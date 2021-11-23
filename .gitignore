@@ -1,0 +1,10 @@
+# notebook, don't commit in jupyter format. too messy
+.ipynb_checkpoints
+*.ipynb
+
+# Data files
+*.csv
+*.gz
+*.pkl
+
+cache/*
