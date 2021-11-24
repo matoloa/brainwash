@@ -6,5 +6,6 @@
 *.csv
 *.gz
 *.pkl
+*.atf
 
 cache/*
