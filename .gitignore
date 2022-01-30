@@ -7,5 +7,9 @@
 *.gz
 *.pkl
 *.atf
+*.abf
+*.ibw
 
 cache/*
+
+
