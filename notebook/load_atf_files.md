@@ -268,17 +268,27 @@ df1stackjoin['volt_normalized'] = df1stackjoin.volt - df1stackjoin.volt_start
 ```
 
 ```python
+dfmean = df1stackjoin.groupby('time').volt_normalized.std()
+```
+
+```python
 # find mean of all measurements
 dfmean = df1stackjoin.groupby('time').volt_normalized.mean() # gives a series with the mean values
 dfmean = pd.DataFrame(dfmean) # need a dataframe for plotting, i think
-dfmean
+dfstd = df1stackjoin.groupby('time').volt_normalized.std()
+dfstd = pd.DataFrame(dfstd) # need a dataframe for plotting, i think
+dfstd
 ```
 
 ```python
 # visualise all measurement point and overlay the calculated mean
+# downsample before or after analysis and vis?
 fig, ax = plt.subplots(ncols=1, figsize=(20, 10))
 g = sns.scatterplot(data=df1stackjoin, y='volt_normalized', x= 'time', color='y', ax=ax)
+g = sns.lineplot(data=dfmean+dfstd, y='volt_normalized', x= 'time', color='tab:orange', ax=ax)
+g = sns.lineplot(data=dfmean-dfstd, y='volt_normalized', x= 'time', color='tab:orange', ax=ax)
 g = sns.lineplot(data=dfmean, y='volt_normalized', x= 'time', ax=ax)
+
 ax.set_ylim(-1, 0.2)
 ```
 
