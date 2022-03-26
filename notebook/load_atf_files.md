@@ -284,7 +284,7 @@ dfstd
 # visualise all measurement point and overlay the calculated mean
 # downsample before or after analysis and vis?
 fig, ax = plt.subplots(ncols=1, figsize=(20, 10))
-g = sns.scatterplot(data=df1stackjoin, y='volt_normalized', x= 'time', color='y', ax=ax)
+g = sns.scatterplot(data=df1stackjoin, y='volt_normalized', x= 'time', color='y', ax=ax, s=50, alpha=0.02)
 g = sns.lineplot(data=dfmean+dfstd, y='volt_normalized', x= 'time', color='tab:orange', ax=ax)
 g = sns.lineplot(data=dfmean-dfstd, y='volt_normalized', x= 'time', color='tab:orange', ax=ax)
 g = sns.lineplot(data=dfmean, y='volt_normalized', x= 'time', ax=ax)
