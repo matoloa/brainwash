@@ -14,6 +14,10 @@ jupyter:
 ---
 
 ```python
+
+```
+
+```python
 import numpy as np              # numeric calculations module
 import pandas as pd             # dataframe module, think excel, but good
 import os                       # speak to OS (list dirs)
@@ -177,7 +181,7 @@ dfatf
 
 ```python
 # make smaller development dataframe, faster prototyping
-df1 = dfatf.iloc[:100, :]
+df1 = dfatf.iloc[:2000, :]
 df1
 ```
 
@@ -284,12 +288,134 @@ dfstd
 # visualise all measurement point and overlay the calculated mean
 # downsample before or after analysis and vis?
 fig, ax = plt.subplots(ncols=1, figsize=(20, 10))
-g = sns.scatterplot(data=df1stackjoin, y='volt_normalized', x= 'time', color='y', ax=ax, s=50, alpha=0.02)
-g = sns.lineplot(data=dfmean+dfstd, y='volt_normalized', x= 'time', color='tab:orange', ax=ax)
-g = sns.lineplot(data=dfmean-dfstd, y='volt_normalized', x= 'time', color='tab:orange', ax=ax)
-g = sns.lineplot(data=dfmean, y='volt_normalized', x= 'time', ax=ax)
+g = sns.scatterplot(data=df1stackjoin, y='volt_normalized', x='time', color='y', ax=ax, s=50, alpha=0.02)
+g = sns.lineplot(data=dfmean+dfstd, y='volt_normalized', x='time', color='tab:orange', ax=ax)
+g = sns.lineplot(data=dfmean-dfstd, y='volt_normalized', x='time', color='tab:orange', ax=ax)
+g = sns.lineplot(data=dfmean, y='volt_normalized', x='time', ax=ax)
+g.axhline(0, linestyle='dotted')
 
-ax.set_ylim(-1, 0.2)
+
+ax.set_ylim(-1.8, 0.2)
+```
+
+```python
+dfmeandiff = dfmean.diff().rolling(4, center=True).mean()
+dfmean2diff = dfmeandiff.diff()
+dfmean3diff = dfmean2diff.diff()
+
+
+fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
+g = sns.lineplot(data=dfmean, y='volt_normalized', x='time', ax=ax1, color='black')
+h = sns.lineplot(data=dfmeandiff*5, y='volt_normalized', x='time', ax=ax1, color='red')
+i = sns.lineplot(data=dfmean2diff*15, y='volt_normalized', x='time', ax=ax1, color='green')
+j = sns.lineplot(data=dfmean3diff.rolling(8, center=True).mean()*50, y='volt_normalized', x='time', ax=ax1, color='blue')
+h.axhline(0, linestyle='dotted')
+ax1.set_ylim(-1.2, 0.5)
+ax1.set_xlim(50, 300)
+```
+
+```python
+dfmeandiff.rolling(8).mean()
+```
+
+```python
+# find Excitatorisk PostSynaptisk Potential (EPSP)
+# as close to Volley EPSP Bump, but not with the rounding
+# assume that EPSP is the biggest bump
+
+fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
+g = sns.lineplot(data=dfmean, y='volt_normalized', x='time', ax=ax1, color='black')
+
+```
+
+```python
+param_minimum_width_of_EPSP = 50
+scipy.signal.find_peaks(-dfmean.volt_normalized, width=param_minimum_width_of_EPSP, prominence=1)
+```
+
+```python
+param_minimum_width_of_EPSP = 50
+time_coord_of_EPSP = scipy.signal.find_peaks(-dfmean.volt_normalized, width=param_minimum_width_of_EPSP, prominence=1)[0][0]
+```
+
+```python
+param_minimum_width_of_VEB = 5
+peaks = scipy.signal.find_peaks(dfmean.volt_normalized, width=param_minimum_width_of_VEB)[0]
+max_acceptable_coord_for_VEB = time_coord_of_EPSP - param_minimum_width_of_EPSP / 2
+possible_VEB_coord = max(peaks[peaks < max_acceptable_coord_for_VEB])
+possible_VEB_coord
+```
+
+```python
+# find 0 crossing of 2nd derivative to find straightest slope at beginning of EPSP event
+dftemp = dfmean[possible_VEB_coord: time_coord_of_EPSP]
+# pick the first one that gets positive sign in 2nd derivative
+coord_to_look_for_EPSP_slope = dftemp[dftemp.volt_normalized.diff().diff().apply(np.sign)==1].iloc[0].name
+coord_to_look_for_EPSP_slope
+param_half_slope_width = 4
+dfplot_EPSP_slope = dfmean[coord_to_look_for_EPSP_slope - param_half_slope_width: 
+                           coord_to_look_for_EPSP_slope + param_half_slope_width]
+dfplot_EPSP_slope
+```
+
+```python
+# get linear regression
+from sklearn import linear_model
+reg = linear_model.LinearRegression()
+reg2 = linear_model.LinearRegression()
+
+x = dfplot_EPSP_slope.index.values.reshape(-1, 1)
+y = dfplot_EPSP_slope.values.reshape(-1, 1)
+
+reg.fit(x, y)
+reg2.fit(x[2:-3],y[2:-3])
+
+reg.coef_, reg.intercept_
+yslope = x * reg.coef_ + reg.intercept_
+dffitslope = pd.DataFrame({'x': x.flatten(), 'yslope': yslope.flatten()})
+dffitslope
+```
+
+```python
+reg.coef_, reg.intercept_, reg2.coef_, reg2.intercept_
+
+
+```
+
+```python
+y = [i[0] for i in dfmean.loc[[time_coord_of_EPSP, possible_VEB_coord]].values]
+dictplot = {'x': [time_coord_of_EPSP, possible_VEB_coord], 'y': y}
+dfplot = pd.DataFrame(dictplot)
+fig, ax = plt.subplots(ncols=1, figsize=(20, 10))
+g = sns.lineplot(data=dfmean, y='volt_normalized', x='time', ax=ax, color='black')
+h = sns.scatterplot(data=dfplot, x='x', y='y')
+i = sns.lineplot(data=dfplot_EPSP_slope, y='volt_normalized', x='time', ax=ax, color='red')
+j  = sns.lineplot(data=dffitslope, y='yslope', x='x', ax=ax, color='blue')
+
+
+ax.set_xlim(90, 110)
+ax.set_ylim(-1, 0)
+
+# LEFT OFF HERE.
+# Found VEB by running peakfinder on first diff by moving left from EPSP valley
+# Then using 2nd first 0 crossing from left, find EPSP slope area.
+# linear regression to get EPSP slope
+```
+
+```python
+
+```
+
+```python
+dfmean.values[possible_VEB_coord: time_coord_of_EPSP]
+```
+
+```python
+
+```
+
+```python
+
 ```
 
 ```python
