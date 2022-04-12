@@ -25,7 +25,9 @@ import matplotlib.pyplot as plt # plotting
 import seaborn as sns           # plotting
 import pyabf                    # read data files atf, abf
 from neo import io              # read data files ibw
-import scipy                    # peanfinder and other useful analysis tools
+import scipy                    # peakfinder and other useful analysis tools
+from tqdm.notebook import tqdm
+
 ```
 
 # Roadmap
@@ -33,6 +35,11 @@ import scipy                    # peanfinder and other useful analysis tools
 * load data into DataFrame structure
 * normalize sweeps
 * find important metadata from raw data
+
+* identify and measure VEB, EPSP
+* remove noise
+* find volley
+
 
 ```python
 # set some working folders
@@ -155,7 +162,7 @@ def collectMetadataAtf(file):
 
 
 
-file_atf = dir_source_data + '/LTP induction-20211124T114212Z-001/LTP induction/tg/' + '042ca.atf'
+file_atf = dir_source_data + '/WT_062.atf'
 file_abf = dir_source_data + '/02GKO/1a IO SR/' + '2022_01_24_0002.abf'
 file_ibw = dir_source_data + '/C02-20190706D3/' + '161117_slice_0_input1_001.ibw'
 out1 = collectMetadataAtf(file_atf)
@@ -330,20 +337,27 @@ g = sns.lineplot(data=dfmean, y='volt_normalized', x='time', ax=ax1, color='blac
 
 ```python
 param_minimum_width_of_EPSP = 50
-scipy.signal.find_peaks(-dfmean.volt_normalized, width=param_minimum_width_of_EPSP, prominence=1)
+param_prominence = .5
+scipy.signal.find_peaks(-dfmean.volt_normalized, width=param_minimum_width_of_EPSP, prominence=param_prominence)
 ```
 
 ```python
 param_minimum_width_of_EPSP = 50
-time_coord_of_EPSP = scipy.signal.find_peaks(-dfmean.volt_normalized, width=param_minimum_width_of_EPSP, prominence=1)[0][0]
+param_prominence = .5
+time_coord_of_EPSP = scipy.signal.find_peaks(-dfmean.volt_normalized, width=param_minimum_width_of_EPSP, prominence=param_prominence)[0][0]
+time_coord_of_EPSP
 ```
 
 ```python
 param_minimum_width_of_VEB = 5
-peaks = scipy.signal.find_peaks(dfmean.volt_normalized, width=param_minimum_width_of_VEB)[0]
+peaks = scipy.signal.find_peaks(dfmeandiff.volt_normalized, width=param_minimum_width_of_VEB)[0]
 max_acceptable_coord_for_VEB = time_coord_of_EPSP - param_minimum_width_of_EPSP / 2
 possible_VEB_coord = max(peaks[peaks < max_acceptable_coord_for_VEB])
 possible_VEB_coord
+```
+
+```python
+peaks
 ```
 
 ```python
@@ -351,10 +365,11 @@ possible_VEB_coord
 dftemp = dfmean[possible_VEB_coord: time_coord_of_EPSP]
 # pick the first one that gets positive sign in 2nd derivative
 coord_to_look_for_EPSP_slope = dftemp[dftemp.volt_normalized.diff().diff().apply(np.sign)==1].iloc[0].name
-coord_to_look_for_EPSP_slope
 param_half_slope_width = 4
-dfplot_EPSP_slope = dfmean[coord_to_look_for_EPSP_slope - param_half_slope_width: 
-                           coord_to_look_for_EPSP_slope + param_half_slope_width]
+coord_EPSP_slope = {'begin': coord_to_look_for_EPSP_slope - param_half_slope_width,
+                    'end': coord_to_look_for_EPSP_slope + param_half_slope_width}
+
+dfplot_EPSP_slope = dfmean.loc[coord_EPSP_slope['begin']: coord_EPSP_slope['end']]
 dfplot_EPSP_slope
 ```
 
@@ -393,30 +408,79 @@ i = sns.lineplot(data=dfplot_EPSP_slope, y='volt_normalized', x='time', ax=ax, c
 j  = sns.lineplot(data=dffitslope, y='yslope', x='x', ax=ax, color='blue')
 
 
-ax.set_xlim(90, 110)
-ax.set_ylim(-1, 0)
+ax.set_xlim(possible_VEB_coord - 30, time_coord_of_EPSP + 30)
+ax.set_ylim(-1, .5)
 
 # LEFT OFF HERE.
 # Found VEB by running peakfinder on first diff by moving left from EPSP valley
-# Then using 2nd first 0 crossing from left, find EPSP slope area.
+# Then using 2nd derivative (diff) first 0 crossing from left, find EPSP slope area.
 # linear regression to get EPSP slope
 ```
 
 ```python
+coord_EPSP_slope
+```
+
+# Roadmap
+* Found EPSP slope time coord
+* Assume similar for all sweeps
+* Calculate slope for all sweeps
+* plot
+
+```python
+from sklearn.linear_model import HuberRegressor
+huber = HuberRegressor()
+```
+
+```python
+dicts = []
+for sweep in tqdm(df1stack.sweep.unique()):
+    dftemp1 = df1stack[df1stack.sweep == sweep]
+    dftemp2 = dftemp1[(coord_EPSP_slope['begin'] <= dftemp1.time) & (dftemp1.time <= coord_EPSP_slope['end'])]
+    
+    x = dftemp2.time.values.reshape(-1, 1)
+    y = dftemp2.volt.values.reshape(-1, 1)
+
+    reg.fit(x, y)
+    dict_slope = {'sweep': sweep, 'slope': reg.coef_[0][0], 'type': 'linear'}
+    dicts.append(dict_slope)
+    
+    huber.epsilon = 1.1
+    huber.fit(x, y.ravel())    
+    dict_slope = {'sweep': sweep, 'slope': huber.coef_[0], 'type': 'huber1'}
+    dicts.append(dict_slope)
+    
+    huber.epsilon = 1.35
+    huber.fit(x, y.ravel())    
+    dict_slope = {'sweep': sweep, 'slope': huber.coef_[0], 'type': 'huber1.35'}
+    dicts.append(dict_slope)
+    
+    huber.epsilon = 1.7
+    huber.fit(x, y.ravel())    
+    dict_slope = {'sweep': sweep, 'slope': huber.coef_[0], 'type': 'huber1.7'}
+    dicts.append(dict_slope)
+
+
+df_slopes = pd.DataFrame(dicts)
+```
+
+```python
+fig, ax = plt.subplots(ncols=1, figsize=(20, 10))
+sns.scatterplot(data=df_slopes, x='sweep', y='slope', hue='type', ax=ax)
+```
+
+```python
 
 ```
 
 ```python
-dfmean.values[possible_VEB_coord: time_coord_of_EPSP]
-```
-
-```python
 
 ```
 
-```python
+# wishlist
+* stabilise slope
+* remove noise
 
-```
 
 ```python
 
