@@ -24,6 +24,8 @@ from neo import io              # read data files ibw
 import scipy                    # peakfinder and other useful analysis tools
 from tqdm.notebook import tqdm
 from pathlib import Path
+from sklearn import linear_model
+from sklearn.linear_model import HuberRegressor
 
 ```
 
@@ -430,12 +432,13 @@ slope_t_EPSP
 * plot
 
 ```python
-from sklearn.linear_model import HuberRegressor
-huber = HuberRegressor()
+
 ```
 
 ```python
 # for all sweeps loop and find the sloop, store in dict and make df for plotting
+reg = linear_model.LinearRegression()
+#huber = HuberRegressor()
 dicts = []
 for sweep in tqdm(df1stack.sweep.unique()):
     dftemp1 = df1stack[df1stack.sweep == sweep]
@@ -528,7 +531,6 @@ dfplot_Volley_slope
 
 ```python
 # get linear regression
-from sklearn import linear_model
 reg = linear_model.LinearRegression()
 
 x = dfplot_Volley_slope.index.values.reshape(-1, 1)
@@ -568,6 +570,7 @@ ax.set_ylim(-1, .5)
 
 ```python
 # for all sweeps loop and find the sloop, store in dict and make df for plotting
+reg = linear_model.LinearRegression()
 dicts = []
 for sweep in tqdm(df1stack.sweep.unique()):
     dftemp1 = df1stack[df1stack.sweep == sweep]
