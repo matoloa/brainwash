@@ -9,6 +9,7 @@
 *.atf
 *.abf
 *.ibw
+*.zip
 
 cache/*
 
