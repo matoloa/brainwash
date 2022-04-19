@@ -14,10 +14,6 @@ jupyter:
 ---
 
 ```python
-
-```
-
-```python
 import numpy as np              # numeric calculations module
 import pandas as pd             # dataframe module, think excel, but good
 import os                       # speak to OS (list dirs)
@@ -27,6 +23,7 @@ import pyabf                    # read data files atf, abf
 from neo import io              # read data files ibw
 import scipy                    # peakfinder and other useful analysis tools
 from tqdm.notebook import tqdm
+from pathlib import Path
 
 ```
 
@@ -43,8 +40,9 @@ from tqdm.notebook import tqdm
 
 ```python
 # set some working folders
-dir_project_root = os.getcwd().split('notebook')[0]
-dir_source_data = dir_project_root + 'dataSource'
+dir_project_root = Path(os.getcwd().split('notebook')[0])
+dir_source_data = dir_project_root / 'dataSource'
+dir_source_data
 ```
 
 ```python
@@ -52,11 +50,11 @@ dir_source_data = dir_project_root + 'dataSource'
 ```
 
 ```python
-os.listdir(dir_source_data + '/LTP induction-20211124T114212Z-001/LTP induction/tg')
+os.listdir(dir_source_data / 'LTP induction-20211124T114212Z-001/LTP induction/tg')
 ```
 
 ```python
-atf = pyabf.ATF(dir_source_data + '/LTP induction-20211124T114212Z-001/LTP induction/tg/' + '042ca.atf')
+atf = pyabf.ATF(dir_source_data / 'LTP induction-20211124T114212Z-001/LTP induction/tg/' / '042ca.atf')
 
 ```
 
@@ -90,7 +88,7 @@ df_sweep
 
 ```python
 # parse abf
-abf = pyabf.ABF(dir_source_data + '/02GKO/1a IO SR/' + '2022_01_24_0002.abf')
+abf = pyabf.ABF(dir_source_data / '02GKO/1a IO SR/' / '2022_01_24_0002.abf')
 ```
 
 ```python
@@ -112,7 +110,7 @@ plt.show()
 ```
 
 ```python
-ibw = io.IgorIO(dir_source_data + '/C02-20190706D3/' + '161117_slice_0_input1_001.ibw')
+ibw = io.IgorIO(dir_source_data / 'C02-20190706D3' / '161117_slice_0_input1_001.ibw')
 
 ```
 
@@ -162,9 +160,9 @@ def collectMetadataAtf(file):
 
 
 
-file_atf = dir_source_data + '/WT_062.atf'
-file_abf = dir_source_data + '/02GKO/1a IO SR/' + '2022_01_24_0002.abf'
-file_ibw = dir_source_data + '/C02-20190706D3/' + '161117_slice_0_input1_001.ibw'
+file_atf = dir_source_data / 'WT_062.atf'
+file_abf = dir_source_data / '02GKO/1a IO SR' / '2022_01_24_0002.abf'
+file_ibw = dir_source_data / 'C02-20190706D3' / '161117_slice_0_input1_001.ibw'
 out1 = collectMetadataAtf(file_atf)
 out2 = collectMetadataAbf(file_abf)
 ```
@@ -398,6 +396,10 @@ reg.coef_, reg.intercept_, reg2.coef_, reg2.intercept_
 ```
 
 ```python
+
+```
+
+```python
 y = [i[0] for i in dfmean.loc[[t_EPSP, t_VEB]].values]
 dictplot = {'x': [t_EPSP, possible_t_VEB], 'y': y}
 dfplot = pd.DataFrame(dictplot)
@@ -405,7 +407,7 @@ fig, ax = plt.subplots(ncols=1, figsize=(20, 10))
 g = sns.lineplot(data=dfmean, y='volt_normalized', x='time', ax=ax, color='black')
 h = sns.scatterplot(data=dfplot, x='x', y='y')
 i = sns.lineplot(data=dfplot_EPSP_slope, y='volt_normalized', x='time', ax=ax, color='red')
-j  = sns.lineplot(data=dffitslope, y='yslope', x='x', ax=ax, color='blue')
+j  = sns.lineplot(data=dffit_EPSP_slope, y='yslope', x='x', ax=ax, color='blue')
 
 
 ax.set_xlim(possible_t_VEB - 30, t_EPSP + 30)
@@ -599,15 +601,7 @@ g.axhline(-0.016, linestyle='dotted')
 ```
 
 ```python
-
-```
-
-```python
 df_slopes_Volley.mean()
-```
-
-```python
-
 ```
 
 # wishlist
