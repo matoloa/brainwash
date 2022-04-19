@@ -306,7 +306,7 @@ ax.set_ylim(-1.8, 0.2)
 ```
 
 ```python
-dfmeandiff = dfmean.diff().rolling(4, center=True).mean()
+dfmeandiff = dfmean.diff().rolling(3, center=True).mean()
 dfmean2diff = dfmeandiff.diff()
 dfmean3diff = dfmean2diff.diff()
 
@@ -344,16 +344,16 @@ scipy.signal.find_peaks(-dfmean.volt_normalized, width=param_minimum_width_of_EP
 ```python
 param_minimum_width_of_EPSP = 50
 param_prominence = .5
-time_coord_of_EPSP = scipy.signal.find_peaks(-dfmean.volt_normalized, width=param_minimum_width_of_EPSP, prominence=param_prominence)[0][0]
-time_coord_of_EPSP
+t_EPSP = scipy.signal.find_peaks(-dfmean.volt_normalized, width=param_minimum_width_of_EPSP, prominence=param_prominence)[0][0]
+t_EPSP
 ```
 
 ```python
 param_minimum_width_of_VEB = 5
 peaks = scipy.signal.find_peaks(dfmeandiff.volt_normalized, width=param_minimum_width_of_VEB)[0]
-max_acceptable_coord_for_VEB = time_coord_of_EPSP - param_minimum_width_of_EPSP / 2
-possible_VEB_coord = max(peaks[peaks < max_acceptable_coord_for_VEB])
-possible_VEB_coord
+max_acceptable_t_for_VEB = t_EPSP - param_minimum_width_of_EPSP / 2
+possible_t_VEB = max(peaks[peaks < max_acceptable_t_for_VEB])
+t_VEB = possible_t_VEB # setting as accepted now, maybe have verification function later
 ```
 
 ```python
@@ -362,14 +362,14 @@ peaks
 
 ```python
 # find 0 crossing of 2nd derivative to find straightest slope at beginning of EPSP event
-dftemp = dfmean[possible_VEB_coord: time_coord_of_EPSP]
+dftemp = dfmean[t_VEB: t_EPSP]
 # pick the first one that gets positive sign in 2nd derivative
-coord_to_look_for_EPSP_slope = dftemp[dftemp.volt_normalized.diff().diff().apply(np.sign)==1].iloc[0].name
+t_to_look_for_EPSP_slope = dftemp[dftemp.volt_normalized.diff().diff().apply(np.sign)==1].iloc[0].name
 param_half_slope_width = 4
-coord_EPSP_slope = {'begin': coord_to_look_for_EPSP_slope - param_half_slope_width,
-                    'end': coord_to_look_for_EPSP_slope + param_half_slope_width}
-
-dfplot_EPSP_slope = dfmean.loc[coord_EPSP_slope['begin']: coord_EPSP_slope['end']]
+slope_t_EPSP = {'begin': t_to_look_for_EPSP_slope - param_half_slope_width,
+                    'end': t_to_look_for_EPSP_slope + param_half_slope_width}
+#TODO: this interval is not symmetric as param half width incorrectly implies, correct.
+dfplot_EPSP_slope = dfmean.loc[slope_t_EPSP['begin']: slope_t_EPSP['end']]
 dfplot_EPSP_slope
 ```
 
@@ -383,12 +383,12 @@ x = dfplot_EPSP_slope.index.values.reshape(-1, 1)
 y = dfplot_EPSP_slope.values.reshape(-1, 1)
 
 reg.fit(x, y)
-reg2.fit(x[2:-3],y[2:-3])
+reg2.fit(x[2:-3],y[2:-3]) # only using a shorter span to see how much it affects the slope
 
 reg.coef_, reg.intercept_
 yslope = x * reg.coef_ + reg.intercept_
-dffitslope = pd.DataFrame({'x': x.flatten(), 'yslope': yslope.flatten()})
-dffitslope
+dffit_EPSP_slope = pd.DataFrame({'x': x.flatten(), 'yslope': yslope.flatten()})
+dffit_EPSP_slope
 ```
 
 ```python
@@ -398,8 +398,8 @@ reg.coef_, reg.intercept_, reg2.coef_, reg2.intercept_
 ```
 
 ```python
-y = [i[0] for i in dfmean.loc[[time_coord_of_EPSP, possible_VEB_coord]].values]
-dictplot = {'x': [time_coord_of_EPSP, possible_VEB_coord], 'y': y}
+y = [i[0] for i in dfmean.loc[[t_EPSP, t_VEB]].values]
+dictplot = {'x': [t_EPSP, possible_t_VEB], 'y': y}
 dfplot = pd.DataFrame(dictplot)
 fig, ax = plt.subplots(ncols=1, figsize=(20, 10))
 g = sns.lineplot(data=dfmean, y='volt_normalized', x='time', ax=ax, color='black')
@@ -408,7 +408,7 @@ i = sns.lineplot(data=dfplot_EPSP_slope, y='volt_normalized', x='time', ax=ax, c
 j  = sns.lineplot(data=dffitslope, y='yslope', x='x', ax=ax, color='blue')
 
 
-ax.set_xlim(possible_VEB_coord - 30, time_coord_of_EPSP + 30)
+ax.set_xlim(possible_t_VEB - 30, t_EPSP + 30)
 ax.set_ylim(-1, .5)
 
 # LEFT OFF HERE.
@@ -418,7 +418,7 @@ ax.set_ylim(-1, .5)
 ```
 
 ```python
-coord_EPSP_slope
+slope_t_EPSP
 ```
 
 # Roadmap
@@ -433,10 +433,11 @@ huber = HuberRegressor()
 ```
 
 ```python
+# for all sweeps loop and find the sloop, store in dict and make df for plotting
 dicts = []
 for sweep in tqdm(df1stack.sweep.unique()):
     dftemp1 = df1stack[df1stack.sweep == sweep]
-    dftemp2 = dftemp1[(coord_EPSP_slope['begin'] <= dftemp1.time) & (dftemp1.time <= coord_EPSP_slope['end'])]
+    dftemp2 = dftemp1[(slope_t_EPSP['begin'] <= dftemp1.time) & (dftemp1.time <= slope_t_EPSP['end'])]
     
     x = dftemp2.time.values.reshape(-1, 1)
     y = dftemp2.volt.values.reshape(-1, 1)
@@ -445,28 +446,28 @@ for sweep in tqdm(df1stack.sweep.unique()):
     dict_slope = {'sweep': sweep, 'slope': reg.coef_[0][0], 'type': 'linear'}
     dicts.append(dict_slope)
     
-    huber.epsilon = 1.1
-    huber.fit(x, y.ravel())    
-    dict_slope = {'sweep': sweep, 'slope': huber.coef_[0], 'type': 'huber1'}
-    dicts.append(dict_slope)
-    
-    huber.epsilon = 1.35
-    huber.fit(x, y.ravel())    
-    dict_slope = {'sweep': sweep, 'slope': huber.coef_[0], 'type': 'huber1.35'}
-    dicts.append(dict_slope)
-    
-    huber.epsilon = 1.7
-    huber.fit(x, y.ravel())    
-    dict_slope = {'sweep': sweep, 'slope': huber.coef_[0], 'type': 'huber1.7'}
-    dicts.append(dict_slope)
+#    huber.epsilon = 1.1
+#    huber.fit(x, y.ravel())    
+#    dict_slope = {'sweep': sweep, 'slope': huber.coef_[0], 'type': 'huber1'}
+#    dicts.append(dict_slope)
+#    
+#    huber.epsilon = 1.35
+#    huber.fit(x, y.ravel())    
+#    dict_slope = {'sweep': sweep, 'slope': huber.coef_[0], 'type': 'huber1.35'}
+#    dicts.append(dict_slope)
+#    
+#    huber.epsilon = 1.7
+#    huber.fit(x, y.ravel())    
+#    dict_slope = {'sweep': sweep, 'slope': huber.coef_[0], 'type': 'huber1.7'}
+#    dicts.append(dict_slope)
 
 
-df_slopes = pd.DataFrame(dicts)
+df_slopes_EPSP = pd.DataFrame(dicts)
 ```
 
 ```python
 fig, ax = plt.subplots(ncols=1, figsize=(20, 10))
-sns.scatterplot(data=df_slopes, x='sweep', y='slope', hue='type', ax=ax)
+sns.scatterplot(data=df_slopes_EPSP, x='sweep', y='slope', hue='type', ax=ax)
 ```
 
 ```python
@@ -481,6 +482,137 @@ sns.scatterplot(data=df_slopes, x='sweep', y='slope', hue='type', ax=ax)
 * stabilise slope
 * remove noise
 
+
+
+# roadmap
+* find and calculate volley
+* requirement, VEB is present and found
+
+```python
+dfmean
+```
+
+```python
+# extra plot to guide visual
+
+fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
+g = sns.lineplot(data=dfmean, y='volt_normalized', x='time', ax=ax1, color='black')
+h = sns.lineplot(data=dfmeandiff*5, y='volt_normalized', x='time', ax=ax1, color='red')
+i = sns.lineplot(data=dfmean2diff*15, y='volt_normalized', x='time', ax=ax1, color='green')
+j = sns.lineplot(data=dfmean3diff.rolling(8, center=True).mean()*50, y='volt_normalized', x='time', ax=ax1, color='blue')
+h.axhline(0, linestyle='dotted')
+ax1.set_ylim(-.1, 0.1)
+ax1.set_xlim(t_VEB - 20, t_VEB)
+ax1.grid(b=True, which='major', color='black', linewidth=0.075)
+ax1.grid(b=True, which='minor', color='black', linewidth=0.075)
+plt.xticks(list(range(85, 103)))
+
+```
+
+```python
+# use VEB coord
+# find min if 1st derivative in search width before VEB to calculate slope of Volley
+param_search_width_volley = 10
+dftemp = dfmean[t_VEB - param_search_width_volley: t_VEB]
+# find min if 1st derivative
+t_to_look_for_slope_Volley = dftemp.iloc[dftemp.volt_normalized.diff().argmin()].name
+param_slope_half_width = 2
+slope_t_Volley = {'begin': t_to_look_for_slope_Volley - param_slope_half_width,
+                    'end': t_to_look_for_slope_Volley + param_slope_half_width}
+
+dfplot_Volley_slope = dfmean.loc[slope_t_Volley['begin']: slope_t_Volley['end']]
+dfplot_Volley_slope
+```
+
+```python
+# get linear regression
+from sklearn import linear_model
+reg = linear_model.LinearRegression()
+
+x = dfplot_Volley_slope.index.values.reshape(-1, 1)
+y = dfplot_Volley_slope.values.reshape(-1, 1)
+
+reg.fit(x, y)
+
+reg.coef_, reg.intercept_
+yslope = x * reg.coef_ + reg.intercept_
+dffit_Volley_slope = pd.DataFrame({'x': x.flatten(), 'yslope': yslope.flatten()})
+dffit_Volley_slope
+```
+
+```python
+reg.coef_, reg.intercept_
+
+```
+
+```python
+y = [i[0] for i in dfmean.loc[[t_EPSP, t_VEB]].values]
+dictplot = {'x': [t_EPSP, possible_t_VEB], 'y': y}
+dfplot = pd.DataFrame(dictplot)
+fig, ax = plt.subplots(ncols=1, figsize=(20, 10))
+g = sns.lineplot(data=dfmean, y='volt_normalized', x='time', ax=ax, color='black')
+h = sns.scatterplot(data=dfplot, x='x', y='y')
+i = sns.lineplot(data=dfplot_EPSP_slope, y='volt_normalized', x='time', ax=ax, color='red')
+j  = sns.lineplot(data=dffit_EPSP_slope, y='yslope', x='x', ax=ax, color='blue')
+k = sns.lineplot(data=dfplot_Volley_slope, y='volt_normalized', x='time', ax=ax, color='red')
+l  = sns.lineplot(data=dffit_Volley_slope, y='yslope', x='x', ax=ax, color='blue')
+
+
+
+ax.set_xlim(possible_t_VEB - 30, t_EPSP + 30)
+ax.set_ylim(-1, .5)
+
+```
+
+```python
+# for all sweeps loop and find the sloop, store in dict and make df for plotting
+dicts = []
+for sweep in tqdm(df1stack.sweep.unique()):
+    dftemp1 = df1stack[df1stack.sweep == sweep]
+    dftemp2 = dftemp1[(slope_t_Volley['begin'] <= dftemp1.time) & (dftemp1.time <= slope_t_Volley['end'])]
+    
+    x = dftemp2.time.values.reshape(-1, 1)
+    y = dftemp2.volt.values.reshape(-1, 1)
+
+    reg.fit(x, y)
+    dict_slope = {'sweep': sweep, 'slope': reg.coef_[0][0], 'type': 'linear'}
+    dicts.append(dict_slope)
+    
+
+df_slopes_Volley = pd.DataFrame(dicts)
+```
+
+```python
+df_df_slopes_Volley_roll = df_slopes_Volley.copy()
+df_df_slopes_Volley_roll['slope'] = df_df_slopes_Volley_roll.slope.rolling(10, center=True, win_type='gaussian').mean(std=10)
+df_df_slopes_Volley_roll['type'] = 'Volley'
+df_slopes_EPSP['type'] = 'EPSP'
+df_slopes_EPSP
+dfplot = pd.concat([df_df_slopes_Volley_roll, df_slopes_EPSP])
+
+
+
+fig, ax = plt.subplots(ncols=1, figsize=(20, 10))
+g = sns.scatterplot(data=dfplot, x='sweep', y='slope', hue='type', ax=ax)
+g.axhline(-0.016, linestyle='dotted')
+
+```
+
+```python
+
+```
+
+```python
+df_slopes_Volley.mean()
+```
+
+```python
+
+```
+
+# wishlist
+* volley test, is volley same through whole experiment
+* possible solutions check if windowed distributions are the same at being / end
 
 ```python
 
