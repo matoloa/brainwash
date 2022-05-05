@@ -202,8 +202,9 @@ df1stack
 
 ```python
 # quick vis to know what we have
-fig, ax = plt.subplots(ncols=1, figsize=(10, 10)) # define the figure and axis we plot in
-g = sns.lineplot(data=df1stack, y='volt', x= 'time', hue='sweep', ax=ax) # create the plot in that axis
+
+#fig, ax = plt.subplots(ncols=1, figsize=(10, 10)) # define the figure and axis we plot in
+#g = sns.lineplot(data=df1stack, y='volt', x= 'time', hue='sweep', ax=ax) # create the plot in that axis
 ```
 
 ```python
@@ -589,7 +590,7 @@ df_slopes_Volley = pd.DataFrame(dicts)
 
 ```python
 df_df_slopes_Volley_roll = df_slopes_Volley.copy()
-df_df_slopes_Volley_roll['slope'] = df_df_slopes_Volley_roll.slope.rolling(10, center=True, win_type='gaussian').mean(std=10)
+df_df_slopes_Volley_roll['slope'] = df_df_slopes_Volley_roll.slope.rolling(3, center=True).mean()
 df_df_slopes_Volley_roll['type'] = 'Volley'
 df_slopes_EPSP['type'] = 'EPSP'
 df_slopes_EPSP
@@ -610,6 +611,12 @@ df_slopes_Volley.mean()
 # wishlist
 * volley test, is volley same through whole experiment
 * possible solutions check if windowed distributions are the same at being / end
+
+```python
+df_df_slopes_EPSP_roll = df_slopes_EPSP.copy()
+df_df_slopes_EPSP_roll['slope'] = df_df_slopes_EPSP_roll.slope.rolling(10, center=True, win_type='gaussian').mean(std=10)
+df_df_slopes_EPSP_roll.slope.plot()
+```
 
 ```python
 
