@@ -237,7 +237,7 @@ autodetect stim artefact
 ```
 
 ```python
-# peadnfinder experiments
+# peakfinder experiments
 df = df1stack[df1stack.sweep==0]
 index = scipy.signal.find_peaks(df.volt, height=2)
 dfvolt = df.iloc[index[0]]
@@ -299,11 +299,15 @@ fig, ax = plt.subplots(ncols=1, figsize=(20, 10))
 g = sns.scatterplot(data=df1stackjoin, y='volt_normalized', x='time', color='y', ax=ax, s=50, alpha=0.02)
 g = sns.lineplot(data=dfmean+dfstd, y='volt_normalized', x='time', color='tab:orange', ax=ax)
 g = sns.lineplot(data=dfmean-dfstd, y='volt_normalized', x='time', color='tab:orange', ax=ax)
-g = sns.lineplot(data=dfmean, y='volt_normalized', x='time', ax=ax)
+g = sns.lineplot(data=dfmean, y='volt_normalized', x='time', color='tab:blue', ax=ax)
 g.axhline(0, linestyle='dotted')
 
 
 ax.set_ylim(-1.8, 0.2)
+```
+
+```python
+dfmean
 ```
 
 ```python

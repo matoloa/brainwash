@@ -128,14 +128,135 @@ g = sns.lineplot(data=dftemp, y='sweepY', x= 'sweepX', hue='sweep', ax=ax) # cre
 ```
 
 ```python
-def importFunction(filename, oddeven=None, channel=None):
+def importAbf(filepath, channel=0, oddeven=None):
+    '''
+    import .abf and return <"odd"/"even"/"all"> sweeps from channel <0/1>
+    oddeven defaults to channel-appropriate parameter
+    '''
     
-    # I HAVE CHANGED IT!
+    # parse abf
+    abf = pyabf.ABF(filepath)
     
+    if not channel in abf.channelList:
+        raise ValueError(f"No channel {channel} in {filepath}")
+    if oddeven is None:
+        if channel == 0:
+            oddeven = "odd"
+        else:
+            oddeven = "even"
+
+    sweeps = range(abf.sweepCount)
+
+    dfs = []
+    for i in sweeps:
+        # get data
+        abf.setSweep(sweepNumber=i, channel=channel)
+        df = pd.DataFrame({'sweepX': abf.sweepX, 'sweepY': abf.sweepY})
+        df['sweep'] = i
+        dfs.append(df)
+    df = pd.concat(dfs)
     
+    # Convert to SI
+    df['time(s)'] = df.sweepX # / abf.sampleRate
+    df['voltage(V)'] = df.sweepY / 1000
     
+    df['even'] = df.sweep.apply(lambda x: x % 2 == 0)
+    df['oddeven'] = df.even.apply(lambda x: 'even' if x else 'odd')
+    df = df[df.oddeven == oddeven] # filter rows by Boolean
+    df.drop(columns=['sweepX', 'sweepY', 'even', 'oddeven'], inplace=True)
+    df.reset_index(drop=True, inplace=True)    
     return df
-
-df = importFunction(filename)
-
 ```
+
+```python
+filepath = dir_source_data / folder1 / list_files[0]
+df = importAbf(filepath, channel=1)
+```
+
+```python
+dftemp = df[df.sweep % 10 == 0]
+dftemp.nunique()
+```
+
+```python
+fig, ax = plt.subplots(ncols=1, figsize=(10, 10)) # define the figure and axis we plot in
+g = sns.lineplot(data=dftemp, y='voltage(V)', x= 'time(s)', hue='sweep', ax=ax) # create the plot in that axis
+```
+
+# Functions to find EPSP and volley slopes
+* Import returns df
+
+* build_dfmean returns dfmean with 3 columns
+    1 dfmean (SLOW!)
+    2 dfmeandiff
+    3 dfmean2diff
+
+* FindStim returns t_Stim (time of stim artefact)
+    IN: dfmeandiff
+* Normalize returns normalized dfmean
+    IN: dfmean, t_Stim=0, normpoints=20
+* FindEPSP returns t_EPSP (time of WIDEST negative peak center)
+    IN: dfmean, t_Stim (limit left)
+* FindVEB returns t_VEB (time of notch between Volley and EPSP)
+    IN: dfmeandiff, t_EPSP
+* FindEPSP_slope returns (time of EPSP slope center)
+    IN: t_VEB, t_EPSP? (limit right)
+* FindVolley_slope returns t_Volley_slope (time of Volley slope center)
+    IN: t_VEB, t_Stim
+
+```python
+def build_dfmean(df)
+    '''
+    create columns
+    dfmean (SLOW!)
+    dfmean.prim
+    dfmean.bis    
+    
+    '''
+    df['diff'] = df.volt.diff()
+        
+    return dfmean
+```
+
+```python
+def findStim(dfmeandiff)
+    '''
+    accepts first order derivative of dfmean
+    finds x of max(y): the steepest incline
+    returns t_Stim (time of stim artefact)
+    '''
+    return t_Stim
+```
+
+```python
+def findEPSP(dfmean, limitleft=0)
+    '''
+    accepts dfmean, t_Stim (for limit left)
+    broadest negative peak on dfmean
+    returns t_EPSP (time of WIDEST negative peak center)
+    '''
+    return t_EPSP
+```
+
+```python
+def findVEB(dfmean, t_EPSP, param_minimum_width_of_VEB=5):
+    '''
+    peak of 
+    returns x-value (t) for VEB (Volley-EPSP Bump - notch between volley and EPSP)
+    '''
+    dfmeandiff = dfmean.diff().rolling(3, center=True).mean()
+
+    peaks = scipy.signal.find_peaks(dfmeandiff.volt_normalized, width=param_minimum_width_of_VEB)[0]
+    max_acceptable_t_for_VEB = t_EPSP - param_minimum_width_of_EPSP / 2
+    possible_t_VEB = max(peaks[peaks < max_acceptable_t_for_VEB])
+    t_VEB = possible_t_VEB # setting as accepted now, maybe have verification function later
+    return t_VEB
+```
+
+```python
+abf.sampleRate
+```
+
+# Wishlist
+* Sanity check for time axis; divide by samplerate?
+
