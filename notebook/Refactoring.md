@@ -212,26 +212,31 @@ df
 def build_dfmean(df, rollingwidth=3):
     '''
     create columns
-    dfmean (a single sweep built on the mean of all time(s)) - NORMALIZE
+    dfmean (a single sweep built on the mean of all time(s))
     dfmean.prim
     dfmean.bis    
     
     '''
    
+    # Extract mean of time 0 for rough normalization
+    voltsAtTime = df[['voltage(V)', 'time(s)']].copy() # fresh copy
+    voltsAtTime = voltsAtTime[voltsAtTime['time(s)'] == 0] # keep only 0
+    firstmean = voltsAtTime['voltage(V)'].mean() # mean for 0
+    
     # Placeholder primitive noob-loop
     dicts = []
     for i in df['time(s)'].unique():
-        voltsAtTime = df[['voltage(V)', 'time(s)']].copy()
-        voltsAtTime = voltsAtTime[voltsAtTime['time(s)'] == i]
-        volt = voltsAtTime['voltage(V)'].mean()
+        voltsAtTime = df[['voltage(V)', 'time(s)']].copy() # fresh copy
+        voltsAtTime = voltsAtTime[voltsAtTime['time(s)'] == i] # keep only relevant time
+        volt = voltsAtTime['voltage(V)'].mean() - firstmean # mean for that time
         dicts.append({'time(s)': i, 'meanVolt': volt})
     dfmean = pd.DataFrame(dicts)
     
     # TODO: Normalize mean - demand Stim-artefact location parameter?
         
     # generate diffs
-    dfmean['prim'] = dfmean.meanVolt.diff().rolling(rollingwidth, center=True).mean() *5
-    dfmean['bis'] = dfmean.prim.diff() *15
+    dfmean['prim'] = dfmean.meanVolt.diff().rolling(rollingwidth, center=True).mean() * 5
+    dfmean['bis'] = dfmean.prim.diff().rolling(rollingwidth, center=True).mean() *5
     
     return dfmean
 ```
@@ -250,12 +255,12 @@ g = sns.lineplot(data=dfmean, y='meanVolt', x='time(s)', ax=ax1, color='black')
 h = sns.lineplot(data=dfmean, y='prim', x='time(s)', ax=ax1, color='red')
 i = sns.lineplot(data=dfmean, y='bis', x='time(s)', ax=ax1, color='green')
 h.axhline(0, linestyle='dotted')
-ax1.set_ylim(-0.004, 0.002)
+ax1.set_ylim(-0.001, 0.001)
 ax1.set_xlim(0.0050, 0.02)
 ```
 
 ```python
-def findStim(dfmeandiff):
+def findStim(dfmean):
     '''
     accepts first order derivative of dfmean
     finds x of max(y): the steepest incline
