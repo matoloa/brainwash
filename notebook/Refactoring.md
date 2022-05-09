@@ -65,7 +65,7 @@ abf
 ```
 
 ```python
-abf.setSweep(sweepNumber=239, channel=1)
+abf.setSweep(sweepNumber=239)#, channel=1)
 plt.plot(abf.sweepX, abf.sweepY)
 plt.show()
 ```
@@ -183,6 +183,10 @@ fig, ax = plt.subplots(ncols=1, figsize=(10, 10)) # define the figure and axis w
 g = sns.lineplot(data=dftemp, y='voltage(V)', x= 'time(s)', hue='sweep', ax=ax) # create the plot in that axis
 ```
 
+```python
+df
+```
+
 # Functions to find EPSP and volley slopes
 * Import returns df
 
@@ -205,21 +209,53 @@ g = sns.lineplot(data=dftemp, y='voltage(V)', x= 'time(s)', hue='sweep', ax=ax) 
     IN: t_VEB, t_Stim
 
 ```python
-def build_dfmean(df)
+def build_dfmean(df, rollingwidth=3):
     '''
     create columns
-    dfmean (SLOW!)
+    dfmean (a single sweep built on the mean of all time(s)) - NORMALIZE
     dfmean.prim
     dfmean.bis    
     
     '''
-    df['diff'] = df.volt.diff()
+   
+    # Placeholder primitive noob-loop
+    dicts = []
+    for i in df['time(s)'].unique():
+        voltsAtTime = df[['voltage(V)', 'time(s)']].copy()
+        voltsAtTime = voltsAtTime[voltsAtTime['time(s)'] == i]
+        volt = voltsAtTime['voltage(V)'].mean()
+        dicts.append({'time(s)': i, 'meanVolt': volt})
+    dfmean = pd.DataFrame(dicts)
+    
+    # TODO: Normalize mean - demand Stim-artefact location parameter?
         
+    # generate diffs
+    dfmean['prim'] = dfmean.meanVolt.diff().rolling(rollingwidth, center=True).mean() *5
+    dfmean['bis'] = dfmean.prim.diff() *15
+    
     return dfmean
 ```
 
 ```python
-def findStim(dfmeandiff)
+dfmean = build_dfmean(df)
+```
+
+```python
+dfmean
+```
+
+```python
+fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
+g = sns.lineplot(data=dfmean, y='meanVolt', x='time(s)', ax=ax1, color='black')
+h = sns.lineplot(data=dfmean, y='prim', x='time(s)', ax=ax1, color='red')
+i = sns.lineplot(data=dfmean, y='bis', x='time(s)', ax=ax1, color='green')
+h.axhline(0, linestyle='dotted')
+ax1.set_ylim(-0.004, 0.002)
+ax1.set_xlim(0.0050, 0.02)
+```
+
+```python
+def findStim(dfmeandiff):
     '''
     accepts first order derivative of dfmean
     finds x of max(y): the steepest incline
@@ -255,6 +291,10 @@ def findVEB(dfmean, t_EPSP, param_minimum_width_of_VEB=5):
 
 ```python
 abf.sampleRate
+```
+
+```python
+print(dftemp)
 ```
 
 # Wishlist
