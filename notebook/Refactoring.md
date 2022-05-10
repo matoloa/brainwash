@@ -320,9 +320,10 @@ t_VEB
 
 ```python
 def findEPSPslope(dfmean, t_VEB, t_EPSP):#, param_half_slope_width = 4):
-    dftemp = dfmean.bis[t_VEB: t_EPSP]
+    
     '''
     # Presumably better method that I do not understand:
+    dftemp = dfmean[t_VEB: t_EPSP]
     t_to_look_for_EPSP_slope = dftemp[dftemp.bis.apply(np.sign)==1].iloc[0].name
     slope_t_EPSP = {'begin': t_to_look_for_EPSP_slope - param_half_slope_width,
                         'end': t_to_look_for_EPSP_slope + param_half_slope_width}
@@ -335,6 +336,7 @@ def findEPSPslope(dfmean, t_VEB, t_EPSP):#, param_half_slope_width = 4):
     '''
     
     # Placeholder loop returns index of first positive bis within range, or -1 if none is found 
+    dftemp = dfmean.bis[t_VEB: t_EPSP]
     armed = False # disregard positive values until first negative is encountered.
     for i in dftemp.index:
         if armed:
