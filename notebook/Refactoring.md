@@ -44,7 +44,7 @@ dir_source_data
 ```
 
 ```python
-list_folders = [i for i in os.listdir(dir_source_data) if -1<i.find("LTP_same")]
+list_folders = [i for i in os.listdir(dir_source_data) if -1<i.find("LTP_")]
 list_folders
 ```
 
@@ -228,7 +228,7 @@ def build_dfmean(df, rollingwidth=3):
     voltsAtTime = voltsAtTime[voltsAtTime['time(s)'] == 0] # keep only 0
     firstmean = voltsAtTime['voltage(V)'].mean() # mean for 0
     
-    # Placeholder primitive noob-loop
+    # Placeholder noob-loop
     dicts = []
     for i in df['time(s)'].unique():
         voltsAtTime = df[['voltage(V)', 'time(s)']].copy() # fresh copy
@@ -319,21 +319,26 @@ t_VEB
 ```
 
 ```python
-abf.sampleRate
-```
-
-```python
-def findEPSPslope(dfmean, t_VEB, t_EPSP, param_half_slope_width = 4):
-    dftemp = dfmean[t_VEB: t_EPSP]
+def findEPSPslope(dfmean, t_VEB, t_EPSP, param_t_VEB_margin=3, param_half_slope_width = 4):
+    dftemp = dfmean[t_VEB+param_t_VEB_margin: t_EPSP]
+    '''
+    # Presumably better method that I do not understand:
     t_to_look_for_EPSP_slope = dftemp[dftemp.bis.apply(np.sign)==1].iloc[0].name
     slope_t_EPSP = {'begin': t_to_look_for_EPSP_slope - param_half_slope_width,
                         'end': t_to_look_for_EPSP_slope + param_half_slope_width}
     dfplot_EPSP_slope = dfmean.bis.loc[slope_t_EPSP['begin']: slope_t_EPSP['end']]
     EPSPslope = dfplot_EPSP_slope
     
-    # TODO: fix DYSFUNCTIONAL: returns VEB
+    # TODO: fix DYSFUNCTIONAL
     return EPSPslope
     #return EPSPslope.index[param_half_slope_width]
+    '''
+    
+    # Placeholder loop returns index of first positive bis within range, or -1 if none is found 
+    for i in dftemp.index:
+        if dftemp.bis[i] > 0:
+            return i
+    return -1
 ```
 
 ```python
