@@ -44,7 +44,7 @@ dir_source_data
 ```
 
 ```python
-list_folders = [i for i in os.listdir(dir_source_data) if -1<i.find("LTP_")]
+list_folders = [i for i in os.listdir(dir_source_data) if -1<i.find("LTP_same")]
 list_folders
 ```
 
@@ -170,24 +170,28 @@ def importAbf(filepath, channel=0, oddeven=None):
 
 ```python
 filepath = dir_source_data / folder1 / list_files[0]
-df = importAbf(filepath, channel=1)
+df = importAbf(filepath, channel=0)
 ```
 
 ```python
-dftemp = df[df.sweep % 10 == 0]
-dftemp.nunique()
+#dftemp = df[df.sweep % 10 == 0]
+#dftemp.nunique()
 ```
 
 ```python
-fig, ax = plt.subplots(ncols=1, figsize=(10, 10)) # define the figure and axis we plot in
-g = sns.lineplot(data=dftemp, y='voltage(V)', x= 'time(s)', hue='sweep', ax=ax) # create the plot in that axis
+#fig, ax = plt.subplots(ncols=1, figsize=(10, 10)) # define the figure and axis we plot in
+#g = sns.lineplot(data=dftemp, y='voltage(V)', x= 'time(s)', hue='sweep', ax=ax) # create the plot in that axis
 ```
 
 ```python
 df
 ```
 
+<!-- #region -->
 # Functions to find EPSP and volley slopes
+* INCOSISTENT NAMING: t or time(s) used when code works on INDEX
+
+
 * Import returns df
 
 * build_dfmean returns dfmean with 3 columns
@@ -207,6 +211,7 @@ df
     IN: t_VEB, t_EPSP? (limit right)
 * FindVolley_slope returns t_Volley_slope (time of Volley slope center)
     IN: t_VEB, t_Stim
+<!-- #endregion -->
 
 ```python
 def build_dfmean(df, rollingwidth=3):
@@ -229,8 +234,8 @@ def build_dfmean(df, rollingwidth=3):
         voltsAtTime = df[['voltage(V)', 'time(s)']].copy() # fresh copy
         voltsAtTime = voltsAtTime[voltsAtTime['time(s)'] == i] # keep only relevant time
         volt = voltsAtTime['voltage(V)'].mean() - firstmean # mean for that time
-        dicts.append({'time(s)': i, 'meanVolt': volt})
-    dfmean = pd.DataFrame(dicts)
+        dicts.append({'time(s)': i, 'meanVolt': volt}) # add to dict
+    dfmean = pd.DataFrame(dicts) # dataframe from dict
     
     # TODO: Normalize mean - demand Stim-artefact location parameter?
         
@@ -256,7 +261,7 @@ h = sns.lineplot(data=dfmean, y='prim', x='time(s)', ax=ax1, color='red')
 i = sns.lineplot(data=dfmean, y='bis', x='time(s)', ax=ax1, color='green')
 h.axhline(0, linestyle='dotted')
 ax1.set_ylim(-0.001, 0.001)
-ax1.set_xlim(0.0050, 0.02)
+ax1.set_xlim(0.006, 0.02)
 ```
 
 ```python
@@ -264,34 +269,53 @@ def findStim(dfmean):
     '''
     accepts first order derivative of dfmean
     finds x of max(y): the steepest incline
-    returns t_Stim (time of stim artefact)
+    returns t_Stim (index of stim artefact)
     '''
-    return t_Stim
+    return dfmean[['meanVolt']].idxmax()
 ```
 
 ```python
-def findEPSP(dfmean, limitleft=0)
+t_Stim = findStim(dfmean)
+t_Stim
+```
+
+```python
+def findEPSP(dfmean, limitleft=0, limitright=-1, param_minimum_width_of_EPSP=50, param_EPSP_prominence=0.0005):
     '''
-    accepts dfmean, t_Stim (for limit left)
-    broadest negative peak on dfmean
-    returns t_EPSP (time of WIDEST negative peak center)
+    width and limits in index, promincence in Volt
+    returns index of center of broadest negative peak on dfmean
     '''
+    peaks = scipy.signal.find_peaks(-dfmean.meanVolt, width=param_minimum_width_of_EPSP, prominence=param_EPSP_prominence)[0]#[0]
+    # scipy.signal.find_peaks returns a tuple
+    # peaks = pd.DataFrame(peaks[0]) # Convert to dataframe in order to select only > limitleft
+    # peaks = peaks[peaks[0] > limitleft] # ERROR - won't work
+    # Can't get stuck - just return the one with the highest index, for now.
+    t_EPSP = peaks.max()
     return t_EPSP
 ```
 
 ```python
-def findVEB(dfmean, t_EPSP, param_minimum_width_of_VEB=5):
-    '''
-    peak of 
-    returns x-value (t) for VEB (Volley-EPSP Bump - notch between volley and EPSP)
-    '''
-    dfmeandiff = dfmean.diff().rolling(3, center=True).mean()
+t_EPSP = findEPSP(dfmean, limitleft=t_Stim)
+t_EPSP
+```
 
-    peaks = scipy.signal.find_peaks(dfmeandiff.volt_normalized, width=param_minimum_width_of_VEB)[0]
+```python
+def findVEB(dfmean, t_EPSP, param_minimum_width_of_VEB=5, param_minimum_width_of_EPSP=50):
+    '''
+    returns index for VEB (Volley-EPSP Bump - notch between volley and EPSP)
+    '''
+    peaks = scipy.signal.find_peaks(dfmean.prim, width=param_minimum_width_of_VEB)[0]
+    print(peaks)
     max_acceptable_t_for_VEB = t_EPSP - param_minimum_width_of_EPSP / 2
+    print(max_acceptable_t_for_VEB)
     possible_t_VEB = max(peaks[peaks < max_acceptable_t_for_VEB])
     t_VEB = possible_t_VEB # setting as accepted now, maybe have verification function later
     return t_VEB
+```
+
+```python
+t_VEB = findVEB(dfmean, t_EPSP)
+t_VEB
 ```
 
 ```python
@@ -299,7 +323,22 @@ abf.sampleRate
 ```
 
 ```python
-print(dftemp)
+def findEPSPslope(dfmean, t_VEB, t_EPSP, param_half_slope_width = 4):
+    dftemp = dfmean[t_VEB: t_EPSP]
+    t_to_look_for_EPSP_slope = dftemp[dftemp.bis.apply(np.sign)==1].iloc[0].name
+    slope_t_EPSP = {'begin': t_to_look_for_EPSP_slope - param_half_slope_width,
+                        'end': t_to_look_for_EPSP_slope + param_half_slope_width}
+    dfplot_EPSP_slope = dfmean.bis.loc[slope_t_EPSP['begin']: slope_t_EPSP['end']]
+    EPSPslope = dfplot_EPSP_slope
+    
+    # TODO: fix DYSFUNCTIONAL: returns VEB
+    return EPSPslope
+    #return EPSPslope.index[param_half_slope_width]
+```
+
+```python
+EPSPslope = findEPSPslope(dfmean, t_VEB, t_EPSP)
+EPSPslope
 ```
 
 # Wishlist
