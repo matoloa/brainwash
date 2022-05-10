@@ -170,17 +170,7 @@ def importAbf(filepath, channel=0, oddeven=None):
 
 ```python
 filepath = dir_source_data / folder1 / list_files[0]
-df = importAbf(filepath, channel=0)
-```
-
-```python
-#dftemp = df[df.sweep % 10 == 0]
-#dftemp.nunique()
-```
-
-```python
-#fig, ax = plt.subplots(ncols=1, figsize=(10, 10)) # define the figure and axis we plot in
-#g = sns.lineplot(data=dftemp, y='voltage(V)', x= 'time(s)', hue='sweep', ax=ax) # create the plot in that axis
+df = importAbf(filepath, channel=0) # df_channelraw?
 ```
 
 ```python
@@ -216,32 +206,36 @@ df
 ```python
 def build_dfmean(df, rollingwidth=3):
     '''
-    create columns
-    dfmean (a single sweep built on the mean of all time(s))
+    dfmean.voltate(V) (a single sweep built on the mean of all time(s))
     dfmean.prim
     dfmean.bis    
-    
+
+    dfabf.pivot(columns='time(s)', index='sweep', values='voltage(V)').mean(axis=0).plot()
+        
     '''
-   
+    
     # Extract mean of time 0 for rough normalization
     voltsAtTime = df[['voltage(V)', 'time(s)']].copy() # fresh copy
     voltsAtTime = voltsAtTime[voltsAtTime['time(s)'] == 0] # keep only 0
     firstmean = voltsAtTime['voltage(V)'].mean() # mean for 0
     
+  
     # Placeholder noob-loop
     dicts = []
     for i in df['time(s)'].unique():
         voltsAtTime = df[['voltage(V)', 'time(s)']].copy() # fresh copy
         voltsAtTime = voltsAtTime[voltsAtTime['time(s)'] == i] # keep only relevant time
         volt = voltsAtTime['voltage(V)'].mean() - firstmean # mean for that time
-        dicts.append({'time(s)': i, 'meanVolt': volt}) # add to dict
+        dicts.append({'time(s)': i, 'voltage(V)': volt}) # add to dict
     dfmean = pd.DataFrame(dicts) # dataframe from dict
     
-    # TODO: Normalize mean - demand Stim-artefact location parameter?
-        
-    # generate diffs
-    dfmean['prim'] = dfmean.meanVolt.diff().rolling(rollingwidth, center=True).mean() * 5
-    dfmean['bis'] = dfmean.prim.diff().rolling(rollingwidth, center=True).mean() *5
+    # More elegant method; can't get it to work (retains all sweeps - not just mean)
+    # dfmean = df.copy()
+    # dfmean.pivot(columns='time(s)', index='sweep', values='voltage(V)').mean(axis=0).plot()
+
+    # generate diffs, *5 for better visualization
+    dfmean['prim'] = dfmean[['voltage(V)']].diff().rolling(rollingwidth, center=True).mean() * 5
+    dfmean['bis'] = dfmean.prim.diff().rolling(rollingwidth, center=True).mean() * 5
     
     return dfmean
 ```
@@ -256,12 +250,12 @@ dfmean
 
 ```python
 fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
-g = sns.lineplot(data=dfmean, y='meanVolt', x='time(s)', ax=ax1, color='black')
+g = sns.lineplot(data=dfmean, y='voltage(V)', x='time(s)', ax=ax1, color='black')
 h = sns.lineplot(data=dfmean, y='prim', x='time(s)', ax=ax1, color='red')
 i = sns.lineplot(data=dfmean, y='bis', x='time(s)', ax=ax1, color='green')
 h.axhline(0, linestyle='dotted')
 ax1.set_ylim(-0.001, 0.001)
-ax1.set_xlim(0.006, 0.02)
+ax1.set_xlim(0.006, 0.03)
 ```
 
 ```python
@@ -269,14 +263,14 @@ def findStim(dfmean):
     '''
     accepts first order derivative of dfmean
     finds x of max(y): the steepest incline
-    returns t_Stim (index of stim artefact)
+    returnsi_t_Stim (index of stim artefact)
     '''
-    return dfmean[['meanVolt']].idxmax()
+    return dfmean['voltage(V)'].idxmax()
 ```
 
 ```python
-t_Stim = findStim(dfmean)
-t_Stim
+i_t_Stim = findStim(dfmean)
+i_t_Stim
 ```
 
 ```python
@@ -285,48 +279,48 @@ def findEPSP(dfmean, limitleft=0, limitright=-1, param_minimum_width_of_EPSP=50,
     width and limits in index, promincence in Volt
     returns index of center of broadest negative peak on dfmean
     '''
-    peaks = scipy.signal.find_peaks(-dfmean.meanVolt, width=param_minimum_width_of_EPSP, prominence=param_EPSP_prominence)[0]#[0]
+    peaks = scipy.signal.find_peaks(-dfmean['voltage(V)'], width=param_minimum_width_of_EPSP, prominence=param_EPSP_prominence)[0]#[0]
     # scipy.signal.find_peaks returns a tuple
     # peaks = pd.DataFrame(peaks[0]) # Convert to dataframe in order to select only > limitleft
     # peaks = peaks[peaks[0] > limitleft] # ERROR - won't work
     # Can't get stuck - just return the one with the highest index, for now.
-    t_EPSP = peaks.max()
-    return t_EPSP
+    i_t_EPSP = peaks.max()
+    return i_t_EPSP
 ```
 
 ```python
-t_EPSP = findEPSP(dfmean, limitleft=t_Stim)
-t_EPSP
+i_t_EPSP = findEPSP(dfmean, limitleft=i_t_Stim)
+i_t_EPSP
 ```
 
 ```python
-def findVEB(dfmean, t_EPSP, param_minimum_width_of_VEB=5, param_minimum_width_of_EPSP=50):
+def findVEB(dfmean,i_t_EPSP, param_minimum_width_of_VEB=5, param_minimum_width_of_EPSP=50):
     '''
     returns index for VEB (Volley-EPSP Bump - notch between volley and EPSP)
     '''
     peaks = scipy.signal.find_peaks(dfmean.prim, width=param_minimum_width_of_VEB)[0]
     print(peaks)
-    max_acceptable_t_for_VEB = t_EPSP - param_minimum_width_of_EPSP / 2
+    max_acceptable_t_for_VEB =i_t_EPSP - param_minimum_width_of_EPSP / 2
     print(max_acceptable_t_for_VEB)
     possible_t_VEB = max(peaks[peaks < max_acceptable_t_for_VEB])
-    t_VEB = possible_t_VEB # setting as accepted now, maybe have verification function later
-    return t_VEB
+    i_t_VEB = possible_t_VEB # setting as accepted now, maybe have verification function later
+    return i_t_VEB
 ```
 
 ```python
-t_VEB = findVEB(dfmean, t_EPSP)
-t_VEB
+i_t_VEB = findVEB(dfmean, i_t_EPSP)
+i_t_VEB
 ```
 
 ```python
-def findEPSPslope(dfmean, t_VEB, t_EPSP):#, param_half_slope_width = 4):
+def findEPSPslope(dfmean, i_t_VEB, i_t_EPSP):#, param_half_slope_width = 4):
     
     '''
-    # Presumably better method that I do not understand:
-    dftemp = dfmean[t_VEB: t_EPSP]
-    t_to_look_for_EPSP_slope = dftemp[dftemp.bis.apply(np.sign)==1].iloc[0].name
-    slope_t_EPSP = {'begin': t_to_look_for_EPSP_slope - param_half_slope_width,
-                        'end': t_to_look_for_EPSP_slope + param_half_slope_width}
+    # Presumably better method which I do not understand:
+    dftemp = dfmean[t_VEB:i_t_EPSP]
+    i_t_to_look_for_EPSP_slope = dftemp[dftemp.bis.apply(np.sign)==1].iloc[0].name
+    slope_t_EPSP = {'begin':i_t_to_look_for_EPSP_slope - param_half_slope_width,
+                        'end':i_t_to_look_for_EPSP_slope + param_half_slope_width}
     dfplot_EPSP_slope = dfmean.bis.loc[slope_t_EPSP['begin']: slope_t_EPSP['end']]
     EPSPslope = dfplot_EPSP_slope
     
@@ -336,21 +330,25 @@ def findEPSPslope(dfmean, t_VEB, t_EPSP):#, param_half_slope_width = 4):
     '''
     
     # Placeholder loop returns index of first positive bis within range, or -1 if none is found 
-    dftemp = dfmean.bis[t_VEB: t_EPSP]
+    dftemp = dfmean[i_t_VEB: i_t_EPSP]
     armed = False # disregard positive values until first negative is encountered.
-    for i in dftemp.index:
+    for i in dftemp.bis.index:
         if armed:
-            if dftemp[i] > 0:
+            if dftemp.bis[i] > 0:
                 return i
         else:
-            if dftemp[i] < 0:
+            if dftemp.bis[i] < 0:
                 armed = True
     return -1
 ```
 
 ```python
-EPSPslope = findEPSPslope(dfmean, t_VEB, t_EPSP)
-EPSPslope
+i_t_EPSPslope = findEPSPslope(dfmean,i_t_VEB, i_t_EPSP)
+i_t_EPSPslope
+```
+
+```python
+
 ```
 
 # Wishlist
