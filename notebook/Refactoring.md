@@ -175,7 +175,7 @@ def importAbf(filepath, channel=0, oddeven=None):
 
 ```python
 filepath = dir_source_data / folder1 / list_files[0]
-df = importAbf(filepath, channel=0) # df_channelraw?
+dfabf = importAbf(filepath, channel=0)
 ```
 
 ```python
