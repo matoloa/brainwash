@@ -40,6 +40,7 @@ from sklearn import linear_model
 # set some working folders
 dir_project_root = Path(os.getcwd().split('notebook')[0])
 dir_source_data = dir_project_root / 'dataSource'
+dir_gen_data = dir_project_root / 'dataGenerated'
 dir_source_data
 ```
 
@@ -179,7 +180,7 @@ dfabf = importAbf(filepath, channel=0)
 ```
 
 ```python
-df
+dfabf
 ```
 
 # Functions to find EPSP and volley slopes
@@ -215,7 +216,7 @@ def build_dfmean(df, rollingwidth=4):
         
     '''
     
-    # More elegant method; can't get it to work (retains all sweeps - not just mean)
+    # pivot is useful, learn to use it
     dfmean = pd.DataFrame(df.pivot(columns='time', index='sweep', values='voltage').mean())
     dfmean.columns = ['voltage']
     dfmean.voltage -= dfmean.voltage.median()
@@ -228,7 +229,7 @@ def build_dfmean(df, rollingwidth=4):
 ```
 
 ```python
-dfmean = build_dfmean(df)
+dfmean = build_dfmean(dfabf)
 ```
 
 ```python
@@ -298,7 +299,7 @@ def findVEB(dfmean, t_EPSP, param_minimum_width_of_VEB=0.0005, param_prim_promin
 
 ```python
 t_VEB, max_acceptable_t_for_VEB = findVEB(dfmean, 0.0132)
-
+t_VEB, max_acceptable_t_for_VEB
 ```
 
 ```python
@@ -306,7 +307,7 @@ t_VEB, max_acceptable_t_for_VEB = findVEB(dfmean, 0.0132)
 ```
 
 ```python
-def find_t_EPSPslope(dfmean, t_VEB, t_EPSP):
+def find_t_EPSPslope(dfmean, t_VEB, t_EPSP, happy=False):
     '''
     
     '''
@@ -314,13 +315,15 @@ def find_t_EPSPslope(dfmean, t_VEB, t_EPSP):
     dftemp = dfmean.bis[t_VEB: t_EPSP]
     t_EPSPslope = dftemp[0 < dftemp.apply(np.sign).diff()].index.values
     if 1 < len(t_EPSPslope):
-        raise ValueError("Found multiple positive zero-crossings in dfmean.bis[t_VEB: t_EPSP]")
-
+        if not happy:
+            raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[t_VEB: t_EPSP]: {t_EPSPslope}")
+        else:
+            print('so we just found more than than we wanted but Im happy, so I pick one and move on.')
     return t_EPSPslope[0]
 ```
 
 ```python
-t_EPSPslope = find_t_EPSPslope(dfmean,t_VEB, t_EPSP)
+t_EPSPslope = find_t_EPSPslope(dfmean,t_VEB, t_EPSP, happy=True)
 t_EPSPslope
 ```
 
@@ -341,7 +344,7 @@ def find_t_volleyslope(dfmean, t_Stim, t_VEB):#, param_half_slope_width = 4):
 ```
 
 ```python
-t_volleyslope = 0.0084#find_t_volleyslope(dfmean, (t_Stim+0.0005), t_VEB)
+t_volleyslope = 0.0084 #find_t_volleyslope(dfmean, (t_Stim+0.0005), t_VEB)
 ```
 
 ```python
@@ -384,7 +387,9 @@ h.axvline(t_volleyslope+0.0002, color='blue')
 ```python
 def calculate(df, t_volleyslope, halfwidth_volley, t_EPSPslope, halfwidth_EPSP):
     '''
-    
+    I've figure out why not to use time as an index for this df.
+    In this case, time is not a unique, but a repeated index and that's should never be done on purpose 
+    in my not so humble opinion. An index should always be unique when you create it on purpose. 
     
     '''
     reg = linear_model.LinearRegression()
@@ -392,14 +397,14 @@ def calculate(df, t_volleyslope, halfwidth_volley, t_EPSPslope, halfwidth_EPSP):
     dicts = []
     for sweep in tqdm(df.sweep.unique()):
         dftemp1 = df[df.sweep == sweep]
-        print(dftemp1)
-        dftemp2 = dftemp1[((t_EPSPslope - halfwidth_EPSP) <= dftemp1.index) & (dftemp1.index <= (t_EPSPslope + halfwidth_EPSP))]
-        print(dftemp2)
+        dftemp2 = dftemp1[((t_EPSPslope - halfwidth_EPSP) <= dftemp1.time) & (dftemp1.time <= (t_EPSPslope + halfwidth_EPSP))]
         x = dftemp2.index.values.reshape(-1, 1)
         y = dftemp2.voltage.values.reshape(-1, 1)
 
         reg.fit(x, y)
-        dict_slope = {'sweep': sweep, 'slope': reg.coef_[0][0], 'type': 'linear'}
+        assert(dftemp2.t0.nunique() == 1)
+        t0 = dftemp2.t0.unique()[0]
+        dict_slope = {'sweep': sweep, 't0': t0, 'slope': reg.coef_[0][0], 'type': 'linear'}
         dicts.append(dict_slope)
 
     df_slopes_EPSP = pd.DataFrame(dicts)
@@ -409,15 +414,34 @@ def calculate(df, t_volleyslope, halfwidth_volley, t_EPSPslope, halfwidth_EPSP):
 ```
 
 ```python
-outdata = calculate(df, 0.0084, 0.0002, 0.0105, 0.0004)
+df_meta_data = calculate(dfabf, 0.0084, 0.0002, 0.0105, 0.0004)
 #outdata = calculate(df, t_volleyslope, 0.0002, t_EPSPslope, 0.0004)
-outdata
+df_meta_data
     
+```
+
+```python
+# persist to local file matching data file
+# Im generally against putting any created files in the source data folder. I prefer to put them in generated data
+# that can be happily wiped and regenerated. let's discuss this later.
+dir_meta_data = dir_gen_data / 'metaData'
+dir_meta_data.mkdir(parents=True, exist_ok=True) # create the dir if it does not exist
+filepath = dir_meta_data / list_files[0]
+filepath.with_suffix('.csv')
+
+def exportMetaData(filepath, df_meta_data):
+    df_meta_data.to_csv(filepath, index=False)
+    
+exportMetaData(filepath.with_suffix('.csv'), df_meta_data)
 ```
 
 # Wishlist
 * Sanity check for time axis; divide by samplerate?
 
+
+```python
+
+```
 
 ```python
 
