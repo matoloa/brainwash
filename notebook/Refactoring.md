@@ -34,18 +34,20 @@ import scipy                    # peakfinder and other useful analysis tools
 from tqdm.notebook import tqdm
 from pathlib import Path
 from sklearn import linear_model
+from joblib import Memory
+memory = Memory('joblib', verbose = 1)
 ```
 
 ```python
 # set some working folders
 dir_project_root = Path(os.getcwd().split('notebook')[0])
-dir_source_data = dir_project_root / 'dataSource'
+dir_source_data = dir_project_root / 'dataSource' / 'Lactate_2022_abf'
 dir_gen_data = dir_project_root / 'dataGenerated'
 dir_source_data
 ```
 
 ```python
-list_folders = [i for i in os.listdir(dir_source_data) if -1<i.find("LTP_")]
+list_folders = [i for i in os.listdir(dir_source_data) if -1<i.find("GKO")]
 list_folders
 ```
 
@@ -73,6 +75,14 @@ plt.show()
 
 ```python
 abf.channelCount
+```
+
+```python
+abf.abfDateTime
+```
+
+```python
+abf.__repr__()
 ```
 
 ```python
@@ -133,6 +143,7 @@ g = sns.lineplot(data=dftemp, y='sweepY', x= 'sweepX', hue='sweep', ax=ax) # cre
 ```
 
 ```python
+@memory.cache
 def importAbf(filepath, channel=0, oddeven=None):
     '''
     import .abf and return <"odd"/"even"/"all"> sweeps from channel <0/1>
@@ -157,29 +168,63 @@ def importAbf(filepath, channel=0, oddeven=None):
         # get data
         abf.setSweep(sweepNumber=i, channel=channel)
         df = pd.DataFrame({'sweepX': abf.sweepX, 'sweepY': abf.sweepY})
-        df['sweep'] = i
+        df['sweep_raw'] = i
         df['t0'] = abf.sweepTimesSec[i]
         dfs.append(df)
-    df = pd.concat(dfs)
     
+    df = pd.concat(dfs)
+    df['sweep'] = df.sweep_raw # relevant for single file imports
+    
+        
     # Convert to SI
     df['time'] = df.sweepX # / abf.sampleRate
     df['voltage'] = df.sweepY / 1000
-    
-    df['even'] = df.sweep.apply(lambda x: x % 2 == 0)
+
+    # Absolute date and time
+    df['timens'] = (df.t0 + df.time) * 1_000_000_000 # to nanoseconds
+    df['datetime'] = df.timens.astype('datetime64[ns]') + (abf.abfDateTime - pd.to_datetime(0))
+        
+    # Odd / Even sweep inclusion
+    df['even'] = df.sweep_raw.apply(lambda x: x % 2 == 0)
     df['oddeven'] = df.even.apply(lambda x: 'even' if x else 'odd')
     df = df[df.oddeven == oddeven] # filter rows by Boolean
-    df.drop(columns=['sweepX', 'sweepY', 'even', 'oddeven'], inplace=True)
+    df.drop(columns=['sweepX', 'sweepY', 'even', 'oddeven', 'timens'], inplace=True)
     df.reset_index(drop=True, inplace=True)    
+    
     return df
+```
+
+```python
+def importAbfFolder(folderpath, channel = 0):
+    '''
+    '''
+    list_files = [i for i in os.listdir(folderpath) if -1<i.find(".abf")]#[:2] # stop before item 2 [begin:end]
+    # print(list_files)
+    listdf = []
+    maxsweep = 0
+    for filename in list_files:
+        df = importAbf(folderpath / filename, channel = channel)
+        df['sweep'] = df.sweep_raw + maxsweep
+        maxsweep = df.sweep.max()
+        listdf.append(df)
+        
+    # Check first timestamp in each df, very correct sequence, raise error
+    df = pd.concat(listdf)
+    #df.drop(columns=['sweep_raw'], inplace=True)
+    df.reset_index(drop=True, inplace=True)  
+    return df
+
+
+dfFolder = importAbfFolder(folder1)
+```
+
+```python
+df#.sweep#.plot()#.datetime#.plot()
 ```
 
 ```python
 filepath = dir_source_data / folder1 / list_files[0]
 dfabf = importAbf(filepath, channel=0)
-```
-
-```python
 dfabf
 ```
 
@@ -216,7 +261,7 @@ def build_dfmean(df, rollingwidth=4):
         
     '''
     
-    # pivot is useful, learn to use it
+    # pivot is useful, learn it
     dfmean = pd.DataFrame(df.pivot(columns='time', index='sweep', values='voltage').mean())
     dfmean.columns = ['voltage']
     dfmean.voltage -= dfmean.voltage.median()
@@ -229,7 +274,8 @@ def build_dfmean(df, rollingwidth=4):
 ```
 
 ```python
-dfmean = build_dfmean(dfabf)
+dfmean = build_dfmean(dfFolder)
+dfmean
 ```
 
 ```python
@@ -239,7 +285,7 @@ h = sns.lineplot(data=dfmean, y='prim', x='time', ax=ax1, color='red')
 i = sns.lineplot(data=dfmean, y='bis', x='time', ax=ax1, color='green')
 h.axhline(0, linestyle='dotted')
 ax1.set_ylim(-0.001, 0.001)
-ax1.set_xlim(0.006, 0.03)
+ax1.set_xlim(0.006, 0.015)
 ```
 
 ```python
@@ -316,9 +362,9 @@ def find_t_EPSPslope(dfmean, t_VEB, t_EPSP, happy=False):
     t_EPSPslope = dftemp[0 < dftemp.apply(np.sign).diff()].index.values
     if 1 < len(t_EPSPslope):
         if not happy:
-            raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[t_VEB: t_EPSP]: {t_EPSPslope}")
+            raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[t_VEB: t_EPSP]:{t_EPSPslope}")
         else:
-            print('so we just found more than than we wanted but Im happy, so I pick one and move on.')
+            print('More EPSPs than than we wanted but Im happy, so I pick one and move on.')
     return t_EPSPslope[0]
 ```
 
@@ -328,7 +374,7 @@ t_EPSPslope
 ```
 
 ```python
-def find_t_volleyslope(dfmean, t_Stim, t_VEB):#, param_half_slope_width = 4):
+def find_t_volleyslope(dfmean, t_Stim, t_VEB, happy=False):#, param_half_slope_width = 4):
     '''
     
     '''
@@ -338,34 +384,39 @@ def find_t_volleyslope(dfmean, t_Stim, t_VEB):#, param_half_slope_width = 4):
     #print(dftemp.apply(np.sign).diff())
     #print(t_volleyslope)
     if 1 < len(t_volleyslope):
-        raise ValueError("Found multiple positive zero-crossings in dfmean.bis[t_Stim: t_VEB]")
-
-    return t_volleyslope[0]
+        if not happy:
+            raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[t_Stim: t_VEB]:{t_volleyslope}")
+        else:
+            print('More volleys than than we wanted but Im happy, so I pick one and move on.')
+    return t_volleyslope[-1]
 ```
 
 ```python
-t_volleyslope = 0.0084 #find_t_volleyslope(dfmean, (t_Stim+0.0005), t_VEB)
+t_volleyslope = find_t_volleyslope(dfmean, (t_Stim+0.0005), t_VEB, happy = True)
 ```
 
 ```python
-filepath = dir_source_data / folder1 / list_files[0]
-def readraw(filepath=filepath, channel=0):
-    df = importAbf(filepath, channel)
+
+```
+
+```python
+def find_t(df, param_min_time_from_t_Stim=0.0005):
+    '''
+    '''
     dfmean = build_dfmean(df)
     t_Stim = findStim(dfmean)
     t_EPSP = findEPSP(dfmean)
     t_VEB, max_acceptable_t_for_VEB = findVEB(dfmean, t_EPSP)
-    t_EPSPslope = find_t_EPSPslope(dfmean,t_VEB, t_EPSP)
-    t_volleyslope = 0.0084#find_t_volleyslope(dfmean, (t_Stim+0.0005), t_VEB)
+    t_EPSPslope = find_t_EPSPslope(dfmean, t_VEB, t_EPSP, happy=True)
+    t_volleyslope = find_t_volleyslope(dfmean, (t_Stim+param_min_time_from_t_Stim), t_VEB, happy = True)
     
-    print(t_volleyslope, t_EPSPslope)
-    
-    
-    return
+    return t_volleyslope, t_EPSPslope 
+
+find_t(dfFolder)
 ```
 
 ```python
-readraw()
+
 ```
 
 ```python
@@ -385,7 +436,7 @@ h.axvline(t_volleyslope+0.0002, color='blue')
 ```
 
 ```python
-def calculate(df, t_volleyslope, halfwidth_volley, t_EPSPslope, halfwidth_EPSP):
+def measure_slopes(df, t_volleyslope, t_EPSPslope, halfwidth_volley=0.0002, halfwidth_EPSP=0.0004):
     '''
     I've figure out why not to use time as an index for this df.
     In this case, time is not a unique, but a repeated index and that's should never be done on purpose 
@@ -404,7 +455,7 @@ def calculate(df, t_volleyslope, halfwidth_volley, t_EPSPslope, halfwidth_EPSP):
         reg.fit(x, y)
         assert(dftemp2.t0.nunique() == 1)
         t0 = dftemp2.t0.unique()[0]
-        dict_slope = {'sweep': sweep, 't0': t0, 'slope': reg.coef_[0][0], 'type': 'linear'}
+        dict_slope = {'sweep': sweep, 't0': t0, 'EPSP_slope': reg.coef_[0][0], 'type': 'linear'}
         dicts.append(dict_slope)
 
     df_slopes_EPSP = pd.DataFrame(dicts)
@@ -414,9 +465,64 @@ def calculate(df, t_volleyslope, halfwidth_volley, t_EPSPslope, halfwidth_EPSP):
 ```
 
 ```python
-df_meta_data = calculate(dfabf, 0.0084, 0.0002, 0.0105, 0.0004)
+def measure_slope(df, t_slope, halfwidth, name='EPSP'):
+    '''
+    I've figure out why not to use time as an index for this df.
+    In this case, time is not a unique, but a repeated index and that's should never be done on purpose 
+    in my not so humble opinion. An index should always be unique when you create it on purpose. 
+    
+    '''
+    reg = linear_model.LinearRegression()
+
+    dicts = []
+    for sweep in tqdm(df.sweep.unique()):
+        dftemp1 = df[df.sweep == sweep]
+        dftemp2 = dftemp1[((t_slope - halfwidth) <= dftemp1.time) & (dftemp1.time <= (t_slope + halfwidth))]
+        x = dftemp2.index.values.reshape(-1, 1)
+        y = dftemp2.voltage.values.reshape(-1, 1)
+
+        reg.fit(x, y)
+        assert(dftemp2.t0.nunique() == 1)
+        t0 = dftemp2.t0.unique()[0]
+        dict_slope = {'sweep': sweep, 't0': t0, name + '_slope': reg.coef_[0][0], 'type': 'linear'}
+        dicts.append(dict_slope)
+
+    df_slopes = pd.DataFrame(dicts)
+
+    return df_slopes
+
+measure_slope(dfFolder, t_EPSPslope, 0.0004)
+```
+
+```python
+#TODO: Left off here.
+
+'''
+Intent: ladda folder eller fil, ta ut alla t, mät slopes i dem.
+Väsentligen färdigt, men format på slopes knepigt.
+
+Kvar att göra:
+    Spara metadata som i ruta nedan
+    Slug: Kolla om metadata finns innan saker laddas
+    Visualisera:
+        Visa EPSP och volley
+        Kolumn där alla svep dividerats på medelvolley
+        Exempelsvep med mätpunkter från början och slutet av varje fil (epok)
+
+
+'''
+
+dfFolder = importAbfFolder(folder1)
+t_volleyslope, t_EPSPslope = find_t(dfFolder, param_min_time_from_t_Stim=0.0005)
+
+list_meta_data = []
+list_meta_data.append(measure_slope(dfFolder, t_EPSPslope, 0.0004, name='EPSP'))
+list_meta_data.append(measure_slope(dfFolder, t_volleyslope, 0.0002, name='volley'))
+        
+#df_meta_data = calculate(dfabf, 0.0084, 0.0105)
 #outdata = calculate(df, t_volleyslope, 0.0002, t_EPSPslope, 0.0004)
-df_meta_data
+#df_meta_data.slope.rolling(10).mean().plot()
+df_meta_data.slope.plot()
     
 ```
 
