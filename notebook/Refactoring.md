@@ -14,13 +14,16 @@ jupyter:
 ---
 
 # Roadmap
-* read abf:s
-* extract EPSP/volley.mean
-* display average EPSP/volley (SEM shade)
-
-
-
-
+* Groups: folders can belong to one, two or more Groups.
+* Array of Include-in-group Booleans, method (manual / “basic”)
+    * Metadata generation obsolete - leave for now
+    * Experiment.csv
+    * updatemetadata(folder) metadata.csv
+        * Folder, t_EPSP, method, ok,  t_volley, method, ok, t_VEB
+* Function to display average EPSP/volley (SEM shade) of all folders in a Group
+* Function to display mean of Group1 vs mean of Group2
+* Function to display all outdata (EPSP, volley or EPSP/volley) in a Group, superimposed
+* Function to display Sample sweeps from first 10 and last 10 of each source file, superimposed, reading points indicated
 
 ```python
 import numpy as np  # numeric calculations module
@@ -298,48 +301,7 @@ def find_t(df, param_min_time_from_t_Stim=0.0005):
         dfmean, (t_Stim + param_min_time_from_t_Stim), t_VEB, happy=True
     )
 
-    return t_volleyslope, t_EPSPslope
-```
-
-```python
-def measure_slopes(
-    df, t_volleyslope, t_EPSPslope, halfwidth_volley=0.0002, halfwidth_EPSP=0.0004
-):
-    """
-
-    INCORRECT, get-both-at-once function. Should be calling measureSlope twice
-
-    I've figure out why not to use time as an index for this df.
-    In this case, time is not a unique, but a repeated index and that's should never be done on purpose
-    in my not so humble opinion. An index should always be unique when you create it on purpose.
-
-    """
-    reg = linear_model.LinearRegression()
-
-    dicts = []
-    for sweep in tqdm(df.sweep.unique()):
-        dftemp1 = df[df.sweep == sweep]
-        dftemp2 = dftemp1[
-            ((t_EPSPslope - halfwidth_EPSP) <= dftemp1.time)
-            & (dftemp1.time <= (t_EPSPslope + halfwidth_EPSP))
-        ]
-        x = dftemp2.index.values.reshape(-1, 1)
-        y = dftemp2.voltage.values.reshape(-1, 1)
-
-        reg.fit(x, y)
-        assert dftemp2.t0.nunique() == 1
-        t0 = dftemp2.t0.unique()[0]
-        dict_slope = {
-            "sweep": sweep,
-            "t0": t0,
-            "EPSP_slope": reg.coef_[0][0],
-            "type": "linear",
-        }
-        dicts.append(dict_slope)
-
-    df_slopes_EPSP = pd.DataFrame(dicts)
-
-    return df_slopes_EPSP
+    return t_volleyslope, t_EPSPslope, dfmean
 ```
 
 ```python
@@ -379,28 +341,28 @@ def measure_slope(df, t_slope, halfwidth, name="EPSP"):
 ```
 
 ```python
-def loadProcessExport(importfolderpath, metadatapath, outdatapath):
+def loadProcessExport(importfolderpath, meandatapath, metadatapath, outdatapath):
     """
     create dfs and csvs from folder
 
     """
     dfFolder = importAbfFolder(importfolderpath)
-
-    dfmean = build_dfmean(dfFolder)  # Added 2022-05-24, since required for find_t
-    t_volleyslope, t_EPSPslope = find_t(dfFolder, param_min_time_from_t_Stim=0.0005)
-    df_metadata = pd.DataFrame(
+    t_volleyslope, t_EPSPslope, dfmean = find_t(dfFolder, param_min_time_from_t_Stim=0.0005)
+    dfmetadata = pd.DataFrame(
         {"t_EPSPslope": t_EPSPslope, "t_volleyslope": t_volleyslope}, index=[1]
     )
-    df_metadata.to_csv(metadatapath, index=False)
 
     list_outdata = []
     list_outdata.append(measure_slope(dfFolder, t_EPSPslope, 0.0004, name="EPSP"))
     list_outdata.append(measure_slope(dfFolder, t_volleyslope, 0.0002, name="volley"))
-    df_outdata = pd.concat(list_outdata)
-    df_outdata.reset_index(drop=True, inplace=True)
-    df_outdata.to_csv(outdatapath, index=False)
+    dfoutdata = pd.concat(list_outdata)
+    dfoutdata.reset_index(drop=True, inplace=True)
+    
+    dfmean.to_csv(meandatapath)
+    dfmetadata.to_csv(metadatapath, index=False)
+    dfoutdata.to_csv(outdatapath, index=False)
 
-    return df_metadata, df_outdata
+    return dfmean, dfmetadata, dfoutdata
 
 
 def loadMetadataORprocess(importfolderpath):
@@ -410,119 +372,67 @@ def loadMetadataORprocess(importfolderpath):
     else: call loadProcessExport
 
     """
-    outdata_path_ending = "_".join(importfolderpath.parts[-2:]) + "_outdata.csv"
-    outdatapath = dir_gen_data / outdata_path_ending
+    meandata_path_ending = "_".join(importfolderpath.parts[-2:]) + "_meandata.csv"
+    meandatapath = dir_gen_data / meandata_path_ending
     metadata_path_ending = "_".join(importfolderpath.parts[-2:]) + "_metadata.txt"
     metadatapath = dir_gen_data / metadata_path_ending
+    outdata_path_ending = "_".join(importfolderpath.parts[-2:]) + "_outdata.csv"
+    outdatapath = dir_gen_data / outdata_path_ending
 
-    if outdatapath.exists():
-        print("Exists! Reading...")
-        df_metadata = pd.read_csv(metadatapath)
-        df_outdata = pd.read_csv(outdatapath)
-        print("...done.")
+    if meandatapath.exists():
+        print("Found", outdata_path_ending, "- Reading...")
+        dfmean = pd.read_csv(meandatapath)
+        dfmetadata = pd.read_csv(metadatapath)
+        dfoutdata = pd.read_csv(outdatapath)
+        #print("...done.")
     else:
-        print("Doesn't exist! Creating...")
-        df_metadata, df_outdata = loadProcessExport(
-            importfolderpath, metadatapath, outdatapath
+        print("No", outdata_path_ending, "- Creating...")
+        dfmean, dfmetadata, dfoutdata = loadProcessExport(
+            importfolderpath, meandatapath, metadatapath, outdatapath
         )
-        print("...done.")
+        #print("...done.")
 
-    return df_metadata, df_outdata
+    return dfmean, dfmetadata, dfoutdata
 ```
 
 ```python
-folder1 = dir_source_data / list_folders[1]
-print(folder1)
-df_metadata, df_outdata = loadMetadataORprocess(folder1)
-print(df_metadata)
+def plotmean(dfmean_in, t, t_VEB=None):
+    '''
+    
+    '''
+    dfmean = dfmean_in.copy() # Create local copy to make sure original is untouched
+    dfmean.reset_index(inplace=True) # Reset index in local copy to make graphs happy
+    t_EPSPslope = t['t_EPSPslope']
+    t_volleyslope = t['t_volleyslope']
+
+    fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
+    g = sns.lineplot(data=dfmean, y='voltage', x='time', ax=ax1, color='black')
+    h = sns.lineplot(data=dfmean, y='prim', x='time', ax=ax1, color='red')
+    i = sns.lineplot(data=dfmean, y='bis', x='time', ax=ax1, color='green')
+    h.axhline(0, linestyle='dotted')
+    ax1.set_ylim(-0.001, 0.001)
+    ax1.set_xlim(0.006, 0.02)
+    if not t_VEB is None:
+        h.axvline(t_VEB, color='orange')
+        #h.axvline(max_acceptable_t_for_VEB, color='yellow')
+    h.axvline(t_EPSPslope-0.0004, color='purple')
+    h.axvline(t_EPSPslope, color='purple')
+    h.axvline(t_EPSPslope+0.0004, color='purple')
+    h.axvline(t_volleyslope-0.0002, color='blue')
+    h.axvline(t_volleyslope, color='blue')
+    h.axvline(t_volleyslope+0.0002, color='blue')
 ```
 
 ```python
-dfFolder = importAbfFolder(folder1)
-dfmean = build_dfmean(dfFolder)
-
-fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
-g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=ax1, color="black")
-h = sns.lineplot(data=dfmean, y="prim", x="time", ax=ax1, color="red")
-i = sns.lineplot(data=dfmean, y="bis", x="time", ax=ax1, color="green")
-h.axhline(0, linestyle="dotted")
-ax1.set_ylim(-0.001, 0.001)
-ax1.set_xlim(0.006, 0.02)
-#h.axvline(t_VEB, color="orange")
-# h.axvline(max_acceptable_t_for_VEB, color='yellow')
-h.axvline(t_EPSPslope - 0.0004, color="red")
-h.axvline(t_EPSPslope + 0.0004, color="red")
-h.axvline(t_volleyslope - 0.0002, color="blue")
-h.axvline(t_volleyslope + 0.0002, color="blue")
+print(list_folders)
+for i in list_folders:
+    folder1 = dir_source_data / i
+    dfmean, dfmetadata, dfoutdata = loadMetadataORprocess(folder1)
+    t = dfmetadata.iloc[0].to_dict()
+    #print(dfmean)
+    plotmean(dfmean, t)
 ```
 
 ```python
-exportpath_outdata.exists()
-```
 
-```python
-outdata_pathEnding = "_".join(folder1.parts[-2:])
-load_process_export(folder1, exportpath_outdata, exportpath_metadata)
-```
-
-```python
-df_outdata_pivot = df_outdata.pivot(index="sweep", columns="type", values="value")
-df_outdata_pivot["ratio_k_EPSP_k_volley"] = (
-    df_outdata_pivot.EPSP_slope / df_outdata_pivot.volley_slope.mean()
-)
-df_outdata_pivot["ratio_k_EPSP_k_volley"].plot()
-```
-
-```python
-df_metadata
-```
-
-```python
-df_outdata_pivot[["EPSP_slope", "volley_slope"]].plot()
-```
-
-```python
-sns.lineplot(data=df_outdata, x="sweep", y="value", hue="type")
-```
-
-```python
-df_outdata.pivot(index="sweep", columns="type", values="value")
-```
-
-```python
-"_".join(folder1.parts[-2:])
-```
-
-```python
-# Obsolete reference "meta_data" -> "df_outdata"
-
-# persist to local file matching data file
-# Im generally against putting any created files in the source data folder. I prefer to put them in generated data
-# that can be happily wiped and regenerated. let's discuss this later.
-dir_outdata = dir_gen_data / "outdata"
-dir_outdata.mkdir(parents=True, exist_ok=True)  # create the dir if it does not exist
-filepath = dir_outdata / list_files[0]
-filepath.with_suffix(".csv")
-
-# def exportData(filepath, df_metadata, df_outdata):
-#   df_outdata.to_csv(filepath, index=False)
-#    df_metadata.to_csv(filepath, index=False)
-#    print(filepath)
-# exportData(filepath.with_suffix('.csv'), df_metadata)
-```
-
-# Wishlist
-* Sanity check for time axis; divide by samplerate?
-
-
-```python
-filepath.parts[-1]
-```
-
-```python
-pd.read_csv(filepath.with_suffix(".csv"))  # , squeeze = True)
-```
-
-```python
-# Le SOLVE! Hämtar te...
 ```
