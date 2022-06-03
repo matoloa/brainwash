@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.13.1
+      jupytext_version: 1.13.8
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -261,6 +261,8 @@ def find_t_volleyslope(
     dfmean, t_Stim, t_VEB, happy=False
 ):  # , param_half_slope_width = 4):
     """
+    DOES NOT USE WIDTH! decided by rolling, earlier?
+    
     returns time of volley slope center,
         as identified by positive zero-crossings in the second order derivative
         if several are found, it returns the latest one
@@ -279,7 +281,7 @@ def find_t_volleyslope(
             print(
                 "More volleys than than we wanted but Im happy, so I pick one and move on."
             )
-    return t_volleyslope[-1]
+    return t_volleyslope[0]
 ```
 
 ```python
@@ -307,7 +309,7 @@ def find_t(df, param_min_time_from_t_Stim=0.0005):
 ```python
 def measure_slope(df, t_slope, halfwidth, name="EPSP"):
     """
-    CORRECT, generalized function
+    Generalized function
 
 
     """
@@ -396,7 +398,7 @@ def loadMetadataORprocess(importfolderpath):
 ```
 
 ```python
-def plotmean(dfmean_in, t, t_VEB=None):
+def plotmean(dfmean_in, t, title=None, t_VEB=None):
     '''
     
     '''
@@ -410,6 +412,8 @@ def plotmean(dfmean_in, t, t_VEB=None):
     h = sns.lineplot(data=dfmean, y='prim', x='time', ax=ax1, color='red')
     i = sns.lineplot(data=dfmean, y='bis', x='time', ax=ax1, color='green')
     h.axhline(0, linestyle='dotted')
+    if not title is None:
+        ax1.set_title(title)
     ax1.set_ylim(-0.001, 0.001)
     ax1.set_xlim(0.006, 0.02)
     if not t_VEB is None:
@@ -418,9 +422,9 @@ def plotmean(dfmean_in, t, t_VEB=None):
     h.axvline(t_EPSPslope-0.0004, color='purple')
     h.axvline(t_EPSPslope, color='purple')
     h.axvline(t_EPSPslope+0.0004, color='purple')
-    h.axvline(t_volleyslope-0.0002, color='blue')
+    h.axvline(t_volleyslope-0.0001, color='blue')
     h.axvline(t_volleyslope, color='blue')
-    h.axvline(t_volleyslope+0.0002, color='blue')
+    h.axvline(t_volleyslope+0.0001, color='blue')
 ```
 
 ```python
@@ -430,7 +434,7 @@ for i in list_folders:
     dfmean, dfmetadata, dfoutdata = loadMetadataORprocess(folder1)
     t = dfmetadata.iloc[0].to_dict()
     #print(dfmean)
-    plotmean(dfmean, t)
+    plotmean(dfmean, t, title=i)
 ```
 
 ```python
