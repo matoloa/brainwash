@@ -51,7 +51,7 @@ dir_source_data
 ```
 
 ```python
-list_folders = [i for i in os.listdir(dir_source_data) if -1 < i.find("GKO")]
+list_folders = [i for i in os.listdir(dir_source_data) if -1 < i.find("")]
 list_folders
 ```
 
@@ -435,6 +435,62 @@ for i in list_folders:
     t = dfmetadata.iloc[0].to_dict()
     #print(dfmean)
     plotmean(dfmean, t, title=i)
+```
+
+```python
+dfoutdata
+#dfmean
+```
+
+```python
+print(list_folders)
+```
+
+```python
+#list_folders = [i for i in os.listdir(dir_source_data) if -1 < i.find("")]
+list_GKO = [i for i in list_folders if -1 < i.find("GKO")]
+list_WT = [i for i in list_folders if -1 < i.find("WT")]
+```
+
+```python
+print(dir_source_data)
+dir_source_data.__str__().split('\\')
+```
+
+```python
+list_WT, list_GKO
+```
+
+```python
+t
+```
+
+```python
+sns.lineplot(data=dfoutdata, x = 'sweep', y = 'value', hue = 'type')
+```
+
+```python
+def getgroupdata(pathfolders:list):
+    """
+    """
+    dfoutdatas = []
+    #print(pathfolders)
+    for i in pathfolders:
+        name = '/'.join(i.__str__().split('\\')[-2:])
+        dfmean, dfmetadata, dfoutdata = loadMetadataORprocess(i)
+        dfoutdata['name'] = name
+        dfoutdatas.append(dfoutdata)
+        print(i, "NAME", name)
+        #plotmean(dfmean, t, title=i)
+    dfoutdata = pd.concat(dfoutdatas)
+    dfoutdata.reset_index(drop=True, inplace=True)
+    return dfoutdata
+```
+
+```python
+listpathWT = [dir_source_data /i for i in os.listdir(dir_source_data) if -1 < i.find("WT")]
+dfoutdata = getgroupdata(listpathWT)
+sns.lineplot(data=dfoutdata, x = 'sweep', y = 'value', hue = 'type')
 ```
 
 ```python
