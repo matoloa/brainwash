@@ -56,6 +56,33 @@ list_folders
 ```
 
 ```python
+def buildexperimentcsv(dir_gen_data):
+    """
+    Generate overview file of all csv:s
+    Assumes no such file exists
+    Add later: functions to check for not-included-folders, convert those
+
+    """
+    list_metadatafiles = [i for i in os.listdir(dir_gen_data) if -1 < i.find("_metadata.txt")]
+    # Read groups and assigment from metadata.txt
+    # Later: read applied algorithm from metadata.txt into df
+    
+    
+    dfmetadata = pd.read_csv(metadatapath)
+    
+    
+```
+
+```python
+list_metadatafiles = [i for i in os.listdir(dir_gen_data) if -1 < i.find("_metadata.txt")]
+list_metadatafiles
+```
+
+```python
+
+```
+
+```python
 @memory.cache
 def importAbf(filepath, channel=0, oddeven=None):
     """
@@ -489,8 +516,22 @@ def getgroupdata(pathfolders:list):
 
 ```python
 listpathWT = [dir_source_data /i for i in os.listdir(dir_source_data) if -1 < i.find("WT")]
-dfoutdata = getgroupdata(listpathWT)
-sns.lineplot(data=dfoutdata, x = 'sweep', y = 'value', hue = 'type')
+dfoutdataWT = getgroupdata(listpathWT)
+sns.lineplot(data=dfoutdataWT, x = 'sweep', y = 'value', hue = 'type')
+listpathGKO = [dir_source_data /i for i in os.listdir(dir_source_data) if -1 < i.find("GKO")]
+dfoutdataGKO = getgroupdata(listpathGKO)
+sns.lineplot(data=dfoutdataGKO, x = 'sweep', y = 'value', hue = 'type')
+```
+
+```python
+dfoutdataWT['group'] = 'WT'
+dfoutdataGKO['group'] = 'GKO'
+dfoutdata = pd.concat([dfoutdataWT, dfoutdataGKO]).reset_index(drop=True)
+sns.lineplot(data=dfoutdata, x = 'sweep', y = 'value', hue = 'group', style = 'type')
+```
+
+```python
+dfoutdata.head()
 ```
 
 ```python
