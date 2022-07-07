@@ -370,15 +370,34 @@ def measure_slope(df, t_slope, halfwidth, name="EPSP"):
 ```
 
 ```python
-def loadProcessExport(importfolderpath, meandatapath, metadatapath, outdatapath):
+def ProcessExport(importfolderpath, meandatapath, metadatapath, outdatapath):
     """
     create dfs and csvs from folder
+    
+    metadata.txt contents
+        Folderpath
+        Exclude (boolean)
+        List of Algorithms
+        Chosen Algorithm
+        Groups (list)
+        
+        t_EPSPslope
+        t_volleyslope
+
+    
 
     """
     dfFolder = importAbfFolder(importfolderpath)
     t_volleyslope, t_EPSPslope, dfmean = find_t(dfFolder, param_min_time_from_t_Stim=0.0005)
     dfmetadata = pd.DataFrame(
-        {"t_EPSPslope": t_EPSPslope, "t_volleyslope": t_volleyslope}, index=[1]
+        {"Folderpath": importfolderpath,
+         "Exclude": False,
+         "Applied algorithms": None,
+         "Chosen algorithm": None,
+         "Groups": None,
+         "t_EPSPslope": t_EPSPslope,
+         "t_volleyslope": t_volleyslope
+        }, index=[1]
     )
 
     list_outdata = []
@@ -398,7 +417,7 @@ def loadMetadataORprocess(importfolderpath):
     """
     Check for metadata file
     if exists: load
-    else: call loadProcessExport
+    else: call ProcessExport
 
     """
     meandata_path_ending = "_".join(importfolderpath.parts[-2:]) + "_meandata.csv"
@@ -408,6 +427,7 @@ def loadMetadataORprocess(importfolderpath):
     outdata_path_ending = "_".join(importfolderpath.parts[-2:]) + "_outdata.csv"
     outdatapath = dir_gen_data / outdata_path_ending
 
+    
     if meandatapath.exists():
         print("Found", outdata_path_ending, "- Reading...")
         dfmean = pd.read_csv(meandatapath)
@@ -416,7 +436,7 @@ def loadMetadataORprocess(importfolderpath):
         #print("...done.")
     else:
         print("No", outdata_path_ending, "- Creating...")
-        dfmean, dfmetadata, dfoutdata = loadProcessExport(
+        dfmean, dfmetadata, dfoutdata = ProcessExport(
             importfolderpath, meandatapath, metadatapath, outdatapath
         )
         #print("...done.")
@@ -499,6 +519,8 @@ sns.lineplot(data=dfoutdata, x = 'sweep', y = 'value', hue = 'type')
 ```python
 def getgroupdata(pathfolders:list):
     """
+    loadMetadtaORprocess all <pathfolders>
+    return concatenated df : outdata with added 'name' = (last two folder levels)
     """
     dfoutdatas = []
     #print(pathfolders)
@@ -517,6 +539,7 @@ def getgroupdata(pathfolders:list):
 ```python
 listpathWT = [dir_source_data /i for i in os.listdir(dir_source_data) if -1 < i.find("WT")]
 dfoutdataWT = getgroupdata(listpathWT)
+print(dfoutdataWT)
 sns.lineplot(data=dfoutdataWT, x = 'sweep', y = 'value', hue = 'type')
 listpathGKO = [dir_source_data /i for i in os.listdir(dir_source_data) if -1 < i.find("GKO")]
 dfoutdataGKO = getgroupdata(listpathGKO)

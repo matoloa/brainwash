@@ -1,0 +1,2 @@
+Folderpath,Exclude,Applied algorithms,Chosen algorithm,Groups,t_EPSPslope,t_volleyslope
+C:\Users\Mats\brainwash\dataSource\Lactate_2022_abf\05WT,False,,,,0.0106,0.008400000000000001
