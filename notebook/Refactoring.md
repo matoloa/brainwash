@@ -61,21 +61,20 @@ def buildexperimentcsv(dir_gen_data):
     Generate overview file of all csv:s
     Assumes no such file exists
     Add later: functions to check for not-included-folders, convert those
-
-    """
-    list_metadatafiles = [i for i in os.listdir(dir_gen_data) if -1 < i.find("_metadata.txt")]
+    
     # Read groups and assigment from metadata.txt
     # Later: read applied algorithm from metadata.txt into df
-    
-    
-    dfmetadata = pd.read_csv(metadatapath)
-    
-    
+    """
+    list_metadatafiles = [i for i in os.listdir(dir_gen_data) if -1 < i.find("_metadata.txt")]
+    dfmetadata = pd.concat([pd.read_csv(dir_gen_data / i) for i in list_metadatafiles])
+    dfmetadata.reset_index(drop=True, inplace=True)
+    return dfmetadata
+
+ 
 ```
 
 ```python
-list_metadatafiles = [i for i in os.listdir(dir_gen_data) if -1 < i.find("_metadata.txt")]
-list_metadatafiles
+
 ```
 
 ```python
@@ -370,7 +369,7 @@ def measure_slope(df, t_slope, halfwidth, name="EPSP"):
 ```
 
 ```python
-def ProcessExport(importfolderpath, meandatapath, metadatapath, outdatapath):
+def ProcessExport(importfolderpath, meandatapath, metadatapath, outdatapath, chosenalgorithm=None):
     """
     create dfs and csvs from folder
     
@@ -387,13 +386,18 @@ def ProcessExport(importfolderpath, meandatapath, metadatapath, outdatapath):
     
 
     """
+    # Placeholder algorithm selector
+    if chosenalgorithm is None:
+        appliedalgorithms = "linear"
+        chosenalgorithm = "linear"     
+    
     dfFolder = importAbfFolder(importfolderpath)
     t_volleyslope, t_EPSPslope, dfmean = find_t(dfFolder, param_min_time_from_t_Stim=0.0005)
     dfmetadata = pd.DataFrame(
         {"Folderpath": importfolderpath,
          "Exclude": False,
-         "Applied algorithms": None,
-         "Chosen algorithm": None,
+         "Applied algorithms": appliedalgorithms,
+         "Chosen algorithm": chosenalgorithm,
          "Groups": None,
          "t_EPSPslope": t_EPSPslope,
          "t_volleyslope": t_volleyslope
@@ -401,6 +405,7 @@ def ProcessExport(importfolderpath, meandatapath, metadatapath, outdatapath):
     )
 
     list_outdata = []
+    # Further down the line: measureslope can run several algorithms, recommend one, but user chooses
     list_outdata.append(measure_slope(dfFolder, t_EPSPslope, 0.0004, name="EPSP"))
     list_outdata.append(measure_slope(dfFolder, t_volleyslope, 0.0002, name="volley"))
     dfoutdata = pd.concat(list_outdata)
@@ -540,21 +545,29 @@ def getgroupdata(pathfolders:list):
 listpathWT = [dir_source_data /i for i in os.listdir(dir_source_data) if -1 < i.find("WT")]
 dfoutdataWT = getgroupdata(listpathWT)
 print(dfoutdataWT)
-sns.lineplot(data=dfoutdataWT, x = 'sweep', y = 'value', hue = 'type')
+#sns.lineplot(data=dfoutdataWT, x = 'sweep', y = 'value', hue = 'type')
 listpathGKO = [dir_source_data /i for i in os.listdir(dir_source_data) if -1 < i.find("GKO")]
 dfoutdataGKO = getgroupdata(listpathGKO)
-sns.lineplot(data=dfoutdataGKO, x = 'sweep', y = 'value', hue = 'type')
+#sns.lineplot(data=dfoutdataGKO, x = 'sweep', y = 'value', hue = 'type')
 ```
 
 ```python
 dfoutdataWT['group'] = 'WT'
 dfoutdataGKO['group'] = 'GKO'
 dfoutdata = pd.concat([dfoutdataWT, dfoutdataGKO]).reset_index(drop=True)
-sns.lineplot(data=dfoutdata, x = 'sweep', y = 'value', hue = 'group', style = 'type')
+dfplot = dfoutdata[dfoutdata.type == "EPSP_slope"]
+
+sns.lineplot(data=dfplot, x = 'sweep', y = 'value', hue = 'group', style = 'type', n_boot=5)
 ```
 
 ```python
 dfoutdata.head()
+```
+
+```python
+print(buildexperimentcsv(dir_gen_data))
+#list_metadatafiles = [i for i in os.listdir(dir_gen_data) if -1 < i.find("_metadata.txt")]
+#list_metadatafiles
 ```
 
 ```python
