@@ -69,21 +69,11 @@ def buildexperimentcsv(dir_gen_data):
     dfmetadata = pd.concat([pd.read_csv(dir_gen_data / i) for i in list_metadatafiles])
     dfmetadata.reset_index(drop=True, inplace=True)
     return dfmetadata
-
- 
-```
-
-```python
-
-```
-
-```python
-
 ```
 
 ```python
 @memory.cache
-def importAbf(filepath, channel=0, oddeven=None):
+def importabf(filepath, channel=0, oddeven=None):
     """
     import .abf and return <"odd"/"even"/"all"> sweeps from channel <0/1>
     oddeven defaults to channel-appropriate parameter
@@ -135,8 +125,10 @@ def importAbf(filepath, channel=0, oddeven=None):
 ```
 
 ```python
-def importAbfFolder(folderpath, channel=0):
-    """ """
+def importabffolder(folderpath, channel=0):
+    """
+    Read and concatenate all .abf files in folderpath to a single df
+    """
     list_files = [
         i for i in os.listdir(folderpath) if -1 < i.find(".abf")
     ]  # [:2] # stop before item 2 [begin:end]
@@ -144,7 +136,7 @@ def importAbfFolder(folderpath, channel=0):
     listdf = []
     maxsweep = 0
     for filename in list_files:
-        df = importAbf(folderpath / filename, channel=channel)
+        df = importabf(folderpath / filename, channel=channel)
         df["sweep"] = df.sweep_raw + maxsweep
         maxsweep = df.sweep.max()
         listdf.append(df)
@@ -160,12 +152,12 @@ def importAbfFolder(folderpath, channel=0):
 
 * Import returns df (FIX: more specific name!)
 
-* build_dfmean returns dfmean with 3 columns
+* builddfmean returns dfmean with 3 columns
     1 dfmean.voltage
     2 dfmean.prim
     3 dfmean.bis
 
-* FindStim returns t_Stim (time of stim artefact)
+* findstim returns t_Stim (time of stim artefact)
     IN: dfmeandiff
 * Normalize returns normalized dfmean
     IN: dfmean, t_Stim=0, normpoints=20
@@ -179,7 +171,7 @@ def importAbfFolder(folderpath, channel=0):
     IN: t_VEB, t_Stim
 
 ```python
-def build_dfmean(df, rollingwidth=3):
+def builddfmean(df, rollingwidth=3):
     """
     dfmean.voltate(V) (a single sweep built on the mean of all time)
     dfmean.prim
@@ -204,7 +196,7 @@ def build_dfmean(df, rollingwidth=3):
 ```
 
 ```python
-def findStim(dfmean):
+def findstim(dfmean):
     """
     accepts first order derivative of dfmean
     finds x of max(y): the steepest incline
@@ -320,8 +312,8 @@ def find_t(df, param_min_time_from_t_Stim=0.0005):
     The function finds VEB, but does not currently report it
 
     """
-    dfmean = build_dfmean(df)
-    t_Stim = findStim(dfmean)
+    dfmean = builddfmean(df)
+    t_Stim = findstim(dfmean)
     t_EPSP = findEPSP(dfmean)
     t_VEB, max_acceptable_t_for_VEB = findVEB(dfmean, t_EPSP)
     t_EPSPslope = find_t_EPSPslope(dfmean, t_VEB, t_EPSP, happy=True)
@@ -333,7 +325,7 @@ def find_t(df, param_min_time_from_t_Stim=0.0005):
 ```
 
 ```python
-def measure_slope(df, t_slope, halfwidth, name="EPSP"):
+def measureslope(df, t_slope, halfwidth, name="EPSP"):
     """
     Generalized function
 
@@ -369,7 +361,7 @@ def measure_slope(df, t_slope, halfwidth, name="EPSP"):
 ```
 
 ```python
-def ProcessExport(importfolderpath, meandatapath, metadatapath, outdatapath, chosenalgorithm=None):
+def Processexport(importfolderpath, meandatapath, metadatapath, outdatapath, chosenalgorithm=None):
     """
     create dfs and csvs from folder
     
@@ -391,7 +383,7 @@ def ProcessExport(importfolderpath, meandatapath, metadatapath, outdatapath, cho
         appliedalgorithms = "linear"
         chosenalgorithm = "linear"     
     
-    dfFolder = importAbfFolder(importfolderpath)
+    dfFolder = importabffolder(importfolderpath)
     t_volleyslope, t_EPSPslope, dfmean = find_t(dfFolder, param_min_time_from_t_Stim=0.0005)
     dfmetadata = pd.DataFrame(
         {"Folderpath": importfolderpath,
@@ -406,8 +398,8 @@ def ProcessExport(importfolderpath, meandatapath, metadatapath, outdatapath, cho
 
     list_outdata = []
     # Further down the line: measureslope can run several algorithms, recommend one, but user chooses
-    list_outdata.append(measure_slope(dfFolder, t_EPSPslope, 0.0004, name="EPSP"))
-    list_outdata.append(measure_slope(dfFolder, t_volleyslope, 0.0002, name="volley"))
+    list_outdata.append(measureslope(dfFolder, t_EPSPslope, 0.0004, name="EPSP"))
+    list_outdata.append(measureslope(dfFolder, t_volleyslope, 0.0002, name="volley"))
     dfoutdata = pd.concat(list_outdata)
     dfoutdata.reset_index(drop=True, inplace=True)
     
@@ -418,11 +410,11 @@ def ProcessExport(importfolderpath, meandatapath, metadatapath, outdatapath, cho
     return dfmean, dfmetadata, dfoutdata
 
 
-def loadMetadataORprocess(importfolderpath):
+def loadmetadataORprocess(importfolderpath):
     """
     Check for metadata file
     if exists: load
-    else: call ProcessExport
+    else: call Processexport
 
     """
     meandata_path_ending = "_".join(importfolderpath.parts[-2:]) + "_meandata.csv"
@@ -441,7 +433,7 @@ def loadMetadataORprocess(importfolderpath):
         #print("...done.")
     else:
         print("No", outdata_path_ending, "- Creating...")
-        dfmean, dfmetadata, dfoutdata = ProcessExport(
+        dfmean, dfmetadata, dfoutdata = Processexport(
             importfolderpath, meandatapath, metadatapath, outdatapath
         )
         #print("...done.")
@@ -483,7 +475,7 @@ def plotmean(dfmean_in, t, title=None, t_VEB=None):
 print(list_folders)
 for i in list_folders:
     folder1 = dir_source_data / i
-    dfmean, dfmetadata, dfoutdata = loadMetadataORprocess(folder1)
+    dfmean, dfmetadata, dfoutdata = loadmetadataORprocess(folder1)
     t = dfmetadata.iloc[0].to_dict()
     #print(dfmean)
     plotmean(dfmean, t, title=i)
@@ -531,7 +523,7 @@ def getgroupdata(pathfolders:list):
     #print(pathfolders)
     for i in pathfolders:
         name = '/'.join(i.__str__().split('\\')[-2:])
-        dfmean, dfmetadata, dfoutdata = loadMetadataORprocess(i)
+        dfmean, dfmetadata, dfoutdata = loadmetadataORprocess(i)
         dfoutdata['name'] = name
         dfoutdatas.append(dfoutdata)
         print(i, "NAME", name)
