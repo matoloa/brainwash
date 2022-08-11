@@ -1,32 +1,101 @@
 ```python
-import sys
-from PyQt5 import QtWidgets, uic
-
-app = QtWidgets.QApplication(sys.argv)
-
-window = uic.loadUi("../quiwip/testtext.ui")
-window.show()
-app.exec()
+"""
+Useful links:
+    https://wiki.qt.io/New_Signal_Slot_Syntax
+    https://doc.qt.io/qtforpython/overviews/qtwidgets-tutorials-widgets-windowlayout-example.html#widgets-tutorial-using-layouts
+    https://realpython.com/qt-designer-python/#installing-and-running-qt-designer
+    https://www.pythonfixing.com/2021/10/fixed-qfilesystemmodel-qtreeview.html
+    https://www.youtube.com/watch?v=gg5TepTc2Jg
+    https://youtu.be/t7JZo2xbb8I?t=29
+"""
 ```
 
 ```python
 import sys
-from PyQt5 import QtWidgets, uic
-
-app = QtWidgets.QApplication(sys.argv)
-
-window = uic.loadUi("../quiwip/testtext.ui")
-window.show()
-app.exec()
+import os
+from pathlib import Path
+from PyQt5 import QtWidgets, uic, QtCore, QtGui
 ```
 
 ```python
+"""app = QtWidgets.QApplication(sys.argv)
+
+window = uic.loadUi("../quiwip/testtext.ui")
+window.show()
+app.exec()"""
+```
+
+```python
+# Copy for toying
+"""app = QtWidgets.QApplication(sys.argv)
+
+window = uic.loadUi("../quiwip/testtext.ui")
+window.show()
+app.exec()"""
+```
+
+```python
+"""from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
+    QMetaObject, QObject, QPoint, QRect,
+    QSize, QTime, QUrl, Qt)
+from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
+    QCursor, QFont, QFontDatabase, QGradient,
+    QIcon, QImage, QKeySequence, QLinearGradient,
+    QPainter, QPalette, QPixmap, QRadialGradient,
+    QTransform)
+from PySide6.QtWidgets import (QApplication, QLabel, QLineEdit, QMainWindow,
+    QMenuBar, QSizePolicy, QStatusBar, QTextBrowser,
+    QWidget)
+"""
+class UI(QtWidgets.QMainWindow):
+    def __init__(self):
+        super(UI, self).__init__()
+        
+        # Load the ui file
+        #uic.loadUi("../quiwip/testtext.ui", self)
+        
+        uic.loadUi("../quiwip/testqtd1.ui", self)
+        self.setWindowTitle("Bind Text Typing")
+        
+        # Define our widgets
+        self.edit = self.findChild(QtWidgets.QLineEdit, "lineEdit")
+        self.label = self.findChild(QtWidgets.QLabel, "label")
+        self.textBrowser = self.findChild(QtWidgets.QTextBrowser, "textBrowser")
+        
+        # Hit Enter
+        self.edit.editingFinished.connect(self.hitEnter)
+        
+        # Change Text
+        self.edit.textChanged.connect(self.changeText)
+                       
+        self.show()
+        
+    def hitEnter(self):
+        self.textBrowser.setText(self.edit.text())
+    
+    def changeText(self):
+        self.label.setText(self.edit.text())
+```
+
+```python
+dir_project_root = Path(os.getcwd().split("notebook")[0])
+app = QtWidgets.QApplication(sys.argv)
+UIWindow = UI()
+app.exec_()
+#app.setupUi()
+#ex = Ui_MainWindow()
+#ex = FileTreeSelectorDialog(root_path=str(dir_project_root)) # dir as str because QT seems to not support pathlib
+# class Ui_MainWindow(object):
+#sys.exit(app.exec_())
+```
+
+```python
+"""
 # file tree selector
 import sys
 import os
 from pathlib import Path
-from PyQt5 import QtWidgets, QtCore, QtGui
-
+from PyQt5 import QtWidgets, uic, QtCore, QtGui
 
 class FileTreeSelectorModel(QtWidgets.QFileSystemModel):
     def __init__(self, parent=None, root_path='/'):
@@ -138,4 +207,9 @@ dir_project_root = Path(os.getcwd().split("notebook")[0])
 app = QtWidgets.QApplication(sys.argv)
 ex = FileTreeSelectorDialog(root_path=str(dir_project_root)) # dir as str because QT seems to not support pathlib
 sys.exit(app.exec_())
+"""
+```
+
+```python
+
 ```
