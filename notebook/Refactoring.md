@@ -6,7 +6,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.13.8
+      jupytext_version: 1.13.1
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -61,11 +61,13 @@ def buildexperimentcsv(dir_gen_data):
     Generate overview file of all csv:s
     Assumes no such file exists
     Add later: functions to check for not-included-folders, convert those
-    
+
     # Read groups and assigment from metadata.txt
     # Later: read applied algorithm from metadata.txt into df
     """
-    list_metadatafiles = [i for i in os.listdir(dir_gen_data) if -1 < i.find("_metadata.txt")]
+    list_metadatafiles = [
+        i for i in os.listdir(dir_gen_data) if -1 < i.find("_metadata.txt")
+    ]
     dfmetadata = pd.concat([pd.read_csv(dir_gen_data / i) for i in list_metadatafiles])
     dfmetadata.reset_index(drop=True, inplace=True)
     return dfmetadata
@@ -280,7 +282,7 @@ def find_t_volleyslope(
 ):  # , param_half_slope_width = 4):
     """
     DOES NOT USE WIDTH! decided by rolling, earlier?
-    
+
     returns time of volley slope center,
         as identified by positive zero-crossings in the second order derivative
         if several are found, it returns the latest one
@@ -361,39 +363,45 @@ def measureslope(df, t_slope, halfwidth, name="EPSP"):
 ```
 
 ```python
-def Processexport(importfolderpath, meandatapath, metadatapath, outdatapath, chosenalgorithm=None):
+def Processexport(
+    importfolderpath, meandatapath, metadatapath, outdatapath, chosenalgorithm=None
+):
     """
     create dfs and csvs from folder
-    
+
     metadata.txt contents
         Folderpath
         Exclude (boolean)
         List of Algorithms
         Chosen Algorithm
         Groups (list)
-        
+
         t_EPSPslope
         t_volleyslope
 
-    
+
 
     """
     # Placeholder algorithm selector
     if chosenalgorithm is None:
         appliedalgorithms = "linear"
-        chosenalgorithm = "linear"     
-    
+        chosenalgorithm = "linear"
+
     dfFolder = importabffolder(importfolderpath)
-    t_volleyslope, t_EPSPslope, dfmean = find_t(dfFolder, param_min_time_from_t_Stim=0.0005)
+    t_volleyslope, t_EPSPslope, dfmean = find_t(
+        dfFolder, param_min_time_from_t_Stim=0.0005
+    )
     dfmetadata = pd.DataFrame(
-        {"Folderpath": importfolderpath,
-         "Exclude": False,
-         "Applied algorithms": appliedalgorithms,
-         "Chosen algorithm": chosenalgorithm,
-         "Groups": None,
-         "t_EPSPslope": t_EPSPslope,
-         "t_volleyslope": t_volleyslope
-        }, index=[1]
+        {
+            "Folderpath": importfolderpath,
+            "Exclude": False,
+            "Applied algorithms": appliedalgorithms,
+            "Chosen algorithm": chosenalgorithm,
+            "Groups": None,
+            "t_EPSPslope": t_EPSPslope,
+            "t_volleyslope": t_volleyslope,
+        },
+        index=[1],
     )
 
     list_outdata = []
@@ -402,7 +410,7 @@ def Processexport(importfolderpath, meandatapath, metadatapath, outdatapath, cho
     list_outdata.append(measureslope(dfFolder, t_volleyslope, 0.0002, name="volley"))
     dfoutdata = pd.concat(list_outdata)
     dfoutdata.reset_index(drop=True, inplace=True)
-    
+
     dfmean.to_csv(meandatapath)
     dfmetadata.to_csv(metadatapath, index=False)
     dfoutdata.to_csv(outdatapath, index=False)
@@ -424,51 +432,48 @@ def loadmetadataORprocess(importfolderpath):
     outdata_path_ending = "_".join(importfolderpath.parts[-2:]) + "_outdata.csv"
     outdatapath = dir_gen_data / outdata_path_ending
 
-    
     if meandatapath.exists():
         print("Found", outdata_path_ending, "- Reading...")
         dfmean = pd.read_csv(meandatapath)
         dfmetadata = pd.read_csv(metadatapath)
         dfoutdata = pd.read_csv(outdatapath)
-        #print("...done.")
+        # print("...done.")
     else:
         print("No", outdata_path_ending, "- Creating...")
         dfmean, dfmetadata, dfoutdata = Processexport(
             importfolderpath, meandatapath, metadatapath, outdatapath
         )
-        #print("...done.")
+        # print("...done.")
 
     return dfmean, dfmetadata, dfoutdata
 ```
 
 ```python
 def plotmean(dfmean_in, t, title=None, t_VEB=None):
-    '''
-    
-    '''
-    dfmean = dfmean_in.copy() # Create local copy to make sure original is untouched
-    dfmean.reset_index(inplace=True) # Reset index in local copy to make graphs happy
-    t_EPSPslope = t['t_EPSPslope']
-    t_volleyslope = t['t_volleyslope']
+    """ """
+    dfmean = dfmean_in.copy()  # Create local copy to make sure original is untouched
+    dfmean.reset_index(inplace=True)  # Reset index in local copy to make graphs happy
+    t_EPSPslope = t["t_EPSPslope"]
+    t_volleyslope = t["t_volleyslope"]
 
     fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
-    g = sns.lineplot(data=dfmean, y='voltage', x='time', ax=ax1, color='black')
-    h = sns.lineplot(data=dfmean, y='prim', x='time', ax=ax1, color='red')
-    i = sns.lineplot(data=dfmean, y='bis', x='time', ax=ax1, color='green')
-    h.axhline(0, linestyle='dotted')
+    g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=ax1, color="black")
+    h = sns.lineplot(data=dfmean, y="prim", x="time", ax=ax1, color="red")
+    i = sns.lineplot(data=dfmean, y="bis", x="time", ax=ax1, color="green")
+    h.axhline(0, linestyle="dotted")
     if not title is None:
         ax1.set_title(title)
     ax1.set_ylim(-0.001, 0.001)
     ax1.set_xlim(0.006, 0.02)
     if not t_VEB is None:
-        h.axvline(t_VEB, color='orange')
-        #h.axvline(max_acceptable_t_for_VEB, color='yellow')
-    h.axvline(t_EPSPslope-0.0004, color='purple')
-    h.axvline(t_EPSPslope, color='purple')
-    h.axvline(t_EPSPslope+0.0004, color='purple')
-    h.axvline(t_volleyslope-0.0001, color='blue')
-    h.axvline(t_volleyslope, color='blue')
-    h.axvline(t_volleyslope+0.0001, color='blue')
+        h.axvline(t_VEB, color="orange")
+        # h.axvline(max_acceptable_t_for_VEB, color='yellow')
+    h.axvline(t_EPSPslope - 0.0004, color="purple")
+    h.axvline(t_EPSPslope, color="purple")
+    h.axvline(t_EPSPslope + 0.0004, color="purple")
+    h.axvline(t_volleyslope - 0.0001, color="blue")
+    h.axvline(t_volleyslope, color="blue")
+    h.axvline(t_volleyslope + 0.0001, color="blue")
 ```
 
 ```python
@@ -477,13 +482,13 @@ for i in list_folders:
     folder1 = dir_source_data / i
     dfmean, dfmetadata, dfoutdata = loadmetadataORprocess(folder1)
     t = dfmetadata.iloc[0].to_dict()
-    #print(dfmean)
+    # print(dfmean)
     plotmean(dfmean, t, title=i)
 ```
 
 ```python
 dfoutdata
-#dfmean
+# dfmean
 ```
 
 ```python
@@ -491,14 +496,14 @@ print(list_folders)
 ```
 
 ```python
-#list_folders = [i for i in os.listdir(dir_source_data) if -1 < i.find("")]
+# list_folders = [i for i in os.listdir(dir_source_data) if -1 < i.find("")]
 list_GKO = [i for i in list_folders if -1 < i.find("GKO")]
 list_WT = [i for i in list_folders if -1 < i.find("WT")]
 ```
 
 ```python
 print(dir_source_data)
-dir_source_data.__str__().split('\\')
+dir_source_data.__str__().split("\\")
 ```
 
 ```python
@@ -510,46 +515,50 @@ t
 ```
 
 ```python
-sns.lineplot(data=dfoutdata, x = 'sweep', y = 'value', hue = 'type')
+sns.lineplot(data=dfoutdata, x="sweep", y="value", hue="type")
 ```
 
 ```python
-def getgroupdata(pathfolders:list):
+def getgroupdata(pathfolders: list):
     """
     loadMetadtaORprocess all <pathfolders>
     return concatenated df : outdata with added 'name' = (last two folder levels)
     """
     dfoutdatas = []
-    #print(pathfolders)
+    # print(pathfolders)
     for i in pathfolders:
-        name = '/'.join(i.__str__().split('\\')[-2:])
+        name = "/".join(i.__str__().split("\\")[-2:])
         dfmean, dfmetadata, dfoutdata = loadmetadataORprocess(i)
-        dfoutdata['name'] = name
+        dfoutdata["name"] = name
         dfoutdatas.append(dfoutdata)
         print(i, "NAME", name)
-        #plotmean(dfmean, t, title=i)
+        # plotmean(dfmean, t, title=i)
     dfoutdata = pd.concat(dfoutdatas)
     dfoutdata.reset_index(drop=True, inplace=True)
     return dfoutdata
 ```
 
 ```python
-listpathWT = [dir_source_data /i for i in os.listdir(dir_source_data) if -1 < i.find("WT")]
+listpathWT = [
+    dir_source_data / i for i in os.listdir(dir_source_data) if -1 < i.find("WT")
+]
 dfoutdataWT = getgroupdata(listpathWT)
 print(dfoutdataWT)
-#sns.lineplot(data=dfoutdataWT, x = 'sweep', y = 'value', hue = 'type')
-listpathGKO = [dir_source_data /i for i in os.listdir(dir_source_data) if -1 < i.find("GKO")]
+# sns.lineplot(data=dfoutdataWT, x = 'sweep', y = 'value', hue = 'type')
+listpathGKO = [
+    dir_source_data / i for i in os.listdir(dir_source_data) if -1 < i.find("GKO")
+]
 dfoutdataGKO = getgroupdata(listpathGKO)
-#sns.lineplot(data=dfoutdataGKO, x = 'sweep', y = 'value', hue = 'type')
+# sns.lineplot(data=dfoutdataGKO, x = 'sweep', y = 'value', hue = 'type')
 ```
 
 ```python
-dfoutdataWT['group'] = 'WT'
-dfoutdataGKO['group'] = 'GKO'
+dfoutdataWT["group"] = "WT"
+dfoutdataGKO["group"] = "GKO"
 dfoutdata = pd.concat([dfoutdataWT, dfoutdataGKO]).reset_index(drop=True)
 dfplot = dfoutdata[dfoutdata.type == "EPSP_slope"]
 
-sns.lineplot(data=dfplot, x = 'sweep', y = 'value', hue = 'group', style = 'type', n_boot=5)
+sns.lineplot(data=dfplot, x="sweep", y="value", hue="group", style="type", n_boot=5)
 ```
 
 ```python
@@ -558,8 +567,8 @@ dfoutdata.head()
 
 ```python
 print(buildexperimentcsv(dir_gen_data))
-#list_metadatafiles = [i for i in os.listdir(dir_gen_data) if -1 < i.find("_metadata.txt")]
-#list_metadatafiles
+# list_metadatafiles = [i for i in os.listdir(dir_gen_data) if -1 < i.find("_metadata.txt")]
+# list_metadatafiles
 ```
 
 ```python
