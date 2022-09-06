@@ -8,7 +8,7 @@ from PyQt5 import QtWidgets, uic, QtCore, QtGui
 
 dir_project_root = Path(os.getcwd().split("quiwip")[0])
 
-class FileTreeSelectorModel(QtWidgets.QFileSystemModel):
+class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with a FileTreeSelectorView
     def __init__(self, parent=None, root_path='/'):
         QtWidgets.QFileSystemModel.__init__(self, None)
         self.root_path      = root_path
@@ -123,11 +123,12 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
 
 
 class FileTreeSelectorDialogStripped(QtWidgets.QWidget):
-    def __init__(self, root_path='/'):
+    def __init__(self, parent=None, root_path='/'):
         super().__init__()
-
+        
+        self.parent = parent
         self.root_path      = root_path
-
+                
         # Model
         self.model          = FileTreeSelectorModel(root_path=self.root_path)
         # self.model          = QtWidgets.QFileSystemModel()
@@ -200,7 +201,8 @@ class UI(QtWidgets.QMainWindow):
 app = QtWidgets.QApplication(sys.argv)
 
 UIWindow = UI()
-# ex = FileTreeSelectorDialogStripped(root_path=str(dir_project_root)) # dir as str because QT seems to not support pathlib
+ex = FileTreeSelectorDialogStripped(parent=UIWindow, root_path=str(dir_project_root)) # dir as str because QT seems to not support pathlib
+app.exec_()
 sys.exit(app.exec_())
 # %%
 print(os.getcwd())
