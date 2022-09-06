@@ -1,4 +1,4 @@
-#%%
+#%%con
 # file tree selector
 import sys
 import os
@@ -169,13 +169,13 @@ class UI(QtWidgets.QMainWindow):
     def __init__(self):
         super(UI, self).__init__()
         # Load interface and main window
-        uic.loadUi(dir_project_root / "quiwip" / "testqtd1.ui", self)
+        uic.loadUi(dir_project_root / "quiwip" / "textandtree.ui", self)
 
         # Define our widgets
         self.edit = self.findChild(QtWidgets.QLineEdit, "lineEdit")
         self.label = self.findChild(QtWidgets.QLabel, "label")
         self.textBrowser = self.findChild(QtWidgets.QTextBrowser, "textBrowser")
-        self.filetree = self.findChild(FileTreeSelectorDialogStripped, "treeWidget") #(root_path=str(dir_project_root))) # dir as str because QT seems to not support pathlib
+        self.filetree = self.findChild(QtWidgets.QTreeWidget, "treeWidget") #(root_path=str(dir_project_root))) # dir as str because QT seems to not support pathlib
 
         # Hit Enter
         self.edit.editingFinished.connect(self.hitEnter)
@@ -200,8 +200,7 @@ class UI(QtWidgets.QMainWindow):
 app = QtWidgets.QApplication(sys.argv)
 
 UIWindow = UI()
-ex = FileTreeSelectorDialogStripped(root_path=str(dir_project_root)) # dir as str because QT seems to not support pathlib
-app.exec_()
+# ex = FileTreeSelectorDialogStripped(root_path=str(dir_project_root)) # dir as str because QT seems to not support pathlib
 sys.exit(app.exec_())
 # %%
 print(os.getcwd())
