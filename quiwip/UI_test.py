@@ -1,3 +1,4 @@
+#%%
 # file tree selector
 import sys
 import os
@@ -75,7 +76,7 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
         self.root_path      = root_path
 
         # Widget
-        self.title          = "Testing this shit"
+        self.title          = "Not supposed to be a separate window!"
         self.left           = 50
         self.top            = 50
         self.width          = 1080
@@ -83,6 +84,49 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
 
         self.setWindowTitle(self.title)         #TODO:  Whilch title?
         self.setGeometry(self.left, self.top, self.width, self.height)
+
+        # Model
+        self.model          = FileTreeSelectorModel(root_path=self.root_path)
+        # self.model          = QtWidgets.QFileSystemModel()
+
+        # View
+        self.view           = QtWidgets.QTreeView()
+
+        self.view.setObjectName('treeView_fileTreeSelector')
+        self.view.setWindowTitle("Dir View")    #TODO:  Which title?
+        self.view.setAnimated(False)
+        self.view.setIndentation(20)
+        self.view.setSortingEnabled(True)
+        self.view.setColumnWidth(0,150)
+        self.view.resize(1080, 640)
+
+        # Attach Model to View
+        self.view.setModel(self.model)
+        self.view.setRootIndex(self.model.parent_index)
+
+        # Misc
+        self.node_stack     = []
+
+        # GUI
+        windowlayout = QtWidgets.QVBoxLayout()
+        windowlayout.addWidget(self.view)
+        self.setLayout(windowlayout)
+
+        QtCore.QMetaObject.connectSlotsByName(self)
+
+        self.show()
+
+    @QtCore.pyqtSlot(QtCore.QModelIndex)
+    def on_treeView_fileTreeSelector_clicked(self, index):
+        print('tree clicked: {}'.format(self.model.filePath(index)))
+        self.model.traverseDirectory(index, callback=self.model.printIndex)
+
+
+class FileTreeSelectorDialogStripped(QtWidgets.QWidget):
+    def __init__(self, root_path='/'):
+        super().__init__()
+
+        self.root_path      = root_path
 
         # Model
         self.model          = FileTreeSelectorModel(root_path=self.root_path)
@@ -131,7 +175,7 @@ class UI(QtWidgets.QMainWindow):
         self.edit = self.findChild(QtWidgets.QLineEdit, "lineEdit")
         self.label = self.findChild(QtWidgets.QLabel, "label")
         self.textBrowser = self.findChild(QtWidgets.QTextBrowser, "textBrowser")
-        self.filetree = self.findChild(QtWidgets.FileTreeSelectorDialog, "filetree") #(root_path=str(dir_project_root))) # dir as str because QT seems to not support pathlib
+        self.filetree = self.findChild(FileTreeSelectorDialogStripped, "treeWidget") #(root_path=str(dir_project_root))) # dir as str because QT seems to not support pathlib
 
         # Hit Enter
         self.edit.editingFinished.connect(self.hitEnter)
@@ -152,13 +196,13 @@ class UI(QtWidgets.QMainWindow):
 
 
 
-#%%
+# %%
 app = QtWidgets.QApplication(sys.argv)
 
 UIWindow = UI()
-#ex = FileTreeSelectorDialog(root_path=str(dir_project_root)) # dir as str because QT seems to not support pathlib
+ex = FileTreeSelectorDialogStripped(root_path=str(dir_project_root)) # dir as str because QT seems to not support pathlib
 app.exec_()
-#sys.exit(app.exec_())
+sys.exit(app.exec_())
 # %%
 print(os.getcwd())
 # %%
