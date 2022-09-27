@@ -137,8 +137,8 @@ def FileTreeSelectorDialogStripped(widget, root_path='/'):
         widget.view.setAnimated(False)
         widget.view.setIndentation(20)
         widget.view.setSortingEnabled(True)
-        widget.view.setColumnWidth(0,150)
-        widget.view.resize(1080, 640)
+        widget.view.setColumnWidth(0,300)
+        widget.view.resize(1080, 600)
 
         # Attach Model to View
         widget.view.setModel(widget.model)
@@ -159,6 +159,7 @@ def FileTreeSelectorDialogStripped(widget, root_path='/'):
     #@QtCore.pyqtSlot(QtCore.QModelIndex)
 def on_treeView_fileTreeSelector_clicked(self, index):
     print('tree clicked: {}'.format(self.model.filePath(index)))
+    self.label.setText("Clicked")
     self.model.traverseDirectory(index, callback=self.model.printIndex)
 
 
@@ -169,31 +170,48 @@ class UI(QtWidgets.QMainWindow):
         uic.loadUi(dir_project_root / "quiwip" / "textandtree.ui", self)
 
         # Define our widgets
-        #self.edit = self.findChild(QtWidgets.QLineEdit, "lineEdit")
-        #self.label = self.findChild(QtWidgets.QLabel, "label")
-        #self.textBrowser = self.findChild(QtWidgets.QTextBrowser, "textBrowser")
-        #self.filetree = self.findChild(QtWidgets.QTreeView, "treeWiew") #(root_path=str(dir_project_root))) # dir as str because QT seems to not support pathlib
+        self.edit = self.findChild(QtWidgets.QLineEdit, "lineEdit")
+        self.label = self.findChild(QtWidgets.QLabel, "label")
         self.widget = self.findChild(QtWidgets.QWidget, "widget")
         
         # create the file tree thingie
         self.ftree = FileTreeSelectorDialogStripped(widget=self.widget, 
                                                     root_path=str(dir_project_root / "dataSource")) # dir as str because QT seems to not support pathlib
 
+        #print(self.children()[1].children()[3].metaObject())
+        print(self.children()[1].children()[1].__dict__)
+        print("0", self.children()[1].children()[0])
+        print("1", self.children()[1].children()[1])
+        print("2", self.children()[1].children()[2])
+        print("3", self.children()[1].children()[3])
 
-        #self.model = FileTreeSelectorModel()
-        
-        #self.filetree.setModel(self.model)
-        #self.filetree.setRootIndex(self.model.parent_index)
 
-        #QtCore.QMetaObject.connectSlotsByName(self)
+        def get_signals(source):
+            cls = source if isinstance(source, type) else type(source)
+            signal = type(QtCore.pyqtSignal())
+            print("Dumdumdum")
+            for subcls in cls.mro():
+                clsname = f'{subcls.__module__}.{subcls.__name__}'
+                for key, value in sorted(vars(subcls).items()):
+                    if isinstance(value, signal):
+                        print(f'{key} [{clsname}]')
 
-        
+        get_signals(self.children()[1].children()[1].model)
+
+
+
+        # Clicked Filetree
+        #self.widget.on_treeView_fileTreeSelector_clicked(self.)
+
         # Hit Enter
-        #self.edit.editingFinished.connect(self.hitEnter)
+        self.edit.editingFinished.connect(self.hitEnter)
 
         # Change Text
-        #self.edit.textChanged.connect(self.changeText)
+        self.edit.textChanged.connect(self.changeText)
 
+        # Placeholder update label instruction
+        self.label.setText("The label text")
+        
         self.show()
 
 
@@ -211,6 +229,8 @@ class UI(QtWidgets.QMainWindow):
 app = QtWidgets.QApplication(sys.argv)
 
 UIWindow = UI()
+#app.allWidgets()
+
 sys.exit(app.exec_())
 # %%
 print(os.getcwd())
