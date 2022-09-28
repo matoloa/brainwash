@@ -157,6 +157,7 @@ def FileTreeSelectorDialogStripped(widget, root_path='/'):
         widget.show()
 
     #@QtCore.pyqtSlot(QtCore.QModelIndex)
+    
 def on_treeView_fileTreeSelector_clicked(self, index):
     print('tree clicked: {}'.format(self.model.filePath(index)))
     self.label.setText("Clicked")
@@ -186,20 +187,6 @@ class UI(QtWidgets.QMainWindow):
         print("3", self.children()[1].children()[3])
 
 
-        def get_signals(source):
-            cls = source if isinstance(source, type) else type(source)
-            signal = type(QtCore.pyqtSignal())
-            print("Dumdumdum")
-            for subcls in cls.mro():
-                clsname = f'{subcls.__module__}.{subcls.__name__}'
-                for key, value in sorted(vars(subcls).items()):
-                    if isinstance(value, signal):
-                        print(f'{key} [{clsname}]')
-
-        get_signals(self.children()[1].children()[1].model)
-
-
-
         # Clicked Filetree
         #self.widget.on_treeView_fileTreeSelector_clicked(self.)
 
@@ -212,10 +199,16 @@ class UI(QtWidgets.QMainWindow):
         # Placeholder update label instruction
         self.label.setText("The label text")
         
+        self.widget.view.clicked.connect(self.ftree_clicked) # this worked to find the signal that finds if the ftree was clicked
+
         self.show()
 
-
+    def ftree_clicked(self): # now working
+        print("clicked")
+    
+    
     def hitEnter(self):
+        get_signals(self.children()[1].children()[1].model)
         self.textBrowser.setText(self.edit.text())
 
 
@@ -223,6 +216,15 @@ class UI(QtWidgets.QMainWindow):
         self.label.setText(self.edit.text())
 
 
+def get_signals(source):
+        cls = source if isinstance(source, type) else type(source)
+        signal = type(QtCore.pyqtSignal())
+        print("Dumdumdum")
+        for subcls in cls.mro():
+            clsname = f'{subcls.__module__}.{subcls.__name__}'
+            for key, value in sorted(vars(subcls).items()):
+                if isinstance(value, signal):
+                    print(f'{key} [{clsname}]')
 
 
 # %%
@@ -230,6 +232,7 @@ app = QtWidgets.QApplication(sys.argv)
 
 UIWindow = UI()
 #app.allWidgets()
+
 
 sys.exit(app.exec_())
 # %%
