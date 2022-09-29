@@ -1,5 +1,6 @@
 #%%con
 # file tree selector
+from re import I
 import sys
 import os
 from pathlib import Path
@@ -39,10 +40,20 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
         else:
             return QtCore.Qt.Unchecked
 
+    def getCheckedPaths(self):
+        str_paths = []
+        for k, v in self.checks.items():
+            if (v == 2): # Checked
+                str_paths.append(format(self.filePath(k)))
+        print(str_paths)
+
+#    print('tree clicked: {}'.format(self.model.filePath(index)))
+#    print(f'tree checks: {self.model.checks}')
+
     def setData(self, index, value, role):
         if (role == QtCore.Qt.CheckStateRole and index.column() == 0):
             self.checks[index] = value
-            print('setData(): {}'.format(value))
+            # print('setData(): {}'.format(value))
             return True
         return QtWidgets.QFileSystemModel.setData(self, index, value, role)
 
@@ -138,7 +149,7 @@ def FileTreeSelectorDialogStripped(widget, root_path='/'):
         widget.view.setAnimated(False)
         widget.view.setIndentation(20)
         widget.view.setSortingEnabled(True)
-        widget.view.setColumnWidth(0,300)
+        widget.view.setColumnWidth(0,150)
         widget.view.resize(1080, 600)
 
         # Attach Model to View
@@ -163,8 +174,9 @@ def FileTreeSelectorDialogStripped(widget, root_path='/'):
 # will the decorator understand that it a bound method? hope so.
 #@QtCore.pyqtSlot(QtCore.QModelIndex)   # Inappropriate decorator syntax for method?
 def on_treeView_fileTreeSelector_clicked(self, index):
-    print('tree clicked: {}'.format(self.model.filePath(index)))
-    print(f'tree checks: {self.model.checks}')
+    self.model.getCheckedPaths()
+    #print('tree clicked: {}'.format(self.model.filePath(index)))
+    #print(f'tree checks: {self.model.checks}')
     #self.model.traverseDirectory(index, callback=self.model.printIndex)
 
 
