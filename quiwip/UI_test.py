@@ -9,6 +9,8 @@ from PyQt5 import QtWidgets, uic, QtCore, QtGui
 dir_project_root = Path(os.getcwd().split("quiwip")[0])
 
 class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with a FileTreeSelectorView
+    paths_selected = QtCore.pyqtSignal(list)
+    
     def __init__(self, parent=None, root_path='/'):
         QtWidgets.QFileSystemModel.__init__(self, None)
         self.root_path      = root_path
@@ -17,7 +19,8 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
         self.parent_index   = self.setRootPath(self.root_path)
         self.root_index     = self.index(self.root_path)
 
-        self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.Hidden | QtCore.QDir.NoDotAndDotDot)
+        self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
+        self.sort(0, QtCore.Qt.SortOrder.AscendingOrder)
         self.directoryLoaded.connect(self._loaded)
 
     def _loaded(self, path):
@@ -40,15 +43,14 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
             return QtCore.Qt.Unchecked
 
     def getCheckedPaths(self):
-        str_paths = []
+        paths = []
         for k, v in self.checks.items():
             if (v == 2): # Checked
-                str_paths.append(format(self.filePath(k)))
-        print(str_paths)
-        # Emit SIGNAL/event
-        
-        #self.textBrowser.setText(str_paths)
-
+                paths.append(format(self.filePath(k)))
+        print(paths)
+        self.paths_selected.emit(paths)
+    
+    
     def setData(self, index, value, role):
         if (role == QtCore.Qt.CheckStateRole and index.column() == 0):
             self.checks[index] = value
@@ -85,13 +87,20 @@ def FileTreeSelectorDialogStripped(widget, root_path='/'):
         widget.view.setWindowTitle("Dir View")    #TODO:  Which title?
         widget.view.setAnimated(False)
         widget.view.setIndentation(20)
-        widget.view.setSortingEnabled(True)
-        widget.view.setColumnWidth(0, 150)
+        widget.view.setColumnHidden(3, True)
+        widget.view.setSortingEnabled(False)
         widget.view.resize(1080, 600)
 
         # Attach Model to View
         widget.view.setModel(widget.model)
         widget.view.setRootIndex(widget.model.parent_index)
+        print(f'coln: {widget.view.columnAt(200)}')
+        widget.view.setColumnHidden(3, True) # hide "modified" column
+        #widget.view.resizeColumnToContents(0) # not a good idea at the moment
+        widget.view.setColumnWidth(0, 250)
+        widget.view.setColumnWidth(1, 100)
+        widget.view.setColumnWidth(2, 50)
+
 
         # Misc
         widget.node_stack     = []
@@ -121,12 +130,16 @@ class UI(QtWidgets.QMainWindow):
         self.edit = self.findChild(QtWidgets.QLineEdit, "lineEdit")
         self.label = self.findChild(QtWidgets.QLabel, "label")
         self.widget = self.findChild(QtWidgets.QWidget, "widget")
+        self.textBrowser = self.findChild(QtWidgets.QTextBrowser, "textBrowser")
+
         
         # create the file tree thingie
         self.ftree = FileTreeSelectorDialogStripped(widget=self.widget, 
                                                     root_path=str(dir_project_root / "dataSource")) # dir as str because QT seems to not support pathlib
         # create the file tree thingie
         self.widget.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
+        
+        self.widget.model.paths_selected.connect(self.print_paths)
 
         # Hit Enter
         self.edit.editingFinished.connect(self.hitEnter)
@@ -147,6 +160,14 @@ class UI(QtWidgets.QMainWindow):
 
     def changeText(self):
         self.label.setText(self.edit.text())
+    
+    #@QtCore.pyqtSlot()
+    def print_paths(self, mypaths):
+        print(f'mystr: {mypaths}')
+        strmystr = "\n".join(sorted(['/'.join(i.split('/')[-2:]) for i in mypaths]))
+        self.textBrowser.setText(strmystr)
+
+        
 
 
 def get_signals(source):
