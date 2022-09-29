@@ -17,7 +17,7 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
         self.parent_index   = self.setRootPath(self.root_path)
         self.root_index     = self.index(self.root_path)
 
-        self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.Hidden | QtCore.QDir.NoDot)
+        self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.Hidden | QtCore.QDir.NoDotAndDotDot)
         self.directoryLoaded.connect(self._loaded)
 
     def _loaded(self, path):
@@ -37,7 +37,7 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
         if index in self.checks:
             return self.checks[index]
         else:
-            return QtCore.Qt.Checked
+            return QtCore.Qt.Unchecked
 
     def setData(self, index, value, role):
         if (role == QtCore.Qt.CheckStateRole and index.column() == 0):
@@ -164,6 +164,7 @@ def FileTreeSelectorDialogStripped(widget, root_path='/'):
 #@QtCore.pyqtSlot(QtCore.QModelIndex)   # Inappropriate decorator syntax for method?
 def on_treeView_fileTreeSelector_clicked(self, index):
     print('tree clicked: {}'.format(self.model.filePath(index)))
+    print(f'tree checks: {self.model.checks}')
     #self.model.traverseDirectory(index, callback=self.model.printIndex)
 
 
