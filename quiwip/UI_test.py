@@ -161,16 +161,15 @@ def FileTreeSelectorDialogStripped(widget, root_path='/'):
 # this may become messy. we define the method as a function. then we add it to the class and it is broadcasted into the widget instance.
 # we also decorate it with pyqtslot to indicate to the signal which type of value is accepted by the slot
 # will the decorator understand that it a bound method? hope so.
-# @QtCore.pyqtSlot(QtCore.QModelIndex)   # Inappropriate decorator syntax for method?
+#@QtCore.pyqtSlot(QtCore.QModelIndex)   # Inappropriate decorator syntax for method?
 def on_treeView_fileTreeSelector_clicked(self, index):
     print('tree clicked: {}'.format(self.model.filePath(index)))
     #self.model.traverseDirectory(index, callback=self.model.printIndex)
 
-# In-Line decorator syntax
-# on_treeView_fileTreeSelector_clicked = QtCore.pyqtSlot(on_treeView_fileTreeSelector_clicked, QtCore.QModelIndex)
-# QtWidgets.QWidget.on_treeView_fileTreeSelector_clicked = QtCore.pyqtSlot(_func = on_treeView_fileTreeSelector_clicked, types=QtCore.QModelIndex)
-# QtWidgets.QWidget.on_treeView_fileTreeSelector_clicked = QtCore.pyqtSlot(QtCore.QModelIndex)(on_treeView_fileTreeSelector_clicked)
-QtWidgets.QWidget.on_treeView_fileTreeSelector_clicked = QtCore.pyqtSlot(QtCore.QModelIndex)(on_treeView_fileTreeSelector_clicked)
+
+QtWidgets.QWidget.on_treeView_fileTreeSelector_clicked = on_treeView_fileTreeSelector_clicked
+
+
 
 class UI(QtWidgets.QMainWindow):
     def __init__(self):
