@@ -153,7 +153,7 @@ def FileTreeSelectorDialogStripped(widget, root_path='/'):
         windowlayout.addWidget(widget.view)
         widget.setLayout(windowlayout)
 
-        QtCore.QMetaObject.connectSlotsByName(widget)
+        #QtCore.QMetaObject.connectSlotsByName(widget)
 
         widget.show()
 
@@ -161,14 +161,14 @@ def FileTreeSelectorDialogStripped(widget, root_path='/'):
 # this may become messy. we define the method as a function. then we add it to the class and it is broadcasted into the widget instance.
 # we also decorate it with pyqtslot to indicate to the signal which type of value is accepted by the slot
 # will the decorator understand that it a bound method? hope so.
-@QtCore.pyqtSlot(QtCore.QModelIndex)   
+#@QtCore.pyqtSlot(QtCore.QModelIndex)   # Inappropriate decorator syntax for method?
 def on_treeView_fileTreeSelector_clicked(self, index):
     print('tree clicked: {}'.format(self.model.filePath(index)))
-    self.label.setText("Clicked")
-    self.model.traverseDirectory(index, callback=self.model.printIndex)
+    #self.model.traverseDirectory(index, callback=self.model.printIndex)
 
 
 QtWidgets.QWidget.on_treeView_fileTreeSelector_clicked = on_treeView_fileTreeSelector_clicked
+
 
 
 class UI(QtWidgets.QMainWindow):
@@ -185,6 +185,8 @@ class UI(QtWidgets.QMainWindow):
         # create the file tree thingie
         self.ftree = FileTreeSelectorDialogStripped(widget=self.widget, 
                                                     root_path=str(dir_project_root / "dataSource")) # dir as str because QT seems to not support pathlib
+        # create the file tree thingie
+        self.widget.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
 
         #print(self.children()[1].children()[3].metaObject())
         print(self.children()[1].children()[1].__dict__)
