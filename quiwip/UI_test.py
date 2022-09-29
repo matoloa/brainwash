@@ -112,7 +112,7 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
         windowlayout.addWidget(self.view)
         self.setLayout(windowlayout)
 
-        QtCore.QMetaObject.connectSlotsByName(self)
+        QtCore.QMetaObject.connectSlotsByName(self) # this is generally advised against as you have limited knowledge of what happened, connect one signal at a time
 
         self.show()
 
@@ -120,6 +120,7 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
     def on_treeView_fileTreeSelector_clicked(self, index):
         print('tree clicked: {}'.format(self.model.filePath(index)))
         self.model.traverseDirectory(index, callback=self.model.printIndex)
+    
 
 
 def FileTreeSelectorDialogStripped(widget, root_path='/'):        
@@ -156,12 +157,18 @@ def FileTreeSelectorDialogStripped(widget, root_path='/'):
 
         widget.show()
 
-    #@QtCore.pyqtSlot(QtCore.QModelIndex)
-    
+
+# this may become messy. we define the method as a function. then we add it to the class and it is broadcasted into the widget instance.
+# we also decorate it with pyqtslot to indicate to the signal which type of value is accepted by the slot
+# will the decorator understand that it a bound method? hope so.
+@QtCore.pyqtSlot(QtCore.QModelIndex)   
 def on_treeView_fileTreeSelector_clicked(self, index):
     print('tree clicked: {}'.format(self.model.filePath(index)))
     self.label.setText("Clicked")
     self.model.traverseDirectory(index, callback=self.model.printIndex)
+
+
+QtWidgets.QWidget.on_treeView_fileTreeSelector_clicked = on_treeView_fileTreeSelector_clicked
 
 
 class UI(QtWidgets.QMainWindow):
@@ -199,7 +206,8 @@ class UI(QtWidgets.QMainWindow):
         # Placeholder update label instruction
         self.label.setText("The label text")
         
-        self.widget.view.clicked.connect(self.ftree_clicked) # this worked to find the signal that finds if the ftree was clicked
+        #self.widget.view.clicked.connect(self.ftree_clicked) # this worked to find the signal that finds if the ftree was clicked
+        #self.widget.view.clicked.connect(on_treeView_fileTreeSelector_clicked(self.ftree))
 
         self.show()
 
