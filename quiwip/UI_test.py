@@ -1,6 +1,5 @@
 #%%con
 # file tree selector
-from re import I
 import sys
 import os
 from pathlib import Path
@@ -46,9 +45,9 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
             if (v == 2): # Checked
                 str_paths.append(format(self.filePath(k)))
         print(str_paths)
-
-#    print('tree clicked: {}'.format(self.model.filePath(index)))
-#    print(f'tree checks: {self.model.checks}')
+        # Emit SIGNAL/event
+        
+        #self.textBrowser.setText(str_paths)
 
     def setData(self, index, value, role):
         if (role == QtCore.Qt.CheckStateRole and index.column() == 0):
@@ -73,73 +72,11 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
         print('model printIndex(): {}'.format(self.filePath(index)))
 
 
-#   def SelectionChanged(self):
-#   self.
-    
-      # Change Text from other project
-#    self.edit.textChanged.connect(self.changeText)
-    
-
-class FileTreeSelectorDialog(QtWidgets.QWidget):
-    def __init__(self, root_path='/'):
-        super().__init__()
-
-        self.root_path      = root_path
-
-        # Widget
-        self.title          = "Not supposed to be a separate window!"
-        self.left           = 50
-        self.top            = 50
-        self.width          = 1080
-        self.height         = 640
-
-        self.setWindowTitle(self.title)         #TODO:  Whilch title?
-        self.setGeometry(self.left, self.top, self.width, self.height)
-
-        # Model
-        self.model          = FileTreeSelectorModel(root_path=self.root_path)
-        # self.model          = QtWidgets.QFileSystemModel()
-
-        # View
-        self.view           = QtWidgets.QTreeView()
-
-        self.view.setObjectName('treeView_fileTreeSelector')
-        self.view.setWindowTitle("Dir View")    #TODO:  Which title?
-        self.view.setAnimated(False)
-        self.view.setIndentation(20)
-        self.view.setSortingEnabled(True)
-        self.view.setColumnWidth(0,150)
-        self.view.resize(1080, 640)
-
-        # Attach Model to View
-        self.view.setModel(self.model)
-        self.view.setRootIndex(self.model.parent_index)
-
-        # Misc
-        self.node_stack     = []
-
-        # GUI
-        windowlayout = QtWidgets.QVBoxLayout()
-        windowlayout.addWidget(self.view)
-        self.setLayout(windowlayout)
-
-        QtCore.QMetaObject.connectSlotsByName(self) # this is generally advised against as you have limited knowledge of what happened, connect one signal at a time
-
-        self.show()
-
-    @QtCore.pyqtSlot(QtCore.QModelIndex)
-    def on_treeView_fileTreeSelector_clicked(self, index):
-        print('tree clicked: {}'.format(self.model.filePath(index)))
-        self.model.traverseDirectory(index, callback=self.model.printIndex)
-    
-
-
 def FileTreeSelectorDialogStripped(widget, root_path='/'):        
         widget.root_path      = root_path
                 
         # Model
         widget.model          = FileTreeSelectorModel(root_path=widget.root_path)
-        # self.model          = QtWidgets.QFileSystemModel()
 
         # View
         widget.view = QtWidgets.QTreeView()
@@ -149,7 +86,7 @@ def FileTreeSelectorDialogStripped(widget, root_path='/'):
         widget.view.setAnimated(False)
         widget.view.setIndentation(20)
         widget.view.setSortingEnabled(True)
-        widget.view.setColumnWidth(0,150)
+        widget.view.setColumnWidth(0, 150)
         widget.view.resize(1080, 600)
 
         # Attach Model to View
@@ -168,21 +105,11 @@ def FileTreeSelectorDialogStripped(widget, root_path='/'):
 
         widget.show()
 
-
-# this may become messy. we define the method as a function. then we add it to the class and it is broadcasted into the widget instance.
-# we also decorate it with pyqtslot to indicate to the signal which type of value is accepted by the slot
-# will the decorator understand that it a bound method? hope so.
-#@QtCore.pyqtSlot(QtCore.QModelIndex)   # Inappropriate decorator syntax for method?
 def on_treeView_fileTreeSelector_clicked(self, index):
     self.model.getCheckedPaths()
-    #print('tree clicked: {}'.format(self.model.filePath(index)))
-    #print(f'tree checks: {self.model.checks}')
-    #self.model.traverseDirectory(index, callback=self.model.printIndex)
 
 
 QtWidgets.QWidget.on_treeView_fileTreeSelector_clicked = on_treeView_fileTreeSelector_clicked
-
-
 
 class UI(QtWidgets.QMainWindow):
     def __init__(self):
@@ -201,39 +128,22 @@ class UI(QtWidgets.QMainWindow):
         # create the file tree thingie
         self.widget.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
 
-        #print(self.children()[1].children()[3].metaObject())
-        print(self.children()[1].children()[1].__dict__)
-        print("0", self.children()[1].children()[0])
-        print("1", self.children()[1].children()[1])
-        print("2", self.children()[1].children()[2])
-        print("3", self.children()[1].children()[3])
-
-
-        # Clicked Filetree
-        #self.widget.on_treeView_fileTreeSelector_clicked(self.)
-
         # Hit Enter
         self.edit.editingFinished.connect(self.hitEnter)
 
         # Change Text
         self.edit.textChanged.connect(self.changeText)
-
-        # Placeholder update label instruction
-        self.label.setText("The label text")
         
-        #self.widget.view.clicked.connect(self.ftree_clicked) # this worked to find the signal that finds if the ftree was clicked
-        #self.widget.view.clicked.connect(on_treeView_fileTreeSelector_clicked(self.ftree))
-
+        # SLOT - listen for SIGNAL from getCheckedPaths
+        
         self.show()
 
     def ftree_clicked(self): # now working
         print("clicked")
-    
-    
+        
     def hitEnter(self):
         get_signals(self.children()[1].children()[1].model)
         self.textBrowser.setText(self.edit.text())
-
 
     def changeText(self):
         self.label.setText(self.edit.text())
@@ -242,7 +152,7 @@ class UI(QtWidgets.QMainWindow):
 def get_signals(source):
         cls = source if isinstance(source, type) else type(source)
         signal = type(QtCore.pyqtSignal())
-        print("Dumdumdum")
+        print("get_signals:")
         for subcls in cls.mro():
             clsname = f'{subcls.__module__}.{subcls.__name__}'
             for key, value in sorted(vars(subcls).items()):
