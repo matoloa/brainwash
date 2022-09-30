@@ -1,6 +1,8 @@
+#!/usr/bin/env python3
+
 import sys
 import lib.ui
-# import lib.parse
+import lib.parse
 # import lib.method
 
 
