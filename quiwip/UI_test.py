@@ -181,14 +181,7 @@ def get_signals(source):
                     print(f'{key} [{clsname}]')
 
 
-# %%
-app = QtWidgets.QApplication(sys.argv)
-
-UIWindow = UI()
-#app.allWidgets()
-
-
-sys.exit(app.exec_())
-# %%
-print(os.getcwd())
-# %%
+if __name__ == '__main__':
+    app = QtWidgets.QApplication(sys.argv)
+    UIWindow = UI()
+    sys.exit(app.exec_())
