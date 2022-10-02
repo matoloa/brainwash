@@ -2,6 +2,9 @@
 .ipynb_checkpoints
 *.ipynb
 
+# python temp files
+*.pyc
+
 # Data files
 *.csv
 *.gz
