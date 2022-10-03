@@ -1,5 +1,4 @@
-#%%con
-# file tree selector
+
 import sys
 import os
 from pathlib import Path
@@ -8,19 +7,21 @@ from PyQt5 import QtWidgets, uic, QtCore, QtGui
 
 dir_project_root = Path(os.getcwd().split("quiwip")[0])
 
-class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with a FileTreeSelectorView
-    paths_selected = QtCore.pyqtSignal(list)
-    
+
+
+class FileTreeSelectorModel(QtWidgets.QFileSystemModel):
     def __init__(self, parent=None, root_path='/'):
         QtWidgets.QFileSystemModel.__init__(self, None)
+        print('hello model')
         self.root_path      = root_path
         self.checks         = {}
         self.nodestack      = []
+        print("about to set the parentindex and crash")
+        print(f"self.rootpath: {self.root_path}")
         self.parent_index   = self.setRootPath(self.root_path)
         self.root_index     = self.index(self.root_path)
 
-        self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
-        self.sort(0, QtCore.Qt.SortOrder.AscendingOrder)
+        self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.Hidden | QtCore.QDir.NoDot)
         self.directoryLoaded.connect(self._loaded)
 
     def _loaded(self, path):
@@ -40,21 +41,12 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
         if index in self.checks:
             return self.checks[index]
         else:
-            return QtCore.Qt.Unchecked
+            return QtCore.Qt.Checked
 
-    def getCheckedPaths(self):
-        paths = []
-        for k, v in self.checks.items():
-            if (v == 2): # Checked
-                paths.append(format(self.filePath(k)))
-        print(paths)
-        self.paths_selected.emit(paths)
-    
-    
     def setData(self, index, value, role):
         if (role == QtCore.Qt.CheckStateRole and index.column() == 0):
             self.checks[index] = value
-            # print('setData(): {}'.format(value))
+            print('setData(): {}'.format(value))
             return True
         return QtWidgets.QFileSystemModel.setData(self, index, value, role)
 
@@ -74,57 +66,64 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
         print('model printIndex(): {}'.format(self.filePath(index)))
 
 
-def FileTreeSelectorDialogStripped(widget, root_path='/'):        
-        widget.root_path      = root_path
-                
+class FileTreeSelectorDialog(QtWidgets.QWidget):
+    def __init__(self, root_path='/'):
+        super().__init__()
+
+        self.root_path      = root_path
+        print('hello dialog')
+        # Widget
+        self.title          = "Application Window"
+        self.left           = 10
+        self.top            = 10
+        self.width          = 1080
+        self.height         = 640
+
+        self.setWindowTitle(self.title)         #TODO:  Whilch title?
+        self.setGeometry(self.left, self.top, self.width, self.height)
+
         # Model
-        widget.model          = FileTreeSelectorModel(root_path=widget.root_path)
+        self.model          = FileTreeSelectorModel(root_path=self.root_path)
+        # self.model          = QtWidgets.QFileSystemModel()
 
         # View
-        widget.view = QtWidgets.QTreeView()
+        self.view           = QtWidgets.QTreeView()
 
-        widget.view.setObjectName('treeView_fileTreeSelector')
-        widget.view.setWindowTitle("Dir View")    #TODO:  Which title?
-        widget.view.setAnimated(False)
-        widget.view.setIndentation(20)
-        widget.view.setColumnHidden(3, True)
-        widget.view.setSortingEnabled(False)
-        widget.view.resize(1080, 600)
+        self.view.setObjectName('treeView_fileTreeSelector')
+        self.view.setWindowTitle("Dir View")    #TODO:  Which title?
+        self.view.setAnimated(False)
+        self.view.setIndentation(20)
+        self.view.setSortingEnabled(True)
+        self.view.setColumnWidth(0,150)
+        self.view.resize(1080, 640)
 
         # Attach Model to View
-        widget.view.setModel(widget.model)
-        widget.view.setRootIndex(widget.model.parent_index)
-        print(f'coln: {widget.view.columnAt(200)}')
-        widget.view.setColumnHidden(3, True) # hide "modified" column
-        #widget.view.resizeColumnToContents(0) # not a good idea at the moment
-        widget.view.setColumnWidth(0, 250)
-        widget.view.setColumnWidth(1, 100)
-        widget.view.setColumnWidth(2, 50)
-
+        self.view.setModel(self.model)
+        self.view.setRootIndex(self.model.parent_index)
 
         # Misc
-        widget.node_stack     = []
+        self.node_stack     = []
 
         # GUI
         windowlayout = QtWidgets.QVBoxLayout()
-        windowlayout.addWidget(widget.view)
-        widget.setLayout(windowlayout)
+        windowlayout.addWidget(self.view)
+        self.setLayout(windowlayout)
 
-        #QtCore.QMetaObject.connectSlotsByName(widget)
+        QtCore.QMetaObject.connectSlotsByName(self)
 
-        widget.show()
+        self.show()
 
-def on_treeView_fileTreeSelector_clicked(self, index):
-    self.model.getCheckedPaths()
+    @QtCore.pyqtSlot(QtCore.QModelIndex)
+    def on_treeView_fileTreeSelector_clicked(self, index):
+        print('tree clicked: {}'.format(self.model.filePath(index)))
+        self.model.traverseDirectory(index, callback=self.model.printIndex)
 
-
-QtWidgets.QWidget.on_treeView_fileTreeSelector_clicked = on_treeView_fileTreeSelector_clicked
 
 class UI(QtWidgets.QMainWindow):
     def __init__(self):
         super(UI, self).__init__()
         # Load interface and main window
-        uic.loadUi(dir_project_root / "quiwip" / "textandtree.ui", self)
+        uic.loadUi(dir_project_root / "lib" / "brainwash.ui", self)
 
         # Define our widgets
         self.edit = self.findChild(QtWidgets.QLineEdit, "lineEdit")
@@ -134,12 +133,12 @@ class UI(QtWidgets.QMainWindow):
 
         
         # create the file tree thingie
-        self.ftree = FileTreeSelectorDialogStripped(widget=self.widget, 
-                                                    root_path=str(dir_project_root / "dataSource")) # dir as str because QT seems to not support pathlib
+        #self.ftree = FileTreeSelectorDialogStripped(widget=self.widget, 
+        #                                            root_path=str(dir_project_root / "dataSource")) # dir as str because QT seems to not support pathlib
         # create the file tree thingie
-        self.widget.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
+        #self.widget.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
         
-        self.widget.model.paths_selected.connect(self.print_paths)
+        #self.widget.model.paths_selected.connect(self.print_paths)
 
         # Hit Enter
         self.edit.editingFinished.connect(self.hitEnter)
