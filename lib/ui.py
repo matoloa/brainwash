@@ -10,15 +10,11 @@ dir_project_root = Path(os.getcwd().split("quiwip")[0])
 
 
 class FileTreeSelectorModel(QtWidgets.QFileSystemModel):
-    def __init__(self, parent=None, root_path='/'):
-        print(f"self {self}, parent {parent}, root_path {root_path}")
+    def __init__(self, parent=None, root_path='.'):
         QtWidgets.QFileSystemModel.__init__(self, None)
-        print('hello model')
         self.root_path      = root_path
         self.checks         = {}
         self.nodestack      = []
-        print("about to set the parentindex and crash")
-        print(f"self.rootpath: {self.root_path}")
         self.parent_index   = self.setRootPath(self.root_path)
         self.root_index     = self.index(self.root_path)
 
@@ -68,14 +64,10 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel):
 
 
 class FileTreeSelectorDialog(QtWidgets.QWidget):
-    def __init__(self, parent=None, root_path='/'):
+    def __init__(self, parent=None, root_path='.'):
         super().__init__(parent)
-        print(f"root_path in ftsdialog {root_path}")
-
         self.root_path      = root_path
-        print(f"self.root_path in ftsdialog {self.root_path}")
 
-        print('hello dialog')
         # Widget
         self.title          = "Application Window"
         self.left           = 10
@@ -87,8 +79,6 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
         self.setGeometry(self.left, self.top, self.width, self.height)
 
         # Model
-        # is this where it fucks up? what is self.root_path here? 
-        print(f"self.root_path in ftsdialog {self.root_path}")
         self.model          = FileTreeSelectorModel(root_path=self.root_path)
         # self.model          = QtWidgets.QFileSystemModel()
 
@@ -124,6 +114,88 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
         print('tree clicked: {}'.format(self.model.filePath(index)))
         self.model.traverseDirectory(index, callback=self.model.printIndex)
 
+#######################################################################
+##### section directly copied from output from pyuic, do not alter ####
+##### trying to make all the rest work with it                     ####
+#######################################################################
+
+class Ui_MainWindow(object):
+    def setupUi(self, MainWindow):
+        MainWindow.setObjectName("MainWindow")
+        MainWindow.resize(1200, 800)
+        self.centralwidget = QtWidgets.QWidget(MainWindow)
+        self.centralwidget.setObjectName("centralwidget")
+        self.textBrowser = QtWidgets.QTextBrowser(self.centralwidget)
+        self.textBrowser.setGeometry(QtCore.QRect(700, 20, 256, 192))
+        self.textBrowser.setObjectName("textBrowser")
+        self.widget = FileTreeSelectorDialog(self.centralwidget)
+        self.widget.setGeometry(QtCore.QRect(20, 20, 600, 800))
+        self.widget.setObjectName("widget")
+        self.label = QtWidgets.QLabel(self.centralwidget)
+        self.label.setGeometry(QtCore.QRect(710, 310, 171, 51))
+        self.label.setObjectName("label")
+        self.lineEdit = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit.setGeometry(QtCore.QRect(700, 410, 271, 21))
+        self.lineEdit.setObjectName("lineEdit")
+        MainWindow.setCentralWidget(self.centralwidget)
+        self.menubar = QtWidgets.QMenuBar(MainWindow)
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1200, 22))
+        self.menubar.setObjectName("menubar")
+        MainWindow.setMenuBar(self.menubar)
+        self.statusbar = QtWidgets.QStatusBar(MainWindow)
+        self.statusbar.setObjectName("statusbar")
+        MainWindow.setStatusBar(self.statusbar)
+
+        self.retranslateUi(MainWindow)
+        QtCore.QMetaObject.connectSlotsByName(MainWindow)
+
+    def retranslateUi(self, MainWindow):
+        _translate = QtCore.QCoreApplication.translate
+        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+        self.label.setText(_translate("MainWindow", "TextLabel"))
+
+#######################################################################
+
+
+# subclassing Ui_MainWindow to be able to use the unaltered output file from pyuic and QT designer
+class UIsub(Ui_MainWindow):
+    def __init__(self, Mainwindow):
+        super(UIsub, self).__init__()
+        self.setupUi(Mainwindow)
+        print('UIsub init')
+        
+        # rename for clarity
+        self.ftree = self.widget
+        
+        # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
+        # maybe learn more about that later?
+        # however, I kinda like the control of putting each of them explicit here and use designer just to get the boxes right visually
+        # connecting the same signals we had in original ui test
+        self.lineEdit.editingFinished.connect(self.hitEnter)
+        self.lineEdit.textChanged.connect(self.changeText)
+        
+        # this could probably be autonnected
+        self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
+        self.widget.model.paths_selected.connect(self.print_paths)
+
+
+
+    
+    def hitEnter(self):
+        #get_signals(self.children()[1].children()[1].model)
+        self.textBrowser.setText(self.lineEdit.text())
+
+
+    def changeText(self):
+        self.label.setText(self.lineEdit.text())
+
+    
+    #@QtCore.pyqtSlot()
+    def print_paths(self, mypaths):
+        print(f'mystr: {mypaths}')
+        strmystr = "\n".join(sorted(['/'.join(i.split('/')[-2:]) for i in mypaths]))
+        self.textBrowser.setText(strmystr)
+        
 
 class UI(QtWidgets.QMainWindow):
     def __init__(self):
@@ -190,7 +262,8 @@ if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
-    ui = Ui_MainWindow()
-    ui.setupUi(MainWindow)
+    #ui = Ui_MainWindow()
+    #ui.setupUi(MainWindow)
+    ui = UIsub(MainWindow)
     MainWindow.show()
     sys.exit(app.exec_())
