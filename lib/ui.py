@@ -128,12 +128,14 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
         self.model.getCheckedPaths()
 
 
-#######################################################################
-##### section directly copied from output from pyuic, do not alter ####
-##### trying to make all the rest work with it                     ####
-#######################################################################
+########################################################################
+##### section directly copied from output from pyuic, do not alter #####
+##### trying to make all the rest work with it                     #####
+##### WARNING: I was forced to change the parent class from        #####
+##### 'object' to 'QtCore.QObject' for the pyqtSlot(list) to work  #####
+########################################################################
 
-class Ui_MainWindow(object):
+class Ui_MainWindow(QtCore.QObject):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1200, 800)
@@ -175,7 +177,7 @@ class Ui_MainWindow(object):
 class UIsub(Ui_MainWindow):
     def __init__(self, Mainwindow):
         super(UIsub, self).__init__()
-        self.setupUi(Mainwindow)
+        self.setupUi(MainWindow)
         print('UIsub init')
         
         # rename for clarity
@@ -190,7 +192,7 @@ class UIsub(Ui_MainWindow):
         
         # this could probably be autonnected
         self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
-        self.widget.model.paths_selected.connect(self.print_paths)
+        self.ftree.model.paths_selected.connect(self.print_paths)
 
     
     def hitEnter(self):
@@ -202,7 +204,7 @@ class UIsub(Ui_MainWindow):
         self.label.setText(self.lineEdit.text())
 
     
-    #@QtCore.pyqtSlot()
+    @QtCore.pyqtSlot(list)
     def print_paths(self, mypaths):
         print(f'mystr: {mypaths}')
         strmystr = "\n".join(sorted(['/'.join(i.split('/')[-2:]) for i in mypaths]))
@@ -224,8 +226,6 @@ if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
-    #ui = Ui_MainWindow()
-    #ui.setupUi(MainWindow)
     ui = UIsub(MainWindow)
     MainWindow.show()
     sys.exit(app.exec_())
