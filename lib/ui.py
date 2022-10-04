@@ -192,8 +192,6 @@ class UIsub(Ui_MainWindow):
         self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
         self.widget.model.paths_selected.connect(self.print_paths)
 
-
-
     
     def hitEnter(self):
         #get_signals(self.children()[1].children()[1].model)
@@ -209,56 +207,6 @@ class UIsub(Ui_MainWindow):
         print(f'mystr: {mypaths}')
         strmystr = "\n".join(sorted(['/'.join(i.split('/')[-2:]) for i in mypaths]))
         self.textBrowser.setText(strmystr)
-        
-
-class UI(QtWidgets.QMainWindow):
-    def __init__(self):
-        super(UI, self).__init__()
-        # Load interface and main window
-        uic.loadUi(dir_project_root / "lib" / "brainwash.ui", self)
-
-        # Define our widgets
-        self.edit = self.findChild(QtWidgets.QLineEdit, "lineEdit")
-        self.label = self.findChild(QtWidgets.QLabel, "label")
-        self.widget = self.findChild(QtWidgets.QWidget, "widget")
-        self.textBrowser = self.findChild(QtWidgets.QTextBrowser, "textBrowser")
-
-        
-        # create the file tree thingie
-        #self.ftree = FileTreeSelectorDialogStripped(widget=self.widget, 
-        #                                            root_path=str(dir_project_root / "dataSource")) # dir as str because QT seems to not support pathlib
-        # create the file tree thingie
-        #self.widget.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
-        
-        #self.widget.model.paths_selected.connect(self.print_paths)
-
-        # Hit Enter
-        self.edit.editingFinished.connect(self.hitEnter)
-
-        # Change Text
-        self.edit.textChanged.connect(self.changeText)
-        
-        # SLOT - listen for SIGNAL from getCheckedPaths
-        
-        self.show()
-
-    def ftree_clicked(self): # now working
-        print("clicked")
-        
-    def hitEnter(self):
-        get_signals(self.children()[1].children()[1].model)
-        self.textBrowser.setText(self.edit.text())
-
-    def changeText(self):
-        self.label.setText(self.edit.text())
-    
-    #@QtCore.pyqtSlot()
-    def print_paths(self, mypaths):
-        print(f'mystr: {mypaths}')
-        strmystr = "\n".join(sorted(['/'.join(i.split('/')[-2:]) for i in mypaths]))
-        self.textBrowser.setText(strmystr)
-
-        
 
 
 def get_signals(source):
