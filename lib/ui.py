@@ -11,6 +11,7 @@ dir_project_root = Path(os.getcwd().split("quiwip")[0])
 
 class FileTreeSelectorModel(QtWidgets.QFileSystemModel):
     def __init__(self, parent=None, root_path='/'):
+        print(f"self {self}, parent {parent}, root_path {root_path}")
         QtWidgets.QFileSystemModel.__init__(self, None)
         print('hello model')
         self.root_path      = root_path
@@ -67,10 +68,13 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel):
 
 
 class FileTreeSelectorDialog(QtWidgets.QWidget):
-    def __init__(self, root_path='/'):
-        super().__init__()
+    def __init__(self, parent=None, root_path='/'):
+        super().__init__(parent)
+        print(f"root_path in ftsdialog {root_path}")
 
         self.root_path      = root_path
+        print(f"self.root_path in ftsdialog {self.root_path}")
+
         print('hello dialog')
         # Widget
         self.title          = "Application Window"
@@ -83,6 +87,8 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
         self.setGeometry(self.left, self.top, self.width, self.height)
 
         # Model
+        # is this where it fucks up? what is self.root_path here? 
+        print(f"self.root_path in ftsdialog {self.root_path}")
         self.model          = FileTreeSelectorModel(root_path=self.root_path)
         # self.model          = QtWidgets.QFileSystemModel()
 
@@ -180,7 +186,11 @@ def get_signals(source):
                     print(f'{key} [{clsname}]')
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+    import sys
     app = QtWidgets.QApplication(sys.argv)
-    UIWindow = UI()
+    MainWindow = QtWidgets.QMainWindow()
+    ui = Ui_MainWindow()
+    ui.setupUi(MainWindow)
+    MainWindow.show()
     sys.exit(app.exec_())
