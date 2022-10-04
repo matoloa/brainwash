@@ -175,9 +175,9 @@ class Ui_MainWindow(QtCore.QObject):
 
 # subclassing Ui_MainWindow to be able to use the unaltered output file from pyuic and QT designer
 class UIsub(Ui_MainWindow):
-    def __init__(self, Mainwindow):
+    def __init__(self, mainwindow):
         super(UIsub, self).__init__()
-        self.setupUi(MainWindow)
+        self.setupUi(mainwindow)
         print('UIsub init')
         
         # rename for clarity
@@ -223,7 +223,6 @@ def get_signals(source):
 
 
 if __name__ == "__main__":
-    import sys
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = UIsub(MainWindow)
