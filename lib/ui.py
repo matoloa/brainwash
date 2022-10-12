@@ -3,11 +3,39 @@ import sys
 import os
 from pathlib import Path
 from PyQt5 import QtWidgets, uic, QtCore, QtGui
+import pandas as pd
 
 
 dir_project_root = Path(os.getcwd().split("quiwip")[0])
 
 debug = False
+
+
+class TableModel(QtCore.QAbstractTableModel):
+    def __init__(self, data):
+        super(TableModel, self).__init__()
+        self._data = data
+
+    def data(self, index, role):
+        if role == QtCore.Qt.DisplayRole:
+            value = self._data.iloc[index.row(), index.column()]
+            return str(value)
+
+    def rowCount(self, index):
+        return self._data.shape[0]
+
+    def columnCount(self, index):
+        return self._data.shape[1]
+
+    def headerData(self, section, orientation, role):
+        # section is the index of the column/row.
+        if role == QtCore.Qt.DisplayRole:
+            if orientation == QtCore.Qt.Horizontal:
+                return str(self._data.columns[section])
+
+            if orientation == QtCore.Qt.Vertical:
+                return str(self._data.index[section])
+
 
 class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with a FileTreeSelectorView
     paths_selected = QtCore.pyqtSignal(list)
@@ -151,11 +179,11 @@ class Ui_MainWindow(QtCore.QObject):
         self.textBrowser = QtWidgets.QTextBrowser(self.tab)
         self.textBrowser.setGeometry(QtCore.QRect(830, 10, 311, 81))
         self.textBrowser.setObjectName("textBrowser")
-        self.tableWidget = QtWidgets.QTableWidget(self.tab)
+        self.tableWidget = QtWidgets.QTableView(self.tab)
         self.tableWidget.setGeometry(QtCore.QRect(830, 100, 311, 561))
         self.tableWidget.setObjectName("tableWidget")
-        self.tableWidget.setColumnCount(0)
-        self.tableWidget.setRowCount(0)
+        #self.tableWidget.setColumnCount(0)
+        #self.tableWidget.setRowCount(0)
         self.tabWidget.addTab(self.tab, "")
         self.tab_2 = QtWidgets.QWidget()
         self.tab_2.setObjectName("tab_2")
@@ -197,6 +225,8 @@ class Ui_MainWindow(QtCore.QObject):
 # subclassing Ui_MainWindow to be able to use the unaltered output file from pyuic and QT designer
 class UIsub(Ui_MainWindow):
     def __init__(self, mainwindow):
+        dftest = pd.DataFrame({'path': ['asdfasdf', 'asdfasdf'],
+                               'value': [5, 6]})
         super(UIsub, self).__init__()
         self.setupUi(mainwindow)
         print('UIsub init')
@@ -214,7 +244,11 @@ class UIsub(Ui_MainWindow):
         # this could probably be autonnected
         self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
         self.ftree.model.paths_selected.connect(self.print_paths)
+        
+        self.tablemodel = TableModel(dftest)
+        self.tableWidget.setModel(self.tablemodel)
 
+    
     
     def hitEnter(self):
         #get_signals(self.children()[1].children()[1].model)
@@ -223,6 +257,11 @@ class UIsub(Ui_MainWindow):
 
     def changeText(self):
         self.label.setText(self.lineEdit.text())
+    
+    
+    def setTableDf(self, df=None):
+        self.tablemodel.data = pd.DataFrame({"new data"})
+        print('i just set new data')
 
     
     @QtCore.pyqtSlot(list)
@@ -230,6 +269,7 @@ class UIsub(Ui_MainWindow):
         print(f'mystr: {mypaths}')
         strmystr = "\n".join(sorted(['/'.join(i.split('/')[-2:]) for i in mypaths]))
         self.textBrowser.setText(strmystr)
+        self.setTableDf()
 
 
 def get_signals(source):
