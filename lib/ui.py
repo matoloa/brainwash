@@ -12,20 +12,24 @@ debug = False
 
 
 class TableModel(QtCore.QAbstractTableModel):
-    def __init__(self, data):
+    def __init__(self, data=None):
         super(TableModel, self).__init__()
         self._data = data
+
 
     def data(self, index, role):
         if role == QtCore.Qt.DisplayRole:
             value = self._data.iloc[index.row(), index.column()]
             return str(value)
 
+
     def rowCount(self, index):
         return self._data.shape[0]
 
+
     def columnCount(self, index):
         return self._data.shape[1]
+
 
     def headerData(self, section, orientation, role):
         # section is the index of the column/row.
@@ -35,6 +39,16 @@ class TableModel(QtCore.QAbstractTableModel):
 
             if orientation == QtCore.Qt.Vertical:
                 return str(self._data.index[section])
+
+    
+    def setData(self, data: pd.DataFrame=None):
+        if not data is None and type(data) is pd.DataFrame:
+            self.beginResetModel()
+            self._data = data
+            self.endResetModel()
+            return True
+        
+        return False
 
 
 class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with a FileTreeSelectorView
@@ -244,7 +258,14 @@ class UIsub(Ui_MainWindow):
         
         self.tablemodel = TableModel(dftest)
         self.tableView.setModel(self.tablemodel)
+        self.tablemodel.dataChanged.connect(self.tableView.update)
+        self.tablemodel.dataChanged.connect(self.hellohello) 
 
+
+    
+    def hellohello(self):
+        print('hellohello')
+        
     
     def hitEnter(self):
         #get_signals(self.children()[1].children()[1].model)
@@ -255,12 +276,9 @@ class UIsub(Ui_MainWindow):
         self.label.setText(self.lineEdit.text())
     
     
-    def setTableDf(self, df=None):
-        dftest = pd.DataFrame({'path': ['det fungerade', 'uppdaterar onclick'],
-                               'value': [7, 8]})
-        if df is None: df = dftest
-        self.tablemodel._data = df
-        print('i just set new data')
+    def setTableDf(self, data):
+        self.tablemodel.setData(data)
+        self.tableView.update()
 
     
     @QtCore.pyqtSlot(list)
@@ -268,7 +286,9 @@ class UIsub(Ui_MainWindow):
         print(f'mystr: {mypaths}')
         strmystr = "\n".join(sorted(['/'.join(i.split('/')[-2:]) for i in mypaths]))
         self.textBrowser.setText(strmystr)
-        self.setTableDf()
+        list_display_names = ['/'.join(i.split('/')[-2:]) for i in mypaths]
+        dftable = pd.DataFrame({'path_source': mypaths, 'name': list_display_names})
+        self.setTableDf(dftable)
 
 
 def get_signals(source):
@@ -288,3 +308,4 @@ if __name__ == "__main__":
     ui = UIsub(MainWindow)
     MainWindow.show()
     sys.exit(app.exec_())
+ 
