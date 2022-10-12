@@ -246,7 +246,6 @@ class UIsub(Ui_MainWindow):
         self.tableView.setModel(self.tablemodel)
 
     
-    
     def hitEnter(self):
         #get_signals(self.children()[1].children()[1].model)
         self.textBrowser.setText(self.lineEdit.text())
@@ -257,7 +256,10 @@ class UIsub(Ui_MainWindow):
     
     
     def setTableDf(self, df=None):
-        self.tablemodel.data = pd.DataFrame({"new data"})
+        dftest = pd.DataFrame({'path': ['det fungerade', 'uppdaterar onclick'],
+                               'value': [7, 8]})
+        if df is None: df = dftest
+        self.tablemodel._data = df
         print('i just set new data')
 
     
