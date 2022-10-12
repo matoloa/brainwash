@@ -179,11 +179,9 @@ class Ui_MainWindow(QtCore.QObject):
         self.textBrowser = QtWidgets.QTextBrowser(self.tab)
         self.textBrowser.setGeometry(QtCore.QRect(830, 10, 311, 81))
         self.textBrowser.setObjectName("textBrowser")
-        self.tableWidget = QtWidgets.QTableView(self.tab)
-        self.tableWidget.setGeometry(QtCore.QRect(830, 100, 311, 561))
-        self.tableWidget.setObjectName("tableWidget")
-        #self.tableWidget.setColumnCount(0)
-        #self.tableWidget.setRowCount(0)
+        self.tableView = QtWidgets.QTableView(self.tab)
+        self.tableView.setGeometry(QtCore.QRect(830, 100, 311, 731))
+        self.tableView.setObjectName("tableView")
         self.tabWidget.addTab(self.tab, "")
         self.tab_2 = QtWidgets.QWidget()
         self.tab_2.setObjectName("tab_2")
@@ -218,7 +216,6 @@ class Ui_MainWindow(QtCore.QObject):
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_2), _translate("MainWindow", "Experiment"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_3), _translate("MainWindow", "Measure"))
 
-
 #######################################################################
 
 
@@ -246,7 +243,7 @@ class UIsub(Ui_MainWindow):
         self.ftree.model.paths_selected.connect(self.print_paths)
         
         self.tablemodel = TableModel(dftest)
-        self.tableWidget.setModel(self.tablemodel)
+        self.tableView.setModel(self.tablemodel)
 
     
     
