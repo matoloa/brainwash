@@ -7,10 +7,10 @@ import matplotlib
 
 matplotlib.use('Qt5Agg')
 
+import numpy as np
 import pandas as pd
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.backends.backend_qt5agg import \
-    NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
@@ -281,20 +281,40 @@ class UIsub(Ui_MainWindow):
         
         # create graph in tab. This is meant to go in with designer later, and not create in this class
         # and also be a standalone window. preparing for that already.
-        self.sc = MplCanvas(width=5, height=4, dpi=100)
-        self.sc.axes.plot([0,1,2,3,4], [10,1,20,3,40])
+        self.canvas = MplCanvas(width=5, height=4, dpi=100)
+        df = pd.DataFrame({'a': [0, 5, 10, 15, 20], 'b': np.random.random(5)})
+
+        # plot the pandas DataFrame, passing in the
+        # matplotlib Canvas axes.
+        df.plot(ax=self.canvas.axes)
+        #self.sc.axes.plot([0,1,2,3,4], [10,1,20,3,40])
         # Create toolbar, passing canvas as first param, parent (self, the MainWindow) as second.
-        self.toolbar_graph = NavigationToolbar(self.sc, self.tab_3)
+        self.toolbar_graph = NavigationToolbar(self.canvas, self.tab_3)
 
         self.layout_graph = QtWidgets.QVBoxLayout()
         self.layout_graph.addWidget(self.toolbar_graph)
-        self.layout_graph.addWidget(self.sc)
+        self.layout_graph.addWidget(self.canvas)
 
         # Create a placeholder widget to hold our toolbar and canvas.
         self.widget_graph = QtWidgets.QWidget()
         self.widget_graph.setLayout(self.layout_graph)
         self.widget_graph.show()
         
+        # skeleton to update the plots, connect with signal and slot when ready
+        # Setup a timer to trigger the redraw by calling update_plot.
+        self.timer = QtCore.QTimer()
+        self.timer.setInterval(1000)
+        self.timer.timeout.connect(self.update_plot)
+        self.timer.start()
+
+    def update_plot(self):
+        # Drop off the first y element, append a new one.
+        df = pd.DataFrame({'a': [0, 5, 10, 15, 20], 'b': np.random.random(5)})
+        self.canvas.axes.cla()  # Clear the canvas.
+        df.plot(ax=self.canvas.axes, x='a', y='b')
+        # self.canvas.axes.plot(self.xdata, self.ydata, 'r')
+        # Trigger the canvas to update and redraw.
+        self.canvas.draw()
 
     
     def hellohello(self):
