@@ -1,10 +1,18 @@
 
-import sys
 import os
+import sys
 from pathlib import Path
-from PyQt5 import QtWidgets, uic, QtCore, QtGui
-import pandas as pd
 
+import matplotlib
+
+matplotlib.use('Qt5Agg')
+
+import pandas as pd
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.backends.backend_qt5agg import \
+    NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
+from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
 dir_project_root = Path(os.getcwd().split("quiwip")[0])
 
@@ -170,6 +178,16 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
         self.model.getCheckedPaths()
 
 
+class MplCanvas(FigureCanvasQTAgg):
+
+    def __init__(self, parent=None, width=5, height=4, dpi=100):
+        fig = Figure(figsize=(width, height), dpi=dpi)
+        self.axes = fig.add_subplot(111)
+        super(MplCanvas, self).__init__(fig)
+        self.setParent(parent)
+
+
+
 ########################################################################
 ##### section directly copied from output from pyuic, do not alter #####
 ##### trying to make all the rest work with it                     #####
@@ -260,6 +278,9 @@ class UIsub(Ui_MainWindow):
         self.tableView.setModel(self.tablemodel)
         self.tablemodel.dataChanged.connect(self.tableView.update)
         self.tablemodel.dataChanged.connect(self.hellohello) 
+        
+        self.sc = MplCanvas(parent=self.tab_3, width=5, height=4, dpi=100)
+        self.sc.axes.plot([0,1,2,3,4], [10,1,20,3,40])
 
 
     
