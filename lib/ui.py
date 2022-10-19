@@ -279,9 +279,22 @@ class UIsub(Ui_MainWindow):
         self.tablemodel.dataChanged.connect(self.tableView.update)
         self.tablemodel.dataChanged.connect(self.hellohello) 
         
-        self.sc = MplCanvas(parent=self.tab_3, width=5, height=4, dpi=100)
+        # create graph in tab. This is meant to go in with designer later, and not create in this class
+        # and also be a standalone window. preparing for that already.
+        self.sc = MplCanvas(width=5, height=4, dpi=100)
         self.sc.axes.plot([0,1,2,3,4], [10,1,20,3,40])
+        # Create toolbar, passing canvas as first param, parent (self, the MainWindow) as second.
+        self.toolbar_graph = NavigationToolbar(self.sc, self.tab_3)
 
+        self.layout_graph = QtWidgets.QVBoxLayout()
+        self.layout_graph.addWidget(self.toolbar_graph)
+        self.layout_graph.addWidget(self.sc)
+
+        # Create a placeholder widget to hold our toolbar and canvas.
+        self.widget_graph = QtWidgets.QWidget()
+        self.widget_graph.setLayout(self.layout_graph)
+        self.widget_graph.show()
+        
 
     
     def hellohello(self):
