@@ -5,7 +5,7 @@ Method extraction
 3) Find Low: the lowest point after the artefact.
 3+) This is not 100% reliable; under certain circumstances, the volley will reach lower than the EPSP. The Volley is, however, a much quicker event. Check for center of biggest area under curve?
 4) Find VE: (volley-EPSP-bump). Tracing backwards from Low: find the least negative part on the way up to Base
-5) Find EPSP-slope: the lowest second derivative between VE and Low. Traditionally, our lab works with 8 point EPSPs. The angle of this is the EPSP-slope.
+5) Find EPSP-slope: the lowest absolute of second order derivative between VE and Low. Traditionally, our lab works with 8 point EPSPs. The angle of this is the EPSP-slope.
 5+) The length of the measurement could be determined by extending the measurement in either direction as far as can be done without bending it.
 6) Find Volley: the steepest coherent (typically 4 points) decline between Stim and VE. Traditionally, our lab works with 4 point volleys. The angle of this is the volley-slope.
 6+) see 5+
