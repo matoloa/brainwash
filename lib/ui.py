@@ -250,7 +250,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBox.setText(_translate("MainWindow", "Preview"))
 
 
-class Ui_Dialog(QtCore.QObject):
+class Ui_Dialog(QtWidgets.QWidget):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
         Dialog.resize(723, 358)
@@ -296,17 +296,10 @@ class UIsub(Ui_MainWindow):
                 
 
     def pushedButtonAddData(self):
-        print('pressed!')
-        Dialog = QtWidgets.QDialog()
-        filetreesub = Filetreesub(Dialog)
-        self.ftree = filetreesub
-        
-        # TODO: Should remain open until OK/cancel. Now: Opens window, but immediately closes it
-        Dialog.show()
-        
-        #Testing window lifespan
-        #import time # import here is a no-no
-        #time.sleep(2)
+        # creates file tree for file selection
+        self.dialog = QtWidgets.QDialog()
+        self.ftree = Filetreesub(self.dialog)
+        self.dialog.show()
     
 
     def hellohello(self):
