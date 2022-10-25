@@ -1,10 +1,10 @@
 ---
 jupyter:
   jupytext:
-    formats: ipynb,md
+    formats: ipynb,py
     text_representation:
-      extension: .md
-      format_name: markdown
+      extension: .py
+      format_name: python
       format_version: '1.3'
       jupytext_version: 1.13.1
   kernelspec:
