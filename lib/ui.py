@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import matplotlib
+import seaborn as sns
 
 matplotlib.use('Qt5Agg')
 
@@ -179,7 +180,7 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
 
 
 class MplCanvas(FigureCanvasQTAgg):
-
+    # graph window, setting parent to None to make it standalone
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = fig.add_subplot(111)
@@ -279,18 +280,13 @@ class UIsub(Ui_MainWindow):
         self.tablemodel.dataChanged.connect(self.tableView.update)
         self.tablemodel.dataChanged.connect(self.hellohello) 
         
-        # create graph in tab. This is meant to go in with designer later, and not create in this class
-        # and also be a standalone window. preparing for that already.
+        # create graph window. This is meant to go in with designer later? and not create in this class
         self.canvas = MplCanvas(width=5, height=4, dpi=100)
         df = pd.DataFrame({'a': [0, 5, 10, 15, 20], 'b': np.random.random(5)})
+        df.plot(ax=self.canvas.axes) # plot DataFrame, passing in the matplotlib Canvas axes.
 
-        # plot the pandas DataFrame, passing in the
-        # matplotlib Canvas axes.
-        df.plot(ax=self.canvas.axes)
-        #self.sc.axes.plot([0,1,2,3,4], [10,1,20,3,40])
         # Create toolbar, passing canvas as first param, parent (self, the MainWindow) as second.
-        self.toolbar_graph = NavigationToolbar(self.canvas, self.tab_3)
-
+        self.toolbar_graph = NavigationToolbar(self.canvas)
         self.layout_graph = QtWidgets.QVBoxLayout()
         self.layout_graph.addWidget(self.toolbar_graph)
         self.layout_graph.addWidget(self.canvas)
@@ -307,6 +303,30 @@ class UIsub(Ui_MainWindow):
         self.timer.timeout.connect(self.update_plot)
         self.timer.start()
 
+        # SEABORN TEST
+        # testing if our graph window can handle advanced seaborn stuff from the notebook prototypes
+        self.canvas_seaborn = MplCanvas(width=5, height=4, dpi=100)
+        dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
+        # sns.lineplot(ax=self.canvas_seaborn.axes)
+        dfmean.set_index('t0', inplace=True)
+        dfmean['slope'] = dfmean.slope/dfmean.slope.abs().max()
+        dfmean['sweep'] = dfmean.sweep/dfmean.sweep.abs().max()
+        g = sns.lineplot(data=dfmean, y="slope", x="t0", ax=self.canvas_seaborn.axes, color="black")
+        h = sns.lineplot(data=dfmean, y="sweep", x="t0", ax=self.canvas_seaborn.axes, color="red")
+        # and so on...
+        
+        # Create toolbar, passing canvas as first param, parent (self, the MainWindow) as second.
+        self.toolbar_graph_seaborn = NavigationToolbar(self.canvas_seaborn)
+        self.layout_graph_seaborn = QtWidgets.QVBoxLayout()
+        self.layout_graph_seaborn.addWidget(self.toolbar_graph_seaborn)
+        self.layout_graph_seaborn.addWidget(self.canvas_seaborn)
+
+        # Create a placeholder widget to hold our toolbar and canvas.
+        self.widget_graph_seaborn = QtWidgets.QWidget()
+        self.widget_graph_seaborn.setLayout(self.layout_graph_seaborn)
+        self.widget_graph_seaborn.show()
+        
+        
     def update_plot(self):
         # Drop off the first y element, append a new one.
         df = pd.DataFrame({'a': [0, 5, 10, 15, 20], 'b': np.random.random(5)})
