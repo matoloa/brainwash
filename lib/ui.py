@@ -306,13 +306,13 @@ class UIsub(Ui_MainWindow):
         # SEABORN TEST
         # testing if our graph window can handle advanced seaborn stuff from the notebook prototypes
         self.canvas_seaborn = MplCanvas(width=5, height=4, dpi=100)
-        dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
+        dfmean = pd.read_csv('dataGenerated/Lactate_2022_abf_11WT_meandata.csv') # import csv
         # sns.lineplot(ax=self.canvas_seaborn.axes)
-        dfmean.set_index('t0', inplace=True)
-        dfmean['slope'] = dfmean.slope/dfmean.slope.abs().max()
-        dfmean['sweep'] = dfmean.sweep/dfmean.sweep.abs().max()
-        g = sns.lineplot(data=dfmean, y="slope", x="t0", ax=self.canvas_seaborn.axes, color="black")
-        h = sns.lineplot(data=dfmean, y="sweep", x="t0", ax=self.canvas_seaborn.axes, color="red")
+        dfmean.set_index('time', inplace=True)
+        dfmean['voltage'] = dfmean.voltage/dfmean.voltage.abs().max()
+        dfmean['prim'] = dfmean.prim/dfmean.prim.abs().max()
+        g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+        h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
         # and so on...
         
         # Create toolbar, passing canvas as first param, parent (self, the MainWindow) as second.
