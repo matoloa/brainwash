@@ -1,7 +1,9 @@
 
+from csv import Dialect
 import os
 import sys
 from pathlib import Path
+from tkinter import dialog
 
 import matplotlib
 import seaborn as sns
@@ -195,42 +197,39 @@ class MplCanvas(FigureCanvasQTAgg):
 ##### WARNING: I was forced to change the parent class from        #####
 ##### 'object' to 'QtCore.QObject' for the pyqtSlot(list) to work  #####
 ########################################################################
+
+
 class Ui_MainWindow(QtCore.QObject):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1223, 942)
+        MainWindow.resize(800, 593)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
-        self.tabWidget = QtWidgets.QTabWidget(self.centralwidget)
-        self.tabWidget.setGeometry(QtCore.QRect(10, 10, 1201, 861))
-        self.tabWidget.setObjectName("tabWidget")
-        self.tab = QtWidgets.QWidget()
-        self.tab.setObjectName("tab")
-        self.widget = FileTreeSelectorDialog(self.tab)
-        self.widget.setGeometry(QtCore.QRect(10, 10, 811, 651))
-        self.widget.setObjectName("widget")
-        self.textBrowser = QtWidgets.QTextBrowser(self.tab)
-        self.textBrowser.setGeometry(QtCore.QRect(830, 10, 311, 81))
-        self.textBrowser.setObjectName("textBrowser")
-        self.tableView = QtWidgets.QTableView(self.tab)
-        self.tableView.setGeometry(QtCore.QRect(830, 100, 311, 731))
-        self.tableView.setObjectName("tableView")
-        self.tabWidget.addTab(self.tab, "")
-        self.tab_2 = QtWidgets.QWidget()
-        self.tab_2.setObjectName("tab_2")
-        self.label = QtWidgets.QLabel(self.tab_2)
-        self.label.setGeometry(QtCore.QRect(140, 70, 171, 51))
-        self.label.setObjectName("label")
-        self.tabWidget.addTab(self.tab_2, "")
-        self.tab_3 = QtWidgets.QWidget()
-        self.tab_3.setObjectName("tab_3")
-        self.lineEdit = QtWidgets.QLineEdit(self.tab_3)
-        self.lineEdit.setGeometry(QtCore.QRect(10, 10, 631, 371))
+        self.lineEdit = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit.setGeometry(QtCore.QRect(10, 10, 191, 22))
         self.lineEdit.setObjectName("lineEdit")
-        self.tabWidget.addTab(self.tab_3, "")
+        self.pushButtonAddData = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonAddData.setGeometry(QtCore.QRect(310, 10, 71, 24))
+        self.pushButtonAddData.setObjectName("pushButtonAddData")
+        self.pushButton_OpenProject = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_OpenProject.setEnabled(False)
+        self.pushButton_OpenProject.setGeometry(QtCore.QRect(210, 10, 91, 24))
+        self.pushButton_OpenProject.setObjectName("pushButton_OpenProject")
+        self.MasterTableView = QtWidgets.QTableView(self.centralwidget)
+        self.MasterTableView.setGeometry(QtCore.QRect(10, 40, 371, 511))
+        self.MasterTableView.setObjectName("MasterTableView")
+        self.label_2 = QtWidgets.QLabel(self.centralwidget)
+        self.label_2.setGeometry(QtCore.QRect(410, 240, 141, 16))
+        self.label_2.setObjectName("label_2")
+        self.pushButton = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton.setGeometry(QtCore.QRect(490, 10, 51, 24))
+        self.pushButton.setObjectName("pushButton")
+        self.checkBox = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBox.setGeometry(QtCore.QRect(410, 10, 77, 21))
+        self.checkBox.setObjectName("checkBox")
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1223, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 21))
         self.menubar.setObjectName("menubar")
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
@@ -238,16 +237,41 @@ class Ui_MainWindow(QtCore.QObject):
         MainWindow.setStatusBar(self.statusbar)
 
         self.retranslateUi(MainWindow)
-        self.tabWidget.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab), _translate("MainWindow", "Source"))
-        self.label.setText(_translate("MainWindow", "TextLabel"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_2), _translate("MainWindow", "Experiment"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_3), _translate("MainWindow", "Measure"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "Brainwash 0.1"))
+        self.lineEdit.setText(_translate("MainWindow", "placeholder project name"))
+        self.pushButtonAddData.setText(_translate("MainWindow", "Add data"))
+        self.pushButton_OpenProject.setText(_translate("MainWindow", "Open project"))
+        self.label_2.setText(_translate("MainWindow", "Metadata:"))
+        self.pushButton.setText(_translate("MainWindow", "select"))
+        self.checkBox.setText(_translate("MainWindow", "Preview"))
+
+
+class Ui_Dialog(QtCore.QObject):
+    def setupUi(self, Dialog):
+        Dialog.setObjectName("Dialog")
+        Dialog.resize(723, 358)
+        self.buttonBox = QtWidgets.QDialogButtonBox(Dialog)
+        self.buttonBox.setGeometry(QtCore.QRect(550, 320, 161, 32))
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName("buttonBox")
+        self.widget = FileTreeSelectorDialog(Dialog)
+        self.widget.setGeometry(QtCore.QRect(10, 10, 701, 301))
+        self.widget.setObjectName("widget")
+
+        self.retranslateUi(Dialog)
+        self.buttonBox.accepted.connect(Dialog.accept)
+        self.buttonBox.rejected.connect(Dialog.reject)
+        QtCore.QMetaObject.connectSlotsByName(Dialog)
+
+    def retranslateUi(self, Dialog):
+        _translate = QtCore.QCoreApplication.translate
+        Dialog.setWindowTitle(_translate("Dialog", "Dialog"))
+
 
 #######################################################################
 
@@ -255,95 +279,44 @@ class Ui_MainWindow(QtCore.QObject):
 # subclassing Ui_MainWindow to be able to use the unaltered output file from pyuic and QT designer
 class UIsub(Ui_MainWindow):
     def __init__(self, mainwindow):
-        dftest = pd.DataFrame({'path': ['asdfasdf', 'asdfasdf'],
-                               'value': [5, 6]})
+#        dftest = pd.DataFrame({'path': ['asdfasdf', 'asdfasdf'],
+#                               'value': [5, 6]})
         super(UIsub, self).__init__()
         self.setupUi(mainwindow)
         print('UIsub init')
         
         # rename for clarity
-        self.ftree = self.widget
         
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
         # however, I kinda like the control of putting each of them explicit here and use designer just to get the boxes right visually
         # connecting the same signals we had in original ui test
-        self.lineEdit.editingFinished.connect(self.hitEnter)
-        self.lineEdit.textChanged.connect(self.changeText)
-        
-        # this could probably be autonnected
-        self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
-        self.ftree.model.paths_selected.connect(self.print_paths)
-        
-        self.tablemodel = TableModel(dftest)
-        self.tableView.setModel(self.tablemodel)
-        self.tablemodel.dataChanged.connect(self.tableView.update)
-        self.tablemodel.dataChanged.connect(self.hellohello) 
-        
-        # create graph window. This is meant to go in with designer later? and not create in this class
-        self.canvas = MplCanvas(width=5, height=4, dpi=100)
-        df = pd.DataFrame({'a': [0, 5, 10, 15, 20], 'b': np.random.random(5)})
-        df.plot(ax=self.canvas.axes) # plot DataFrame, passing in the matplotlib Canvas axes.
+        self.lineEdit.editingFinished.connect(self.setProjectname)
+        self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
+                
 
-        # Create toolbar, passing canvas as first param, parent (self, the MainWindow) as second.
-        self.toolbar_graph = NavigationToolbar(self.canvas)
-        self.layout_graph = QtWidgets.QVBoxLayout()
-        self.layout_graph.addWidget(self.toolbar_graph)
-        self.layout_graph.addWidget(self.canvas)
-
-        # Create a placeholder widget to hold our toolbar and canvas.
-        self.widget_graph = QtWidgets.QWidget()
-        self.widget_graph.setLayout(self.layout_graph)
-        self.widget_graph.show()
+    def pushedButtonAddData(self):
+        print('pressed!')
+        Dialog = QtWidgets.QDialog()
+        filetreesub = Filetreesub(Dialog)
+        self.ftree = filetreesub
         
-        # skeleton to update the plots, connect with signal and slot when ready
-        # Setup a timer to trigger the redraw by calling update_plot.
-        self.timer = QtCore.QTimer()
-        self.timer.setInterval(1000)
-        self.timer.timeout.connect(self.update_plot)
-        self.timer.start()
-
-        # SEABORN TEST
-        # testing if our graph window can handle advanced seaborn stuff from the notebook prototypes
-        self.canvas_seaborn = MplCanvas(width=5, height=4, dpi=100)
-        dfmean = pd.read_csv('dataGenerated/Lactate_2022_abf_11WT_meandata.csv') # import csv
-        # sns.lineplot(ax=self.canvas_seaborn.axes)
-        dfmean.set_index('time', inplace=True)
-        dfmean['voltage'] = dfmean.voltage/dfmean.voltage.abs().max()
-        dfmean['prim'] = dfmean.prim/dfmean.prim.abs().max()
-        g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
-        h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
-        # and so on...
+        # TODO: Should remain open until OK/cancel. Now: Opens window, but immediately closes it
+        Dialog.show()
         
-        # Create toolbar, passing canvas as first param, parent (self, the MainWindow) as second.
-        self.toolbar_graph_seaborn = NavigationToolbar(self.canvas_seaborn)
-        self.layout_graph_seaborn = QtWidgets.QVBoxLayout()
-        self.layout_graph_seaborn.addWidget(self.toolbar_graph_seaborn)
-        self.layout_graph_seaborn.addWidget(self.canvas_seaborn)
-
-        # Create a placeholder widget to hold our toolbar and canvas.
-        self.widget_graph_seaborn = QtWidgets.QWidget()
-        self.widget_graph_seaborn.setLayout(self.layout_graph_seaborn)
-        self.widget_graph_seaborn.show()
-        
-        
-    def update_plot(self):
-        # Drop off the first y element, append a new one.
-        df = pd.DataFrame({'a': [0, 5, 10, 15, 20], 'b': np.random.random(5)})
-        self.canvas.axes.cla()  # Clear the canvas.
-        df.plot(ax=self.canvas.axes, x='a', y='b')
-        # self.canvas.axes.plot(self.xdata, self.ydata, 'r')
-        # Trigger the canvas to update and redraw.
-        self.canvas.draw()
-
+        #Testing window lifespan
+        #import time # import here is a no-no
+        #time.sleep(2)
     
+
     def hellohello(self):
         print('hellohello')
         
     
-    def hitEnter(self):
+    def setProjectname(self):
         #get_signals(self.children()[1].children()[1].model)
-        self.textBrowser.setText(self.lineEdit.text())
+        #self.textBrowser.setText(self.lineEdit.text())
+        print(f"setProjectName: {self}")
 
 
     def changeText(self):
@@ -365,6 +338,19 @@ class UIsub(Ui_MainWindow):
         self.setTableDf(dftable)
 
 
+class Filetreesub(Ui_Dialog):
+    def __init__(self, dialog):
+#        dftest = pd.DataFrame({'path': ['asdfasdf', 'asdfasdf'],
+#                               'value': [5, 6]})
+        super(Filetreesub, self).__init__()
+        self.setupUi(dialog)
+
+        print('Filetreesub init')
+#       self.ftree = self.widget
+#       self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
+#       self.ftree.model.paths_selected.connect(self.print_paths)
+        
+
 def get_signals(source):
         cls = source if isinstance(source, type) else type(source)
         signal = type(QtCore.pyqtSignal())
@@ -381,5 +367,7 @@ if __name__ == "__main__":
     MainWindow = QtWidgets.QMainWindow()
     ui = UIsub(MainWindow)
     MainWindow.show()
+    
     sys.exit(app.exec_())
  
+
