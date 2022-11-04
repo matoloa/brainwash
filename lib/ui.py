@@ -296,7 +296,8 @@ class UIsub(Ui_MainWindow):
         # connecting the same signals we had in original ui test
         self.lineEdit.editingFinished.connect(self.setProjectname)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
-                
+        self.pushButton.pressed.connect(self.setGraph)
+
 
     def pushedButtonAddData(self):
         # creates file tree for file selection
@@ -305,6 +306,24 @@ class UIsub(Ui_MainWindow):
         self.dialog.show()
     
 
+    def setGraph(self):
+        print('hello')
+        dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
+        self.canvas_seaborn = MplCanvas(parent=self.graphView)  # instantiate canvas
+        dfmean.set_index('t0', inplace=True)
+        dfmean['slope'] = dfmean.slope/dfmean.slope.abs().max()
+        dfmean['sweep'] = dfmean.sweep/dfmean.sweep.abs().max()
+        g = sns.lineplot(data=dfmean, y="slope", x="t0", ax=self.canvas_seaborn.axes, color="black")
+        h = sns.lineplot(data=dfmean, y="sweep", x="t0", ax=self.canvas_seaborn.axes, color="red")
+        self.canvas_seaborn.draw()
+        self.canvas_seaborn.show()
+
+
+        
+
+        
+        
+        
     def hellohello(self):
         print('hellohello')
         
