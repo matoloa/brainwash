@@ -40,7 +40,7 @@
      <string>Add data</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="pushButton_OpenProject">
+   <widget class="QPushButton" name="pushButtonOpenProject">
     <property name="enabled">
      <bool>false</bool>
     </property>
@@ -103,6 +103,16 @@
     </property>
     <property name="text">
      <string>Preview</string>
+    </property>
+   </widget>
+   <widget class="QWidget" name="graphView" native="true">
+    <property name="geometry">
+     <rect>
+      <x>400</x>
+      <y>40</y>
+      <width>381</width>
+      <height>191</height>
+     </rect>
     </property>
    </widget>
   </widget>
