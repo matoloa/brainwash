@@ -202,12 +202,12 @@ class MplCanvas(FigureCanvasQTAgg):
 class Ui_MainWindow(QtCore.QObject):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(800, 593)
+        MainWindow.resize(783, 592)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
-        self.lineEdit = QtWidgets.QLineEdit(self.centralwidget)
-        self.lineEdit.setGeometry(QtCore.QRect(10, 10, 191, 22))
-        self.lineEdit.setObjectName("lineEdit")
+        self.inputProjectName = QtWidgets.QLineEdit(self.centralwidget)
+        self.inputProjectName.setGeometry(QtCore.QRect(10, 10, 191, 22))
+        self.inputProjectName.setObjectName("inputProjectName")
         self.pushButtonAddData = QtWidgets.QPushButton(self.centralwidget)
         self.pushButtonAddData.setGeometry(QtCore.QRect(310, 10, 71, 24))
         self.pushButtonAddData.setObjectName("pushButtonAddData")
@@ -215,24 +215,36 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButtonOpenProject.setEnabled(False)
         self.pushButtonOpenProject.setGeometry(QtCore.QRect(210, 10, 91, 24))
         self.pushButtonOpenProject.setObjectName("pushButtonOpenProject")
-        self.MasterTableView = QtWidgets.QTableView(self.centralwidget)
-        self.MasterTableView.setGeometry(QtCore.QRect(10, 40, 371, 511))
-        self.MasterTableView.setObjectName("MasterTableView")
-        self.label_2 = QtWidgets.QLabel(self.centralwidget)
-        self.label_2.setGeometry(QtCore.QRect(410, 240, 141, 16))
-        self.label_2.setObjectName("label_2")
-        self.pushButton = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton.setGeometry(QtCore.QRect(490, 10, 51, 24))
-        self.pushButton.setObjectName("pushButton")
-        self.checkBox = QtWidgets.QCheckBox(self.centralwidget)
-        self.checkBox.setGeometry(QtCore.QRect(410, 10, 77, 21))
-        self.checkBox.setObjectName("checkBox")
-        self.graphView = QtWidgets.QWidget(self.centralwidget)
-        self.graphView.setGeometry(QtCore.QRect(400, 40, 381, 191))
-        self.graphView.setObjectName("graphView")
+        self.tableMaster = QtWidgets.QTableView(self.centralwidget)
+        self.tableMaster.setGeometry(QtCore.QRect(10, 40, 371, 511))
+        self.tableMaster.setObjectName("tableMaster")
+        self.labelMetadata = QtWidgets.QLabel(self.centralwidget)
+        self.labelMetadata.setGeometry(QtCore.QRect(390, 470, 141, 16))
+        self.labelMetadata.setObjectName("labelMetadata")
+        self.pushButtonSelect = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonSelect.setGeometry(QtCore.QRect(720, 10, 51, 24))
+        self.pushButtonSelect.setObjectName("pushButtonSelect")
+        self.checkPreview = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkPreview.setGeometry(QtCore.QRect(630, 10, 77, 21))
+        self.checkPreview.setObjectName("checkPreview")
+        self.graphData = QtWidgets.QWidget(self.centralwidget)
+        self.graphData.setGeometry(QtCore.QRect(390, 40, 381, 191))
+        self.graphData.setObjectName("graphData")
+        self.graphOutput = QtWidgets.QWidget(self.centralwidget)
+        self.graphOutput.setGeometry(QtCore.QRect(390, 260, 381, 201))
+        self.graphOutput.setObjectName("graphOutput")
+        self.labelMeanGroups = QtWidgets.QLabel(self.centralwidget)
+        self.labelMeanGroups.setGeometry(QtCore.QRect(390, 240, 141, 16))
+        self.labelMeanGroups.setObjectName("labelMeanGroups")
+        self.labelMeanSweep = QtWidgets.QLabel(self.centralwidget)
+        self.labelMeanSweep.setGeometry(QtCore.QRect(390, 20, 141, 16))
+        self.labelMeanSweep.setObjectName("labelMeanSweep")
+        self.tableMetadata = QtWidgets.QTableView(self.centralwidget)
+        self.tableMetadata.setGeometry(QtCore.QRect(390, 490, 381, 61))
+        self.tableMetadata.setObjectName("tableMetadata")
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 783, 21))
         self.menubar.setObjectName("menubar")
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
@@ -245,12 +257,14 @@ class Ui_MainWindow(QtCore.QObject):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Brainwash 0.1"))
-        self.lineEdit.setText(_translate("MainWindow", "placeholder project name"))
+        self.inputProjectName.setText(_translate("MainWindow", "placeholder project name"))
         self.pushButtonAddData.setText(_translate("MainWindow", "Add data"))
         self.pushButtonOpenProject.setText(_translate("MainWindow", "Open project"))
-        self.label_2.setText(_translate("MainWindow", "Metadata:"))
-        self.pushButton.setText(_translate("MainWindow", "select"))
-        self.checkBox.setText(_translate("MainWindow", "Preview"))
+        self.labelMetadata.setText(_translate("MainWindow", "Metadata:"))
+        self.pushButtonSelect.setText(_translate("MainWindow", "select"))
+        self.checkPreview.setText(_translate("MainWindow", "Preview"))
+        self.labelMeanGroups.setText(_translate("MainWindow", "Mean Groups:"))
+        self.labelMeanSweep.setText(_translate("MainWindow", "Mean Sweep:"))
 
 
 class Ui_Dialog(QtWidgets.QWidget):
@@ -294,9 +308,9 @@ class UIsub(Ui_MainWindow):
         # maybe learn more about that later?
         # however, I kinda like the control of putting each of them explicit here and use designer just to get the boxes right visually
         # connecting the same signals we had in original ui test
-        self.lineEdit.editingFinished.connect(self.setProjectname)
+        self.inputProjectName.editingFinished.connect(self.setProjectname)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
-        self.pushButton.pressed.connect(self.setGraph)
+        self.pushButtonSelect.pressed.connect(self.setGraph)
 
 
     def pushedButtonAddData(self):
@@ -318,24 +332,15 @@ class UIsub(Ui_MainWindow):
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
 
-
-        
-
-        
-        
-        
-    def hellohello(self):
-        print('hellohello')
-        
     
     def setProjectname(self):
         #get_signals(self.children()[1].children()[1].model)
-        #self.textBrowser.setText(self.lineEdit.text())
+        #self.textBrowser.setText(self.inputProjectName.text())
         print(f"setProjectName: {self}")
 
 
     def changeText(self):
-        self.label.setText(self.lineEdit.text())
+        self.label.setText(self.inputProjectName.text())
     
     
     def setTableDf(self, data):
@@ -361,8 +366,8 @@ class Filetreesub(Ui_Dialog):
         self.setupUi(dialog)
 
         print('Filetreesub init')
-#       self.ftree = self.widget
-#       self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
+        self.ftree = self.widget
+        self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
 #       self.ftree.model.paths_selected.connect(self.print_paths)
         
 
