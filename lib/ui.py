@@ -418,9 +418,8 @@ class Filetreesub(Ui_Dialog):
         self.buttonBoxAddGroup.setOrientation(QtCore.Qt.Vertical)
         self.buttonBoxAddGroup.setStandardButtons(QtWidgets.QDialogButtonBox.NoButton)
         self.buttonBoxAddGroup.setObjectName("buttonBoxAddGroup")
-        # Consider UI for easy renaming and removing
-        # Manually added (unconnected) default group buttons
-        # Eventually, these must be populated from masterTable group names
+        
+        # Manually added (unconnected) default group buttons - eventually, these must be populated from project.brainwash group names
         self.buttonBoxAddGroup.groupcontrol = QtWidgets.QPushButton(self.tr("&Control"))
         self.buttonBoxAddGroup.groupintervention = QtWidgets.QPushButton(self.tr("&Intervention"))
         self.buttonBoxAddGroup.newGroup = QtWidgets.QPushButton(self.tr("&New group"))
@@ -437,8 +436,10 @@ class Filetreesub(Ui_Dialog):
 
 
     def pathsSelectedUpdateTable(self, paths):
-        print(paths)
-        self.tablemodel.setData(pd.DataFrame({"paths": paths}))
+        # TODO: Extract host, checksum, name, group
+        # for i in paths:
+        #   name = os.path.basename(os.path.dirname(i)) + '_' + os.path.basename(i)
+        self.tablemodel.setData(pd.DataFrame({"host": 'computer 1', "path": paths, 'checksum': 'big number', 'name': None, 'group': None}))
         self.tableView.update()
 
 
