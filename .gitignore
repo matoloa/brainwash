@@ -16,5 +16,8 @@
 
 cache/*
 
+# location of current user's brainwash project folder
+projectFolderLocation.txt
+
 # Mats' convenience files
 *.bat
