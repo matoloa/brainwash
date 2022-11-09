@@ -106,7 +106,6 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
         for k, v in self.checks.items():
             if (v == 2): # Checked
                 paths.append(format(self.filePath(k)))
-        print(paths)
         self.paths_selected.emit(paths)    
 
     
@@ -215,9 +214,9 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButtonOpenProject.setEnabled(False)
         self.pushButtonOpenProject.setGeometry(QtCore.QRect(210, 10, 91, 24))
         self.pushButtonOpenProject.setObjectName("pushButtonOpenProject")
-        self.tableMaster = QtWidgets.QTableView(self.centralwidget)
-        self.tableMaster.setGeometry(QtCore.QRect(10, 40, 371, 511))
-        self.tableMaster.setObjectName("tableMaster")
+        self.tableProj = QtWidgets.QTableView(self.centralwidget)
+        self.tableProj.setGeometry(QtCore.QRect(10, 40, 371, 511))
+        self.tableProj.setObjectName("tableProj")
         self.labelMetadata = QtWidgets.QLabel(self.centralwidget)
         self.labelMetadata.setGeometry(QtCore.QRect(390, 470, 141, 16))
         self.labelMetadata.setObjectName("labelMetadata")
@@ -283,22 +282,6 @@ class Ui_Dialog(QtWidgets.QWidget):
         self.tableView.setGeometry(QtCore.QRect(570, 10, 521, 461))
         self.tableView.setObjectName("tableView")
 
-        self.buttonBoxAddGroup = QtWidgets.QDialogButtonBox(Dialog)
-        self.buttonBoxAddGroup.setGeometry(QtCore.QRect(470, 20, 91, 491))
-        self.buttonBoxAddGroup.setLayoutDirection(QtCore.Qt.LeftToRight)
-        self.buttonBoxAddGroup.setOrientation(QtCore.Qt.Vertical)
-        self.buttonBoxAddGroup.setStandardButtons(QtWidgets.QDialogButtonBox.NoButton)
-        self.buttonBoxAddGroup.setObjectName("buttonBoxAddGroup")
-        # Consider UI for easy renaming and removing
-        # Manually added (unconnected) default group buttons
-        # Eventually, these must be populated from masterTable group names
-        self.buttonBoxAddGroup.groupcontrol = QtWidgets.QPushButton(self.tr("&Control"))
-        self.buttonBoxAddGroup.groupintervention = QtWidgets.QPushButton(self.tr("&Intervention"))
-        self.buttonBoxAddGroup.newGroup = QtWidgets.QPushButton(self.tr("&New group"))
-        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.groupcontrol, QtWidgets.QDialogButtonBox.ActionRole)
-        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.groupintervention, QtWidgets.QDialogButtonBox.ActionRole)
-        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.newGroup, QtWidgets.QDialogButtonBox.ActionRole)
-
         self.retranslateUi(Dialog)
         self.buttonBox.accepted.connect(Dialog.accept)
         self.buttonBox.rejected.connect(Dialog.reject)
@@ -315,21 +298,44 @@ class Ui_Dialog(QtWidgets.QWidget):
 # subclassing Ui_MainWindow to be able to use the unaltered output file from pyuic and QT designer
 class UIsub(Ui_MainWindow):
     def __init__(self, mainwindow):
-#        dftest = pd.DataFrame({'path': ['asdfasdf', 'asdfasdf'],
-#                               'value': [5, 6]})
         super(UIsub, self).__init__()
         self.setupUi(mainwindow)
-        print('UIsub init')
-       
-        # rename for clarity
+        print('UIsub init') # rename for clarity
+
+        # TODO: this is placeholder project dataframe
+        self.dfProj = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
         
+        # path to brainwash directory
+        self.repo_root = Path(os.getcwd())
+        # path to projectFolderLocation.txt - the file that stores the location of brainwash projects
+        self.projectLocationPath = self.repo_root / 'projectFolderLocation.txt'
+        # print('projectLocationPath:', self.projectLocationPath)
+        
+        # open projectFolderLocation.txt; if it exists, use contents for self.projectLocation
+        if os.path.exists(self.projectLocationPath):
+            with open(self.projectLocationPath, 'r') as f:
+                self.project_root = Path(f.readline())
+                print (self.project_root)
+        else: # file does not exist or is empty: assign default path to brainwash projects
+            self.project_root = Path(os.path.expanduser('~/Documents/brainwash projects'))
+            with open(self.projectLocationPath, 'w+') as f:
+                f.writelines(str(self.project_root))
+
+        # complete path to default folder - for later use in load-last-project
+        self.project = "default" # a folder in project_root
+        self.projectfolder = self.project_root / self.project
+
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
         # however, I kinda like the control of putting each of them explicit here and use designer just to get the boxes right visually
         # connecting the same signals we had in original ui test
+
         self.inputProjectName.editingFinished.connect(self.setProjectname)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
         self.pushButtonSelect.pressed.connect(self.addData)
+
+    # place current project as folder in project_root, lock project name for now
+    # self.projectfolder = self.project_root / self.project
 
 
     def pushedButtonAddData(self):
@@ -339,14 +345,23 @@ class UIsub(Ui_MainWindow):
         self.dialog.show()
         
 
-    def addData(self): # TODO move contents to correct place, trigger from ftree buttonBox.accepted
+    def getdfProj(self):
+        return self.dfProj
+
+
+    def setdfProj(self, df):
+        self.dfProj = df
+
+
+    def addData(self): # TODO trigger from ftree buttonBox.accepted
         print('addData')
-        # create placeholder dataframes
-        dfMaster = pd.DataFrame({'rigID': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
-        dfAdd = pd.DataFrame({'rigID': ['computer 1', 'computer 58'], 'path': ['C:/copy of new folder(4)/braindamage/second test', 'F:/404/braindamage/sillySubfolder/first test'], 'checksum': ['big number', 'arbitrary number'], 'name': ['first test', 'second test'], 'group': ['pilot', 'pilot']})
-        # .append is deprecated; switching to pd.concat
-        dfMaster = pd.concat([dfMaster, dfAdd])
-        print(dfMaster)
+        dfProj = self.getdfProj()
+        # create placeholder dataframe
+        dfAdd = pd.DataFrame({'host': ['computer 1', 'computer 58'], 'path': ['C:/copy of new folder(4)/braindamage/second test', 'F:/404/braindamage/sillySubfolder/first test'], 'checksum': ['big number', 'arbitrary number'], 'name': ['first test', 'second test'], 'group': ['pilot', 'pilot']})
+        dfProj = pd.concat([dfProj, dfAdd]) # .append is deprecated; using pd.concat
+        dfProj.reset_index(drop=True, inplace=True)
+        self.setdfProj(dfProj)
+        print(self.getdfProj())
 
 
     def setGraph(self):
@@ -364,19 +379,18 @@ class UIsub(Ui_MainWindow):
     
     def setProjectname(self):
         #get_signals(self.children()[1].children()[1].model)
-        #self.textBrowser.setText(self.inputProjectName.text())
-        print(f"setProjectName: {self}")
+        self.project = self.inputProjectName.text()
+        self.projectfolder = self.project_root / self.project
+        if not os.path.exists(self.projectfolder):
+            os.makedirs(self.projectfolder)
+        print (os.path.exists(self.projectfolder))
 
-
-    def changeText(self):
-        self.label.setText(self.inputProjectName.text())
-    
     
     def setTableDf(self, data):
         self.tablemodel.setData(data)
         self.tableView.update()
 
-    
+   
     @QtCore.pyqtSlot(list)
     def print_paths(self, mypaths):
         print(f'mystr: {mypaths}')
@@ -389,16 +403,46 @@ class UIsub(Ui_MainWindow):
 
 class Filetreesub(Ui_Dialog):
     def __init__(self, dialog):
-#        dftest = pd.DataFrame({'path': ['asdfasdf', 'asdfasdf'],
-#                               'value': [5, 6]})
         super(Filetreesub, self).__init__()
         self.setupUi(dialog)
 
         print('Filetreesub init')
+    
         self.ftree = self.widget
-        self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
-#       self.ftree.model.paths_selected.connect(self.print_paths)
+
+        # Dataframe to add
+        self.dfAdd = pd.DataFrame({'host': ['computer 1', 'computer 58'], 'path': ['C:/copy of new folder(4)/braindamage/second test', 'F:/404/braindamage/sillySubfolder/first test'], 'checksum': ['big number', 'arbitrary number'], 'name': ['first test', 'second test'], 'group': ['pilot', 'pilot']})
         
+
+        self.buttonBoxAddGroup = QtWidgets.QDialogButtonBox(dialog)
+        self.buttonBoxAddGroup.setGeometry(QtCore.QRect(470, 20, 91, 491))
+        self.buttonBoxAddGroup.setLayoutDirection(QtCore.Qt.LeftToRight)
+        self.buttonBoxAddGroup.setOrientation(QtCore.Qt.Vertical)
+        self.buttonBoxAddGroup.setStandardButtons(QtWidgets.QDialogButtonBox.NoButton)
+        self.buttonBoxAddGroup.setObjectName("buttonBoxAddGroup")
+        # Consider UI for easy renaming and removing
+        # Manually added (unconnected) default group buttons
+        # Eventually, these must be populated from masterTable group names
+        self.buttonBoxAddGroup.groupcontrol = QtWidgets.QPushButton(self.tr("&Control"))
+        self.buttonBoxAddGroup.groupintervention = QtWidgets.QPushButton(self.tr("&Intervention"))
+        self.buttonBoxAddGroup.newGroup = QtWidgets.QPushButton(self.tr("&New group"))
+        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.groupcontrol, QtWidgets.QDialogButtonBox.ActionRole)
+        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.groupintervention, QtWidgets.QDialogButtonBox.ActionRole)
+        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.newGroup, QtWidgets.QDialogButtonBox.ActionRole)
+
+
+        self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
+        self.ftree.model.paths_selected.connect(self.pathsSelectedUpdateTable)
+    
+        self.tablemodel = TableModel(self.dfAdd)
+        self.tableView.setModel(self.tablemodel)
+
+
+    def pathsSelectedUpdateTable(self, paths):
+        print(paths)
+        self.tablemodel.setData(pd.DataFrame({"paths": paths}))
+        self.tableView.update()
+
 
 def get_signals(source):
         cls = source if isinstance(source, type) else type(source)
