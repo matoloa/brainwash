@@ -270,15 +270,34 @@ class Ui_MainWindow(QtCore.QObject):
 class Ui_Dialog(QtWidgets.QWidget):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
-        Dialog.resize(723, 358)
+        Dialog.resize(1105, 525)
         self.buttonBox = QtWidgets.QDialogButtonBox(Dialog)
-        self.buttonBox.setGeometry(QtCore.QRect(550, 320, 161, 32))
+        self.buttonBox.setGeometry(QtCore.QRect(930, 480, 161, 32))
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
         self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.widget = FileTreeSelectorDialog(Dialog)
-        self.widget.setGeometry(QtCore.QRect(10, 10, 701, 301))
+        self.widget.setGeometry(QtCore.QRect(10, 10, 451, 501))
         self.widget.setObjectName("widget")
+        self.tableView = QtWidgets.QTableView(Dialog)
+        self.tableView.setGeometry(QtCore.QRect(570, 10, 521, 461))
+        self.tableView.setObjectName("tableView")
+
+        self.buttonBoxAddGroup = QtWidgets.QDialogButtonBox(Dialog)
+        self.buttonBoxAddGroup.setGeometry(QtCore.QRect(470, 20, 91, 491))
+        self.buttonBoxAddGroup.setLayoutDirection(QtCore.Qt.LeftToRight)
+        self.buttonBoxAddGroup.setOrientation(QtCore.Qt.Vertical)
+        self.buttonBoxAddGroup.setStandardButtons(QtWidgets.QDialogButtonBox.NoButton)
+        self.buttonBoxAddGroup.setObjectName("buttonBoxAddGroup")
+        # Consider UI for easy renaming and removing
+        # Manually added (unconnected) default group buttons
+        # Eventually, these must be populated from masterTable group names
+        self.buttonBoxAddGroup.groupcontrol = QtWidgets.QPushButton(self.tr("&Control"))
+        self.buttonBoxAddGroup.groupintervention = QtWidgets.QPushButton(self.tr("&Intervention"))
+        self.buttonBoxAddGroup.newGroup = QtWidgets.QPushButton(self.tr("&New group"))
+        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.groupcontrol, QtWidgets.QDialogButtonBox.ActionRole)
+        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.groupintervention, QtWidgets.QDialogButtonBox.ActionRole)
+        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.newGroup, QtWidgets.QDialogButtonBox.ActionRole)
 
         self.retranslateUi(Dialog)
         self.buttonBox.accepted.connect(Dialog.accept)
@@ -301,7 +320,7 @@ class UIsub(Ui_MainWindow):
         super(UIsub, self).__init__()
         self.setupUi(mainwindow)
         print('UIsub init')
-        
+       
         # rename for clarity
         
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
@@ -310,7 +329,7 @@ class UIsub(Ui_MainWindow):
         # connecting the same signals we had in original ui test
         self.inputProjectName.editingFinished.connect(self.setProjectname)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
-        self.pushButtonSelect.pressed.connect(self.setGraph)
+        self.pushButtonSelect.pressed.connect(self.addData)
 
 
     def pushedButtonAddData(self):
@@ -318,10 +337,20 @@ class UIsub(Ui_MainWindow):
         self.dialog = QtWidgets.QDialog()
         self.ftree = Filetreesub(self.dialog)
         self.dialog.show()
-    
+        
+
+    def addData(self): # TODO move contents to correct place, trigger from ftree buttonBox.accepted
+        print('addData')
+        # create placeholder dataframes
+        dfMaster = pd.DataFrame({'rigID': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
+        dfAdd = pd.DataFrame({'rigID': ['computer 1', 'computer 58'], 'path': ['C:/copy of new folder(4)/braindamage/second test', 'F:/404/braindamage/sillySubfolder/first test'], 'checksum': ['big number', 'arbitrary number'], 'name': ['first test', 'second test'], 'group': ['pilot', 'pilot']})
+        # .append is deprecated; switching to pd.concat
+        dfMaster = pd.concat([dfMaster, dfAdd])
+        print(dfMaster)
+
 
     def setGraph(self):
-        print('hello')
+        print('setGraph')
         dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
         self.canvas_seaborn = MplCanvas(parent=self.graphView)  # instantiate canvas
         dfmean.set_index('t0', inplace=True)
