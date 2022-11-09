@@ -305,25 +305,8 @@ class UIsub(Ui_MainWindow):
         # TODO: this is placeholder project dataframe
         self.dfProj = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
         
-        # path to brainwash directory
-        self.repo_root = Path(os.getcwd())
-        # path to projectFolderLocation.txt - the file that stores the location of brainwash projects
-        self.projectLocationPath = self.repo_root / 'projectFolderLocation.txt'
-        # print('projectLocationPath:', self.projectLocationPath)
-        
-        # open projectFolderLocation.txt; if it exists, use contents for self.projectLocation
-        if os.path.exists(self.projectLocationPath):
-            with open(self.projectLocationPath, 'r') as f:
-                self.project_root = Path(f.readline())
-                print (self.project_root)
-        else: # file does not exist or is empty: assign default path to brainwash projects
-            self.project_root = Path(os.path.expanduser('~/Documents/brainwash projects'))
-            with open(self.projectLocationPath, 'w+') as f:
-                f.writelines(str(self.project_root))
-
-        # complete path to default folder - for later use in load-last-project
         self.project = "default" # a folder in project_root
-        self.projectfolder = self.project_root / self.project
+        self.projectfolder = self.getProjectFolder() / self.project
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
@@ -336,6 +319,21 @@ class UIsub(Ui_MainWindow):
 
     # place current project as folder in project_root, lock project name for now
     # self.projectfolder = self.project_root / self.project
+
+
+    def getProjectFolder(self):
+        # Find projectFolderLocation.txt in brainwash folder, or create a default one. Return Project Folder (Path).
+        repo_root = Path(os.getcwd()) # path to brainwash directory
+        self.projectLocationPath = repo_root / 'projectFolderLocation.txt'
+        # open projectFolderLocation.txt; if it exists, use contents for self.projectLocation
+        if os.path.exists(self.projectLocationPath):
+            with open(self.projectLocationPath, 'r') as f:
+                self.project_root = Path(f.readline())
+        else: # file does not exist or is empty: assign default path to brainwash projects
+            self.project_root = Path(os.path.expanduser('~/Documents/brainwash projects'))
+            with open(self.projectLocationPath, 'w+') as f:
+                f.writelines(str(self.project_root))
+        return self.project_root
 
 
     def pushedButtonAddData(self):
@@ -462,5 +460,3 @@ if __name__ == "__main__":
     MainWindow.show()
     
     sys.exit(app.exec_())
- 
-
