@@ -338,7 +338,7 @@ class UIsub(Ui_MainWindow):
     def pushedButtonAddData(self):
         # creates file tree for file selection
         self.dialog = QtWidgets.QDialog()
-        self.ftree = Filetreesub(self.dialog)
+        self.ftree = Filetreesub(self.dialog, parent=self)
         self.dialog.show()
         
 
@@ -406,7 +406,7 @@ class UIsub(Ui_MainWindow):
 class Filetreesub(Ui_Dialog):
     signalAddData = QtCore.pyqtSignal(list)
 
-    def __init__(self, dialog):
+    def __init__(self, dialog, parent=None):
         super(Filetreesub, self).__init__()
         self.setupUi(dialog)
 
@@ -437,7 +437,7 @@ class Filetreesub(Ui_Dialog):
         self.ftree.model.paths_selected.connect(self.pathsSelectedUpdateTable)
         
         self.buttonBox.accepted.connect(self.addDataOK)
-        self.signalAddData.connect(UIsub.slotAddData)
+        self.signalAddData.connect(parent.slotAddData)
 
         self.tablemodel = TableModel(self.dfAdd)
         self.tableView.setModel(self.tablemodel)
