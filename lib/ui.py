@@ -315,7 +315,6 @@ class UIsub(Ui_MainWindow):
 
         self.inputProjectName.editingFinished.connect(self.setProjectname)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
-        self.pushButtonSelect.pressed.connect(self.addData)
 
     # place current project as folder in project_root, lock project name for now
     # self.projectfolder = self.project_root / self.project
@@ -353,13 +352,13 @@ class UIsub(Ui_MainWindow):
 
     def addData(self): # TODO trigger from ftree buttonBox.accepted
         print('addData')
-        dfProj = self.getdfProj()
+        dfProj = self.getdfProj(self)
         # create placeholder dataframe
         dfAdd = pd.DataFrame({'host': ['computer 1', 'computer 58'], 'path': ['C:/copy of new folder(4)/braindamage/second test', 'F:/404/braindamage/sillySubfolder/first test'], 'checksum': ['big number', 'arbitrary number'], 'name': ['first test', 'second test'], 'group': ['pilot', 'pilot']})
         dfProj = pd.concat([dfProj, dfAdd]) # .append is deprecated; using pd.concat
         dfProj.reset_index(drop=True, inplace=True)
         self.setdfProj(dfProj)
-        print(self.getdfProj())
+        print(self.getdfProj(dfProj))
 
 
     def setGraph(self):
@@ -388,9 +387,9 @@ class UIsub(Ui_MainWindow):
         self.tablemodel.setData(data)
         self.tableView.update()
 
-   
+
     @QtCore.pyqtSlot(list)
-    def print_paths(self, mypaths):
+    def slotPrintPaths(self, mypaths):
         print(f'mystr: {mypaths}')
         strmystr = "\n".join(sorted(['/'.join(i.split('/')[-2:]) for i in mypaths]))
         self.textBrowser.setText(strmystr)
@@ -399,7 +398,14 @@ class UIsub(Ui_MainWindow):
         self.setTableDf(dftable)
 
 
+    @QtCore.pyqtSlot(list)
+    def slotAddData(self, datalist):
+        print(f"I DID IT!{datalist}")
+
+
 class Filetreesub(Ui_Dialog):
+    signalAddData = QtCore.pyqtSignal(list)
+
     def __init__(self, dialog):
         super(Filetreesub, self).__init__()
         self.setupUi(dialog)
@@ -409,9 +415,9 @@ class Filetreesub(Ui_Dialog):
         self.ftree = self.widget
 
         # Dataframe to add
-        self.dfAdd = pd.DataFrame({'host': ['computer 1', 'computer 58'], 'path': ['C:/copy of new folder(4)/braindamage/second test', 'F:/404/braindamage/sillySubfolder/first test'], 'checksum': ['big number', 'arbitrary number'], 'name': ['first test', 'second test'], 'group': ['pilot', 'pilot']})
+        self.names = []
+        self.dfAdd = pd.DataFrame()
         
-
         self.buttonBoxAddGroup = QtWidgets.QDialogButtonBox(dialog)
         self.buttonBoxAddGroup.setGeometry(QtCore.QRect(470, 20, 91, 491))
         self.buttonBoxAddGroup.setLayoutDirection(QtCore.Qt.LeftToRight)
@@ -427,12 +433,19 @@ class Filetreesub(Ui_Dialog):
         self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.groupintervention, QtWidgets.QDialogButtonBox.ActionRole)
         self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.newGroup, QtWidgets.QDialogButtonBox.ActionRole)
 
-
         self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
         self.ftree.model.paths_selected.connect(self.pathsSelectedUpdateTable)
-    
+        
+        self.buttonBox.accepted.connect(self.addDataOK)
+        self.signalAddData.connect(UIsub.slotAddData)
+
         self.tablemodel = TableModel(self.dfAdd)
         self.tableView.setModel(self.tablemodel)
+
+    
+    def addDataOK(self):
+        datalist = self.names
+        self.signalAddData.emit(datalist)
 
 
     def pathsSelectedUpdateTable(self, paths):
@@ -445,6 +458,7 @@ class Filetreesub(Ui_Dialog):
         for i in paths:
             names.append(os.path.basename(os.path.dirname(i)) + '_' + os.path.basename(i))
         addTable["name"] = names
+        self.names = names
         # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
         # TODO: names that have been set manually are stored a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)
         # format tableView
