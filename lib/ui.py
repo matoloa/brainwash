@@ -436,10 +436,24 @@ class Filetreesub(Ui_Dialog):
 
 
     def pathsSelectedUpdateTable(self, paths):
-        # TODO: Extract host, checksum, name, group
-        # for i in paths:
-        #   name = os.path.basename(os.path.dirname(i)) + '_' + os.path.basename(i)
-        self.tablemodel.setData(pd.DataFrame({"host": 'computer 1', "path": paths, 'checksum': 'big number', 'name': None, 'group': None}))
+        # TODO: Extract host, checksum, group
+        addTable = pd.DataFrame({"host": 'computer 1', "path": paths, 'checksum': 'big number', 'name': paths, 'group': None})
+        self.tablemodel.setData(addTable)
+        # NTH: more intelligent default naming; lowest level unique name?
+        # For now, use name + lowest level folder
+        names = []
+        for i in paths:
+            names.append(os.path.basename(os.path.dirname(i)) + '_' + os.path.basename(i))
+        addTable["name"] = names
+        # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
+        # TODO: names that have been set manually are stored a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)
+        # format tableView
+        header = self.tableView.horizontalHeader()
+        self.tableView.setColumnHidden(0, True) #host
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents) #path
+        self.tableView.setColumnHidden(2, True) #checksum
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents) #name
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents) #group
         self.tableView.update()
 
 
