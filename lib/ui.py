@@ -404,6 +404,11 @@ class UIsub(Ui_MainWindow):
         dfAdd = pd.DataFrame({"host": host0, "path": path1, "checksum": checksum2, "name": name3, "group": group4})
         self.addData(dfAdd)
 
+        
+    @QtCore.pyqtSlot()
+    def slotAddDfData(self, df):
+        self.addData(df)
+
 
 class Filetreesub(Ui_Dialog):
     signalAddData = QtCore.pyqtSignal(list, list, list, list, list)
@@ -411,6 +416,7 @@ class Filetreesub(Ui_Dialog):
     def __init__(self, dialog, parent=None):
         super(Filetreesub, self).__init__()
         self.setupUi(dialog)
+        self.parent = parent
 
         print('Filetreesub init')
     
@@ -438,12 +444,18 @@ class Filetreesub(Ui_Dialog):
         self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
         self.ftree.model.paths_selected.connect(self.pathsSelectedUpdateTable)
         
-        self.buttonBox.accepted.connect(self.addDataOK)
+        #self.buttonBox.accepted.connect(self.addDataOK)
+        self.buttonBox.accepted.connect(self.addDf)
+
         self.signalAddData.connect(parent.slotAddData)
 
         self.tablemodel = TableModel(self.dfAdd)
         self.tableView.setModel(self.tablemodel)
 
+
+    def addDf(self):
+        self.parent.slotAddDfData(self.dfAdd)
+        
     
     def addDataOK(self):
         #Deconstructs dataframe for passing through PyQt signals
