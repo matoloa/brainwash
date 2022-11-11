@@ -304,7 +304,7 @@ class UIsub(Ui_MainWindow):
 
         # TODO: this is placeholder project dataframe
         self.dfProj = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
-        
+
         self.project = "default" # a folder in project_root
         self.projectfolder = self.getProjectFolder() / self.project
 
@@ -350,18 +350,8 @@ class UIsub(Ui_MainWindow):
         self.dfProj = df
 
 
-    def addData(self): # TODO trigger from ftree buttonBox.accepted
-        print('addData')
-        dfProj = self.getdfProj(self)
-        # create placeholder dataframe
-        dfAdd = pd.DataFrame({'host': ['computer 1', 'computer 58'], 'path': ['C:/copy of new folder(4)/braindamage/second test', 'F:/404/braindamage/sillySubfolder/first test'], 'checksum': ['big number', 'arbitrary number'], 'name': ['first test', 'second test'], 'group': ['pilot', 'pilot']})
-        dfProj = pd.concat([dfProj, dfAdd]) # .append is deprecated; using pd.concat
-        dfProj.reset_index(drop=True, inplace=True)
-        self.setdfProj(dfProj)
-        print(self.getdfProj(dfProj))
-
-
     def setGraph(self):
+        #defunct, except on Jonathan's laptop
         print('setGraph')
         dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
         self.canvas_seaborn = MplCanvas(parent=self.graphView)  # instantiate canvas
@@ -388,6 +378,15 @@ class UIsub(Ui_MainWindow):
         self.tableView.update()
 
 
+    def addData(self, dfAdd): # concatinate dataframes of old and new data
+        #print('addData')
+        dfProj = self.getdfProj()
+        dfProj = pd.concat([dfProj, dfAdd]) # .append is deprecated; using pd.concat
+        dfProj.reset_index(drop=True, inplace=True)
+        self.setdfProj(dfProj)
+        print(self.getdfProj())
+
+
     @QtCore.pyqtSlot(list)
     def slotPrintPaths(self, mypaths):
         print(f'mystr: {mypaths}')
@@ -398,13 +397,16 @@ class UIsub(Ui_MainWindow):
         self.setTableDf(dftable)
 
 
-    @QtCore.pyqtSlot(list)
-    def slotAddData(self, datalist):
-        print(f"I DID IT!{datalist}")
+    @QtCore.pyqtSlot(list, list, list, list, list)
+    def slotAddData(self, host0, path1, checksum2, name3, group4):
+        #Reconstructs dataframe after passing it through pyqt signaling as lists
+        #print("slotAddData")
+        dfAdd = pd.DataFrame({"host": host0, "path": path1, "checksum": checksum2, "name": name3, "group": group4})
+        self.addData(dfAdd)
 
 
 class Filetreesub(Ui_Dialog):
-    signalAddData = QtCore.pyqtSignal(list)
+    signalAddData = QtCore.pyqtSignal(list, list, list, list, list)
 
     def __init__(self, dialog, parent=None):
         super(Filetreesub, self).__init__()
@@ -444,21 +446,28 @@ class Filetreesub(Ui_Dialog):
 
     
     def addDataOK(self):
-        datalist = self.names
-        self.signalAddData.emit(datalist)
+        #Deconstructs dataframe for passing through PyQt signals
+        #print("addDataOK")
+        df = self.dfAdd
+        host0 = list(df["host"])
+        path1 = list(df["path"])
+        checksum2 = list(df["checksum"])
+        name3 = list(df["name"])
+        group4 = list(df["group"])
+        self.signalAddData.emit(host0, path1, checksum2, name3, group4)
 
 
     def pathsSelectedUpdateTable(self, paths):
         # TODO: Extract host, checksum, group
-        addTable = pd.DataFrame({"host": 'computer 1', "path": paths, 'checksum': 'big number', 'name': paths, 'group': None})
-        self.tablemodel.setData(addTable)
+        dfAdd = pd.DataFrame({"host": 'computer 1', "path": paths, 'checksum': 'big number', 'name': paths, 'group': None})
+        self.tablemodel.setData(dfAdd)
         # NTH: more intelligent default naming; lowest level unique name?
         # For now, use name + lowest level folder
         names = []
         for i in paths:
             names.append(os.path.basename(os.path.dirname(i)) + '_' + os.path.basename(i))
-        addTable["name"] = names
-        self.names = names
+        dfAdd["name"] = names
+        self.dfAdd = dfAdd
         # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
         # TODO: names that have been set manually are stored a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)
         # format tableView
