@@ -337,7 +337,8 @@ class UIsub(Ui_MainWindow):
         print('UIsub init') # rename for clarity
 
         # TODO: Placeholder project dataframe
-        self.dfProj = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
+        self.dfProj = pd.DataFrame(columns=['host', 'path', 'checksum', 'name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
+        #self.dfProj = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
 
         self.project = "default" # a folder in project_root
         self.projectfolder = self.getProjectFolder() / self.project
