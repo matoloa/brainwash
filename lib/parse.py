@@ -110,3 +110,30 @@ def importabffolder(folderpath, channel=0):
     # df.drop(columns=['sweep_raw'], inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
+
+
+def parseProjFiles(proj_folder:str, df):
+    '''
+    receives a df of project data files built in ui
+    checks for or creates project parsed files folder
+    parses each file, that is not already parsed by name
+    optional: checks if file is already parsed by checksums
+    saves parsed file into project parsed files folder
+    get proj_folder from ui self.project_folder
+    '''
+    print(f"proj folder: {proj_folder}")
+    
+    # check for files in the folder.
+    list_metadatafiles = [
+        i for i in os.listdir(dir_gen_data) if -1 < i.find("_mean.csv")
+    ]
+    
+    # list found files
+    print(list_metadatafiles)
+    
+    # remove the found files from the parse que
+    
+    # start parsing the que
+    
+    # show progress
+        
