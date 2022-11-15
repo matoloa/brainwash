@@ -302,7 +302,7 @@ class UIsub(Ui_MainWindow):
         self.setupUi(mainwindow)
         print('UIsub init') # rename for clarity
 
-        # TODO: this is placeholder project dataframe
+        # TODO: Placeholder project dataframe
         self.dfProj = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
 
         self.project = "default" # a folder in project_root
@@ -316,8 +316,16 @@ class UIsub(Ui_MainWindow):
         self.inputProjectName.editingFinished.connect(self.setProjectname)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
 
-    # place current project as folder in project_root, lock project name for now
-    # self.projectfolder = self.project_root / self.project
+        # show dfProj in tableProj - TODO: Doesn't work!
+        self.tablemodel = TableModel(self.dfProj)
+        self.tableProj.setModel(self.tablemodel)
+        self.setTableDf(self.dfProj)
+
+        #self.tablemodel.setData(self.dfProj)
+        #self.tableProj.update()
+
+        # place current project as folder in project_root, lock project name for now
+        # self.projectfolder = self.project_root / self.project
 
 
     def getProjectFolder(self):
@@ -375,7 +383,21 @@ class UIsub(Ui_MainWindow):
     
     def setTableDf(self, data):
         self.tablemodel.setData(data)
-        self.tableView.update()
+        #format table
+        header = self.tableProj.horizontalHeader()
+        self.tableProj.setColumnHidden(0, True) #host
+        self.tableProj.setColumnHidden(1, True) #path
+        self.tableProj.setColumnHidden(2, True) #checksum
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents) #name
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents) #group
+        self.tableProj.setColumnHidden(5, True) #rgb
+        self.tableProj.setColumnHidden(6, True) #timestamp (of parsing)
+        self.tableProj.setColumnHidden(7, False) #nSweeps
+        header.setSectionResizeMode(7, QtWidgets.QHeaderView.ResizeToContents)
+        self.tableProj.setColumnHidden(8, True) #measurements
+        self.tableProj.setColumnHidden(9, True) #exclude
+        self.tableProj.setColumnHidden(10, True) #comments
+        self.tableProj.update()
 
 
     def addData(self, dfAdd): # concatinate dataframes of old and new data
@@ -384,9 +406,10 @@ class UIsub(Ui_MainWindow):
         dfProj = pd.concat([dfProj, dfAdd]) # .append is deprecated; using pd.concat
         dfProj.reset_index(drop=True, inplace=True)
         self.setdfProj(dfProj)
-        print(self.getdfProj())
+        #print(self.getdfProj())
+        self.setTableDf(dfProj)
 
-
+    
     @QtCore.pyqtSlot(list)
     def slotPrintPaths(self, mypaths):
         print(f'mystr: {mypaths}')
@@ -444,7 +467,6 @@ class Filetreesub(Ui_Dialog):
         self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
         self.ftree.model.paths_selected.connect(self.pathsSelectedUpdateTable)
         
-        #self.buttonBox.accepted.connect(self.addDataOK)
         self.buttonBox.accepted.connect(self.addDf)
 
         self.signalAddData.connect(parent.slotAddData)
@@ -457,18 +479,6 @@ class Filetreesub(Ui_Dialog):
         self.parent.slotAddDfData(self.dfAdd)
         
     
-    def addDataOK(self):
-        #Deconstructs dataframe for passing through PyQt signals
-        #print("addDataOK")
-        df = self.dfAdd
-        host0 = list(df["host"])
-        path1 = list(df["path"])
-        checksum2 = list(df["checksum"])
-        name3 = list(df["name"])
-        group4 = list(df["group"])
-        self.signalAddData.emit(host0, path1, checksum2, name3, group4)
-
-
     def pathsSelectedUpdateTable(self, paths):
         # TODO: Extract host, checksum, group
         dfAdd = pd.DataFrame({"host": 'computer 1', "path": paths, 'checksum': 'big number', 'name': paths, 'group': None})
