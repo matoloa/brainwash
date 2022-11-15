@@ -1,173 +1,129 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>MainWindow</class>
- <widget class="QMainWindow" name="MainWindow">
+ <class>mainWindow</class>
+ <widget class="QMainWindow" name="mainWindow">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>783</width>
-    <height>592</height>
+    <width>394</width>
+    <height>432</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Brainwash 0.1</string>
+   <string>Brainwash 0.2</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QLineEdit" name="inputProjectName">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>10</y>
-      <width>191</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>placeholder project name</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="pushButtonAddData">
-    <property name="geometry">
-     <rect>
-      <x>310</x>
-      <y>10</y>
-      <width>71</width>
-      <height>24</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Add data</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="pushButtonOpenProject">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>210</x>
-      <y>10</y>
-      <width>91</width>
-      <height>24</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Open project</string>
-    </property>
-   </widget>
-   <widget class="QTableView" name="tableMaster">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>40</y>
-      <width>371</width>
-      <height>511</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLabel" name="labelMetadata">
-    <property name="geometry">
-     <rect>
-      <x>390</x>
-      <y>470</y>
-      <width>141</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Metadata:</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="pushButtonSelect">
-    <property name="geometry">
-     <rect>
-      <x>720</x>
-      <y>10</y>
-      <width>51</width>
-      <height>24</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>select</string>
-    </property>
-   </widget>
-   <widget class="QCheckBox" name="checkPreview">
-    <property name="geometry">
-     <rect>
-      <x>630</x>
-      <y>10</y>
-      <width>77</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Preview</string>
-    </property>
-   </widget>
-   <widget class="QWidget" name="graphData" native="true">
-    <property name="geometry">
-     <rect>
-      <x>390</x>
-      <y>40</y>
-      <width>381</width>
-      <height>191</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QWidget" name="graphOutput" native="true">
-    <property name="geometry">
-     <rect>
-      <x>390</x>
-      <y>260</y>
-      <width>381</width>
-      <height>201</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLabel" name="labelMeanGroups">
-    <property name="geometry">
-     <rect>
-      <x>390</x>
-      <y>240</y>
-      <width>141</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Mean Groups:</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="labelMeanSweep">
-    <property name="geometry">
-     <rect>
-      <x>390</x>
-      <y>20</y>
-      <width>141</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Mean Sweep:</string>
-    </property>
-   </widget>
-   <widget class="QTableView" name="tableMetadata">
-    <property name="geometry">
-     <rect>
-      <x>390</x>
-      <y>490</y>
-      <width>381</width>
-      <height>61</height>
-     </rect>
-    </property>
-   </widget>
+   <layout class="QHBoxLayout" name="horizontalLayoutCentralwidget">
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayoutProj">
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayoutProj">
+        <item>
+         <widget class="QLineEdit" name="inputProjectName">
+          <property name="text">
+           <string>placeholder project name</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButtonOpenProject">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="text">
+           <string>Open project</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButtonAddData">
+          <property name="text">
+           <string>Add data</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QTableView" name="tableProj"/>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayoutGraph" stretch="0,0,5,0,5,0,1">
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayoutGraph">
+        <item>
+         <widget class="QPushButton" name="pushButtonSelect">
+          <property name="text">
+           <string>select</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkPreview">
+          <property name="text">
+           <string>Preview</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QLabel" name="labelMeanSweep">
+        <property name="text">
+         <string>Mean Sweep:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QWidget" name="graphMean" native="true">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>100</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="labelMeanGroups">
+        <property name="text">
+         <string>Mean Groups:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QWidget" name="graphOutput" native="true">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>100</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="labelMetadata">
+        <property name="text">
+         <string>Metadata:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QTableView" name="tableMetadata"/>
+      </item>
+     </layout>
+    </item>
+   </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>783</width>
+     <width>394</width>
      <height>21</height>
     </rect>
    </property>
