@@ -125,7 +125,7 @@ def parseProjFiles(proj_folder:str, df):
     
     # check for files in the folder.
     list_metadatafiles = [
-        i for i in os.listdir(dir_gen_data) if -1 < i.find("_mean.csv")
+        i for i in os.listdir(proj_folder) if -1 < i.find("_mean.csv")
     ]
     
     # list found files

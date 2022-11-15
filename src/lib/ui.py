@@ -17,6 +17,8 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
+from .parse import parseProjFiles
+
 dir_project_root = Path(os.getcwd().split("quiwip")[0])
 
 debug = False
@@ -286,19 +288,6 @@ class Ui_MainWindow(QtCore.QObject):
         self.labelMetadata.setText(_translate("mainWindow", "Metadata:"))
 
 
-    def retranslateUi(self, mainWindow):
-        _translate = QtCore.QCoreApplication.translate
-        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash 0.2"))
-        self.inputProjectName.setText(_translate("mainWindow", "placeholder project name"))
-        self.pushButtonOpenProject.setText(_translate("mainWindow", "Open project"))
-        self.pushButtonAddData.setText(_translate("mainWindow", "Add data"))
-        self.pushButtonSelect.setText(_translate("mainWindow", "select"))
-        self.checkPreview.setText(_translate("mainWindow", "Preview"))
-        self.labelMeanSweep.setText(_translate("mainWindow", "Mean Sweep:"))
-        self.labelMeanGroups.setText(_translate("mainWindow", "Mean Groups:"))
-        self.labelMetadata.setText(_translate("mainWindow", "Metadata:"))
-
-
 class Ui_Dialog(QtWidgets.QWidget):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
@@ -337,11 +326,11 @@ class UIsub(Ui_MainWindow):
         print('UIsub init') # rename for clarity
 
         # TODO: Placeholder project dataframe
-        self.dfProj = pd.DataFrame(columns=['host', 'path', 'checksum', 'name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
-        #self.dfProj = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
+        self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
+        #self.projectdf = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
 
-        self.project = "default" # a folder in project_root
-        self.projectfolder = self.getProjectFolder() / self.project
+        self.projectname = "default" # a folder in project_root
+        self.projectfolder = self.getProjectFolder() / self.projectname
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
@@ -350,13 +339,14 @@ class UIsub(Ui_MainWindow):
 
         self.inputProjectName.editingFinished.connect(self.setProjectname)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
+        self.pushButtonSelect.pressed.connect(self.pushedButtonSelect)
 
         # show dfProj in tableProj - TODO: Doesn't work!
-        self.tablemodel = TableModel(self.dfProj)
+        self.tablemodel = TableModel(self.projectdf)
         self.tableProj.setModel(self.tablemodel)
-        self.setTableDf(self.dfProj)
+        self.setTableDf(self.projectdf)
 
-        #self.tablemodel.setData(self.dfProj)
+        #self.tablemodel.setData(self.projectdf)
         #self.tableProj.update()
 
         # place current project as folder in project_root, lock project name for now
@@ -384,13 +374,17 @@ class UIsub(Ui_MainWindow):
         self.ftree = Filetreesub(self.dialog, parent=self)
         self.dialog.show()
         
-
+    def pushedButtonSelect(self):
+        # pushed button select, now being misused to trigger file parsing
+        print("pushed button select")
+        parseProjFiles(self.projectfolder, self.projectdf)
+        
     def getdfProj(self):
-        return self.dfProj
+        return self.projectdf
 
 
     def setdfProj(self, df):
-        self.dfProj = df
+        self.projectdf = df
 
 
     def setGraph(self):
@@ -409,8 +403,8 @@ class UIsub(Ui_MainWindow):
     
     def setProjectname(self):
         #get_signals(self.children()[1].children()[1].model)
-        self.project = self.inputProjectName.text()
-        self.projectfolder = self.project_root / self.project
+        self.projectname = self.inputProjectName.text()
+        self.projectfolder = self.project_root / self.projectname
         if not os.path.exists(self.projectfolder):
             os.makedirs(self.projectfolder)
         print (os.path.exists(self.projectfolder))
