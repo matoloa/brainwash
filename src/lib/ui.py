@@ -19,7 +19,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
 from parse import parseProjFiles
 
-debug = True
+debug = False
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
@@ -147,20 +147,17 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
 
         self.view.setObjectName('treeView_fileTreeSelector')
         self.view.setWindowTitle("Dir View")    #TODO:  Which title?
-
-
         self.view.setSortingEnabled(False)
-        #self.view.resize(1080, 600)
 
         # Attach Model to View
         self.view.setModel(self.model)
         self.view.setRootIndex(self.model.parent_index)
         self.view.setAnimated(False)
         self.view.setIndentation(20)
-        self.view.setColumnHidden(3, True)
         self.view.setColumnWidth(0, 250)
         self.view.setColumnWidth(1, 100)
         self.view.setColumnWidth(2, 50)
+        self.view.setColumnHidden(3, True)
 
         
         # Misc
@@ -320,7 +317,7 @@ class UIsub(Ui_MainWindow):
     def __init__(self, mainwindow):
         super(UIsub, self).__init__()
         self.setupUi(mainwindow)
-        if(debug): print('UIsub init, verbose mode') # rename for clarity
+        if(debug): print(' - UIsub init, verbose mode') # rename for clarity
 
         self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
         # Placeholder project dataframe
@@ -352,6 +349,7 @@ class UIsub(Ui_MainWindow):
 
     def getProjectFolder(self):
         # Find projectFolderLocation.txt in brainwash folder, or create a default one. Return Project Folder (Path).
+        if(debug): print("getProjectFolder")
         repo_root = Path(os.getcwd()) # path to brainwash directory
         self.projectLocationPath = repo_root / 'projectFolderLocation.txt'
         # open projectFolderLocation.txt; if it exists, use contents for self.projectLocation
@@ -367,6 +365,7 @@ class UIsub(Ui_MainWindow):
 
     def pushedButtonAddData(self):
         # creates file tree for file selection
+        if(debug): print("pushedButtonAddData")
         self.dialog = QtWidgets.QDialog()
         self.ftree = Filetreesub(self.dialog, parent=self)
         self.dialog.show()
@@ -399,6 +398,7 @@ class UIsub(Ui_MainWindow):
 
     
     def setProjectname(self):
+        if(debug): print('setProjectname')
         #get_signals(self.children()[1].children()[1].model)
         self.projectname = self.inputProjectName.text()
         self.projectfolder = self.project_root / self.projectname
@@ -408,8 +408,15 @@ class UIsub(Ui_MainWindow):
 
     
     def setTableDf(self, data):
+        if(debug): print('setTableDf')
         self.tablemodel.setData(data)
         #format table TODO: Break out to separate function
+        self.formatTableProj()
+        self.tableProj.update()
+
+
+    def formatTableProj(self):
+        if(debug): print('formatTableProj')
         header = self.tableProj.horizontalHeader()
         self.tableProj.setColumnHidden(0, True) #host
         self.tableProj.setColumnHidden(1, True) #path
@@ -423,7 +430,6 @@ class UIsub(Ui_MainWindow):
         self.tableProj.setColumnHidden(8, True) #measurements
         self.tableProj.setColumnHidden(9, True) #exclude
         self.tableProj.setColumnHidden(10, True) #comments
-        self.tableProj.update()
 
 
     def addData(self, dfAdd): # concatinate dataframes of old and new data
@@ -463,8 +469,7 @@ class Filetreesub(Ui_Dialog):
         super(Filetreesub, self).__init__()
         self.setupUi(dialog)
         self.parent = parent
-
-        if(debug): print('Filetreesub init')
+        if(debug): print(' - Filetreesub init')
     
         self.ftree = self.widget
 
@@ -501,6 +506,7 @@ class Filetreesub(Ui_Dialog):
     
     def pathsSelectedUpdateTable(self, paths):
         # TODO: Extract host, checksum, group
+        if(debug): print('pathsSelectedUpdateTable')
         dfAdd = pd.DataFrame({"host": 'computer 1', "path": paths, 'checksum': 'big number', 'name': paths, 'group': None})
         self.tablemodel.setData(dfAdd)
         # NTH: more intelligent default naming; lowest level unique name?
