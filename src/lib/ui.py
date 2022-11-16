@@ -17,12 +17,9 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
-from .parse import parseProjFiles
+from parse import parseProjFiles
 
-dir_project_root = Path(os.getcwd().split("quiwip")[0])
-
-debug = False
-
+debug = True
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
@@ -82,7 +79,7 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
 
 
     def _loaded(self, path):
-        print('_loaded', self.root_path, self.rowCount(self.parent_index))
+        if(debug): print('_loaded', self.root_path, self.rowCount(self.parent_index))
 
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
@@ -114,7 +111,7 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
     def setData(self, index, value, role):
         if (role == QtCore.Qt.CheckStateRole and index.column() == 0):
             self.checks[index] = value
-            # print('setData(): {}'.format(value))
+            if(debug): print('setData(): {}'.format(value))
             return True
         return QtWidgets.QFileSystemModel.setData(self, index, value, role)
 
@@ -323,11 +320,11 @@ class UIsub(Ui_MainWindow):
     def __init__(self, mainwindow):
         super(UIsub, self).__init__()
         self.setupUi(mainwindow)
-        print('UIsub init') # rename for clarity
+        if(debug): print('UIsub init, verbose mode') # rename for clarity
 
-        # TODO: Placeholder project dataframe
         self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
-        #self.projectdf = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
+        # Placeholder project dataframe
+        # self.projectdf = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
 
         self.projectname = "default" # a folder in project_root
         self.projectfolder = self.getProjectFolder() / self.projectname
@@ -376,7 +373,7 @@ class UIsub(Ui_MainWindow):
         
     def pushedButtonSelect(self):
         # pushed button select, now being misused to trigger file parsing
-        print("pushed button select")
+        if(debug): print("pushedButtonSelect")
         parseProjFiles(self.projectfolder, self.projectdf)
         
     def getdfProj(self):
@@ -389,7 +386,7 @@ class UIsub(Ui_MainWindow):
 
     def setGraph(self):
         #defunct, except on Jonathan's laptop
-        print('setGraph')
+        if(debug): print('setGraph')
         dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
         self.canvas_seaborn = MplCanvas(parent=self.graphView)  # instantiate canvas
         dfmean.set_index('t0', inplace=True)
@@ -407,7 +404,7 @@ class UIsub(Ui_MainWindow):
         self.projectfolder = self.project_root / self.projectname
         if not os.path.exists(self.projectfolder):
             os.makedirs(self.projectfolder)
-        print (os.path.exists(self.projectfolder))
+        if(debug): print (os.path.exists(self.projectfolder))
 
     
     def setTableDf(self, data):
@@ -430,18 +427,17 @@ class UIsub(Ui_MainWindow):
 
 
     def addData(self, dfAdd): # concatinate dataframes of old and new data
-        #print('addData')
         dfProj = self.getdfProj()
         dfProj = pd.concat([dfProj, dfAdd]) # .append is deprecated; using pd.concat
         dfProj.reset_index(drop=True, inplace=True)
         self.setdfProj(dfProj)
-        #print(self.getdfProj())
+        if(debug): print('addData:', self.getdfProj())
         self.setTableDf(dfProj)
 
     
     @QtCore.pyqtSlot(list)
     def slotPrintPaths(self, mypaths):
-        print(f'mystr: {mypaths}')
+        if(debug): print(f'mystr: {mypaths}')
         strmystr = "\n".join(sorted(['/'.join(i.split('/')[-2:]) for i in mypaths]))
         self.textBrowser.setText(strmystr)
         list_display_names = ['/'.join(i.split('/')[-2:]) for i in mypaths]
@@ -452,7 +448,7 @@ class UIsub(Ui_MainWindow):
     @QtCore.pyqtSlot(list, list, list, list, list)
     def slotAddData(self, host0, path1, checksum2, name3, group4):
         #Reconstructs dataframe after passing it through pyqt signaling as lists
-        #print("slotAddData")
+        if(debug): print("slotAddData")
         dfAdd = pd.DataFrame({"host": host0, "path": path1, "checksum": checksum2, "name": name3, "group": group4})
         self.addData(dfAdd)
 
@@ -463,14 +459,12 @@ class UIsub(Ui_MainWindow):
 
 
 class Filetreesub(Ui_Dialog):
-    signalAddData = QtCore.pyqtSignal(list, list, list, list, list)
-
     def __init__(self, dialog, parent=None):
         super(Filetreesub, self).__init__()
         self.setupUi(dialog)
         self.parent = parent
 
-        print('Filetreesub init')
+        if(debug): print('Filetreesub init')
     
         self.ftree = self.widget
 
@@ -495,10 +489,7 @@ class Filetreesub(Ui_Dialog):
 
         self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
         self.ftree.model.paths_selected.connect(self.pathsSelectedUpdateTable)
-        
         self.buttonBox.accepted.connect(self.addDf)
-
-        self.signalAddData.connect(parent.slotAddData)
 
         self.tablemodel = TableModel(self.dfAdd)
         self.tableView.setModel(self.tablemodel)
