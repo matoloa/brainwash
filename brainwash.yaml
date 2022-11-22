@@ -1,0 +1,22 @@
+name: brainwash
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pyqt=5
+  - pandas
+  - joblib
+  - matplotlib
+  - notebook
+  - scikit-learn
+  - scipy
+  - seaborn
+  - tqdm
+  - jupytext
+  - requests
+  - flake8
+  - flake8-black
+  - black
+  - isort
+  - nose2
+
