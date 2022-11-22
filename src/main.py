@@ -2,7 +2,7 @@
 
 import sys
 from lib.ui import UIsub
-import lib.parse
+# from lib.parse 
 # import lib.method
 from PyQt5 import QtCore, QtGui, QtWidgets
 

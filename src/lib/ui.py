@@ -4,6 +4,7 @@ import os
 import sys
 from pathlib import Path
 from tkinter import dialog
+import yaml
 
 import matplotlib
 import seaborn as sns
@@ -291,7 +292,7 @@ class Ui_Dialog(QtWidgets.QWidget):
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
         self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
-        self.widget = FileTreeSelectorDialog(Dialog)
+        self.widget = FileTreeSelectorDialog(Dialog, root_path="get from cfg windows documents or linux folder")
         self.widget.setGeometry(QtCore.QRect(10, 10, 451, 501))
         self.widget.setObjectName("widget")
         self.tableView = QtWidgets.QTableView(Dialog)
@@ -319,12 +320,33 @@ class UIsub(Ui_MainWindow):
         self.setupUi(mainwindow)
         if(debug): print(' - UIsub init, verbose mode') # rename for clarity
 
+        # load cfg if present, create if not existing
+        paths = [Path.cwd()] + list(Path.cwd().parents)
+        self.repo_root = [i for i in paths if (-1 < str(i).find('brainwash')) & (str(i).find('src') == -1)][0] # path to brainwash directory
+        self.cfg_yaml = self.repo_root / 'cfg.yaml'
+        if self.cfg_yaml.exists():
+            with self.cfg_yaml.open('r') as file:
+                cfg = yaml.safe_load(file)
+                self.user_home = Path(cfg['user_home'])
+                self.projects_folder = Path(cfg['user_home'])
+        else:
+            self.user_home = Path.home()
+            self.projects_folder = self.user_home / 'Brainwash Projects'
+            cfg = {
+                'user_home': str(self.user_home),
+                'projects_folder': str(self.projects_folder),
+                
+            }
+            with self.cfg_yaml.open('w+') as file:
+                yaml.safe_dump(cfg, file)
+            
+        
         self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
         # Placeholder project dataframe
         # self.projectdf = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
 
         self.projectname = "default" # a folder in project_root
-        self.projectfolder = self.getProjectFolder() / self.projectname
+        self.projectfolder = self.projects_folder / self.projectname
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
@@ -346,21 +368,6 @@ class UIsub(Ui_MainWindow):
         # place current project as folder in project_root, lock project name for now
         # self.projectfolder = self.project_root / self.project
 
-
-    def getProjectFolder(self):
-        # Find projectFolderLocation.txt in brainwash folder, or create a default one. Return Project Folder (Path).
-        if(debug): print("getProjectFolder")
-        repo_root = Path(os.getcwd()) # path to brainwash directory
-        self.projectLocationPath = repo_root / 'projectFolderLocation.txt'
-        # open projectFolderLocation.txt; if it exists, use contents for self.projectLocation
-        if os.path.exists(self.projectLocationPath):
-            with open(self.projectLocationPath, 'r') as f:
-                self.project_root = Path(f.readline())
-        else: # file does not exist or is empty: assign default path to brainwash projects
-            self.project_root = Path(os.path.expanduser('~/Documents/brainwash projects'))
-            with open(self.projectLocationPath, 'w+') as f:
-                f.writelines(str(self.project_root))
-        return self.project_root
 
 
     def pushedButtonAddData(self):
@@ -401,7 +408,7 @@ class UIsub(Ui_MainWindow):
         if(debug): print('setProjectname')
         #get_signals(self.children()[1].children()[1].model)
         self.projectname = self.inputProjectName.text()
-        self.projectfolder = self.project_root / self.projectname
+        self.projectfolder = self.projects_folder / self.projectname
         if not os.path.exists(self.projectfolder):
             os.makedirs(self.projectfolder)
         if(debug): print (os.path.exists(self.projectfolder))
