@@ -78,7 +78,6 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
         self.sort(0, QtCore.Qt.SortOrder.AscendingOrder)
         self.directoryLoaded.connect(self._loaded)
 
-
     def _loaded(self, path):
         if(debug): print('_loaded', self.root_path, self.rowCount(self.parent_index))
 
@@ -137,13 +136,16 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
 class FileTreeSelectorDialog(QtWidgets.QWidget):
     def __init__(self, parent=None, root_path='.'):
         super().__init__(parent)
-        self.root_path      = root_path
+
+
+    def delayedInitForRootPath(self, root_path):
+        self.root_path      = str(root_path)
 
         # Model
         self.model          = FileTreeSelectorModel(root_path=self.root_path)
         # self.model          = QtWidgets.QFileSystemModel()
 
-        # View
+        # view
         self.view           = QtWidgets.QTreeView()
 
         self.view.setObjectName('treeView_fileTreeSelector')
@@ -292,7 +294,7 @@ class Ui_Dialog(QtWidgets.QWidget):
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
         self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
-        self.widget = FileTreeSelectorDialog(Dialog, root_path="get from cfg windows documents or linux folder")
+        self.widget = FileTreeSelectorDialog(Dialog)
         self.widget.setGeometry(QtCore.QRect(10, 10, 451, 501))
         self.widget.setObjectName("widget")
         self.tableView = QtWidgets.QTableView(Dialog)
@@ -374,7 +376,7 @@ class UIsub(Ui_MainWindow):
         # creates file tree for file selection
         if(debug): print("pushedButtonAddData")
         self.dialog = QtWidgets.QDialog()
-        self.ftree = Filetreesub(self.dialog, parent=self)
+        self.ftree = Filetreesub(self.dialog, parent=self, projects_folder=self.projects_folder)
         self.dialog.show()
         
     def pushedButtonSelect(self):
@@ -472,13 +474,17 @@ class UIsub(Ui_MainWindow):
 
 
 class Filetreesub(Ui_Dialog):
-    def __init__(self, dialog, parent=None):
+    def __init__(self, dialog, parent=None, projects_folder='.'):
         super(Filetreesub, self).__init__()
         self.setupUi(dialog)
         self.parent = parent
         if(debug): print(' - Filetreesub init')
     
         self.ftree = self.widget
+        # set root_path for file tree model
+        self.ftree.delayedInitForRootPath(projects_folder)
+        #self.ftree.model.parent_index   = self.ftree.model.setRootPath(projects_folder)
+        #self.ftree.model.root_index     = self.ftree.model.index(projects_folder)
 
         # Dataframe to add
         self.names = []
