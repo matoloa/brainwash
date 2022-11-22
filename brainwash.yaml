@@ -13,6 +13,7 @@ dependencies:
   - seaborn
   - tqdm
   - jupytext
+  - pyyaml
   - requests
   - flake8
   - flake8-black
