@@ -112,7 +112,7 @@ def importabffolder(folderpath, channel=0):
     return df
 
 
-def parseProjFiles(proj_folder:str, df):
+def parseProjFiles(proj_folder:Path, df):
     '''
     receives a df of project data files built in ui
     checks for or creates project parsed files folder
@@ -122,26 +122,38 @@ def parseProjFiles(proj_folder:str, df):
     get proj_folder from ui self.project_folder
     '''
     print(f"proj folder: {proj_folder}")
-    print(f"source: {df['name']}")
+    print(f"name: {df['name']}")
+    print(f"path: {df['path']}")
     
     # check for files in the folder.
-    if not os.path.exists(proj_folder):
-            os.makedirs(proj_folder)
-    else:
-        list_metadatafiles = [
-            i for i in os.listdir(proj_folder) if -1 < i.find("_mean.csv")
-        ]
-        # list found files
-        print(list_metadatafiles)  
-        # remove the found files from the parse que
-    
+    path_proj_folder = Path(proj_folder)
+    path_proj_folder.mkdir(exist_ok=True) # Try to make a folder, error if it exists
+
+    list_existingfiles = [
+        i for i in path_proj_folder.iterdir() if -1 < i.find("_mean.csv")
+    ]
+    # list found files
+    print(list_existingfiles)
+    # remove the found files from the parse que
+
+    for i, row in df.iterrows():
+        if Path(row.path).is_dir():
+            df2parse = importabffolder(folderpath=Path(row.path))
+        else:
+            df2parse = importabf(folderpath=Path(row.path))
+        savepath = str(Path(proj_folder) / row.name)
+        df2parse.to_csv(savepath, index=False)
+
+# Path.is_dir to check if folder or file
+
     # start parsing the que
-    
+        
+
     # show progress
 
 
 if __name__ == "__main__":
     print("Placeholder: standalone test")
-    df = pd.DataFrame({"name": ["created folder1", "created folder2"]})
+    df = pd.DataFrame({"path": ["C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_13_P0629-S5\\LTP", "C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_21_P0701-S2\\LTP"], "name": ["A13", "A21"]})
 
     parseProjFiles(proj_folder="C:\\Users\\Mats\\Standalone test", df=df)
