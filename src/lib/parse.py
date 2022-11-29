@@ -122,7 +122,7 @@ def parseProjFiles(proj_folder:Path, df):
     get proj_folder from ui self.project_folder
     '''
     print(f"proj folder: {proj_folder}")
-    print(f"name: {df['name']}")
+    print(f"name: {df['target_name']}")
     print(f"path: {df['path']}")
     
     # check for files in the folder.
@@ -141,7 +141,7 @@ def parseProjFiles(proj_folder:Path, df):
             df2parse = importabffolder(folderpath=Path(row.path))
         else:
             df2parse = importabf(folderpath=Path(row.path))
-        savepath = str(Path(proj_folder) / row.name)
+        savepath = str(Path(proj_folder) / row.target_name)
         df2parse.to_csv(savepath, index=False)
 
 # Path.is_dir to check if folder or file
@@ -154,6 +154,7 @@ def parseProjFiles(proj_folder:Path, df):
 
 if __name__ == "__main__":
     print("Placeholder: standalone test")
-    df = pd.DataFrame({"path": ["C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_13_P0629-S5\\LTP", "C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_21_P0701-S2\\LTP"], "name": ["A13", "A21"]})
-
+    df = pd.DataFrame({"path": ["C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_13_P0629-S5\\LTP",
+                                "C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_21_P0701-S2\\LTP"],
+                       "target_name": ["A13", "A21"]})
     parseProjFiles(proj_folder="C:\\Users\\Mats\\Standalone test", df=df)
