@@ -333,15 +333,14 @@ class UIsub(Ui_MainWindow):
         if self.cfg_yaml.exists():
             with self.cfg_yaml.open('r') as file:
                 cfg = yaml.safe_load(file)
-                self.user_home = Path(cfg['user_home'])
-                self.projects_folder = Path(cfg['user_home'])
+                self.user_documents = Path(cfg['user_documents']) # Where to look for raw data
+                self.projects_folder = Path(cfg['projects_folder']) # Where to save and read parsed data
         else:
-            self.user_home = Path.home()
-            self.projects_folder = self.user_home / 'Brainwash Projects'
+            self.user_documents = Path.home() / 'Documents' # Where to look for raw data
+            self.projects_folder = self.user_documents / 'Brainwash Projects' # Where to save and read parsed data
             cfg = {
-                'user_home': str(self.user_home),
+                'user_documents': str(self.user_documents),
                 'projects_folder': str(self.projects_folder),
-                
             }
             with self.cfg_yaml.open('w+') as file:
                 yaml.safe_dump(cfg, file)
@@ -380,7 +379,7 @@ class UIsub(Ui_MainWindow):
         # creates file tree for file selection
         if(debug): print("pushedButtonAddData")
         self.dialog = QtWidgets.QDialog()
-        self.ftree = Filetreesub(self.dialog, parent=self, projects_folder=self.projects_folder)
+        self.ftree = Filetreesub(self.dialog, parent=self, folder=self.user_documents)
         self.dialog.show()
 
 
@@ -478,7 +477,7 @@ class UIsub(Ui_MainWindow):
 
 
 class Filetreesub(Ui_Dialog):
-    def __init__(self, dialog, parent=None, projects_folder='.'):
+    def __init__(self, dialog, parent=None, folder='.'):
         super(Filetreesub, self).__init__()
         self.setupUi(dialog)
         self.parent = parent
@@ -486,7 +485,7 @@ class Filetreesub(Ui_Dialog):
     
         self.ftree = self.widget
         # set root_path for file tree model
-        self.ftree.delayedInitForRootPath(projects_folder)
+        self.ftree.delayedInitForRootPath(folder)
         #self.ftree.model.parent_index   = self.ftree.model.setRootPath(projects_folder)
         #self.ftree.model.root_index     = self.ftree.model.index(projects_folder)
 

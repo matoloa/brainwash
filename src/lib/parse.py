@@ -122,18 +122,26 @@ def parseProjFiles(proj_folder:str, df):
     get proj_folder from ui self.project_folder
     '''
     print(f"proj folder: {proj_folder}")
+    print(f"source: {df['name']}")
     
     # check for files in the folder.
-    list_metadatafiles = [
-        i for i in os.listdir(proj_folder) if -1 < i.find("_mean.csv")
-    ]
-    
-    # list found files
-    print(list_metadatafiles)
-    
-    # remove the found files from the parse que
+    if not os.path.exists(proj_folder):
+            os.makedirs(proj_folder)
+    else:
+        list_metadatafiles = [
+            i for i in os.listdir(proj_folder) if -1 < i.find("_mean.csv")
+        ]
+        # list found files
+        print(list_metadatafiles)  
+        # remove the found files from the parse que
     
     # start parsing the que
     
     # show progress
-        
+
+
+if __name__ == "__main__":
+    print("Placeholder: standalone test")
+    df = pd.DataFrame({"name": ["created folder1", "created folder2"]})
+
+    parseProjFiles(proj_folder="C:\\Users\\Mats\\Standalone test", df=df)
