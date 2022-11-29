@@ -361,6 +361,7 @@ class UIsub(Ui_MainWindow):
 
         self.inputProjectName.editingFinished.connect(self.setProjectname)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
+        self.pushButtonParse.pressed.connect(self.pushedButtonParse)
         self.pushButtonSelect.pressed.connect(self.pushedButtonSelect)
 
         # show dfProj in tableProj - TODO: Doesn't work!
@@ -381,13 +382,20 @@ class UIsub(Ui_MainWindow):
         self.dialog = QtWidgets.QDialog()
         self.ftree = Filetreesub(self.dialog, parent=self, projects_folder=self.projects_folder)
         self.dialog.show()
-        
+
+
     def pushedButtonSelect(self):
-        # pushed button select, now being misused to trigger file parsing
-        if(debug): print("pushedButtonSelect")
+        # Placeholder; this is later meant to open a dialog to specify what aspects of the data are to be displayed in the graphs        
+        # if(debug):
+        print("pushedButtonSelect")
+
+
+    def pushedButtonParse(self):
+        # parse non-parsed files and folders in self.projectdf
+        if(debug): print("pushedButtonParse")
         parseProjFiles(self.projectfolder, self.projectdf)
         
-        
+
     def getdfProj(self):
         return self.projectdf
 
