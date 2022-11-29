@@ -346,9 +346,9 @@ class UIsub(Ui_MainWindow):
                 yaml.safe_dump(cfg, file)
             
         
-        self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
+        self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
         # Placeholder project dataframe
-        # self.projectdf = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
+        # self.projectdf = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'save_file_name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
 
         self.projectname = "default" # a folder in project_root
         self.projectfolder = self.projects_folder / self.projectname
@@ -467,7 +467,7 @@ class UIsub(Ui_MainWindow):
         strmystr = "\n".join(sorted(['/'.join(i.split('/')[-2:]) for i in mypaths]))
         self.textBrowser.setText(strmystr)
         list_display_names = ['/'.join(i.split('/')[-2:]) for i in mypaths]
-        dftable = pd.DataFrame({'path_source': mypaths, 'name': list_display_names})
+        dftable = pd.DataFrame({'path_source': mypaths, 'save_file_name': list_display_names})
         self.setTableDf(dftable)
 
         
@@ -523,14 +523,14 @@ class Filetreesub(Ui_Dialog):
     def pathsSelectedUpdateTable(self, paths):
         # TODO: Extract host, checksum, group
         if(debug): print('pathsSelectedUpdateTable')
-        dfAdd = pd.DataFrame({"host": 'computer 1', "path": paths, 'checksum': 'big number', 'name': paths, 'group': None})
+        dfAdd = pd.DataFrame({"host": 'computer 1', "path": paths, 'checksum': 'big number', 'save_file_name': paths, 'group': None})
         self.tablemodel.setData(dfAdd)
         # NTH: more intelligent default naming; lowest level unique name?
         # For now, use name + lowest level folder
         names = []
         for i in paths:
             names.append(os.path.basename(os.path.dirname(i)) + '_' + os.path.basename(i))
-        dfAdd["name"] = names
+        dfAdd['save_file_name'] = names
         self.dfAdd = dfAdd
         # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
         # TODO: names that have been set manually are stored a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)

@@ -122,18 +122,18 @@ def parseProjFiles(proj_folder:Path, df):
     get proj_folder from ui self.project_folder
     '''
     print(f"proj folder: {proj_folder}")
-    print(f"name: {df['target_name']}")
+    print(f"save_file_name: {df['save_file_name']}")
     print(f"path: {df['path']}")
     
     # check for files in the folder.
     path_proj_folder = Path(proj_folder)
     path_proj_folder.mkdir(exist_ok=True) # Try to make a folder, error if it exists
 
-    list_existingfiles = [
-        i for i in path_proj_folder.iterdir() if -1 < i.find("_mean.csv")
-    ]
+    #list_existingfiles = [
+    #    i for i in path_proj_folder.iterdir() if -1 < i.find("_mean.csv")
+    #]
     # list found files
-    print(list_existingfiles)
+    #print(list_existingfiles)
     # remove the found files from the parse que
 
     for i, row in df.iterrows():
@@ -141,7 +141,7 @@ def parseProjFiles(proj_folder:Path, df):
             df2parse = importabffolder(folderpath=Path(row.path))
         else:
             df2parse = importabf(folderpath=Path(row.path))
-        savepath = str(Path(proj_folder) / row.target_name)
+        savepath = str(Path(proj_folder) / row.save_file_name) + '.csv'
         df2parse.to_csv(savepath, index=False)
 
 # Path.is_dir to check if folder or file
@@ -156,5 +156,5 @@ if __name__ == "__main__":
     print("Placeholder: standalone test")
     df = pd.DataFrame({"path": ["C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_13_P0629-S5\\LTP",
                                 "C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_21_P0701-S2\\LTP"],
-                       "target_name": ["A13", "A21"]})
-    parseProjFiles(proj_folder="C:\\Users\\Mats\\Standalone test", df=df)
+                       "save_file_name": ["A13", "A21"]})
+    parseProjFiles(proj_folder="C:\\Users\\Mats\\Documents\\brainwash projects\\Standalone test", df=df)
