@@ -63,8 +63,7 @@ class TableModel(QtCore.QAbstractTableModel):
 
 
 class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with a FileTreeSelectorView
-    paths_selected = QtCore.pyqtSignal(list)
-    
+    paths_selected = QtCore.pyqtSignal(list) 
     def __init__(self, parent=None, root_path='.'):
         QtWidgets.QFileSystemModel.__init__(self, None)
         self.root_path      = root_path
@@ -88,6 +87,7 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
         else:
             if index.column() == 0:
                 return self.checkState(index)
+
 
     def flags(self, index):
         return QtWidgets.QFileSystemModel.flags(self, index) | QtCore.Qt.ItemIsUserCheckable
@@ -161,7 +161,6 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
         self.view.setColumnWidth(1, 100)
         self.view.setColumnWidth(2, 50)
         self.view.setColumnHidden(3, True)
-
         
         # Misc
         self.node_stack     = []
@@ -200,7 +199,7 @@ class MplCanvas(FigureCanvasQTAgg):
 class Ui_MainWindow(QtCore.QObject):
     def setupUi(self, mainWindow):
         mainWindow.setObjectName("mainWindow")
-        mainWindow.resize(394, 432)
+        mainWindow.resize(567, 432)
         self.centralwidget = QtWidgets.QWidget(mainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayoutCentralwidget = QtWidgets.QHBoxLayout(self.centralwidget)
@@ -210,6 +209,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.horizontalLayoutProj = QtWidgets.QHBoxLayout()
         self.horizontalLayoutProj.setObjectName("horizontalLayoutProj")
         self.inputProjectName = QtWidgets.QLineEdit(self.centralwidget)
+        self.inputProjectName.setMinimumSize(QtCore.QSize(150, 0))
         self.inputProjectName.setObjectName("inputProjectName")
         self.horizontalLayoutProj.addWidget(self.inputProjectName)
         self.pushButtonOpenProject = QtWidgets.QPushButton(self.centralwidget)
@@ -219,6 +219,9 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButtonAddData = QtWidgets.QPushButton(self.centralwidget)
         self.pushButtonAddData.setObjectName("pushButtonAddData")
         self.horizontalLayoutProj.addWidget(self.pushButtonAddData)
+        self.pushButtonParse = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonParse.setObjectName("pushButtonParse")
+        self.horizontalLayoutProj.addWidget(self.pushButtonParse)
         self.verticalLayoutProj.addLayout(self.horizontalLayoutProj)
         self.tableProj = QtWidgets.QTableView(self.centralwidget)
         self.tableProj.setObjectName("tableProj")
@@ -261,7 +264,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.horizontalLayoutCentralwidget.addLayout(self.verticalLayoutGraph)
         mainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(mainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 394, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 567, 21))
         self.menubar.setObjectName("menubar")
         mainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(mainWindow)
@@ -278,6 +281,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.inputProjectName.setText(_translate("mainWindow", "placeholder project name"))
         self.pushButtonOpenProject.setText(_translate("mainWindow", "Open project"))
         self.pushButtonAddData.setText(_translate("mainWindow", "Add data"))
+        self.pushButtonParse.setText(_translate("mainWindow", "Import"))
         self.pushButtonSelect.setText(_translate("mainWindow", "select"))
         self.checkPreview.setText(_translate("mainWindow", "Preview"))
         self.labelMeanSweep.setText(_translate("mainWindow", "Mean Sweep:"))
@@ -371,7 +375,6 @@ class UIsub(Ui_MainWindow):
         # self.projectfolder = self.project_root / self.project
 
 
-
     def pushedButtonAddData(self):
         # creates file tree for file selection
         if(debug): print("pushedButtonAddData")
@@ -383,6 +386,7 @@ class UIsub(Ui_MainWindow):
         # pushed button select, now being misused to trigger file parsing
         if(debug): print("pushedButtonSelect")
         parseProjFiles(self.projectfolder, self.projectdf)
+        
         
     def getdfProj(self):
         return self.projectdf
@@ -458,14 +462,6 @@ class UIsub(Ui_MainWindow):
         list_display_names = ['/'.join(i.split('/')[-2:]) for i in mypaths]
         dftable = pd.DataFrame({'path_source': mypaths, 'name': list_display_names})
         self.setTableDf(dftable)
-
-
-    @QtCore.pyqtSlot(list, list, list, list, list)
-    def slotAddData(self, host0, path1, checksum2, name3, group4):
-        #Reconstructs dataframe after passing it through pyqt signaling as lists
-        if(debug): print("slotAddData")
-        dfAdd = pd.DataFrame({"host": host0, "path": path1, "checksum": checksum2, "name": name3, "group": group4})
-        self.addData(dfAdd)
 
         
     @QtCore.pyqtSlot()
