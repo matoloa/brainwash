@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>394</width>
+    <width>567</width>
     <height>432</height>
    </rect>
   </property>
@@ -21,6 +21,12 @@
        <layout class="QHBoxLayout" name="horizontalLayoutProj">
         <item>
          <widget class="QLineEdit" name="inputProjectName">
+          <property name="minimumSize">
+           <size>
+            <width>150</width>
+            <height>0</height>
+           </size>
+          </property>
           <property name="text">
            <string>placeholder project name</string>
           </property>
@@ -40,6 +46,13 @@
          <widget class="QPushButton" name="pushButtonAddData">
           <property name="text">
            <string>Add data</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButtonParse">
+          <property name="text">
+           <string>Import</string>
           </property>
          </widget>
         </item>
@@ -123,7 +136,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>394</width>
+     <width>567</width>
      <height>21</height>
     </rect>
    </property>
