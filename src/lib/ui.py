@@ -28,10 +28,20 @@ class TableModel(QtCore.QAbstractTableModel):
         self._data = data
 
 
-    def data(self, index, role):
+    def data(self, index, role=None): # dataCell
+        if role is None:
+            value = self._data.iloc[index.row(), index.column()]
+            return value
         if role == QtCore.Qt.DisplayRole:
             value = self._data.iloc[index.row(), index.column()]
             return str(value)
+
+
+    def dataRow(self, index, role=None):
+        # TODO: return entire selected row
+        if role is None:
+            value = self._data.iloc[index.row(), :]
+            return value
 
 
     def rowCount(self, index):
@@ -363,10 +373,17 @@ class UIsub(Ui_MainWindow):
         self.pushButtonParse.pressed.connect(self.pushedButtonParse)
         self.pushButtonSelect.pressed.connect(self.pushedButtonSelect)
 
-        # show dfProj in tableProj - TODO: Doesn't work!
+        # show dfProj in tableProj
         self.tablemodel = TableModel(self.projectdf)
         self.tableProj.setModel(self.tablemodel)
         self.setTableDf(self.projectdf)
+
+        self.tableProj.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
+        #self.tableProj.setSelectionMode(QTableView.SingleSelection)
+
+        selection_model = self.tableProj.selectionModel()
+        #selection_model.selectionChanged.connect(lambda x: print(self.tablemodel.dataRow(x.indexes()[0])))
+        selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
 
         #self.tablemodel.setData(self.projectdf)
         #self.tableProj.update()
@@ -374,6 +391,14 @@ class UIsub(Ui_MainWindow):
         # place current project as folder in project_root, lock project name for now
         # self.projectfolder = self.project_root / self.project
 
+
+    def tableProjSelectionChanged(self, single_index_range):
+        # TODO: handle list index out of range 
+        single_index = single_index_range.indexes()[0]
+        print(single_index)
+        table_row = self.tablemodel.dataRow(single_index)
+        print(table_row)
+        
 
     def pushedButtonAddData(self):
         # creates file tree for file selection
@@ -404,7 +429,10 @@ class UIsub(Ui_MainWindow):
 
 
     def setGraph(self):
-        #defunct, except on Jonathan's laptop
+        #get dfmean from selected row in UIsub.
+        # dipslay SELECTED from tableProj at graphMean
+
+
         if(debug): print('setGraph')
         dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
         self.canvas_seaborn = MplCanvas(parent=self.graphView)  # instantiate canvas
@@ -430,8 +458,7 @@ class UIsub(Ui_MainWindow):
     def setTableDf(self, data):
         if(debug): print('setTableDf')
         self.tablemodel.setData(data)
-        #format table TODO: Break out to separate function
-        self.formatTableProj()
+        self.formatTableProj() #hide/resize columns
         self.tableProj.update()
 
 

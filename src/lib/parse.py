@@ -112,6 +112,30 @@ def importabffolder(folderpath, channel=0):
     return df
 
 
+def builddfmean(df, rollingwidth=3):
+    """
+    dfmean.voltate(V) (a single sweep built on the mean of all time)
+    dfmean.prim
+    dfmean.bis
+
+    dfabf.pivot(columns='time', index='sweep', values='voltage').mean(axis=0).plot()
+
+    """
+
+    # pivot is useful, learn it
+    dfmean = pd.DataFrame(
+        df.pivot(columns="time", index="sweep", values="voltage").mean()
+    )
+    dfmean.columns = ["voltage"]
+    dfmean.voltage -= dfmean.voltage.median()
+
+    # generate diffs, *5 for better visualization
+    dfmean["prim"] = dfmean.voltage.diff().rolling(rollingwidth, center=True).mean() * 5
+    dfmean["bis"] = dfmean.prim.diff().rolling(rollingwidth, center=True).mean() * 5
+
+    return dfmean
+
+
 def parseProjFiles(proj_folder:Path, df):
     '''
     receives a df of project data files built in ui
@@ -120,6 +144,8 @@ def parseProjFiles(proj_folder:Path, df):
     optional: checks if file is already parsed by checksums
     saves parsed file into project parsed files folder
     get proj_folder from ui self.project_folder
+
+    calls builddfmean to create an average, prim and bis file
     '''
     print(f"proj folder: {proj_folder}")
     print(f"save_file_name: {df['save_file_name']}")
@@ -141,8 +167,10 @@ def parseProjFiles(proj_folder:Path, df):
             df2parse = importabffolder(folderpath=Path(row.path))
         else:
             df2parse = importabf(folderpath=Path(row.path))
-        savepath = str(Path(proj_folder) / row.save_file_name) + '.csv'
-        df2parse.to_csv(savepath, index=False)
+        savepath = str(Path(proj_folder) / row.save_file_name)
+        df2parse.to_csv(savepath + '.csv', index=False)
+        dfmean = builddfmean(df2parse)
+        dfmean.to_csv(savepath + '_mean.csv', index=False)
 
 # Path.is_dir to check if folder or file
 
@@ -150,6 +178,7 @@ def parseProjFiles(proj_folder:Path, df):
         
 
     # show progress
+
 
 
 if __name__ == "__main__":
