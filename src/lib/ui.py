@@ -18,7 +18,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
-from parse import parseProjFiles
+import parse
 
 debug = False
 
@@ -354,7 +354,10 @@ class UIsub(Ui_MainWindow):
             }
             with self.cfg_yaml.open('w+') as file:
                 yaml.safe_dump(cfg, file)
-            
+        
+        if not os.path.exists(self.projects_folder):
+            os.makedirs(self.projects_folder)
+        parse.clearTemp(self.projects_folder)    
         
         self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
         # Placeholder project dataframe
@@ -417,7 +420,7 @@ class UIsub(Ui_MainWindow):
     def pushedButtonParse(self):
         # parse non-parsed files and folders in self.projectdf
         if(debug): print("pushedButtonParse")
-        parseProjFiles(self.projectfolder, self.projectdf)
+        parse.parseProjFiles(self.projects_folder / ".temp", self.projectdf)
         
 
     def getdfProj(self):

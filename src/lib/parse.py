@@ -10,6 +10,7 @@ from tqdm.notebook import tqdm
 from pathlib import Path
 from sklearn import linear_model
 from joblib import Memory
+import shutil
 
 memory = Memory("../cache", verbose=1)
 
@@ -166,7 +167,7 @@ def parseProjFiles(proj_folder:Path, df):
         if Path(row.path).is_dir():
             df2parse = importabffolder(folderpath=Path(row.path))
         else:
-            df2parse = importabf(folderpath=Path(row.path))
+            df2parse = importabf(filepath=Path(row.path))
         savepath = str(Path(proj_folder) / row.save_file_name)
         df2parse.to_csv(savepath + '.csv', index=False)
         dfmean = builddfmean(df2parse)
@@ -180,10 +181,28 @@ def parseProjFiles(proj_folder:Path, df):
     # show progress
 
 
+def clearTemp(proj_folder:Path):
+    """
+    Checks if proj_folder containts phrase "Brainwash Projects"
+    If so, remove proj_folder\\.temp AND ALL OF ITS CONTENTS
+    If not, critical error
+    """
+    if ("Brainwash Projects" in str(proj_folder)):
+        temp_path = str(proj_folder / ".temp")
+        #print(f"I'll now kill {temp_path}")
+        shutil.rmtree(temp_path)
+    else:
+        print(f"Incorrect project folder: {proj_folder}")
+        raise()
+
 
 if __name__ == "__main__":
     print("Placeholder: standalone test")
+    proj_folder = Path("C:\\Users\\Mats\\Documents\\Brainwash Projects")
+    standalone_folder = proj_folder / ".temp"
+    clearTemp(proj_folder)
+    #clearTemp(Path("C:\\Users\\Mats\\Documents\\Lactate 5 LTP\\DG"))
     df = pd.DataFrame({"path": ["C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_13_P0629-S5\\LTP",
                                 "C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_21_P0701-S2\\LTP"],
                        "save_file_name": ["A13", "A21"]})
-    parseProjFiles(proj_folder="C:\\Users\\Mats\\Documents\\brainwash projects\\Standalone test", df=df)
+    parseProjFiles(proj_folder=standalone_folder, df=df)
