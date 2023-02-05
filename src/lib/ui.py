@@ -20,7 +20,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
 import parse
 
-debug = False
+verbose = True
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
@@ -77,7 +77,7 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
     def __init__(self, parent=None, root_path='.'):
         QtWidgets.QFileSystemModel.__init__(self, None)
         self.root_path      = root_path
-        self.debug = debug
+        self.verbose = verbose
         self.checks         = {}
         self.nodestack      = []
         self.parent_index   = self.setRootPath(self.root_path)
@@ -88,7 +88,7 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
         self.directoryLoaded.connect(self._loaded)
 
     def _loaded(self, path):
-        if(debug): print('_loaded', self.root_path, self.rowCount(self.parent_index))
+        if self.verbose: print('_loaded', self.root_path, self.rowCount(self.parent_index))
 
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
@@ -121,13 +121,13 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
     def setData(self, index, value, role):
         if (role == QtCore.Qt.CheckStateRole and index.column() == 0):
             self.checks[index] = value
-            if(debug): print('setData(): {}'.format(value))
+            if verbose: print('setData(): {}'.format(value))
             return True
         return QtWidgets.QFileSystemModel.setData(self, index, value, role)
 
 
     def traverseDirectory(self, parentindex, callback=None):
-        if debug: print('traverseDirectory():')
+        if verbose: print('traverseDirectory():')
         callback(parentindex)
         if self.hasChildren(parentindex):
             path = self.filePath(parentindex)
@@ -334,7 +334,7 @@ class UIsub(Ui_MainWindow):
     def __init__(self, mainwindow):
         super(UIsub, self).__init__()
         self.setupUi(mainwindow)
-        if(debug): print(' - UIsub init, verbose mode') # rename for clarity
+        if verbose: print(' - UIsub init, verbose mode') # rename for clarity
 
         # load cfg if present, create if not existing
         paths = [Path.cwd()] + list(Path.cwd().parents)
@@ -396,15 +396,17 @@ class UIsub(Ui_MainWindow):
 
     def tableProjSelectionChanged(self, single_index_range):
         # TODO: handle list index out of range 
-        single_index = single_index_range.indexes()[0]
-        print(single_index)
-        table_row = self.tablemodel.dataRow(single_index)
-        print(table_row)
+        print(f"single_index_range: {single_index_range.indexes()}")
+        if 0 < len(single_index_range.indexes()):
+            single_index = single_index_range.indexes()[0]
+            print(single_index)
+            table_row = self.tablemodel.dataRow(single_index)
+            print(table_row)
         
 
     def pushedButtonAddData(self):
         # creates file tree for file selection
-        if(debug): print("pushedButtonAddData")
+        if verbose: print("pushedButtonAddData")
         self.dialog = QtWidgets.QDialog()
         self.ftree = Filetreesub(self.dialog, parent=self, folder=self.user_documents)
         self.dialog.show()
@@ -412,22 +414,27 @@ class UIsub(Ui_MainWindow):
 
     def pushedButtonSelect(self):
         # Placeholder; this is later meant to open a dialog to specify what aspects of the data are to be displayed in the graphs        
-        # if(debug):
+        # if verbose:
         print("pushedButtonSelect")
 
 
     def pushedButtonParse(self):
         # parse non-parsed files and folders in self.projectdf
-        if(debug): print("pushedButtonParse")
-        parse.parseProjFiles(self.projects_folder, self.projectdf)
+        if verbose: print("pushedButtonParse")
+        parse.parseProjFiles(self.projectfolder, self.projectdf)
         
 
     def getdfProj(self):
         return self.projectdf
 
 
-    def setdfProj(self, df):
+    def save_df_proj(self):
+        self.projectdf.to_csv(str(self.projectfolder / "project.brainwash"), index=False)        
+
+
+    def set_dfproj(self, df):
         self.projectdf = df
+        self.save_df_proj()
 
 
     def setGraph(self):
@@ -435,12 +442,12 @@ class UIsub(Ui_MainWindow):
         # dipslay SELECTED from tableProj at graphMean
 
 
-        if(debug): print('setGraph')
+        if verbose: print('setGraph')
         dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
         self.canvas_seaborn = MplCanvas(parent=self.graphView)  # instantiate canvas
         dfmean.set_index('t0', inplace=True)
-        dfmean['slope'] = dfmean.slope/dfmean.slope.abs().max()
-        dfmean['sweep'] = dfmean.sweep/dfmean.sweep.abs().max()
+        dfmean['slope'] = dfmean.slope / dfmean.slope.abs().max()
+        dfmean['sweep'] = dfmean.sweep / dfmean.sweep.abs().max()
         g = sns.lineplot(data=dfmean, y="slope", x="t0", ax=self.canvas_seaborn.axes, color="black")
         h = sns.lineplot(data=dfmean, y="sweep", x="t0", ax=self.canvas_seaborn.axes, color="red")
         self.canvas_seaborn.draw()
@@ -448,24 +455,24 @@ class UIsub(Ui_MainWindow):
 
     
     def setProjectname(self):
-        if(debug): print('setProjectname')
+        if verbose: print('setProjectname')
         #get_signals(self.children()[1].children()[1].model)
         self.projectname = self.inputProjectName.text()
         self.projectfolder = self.projects_folder / self.projectname
         if not os.path.exists(self.projectfolder):
             os.makedirs(self.projectfolder)
-        if(debug): print (os.path.exists(self.projectfolder))
+        if verbose: print (os.path.exists(self.projectfolder))
 
     
     def setTableDf(self, data):
-        if(debug): print('setTableDf')
+        if verbose: print('setTableDf')
         self.tablemodel.setData(data)
         self.formatTableProj() #hide/resize columns
         self.tableProj.update()
 
 
     def formatTableProj(self):
-        if(debug): print('formatTableProj')
+        if verbose: print('formatTableProj')
         header = self.tableProj.horizontalHeader()
         self.tableProj.setColumnHidden(0, True) #host
         self.tableProj.setColumnHidden(1, True) #path
@@ -485,14 +492,14 @@ class UIsub(Ui_MainWindow):
         dfProj = self.getdfProj()
         dfProj = pd.concat([dfProj, dfAdd]) # .append is deprecated; using pd.concat
         dfProj.reset_index(drop=True, inplace=True)
-        self.setdfProj(dfProj)
-        if(debug): print('addData:', self.getdfProj())
+        self.set_dfproj(dfProj)
+        if verbose: print('addData:', self.getdfProj())
         self.setTableDf(dfProj)
 
     
     @QtCore.pyqtSlot(list)
     def slotPrintPaths(self, mypaths):
-        if(debug): print(f'mystr: {mypaths}')
+        if verbose: print(f'mystr: {mypaths}')
         strmystr = "\n".join(sorted(['/'.join(i.split('/')[-2:]) for i in mypaths]))
         self.textBrowser.setText(strmystr)
         list_display_names = ['/'.join(i.split('/')[-2:]) for i in mypaths]
@@ -510,7 +517,7 @@ class Filetreesub(Ui_Dialog):
         super(Filetreesub, self).__init__()
         self.setupUi(dialog)
         self.parent = parent
-        if(debug): print(' - Filetreesub init')
+        if verbose: print(' - Filetreesub init')
     
         self.ftree = self.widget
         # set root_path for file tree model
@@ -551,7 +558,7 @@ class Filetreesub(Ui_Dialog):
     
     def pathsSelectedUpdateTable(self, paths):
         # TODO: Extract host, checksum, group
-        if(debug): print('pathsSelectedUpdateTable')
+        if verbose: print('pathsSelectedUpdateTable')
         dfAdd = pd.DataFrame({"host": 'computer 1', "path": paths, 'checksum': 'big number', 'save_file_name': paths, 'group': None})
         self.tablemodel.setData(dfAdd)
         # NTH: more intelligent default naming; lowest level unique name?
