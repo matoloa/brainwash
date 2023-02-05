@@ -13,6 +13,8 @@ from joblib import Memory
 
 memory = Memory("../cache", verbose=1)
 
+verbose = True
+
 # set some working folders
 #TODO: set as globals?
 #TODO: get project root. this will not work now
@@ -163,6 +165,7 @@ def parseProjFiles(proj_folder:Path, df):
     # remove the found files from the parse que
 
     for i, row in df.iterrows():
+        if verbose: print(f"row: {row}")
         if Path(row.path).is_dir():
             df2parse = importabffolder(folderpath=Path(row.path))
         else:

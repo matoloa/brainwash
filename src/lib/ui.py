@@ -73,7 +73,7 @@ class TableModel(QtCore.QAbstractTableModel):
 
 
 class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with a FileTreeSelectorView
-    paths_selected = QtCore.pyqtSignal(list) 
+    paths_selected = QtCore.pyqtSignal(list)
     def __init__(self, parent=None, root_path='.'):
         QtWidgets.QFileSystemModel.__init__(self, None)
         self.root_path      = root_path
@@ -86,6 +86,7 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
         self.sort(0, QtCore.Qt.SortOrder.AscendingOrder)
         self.directoryLoaded.connect(self._loaded)
+
 
     def _loaded(self, path):
         if self.verbose: print('_loaded', self.root_path, self.rowCount(self.parent_index))
@@ -197,7 +198,6 @@ class MplCanvas(FigureCanvasQTAgg):
         self.setParent(parent)
 
 
-
 ########################################################################
 ##### section directly copied from output from pyuic, do not alter #####
 ##### trying to make all the rest work with it                     #####
@@ -223,7 +223,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.inputProjectName.setObjectName("inputProjectName")
         self.horizontalLayoutProj.addWidget(self.inputProjectName)
         self.pushButtonOpenProject = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButtonOpenProject.setEnabled(False)
+        #self.pushButtonOpenProject.setEnabled(False)
         self.pushButtonOpenProject.setObjectName("pushButtonOpenProject")
         self.horizontalLayoutProj.addWidget(self.pushButtonOpenProject)
         self.pushButtonAddData = QtWidgets.QPushButton(self.centralwidget)
@@ -371,6 +371,7 @@ class UIsub(Ui_MainWindow):
         # connecting the same signals we had in original ui test
 
         self.inputProjectName.editingFinished.connect(self.setProjectname)
+        self.pushButtonOpenProject.pressed.connect(self.pushedButtonOpenProject)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
         self.pushButtonParse.pressed.connect(self.pushedButtonParse)
         self.pushButtonSelect.pressed.connect(self.pushedButtonSelect)
@@ -402,7 +403,18 @@ class UIsub(Ui_MainWindow):
             print(single_index)
             table_row = self.tablemodel.dataRow(single_index)
             print(table_row)
-        
+    
+    
+    def pushedButtonOpenProject(self):
+        # open folder selector dialog
+        self.dialog = QtWidgets.QDialog()
+        projectfolder = QtWidgets.QFileDialog.getExistingDirectory(self.dialog, "Open Directory", str(self.projects_folder), 
+                                                            QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks)
+        self.projectfolder = Path(projectfolder)
+        self.load_dfproj()
+        self.setTableDf(self.projectdf)  # set dfproj to table
+        self.inputProjectName.setText(self.projectfolder.stem)  # set foler name to proj name
+
 
     def pushedButtonAddData(self):
         # creates file tree for file selection
@@ -428,13 +440,19 @@ class UIsub(Ui_MainWindow):
         return self.projectdf
 
 
-    def save_df_proj(self):
+    def load_dfproj(self):
+        self.projectdf = pd.read_csv(str(self.projectfolder / "project.brainwash"))
+        
+        print(f"loaded project df: {self.projectdf}")        
+
+
+    def save_dfproj(self):
         self.projectdf.to_csv(str(self.projectfolder / "project.brainwash"), index=False)        
 
 
     def set_dfproj(self, df):
         self.projectdf = df
-        self.save_df_proj()
+        self.save_dfproj()
 
 
     def setGraph(self):
