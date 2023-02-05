@@ -357,7 +357,6 @@ class UIsub(Ui_MainWindow):
         
         if not os.path.exists(self.projects_folder):
             os.makedirs(self.projects_folder)
-        parse.clearTemp(self.projects_folder)    
         
         self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
         # Placeholder project dataframe
@@ -420,7 +419,7 @@ class UIsub(Ui_MainWindow):
     def pushedButtonParse(self):
         # parse non-parsed files and folders in self.projectdf
         if(debug): print("pushedButtonParse")
-        parse.parseProjFiles(self.projects_folder / ".temp", self.projectdf)
+        parse.parseProjFiles(self.projects_folder, self.projectdf)
         
 
     def getdfProj(self):
