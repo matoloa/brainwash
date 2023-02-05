@@ -412,8 +412,6 @@ class UIsub(Ui_MainWindow):
                                                             QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks)
         self.projectfolder = Path(projectfolder)
         self.load_dfproj()
-        self.setTableDf(self.projectdf)  # set dfproj to table
-        self.inputProjectName.setText(self.projectfolder.stem)  # set foler name to proj name
 
 
     def pushedButtonAddData(self):
@@ -442,8 +440,9 @@ class UIsub(Ui_MainWindow):
 
     def load_dfproj(self):
         self.projectdf = pd.read_csv(str(self.projectfolder / "project.brainwash"))
-        
-        print(f"loaded project df: {self.projectdf}")        
+        self.setTableDf(self.projectdf)  # set dfproj to table
+        self.inputProjectName.setText(self.projectfolder.stem)  # set foler name to proj name
+        if verbose: print(f"loaded project df: {self.projectdf}")        
 
 
     def save_dfproj(self):
@@ -477,11 +476,15 @@ class UIsub(Ui_MainWindow):
         #get_signals(self.children()[1].children()[1].model)
         self.projectname = self.inputProjectName.text()
         self.projectfolder = self.projects_folder / self.projectname
-        if not os.path.exists(self.projectfolder):
-            os.makedirs(self.projectfolder)
-        if verbose: print (os.path.exists(self.projectfolder))
+        if self.projectfolder.exists():
+            # look for project.brainwash and load it
+            if (self.projectfolder / "project.brainwash").exists():
+                self.load_dfproj()
+        else:
+            self.projectfolder.mkdir()
+        if verbose: print(f"folder: {self.projectfolder} exists: {self.projectfolder.exists()}")
 
-    
+           
     def setTableDf(self, data):
         if verbose: print('setTableDf')
         self.tablemodel.setData(data)
