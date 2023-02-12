@@ -403,6 +403,7 @@ class UIsub(Ui_MainWindow):
             print(single_index)
             table_row = self.tablemodel.dataRow(single_index)
             print(table_row)
+            self.setGraph(table_row[3]) # Passing along save_file_name
     
     
     def pushedButtonOpenProject(self):
@@ -454,21 +455,39 @@ class UIsub(Ui_MainWindow):
         self.save_dfproj()
 
 
-    def setGraph(self):
+    def clearGraph(self):
+        if verbose: print('clearGraph')
+        self.canvas_seaborn = None
+
+
+    def setGraph(self, save_file_name):
         #get dfmean from selected row in UIsub.
         # dipslay SELECTED from tableProj at graphMean
 
-
         if verbose: print('setGraph')
-        dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
-        self.canvas_seaborn = MplCanvas(parent=self.graphView)  # instantiate canvas
-        dfmean.set_index('t0', inplace=True)
-        dfmean['slope'] = dfmean.slope / dfmean.slope.abs().max()
-        dfmean['sweep'] = dfmean.sweep / dfmean.sweep.abs().max()
-        g = sns.lineplot(data=dfmean, y="slope", x="t0", ax=self.canvas_seaborn.axes, color="black")
-        h = sns.lineplot(data=dfmean, y="sweep", x="t0", ax=self.canvas_seaborn.axes, color="red")
+        dfmean_path = self.projectfolder / (save_file_name + "_mean.csv")
+        print(dfmean_path)
+        dfmean = pd.read_csv(dfmean_path) # import csv
+        print(dfmean)
+        # dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
+        self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
+        dfmean.reset_index(inplace=True)
+        dfmean['voltage'] = dfmean.voltage / dfmean.voltage.abs().max()
+        dfmean['prim'] = dfmean.prim / dfmean.prim.abs().max()
+        dfmean['bis'] = dfmean.bis / dfmean.bis.abs().max()
+        g = sns.lineplot(data=dfmean, y="voltage", x="index", ax=self.canvas_seaborn.axes, color="black")
+        h = sns.lineplot(data=dfmean, y="prim", x="index", ax=self.canvas_seaborn.axes, color="red")
+        i = sns.lineplot(data=dfmean, y="bis", x="index", ax=self.canvas_seaborn.axes, color="green")
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
+
+#        dfmean.set_index('t0', inplace=True)
+#        dfmean['slope'] = dfmean.slope / dfmean.slope.abs().max()
+#        dfmean['sweep'] = dfmean.sweep / dfmean.sweep.abs().max()
+#        g = sns.lineplot(data=dfmean, y="slope", x="t0", ax=self.canvas_seaborn.axes, color="black")
+#        h = sns.lineplot(data=dfmean, y="sweep", x="t0", ax=self.canvas_seaborn.axes, color="red")
+#        self.canvas_seaborn.draw()
+#        self.canvas_seaborn.show()
 
     
     def setProjectname(self):
