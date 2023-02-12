@@ -443,7 +443,8 @@ class UIsub(Ui_MainWindow):
         self.projectdf = pd.read_csv(str(self.projectfolder / "project.brainwash"))
         self.setTableDf(self.projectdf)  # set dfproj to table
         self.inputProjectName.setText(self.projectfolder.stem)  # set foler name to proj name
-        if verbose: print(f"loaded project df: {self.projectdf}")        
+        if verbose: print(f"loaded project df: {self.projectdf}")
+        self.clear_graph()      
 
 
     def save_dfproj(self):
@@ -455,9 +456,14 @@ class UIsub(Ui_MainWindow):
         self.save_dfproj()
 
 
-    def clearGraph(self):
-        if verbose: print('clearGraph')
-        self.canvas_seaborn = None
+    def clear_graph(self):
+        if verbose: print('clear_graph')
+        if hasattr(self, 'canvas_seaborn'):
+            if verbose: print('self has attribue canvas_seaborn')
+            print(f"axes: {self.canvas_seaborn.axes}")
+            self.canvas_seaborn.axes.cla()
+            self.canvas_seaborn.draw()
+            self.canvas_seaborn.show()
 
 
     def setGraph(self, save_file_name):
