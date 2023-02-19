@@ -470,8 +470,10 @@ class UIsub(Ui_MainWindow):
         self.dialog = QtWidgets.QDialog()
         projectfolder = QtWidgets.QFileDialog.getExistingDirectory(self.dialog, "Open Directory", str(self.projects_folder), 
                                                             QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks)
-        self.projectfolder = Path(projectfolder)
-        self.load_dfproj()
+        if verbose: print(f"Received projectfolder: {str(projectfolder)}")
+        if (Path(projectfolder) / "project.brainwash").exists():
+            self.projectfolder = Path(projectfolder)
+            self.load_dfproj()
 
 
     def pushedButtonAddData(self):
