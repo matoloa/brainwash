@@ -1,4 +1,3 @@
-# %%
 from csv import Dialect
 import os
 import sys
@@ -340,11 +339,14 @@ class UIsub(Ui_MainWindow):
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find('brainwash')) & (str(i).find('src') == -1)][0] # path to brainwash directory
         self.cfg_yaml = self.repo_root / 'cfg.yaml'
+        self.projectname = None
         if self.cfg_yaml.exists():
             with self.cfg_yaml.open('r') as file:
                 cfg = yaml.safe_load(file)
                 self.user_documents = Path(cfg['user_documents']) # Where to look for raw data
                 self.projects_folder = Path(cfg['projects_folder']) # Where to save and read parsed data
+                if 'projectname' in cfg.keys():
+                    self.projectname = cfg['projectname']
         else:
             self.user_documents = Path.home() / 'Documents' # Where to look for raw data
             self.projects_folder = self.user_documents / 'Brainwash Projects' # Where to save and read parsed data
@@ -361,10 +363,19 @@ class UIsub(Ui_MainWindow):
         self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
         # Placeholder project dataframe
         # self.projectdf = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'save_file_name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
-
-        self.projectname = "default" # a folder in project_root
-        self.projectfolder = self.projects_folder / self.projectname
-
+        self.tablemodel = TableModel(self.projectdf)
+        self.tableProj.setModel(self.tablemodel)
+        
+        if self.projectname is not None:
+            self.projectfolder = self.projects_folder / self.projectname
+            self.load_dfproj()
+        else:
+            self.projectname = "my project"
+            self.projectfolder = self.projects_folder / self.projectname
+        
+        # show dfProj in tableProj
+        self.setTableDf(self.projectdf)
+        
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
         # however, I kinda like the control of putting each of them explicit here and use designer just to get the boxes right visually
@@ -375,11 +386,6 @@ class UIsub(Ui_MainWindow):
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
         self.pushButtonParse.pressed.connect(self.pushedButtonParse)
         self.pushButtonSelect.pressed.connect(self.pushedButtonSelect)
-
-        # show dfProj in tableProj
-        self.tablemodel = TableModel(self.projectdf)
-        self.tableProj.setModel(self.tablemodel)
-        self.setTableDf(self.projectdf)
 
         self.tableProj.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
         #self.tableProj.setSelectionMode(QTableView.SingleSelection)
@@ -395,6 +401,16 @@ class UIsub(Ui_MainWindow):
         # self.projectfolder = self.project_root / self.project
 
 
+    def write_cfg(self):
+        cfg = {
+            'user_documents': str(self.user_documents),
+            'projects_folder': str(self.projects_folder),
+            'projectname': self.projectname
+            }
+        with self.cfg_yaml.open('w+') as file:
+            yaml.safe_dump(cfg, file)
+    
+    
     def tableProjSelectionChanged(self, single_index_range):
         # TODO: handle list index out of range 
         print(f"single_index_range: {single_index_range.indexes()}")
@@ -443,8 +459,11 @@ class UIsub(Ui_MainWindow):
         self.projectdf = pd.read_csv(str(self.projectfolder / "project.brainwash"))
         self.setTableDf(self.projectdf)  # set dfproj to table
         self.inputProjectName.setText(self.projectfolder.stem)  # set foler name to proj name
+        self.projectname = self.projectfolder.stem
         if verbose: print(f"loaded project df: {self.projectdf}")
-        self.clear_graph()      
+        self.clear_graph()
+        self.write_cfg()
+        
 
 
     def save_dfproj(self):
@@ -473,7 +492,10 @@ class UIsub(Ui_MainWindow):
         if verbose: print('setGraph')
         dfmean_path = self.projectfolder / (save_file_name + "_mean.csv")
         print(dfmean_path)
-        dfmean = pd.read_csv(dfmean_path) # import csv
+        try:
+            dfmean = pd.read_csv(dfmean_path) # import csv
+        except FileNotFoundError:
+            print('did not find _mean.csv to load. probably not imported')
         print(dfmean)
         # dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
         self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
@@ -534,10 +556,14 @@ class UIsub(Ui_MainWindow):
         self.tableProj.setColumnHidden(10, True) #comments
 
 
-    def addData(self, dfAdd): # concatinate dataframes of old and new data
+    def addData(self, dfAdd): # concatenate dataframes of old and new data
+        dfAdd['group'] = dfAdd['group'].fillna('Not set')
+        dfAdd['nSweeps'] = dfAdd['nSweeps'].fillna('...')
         dfProj = self.getdfProj()
         dfProj = pd.concat([dfProj, dfAdd]) # .append is deprecated; using pd.concat
         dfProj.reset_index(drop=True, inplace=True)
+        dfProj['group'] = dfProj['group'].fillna('Not set')
+        dfProj['nSweeps'] = dfProj['nSweeps'].fillna('...')
         self.set_dfproj(dfProj)
         if verbose: print('addData:', self.getdfProj())
         self.setTableDf(dfProj)
