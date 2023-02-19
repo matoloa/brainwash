@@ -384,6 +384,7 @@ class UIsub(Ui_MainWindow):
         # connecting the same signals we had in original ui test
 
         self.pushButtonRenameProject.pressed.connect(self.pushedButtonRenameProject)
+        self.pushButtonNewProject.pressed.connect(self.pushedButtonNewProject)
         self.pushButtonOpenProject.pressed.connect(self.pushedButtonOpenProject)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
         self.pushButtonParse.pressed.connect(self.pushedButtonParse)
@@ -438,13 +439,31 @@ class UIsub(Ui_MainWindow):
         new_project_name = self.inputProjectName.text()
         # check if ok
         if (self.projects_folder / new_project_name).exists():
-            # refuse, with message
+            if verbose: print("The target project name already exists")
             self.inputProjectName.setText(self.projectname)
         else:
             self.projectfolder = self.projectfolder.rename(self.projects_folder / new_project_name)
             self.projectname = new_project_name
  
 
+    def pushedButtonNewProject(self):
+        if verbose: print("pushedButtonNewProject")
+        self.inputProjectName.setReadOnly(False)
+        self.inputProjectName.editingFinished.connect(self.newProject)
+        
+        
+    def newProject(self):
+        new_projectname = self.inputProjectName.text()
+        new_projectfolder = self.projects_folder / new_projectname
+        # check if ok
+        if (self.projects_folder / new_projectname).exists():
+            if verbose: print("The target project name already exists")
+            self.inputProjectName.setText(self.projectname)
+        else:
+            new_projectfolder.mkdir()
+            self.projectfolder = new_projectfolder
+            self.projectname = new_projectname
+        
     
     def pushedButtonOpenProject(self):
         # open folder selector dialog
