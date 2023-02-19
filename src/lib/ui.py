@@ -340,6 +340,8 @@ class UIsub(Ui_MainWindow):
         self.repo_root = [i for i in paths if (-1 < str(i).find('brainwash')) & (str(i).find('src') == -1)][0] # path to brainwash directory
         self.cfg_yaml = self.repo_root / 'cfg.yaml'
         self.projectname = None
+        self.inputProjectName.setReadOnly(True)
+
         if self.cfg_yaml.exists():
             with self.cfg_yaml.open('r') as file:
                 cfg = yaml.safe_load(file)
@@ -370,7 +372,7 @@ class UIsub(Ui_MainWindow):
             self.projectfolder = self.projects_folder / self.projectname
             self.load_dfproj()
         else:
-            self.projectname = "my project"
+            self.projectname = "My Project"
             self.projectfolder = self.projects_folder / self.projectname
         
         # show dfProj in tableProj
@@ -381,10 +383,11 @@ class UIsub(Ui_MainWindow):
         # however, I kinda like the control of putting each of them explicit here and use designer just to get the boxes right visually
         # connecting the same signals we had in original ui test
 
-        self.inputProjectName.editingFinished.connect(self.setProjectname)
+        self.pushButtonRenameProject.pressed.connect(self.pushedButtonRenameProject)
         self.pushButtonOpenProject.pressed.connect(self.pushedButtonOpenProject)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
         self.pushButtonParse.pressed.connect(self.pushedButtonParse)
+#        self.pushButtonSelect.pressed.connect(self.pushedButtonSelect)
         #self.pushButtonSelect.pressed.connect(self.pushedButtonSelect)
 
         self.tableProj.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
@@ -421,6 +424,27 @@ class UIsub(Ui_MainWindow):
             print(table_row)
             self.setGraph(table_row[3]) # Passing along save_file_name
     
+    
+    def pushedButtonRenameProject(self):
+        if verbose: print("pushedButtonRenameProject")
+        self.inputProjectName.setReadOnly(False)
+        self.inputProjectName.editingFinished.connect(self.renameProject)
+        # renameProject
+        
+    
+    def renameProject(self):
+        # make if not existing
+        self.projectfolder.mkdir(exist_ok=True)
+        new_project_name = self.inputProjectName.text()
+        # check if ok
+        if (self.projects_folder / new_project_name).exists():
+            # refuse, with message
+            self.inputProjectName.setText(self.projectname)
+        else:
+            self.projectfolder = self.projectfolder.rename(self.projects_folder / new_project_name)
+            self.projectname = new_project_name
+ 
+
     
     def pushedButtonOpenProject(self):
         # open folder selector dialog
