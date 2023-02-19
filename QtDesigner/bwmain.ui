@@ -6,17 +6,17 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>567</width>
-    <height>432</height>
+    <width>923</width>
+    <height>957</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Brainwash 0.2</string>
+   <string>Brainwash 0.3</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayoutCentralwidget">
     <item>
-     <layout class="QVBoxLayout" name="verticalLayoutProj">
+     <layout class="QVBoxLayout" name="verticalLayoutProj" stretch="0,0,0">
       <item>
        <layout class="QHBoxLayout" name="horizontalLayoutProj">
         <item>
@@ -28,20 +28,44 @@
            </size>
           </property>
           <property name="text">
-           <string>placeholder project name</string>
+           <string>My Project</string>
+          </property>
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButtonRenameProject">
+          <property name="text">
+           <string>Rename</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButtonNewProject">
+          <property name="text">
+           <string>New</string>
           </property>
          </widget>
         </item>
         <item>
          <widget class="QPushButton" name="pushButtonOpenProject">
           <property name="enabled">
-           <bool>false</bool>
+           <bool>true</bool>
           </property>
           <property name="text">
-           <string>Open project</string>
+           <string>Open</string>
           </property>
          </widget>
         </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayoutData">
+        <property name="sizeConstraint">
+         <enum>QLayout::SetMinAndMaxSize</enum>
+        </property>
         <item>
          <widget class="QPushButton" name="pushButtonAddData">
           <property name="text">
@@ -64,25 +88,7 @@
      </layout>
     </item>
     <item>
-     <layout class="QVBoxLayout" name="verticalLayoutGraph" stretch="0,0,5,0,5,0,1">
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayoutGraph">
-        <item>
-         <widget class="QPushButton" name="pushButtonSelect">
-          <property name="text">
-           <string>select</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QCheckBox" name="checkPreview">
-          <property name="text">
-           <string>Preview</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
+     <layout class="QVBoxLayout" name="verticalLayoutGraph" stretch="0,5,0,5,0,1">
       <item>
        <widget class="QLabel" name="labelMeanSweep">
         <property name="text">
@@ -136,7 +142,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>567</width>
+     <width>923</width>
      <height>21</height>
     </rect>
    </property>

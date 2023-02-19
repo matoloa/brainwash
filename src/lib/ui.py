@@ -374,7 +374,7 @@ class UIsub(Ui_MainWindow):
         self.pushButtonOpenProject.pressed.connect(self.pushedButtonOpenProject)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
         self.pushButtonParse.pressed.connect(self.pushedButtonParse)
-        self.pushButtonSelect.pressed.connect(self.pushedButtonSelect)
+        #self.pushButtonSelect.pressed.connect(self.pushedButtonSelect)
 
         # show dfProj in tableProj
         self.tablemodel = TableModel(self.projectdf)
@@ -423,10 +423,10 @@ class UIsub(Ui_MainWindow):
         self.dialog.show()
 
 
-    def pushedButtonSelect(self):
+    #def pushedButtonSelect(self):
         # Placeholder; this is later meant to open a dialog to specify what aspects of the data are to be displayed in the graphs        
         # if verbose:
-        print("pushedButtonSelect")
+        #print("pushedButtonSelect")
 
 
     def pushedButtonParse(self):
