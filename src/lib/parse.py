@@ -138,7 +138,7 @@ def builddfmean(df, rollingwidth=3):
     return dfmean
 
 
-def parseProjFiles(proj_folder:Path, df):
+def parseProjFiles(proj_folder:Path, df=None, row=None):
     '''
     receives a df of project data files built in ui
     checks for or creates project parsed files folder
@@ -149,9 +149,26 @@ def parseProjFiles(proj_folder:Path, df):
 
     calls builddfmean to create an average, prim and bis file
     '''
+    def parser(proj_folder, row):
+        if verbose: print(f"row: {row}")
+        if Path(row.path).is_dir():
+            df2parse = importabffolder(folderpath=Path(row.path))
+        else:
+            df2parse = importabf(filepath=Path(row.path))
+        savepath = str(Path(proj_folder) / row.save_file_name)
+        df2parse.to_csv(savepath + '.csv', index=False)
+        dfmean = builddfmean(df2parse)
+        dfmean.to_csv(savepath + '_mean.csv', index=False)
+        #print(f"df2parse: {df2parse}")
+        return df2parse['sweep'].values[-1]
+    
     print(f"proj folder: {proj_folder}")
-    print(f"save_file_name: {df['save_file_name']}")
-    print(f"path: {df['path']}")
+    if row is not None:
+        print(f"save_file_name: {row['save_file_name']}")
+        print(f"path: {row['path']}")
+    if df is not None:
+        print(f"save_file_name: {df['save_file_name']}")
+        print(f"path: {df['path']}")
     
     # check for files in the folder.
     path_proj_folder = Path(proj_folder)
@@ -163,17 +180,15 @@ def parseProjFiles(proj_folder:Path, df):
     # list found files
     #print(list_existingfiles)
     # remove the found files from the parse que
+    if row is not None:
+        nSweeps = parser(proj_folder, row)
+        return {'nSweeps': nSweeps}
 
-    for i, row in df.iterrows():
-        if verbose: print(f"row: {row}")
-        if Path(row.path).is_dir():
-            df2parse = importabffolder(folderpath=Path(row.path))
-        else:
-            df2parse = importabf(filepath=Path(row.path))
-        savepath = str(Path(proj_folder) / row.save_file_name)
-        df2parse.to_csv(savepath + '.csv', index=False)
-        dfmean = builddfmean(df2parse)
-        dfmean.to_csv(savepath + '_mean.csv', index=False)
+    if df is not None:
+        for i, row in df.iterrows():
+            nSweeps = parser(proj_folder, row)
+
+    
 
 # Path.is_dir to check if folder or file
 

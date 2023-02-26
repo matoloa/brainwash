@@ -347,34 +347,34 @@ class UIsub(Ui_MainWindow):
                 cfg = yaml.safe_load(file)
                 self.user_documents = Path(cfg['user_documents']) # Where to look for raw data
                 self.projects_folder = Path(cfg['projects_folder']) # Where to save and read parsed data
-                if 'projectname' in cfg.keys():
-                    self.projectname = cfg['projectname']
+                self.projectname = cfg['projectname']
         else:
             self.user_documents = Path.home() / 'Documents' # Where to look for raw data
             self.projects_folder = self.user_documents / 'Brainwash Projects' # Where to save and read parsed data
+            self.projectname = 'My Project'
             cfg = {
                 'user_documents': str(self.user_documents),
                 'projects_folder': str(self.projects_folder),
+                'projectname': self.projectname
             }
-            with self.cfg_yaml.open('w+') as file:
-                yaml.safe_dump(cfg, file)
-        
+            self.write_cfg()
+
+        self.projectfolder = self.projects_folder / self.projectname
+
         if not os.path.exists(self.projects_folder):
             os.makedirs(self.projects_folder)
         
         self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
-        # Placeholder project dataframe
-        # self.projectdf = pd.DataFrame({'host': ['computer 0'], 'path': ['C:/new folder(4)/braindamage/pre-test'], 'checksum': ['biggest number'], 'save_file_name': ['Zero test'], 'group': ['pilot'], 'groupRGB': ['255,0,0'], 'parsetimestamp': ['2022-04-05'], 'nSweeps': [720], 'measurements': ['(dict of coordinates)'], 'exclude': [False], 'comment': ['recorded sideways']})
         self.tablemodel = TableModel(self.projectdf)
         self.tableProj.setModel(self.tablemodel)
-        
-        if self.projectname is not None:
-            self.projectfolder = self.projects_folder / self.projectname
+
+        if Path(self.projectfolder / "project.brainwash").exists():
             self.load_dfproj()
         else:
             self.projectname = "My Project"
-            self.projectfolder = self.projects_folder / self.projectname
-        
+            self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
+
+
         # show dfProj in tableProj
         self.setTableDf(self.projectdf)
         
@@ -411,6 +411,8 @@ class UIsub(Ui_MainWindow):
             'projects_folder': str(self.projects_folder),
             'projectname': self.projectname
             }
+        new_projectfolder = self.projects_folder / self.projectname
+        new_projectfolder.mkdir(exist_ok=True)
         with self.cfg_yaml.open('w+') as file:
             yaml.safe_dump(cfg, file)
     
@@ -493,8 +495,16 @@ class UIsub(Ui_MainWindow):
     def pushedButtonParse(self):
         # parse non-parsed files and folders in self.projectdf
         if verbose: print("pushedButtonParse")
-        parse.parseProjFiles(self.projectfolder, self.projectdf)
-        
+        for i, row in self.projectdf.iterrows():
+            if row['nSweeps'] == '...':
+                result = parse.parseProjFiles(self.projectfolder, row=row)
+                self.projectdf.loc[i, 'nSweeps'] = str(result['nSweeps'])
+                #self.tablemodel.setData(self.projectdf)
+                # TODO: force ui update with sweeps to get progress
+                print(f"profectdf: {self.projectdf}")
+            else:
+                print(f"row['nSweeps']: {row['nSweeps']}")
+        self.save_dfproj()
 
     def getdfProj(self):
         return self.projectdf
@@ -508,7 +518,6 @@ class UIsub(Ui_MainWindow):
         if verbose: print(f"loaded project df: {self.projectdf}")
         self.clear_graph()
         self.write_cfg()
-        
 
 
     def save_dfproj(self):
@@ -602,8 +611,6 @@ class UIsub(Ui_MainWindow):
 
 
     def addData(self, dfAdd): # concatenate dataframes of old and new data
-        dfAdd['group'] = dfAdd['group'].fillna('Not set')
-        dfAdd['nSweeps'] = dfAdd['nSweeps'].fillna('...')
         dfProj = self.getdfProj()
         dfProj = pd.concat([dfProj, dfAdd]) # .append is deprecated; using pd.concat
         dfProj.reset_index(drop=True, inplace=True)
