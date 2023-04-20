@@ -1,3 +1,4 @@
+# %%
 import numpy as np  # numeric calculations module
 import pandas as pd  # dataframe module, think excel, but good
 import os  # speak to OS (list dirs)
@@ -40,33 +41,28 @@ def buildexperimentcsv(dir_gen_data):
 
 
 @memory.cache
-def importabf(filepath, channel=0, oddeven=None):
+def importabf(filepath):
     """
-    import .abf and return <"odd"/"even"/"all"> sweeps from channel <0/1>
-    oddeven defaults to channel-appropriate parameter
+    import .abf and return dataframe wiht proper SI units
     """
 
     # parse abf
     abf = pyabf.ABF(filepath)
 
-    if not channel in abf.channelList:
-        raise ValueError(f"No channel {channel} in {filepath}")
-    if oddeven is None:
-        if channel == 0:
-            oddeven = "odd"
-        else:
-            oddeven = "even"
-
+    channels = range(abf.channelCount)
     sweeps = range(abf.sweepCount)
-
+    if verbose: print(f"abf.channelCount: {channels}")
+    if verbose: print(f"abf.sweepCount): {sweeps}")
     dfs = []
-    for i in sweeps:
-        # get data
-        abf.setSweep(sweepNumber=i, channel=channel)
-        df = pd.DataFrame({"sweepX": abf.sweepX, "sweepY": abf.sweepY})
-        df["sweep_raw"] = i
-        df["t0"] = abf.sweepTimesSec[i]
-        dfs.append(df)
+    for j in channels:
+        for i in sweeps:
+            # get data
+            abf.setSweep(sweepNumber=i, channel=j)
+            df = pd.DataFrame({"sweepX": abf.sweepX, "sweepY": abf.sweepY})
+            df["sweep_raw"] = i
+            df["t0"] = abf.sweepTimesSec[i]
+            df["channel"] = j
+            dfs.append(df)
 
     df = pd.concat(dfs)
     df["sweep"] = df.sweep_raw  # relevant for single file imports
@@ -80,6 +76,14 @@ def importabf(filepath, channel=0, oddeven=None):
     df["datetime"] = df.timens.astype("datetime64[ns]") + (
         abf.abfDateTime - pd.to_datetime(0)
     )
+    """
+    if not channel in abf.channelList:
+        raise ValueError(f"No channel {channel} in {filepath}")
+    if oddeven is None:
+        if channel == 0:
+            oddeven = "odd"
+        else:
+            oddeven = "even"
 
     # Odd / Even sweep inclusion
     df["even"] = df.sweep_raw.apply(lambda x: x % 2 == 0)
@@ -87,11 +91,15 @@ def importabf(filepath, channel=0, oddeven=None):
     df = df[df.oddeven == oddeven]  # filter rows by Boolean
     df.drop(columns=["sweepX", "sweepY", "even", "oddeven", "timens"], inplace=True)
     df.reset_index(drop=True, inplace=True)
+    """
+
+    # Create and return one df per channel
+    df.drop(columns=["sweepX", "sweepY", "timens"], inplace=True)
 
     return df
 
-
-def importabffolder(folderpath, channel=0):
+# %%
+def importabffolder(folderpath):
     """
     Read and concatenate all .abf files in folderpath to a single df
     """
@@ -102,8 +110,8 @@ def importabffolder(folderpath, channel=0):
     listdf = []
     maxsweep = 0
     for filename in list_files:
-        df = importabf(folderpath / filename, channel=channel)
-        df["sweep"] = df.sweep_raw + maxsweep
+        df = importabf(folderpath / filename)
+        df["sweep"] = df.sweep_raw + maxsweep + 1
         maxsweep = df.sweep.max()
         listdf.append(df)
 
@@ -112,7 +120,7 @@ def importabffolder(folderpath, channel=0):
     # df.drop(columns=['sweep_raw'], inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
-
+# %%
 
 def builddfmean(df, rollingwidth=3):
     """
@@ -155,14 +163,28 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
             df2parse = importabffolder(folderpath=Path(row.path))
         else:
             df2parse = importabf(filepath=Path(row.path))
-        savepath = str(Path(proj_folder) / row.save_file_name)
-        df2parse.to_csv(savepath + '.csv', index=False)
-        dfmean = builddfmean(df2parse)
-        dfmean.to_csv(savepath + '_mean.csv', index=False)
-        #print(f"df2parse: {df2parse}")
-        return df2parse['sweep'].values[-1]
+        
+        if verbose: print(f"df2parse['channel'].nunique(): {df2parse['channel'].nunique()}")
+        for i in df2parse['channel'].unique():
+            # Create unique filename for current channel
+            save_file_name_channel = row.save_file_name + "_ch_" + str(i)
+            savepath = str(Path(proj_folder) / save_file_name_channel)
+            # save ONLY active channel as filename
+            df = df2parse[df2parse.channel==i]
+            df.to_csv(savepath + '.csv', index=False)
+            # df.drop(columns=["channel"]).to_csv(savepath + '.csv', index=False) # use after verification
+            if verbose:
+                print(f"df2parse: {df2parse}")
+                print(f"df: {df}")
+            dfmean = builddfmean(df)
+            dfmean.to_csv(savepath + '_mean.csv', index=False)
+            if verbose:
+                print(f"frame has channel: {i}")
+                print(f"df: {df}")
+                print(f"df['sweep'].values[-1]: {df['sweep'].values[-1]}")
+        return df['sweep'].values[-1]
     
-    print(f"proj folder: {proj_folder}")
+    if verbose: print(f"proj folder: {proj_folder}")
     if row is not None:
         print(f"save_file_name: {row['save_file_name']}")
         print(f"path: {row['path']}")
@@ -172,7 +194,7 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
     
     # check for files in the folder.
     path_proj_folder = Path(proj_folder)
-    path_proj_folder.mkdir(exist_ok=True) # Try to make a folder, error if it exists
+    path_proj_folder.mkdir(exist_ok=True) # Try to make a folder
 
     #list_existingfiles = [
     #    i for i in path_proj_folder.iterdir() if -1 < i.find("_mean.csv")
@@ -191,10 +213,7 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
     
 
 # Path.is_dir to check if folder or file
-
     # start parsing the que
-        
-
     # show progress
 
 
@@ -203,7 +222,11 @@ if __name__ == "__main__":
     print("Placeholder: standalone test")
     proj_folder = Path("C:\\Users\\Mats\\Documents\\Brainwash Projects")
     #clearTemp(Path("C:\\Users\\Mats\\Documents\\Lactate 5 LTP\\DG"))
-    df = pd.DataFrame({"path": ["C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_13_P0629-S5\\LTP",
+    dffiles = pd.DataFrame({"path": ["C:\\Users\\Mats\\Documents\\Source\\2 channels"], "save_file_name": ["abf0722"]})
+    parseProjFiles(proj_folder=proj_folder, df=dffiles)
+
+"""    df = pd.DataFrame({"path": ["C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_13_P0629-S5\\LTP",
                                 "C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_21_P0701-S2\\LTP"],
                        "save_file_name": ["A13", "A21"]})
-    parseProjFiles(proj_folder=proj_folder, df=df)
+"""
+# %%
