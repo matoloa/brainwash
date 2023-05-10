@@ -20,4 +20,7 @@ dependencies:
   - black
   - isort
   - nose2
+  - python-neo
+  - pip:
+    - pyabf
 

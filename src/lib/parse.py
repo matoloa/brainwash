@@ -220,9 +220,9 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
 
 if __name__ == "__main__":
     print("Placeholder: standalone test")
-    proj_folder = Path("C:\\Users\\Mats\\Documents\\Brainwash Projects")
+    proj_folder = Path.home()/"Documents"#("/home/matolo/Documents")
     #clearTemp(Path("C:\\Users\\Mats\\Documents\\Lactate 5 LTP\\DG"))
-    dffiles = pd.DataFrame({"path": ["C:\\Users\\Mats\\Documents\\Source\\2 channels"], "save_file_name": ["abf0722"]})
+    dffiles = pd.DataFrame({"path": ["/home/matolo/Documents/Brainwash Data Source/Lactate_2022_abf"], "save_file_name": ["Lactate_2022"]})
     parseProjFiles(proj_folder=proj_folder, df=dffiles)
 
 """    df = pd.DataFrame({"path": ["C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_13_P0629-S5\\LTP",
