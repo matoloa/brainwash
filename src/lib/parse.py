@@ -218,15 +218,13 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
 
 
 
-if __name__ == "__main__":
-    print("Placeholder: standalone test")
-    proj_folder = Path.home()/"Documents"#("/home/matolo/Documents")
-    #clearTemp(Path("C:\\Users\\Mats\\Documents\\Lactate 5 LTP\\DG"))
-    dffiles = pd.DataFrame({"path": ["/home/matolo/Documents/Brainwash Data Source/Lactate_2022_abf"], "save_file_name": ["Lactate_2022"]})
+if __name__ == "__main__": #hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
+    standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 2 channel/KO_02"
+    standalone_test_output = "KO_02"
+    proj_folder = Path.home()/"Documents/Brainwash Projects/standalone_test"
+    print("Placeholder: standalone test, processing", standalone_test_source, "as save_file_name", standalone_test_output)
+    
+    dffiles = pd.DataFrame({"path": [standalone_test_source], "save_file_name": [standalone_test_output]})
     parseProjFiles(proj_folder=proj_folder, df=dffiles)
 
-"""    df = pd.DataFrame({"path": ["C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_13_P0629-S5\\LTP",
-                                "C:\\Users\\Mats\\Documents\\Source\\Longo Ventral.abf\\Males\\A_21_P0701-S2\\LTP"],
-                       "save_file_name": ["A13", "A21"]})
-"""
 # %%
