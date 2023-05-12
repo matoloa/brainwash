@@ -165,12 +165,18 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
             df2parse = importabf(filepath=Path(row.path))
         
         if verbose: print(f"df2parse['channel'].nunique(): {df2parse['channel'].nunique()}")
+
         for i in df2parse['channel'].unique():
-            # Create unique filename for current channel
-            save_file_name_channel = row.save_file_name + "_ch_" + str(i)
-            savepath = str(Path(proj_folder) / save_file_name_channel)
-            # save ONLY active channel as filename
-            df = df2parse[df2parse.channel==i]
+            # Create unique filename for current channel, if there are more than one
+            if(df2parse['channel'].nunique() == 1):
+                save_file_name = row.save_file_name
+                savepath = str(Path(proj_folder) / save_file_name)
+                df = df2parse
+            else:
+                save_file_name_channel = row.save_file_name + "_ch_" + str(i)
+                savepath = str(Path(proj_folder) / save_file_name_channel)
+                # save ONLY active channel as filename
+                df = df2parse[df2parse.channel==i]
             df.to_csv(savepath + '.csv', index=False)
             # df.drop(columns=["channel"]).to_csv(savepath + '.csv', index=False) # use after verification
             if verbose:
@@ -219,8 +225,12 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
 
 
 if __name__ == "__main__": #hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
-    standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 2 channel/KO_02"
-    standalone_test_output = "KO_02"
+    # Single channel .abf test
+    standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 1 channel/A_21_P0701-S2"
+    standalone_test_output = "A_21"
+    # dual channel .abf test
+    # standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 2 channel/KO_02"
+    # standalone_test_output = "KO_02"
     proj_folder = Path.home()/"Documents/Brainwash Projects/standalone_test"
     print("Placeholder: standalone test, processing", standalone_test_source, "as save_file_name", standalone_test_output)
     
