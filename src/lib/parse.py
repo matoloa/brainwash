@@ -151,10 +151,12 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
     receives a df of project data files built in ui
     checks for or creates project parsed files folder
     parses each file, that is not already parsed by name
-    optional: checks if file is already parsed by checksums
     saves parsed file into project parsed files folder
     get proj_folder from ui self.project_folder
+    returns a dict of channels, used by ui to split a single file with multiple channels
 
+    NTH: checks if file is already parsed by checksums
+    
     calls builddfmean to create an average, prim and bis file
     '''
     def parser(proj_folder, row):
@@ -165,7 +167,8 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
             df2parse = importabf(filepath=Path(row.path))
         
         if verbose: print(f"df2parse['channel'].nunique(): {df2parse['channel'].nunique()}")
-
+        
+        dict_channels = {}
         for i in df2parse['channel'].unique():
             # Create unique filename for current channel, if there are more than one
             if(df2parse['channel'].nunique() == 1):
@@ -184,11 +187,13 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
                 print(f"df: {df}")
             dfmean = builddfmean(df)
             dfmean.to_csv(savepath + '_mean.csv', index=False)
+            dict_channels[str(i)] = df['sweep'].values[-1]
             if verbose:
                 print(f"frame has channel: {i}")
                 print(f"df: {df}")
-                print(f"df['sweep'].values[-1]: {df['sweep'].values[-1]}")
-        return df['sweep'].values[-1]
+                print(f"dict_channels: {dict_channels}")
+        return dict_channels
+        # return df['sweep'].values[-1] # rendered obsolete by dict return for multi-channel recordings
     
     if verbose: print(f"proj folder: {proj_folder}")
     if row is not None:
@@ -210,13 +215,11 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
     # remove the found files from the parse que
     if row is not None:
         nSweeps = parser(proj_folder, row)
-        return {'nSweeps': nSweeps}
+        return nSweeps
 
     if df is not None:
         for i, row in df.iterrows():
             nSweeps = parser(proj_folder, row)
-
-    
 
 # Path.is_dir to check if folder or file
     # start parsing the que
@@ -226,11 +229,11 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
 
 if __name__ == "__main__": #hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
     # Single channel .abf test
-    standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 1 channel/A_21_P0701-S2"
-    standalone_test_output = "A_21"
+    # standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 1 channel/A_21_P0701-S2"
+    # standalone_test_output = "A_21"
     # dual channel .abf test
-    # standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 2 channel/KO_02"
-    # standalone_test_output = "KO_02"
+    standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 2 channel/KO_02"
+    standalone_test_output = "KO_02"
     proj_folder = Path.home()/"Documents/Brainwash Projects/standalone_test"
     print("Placeholder: standalone test, processing", standalone_test_source, "as save_file_name", standalone_test_output)
     

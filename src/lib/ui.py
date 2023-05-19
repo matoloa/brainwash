@@ -495,16 +495,33 @@ class UIsub(Ui_MainWindow):
     def pushedButtonParse(self):
         # parse non-parsed files and folders in self.projectdf
         if verbose: print("pushedButtonParse")
+        update_frame = self.projectdf.copy() # copy from which to remove rows without confusing index
+        frame2add = self.projectdf.iloc[0:0].copy() # new, empty df for adding rows for multi-channel readings, without messing with index
         for i, row in self.projectdf.iterrows():
-            if row['nSweeps'] == '...':
-                result = parse.parseProjFiles(self.projectfolder, row=row)
-                self.projectdf.loc[i, 'nSweeps'] = str(result['nSweeps'])
-                #self.tablemodel.setData(self.projectdf)
-                # TODO: force ui update with sweeps to get progress
-                print(f"profectdf: {self.projectdf}")
+            if row['nSweeps'] == '...': # indicates not read before
+                # check number of channels. If more than one, create new row for each new channel. Re-sort df after loop.
+                result = parse.parseProjFiles(self.projectfolder, row=row) # result is a dict of <channel>:<channel ID>
+                if len(result) > 1: # more than one channel; rename
+                    print(len(result), "channels found")
+                    for j in result:
+                        row2add = self.projectdf[self.projectdf.index==i].copy()
+                        row2add['save_file_name'] = row2add['save_file_name'] + "_ch_" + str(j)
+                        row2add['nSweeps'] = result[j]
+                        frame2add = pd.concat([row2add, frame2add]) # add new, separate channel rows
+                        update_frame = update_frame[update_frame.index!=i] # destroy original row in update_frame
+                    if verbose: print (f"frame2add:{frame2add}")
+                else: # just one channel - update nSweeps
+                    print (f"result:{result}")
+                    print (f"i:{i}")
+                    update_frame.loc[i, 'nSweeps'] = str(result['0'])
+                # TODO: NTH - new visual progress report (old one dysfunctional with index-preserving update_frame appraoch)
             else:
-                print(f"row['nSweeps']: {row['nSweeps']}")
+                print(i, "already exists: no action")
+
+        self.projectdf = pd.concat([update_frame, frame2add])
+        if verbose: print(f"update_frame: {update_frame}")
         self.save_dfproj()
+        self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
 
     def getdfProj(self):
         return self.projectdf
