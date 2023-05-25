@@ -199,6 +199,51 @@ class MplCanvas(FigureCanvasQTAgg):
 
 ########################################################################
 ##### section directly copied from output from pyuic, do not alter #####
+##### WARNING: changed parent class 'object' to 'QtCore.QObject'   #####
+########################################################################
+
+class Ui_measure_window(QtCore.QObject):
+    def setupUi(self, measure_window):
+        measure_window.setObjectName("measure_window")
+        measure_window.resize(800, 600)
+        measure_window.setFocusPolicy(QtCore.Qt.StrongFocus)
+        self.centralwidget = QtWidgets.QWidget(measure_window)
+        self.centralwidget.setObjectName("centralwidget")
+        self.verticalLayoutWidget = QtWidgets.QWidget(self.centralwidget)
+        self.verticalLayoutWidget.setGeometry(QtCore.QRect(0, 0, 801, 571))
+        self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
+        self.measure_verticalLayout = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
+        self.measure_verticalLayout.setContentsMargins(0, 0, 0, 0)
+        self.measure_verticalLayout.setObjectName("measure_verticalLayout")
+        self.measure_graph_mean = QtWidgets.QWidget(self.verticalLayoutWidget)
+        self.measure_graph_mean.setMinimumSize(QtCore.QSize(0, 100))
+        self.measure_graph_mean.setObjectName("measure_graph_mean")
+        self.measure_verticalLayout.addWidget(self.measure_graph_mean)
+        self.measure_info = QtWidgets.QTableView(self.verticalLayoutWidget)
+        self.measure_info.setObjectName("measure_info")
+        self.measure_verticalLayout.addWidget(self.measure_info)
+        self.measure_graph_output = QtWidgets.QWidget(self.verticalLayoutWidget)
+        self.measure_graph_output.setMinimumSize(QtCore.QSize(0, 100))
+        self.measure_graph_output.setObjectName("measure_graph_output")
+        self.measure_verticalLayout.addWidget(self.measure_graph_output)
+        self.measure_verticalLayout.setStretch(0, 4)
+        self.measure_verticalLayout.setStretch(1, 1)
+        self.measure_verticalLayout.setStretch(2, 2)
+        measure_window.setCentralWidget(self.centralwidget)
+        self.statusbar = QtWidgets.QStatusBar(measure_window)
+        self.statusbar.setObjectName("statusbar")
+        measure_window.setStatusBar(self.statusbar)
+
+        self.retranslateUi(measure_window)
+        QtCore.QMetaObject.connectSlotsByName(measure_window)
+
+    def retranslateUi(self, measure_window):
+        _translate = QtCore.QCoreApplication.translate
+        measure_window.setWindowTitle(_translate("measure_window", "placeholder_name_of_recording"))
+
+
+########################################################################
+##### section directly copied from output from pyuic, do not alter #####
 ##### trying to make all the rest work with it                     #####
 ##### WARNING: I was forced to change the parent class from        #####
 ##### 'object' to 'QtCore.QObject' for the pyqtSlot(list) to work  #####
@@ -335,8 +380,7 @@ class UIsub(Ui_MainWindow):
         self.setupUi(mainwindow)
         if verbose: print(' - UIsub init, verbose mode') # rename for clarity
 
-        # load cfg if present, create if not existing
-        paths = [Path.cwd()] + list(Path.cwd().parents)
+        # load cfg if preseunused] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find('brainwash')) & (str(i).find('src') == -1)][0] # path to brainwash directory
         self.cfg_yaml = self.repo_root / 'cfg.yaml'
         self.projectname = None
@@ -388,16 +432,17 @@ class UIsub(Ui_MainWindow):
         self.pushButtonOpenProject.pressed.connect(self.pushedButtonOpenProject)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
         self.pushButtonParse.pressed.connect(self.pushedButtonParse)
-#        self.pushButtonSelect.pressed.connect(self.pushedButtonSelect)
         #self.pushButtonSelect.pressed.connect(self.pushedButtonSelect)
 
         self.tableProj.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
         #self.tableProj.setSelectionMode(QTableView.SingleSelection)
 
+        self.tableProj.doubleClicked.connect(self.tableProjDoubleClicked)
+        
+
         selection_model = self.tableProj.selectionModel()
         #selection_model.selectionChanged.connect(lambda x: print(self.tablemodel.dataRow(x.indexes()[0])))
         selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
-
         #self.tablemodel.setData(self.projectdf)
         #self.tableProj.update()
 
@@ -417,8 +462,18 @@ class UIsub(Ui_MainWindow):
             yaml.safe_dump(cfg, file)
     
     
+    def tableProjDoubleClicked(self):#, single_index_range):
+        # TODO:
+        # Upon double click, open a new Ui_measure_window (if it's already open, focus on it)
+        # display the appropriate recording on its graphs: mean and output
+        # How to access index (from selection_model?) for opening the right recording?
+        # How to check for existing windows?
+        # Construct a sensible interface: drag-drop on measurement middle, start and finish points
+        # UI for toggling displayed measurement methods. Drag-drop forces Manual.
+        print("DOUBLE CLICK")# on single_index_range: {single_index_range.indexes()}")
+
+
     def tableProjSelectionChanged(self, single_index_range):
-        # TODO: handle list index out of range 
         print(f"single_index_range: {single_index_range.indexes()}")
         if 0 < len(single_index_range.indexes()):
             single_index = single_index_range.indexes()[0]
