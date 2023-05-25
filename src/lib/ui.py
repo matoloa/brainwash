@@ -381,6 +381,7 @@ class UIsub(Ui_MainWindow):
         if verbose: print(' - UIsub init, verbose mode') # rename for clarity
 
         # load cfg if preseunused] + list(Path.cwd().parents)
+        paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find('brainwash')) & (str(i).find('src') == -1)][0] # path to brainwash directory
         self.cfg_yaml = self.repo_root / 'cfg.yaml'
         self.projectname = None
@@ -465,12 +466,14 @@ class UIsub(Ui_MainWindow):
     def tableProjDoubleClicked(self):#, single_index_range):
         # TODO:
         # Upon double click, open a new Ui_measure_window (if it's already open, focus on it)
-        # display the appropriate recording on its graphs: mean and output
-        # How to access index (from selection_model?) for opening the right recording?
-        # How to check for existing windows?
-        # Construct a sensible interface: drag-drop on measurement middle, start and finish points
-        # UI for toggling displayed measurement methods. Drag-drop forces Manual.
-        print("DOUBLE CLICK")# on single_index_range: {single_index_range.indexes()}")
+        #   How to check for existing windows?
+        #   How to shift focus?
+        # Display the appropriate recording on the new window's graphs: mean and output
+        #   Construct a sensible interface: drag-drop on measurement middle, start and finish points
+        #   UI for toggling displayed measurement methods. Drag-drop forces Manual.
+        single_index = self.tableProj.selectionModel().selectedIndexes()[0]
+        table_row = self.tablemodel.dataRow(single_index)
+        if verbose: print("DOUBLE CLICK on", table_row[3])
 
 
     def tableProjSelectionChanged(self, single_index_range):
