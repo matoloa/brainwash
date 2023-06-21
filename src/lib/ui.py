@@ -456,9 +456,14 @@ class UIsub(Ui_MainWindow):
             yaml.safe_dump(cfg, file)
     
     
-    def tableProjDoubleClicked(self):#, single_index_range):
+    def tableProjDoubleClicked(self):
+        if verbose: print("DOUBLE CLICK")
+        self.launchMeasureWindow()
+
+
+    def launchMeasureWindow(self):#, single_index_range):
         # TODO:
-        # Upon double click, open a new Ui_measure_window (if it's already open, focus on it)
+        # Open a new Ui_measure_window (if it's already open, focus on it)
         #   How to check for existing windows?
         #   How to shift focus?
         # Display the appropriate recording on the new window's graphs: mean and output
@@ -466,12 +471,14 @@ class UIsub(Ui_MainWindow):
         #   UI for toggling displayed measurement methods. Drag-drop forces Manual.
         single_index = self.tableProj.selectionModel().selectedIndexes()[0]
         table_row = self.tablemodel.dataRow(single_index)
-        if verbose: print("DOUBLE CLICK on", table_row[3])
+        if verbose: print("launchMeasureWindow", table_row[3])
        
         # Open window
         self.measure = QtWidgets.QDialog()
         self.measure_window_sub = Measure_window_sub(self.measure)
+        self.measure.setWindowTitle(table_row[3])
         self.measure.show()
+        self.measure_window_sub.setMeasureGraph(table_row[3], self.dfmean)
 
 
     def tableProjSelectionChanged(self, single_index_range):
@@ -622,7 +629,7 @@ class UIsub(Ui_MainWindow):
         try:
             dfmean = pd.read_csv(dfmean_path) # import csv
         except FileNotFoundError:
-            print('did not find _mean.csv to load. probably not imported')
+            print('did not find _mean.csv to load. Not imported?')
         print(dfmean)
         # dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
         self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
@@ -630,9 +637,13 @@ class UIsub(Ui_MainWindow):
         dfmean['voltage'] = dfmean.voltage / dfmean.voltage.abs().max()
         dfmean['prim'] = dfmean.prim / dfmean.prim.abs().max()
         dfmean['bis'] = dfmean.bis / dfmean.bis.abs().max()
+        
         g = sns.lineplot(data=dfmean, y="voltage", x="index", ax=self.canvas_seaborn.axes, color="black")
         h = sns.lineplot(data=dfmean, y="prim", x="index", ax=self.canvas_seaborn.axes, color="red")
         i = sns.lineplot(data=dfmean, y="bis", x="index", ax=self.canvas_seaborn.axes, color="green")
+        
+        self.dfmean = dfmean # assign to self to make available for launchMeasureWindow()
+
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
 
@@ -783,67 +794,20 @@ class Measure_window_sub(Ui_measure_window):
         self.setupUi(measure_window)
         self.parent = parent
         if verbose: print(' - measure_window init')
-'''    
-        self.ftree = self.widget
-        # set root_path for file tree model
-        self.ftree.delayedInitForRootPath(folder)
-        #self.ftree.model.parent_index   = self.ftree.model.setRootPath(projects_folder)
-        #self.ftree.model.root_index     = self.ftree.model.index(projects_folder)
-
-        # Dataframe to add
-        self.names = []
-        self.dfAdd = pd.DataFrame()
-        
-        self.buttonBoxAddGroup = QtWidgets.QDialogButtonBox(dialog)
-        self.buttonBoxAddGroup.setGeometry(QtCore.QRect(470, 20, 91, 491))
-        self.buttonBoxAddGroup.setLayoutDirection(QtCore.Qt.LeftToRight)
-        self.buttonBoxAddGroup.setOrientation(QtCore.Qt.Vertical)
-        self.buttonBoxAddGroup.setStandardButtons(QtWidgets.QDialogButtonBox.NoButton)
-        self.buttonBoxAddGroup.setObjectName("buttonBoxAddGroup")
-        
-        # Manually added (unconnected) default group buttons - eventually, these must be populated from project.brainwash group names
-        self.buttonBoxAddGroup.groupcontrol = QtWidgets.QPushButton(self.tr("&Control"))
-        self.buttonBoxAddGroup.groupintervention = QtWidgets.QPushButton(self.tr("&Intervention"))
-        self.buttonBoxAddGroup.newGroup = QtWidgets.QPushButton(self.tr("&New group"))
-        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.groupcontrol, QtWidgets.QDialogButtonBox.ActionRole)
-        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.groupintervention, QtWidgets.QDialogButtonBox.ActionRole)
-        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.newGroup, QtWidgets.QDialogButtonBox.ActionRole)
-
-        self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
-        self.ftree.model.paths_selected.connect(self.pathsSelectedUpdateTable)
-        self.buttonBox.accepted.connect(self.addDf)
-
-        self.tablemodel = TableModel(self.dfAdd)
-        self.tableView.setModel(self.tablemodel)
 
 
-    def addDf(self):
-        self.parent.slotAddDfData(self.dfAdd)
-        
-    
-    def pathsSelectedUpdateTable(self, paths):
-        # TODO: Extract host, checksum, group
-        if verbose: print('pathsSelectedUpdateTable')
-        dfAdd = pd.DataFrame({"host": 'computer 1', "path": paths, 'checksum': 'big number', 'save_file_name': paths, 'group': None})
-        self.tablemodel.setData(dfAdd)
-        # NTH: more intelligent default naming; lowest level unique name?
-        # For now, use name + lowest level folder
-        names = []
-        for i in paths:
-            names.append(os.path.basename(os.path.dirname(i)) + '_' + os.path.basename(i))
-        dfAdd['save_file_name'] = names
-        self.dfAdd = dfAdd
-        # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
-        # TODO: names that have been set manually are stored a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)
-        # format tableView
-        header = self.tableView.horizontalHeader()
-        self.tableView.setColumnHidden(0, True) #host
-        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents) #path
-        self.tableView.setColumnHidden(2, True) #checksum
-        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents) #name
-        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents) #group
-        self.tableView.update()
-'''
+    def setMeasureGraph(self, save_file_name, dfmean):
+        # get dfmean from selected row in UIsub.
+        # dipslay SELECTED from tableProj at measurewindow
+        if verbose: print('setGraph', dfmean)
+        self.canvas_seaborn = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
+
+        g = sns.lineplot(data=dfmean, y="voltage", x="index", ax=self.canvas_seaborn.axes, color="black")
+        h = sns.lineplot(data=dfmean, y="prim", x="index", ax=self.canvas_seaborn.axes, color="red")
+        i = sns.lineplot(data=dfmean, y="bis", x="index", ax=self.canvas_seaborn.axes, color="green")
+        self.canvas_seaborn.draw()
+        self.canvas_seaborn.show()
+
 
 def get_signals(source):
         cls = source if isinstance(source, type) else type(source)
