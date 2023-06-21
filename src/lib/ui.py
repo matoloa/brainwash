@@ -203,14 +203,11 @@ class MplCanvas(FigureCanvasQTAgg):
 ########################################################################
 
 class Ui_measure_window(QtCore.QObject):
-    def setupUi(self, measure_window):
-        measure_window.setObjectName("measure_window")
-        measure_window.resize(800, 600)
-        measure_window.setFocusPolicy(QtCore.Qt.StrongFocus)
-        self.centralwidget = QtWidgets.QWidget(measure_window)
-        self.centralwidget.setObjectName("centralwidget")
-        self.verticalLayoutWidget = QtWidgets.QWidget(self.centralwidget)
-        self.verticalLayoutWidget.setGeometry(QtCore.QRect(0, 0, 801, 571))
+    def setupUi(self, measure):
+        measure.setObjectName("measure")
+        measure.resize(820, 588)
+        self.verticalLayoutWidget = QtWidgets.QWidget(measure)
+        self.verticalLayoutWidget.setGeometry(QtCore.QRect(10, 10, 801, 571))
         self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
         self.measure_verticalLayout = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
         self.measure_verticalLayout.setContentsMargins(0, 0, 0, 0)
@@ -229,18 +226,14 @@ class Ui_measure_window(QtCore.QObject):
         self.measure_verticalLayout.setStretch(0, 4)
         self.measure_verticalLayout.setStretch(1, 1)
         self.measure_verticalLayout.setStretch(2, 2)
-        measure_window.setCentralWidget(self.centralwidget)
-        self.statusbar = QtWidgets.QStatusBar(measure_window)
-        self.statusbar.setObjectName("statusbar")
-        measure_window.setStatusBar(self.statusbar)
 
-        self.retranslateUi(measure_window)
-        QtCore.QMetaObject.connectSlotsByName(measure_window)
+        self.retranslateUi(measure)
+        QtCore.QMetaObject.connectSlotsByName(measure)
 
-    def retranslateUi(self, measure_window):
+    def retranslateUi(self, measure):
         _translate = QtCore.QCoreApplication.translate
-        measure_window.setWindowTitle(_translate("measure_window", "placeholder_name_of_recording"))
-
+        measure.setWindowTitle(_translate("measure", "Placeholder Window Title"))
+    
 
 ########################################################################
 ##### section directly copied from output from pyuic, do not alter #####
@@ -474,6 +467,11 @@ class UIsub(Ui_MainWindow):
         single_index = self.tableProj.selectionModel().selectedIndexes()[0]
         table_row = self.tablemodel.dataRow(single_index)
         if verbose: print("DOUBLE CLICK on", table_row[3])
+       
+        # Open window
+        self.measure = QtWidgets.QDialog()
+        self.measure_window_sub = Measure_window_sub(self.measure)
+        self.measure.show()
 
 
     def tableProjSelectionChanged(self, single_index_range):
@@ -778,6 +776,74 @@ class Filetreesub(Ui_Dialog):
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents) #group
         self.tableView.update()
 
+
+class Measure_window_sub(Ui_measure_window):
+    def __init__(self, measure_window, parent=None, folder='.'):
+        super(Measure_window_sub, self).__init__()
+        self.setupUi(measure_window)
+        self.parent = parent
+        if verbose: print(' - measure_window init')
+'''    
+        self.ftree = self.widget
+        # set root_path for file tree model
+        self.ftree.delayedInitForRootPath(folder)
+        #self.ftree.model.parent_index   = self.ftree.model.setRootPath(projects_folder)
+        #self.ftree.model.root_index     = self.ftree.model.index(projects_folder)
+
+        # Dataframe to add
+        self.names = []
+        self.dfAdd = pd.DataFrame()
+        
+        self.buttonBoxAddGroup = QtWidgets.QDialogButtonBox(dialog)
+        self.buttonBoxAddGroup.setGeometry(QtCore.QRect(470, 20, 91, 491))
+        self.buttonBoxAddGroup.setLayoutDirection(QtCore.Qt.LeftToRight)
+        self.buttonBoxAddGroup.setOrientation(QtCore.Qt.Vertical)
+        self.buttonBoxAddGroup.setStandardButtons(QtWidgets.QDialogButtonBox.NoButton)
+        self.buttonBoxAddGroup.setObjectName("buttonBoxAddGroup")
+        
+        # Manually added (unconnected) default group buttons - eventually, these must be populated from project.brainwash group names
+        self.buttonBoxAddGroup.groupcontrol = QtWidgets.QPushButton(self.tr("&Control"))
+        self.buttonBoxAddGroup.groupintervention = QtWidgets.QPushButton(self.tr("&Intervention"))
+        self.buttonBoxAddGroup.newGroup = QtWidgets.QPushButton(self.tr("&New group"))
+        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.groupcontrol, QtWidgets.QDialogButtonBox.ActionRole)
+        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.groupintervention, QtWidgets.QDialogButtonBox.ActionRole)
+        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.newGroup, QtWidgets.QDialogButtonBox.ActionRole)
+
+        self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
+        self.ftree.model.paths_selected.connect(self.pathsSelectedUpdateTable)
+        self.buttonBox.accepted.connect(self.addDf)
+
+        self.tablemodel = TableModel(self.dfAdd)
+        self.tableView.setModel(self.tablemodel)
+
+
+    def addDf(self):
+        self.parent.slotAddDfData(self.dfAdd)
+        
+    
+    def pathsSelectedUpdateTable(self, paths):
+        # TODO: Extract host, checksum, group
+        if verbose: print('pathsSelectedUpdateTable')
+        dfAdd = pd.DataFrame({"host": 'computer 1', "path": paths, 'checksum': 'big number', 'save_file_name': paths, 'group': None})
+        self.tablemodel.setData(dfAdd)
+        # NTH: more intelligent default naming; lowest level unique name?
+        # For now, use name + lowest level folder
+        names = []
+        for i in paths:
+            names.append(os.path.basename(os.path.dirname(i)) + '_' + os.path.basename(i))
+        dfAdd['save_file_name'] = names
+        self.dfAdd = dfAdd
+        # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
+        # TODO: names that have been set manually are stored a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)
+        # format tableView
+        header = self.tableView.horizontalHeader()
+        self.tableView.setColumnHidden(0, True) #host
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents) #path
+        self.tableView.setColumnHidden(2, True) #checksum
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents) #name
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents) #group
+        self.tableView.update()
+'''
 
 def get_signals(source):
         cls = source if isinstance(source, type) else type(source)
