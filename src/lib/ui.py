@@ -18,6 +18,7 @@ from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
 import parse
+import analysis
 
 verbose = True
 
@@ -480,6 +481,9 @@ class UIsub(Ui_MainWindow):
         self.measure.show()
         self.measure_window_sub.setMeasureGraph(table_row[3], self.dfmean)
 
+        # Test analysis.py
+        print(f"find_t_stim_prim_max(self.dfmean): {analysis.find_t_stim_prim_max(self.dfmean)}")
+
 
     def tableProjSelectionChanged(self, single_index_range):
         print(f"single_index_range: {single_index_range.indexes()}")
@@ -489,15 +493,15 @@ class UIsub(Ui_MainWindow):
             table_row = self.tablemodel.dataRow(single_index)
             print(table_row)
             self.setGraph(table_row[3]) # Passing along save_file_name
-    
-    
+
+
     def pushedButtonRenameProject(self):
         if verbose: print("pushedButtonRenameProject")
         self.inputProjectName.setReadOnly(False)
         self.inputProjectName.editingFinished.connect(self.renameProject)
         # renameProject
-        
-    
+
+
     def renameProject(self):
         # make if not existing
         self.projectfolder.mkdir(exist_ok=True)
