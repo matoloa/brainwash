@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt  # plotting
 import seaborn as sns  # plotting
 import pyabf  # read data files atf, abf
 from neo import io  # read data files ibw
-import scipy  # peakfinder and other useful analysis tools
+# import scipy  # peakfinder and other useful analysis tools
 from tqdm.notebook import tqdm
 from pathlib import Path
 from sklearn import linear_model
@@ -51,8 +51,10 @@ def importabf(filepath):
 
     channels = range(abf.channelCount)
     sweeps = range(abf.sweepCount)
+    sampling_Hz = abf.sampleRate
     if verbose: print(f"abf.channelCount: {channels}")
     if verbose: print(f"abf.sweepCount): {sweeps}")
+    if verbose: print(f"abf.sampleRate): {sampling_Hz}")
     dfs = []
     for j in channels:
         for i in sweeps:
@@ -68,8 +70,8 @@ def importabf(filepath):
     df["sweep"] = df.sweep_raw  # relevant for single file imports
 
     # Convert to SI
-    df["time"] = df.sweepX  # / abf.sampleRate
-    df["voltage"] = df.sweepY / 1000
+    df["time"] = df.sweepX  # time in seconds from start of sweep recording
+    df["voltage"] = df.sweepY / 1000 # mv to V
 
     # Absolute date and time
     df["timens"] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
@@ -93,10 +95,10 @@ def importabf(filepath):
     df.reset_index(drop=True, inplace=True)
     """
 
-    # Create and return one df per channel
     df.drop(columns=["sweepX", "sweepY", "timens"], inplace=True)
 
     return df
+
 
 # %%
 def importabffolder(folderpath):
@@ -186,7 +188,7 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
                 print(f"df2parse: {df2parse}")
                 print(f"df: {df}")
             dfmean = builddfmean(df)
-            dfmean.to_csv(savepath + '_mean.csv', index=False)
+            dfmean.reset_index().to_csv(savepath + '_mean.csv', index=False)
             dict_channels[str(i)] = df['sweep'].values[-1]
             if verbose:
                 print(f"frame has channel: {i}")

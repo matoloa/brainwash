@@ -27,23 +27,30 @@ def find_t_EPSP_peak_max(
     dfmean,
     limitleft=0,
     limitright=-1,
-    param_minimum_width_of_EPSP=2,
-    param_EPSP_prominence=0.00005,
+    param_EPSP_minimum_width_ms=50, # width in ms
+    param_EPSP_minimum_prominence_mV=0.01, # in WHAT TODO: find out!
 ):
     """
     width and limits in index, promincence in Volt
     returns index of center of broadest negative peak on dfmean
     """
-    i_peaks = scipy.signal.find_peaks(
+    print(f"dfmean.time:{dfmean.time}")
+    time_delta = dfmean.time[1] - dfmean.time[0]
+    sampling_Hz = 1 / time_delta
+    print(f"sampling_Hz:{sampling_Hz}")
+    i_peaks, properties = scipy.signal.find_peaks(
         -dfmean["voltage"],
-        width=param_minimum_width_of_EPSP,
-        prominence=param_EPSP_prominence,
-    )[0]
+        width=param_EPSP_minimum_width_ms * 1000 / sampling_Hz,
+        prominence=param_EPSP_minimum_prominence_mV / 1000,
+    )
+    print(f"i_peaks:{i_peaks}")
+    print(f"properties:{properties}")
     # scipy.signal.find_peaks returns a tuple
     dfpeaks = dfmean.iloc[i_peaks]
     # dfpeaks = pd.DataFrame(peaks[0]) # Convert to dataframe in order to select only > limitleft
     dfpeaks = dfpeaks[limitleft < dfpeaks.index]
-    t_EPSP = dfpeaks.index.max()
+    print(f"dfpeaks:{dfpeaks}")
+    t_EPSP = i_peaks[properties["prominences"].argmax()]
 
     return t_EPSP
 
@@ -116,25 +123,32 @@ def find_t_volleyslope(
     return t_volleyslope[0]
 
 
-def find_ts(df, param_min_time_from_t_Stim=0.0005):
+def find_ts(dfmean, param_min_time_from_t_Stim=0.0005, verbose=False):
     """
     runs all t-detections in the appropriate sequence,
     returns time of center for volley EPSP slopes
         as identified by positive zero-crossings in the second order derivative
         if several are found, it returns the latest one
     The function finds VEB, but does not currently report it
+    """
+    
+    t_Stim = find_t_stim_prim_max(dfmean)
+    if verbose: print(f"t_Stim:{t_Stim}")
 
-    dfmean = builddfmean(df)
-    t_Stim = findstim(dfmean)
-    t_EPSP = findEPSP(dfmean)
-    t_VEB, max_acceptable_t_for_VEB = findVEB(dfmean, t_EPSP)
+    t_EPSP = find_t_EPSP_peak_max(dfmean)
+    print(f"t_EPSP:{t_EPSP}")
+    """
+    t_VEB, max_acceptable_t_for_VEB = find_t_VEB_peak_max(dfmean, t_EPSP)
     t_EPSPslope = find_t_EPSPslope(dfmean, t_VEB, t_EPSP, happy=True)
     t_volleyslope = find_t_volleyslope(
         dfmean, (t_Stim + param_min_time_from_t_Stim), t_VEB, happy=True
     )
-
-    return t_volleyslope, t_EPSPslope, dfmean
+    print(f"t_VEB:{t_VEB}")
+    print(f"max_acceptable_t_for_VEB:{max_acceptable_t_for_VEB}")
+    print(f"t_EPSPslope:{t_EPSPslope}")
+    print(f"t_volleyslope:{t_volleyslope}")
     """
+    return t_Stim #t_volleyslope, t_EPSPslope
 
 
 def measureslope(df, t_slope, halfwidth, name="EPSP"):

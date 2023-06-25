@@ -482,7 +482,9 @@ class UIsub(Ui_MainWindow):
         self.measure_window_sub.setMeasureGraph(table_row[3], self.dfmean)
 
         # Test analysis.py
-        print(f"find_t_stim_prim_max(self.dfmean): {analysis.find_t_stim_prim_max(self.dfmean)}")
+        print(f"find_ts return: {analysis.find_ts(self.dfmean, verbose=verbose)}")
+        #print(f"find_t_stim_prim_max(self.dfmean): {analysis.find_t_stim_prim_max(self.dfmean)}")
+
 
 
     def tableProjSelectionChanged(self, single_index_range):
@@ -634,17 +636,18 @@ class UIsub(Ui_MainWindow):
             dfmean = pd.read_csv(dfmean_path) # import csv
         except FileNotFoundError:
             print('did not find _mean.csv to load. Not imported?')
-        print(dfmean)
+        print("*** *** *** dfmean PRE reset_index:", dfmean)
         # dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
         self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
-        dfmean.reset_index(inplace=True)
+        dfmean.reset_index(inplace=True, drop=True)
+        print("*** *** *** dfmean POST reset_index:", dfmean)
         dfmean['voltage'] = dfmean.voltage / dfmean.voltage.abs().max()
         dfmean['prim'] = dfmean.prim / dfmean.prim.abs().max()
         dfmean['bis'] = dfmean.bis / dfmean.bis.abs().max()
         
-        g = sns.lineplot(data=dfmean, y="voltage", x="index", ax=self.canvas_seaborn.axes, color="black")
-        h = sns.lineplot(data=dfmean, y="prim", x="index", ax=self.canvas_seaborn.axes, color="red")
-        i = sns.lineplot(data=dfmean, y="bis", x="index", ax=self.canvas_seaborn.axes, color="green")
+        g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+        h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
+        i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
         
         self.dfmean = dfmean # assign to self to make available for launchMeasureWindow()
 
@@ -806,9 +809,9 @@ class Measure_window_sub(Ui_measure_window):
         if verbose: print('setGraph', dfmean)
         self.canvas_seaborn = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
 
-        g = sns.lineplot(data=dfmean, y="voltage", x="index", ax=self.canvas_seaborn.axes, color="black")
-        h = sns.lineplot(data=dfmean, y="prim", x="index", ax=self.canvas_seaborn.axes, color="red")
-        i = sns.lineplot(data=dfmean, y="bis", x="index", ax=self.canvas_seaborn.axes, color="green")
+        g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+        h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
+        i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
 
