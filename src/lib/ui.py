@@ -206,27 +206,30 @@ class MplCanvas(FigureCanvasQTAgg):
 class Ui_measure_window(QtCore.QObject):
     def setupUi(self, measure):
         measure.setObjectName("measure")
-        measure.resize(820, 588)
-        self.verticalLayoutWidget = QtWidgets.QWidget(measure)
-        self.verticalLayoutWidget.setGeometry(QtCore.QRect(10, 10, 801, 571))
-        self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
-        self.measure_verticalLayout = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
-        self.measure_verticalLayout.setContentsMargins(0, 0, 0, 0)
+        measure.resize(502, 992)
+        self.verticalLayout = QtWidgets.QVBoxLayout(measure)
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.measure_verticalLayout = QtWidgets.QVBoxLayout()
+        self.measure_verticalLayout.setSizeConstraint(QtWidgets.QLayout.SetNoConstraint)
         self.measure_verticalLayout.setObjectName("measure_verticalLayout")
-        self.measure_graph_mean = QtWidgets.QWidget(self.verticalLayoutWidget)
-        self.measure_graph_mean.setMinimumSize(QtCore.QSize(0, 100))
+        self.measure_graph_mean = QtWidgets.QWidget(measure)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.measure_graph_mean.sizePolicy().hasHeightForWidth())
+        self.measure_graph_mean.setSizePolicy(sizePolicy)
         self.measure_graph_mean.setObjectName("measure_graph_mean")
         self.measure_verticalLayout.addWidget(self.measure_graph_mean)
-        self.measure_info = QtWidgets.QTableView(self.verticalLayoutWidget)
+        self.measure_info = QtWidgets.QTableView(measure)
         self.measure_info.setObjectName("measure_info")
         self.measure_verticalLayout.addWidget(self.measure_info)
-        self.measure_graph_output = QtWidgets.QWidget(self.verticalLayoutWidget)
-        self.measure_graph_output.setMinimumSize(QtCore.QSize(0, 100))
+        self.measure_graph_output = QtWidgets.QWidget(measure)
         self.measure_graph_output.setObjectName("measure_graph_output")
         self.measure_verticalLayout.addWidget(self.measure_graph_output)
         self.measure_verticalLayout.setStretch(0, 4)
         self.measure_verticalLayout.setStretch(1, 1)
-        self.measure_verticalLayout.setStretch(2, 2)
+        self.measure_verticalLayout.setStretch(2, 4)
+        self.verticalLayout.addLayout(self.measure_verticalLayout)
 
         self.retranslateUi(measure)
         QtCore.QMetaObject.connectSlotsByName(measure)
@@ -482,9 +485,7 @@ class UIsub(Ui_MainWindow):
         self.measure_window_sub.setMeasureGraph(table_row[3], self.dfmean)
 
         # Test analysis.py
-        print(f"find_ts return: {analysis.find_ts(self.dfmean, verbose=verbose)}")
-        #print(f"find_t_stim_prim_max(self.dfmean): {analysis.find_t_stim_prim_max(self.dfmean)}")
-
+        print(f"find_all_i return: {analysis.find_all_i(self.dfmean, verbose=verbose)}")
 
 
     def tableProjSelectionChanged(self, single_index_range):

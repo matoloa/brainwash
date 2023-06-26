@@ -6,48 +6,38 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>820</width>
-    <height>588</height>
+    <width>502</width>
+    <height>992</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Placeholder Window Title</string>
   </property>
-  <widget class="QWidget" name="verticalLayoutWidget">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>10</y>
-     <width>801</width>
-     <height>571</height>
-    </rect>
-   </property>
-   <layout class="QVBoxLayout" name="measure_verticalLayout" stretch="4,1,2">
-    <item>
-     <widget class="QWidget" name="measure_graph_mean" native="true">
-      <property name="minimumSize">
-       <size>
-        <width>0</width>
-        <height>100</height>
-       </size>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QTableView" name="measure_info"/>
-    </item>
-    <item>
-     <widget class="QWidget" name="measure_graph_output" native="true">
-      <property name="minimumSize">
-       <size>
-        <width>0</width>
-        <height>100</height>
-       </size>
-      </property>
-     </widget>
-    </item>
-   </layout>
-  </widget>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <layout class="QVBoxLayout" name="measure_verticalLayout" stretch="4,1,4">
+     <property name="sizeConstraint">
+      <enum>QLayout::SetNoConstraint</enum>
+     </property>
+     <item>
+      <widget class="QWidget" name="measure_graph_mean" native="true">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QTableView" name="measure_info"/>
+     </item>
+     <item>
+      <widget class="QWidget" name="measure_graph_output" native="true"/>
+     </item>
+    </layout>
+   </item>
+  </layout>
  </widget>
  <resources/>
  <connections/>
