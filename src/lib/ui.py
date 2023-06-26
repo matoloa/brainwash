@@ -6,6 +6,7 @@ from tkinter import dialog
 import yaml
 
 import matplotlib
+import matplotlib.pyplot as plt
 import seaborn as sns
 
 matplotlib.use('Qt5Agg')
@@ -639,7 +640,7 @@ class UIsub(Ui_MainWindow):
             print('did not find _mean.csv to load. Not imported?')
         print("*** *** *** dfmean PRE reset_index:", dfmean)
         # dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
-        self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
+        self.canvas_seaborn = MplCanvas(parent=self.graphMean) # instantiate canvas
         dfmean.reset_index(inplace=True, drop=True)
         print("*** *** *** dfmean POST reset_index:", dfmean)
         dfmean['voltage'] = dfmean.voltage / dfmean.voltage.abs().max()
@@ -810,9 +811,19 @@ class Measure_window_sub(Ui_measure_window):
         if verbose: print('setGraph', dfmean)
         self.canvas_seaborn = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
 
+        # fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
         g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
         h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
         i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
+        h.axhline(0, linestyle="dotted")
+        #plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+#        if not title is None:
+#            ax1.set_title(title)
+        self.canvas_seaborn.axes.set_ylim(-0.05, 0.01)
+        self.canvas_seaborn.axes.set_xlim(0.006, 0.02)
+#       self.canvas_seaborn.axes.set_xmargin((100,500))
+#        if not t_VEB is None:
+            #h.axvline(i_VEB, color="orange")
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
 
