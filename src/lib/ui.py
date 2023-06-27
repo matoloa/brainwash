@@ -407,7 +407,14 @@ class UIsub(Ui_MainWindow):
         if not os.path.exists(self.projects_folder):
             os.makedirs(self.projects_folder)
         
-        self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
+        self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 't_stim',
+                                               't_stim', 't_stim_method', 't_stim_params',
+                                                't_VEB', 't_VEB_method', 't_VEB_params',
+                                                't_volley_amp', 't_volley_amp_method', 't_volley_amp_params',
+                                                't_volley_slope', 't_volley_slope_method', 't_volley_slope_params',
+                                                't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params',
+                                                't_EPSP_slope', 't_EPSP_slope_method', 't_EPSP_slope_params',
+                                                'exclude', 'comment'])
         self.tablemodel = TableModel(self.projectdf)
         self.tableProj.setModel(self.tablemodel)
 
@@ -415,7 +422,14 @@ class UIsub(Ui_MainWindow):
             self.load_dfproj()
         else:
             self.projectname = "My Project"
-            self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 'measurements', 'exclude', 'comment'])
+            self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 't_stim',
+                                               't_stim', 't_stim_method', 't_stim_params',
+                                                't_VEB', 't_VEB_method', 't_VEB_params',
+                                                't_volley_amp', 't_volley_amp_method', 't_volley_amp_params',
+                                                't_volley_slope', 't_volley_slope_method', 't_volley_slope_params',
+                                                't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params',
+                                                't_EPSP_slope', 't_EPSP_slope_method', 't_EPSP_slope_params',
+                                                'exclude', 'comment'])
 
 
         # show dfProj in tableProj
@@ -474,6 +488,11 @@ class UIsub(Ui_MainWindow):
         # Display the appropriate recording on the new window's graphs: mean and output
         #   Construct a sensible interface: drag-drop on measurement middle, start and finish points
         #   UI for toggling displayed measurement methods. Drag-drop forces Manual.
+
+        """
+        table_row should already have t_ values; otherwise do not attempt to draw them
+        """
+
         single_index = self.tableProj.selectionModel().selectedIndexes()[0]
         table_row = self.tablemodel.dataRow(single_index)
         if verbose: print("launchMeasureWindow", table_row[3])
@@ -698,9 +717,26 @@ class UIsub(Ui_MainWindow):
         self.tableProj.setColumnHidden(6, True) #timestamp (of parsing)
         self.tableProj.setColumnHidden(7, False) #nSweeps
         header.setSectionResizeMode(7, QtWidgets.QHeaderView.ResizeToContents)
-        self.tableProj.setColumnHidden(8, True) #measurements
-        self.tableProj.setColumnHidden(9, True) #exclude
-        self.tableProj.setColumnHidden(10, True) #comments
+        self.tableProj.setColumnHidden(8, True) #t_stim
+        self.tableProj.setColumnHidden(9, True) #t_stim_method
+        self.tableProj.setColumnHidden(10, True) #t_stim_params
+        self.tableProj.setColumnHidden(11, True) #t_VEB
+        self.tableProj.setColumnHidden(12, True) #t_VEB_method
+        self.tableProj.setColumnHidden(13, True) #t_VEB_params
+        self.tableProj.setColumnHidden(14, True) #t_volley_amp
+        self.tableProj.setColumnHidden(15, True) #t_volley_amp_method
+        self.tableProj.setColumnHidden(16, True) #t_volley_amp_params
+        self.tableProj.setColumnHidden(17, True) #t_volley_slope
+        self.tableProj.setColumnHidden(18, True) #t_volley_slope_method
+        self.tableProj.setColumnHidden(19, True) #t_volley_slope_params
+        self.tableProj.setColumnHidden(20, True) #t_EPSP_amp
+        self.tableProj.setColumnHidden(21, True) #t_EPSP_amp_method
+        self.tableProj.setColumnHidden(22, True) #t_EPSP_amp_params
+        self.tableProj.setColumnHidden(23, True) #t_EPSP_slope
+        self.tableProj.setColumnHidden(24, True) #t_EPSP_slope_method
+        self.tableProj.setColumnHidden(25, True) #t_EPSP_slope_params
+        self.tableProj.setColumnHidden(26, True) #exclude
+        self.tableProj.setColumnHidden(27, True) #comments
 
 
     def addData(self, dfAdd): # concatenate dataframes of old and new data
@@ -821,6 +857,10 @@ class Measure_window_sub(Ui_measure_window):
 #            ax1.set_title(title)
         self.canvas_seaborn.axes.set_ylim(-0.05, 0.01)
         self.canvas_seaborn.axes.set_xlim(0.006, 0.02)
+        
+        # TODO: this is a placeholder command, later intended to mark the measurements (t_EPSP_amp etc.) in tableproj
+        sns.scatterplot(data=pd.DataFrame({"x":[0.012], "y":[-0.01]}), x="x", y="y", ax=self.canvas_seaborn.axes, marker="x", color="blue", s=500)
+
 #       self.canvas_seaborn.axes.set_xmargin((100,500))
 #        if not t_VEB is None:
             #h.axvline(i_VEB, color="orange")
