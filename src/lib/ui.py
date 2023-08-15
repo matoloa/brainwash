@@ -495,17 +495,26 @@ class UIsub(Ui_MainWindow):
 
         single_index = self.tableProj.selectionModel().selectedIndexes()[0]
         table_row = self.tablemodel.dataRow(single_index)
-        if verbose: print("launchMeasureWindow", table_row[3])
-       
-        # Open window
-        self.measure = QtWidgets.QDialog()
-        self.measure_window_sub = Measure_window_sub(self.measure)
-        self.measure.setWindowTitle(table_row[3])
-        self.measure.show()
-        self.measure_window_sub.setMeasureGraph(table_row[3], self.dfmean)
+        irow = table_row[3]
+        if verbose: print("launchMeasureWindow", irow)
 
         # Test analysis.py
         print(f"find_all_i return: {analysis.find_all_i(self.dfmean, verbose=verbose)}")
+        all_i = analysis.find_all_i(self.dfmean, verbose=verbose)
+        
+
+        # TODO: NB! code currently uses i_EPSP (AMPLITUDE INDEX) like i_EPSP_slope (SLOPE INDEX)
+        # This is incorrect and ethically wrong. FIX FIRST!
+        self.projectdf.loc[irow, "i_EPSP_slope"] = all_i["i_EPSP"]
+        print(f"projectdf: {self.projectdf}")
+
+        # Open window
+        self.measure = QtWidgets.QDialog()
+        self.measure_window_sub = Measure_window_sub(self.measure)
+        self.measure.setWindowTitle(irow)
+        self.measure.show()
+        i_EPSP_slope = self.projectdf.loc[irow, "i_EPSP_slope"]
+        self.measure_window_sub.setMeasureGraph(irow, self.dfmean, i_EPSP_slope)
 
 
     def tableProjSelectionChanged(self, single_index_range):
@@ -841,9 +850,9 @@ class Measure_window_sub(Ui_measure_window):
         if verbose: print(' - measure_window init')
 
 
-    def setMeasureGraph(self, save_file_name, dfmean):
+    def setMeasureGraph(self, save_file_name, dfmean, i_EPSP_slope):
         # get dfmean from selected row in UIsub.
-        # dipslay SELECTED from tableProj at measurewindow
+        # display SELECTED from tableProj at measurewindow
         if verbose: print('setGraph', dfmean)
         self.canvas_seaborn = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
 
@@ -851,7 +860,11 @@ class Measure_window_sub(Ui_measure_window):
         g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
         h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
         i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
-        h.axhline(0, linestyle="dotted")
+        t_EPSP_slope = dfmean.loc[i_EPSP_slope, "time"]
+        print(f"t_EPSP_slope: {t_EPSP_slope}")
+        g.axvline(t_EPSP_slope - 0.0004, color="purple")
+        g.axvline(t_EPSP_slope, color="purple")
+        g.axvline(t_EPSP_slope + 0.0004, color="purple")
         #plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
 #        if not title is None:
 #            ax1.set_title(title)

@@ -39,7 +39,7 @@ def find_i_EPSP_peak_max(
     # calculate sampling frequency
     time_delta = dfmean.time[1] - dfmean.time[0]
     sampling_Hz = 1 / time_delta
-    print(f" . . . sampling_Hz:{sampling_Hz}")
+    print(f" . . . sampling_Hz: {sampling_Hz}")
 
     # convert EPSP width from ms to index
     EPSP_minimum_width_i = int(param_EPSP_minimum_width_ms * 0.001 * sampling_Hz) #0.001 for ms to seconds, *sampling_Hz for seconds to recorded points
@@ -69,7 +69,7 @@ def find_i_VEB_prim_peak_max(
     i_EPSP,
     param_minimum_width_of_EPSP=5,   # ms
     param_minimum_width_of_VEB=1,    # ms
-    param_prim_prominence=0.0001,        # TODO: unit?
+    param_prim_prominence=0.0001,    # TODO: correct unit for prim?
 ):
     """
     returns index for VEB (Volley-EPSP Bump - notch between volley and EPSP)
@@ -80,7 +80,7 @@ def find_i_VEB_prim_peak_max(
     # calculate sampling frequency
     time_delta = dfmean.time[1] - dfmean.time[0]
     sampling_Hz = 1 / time_delta
-    print(f" . . . sampling_Hz:{sampling_Hz}")
+    print(f" . . . sampling_Hz: {sampling_Hz}")
     
     # convert time constraints (where to look for the VEB) to indexes
     minimum_acceptable_i_for_VEB = int(i_Stim + 0.001 * sampling_Hz) # The VEB is not within a ms of the i_stim
@@ -179,7 +179,8 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     print(f"i_EPSPslope:{i_EPSPslope}")
     print(f"i_volleyslope:{i_volleyslope}")
     """
-    return i_Stim, i_VEB, i_EPSP #i_volleyslope, i_EPSPslope
+    # TODO: change return to {}
+    return {"i_Stim": i_Stim, "i_VEB": i_VEB, "i_EPSP": i_EPSP} #i_volleyslope, i_EPSPslope
 
 
 def measureslope(df, i_slope, halfwidth, name="EPSP"):
