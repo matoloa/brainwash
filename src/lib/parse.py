@@ -142,8 +142,8 @@ def builddfmean(df, rollingwidth=3):
     dfmean.voltage -= dfmean.voltage.median()
 
     # generate diffs, *5 for better visualization
-    dfmean["prim"] = dfmean.voltage.diff().rolling(rollingwidth, center=True).mean() * 5
-    dfmean["bis"] = dfmean.prim.diff().rolling(rollingwidth, center=True).mean() * 5
+    dfmean["prim"] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff() * 10
+    dfmean["bis"] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff() * 10
 
     return dfmean
 

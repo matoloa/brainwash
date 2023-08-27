@@ -108,21 +108,21 @@ def find_i_VEB_prim_peak_max(
     return i_VEB
 
 
-def find_i_EPSPslope(dfmean, i_VEB, i_EPSP, happy=False):
+def find_i_EPSP_slope(dfmean, i_VEB, i_EPSP, happy=False):
     """ """
 
     dftemp = dfmean.bis[i_VEB:i_EPSP]
-    i_EPSPslope = dftemp[0 < dftemp.apply(np.sign).diff()].index.values
-    if 1 < len(i_EPSPslope):
+    i_EPSP_slope = dftemp[0 < dftemp.apply(np.sign).diff()].index.values
+    if 1 < len(i_EPSP_slope):
         if not happy:
             raise ValueError(
-                f"Found multiple positive zero-crossings in dfmean.bis[i_VEB: i_EPSP]:{i_EPSPslope}"
+                f"Found multiple positive zero-crossings in dfmean.bis[i_VEB: i_EPSP]:{i_EPSP_slope}"
             )
         else:
             print(
                 "More EPSPs than than we wanted but Im happy, so I pick one and move on."
             )
-    return i_EPSPslope[0]
+    return i_EPSP_slope[0]
 
 
 def find_i_volleyslope(
@@ -164,13 +164,16 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     i_Stim = find_i_stim_prim_max(dfmean)
     if verbose: print(f"i_Stim:{i_Stim}")
 
-    i_EPSP = find_i_EPSP_peak_max(dfmean)
-    if verbose: print(f"i_EPSP:{i_EPSP}")
+    i_EPSP_amp = find_i_EPSP_peak_max(dfmean)
+    if verbose: print(f"i_EPSP_amp:{i_EPSP_amp}")
 
-    i_VEB = find_i_VEB_prim_peak_max(dfmean, i_Stim, i_EPSP)
+    i_VEB = find_i_VEB_prim_peak_max(dfmean, i_Stim, i_EPSP_amp)
     if verbose: print(f"i_VEB:{i_VEB}")
+    
+    i_EPSP_slope = find_i_EPSP_slope(dfmean, i_VEB, i_EPSP_amp, happy=True)
+    if verbose: print(f"i_EPSP_slope:{i_EPSP_slope}")
+
     """
-    i_EPSPslope = find_i_EPSPslope(dfmean, i_VEB, i_EPSP, happy=True)
     i_volleyslope = find_i_volleyslope(
         dfmean, (i_Stim + param_min_time_from_i_Stim), i_VEB, happy=True
     )
@@ -180,7 +183,7 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     print(f"i_volleyslope:{i_volleyslope}")
     """
     # TODO: change return to {}
-    return {"i_Stim": i_Stim, "i_VEB": i_VEB, "i_EPSP": i_EPSP} #i_volleyslope, i_EPSPslope
+    return {"i_Stim": i_Stim, "i_VEB": i_VEB, "i_EPSP_amp": i_EPSP_amp, "i_EPSP_slope": i_EPSP_slope}
 
 
 def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):

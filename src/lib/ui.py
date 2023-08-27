@@ -503,7 +503,8 @@ class UIsub(Ui_MainWindow):
         
         # TODO: NB! code currently uses i_EPSP (AMPLITUDE INDEX) like i_EPSP_slope (SLOPE INDEX)
         # This is incorrect and ethically wrong. FIX FIRST!
-        self.projectdf.loc[irow, "t_EPSP"] = all_t["t_EPSP"]
+        self.projectdf.loc[irow, "t_EPSP_amp"] = all_t["t_EPSP_amp"]
+        self.projectdf.loc[irow, "t_EPSP_slope"] = all_t["t_EPSP_slope"]
         print(f"projectdf: {self.projectdf}")
 
         # Open window
@@ -511,8 +512,9 @@ class UIsub(Ui_MainWindow):
         self.measure_window_sub = Measure_window_sub(self.measure)
         self.measure.setWindowTitle(irow)
         self.measure.show()
-        t_EPSP = self.projectdf.loc[irow, "t_EPSP"]
-        self.measure_window_sub.setMeasureGraph(irow, self.dfmean, t_EPSP)
+        t_EPSP_amp = self.projectdf.loc[irow, "t_EPSP_amp"]
+        t_EPSP_slope = self.projectdf.loc[irow, "t_EPSP_slope"]
+        self.measure_window_sub.setMeasureGraph(irow, self.dfmean, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
 
 
     def tableProjSelectionChanged(self, single_index_range):
@@ -848,23 +850,28 @@ class Measure_window_sub(Ui_measure_window):
         if verbose: print(' - measure_window init')
 
 
-    def setMeasureGraph(self, save_file_name, dfmean, t_EPSP=None):
+    def setMeasureGraph(self, save_file_name, dfmean, t_EPSP_amp=None, t_EPSP_slope=None):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
         if verbose: print('setGraph', dfmean)
         self.canvas_seaborn = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
 
+
+        # TODO: Rational use of g h i sequence vs print order
         # fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
-        g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
         h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
         i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
-        print(f"t_EPSP: {t_EPSP}")
-        g.axvline(t_EPSP, color="purple")
+        g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+        g.axvline(t_EPSP_amp, color="black", linestyle="--")
 
-#        TODO: t_EPSP_slope
-#        g.axvline(t_EPSP_slope - 0.0004, color="purple")
-#        g.axvline(t_EPSP_slope + 0.0004, color="purple")
+        # TODO: t_EPSP_slope
+        g.axvline(t_EPSP_slope - 0.0004, color="green", linestyle=":")
+        g.axvline(t_EPSP_slope, color="green", linestyle="--")
+        g.axvline(t_EPSP_slope + 0.0004, color="green", linestyle=":")
         #plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+
+        
+
 #        if not title is None:
 #            ax1.set_title(title)
         self.canvas_seaborn.axes.set_ylim(-0.05, 0.01)
