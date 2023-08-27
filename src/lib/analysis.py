@@ -155,7 +155,7 @@ def find_i_volleyslope(
 def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     """
     runs all t-detections in the appropriate sequence,
-    returns time of center for volley EPSP slopes
+    returns INDEX of center for volley EPSP slopes
         as identified by positive zero-crossings in the second order derivative
         if several are found, it returns the latest one
     The function finds VEB, but does not currently report it
@@ -181,6 +181,17 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     """
     # TODO: change return to {}
     return {"i_Stim": i_Stim, "i_VEB": i_VEB, "i_EPSP": i_EPSP} #i_volleyslope, i_EPSPslope
+
+
+def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
+    if verbose: print("find_all_t")
+    dict_i = find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False)
+    dict_t = {}
+    for k, v in dict_i.items():
+        k_new = "t" + k[1:]
+        dict_t[k_new] = dfmean.loc[v].time
+    if verbose: print(f"dict_t: {dict_t}")
+    return dict_t
 
 
 def measureslope(df, i_slope, halfwidth, name="EPSP"):

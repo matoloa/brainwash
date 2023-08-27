@@ -481,8 +481,7 @@ class UIsub(Ui_MainWindow):
 
 
     def launchMeasureWindow(self):#, single_index_range):
-        # TODO:
-        # Open a new Ui_measure_window (if it's already open, focus on it)
+        # TODO:find_all_ture_window (if it's already open, focus on it)
         #   How to check for existing windows?
         #   How to shift focus?
         # Display the appropriate recording on the new window's graphs: mean and output
@@ -499,13 +498,12 @@ class UIsub(Ui_MainWindow):
         if verbose: print("launchMeasureWindow", irow)
 
         # Test analysis.py
-        print(f"find_all_i return: {analysis.find_all_i(self.dfmean, verbose=verbose)}")
-        all_i = analysis.find_all_i(self.dfmean, verbose=verbose)
+        print(f"find_all_t return: {analysis.find_all_t(self.dfmean, verbose=verbose)}")
+        all_t = analysis.find_all_t(self.dfmean, verbose=verbose)
         
-
         # TODO: NB! code currently uses i_EPSP (AMPLITUDE INDEX) like i_EPSP_slope (SLOPE INDEX)
         # This is incorrect and ethically wrong. FIX FIRST!
-        self.projectdf.loc[irow, "i_EPSP_slope"] = all_i["i_EPSP"]
+        self.projectdf.loc[irow, "t_EPSP"] = all_t["t_EPSP"]
         print(f"projectdf: {self.projectdf}")
 
         # Open window
@@ -513,8 +511,8 @@ class UIsub(Ui_MainWindow):
         self.measure_window_sub = Measure_window_sub(self.measure)
         self.measure.setWindowTitle(irow)
         self.measure.show()
-        i_EPSP_slope = self.projectdf.loc[irow, "i_EPSP_slope"]
-        self.measure_window_sub.setMeasureGraph(irow, self.dfmean, i_EPSP_slope)
+        t_EPSP = self.projectdf.loc[irow, "t_EPSP"]
+        self.measure_window_sub.setMeasureGraph(irow, self.dfmean, t_EPSP)
 
 
     def tableProjSelectionChanged(self, single_index_range):
@@ -850,7 +848,7 @@ class Measure_window_sub(Ui_measure_window):
         if verbose: print(' - measure_window init')
 
 
-    def setMeasureGraph(self, save_file_name, dfmean, i_EPSP_slope):
+    def setMeasureGraph(self, save_file_name, dfmean, t_EPSP=None):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
         if verbose: print('setGraph', dfmean)
@@ -860,11 +858,12 @@ class Measure_window_sub(Ui_measure_window):
         g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
         h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
         i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
-        t_EPSP_slope = dfmean.loc[i_EPSP_slope, "time"]
-        print(f"t_EPSP_slope: {t_EPSP_slope}")
-        g.axvline(t_EPSP_slope - 0.0004, color="purple")
-        g.axvline(t_EPSP_slope, color="purple")
-        g.axvline(t_EPSP_slope + 0.0004, color="purple")
+        print(f"t_EPSP: {t_EPSP}")
+        g.axvline(t_EPSP, color="purple")
+
+#        TODO: t_EPSP_slope
+#        g.axvline(t_EPSP_slope - 0.0004, color="purple")
+#        g.axvline(t_EPSP_slope + 0.0004, color="purple")
         #plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
 #        if not title is None:
 #            ax1.set_title(title)
