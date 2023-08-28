@@ -125,6 +125,7 @@ def importabffolder(folderpath):
 # %%
 
 def builddfmean(df, rollingwidth=3):
+    # TODO: is rollingwidth "radius" or "diameter"?
     """
     dfmean.voltate(V) (a single sweep built on the mean of all time)
     dfmean.prim
@@ -141,9 +142,9 @@ def builddfmean(df, rollingwidth=3):
     dfmean.columns = ["voltage"]
     dfmean.voltage -= dfmean.voltage.median()
 
-    # generate diffs, *5 for better visualization
-    dfmean["prim"] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff() * 10
-    dfmean["bis"] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff() * 10
+    # generate diffs
+    dfmean["prim"] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
+    dfmean["bis"] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()
 
     return dfmean
 

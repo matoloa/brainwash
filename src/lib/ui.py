@@ -497,8 +497,7 @@ class UIsub(Ui_MainWindow):
         print(f"find_all_t return: {analysis.find_all_t(self.dfmean, verbose=verbose)}")
         all_t = analysis.find_all_t(self.dfmean, verbose=verbose)
         
-        # TODO: NB! code currently uses i_EPSP (AMPLITUDE INDEX) like i_EPSP_slope (SLOPE INDEX)
-        # This is incorrect and ethically wrong. FIX FIRST!
+        self.projectdf.loc[irow, "t_VEB"] = all_t["t_VEB"]
         self.projectdf.loc[irow, "t_EPSP_amp"] = all_t["t_EPSP_amp"]
         self.projectdf.loc[irow, "t_EPSP_slope"] = all_t["t_EPSP_slope"]
         print(f"projectdf: {self.projectdf}")
@@ -508,9 +507,10 @@ class UIsub(Ui_MainWindow):
         self.measure_window_sub = Measure_window_sub(self.measure)
         self.measure.setWindowTitle(irow)
         self.measure.show()
+        t_VEB = self.projectdf.loc[irow, "t_VEB"]
         t_EPSP_amp = self.projectdf.loc[irow, "t_EPSP_amp"]
         t_EPSP_slope = self.projectdf.loc[irow, "t_EPSP_slope"]
-        self.measure_window_sub.setMeasureGraph(irow, self.dfmean, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
+        self.measure_window_sub.setMeasureGraph(irow, self.dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
 
 
     def tableProjSelectionChanged(self, single_index_range):
@@ -615,6 +615,7 @@ class UIsub(Ui_MainWindow):
 
         self.projectdf = pd.concat([update_frame, frame2add])
         if verbose: print(f"update_frame: {update_frame}")
+        self.projectdf.reset_index(inplace=True, drop=True) # Required for split abf files
         self.save_dfproj()
         self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
 
@@ -662,11 +663,11 @@ class UIsub(Ui_MainWindow):
             dfmean = pd.read_csv(dfmean_path) # import csv
         except FileNotFoundError:
             print('did not find _mean.csv to load. Not imported?')
-        print("*** *** *** dfmean PRE reset_index:", dfmean)
+        #print("*** *** *** dfmean PRE reset_index:", dfmean)
         # dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
         self.canvas_seaborn = MplCanvas(parent=self.graphMean) # instantiate canvas
         dfmean.reset_index(inplace=True, drop=True)
-        print("*** *** *** dfmean POST reset_index:", dfmean)
+        #print("*** *** *** dfmean POST reset_index:", dfmean)
         dfmean['voltage'] = dfmean.voltage / dfmean.voltage.abs().max()
         dfmean['prim'] = dfmean.prim / dfmean.prim.abs().max()
         dfmean['bis'] = dfmean.bis / dfmean.bis.abs().max()
@@ -785,7 +786,7 @@ class Filetreesub(Ui_Dialog):
 
         # Dataframe to add
         self.names = []
-        self.dfAdd = pd.DataFrame()
+        self.dfAdd = buildTemplate()
         
         self.buttonBoxAddGroup = QtWidgets.QDialogButtonBox(dialog)
         self.buttonBoxAddGroup.setGeometry(QtCore.QRect(470, 20, 91, 491))
@@ -851,19 +852,23 @@ class Measure_window_sub(Ui_measure_window):
         if verbose: print(' - measure_window init')
 
 
-    def setMeasureGraph(self, save_file_name, dfmean, t_EPSP_amp=None, t_EPSP_slope=None):
+    def setMeasureGraph(self, save_file_name, dfmean, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
         if verbose: print('setGraph', dfmean)
         self.canvas_seaborn = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
 
-
-        # TODO: Rational use of g h i sequence vs print order
         # fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
-        h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
-        i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
-        g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
-        g.axvline(t_EPSP_amp, color="black", linestyle="--")
+        g = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
+        g = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
+        h = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+        h.axvline(t_EPSP_amp, color="black", linestyle="--")
+
+
+        # t_VEB
+        print(f"t_VEB: {t_VEB}")
+        g.axvline(t_VEB, color="grey", linestyle="--")
+        
 
         # TODO: t_EPSP_slope
         g.axvline(t_EPSP_slope - 0.0004, color="green", linestyle=":")
@@ -872,18 +877,12 @@ class Measure_window_sub(Ui_measure_window):
         #plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
 
         
-
 #        if not title is None:
 #            ax1.set_title(title)
         self.canvas_seaborn.axes.set_ylim(-0.05, 0.01)
-        self.canvas_seaborn.axes.set_xlim(0.006, 0.02)
+        self.canvas_seaborn.axes.set_xlim(0.006, 0.015)
         
-        # TODO: this is a placeholder command, later intended to mark the measurements (t_EPSP_amp etc.) in tableproj
-        sns.scatterplot(data=pd.DataFrame({"x":[0.012], "y":[-0.01]}), x="x", y="y", ax=self.canvas_seaborn.axes, marker="x", color="blue", s=500)
-
-#       self.canvas_seaborn.axes.set_xmargin((100,500))
-#        if not t_VEB is None:
-            #h.axvline(i_VEB, color="orange")
+        #self.canvas_seaborn.axes.set_xmargin((100,500))
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
 
