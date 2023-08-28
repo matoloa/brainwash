@@ -371,6 +371,17 @@ class Ui_Dialog(QtWidgets.QWidget):
 #######################################################################
 
 
+def buildTemplate():
+    return pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 't_stim',
+                                                't_stim', 't_stim_method', 't_stim_params',
+                                                't_VEB', 't_VEB_method', 't_VEB_params',
+                                                't_volley_amp', 't_volley_amp_method', 't_volley_amp_params',
+                                                't_volley_slope', 't_volley_slope_method', 't_volley_slope_params',
+                                                't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params',
+                                                't_EPSP_slope', 't_EPSP_slope_method', 't_EPSP_slope_params',
+                                                'exclude', 'comment'])
+
+
 # subclassing Ui_MainWindow to be able to use the unaltered output file from pyuic and QT designer
 class UIsub(Ui_MainWindow):
     def __init__(self, mainwindow):
@@ -407,14 +418,7 @@ class UIsub(Ui_MainWindow):
         if not os.path.exists(self.projects_folder):
             os.makedirs(self.projects_folder)
         
-        self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 't_stim',
-                                               't_stim', 't_stim_method', 't_stim_params',
-                                                't_VEB', 't_VEB_method', 't_VEB_params',
-                                                't_volley_amp', 't_volley_amp_method', 't_volley_amp_params',
-                                                't_volley_slope', 't_volley_slope_method', 't_volley_slope_params',
-                                                't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params',
-                                                't_EPSP_slope', 't_EPSP_slope_method', 't_EPSP_slope_params',
-                                                'exclude', 'comment'])
+        self.projectdf = buildTemplate()
         self.tablemodel = TableModel(self.projectdf)
         self.tableProj.setModel(self.tablemodel)
 
@@ -422,15 +426,7 @@ class UIsub(Ui_MainWindow):
             self.load_dfproj()
         else:
             self.projectname = "My Project"
-            self.projectdf = pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 't_stim',
-                                               't_stim', 't_stim_method', 't_stim_params',
-                                                't_VEB', 't_VEB_method', 't_VEB_params',
-                                                't_volley_amp', 't_volley_amp_method', 't_volley_amp_params',
-                                                't_volley_slope', 't_volley_slope_method', 't_volley_slope_params',
-                                                't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params',
-                                                't_EPSP_slope', 't_EPSP_slope_method', 't_EPSP_slope_params',
-                                                'exclude', 'comment'])
-
+            self.projectdf = buildTemplate()
 
         # show dfProj in tableProj
         self.setTableDf(self.projectdf)
@@ -750,14 +746,14 @@ class UIsub(Ui_MainWindow):
 
     def addData(self, dfAdd): # concatenate dataframes of old and new data
         dfProj = self.getdfProj()
-        dfProj = pd.concat([dfProj, dfAdd]) # .append is deprecated; using pd.concat
+        dfProj = pd.concat([dfProj, dfAdd])
         dfProj.reset_index(drop=True, inplace=True)
         dfProj['group'] = dfProj['group'].fillna('Not set')
         dfProj['nSweeps'] = dfProj['nSweeps'].fillna('...')
         self.set_dfproj(dfProj)
         if verbose: print('addData:', self.getdfProj())
         self.setTableDf(dfProj)
-
+        
     
     @QtCore.pyqtSlot(list)
     def slotPrintPaths(self, mypaths):
@@ -816,12 +812,17 @@ class Filetreesub(Ui_Dialog):
 
     def addDf(self):
         self.parent.slotAddDfData(self.dfAdd)
-        
-    
+
+
     def pathsSelectedUpdateTable(self, paths):
         # TODO: Extract host, checksum, group
         if verbose: print('pathsSelectedUpdateTable')
-        dfAdd = pd.DataFrame({"host": 'computer 1', "path": paths, 'checksum': 'big number', 'save_file_name': paths, 'group': None})
+        dfAdd = buildTemplate()
+        dfAdd['host']='Computer 1' #TODO: Why doesn't this one work?
+        dfAdd['path']=paths
+        dfAdd['checksum']='big number'
+        dfAdd['save_file_name']=paths
+        dfAdd['group']=None
         self.tablemodel.setData(dfAdd)
         # NTH: more intelligent default naming; lowest level unique name?
         # For now, use name + lowest level folder
