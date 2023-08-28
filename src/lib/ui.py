@@ -372,7 +372,8 @@ class Ui_Dialog(QtWidgets.QWidget):
 
 
 def buildTemplate():
-    return pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps', 't_stim',
+    if verbose: print(" . . . buildTemplate()")
+    return pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps',
                                                 't_stim', 't_stim_method', 't_stim_params',
                                                 't_VEB', 't_VEB_method', 't_VEB_params',
                                                 't_volley_amp', 't_volley_amp_method', 't_volley_amp_params',
@@ -494,27 +495,37 @@ class UIsub(Ui_MainWindow):
         if verbose: print("launchMeasureWindow", irow)
 
         # Test analysis.py
-        print(f"find_all_t return: {analysis.find_all_t(self.dfmean, verbose=verbose)}")
         all_t = analysis.find_all_t(self.dfmean, verbose=verbose)
-        
-        self.projectdf.loc[irow, "t_VEB"] = all_t["t_VEB"]
-        self.projectdf.loc[irow, "t_EPSP_amp"] = all_t["t_EPSP_amp"]
-        self.projectdf.loc[irow, "t_EPSP_slope"] = all_t["t_EPSP_slope"]
-        print(f"projectdf: {self.projectdf}")
+        if verbose: print(f"find_all_t returned: {all_t}")
+
+        # Break out to variables
+        t_VEB = all_t['t_VEB']
+        t_EPSP_amp = all_t['t_EPSP_amp']
+        t_EPSP_slope = all_t['t_EPSP_slope']
+
+        # Store variables in projectdf
+        self.projectdf.loc[irow, 't_VEB'] = t_VEB
+        self.projectdf.loc[irow, 't_EPSP_amp'] = t_EPSP_amp
+        self.projectdf.loc[irow, 't_EPSP_slope'] = t_EPSP_slope
+
+        # TODO: self.projectdf is NOT updated!
+        print("*** *** TRANSFER CHECK: *** ***")
+        print(f"t_EPSP_slope: {t_EPSP_slope}")
+        print(f"self.projectdf.loc[irow, 't_EPSP_slope']: {self.projectdf.loc[irow, 't_EPSP_slope']}")
+
+        if verbose: print(f"projectdf: {self.projectdf}")
 
         # Open window
         self.measure = QtWidgets.QDialog()
         self.measure_window_sub = Measure_window_sub(self.measure)
         self.measure.setWindowTitle(irow)
         self.measure.show()
-        t_VEB = self.projectdf.loc[irow, "t_VEB"]
-        t_EPSP_amp = self.projectdf.loc[irow, "t_EPSP_amp"]
-        t_EPSP_slope = self.projectdf.loc[irow, "t_EPSP_slope"]
+
         self.measure_window_sub.setMeasureGraph(irow, self.dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
 
 
     def tableProjSelectionChanged(self, single_index_range):
-        print(f"single_index_range: {single_index_range.indexes()}")
+        #if verbose: print(f"single_index_range: {single_index_range.indexes()}")
         if 0 < len(single_index_range.indexes()):
             single_index = single_index_range.indexes()[0]
             print(single_index)
@@ -602,7 +613,7 @@ class UIsub(Ui_MainWindow):
                         row2add = self.projectdf[self.projectdf.index==i].copy()
                         row2add['save_file_name'] = row2add['save_file_name'] + "_ch_" + str(j)
                         row2add['nSweeps'] = result[j]
-                        frame2add = pd.concat([row2add, frame2add]) # add new, separate channel rows
+                        frame2add = pd.concat([frame2add, row2add]) # add new, separate channel rows
                         update_frame = update_frame[update_frame.index!=i] # destroy original row in update_frame
                     if verbose: print (f"frame2add:{frame2add}")
                 else: # just one channel - update nSweeps
@@ -864,18 +875,15 @@ class Measure_window_sub(Ui_measure_window):
         h = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
         h.axvline(t_EPSP_amp, color="black", linestyle="--")
 
-
         # t_VEB
         print(f"t_VEB: {t_VEB}")
         g.axvline(t_VEB, color="grey", linestyle="--")
         
-
-        # TODO: t_EPSP_slope
+        # t_EPSP_slope
         g.axvline(t_EPSP_slope - 0.0004, color="green", linestyle=":")
         g.axvline(t_EPSP_slope, color="green", linestyle="--")
         g.axvline(t_EPSP_slope + 0.0004, color="green", linestyle=":")
         #plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-
         
 #        if not title is None:
 #            ax1.set_title(title)
