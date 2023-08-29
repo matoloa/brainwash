@@ -190,7 +190,8 @@ def parseProjFiles(proj_folder:Path, df=None, row=None):
                 print(f"df: {df}")
             dfmean = builddfmean(df)
             dfmean.reset_index().to_csv(savepath + '_mean.csv', index=False)
-            dict_channels[str(i)] = df['sweep'].values[-1]
+            dict_channels[str(i)] = df['sweep'].nunique()
+            #dict_channels[str(i)] = df['sweep'].values[-1]
             if verbose:
                 print(f"frame has channel: {i}")
                 print(f"df: {df}")
