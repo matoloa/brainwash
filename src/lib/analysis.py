@@ -52,14 +52,17 @@ def find_i_EPSP_peak_max(
         prominence=param_EPSP_minimum_prominence_mV / 1000,
     )
     print(f" . . . i_peaks:{i_peaks}")
+    if len(i_peaks) is 0:
+        print(" . . No peaks in specified interval.")
+        return np.nan
     print(f" . . . properties:{properties}")
     
     dfpeaks = dfmean.iloc[i_peaks]
     # dfpeaks = pd.DataFrame(peaks[0]) # Convert to dataframe in order to select only > limitleft
     dfpeaks = dfpeaks[limitleft < dfpeaks.index]
     print(f" . . . dfpeaks:{dfpeaks}")
-    i_EPSP = i_peaks[properties["prominences"].argmax()]
 
+    i_EPSP = i_peaks[properties["prominences"].argmax()]
     return i_EPSP
 
 
@@ -100,6 +103,12 @@ def find_i_VEB_prim_peak_max(
     # add skipped range to found indexes
     i_peaks += minimum_acceptable_i_for_VEB
     print(" . . . i_peaks:", i_peaks)
+    if len(i_peaks) is 0:
+        print(" . . No peaks in specified interval.")
+        return np.nan
+    #print(f" . . . prim_sample:{list(prim_sample)}")
+    #import matplotlib.pyplot as plt
+    #plt.plot(prim_sample)
     print(f" . . . properties:{properties}")
     
     i_VEB = i_peaks[properties["prominences"].argmax()]
@@ -113,6 +122,10 @@ def find_i_EPSP_slope(dfmean, i_VEB, i_EPSP, happy=False):
 
     dftemp = dfmean.bis[i_VEB:i_EPSP]
     i_EPSP_slope = dftemp[0 < dftemp.apply(np.sign).diff()].index.values
+    
+    if len(i_EPSP_slope) is 0:
+        print(" . . No positive zero-crossings in dfmean.bis[i_VEB: i_EPSP].")
+        return np.nan
     if 1 < len(i_EPSP_slope):
         if not happy:
             raise ValueError(
@@ -160,30 +173,35 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
         if several are found, it returns the latest one
     The function finds VEB, but does not currently report it
     """
-    
+
+    i_Stim = np.nan
+    i_EPSP_amp = np.nan
+    i_VEB = np.nan
+    i_EPSP_slope = np.nan
+
     i_Stim = find_i_stim_prim_max(dfmean)
     if verbose: print(f"i_Stim:{i_Stim}")
-
-    i_EPSP_amp = find_i_EPSP_peak_max(dfmean)
-    if verbose: print(f"i_EPSP_amp:{i_EPSP_amp}")
-
-    i_VEB = find_i_VEB_prim_peak_max(dfmean, i_Stim, i_EPSP_amp)
-    if verbose: print(f"i_VEB:{i_VEB}")
-    
-    i_EPSP_slope = find_i_EPSP_slope(dfmean, i_VEB, i_EPSP_amp, happy=True)
-    if verbose: print(f"i_EPSP_slope:{i_EPSP_slope}")
+    if i_Stim is not np.nan:
+        i_EPSP_amp = find_i_EPSP_peak_max(dfmean)
+        if verbose: print(f"i_EPSP_amp:{i_EPSP_amp}")
+        if i_EPSP_amp is not np.nan:
+            i_VEB = find_i_VEB_prim_peak_max(dfmean, i_Stim, i_EPSP_amp)
+            if verbose: print(f"i_VEB:{i_VEB}")
+            if i_VEB is not np.nan:
+                i_EPSP_slope = find_i_EPSP_slope(dfmean, i_VEB, i_EPSP_amp, happy=True)
+                if verbose: print(f"i_EPSP_slope:{i_EPSP_slope}")
+                #if i_EPSP_slope is not np.nan: 
 
     """
     i_volleyslope = find_i_volleyslope(
         dfmean, (i_Stim + param_min_time_from_i_Stim), i_VEB, happy=True
     )
-    print(f"i_VEB:{i_VEB}")
-    print(f"max_acceptable_i_for_VEB:{max_acceptable_i_for_VEB}")
-    print(f"i_EPSPslope:{i_EPSPslope}")
-    print(f"i_volleyslope:{i_volleyslope}")
     """
+
     # TODO: change return to {}
     return {"i_Stim": i_Stim, "i_VEB": i_VEB, "i_EPSP_amp": i_EPSP_amp, "i_EPSP_slope": i_EPSP_slope}
+
+    
 
 
 def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
@@ -192,7 +210,7 @@ def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     dict_t = {}
     for k, v in dict_i.items():
         k_new = "t" + k[1:]
-        dict_t[k_new] = dfmean.loc[v].time
+        dict_t[k_new] = np.nan if v is np.nan else dfmean.loc[v].time
     if verbose: print(f"dict_t: {dict_t}")
     return dict_t
 

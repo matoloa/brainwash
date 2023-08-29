@@ -681,6 +681,10 @@ class UIsub(Ui_MainWindow):
         h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
         i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
         
+        # TODO: replace hard-coding, overview but not the whole stim-artefact.
+        self.canvas_seaborn.axes.set_ylim(-0.05, 0.01)
+        self.canvas_seaborn.axes.set_xlim(0.006, 0.015)
+
         self.dfmean = dfmean # assign to self to make available for launchMeasureWindow()
 
         self.canvas_seaborn.draw()
