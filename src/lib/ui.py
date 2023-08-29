@@ -494,7 +494,7 @@ class UIsub(Ui_MainWindow):
             #TODO: Make it import the missing file
             print('did not find _mean.csv to load. Not imported?')
             return
-        file_name = ser_table_row[3]
+        file_name = ser_table_row['save_file_name']
         row_index = ser_table_row.name
         if verbose: print("launchMeasureWindow", file_name)
 
@@ -529,7 +529,7 @@ class UIsub(Ui_MainWindow):
             ser_table_row = self.tablemodel.dataRow(qt_index)
             nSweeps = ser_table_row['nSweeps']
             if nSweeps != '...': # if the file is imported, set the graph
-                self.setGraph(ser_table_row[3]) # Passing along save_file_name
+                self.setGraph(ser_table_row['save_file_name']) # Passing along save_file_name
             else: # if the file isn't imported, clear the mean graph
                 self.canvas_seaborn = MplCanvas(parent=self.graphMean) # instantiate canvas
                 self.canvas_seaborn.draw()
@@ -621,7 +621,7 @@ class UIsub(Ui_MainWindow):
                 else: # just one channel - update nSweeps
                     print (f"result:{result}")
                     print (f"i:{i}")
-                    update_frame.loc[i, 'nSweeps'] = str(result['0'])
+                    update_frame.loc[i, 'nSweeps'] = str(list(result.values())[0])
                 # TODO: NTH - new visual progress report (old one dysfunctional with index-preserving update_frame appraoch)
             else:
                 print(i, "already exists: no action")
