@@ -489,39 +489,33 @@ class UIsub(Ui_MainWindow):
         table_row should already have t_ values; otherwise do not attempt to draw them
         """
 
-        single_index = self.tableProj.selectionModel().selectedIndexes()[0]
-        table_row = self.tablemodel.dataRow(single_index)
-        irow = table_row[3]
-        if verbose: print("launchMeasureWindow", irow)
+        qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
+        ser_table_row = self.tablemodel.dataRow(qt_index)
+        file_name = ser_table_row[3]
+        row_index = ser_table_row.name
+        if verbose: print("launchMeasureWindow", file_name)
 
-        # Test analysis.py
+        # Analysis.py
         all_t = analysis.find_all_t(self.dfmean, verbose=verbose)
-        if verbose: print(f"find_all_t returned: {all_t}")
-
         # Break out to variables
         t_VEB = all_t['t_VEB']
         t_EPSP_amp = all_t['t_EPSP_amp']
         t_EPSP_slope = all_t['t_EPSP_slope']
 
-        # Store variables in projectdf
-        self.projectdf.loc[irow, 't_VEB'] = t_VEB
-        self.projectdf.loc[irow, 't_EPSP_amp'] = t_EPSP_amp
-        self.projectdf.loc[irow, 't_EPSP_slope'] = t_EPSP_slope
-
-        # TODO: self.projectdf is NOT updated!
-        print("*** *** TRANSFER CHECK: *** ***")
-        print(f"t_EPSP_slope: {t_EPSP_slope}")
-        print(f"self.projectdf.loc[irow, 't_EPSP_slope']: {self.projectdf.loc[irow, 't_EPSP_slope']}")
+        # Store variables in self.projectdf
+        self.projectdf.loc[row_index, 't_VEB'] = t_VEB
+        self.projectdf.loc[row_index, 't_EPSP_amp'] = t_EPSP_amp
+        self.projectdf.loc[row_index, 't_EPSP_slope'] = t_EPSP_slope
 
         if verbose: print(f"projectdf: {self.projectdf}")
 
         # Open window
         self.measure = QtWidgets.QDialog()
         self.measure_window_sub = Measure_window_sub(self.measure)
-        self.measure.setWindowTitle(irow)
+        self.measure.setWindowTitle(file_name)
         self.measure.show()
 
-        self.measure_window_sub.setMeasureGraph(irow, self.dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
+        self.measure_window_sub.setMeasureGraph(file_name, self.dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
 
 
     def tableProjSelectionChanged(self, single_index_range):
