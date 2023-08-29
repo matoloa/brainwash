@@ -473,7 +473,6 @@ class UIsub(Ui_MainWindow):
     
     
     def tableProjDoubleClicked(self):
-        if verbose: print("DOUBLE CLICK")
         self.launchMeasureWindow()
 
 
@@ -491,6 +490,11 @@ class UIsub(Ui_MainWindow):
 
         qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
         ser_table_row = self.tablemodel.dataRow(qt_index)
+        nSweeps = ser_table_row['nSweeps']
+        if nSweeps == '...':
+            #TODO: Make it import the missing file
+            print('did not find _mean.csv to load. Not imported?')
+            return
         file_name = ser_table_row[3]
         row_index = ser_table_row.name
         if verbose: print("launchMeasureWindow", file_name)
@@ -519,13 +523,18 @@ class UIsub(Ui_MainWindow):
 
 
     def tableProjSelectionChanged(self, single_index_range):
+        if verbose: print("tableProjSelectionChanged")
         #if verbose: print(f"single_index_range: {single_index_range.indexes()}")
         if 0 < len(single_index_range.indexes()):
-            single_index = single_index_range.indexes()[0]
-            print(single_index)
-            table_row = self.tablemodel.dataRow(single_index)
-            print(table_row)
-            self.setGraph(table_row[3]) # Passing along save_file_name
+            qt_index = single_index_range.indexes()[0]
+            ser_table_row = self.tablemodel.dataRow(qt_index)
+            nSweeps = ser_table_row['nSweeps']
+            if nSweeps != '...': # if the file is imported, set the graph
+                self.setGraph(ser_table_row[3]) # Passing along save_file_name
+            else: # if the file isn't imported, clear the mean graph
+                self.canvas_seaborn = MplCanvas(parent=self.graphMean) # instantiate canvas
+                self.canvas_seaborn.draw()
+                self.canvas_seaborn.show()
 
 
     def pushedButtonRenameProject(self):
@@ -864,7 +873,7 @@ class Measure_window_sub(Ui_measure_window):
     def setMeasureGraph(self, save_file_name, dfmean, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
-        if verbose: print('setGraph', dfmean)
+        if verbose: print('setMeasureGraph', dfmean)
         self.canvas_seaborn = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
 
         # fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))

@@ -202,8 +202,6 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     return {"i_Stim": i_Stim, "i_VEB": i_VEB, "i_EPSP_amp": i_EPSP_amp, "i_EPSP_slope": i_EPSP_slope}
 
     
-
-
 def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     if verbose: print("find_all_t")
     dict_i = find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False)
