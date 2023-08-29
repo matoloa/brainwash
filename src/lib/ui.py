@@ -372,7 +372,6 @@ class Ui_Dialog(QtWidgets.QWidget):
 
 
 def buildTemplate():
-    if verbose: print(" . . . buildTemplate()")
     return pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps',
                                                 't_stim', 't_stim_method', 't_stim_params',
                                                 't_VEB', 't_VEB_method', 't_VEB_params',
@@ -837,10 +836,10 @@ class Filetreesub(Ui_Dialog):
         # TODO: Extract host, checksum, group
         if verbose: print('pathsSelectedUpdateTable')
         dfAdd = buildTemplate()
-        dfAdd['host']='Computer 1' #TODO: Why doesn't this one work?
         dfAdd['path']=paths
+        dfAdd['host']='Computer 1'
         dfAdd['checksum']='big number'
-        dfAdd['save_file_name']=paths
+#        dfAdd['save_file_name']=paths
         dfAdd['group']=None
         self.tablemodel.setData(dfAdd)
         # NTH: more intelligent default naming; lowest level unique name?
