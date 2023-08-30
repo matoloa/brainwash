@@ -14,7 +14,7 @@
 *.ibw
 *.zip
 
-cache/*
+cache/**
 
 # location of current user's brainwash project folder
 projectFolderLocation.txt
