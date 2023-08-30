@@ -15,6 +15,7 @@
 *.zip
 
 **/cache/**
+src/cache/*
 
 # location of current user's brainwash project folder
 projectFolderLocation.txt
