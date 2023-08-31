@@ -529,20 +529,17 @@ class UIsub(Ui_MainWindow):
 
         if 0 < n_rows:
             dfProj = self.projectdf
-            top_row = selected_rows[0]
-            save_file_name = dfProj.at[top_row, 'save_file_name']
-            nSweeps = dfProj.at[top_row, 'nSweeps']
-            if nSweeps != '...': # if the file is imported, set the graph
-#                self.setGraph(ser_table_row['save_file_name']) # Passing along save_file_name
-                self.setGraph(save_file_name)
-                if verbose:
-                    if selected_rows:
-                        print("Selected rows:")
-                        for row in selected_rows:
-                            print(row)
-                return
+            dfSelection = dfProj.loc[selected_rows]
+            dfFiltered = dfSelection[dfSelection['nSweeps'] != '...']
+            list_files_filtered = dfFiltered['save_file_name'].tolist()
+            if not dfFiltered.empty:
+                if len(list_files_filtered) == 1: # exactly one file selected
+                    self.setGraph(list_files_filtered[-1])
+                else: # several files selected
+                    self.setGraphs(list_files_filtered)
             else:
-                if verbose: print("File not yet analyzed") # TODO: parse and analyse
+                print("Selection not analyzed.")
+            return
         else:
             if verbose: print("No rows selected.")
         # if the file isn't imported, or no file selected, clear the mean graph
@@ -682,7 +679,7 @@ class UIsub(Ui_MainWindow):
 
     def setGraph(self, save_file_name):
         #get dfmean from selected row in UIsub.
-        # dipslay SELECTED from tableProj at graphMean
+        # display SELECTED from tableProj at graphMean
 
         if verbose: print('setGraph')
         dfmean_path = self.projectfolder / (save_file_name + "_mean.csv")
@@ -721,7 +718,39 @@ class UIsub(Ui_MainWindow):
 #        self.canvas_seaborn.draw()
 #        self.canvas_seaborn.show()
 
-    
+
+    def setGraphs(self, list_files_filtered):
+        # plot the mean voltages of several selected files
+        #print(f"list_files_filtered: {list_files_filtered}")
+
+        if verbose: print('setGraphs')
+
+        dfmeans = []
+        for file in list_files_filtered:
+            dfmean_path = self.projectfolder / (file + "_mean.csv")
+            #print(f"df_mean_path: {dfmean_path}")
+            try:
+                df = pd.read_csv(dfmean_path)
+            except FileNotFoundError:
+                print('did not find _mean.csv to load. Not imported?')
+            dfmeans.append(df)
+            #dfmeans = pd.concat([dfmeans, df], ignore_index=True, axis=0) #TODO: make functional
+
+        self.canvas_seaborn = MplCanvas(parent=self.graphMean) # instantiate canvas
+        for dfmeanfile in dfmeans:
+            #sns.lineplot(data=dfmeanfile, x='time', y='voltage')
+            dfmeanfile['voltage'] = dfmeanfile.voltage / dfmeanfile.voltage.abs().max()
+            g = sns.lineplot(data=dfmeanfile, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+
+        self.canvas_seaborn.axes.set_ylim(-0.05, 0.01)
+        self.canvas_seaborn.axes.set_xlim(0.006, 0.015)
+
+        #self.dfmean = dfmean # assign to self to make available for launchMeasureWindow()
+
+        self.canvas_seaborn.draw()
+        self.canvas_seaborn.show()
+ 
+
     def setProjectname(self):
         if verbose: print('setProjectname')
         #get_signals(self.children()[1].children()[1].model)
