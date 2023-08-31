@@ -521,19 +521,34 @@ class UIsub(Ui_MainWindow):
         self.measure_window_sub.setMeasureGraph(file_name, self.dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
 
 
-    def tableProjSelectionChanged(self, single_index_range):
+    def tableProjSelectionChanged(self):
         if verbose: print("tableProjSelectionChanged")
-        #if verbose: print(f"single_index_range: {single_index_range.indexes()}")
-        if 0 < len(single_index_range.indexes()):
-            qt_index = single_index_range.indexes()[0]
-            ser_table_row = self.tablemodel.dataRow(qt_index)
-            nSweeps = ser_table_row['nSweeps']
+        selected_indexes = self.tableProj.selectionModel().selectedRows()
+        selected_rows = [row.row() for row in selected_indexes]
+        n_rows = len(selected_rows)
+
+        if 0 < n_rows:
+            dfProj = self.projectdf
+            top_row = selected_rows[0]
+            save_file_name = dfProj.at[top_row, 'save_file_name']
+            nSweeps = dfProj.at[top_row, 'nSweeps']
             if nSweeps != '...': # if the file is imported, set the graph
-                self.setGraph(ser_table_row['save_file_name']) # Passing along save_file_name
-            else: # if the file isn't imported, clear the mean graph
-                self.canvas_seaborn = MplCanvas(parent=self.graphMean) # instantiate canvas
-                self.canvas_seaborn.draw()
-                self.canvas_seaborn.show()
+#                self.setGraph(ser_table_row['save_file_name']) # Passing along save_file_name
+                self.setGraph(save_file_name)
+                if verbose:
+                    if selected_rows:
+                        print("Selected rows:")
+                        for row in selected_rows:
+                            print(row)
+                return
+            else:
+                if verbose: print("File not yet analyzed") # TODO: parse and analyse
+        else:
+            if verbose: print("No rows selected.")
+        # if the file isn't imported, or no file selected, clear the mean graph
+        self.canvas_seaborn = MplCanvas(parent=self.graphMean) # instantiate canvas
+        self.canvas_seaborn.draw()
+        self.canvas_seaborn.show()
 
 
     def pushedButtonRenameProject(self):
@@ -766,7 +781,7 @@ class UIsub(Ui_MainWindow):
         dfProj = self.getdfProj()
         dfProj = pd.concat([dfProj, dfAdd])
         dfProj.reset_index(drop=True, inplace=True)
-        dfProj['group'] = dfProj['group'].fillna('Not set')
+        dfProj['group'] = dfProj['group'].fillna('Unassigned')
         dfProj['nSweeps'] = dfProj['nSweeps'].fillna('...')
         self.set_dfproj(dfProj)
         if verbose: print('addData:', self.getdfProj())
