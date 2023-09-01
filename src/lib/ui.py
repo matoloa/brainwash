@@ -251,7 +251,7 @@ class Ui_measure_window(QtCore.QObject):
 class Ui_MainWindow(QtCore.QObject):
     def setupUi(self, mainWindow):
         mainWindow.setObjectName("mainWindow")
-        mainWindow.resize(923, 957)
+        mainWindow.resize(951, 816)
         self.centralwidget = QtWidgets.QWidget(mainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayoutCentralwidget = QtWidgets.QHBoxLayout(self.centralwidget)
@@ -260,20 +260,24 @@ class Ui_MainWindow(QtCore.QObject):
         self.verticalLayoutProj.setObjectName("verticalLayoutProj")
         self.horizontalLayoutProj = QtWidgets.QHBoxLayout()
         self.horizontalLayoutProj.setObjectName("horizontalLayoutProj")
-        self.inputProjectName = QtWidgets.QLineEdit(self.centralwidget)
-        self.inputProjectName.setMinimumSize(QtCore.QSize(150, 0))
-        self.inputProjectName.setObjectName("inputProjectName")
-        self.horizontalLayoutProj.addWidget(self.inputProjectName)
-        self.pushButtonRenameProject = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButtonRenameProject.setObjectName("pushButtonRenameProject")
-        self.horizontalLayoutProj.addWidget(self.pushButtonRenameProject)
         self.pushButtonNewProject = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonNewProject.setMaximumSize(QtCore.QSize(50, 16777215))
         self.pushButtonNewProject.setObjectName("pushButtonNewProject")
         self.horizontalLayoutProj.addWidget(self.pushButtonNewProject)
         self.pushButtonOpenProject = QtWidgets.QPushButton(self.centralwidget)
         self.pushButtonOpenProject.setEnabled(True)
+        self.pushButtonOpenProject.setMaximumSize(QtCore.QSize(50, 16777215))
         self.pushButtonOpenProject.setObjectName("pushButtonOpenProject")
         self.horizontalLayoutProj.addWidget(self.pushButtonOpenProject)
+        self.inputProjectName = QtWidgets.QLineEdit(self.centralwidget)
+        self.inputProjectName.setMinimumSize(QtCore.QSize(150, 0))
+        self.inputProjectName.setReadOnly(True)
+        self.inputProjectName.setObjectName("inputProjectName")
+        self.horizontalLayoutProj.addWidget(self.inputProjectName)
+        self.pushButtonRenameProject = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonRenameProject.setMaximumSize(QtCore.QSize(65, 16777215))
+        self.pushButtonRenameProject.setObjectName("pushButtonRenameProject")
+        self.horizontalLayoutProj.addWidget(self.pushButtonRenameProject)
         self.verticalLayoutProj.addLayout(self.horizontalLayoutProj)
         self.horizontalLayoutData = QtWidgets.QHBoxLayout()
         self.horizontalLayoutData.setSizeConstraint(QtWidgets.QLayout.SetMinAndMaxSize)
@@ -284,11 +288,27 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButtonParse = QtWidgets.QPushButton(self.centralwidget)
         self.pushButtonParse.setObjectName("pushButtonParse")
         self.horizontalLayoutData.addWidget(self.pushButtonParse)
+        self.pushButtonGroups = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonGroups.setObjectName("pushButtonGroups")
+        self.horizontalLayoutData.addWidget(self.pushButtonGroups)
+        self.pushButtonDelete = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonDelete.setMaximumSize(QtCore.QSize(60, 16777215))
+        self.pushButtonDelete.setObjectName("pushButtonDelete")
+        self.horizontalLayoutData.addWidget(self.pushButtonDelete)
+        self.checkBoxLockDelete = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBoxLockDelete.setMaximumSize(QtCore.QSize(15, 16777215))
+        self.checkBoxLockDelete.setText("")
+        self.checkBoxLockDelete.setChecked(True)
+        self.checkBoxLockDelete.setObjectName("checkBoxLockDelete")
+        self.horizontalLayoutData.addWidget(self.checkBoxLockDelete)
         self.verticalLayoutProj.addLayout(self.horizontalLayoutData)
         self.tableProj = QtWidgets.QTableView(self.centralwidget)
+        self.tableProj.setAcceptDrops(True)
         self.tableProj.setObjectName("tableProj")
         self.verticalLayoutProj.addWidget(self.tableProj)
         self.horizontalLayoutCentralwidget.addLayout(self.verticalLayoutProj)
+        spacerItem = QtWidgets.QSpacerItem(10, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayoutCentralwidget.addItem(spacerItem)
         self.verticalLayoutGraph = QtWidgets.QVBoxLayout()
         self.verticalLayoutGraph.setObjectName("verticalLayoutGraph")
         self.labelMeanSweep = QtWidgets.QLabel(self.centralwidget)
@@ -317,7 +337,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.horizontalLayoutCentralwidget.addLayout(self.verticalLayoutGraph)
         mainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(mainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 923, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 951, 22))
         self.menubar.setObjectName("menubar")
         mainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(mainWindow)
@@ -329,17 +349,21 @@ class Ui_MainWindow(QtCore.QObject):
 
     def retranslateUi(self, mainWindow):
         _translate = QtCore.QCoreApplication.translate
-        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash 0.3"))
-        self.inputProjectName.setText(_translate("mainWindow", "My Project"))
-        self.pushButtonRenameProject.setText(_translate("mainWindow", "Rename"))
+        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash 0.4"))
         self.pushButtonNewProject.setText(_translate("mainWindow", "New"))
         self.pushButtonOpenProject.setText(_translate("mainWindow", "Open"))
+        self.inputProjectName.setText(_translate("mainWindow", "My Project"))
+        self.pushButtonRenameProject.setText(_translate("mainWindow", "Rename"))
         self.pushButtonAddData.setText(_translate("mainWindow", "Add data"))
-        self.pushButtonParse.setText(_translate("mainWindow", "Import"))
+        self.pushButtonParse.setText(_translate("mainWindow", "Analyze"))
+        self.pushButtonGroups.setText(_translate("mainWindow", "Groups"))
+        self.pushButtonDelete.setText(_translate("mainWindow", "Delete"))
         self.labelMeanSweep.setText(_translate("mainWindow", "Mean Sweep:"))
         self.labelMeanGroups.setText(_translate("mainWindow", "Mean Groups:"))
         self.labelMetadata.setText(_translate("mainWindow", "Metadata:"))
 
+#       TODO: These instructions are to be moved to a local config
+        self.pushButtonDelete.setEnabled(False)
 
 class Ui_Dialog(QtWidgets.QWidget):
     def setupUi(self, Dialog):
@@ -426,7 +450,6 @@ class UIsub(Ui_MainWindow):
             self.load_dfproj()
         else:
             self.projectname = "My Project"
-            self.projectdf = buildTemplate()
 
         # show dfProj in tableProj
         self.setTableDf(self.projectdf)
@@ -436,16 +459,16 @@ class UIsub(Ui_MainWindow):
         # however, I kinda like the control of putting each of them explicit here and use designer just to get the boxes right visually
         # connecting the same signals we had in original ui test
 
-        self.pushButtonRenameProject.pressed.connect(self.pushedButtonRenameProject)
         self.pushButtonNewProject.pressed.connect(self.pushedButtonNewProject)
         self.pushButtonOpenProject.pressed.connect(self.pushedButtonOpenProject)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
         self.pushButtonParse.pressed.connect(self.pushedButtonParse)
-        #self.pushButtonSelect.pressed.connect(self.pushedButtonSelect)
+        self.pushButtonRenameProject.pressed.connect(self.pushedButtonRenameProject)
+        self.pushButtonGroups.pressed.connect(self.pushedButtonGroups)
+        self.pushButtonDelete.pressed.connect(self.pushedButtonDelete)
+        self.checkBoxLockDelete.stateChanged.connect(self.checkedBoxLockDelete)
 
         self.tableProj.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
-        #self.tableProj.setSelectionMode(QTableView.SingleSelection)
-
         self.tableProj.doubleClicked.connect(self.tableProjDoubleClicked)
         
 
@@ -457,6 +480,21 @@ class UIsub(Ui_MainWindow):
 
         # place current project as folder in project_root, lock project name for now
         # self.projectfolder = self.project_root / self.project
+
+
+    def pushedButtonGroups(self):
+        # Open groups UI (not built)
+        if verbose: print("pushedButtonGroups")
+
+
+    def pushedButtonDelete(self):
+        # TODO: Delete files for selected rows
+        if verbose: print("pushedButtonDelete")
+
+
+    def checkedBoxLockDelete(self, state):
+        if verbose: print("checkedBoxLockDelete", state)
+        self.pushButtonDelete.setEnabled(not state)
 
 
     def write_cfg(self):
@@ -543,19 +581,18 @@ class UIsub(Ui_MainWindow):
         else:
             if verbose: print("No rows selected.")
         # if the file isn't imported, or no file selected, clear the mean graph
-        self.canvas_seaborn = MplCanvas(parent=self.graphMean) # instantiate canvas
-        self.canvas_seaborn.draw()
-        self.canvas_seaborn.show()
+        self.clear_graph()
 
 
     def pushedButtonRenameProject(self):
+        # renameProject
         if verbose: print("pushedButtonRenameProject")
         self.inputProjectName.setReadOnly(False)
         self.inputProjectName.editingFinished.connect(self.renameProject)
-        # renameProject
 
 
     def renameProject(self):
+        #TODO: sanitize path
         # make if not existing
         self.projectfolder.mkdir(exist_ok=True)
         new_project_name = self.inputProjectName.text()
@@ -566,25 +603,39 @@ class UIsub(Ui_MainWindow):
         else:
             self.projectfolder = self.projectfolder.rename(self.projects_folder / new_project_name)
             self.projectname = new_project_name
+            self.inputProjectName.setReadOnly(True)
+            self.write_cfg()
+        
  
-
     def pushedButtonNewProject(self):
         if verbose: print("pushedButtonNewProject")
-        self.inputProjectName.setReadOnly(False)
-        self.inputProjectName.editingFinished.connect(self.newProject)
+        self.projectfolder.mkdir(exist_ok=True)
+        i = 1
+        while True:
+            new_project_name = "Project " + str(i)
+            if (self.projects_folder / new_project_name).exists():
+                if verbose: print(new_project_name, " already exists")
+                i += 1
+            else:
+                self.newProject(new_project_name)
+                break
+
         
-        
-    def newProject(self):
-        new_projectname = self.inputProjectName.text()
-        new_projectfolder = self.projects_folder / new_projectname
+    def newProject(self, new_project_name):
+        new_projectfolder = self.projects_folder / new_project_name
         # check if ok
-        if (self.projects_folder / new_projectname).exists():
+        if (self.projects_folder / new_project_name).exists():
             if verbose: print("The target project name already exists")
-            self.inputProjectName.setText(self.projectname)
         else:
             new_projectfolder.mkdir()
             self.projectfolder = new_projectfolder
-            self.projectname = new_projectname
+            self.projectname = new_project_name
+            self.inputProjectName.setText(self.projectname)
+            self.clear_graph()
+            self.projectdf = buildTemplate()
+            self.setTableDf(self.projectdf)
+            self.save_dfproj()
+            self.write_cfg()
         
     
     def pushedButtonOpenProject(self):
@@ -595,7 +646,9 @@ class UIsub(Ui_MainWindow):
         if verbose: print(f"Received projectfolder: {str(projectfolder)}")
         if (Path(projectfolder) / "project.brainwash").exists():
             self.projectfolder = Path(projectfolder)
+            self.clear_graph()
             self.load_dfproj()
+            self.write_cfg()
 
 
     def pushedButtonAddData(self):
@@ -604,12 +657,6 @@ class UIsub(Ui_MainWindow):
         self.dialog = QtWidgets.QDialog()
         self.ftree = Filetreesub(self.dialog, parent=self, folder=self.user_documents)
         self.dialog.show()
-
-
-    #def pushedButtonSelect(self):
-        # Placeholder; this is later meant to open a dialog to specify what aspects of the data are to be displayed in the graphs        
-        # if verbose:
-        #print("pushedButtonSelect")
 
 
     def pushedButtonParse(self):
