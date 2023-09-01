@@ -6,12 +6,12 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>923</width>
-    <height>957</height>
+    <width>951</width>
+    <height>816</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Brainwash 0.3</string>
+   <string>Brainwash 0.4</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayoutCentralwidget">
@@ -19,6 +19,35 @@
      <layout class="QVBoxLayout" name="verticalLayoutProj" stretch="0,0,0">
       <item>
        <layout class="QHBoxLayout" name="horizontalLayoutProj">
+        <item>
+         <widget class="QPushButton" name="pushButtonNewProject">
+          <property name="maximumSize">
+           <size>
+            <width>50</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>New</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButtonOpenProject">
+          <property name="enabled">
+           <bool>true</bool>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>50</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>Open</string>
+          </property>
+         </widget>
+        </item>
         <item>
          <widget class="QLineEdit" name="inputProjectName">
           <property name="minimumSize">
@@ -37,25 +66,14 @@
         </item>
         <item>
          <widget class="QPushButton" name="pushButtonRenameProject">
+          <property name="maximumSize">
+           <size>
+            <width>65</width>
+            <height>16777215</height>
+           </size>
+          </property>
           <property name="text">
            <string>Rename</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="pushButtonNewProject">
-          <property name="text">
-           <string>New</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="pushButtonOpenProject">
-          <property name="enabled">
-           <bool>true</bool>
-          </property>
-          <property name="text">
-           <string>Open</string>
           </property>
          </widget>
         </item>
@@ -76,16 +94,72 @@
         <item>
          <widget class="QPushButton" name="pushButtonParse">
           <property name="text">
-           <string>Import</string>
+           <string>Analyze</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButtonGroups">
+          <property name="text">
+           <string>Groups</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButtonDelete">
+          <property name="maximumSize">
+           <size>
+            <width>60</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>Delete</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkBoxLockDelete">
+          <property name="maximumSize">
+           <size>
+            <width>15</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string/>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
           </property>
          </widget>
         </item>
        </layout>
       </item>
       <item>
-       <widget class="QTableView" name="tableProj"/>
+       <widget class="QTableView" name="tableProj">
+        <property name="acceptDrops">
+         <bool>true</bool>
+        </property>
+       </widget>
       </item>
      </layout>
+    </item>
+    <item>
+     <spacer name="horizontalSpacer">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <property name="sizeType">
+       <enum>QSizePolicy::Fixed</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>10</width>
+        <height>20</height>
+       </size>
+      </property>
+     </spacer>
     </item>
     <item>
      <layout class="QVBoxLayout" name="verticalLayoutGraph" stretch="0,5,0,5,0,1">
@@ -142,8 +216,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>923</width>
-     <height>21</height>
+     <width>951</width>
+     <height>22</height>
     </rect>
    </property>
   </widget>

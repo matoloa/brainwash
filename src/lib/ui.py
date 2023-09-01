@@ -362,8 +362,6 @@ class Ui_MainWindow(QtCore.QObject):
         self.labelMeanGroups.setText(_translate("mainWindow", "Mean Groups:"))
         self.labelMetadata.setText(_translate("mainWindow", "Metadata:"))
 
-#       TODO: These instructions are to be moved to a local config
-        self.pushButtonDelete.setEnabled(False)
 
 class Ui_Dialog(QtWidgets.QWidget):
     def setupUi(self, Dialog):
@@ -439,6 +437,25 @@ class UIsub(Ui_MainWindow):
 
         self.projectfolder = self.projects_folder / self.projectname
 
+        # Write local cfg, for storage of group colours, zoom levels etc.
+        self.project_cfg_yaml = self.projectfolder / 'project_cfg.yaml'
+        self.delete_locked = True
+        if self.project_cfg_yaml.exists():
+            with self.project_cfg_yaml.open('r') as file:
+                project_cfg = yaml.safe_load(file)
+                self.delete_locked = project_cfg['delete_locked'] == 'True' # Delete lock engaged
+                #print(f"Found project_cfg['delete_locked']:{project_cfg['delete_locked']}")
+                #print(f"Boolean project_cfg:{self.delete_locked}")
+        else:
+            project_cfg = {
+                'delete_locked': str(self.delete_locked),
+            }
+            print("Creating project_cfg:", self.project_cfg_yaml)
+            self.write_project_cfg()
+        # Enforce local cfg
+        self.checkBoxLockDelete.setChecked(self.delete_locked)
+        self.pushButtonDelete.setEnabled(not self.delete_locked)
+
         if not os.path.exists(self.projects_folder):
             os.makedirs(self.projects_folder)
         
@@ -490,14 +507,43 @@ class UIsub(Ui_MainWindow):
     def pushedButtonDelete(self):
         # TODO: Delete files for selected rows
         if verbose: print("pushedButtonDelete")
-
+        selected_indexes = self.tableProj.selectionModel().selectedRows()
+        selected_rows = [row.row() for row in selected_indexes]
+        n_rows = len(selected_rows)
+        if 0 < n_rows:
+            dfProj = self.projectdf
+            dfSelection = dfProj.loc[selected_rows]
+            list_delete = dfSelection['save_file_name'].tolist()
+            #print(f"list_delete: {list_delete}")
+            for file in list_delete:
+                delete_data = self.projectfolder / (file + ".csv")
+                delete_mean = self.projectfolder / (file + "_mean.csv")
+                print(delete_data, delete_mean)
+                #TODO: Actually delete them!
+            self.clear_graph()
+            '''
+            # remove selected rows from projectdf
+            self.projectdf = dfProj.drop(selected_rows)
+            self.projectdf.reset_index(inplace=True, drop=True)
+            self.save_dfproj()
+            self.setTableDf(self.projectdf)
+            '''
+        else:
+            print("No files selected.")
+            
 
     def checkedBoxLockDelete(self, state):
         if verbose: print("checkedBoxLockDelete", state)
-        self.pushButtonDelete.setEnabled(not state)
+        if state == 2:
+            self.delete_locked = True
+        else:
+            self.delete_locked = False
+        self.pushButtonDelete.setEnabled(not self.delete_locked)
+        print(f"self.delete_locked:{self.delete_locked}")
+        self.write_project_cfg()
 
 
-    def write_cfg(self):
+    def write_cfg(self): # config file for program, global stuff
         cfg = {
             'user_documents': str(self.user_documents),
             'projects_folder': str(self.projects_folder),
@@ -507,6 +553,16 @@ class UIsub(Ui_MainWindow):
         new_projectfolder.mkdir(exist_ok=True)
         with self.cfg_yaml.open('w+') as file:
             yaml.safe_dump(cfg, file)
+    
+
+    def write_project_cfg(self): # config file for project, local stuff
+        project_cfg = {
+            'delete_locked': str(self.delete_locked),
+            }
+        new_projectfolder = self.projects_folder / self.projectname
+        new_projectfolder.mkdir(exist_ok=True)
+        with self.project_cfg_yaml.open('w+') as file:
+            yaml.safe_dump(project_cfg, file)
     
     
     def tableProjDoubleClicked(self):
