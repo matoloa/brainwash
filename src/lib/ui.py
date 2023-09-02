@@ -17,6 +17,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
+from datetime import datetime
 
 import parse
 import analysis
@@ -394,14 +395,14 @@ class Ui_Dialog(QtWidgets.QWidget):
 
 
 def buildTemplate():
-    return pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'groupRGB', 'parsetimestamp', 'nSweeps',
-                                                't_stim', 't_stim_method', 't_stim_params',
-                                                't_VEB', 't_VEB_method', 't_VEB_params',
-                                                't_volley_amp', 't_volley_amp_method', 't_volley_amp_params',
-                                                't_volley_slope', 't_volley_slope_method', 't_volley_slope_params',
-                                                't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params',
-                                                't_EPSP_slope', 't_EPSP_slope_method', 't_EPSP_slope_params',
-                                                'exclude', 'comment'])
+    return pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'parsetimestamp', 'nSweeps', #0-6
+                                                't_stim', 't_stim_method', 't_stim_params', #7-9
+                                                't_VEB', 't_VEB_method', 't_VEB_params', #10-12
+                                                't_volley_amp', 't_volley_amp_method', 't_volley_amp_params', #13-15
+                                                't_volley_slope', 't_volley_slope_method', 't_volley_slope_params', #16-18
+                                                't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params', #19-21
+                                                't_EPSP_slope', 't_EPSP_slope_method', 't_EPSP_slope_params', #22-24
+                                                'exclude', 'comment']) #25-26
 
 
 # subclassing Ui_MainWindow to be able to use the unaltered output file from pyuic and QT designer
@@ -666,9 +667,11 @@ class UIsub(Ui_MainWindow):
     def pushedButtonNewProject(self):
         if verbose: print("pushedButtonNewProject")
         self.projectfolder.mkdir(exist_ok=True)
-        i = 1
+        date = datetime.now().strftime('%Y-%m-%d')
+        i = 0
         while True:
-            new_project_name = "Project " + str(i)
+            new_project_name = "Project " + date
+            if i>0: new_project_name = new_project_name + "(" + str(i) + ")"
             if (self.projects_folder / new_project_name).exists():
                 if verbose: print(new_project_name, " already exists")
                 i += 1
@@ -878,36 +881,18 @@ class UIsub(Ui_MainWindow):
     def formatTableProj(self):
         if verbose: print('formatTableProj')
         header = self.tableProj.horizontalHeader()
-        self.tableProj.setColumnHidden(0, True) #host
-        self.tableProj.setColumnHidden(1, True) #path
-        self.tableProj.setColumnHidden(2, True) #checksum
-        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents) #name
-        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents) #group
-        self.tableProj.setColumnHidden(5, True) #rgb
-        self.tableProj.setColumnHidden(6, True) #timestamp (of parsing)
-        self.tableProj.setColumnHidden(7, False) #nSweeps
-        header.setSectionResizeMode(7, QtWidgets.QHeaderView.ResizeToContents)
-        self.tableProj.setColumnHidden(8, True) #t_stim
-        self.tableProj.setColumnHidden(9, True) #t_stim_method
-        self.tableProj.setColumnHidden(10, True) #t_stim_params
-        self.tableProj.setColumnHidden(11, True) #t_VEB
-        self.tableProj.setColumnHidden(12, True) #t_VEB_method
-        self.tableProj.setColumnHidden(13, True) #t_VEB_params
-        self.tableProj.setColumnHidden(14, True) #t_volley_amp
-        self.tableProj.setColumnHidden(15, True) #t_volley_amp_method
-        self.tableProj.setColumnHidden(16, True) #t_volley_amp_params
-        self.tableProj.setColumnHidden(17, True) #t_volley_slope
-        self.tableProj.setColumnHidden(18, True) #t_volley_slope_method
-        self.tableProj.setColumnHidden(19, True) #t_volley_slope_params
-        self.tableProj.setColumnHidden(20, True) #t_EPSP_amp
-        self.tableProj.setColumnHidden(21, True) #t_EPSP_amp_method
-        self.tableProj.setColumnHidden(22, True) #t_EPSP_amp_params
-        self.tableProj.setColumnHidden(23, True) #t_EPSP_slope
-        self.tableProj.setColumnHidden(24, True) #t_EPSP_slope_method
-        self.tableProj.setColumnHidden(25, True) #t_EPSP_slope_params
-        self.tableProj.setColumnHidden(26, True) #exclude
-        self.tableProj.setColumnHidden(27, True) #comments
-
+        dfProj = self.projectdf
+        #hide all columns except these:
+        list_show = [dfProj.columns.get_loc('save_file_name'),
+                     dfProj.columns.get_loc('group'),
+                     dfProj.columns.get_loc('nSweeps')]
+        num_columns = dfProj.shape[1]
+        for col in range(num_columns):
+            if col in list_show:
+                header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+            else:
+                self.tableProj.setColumnHidden(col, True)
+        
 
     def addData(self, dfAdd): # concatenate dataframes of old and new data
         dfProj = self.getdfProj()
