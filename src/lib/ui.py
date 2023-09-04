@@ -394,14 +394,14 @@ class Ui_Dialog(QtWidgets.QWidget):
 
 
 def buildTemplate():
-    return pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'group', 'parsetimestamp', 'nSweeps', #0-6
-                                                't_stim', 't_stim_method', 't_stim_params', #7-9
-                                                't_VEB', 't_VEB_method', 't_VEB_params', #10-12
-                                                't_volley_amp', 't_volley_amp_method', 't_volley_amp_params', #13-15
-                                                't_volley_slope', 't_volley_slope_method', 't_volley_slope_params', #16-18
-                                                't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params', #19-21
-                                                't_EPSP_slope', 't_EPSP_slope_method', 't_EPSP_slope_params', #22-24
-                                                'exclude', 'comment']) #25-26
+    return pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'groups', 'parsetimestamp', 'nSweeps', #0-6
+                                't_stim', 't_stim_method', 't_stim_params', #7-9
+                                't_VEB', 't_VEB_method', 't_VEB_params', #10-12
+                                't_volley_amp', 't_volley_amp_method', 't_volley_amp_params', #13-15
+                                't_volley_slope', 't_volley_slope_method', 't_volley_slope_params', #16-18
+                                't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params', #19-21
+                                't_EPSP_slope', 't_EPSP_slope_method', 't_EPSP_slope_params', #22-24
+                                'exclude', 'comment']) #25-26
 
 
 # subclassing Ui_MainWindow to be able to use the unaltered output file from pyuic and QT designer
@@ -428,17 +428,13 @@ class UIsub(Ui_MainWindow):
             self.user_documents = Path.home() / 'Documents' # Where to look for raw data
             self.projects_folder = self.user_documents / 'Brainwash Projects' # Where to save and read parsed data
             self.projectname = 'My Project'
-            cfg = {
-                'user_documents': str(self.user_documents),
-                'projects_folder': str(self.projects_folder),
-                'projectname': self.projectname
-            }
 
         if not os.path.exists(self.projects_folder):
             os.makedirs(self.projects_folder)
 
         self.projectdf = buildTemplate()
         self.tablemodel = TableModel(self.projectdf)
+        #self.formatTableProj()
         self.tableProj.setModel(self.tablemodel)
 
         self.projectfolder = self.projects_folder / self.projectname
@@ -448,7 +444,7 @@ class UIsub(Ui_MainWindow):
         else:
             self.projectname = "My Project"
             self.projectfolder = self.projects_folder / self.projectname
-            cfg['projectname'] = self.projectname
+            self.setTableDf(self.projectdf)
                 
         self.write_cfg()
 
@@ -502,6 +498,28 @@ class UIsub(Ui_MainWindow):
     def pushedButtonGroups(self):
         # Open groups UI (not built)
         if verbose: print("pushedButtonGroups")
+        # Placeholder function: Assign all selected files to add_group unless they already belong to that group
+        selected_indexes = self.tableProj.selectionModel().selectedRows()
+        selected_rows = [row.row() for row in selected_indexes]
+        n_rows = len(selected_rows)
+        if 0 < n_rows:
+            list_group = ""
+            add_group = "Group1"
+            for i in selected_rows:
+                if self.projectdf.loc[i, 'groups'] == ' ':
+                    self.projectdf.loc[i, 'groups'] = add_group
+                else:
+                    list_group = self.projectdf.loc[i, 'groups']
+                    list_group = list(list_group.split(","))
+                    if add_group not in list_group:
+                        list_group.append(add_group)
+                        self.projectdf.loc[i, 'groups'] = ','.join(map(str,sorted(list_group)))
+                    else:
+                        print(self.projectdf.loc[i, 'save_file_name'], "is already in", add_group)
+                self.save_dfproj()
+                self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
+        else:
+            print("No files selected.")
 
 
     def pushedButtonDelete(self):
@@ -873,6 +891,7 @@ class UIsub(Ui_MainWindow):
                 self.load_dfproj()
         else:
             self.projectfolder.mkdir()
+
         if verbose: print(f"folder: {self.projectfolder} exists: {self.projectfolder.exists()}")
 
            
@@ -889,7 +908,7 @@ class UIsub(Ui_MainWindow):
         dfProj = self.projectdf
         #hide all columns except these:
         list_show = [dfProj.columns.get_loc('save_file_name'),
-                     dfProj.columns.get_loc('group'),
+                     dfProj.columns.get_loc('groups'),
                      dfProj.columns.get_loc('nSweeps')]
         num_columns = dfProj.shape[1]
         for col in range(num_columns):
@@ -903,7 +922,7 @@ class UIsub(Ui_MainWindow):
         dfProj = self.getdfProj()
         dfProj = pd.concat([dfProj, dfAdd])
         dfProj.reset_index(drop=True, inplace=True)
-        dfProj['group'] = dfProj['group'].fillna(' ')
+        dfProj['groups'] = dfProj['groups'].fillna(' ')
         dfProj['nSweeps'] = dfProj['nSweeps'].fillna('...')
         self.set_dfproj(dfProj)
         if verbose: print('addData:', self.getdfProj())
@@ -976,8 +995,8 @@ class Filetreesub(Ui_Dialog):
         dfAdd['path']=paths
         dfAdd['host']='Computer 1'
         dfAdd['checksum']='big number'
-#        dfAdd['save_file_name']=paths
-        dfAdd['group']=None
+        #dfAdd['save_file_name']=paths
+        #dfAdd['groups']=' '
         self.tablemodel.setData(dfAdd)
         # NTH: more intelligent default naming; lowest level unique name?
         # For now, use name + lowest level folder
