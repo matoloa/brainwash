@@ -1,12 +1,11 @@
 from csv import Dialect
-import os
+import os #TODO: replace use by pathlib?
 import sys
 from pathlib import Path
-from tkinter import dialog
 import yaml
 
 import matplotlib
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt #TODO: use instead of matplotlib for smaller import?
 import seaborn as sns
 
 matplotlib.use('Qt5Agg')
@@ -16,7 +15,7 @@ import pandas as pd
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-from PyQt5 import QtCore, QtGui, QtWidgets, uic
+from PyQt5 import QtCore, QtWidgets, QtGui, uic
 from datetime import datetime
 
 import parse
@@ -434,9 +433,24 @@ class UIsub(Ui_MainWindow):
                 'projects_folder': str(self.projects_folder),
                 'projectname': self.projectname
             }
-            self.write_cfg()
+
+        if not os.path.exists(self.projects_folder):
+            os.makedirs(self.projects_folder)
+
+        self.projectdf = buildTemplate()
+        self.tablemodel = TableModel(self.projectdf)
+        self.tableProj.setModel(self.tablemodel)
 
         self.projectfolder = self.projects_folder / self.projectname
+        # If projectfile exists, load it, otherwise create it
+        if Path(self.projectfolder / "project.brainwash").exists():
+            self.load_dfproj()
+        else:
+            self.projectname = "My Project"
+            self.projectfolder = self.projects_folder / self.projectname
+            cfg['projectname'] = self.projectname
+                
+        self.write_cfg()
 
         # Write local cfg, for storage of group colours, zoom levels etc.
         self.project_cfg_yaml = self.projectfolder / 'project_cfg.yaml'
@@ -457,21 +471,6 @@ class UIsub(Ui_MainWindow):
         self.checkBoxLockDelete.setChecked(self.delete_locked)
         self.pushButtonDelete.setEnabled(not self.delete_locked)
 
-        if not os.path.exists(self.projects_folder):
-            os.makedirs(self.projects_folder)
-        
-        self.projectdf = buildTemplate()
-        self.tablemodel = TableModel(self.projectdf)
-        self.tableProj.setModel(self.tablemodel)
-
-        if Path(self.projectfolder / "project.brainwash").exists():
-            self.load_dfproj()
-        else:
-            self.projectname = "My Project"
-
-        # show dfProj in tableProj
-        self.setTableDf(self.projectdf)
-        
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
         # however, I kinda like the control of putting each of them explicit here and use designer just to get the boxes right visually
@@ -516,19 +515,25 @@ class UIsub(Ui_MainWindow):
             dfSelection = dfProj.loc[selected_rows]
             list_delete = dfSelection['save_file_name'].tolist()
             #print(f"list_delete: {list_delete}")
+            self.clear_graph()
             for file in list_delete:
                 delete_data = self.projectfolder / (file + ".csv")
                 delete_mean = self.projectfolder / (file + "_mean.csv")
-                print(delete_data, delete_mean)
-                #TODO: Actually delete them!
-            self.clear_graph()
-            '''
+                if delete_data.exists():
+                    delete_data.unlink()
+                    print(f"Deleted data: {delete_data}")
+                else:
+                    print(f"File not found: {delete_data}")
+                if delete_mean.exists():
+                    delete_mean.unlink()
+                    print(f"Deleted mean: {delete_mean}")
+                else:
+                    print(f"File not found: {delete_mean}")
             # remove selected rows from projectdf
             self.projectdf = dfProj.drop(selected_rows)
             self.projectdf.reset_index(inplace=True, drop=True)
             self.save_dfproj()
-            self.setTableDf(self.projectdf)
-            '''
+            self.setTableDf(self.projectdf) # Force update
         else:
             print("No files selected.")
             
@@ -550,8 +555,8 @@ class UIsub(Ui_MainWindow):
             'projects_folder': str(self.projects_folder),
             'projectname': self.projectname
             }
-        new_projectfolder = self.projects_folder / self.projectname
-        new_projectfolder.mkdir(exist_ok=True)
+#        new_projectfolder = self.projects_folder / self.projectname
+#        new_projectfolder.mkdir(exist_ok=True)
         with self.cfg_yaml.open('w+') as file:
             yaml.safe_dump(cfg, file)
     
@@ -898,7 +903,7 @@ class UIsub(Ui_MainWindow):
         dfProj = self.getdfProj()
         dfProj = pd.concat([dfProj, dfAdd])
         dfProj.reset_index(drop=True, inplace=True)
-        dfProj['group'] = dfProj['group'].fillna('Unassigned')
+        dfProj['group'] = dfProj['group'].fillna(' ')
         dfProj['nSweeps'] = dfProj['nSweeps'].fillna('...')
         self.set_dfproj(dfProj)
         if verbose: print('addData:', self.getdfProj())
