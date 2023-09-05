@@ -288,9 +288,12 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButtonParse = QtWidgets.QPushButton(self.centralwidget)
         self.pushButtonParse.setObjectName("pushButtonParse")
         self.horizontalLayoutData.addWidget(self.pushButtonParse)
-        self.pushButtonGroups = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButtonGroups.setObjectName("pushButtonGroups")
-        self.horizontalLayoutData.addWidget(self.pushButtonGroups)
+        self.pushButtonAddGroup = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonAddGroup.setObjectName("pushButtonAddGroup")
+        self.horizontalLayoutData.addWidget(self.pushButtonAddGroup)
+        self.pushButtonEditGroups = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonEditGroups.setObjectName("pushButtonEditGroups")
+        self.horizontalLayoutData.addWidget(self.pushButtonEditGroups)
         self.pushButtonDelete = QtWidgets.QPushButton(self.centralwidget)
         self.pushButtonDelete.setMaximumSize(QtCore.QSize(60, 16777215))
         self.pushButtonDelete.setObjectName("pushButtonDelete")
@@ -302,6 +305,9 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBoxLockDelete.setObjectName("checkBoxLockDelete")
         self.horizontalLayoutData.addWidget(self.checkBoxLockDelete)
         self.verticalLayoutProj.addLayout(self.horizontalLayoutData)
+        self.gridLayout = QtWidgets.QGridLayout()
+        self.gridLayout.setObjectName("gridLayout")
+        self.verticalLayoutProj.addLayout(self.gridLayout)
         self.tableProj = QtWidgets.QTableView(self.centralwidget)
         self.tableProj.setAcceptDrops(True)
         self.tableProj.setObjectName("tableProj")
@@ -354,9 +360,10 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButtonOpenProject.setText(_translate("mainWindow", "Open"))
         self.inputProjectName.setText(_translate("mainWindow", "My Project"))
         self.pushButtonRenameProject.setText(_translate("mainWindow", "Rename"))
-        self.pushButtonAddData.setText(_translate("mainWindow", "Add data"))
+        self.pushButtonAddData.setText(_translate("mainWindow", "Add Data"))
         self.pushButtonParse.setText(_translate("mainWindow", "Analyze"))
-        self.pushButtonGroups.setText(_translate("mainWindow", "Groups"))
+        self.pushButtonAddGroup.setText(_translate("mainWindow", "Add Group"))
+        self.pushButtonEditGroups.setText(_translate("mainWindow", "Edit Groups"))
         self.pushButtonDelete.setText(_translate("mainWindow", "Delete"))
         self.labelMeanSweep.setText(_translate("mainWindow", "Mean Sweep:"))
         self.labelMeanGroups.setText(_translate("mainWindow", "Mean Groups:"))
@@ -411,7 +418,7 @@ class UIsub(Ui_MainWindow):
         self.setupUi(mainwindow)
         if verbose: print(' - UIsub init, verbose mode') # rename for clarity
 
-        # load cfg if preseunused] + list(Path.cwd().parents)
+        # load cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find('brainwash')) & (str(i).find('src') == -1)][0] # path to brainwash directory
         self.cfg_yaml = self.repo_root / 'cfg.yaml'
@@ -434,7 +441,6 @@ class UIsub(Ui_MainWindow):
 
         self.projectdf = buildTemplate()
         self.tablemodel = TableModel(self.projectdf)
-        #self.formatTableProj()
         self.tableProj.setModel(self.tablemodel)
 
         self.projectfolder = self.projects_folder / self.projectname
@@ -445,27 +451,32 @@ class UIsub(Ui_MainWindow):
             self.projectname = "My Project"
             self.projectfolder = self.projects_folder / self.projectname
             self.setTableDf(self.projectdf)
-                
         self.write_cfg()
 
         # Write local cfg, for storage of group colours, zoom levels etc.
         self.project_cfg_yaml = self.projectfolder / 'project_cfg.yaml'
         self.delete_locked = True
+        self.list_groups = []
+        self.dict_groups = {'button_name':'group_name'}
         if self.project_cfg_yaml.exists():
             with self.project_cfg_yaml.open('r') as file:
                 project_cfg = yaml.safe_load(file)
                 self.delete_locked = project_cfg['delete_locked'] == 'True' # Delete lock engaged
+                self.list_groups = project_cfg['list_groups']
                 #print(f"Found project_cfg['delete_locked']:{project_cfg['delete_locked']}")
                 #print(f"Boolean project_cfg:{self.delete_locked}")
         else:
             project_cfg = {
                 'delete_locked': str(self.delete_locked),
+                'list_groups': self.list_groups
             }
             print("Creating project_cfg:", self.project_cfg_yaml)
             self.write_project_cfg()
         # Enforce local cfg
         self.checkBoxLockDelete.setChecked(self.delete_locked)
         self.pushButtonDelete.setEnabled(not self.delete_locked)
+        for group in self.list_groups: # Generate buttons based on groups in project:
+            self.addGroupButton(group)
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
@@ -477,7 +488,8 @@ class UIsub(Ui_MainWindow):
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
         self.pushButtonParse.pressed.connect(self.pushedButtonParse)
         self.pushButtonRenameProject.pressed.connect(self.pushedButtonRenameProject)
-        self.pushButtonGroups.pressed.connect(self.pushedButtonGroups)
+        self.pushButtonAddGroup.pressed.connect(self.pushedButtonAddGroup)
+        self.pushButtonEditGroups.pressed.connect(self.pushedButtonEditGroups)
         self.pushButtonDelete.pressed.connect(self.pushedButtonDelete)
         self.checkBoxLockDelete.stateChanged.connect(self.checkedBoxLockDelete)
 
@@ -495,16 +507,55 @@ class UIsub(Ui_MainWindow):
         # self.projectfolder = self.project_root / self.project
 
 
-    def pushedButtonGroups(self):
+    def pushedButtonEditGroups(self):
         # Open groups UI (not built)
+        if verbose: print("pushedButtonEditGroups")
+
+
+    def pushedButtonAddGroup(self):
         if verbose: print("pushedButtonGroups")
-        # Placeholder function: Assign all selected files to add_group unless they already belong to that group
+        print(f"self.list_groups before {self.list_groups}")
+        i = 0
+        while True:
+            new_group_name = "group_" + str(i)
+            if new_group_name in self.list_groups:
+                if verbose: print(new_group_name, " already exists")
+                i += 1
+            else:
+                self.list_groups.append(new_group_name)
+                print("created", new_group_name)
+                break
+        print(f"self.list_groups after {self.list_groups}")
+        self.write_project_cfg()
+        self.addGroup(new_group_name)
+    
+
+    def addGroup(self, new_group_name):
+        if verbose: print("addGroupButton")
+        self.addGroupButton(new_group_name)
+      
+
+    def addGroupButton(self, group):
+        self.new_button = QtWidgets.QPushButton(group, self.centralwidget)
+        self.new_button.setObjectName(group)
+        self.new_button.clicked.connect(lambda _, button_name=group: self.pushedGroupButton(group))
+        #TODO: arrange in rows of 4
+        self.gridLayout.addWidget(self.new_button, 0, self.gridLayout.columnCount(), 1, 1)
+        #self.gridLayout.addWidget(self.new_button, self.gridLayout.rowCount(), 0, 1, 1)
+
+
+    def pushedGroupButton(self, button_name):
+        if verbose: print("pushedGroupButton", button_name)
+        self.addToGroup(button_name)
+
+
+    def addToGroup(self, add_group):
+    # Placeholder function: Assign all selected files to add_group unless they already belong to that group
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         selected_rows = [row.row() for row in selected_indexes]
         n_rows = len(selected_rows)
         if 0 < n_rows:
             list_group = ""
-            add_group = "Group1"
             for i in selected_rows:
                 if self.projectdf.loc[i, 'groups'] == ' ':
                     self.projectdf.loc[i, 'groups'] = add_group
@@ -582,6 +633,7 @@ class UIsub(Ui_MainWindow):
     def write_project_cfg(self): # config file for project, local stuff
         project_cfg = {
             'delete_locked': str(self.delete_locked),
+            'list_groups': self.list_groups
             }
         new_projectfolder = self.projects_folder / self.projectname
         new_projectfolder.mkdir(exist_ok=True)
@@ -772,6 +824,7 @@ class UIsub(Ui_MainWindow):
         self.projectdf.reset_index(inplace=True, drop=True) # Required for split abf files
         self.save_dfproj()
         self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
+
 
     def getdfProj(self):
         return self.projectdf

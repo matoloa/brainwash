@@ -16,7 +16,7 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayoutCentralwidget">
     <item>
-     <layout class="QVBoxLayout" name="verticalLayoutProj" stretch="0,0,0">
+     <layout class="QVBoxLayout" name="verticalLayoutProj" stretch="0,0,0,0">
       <item>
        <layout class="QHBoxLayout" name="horizontalLayoutProj">
         <item>
@@ -87,7 +87,7 @@
         <item>
          <widget class="QPushButton" name="pushButtonAddData">
           <property name="text">
-           <string>Add data</string>
+           <string>Add Data</string>
           </property>
          </widget>
         </item>
@@ -99,9 +99,16 @@
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="pushButtonGroups">
+         <widget class="QPushButton" name="pushButtonAddGroup">
           <property name="text">
-           <string>Groups</string>
+           <string>Add Group</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButtonEditGroups">
+          <property name="text">
+           <string>Edit Groups</string>
           </property>
          </widget>
         </item>
@@ -135,6 +142,9 @@
          </widget>
         </item>
        </layout>
+      </item>
+      <item>
+       <layout class="QGridLayout" name="gridLayout"/>
       </item>
       <item>
        <widget class="QTableView" name="tableProj">
