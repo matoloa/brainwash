@@ -11,10 +11,12 @@ Useful links:
 ```
 
 ```python
-import sys
 import os
+import sys
 from pathlib import Path
-from PyQt5 import QtWidgets, uic, QtCore, QtGui
+
+from PyQt5 import QtCore, QtGui, QtWidgets, uic
+
 ```
 
 ```python

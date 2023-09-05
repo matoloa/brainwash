@@ -26,17 +26,19 @@ jupyter:
 * Function to display Sample sweeps from first 10 and last 10 of each source file, superimposed, reading points indicated
 
 ```python
+import os  # speak to OS (list dirs)
+from pathlib import Path
+
+import matplotlib.pyplot as plt  # plotting
 import numpy as np  # numeric calculations module
 import pandas as pd  # dataframe module, think excel, but good
-import os  # speak to OS (list dirs)
-import matplotlib.pyplot as plt  # plotting
-import seaborn as sns  # plotting
 import pyabf  # read data files atf, abf
-from neo import io  # read data files ibw
 import scipy  # peakfinder and other useful analysis tools
-from tqdm.notebook import tqdm
-from pathlib import Path
+import seaborn as sns  # plotting
+from neo import io  # read data files ibw
 from sklearn import linear_model
+from tqdm.notebook import tqdm
+
 from joblib import Memory
 
 memory = Memory("joblib", verbose=1)

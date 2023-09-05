@@ -14,18 +14,19 @@ jupyter:
 ---
 
 ```python
-import numpy as np              # numeric calculations module
-import pandas as pd             # dataframe module, think excel, but good
-import os                       # speak to OS (list dirs)
-import matplotlib.pyplot as plt # plotting
-import seaborn as sns           # plotting
-import pyabf                    # read data files atf, abf
-from neo import io              # read data files ibw
-import scipy                    # peakfinder and other useful analysis tools
-from tqdm.notebook import tqdm
+import os  # speak to OS (list dirs)
 from pathlib import Path
+
+import matplotlib.pyplot as plt  # plotting
+import numpy as np  # numeric calculations module
+import pandas as pd  # dataframe module, think excel, but good
+import pyabf  # read data files atf, abf
+import scipy  # peakfinder and other useful analysis tools
+import seaborn as sns  # plotting
+from neo import io  # read data files ibw
 from sklearn import linear_model
 from sklearn.linear_model import HuberRegressor
+from tqdm.notebook import tqdm
 
 ```
 
@@ -381,6 +382,7 @@ dfplot_EPSP_slope
 ```python
 # get linear regression
 from sklearn import linear_model
+
 reg = linear_model.LinearRegression()
 reg2 = linear_model.LinearRegression()
 

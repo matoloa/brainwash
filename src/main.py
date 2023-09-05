@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 import sys
-from lib.ui import UIsub
-from lib.parse import *
+
 # import lib.method
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtWidgets
 
+# from lib.parse import *
+from lib.ui import UIsub
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = UIsub(MainWindow)

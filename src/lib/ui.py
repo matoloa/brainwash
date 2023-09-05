@@ -1,35 +1,35 @@
-from csv import Dialect
-import os #TODO: replace use by pathlib?
+import os  # TODO: replace use by pathlib?
 import sys
 from pathlib import Path
 import yaml
 
 import matplotlib
-#import matplotlib.pyplot as plt #TODO: use instead of matplotlib for smaller import?
+
+# import matplotlib.pyplot as plt # TODO: use instead of matplotlib for smaller import?
 import seaborn as sns
 
-matplotlib.use('Qt5Agg')
-
-import numpy as np
 import pandas as pd
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+
+# from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-from PyQt5 import QtCore, QtWidgets, QtGui, uic
+from PyQt5 import QtCore, QtWidgets
 from datetime import datetime
 
 import parse
 import analysis
 
+matplotlib.use("Qt5Agg")
+
 verbose = True
+
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
         super(TableModel, self).__init__()
         self._data = data
 
-
-    def data(self, index, role=None): # dataCell
+    def data(self, index, role=None):  # dataCell
         if role is None:
             value = self._data.iloc[index.row(), index.column()]
             return value
@@ -37,21 +37,17 @@ class TableModel(QtCore.QAbstractTableModel):
             value = self._data.iloc[index.row(), index.column()]
             return str(value)
 
-
     def dataRow(self, index, role=None):
         # TODO: return entire selected row
         if role is None:
             value = self._data.iloc[index.row(), :]
             return value
 
-
     def rowCount(self, index):
         return self._data.shape[0]
 
-
     def columnCount(self, index):
         return self._data.shape[1]
-
 
     def headerData(self, section, orientation, role):
         # section is the index of the column/row.
@@ -62,36 +58,35 @@ class TableModel(QtCore.QAbstractTableModel):
             if orientation == QtCore.Qt.Vertical:
                 return str(self._data.index[section])
 
-    
-    def setData(self, data: pd.DataFrame=None):
+    def setData(self, data: pd.DataFrame = None):
         if not data is None and type(data) is pd.DataFrame:
             self.beginResetModel()
             self._data = data
             self.endResetModel()
             return True
-        
+
         return False
 
 
-class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with a FileTreeSelectorView
+class FileTreeSelectorModel(QtWidgets.QFileSystemModel):  # Should be paired with a FileTreeSelectorView
     paths_selected = QtCore.pyqtSignal(list)
-    def __init__(self, parent=None, root_path='.'):
+
+    def __init__(self, parent=None, root_path="."):
         QtWidgets.QFileSystemModel.__init__(self, None)
-        self.root_path      = root_path
+        self.root_path = root_path
         self.verbose = verbose
-        self.checks         = {}
-        self.nodestack      = []
-        self.parent_index   = self.setRootPath(self.root_path)
-        self.root_index     = self.index(self.root_path)
+        self.checks = {}
+        self.nodestack = []
+        self.parent_index = self.setRootPath(self.root_path)
+        self.root_index = self.index(self.root_path)
 
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
         self.sort(0, QtCore.Qt.SortOrder.AscendingOrder)
         self.directoryLoaded.connect(self._loaded)
 
-
     def _loaded(self, path):
-        if self.verbose: print('_loaded', self.root_path, self.rowCount(self.parent_index))
-
+        if self.verbose:
+            print("_loaded", self.root_path, self.rowCount(self.parent_index))
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
         if role != QtCore.Qt.CheckStateRole:
@@ -100,10 +95,8 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
             if index.column() == 0:
                 return self.checkState(index)
 
-
     def flags(self, index):
         return QtWidgets.QFileSystemModel.flags(self, index) | QtCore.Qt.ItemIsUserCheckable
-
 
     def checkState(self, index):
         if index in self.checks:
@@ -111,57 +104,54 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
         else:
             return QtCore.Qt.Unchecked
 
-
     def getCheckedPaths(self):
         paths = []
         for k, v in self.checks.items():
-            if (v == 2): # Checked
+            if v == 2:  # Checked
                 paths.append(format(self.filePath(k)))
-        self.paths_selected.emit(paths)    
+        self.paths_selected.emit(paths)
 
-    
     def setData(self, index, value, role):
-        if (role == QtCore.Qt.CheckStateRole and index.column() == 0):
+        if role == QtCore.Qt.CheckStateRole and index.column() == 0:
             self.checks[index] = value
-            if verbose: print('setData(): {}'.format(value))
+            if verbose:
+                print("setData(): {}".format(value))
             return True
         return QtWidgets.QFileSystemModel.setData(self, index, value, role)
 
-
     def traverseDirectory(self, parentindex, callback=None):
-        if verbose: print('traverseDirectory():')
+        if verbose:
+            print("traverseDirectory():")
         callback(parentindex)
         if self.hasChildren(parentindex):
             path = self.filePath(parentindex)
-            it = QtCore.QDirIterator(path, self.filter()  | QtCore.QDir.NoDotAndDotDot)
+            it = QtCore.QDirIterator(path, self.filter() | QtCore.QDir.NoDotAndDotDot)
             while it.hasNext():
-                childIndex =  self.index(it.next())
+                childIndex = self.index(it.next())
                 self.traverseDirectory(childIndex, callback=callback)
         else:
-            print('no children')
-
+            print("no children")
 
     def printIndex(self, index):
-        print('model printIndex(): {}'.format(self.filePath(index)))
+        print("model printIndex(): {}".format(self.filePath(index)))
 
 
 class FileTreeSelectorDialog(QtWidgets.QWidget):
-    def __init__(self, parent=None, root_path='.'):
+    def __init__(self, parent=None, root_path="."):
         super().__init__(parent)
 
-
     def delayedInitForRootPath(self, root_path):
-        self.root_path      = str(root_path)
+        self.root_path = str(root_path)
 
         # Model
-        self.model          = FileTreeSelectorModel(root_path=self.root_path)
+        self.model = FileTreeSelectorModel(root_path=self.root_path)
         # self.model          = QtWidgets.QFileSystemModel()
 
         # view
-        self.view           = QtWidgets.QTreeView()
+        self.view = QtWidgets.QTreeView()
 
-        self.view.setObjectName('treeView_fileTreeSelector')
-        self.view.setWindowTitle("Dir View")    #TODO:  Which title?
+        self.view.setObjectName("treeView_fileTreeSelector")
+        self.view.setWindowTitle("Dir View")  # TODO:  Which title?
         self.view.setSortingEnabled(False)
 
         # Attach Model to View
@@ -173,17 +163,16 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
         self.view.setColumnWidth(1, 100)
         self.view.setColumnWidth(2, 50)
         self.view.setColumnHidden(3, True)
-        
+
         # Misc
-        self.node_stack     = []
+        self.node_stack = []
 
         # GUI
         windowlayout = QtWidgets.QVBoxLayout()
         windowlayout.addWidget(self.view)
         self.setLayout(windowlayout)
 
-        #QtCore.QMetaObject.connectSlotsByName(self)
-
+        # QtCore.QMetaObject.connectSlotsByName(self)
 
     @QtCore.pyqtSlot(QtCore.QModelIndex)
     def on_treeView_fileTreeSelector_clicked(self, index):
@@ -199,10 +188,11 @@ class MplCanvas(FigureCanvasQTAgg):
         self.setParent(parent)
 
 
-########################################################################
-##### section directly copied from output from pyuic, do not alter #####
-##### WARNING: changed parent class 'object' to 'QtCore.QObject'   #####
-########################################################################
+################################################################
+# section directly copied from output from pyuic, do not alter #
+# WARNING: changed parent class 'object' to 'QtCore.QObject'   #
+################################################################
+
 
 class Ui_measure_window(QtCore.QObject):
     def setupUi(self, measure):
@@ -238,14 +228,14 @@ class Ui_measure_window(QtCore.QObject):
     def retranslateUi(self, measure):
         _translate = QtCore.QCoreApplication.translate
         measure.setWindowTitle(_translate("measure", "Placeholder Window Title"))
-    
 
-########################################################################
-##### section directly copied from output from pyuic, do not alter #####
-##### trying to make all the rest work with it                     #####
-##### WARNING: I was forced to change the parent class from        #####
-##### 'object' to 'QtCore.QObject' for the pyqtSlot(list) to work  #####
-########################################################################
+
+################################################################
+# section directly copied from output from pyuic, do not alter #
+# trying to make all the rest work with it                     #
+# WARNING: I was forced to change the parent class from        #
+# 'object' to 'QtCore.QObject' for the pyqtSlot(list) to work  #
+################################################################
 
 
 class Ui_MainWindow(QtCore.QObject):
@@ -377,7 +367,7 @@ class Ui_Dialog(QtWidgets.QWidget):
         self.buttonBox = QtWidgets.QDialogButtonBox(Dialog)
         self.buttonBox.setGeometry(QtCore.QRect(930, 480, 161, 32))
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.widget = FileTreeSelectorDialog(Dialog)
         self.widget.setGeometry(QtCore.QRect(10, 10, 451, 501))
@@ -391,7 +381,6 @@ class Ui_Dialog(QtWidgets.QWidget):
         self.buttonBox.rejected.connect(Dialog.reject)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
 
-
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Dialog"))
@@ -401,14 +390,37 @@ class Ui_Dialog(QtWidgets.QWidget):
 
 
 def buildTemplate():
-    return pd.DataFrame(columns=['host', 'path', 'checksum', 'save_file_name', 'groups', 'parsetimestamp', 'nSweeps', #0-6
-                                't_stim', 't_stim_method', 't_stim_params', #7-9
-                                't_VEB', 't_VEB_method', 't_VEB_params', #10-12
-                                't_volley_amp', 't_volley_amp_method', 't_volley_amp_params', #13-15
-                                't_volley_slope', 't_volley_slope_method', 't_volley_slope_params', #16-18
-                                't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params', #19-21
-                                't_EPSP_slope', 't_EPSP_slope_method', 't_EPSP_slope_params', #22-24
-                                'exclude', 'comment']) #25-26
+    return pd.DataFrame(
+        columns=[
+            "host",
+            "path",
+            "checksum",
+            "save_file_name",
+            "groups",
+            "parsetimestamp",
+            "nSweeps",
+            "t_stim",
+            "t_stim_method",
+            "t_stim_params",
+            "t_VEB",
+            "t_VEB_method",
+            "t_VEB_params",
+            "t_volley_amp",
+            "t_volley_amp_method",
+            "t_volley_amp_params",
+            "t_volley_slope",
+            "t_volley_slope_method",
+            "t_volley_slope_params",
+            "t_EPSP_amp",
+            "t_EPSP_amp_method",
+            "t_EPSP_amp_params",
+            "t_EPSP_slope",
+            "t_EPSP_slope_method",
+            "t_EPSP_slope_params",
+            "exclude",
+            "comment",
+        ]
+    )
 
 
 # subclassing Ui_MainWindow to be able to use the unaltered output file from pyuic and QT designer
@@ -416,25 +428,26 @@ class UIsub(Ui_MainWindow):
     def __init__(self, mainwindow):
         super(UIsub, self).__init__()
         self.setupUi(mainwindow)
-        if verbose: print(' - UIsub init, verbose mode') # rename for clarity
+        if verbose:
+            print(" - UIsub init, verbose mode")  # rename for clarity
 
         # load cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
-        self.repo_root = [i for i in paths if (-1 < str(i).find('brainwash')) & (str(i).find('src') == -1)][0] # path to brainwash directory
-        self.cfg_yaml = self.repo_root / 'cfg.yaml'
+        self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
+        self.cfg_yaml = self.repo_root / "cfg.yaml"
         self.projectname = None
         self.inputProjectName.setReadOnly(True)
 
         if self.cfg_yaml.exists():
-            with self.cfg_yaml.open('r') as file:
+            with self.cfg_yaml.open("r") as file:
                 cfg = yaml.safe_load(file)
-                self.user_documents = Path(cfg['user_documents']) # Where to look for raw data
-                self.projects_folder = Path(cfg['projects_folder']) # Where to save and read parsed data
-                self.projectname = cfg['projectname']
+                self.user_documents = Path(cfg["user_documents"])  # Where to look for raw data
+                self.projects_folder = Path(cfg["projects_folder"])  # Where to save and read parsed data
+                self.projectname = cfg["projectname"]
         else:
-            self.user_documents = Path.home() / 'Documents' # Where to look for raw data
-            self.projects_folder = self.user_documents / 'Brainwash Projects' # Where to save and read parsed data
-            self.projectname = 'My Project'
+            self.user_documents = Path.home() / "Documents"  # Where to look for raw data
+            self.projects_folder = self.user_documents / "Brainwash Projects"  # Where to save and read parsed data
+            self.projectname = "My Project"
 
         if not os.path.exists(self.projects_folder):
             os.makedirs(self.projects_folder)
@@ -454,28 +467,25 @@ class UIsub(Ui_MainWindow):
         self.write_cfg()
 
         # Write local cfg, for storage of group colours, zoom levels etc.
-        self.project_cfg_yaml = self.projectfolder / 'project_cfg.yaml'
+        self.project_cfg_yaml = self.projectfolder / "project_cfg.yaml"
         self.delete_locked = True
         self.list_groups = []
-        self.dict_groups = {'button_name':'group_name'}
+        self.dict_groups = {"button_name": "group_name"}
         if self.project_cfg_yaml.exists():
-            with self.project_cfg_yaml.open('r') as file:
+            with self.project_cfg_yaml.open("r") as file:
                 project_cfg = yaml.safe_load(file)
-                self.delete_locked = project_cfg['delete_locked'] == 'True' # Delete lock engaged
-                self.list_groups = project_cfg['list_groups']
-                #print(f"Found project_cfg['delete_locked']:{project_cfg['delete_locked']}")
-                #print(f"Boolean project_cfg:{self.delete_locked}")
+                self.delete_locked = project_cfg["delete_locked"] == "True"  # Delete lock engaged
+                self.list_groups = project_cfg["list_groups"]
+                # print(f"Found project_cfg['delete_locked']:{project_cfg['delete_locked']}")
+                # print(f"Boolean project_cfg:{self.delete_locked}")
         else:
-            project_cfg = {
-                'delete_locked': str(self.delete_locked),
-                'list_groups': self.list_groups
-            }
+            project_cfg = {"delete_locked": str(self.delete_locked), "list_groups": self.list_groups}
             print("Creating project_cfg:", self.project_cfg_yaml)
             self.write_project_cfg()
         # Enforce local cfg
         self.checkBoxLockDelete.setChecked(self.delete_locked)
         self.pushButtonDelete.setEnabled(not self.delete_locked)
-        for group in self.list_groups: # Generate buttons based on groups in project:
+        for group in self.list_groups:  # Generate buttons based on groups in project:
             self.addGroupButton(group)
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
@@ -495,31 +505,31 @@ class UIsub(Ui_MainWindow):
 
         self.tableProj.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
         self.tableProj.doubleClicked.connect(self.tableProjDoubleClicked)
-        
 
         selection_model = self.tableProj.selectionModel()
-        #selection_model.selectionChanged.connect(lambda x: print(self.tablemodel.dataRow(x.indexes()[0])))
+        # selection_model.selectionChanged.connect(lambda x: print(self.tablemodel.dataRow(x.indexes()[0])))
         selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
-        #self.tablemodel.setData(self.projectdf)
-        #self.tableProj.update()
+        # self.tablemodel.setData(self.projectdf)
+        # self.tableProj.update()
 
         # place current project as folder in project_root, lock project name for now
         # self.projectfolder = self.project_root / self.project
 
-
     def pushedButtonEditGroups(self):
         # Open groups UI (not built)
-        if verbose: print("pushedButtonEditGroups")
-
+        if verbose:
+            print("pushedButtonEditGroups")
 
     def pushedButtonAddGroup(self):
-        if verbose: print("pushedButtonGroups")
+        if verbose:
+            print("pushedButtonGroups")
         print(f"self.list_groups before {self.list_groups}")
         i = 0
         while True:
             new_group_name = "group_" + str(i)
             if new_group_name in self.list_groups:
-                if verbose: print(new_group_name, " already exists")
+                if verbose:
+                    print(new_group_name, " already exists")
                 i += 1
             else:
                 self.list_groups.append(new_group_name)
@@ -528,62 +538,60 @@ class UIsub(Ui_MainWindow):
         print(f"self.list_groups after {self.list_groups}")
         self.write_project_cfg()
         self.addGroup(new_group_name)
-    
 
     def addGroup(self, new_group_name):
-        if verbose: print("addGroupButton")
+        if verbose:
+            print("addGroupButton")
         self.addGroupButton(new_group_name)
-      
 
     def addGroupButton(self, group):
         self.new_button = QtWidgets.QPushButton(group, self.centralwidget)
         self.new_button.setObjectName(group)
         self.new_button.clicked.connect(lambda _, button_name=group: self.pushedGroupButton(group))
-        #TODO: arrange in rows of 4
+        # TODO: arrange in rows of 4
         self.gridLayout.addWidget(self.new_button, 0, self.gridLayout.columnCount(), 1, 1)
-        #self.gridLayout.addWidget(self.new_button, self.gridLayout.rowCount(), 0, 1, 1)
-
+        # self.gridLayout.addWidget(self.new_button, self.gridLayout.rowCount(), 0, 1, 1)
 
     def pushedGroupButton(self, button_name):
-        if verbose: print("pushedGroupButton", button_name)
+        if verbose:
+            print("pushedGroupButton", button_name)
         self.addToGroup(button_name)
 
-
     def addToGroup(self, add_group):
-    # Placeholder function: Assign all selected files to add_group unless they already belong to that group
+        # Placeholder function: Assign all selected files to add_group unless they already belong to that group
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         selected_rows = [row.row() for row in selected_indexes]
         n_rows = len(selected_rows)
         if 0 < n_rows:
             list_group = ""
             for i in selected_rows:
-                if self.projectdf.loc[i, 'groups'] == ' ':
-                    self.projectdf.loc[i, 'groups'] = add_group
+                if self.projectdf.loc[i, "groups"] == " ":
+                    self.projectdf.loc[i, "groups"] = add_group
                 else:
-                    list_group = self.projectdf.loc[i, 'groups']
+                    list_group = self.projectdf.loc[i, "groups"]
                     list_group = list(list_group.split(","))
                     if add_group not in list_group:
                         list_group.append(add_group)
-                        self.projectdf.loc[i, 'groups'] = ','.join(map(str,sorted(list_group)))
+                        self.projectdf.loc[i, "groups"] = ",".join(map(str, sorted(list_group)))
                     else:
-                        print(self.projectdf.loc[i, 'save_file_name'], "is already in", add_group)
+                        print(self.projectdf.loc[i, "save_file_name"], "is already in", add_group)
                 self.save_dfproj()
                 self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
         else:
             print("No files selected.")
 
-
     def pushedButtonDelete(self):
         # TODO: Delete files for selected rows
-        if verbose: print("pushedButtonDelete")
+        if verbose:
+            print("pushedButtonDelete")
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         selected_rows = [row.row() for row in selected_indexes]
         n_rows = len(selected_rows)
         if 0 < n_rows:
             dfProj = self.projectdf
             dfSelection = dfProj.loc[selected_rows]
-            list_delete = dfSelection['save_file_name'].tolist()
-            #print(f"list_delete: {list_delete}")
+            list_delete = dfSelection["save_file_name"].tolist()
+            # print(f"list_delete: {list_delete}")
             self.clear_graph()
             for file in list_delete:
                 delete_data = self.projectfolder / (file + ".csv")
@@ -602,13 +610,13 @@ class UIsub(Ui_MainWindow):
             self.projectdf = dfProj.drop(selected_rows)
             self.projectdf.reset_index(inplace=True, drop=True)
             self.save_dfproj()
-            self.setTableDf(self.projectdf) # Force update
+            self.setTableDf(self.projectdf)  # Force update
         else:
             print("No files selected.")
-            
 
     def checkedBoxLockDelete(self, state):
-        if verbose: print("checkedBoxLockDelete", state)
+        if verbose:
+            print("checkedBoxLockDelete", state)
         if state == 2:
             self.delete_locked = True
         else:
@@ -617,35 +625,24 @@ class UIsub(Ui_MainWindow):
         print(f"self.delete_locked:{self.delete_locked}")
         self.write_project_cfg()
 
-
-    def write_cfg(self): # config file for program, global stuff
-        cfg = {
-            'user_documents': str(self.user_documents),
-            'projects_folder': str(self.projects_folder),
-            'projectname': self.projectname
-            }
-#        new_projectfolder = self.projects_folder / self.projectname
-#        new_projectfolder.mkdir(exist_ok=True)
-        with self.cfg_yaml.open('w+') as file:
+    def write_cfg(self):  # config file for program, global stuff
+        cfg = {"user_documents": str(self.user_documents), "projects_folder": str(self.projects_folder), "projectname": self.projectname}
+        #        new_projectfolder = self.projects_folder / self.projectname
+        #        new_projectfolder.mkdir(exist_ok=True)
+        with self.cfg_yaml.open("w+") as file:
             yaml.safe_dump(cfg, file)
-    
 
-    def write_project_cfg(self): # config file for project, local stuff
-        project_cfg = {
-            'delete_locked': str(self.delete_locked),
-            'list_groups': self.list_groups
-            }
+    def write_project_cfg(self):  # config file for project, local stuff
+        project_cfg = {"delete_locked": str(self.delete_locked), "list_groups": self.list_groups}
         new_projectfolder = self.projects_folder / self.projectname
         new_projectfolder.mkdir(exist_ok=True)
-        with self.project_cfg_yaml.open('w+') as file:
+        with self.project_cfg_yaml.open("w+") as file:
             yaml.safe_dump(project_cfg, file)
-    
-    
+
     def tableProjDoubleClicked(self):
         self.launchMeasureWindow()
 
-
-    def launchMeasureWindow(self):#, single_index_range):
+    def launchMeasureWindow(self):  # , single_index_range):
         # TODO:find_all_ture_window (if it's already open, focus on it)
         #   How to check for existing windows?
         #   How to shift focus?
@@ -659,28 +656,30 @@ class UIsub(Ui_MainWindow):
 
         qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
         ser_table_row = self.tablemodel.dataRow(qt_index)
-        nSweeps = ser_table_row['nSweeps']
-        if nSweeps == '...':
-            #TODO: Make it import the missing file
-            print('did not find _mean.csv to load. Not imported?')
+        nSweeps = ser_table_row["nSweeps"]
+        if nSweeps == "...":
+            # TODO: Make it import the missing file
+            print("did not find _mean.csv to load. Not imported?")
             return
-        file_name = ser_table_row['save_file_name']
+        file_name = ser_table_row["save_file_name"]
         row_index = ser_table_row.name
-        if verbose: print("launchMeasureWindow", file_name)
+        if verbose:
+            print("launchMeasureWindow", file_name)
 
         # Analysis.py
         all_t = analysis.find_all_t(self.dfmean, verbose=verbose)
         # Break out to variables
-        t_VEB = all_t['t_VEB']
-        t_EPSP_amp = all_t['t_EPSP_amp']
-        t_EPSP_slope = all_t['t_EPSP_slope']
+        t_VEB = all_t["t_VEB"]
+        t_EPSP_amp = all_t["t_EPSP_amp"]
+        t_EPSP_slope = all_t["t_EPSP_slope"]
 
         # Store variables in self.projectdf
-        self.projectdf.loc[row_index, 't_VEB'] = t_VEB
-        self.projectdf.loc[row_index, 't_EPSP_amp'] = t_EPSP_amp
-        self.projectdf.loc[row_index, 't_EPSP_slope'] = t_EPSP_slope
+        self.projectdf.loc[row_index, "t_VEB"] = t_VEB
+        self.projectdf.loc[row_index, "t_EPSP_amp"] = t_EPSP_amp
+        self.projectdf.loc[row_index, "t_EPSP_slope"] = t_EPSP_slope
 
-        if verbose: print(f"projectdf: {self.projectdf}")
+        if verbose:
+            print(f"projectdf: {self.projectdf}")
 
         # Open window
         self.measure = QtWidgets.QDialog()
@@ -690,9 +689,9 @@ class UIsub(Ui_MainWindow):
 
         self.measure_window_sub.setMeasureGraph(file_name, self.dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
 
-
     def tableProjSelectionChanged(self):
-        if verbose: print("tableProjSelectionChanged")
+        if verbose:
+            print("tableProjSelectionChanged")
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         selected_rows = [row.row() for row in selected_indexes]
         n_rows = len(selected_rows)
@@ -700,66 +699,69 @@ class UIsub(Ui_MainWindow):
         if 0 < n_rows:
             dfProj = self.projectdf
             dfSelection = dfProj.loc[selected_rows]
-            dfFiltered = dfSelection[dfSelection['nSweeps'] != '...']
-            list_files_filtered = dfFiltered['save_file_name'].tolist()
+            dfFiltered = dfSelection[dfSelection["nSweeps"] != "..."]
+            list_files_filtered = dfFiltered["save_file_name"].tolist()
             if not dfFiltered.empty:
-                if len(list_files_filtered) == 1: # exactly one file selected
+                if len(list_files_filtered) == 1:  # exactly one file selected
                     self.setGraph(list_files_filtered[-1])
-                else: # several files selected
+                else:  # several files selected
                     self.setGraphs(list_files_filtered)
             else:
                 print("Selection not analyzed.")
             return
         else:
-            if verbose: print("No rows selected.")
+            if verbose:
+                print("No rows selected.")
         # if the file isn't imported, or no file selected, clear the mean graph
         self.clear_graph()
 
-
     def pushedButtonRenameProject(self):
         # renameProject
-        if verbose: print("pushedButtonRenameProject")
+        if verbose:
+            print("pushedButtonRenameProject")
         self.inputProjectName.setReadOnly(False)
         self.inputProjectName.editingFinished.connect(self.renameProject)
 
-
     def renameProject(self):
-        #TODO: sanitize path
+        # TODO: sanitize path
         # make if not existing
         self.projectfolder.mkdir(exist_ok=True)
         new_project_name = self.inputProjectName.text()
         # check if ok
         if (self.projects_folder / new_project_name).exists():
-            if verbose: print("The target project name already exists")
+            if verbose:
+                print("The target project name already exists")
             self.inputProjectName.setText(self.projectname)
         else:
             self.projectfolder = self.projectfolder.rename(self.projects_folder / new_project_name)
             self.projectname = new_project_name
             self.inputProjectName.setReadOnly(True)
             self.write_cfg()
-        
- 
+
     def pushedButtonNewProject(self):
-        if verbose: print("pushedButtonNewProject")
+        if verbose:
+            print("pushedButtonNewProject")
         self.projectfolder.mkdir(exist_ok=True)
-        date = datetime.now().strftime('%Y-%m-%d')
+        date = datetime.now().strftime("%Y-%m-%d")
         i = 0
         while True:
             new_project_name = "Project " + date
-            if i>0: new_project_name = new_project_name + "(" + str(i) + ")"
+            if i > 0:
+                new_project_name = new_project_name + "(" + str(i) + ")"
             if (self.projects_folder / new_project_name).exists():
-                if verbose: print(new_project_name, " already exists")
+                if verbose:
+                    print(new_project_name, " already exists")
                 i += 1
             else:
                 self.newProject(new_project_name)
                 break
 
-        
     def newProject(self, new_project_name):
         new_projectfolder = self.projects_folder / new_project_name
         # check if ok
         if (self.projects_folder / new_project_name).exists():
-            if verbose: print("The target project name already exists")
+            if verbose:
+                print("The target project name already exists")
         else:
             new_projectfolder.mkdir()
             self.projectfolder = new_projectfolder
@@ -770,172 +772,173 @@ class UIsub(Ui_MainWindow):
             self.setTableDf(self.projectdf)
             self.save_dfproj()
             self.write_cfg()
-        
-    
+
     def pushedButtonOpenProject(self):
         # open folder selector dialog
         self.dialog = QtWidgets.QDialog()
-        projectfolder = QtWidgets.QFileDialog.getExistingDirectory(self.dialog, "Open Directory", str(self.projects_folder), 
-                                                            QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks)
-        if verbose: print(f"Received projectfolder: {str(projectfolder)}")
+        projectfolder = QtWidgets.QFileDialog.getExistingDirectory(
+            self.dialog, "Open Directory", str(self.projects_folder), QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks
+        )
+        if verbose:
+            print(f"Received projectfolder: {str(projectfolder)}")
         if (Path(projectfolder) / "project.brainwash").exists():
             self.projectfolder = Path(projectfolder)
             self.clear_graph()
             self.load_dfproj()
             self.write_cfg()
 
-
     def pushedButtonAddData(self):
         # creates file tree for file selection
-        if verbose: print("pushedButtonAddData")
+        if verbose:
+            print("pushedButtonAddData")
         self.dialog = QtWidgets.QDialog()
         self.ftree = Filetreesub(self.dialog, parent=self, folder=self.user_documents)
         self.dialog.show()
 
-
     def pushedButtonParse(self):
         # parse non-parsed files and folders in self.projectdf
-        if verbose: print("pushedButtonParse")
-        update_frame = self.projectdf.copy() # copy from which to remove rows without confusing index
-        frame2add = self.projectdf.iloc[0:0].copy() # new, empty df for adding rows for multi-channel readings, without messing with index
+        if verbose:
+            print("pushedButtonParse")
+        update_frame = self.projectdf.copy()  # copy from which to remove rows without confusing index
+        frame2add = self.projectdf.iloc[0:0].copy()  # new, empty df for adding rows for multi-channel readings, without messing with index
         for i, row in self.projectdf.iterrows():
-            if row['nSweeps'] == '...': # indicates not read before
+            if row["nSweeps"] == "...":  # indicates not read before
                 # check number of channels. If more than one, create new row for each new channel. Re-sort df after loop.
-                result = parse.parseProjFiles(self.projectfolder, row=row) # result is a dict of <channel>:<channel ID>
-                if len(result) > 1: # more than one channel; rename
+                result = parse.parseProjFiles(self.projectfolder, row=row)  # result is a dict of <channel>:<channel ID>
+                if len(result) > 1:  # more than one channel; rename
                     print(len(result), "channels found")
                     for j in result:
-                        row2add = self.projectdf[self.projectdf.index==i].copy()
-                        row2add['save_file_name'] = row2add['save_file_name'] + "_ch_" + str(j)
-                        row2add['nSweeps'] = result[j]
-                        frame2add = pd.concat([frame2add, row2add]) # add new, separate channel rows
-                        update_frame = update_frame[update_frame.index!=i] # destroy original row in update_frame
-                    if verbose: print (f"frame2add:{frame2add}")
-                else: # just one channel - update nSweeps
-                    print (f"result:{result}")
-                    print (f"i:{i}")
-                    update_frame.loc[i, 'nSweeps'] = str(list(result.values())[0])
+                        row2add = self.projectdf[self.projectdf.index == i].copy()
+                        row2add["save_file_name"] = row2add["save_file_name"] + "_ch_" + str(j)
+                        row2add["nSweeps"] = result[j]
+                        frame2add = pd.concat([frame2add, row2add])  # add new, separate channel rows
+                        update_frame = update_frame[update_frame.index != i]  # destroy original row in update_frame
+                    if verbose:
+                        print(f"frame2add:{frame2add}")
+                else:  # just one channel - update nSweeps
+                    print(f"result:{result}")
+                    print(f"i:{i}")
+                    update_frame.loc[i, "nSweeps"] = str(list(result.values())[0])
                 # TODO: NTH - new visual progress report (old one dysfunctional with index-preserving update_frame appraoch)
             else:
                 print(i, "already exists: no action")
 
         self.projectdf = pd.concat([update_frame, frame2add])
-        if verbose: print(f"update_frame: {update_frame}")
-        self.projectdf.reset_index(inplace=True, drop=True) # Required for split abf files
+        if verbose:
+            print(f"update_frame: {update_frame}")
+        self.projectdf.reset_index(inplace=True, drop=True)  # Required for split abf files
         self.save_dfproj()
         self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
 
-
     def getdfProj(self):
         return self.projectdf
-
 
     def load_dfproj(self):
         self.projectdf = pd.read_csv(str(self.projectfolder / "project.brainwash"))
         self.setTableDf(self.projectdf)  # set dfproj to table
         self.inputProjectName.setText(self.projectfolder.stem)  # set foler name to proj name
         self.projectname = self.projectfolder.stem
-        if verbose: print(f"loaded project df: {self.projectdf}")
+        if verbose:
+            print(f"loaded project df: {self.projectdf}")
         self.clear_graph()
         self.write_cfg()
 
-
     def save_dfproj(self):
-        self.projectdf.to_csv(str(self.projectfolder / "project.brainwash"), index=False)        
-
+        self.projectdf.to_csv(str(self.projectfolder / "project.brainwash"), index=False)
 
     def set_dfproj(self, df):
         self.projectdf = df
         self.save_dfproj()
 
-
     def clear_graph(self):
-        if verbose: print('clear_graph')
-        if hasattr(self, 'canvas_seaborn'):
-            if verbose: print('self has attribue canvas_seaborn')
+        if verbose:
+            print("clear_graph")
+        if hasattr(self, "canvas_seaborn"):
+            if verbose:
+                print("self has attribue canvas_seaborn")
             print(f"axes: {self.canvas_seaborn.axes}")
             self.canvas_seaborn.axes.cla()
             self.canvas_seaborn.draw()
             self.canvas_seaborn.show()
 
-
     def setGraph(self, save_file_name):
-        #get dfmean from selected row in UIsub.
+        # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at graphMean
 
-        if verbose: print('setGraph')
+        if verbose:
+            print("setGraph")
         dfmean_path = self.projectfolder / (save_file_name + "_mean.csv")
         print(dfmean_path)
         try:
-            dfmean = pd.read_csv(dfmean_path) # import csv
+            dfmean = pd.read_csv(dfmean_path)  # import csv
         except FileNotFoundError:
-            print('did not find _mean.csv to load. Not imported?')
-        #print("*** *** *** dfmean PRE reset_index:", dfmean)
+            print("did not find _mean.csv to load. Not imported?")
+        # print("*** *** *** dfmean PRE reset_index:", dfmean)
         # dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
-        self.canvas_seaborn = MplCanvas(parent=self.graphMean) # instantiate canvas
+        self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
         dfmean.reset_index(inplace=True, drop=True)
-        #print("*** *** *** dfmean POST reset_index:", dfmean)
-        dfmean['voltage'] = dfmean.voltage / dfmean.voltage.abs().max()
-        dfmean['prim'] = dfmean.prim / dfmean.prim.abs().max()
-        dfmean['bis'] = dfmean.bis / dfmean.bis.abs().max()
-        
+        # print("*** *** *** dfmean POST reset_index:", dfmean)
+        dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
+        dfmean["prim"] = dfmean.prim / dfmean.prim.abs().max()
+        dfmean["bis"] = dfmean.bis / dfmean.bis.abs().max()
+
         g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
         h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
         i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
-        
+
         # TODO: replace hard-coding, overview but not the whole stim-artefact.
         self.canvas_seaborn.axes.set_ylim(-0.05, 0.01)
         self.canvas_seaborn.axes.set_xlim(0.006, 0.015)
 
-        self.dfmean = dfmean # assign to self to make available for launchMeasureWindow()
+        self.dfmean = dfmean  # assign to self to make available for launchMeasureWindow()
 
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
 
-#        dfmean.set_index('t0', inplace=True)
-#        dfmean['slope'] = dfmean.slope / dfmean.slope.abs().max()
-#        dfmean['sweep'] = dfmean.sweep / dfmean.sweep.abs().max()
-#        g = sns.lineplot(data=dfmean, y="slope", x="t0", ax=self.canvas_seaborn.axes, color="black")
-#        h = sns.lineplot(data=dfmean, y="sweep", x="t0", ax=self.canvas_seaborn.axes, color="red")
-#        self.canvas_seaborn.draw()
-#        self.canvas_seaborn.show()
-
+    #        dfmean.set_index('t0', inplace=True)
+    #        dfmean['slope'] = dfmean.slope / dfmean.slope.abs().max()
+    #        dfmean['sweep'] = dfmean.sweep / dfmean.sweep.abs().max()
+    #        g = sns.lineplot(data=dfmean, y="slope", x="t0", ax=self.canvas_seaborn.axes, color="black")
+    #        h = sns.lineplot(data=dfmean, y="sweep", x="t0", ax=self.canvas_seaborn.axes, color="red")
+    #        self.canvas_seaborn.draw()
+    #        self.canvas_seaborn.show()
 
     def setGraphs(self, list_files_filtered):
         # plot the mean voltages of several selected files
-        #print(f"list_files_filtered: {list_files_filtered}")
+        # print(f"list_files_filtered: {list_files_filtered}")
 
-        if verbose: print('setGraphs')
+        if verbose:
+            print("setGraphs")
 
         dfmeans = []
         for file in list_files_filtered:
             dfmean_path = self.projectfolder / (file + "_mean.csv")
-            #print(f"df_mean_path: {dfmean_path}")
+            # print(f"df_mean_path: {dfmean_path}")
             try:
                 df = pd.read_csv(dfmean_path)
             except FileNotFoundError:
-                print('did not find _mean.csv to load. Not imported?')
+                print("did not find _mean.csv to load. Not imported?")
             dfmeans.append(df)
-            #dfmeans = pd.concat([dfmeans, df], ignore_index=True, axis=0) #TODO: make functional
+            # dfmeans = pd.concat([dfmeans, df], ignore_index=True, axis=0) #TODO: make functional
 
-        self.canvas_seaborn = MplCanvas(parent=self.graphMean) # instantiate canvas
+        self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
         for dfmeanfile in dfmeans:
-            #sns.lineplot(data=dfmeanfile, x='time', y='voltage')
-            dfmeanfile['voltage'] = dfmeanfile.voltage / dfmeanfile.voltage.abs().max()
+            # sns.lineplot(data=dfmeanfile, x='time', y='voltage')
+            dfmeanfile["voltage"] = dfmeanfile.voltage / dfmeanfile.voltage.abs().max()
             g = sns.lineplot(data=dfmeanfile, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
 
         self.canvas_seaborn.axes.set_ylim(-0.05, 0.01)
         self.canvas_seaborn.axes.set_xlim(0.006, 0.015)
 
-        #self.dfmean = dfmean # assign to self to make available for launchMeasureWindow()
+        # self.dfmean = dfmean # assign to self to make available for launchMeasureWindow()
 
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
- 
 
     def setProjectname(self):
-        if verbose: print('setProjectname')
-        #get_signals(self.children()[1].children()[1].model)
+        if verbose:
+            print("setProjectname")
+        # get_signals(self.children()[1].children()[1].model)
         self.projectname = self.inputProjectName.text()
         self.projectfolder = self.projects_folder / self.projectname
         if self.projectfolder.exists():
@@ -945,82 +948,81 @@ class UIsub(Ui_MainWindow):
         else:
             self.projectfolder.mkdir()
 
-        if verbose: print(f"folder: {self.projectfolder} exists: {self.projectfolder.exists()}")
+        if verbose:
+            print(f"folder: {self.projectfolder} exists: {self.projectfolder.exists()}")
 
-           
     def setTableDf(self, data):
-        if verbose: print('setTableDf')
+        if verbose:
+            print("setTableDf")
         self.tablemodel.setData(data)
-        self.formatTableProj() #hide/resize columns
+        self.formatTableProj()  # hide/resize columns
         self.tableProj.update()
 
-
     def formatTableProj(self):
-        if verbose: print('formatTableProj')
+        if verbose:
+            print("formatTableProj")
         header = self.tableProj.horizontalHeader()
         dfProj = self.projectdf
-        #hide all columns except these:
-        list_show = [dfProj.columns.get_loc('save_file_name'),
-                     dfProj.columns.get_loc('groups'),
-                     dfProj.columns.get_loc('nSweeps')]
+        # hide all columns except these:
+        list_show = [dfProj.columns.get_loc("save_file_name"), dfProj.columns.get_loc("groups"), dfProj.columns.get_loc("nSweeps")]
         num_columns = dfProj.shape[1]
         for col in range(num_columns):
             if col in list_show:
                 header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
             else:
                 self.tableProj.setColumnHidden(col, True)
-        
 
-    def addData(self, dfAdd): # concatenate dataframes of old and new data
+    def addData(self, dfAdd):  # concatenate dataframes of old and new data
         dfProj = self.getdfProj()
         dfProj = pd.concat([dfProj, dfAdd])
         dfProj.reset_index(drop=True, inplace=True)
-        dfProj['groups'] = dfProj['groups'].fillna(' ')
-        dfProj['nSweeps'] = dfProj['nSweeps'].fillna('...')
+        dfProj["groups"] = dfProj["groups"].fillna(" ")
+        dfProj["nSweeps"] = dfProj["nSweeps"].fillna("...")
         self.set_dfproj(dfProj)
-        if verbose: print('addData:', self.getdfProj())
+        if verbose:
+            print("addData:", self.getdfProj())
         self.setTableDf(dfProj)
-        
-    
+
     @QtCore.pyqtSlot(list)
     def slotPrintPaths(self, mypaths):
-        if verbose: print(f'mystr: {mypaths}')
-        strmystr = "\n".join(sorted(['/'.join(i.split('/')[-2:]) for i in mypaths]))
+        if verbose:
+            print(f"mystr: {mypaths}")
+        strmystr = "\n".join(sorted(["/".join(i.split("/")[-2:]) for i in mypaths]))
         self.textBrowser.setText(strmystr)
-        list_display_names = ['/'.join(i.split('/')[-2:]) for i in mypaths]
-        dftable = pd.DataFrame({'path_source': mypaths, 'save_file_name': list_display_names})
+        list_display_names = ["/".join(i.split("/")[-2:]) for i in mypaths]
+        dftable = pd.DataFrame({"path_source": mypaths, "save_file_name": list_display_names})
         self.setTableDf(dftable)
 
-        
     @QtCore.pyqtSlot()
     def slotAddDfData(self, df):
         self.addData(df)
 
 
 class Filetreesub(Ui_Dialog):
-    def __init__(self, dialog, parent=None, folder='.'):
+    def __init__(self, dialog, parent=None, folder="."):
         super(Filetreesub, self).__init__()
         self.setupUi(dialog)
         self.parent = parent
-        if verbose: print(' - Filetreesub init')
-    
+        if verbose:
+            print(" - Filetreesub init")
+
         self.ftree = self.widget
         # set root_path for file tree model
         self.ftree.delayedInitForRootPath(folder)
-        #self.ftree.model.parent_index   = self.ftree.model.setRootPath(projects_folder)
-        #self.ftree.model.root_index     = self.ftree.model.index(projects_folder)
+        # self.ftree.model.parent_index   = self.ftree.model.setRootPath(projects_folder)
+        # self.ftree.model.root_index     = self.ftree.model.index(projects_folder)
 
         # Dataframe to add
         self.names = []
         self.dfAdd = buildTemplate()
-        
+
         self.buttonBoxAddGroup = QtWidgets.QDialogButtonBox(dialog)
         self.buttonBoxAddGroup.setGeometry(QtCore.QRect(470, 20, 91, 491))
         self.buttonBoxAddGroup.setLayoutDirection(QtCore.Qt.LeftToRight)
         self.buttonBoxAddGroup.setOrientation(QtCore.Qt.Vertical)
         self.buttonBoxAddGroup.setStandardButtons(QtWidgets.QDialogButtonBox.NoButton)
         self.buttonBoxAddGroup.setObjectName("buttonBoxAddGroup")
-        
+
         # Manually added (unconnected) default group buttons - eventually, these must be populated from project.brainwash group names
         self.buttonBoxAddGroup.groupcontrol = QtWidgets.QPushButton(self.tr("&Control"))
         self.buttonBoxAddGroup.groupintervention = QtWidgets.QPushButton(self.tr("&Intervention"))
@@ -1036,52 +1038,52 @@ class Filetreesub(Ui_Dialog):
         self.tablemodel = TableModel(self.dfAdd)
         self.tableView.setModel(self.tablemodel)
 
-
     def addDf(self):
         self.parent.slotAddDfData(self.dfAdd)
 
-
     def pathsSelectedUpdateTable(self, paths):
         # TODO: Extract host, checksum, group
-        if verbose: print('pathsSelectedUpdateTable')
+        if verbose:
+            print("pathsSelectedUpdateTable")
         dfAdd = buildTemplate()
-        dfAdd['path']=paths
-        dfAdd['host']='Computer 1'
-        dfAdd['checksum']='big number'
-        #dfAdd['save_file_name']=paths
-        #dfAdd['groups']=' '
+        dfAdd["path"] = paths
+        dfAdd["host"] = "Computer 1"
+        dfAdd["checksum"] = "big number"
+        # dfAdd['save_file_name']=paths
+        # dfAdd['groups']=' '
         self.tablemodel.setData(dfAdd)
         # NTH: more intelligent default naming; lowest level unique name?
         # For now, use name + lowest level folder
         names = []
         for i in paths:
-            names.append(os.path.basename(os.path.dirname(i)) + '_' + os.path.basename(i))
-        dfAdd['save_file_name'] = names
+            names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
+        dfAdd["save_file_name"] = names
         self.dfAdd = dfAdd
         # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
         # TODO: names that have been set manually are stored a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)
         # format tableView
         header = self.tableView.horizontalHeader()
-        self.tableView.setColumnHidden(0, True) #host
-        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents) #path
-        self.tableView.setColumnHidden(2, True) #checksum
-        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents) #name
-        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents) #group
+        self.tableView.setColumnHidden(0, True)  # host
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)  # path
+        self.tableView.setColumnHidden(2, True)  # checksum
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # name
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # group
         self.tableView.update()
 
 
 class Measure_window_sub(Ui_measure_window):
-    def __init__(self, measure_window, parent=None, folder='.'):
+    def __init__(self, measure_window, parent=None, folder="."):
         super(Measure_window_sub, self).__init__()
         self.setupUi(measure_window)
         self.parent = parent
-        if verbose: print(' - measure_window init')
-
+        if verbose:
+            print(" - measure_window init")
 
     def setMeasureGraph(self, save_file_name, dfmean, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
-        if verbose: print('setMeasureGraph', dfmean)
+        if verbose:
+            print("setMeasureGraph", dfmean)
         self.canvas_seaborn = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
 
         # fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
@@ -1093,32 +1095,32 @@ class Measure_window_sub(Ui_measure_window):
         # t_VEB
         print(f"t_VEB: {t_VEB}")
         g.axvline(t_VEB, color="grey", linestyle="--")
-        
+
         # t_EPSP_slope
         g.axvline(t_EPSP_slope - 0.0004, color="green", linestyle=":")
         g.axvline(t_EPSP_slope, color="green", linestyle="--")
         g.axvline(t_EPSP_slope + 0.0004, color="green", linestyle=":")
-        #plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-        
-#        if not title is None:
-#            ax1.set_title(title)
+        # plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+
+        # if not title is None:
+        # ax1.set_title(title)
         self.canvas_seaborn.axes.set_ylim(-0.05, 0.01)
         self.canvas_seaborn.axes.set_xlim(0.006, 0.015)
-        
-        #self.canvas_seaborn.axes.set_xmargin((100,500))
+
+        # self.canvas_seaborn.axes.set_xmargin((100,500))
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
 
 
 def get_signals(source):
-        cls = source if isinstance(source, type) else type(source)
-        signal = type(QtCore.pyqtSignal())
-        print("get_signals:")
-        for subcls in cls.mro():
-            clsname = f'{subcls.__module__}.{subcls.__name__}'
-            for key, value in sorted(vars(subcls).items()):
-                if isinstance(value, signal):
-                    print(f'{key} [{clsname}]')
+    cls = source if isinstance(source, type) else type(source)
+    signal = type(QtCore.pyqtSignal())
+    print("get_signals:")
+    for subcls in cls.mro():
+        clsname = f"{subcls.__module__}.{subcls.__name__}"
+        for key, value in sorted(vars(subcls).items()):
+            if isinstance(value, signal):
+                print(f"{key} [{clsname}]")
 
 
 if __name__ == "__main__":
@@ -1126,5 +1128,5 @@ if __name__ == "__main__":
     MainWindow = QtWidgets.QMainWindow()
     ui = UIsub(MainWindow)
     MainWindow.show()
-    
+
     sys.exit(app.exec_())

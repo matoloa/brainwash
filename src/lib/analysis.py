@@ -1,14 +1,9 @@
 import numpy as np  # numeric calculations module
 import pandas as pd  # dataframe module, think excel, but good
-import os  # speak to OS (list dirs)
-import matplotlib.pyplot as plt  # plotting
-import seaborn as sns  # plotting
-import pyabf  # read data files atf, abf
-from neo import io  # read data files ibw
 import scipy  # peakfinder and other useful analysis tools
-from tqdm.notebook import tqdm
-from pathlib import Path
 from sklearn import linear_model
+from tqdm.notebook import tqdm
+
 from joblib import Memory
 
 memory = Memory("joblib", verbose=1)
@@ -27,8 +22,8 @@ def find_i_EPSP_peak_max(
     dfmean,
     limitleft=0,
     limitright=-1,
-    param_EPSP_minimum_width_ms=5, # width in ms
-    param_EPSP_minimum_prominence_mV=0.001, # what unit? TODO: find out!
+    param_EPSP_minimum_width_ms=5,  # width in ms
+    param_EPSP_minimum_prominence_mV=0.001,  # what unit? TODO: find out!
 ):
     """
     width and limits in index, promincence in Volt
@@ -42,7 +37,9 @@ def find_i_EPSP_peak_max(
     print(f" . . . sampling_Hz: {sampling_Hz}")
 
     # convert EPSP width from ms to index
-    EPSP_minimum_width_i = int(param_EPSP_minimum_width_ms * 0.001 * sampling_Hz) #0.001 for ms to seconds, *sampling_Hz for seconds to recorded points
+    EPSP_minimum_width_i = int(
+        param_EPSP_minimum_width_ms * 0.001 * sampling_Hz
+    )  # 0.001 for ms to seconds, *sampling_Hz for seconds to recorded points
     print(" . . . EPSP is at least", EPSP_minimum_width_i, "points wide")
 
     # scipy.signal.find_peaks returns a tuple
@@ -52,11 +49,11 @@ def find_i_EPSP_peak_max(
         prominence=param_EPSP_minimum_prominence_mV / 1000,
     )
     print(f" . . . i_peaks:{i_peaks}")
-    if len(i_peaks) is 0:
+    if len(i_peaks) == 0:
         print(" . . No peaks in specified interval.")
         return np.nan
     print(f" . . . properties:{properties}")
-    
+
     dfpeaks = dfmean.iloc[i_peaks]
     # dfpeaks = pd.DataFrame(peaks[0]) # Convert to dataframe in order to select only > limitleft
     dfpeaks = dfpeaks[limitleft < dfpeaks.index]
@@ -70,47 +67,49 @@ def find_i_VEB_prim_peak_max(
     dfmean,
     i_Stim,
     i_EPSP,
-    param_minimum_width_of_EPSP=5,   # ms
-    param_minimum_width_of_VEB=1,    # ms
-    param_prim_prominence=0.0001,    # TODO: correct unit for prim?
+    param_minimum_width_of_EPSP=5,  # ms
+    param_minimum_width_of_VEB=1,  # ms
+    param_prim_prominence=0.0001,  # TODO: correct unit for prim?
 ):
     """
     returns index for VEB (Volley-EPSP Bump - notch between volley and EPSP)
     defined as largest positive peak in first order derivative between i_stim and i_EPSP
-    
+
     """
     print("find_i_VEB_prim_peak_max:")
     # calculate sampling frequency
     time_delta = dfmean.time[1] - dfmean.time[0]
     sampling_Hz = 1 / time_delta
     print(f" . . . sampling_Hz: {sampling_Hz}")
-    
+
     # convert time constraints (where to look for the VEB) to indexes
-    minimum_acceptable_i_for_VEB = int(i_Stim + 0.001 * sampling_Hz) # The VEB is not within a ms of the i_stim
-    max_acceptable_i_for_VEB = int(i_EPSP - np.floor((param_minimum_width_of_EPSP * 0.001 * sampling_Hz)/2)) #0.001 for ms to seconds, *sampling_Hz for seconds to recorded points
+    minimum_acceptable_i_for_VEB = int(i_Stim + 0.001 * sampling_Hz)  # The VEB is not within a ms of the i_stim
+    max_acceptable_i_for_VEB = int(
+        i_EPSP - np.floor((param_minimum_width_of_EPSP * 0.001 * sampling_Hz) / 2)
+    )  # 0.001 for ms to seconds, *sampling_Hz for seconds to recorded points
     print(" . . . VEB is between", minimum_acceptable_i_for_VEB, "and", max_acceptable_i_for_VEB)
-    
+
     # create a window to the acceptable range:
-    prim_sample = dfmean["prim"].values[minimum_acceptable_i_for_VEB:max_acceptable_i_for_VEB] 
-    
+    prim_sample = dfmean["prim"].values[minimum_acceptable_i_for_VEB:max_acceptable_i_for_VEB]
+
     # find the sufficiently wide and promintent peaks within this range
     i_peaks, properties = scipy.signal.find_peaks(
         prim_sample,
-        width=param_minimum_width_of_VEB * 1000 / sampling_Hz, # *1000 for ms to seconds, / sampling_Hz for seconds to recorded points
-        prominence=param_prim_prominence / 1000, # TODO: unit?
+        width=param_minimum_width_of_VEB * 1000 / sampling_Hz,  # *1000 for ms to seconds, / sampling_Hz for seconds to recorded points
+        prominence=param_prim_prominence / 1000,  # TODO: unit?
     )
 
     # add skipped range to found indexes
     i_peaks += minimum_acceptable_i_for_VEB
     print(" . . . i_peaks:", i_peaks)
-    if len(i_peaks) is 0:
+    if len(i_peaks) == 0:
         print(" . . No peaks in specified interval.")
         return np.nan
-    #print(f" . . . prim_sample:{list(prim_sample)}")
-    #import matplotlib.pyplot as plt
-    #plt.plot(prim_sample)
+    # print(f" . . . prim_sample:{list(prim_sample)}")
+    # import matplotlib.pyplot as plt
+    # plt.plot(prim_sample)
     print(f" . . . properties:{properties}")
-    
+
     i_VEB = i_peaks[properties["prominences"].argmax()]
     print(f" . . . i_VEB: {i_VEB}")
 
@@ -122,25 +121,19 @@ def find_i_EPSP_slope(dfmean, i_VEB, i_EPSP, happy=False):
 
     dftemp = dfmean.bis[i_VEB:i_EPSP]
     i_EPSP_slope = dftemp[0 < dftemp.apply(np.sign).diff()].index.values
-    
-    if len(i_EPSP_slope) is 0:
+
+    if len(i_EPSP_slope) == 0:
         print(" . . No positive zero-crossings in dfmean.bis[i_VEB: i_EPSP].")
         return np.nan
     if 1 < len(i_EPSP_slope):
         if not happy:
-            raise ValueError(
-                f"Found multiple positive zero-crossings in dfmean.bis[i_VEB: i_EPSP]:{i_EPSP_slope}"
-            )
+            raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[i_VEB: i_EPSP]:{i_EPSP_slope}")
         else:
-            print(
-                "More EPSPs than than we wanted but Im happy, so I pick one and move on."
-            )
+            print("More EPSPs than than we wanted but Im happy, so I pick one and move on.")
     return i_EPSP_slope[0]
 
 
-def find_i_volleyslope(
-    dfmean, i_Stim, i_VEB, happy=False
-):  # , param_half_slope_width = 4):
+def find_i_volleyslope(dfmean, i_Stim, i_VEB, happy=False):  # , param_half_slope_width = 4):
     """
     DOES NOT USE WIDTH! decided by rolling, earlier?
 
@@ -155,13 +148,9 @@ def find_i_volleyslope(
     # print(i_volleyslope)
     if 1 < len(i_volleyslope):
         if not happy:
-            raise ValueError(
-                f"Found multiple positive zero-crossings in dfmean.bis[i_Stim: i_VEB]:{i_volleyslope}"
-            )
+            raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[i_Stim: i_VEB]:{i_volleyslope}")
         else:
-            print(
-                "More volleys than than we wanted but Im happy, so I pick one and move on."
-            )
+            print("More volleys than than we wanted but Im happy, so I pick one and move on.")
     return i_volleyslope[0]
 
 
@@ -180,17 +169,21 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     i_EPSP_slope = np.nan
 
     i_Stim = find_i_stim_prim_max(dfmean)
-    if verbose: print(f"i_Stim:{i_Stim}")
+    if verbose:
+        print(f"i_Stim:{i_Stim}")
     if i_Stim is not np.nan:
         i_EPSP_amp = find_i_EPSP_peak_max(dfmean)
-        if verbose: print(f"i_EPSP_amp:{i_EPSP_amp}")
+        if verbose:
+            print(f"i_EPSP_amp:{i_EPSP_amp}")
         if i_EPSP_amp is not np.nan:
             i_VEB = find_i_VEB_prim_peak_max(dfmean, i_Stim, i_EPSP_amp)
-            if verbose: print(f"i_VEB:{i_VEB}")
+            if verbose:
+                print(f"i_VEB:{i_VEB}")
             if i_VEB is not np.nan:
                 i_EPSP_slope = find_i_EPSP_slope(dfmean, i_VEB, i_EPSP_amp, happy=True)
-                if verbose: print(f"i_EPSP_slope:{i_EPSP_slope}")
-                #if i_EPSP_slope is not np.nan: 
+                if verbose:
+                    print(f"i_EPSP_slope:{i_EPSP_slope}")
+                # if i_EPSP_slope is not np.nan:
 
     """
     i_volleyslope = find_i_volleyslope(
@@ -201,15 +194,17 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     # TODO: change return to {}
     return {"i_Stim": i_Stim, "i_VEB": i_VEB, "i_EPSP_amp": i_EPSP_amp, "i_EPSP_slope": i_EPSP_slope}
 
-    
+
 def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
-    if verbose: print("find_all_t")
+    if verbose:
+        print("find_all_t")
     dict_i = find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False)
     dict_t = {}
     for k, v in dict_i.items():
         k_new = "t" + k[1:]
         dict_t[k_new] = np.nan if v is np.nan else dfmean.loc[v].time
-    if verbose: print(f"dict_t: {dict_t}")
+    if verbose:
+        print(f"dict_t: {dict_t}")
     return dict_t
 
 
@@ -224,10 +219,7 @@ def measureslope(df, i_slope, halfwidth, name="EPSP"):
     dicts = []
     for sweep in tqdm(df.sweep.unique()):
         dftemp1 = df[df.sweep == sweep]
-        dftemp2 = dftemp1[
-            ((i_slope - halfwidth) <= dftemp1.time)
-            & (dftemp1.time <= (i_slope + halfwidth))
-        ]
+        dftemp2 = dftemp1[((i_slope - halfwidth) <= dftemp1.time) & (dftemp1.time <= (i_slope + halfwidth))]
         x = dftemp2.index.values.reshape(-1, 1)
         y = dftemp2.voltage.values.reshape(-1, 1)
 
@@ -246,5 +238,3 @@ def measureslope(df, i_slope, halfwidth, name="EPSP"):
     df_slopes = pd.DataFrame(dicts)
 
     return df_slopes
-
-

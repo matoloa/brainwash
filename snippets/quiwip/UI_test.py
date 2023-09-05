@@ -1,30 +1,31 @@
-#%%con
+# %%con
 # file tree selector
-import sys
 import os
+import sys
 from pathlib import Path
-from PyQt5 import QtWidgets, uic, QtCore, QtGui
 
+from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
 dir_project_root = Path(os.getcwd().split("quiwip")[0])
 
-class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with a FileTreeSelectorView
+
+class FileTreeSelectorModel(QtWidgets.QFileSystemModel):  # Should be paired with a FileTreeSelectorView
     paths_selected = QtCore.pyqtSignal(list)
-    
-    def __init__(self, parent=None, root_path='/'):
+
+    def __init__(self, parent=None, root_path="/"):
         QtWidgets.QFileSystemModel.__init__(self, None)
-        self.root_path      = root_path
-        self.checks         = {}
-        self.nodestack      = []
-        self.parent_index   = self.setRootPath(self.root_path)
-        self.root_index     = self.index(self.root_path)
+        self.root_path = root_path
+        self.checks = {}
+        self.nodestack = []
+        self.parent_index = self.setRootPath(self.root_path)
+        self.root_index = self.index(self.root_path)
 
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
         self.sort(0, QtCore.Qt.SortOrder.AscendingOrder)
         self.directoryLoaded.connect(self._loaded)
 
     def _loaded(self, path):
-        print('_loaded', self.root_path, self.rowCount(self.parent_index))
+        print("_loaded", self.root_path, self.rowCount(self.parent_index))
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
         if role != QtCore.Qt.CheckStateRole:
@@ -45,80 +46,80 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel): #Should be paired with 
     def getCheckedPaths(self):
         paths = []
         for k, v in self.checks.items():
-            if (v == 2): # Checked
+            if v == 2:  # Checked
                 paths.append(format(self.filePath(k)))
         print(paths)
         self.paths_selected.emit(paths)
-    
-    
+
     def setData(self, index, value, role):
-        if (role == QtCore.Qt.CheckStateRole and index.column() == 0):
+        if role == QtCore.Qt.CheckStateRole and index.column() == 0:
             self.checks[index] = value
             # print('setData(): {}'.format(value))
             return True
         return QtWidgets.QFileSystemModel.setData(self, index, value, role)
 
     def traverseDirectory(self, parentindex, callback=None):
-        print('traverseDirectory():')
+        print("traverseDirectory():")
         callback(parentindex)
         if self.hasChildren(parentindex):
             path = self.filePath(parentindex)
-            it = QtCore.QDirIterator(path, self.filter()  | QtCore.QDir.NoDotAndDotDot)
+            it = QtCore.QDirIterator(path, self.filter() | QtCore.QDir.NoDotAndDotDot)
             while it.hasNext():
-                childIndex =  self.index(it.next())
+                childIndex = self.index(it.next())
                 self.traverseDirectory(childIndex, callback=callback)
         else:
-            print('no children')
+            print("no children")
 
     def printIndex(self, index):
-        print('model printIndex(): {}'.format(self.filePath(index)))
+        print("model printIndex(): {}".format(self.filePath(index)))
 
 
-def FileTreeSelectorDialogStripped(widget, root_path='/'):        
-        widget.root_path      = root_path
-                
-        # Model
-        widget.model          = FileTreeSelectorModel(root_path=widget.root_path)
+def FileTreeSelectorDialogStripped(widget, root_path="/"):
+    widget.root_path = root_path
 
-        # View
-        widget.view = QtWidgets.QTreeView()
+    # Model
+    widget.model = FileTreeSelectorModel(root_path=widget.root_path)
 
-        widget.view.setObjectName('treeView_fileTreeSelector')
-        widget.view.setWindowTitle("Dir View")    #TODO:  Which title?
-        widget.view.setAnimated(False)
-        widget.view.setIndentation(20)
-        widget.view.setColumnHidden(3, True)
-        widget.view.setSortingEnabled(False)
-        widget.view.resize(1080, 600)
+    # View
+    widget.view = QtWidgets.QTreeView()
 
-        # Attach Model to View
-        widget.view.setModel(widget.model)
-        widget.view.setRootIndex(widget.model.parent_index)
-        print(f'coln: {widget.view.columnAt(200)}')
-        widget.view.setColumnHidden(3, True) # hide "modified" column
-        #widget.view.resizeColumnToContents(0) # not a good idea at the moment
-        widget.view.setColumnWidth(0, 250)
-        widget.view.setColumnWidth(1, 100)
-        widget.view.setColumnWidth(2, 50)
+    widget.view.setObjectName("treeView_fileTreeSelector")
+    widget.view.setWindowTitle("Dir View")  # TODO:  Which title?
+    widget.view.setAnimated(False)
+    widget.view.setIndentation(20)
+    widget.view.setColumnHidden(3, True)
+    widget.view.setSortingEnabled(False)
+    widget.view.resize(1080, 600)
 
+    # Attach Model to View
+    widget.view.setModel(widget.model)
+    widget.view.setRootIndex(widget.model.parent_index)
+    print(f"coln: {widget.view.columnAt(200)}")
+    widget.view.setColumnHidden(3, True)  # hide "modified" column
+    # widget.view.resizeColumnToContents(0) # not a good idea at the moment
+    widget.view.setColumnWidth(0, 250)
+    widget.view.setColumnWidth(1, 100)
+    widget.view.setColumnWidth(2, 50)
 
-        # Misc
-        widget.node_stack     = []
+    # Misc
+    widget.node_stack = []
 
-        # GUI
-        windowlayout = QtWidgets.QVBoxLayout()
-        windowlayout.addWidget(widget.view)
-        widget.setLayout(windowlayout)
+    # GUI
+    windowlayout = QtWidgets.QVBoxLayout()
+    windowlayout.addWidget(widget.view)
+    widget.setLayout(windowlayout)
 
-        #QtCore.QMetaObject.connectSlotsByName(widget)
+    # QtCore.QMetaObject.connectSlotsByName(widget)
 
-        widget.show()
+    widget.show()
+
 
 def on_treeView_fileTreeSelector_clicked(self, index):
     self.model.getCheckedPaths()
 
 
 QtWidgets.QWidget.on_treeView_fileTreeSelector_clicked = on_treeView_fileTreeSelector_clicked
+
 
 class UI(QtWidgets.QMainWindow):
     def __init__(self):
@@ -132,13 +133,13 @@ class UI(QtWidgets.QMainWindow):
         self.widget = self.findChild(QtWidgets.QWidget, "widget")
         self.textBrowser = self.findChild(QtWidgets.QTextBrowser, "textBrowser")
 
-        
         # create the file tree thingie
-        self.ftree = FileTreeSelectorDialogStripped(widget=self.widget, 
-                                                    root_path=str(dir_project_root / "dataSource")) # dir as str because QT seems to not support pathlib
+        self.ftree = FileTreeSelectorDialogStripped(
+            widget=self.widget, root_path=str(dir_project_root / "dataSource")
+        )  # dir as str because QT seems to not support pathlib
         # create the file tree thingie
         self.widget.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
-        
+
         self.widget.model.paths_selected.connect(self.print_paths)
 
         # Hit Enter
@@ -146,42 +147,40 @@ class UI(QtWidgets.QMainWindow):
 
         # Change Text
         self.edit.textChanged.connect(self.changeText)
-        
+
         # SLOT - listen for SIGNAL from getCheckedPaths
-        
+
         self.show()
 
-    def ftree_clicked(self): # now working
+    def ftree_clicked(self):  # now working
         print("clicked")
-        
+
     def hitEnter(self):
         get_signals(self.children()[1].children()[1].model)
         self.textBrowser.setText(self.edit.text())
 
     def changeText(self):
         self.label.setText(self.edit.text())
-    
-    #@QtCore.pyqtSlot()
-    def print_paths(self, mypaths):
-        print(f'mystr: {mypaths}')
-        strmystr = "\n".join(sorted(['/'.join(i.split('/')[-2:]) for i in mypaths]))
-        self.textBrowser.setText(strmystr)
 
-        
+    # @QtCore.pyqtSlot()
+    def print_paths(self, mypaths):
+        print(f"mystr: {mypaths}")
+        strmystr = "\n".join(sorted(["/".join(i.split("/")[-2:]) for i in mypaths]))
+        self.textBrowser.setText(strmystr)
 
 
 def get_signals(source):
-        cls = source if isinstance(source, type) else type(source)
-        signal = type(QtCore.pyqtSignal())
-        print("get_signals:")
-        for subcls in cls.mro():
-            clsname = f'{subcls.__module__}.{subcls.__name__}'
-            for key, value in sorted(vars(subcls).items()):
-                if isinstance(value, signal):
-                    print(f'{key} [{clsname}]')
+    cls = source if isinstance(source, type) else type(source)
+    signal = type(QtCore.pyqtSignal())
+    print("get_signals:")
+    for subcls in cls.mro():
+        clsname = f"{subcls.__module__}.{subcls.__name__}"
+        for key, value in sorted(vars(subcls).items()):
+            if isinstance(value, signal):
+                print(f"{key} [{clsname}]")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     UIWindow = UI()
     sys.exit(app.exec_())
