@@ -544,25 +544,41 @@ class UIsub(Ui_MainWindow):
         # Open groups UI (not built)
         if verbose:
             print("pushedButtonEditGroups")
+        # Placeholder: For now, delete all buttons and groups
+        # print(self.list_groups)
+        # print(f"self.gridLayout: {self.gridLayout}")
+        # print(f"range(self.gridLayout.count()): {range(self.gridLayout.count())}")
+        for group in self.list_groups:
+            for i in range(self.gridLayout.count()):
+                widget = self.gridLayout.itemAt(i).widget()
+                if widget and widget.text() == group:
+                    widget.deleteLater()
+                    if verbose:
+                        print("Removed", group, f"(widget: {widget}")
+        self.list_groups = []
+        self.write_project_cfg()
+
 
     def pushedButtonAddGroup(self):
         if verbose:
             print("pushedButtonGroups")
-        print(f"self.list_groups before {self.list_groups}")
-        i = 0
-        while True:
-            new_group_name = "group_" + str(i)
-            if new_group_name in self.list_groups:
-                if verbose:
-                    print(new_group_name, " already exists")
-                i += 1
-            else:
-                self.list_groups.append(new_group_name)
-                print("created", new_group_name)
-                break
-        print(f"self.list_groups after {self.list_groups}")
-        self.write_project_cfg()
-        self.addGroup(new_group_name)
+        if len(self.list_groups) < 12: # TODO: hardcoded max nr of groups: move to cfg
+            i = 0
+            while True:
+                new_group_name = "group_" + str(i)
+                if new_group_name in self.list_groups:
+                    if verbose:
+                        print(new_group_name, " already exists")
+                    i += 1
+                else:
+                    self.list_groups.append(new_group_name)
+                    print("created", new_group_name)
+                    break
+            print(f"self.list_groups after {self.list_groups}")
+            self.write_project_cfg()
+            self.addGroup(new_group_name)
+        else:
+            print("Maximum of 12 groups allowed for now.")
 
     def addGroup(self, new_group_name):
         if verbose:
@@ -573,8 +589,15 @@ class UIsub(Ui_MainWindow):
         self.new_button = QtWidgets.QPushButton(group, self.centralwidget)
         self.new_button.setObjectName(group)
         self.new_button.clicked.connect(lambda _, button_name=group: self.pushedGroupButton(group))
-        # TODO: arrange in rows of 4
-        self.gridLayout.addWidget(self.new_button, 0, self.gridLayout.columnCount(), 1, 1)
+        
+        # Arrange in rows of 4. TODO: hardcoded number of columns: move to cfg
+        column = self.list_groups.index(group)
+        row = 0
+        print(row, column)
+        while column >= 4:
+            column -= 4
+            row += 1
+        self.gridLayout.addWidget(self.new_button, row, column, 1, 1)
         # self.gridLayout.addWidget(self.new_button, self.gridLayout.rowCount(), 0, 1, 1)
 
     def pushedGroupButton(self, button_name):
