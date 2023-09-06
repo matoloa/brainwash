@@ -9,6 +9,22 @@ from joblib import Memory
 memory = Memory("joblib", verbose=1)
 
 
+def buildResultFile(df, t_EPSP_amp, t_EPSP_slope, t_EPSP_slope_size, output_path):
+    """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
+
+    Args:
+        df: a dataframe containing numbered sweeps, timestamps and voltage
+        t_EPSP_amp: time of lowest point of EPSP
+        t_EPSP_slope: time of centre of EPSP_slope
+        t_EPSP_slope_size: width of EPSP slope
+        Optional
+            output_path: if present, store results to this path (csv)
+
+    Returns:
+        a dataframe of results: Sweep, EPSP_amp, EPSP_slope
+    """
+
+
 def find_i_stim_prim_max(dfmean):
     """
     accepts first order derivative of dfmean

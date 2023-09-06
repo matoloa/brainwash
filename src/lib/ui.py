@@ -574,7 +574,6 @@ class UIsub(Ui_MainWindow):
                     self.list_groups.append(new_group_name)
                     print("created", new_group_name)
                     break
-            print(f"self.list_groups after {self.list_groups}")
             self.write_project_cfg()
             self.addGroup(new_group_name)
         else:
@@ -697,11 +696,9 @@ class UIsub(Ui_MainWindow):
         # Display the appropriate recording on the new window's graphs: mean and output
         #   Construct a sensible interface: drag-drop on measurement middle, start and finish points
         #   UI for toggling displayed measurement methods. Drag-drop forces Manual.
-
         """
         table_row should already have t_ values; otherwise do not attempt to draw them
         """
-
         qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
         ser_table_row = self.tablemodel.dataRow(qt_index)
         nSweeps = ser_table_row["nSweeps"]
@@ -870,7 +867,6 @@ class UIsub(Ui_MainWindow):
                 # TODO: NTH - new visual progress report (old one dysfunctional with index-preserving update_frame appraoch)
             else:
                 print(i, "already exists: no action")
-
         self.projectdf = pd.concat([update_frame, frame2add])
         if verbose:
             print(f"update_frame: {update_frame}")
