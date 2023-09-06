@@ -278,22 +278,31 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButtonParse = QtWidgets.QPushButton(self.centralwidget)
         self.pushButtonParse.setObjectName("pushButtonParse")
         self.horizontalLayoutData.addWidget(self.pushButtonParse)
-        self.pushButtonAddGroup = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButtonAddGroup.setObjectName("pushButtonAddGroup")
-        self.horizontalLayoutData.addWidget(self.pushButtonAddGroup)
-        self.pushButtonEditGroups = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButtonEditGroups.setObjectName("pushButtonEditGroups")
-        self.horizontalLayoutData.addWidget(self.pushButtonEditGroups)
-        self.pushButtonDelete = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButtonDelete.setMaximumSize(QtCore.QSize(60, 16777215))
-        self.pushButtonDelete.setObjectName("pushButtonDelete")
-        self.horizontalLayoutData.addWidget(self.pushButtonDelete)
         self.checkBoxLockDelete = QtWidgets.QCheckBox(self.centralwidget)
         self.checkBoxLockDelete.setMaximumSize(QtCore.QSize(15, 16777215))
         self.checkBoxLockDelete.setText("")
         self.checkBoxLockDelete.setChecked(True)
         self.checkBoxLockDelete.setObjectName("checkBoxLockDelete")
         self.horizontalLayoutData.addWidget(self.checkBoxLockDelete)
+        self.pushButtonDelete = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonDelete.setMaximumSize(QtCore.QSize(60, 16777215))
+        self.pushButtonDelete.setObjectName("pushButtonDelete")
+        self.horizontalLayoutData.addWidget(self.pushButtonDelete)
+        self.label = QtWidgets.QLabel(self.centralwidget)
+        self.label.setObjectName("label")
+        self.horizontalLayoutData.addWidget(self.label)
+        self.pushButtonAddGroup = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonAddGroup.setMaximumSize(QtCore.QSize(40, 16777215))
+        self.pushButtonAddGroup.setObjectName("pushButtonAddGroup")
+        self.horizontalLayoutData.addWidget(self.pushButtonAddGroup)
+        self.pushButtonEditGroups = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonEditGroups.setMaximumSize(QtCore.QSize(40, 16777215))
+        self.pushButtonEditGroups.setObjectName("pushButtonEditGroups")
+        self.horizontalLayoutData.addWidget(self.pushButtonEditGroups)
+        self.pushButtonClearGroups = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonClearGroups.setMaximumSize(QtCore.QSize(40, 16777215))
+        self.pushButtonClearGroups.setObjectName("pushButtonClearGroups")
+        self.horizontalLayoutData.addWidget(self.pushButtonClearGroups)
         self.verticalLayoutProj.addLayout(self.horizontalLayoutData)
         self.gridLayout = QtWidgets.QGridLayout()
         self.gridLayout.setObjectName("gridLayout")
@@ -352,13 +361,14 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButtonRenameProject.setText(_translate("mainWindow", "Rename"))
         self.pushButtonAddData.setText(_translate("mainWindow", "Add Data"))
         self.pushButtonParse.setText(_translate("mainWindow", "Analyze"))
-        self.pushButtonAddGroup.setText(_translate("mainWindow", "Add Group"))
-        self.pushButtonEditGroups.setText(_translate("mainWindow", "Edit Groups"))
         self.pushButtonDelete.setText(_translate("mainWindow", "Delete"))
+        self.label.setText(_translate("mainWindow", "Groups:"))
+        self.pushButtonAddGroup.setText(_translate("mainWindow", "Add"))
+        self.pushButtonEditGroups.setText(_translate("mainWindow", "Edit"))
+        self.pushButtonClearGroups.setText(_translate("mainWindow", "Clear"))
         self.labelMeanSweep.setText(_translate("mainWindow", "Mean Sweep:"))
         self.labelMeanGroups.setText(_translate("mainWindow", "Mean Groups:"))
         self.labelMetadata.setText(_translate("mainWindow", "Metadata:"))
-
 
 class Ui_Dialog(QtWidgets.QWidget):
     def setupUi(self, Dialog):
@@ -500,6 +510,7 @@ class UIsub(Ui_MainWindow):
         self.pushButtonRenameProject.pressed.connect(self.pushedButtonRenameProject)
         self.pushButtonAddGroup.pressed.connect(self.pushedButtonAddGroup)
         self.pushButtonEditGroups.pressed.connect(self.pushedButtonEditGroups)
+        self.pushButtonClearGroups.pressed.connect(self.pushedButtonClearGroups)
         self.pushButtonDelete.pressed.connect(self.pushedButtonDelete)
         self.checkBoxLockDelete.stateChanged.connect(self.checkedBoxLockDelete)
 
@@ -514,6 +525,20 @@ class UIsub(Ui_MainWindow):
 
         # place current project as folder in project_root, lock project name for now
         # self.projectfolder = self.project_root / self.project
+
+    def pushedButtonClearGroups(self):
+        if verbose:
+            print("pushedButtonClearGroups")
+        selected_indexes = self.tableProj.selectionModel().selectedRows()
+        selected_rows = [row.row() for row in selected_indexes]
+        n_rows = len(selected_rows)
+        if 0 < n_rows:
+            for i in selected_rows:
+                self.projectdf.loc[i, "groups"] = " "
+                self.save_dfproj()
+                self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
+        else:
+            print("No files selected.")
 
     def pushedButtonEditGroups(self):
         # Open groups UI (not built)

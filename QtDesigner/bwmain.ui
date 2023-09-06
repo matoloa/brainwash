@@ -99,16 +99,18 @@
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="pushButtonAddGroup">
-          <property name="text">
-           <string>Add Group</string>
+         <widget class="QCheckBox" name="checkBoxLockDelete">
+          <property name="maximumSize">
+           <size>
+            <width>15</width>
+            <height>16777215</height>
+           </size>
           </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="pushButtonEditGroups">
           <property name="text">
-           <string>Edit Groups</string>
+           <string/>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
           </property>
          </widget>
         </item>
@@ -126,18 +128,48 @@
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="checkBoxLockDelete">
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>Groups:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButtonAddGroup">
           <property name="maximumSize">
            <size>
-            <width>15</width>
+            <width>40</width>
             <height>16777215</height>
            </size>
           </property>
           <property name="text">
-           <string/>
+           <string>Add</string>
           </property>
-          <property name="checked">
-           <bool>true</bool>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButtonEditGroups">
+          <property name="maximumSize">
+           <size>
+            <width>40</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>Edit</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButtonClearGroups">
+          <property name="maximumSize">
+           <size>
+            <width>40</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>Clear</string>
           </property>
          </widget>
         </item>
