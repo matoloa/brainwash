@@ -462,6 +462,21 @@ class UIsub(Ui_MainWindow):
         if not os.path.exists(self.projects_folder):
             os.makedirs(self.projects_folder)
 
+        # replacing table proj with custom to allow changing of keypress event handling
+        originalTableView = self.centralwidget.findChild(QtWidgets.QTableView, "tableProj")  # Find and replace the original QTableView in the layout
+        tableProj = TableProjSub(self.centralwidget)  # Create an instance of your custom table view
+        tableProj.setAcceptDrops(True)
+        tableProj.setObjectName("tableProj")
+        
+        # Replace the original QTableView with TableProjSub in the layout
+        layout = self.centralwidget.layout()
+        layout.replaceWidget(originalTableView, tableProj)
+
+        # Update the layout
+        layout.update()
+        self.tableProj = tableProj
+
+
         self.projectdf = buildTemplate()
         self.tablemodel = TableModel(self.projectdf)
         self.tableProj.setModel(self.tablemodel)
@@ -497,6 +512,9 @@ class UIsub(Ui_MainWindow):
         self.pushButtonDelete.setEnabled(not self.delete_locked)
         for group in self.list_groups:  # Generate buttons based on groups in project:
             self.addGroupButton(group)
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.checkFocus)
+        self.timer.start(1000)  
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
@@ -514,7 +532,7 @@ class UIsub(Ui_MainWindow):
         self.pushButtonDelete.pressed.connect(self.pushedButtonDelete)
         self.checkBoxLockDelete.stateChanged.connect(self.checkedBoxLockDelete)
 
-        self.tableProj.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
+        self.tableProj.setSelectionBehavior(TableProjSub.SelectRows)
         self.tableProj.doubleClicked.connect(self.tableProjDoubleClicked)
 
         selection_model = self.tableProj.selectionModel()
@@ -525,6 +543,21 @@ class UIsub(Ui_MainWindow):
 
         # place current project as folder in project_root, lock project name for now
         # self.projectfolder = self.project_root / self.project
+        self.find_widgets_with_top_left_coordinates(self.centralwidget)
+
+    def find_widgets_with_top_left_coordinates(self, widget):
+        print(f"trying child geometry")
+        for child in widget.findChildren(QtWidgets.QWidget):
+            print(f"child.geometry().topLeft(): {child.geometry().topLeft()}")
+            print(f"child.mapTo(self.centralwidget, child.geometry().topLeft()): {child.mapTo(self.centralwidget, child.geometry().topLeft())}")
+            print(f"child.objectName(): {child.objectName()}")
+
+    def checkFocus(self):
+        focused_widget = QtWidgets.QApplication.focusWidget()
+        if focused_widget is not None:
+            print(f"Focused Widget: {focused_widget.objectName()}")
+        else:
+            print("No widget has focus.")
 
     def pushedButtonClearGroups(self):
         if verbose:
@@ -1041,6 +1074,18 @@ class UIsub(Ui_MainWindow):
     def slotAddDfData(self, df):
         self.addData(df)
 
+
+class TableProjSub(QtWidgets.QTableView):
+    # subclassing to change behavior of keypress event
+    def keyPressEvent(self, event):
+        print("a key pressed in CustomTableView")
+        if event.key() == QtCore.Qt.Key.Key_F2:
+            print("F2 key pressed in CustomTableView")
+            # Forward the key press event to the base class
+            super().keyPressEvent(event)
+        else:
+            # Handle other key events or pass them to the base class
+            super().keyPressEvent(event)
 
 class Filetreesub(Ui_Dialog):
     def __init__(self, dialog, parent=None, folder="."):
