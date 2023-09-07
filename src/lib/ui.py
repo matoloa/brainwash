@@ -64,7 +64,6 @@ class TableModel(QtCore.QAbstractTableModel):
             self._data = data
             self.endResetModel()
             return True
-
         return False
 
 
@@ -395,9 +394,7 @@ class Ui_Dialog(QtWidgets.QWidget):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Dialog"))
 
-
 #######################################################################
-
 
 def buildTemplate():
     return pd.DataFrame(
@@ -432,7 +429,6 @@ def buildTemplate():
         ]
     )
 
-
 # subclassing Ui_MainWindow to be able to use the unaltered output file from pyuic and QT designer
 class UIsub(Ui_MainWindow):
     def __init__(self, mainwindow):
@@ -440,7 +436,6 @@ class UIsub(Ui_MainWindow):
         self.setupUi(mainwindow)
         if verbose:
             print(" - UIsub init, verbose mode")  # rename for clarity
-
         # load cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
@@ -520,7 +515,6 @@ class UIsub(Ui_MainWindow):
         # maybe learn more about that later?
         # however, I kinda like the control of putting each of them explicit here and use designer just to get the boxes right visually
         # connecting the same signals we had in original ui test
-
         self.pushButtonNewProject.pressed.connect(self.pushedButtonNewProject)
         self.pushButtonOpenProject.pressed.connect(self.pushedButtonOpenProject)
         self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
@@ -534,12 +528,8 @@ class UIsub(Ui_MainWindow):
 
         self.tableProj.setSelectionBehavior(TableProjSub.SelectRows)
         self.tableProj.doubleClicked.connect(self.tableProjDoubleClicked)
-
         selection_model = self.tableProj.selectionModel()
-        # selection_model.selectionChanged.connect(lambda x: print(self.tablemodel.dataRow(x.indexes()[0])))
         selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
-        # self.tablemodel.setData(self.projectdf)
-        # self.tableProj.update()
 
         # place current project as folder in project_root, lock project name for now
         # self.projectfolder = self.project_root / self.project
@@ -743,29 +733,31 @@ class UIsub(Ui_MainWindow):
         row_index = ser_table_row.name
         if verbose:
             print("launchMeasureWindow", file_name)
-
         # Analysis.py
         all_t = analysis.find_all_t(self.dfmean, verbose=verbose)
         # Break out to variables
         t_VEB = all_t["t_VEB"]
         t_EPSP_amp = all_t["t_EPSP_amp"]
         t_EPSP_slope = all_t["t_EPSP_slope"]
-
         # Store variables in self.projectdf
         self.projectdf.loc[row_index, "t_VEB"] = t_VEB
         self.projectdf.loc[row_index, "t_EPSP_amp"] = t_EPSP_amp
         self.projectdf.loc[row_index, "t_EPSP_slope"] = t_EPSP_slope
-
         if verbose:
             print(f"projectdf: {self.projectdf}")
-
         # Open window
         self.measure = QtWidgets.QDialog()
         self.measure_window_sub = Measure_window_sub(self.measure)
         self.measure.setWindowTitle(file_name)
         self.measure.show()
-
         self.measure_window_sub.setMeasureGraph(file_name, self.dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
+
+        # TODO: Placeholder functionality for loading analysis.buildResultFile()
+        file_path = Path(self.projectfolder / (file_name + ".csv"))
+        print(file_path)
+        if file_path.exists():
+            bigdata = pd.read_csv(file_path)
+            analysis.buildResultFile(df=bigdata, t_EPSP_amp=t_EPSP_amp)
 
     def tableProjSelectionChanged(self):
         if verbose:
@@ -1112,14 +1104,6 @@ class Filetreesub(Ui_Dialog):
         self.buttonBoxAddGroup.setStandardButtons(QtWidgets.QDialogButtonBox.NoButton)
         self.buttonBoxAddGroup.setObjectName("buttonBoxAddGroup")
 
-        # Manually added (unconnected) default group buttons - eventually, these must be populated from project.brainwash group names
-        self.buttonBoxAddGroup.groupcontrol = QtWidgets.QPushButton(self.tr("&Control"))
-        self.buttonBoxAddGroup.groupintervention = QtWidgets.QPushButton(self.tr("&Intervention"))
-        self.buttonBoxAddGroup.newGroup = QtWidgets.QPushButton(self.tr("&New group"))
-        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.groupcontrol, QtWidgets.QDialogButtonBox.ActionRole)
-        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.groupintervention, QtWidgets.QDialogButtonBox.ActionRole)
-        self.buttonBoxAddGroup.addButton(self.buttonBoxAddGroup.newGroup, QtWidgets.QDialogButtonBox.ActionRole)
-
         self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
         self.ftree.model.paths_selected.connect(self.pathsSelectedUpdateTable)
         self.buttonBox.accepted.connect(self.addDf)
@@ -1199,7 +1183,6 @@ class Measure_window_sub(Ui_measure_window):
         # self.canvas_seaborn.axes.set_xmargin((100,500))
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
-
 
 def get_signals(source):
     cls = source if isinstance(source, type) else type(source)

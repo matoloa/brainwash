@@ -1,17 +1,20 @@
+# %%
 import numpy as np  # numeric calculations module
 import pandas as pd  # dataframe module, think excel, but good
 import scipy  # peakfinder and other useful analysis tools
 from sklearn import linear_model
 from tqdm.notebook import tqdm
 
+# %%
 from joblib import Memory
 
+# %%
 memory = Memory("joblib", verbose=1)
 
 
-def buildResultFile(df, t_EPSP_amp, t_EPSP_slope, t_EPSP_slope_size, output_path):
+# %%
+def buildResultFile(df, t_EPSP_amp):#, t_EPSP_slope, t_EPSP_slope_size, output_path):
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
-
     Args:
         df: a dataframe containing numbered sweeps, timestamps and voltage
         t_EPSP_amp: time of lowest point of EPSP
@@ -19,21 +22,21 @@ def buildResultFile(df, t_EPSP_amp, t_EPSP_slope, t_EPSP_slope_size, output_path
         t_EPSP_slope_size: width of EPSP slope
         Optional
             output_path: if present, store results to this path (csv)
-
     Returns:
         a dataframe of results: Sweep, EPSP_amp, EPSP_slope
     """
+    #print(f"df{df}, t_EPSP_amp{t_EPSP_amp}")
+    print(f"t_EPSP_amp{t_EPSP_amp}")
+    
 
 
+# %%
 def find_i_stim_prim_max(dfmean):
-    """
-    accepts first order derivative of dfmean
-    finds x of max(y): the steepest incline
-    returnsi_Stim (index of stim artefact)
-    """
+    # TODO: return an index of sufficiently separated over-threshold x:es instead
     return dfmean["prim"].idxmax()
 
 
+# %%
 def find_i_EPSP_peak_max(
     dfmean,
     limitleft=0,
@@ -79,6 +82,7 @@ def find_i_EPSP_peak_max(
     return i_EPSP
 
 
+# %%
 def find_i_VEB_prim_peak_max(
     dfmean,
     i_Stim,
@@ -132,6 +136,7 @@ def find_i_VEB_prim_peak_max(
     return i_VEB
 
 
+# %%
 def find_i_EPSP_slope(dfmean, i_VEB, i_EPSP, happy=False):
     """ """
 
@@ -149,6 +154,7 @@ def find_i_EPSP_slope(dfmean, i_VEB, i_EPSP, happy=False):
     return i_EPSP_slope[0]
 
 
+# %%
 def find_i_volleyslope(dfmean, i_Stim, i_VEB, happy=False):  # , param_half_slope_width = 4):
     """
     DOES NOT USE WIDTH! decided by rolling, earlier?
@@ -170,6 +176,7 @@ def find_i_volleyslope(dfmean, i_Stim, i_VEB, happy=False):  # , param_half_slop
     return i_volleyslope[0]
 
 
+# %%
 def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     """
     runs all t-detections in the appropriate sequence,
@@ -211,6 +218,7 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     return {"i_Stim": i_Stim, "i_VEB": i_VEB, "i_EPSP_amp": i_EPSP_amp, "i_EPSP_slope": i_EPSP_slope}
 
 
+# %%
 def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     if verbose:
         print("find_all_t")
@@ -224,6 +232,7 @@ def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     return dict_t
 
 
+# %%
 def measureslope(df, i_slope, halfwidth, name="EPSP"):
     """
     Generalized function
@@ -254,3 +263,34 @@ def measureslope(df, i_slope, halfwidth, name="EPSP"):
     df_slopes = pd.DataFrame(dicts)
 
     return df_slopes
+
+
+# %%
+if __name__ == "__main__":
+    print("Running as main")
+    import parse
+    from pathlib import Path
+    path_datafile = Path("/home/matolo/Documents/Brainwash Projects/My Project/A_21_P0701-S2_2022_07_01_0000.abf.csv")
+    df = pd.read_csv(str(path_datafile))
+    t_EPSP_amp = 0.0128
+    buildResultFile(df=df, t_EPSP_amp=t_EPSP_amp)
+    
+    
+    
+    
+    
+
+# %%
+if __name__ == "__main__":
+    result = df[df.time == t_EPSP_amp].voltage
+    result.plot()
+
+# %%
+if __name__ == "__main__":
+    width = 0.0005
+    result = df[(df.time - width < t_EPSP_amp) & (t_EPSP_amp < df.time + width)][['sweep', 'voltage']]
+    print(result)
+    result.pivot_table(index='sweep', aggfunc='median').plot()
+    #result.pivot_table(index='sweep', aggfunc='median').rolling(50).median().plot()
+
+# %%
