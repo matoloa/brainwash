@@ -26,10 +26,14 @@ def buildResultFile(df, t_EPSP_amp, t_EPSP_slope, t_EPSP_slope_size, output_path
 
 
 def find_i_stim_prim_max(dfmean):
-    """
-    accepts first order derivative of dfmean
-    finds x of max(y): the steepest incline
-    returnsi_Stim (index of stim artefact)
+    """ finds x of max(y) in dfmean['Prim']: the steepest incline
+
+    Args:
+        dfmean: a dataframe of the average from the data files
+
+    Returns:
+        index of steepest incline in dfmean['Prim']
+    TODO: return an index of over-threshold x:es
     """
     return dfmean["prim"].idxmax()
 
