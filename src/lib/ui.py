@@ -22,7 +22,7 @@ import analysis
 matplotlib.use("Qt5Agg")
 
 verbose = True
-
+track_widget_focus = False
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
@@ -507,9 +507,10 @@ class UIsub(Ui_MainWindow):
         self.pushButtonDelete.setEnabled(not self.delete_locked)
         for group in self.list_groups:  # Generate buttons based on groups in project:
             self.addGroupButton(group)
-        self.timer = QtCore.QTimer(self)
-        self.timer.timeout.connect(self.checkFocus)
-        self.timer.start(1000)  
+        if track_widget_focus: # debug mode; prints widget focus every 1000ms
+            self.timer = QtCore.QTimer(self)
+            self.timer.timeout.connect(self.checkFocus)
+            self.timer.start(1000)  
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
@@ -1069,14 +1070,20 @@ class UIsub(Ui_MainWindow):
 class TableProjSub(QtWidgets.QTableView):
     # subclassing to change behavior of keypress event
     def keyPressEvent(self, event):
-        print("a key pressed in CustomTableView")
+        # print("a key pressed in CustomTableView")
         if event.key() == QtCore.Qt.Key.Key_F2:
-            print("F2 key pressed in CustomTableView")
+            self.renameRecording()
             # Forward the key press event to the base class
             super().keyPressEvent(event)
         else:
             # Handle other key events or pass them to the base class
             super().keyPressEvent(event)
+
+    def renameRecording(self):
+        # TODO: functional renaming; do nothing if several lines selected. Rename ALL files of the recording.
+        if verbose:
+                print("F2 key pressed in CustomTableView")
+
 
 class Filetreesub(Ui_Dialog):
     def __init__(self, dialog, parent=None, folder="."):
