@@ -460,17 +460,17 @@ class UIsub(Ui_MainWindow):
         # replacing table proj with custom to allow changing of keypress event handling
         originalTableView = self.centralwidget.findChild(QtWidgets.QTableView, "tableProj")  # Find and replace the original QTableView in the layout
         tableProj = TableProjSub(self.centralwidget)  # Create an instance of your custom table view
-        tableProj.setAcceptDrops(True)
-        tableProj.setObjectName("tableProj")
         
         # Replace the original QTableView with TableProjSub in the layout
         layout = self.centralwidget.layout()
         layout.replaceWidget(originalTableView, tableProj)
+        layout.removeWidget(originalTableView)
 
         # Update the layout
         layout.update()
         self.tableProj = tableProj
-
+        tableProj.setAcceptDrops(True)
+        tableProj.setObjectName("tableProj")
 
         self.projectdf = buildTemplate()
         self.tablemodel = TableModel(self.projectdf)
@@ -538,9 +538,8 @@ class UIsub(Ui_MainWindow):
     def find_widgets_with_top_left_coordinates(self, widget):
         print(f"trying child geometry")
         for child in widget.findChildren(QtWidgets.QWidget):
-            print(f"child.geometry().topLeft(): {child.geometry().topLeft()}")
-            print(f"child.mapTo(self.centralwidget, child.geometry().topLeft()): {child.mapTo(self.centralwidget, child.geometry().topLeft())}")
-            print(f"child.objectName(): {child.objectName()}")
+            #print(f"attribs: {dir(child.geometry())}")
+            print(f"child.geometry(): {child.objectName()}, {child.geometry().topLeft()},  {child.mapTo(self.centralwidget, child.geometry().topLeft())}, {child.geometry().size()}")
 
     def checkFocus(self):
         focused_widget = QtWidgets.QApplication.focusWidget()
