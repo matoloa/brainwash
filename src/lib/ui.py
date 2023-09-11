@@ -402,7 +402,7 @@ def buildTemplate():
             "host",
             "path",
             "checksum",
-            "save_file_name",
+            "recording_name",
             "groups",
             "parsetimestamp",
             "nSweeps",
@@ -549,13 +549,15 @@ class UIsub(Ui_MainWindow):
         else:
             print("No widget has focus.")
 
+    def listSelectedRows(self):
+        selected_indexes = self.tableProj.selectionModel().selectedRows()
+        return [row.row() for row in selected_indexes]        
+
     def pushedButtonClearGroups(self):
         if verbose:
             print("pushedButtonClearGroups")
-        selected_indexes = self.tableProj.selectionModel().selectedRows()
-        selected_rows = [row.row() for row in selected_indexes]
-        n_rows = len(selected_rows)
-        if 0 < n_rows:
+        selected_rows = self.listSelectedRows()
+        if 0 < len(selected_rows):
             for i in selected_rows:
                 self.projectdf.loc[i, "groups"] = " "
                 self.save_dfproj()
@@ -629,10 +631,8 @@ class UIsub(Ui_MainWindow):
 
     def addToGroup(self, add_group):
         # Placeholder function: Assign all selected files to add_group unless they already belong to that group
-        selected_indexes = self.tableProj.selectionModel().selectedRows()
-        selected_rows = [row.row() for row in selected_indexes]
-        n_rows = len(selected_rows)
-        if 0 < n_rows:
+        selected_rows = self.listSelectedRows()
+        if 0 < len(selected_rows):
             list_group = ""
             for i in selected_rows:
                 if self.projectdf.loc[i, "groups"] == " ":
@@ -644,7 +644,7 @@ class UIsub(Ui_MainWindow):
                         list_group.append(add_group)
                         self.projectdf.loc[i, "groups"] = ",".join(map(str, sorted(list_group)))
                     else:
-                        print(self.projectdf.loc[i, "save_file_name"], "is already in", add_group)
+                        print(self.projectdf.loc[i, "recording_name"], "is already in", add_group)
                 self.save_dfproj()
                 self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
         else:
@@ -654,13 +654,11 @@ class UIsub(Ui_MainWindow):
         # TODO: Delete files for selected rows
         if verbose:
             print("pushedButtonDelete")
-        selected_indexes = self.tableProj.selectionModel().selectedRows()
-        selected_rows = [row.row() for row in selected_indexes]
-        n_rows = len(selected_rows)
-        if 0 < n_rows:
+        selected_rows = self.listSelectedRows()
+        if 0 < len(selected_rows):
             dfProj = self.projectdf
             dfSelection = dfProj.loc[selected_rows]
-            list_delete = dfSelection["save_file_name"].tolist()
+            list_delete = dfSelection["recording_name"].tolist()
             # print(f"list_delete: {list_delete}")
             self.clear_graph()
             for file in list_delete:
@@ -729,7 +727,7 @@ class UIsub(Ui_MainWindow):
             # TODO: Make it import the missing file
             print("did not find _mean.csv to load. Not imported?")
             return
-        file_name = ser_table_row["save_file_name"]
+        file_name = ser_table_row["recording_name"]
         row_index = ser_table_row.name
         if verbose:
             print("launchMeasureWindow", file_name)
@@ -762,15 +760,12 @@ class UIsub(Ui_MainWindow):
     def tableProjSelectionChanged(self):
         if verbose:
             print("tableProjSelectionChanged")
-        selected_indexes = self.tableProj.selectionModel().selectedRows()
-        selected_rows = [row.row() for row in selected_indexes]
-        n_rows = len(selected_rows)
-
-        if 0 < n_rows:
+        selected_rows = self.listSelectedRows()
+        if 0 < len(selected_rows):
             dfProj = self.projectdf
             dfSelection = dfProj.loc[selected_rows]
             dfFiltered = dfSelection[dfSelection["nSweeps"] != "..."]
-            list_files_filtered = dfFiltered["save_file_name"].tolist()
+            list_files_filtered = dfFiltered["recording_name"].tolist()
             if not dfFiltered.empty:
                 if len(list_files_filtered) == 1:  # exactly one file selected
                     self.setGraph(list_files_filtered[-1])
@@ -879,7 +874,7 @@ class UIsub(Ui_MainWindow):
                     print(len(result), "channels found")
                     for j in result:
                         row2add = self.projectdf[self.projectdf.index == i].copy()
-                        row2add["save_file_name"] = row2add["save_file_name"] + "_ch_" + str(j)
+                        row2add["recording_name"] = row2add["recording_name"] + "_ch_" + str(j)
                         row2add["nSweeps"] = result[j]
                         frame2add = pd.concat([frame2add, row2add])  # add new, separate channel rows
                         update_frame = update_frame[update_frame.index != i]  # destroy original row in update_frame
@@ -930,14 +925,13 @@ class UIsub(Ui_MainWindow):
             self.canvas_seaborn.draw()
             self.canvas_seaborn.show()
 
-    def setGraph(self, save_file_name):
+    def setGraph(self, recording_name):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at graphMean
-
         if verbose:
             print("setGraph")
-        dfmean_path = self.projectfolder / (save_file_name + "_mean.csv")
-        print(dfmean_path)
+        dfmean_path = self.projectfolder / (recording_name + "_mean.csv")
+        #print(dfmean_path)
         try:
             dfmean = pd.read_csv(dfmean_path)  # import csv
         except FileNotFoundError:
@@ -1033,7 +1027,7 @@ class UIsub(Ui_MainWindow):
         header = self.tableProj.horizontalHeader()
         dfProj = self.projectdf
         # hide all columns except these:
-        list_show = [dfProj.columns.get_loc("save_file_name"), dfProj.columns.get_loc("groups"), dfProj.columns.get_loc("nSweeps")]
+        list_show = [dfProj.columns.get_loc("recording_name"), dfProj.columns.get_loc("groups"), dfProj.columns.get_loc("nSweeps")]
         num_columns = dfProj.shape[1]
         for col in range(num_columns):
             if col in list_show:
@@ -1059,7 +1053,7 @@ class UIsub(Ui_MainWindow):
         strmystr = "\n".join(sorted(["/".join(i.split("/")[-2:]) for i in mypaths]))
         self.textBrowser.setText(strmystr)
         list_display_names = ["/".join(i.split("/")[-2:]) for i in mypaths]
-        dftable = pd.DataFrame({"path_source": mypaths, "save_file_name": list_display_names})
+        dftable = pd.DataFrame({"path_source": mypaths, "recording_name": list_display_names})
         self.setTableDf(dftable)
 
     @QtCore.pyqtSlot()
@@ -1128,7 +1122,7 @@ class Filetreesub(Ui_Dialog):
         dfAdd["path"] = paths
         dfAdd["host"] = "Computer 1"
         dfAdd["checksum"] = "big number"
-        # dfAdd['save_file_name']=paths
+        # dfAdd['recording_name']=paths
         # dfAdd['groups']=' '
         self.tablemodel.setData(dfAdd)
         # NTH: more intelligent default naming; lowest level unique name?
@@ -1136,7 +1130,7 @@ class Filetreesub(Ui_Dialog):
         names = []
         for i in paths:
             names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
-        dfAdd["save_file_name"] = names
+        dfAdd["recording_name"] = names
         self.dfAdd = dfAdd
         # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
         # TODO: names that have been set manually are stored a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)
@@ -1158,7 +1152,7 @@ class Measure_window_sub(Ui_measure_window):
         if verbose:
             print(" - measure_window init")
 
-    def setMeasureGraph(self, save_file_name, dfmean, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
+    def setMeasureGraph(self, recording_name, dfmean, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
         if verbose:
