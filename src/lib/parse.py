@@ -173,12 +173,12 @@ def parseProjFiles(proj_folder: Path, df=None, row=None):
         for i in df2parse["channel"].unique():
             # Create unique filename for current channel, if there are more than one
             if df2parse["channel"].nunique() == 1:
-                save_file_name = row.save_file_name
-                savepath = str(Path(proj_folder) / save_file_name)
+                recording_name = row.recording_name
+                savepath = str(Path(proj_folder) / recording_name)
                 df = df2parse
             else:
-                save_file_name_channel = row.save_file_name + "_ch_" + str(i)
-                savepath = str(Path(proj_folder) / save_file_name_channel)
+                recording_name_channel = row.recording_name + "_ch_" + str(i)
+                savepath = str(Path(proj_folder) / recording_name_channel)
                 # save ONLY active channel as filename
                 df = df2parse[df2parse.channel == i]
             df.to_csv(savepath + ".csv", index=False)
@@ -200,10 +200,10 @@ def parseProjFiles(proj_folder: Path, df=None, row=None):
     if verbose:
         print(f"proj folder: {proj_folder}")
     if row is not None:
-        print(f"save_file_name: {row['save_file_name']}")
+        print(f"recording_name: {row['recording_name']}")
         print(f"path: {row['path']}")
     if df is not None:
-        print(f"save_file_name: {df['save_file_name']}")
+        print(f"recording_name: {df['recording_name']}")
         print(f"path: {df['path']}")
 
     # check for files in the folder.
@@ -238,9 +238,9 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 2 channel/KO_02"
     standalone_test_output = "KO_02"
     proj_folder = Path.home() / "Documents/Brainwash Projects/standalone_test"
-    print("Placeholder: standalone test, processing", standalone_test_source, "as save_file_name", standalone_test_output)
+    print("Placeholder: standalone test, processing", standalone_test_source, "as recording_name", standalone_test_output)
 
-    dffiles = pd.DataFrame({"path": [standalone_test_source], "save_file_name": [standalone_test_output]})
+    dffiles = pd.DataFrame({"path": [standalone_test_source], "recording_name": [standalone_test_output]})
     parseProjFiles(proj_folder=proj_folder, df=dffiles)
 
 # %%

@@ -1042,8 +1042,11 @@ class UIsub(Ui_MainWindow):
         list_recording_names = set(dfProj['recording_name'])
         for index, row in dfAdd.iterrows():
             check_recording_name = row['recording_name']
+            if check_recording_name.endswith('_mean.csv'):
+                # TODO: Resolve appropriately
+                print("ERROR: recording_name must not end with _mean.csv")
             if check_recording_name in list_recording_names:
-                print(index, check_recording_name, "already exists!")
+                # print(index, check_recording_name, "already exists!")
                 i = 1
                 new_recording_name = check_recording_name + "(" + str(i) + ")"
                 while(new_recording_name in list_recording_names):
