@@ -270,20 +270,28 @@ if __name__ == "__main__":
     print("Running as main")
     import parse
     from pathlib import Path
-    path_datafile = Path("/home/matolo/Documents/Brainwash Projects/My Project/A_21_P0701-S2_2022_07_01_0000.abf.csv")
+    path_datafile = Path("/home/matolo/Documents/Brainwash Projects/standalone_test/A_21.csv")
+    #path_datafile = Path("/home/matolo/Documents/Brainwash Projects/My Project/A_21_P0701-S2_2022_07_01_0000.abf.csv")
     df = pd.read_csv(str(path_datafile))
     t_EPSP_amp = 0.0128
     buildResultFile(df=df, t_EPSP_amp=t_EPSP_amp)
-    
-    
-    
-    
+
+# %%
+if __name__ == "__main__":
+    test = df[df.time == t_EPSP_amp]
+    test.plot(x = 'datetime', y = 'voltage')
     
 
 # %%
 if __name__ == "__main__":
     result = df[df.time == t_EPSP_amp].voltage
-    result.plot()
+    result.plot(x = 'time')
+
+# %%
+if __name__ == "__main__":
+    path_meanfile = Path("/home/matolo/Documents/Brainwash Projects/standalone_test/A_21_mean.csv")
+    df_mean = pd.read_csv(str(path_meanfile))
+    df_mean.plot(x = 'time', y = 'voltage')
 
 # %%
 if __name__ == "__main__":

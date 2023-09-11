@@ -1080,9 +1080,7 @@ class UIsub(Ui_MainWindow):
             old_data = self.projectfolder / (old_recording_name + ".csv")
             old_mean = self.projectfolder / (old_recording_name + "_mean.csv")
             RenameDialog = InputDialogPopup()
-            #RenameDialog.showInputDialog(pre_text=old_recording_name)
             new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query='')
-            #print(f'You entered: {text}')
             list_recording_names = set(dfProj['recording_name'])
             if not new_recording_name in list_recording_names: # TODO: complete sanitation
                 self.projectdf.at[row, 'recording_name'] = new_recording_name

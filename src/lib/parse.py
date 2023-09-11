@@ -235,8 +235,8 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     # standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 1 channel/A_21_P0701-S2"
     # standalone_test_output = "A_21"
     # dual channel .abf test
-    standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 2 channel/KO_02"
-    standalone_test_output = "KO_02"
+    standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 1 channel/A_21_P0701-S2"
+    standalone_test_output = "A_21"
     proj_folder = Path.home() / "Documents/Brainwash Projects/standalone_test"
     print("Placeholder: standalone test, processing", standalone_test_source, "as recording_name", standalone_test_output)
 
