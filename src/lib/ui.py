@@ -1043,8 +1043,9 @@ class UIsub(Ui_MainWindow):
         for index, row in dfAdd.iterrows():
             check_recording_name = row['recording_name']
             if check_recording_name.endswith('_mean.csv'):
-                # TODO: Resolve appropriately
-                print("ERROR: recording_name must not end with _mean.csv")
+                print("recording_name must not end with _mean.csv - appending _X") # must not collide with internal naming
+                check_recording_name = check_recording_name + '_X'
+                dfAdd.at[index,'recording_name'] = check_recording_name
             if check_recording_name in list_recording_names:
                 # print(index, check_recording_name, "already exists!")
                 i = 1
@@ -1066,6 +1067,46 @@ class UIsub(Ui_MainWindow):
             print("addData:", self.getdfProj())
         self.setTableDf(dfProj)
 
+    def renameRecording(self):
+        # TODO: functional renaming; do nothing if several lines selected. Rename ALL files of the recording.
+        if verbose:
+            print("F2 key pressed in CustomTableView")
+        selected_rows = self.listSelectedRows()
+        if len(selected_rows) == 1:
+            row = selected_rows[0]
+            dfProj = self.projectdf
+            old_recording_name = dfProj.at[row,'recording_name']
+            print(f"dfSelection: {old_recording_name} to be renamed!")
+            old_data = self.projectfolder / (old_recording_name + ".csv")
+            old_mean = self.projectfolder / (old_recording_name + "_mean.csv")
+            RenameDialog = InputDialogPopup()
+            #RenameDialog.showInputDialog(pre_text=old_recording_name)
+            new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query='')
+            #print(f'You entered: {text}')
+            list_recording_names = set(dfProj['recording_name'])
+            if not new_recording_name in list_recording_names: # TODO: complete sanitation
+                self.projectdf.at[row, 'recording_name'] = new_recording_name
+                print(new_recording_name)
+                new_data = self.projectfolder / (new_recording_name + ".csv")
+                new_mean = self.projectfolder / (new_recording_name + "_mean.csv")
+                if old_data.exists():
+                    print(f"rename_data: {old_data} to {new_data}")
+                    os.rename(old_data, new_data)
+                else:
+                    print(f"File not found: {old_data}")
+                if old_mean.exists():
+                    print(f"rename_mean: {old_mean} to {new_mean}")
+                    os.rename(old_mean, new_mean)
+                else:
+                    print(f"File not found: {old_mean}")
+                self.save_dfproj()
+                self.setTableDf(self.projectdf)  # Force update
+            else:
+                print(f"new_recording_name {new_recording_name} is not unique")
+        else:
+            print("Rename: invalid selection - please select one file only for renaming.")
+
+            
     @QtCore.pyqtSlot(list)
     def slotPrintPaths(self, mypaths):
         if verbose:
@@ -1081,22 +1122,29 @@ class UIsub(Ui_MainWindow):
         self.addData(df)
 
 
+class InputDialogPopup(QtWidgets.QDialog):
+    def __init__(self):
+        super().__init__()
+
+    def showInputDialog(self, title, query):
+        text, ok = QtWidgets.QInputDialog.getText(self, title, query)
+        if ok:
+            print(f'You entered: {text}')
+            self.accept()  # Close the dialog when Enter is pressed
+            return text
+
+
 class TableProjSub(QtWidgets.QTableView):
     # subclassing to change behavior of keypress event
     def keyPressEvent(self, event):
         # print("a key pressed in CustomTableView")
         if event.key() == QtCore.Qt.Key.Key_F2:
-            self.renameRecording()
+            ui.renameRecording()
             # Forward the key press event to the base class
             super().keyPressEvent(event)
         else:
             # Handle other key events or pass them to the base class
             super().keyPressEvent(event)
-
-    def renameRecording(self):
-        # TODO: functional renaming; do nothing if several lines selected. Rename ALL files of the recording.
-        if verbose:
-                print("F2 key pressed in CustomTableView")
 
 
 class Filetreesub(Ui_Dialog):
