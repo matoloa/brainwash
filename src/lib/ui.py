@@ -1036,7 +1036,24 @@ class UIsub(Ui_MainWindow):
                 self.tableProj.setColumnHidden(col, True)
 
     def addData(self, dfAdd):  # concatenate dataframes of old and new data
+        # Check for unique names in dfAdd, vs dfProj and dfAdd
+        # Adds (<lowest integer that makes unique>) to the end of non-unique recording_names
         dfProj = self.getdfProj()
+        list_recording_names = set(dfProj['recording_name'])
+        for index, row in dfAdd.iterrows():
+            check_recording_name = row['recording_name']
+            if check_recording_name in list_recording_names:
+                print(index, check_recording_name, "already exists!")
+                i = 1
+                new_recording_name = check_recording_name + "(" + str(i) + ")"
+                while(new_recording_name in list_recording_names):
+                    i += 1
+                    new_recording_name = check_recording_name + "(" + str(i) + ")"
+                print("New name:", new_recording_name)
+                list_recording_names.add(new_recording_name)
+                dfAdd.at[index,'recording_name'] = new_recording_name
+            else:
+                list_recording_names.add(check_recording_name)
         dfProj = pd.concat([dfProj, dfAdd])
         dfProj.reset_index(drop=True, inplace=True)
         dfProj["groups"] = dfProj["groups"].fillna(" ")
