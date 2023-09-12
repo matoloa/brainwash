@@ -270,7 +270,7 @@ if __name__ == "__main__":
     print("Running as main")
     import parse
     from pathlib import Path
-    path_datafile = Path("/home/matolo/Documents/Brainwash Projects/standalone_test/A_21.csv")
+    path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/A_21.csv")
     #path_datafile = Path("/home/matolo/Documents/Brainwash Projects/My Project/A_21_P0701-S2_2022_07_01_0000.abf.csv")
     df = pd.read_csv(str(path_datafile))
     t_EPSP_amp = 0.0128
@@ -299,17 +299,26 @@ if __name__ == "__main__":
     #df_calibrated = dfpivot - ser_startmedian
     df_calibrated = dfpivot.subtract(ser_startmedian, axis = 'rows')
     df_calibrated = df_calibrated.stack().reset_index()
-    df_calibrated.rename(columns = {'0':'voltage'}, inplace=True)
+    df_calibrated.rename(columns = {0: 'volt_cal'}, inplace=True)
+    df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
+    df['volt_cal'] = df_calibrated.volt_cal
     
-    df_calibrated.sample(10).plot(x = 'sweep', y = 'voltage')
-    print(df_calibrated)
     #print(ser_startmedian)
 
 
 # %%
 if __name__ == "__main__":
-    result = df[df.time == t_EPSP_amp].voltage
+    result = df[df.time == t_EPSP_amp].volt_cal
     result.plot(x = 'time')
+
+# %%
+if __name__ == "__main__":
+    result = df[df.time == 0.001][['sweep', 'voltage', 'volt_cal']]
+    g = result.plot(x = 'sweep')
+    g.hlines(y=[-0.0001, 0.0001], xmin=0, xmax=1000)
+
+# %%
+result
 
 # %%
 if __name__ == "__main__":
@@ -324,5 +333,12 @@ if __name__ == "__main__":
     print(result)
     result.pivot_table(index='sweep', aggfunc='median').plot()
     #result.pivot_table(index='sweep', aggfunc='median').rolling(50).median().plot()
+
+# %%
+df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
+df_calibrated
+
+# %%
+df
 
 # %%
