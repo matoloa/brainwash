@@ -26,7 +26,7 @@ def buildResultFile(df, t_EPSP_amp):#, t_EPSP_slope, t_EPSP_slope_size, output_p
         a dataframe of results: Sweep, EPSP_amp, EPSP_slope
     """
     #print(f"df{df}, t_EPSP_amp{t_EPSP_amp}")
-    print(f"t_EPSP_amp{t_EPSP_amp}")
+    print(f"t_EPSP_amp: {t_EPSP_amp}")
     
 
 
@@ -278,9 +278,33 @@ if __name__ == "__main__":
 
 # %%
 if __name__ == "__main__":
+    sample1 = df[df.sweep == 10]
+    sample2 = df[df.sweep == 250]
+    sample3 = df[df.sweep == 900]
+    sample = pd.concat([sample1, sample2, sample3])
+    sample.plot(x = 'time', y='voltage', ylim = (-0.001, 0.001))
+
+# %%
+
+# %%
+if __name__ == "__main__":
+    grouping = df[['sweep', 'voltage']].groupby(['sweep']).mean().plot()#x = 'sweep', y='voltage')#, ylim = (-0.001, 0.001))
+    #print(grouping)
+
+# %%
+if __name__ == "__main__":
     test = df[df.time == t_EPSP_amp]
-    test.plot(x = 'datetime', y = 'voltage')
+    dfpivot = df[['sweep', 'voltage', 'time']].pivot_table(values='voltage', columns = 'time', index = 'sweep')
+    ser_startmedian = dfpivot.iloc[:,:20].median(axis=1)
+    #df_calibrated = dfpivot - ser_startmedian
+    df_calibrated = dfpivot.subtract(ser_startmedian, axis = 'rows')
+    df_calibrated = df_calibrated.stack().reset_index()
+    df_calibrated.rename(columns = {'0':'voltage'}, inplace=True)
     
+    df_calibrated.sample(10).plot(x = 'sweep', y = 'voltage')
+    print(df_calibrated)
+    #print(ser_startmedian)
+
 
 # %%
 if __name__ == "__main__":
