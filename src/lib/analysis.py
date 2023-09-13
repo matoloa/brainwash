@@ -278,13 +278,50 @@ if __name__ == "__main__":
 
 # %%
 if __name__ == "__main__":
-    sample1 = df[df.sweep == 10]
-    sample2 = df[df.sweep == 250]
-    sample3 = df[df.sweep == 900]
-    sample = pd.concat([sample1, sample2, sample3])
-    sample.plot(x = 'time', y='voltage', ylim = (-0.001, 0.001))
+    test = df[df.time == t_EPSP_amp]
+    dfpivot = df[['sweep', 'voltage', 'time']].pivot_table(values='voltage', columns = 'time', index = 'sweep')
+    ser_startmedian = dfpivot.iloc[:,:20].median(axis=1)
+    df_calibrated = dfpivot.subtract(ser_startmedian, axis = 'rows')
+    df_calibrated = df_calibrated.stack().reset_index()
+    df_calibrated.rename(columns = {0: 'volt_cal'}, inplace=True)
+    df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
+    df['volt_cal'] = df_calibrated.volt_cal
 
 # %%
+import matplotlib.pyplot as plt
+if __name__ == "__main__":
+    width = 0.0001
+    dfplot = df.copy()
+    dfplot = dfplot[(0.0128-width < dfplot.time) & (dfplot.time < 0.0128+width)]
+    dfplot['odd'] = dfplot.sweep %2 == 0
+    print(dfplot.odd.sum()/dfplot.shape[0])
+    plt.scatter(dfplot[~dfplot.odd]['time'], dfplot[~dfplot.odd]['volt_cal'])
+    plt.scatter(dfplot[dfplot.odd]['time'], dfplot[dfplot.odd]['volt_cal'])
+    #plt.hist(dfplot[~dfplot.odd]['volt_cal'], bins=100)
+    #plt.hist(dfplot[dfplot.odd]['volt_cal'], bins=100)
+
+# %%
+df_sample = df[df.sweep.isin([0,1,120,121,240,241,300,301])]
+df_sample.plot(x = 'time', y='volt_cal', ylim = (-0.001, 0.001))
+
+# %%
+df['datetime'] = pd.to_datetime(df.datetime)
+print(df.datetime.dtype)
+df.sort_values('datetime').datetime.is_monotonic_increasing
+print(df.datetime.is_monotonic_increasing)
+
+# %%
+import seaborn as sns
+if __name__ == "__main__":
+    #dfplot = df.copy()
+    #dfplot = dfplot[(0.01 < dfplot.time) & (dfplot.time < 0.02)]
+    #dfplot['odd'] = dfplot.sweep %2 == 0
+    sns.histplot(data=dfplot, x='volt_cal', hue='odd')
+    
+
+# %%
+dfplot[~dfplot.odd].volt_cal.std() / dfplot[dfplot.odd].volt_cal.std()
+#dfplot[~dfplot.odd].volt_cal.quantile(0.0001) / dfplot[dfplot.odd].volt_cal.quantile(0.0001)
 
 # %%
 if __name__ == "__main__":
@@ -292,24 +329,14 @@ if __name__ == "__main__":
     #print(grouping)
 
 # %%
-if __name__ == "__main__":
-    test = df[df.time == t_EPSP_amp]
-    dfpivot = df[['sweep', 'voltage', 'time']].pivot_table(values='voltage', columns = 'time', index = 'sweep')
-    ser_startmedian = dfpivot.iloc[:,:20].median(axis=1)
-    #df_calibrated = dfpivot - ser_startmedian
-    df_calibrated = dfpivot.subtract(ser_startmedian, axis = 'rows')
-    df_calibrated = df_calibrated.stack().reset_index()
-    df_calibrated.rename(columns = {0: 'volt_cal'}, inplace=True)
-    df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
-    df['volt_cal'] = df_calibrated.volt_cal
-    
-    #print(ser_startmedian)
 
 
 # %%
 if __name__ == "__main__":
-    result = df[df.time == t_EPSP_amp].volt_cal
-    result.plot(x = 'time')
+    result = dfplot[(dfplot.time == t_EPSP_amp)][['volt_cal','sweep', 'odd']]
+    #result.plot(x = 'sweep')
+    #result['c_odd'] = '1' if result.odd else '0'
+    sns.lineplot(data = result, x = 'sweep', y = 'volt_cal', hue = 'odd')
 
 # %%
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ from joblib import Memory
 
 memory = Memory("../cache", verbose=1)
 
-verbose = True
+verbose = False#True
 
 # set some working folders
 # TODO: set as globals?
@@ -101,8 +101,9 @@ def importabffolder(folderpath):
     """
     Read and concatenate all .abf files in folderpath to a single df
     """
-    list_files = [i for i in os.listdir(folderpath) if -1 < i.find(".abf")]  # [:2] # stop before item 2 [begin:end]
-    # print(list_files)
+    list_files = sorted([i for i in os.listdir(folderpath) if -1 < i.find(".abf")])  # [:2] # stop before item 2 [begin:end]
+    if verbose:
+        print(f"list_files: {list_files}")
     listdf = []
     maxsweep = 0
     for filename in list_files:
@@ -111,7 +112,7 @@ def importabffolder(folderpath):
         maxsweep = df.sweep.max()
         listdf.append(df)
 
-    # Check first timestamp in each df, very correct sequence, raise error
+    # TODO: Check first timestamp in each df, verify correct sequence, raise error
     df = pd.concat(listdf)
     # df.drop(columns=['sweep_raw'], inplace=True)
     df.reset_index(drop=True, inplace=True)
@@ -173,6 +174,7 @@ def parseProjFiles(proj_folder: Path, df=None, row=None):
         for i in df2parse["channel"].unique():
             # Create unique filename for current channel, if there are more than one
             if df2parse["channel"].nunique() == 1:
+                # TODO: Check if file needs splitting in odd/even sweeps
                 recording_name = row.recording_name
                 savepath = str(Path(proj_folder) / recording_name)
                 df = df2parse
