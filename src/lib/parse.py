@@ -10,7 +10,7 @@ from joblib import Memory
 
 memory = Memory("../cache", verbose=1)
 
-verbose = False#True
+verbose = True
 
 # set some working folders
 # TODO: set as globals?
@@ -40,7 +40,6 @@ def importabf(filepath):
     """
     import .abf and return dataframe wiht proper SI units
     """
-
     # parse abf
     abf = pyabf.ABF(filepath)
 
@@ -49,9 +48,7 @@ def importabf(filepath):
     sampling_Hz = abf.sampleRate
     if verbose:
         print(f"abf.channelCount: {channels}")
-    if verbose:
         print(f"abf.sweepCount): {sweeps}")
-    if verbose:
         print(f"abf.sampleRate): {sampling_Hz}")
     dfs = []
     for j in channels:
@@ -63,14 +60,11 @@ def importabf(filepath):
             df["t0"] = abf.sweepTimesSec[i]
             df["channel"] = j
             dfs.append(df)
-
     df = pd.concat(dfs)
     df["sweep"] = df.sweep_raw  # relevant for single file imports
-
     # Convert to SI
     df["time"] = df.sweepX  # time in seconds from start of sweep recording
     df["voltage"] = df.sweepY / 1000  # mv to V
-
     # Absolute date and time
     df["timens"] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
     df["datetime"] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
@@ -99,7 +93,7 @@ def importabf(filepath):
 # %%
 def importabffolder(folderpath):
     """
-    Read and concatenate all .abf files in folderpath to a single df
+    Read, sort (by filename) and concatenate all .abf files in folderpath to a single df
     """
     list_files = sorted([i for i in os.listdir(folderpath) if -1 < i.find(".abf")])  # [:2] # stop before item 2 [begin:end]
     if verbose:
@@ -111,11 +105,15 @@ def importabffolder(folderpath):
         df["sweep"] = df.sweep_raw + maxsweep + 1
         maxsweep = df.sweep.max()
         listdf.append(df)
-
-    # TODO: Check first timestamp in each df, verify correct sequence, raise error
     df = pd.concat(listdf)
-    # df.drop(columns=['sweep_raw'], inplace=True)
     df.reset_index(drop=True, inplace=True)
+    # Check first timestamp in each df, verify correct sequence, raise error
+    df['datetime'] = pd.to_datetime(df.datetime)
+    if df.datetime.is_monotonic_increasing:
+        if verbose:
+            print(f"Datetime check: {df.datetime.is_monotonic_increasing}")
+    else:
+        raise Exception("importabffolder: files not concatenated in chronological order.")
     return df
 
 
@@ -185,16 +183,16 @@ def parseProjFiles(proj_folder: Path, df=None, row=None):
                 df = df2parse[df2parse.channel == i]
             df.to_csv(savepath + ".csv", index=False)
             # df.drop(columns=["channel"]).to_csv(savepath + '.csv', index=False) # use after verification
-            if verbose:
-                print(f"df2parse: {df2parse}")
-                print(f"df: {df}")
+            #if verbose:
+                #print(f"df2parse: {df2parse}")
+                #print(f"df: {df}")
             dfmean = builddfmean(df)
             dfmean.reset_index().to_csv(savepath + "_mean.csv", index=False)
             dict_channels[str(i)] = df["sweep"].nunique()
             # dict_channels[str(i)] = df['sweep'].values[-1]
             if verbose:
                 print(f"frame has channel: {i}")
-                print(f"df: {df}")
+                #print(f"df: {df}")
                 print(f"dict_channels: {dict_channels}")
         return dict_channels
         # return df['sweep'].values[-1] # rendered obsolete by dict return for multi-channel recordings
