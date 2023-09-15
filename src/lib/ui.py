@@ -866,10 +866,13 @@ class UIsub(Ui_MainWindow):
             print("pushedButtonParse")
         update_frame = self.projectdf.copy()  # copy from which to remove rows without confusing index
         frame2add = self.projectdf.iloc[0:0].copy()  # new, empty df for adding rows for multi-channel readings, without messing with index
-        for i, row in self.projectdf.iterrows():
-            if row["nSweeps"] == "...":  # indicates not read before
+
+        for i, df_proj_row in self.projectdf.iterrows():
+            recording_name = df_proj_row['recording_name']
+            source_path = df_proj_row['path']
+            if df_proj_row["nSweeps"] == "...":  # indicates not read before
                 # check number of channels. If more than one, create new row for each new channel. Re-sort df after loop.
-                result = parse.parseProjFiles(self.projectfolder, row=row)  # result is a dict of <channel>:<channel ID>
+                result = parse.parseProjFiles(self.projectfolder, recording_name=recording_name, source_path=source_path)  # result is a dict of <channel>:<channel ID>
                 if len(result) > 1:  # more than one channel; rename
                     print(len(result), "channels found")
                     for j in result:
@@ -887,6 +890,7 @@ class UIsub(Ui_MainWindow):
                 # TODO: NTH - new visual progress report (old one dysfunctional with index-preserving update_frame appraoch)
             else:
                 print(i, "already exists: no action")
+
         self.projectdf = pd.concat([update_frame, frame2add])
         if verbose:
             print(f"update_frame: {update_frame}")

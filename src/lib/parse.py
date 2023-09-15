@@ -143,7 +143,7 @@ def builddfmean(df, rollingwidth=3):
     return dfmean
 
 
-def parseProjFiles(proj_folder: Path, df=None, row=None):
+def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=None):
     """
     receives a df of project data files built in ui
     checks for or creates project parsed files folder
@@ -157,13 +157,13 @@ def parseProjFiles(proj_folder: Path, df=None, row=None):
     calls builddfmean to create an average, prim and bis file
     """
 
-    def parser(proj_folder, row):
+    def parser(proj_folder, recording_name, source_path):
         if verbose:
-            print(f"row: {row}")
-        if Path(row.path).is_dir():
-            df2parse = importabffolder(folderpath=Path(row.path))
+            print(f"parser, source_path: {source_path}")
+        if Path(source_path).is_dir():
+            df2parse = importabffolder(folderpath=Path(source_path))
         else:
-            df2parse = importabf(filepath=Path(row.path))
+            df2parse = importabf(filepath=Path(source_path))
 
         if verbose:
             print(f"df2parse['channel'].nunique(): {df2parse['channel'].nunique()}")
@@ -172,12 +172,10 @@ def parseProjFiles(proj_folder: Path, df=None, row=None):
         for i in df2parse["channel"].unique():
             # Create unique filename for current channel, if there are more than one
             if df2parse["channel"].nunique() == 1:
-                # TODO: Check if file needs splitting in odd/even sweeps
-                recording_name = row.recording_name
                 savepath = str(Path(proj_folder) / recording_name)
                 df = df2parse
             else:
-                recording_name_channel = row.recording_name + "_ch_" + str(i)
+                recording_name_channel = recording_name + "_ch_" + str(i)
                 savepath = str(Path(proj_folder) / recording_name_channel)
                 # save ONLY active channel as filename
                 df = df2parse[df2parse.channel == i]
@@ -199,9 +197,9 @@ def parseProjFiles(proj_folder: Path, df=None, row=None):
 
     if verbose:
         print(f"proj folder: {proj_folder}")
-    if row is not None:
-        print(f"recording_name: {row['recording_name']}")
-        print(f"path: {row['path']}")
+    if source_path is not None:
+        print(f"recording_name: {recording_name}")
+        print(f"source_path: {source_path}")
     if df is not None:
         print(f"recording_name: {df['recording_name']}")
         print(f"path: {df['path']}")
@@ -216,15 +214,16 @@ def parseProjFiles(proj_folder: Path, df=None, row=None):
     # list found files
     # print(list_existingfiles)
     # remove the found files from the parse que
-    if row is not None:
-        nSweeps = parser(proj_folder, row)
+    if recording_name is not None:
+        nSweeps = parser(proj_folder, recording_name=recording_name, source_path=source_path)
         return nSweeps
 
     if df is not None:
-        for i, row in df.iterrows():
-            nSweeps = parser(proj_folder, row)
-
-
+        df_unique_names = df.drop_duplicates(subset='recording_name')
+        for i, row in df_unique_names.iterrows():
+            recording_name = row['recording_name']
+            source_path = row['path']
+            nSweeps = parser(proj_folder, recording_name=recording_name, source_path=source_path)
 # Path.is_dir to check if folder or file
 # start parsing the que
 # show progress
@@ -242,3 +241,4 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     
     dffiles = pd.DataFrame({"path": [standalone_test_source], "recording_name": [standalone_test_output]})
     parseProjFiles(proj_folder=proj_folder, df=dffiles)
+

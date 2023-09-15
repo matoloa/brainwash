@@ -264,7 +264,6 @@ def measureslope(df, i_slope, halfwidth, name="EPSP"):
 
     return df_slopes
 
-
 # %%
 if __name__ == "__main__":
     print("Running as main")
@@ -301,18 +300,20 @@ if __name__ == "__main__":
     #plt.hist(dfplot[dfplot.odd]['volt_cal'], bins=100)
 
 # %%
-df_sample = df[df.sweep.isin([0,1,120,121,240,241,300,301])]
-df_sample.plot(x = 'time', y='volt_cal', ylim = (-0.001, 0.001))
-
-# %%
-df['datetime'] = pd.to_datetime(df.datetime)
-print(df.datetime.dtype)
-df.sort_values('datetime').datetime.is_monotonic_increasing
-print(df.datetime.is_monotonic_increasing)
-
-# %%
-import seaborn as sns
 if __name__ == "__main__":
+    df_sample = df[df.sweep.isin([0,1,120,121,240,241,300,301])]
+    df_sample.plot(x = 'time', y='volt_cal', ylim = (-0.001, 0.001))
+
+# %%
+if __name__ == "__main__":
+    df['datetime'] = pd.to_datetime(df.datetime)
+    print(df.datetime.dtype)
+    df.sort_values('datetime').datetime.is_monotonic_increasing
+    print(df.datetime.is_monotonic_increasing)
+
+# %%
+if __name__ == "__main__":
+    import seaborn as sns
     #dfplot = df.copy()
     #dfplot = dfplot[(0.01 < dfplot.time) & (dfplot.time < 0.02)]
     #dfplot['odd'] = dfplot.sweep %2 == 0
@@ -320,16 +321,14 @@ if __name__ == "__main__":
     
 
 # %%
-dfplot[~dfplot.odd].volt_cal.std() / dfplot[dfplot.odd].volt_cal.std()
-#dfplot[~dfplot.odd].volt_cal.quantile(0.0001) / dfplot[dfplot.odd].volt_cal.quantile(0.0001)
+if __name__ == "__main__":
+    dfplot[~dfplot.odd].volt_cal.std() / dfplot[dfplot.odd].volt_cal.std()
+    #dfplot[~dfplot.odd].volt_cal.quantile(0.0001) / dfplot[dfplot.odd].volt_cal.quantile(0.0001)
 
 # %%
 if __name__ == "__main__":
     grouping = df[['sweep', 'voltage']].groupby(['sweep']).mean().plot()#x = 'sweep', y='voltage')#, ylim = (-0.001, 0.001))
     #print(grouping)
-
-# %%
-
 
 # %%
 if __name__ == "__main__":
@@ -345,7 +344,8 @@ if __name__ == "__main__":
     g.hlines(y=[-0.0001, 0.0001], xmin=0, xmax=1000)
 
 # %%
-result
+if __name__ == "__main__":
+    result
 
 # %%
 if __name__ == "__main__":
@@ -362,10 +362,6 @@ if __name__ == "__main__":
     #result.pivot_table(index='sweep', aggfunc='median').rolling(50).median().plot()
 
 # %%
-df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
-df_calibrated
-
-# %%
-df
-
-# %%
+if __name__ == "__main__":
+    df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
+    df_calibrated
