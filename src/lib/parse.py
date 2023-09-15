@@ -38,7 +38,7 @@ def buildexperimentcsv(dir_gen_data):
 @memory.cache
 def importabf(filepath):
     """
-    import .abf and return dataframe wiht proper SI units
+    import .abf and return dataframe with proper SI units
     """
     # parse abf
     abf = pyabf.ABF(filepath)
@@ -56,37 +56,18 @@ def importabf(filepath):
             # get data
             abf.setSweep(sweepNumber=i, channel=j)
             df = pd.DataFrame({"sweepX": abf.sweepX, "sweepY": abf.sweepY})
-            df["sweep_raw"] = i
+            #df["sweep_raw"] = i #TODO: do we need this?
             df["t0"] = abf.sweepTimesSec[i]
             df["channel"] = j
             dfs.append(df)
     df = pd.concat(dfs)
-    df["sweep"] = df.sweep_raw  # relevant for single file imports
     # Convert to SI
     df["time"] = df.sweepX  # time in seconds from start of sweep recording
     df["voltage"] = df.sweepY / 1000  # mv to V
     # Absolute date and time
     df["timens"] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
     df["datetime"] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
-    """
-    if not channel in abf.channelList:
-        raise ValueError(f"No channel {channel} in {filepath}")
-    if oddeven is None:
-        if channel == 0:
-            oddeven = "odd"
-        else:
-            oddeven = "even"
-
-    # Odd / Even sweep inclusion
-    df["even"] = df.sweep_raw.apply(lambda x: x % 2 == 0)
-    df["oddeven"] = df.even.apply(lambda x: "even" if x else "odd")
-    df = df[df.oddeven == oddeven]  # filter rows by Boolean
-    df.drop(columns=["sweepX", "sweepY", "even", "oddeven", "timens"], inplace=True)
-    df.reset_index(drop=True, inplace=True)
-    """
-
     df.drop(columns=["sweepX", "sweepY", "timens"], inplace=True)
-
     return df
 
 
@@ -99,21 +80,13 @@ def importabffolder(folderpath):
     if verbose:
         print(f"list_files: {list_files}")
     listdf = []
-    maxsweep = 0
     for filename in list_files:
         df = importabf(folderpath / filename)
-        df["sweep"] = df.sweep_raw + maxsweep + 1
-        maxsweep = df.sweep.max()
         listdf.append(df)
     df = pd.concat(listdf)
     df.reset_index(drop=True, inplace=True)
     # Check first timestamp in each df, verify correct sequence, raise error
     df['datetime'] = pd.to_datetime(df.datetime)
-    if df.datetime.is_monotonic_increasing:
-        if verbose:
-            print(f"Datetime check: {df.datetime.is_monotonic_increasing}")
-    else:
-        raise Exception("importabffolder: files not concatenated in chronological order.")
     return df
 
 
@@ -143,57 +116,99 @@ def builddfmean(df, rollingwidth=3):
     return dfmean
 
 
-def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=None):
+def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=None, single_stim=False):
     """
-    receives a df of project data files built in ui
-    checks for or creates project parsed files folder
-    parses each file, that is not already parsed by name
-    saves parsed file into project parsed files folder
-    get proj_folder from ui self.project_folder
-    returns a dict of channels, used by ui to split a single file with multiple channels
+    * receives a df of project data file paths built in ui
+        files that are already parsed are to be overwritten (ui.py passes filitered list of unparsed files)
+    * checks for or creates project parsed files folder
+    * parses each file by source path
+    * adds columns: channel, stim (default a and b), sweep (0-max for each channel-stim combo)
+    * fetches proj_folder from ui self.project_folder
+    * saves a parsed file into project parsed files folder as .csv
+    
+    returns a dict of channels and stims, used by ui.py to split a single file with multiple channels
 
     NTH: checks if file is already parsed by checksums
-
-    calls builddfmean to create an average, prim and bis file
+    calls builddfmean() to create an average, prim and bis file, per channel-stim combo
     """
+
+    def assignStimAndSweep(df_data, list_stims, recording_name):
+        # sets stim-column, sorts df_data and builds new dfmean
+        if verbose:
+            print(f" - assignStim, list_stims: {list_stims}")
+        for channel in df_data.channel.unique():
+            df = df_data[df_data.channel==channel].copy()
+            nstims = len(list_stims)
+            '''
+            if nstims == 1:
+                for i, t0 in enumerate(df.t0.unique()):
+                    idf = df[df.t0 == t0].copy() #iterating df
+                    idf['sweep'] = i
+                    idf['stim'] = list_stims[0]
+                    dfs.append(idf)
+                df = pd.concat(dfs).reset_index(drop=True)
+                return df
+            else:
+            '''
+            df['stim'] = ''
+            dfs = []
+            for i, stim in enumerate(list_stims):
+                df.loc[df.index % nstims == i, 'stim'] = stim
+                for i, t0 in enumerate(df.t0.unique()):
+                    idf = df[((df.t0 == t0) & (df.stim == stim))].copy()
+                    idf['sweep'] = i
+                    idf['stim'] = list_stims[0]
+                    dfs.append(idf)
+            df = pd.concat(dfs).reset_index(drop=True)
+            return df
+        df_assigned = df
+        return df_assigned
 
     def parser(proj_folder, recording_name, source_path):
         if verbose:
-            print(f"parser, source_path: {source_path}")
+            print(f" - parser, source_path: {source_path}")
         if Path(source_path).is_dir():
-            df2parse = importabffolder(folderpath=Path(source_path))
+            df = importabffolder(folderpath=Path(source_path))
         else:
-            df2parse = importabf(filepath=Path(source_path))
-
+            df = importabf(filepath=Path(source_path))
         if verbose:
-            print(f"df2parse['channel'].nunique(): {df2parse['channel'].nunique()}")
+            print(f" - - df['channel'].nunique(): {df['channel'].nunique()}")
 
-        dict_channels = {}
-        for i in df2parse["channel"].unique():
-            # Create unique filename for current channel, if there are more than one
-            if df2parse["channel"].nunique() == 1:
-                savepath = str(Path(proj_folder) / recording_name)
-                df = df2parse
-            else:
-                recording_name_channel = recording_name + "_ch_" + str(i)
-                savepath = str(Path(proj_folder) / recording_name_channel)
-                # save ONLY active channel as filename
-                df = df2parse[df2parse.channel == i]
-            df.to_csv(savepath + ".csv", index=False)
-            # df.drop(columns=["channel"]).to_csv(savepath + '.csv', index=False) # use after verification
-            #if verbose:
-                #print(f"df2parse: {df2parse}")
-                #print(f"df: {df}")
-            dfmean = builddfmean(df)
-            dfmean.reset_index().to_csv(savepath + "_mean.csv", index=False)
-            dict_channels[str(i)] = df["sweep"].nunique()
-            # dict_channels[str(i)] = df['sweep'].values[-1]
+        df = df.sort_values(by='datetime').reset_index(drop=True)
+        # sort df2parse in channels and stims (a and b)
+        if single_stim:
             if verbose:
-                print(f"frame has channel: {i}")
-                #print(f"df: {df}")
-                print(f"dict_channels: {dict_channels}")
+                print(" - - user set single_stim=True")
+                list_stims=["a"]
+        else: #default to 2 stims 
+            if verbose:
+                print(" - - default: two stims per channel")
+                list_stims=["a", "b"]
+        df = assignStimAndSweep(df_data = df, list_stims=list_stims, recording_name=recording_name)
+        
+        # TODO: persist df_data and dfmean using refactored function
+            
+        # TODO: every channel:stim combo counts sweeps from 0 to max
+
+        
+        savepath = str(Path(proj_folder) / recording_name)
+        df.to_csv(savepath + ".csv", index=False)
+
+
+
+
+    '''
+        dfmean = builddfmean(df2parse)
+        dfmean.reset_index().to_csv(savepath + "_mean.csv", index=False)
+        dict_channels[str(i)] = df["sweep"].nunique()
+        # dict_channels[str(i)] = df['sweep'].values[-1]
+        if verbose:
+            print(f"frame has channel: {i}")
+            #print(f"df: {df}")
+            print(f"dict_channels: {dict_channels}")
         return dict_channels
         # return df['sweep'].values[-1] # rendered obsolete by dict return for multi-channel recordings
+    '''
 
     if verbose:
         print(f"proj folder: {proj_folder}")
@@ -239,6 +254,6 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     proj_folder = Path.home() / "Documents/Brainwash Projects/standalone_test"
     print("Placeholder: standalone test, processing", standalone_test_source, "as recording_name", standalone_test_output)
     
-    dffiles = pd.DataFrame({"path": [standalone_test_source], "recording_name": [standalone_test_output]})
-    parseProjFiles(proj_folder=proj_folder, df=dffiles)
+    df_files = pd.DataFrame({"path": [standalone_test_source], "recording_name": [standalone_test_output]})
+    parseProjFiles(proj_folder=proj_folder, df=df_files)
 
