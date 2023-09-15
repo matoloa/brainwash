@@ -134,13 +134,10 @@ def assignStimAndSweep(df_data, list_stims, recording_name):
         else:
         '''
         df['stim'] = ''
-        df['sweep'] = 0
+        sweeplength = df.time.nunique()
+        df['sweep'] = df.index.to_numpy() // (sweeplength * nstims)
         for i, stim in enumerate(list_stims):
-            print(f"stim: {stim}")
             df.loc[df.index % nstims == i, 'stim'] = stim
-            print(f"shape: {df.loc[df.index % nstims == i].shape}") 
-            for i, t0 in tqdm(enumerate(df.t0.unique())):
-                df.loc[((df.t0 == t0) & (df.stim == stim)), 'sweep'] = i
         return df
     df_assigned = df
     return df_assigned
@@ -246,16 +243,6 @@ print(f"df: {df}")
 
 
 # %%
-df.stim.unique()
-
-# %%
-dforig = df.copy()
-dforig
-
-# %%
-dforig.channel.unique()
-
-# %%
 if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
     # Single channel .abf test
     # standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 1 channel/A_21_P0701-S2"
@@ -267,7 +254,7 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     print("Placeholder: standalone test, processing", standalone_test_source, "as recording_name", standalone_test_output)
     
     df_files = pd.DataFrame({"path": [standalone_test_source], "recording_name": [standalone_test_output]})
-    parseProjFiles(proj_folder=proj_folder, df=df_files)
+    df = parseProjFiles(proj_folder=proj_folder, df=df_files)
 
 
 # %%
