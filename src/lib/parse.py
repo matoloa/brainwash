@@ -6,6 +6,7 @@ import pandas as pd  # dataframe module, think excel, but good
 import pyabf  # read data files atf, abf
 from neo import io  # read data files ibw
 
+from tqdm.notebook import tqdm
 from joblib import Memory
 
 memory = Memory("../cache", verbose=1)
@@ -91,8 +92,6 @@ def importabffolder(folderpath):
 
 
 # %%
-
-
 def builddfmean(df, rollingwidth=3):
     # TODO: is rollingwidth "radius" or "diameter"?
     """
@@ -116,6 +115,37 @@ def builddfmean(df, rollingwidth=3):
     return dfmean
 
 
+def assignStimAndSweep(df_data, list_stims, recording_name):
+    # sets stim-column, sorts df_data and builds new dfmean
+    if verbose:
+        print(f" - assignStim, list_stims: {list_stims}")
+    for channel in df_data.channel.unique():
+        df = df_data[df_data.channel==channel].copy()
+        nstims = len(list_stims)
+        '''
+        if nstims == 1:
+            for i, t0 in enumerate(df.t0.unique()):
+                idf = df[df.t0 == t0].copy() #iterating df
+                idf['sweep'] = i
+                idf['stim'] = list_stims[0]
+                dfs.append(idf)
+            df = pd.concat(dfs).reset_index(drop=True)
+            return df
+        else:
+        '''
+        df['stim'] = ''
+        df['sweep'] = 0
+        for i, stim in enumerate(list_stims):
+            print(f"stim: {stim}")
+            df.loc[df.index % nstims == i, 'stim'] = stim
+            print(f"shape: {df.loc[df.index % nstims == i].shape}") 
+            for i, t0 in tqdm(enumerate(df.t0.unique())):
+                df.loc[((df.t0 == t0) & (df.stim == stim)), 'sweep'] = i
+        return df
+    df_assigned = df
+    return df_assigned
+
+
 def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=None, single_stim=False):
     """
     * receives a df of project data file paths built in ui
@@ -131,38 +161,6 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
     NTH: checks if file is already parsed by checksums
     calls builddfmean() to create an average, prim and bis file, per channel-stim combo
     """
-
-    def assignStimAndSweep(df_data, list_stims, recording_name):
-        # sets stim-column, sorts df_data and builds new dfmean
-        if verbose:
-            print(f" - assignStim, list_stims: {list_stims}")
-        for channel in df_data.channel.unique():
-            df = df_data[df_data.channel==channel].copy()
-            nstims = len(list_stims)
-            '''
-            if nstims == 1:
-                for i, t0 in enumerate(df.t0.unique()):
-                    idf = df[df.t0 == t0].copy() #iterating df
-                    idf['sweep'] = i
-                    idf['stim'] = list_stims[0]
-                    dfs.append(idf)
-                df = pd.concat(dfs).reset_index(drop=True)
-                return df
-            else:
-            '''
-            df['stim'] = ''
-            dfs = []
-            for i, stim in enumerate(list_stims):
-                df.loc[df.index % nstims == i, 'stim'] = stim
-                for i, t0 in enumerate(df.t0.unique()):
-                    idf = df[((df.t0 == t0) & (df.stim == stim))].copy()
-                    idf['sweep'] = i
-                    idf['stim'] = list_stims[0]
-                    dfs.append(idf)
-            df = pd.concat(dfs).reset_index(drop=True)
-            return df
-        df_assigned = df
-        return df_assigned
 
     def parser(proj_folder, recording_name, source_path):
         if verbose:
@@ -184,18 +182,17 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
             if verbose:
                 print(" - - default: two stims per channel")
                 list_stims=["a", "b"]
+
         df = assignStimAndSweep(df_data = df, list_stims=list_stims, recording_name=recording_name)
-        
+        return df
+
         # TODO: persist df_data and dfmean using refactored function
-            
+        
         # TODO: every channel:stim combo counts sweeps from 0 to max
 
         
         savepath = str(Path(proj_folder) / recording_name)
         df.to_csv(savepath + ".csv", index=False)
-
-
-
 
     '''
         dfmean = builddfmean(df2parse)
@@ -239,11 +236,26 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
             recording_name = row['recording_name']
             source_path = row['path']
             nSweeps = parser(proj_folder, recording_name=recording_name, source_path=source_path)
+        return nSweeps
+
+df = parseProjFiles(proj_folder=proj_folder, df=df_files)
+print(f"df: {df}")
 # Path.is_dir to check if folder or file
 # start parsing the que
 # show progress
 
 
+# %%
+df.stim.unique()
+
+# %%
+dforig = df.copy()
+dforig
+
+# %%
+dforig.channel.unique()
+
+# %%
 if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
     # Single channel .abf test
     # standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 1 channel/A_21_P0701-S2"
@@ -257,3 +269,5 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     df_files = pd.DataFrame({"path": [standalone_test_source], "recording_name": [standalone_test_output]})
     parseProjFiles(proj_folder=proj_folder, df=df_files)
 
+
+# %%
