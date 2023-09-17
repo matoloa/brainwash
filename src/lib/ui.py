@@ -873,6 +873,7 @@ class UIsub(Ui_MainWindow):
             if df_proj_row["nSweeps"] == "...":  # indicates not read before TODO: Replace with selector!
                 # check number of channels. If more than one, create new row for each new channel. Re-sort df after loop.
                 result = parse.parseProjFiles(self.projectfolder, recording_name=recording_name, source_path=source_path)  # result is a dict of <channel>:<channel ID>
+                # TODO: rebuild this. previously result contained a dict of sweep channels. what is needed now?
                 if len(result) > 1:  # more than one channel; rename
                     print(len(result), "channels found")
                     for j in result:
