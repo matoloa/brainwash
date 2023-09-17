@@ -102,20 +102,26 @@ def builddfmean(df, rollingwidth=3):
     dfabf.pivot(columns='time', index='sweep', values='voltage').mean(axis=0).plot()
 
     """
-
-    # pivot is useful, learn it
-    dfmean = pd.DataFrame(df.pivot(columns="time", index="sweep", values="voltage").mean())
-    dfmean.columns = ["voltage"]
-    dfmean.voltage -= dfmean.voltage.median()
-
-    # generate diffs
-    dfmean["prim"] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
-    dfmean["bis"] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()
-
+    dfs = []
+    for channel in df.channel.unique():
+        for stim in df.stim.unique():
+            # pivot is useful, learn it
+            dfmean = pd.DataFrame(df[(df.channel == 0) & (df.stim == 'a')].pivot(columns="time", index="sweep", values="voltage").mean())
+            dfmean.columns = ["voltage"]
+            dfmean.voltage -= dfmean.voltage.median()
+        
+            # generate diffs
+            dfmean["prim"] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
+            dfmean["bis"] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()
+            # tag
+            dfmean['channel'] = channel
+            dfmean['stim'] = stim
+            dfs.append(dfmean)
+    dfmean = pd.concat(dfs).reset_index(drop=True)
     return dfmean
 
 
-def assignStimAndSweep(df_data, list_stims, recording_name):
+def assignstimandsweep(df_data, list_stims, recording_name):
     # sets stim-column, sorts df_data and builds new dfmean
     if verbose:
         print(f" - assignStim, list_stims: {list_stims}")
@@ -135,12 +141,20 @@ def assignStimAndSweep(df_data, list_stims, recording_name):
         '''
         df['stim'] = ''
         sweeplength = df.time.nunique()
-        df['sweep'] = df.index.to_numpy() // (sweeplength * nstims)
+        df['sweep'] = df.index.to_numpy() // sweeplength
         for i, stim in enumerate(list_stims):
             df.loc[df.index % nstims == i, 'stim'] = stim
         return df
     df_assigned = df
     return df_assigned
+
+
+def persistdf(recording_name, proj_folder, dfdata=None, dfmean=None):
+    savepath = str(Path(proj_folder) / recording_name)
+    if dfdata is not None:
+        dfdata.to_csv(savepath + ".csv", index=False)
+    if dfmean is not None:
+        dfmean.to_csv(savepath + "_mean.csv", index=False)
 
 
 def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=None, single_stim=False):
@@ -180,29 +194,15 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
                 print(" - - default: two stims per channel")
                 list_stims=["a", "b"]
 
-        df = assignStimAndSweep(df_data = df, list_stims=list_stims, recording_name=recording_name)
-        return df
+        df = assignstimandsweep(df_data = df, list_stims=list_stims, recording_name=recording_name)
+        dfmean = builddfmean(df)
+        persistdf(recording_name, proj_folder, dfdata=df, dfmean=dfmean)
 
-        # TODO: persist df_data and dfmean using refactored function
-        
         # TODO: every channel:stim combo counts sweeps from 0 to max
+        # TODO: is the above done? MATS?
+        nsweeps =  df["sweep"].nunique()
+        return nsweeps
 
-        
-        savepath = str(Path(proj_folder) / recording_name)
-        df.to_csv(savepath + ".csv", index=False)
-
-    '''
-        dfmean = builddfmean(df2parse)
-        dfmean.reset_index().to_csv(savepath + "_mean.csv", index=False)
-        dict_channels[str(i)] = df["sweep"].nunique()
-        # dict_channels[str(i)] = df['sweep'].values[-1]
-        if verbose:
-            print(f"frame has channel: {i}")
-            #print(f"df: {df}")
-            print(f"dict_channels: {dict_channels}")
-        return dict_channels
-        # return df['sweep'].values[-1] # rendered obsolete by dict return for multi-channel recordings
-    '''
 
     if verbose:
         print(f"proj folder: {proj_folder}")
@@ -235,8 +235,6 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
             nSweeps = parser(proj_folder, recording_name=recording_name, source_path=source_path)
         return nSweeps
 
-df = parseProjFiles(proj_folder=proj_folder, df=df_files)
-print(f"df: {df}")
 # Path.is_dir to check if folder or file
 # start parsing the que
 # show progress
@@ -254,7 +252,10 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     print("Placeholder: standalone test, processing", standalone_test_source, "as recording_name", standalone_test_output)
     
     df_files = pd.DataFrame({"path": [standalone_test_source], "recording_name": [standalone_test_output]})
-    df = parseProjFiles(proj_folder=proj_folder, df=df_files)
+    nsweeps = parseProjFiles(proj_folder=proj_folder, df=df_files)
+    print(f"nsweeps: {nsweeps}")
 
+
+# %%
 
 # %%
