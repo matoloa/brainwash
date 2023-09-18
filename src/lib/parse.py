@@ -117,7 +117,8 @@ def builddfmean(df, rollingwidth=3):
             dfmean['channel'] = channel
             dfmean['stim'] = stim
             dfs.append(dfmean)
-    dfmean = pd.concat(dfs).reset_index(drop=True)
+    dfmean = pd.concat(dfs).reset_index()#drop=True)
+    print(dfmean)
     return dfmean
 
 

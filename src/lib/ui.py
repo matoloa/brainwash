@@ -767,12 +767,11 @@ class UIsub(Ui_MainWindow):
             dfProj = self.projectdf
             dfSelection = dfProj.loc[selected_rows]
             dfFiltered = dfSelection[dfSelection["nSweeps"] != "..."]
-            list_files_filtered = dfFiltered["recording_name"].tolist()
             if not dfFiltered.empty:
-                if len(list_files_filtered) == 1:  # exactly one file selected
-                    self.setGraph(list_files_filtered[-1])
+                if dfFiltered.shape[0] == 1:  # exactly one file selected
+                    self.setGraph(dfFiltered)
                 else:  # several files selected
-                    self.setGraphs(list_files_filtered)
+                    self.setGraphs(dfFiltered)
             else:
                 print("Selection not analyzed.")
             return
@@ -921,35 +920,40 @@ class UIsub(Ui_MainWindow):
             self.canvas_seaborn.draw()
             self.canvas_seaborn.show()
 
-    def setGraph(self, recording_name):
+    def setGraph(self, row):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at graphMean
         if verbose:
-            print("setGraph")
+            print("setGraph", type(row))#['recording_name'])
+        recording_name = row['recording_name'].values[0]
+        channel = row['channel'].values[0]
+        stim = row['stim'].values[0]
         dfmean_path = self.projectfolder / (recording_name + "_mean.csv")
-        #print(dfmean_path)
+        print(f"dfmean_path: {dfmean_path}, type: {type(dfmean_path)}")
         try:
-            dfmean = pd.read_csv(dfmean_path)  # import csv
+            dfmean = pd.read_csv(str(dfmean_path))  # import csv
         except FileNotFoundError:
             print("did not find _mean.csv to load. Not imported?")
         # print("*** *** *** dfmean PRE reset_index:", dfmean)
         # dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
         self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
-        dfmean.reset_index(inplace=True, drop=True)
+        dfmean_view = dfmean[(dfmean['channel']==channel) & (dfmean['stim']==stim)].copy()
+        #dfmean_view.reset_index(inplace=True, drop=True)
+        print(dfmean_view)
         # print("*** *** *** dfmean POST reset_index:", dfmean)
-        dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
-        dfmean["prim"] = dfmean.prim / dfmean.prim.abs().max()
-        dfmean["bis"] = dfmean.bis / dfmean.bis.abs().max()
+        dfmean_view["voltage"] = dfmean_view.voltage / dfmean_view.voltage.abs().max()
+        dfmean_view["prim"] = dfmean_view.prim / dfmean_view.prim.abs().max()
+        dfmean_view["bis"] = dfmean_view.bis / dfmean_view.bis.abs().max()
 
-        g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
-        h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
-        i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
+        g = sns.lineplot(data=dfmean_view, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+        h = sns.lineplot(data=dfmean_view, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
+        i = sns.lineplot(data=dfmean_view, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
 
         # TODO: replace hard-coding, overview but not the whole stim-artefact.
         self.canvas_seaborn.axes.set_ylim(-0.05, 0.01)
         self.canvas_seaborn.axes.set_xlim(0.006, 0.015)
 
-        self.dfmean = dfmean  # assign to self to make available for launchMeasureWindow()
+        self.dfmean_view = dfmean_view  # assign to self to make available for launchMeasureWindow()
 
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
