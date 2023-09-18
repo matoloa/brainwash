@@ -868,7 +868,7 @@ class UIsub(Ui_MainWindow):
             print("pushedButtonParse")
         update_frame = self.projectdf.copy()  # copy from which to remove rows without confusing index
         frame2add = self.projectdf.iloc[0:0].copy()  # new, empty df for adding rows for multi-channel readings, without messing with index
-
+        rows = []
         for i, df_proj_row in self.projectdf.iterrows():
             recording_name = df_proj_row['recording_name']
             source_path = df_proj_row['path']
@@ -876,35 +876,19 @@ class UIsub(Ui_MainWindow):
                 dictmeta = parse.parseProjFiles(self.projectfolder, recording_name=recording_name, source_path=source_path)  # result is a dict of <channel>:<channel ID>
                 for channel in dictmeta['channel']:
                     for stim in dictmeta['stim']:
-                        print(f"recording_name: {df_proj_row['recording_name']}, df_proj_row.channel: {df_proj_row['channel']}, df_proj_row.stim: {df_proj_row['stim']}")
-                        print(f"channel: {channel}, stim: {stim}")
-                        
-
-                return
-                if len(result) > 1:  # more than one channel; rename
-                    print(len(result), "channels found")
-                    for j in result:
-                        row2add = self.projectdf[self.projectdf.index == i].copy()
-                        row2add["recording_name"] = row2add["recording_name"] + "_ch_" + str(j)
-                        row2add["nSweeps"] = result[j]
-                        frame2add = pd.concat([frame2add, row2add])  # add new, separate channel rows
-                        update_frame = update_frame[update_frame.index != i]  # destroy original row in update_frame
-                    if verbose:
-                        print(f"frame2add:{frame2add}")
-                else:  # just one channel - update nSweeps
-                    print(f"result:{result}")
-                    print(f"i:{i}")
-                    update_frame.loc[i, "nSweeps"] = str(list(result.values())[0])
-                # TODO: NTH - new visual progress report (old one dysfunctional with index-preserving update_frame appraoch)
-            else:
-                print(i, "already exists: no action")
-        return
-        self.projectdf = pd.concat([update_frame, frame2add])
-        if verbose:
-            print(f"update_frame: {update_frame}")
-        self.projectdf.reset_index(inplace=True, drop=True)  # Required for split abf files
-        self.save_dfproj()
-        self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
+                        df_proj_new_row = df_proj_row.copy()
+                        df_proj_new_row['channel'] = channel
+                        df_proj_new_row['stim'] = stim
+                        df_proj_new_row['nSweeps'] = dictmeta['nSweeps']
+                        rows.append(df_proj_new_row)
+                update_frame = update_frame[update_frame.recording_name != recording_name]
+                print(f"update_frame: {update_frame}")
+                rows2add = pd.concat(rows, axis=1).transpose()
+                print("rows2add:", rows2add[["recording_name", "channel", "stim", "nSweeps" ]])
+                self.projectdf = (pd.concat([update_frame, rows2add])).reset_index(drop=True)
+                print(self.projectdf[["recording_name", "channel", "stim", "nSweeps" ]])
+                self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
+                self.save_dfproj()
 
     def getdfProj(self):
         return self.projectdf
@@ -1039,7 +1023,11 @@ class UIsub(Ui_MainWindow):
         header = self.tableProj.horizontalHeader()
         dfProj = self.projectdf
         # hide all columns except these:
-        list_show = [dfProj.columns.get_loc("recording_name"), dfProj.columns.get_loc("groups"), dfProj.columns.get_loc("nSweeps")]
+        list_show = [dfProj.columns.get_loc("recording_name"),
+                     dfProj.columns.get_loc("groups"),
+                     dfProj.columns.get_loc("nSweeps"),
+                     dfProj.columns.get_loc("channel"),
+                     dfProj.columns.get_loc("stim")]
         num_columns = dfProj.shape[1]
         for col in range(num_columns):
             if col in list_show:
@@ -1073,6 +1061,8 @@ class UIsub(Ui_MainWindow):
         dfProj = pd.concat([dfProj, dfAdd])
         dfProj.reset_index(drop=True, inplace=True)
         dfProj["groups"] = dfProj["groups"].fillna(" ")
+        dfProj["channel"] = dfProj["channel"].fillna(" ")
+        dfProj["stim"] = dfProj["stim"].fillna(" ")
         dfProj["nSweeps"] = dfProj["nSweeps"].fillna("...")
         self.set_dfproj(dfProj)
         if verbose:

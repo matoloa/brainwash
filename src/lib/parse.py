@@ -201,7 +201,7 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
 
         # TODO: every channel:stim combo counts sweeps from 0 to max
         # TODO: is the above done? MATS?
-        dictmeta = {'channel': df.channel.unique(), 'stim': df.stim.unique(), 'nsweeps': df.sweep.nunique()}
+        dictmeta = {'channel': df.channel.unique(), 'stim': df.stim.unique(), 'nSweeps': df.sweep.nunique()}
         return dictmeta
 
     if verbose:
