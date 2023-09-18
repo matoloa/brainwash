@@ -475,7 +475,7 @@ class UIsub(Ui_MainWindow):
         tableProj.setObjectName("tableProj")
 
         self.projectdf = buildTemplate()
-        self.tablemodel = TableModel(self.precording_namerojectdf)
+        self.tablemodel = TableModel(self.projectdf)
         self.tableProj.setModel(self.tablemodel)
 
         self.projectfolder = self.projects_folder / self.projectname
@@ -878,7 +878,10 @@ class UIsub(Ui_MainWindow):
                 print(f"dictmeta: {dictmeta}")
                 for channel in dictmeta['channel']:
                     for stim in dictmeta['stim']:
+                        print(f"recording_name: {df_proj_row['recording_name']}, df_proj_row.channel: {df_proj_row['channel']}, df_proj_row.stim: {df_proj_row['stim']}")
                         print(f"channel: {channel}, stim: {stim}")
+                        
+
                 return
                 if len(result) > 1:  # more than one channel; rename
                     print(len(result), "channels found")
