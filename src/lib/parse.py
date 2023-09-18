@@ -121,10 +121,11 @@ def builddfmean(df, rollingwidth=3):
     return dfmean
 
 
-def assignstimandsweep(df_data, list_stims, recording_name):
+def assignStimAndsweep(df_data, list_stims):
     # sets stim-column, sorts df_data and builds new dfmean
     if verbose:
-        print(f" - assignStim, list_stims: {list_stims}")
+        print(f" - assignStimAndsweep, channels:{df_data.channel.unique()}, list_stims: {list_stims}")
+    dfs = []
     for channel in df_data.channel.unique():
         df = df_data[df_data.channel==channel].copy()
         nstims = len(list_stims)
@@ -144,8 +145,8 @@ def assignstimandsweep(df_data, list_stims, recording_name):
         df['sweep'] = df.index.to_numpy() // sweeplength
         for i, stim in enumerate(list_stims):
             df.loc[df.index % nstims == i, 'stim'] = stim
-        return df
-    df_assigned = df
+        dfs.append(df)
+    df_assigned = pd.concat(dfs).reset_index(drop=True)
     return df_assigned
 
 
@@ -194,15 +195,14 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
                 print(" - - default: two stims per channel")
                 list_stims=["a", "b"]
 
-        df = assignstimandsweep(df_data = df, list_stims=list_stims, recording_name=recording_name)
+        df = assignStimAndsweep(df_data = df, list_stims=list_stims)
         dfmean = builddfmean(df)
         persistdf(recording_name, proj_folder, dfdata=df, dfmean=dfmean)
 
         # TODO: every channel:stim combo counts sweeps from 0 to max
         # TODO: is the above done? MATS?
-        dictnsweeps = {'channel': df.channel.unique(), 'nsweeps': df.sweep.nunique()}
-        return dictnsweeps
-
+        dictmeta = {'channel': df.channel.unique(), 'stim': df.stim.unique(), 'nsweeps': df.sweep.nunique()}
+        return dictmeta
 
     if verbose:
         print(f"proj folder: {proj_folder}")
@@ -224,38 +224,36 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
     # print(list_existingfiles)
     # remove the found files from the parse que
     if recording_name is not None:
-        nSweeps = parser(proj_folder, recording_name=recording_name, source_path=source_path)
-        return nSweeps
+        dictmeta = parser(proj_folder, recording_name=recording_name, source_path=source_path)
+        return dictmeta
 
     if df is not None:
         df_unique_names = df.drop_duplicates(subset='recording_name')
         for i, row in df_unique_names.iterrows():
             recording_name = row['recording_name']
             source_path = row['path']
-            nSweeps = parser(proj_folder, recording_name=recording_name, source_path=source_path)
-        return nSweeps
+            dictmeta = parser(proj_folder, recording_name=recording_name, source_path=source_path)
+        return dictmeta
 
 # Path.is_dir to check if folder or file
-# start parsing the que
+# start parsing the queue
 # show progress
 
 
 # %%
 if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
-    # Single channel .abf test
-    # standalone_test_source = "/home/matolo/Documents/Brainwash Data Source/abf 1 channel/A_21_P0701-S2"
-    # standalone_test_output = "A_21"
-    # dual channel .abf test
-    standalone_test_source = str(Path.home() / "Documents/Brainwash Data Source/abf 1 channel/A_21_P0701-S2")
-    standalone_test_output = "A_21"
+
+    source_folder = Path.home() / "Documents/Brainwash Data Source/"
     proj_folder = Path.home() / "Documents/Brainwash Projects/standalone_test"
-    print("Placeholder: standalone test, processing", standalone_test_source, "as recording_name", standalone_test_output)
-    
-    df_files = pd.DataFrame({"path": [standalone_test_source], "recording_name": [standalone_test_output]})
-    nsweeps = parseProjFiles(proj_folder=proj_folder, df=df_files)
-    print(f"nsweeps: {nsweeps}")
-
-
-# %%
-
-# %%
+    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"),
+                    str(source_folder / "abf 2 channel/KO_02/2022_01_24_0000.abf")]
+    for _ in range(3):
+        print()
+    print("", "*** parse.py standalone test: ***")
+    for item in list_sources:
+        recording_name = os.path.basename(os.path.dirname(item))
+        print(" - processing", item, "as recording_name", recording_name)
+        df_files = pd.DataFrame({"path": [item], "recording_name": [recording_name]})
+        dictmeta = parseProjFiles(proj_folder=proj_folder, df=df_files)
+        print(f" - dictmeta: {dictmeta}")
+        print()
