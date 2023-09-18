@@ -873,9 +873,7 @@ class UIsub(Ui_MainWindow):
             recording_name = df_proj_row['recording_name']
             source_path = df_proj_row['path']
             if df_proj_row["nSweeps"] == "...":  # indicates not read before TODO: Replace with selector!
-                # check number of channels. If more than one, create new row for each new channel. Re-sort df after loop.
                 dictmeta = parse.parseProjFiles(self.projectfolder, recording_name=recording_name, source_path=source_path)  # result is a dict of <channel>:<channel ID>
-                print(f"dictmeta: {dictmeta}")
                 for channel in dictmeta['channel']:
                     for stim in dictmeta['stim']:
                         print(f"recording_name: {df_proj_row['recording_name']}, df_proj_row.channel: {df_proj_row['channel']}, df_proj_row.stim: {df_proj_row['stim']}")
