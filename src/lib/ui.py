@@ -646,14 +646,14 @@ class UIsub(Ui_MainWindow):
                         list_group.append(add_group)
                         self.projectdf.loc[i, "groups"] = ",".join(map(str, sorted(list_group)))
                     else:
-                        print(self.projectdf.loc[i, "recording_name"], "is already in", add_group)
+                        print(f"{self.projectdf.loc[i, 'recording_name']}, channel {self.projectdf.loc[i, 'channel']}, stim {self.projectdf.loc[i, 'stim']} is already in {add_group}")
                 self.save_dfproj()
                 self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
         else:
             print("No files selected.")
 
     def pushedButtonDelete(self):
-        # TODO: Delete files for selected rows
+        # TODO: Delete files for selected rows BY SELECTION - not by recording name!
         if verbose:
             print("pushedButtonDelete")
         selected_rows = self.listSelectedRows()
@@ -769,7 +769,7 @@ class UIsub(Ui_MainWindow):
             dfFiltered = dfSelection[dfSelection["nSweeps"] != "..."]
             if not dfFiltered.empty:
                 if dfFiltered.shape[0] == 1:  # exactly one file selected
-                    self.setGraph(dfFiltered)
+                    self.setGraph(dfFiltered) # passes a row, because only one is selected
                 else:  # several files selected
                     self.setGraphs(dfFiltered)
             else:
@@ -964,35 +964,29 @@ class UIsub(Ui_MainWindow):
     #        self.canvas_seaborn.draw()
     #        self.canvas_seaborn.show()
 
-    def setGraphs(self, list_files_filtered):
+    def setGraphs(self, dfFiltered):
         # plot the mean voltages of several selected files
         # print(f"list_files_filtered: {list_files_filtered}")
-
         if verbose:
             print("setGraphs")
-
-        dfmeans = []
-        for file in list_files_filtered:
-            dfmean_path = self.projectfolder / (file + "_mean.csv")
-            # print(f"df_mean_path: {dfmean_path}")
+        self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
+        for i, row in dfFiltered.iterrows(): # TODO: i to be used later for cycling colours?
+            channel = row['channel']
+            stim = row['stim']
+            dfmean_path = self.projectfolder / (row['recording_name'] + "_mean.csv")
             try:
-                df = pd.read_csv(dfmean_path)
+                dfmean = pd.read_csv(dfmean_path)
             except FileNotFoundError:
                 print("did not find _mean.csv to load. Not imported?")
-            dfmeans.append(df)
-            # dfmeans = pd.concat([dfmeans, df], ignore_index=True, axis=0) #TODO: make functional
-
-        self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
-        for dfmeanfile in dfmeans:
-            # sns.lineplot(data=dfmeanfile, x='time', y='voltage')
-            dfmeanfile["voltage"] = dfmeanfile.voltage / dfmeanfile.voltage.abs().max()
-            g = sns.lineplot(data=dfmeanfile, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
-
-        self.canvas_seaborn.axes.set_ylim(-0.05, 0.01)
-        self.canvas_seaborn.axes.set_xlim(0.006, 0.015)
-
-        # self.dfmean = dfmean # assign to self to make available for launchMeasureWindow()
-
+            df_view = dfmean[(dfmean['channel'] == channel) & (dfmean['stim'] == stim)].copy()
+            df_view["voltage"] = df_view.voltage / df_view.voltage.abs().max()
+            df_view["prim"] = df_view.prim / df_view.prim.abs().max()
+            df_view["bis"] = df_view.bis / df_view.bis.abs().max()
+            g = sns.lineplot(data=df_view, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+  
+        # TODO: replace hard-coding, overview but not the whole stim-artefact.
+        self.canvas_seaborn.axes.set_ylim(-0.08, 0.02)
+        self.canvas_seaborn.axes.set_xlim(0.006, 0.020)
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
 
