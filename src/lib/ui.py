@@ -1066,7 +1066,7 @@ class UIsub(Ui_MainWindow):
         self.setTableDf(dfProj)
 
     def renameRecording(self):
-        # TODO: functional renaming; do nothing if several lines selected. Rename ALL files of the recording.
+        # renames all instances of selected recording_name in projectdf, and their associated files
         if verbose:
             print("F2 key pressed in CustomTableView")
         selected_rows = self.listSelectedRows()
@@ -1081,24 +1081,27 @@ class UIsub(Ui_MainWindow):
             new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query='')
             list_recording_names = set(dfProj['recording_name'])
             if not new_recording_name in list_recording_names: # TODO: complete sanitation
-                self.projectdf.at[row, 'recording_name'] = new_recording_name
-                print(new_recording_name)
+                df_shared_recording_name = dfProj[dfProj['recording_name'] == old_recording_name]
+                for i, subrow in df_shared_recording_name.iterrows():
+                   dfProj.at[i,'recording_name'] = new_recording_name
+                if verbose:
+                    print(f"new_recording_name set: {new_recording_name}")
                 new_data = self.projectfolder / (new_recording_name + ".csv")
                 new_mean = self.projectfolder / (new_recording_name + "_mean.csv")
-                if old_data.exists():
+                if old_data.exists() & old_mean.exists():
                     print(f"rename_data: {old_data} to {new_data}")
                     os.rename(old_data, new_data)
-                else:
-                    print(f"File not found: {old_data}")
-                if old_mean.exists():
                     print(f"rename_mean: {old_mean} to {new_mean}")
                     os.rename(old_mean, new_mean)
                 else:
-                    print(f"File not found: {old_mean}")
+                    print(f"Found data file: {old_data.exists()} : {old_data}")
+                    print(f"Found mean file: {old_mean.exists()} : {old_mean}")
+                    raise FileNotFoundError
+                self.projectdf = dfProj
                 self.save_dfproj()
                 self.setTableDf(self.projectdf)  # Force update
             else:
-                print(f"new_recording_name {new_recording_name} is not unique")
+                print(f"new_recording_name {new_recording_name} already exists")
         else:
             print("Rename: invalid selection - please select one file only for renaming.")
 
