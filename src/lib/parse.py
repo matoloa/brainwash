@@ -2,6 +2,7 @@
 import os  # speak to OS (list dirs)
 from pathlib import Path
 
+import numpy as np
 import pandas as pd  # dataframe module, think excel, but good
 import pyabf  # read data files atf, abf
 from neo import io  # read data files ibw
@@ -69,6 +70,7 @@ def importabf(filepath):
     df["timens"] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
     df["datetime"] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
     df.drop(columns=["sweepX", "sweepY", "timens"], inplace=True)
+    df.reset_index(drop=True, inplace=True)
     return df
 
 
@@ -126,29 +128,22 @@ def assignStimAndsweep(df_data, list_stims):
     # sets stim-column, sorts df_data and builds new dfmean
     if verbose:
         print(f" - assignStimAndsweep, channels:{df_data.channel.unique()}, list_stims: {list_stims}")
+    nstims = len(list_stims)
+    nchannels = df_data.channel.nunique()
+    sweeplength = df_data.time.nunique()
+    dfcopy = df_data.copy()
+    dfcopy = dfcopy.sort_values(by=['datetime', 'channel']).reset_index(drop=True)
+    dfcopy['sweepraw'] = dfcopy.index.to_numpy() // (sweeplength * nchannels)
     dfs = []
-    for channel in df_data.channel.unique():
-        df = df_data[df_data.channel==channel].copy()
-        nstims = len(list_stims)
-        '''
-        if nstims == 1:
-            for i, t0 in enumerate(df.t0.unique()):
-                idf = df[df.t0 == t0].copy() #iterating df
-                idf['sweep'] = i
-                idf['stim'] = list_stims[0]
-                dfs.append(idf)
-            df = pd.concat(dfs).reset_index(drop=True)
-            return df
-        else:
-        '''
+    for channel in dfcopy.channel.unique():
+        df = dfcopy[dfcopy.channel==channel].copy()
         df['stim'] = ''
-        sweeplength = df.time.nunique()
-        df['sweep'] = df.index.to_numpy() // sweeplength
         for i, stim in enumerate(list_stims):
-            df.loc[df.index % nstims == i, 'stim'] = stim
+            df.loc[df.sweepraw % nstims == i, 'stim'] = stim
         dfs.append(df)
-    df_assigned = pd.concat(dfs).reset_index(drop=True)
-    return df_assigned
+    df = pd.concat(dfs).sort_values(by=['stim', 'datetime']).reset_index(drop=True)
+    df['sweep'] = (df.sweepraw / nstims).apply(lambda x: int(np.floor(x)))
+    return df
 
 
 def persistdf(recording_name, proj_folder, dfdata=None, dfmean=None):
@@ -258,3 +253,30 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
         dictmeta = parseProjFiles(proj_folder=proj_folder, df=df_files)
         print(f" - dictmeta: {dictmeta}")
         print()
+
+# %%
+if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
+
+    item = list_sources[0]
+    recording_name = os.path.basename(os.path.dirname(item))
+    df = pd.read_csv(str(proj_folder / (recording_name + '.csv')))
+    repo_root = Path("/home/jonathan/code/brainwash") 
+    source_folder = repo_root / "src/lib/test_data"
+    list_sources = [str(source_folder / "A_21_P0701-S2/2022_07_01_0012.abf.gitkeep"), str(source_folder / "KO_02/2022_01_24_0000.abf.gitkeep")]
+
+
+# %%
+if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
+
+    df = importabf(filepath=Path(list_sources[1]))
+    sweeplength = df.time.nunique()
+    df.index.to_numpy()
+    dfss = assignStimAndsweep(df, list_stims=['a', 'b', 'c', 'd'])
+    print(dfss)
+
+# %%
+if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
+
+    dfvc = dfss[['stim', 'sweepraw']].value_counts()
+    dfvc.sort_index(inplace=True)
+    print(dfvc)
