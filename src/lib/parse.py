@@ -107,11 +107,9 @@ def builddfmean(df, rollingwidth=3):
     dfs = []
     for channel in df.channel.unique():
         for stim in df.stim.unique():
-            # pivot is useful, learn it
-            dfmean = pd.DataFrame(df[(df.channel == 0) & (df.stim == 'a')].pivot(columns="time", index="sweep", values="voltage").mean())
+            dfmean = pd.DataFrame(df[(df.channel == channel) & (df.stim == stim)].pivot(columns="time", index="sweep", values="voltage").mean())
             dfmean.columns = ["voltage"]
             dfmean.voltage -= dfmean.voltage.median()
-        
             # generate diffs
             dfmean["prim"] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
             dfmean["bis"] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()
@@ -260,7 +258,7 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     item = list_sources[0]
     recording_name = os.path.basename(os.path.dirname(item))
     df = pd.read_csv(str(proj_folder / (recording_name + '.csv')))
-    repo_root = Path("/home/jonathan/code/brainwash") 
+    repo_root = Path.home() / "code/brainwash"
     source_folder = repo_root / "src/lib/test_data"
     list_sources = [str(source_folder / "A_21_P0701-S2/2022_07_01_0012.abf.gitkeep"), str(source_folder / "KO_02/2022_01_24_0000.abf.gitkeep")]
 

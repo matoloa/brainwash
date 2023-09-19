@@ -934,13 +934,11 @@ class UIsub(Ui_MainWindow):
             dfmean = pd.read_csv(str(dfmean_path))  # import csv
         except FileNotFoundError:
             print("did not find _mean.csv to load. Not imported?")
-        # print("*** *** *** dfmean PRE reset_index:", dfmean)
-        # dfmean = pd.read_csv('/home/jonathan/code/brainwash/dataGenerated/metaData/2022_01_24_0020.csv') # import csv
+        
         self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
         dfmean_view = dfmean[(dfmean['channel']==channel) & (dfmean['stim']==stim)].copy()
-        #dfmean_view.reset_index(inplace=True, drop=True)
-        print(dfmean_view)
-        # print("*** *** *** dfmean POST reset_index:", dfmean)
+        print(channel, stim, dfmean_view)
+        
         dfmean_view["voltage"] = dfmean_view.voltage / dfmean_view.voltage.abs().max()
         dfmean_view["prim"] = dfmean_view.prim / dfmean_view.prim.abs().max()
         dfmean_view["bis"] = dfmean_view.bis / dfmean_view.bis.abs().max()
@@ -950,8 +948,8 @@ class UIsub(Ui_MainWindow):
         i = sns.lineplot(data=dfmean_view, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
 
         # TODO: replace hard-coding, overview but not the whole stim-artefact.
-        self.canvas_seaborn.axes.set_ylim(-0.05, 0.01)
-        self.canvas_seaborn.axes.set_xlim(0.006, 0.015)
+        self.canvas_seaborn.axes.set_ylim(-0.08, 0.02)
+        self.canvas_seaborn.axes.set_xlim(0.006, 0.020)
 
         self.dfmean_view = dfmean_view  # assign to self to make available for launchMeasureWindow()
 
