@@ -269,7 +269,7 @@ if __name__ == "__main__":
     print("Running as main")
     import parse
     from pathlib import Path
-    path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/A_21.csv")
+    path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/A_21_P0701-S2.csv")
     #path_datafile = Path("/home/matolo/Documents/Brainwash Projects/My Project/A_21_P0701-S2_2022_07_01_0000.abf.csv")
     df = pd.read_csv(str(path_datafile))
     t_EPSP_amp = 0.0128
@@ -318,7 +318,6 @@ if __name__ == "__main__":
     #dfplot = dfplot[(0.01 < dfplot.time) & (dfplot.time < 0.02)]
     #dfplot['odd'] = dfplot.sweep %2 == 0
     sns.histplot(data=dfplot, x='volt_cal', hue='odd')
-    
 
 # %%
 if __name__ == "__main__":
