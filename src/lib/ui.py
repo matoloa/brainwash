@@ -15,6 +15,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtWidgets
 from datetime import datetime
+import re
 
 import parse
 import analysis
@@ -654,9 +655,21 @@ class UIsub(Ui_MainWindow):
 
     def pushedButtonDelete(self):
         # TODO: Delete files for selected rows BY SELECTION - not by recording name!
+        # 2023-09-20: reconstruct to selectively purge data from data and mean csv:s
         if verbose:
             print("pushedButtonDelete")
+        dfProj = self.projectdf
         selected_rows = self.listSelectedRows()
+        if 0 < len(selected_rows):
+            print("Flagged for delete:")
+            for row in selected_rows:
+                recording_name = dfProj.at[row, 'recording_name']
+                channel = dfProj.at[row, 'channel']
+                stim = dfProj.at[row, 'stim']
+                print(" - ", recording_name, channel, stim)
+        else:
+            print("No files selected.")
+        return
         if 0 < len(selected_rows):
             dfProj = self.projectdf
             dfSelection = dfProj.loc[selected_rows]
@@ -681,8 +694,6 @@ class UIsub(Ui_MainWindow):
             self.projectdf.reset_index(inplace=True, drop=True)
             self.save_dfproj()
             self.setTableDf(self.projectdf)  # Force update
-        else:
-            print("No files selected.")
 
     def checkedBoxLockDelete(self, state):
         if verbose:
@@ -1074,36 +1085,38 @@ class UIsub(Ui_MainWindow):
             row = selected_rows[0]
             dfProj = self.projectdf
             old_recording_name = dfProj.at[row,'recording_name']
-            print(f"dfSelection: {old_recording_name} to be renamed!")
             old_data = self.projectfolder / (old_recording_name + ".csv")
             old_mean = self.projectfolder / (old_recording_name + "_mean.csv")
             RenameDialog = InputDialogPopup()
             new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query='')
-            list_recording_names = set(dfProj['recording_name'])
-            if not new_recording_name in list_recording_names: # TODO: complete sanitation
-                df_shared_recording_name = dfProj[dfProj['recording_name'] == old_recording_name]
-                for i, subrow in df_shared_recording_name.iterrows():
-                   dfProj.at[i,'recording_name'] = new_recording_name
-                if verbose:
-                    print(f"new_recording_name set: {new_recording_name}")
-                new_data = self.projectfolder / (new_recording_name + ".csv")
-                new_mean = self.projectfolder / (new_recording_name + "_mean.csv")
-                if old_data.exists() & old_mean.exists():
-                    print(f"rename_data: {old_data} to {new_data}")
-                    os.rename(old_data, new_data)
-                    print(f"rename_mean: {old_mean} to {new_mean}")
-                    os.rename(old_mean, new_mean)
+            if re.match(r'^[a-zA-Z0-9_-]+$', str(new_recording_name)) is not None: # check if valid filename
+                list_recording_names = set(dfProj['recording_name'])
+                if not new_recording_name in list_recording_names: # prevent duplicates
+                    new_data = self.projectfolder / (new_recording_name + ".csv")
+                    new_mean = self.projectfolder / (new_recording_name + "_mean.csv")
+                    if old_data.exists() & old_mean.exists():
+                        if verbose:
+                            print(f"rename_data: {old_data} to {new_data}")
+                            print(f"rename_mean: {old_mean} to {new_mean}")
+                            print(f"new recording_name set: {new_recording_name}")
+                        os.rename(old_data, new_data)
+                        os.rename(old_mean, new_mean)
+                    else:
+                        print(f"data file exists: {old_data.exists()} : {old_data}")
+                        print(f"mean file exists: {old_mean.exists()} : {old_mean}")
+                        raise FileNotFoundError
+                    df_shared_recording_name = dfProj[dfProj['recording_name'] == old_recording_name]
+                    for i, subrow in df_shared_recording_name.iterrows():
+                        dfProj.at[i,'recording_name'] = new_recording_name
+                    self.projectdf = dfProj
+                    self.save_dfproj()
+                    self.setTableDf(self.projectdf)  # Force update
                 else:
-                    print(f"Found data file: {old_data.exists()} : {old_data}")
-                    print(f"Found mean file: {old_mean.exists()} : {old_mean}")
-                    raise FileNotFoundError
-                self.projectdf = dfProj
-                self.save_dfproj()
-                self.setTableDf(self.projectdf)  # Force update
+                    print(f"new_recording_name {new_recording_name} already exists")
             else:
-                print(f"new_recording_name {new_recording_name} already exists")
+                print(f"new_recording_name {new_recording_name} is not a valid filename")    
         else:
-            print("Rename: invalid selection - please select one file only for renaming.")
+            print("Rename: please select one row only for renaming.")
 
             
     @QtCore.pyqtSlot(list)
