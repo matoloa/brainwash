@@ -658,50 +658,58 @@ class UIsub(Ui_MainWindow):
         # 2023-09-20: reconstruct to selectively purge data from data and mean csv:s
         if verbose:
             print("pushedButtonDelete")
+        self.deleteSelectedRows()
+
+    def deleteSelectedRows(self):
         dfProj = self.projectdf
         set_files_before_purge = set(dfProj['recording_name'])
         selected_rows = self.listSelectedRows()
         if 0 < len(selected_rows):
+            files_to_purge = False
             print("Flagged for delete:")
             for row in selected_rows:
-                recording_name = dfProj.at[row, 'recording_name']
-                channel = dfProj.at[row, 'channel']
-                stim = dfProj.at[row, 'stim']
-                print(" - ", recording_name, channel, stim)
-                data_path = Path(self.projectfolder / (recording_name + ".csv"))
-                try:
-                    df = pd.read_csv(str(data_path))  # import csv
-                except FileNotFoundError:
-                    print("did not find data .csv to load. Not imported?")
-                dfmean_path = Path(self.projectfolder / (recording_name + "_mean.csv"))
-                try:
-                    dfmean = pd.read_csv(str(dfmean_path))  # import csv
-                except FileNotFoundError:
-                    print("did not find _mean.csv to load. Not imported?")
-                purged_df = df[(df['channel'] != channel) | (df['stim'] != stim)]
-                purged_dfmean = dfmean[(dfmean['channel'] != channel) | (dfmean['stim'] != stim)]
-                parse.persistdf(recording_name=recording_name, proj_folder=self.projectfolder, dfdata=purged_df, dfmean=purged_dfmean)
-                #check if recording_name is purged from dfProj
+                sweeps = dfProj.at[row, 'nSweeps']
+                if sweeps != "...": # if the file is imported:
+                    files_to_purge = True
+                    recording_name = dfProj.at[row, 'recording_name']
+                    channel = dfProj.at[row, 'channel']
+                    stim = dfProj.at[row, 'stim']
+                    if verbose:
+                        print(" - ", recording_name, channel, stim)
+                    data_path = Path(self.projectfolder / (recording_name + ".csv"))
+                    try:
+                        df = pd.read_csv(str(data_path))  # import csv
+                    except FileNotFoundError:
+                        print("did not find data .csv to load. Not imported?")
+                    dfmean_path = Path(self.projectfolder / (recording_name + "_mean.csv"))
+                    try:
+                        dfmean = pd.read_csv(str(dfmean_path))  # import csv
+                    except FileNotFoundError:
+                        print("did not find _mean.csv to load. Not imported?")
+                    purged_df = df[(df['channel'] != channel) | (df['stim'] != stim)]
+                    purged_dfmean = dfmean[(dfmean['channel'] != channel) | (dfmean['stim'] != stim)]
+                    parse.persistdf(recording_name=recording_name, proj_folder=self.projectfolder, dfdata=purged_df, dfmean=purged_dfmean)
+            # Regardless of whether or not the file was imported, purge it from dfProj
+            self.clear_graph()
             dfProj.drop(selected_rows, inplace=True)
+            if files_to_purge: # unlink any files that are no longer in dfProj
+                set_files_after_purge = set(dfProj['recording_name'])
+                list_delete = [item for item in set_files_before_purge if item not in set_files_after_purge]
+                for file in list_delete:
+                    delete_data = self.projectfolder / (file + ".csv")
+                    delete_mean = self.projectfolder / (file + "_mean.csv")
+                    if delete_data.exists():
+                        delete_data.unlink()
+                        print(f"Deleted data: {delete_data}")
+                    else:
+                        print(f"File not found: {delete_data}")
+                    if delete_mean.exists():
+                        delete_mean.unlink()
+                        print(f"Deleted mean: {delete_mean}")
+                    else:
+                        print(f"File not found: {delete_mean}")
             dfProj.reset_index(inplace=True, drop=True)
             self.set_dfproj(dfProj)
-            # unlink .csv files that are no longer in use
-            set_files_after_purge = set(dfProj['recording_name'])
-            list_delete = [item for item in set_files_before_purge if item not in set_files_after_purge]
-            self.clear_graph()
-            for file in list_delete:
-                delete_data = self.projectfolder / (file + ".csv")
-                delete_mean = self.projectfolder / (file + "_mean.csv")
-                if delete_data.exists():
-                    delete_data.unlink()
-                    print(f"Deleted data: {delete_data}")
-                else:
-                    print(f"File not found: {delete_data}")
-                if delete_mean.exists():
-                    delete_mean.unlink()
-                    print(f"Deleted mean: {delete_mean}")
-                else:
-                    print(f"File not found: {delete_mean}")
             self.setTableDf(self.projectdf)  # Force update
         else:
             print("No files selected.")
