@@ -586,7 +586,6 @@ class UIsub(Ui_MainWindow):
         self.list_groups = []
         self.write_project_cfg()
 
-
     def pushedButtonAddGroup(self):
         if verbose:
             print("pushedButtonGroups")
@@ -616,7 +615,6 @@ class UIsub(Ui_MainWindow):
         self.new_button = QtWidgets.QPushButton(group, self.centralwidget)
         self.new_button.setObjectName(group)
         self.new_button.clicked.connect(lambda _, button_name=group: self.pushedGroupButton(group))
-        
         # Arrange in rows of 4. TODO: hardcoded number of columns: move to cfg
         column = self.list_groups.index(group)
         row = 0
@@ -662,8 +660,6 @@ class UIsub(Ui_MainWindow):
         selected_rows = self.listSelectedRows()
         if 0 < len(selected_rows):
             files_to_purge = False
-            if verbose:
-                print("Flagged for delete:")
             for row in selected_rows:
                 sweeps = dfProj.at[row, 'nSweeps']
                 if sweeps != "...": # if the file is imported:
@@ -672,7 +668,7 @@ class UIsub(Ui_MainWindow):
                     channel = dfProj.at[row, 'channel']
                     stim = dfProj.at[row, 'stim']
                     if verbose:
-                        print(" - ", recording_name, channel, stim)
+                        print("Delete:", recording_name, channel, stim)
                     data_path = Path(self.projectfolder / (recording_name + ".csv"))
                     try:
                         df = pd.read_csv(str(data_path))  # import csv
@@ -761,6 +757,9 @@ class UIsub(Ui_MainWindow):
         row_index = ser_table_row.name
         if verbose:
             print("launchMeasureWindow", file_name)
+        
+        # TODO: 2023-09-20, disabled to prevent crash. Assign per recording_name, channel and stim.
+        return
         # Analysis.py
         all_t = analysis.find_all_t(self.dfmean, verbose=verbose)
         # Break out to variables
