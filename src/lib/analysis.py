@@ -49,6 +49,8 @@ def find_i_EPSP_peak_max(
     returns index of center of broadest negative peak on dfmean
     """
     print("find_i_EPSP_peak_max:")
+    print(dfmean)
+    print(dfmean['time'])
 
     # calculate sampling frequency
     time_delta = dfmean.time[1] - dfmean.time[0]
@@ -190,7 +192,6 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     i_EPSP_amp = np.nan
     i_VEB = np.nan
     i_EPSP_slope = np.nan
-
     i_Stim = find_i_stim_prim_max(dfmean)
     if verbose:
         print(f"i_Stim:{i_Stim}")
@@ -222,7 +223,7 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
 def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     if verbose:
         print("find_all_t")
-    dict_i = find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False)
+    dict_i = find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=verbose)
     dict_t = {}
     for k, v in dict_i.items():
         k_new = "t" + k[1:]

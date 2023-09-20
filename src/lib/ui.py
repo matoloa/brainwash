@@ -743,25 +743,24 @@ class UIsub(Ui_MainWindow):
         # Display the appropriate recording on the new window's graphs: mean and output
         #   Construct a sensible interface: drag-drop on measurement middle, start and finish points
         #   UI for toggling displayed measurement methods. Drag-drop forces Manual.
-        """
-        table_row should already have t_ values; otherwise do not attempt to draw them
-        """
+
+        # table_row should already have t_ values; otherwise do not attempt to draw them
+
         qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
         ser_table_row = self.tablemodel.dataRow(qt_index)
+        row_index = ser_table_row.name
+        recording_name = ser_table_row["recording_name"]
+        channel = ser_table_row["channel"]
+        stim = ser_table_row["stim"]
         nSweeps = ser_table_row["nSweeps"]
         if nSweeps == "...":
             # TODO: Make it import the missing file
             print("did not find _mean.csv to load. Not imported?")
             return
-        file_name = ser_table_row["recording_name"]
-        row_index = ser_table_row.name
-        if verbose:
-            print("launchMeasureWindow", file_name)
-        
-        # TODO: 2023-09-20, disabled to prevent crash. Assign per recording_name, channel and stim.
-        return
+        dfmean = self.getdfmean(ser_table_row)
+        print(dfmean, type(dfmean))
         # Analysis.py
-        all_t = analysis.find_all_t(self.dfmean, verbose=verbose)
+        all_t = analysis.find_all_t(dfmean=dfmean, verbose=verbose)
         # Break out to variables
         t_VEB = all_t["t_VEB"]
         t_EPSP_amp = all_t["t_EPSP_amp"]
@@ -770,17 +769,22 @@ class UIsub(Ui_MainWindow):
         self.projectdf.loc[row_index, "t_VEB"] = t_VEB
         self.projectdf.loc[row_index, "t_EPSP_amp"] = t_EPSP_amp
         self.projectdf.loc[row_index, "t_EPSP_slope"] = t_EPSP_slope
-        if verbose:
-            print(f"projectdf: {self.projectdf}")
+
+        # zero Y
+        dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
+        dfmean["prim"] = dfmean.prim / dfmean.prim.abs().max()
+        dfmean["bis"] = dfmean.bis / dfmean.bis.abs().max()
+
         # Open window
         self.measure = QtWidgets.QDialog()
         self.measure_window_sub = Measure_window_sub(self.measure)
-        self.measure.setWindowTitle(file_name)
+        window_name = (recording_name + ",_ch" + str(channel) + ", st" + stim)
+        self.measure.setWindowTitle(window_name)
         self.measure.show()
-        self.measure_window_sub.setMeasureGraph(file_name, self.dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
-
+        self.measure_window_sub.setMeasureGraph(recording_name, dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
+        return
         # TODO: Placeholder functionality for loading analysis.buildResultFile()
-        file_path = Path(self.projectfolder / (file_name + ".csv"))
+        file_path = Path(self.projectfolder / (recording_name + ".csv"))
         print(file_path)
         if file_path.exists():
             bigdata = pd.read_csv(file_path)
@@ -947,6 +951,20 @@ class UIsub(Ui_MainWindow):
             self.canvas_seaborn.draw()
             self.canvas_seaborn.show()
 
+    def getdfmean(self, row):
+        # returns dfmean, selected for the row's channel and stim
+        channel = row['channel']
+        stim = row['stim']
+        dfmean_path = self.projectfolder / (row['recording_name'] + "_mean.csv")
+        print(f"dfmean_path: {dfmean_path}, type: {type(dfmean_path)}")
+        try:
+            dfmean = pd.read_csv(str(dfmean_path))  # import csv
+        except FileNotFoundError:
+            print("did not find _mean.csv to load. Not imported?")
+        df = dfmean[(dfmean['channel']==channel) & (dfmean['stim']==stim)].copy()
+        df.reset_index(inplace=True)
+        return df
+
     def setGraph(self, row):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at graphMean
@@ -956,7 +974,6 @@ class UIsub(Ui_MainWindow):
         channel = row['channel'].values[0]
         stim = row['stim'].values[0]
         dfmean_path = self.projectfolder / (recording_name + "_mean.csv")
-        print(f"dfmean_path: {dfmean_path}, type: {type(dfmean_path)}")
         try:
             dfmean = pd.read_csv(str(dfmean_path))  # import csv
         except FileNotFoundError:
@@ -1272,8 +1289,8 @@ class Measure_window_sub(Ui_measure_window):
 
         # if not title is None:
         # ax1.set_title(title)
-        self.canvas_seaborn.axes.set_ylim(-0.05, 0.01)
-        self.canvas_seaborn.axes.set_xlim(0.006, 0.015)
+        self.canvas_seaborn.axes.set_ylim(-0.08, 0.02)
+        self.canvas_seaborn.axes.set_xlim(0.006, 0.020)
 
         # self.canvas_seaborn.axes.set_xmargin((100,500))
         self.canvas_seaborn.draw()
