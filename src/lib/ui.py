@@ -654,10 +654,6 @@ class UIsub(Ui_MainWindow):
             print("No files selected.")
 
     def pushedButtonDelete(self):
-        # TODO: Delete files for selected rows BY SELECTION - not by recording name!
-        # 2023-09-20: reconstruct to selectively purge data from data and mean csv:s
-        if verbose:
-            print("pushedButtonDelete")
         self.deleteSelectedRows()
 
     def deleteSelectedRows(self):
@@ -666,7 +662,8 @@ class UIsub(Ui_MainWindow):
         selected_rows = self.listSelectedRows()
         if 0 < len(selected_rows):
             files_to_purge = False
-            print("Flagged for delete:")
+            if verbose:
+                print("Flagged for delete:")
             for row in selected_rows:
                 sweeps = dfProj.at[row, 'nSweeps']
                 if sweeps != "...": # if the file is imported:
@@ -700,12 +697,14 @@ class UIsub(Ui_MainWindow):
                     delete_mean = self.projectfolder / (file + "_mean.csv")
                     if delete_data.exists():
                         delete_data.unlink()
-                        print(f"Deleted data: {delete_data}")
+                        if verbose:
+                            print(f"Deleted data: {delete_data}")
                     else:
                         print(f"File not found: {delete_data}")
                     if delete_mean.exists():
                         delete_mean.unlink()
-                        print(f"Deleted mean: {delete_mean}")
+                        if verbose:
+                            print(f"Deleted mean: {delete_mean}")
                     else:
                         print(f"File not found: {delete_mean}")
             dfProj.reset_index(inplace=True, drop=True)
@@ -715,14 +714,13 @@ class UIsub(Ui_MainWindow):
             print("No files selected.")
 
     def checkedBoxLockDelete(self, state):
-        if verbose:
-            print("checkedBoxLockDelete", state)
         if state == 2:
             self.delete_locked = True
         else:
             self.delete_locked = False
         self.pushButtonDelete.setEnabled(not self.delete_locked)
-        print(f"self.delete_locked:{self.delete_locked}")
+        if verbose:
+            print(f"checkedBoxLockDelete {state}, self.delete_locked:{self.delete_locked}")
         self.write_project_cfg()
 
     def write_cfg(self):  # config file for program, global stuff
