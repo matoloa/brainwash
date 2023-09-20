@@ -554,7 +554,7 @@ class UIsub(Ui_MainWindow):
 
     def listSelectedRows(self):
         selected_indexes = self.tableProj.selectionModel().selectedRows()
-        return [row.row() for row in selected_indexes]        
+        return [row.row() for row in selected_indexes]
 
     def pushedButtonClearGroups(self):
         if verbose:
@@ -659,6 +659,7 @@ class UIsub(Ui_MainWindow):
         if verbose:
             print("pushedButtonDelete")
         dfProj = self.projectdf
+        set_files_before_purge = set(dfProj['recording_name'])
         selected_rows = self.listSelectedRows()
         if 0 < len(selected_rows):
             print("Flagged for delete:")
@@ -667,14 +668,26 @@ class UIsub(Ui_MainWindow):
                 channel = dfProj.at[row, 'channel']
                 stim = dfProj.at[row, 'stim']
                 print(" - ", recording_name, channel, stim)
-        else:
-            print("No files selected.")
-        return
-        if 0 < len(selected_rows):
-            dfProj = self.projectdf
-            dfSelection = dfProj.loc[selected_rows]
-            list_delete = dfSelection["recording_name"].tolist()
-            # print(f"list_delete: {list_delete}")
+                data_path = Path(self.projectfolder / (recording_name + ".csv"))
+                try:
+                    df = pd.read_csv(str(data_path))  # import csv
+                except FileNotFoundError:
+                    print("did not find data .csv to load. Not imported?")
+                dfmean_path = Path(self.projectfolder / (recording_name + "_mean.csv"))
+                try:
+                    dfmean = pd.read_csv(str(dfmean_path))  # import csv
+                except FileNotFoundError:
+                    print("did not find _mean.csv to load. Not imported?")
+                purged_df = df[(df['channel'] != channel) | (df['stim'] != stim)]
+                purged_dfmean = dfmean[(dfmean['channel'] != channel) | (dfmean['stim'] != stim)]
+                parse.persistdf(recording_name=recording_name, proj_folder=self.projectfolder, dfdata=purged_df, dfmean=purged_dfmean)
+                #check if recording_name is purged from dfProj
+            dfProj.drop(selected_rows, inplace=True)
+            dfProj.reset_index(inplace=True, drop=True)
+            self.set_dfproj(dfProj)
+            # unlink .csv files that are no longer in use
+            set_files_after_purge = set(dfProj['recording_name'])
+            list_delete = [item for item in set_files_before_purge if item not in set_files_after_purge]
             self.clear_graph()
             for file in list_delete:
                 delete_data = self.projectfolder / (file + ".csv")
@@ -689,11 +702,9 @@ class UIsub(Ui_MainWindow):
                     print(f"Deleted mean: {delete_mean}")
                 else:
                     print(f"File not found: {delete_mean}")
-            # remove selected rows from projectdf
-            self.projectdf = dfProj.drop(selected_rows)
-            self.projectdf.reset_index(inplace=True, drop=True)
-            self.save_dfproj()
             self.setTableDf(self.projectdf)  # Force update
+        else:
+            print("No files selected.")
 
     def checkedBoxLockDelete(self, state):
         if verbose:
@@ -1108,8 +1119,7 @@ class UIsub(Ui_MainWindow):
                     df_shared_recording_name = dfProj[dfProj['recording_name'] == old_recording_name]
                     for i, subrow in df_shared_recording_name.iterrows():
                         dfProj.at[i,'recording_name'] = new_recording_name
-                    self.projectdf = dfProj
-                    self.save_dfproj()
+                    self.set_dfproj(dfProj)
                     self.setTableDf(self.projectdf)  # Force update
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
