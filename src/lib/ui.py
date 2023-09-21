@@ -565,7 +565,7 @@ class UIsub(Ui_MainWindow):
             print("No widget has focus.")
 
 
-# pushedButton functions
+# pushedButton functions TODO: break out the big ones to separate functions!
 
     def pushedButtonClearGroups(self):
         selected_rows = self.listSelectedRows()
@@ -953,20 +953,22 @@ class UIsub(Ui_MainWindow):
             self.write_cfg()
 
     def renameProject(self): # changes name of project folder, updates .cfg
-        # TODO: sanitize path
         # make if not existing
         self.projectfolder.mkdir(exist_ok=True)
         new_project_name = self.inputProjectName.text()
         # check if ok
         if (self.projects_folder / new_project_name).exists():
             if verbose:
-                print("The target project name already exists")
+                print(f"Project name {new_project_name} already exists.")
             self.inputProjectName.setText(self.projectname)
-        else:
+        elif re.match(r'^[a-zA-Z0-9_-]+$', str(new_project_name)) is not None: # check if valid filename
             self.projectfolder = self.projectfolder.rename(self.projects_folder / new_project_name)
             self.projectname = new_project_name
             self.inputProjectName.setReadOnly(True)
             self.write_cfg()
+            print(f"Project renamed to {new_project_name}.")
+        else:
+            print(f"Project name {new_project_name} is not a valid path.")
 
     def setProjectname(self):
         # get_signals(self.children()[1].children()[1].model)
