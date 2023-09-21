@@ -38,9 +38,9 @@ def buildexperimentcsv(dir_gen_data):
 
 
 @memory.cache
-def importabf(filepath):
+def parse_abf(filepath):
     """
-    import .abf and return dataframe with proper SI units
+    read .abf and return dataframe with proper SI units
     """
     # parse abf
     abf = pyabf.ABF(filepath)
@@ -75,7 +75,7 @@ def importabf(filepath):
 
 
 # %%
-def importabffolder(folderpath):
+def parse_abfFolder(folderpath):
     """
     Read, sort (by filename) and concatenate all .abf files in folderpath to a single df
     """
@@ -84,7 +84,7 @@ def importabffolder(folderpath):
         print(f"list_files: {list_files}")
     listdf = []
     for filename in list_files:
-        df = importabf(folderpath / filename)
+        df = parse_abf(folderpath / filename)
         listdf.append(df)
     df = pd.concat(listdf)
     df.reset_index(drop=True, inplace=True)
@@ -172,9 +172,9 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
         if verbose:
             print(f" - parser, source_path: {source_path}")
         if Path(source_path).is_dir():
-            df = importabffolder(folderpath=Path(source_path))
+            df = parse_abfFolder(folderpath=Path(source_path))
         else:
-            df = importabf(filepath=Path(source_path))
+            df = parse_abf(filepath=Path(source_path))
         if verbose:
             print(f" - - df['channel'].nunique(): {df['channel'].nunique()}")
 
@@ -263,7 +263,7 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
 # %%
 if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
 
-    df = importabf(filepath=Path(list_sources[1]))
+    df = parse_abf(filepath=Path(list_sources[1]))
     sweeplength = df.time.nunique()
     df.index.to_numpy()
     dfss = assignStimAndsweep(df, list_stims=['a', 'b', 'c', 'd'])

@@ -818,7 +818,7 @@ class UIsub(Ui_MainWindow):
             files_to_purge = False
             for row in selected_rows:
                 sweeps = df_p.at[row, 'sweeps']
-                if sweeps != "...": # if the file is imported:
+                if sweeps != "...": # if the file is parsed:
                     files_to_purge = True
                     recording_name = df_p.at[row, 'recording_name']
                     channel = df_p.at[row, 'channel']
@@ -827,12 +827,12 @@ class UIsub(Ui_MainWindow):
                         print("Delete:", recording_name, channel, stim)
                     data_path = Path(self.projectfolder / (recording_name + ".csv"))
                     try:
-                        df = pd.read_csv(str(data_path))  # import csv
+                        df = pd.read_csv(str(data_path))  # parse csv
                     except FileNotFoundError:
                         print("did not find data .csv to load. Not imported?")
                     dfmean_path = Path(self.projectfolder / (recording_name + "_mean.csv"))
                     try:
-                        dfmean = pd.read_csv(str(dfmean_path))  # import csv
+                        dfmean = pd.read_csv(str(dfmean_path))  # parse _mean.csv
                     except FileNotFoundError:
                         print("did not find _mean.csv to load. Not imported?")
                     purged_df = df[(df['channel'] != channel) | (df['stim'] != stim)]
@@ -1012,7 +1012,7 @@ class UIsub(Ui_MainWindow):
         dfmean_path = self.projectfolder / (row['recording_name'] + "_mean.csv")
         print(f"dfmean_path: {dfmean_path}, type: {type(dfmean_path)}")
         try:
-            dfmean = pd.read_csv(str(dfmean_path))  # import csv
+            dfmean = pd.read_csv(str(dfmean_path))  # parse _mean.csv
         except FileNotFoundError:
             print("did not find _mean.csv to load. Not imported?")
         df = dfmean[(dfmean['channel']==channel) & (dfmean['stim']==stim)].copy()
