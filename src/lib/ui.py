@@ -401,7 +401,7 @@ class Ui_Dialog(QtWidgets.QWidget):
 #######################################################################
 
 
-def df_pectTemplate():
+def df_projectTemplate():
     return pd.DataFrame(
         columns=[
             "host",
@@ -480,7 +480,7 @@ class UIsub(Ui_MainWindow):
         tableProj.setAcceptDrops(True)
         tableProj.setObjectName("tableProj")
 
-        self.df_project = df_pectTemplate()
+        self.df_project = df_projectTemplate()
         self.tablemodel = TableModel(self.df_project)
         self.tableProj.setModel(self.tablemodel)
 
@@ -542,6 +542,11 @@ class UIsub(Ui_MainWindow):
 
         # place current project as folder in project_root, lock project name for now
         # self.projectfolder = self.project_root / self.project
+
+# Placeholder variables (Zoom levels)
+    graph_xlim = (0.006, 0.020)
+    graph_ylim = (-0.08, 0.02)
+
 
 # Debugging tools
         # self.find_widgets_with_top_left_coordinates(self.centralwidget)
@@ -704,7 +709,7 @@ class UIsub(Ui_MainWindow):
                 if dfFiltered.shape[0] == 1:  # exactly one file selected
                     self.setGraph(dfFiltered) # passes a row, because only one is selected
                 else:  # several files selected
-                    self.setGraphs(dfFiltered)
+                    self.setGraph(dfFiltered)
             else:
                 print("Selection not analyzed.")
             return
@@ -942,7 +947,7 @@ class UIsub(Ui_MainWindow):
             self.projectname = new_project_name
             self.inputProjectName.setText(self.projectname)
             self.clearGraph()
-            self.df_project = df_pectTemplate()
+            self.df_project = df_projectTemplate()
             self.setTableDf(self.df_project)
             self.save_df_project()
             self.write_cfg()
@@ -1056,56 +1061,9 @@ class UIsub(Ui_MainWindow):
             self.canvas_seaborn.draw()
             self.canvas_seaborn.show()
 
-    def setGraph(self, row): # TODO: Unify with setGraphs!
-        # get dfmean from selected row in UIsub.
-        # display SELECTED from tableProj at graphMean
-        if verbose:
-            print("setGraph", type(row))#['recording_name'])
-        recording_name = row['recording_name'].values[0]
-        channel = row['channel'].values[0]
-        stim = row['stim'].values[0]
-        dfmean_path = self.projectfolder / (recording_name + "_mean.csv")
-        try:
-            dfmean = pd.read_csv(str(dfmean_path))  # import csv
-        except FileNotFoundError:
-            print("did not find _mean.csv to load. Not imported?")
-        
+    def setGraph(self, df): # plot selected rows, add prim and bis if only one
         self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
-        dfmean_view = dfmean[(dfmean['channel']==channel) & (dfmean['stim']==stim)].copy()
-        print(channel, stim, dfmean_view)
-        
-        dfmean_view["voltage"] = dfmean_view.voltage / dfmean_view.voltage.abs().max()
-        dfmean_view["prim"] = dfmean_view.prim / dfmean_view.prim.abs().max()
-        dfmean_view["bis"] = dfmean_view.bis / dfmean_view.bis.abs().max()
-
-        g = sns.lineplot(data=dfmean_view, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
-        h = sns.lineplot(data=dfmean_view, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
-        i = sns.lineplot(data=dfmean_view, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
-
-        # TODO: replace hard-coding, overview but not the whole stim-artefact.
-        self.canvas_seaborn.axes.set_ylim(-0.08, 0.02)
-        self.canvas_seaborn.axes.set_xlim(0.006, 0.020)
-
-        self.dfmean_view = dfmean_view  # assign to self to make available for launchMeasureWindow()
-
-        self.canvas_seaborn.draw()
-        self.canvas_seaborn.show()
-
-    #        dfmean.set_index('t0', inplace=True)
-    #        dfmean['slope'] = dfmean.slope / dfmean.slope.abs().max()
-    #        dfmean['sweep'] = dfmean.sweep / dfmean.sweep.abs().max()
-    #        g = sns.lineplot(data=dfmean, y="slope", x="t0", ax=self.canvas_seaborn.axes, color="black")
-    #        h = sns.lineplot(data=dfmean, y="sweep", x="t0", ax=self.canvas_seaborn.axes, color="red")
-    #        self.canvas_seaborn.draw()
-    #        self.canvas_seaborn.show()
-
-    def setGraphs(self, dfFiltered):
-        # plot the mean voltages of several selected files
-        # print(f"list_files_filtered: {list_files_filtered}")
-        if verbose:
-            print("setGraphs")
-        self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
-        for i, row in dfFiltered.iterrows(): # TODO: i to be used later for cycling colours?
+        for i, row in df.iterrows(): # TODO: i to be used later for cycling colours?
             channel = row['channel']
             stim = row['stim']
             dfmean_path = self.projectfolder / (row['recording_name'] + "_mean.csv")
@@ -1118,10 +1076,15 @@ class UIsub(Ui_MainWindow):
             df_view["prim"] = df_view.prim / df_view.prim.abs().max()
             df_view["bis"] = df_view.bis / df_view.bis.abs().max()
             g = sns.lineplot(data=df_view, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
-  
-        # TODO: replace hard-coding, overview but not the whole stim-artefact.
-        self.canvas_seaborn.axes.set_ylim(-0.08, 0.02)
-        self.canvas_seaborn.axes.set_xlim(0.006, 0.020)
+        
+        g = sns.lineplot(data=df_view, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+        if df.shape[0] == 1: # if just one row is selected, also show prim and bis
+            h = sns.lineplot(data=df_view, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
+            i = sns.lineplot(data=df_view, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
+
+        self.canvas_seaborn.axes.set_xlim(self.graph_xlim)
+        self.canvas_seaborn.axes.set_ylim(self.graph_ylim)
+
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
 
@@ -1241,7 +1204,7 @@ class Filetreesub(Ui_Dialog):
 
         # Dataframe to add
         self.names = []
-        self.dfAdd = df_pectTemplate()
+        self.dfAdd = df_projectTemplate()
 
         self.buttonBoxAddGroup = QtWidgets.QDialogButtonBox(dialog)
         self.buttonBoxAddGroup.setGeometry(QtCore.QRect(470, 20, 91, 491))
@@ -1264,7 +1227,7 @@ class Filetreesub(Ui_Dialog):
         # TODO: Extract host, checksum, group
         if verbose:
             print("pathsSelectedUpdateTable")
-        dfAdd = df_pectTemplate()
+        dfAdd = df_projectTemplate()
         dfAdd["path"] = paths
         dfAdd["host"] = "Computer 1"
         dfAdd["checksum"] = "big number"
@@ -1323,8 +1286,8 @@ class Measure_window_sub(Ui_measure_window):
 
         # if not title is None:
         # ax1.set_title(title)
-        self.canvas_seaborn.axes.set_ylim(-0.08, 0.02)
-        self.canvas_seaborn.axes.set_xlim(0.006, 0.020)
+        self.canvas_seaborn.axes.set_xlim(ui.graph_xlim)
+        self.canvas_seaborn.axes.set_ylim(ui.graph_ylim)
 
         # self.canvas_seaborn.axes.set_xmargin((100,500))
         self.canvas_seaborn.draw()
