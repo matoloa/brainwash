@@ -543,7 +543,7 @@ class UIsub(Ui_MainWindow):
         # place current project as folder in project_root, lock project name for now
         # self.projectfolder = self.project_root / self.project
 
-# Placeholder variables (Zoom levels)
+# Placeholder tuples (zoom for graphs)
     graph_xlim = (0.006, 0.020)
     graph_ylim = (-0.1, 0.02)
 
@@ -574,8 +574,7 @@ class UIsub(Ui_MainWindow):
         else:
             print("No files selected.")
 
-    def pushedButtonEditGroups(self):
-        # Open groups UI (not built)
+    def pushedButtonEditGroups(self): # Open groups UI (not built)
         if verbose:
             print("pushedButtonEditGroups")
         # Placeholder: For now, delete all buttons and groups
@@ -620,8 +619,7 @@ class UIsub(Ui_MainWindow):
     def pushedButtonDelete(self):
         self.deleteSelectedRows()
 
-    def pushedButtonRenameProject(self):
-        # renameProject
+    def pushedButtonRenameProject(self): # renameProject
         if verbose:
             print("pushedButtonRenameProject")
         self.inputProjectName.setReadOnly(False)
@@ -645,8 +643,7 @@ class UIsub(Ui_MainWindow):
                 self.newProject(new_project_name)
                 break
 
-    def pushedButtonOpenProject(self):
-        # open folder selector dialog
+    def pushedButtonOpenProject(self): # open folder selector dialog
         self.dialog = QtWidgets.QDialog()
         projectfolder = QtWidgets.QFileDialog.getExistingDirectory(
             self.dialog, "Open Directory", str(self.projects_folder), QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks
@@ -659,41 +656,16 @@ class UIsub(Ui_MainWindow):
             self.load_df_project()
             self.write_cfg()
 
-    def pushedButtonAddData(self):
-        # creates file tree for file selection
+    def pushedButtonAddData(self): # creates file tree for file selection
         if verbose:
             print("pushedButtonAddData")
         self.dialog = QtWidgets.QDialog()
         self.ftree = Filetreesub(self.dialog, parent=self, folder=self.user_documents)
         self.dialog.show()
 
-    def pushedButtonParse(self):
-        # parse non-parsed files and folders in self.df_project
-        if verbose:
-            print("pushedButtonParse")
-        update_frame = self.df_project.copy()  # copy from which to remove rows without confusing index
-        frame2add = self.df_project.iloc[0:0].copy()  # new, empty df for adding rows for multi-channel readings, without messing with index
-        rows = []
-        for i, df_proj_row in self.df_project.iterrows():
-            recording_name = df_proj_row['recording_name']
-            source_path = df_proj_row['path']
-            if df_proj_row["sweeps"] == "...":  # indicates not read before TODO: Replace with selector!
-                dictmeta = parse.parseProjFiles(self.projectfolder, recording_name=recording_name, source_path=source_path)  # result is a dict of <channel>:<channel ID>
-                for channel in dictmeta['channel']:
-                    for stim in dictmeta['stim']:
-                        df_proj_new_row = df_proj_row.copy()
-                        df_proj_new_row['channel'] = channel
-                        df_proj_new_row['stim'] = stim
-                        df_proj_new_row['sweeps'] = dictmeta['sweeps']
-                        rows.append(df_proj_new_row)
-                update_frame = update_frame[update_frame.recording_name != recording_name]
-                print(f"update_frame: {update_frame}")
-                rows2add = pd.concat(rows, axis=1).transpose()
-                print("rows2add:", rows2add[["recording_name", "channel", "stim", "sweeps" ]])
-                self.df_project = (pd.concat([update_frame, rows2add])).reset_index(drop=True)
-                print(self.df_project[["recording_name", "channel", "stim", "sweeps" ]])
-                self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
-                self.save_df_project()
+    def pushedButtonParse(self): # parse non-parsed files and folders in self.df_project
+        self.parse_data()
+
 
 # Non-button event functions
 
@@ -864,6 +836,30 @@ class UIsub(Ui_MainWindow):
             self.setTableDf(self.df_project)  # Force update
         else:
             print("No files selected.")
+
+    def parse_data(self): # parse data files and modify self.df_project accordingly
+        update_frame = self.df_project.copy()  # copy from which to remove rows without confusing index
+        rows = []
+        for i, df_proj_row in self.df_project.iterrows():
+            recording_name = df_proj_row['recording_name']
+            source_path = df_proj_row['path']
+            if df_proj_row["sweeps"] == "...":  # indicates not read before TODO: Replace with selector!
+                dictmeta = parse.parseProjFiles(self.projectfolder, recording_name=recording_name, source_path=source_path)  # result is a dict of <channel>:<channel ID>
+                for channel in dictmeta['channel']:
+                    for stim in dictmeta['stim']:
+                        df_proj_new_row = df_proj_row.copy()
+                        df_proj_new_row['channel'] = channel
+                        df_proj_new_row['stim'] = stim
+                        df_proj_new_row['sweeps'] = dictmeta['sweeps']
+                        rows.append(df_proj_new_row)
+                update_frame = update_frame[update_frame.recording_name != recording_name]
+                print(f"update_frame: {update_frame}")
+                rows2add = pd.concat(rows, axis=1).transpose()
+                print("rows2add:", rows2add[["recording_name", "channel", "stim", "sweeps" ]])
+                self.df_project = (pd.concat([update_frame, rows2add])).reset_index(drop=True)
+                print(self.df_project[["recording_name", "channel", "stim", "sweeps" ]])
+                self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
+                self.save_df_project()
 
 
 # Data Group functions
