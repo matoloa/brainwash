@@ -412,7 +412,7 @@ def df_projectTemplate():
             "stim",
             "groups",
             "parsetimestamp",
-            "nSweeps",
+            "sweeps",
             "t_stim",
             "t_stim_method",
             "t_stim_params",
@@ -545,7 +545,7 @@ class UIsub(Ui_MainWindow):
 
 # Placeholder variables (Zoom levels)
     graph_xlim = (0.006, 0.020)
-    graph_ylim = (-0.08, 0.02)
+    graph_ylim = (-0.1, 0.02)
 
 
 # Debugging tools
@@ -677,21 +677,21 @@ class UIsub(Ui_MainWindow):
         for i, df_proj_row in self.df_project.iterrows():
             recording_name = df_proj_row['recording_name']
             source_path = df_proj_row['path']
-            if df_proj_row["nSweeps"] == "...":  # indicates not read before TODO: Replace with selector!
+            if df_proj_row["sweeps"] == "...":  # indicates not read before TODO: Replace with selector!
                 dictmeta = parse.parseProjFiles(self.projectfolder, recording_name=recording_name, source_path=source_path)  # result is a dict of <channel>:<channel ID>
                 for channel in dictmeta['channel']:
                     for stim in dictmeta['stim']:
                         df_proj_new_row = df_proj_row.copy()
                         df_proj_new_row['channel'] = channel
                         df_proj_new_row['stim'] = stim
-                        df_proj_new_row['nSweeps'] = dictmeta['nSweeps']
+                        df_proj_new_row['sweeps'] = dictmeta['sweeps']
                         rows.append(df_proj_new_row)
                 update_frame = update_frame[update_frame.recording_name != recording_name]
                 print(f"update_frame: {update_frame}")
                 rows2add = pd.concat(rows, axis=1).transpose()
-                print("rows2add:", rows2add[["recording_name", "channel", "stim", "nSweeps" ]])
+                print("rows2add:", rows2add[["recording_name", "channel", "stim", "sweeps" ]])
                 self.df_project = (pd.concat([update_frame, rows2add])).reset_index(drop=True)
-                print(self.df_project[["recording_name", "channel", "stim", "nSweeps" ]])
+                print(self.df_project[["recording_name", "channel", "stim", "sweeps" ]])
                 self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
                 self.save_df_project()
 
@@ -704,7 +704,7 @@ class UIsub(Ui_MainWindow):
         if 0 < len(selected_rows):
             df_p = self.df_project
             dfSelection = df_p.loc[selected_rows]
-            dfFiltered = dfSelection[dfSelection["nSweeps"] != "..."]
+            dfFiltered = dfSelection[dfSelection["sweeps"] != "..."]
             if not dfFiltered.empty:
                 if dfFiltered.shape[0] == 1:  # exactly one file selected
                     self.setGraph(dfFiltered) # passes a row, because only one is selected
@@ -763,7 +763,7 @@ class UIsub(Ui_MainWindow):
         df_p["groups"] = df_p["groups"].fillna(" ")
         df_p["channel"] = df_p["channel"].fillna(" ")
         df_p["stim"] = df_p["stim"].fillna(" ")
-        df_p["nSweeps"] = df_p["nSweeps"].fillna("...")
+        df_p["sweeps"] = df_p["sweeps"].fillna("...")
         self.set_df_project(df_p)
         if verbose:
             print("addData:", self.get_df_project())
@@ -817,7 +817,7 @@ class UIsub(Ui_MainWindow):
         if 0 < len(selected_rows):
             files_to_purge = False
             for row in selected_rows:
-                sweeps = df_p.at[row, 'nSweeps']
+                sweeps = df_p.at[row, 'sweeps']
                 if sweeps != "...": # if the file is imported:
                     files_to_purge = True
                     recording_name = df_p.at[row, 'recording_name']
@@ -1041,7 +1041,7 @@ class UIsub(Ui_MainWindow):
         # hide all columns except these:
         list_show = [df_p.columns.get_loc("recording_name"),
                      df_p.columns.get_loc("groups"),
-                     df_p.columns.get_loc("nSweeps"),
+                     df_p.columns.get_loc("sweeps"),
                      df_p.columns.get_loc("channel"),
                      df_p.columns.get_loc("stim")]
         num_columns = df_p.shape[1]
@@ -1109,8 +1109,8 @@ class UIsub(Ui_MainWindow):
         recording_name = ser_table_row["recording_name"]
         channel = ser_table_row["channel"]
         stim = ser_table_row["stim"]
-        nSweeps = ser_table_row["nSweeps"]
-        if nSweeps == "...":
+        sweeps = ser_table_row["sweeps"]
+        if sweeps == "...":
             # TODO: Make it import the missing file
             print("did not find _mean.csv to load. Not imported?")
             return

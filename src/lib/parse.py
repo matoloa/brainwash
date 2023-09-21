@@ -192,10 +192,7 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
         df = assignStimAndsweep(df_data = df, list_stims=list_stims)
         dfmean = builddfmean(df)
         persistdf(recording_name, proj_folder, dfdata=df, dfmean=dfmean)
-
-        # TODO: every channel:stim combo counts sweeps from 0 to max
-        # TODO: is the above done? MATS?
-        dictmeta = {'channel': df.channel.unique(), 'stim': df.stim.unique(), 'nSweeps': df.sweep.nunique()}
+        dictmeta = {'channel': df.channel.unique(), 'stim': df.stim.unique(), 'sweeps': df.sweep.nunique()}
         return dictmeta
 
     if verbose:
