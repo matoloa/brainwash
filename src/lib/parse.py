@@ -236,18 +236,25 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
 
     source_folder = Path.home() / "Documents/Brainwash Data Source/"
     proj_folder = Path.home() / "Documents/Brainwash Projects/standalone_test"
-    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"),
-                    str(source_folder / "abf 2 channel/KO_02/2022_01_24_0000.abf")]
+    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"),
+                    str(source_folder / "abf 2 channel/KO_02")]
+#    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"),
+#                    str(source_folder / "abf 2 channel/KO_02/2022_01_24_0000.abf")]
     for _ in range(3):
         print()
     print("", "*** parse.py standalone test: ***")
     for item in list_sources:
-        recording_name = os.path.basename(os.path.dirname(item))
+        if Path(item).is_dir():
+            recording_name = os.path.basename(item)
+        else:
+            recording_name = os.path.basename(os.path.dirname(item))
         print(" - processing", item, "as recording_name", recording_name)
         df_files = pd.DataFrame({"path": [item], "recording_name": [recording_name]})
         dictmeta = parseProjFiles(proj_folder=proj_folder, df=df_files)
         print(f" - dictmeta: {dictmeta}")
         print()
+
+'''
 
 # %%
 if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
@@ -275,3 +282,4 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     dfvc = dfss[['stim', 'sweepraw']].value_counts()
     dfvc.sort_index(inplace=True)
     print(dfvc)
+'''

@@ -272,14 +272,15 @@ if __name__ == "__main__":
     from pathlib import Path
     path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/A_21_P0701-S2.csv")
     #path_datafile = Path("/home/matolo/Documents/Brainwash Projects/My Project/A_21_P0701-S2_2022_07_01_0000.abf.csv")
-    df = pd.read_csv(str(path_datafile))
+    df_data = pd.read_csv(str(path_datafile))
     t_EPSP_amp = 0.0128
-    buildResultFile(df=df, t_EPSP_amp=t_EPSP_amp)
+    buildResultFile(df=df_data, t_EPSP_amp=t_EPSP_amp)
+    print(df_data)
 
 # %%
 if __name__ == "__main__":
-    test = df[df.time == t_EPSP_amp]
-    dfpivot = df[['sweep', 'voltage', 'time']].pivot_table(values='voltage', columns = 'time', index = 'sweep')
+    test = df_data[df_data.time == t_EPSP_amp]
+    dfpivot = df_data[['sweep', 'voltage', 'time']].pivot_table(values='voltage', columns = 'time', index = 'sweep')
     ser_startmedian = dfpivot.iloc[:,:20].median(axis=1)
     df_calibrated = dfpivot.subtract(ser_startmedian, axis = 'rows')
     df_calibrated = df_calibrated.stack().reset_index()
@@ -290,7 +291,7 @@ if __name__ == "__main__":
 # %%
 import matplotlib.pyplot as plt
 if __name__ == "__main__":
-    width = 0.0001
+    width = 0.005
     dfplot = df.copy()
     dfplot = dfplot[(0.0128-width < dfplot.time) & (dfplot.time < 0.0128+width)]
     dfplot['odd'] = dfplot.sweep %2 == 0
@@ -302,8 +303,8 @@ if __name__ == "__main__":
 
 # %%
 if __name__ == "__main__":
-    df_sample = df[df.sweep.isin([0,1,120,121,240,241,300,301])]
-    df_sample.plot(x = 'time', y='volt_cal', ylim = (-0.001, 0.001))
+    df_sample = df[df.sweep.isin([0,1,120,121,240,241,300,301,700,701])]
+    df_sample.plot(x = 'time', y='volt_cal', ylim = (-0.001, 0.0001))
 
 # %%
 if __name__ == "__main__":
@@ -333,25 +334,29 @@ if __name__ == "__main__":
 # %%
 if __name__ == "__main__":
     result = dfplot[(dfplot.time == t_EPSP_amp)][['volt_cal','sweep', 'odd']]
+    print(result)
     #result.plot(x = 'sweep')
     #result['c_odd'] = '1' if result.odd else '0'
     sns.lineplot(data = result, x = 'sweep', y = 'volt_cal', hue = 'odd')
 
 # %%
 if __name__ == "__main__":
-    result = df[df.time == 0.001][['sweep', 'voltage', 'volt_cal']]
+    result = df[df.time == 0.001][['sweep', 'volt_cal']]
     g = result.plot(x = 'sweep')
     g.hlines(y=[-0.0001, 0.0001], xmin=0, xmax=1000)
 
 # %%
 if __name__ == "__main__":
-    result
-
-# %%
-if __name__ == "__main__":
-    path_meanfile = Path("/home/matolo/Documents/Brainwash Projects/standalone_test/A_21_mean.csv")
+    path_meanfile = Path("/home/matolo/Documents/Brainwash Projects/standalone_test/A_21_P0701-S2_mean.csv")
     df_mean = pd.read_csv(str(path_meanfile))
-    df_mean.plot(x = 'time', y = 'voltage')
+    print(df_mean.shape)
+    print(df_mean)
+    sns.lineplot(data = df_mean, x = 'time', y = 'voltage')
+    plt.ylim(-0.0003,0.0001)
+    plt.xlim(0.005,0.04)
+    #sns.set_ylim(ui.graph_ylim)
+
+    #df_mean.plot(x = 'time', y = 'voltage', ymin = -0.001, ymax = 0.0001)
 
 # %%
 if __name__ == "__main__":
@@ -364,4 +369,6 @@ if __name__ == "__main__":
 # %%
 if __name__ == "__main__":
     df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
-    df_calibrated
+    print(df_calibrated)
+
+# %%
