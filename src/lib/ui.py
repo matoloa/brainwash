@@ -25,6 +25,7 @@ matplotlib.use("Qt5Agg")
 verbose = True
 track_widget_focus = False
 
+
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
         super(TableModel, self).__init__()
@@ -370,6 +371,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.labelMeanGroups.setText(_translate("mainWindow", "Mean Groups:"))
         self.labelMetadata.setText(_translate("mainWindow", "Metadata:"))
 
+
 class Ui_Dialog(QtWidgets.QWidget):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
@@ -395,7 +397,9 @@ class Ui_Dialog(QtWidgets.QWidget):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Dialog"))
 
+
 #######################################################################
+
 
 def df_pectTemplate():
     return pd.DataFrame(
@@ -431,6 +435,7 @@ def df_pectTemplate():
             "comment",
         ]
     )
+
 
 # subclassing Ui_MainWindow to be able to use the unaltered output file from pyuic and QT designer
 class UIsub(Ui_MainWindow):
@@ -482,7 +487,7 @@ class UIsub(Ui_MainWindow):
         self.projectfolder = self.projects_folder / self.projectname
         # If projectfile exists, load it, otherwise create it
         if Path(self.projectfolder / "project.brainwash").exists():
-            self.load_df_p()
+            self.load_df_project()
         else:
             self.projectname = "My Project"
             self.projectfolder = self.projects_folder / self.projectname
@@ -646,7 +651,7 @@ class UIsub(Ui_MainWindow):
         if (Path(projectfolder) / "project.brainwash").exists():
             self.projectfolder = Path(projectfolder)
             self.clearGraph()
-            self.load_df_p()
+            self.load_df_project()
             self.write_cfg()
 
     def pushedButtonAddData(self):
@@ -723,57 +728,82 @@ class UIsub(Ui_MainWindow):
         self.write_project_cfg()
 
 
-# Group functions
+# Data Editing functions
 
-    def addGroup(self, new_group_name):
+    def addData(self, dfAdd):  # concatenate dataframes of old and new data
+        # Check for unique names in dfAdd, vs df_p and dfAdd
+        # Adds (<lowest integer that makes unique>) to the end of non-unique recording_names
+        df_p = self.get_df_project()
+        list_recording_names = set(df_p['recording_name'])
+        for index, row in dfAdd.iterrows():
+            check_recording_name = row['recording_name']
+            if check_recording_name.endswith('_mean.csv'):
+                print("recording_name must not end with _mean.csv - appending _X") # must not collide with internal naming
+                check_recording_name = check_recording_name + '_X'
+                dfAdd.at[index,'recording_name'] = check_recording_name
+            if check_recording_name in list_recording_names:
+                # print(index, check_recording_name, "already exists!")
+                i = 1
+                new_recording_name = check_recording_name + "(" + str(i) + ")"
+                while(new_recording_name in list_recording_names):
+                    i += 1
+                    new_recording_name = check_recording_name + "(" + str(i) + ")"
+                print("New name:", new_recording_name)
+                list_recording_names.add(new_recording_name)
+                dfAdd.at[index,'recording_name'] = new_recording_name
+            else:
+                list_recording_names.add(check_recording_name)
+        df_p = pd.concat([df_p, dfAdd])
+        df_p.reset_index(drop=True, inplace=True)
+        df_p["groups"] = df_p["groups"].fillna(" ")
+        df_p["channel"] = df_p["channel"].fillna(" ")
+        df_p["stim"] = df_p["stim"].fillna(" ")
+        df_p["nSweeps"] = df_p["nSweeps"].fillna("...")
+        self.set_df_project(df_p)
         if verbose:
-            print("addGroupButton")
-        self.addGroupButton(new_group_name)
+            print("addData:", self.get_df_project())
+        self.setTableDf(df_p)
 
-    def addGroupButton(self, group):
-        self.new_button = QtWidgets.QPushButton(group, self.centralwidget)
-        self.new_button.setObjectName(group)
-        self.new_button.clicked.connect(lambda _, button_name=group: self.pushedGroupButton(group))
-        # Arrange in rows of 4. TODO: hardcoded number of columns: move to cfg
-        column = self.list_groups.index(group)
-        row = 0
-        print(row, column)
-        while column >= 4:
-            column -= 4
-            row += 1
-        self.gridLayout.addWidget(self.new_button, row, column, 1, 1)
-        # self.gridLayout.addWidget(self.new_button, self.gridLayout.rowCount(), 0, 1, 1)
-
-    def addToGroup(self, add_group):
-        # Placeholder function: Assign all selected files to add_group unless they already belong to that group
+    def renameRecording(self):
+        # renames all instances of selected recording_name in df_project, and their associated files
+        if verbose:
+            print("F2 key pressed in CustomTableView")
         selected_rows = self.listSelectedRows()
-        if 0 < len(selected_rows):
-            list_group = ""
-            for i in selected_rows:
-                if self.df_project.loc[i, "groups"] == " ":
-                    self.df_project.loc[i, "groups"] = add_group
-                else:
-                    list_group = self.df_project.loc[i, "groups"]
-                    list_group = list(list_group.split(","))
-                    if add_group not in list_group:
-                        list_group.append(add_group)
-                        self.df_project.loc[i, "groups"] = ",".join(map(str, sorted(list_group)))
+        if len(selected_rows) == 1:
+            row = selected_rows[0]
+            df_p = self.df_project
+            old_recording_name = df_p.at[row,'recording_name']
+            old_data = self.projectfolder / (old_recording_name + ".csv")
+            old_mean = self.projectfolder / (old_recording_name + "_mean.csv")
+            RenameDialog = InputDialogPopup()
+            new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query='')
+            if re.match(r'^[a-zA-Z0-9_-]+$', str(new_recording_name)) is not None: # check if valid filename
+                list_recording_names = set(df_p['recording_name'])
+                if not new_recording_name in list_recording_names: # prevent duplicates
+                    new_data = self.projectfolder / (new_recording_name + ".csv")
+                    new_mean = self.projectfolder / (new_recording_name + "_mean.csv")
+                    if old_data.exists() & old_mean.exists():
+                        if verbose:
+                            print(f"rename_data: {old_data} to {new_data}")
+                            print(f"rename_mean: {old_mean} to {new_mean}")
+                            print(f"new recording_name set: {new_recording_name}")
+                        os.rename(old_data, new_data)
+                        os.rename(old_mean, new_mean)
                     else:
-                        print(f"{self.df_project.loc[i, 'recording_name']}, channel {self.df_project.loc[i, 'channel']}, stim {self.df_project.loc[i, 'stim']} is already in {add_group}")
-                self.save_df_project()
-                self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
+                        print(f"data file exists: {old_data.exists()} : {old_data}")
+                        print(f"mean file exists: {old_mean.exists()} : {old_mean}")
+                        raise FileNotFoundError
+                    df_shared_recording_name = df_p[df_p['recording_name'] == old_recording_name]
+                    for i, subrow in df_shared_recording_name.iterrows():
+                        df_p.at[i,'recording_name'] = new_recording_name
+                    self.set_df_project(df_p)
+                    self.setTableDf(self.df_project)  # Force update
+                else:
+                    print(f"new_recording_name {new_recording_name} already exists")
+            else:
+                print(f"new_recording_name {new_recording_name} is not a valid filename")    
         else:
-            print("No files selected.")
-
-    def clearGroupsByRow(self, rows):
-        for i in rows:
-            self.df_project.loc[i, "groups"] = " "
-        self.save_df_project()
-        self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
-        self.clearGraph()
-
-
-# Edit functions
+            print("Rename: please select one row only for renaming.")
 
     def deleteSelectedRows(self):
         df_p = self.df_project
@@ -825,10 +855,60 @@ class UIsub(Ui_MainWindow):
                     else:
                         print(f"File not found: {delete_mean}")
             df_p.reset_index(inplace=True, drop=True)
-            self.set_df_p(df_p)
+            self.set_df_project(df_p)
             self.setTableDf(self.df_project)  # Force update
         else:
             print("No files selected.")
+
+
+# Data Group functions
+
+    def addGroup(self, new_group_name):
+        if verbose:
+            print("addGroupButton")
+        self.addGroupButton(new_group_name)
+
+    def addGroupButton(self, group):
+        self.new_button = QtWidgets.QPushButton(group, self.centralwidget)
+        self.new_button.setObjectName(group)
+        self.new_button.clicked.connect(lambda _, button_name=group: self.pushedGroupButton(group))
+        # Arrange in rows of 4. TODO: hardcoded number of columns: move to cfg
+        column = self.list_groups.index(group)
+        row = 0
+        print(row, column)
+        while column >= 4:
+            column -= 4
+            row += 1
+        self.gridLayout.addWidget(self.new_button, row, column, 1, 1)
+        # self.gridLayout.addWidget(self.new_button, self.gridLayout.rowCount(), 0, 1, 1)
+
+    def addToGroup(self, add_group):
+        # Placeholder function: Assign all selected files to add_group unless they already belong to that group
+        selected_rows = self.listSelectedRows()
+        if 0 < len(selected_rows):
+            list_group = ""
+            for i in selected_rows:
+                if self.df_project.loc[i, "groups"] == " ":
+                    self.df_project.loc[i, "groups"] = add_group
+                else:
+                    list_group = self.df_project.loc[i, "groups"]
+                    list_group = list(list_group.split(","))
+                    if add_group not in list_group:
+                        list_group.append(add_group)
+                        self.df_project.loc[i, "groups"] = ",".join(map(str, sorted(list_group)))
+                    else:
+                        print(f"{self.df_project.loc[i, 'recording_name']}, channel {self.df_project.loc[i, 'channel']}, stim {self.df_project.loc[i, 'stim']} is already in {add_group}")
+                self.save_df_project()
+                self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
+        else:
+            print("No files selected.")
+
+    def clearGroupsByRow(self, rows):
+        for i in rows:
+            self.df_project.loc[i, "groups"] = " "
+        self.save_df_project()
+        self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
+        self.clearGraph()
 
 
 # writer functions
@@ -848,87 +928,7 @@ class UIsub(Ui_MainWindow):
             yaml.safe_dump(project_cfg, file)
 
 
-# Convenience functions
-
-    def listSelectedRows(self):
-        selected_indexes = self.tableProj.selectionModel().selectedRows()
-        return [row.row() for row in selected_indexes]
-    
-
-# Executive functions
-
-    def launchMeasureWindow(self):  # , single_index_range):
-        # TODO:find_all_ture_window (if it's already open, focus on it)
-        #   How to check for existing windows?
-        #   How to shift focus?
-        # Display the appropriate recording on the new window's graphs: mean and output
-        #   Construct a sensible interface: drag-drop on measurement middle, start and finish points
-        #   UI for toggling displayed measurement methods. Drag-drop forces Manual.
-
-        # table_row should already have t_ values; otherwise do not attempt to draw them
-
-        qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
-        ser_table_row = self.tablemodel.dataRow(qt_index)
-        row_index = ser_table_row.name
-        recording_name = ser_table_row["recording_name"]
-        channel = ser_table_row["channel"]
-        stim = ser_table_row["stim"]
-        nSweeps = ser_table_row["nSweeps"]
-        if nSweeps == "...":
-            # TODO: Make it import the missing file
-            print("did not find _mean.csv to load. Not imported?")
-            return
-        dfmean = self.getdfmean(ser_table_row)
-        print(dfmean, type(dfmean))
-        # Analysis.py
-        all_t = analysis.find_all_t(dfmean=dfmean, verbose=verbose)
-        # Break out to variables
-        t_VEB = all_t["t_VEB"]
-        t_EPSP_amp = all_t["t_EPSP_amp"]
-        t_EPSP_slope = all_t["t_EPSP_slope"]
-        # Store variables in self.df_project
-        self.df_project.loc[row_index, "t_VEB"] = t_VEB
-        self.df_project.loc[row_index, "t_EPSP_amp"] = t_EPSP_amp
-        self.df_project.loc[row_index, "t_EPSP_slope"] = t_EPSP_slope
-
-        # zero Y
-        dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
-        dfmean["prim"] = dfmean.prim / dfmean.prim.abs().max()
-        dfmean["bis"] = dfmean.bis / dfmean.bis.abs().max()
-
-        # Open window
-        self.measure = QtWidgets.QDialog()
-        self.measure_window_sub = Measure_window_sub(self.measure)
-        window_name = (recording_name + ",_ch" + str(channel) + ", st" + stim)
-        self.measure.setWindowTitle(window_name)
-        self.measure.show()
-        self.measure_window_sub.setMeasureGraph(recording_name, dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
-        return
-        # TODO: Placeholder functionality for loading analysis.buildResultFile()
-        file_path = Path(self.projectfolder / (recording_name + ".csv"))
-        print(file_path)
-        if file_path.exists():
-            bigdata = pd.read_csv(file_path)
-            analysis.buildResultFile(df=bigdata, t_EPSP_amp=t_EPSP_amp)
-
-
 # Project functions
-
-    def renameProject(self):
-        # TODO: sanitize path
-        # make if not existing
-        self.projectfolder.mkdir(exist_ok=True)
-        new_project_name = self.inputProjectName.text()
-        # check if ok
-        if (self.projects_folder / new_project_name).exists():
-            if verbose:
-                print("The target project name already exists")
-            self.inputProjectName.setText(self.projectname)
-        else:
-            self.projectfolder = self.projectfolder.rename(self.projects_folder / new_project_name)
-            self.projectname = new_project_name
-            self.inputProjectName.setReadOnly(True)
-            self.write_cfg()
 
     def newProject(self, new_project_name):
         new_projectfolder = self.projects_folder / new_project_name
@@ -947,38 +947,59 @@ class UIsub(Ui_MainWindow):
             self.save_df_project()
             self.write_cfg()
 
+    def renameProject(self): # changes name of project folder, updates .cfg
+        # TODO: sanitize path
+        # make if not existing
+        self.projectfolder.mkdir(exist_ok=True)
+        new_project_name = self.inputProjectName.text()
+        # check if ok
+        if (self.projects_folder / new_project_name).exists():
+            if verbose:
+                print("The target project name already exists")
+            self.inputProjectName.setText(self.projectname)
+        else:
+            self.projectfolder = self.projectfolder.rename(self.projects_folder / new_project_name)
+            self.projectname = new_project_name
+            self.inputProjectName.setReadOnly(True)
+            self.write_cfg()
 
-    def getdf_p(self):
+    def setProjectname(self):
+        # get_signals(self.children()[1].children()[1].model)
+        self.projectname = self.inputProjectName.text()
+        self.projectfolder = self.projects_folder / self.projectname
+        if self.projectfolder.exists():
+            # look for project.brainwash and load it
+            if (self.projectfolder / "project.brainwash").exists():
+                self.load_df_project()
+        else:
+            self.projectfolder.mkdir()
+        if verbose:
+            print(f"setProjectname, folder: {self.projectfolder} exists: {self.projectfolder.exists()}")
+
+
+# Project dataframe handling
+
+    def get_df_project(self): # returns a copy of the persistent df_project TODO: make these functions the only way to get to it.
         return self.df_project
 
-    def load_df_p(self):
+    def load_df_project(self): # reads fileversion of df_project to persisted self.df_project, clears graphs and saves cfg
         self.df_project = pd.read_csv(str(self.projectfolder / "project.brainwash"))
-        self.setTableDf(self.df_project)  # set df_p to table
-        self.inputProjectName.setText(self.projectfolder.stem)  # set foler name to proj name
+        self.setTableDf(self.df_project)  # display self.df_project to table
+        self.inputProjectName.setText(self.projectfolder.stem)  # set folder name to proj name
         self.projectname = self.projectfolder.stem
         if verbose:
             print(f"loaded project df: {self.df_project}")
         self.clearGraph()
         self.write_cfg()
 
-    def save_df_project(self):
+    def save_df_project(self): # writes df_project to .csv
         self.df_project.to_csv(str(self.projectfolder / "project.brainwash"), index=False)
 
-    def set_df_p(self, df):
+    def set_df_project(self, df): # persists df and saves it to .csv
         self.df_project = df
         self.save_df_project()
 
-    def clearGraph(self):
-        if hasattr(self, "canvas_seaborn"):
-            if verbose:
-                print("clearGraph: self has attribue canvas_seaborn")
-            print(f"axes: {self.canvas_seaborn.axes}")
-            self.canvas_seaborn.axes.cla()
-            self.canvas_seaborn.draw()
-            self.canvas_seaborn.show()
-
-    def getdfmean(self, row):
-        # returns dfmean, selected for the row's channel and stim
+    def getdfmean(self, row): # returns dfmean, selected for the row's channel and stim
         channel = row['channel']
         stim = row['stim']
         dfmean_path = self.projectfolder / (row['recording_name'] + "_mean.csv")
@@ -991,7 +1012,51 @@ class UIsub(Ui_MainWindow):
         df.reset_index(inplace=True)
         return df
 
-    def setGraph(self, row):
+
+# Table handling
+
+    def listSelectedRows(self):
+        selected_indexes = self.tableProj.selectionModel().selectedRows()
+        return [row.row() for row in selected_indexes]
+
+    def setTableDf(self, data):
+        if verbose:
+            print("setTableDf")
+        self.tablemodel.setData(data)
+        self.formatTableProj() # hide/resize columns
+        self.tableProj.update()
+
+    def formatTableProj(self): # hide/resize columns
+        if verbose:
+            print("formatTableProj")
+        header = self.tableProj.horizontalHeader()
+        df_p = self.df_project
+        # hide all columns except these:
+        list_show = [df_p.columns.get_loc("recording_name"),
+                     df_p.columns.get_loc("groups"),
+                     df_p.columns.get_loc("nSweeps"),
+                     df_p.columns.get_loc("channel"),
+                     df_p.columns.get_loc("stim")]
+        num_columns = df_p.shape[1]
+        for col in range(num_columns):
+            if col in list_show:
+                header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+            else:
+                self.tableProj.setColumnHidden(col, True)
+
+
+# Graph handling
+
+    def clearGraph(self): # removes all data from canvas_seaborn
+        if hasattr(self, "canvas_seaborn"):
+            if verbose:
+                print("clearGraph: self has attribue canvas_seaborn")
+            print(f"axes: {self.canvas_seaborn.axes}")
+            self.canvas_seaborn.axes.cla()
+            self.canvas_seaborn.draw()
+            self.canvas_seaborn.show()
+
+    def setGraph(self, row): # TODO: Unify with setGraphs!
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at graphMean
         if verbose:
@@ -1060,121 +1125,62 @@ class UIsub(Ui_MainWindow):
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
 
-    def setProjectname(self):
-        if verbose:
-            print("setProjectname")
-        # get_signals(self.children()[1].children()[1].model)
-        self.projectname = self.inputProjectName.text()
-        self.projectfolder = self.projects_folder / self.projectname
-        if self.projectfolder.exists():
-            # look for project.brainwash and load it
-            if (self.projectfolder / "project.brainwash").exists():
-                self.load_df_p()
-        else:
-            self.projectfolder.mkdir()
 
-        if verbose:
-            print(f"folder: {self.projectfolder} exists: {self.projectfolder.exists()}")
+# Executive functions
 
-    def setTableDf(self, data):
-        if verbose:
-            print("setTableDf")
-        self.tablemodel.setData(data)
-        self.formatTableProj()  # hide/resize columns
-        self.tableProj.update()
+    def launchMeasureWindow(self):  # , single_index_range):
+        # TODO:find_all_ture_window (if it's already open, focus on it)
+        #   How to check for existing windows?
+        #   How to shift focus?
+        # Display the appropriate recording on the new window's graphs: mean and output
+        #   Construct a sensible interface: drag-drop on measurement middle, start and finish points
+        #   UI for toggling displayed measurement methods. Drag-drop forces Manual.
 
-    def formatTableProj(self):
-        if verbose:
-            print("formatTableProj")
-        header = self.tableProj.horizontalHeader()
-        df_p = self.df_project
-        # hide all columns except these:
-        list_show = [df_p.columns.get_loc("recording_name"),
-                     df_p.columns.get_loc("groups"),
-                     df_p.columns.get_loc("nSweeps"),
-                     df_p.columns.get_loc("channel"),
-                     df_p.columns.get_loc("stim")]
-        num_columns = df_p.shape[1]
-        for col in range(num_columns):
-            if col in list_show:
-                header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
-            else:
-                self.tableProj.setColumnHidden(col, True)
+        # table_row should already have t_ values; otherwise do not attempt to draw them
 
-    def addData(self, dfAdd):  # concatenate dataframes of old and new data
-        # Check for unique names in dfAdd, vs df_p and dfAdd
-        # Adds (<lowest integer that makes unique>) to the end of non-unique recording_names
-        df_p = self.getdf_p()
-        list_recording_names = set(df_p['recording_name'])
-        for index, row in dfAdd.iterrows():
-            check_recording_name = row['recording_name']
-            if check_recording_name.endswith('_mean.csv'):
-                print("recording_name must not end with _mean.csv - appending _X") # must not collide with internal naming
-                check_recording_name = check_recording_name + '_X'
-                dfAdd.at[index,'recording_name'] = check_recording_name
-            if check_recording_name in list_recording_names:
-                # print(index, check_recording_name, "already exists!")
-                i = 1
-                new_recording_name = check_recording_name + "(" + str(i) + ")"
-                while(new_recording_name in list_recording_names):
-                    i += 1
-                    new_recording_name = check_recording_name + "(" + str(i) + ")"
-                print("New name:", new_recording_name)
-                list_recording_names.add(new_recording_name)
-                dfAdd.at[index,'recording_name'] = new_recording_name
-            else:
-                list_recording_names.add(check_recording_name)
-        df_p = pd.concat([df_p, dfAdd])
-        df_p.reset_index(drop=True, inplace=True)
-        df_p["groups"] = df_p["groups"].fillna(" ")
-        df_p["channel"] = df_p["channel"].fillna(" ")
-        df_p["stim"] = df_p["stim"].fillna(" ")
-        df_p["nSweeps"] = df_p["nSweeps"].fillna("...")
-        self.set_df_p(df_p)
-        if verbose:
-            print("addData:", self.getdf_p())
-        self.setTableDf(df_p)
+        qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
+        ser_table_row = self.tablemodel.dataRow(qt_index)
+        row_index = ser_table_row.name
+        recording_name = ser_table_row["recording_name"]
+        channel = ser_table_row["channel"]
+        stim = ser_table_row["stim"]
+        nSweeps = ser_table_row["nSweeps"]
+        if nSweeps == "...":
+            # TODO: Make it import the missing file
+            print("did not find _mean.csv to load. Not imported?")
+            return
+        dfmean = self.getdfmean(ser_table_row)
+        print(dfmean, type(dfmean))
+        # Analysis.py
+        all_t = analysis.find_all_t(dfmean=dfmean, verbose=verbose)
+        # Break out to variables
+        t_VEB = all_t["t_VEB"]
+        t_EPSP_amp = all_t["t_EPSP_amp"]
+        t_EPSP_slope = all_t["t_EPSP_slope"]
+        # Store variables in self.df_project
+        self.df_project.loc[row_index, "t_VEB"] = t_VEB
+        self.df_project.loc[row_index, "t_EPSP_amp"] = t_EPSP_amp
+        self.df_project.loc[row_index, "t_EPSP_slope"] = t_EPSP_slope
 
-    def renameRecording(self):
-        # renames all instances of selected recording_name in df_project, and their associated files
-        if verbose:
-            print("F2 key pressed in CustomTableView")
-        selected_rows = self.listSelectedRows()
-        if len(selected_rows) == 1:
-            row = selected_rows[0]
-            df_p = self.df_project
-            old_recording_name = df_p.at[row,'recording_name']
-            old_data = self.projectfolder / (old_recording_name + ".csv")
-            old_mean = self.projectfolder / (old_recording_name + "_mean.csv")
-            RenameDialog = InputDialogPopup()
-            new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query='')
-            if re.match(r'^[a-zA-Z0-9_-]+$', str(new_recording_name)) is not None: # check if valid filename
-                list_recording_names = set(df_p['recording_name'])
-                if not new_recording_name in list_recording_names: # prevent duplicates
-                    new_data = self.projectfolder / (new_recording_name + ".csv")
-                    new_mean = self.projectfolder / (new_recording_name + "_mean.csv")
-                    if old_data.exists() & old_mean.exists():
-                        if verbose:
-                            print(f"rename_data: {old_data} to {new_data}")
-                            print(f"rename_mean: {old_mean} to {new_mean}")
-                            print(f"new recording_name set: {new_recording_name}")
-                        os.rename(old_data, new_data)
-                        os.rename(old_mean, new_mean)
-                    else:
-                        print(f"data file exists: {old_data.exists()} : {old_data}")
-                        print(f"mean file exists: {old_mean.exists()} : {old_mean}")
-                        raise FileNotFoundError
-                    df_shared_recording_name = df_p[df_p['recording_name'] == old_recording_name]
-                    for i, subrow in df_shared_recording_name.iterrows():
-                        df_p.at[i,'recording_name'] = new_recording_name
-                    self.set_df_p(df_p)
-                    self.setTableDf(self.df_project)  # Force update
-                else:
-                    print(f"new_recording_name {new_recording_name} already exists")
-            else:
-                print(f"new_recording_name {new_recording_name} is not a valid filename")    
-        else:
-            print("Rename: please select one row only for renaming.")
+        # zero Y
+        dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
+        dfmean["prim"] = dfmean.prim / dfmean.prim.abs().max()
+        dfmean["bis"] = dfmean.bis / dfmean.bis.abs().max()
+
+        # Open window
+        self.measure = QtWidgets.QDialog()
+        self.measure_window_sub = Measure_window_sub(self.measure)
+        window_name = (recording_name + ",_ch" + str(channel) + ", st" + stim)
+        self.measure.setWindowTitle(window_name)
+        self.measure.show()
+        self.measure_window_sub.setMeasureGraph(recording_name, dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
+        return
+        # TODO: Placeholder functionality for loading analysis.buildResultFile()
+        file_path = Path(self.projectfolder / (recording_name + ".csv"))
+        print(file_path)
+        if file_path.exists():
+            bigdata = pd.read_csv(file_path)
+            analysis.buildResultFile(df=bigdata, t_EPSP_amp=t_EPSP_amp)
 
             
     @QtCore.pyqtSlot(list)
@@ -1190,6 +1196,8 @@ class UIsub(Ui_MainWindow):
     @QtCore.pyqtSlot()
     def slotAddDfData(self, df):
         self.addData(df)
+
+#####################################
 
 
 class InputDialogPopup(QtWidgets.QDialog):
@@ -1321,6 +1329,7 @@ class Measure_window_sub(Ui_measure_window):
         # self.canvas_seaborn.axes.set_xmargin((100,500))
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
+
 
 def get_signals(source):
     cls = source if isinstance(source, type) else type(source)
