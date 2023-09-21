@@ -397,7 +397,7 @@ class Ui_Dialog(QtWidgets.QWidget):
 
 #######################################################################
 
-def buildTemplate():
+def df_pectTemplate():
     return pd.DataFrame(
         columns=[
             "host",
@@ -475,18 +475,18 @@ class UIsub(Ui_MainWindow):
         tableProj.setAcceptDrops(True)
         tableProj.setObjectName("tableProj")
 
-        self.projectdf = buildTemplate()
-        self.tablemodel = TableModel(self.projectdf)
+        self.df_project = df_pectTemplate()
+        self.tablemodel = TableModel(self.df_project)
         self.tableProj.setModel(self.tablemodel)
 
         self.projectfolder = self.projects_folder / self.projectname
         # If projectfile exists, load it, otherwise create it
         if Path(self.projectfolder / "project.brainwash").exists():
-            self.load_dfproj()
+            self.load_df_p()
         else:
             self.projectname = "My Project"
             self.projectfolder = self.projects_folder / self.projectname
-            self.setTableDf(self.projectdf)
+            self.setTableDf(self.df_project)
         self.write_cfg()
 
         # Write local cfg, for storage of group colours, zoom levels etc.
@@ -537,7 +537,9 @@ class UIsub(Ui_MainWindow):
 
         # place current project as folder in project_root, lock project name for now
         # self.projectfolder = self.project_root / self.project
-        self.find_widgets_with_top_left_coordinates(self.centralwidget)
+
+# Debugging tools
+        # self.find_widgets_with_top_left_coordinates(self.centralwidget)
 
     def find_widgets_with_top_left_coordinates(self, widget):
         print(f"trying child geometry")
@@ -552,19 +554,13 @@ class UIsub(Ui_MainWindow):
         else:
             print("No widget has focus.")
 
-    def listSelectedRows(self):
-        selected_indexes = self.tableProj.selectionModel().selectedRows()
-        return [row.row() for row in selected_indexes]
+
+# pushedButton functions
 
     def pushedButtonClearGroups(self):
-        if verbose:
-            print("pushedButtonClearGroups")
         selected_rows = self.listSelectedRows()
         if 0 < len(selected_rows):
-            for i in selected_rows:
-                self.projectdf.loc[i, "groups"] = " "
-                self.save_dfproj()
-                self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
+            self.clearGroupsByRow(selected_rows)
         else:
             print("No files selected.")
 
@@ -606,6 +602,129 @@ class UIsub(Ui_MainWindow):
         else:
             print("Maximum of 12 groups allowed for now.")
 
+    def pushedGroupButton(self, button_name):
+        if verbose:
+            print("pushedGroupButton", button_name)
+        self.addToGroup(button_name)
+
+    def pushedButtonDelete(self):
+        self.deleteSelectedRows()
+
+    def pushedButtonRenameProject(self):
+        # renameProject
+        if verbose:
+            print("pushedButtonRenameProject")
+        self.inputProjectName.setReadOnly(False)
+        self.inputProjectName.editingFinished.connect(self.renameProject)
+
+    def pushedButtonNewProject(self):
+        if verbose:
+            print("pushedButtonNewProject")
+        self.projectfolder.mkdir(exist_ok=True)
+        date = datetime.now().strftime("%Y-%m-%d")
+        i = 0
+        while True:
+            new_project_name = "Project " + date
+            if i > 0:
+                new_project_name = new_project_name + "(" + str(i) + ")"
+            if (self.projects_folder / new_project_name).exists():
+                if verbose:
+                    print(new_project_name, " already exists")
+                i += 1
+            else:
+                self.newProject(new_project_name)
+                break
+
+    def pushedButtonOpenProject(self):
+        # open folder selector dialog
+        self.dialog = QtWidgets.QDialog()
+        projectfolder = QtWidgets.QFileDialog.getExistingDirectory(
+            self.dialog, "Open Directory", str(self.projects_folder), QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks
+        )
+        if verbose:
+            print(f"Received projectfolder: {str(projectfolder)}")
+        if (Path(projectfolder) / "project.brainwash").exists():
+            self.projectfolder = Path(projectfolder)
+            self.clearGraph()
+            self.load_df_p()
+            self.write_cfg()
+
+    def pushedButtonAddData(self):
+        # creates file tree for file selection
+        if verbose:
+            print("pushedButtonAddData")
+        self.dialog = QtWidgets.QDialog()
+        self.ftree = Filetreesub(self.dialog, parent=self, folder=self.user_documents)
+        self.dialog.show()
+
+    def pushedButtonParse(self):
+        # parse non-parsed files and folders in self.df_project
+        if verbose:
+            print("pushedButtonParse")
+        update_frame = self.df_project.copy()  # copy from which to remove rows without confusing index
+        frame2add = self.df_project.iloc[0:0].copy()  # new, empty df for adding rows for multi-channel readings, without messing with index
+        rows = []
+        for i, df_proj_row in self.df_project.iterrows():
+            recording_name = df_proj_row['recording_name']
+            source_path = df_proj_row['path']
+            if df_proj_row["nSweeps"] == "...":  # indicates not read before TODO: Replace with selector!
+                dictmeta = parse.parseProjFiles(self.projectfolder, recording_name=recording_name, source_path=source_path)  # result is a dict of <channel>:<channel ID>
+                for channel in dictmeta['channel']:
+                    for stim in dictmeta['stim']:
+                        df_proj_new_row = df_proj_row.copy()
+                        df_proj_new_row['channel'] = channel
+                        df_proj_new_row['stim'] = stim
+                        df_proj_new_row['nSweeps'] = dictmeta['nSweeps']
+                        rows.append(df_proj_new_row)
+                update_frame = update_frame[update_frame.recording_name != recording_name]
+                print(f"update_frame: {update_frame}")
+                rows2add = pd.concat(rows, axis=1).transpose()
+                print("rows2add:", rows2add[["recording_name", "channel", "stim", "nSweeps" ]])
+                self.df_project = (pd.concat([update_frame, rows2add])).reset_index(drop=True)
+                print(self.df_project[["recording_name", "channel", "stim", "nSweeps" ]])
+                self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
+                self.save_df_project()
+
+# Non-button event functions
+
+    def tableProjSelectionChanged(self):
+        if verbose:
+            print("tableProjSelectionChanged")
+        selected_rows = self.listSelectedRows()
+        if 0 < len(selected_rows):
+            df_p = self.df_project
+            dfSelection = df_p.loc[selected_rows]
+            dfFiltered = dfSelection[dfSelection["nSweeps"] != "..."]
+            if not dfFiltered.empty:
+                if dfFiltered.shape[0] == 1:  # exactly one file selected
+                    self.setGraph(dfFiltered) # passes a row, because only one is selected
+                else:  # several files selected
+                    self.setGraphs(dfFiltered)
+            else:
+                print("Selection not analyzed.")
+            return
+        else:
+            if verbose:
+                print("No rows selected.")
+        # if the file isn't imported, or no file selected, clear the mean graph
+        self.clearGraph()
+
+    def tableProjDoubleClicked(self):
+        self.launchMeasureWindow()
+
+    def checkedBoxLockDelete(self, state):
+        if state == 2:
+            self.delete_locked = True
+        else:
+            self.delete_locked = False
+        self.pushButtonDelete.setEnabled(not self.delete_locked)
+        if verbose:
+            print(f"checkedBoxLockDelete {state}, self.delete_locked:{self.delete_locked}")
+        self.write_project_cfg()
+
+
+# Group functions
+
     def addGroup(self, new_group_name):
         if verbose:
             print("addGroupButton")
@@ -625,48 +744,50 @@ class UIsub(Ui_MainWindow):
         self.gridLayout.addWidget(self.new_button, row, column, 1, 1)
         # self.gridLayout.addWidget(self.new_button, self.gridLayout.rowCount(), 0, 1, 1)
 
-    def pushedGroupButton(self, button_name):
-        if verbose:
-            print("pushedGroupButton", button_name)
-        self.addToGroup(button_name)
-
     def addToGroup(self, add_group):
         # Placeholder function: Assign all selected files to add_group unless they already belong to that group
         selected_rows = self.listSelectedRows()
         if 0 < len(selected_rows):
             list_group = ""
             for i in selected_rows:
-                if self.projectdf.loc[i, "groups"] == " ":
-                    self.projectdf.loc[i, "groups"] = add_group
+                if self.df_project.loc[i, "groups"] == " ":
+                    self.df_project.loc[i, "groups"] = add_group
                 else:
-                    list_group = self.projectdf.loc[i, "groups"]
+                    list_group = self.df_project.loc[i, "groups"]
                     list_group = list(list_group.split(","))
                     if add_group not in list_group:
                         list_group.append(add_group)
-                        self.projectdf.loc[i, "groups"] = ",".join(map(str, sorted(list_group)))
+                        self.df_project.loc[i, "groups"] = ",".join(map(str, sorted(list_group)))
                     else:
-                        print(f"{self.projectdf.loc[i, 'recording_name']}, channel {self.projectdf.loc[i, 'channel']}, stim {self.projectdf.loc[i, 'stim']} is already in {add_group}")
-                self.save_dfproj()
-                self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
+                        print(f"{self.df_project.loc[i, 'recording_name']}, channel {self.df_project.loc[i, 'channel']}, stim {self.df_project.loc[i, 'stim']} is already in {add_group}")
+                self.save_df_project()
+                self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
         else:
             print("No files selected.")
 
-    def pushedButtonDelete(self):
-        self.deleteSelectedRows()
+    def clearGroupsByRow(self, rows):
+        for i in rows:
+            self.df_project.loc[i, "groups"] = " "
+        self.save_df_project()
+        self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
+        self.clearGraph()
+
+
+# Edit functions
 
     def deleteSelectedRows(self):
-        dfProj = self.projectdf
-        set_files_before_purge = set(dfProj['recording_name'])
+        df_p = self.df_project
+        set_files_before_purge = set(df_p['recording_name'])
         selected_rows = self.listSelectedRows()
         if 0 < len(selected_rows):
             files_to_purge = False
             for row in selected_rows:
-                sweeps = dfProj.at[row, 'nSweeps']
+                sweeps = df_p.at[row, 'nSweeps']
                 if sweeps != "...": # if the file is imported:
                     files_to_purge = True
-                    recording_name = dfProj.at[row, 'recording_name']
-                    channel = dfProj.at[row, 'channel']
-                    stim = dfProj.at[row, 'stim']
+                    recording_name = df_p.at[row, 'recording_name']
+                    channel = df_p.at[row, 'channel']
+                    stim = df_p.at[row, 'stim']
                     if verbose:
                         print("Delete:", recording_name, channel, stim)
                     data_path = Path(self.projectfolder / (recording_name + ".csv"))
@@ -682,11 +803,11 @@ class UIsub(Ui_MainWindow):
                     purged_df = df[(df['channel'] != channel) | (df['stim'] != stim)]
                     purged_dfmean = dfmean[(dfmean['channel'] != channel) | (dfmean['stim'] != stim)]
                     parse.persistdf(recording_name=recording_name, proj_folder=self.projectfolder, dfdata=purged_df, dfmean=purged_dfmean)
-            # Regardless of whether or not the file was imported, purge it from dfProj
-            self.clear_graph()
-            dfProj.drop(selected_rows, inplace=True)
-            if files_to_purge: # unlink any files that are no longer in dfProj
-                set_files_after_purge = set(dfProj['recording_name'])
+            # Regardless of whether or not the file was imported, purge it from df_p
+            self.clearGraph()
+            df_p.drop(selected_rows, inplace=True)
+            if files_to_purge: # unlink any files that are no longer in df_p
+                set_files_after_purge = set(df_p['recording_name'])
                 list_delete = [item for item in set_files_before_purge if item not in set_files_after_purge]
                 for file in list_delete:
                     delete_data = self.projectfolder / (file + ".csv")
@@ -703,22 +824,15 @@ class UIsub(Ui_MainWindow):
                             print(f"Deleted mean: {delete_mean}")
                     else:
                         print(f"File not found: {delete_mean}")
-            dfProj.reset_index(inplace=True, drop=True)
-            self.set_dfproj(dfProj)
-            self.setTableDf(self.projectdf)  # Force update
+            df_p.reset_index(inplace=True, drop=True)
+            self.set_df_p(df_p)
+            self.setTableDf(self.df_project)  # Force update
         else:
             print("No files selected.")
 
-    def checkedBoxLockDelete(self, state):
-        if state == 2:
-            self.delete_locked = True
-        else:
-            self.delete_locked = False
-        self.pushButtonDelete.setEnabled(not self.delete_locked)
-        if verbose:
-            print(f"checkedBoxLockDelete {state}, self.delete_locked:{self.delete_locked}")
-        self.write_project_cfg()
 
+# writer functions
+    
     def write_cfg(self):  # config file for program, global stuff
         cfg = {"user_documents": str(self.user_documents), "projects_folder": str(self.projects_folder), "projectname": self.projectname}
         #        new_projectfolder = self.projects_folder / self.projectname
@@ -733,8 +847,15 @@ class UIsub(Ui_MainWindow):
         with self.project_cfg_yaml.open("w+") as file:
             yaml.safe_dump(project_cfg, file)
 
-    def tableProjDoubleClicked(self):
-        self.launchMeasureWindow()
+
+# Convenience functions
+
+    def listSelectedRows(self):
+        selected_indexes = self.tableProj.selectionModel().selectedRows()
+        return [row.row() for row in selected_indexes]
+    
+
+# Executive functions
 
     def launchMeasureWindow(self):  # , single_index_range):
         # TODO:find_all_ture_window (if it's already open, focus on it)
@@ -765,10 +886,10 @@ class UIsub(Ui_MainWindow):
         t_VEB = all_t["t_VEB"]
         t_EPSP_amp = all_t["t_EPSP_amp"]
         t_EPSP_slope = all_t["t_EPSP_slope"]
-        # Store variables in self.projectdf
-        self.projectdf.loc[row_index, "t_VEB"] = t_VEB
-        self.projectdf.loc[row_index, "t_EPSP_amp"] = t_EPSP_amp
-        self.projectdf.loc[row_index, "t_EPSP_slope"] = t_EPSP_slope
+        # Store variables in self.df_project
+        self.df_project.loc[row_index, "t_VEB"] = t_VEB
+        self.df_project.loc[row_index, "t_EPSP_amp"] = t_EPSP_amp
+        self.df_project.loc[row_index, "t_EPSP_slope"] = t_EPSP_slope
 
         # zero Y
         dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
@@ -790,34 +911,8 @@ class UIsub(Ui_MainWindow):
             bigdata = pd.read_csv(file_path)
             analysis.buildResultFile(df=bigdata, t_EPSP_amp=t_EPSP_amp)
 
-    def tableProjSelectionChanged(self):
-        if verbose:
-            print("tableProjSelectionChanged")
-        selected_rows = self.listSelectedRows()
-        if 0 < len(selected_rows):
-            dfProj = self.projectdf
-            dfSelection = dfProj.loc[selected_rows]
-            dfFiltered = dfSelection[dfSelection["nSweeps"] != "..."]
-            if not dfFiltered.empty:
-                if dfFiltered.shape[0] == 1:  # exactly one file selected
-                    self.setGraph(dfFiltered) # passes a row, because only one is selected
-                else:  # several files selected
-                    self.setGraphs(dfFiltered)
-            else:
-                print("Selection not analyzed.")
-            return
-        else:
-            if verbose:
-                print("No rows selected.")
-        # if the file isn't imported, or no file selected, clear the mean graph
-        self.clear_graph()
 
-    def pushedButtonRenameProject(self):
-        # renameProject
-        if verbose:
-            print("pushedButtonRenameProject")
-        self.inputProjectName.setReadOnly(False)
-        self.inputProjectName.editingFinished.connect(self.renameProject)
+# Project functions
 
     def renameProject(self):
         # TODO: sanitize path
@@ -835,24 +930,6 @@ class UIsub(Ui_MainWindow):
             self.inputProjectName.setReadOnly(True)
             self.write_cfg()
 
-    def pushedButtonNewProject(self):
-        if verbose:
-            print("pushedButtonNewProject")
-        self.projectfolder.mkdir(exist_ok=True)
-        date = datetime.now().strftime("%Y-%m-%d")
-        i = 0
-        while True:
-            new_project_name = "Project " + date
-            if i > 0:
-                new_project_name = new_project_name + "(" + str(i) + ")"
-            if (self.projects_folder / new_project_name).exists():
-                if verbose:
-                    print(new_project_name, " already exists")
-                i += 1
-            else:
-                self.newProject(new_project_name)
-                break
-
     def newProject(self, new_project_name):
         new_projectfolder = self.projects_folder / new_project_name
         # check if ok
@@ -864,88 +941,37 @@ class UIsub(Ui_MainWindow):
             self.projectfolder = new_projectfolder
             self.projectname = new_project_name
             self.inputProjectName.setText(self.projectname)
-            self.clear_graph()
-            self.projectdf = buildTemplate()
-            self.setTableDf(self.projectdf)
-            self.save_dfproj()
+            self.clearGraph()
+            self.df_project = df_pectTemplate()
+            self.setTableDf(self.df_project)
+            self.save_df_project()
             self.write_cfg()
 
-    def pushedButtonOpenProject(self):
-        # open folder selector dialog
-        self.dialog = QtWidgets.QDialog()
-        projectfolder = QtWidgets.QFileDialog.getExistingDirectory(
-            self.dialog, "Open Directory", str(self.projects_folder), QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks
-        )
-        if verbose:
-            print(f"Received projectfolder: {str(projectfolder)}")
-        if (Path(projectfolder) / "project.brainwash").exists():
-            self.projectfolder = Path(projectfolder)
-            self.clear_graph()
-            self.load_dfproj()
-            self.write_cfg()
 
-    def pushedButtonAddData(self):
-        # creates file tree for file selection
-        if verbose:
-            print("pushedButtonAddData")
-        self.dialog = QtWidgets.QDialog()
-        self.ftree = Filetreesub(self.dialog, parent=self, folder=self.user_documents)
-        self.dialog.show()
+    def getdf_p(self):
+        return self.df_project
 
-    def pushedButtonParse(self):
-        # parse non-parsed files and folders in self.projectdf
-        if verbose:
-            print("pushedButtonParse")
-        update_frame = self.projectdf.copy()  # copy from which to remove rows without confusing index
-        frame2add = self.projectdf.iloc[0:0].copy()  # new, empty df for adding rows for multi-channel readings, without messing with index
-        rows = []
-        for i, df_proj_row in self.projectdf.iterrows():
-            recording_name = df_proj_row['recording_name']
-            source_path = df_proj_row['path']
-            if df_proj_row["nSweeps"] == "...":  # indicates not read before TODO: Replace with selector!
-                dictmeta = parse.parseProjFiles(self.projectfolder, recording_name=recording_name, source_path=source_path)  # result is a dict of <channel>:<channel ID>
-                for channel in dictmeta['channel']:
-                    for stim in dictmeta['stim']:
-                        df_proj_new_row = df_proj_row.copy()
-                        df_proj_new_row['channel'] = channel
-                        df_proj_new_row['stim'] = stim
-                        df_proj_new_row['nSweeps'] = dictmeta['nSweeps']
-                        rows.append(df_proj_new_row)
-                update_frame = update_frame[update_frame.recording_name != recording_name]
-                print(f"update_frame: {update_frame}")
-                rows2add = pd.concat(rows, axis=1).transpose()
-                print("rows2add:", rows2add[["recording_name", "channel", "stim", "nSweeps" ]])
-                self.projectdf = (pd.concat([update_frame, rows2add])).reset_index(drop=True)
-                print(self.projectdf[["recording_name", "channel", "stim", "nSweeps" ]])
-                self.setTableDf(self.projectdf)  # Force update table (TODO: why is this required?)
-                self.save_dfproj()
-
-    def getdfProj(self):
-        return self.projectdf
-
-    def load_dfproj(self):
-        self.projectdf = pd.read_csv(str(self.projectfolder / "project.brainwash"))
-        self.setTableDf(self.projectdf)  # set dfproj to table
+    def load_df_p(self):
+        self.df_project = pd.read_csv(str(self.projectfolder / "project.brainwash"))
+        self.setTableDf(self.df_project)  # set df_p to table
         self.inputProjectName.setText(self.projectfolder.stem)  # set foler name to proj name
         self.projectname = self.projectfolder.stem
         if verbose:
-            print(f"loaded project df: {self.projectdf}")
-        self.clear_graph()
+            print(f"loaded project df: {self.df_project}")
+        self.clearGraph()
         self.write_cfg()
 
-    def save_dfproj(self):
-        self.projectdf.to_csv(str(self.projectfolder / "project.brainwash"), index=False)
+    def save_df_project(self):
+        self.df_project.to_csv(str(self.projectfolder / "project.brainwash"), index=False)
 
-    def set_dfproj(self, df):
-        self.projectdf = df
-        self.save_dfproj()
+    def set_df_p(self, df):
+        self.df_project = df
+        self.save_df_project()
 
-    def clear_graph(self):
-        if verbose:
-            print("clear_graph")
+    def clearGraph(self):
         if hasattr(self, "canvas_seaborn"):
             if verbose:
-                print("self has attribue canvas_seaborn")
+                print("clearGraph: self has attribue canvas_seaborn")
             print(f"axes: {self.canvas_seaborn.axes}")
             self.canvas_seaborn.axes.cla()
             self.canvas_seaborn.draw()
@@ -1043,7 +1069,7 @@ class UIsub(Ui_MainWindow):
         if self.projectfolder.exists():
             # look for project.brainwash and load it
             if (self.projectfolder / "project.brainwash").exists():
-                self.load_dfproj()
+                self.load_df_p()
         else:
             self.projectfolder.mkdir()
 
@@ -1061,14 +1087,14 @@ class UIsub(Ui_MainWindow):
         if verbose:
             print("formatTableProj")
         header = self.tableProj.horizontalHeader()
-        dfProj = self.projectdf
+        df_p = self.df_project
         # hide all columns except these:
-        list_show = [dfProj.columns.get_loc("recording_name"),
-                     dfProj.columns.get_loc("groups"),
-                     dfProj.columns.get_loc("nSweeps"),
-                     dfProj.columns.get_loc("channel"),
-                     dfProj.columns.get_loc("stim")]
-        num_columns = dfProj.shape[1]
+        list_show = [df_p.columns.get_loc("recording_name"),
+                     df_p.columns.get_loc("groups"),
+                     df_p.columns.get_loc("nSweeps"),
+                     df_p.columns.get_loc("channel"),
+                     df_p.columns.get_loc("stim")]
+        num_columns = df_p.shape[1]
         for col in range(num_columns):
             if col in list_show:
                 header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
@@ -1076,10 +1102,10 @@ class UIsub(Ui_MainWindow):
                 self.tableProj.setColumnHidden(col, True)
 
     def addData(self, dfAdd):  # concatenate dataframes of old and new data
-        # Check for unique names in dfAdd, vs dfProj and dfAdd
+        # Check for unique names in dfAdd, vs df_p and dfAdd
         # Adds (<lowest integer that makes unique>) to the end of non-unique recording_names
-        dfProj = self.getdfProj()
-        list_recording_names = set(dfProj['recording_name'])
+        df_p = self.getdf_p()
+        list_recording_names = set(df_p['recording_name'])
         for index, row in dfAdd.iterrows():
             check_recording_name = row['recording_name']
             if check_recording_name.endswith('_mean.csv'):
@@ -1098,32 +1124,32 @@ class UIsub(Ui_MainWindow):
                 dfAdd.at[index,'recording_name'] = new_recording_name
             else:
                 list_recording_names.add(check_recording_name)
-        dfProj = pd.concat([dfProj, dfAdd])
-        dfProj.reset_index(drop=True, inplace=True)
-        dfProj["groups"] = dfProj["groups"].fillna(" ")
-        dfProj["channel"] = dfProj["channel"].fillna(" ")
-        dfProj["stim"] = dfProj["stim"].fillna(" ")
-        dfProj["nSweeps"] = dfProj["nSweeps"].fillna("...")
-        self.set_dfproj(dfProj)
+        df_p = pd.concat([df_p, dfAdd])
+        df_p.reset_index(drop=True, inplace=True)
+        df_p["groups"] = df_p["groups"].fillna(" ")
+        df_p["channel"] = df_p["channel"].fillna(" ")
+        df_p["stim"] = df_p["stim"].fillna(" ")
+        df_p["nSweeps"] = df_p["nSweeps"].fillna("...")
+        self.set_df_p(df_p)
         if verbose:
-            print("addData:", self.getdfProj())
-        self.setTableDf(dfProj)
+            print("addData:", self.getdf_p())
+        self.setTableDf(df_p)
 
     def renameRecording(self):
-        # renames all instances of selected recording_name in projectdf, and their associated files
+        # renames all instances of selected recording_name in df_project, and their associated files
         if verbose:
             print("F2 key pressed in CustomTableView")
         selected_rows = self.listSelectedRows()
         if len(selected_rows) == 1:
             row = selected_rows[0]
-            dfProj = self.projectdf
-            old_recording_name = dfProj.at[row,'recording_name']
+            df_p = self.df_project
+            old_recording_name = df_p.at[row,'recording_name']
             old_data = self.projectfolder / (old_recording_name + ".csv")
             old_mean = self.projectfolder / (old_recording_name + "_mean.csv")
             RenameDialog = InputDialogPopup()
             new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query='')
             if re.match(r'^[a-zA-Z0-9_-]+$', str(new_recording_name)) is not None: # check if valid filename
-                list_recording_names = set(dfProj['recording_name'])
+                list_recording_names = set(df_p['recording_name'])
                 if not new_recording_name in list_recording_names: # prevent duplicates
                     new_data = self.projectfolder / (new_recording_name + ".csv")
                     new_mean = self.projectfolder / (new_recording_name + "_mean.csv")
@@ -1138,11 +1164,11 @@ class UIsub(Ui_MainWindow):
                         print(f"data file exists: {old_data.exists()} : {old_data}")
                         print(f"mean file exists: {old_mean.exists()} : {old_mean}")
                         raise FileNotFoundError
-                    df_shared_recording_name = dfProj[dfProj['recording_name'] == old_recording_name]
+                    df_shared_recording_name = df_p[df_p['recording_name'] == old_recording_name]
                     for i, subrow in df_shared_recording_name.iterrows():
-                        dfProj.at[i,'recording_name'] = new_recording_name
-                    self.set_dfproj(dfProj)
-                    self.setTableDf(self.projectdf)  # Force update
+                        df_p.at[i,'recording_name'] = new_recording_name
+                    self.set_df_p(df_p)
+                    self.setTableDf(self.df_project)  # Force update
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
             else:
@@ -1207,7 +1233,7 @@ class Filetreesub(Ui_Dialog):
 
         # Dataframe to add
         self.names = []
-        self.dfAdd = buildTemplate()
+        self.dfAdd = df_pectTemplate()
 
         self.buttonBoxAddGroup = QtWidgets.QDialogButtonBox(dialog)
         self.buttonBoxAddGroup.setGeometry(QtCore.QRect(470, 20, 91, 491))
@@ -1230,7 +1256,7 @@ class Filetreesub(Ui_Dialog):
         # TODO: Extract host, checksum, group
         if verbose:
             print("pathsSelectedUpdateTable")
-        dfAdd = buildTemplate()
+        dfAdd = df_pectTemplate()
         dfAdd["path"] = paths
         dfAdd["host"] = "Computer 1"
         dfAdd["checksum"] = "big number"
