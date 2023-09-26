@@ -13,21 +13,28 @@ memory = Memory("joblib", verbose=1)
 
 
 # %%
-def buildResultFile(df, t_EPSP_amp):#, t_EPSP_slope, t_EPSP_slope_size, output_path):
+def build_df_result(df_data, t_EPSP_amp):#, t_EPSP_slope, t_EPSP_slope_size, t_volley_amp, t_volley_slope, t_volley_slope_size, output_path):
+    # Incomplete function: only resolves EPSP_amp for now
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
     Args:
         df: a dataframe containing numbered sweeps, timestamps and voltage
         t_EPSP_amp: time of lowest point of EPSP
         t_EPSP_slope: time of centre of EPSP_slope
         t_EPSP_slope_size: width of EPSP slope
+        t_volley_amp: time of lowest point of volley
+        t_volley_slope: time of centre of volley_slope
+        t_volley_slope_size: width of volley slope
         Optional
             output_path: if present, store results to this path (csv)
     Returns:
-        a dataframe of results: Sweep, EPSP_amp, EPSP_slope
+        a dataframe. Per sweep (row): EPSP_amp, EPSP_slope, volley_amp, volley_EPSP
     """
-    #print(f"df{df}, t_EPSP_amp{t_EPSP_amp}")
-    print(f"t_EPSP_amp: {t_EPSP_amp}")
-    
+    df_result = pd.DataFrame()
+    df_result['sweep'] = df_data.sweep.unique() # one row per unique sweep in data file
+    df_EPSP_amp = df_data[df_data['time']==t_EPSP_amp].copy() # filter out all time (from sweep start) that do not match t_EPSP_amp
+    df_EPSP_amp.reset_index(inplace=True)
+    df_result['EPSP_amp'] = df_EPSP_amp['voltage'] # add the voltage of selected times to df_result
+    return df_result
 
 
 # %%
@@ -152,7 +159,7 @@ def find_i_EPSP_slope(dfmean, i_VEB, i_EPSP, happy=False):
         if not happy:
             raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[i_VEB: i_EPSP]:{i_EPSP_slope}")
         else:
-            print("More EPSPs than than we wanted but Im happy, so I pick one and move on.")
+            print("More EPSPs than than we wanted but I'm happy, so I pick the first one and move on.")
     return i_EPSP_slope[0]
 
 
@@ -181,11 +188,10 @@ def find_i_volleyslope(dfmean, i_Stim, i_VEB, happy=False):  # , param_half_slop
 # %%
 def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     """
-    runs all t-detections in the appropriate sequence,
-    returns INDEX of center for volley EPSP slopes
-        as identified by positive zero-crossings in the second order derivative
-        if several are found, it returns the latest one
+    runs all index-detections in the appropriate sequence,
     The function finds VEB, but does not currently report it
+    TODO: also report volley amp and slope
+    Returns a dict of all DETECTED indices: point for amp(litudes), center for slopes.
     """
 
     i_Stim = np.nan
@@ -221,6 +227,10 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
 
 # %%
 def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
+    """
+    Acquires indices via find_all_t() for the provided dfmean and converts them to time values
+    Returns a dict of all t-values provided by find_all_t()
+    """
     if verbose:
         print("find_all_t")
     dict_i = find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=verbose)
@@ -237,8 +247,6 @@ def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
 def measureslope(df, i_slope, halfwidth, name="EPSP"):
     """
     Generalized function
-
-
     """
     reg = linear_model.LinearRegression()
 
@@ -264,6 +272,40 @@ def measureslope(df, i_slope, halfwidth, name="EPSP"):
     df_slopes = pd.DataFrame(dicts)
 
     return df_slopes
+
+# %%
+''' Standalone test:'''
+if __name__ == "__main__":
+    print("Running as main: standalone test")
+    from pathlib import Path
+    import os
+    path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/A_21_P0701-S2.csv")
+    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/A_21_P0701-S2_mean.csv")
+    df_data = pd.read_csv(str(path_datafile)) # a persisted csv-form of the data file
+    df_mean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
+    df_data_a = df_data[(df_data['stim']=='a')] # select stim 'a' only in data file
+    df_mean_a = df_mean[(df_mean['stim']=='a')] # select stim 'a' only in mean file
+
+    # adding calibrated voltage to df_data_a (in later iterations, this will be done upon parsing the raw data)
+    dfpivot = df_data_a[['sweep', 'voltage', 'time']].pivot_table(values='voltage', columns = 'time', index = 'sweep')
+    ser_startmedian = dfpivot.iloc[:,:20].median(axis=1)
+    df_calibrated = dfpivot.subtract(ser_startmedian, axis = 'rows')
+    df_calibrated = df_calibrated.stack().reset_index()
+    df_calibrated.rename(columns = {0: 'voltage'}, inplace=True)
+    df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
+    df_data_a.rename(columns = {'voltage': 'voltage_raw'}, inplace=True)
+    df_data_a['voltage'] = df_calibrated.voltage
+    
+    all_t = find_all_t(df_mean_a) # use the average all sweeps to determine where all events are located (noise reduction)
+    t_EPSP_amp = all_t['t_EPSP_amp'] # use coordinates from the average on all sweeps in the data file (measure actual data)
+    # t_EPSP_slope = all_t['t_EPSP_slope']
+    print(df_data_a)
+    df_result = build_df_result(df_data=df_data_a, t_EPSP_amp=t_EPSP_amp)
+    print(df_result)
+
+# The following section is for rapid prototyping in jupyter lab
+
+'''
 
 # %%
 if __name__ == "__main__":
@@ -372,3 +414,4 @@ if __name__ == "__main__":
     print(df_calibrated)
 
 # %%
+'''
