@@ -276,7 +276,7 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     dfss = assignStimAndsweep(df, list_stims=['a', 'b', 'c', 'd'])
     print(dfss)
 
-# %%
+# %%Import_x should be parse, not “import”.
 if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
 
     dfvc = dfss[['stim', 'sweepraw']].value_counts()
