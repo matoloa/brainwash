@@ -1087,7 +1087,7 @@ class UIsub(Ui_MainWindow):
         self.canvas_seaborn.show()
 
 
-# Executive functions
+# MeasureWindow
 
     def launchMeasureWindow(self):  # , single_index_range):
         # TODO:find_all_ture_window (if it's already open, focus on it)
@@ -1122,6 +1122,8 @@ class UIsub(Ui_MainWindow):
         self.df_project.loc[row_index, "t_VEB"] = t_VEB
         self.df_project.loc[row_index, "t_EPSP_amp"] = t_EPSP_amp
         self.df_project.loc[row_index, "t_EPSP_slope"] = t_EPSP_slope
+        
+        print(f"t_EPSP_amp: {t_EPSP_amp}")
 
         # zero Y
         dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
@@ -1135,14 +1137,32 @@ class UIsub(Ui_MainWindow):
         self.measure.setWindowTitle(window_name)
         self.measure.show()
         self.measure_window_sub.setMeasureGraph(recording_name, dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
-        return
+
         # TODO: Placeholder functionality for loading analysis.buildResultFile()
         file_path = Path(self.projectfolder / (recording_name + ".csv"))
-        print(file_path)
-        if file_path.exists():
-            bigdata = pd.read_csv(file_path)
-            analysis.buildResultFile(df=bigdata, t_EPSP_amp=t_EPSP_amp)
+        if not file_path.exists():
+            print(f"Error: {file_path} not found.")
+            return
+        df_datafile = pd.read_csv(file_path)
+        df_data = df_datafile[(df_datafile['channel']==channel) & (df_datafile['stim']==stim)].copy()
+        df_data.reset_index(inplace=True)
 
+        # adding calibrated voltage to df_data TODO: in later iterations, this will be done upon parsing the raw data
+        dfpivot = df_data[['sweep', 'voltage', 'time']].pivot_table(values='voltage', columns = 'time', index = 'sweep')
+        ser_startmedian = dfpivot.iloc[:,:20].median(axis=1)
+        df_calibrated = dfpivot.subtract(ser_startmedian, axis = 'rows')
+        df_calibrated = df_calibrated.stack().reset_index()
+        df_calibrated.rename(columns = {0: 'voltage'}, inplace=True)
+        df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
+        df_data.rename(columns = {'voltage': 'voltage_raw'}, inplace=True)
+        df_data['voltage'] = df_calibrated.voltage
+
+        df_result = analysis.build_df_result(df_data=df_data, t_EPSP_amp=t_EPSP_amp)
+        df_result.reset_index(inplace=True)
+        print(recording_name, channel, stim)
+        self.measure_window_sub.setOutputGraph(df_result=df_result)
+
+        
             
     @QtCore.pyqtSlot(list)
     def slotPrintPaths(self, mypaths):
@@ -1288,6 +1308,21 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_seaborn.axes.set_ylim(ui.graph_ylim)
 
         # self.canvas_seaborn.axes.set_xmargin((100,500))
+        self.canvas_seaborn.draw()
+        self.canvas_seaborn.show()
+
+    def setOutputGraph(self, df_result):
+        # get df_result from selected row in UIsub.
+        # display SELECTED from tableProj at measurewindow
+        if verbose:
+            print("setOutputGraph", df_result)
+        self.canvas_seaborn = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
+
+        # fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
+        g = sns.lineplot(data=df_result, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn.axes, color="black")
+
+        self.canvas_seaborn.axes.set_ylim(-0.0015, 0)
+
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
 
