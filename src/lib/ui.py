@@ -515,10 +515,13 @@ class UIsub(Ui_MainWindow):
         self.pushButtonDelete.setEnabled(not self.delete_locked)
         for group in self.list_groups:  # Generate buttons based on groups in project:
             self.addGroupButton(group)
+
         if track_widget_focus: # debug mode; prints widget focus every 1000ms
             self.timer = QtCore.QTimer(self)
             self.timer.timeout.connect(self.checkFocus)
             self.timer.start(1000)  
+
+        self.dict_means = {}
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
@@ -669,25 +672,22 @@ class UIsub(Ui_MainWindow):
 
 # Non-button event functions
 
+    def showSelected(self, rows):
+        df_p = self.df_project
+        dfSelection = df_p.loc[rows]
+        dfFiltered = dfSelection[dfSelection["sweeps"] != "..."]
+        if not dfFiltered.empty:
+            self.setGraph(dfFiltered)
+        else:
+            print("Selection not analyzed.")
+
     def tableProjSelectionChanged(self):
-        if verbose:
-            print("tableProjSelectionChanged")
         selected_rows = self.listSelectedRows()
         if 0 < len(selected_rows):
-            df_p = self.df_project
-            dfSelection = df_p.loc[selected_rows]
-            dfFiltered = dfSelection[dfSelection["sweeps"] != "..."]
-            if not dfFiltered.empty:
-                if dfFiltered.shape[0] == 1:  # exactly one file selected
-                    self.setGraph(dfFiltered) # passes a row, because only one is selected
-                else:  # several files selected
-                    self.setGraph(dfFiltered)
-            else:
-                print("Selection not analyzed.")
+            self.showSelected(rows=selected_rows)
             return
         else:
-            if verbose:
-                print("No rows selected.")
+            print("No rows selected.")
         # if the file isn't imported, or no file selected, clear the mean graph
         self.clearGraph()
 
@@ -810,7 +810,7 @@ class UIsub(Ui_MainWindow):
                     purged_df = df[(df['channel'] != channel) | (df['stim'] != stim)]
                     purged_dfmean = dfmean[(dfmean['channel'] != channel) | (dfmean['stim'] != stim)]
                     parse.persistdf(recording_name=recording_name, proj_folder=self.projectfolder, dfdata=purged_df, dfmean=purged_dfmean)
-            # Regardless of whether or not the file was imported, purge it from df_p
+            # Regardless of whether or not there was a file, purge the row from df_project
             self.clearGraph()
             df_p.drop(selected_rows, inplace=True)
             if files_to_purge: # unlink any files that are no longer in df_p
@@ -884,7 +884,7 @@ class UIsub(Ui_MainWindow):
         # self.gridLayout.addWidget(self.new_button, self.gridLayout.rowCount(), 0, 1, 1)
 
     def addToGroup(self, add_group):
-        # Placeholder function: Assign all selected files to add_group unless they already belong to that group
+        # Assign all selected files to group "add_group" unless they already belong to that group
         selected_rows = self.listSelectedRows()
         if 0 < len(selected_rows):
             list_group = ""
@@ -948,8 +948,7 @@ class UIsub(Ui_MainWindow):
             self.save_df_project()
             self.write_cfg()
 
-    def renameProject(self): # changes name of project folder, updates .cfg
-        # make if not existing
+    def renameProject(self): # changes name of project folder and updates .cfg
         self.projectfolder.mkdir(exist_ok=True)
         new_project_name = self.inputProjectName.text()
         # check if ok
@@ -1002,19 +1001,6 @@ class UIsub(Ui_MainWindow):
         self.df_project = df
         self.save_df_project()
 
-    def getdfmean(self, row): # returns dfmean, selected for the row's channel and stim
-        channel = row['channel']
-        stim = row['stim']
-        dfmean_path = self.projectfolder / (row['recording_name'] + "_mean.csv")
-        print(f"dfmean_path: {dfmean_path}, type: {type(dfmean_path)}")
-        try:
-            dfmean = pd.read_csv(str(dfmean_path))  # parse _mean.csv
-        except FileNotFoundError:
-            print("did not find _mean.csv to load. Not imported?")
-        df = dfmean[(dfmean['channel']==channel) & (dfmean['stim']==stim)].copy()
-        df.reset_index(inplace=True)
-        return df
-
 
 # Table handling
 
@@ -1047,6 +1033,29 @@ class UIsub(Ui_MainWindow):
             else:
                 self.tableProj.setColumnHidden(col, True)
 
+# internal dataframe handling
+    def row2key(self, row):
+        return (row['recording_name'] + str(row['channel']) + str(row['stim']))
+
+    def get_dfmean(self, row):
+        # returns an internal df mean for the selected file. If it does not exist, read it from file first.
+        key_mean = self.row2key(row=row) + "_mean"
+        if key_mean in self.dict_means:
+            return self.dict_means[key_mean]
+        else:
+            recording_name = row['recording_name']
+            channel = row['channel']
+            stim = row['stim']
+            dfmean_path = self.projectfolder / (recording_name + "_mean.csv")
+            try:
+                dfmean = pd.read_csv(dfmean_path)
+            except FileNotFoundError:
+                print("did not find _mean.csv to load. Not imported?")
+            dfmean = dfmean[(dfmean['channel'] == channel) & (dfmean['stim'] == stim)].copy()
+            dfmean.reset_index(inplace=True)
+            self.dict_means[key_mean] = dfmean
+            return self.dict_means[key_mean]
+
 
 # Graph handling
 
@@ -1062,23 +1071,16 @@ class UIsub(Ui_MainWindow):
     def setGraph(self, df): # plot selected rows, add prim and bis if only one
         self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
         for i, row in df.iterrows(): # TODO: i to be used later for cycling colours?
-            channel = row['channel']
-            stim = row['stim']
-            dfmean_path = self.projectfolder / (row['recording_name'] + "_mean.csv")
-            try:
-                dfmean = pd.read_csv(dfmean_path)
-            except FileNotFoundError:
-                print("did not find _mean.csv to load. Not imported?")
-            df_view = dfmean[(dfmean['channel'] == channel) & (dfmean['stim'] == stim)].copy()
-            df_view["voltage"] = df_view.voltage / df_view.voltage.abs().max()
-            df_view["prim"] = df_view.prim / df_view.prim.abs().max()
-            df_view["bis"] = df_view.bis / df_view.bis.abs().max()
-            g = sns.lineplot(data=df_view, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+            dfmean = self.get_dfmean(row=row)
+            dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
+            g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
         
-        g = sns.lineplot(data=df_view, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
-        if df.shape[0] == 1: # if just one row is selected, also show prim and bis
-            h = sns.lineplot(data=df_view, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
-            i = sns.lineplot(data=df_view, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
+        g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+        if False:#df.shape[0] == 1: # if just one row is selected, also show prim and bis, disabled for now
+            dfmean["prim"] = dfmean.prim / dfmean.prim.abs().max()
+            dfmean["bis"] = dfmean.bis / dfmean.bis.abs().max()
+            h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
+            i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
 
         self.canvas_seaborn.axes.set_xlim(self.graph_xlim)
         self.canvas_seaborn.axes.set_ylim(self.graph_ylim)
@@ -1108,10 +1110,9 @@ class UIsub(Ui_MainWindow):
         sweeps = ser_table_row["sweeps"]
         if sweeps == "...":
             # TODO: Make it import the missing file
-            print("did not find _mean.csv to load. Not imported?")
+            print("Unknown number of sweeps - not imported?")
             return
-        dfmean = self.getdfmean(ser_table_row)
-        print(dfmean, type(dfmean))
+        dfmean = self.get_dfmean(ser_table_row)
         # Analysis.py
         all_t = analysis.find_all_t(dfmean=dfmean, verbose=verbose)
         # Break out to variables
