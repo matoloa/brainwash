@@ -1051,9 +1051,9 @@ class UIsub(Ui_MainWindow):
                 dfmean = pd.read_csv(dfmean_path)
             except FileNotFoundError:
                 print("did not find _mean.csv to load. Not imported?")
-            dfmean = dfmean[(dfmean['channel'] == channel) & (dfmean['stim'] == stim)].copy()
-            dfmean.reset_index(inplace=True)
-            self.dict_means[key_mean] = dfmean
+            dfcopy = dfmean[(dfmean['channel'] == channel) & (dfmean['stim'] == stim)].copy()
+            dfcopy.reset_index(inplace=True)
+            self.dict_means[key_mean] = dfcopy
             return self.dict_means[key_mean]
 
 
@@ -1147,16 +1147,6 @@ class UIsub(Ui_MainWindow):
         df_datafile = pd.read_csv(file_path)
         df_data = df_datafile[(df_datafile['channel']==channel) & (df_datafile['stim']==stim)].copy()
         df_data.reset_index(inplace=True)
-
-        # adding calibrated voltage to df_data TODO: in later iterations, this will be done upon parsing the raw data
-        dfpivot = df_data[['sweep', 'voltage', 'time']].pivot_table(values='voltage', columns = 'time', index = 'sweep')
-        ser_startmedian = dfpivot.iloc[:,:20].median(axis=1)
-        df_calibrated = dfpivot.subtract(ser_startmedian, axis = 'rows')
-        df_calibrated = df_calibrated.stack().reset_index()
-        df_calibrated.rename(columns = {0: 'voltage'}, inplace=True)
-        df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
-        df_data.rename(columns = {'voltage': 'voltage_raw'}, inplace=True)
-        df_data['voltage'] = df_calibrated.voltage
 
         df_result = analysis.build_df_result(df_data=df_data, t_EPSP_amp=t_EPSP_amp)
         df_result.reset_index(inplace=True)

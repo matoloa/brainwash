@@ -122,25 +122,57 @@ def builddfmean(df, rollingwidth=3):
     return dfmean
 
 
-def assignStimAndsweep(df_data, list_stims):
+def zeroSweeps(df_data):
+    #df_data.rename(columns = {'voltage': 'voltage_raw'}, inplace=True)
+    df_data['voltage_raw'] = df_data.voltage
+    print("pre", df_data)
+    dfmean = builddfmean(df_data)
+    for channel in df_data.channel.unique():
+        for stim in df_data.stim.unique():
+            if stim == 'b':
+                break
+            df_meancopy = dfmean[(dfmean['channel'] == channel) & (dfmean['stim'] == stim)].copy()
+            df_meancopy.reset_index(inplace=True)
+            i_stim = df_meancopy['prim'].idxmax()
+            for sweep in df_data.sweep.unique():
+                criteria = (df_data['channel'] == channel) & (df_data['stim'] == stim) & (df_data['sweep'] == sweep)
+                pre_stim_median = df_data.loc[criteria, ['voltage_raw']].iloc[i_stim-10:i_stim-5].median()[0]# TODO: hardcoded
+                df_data.loc[criteria, ['voltage']] = df_data.loc[criteria, ['voltage_raw']] - pre_stim_median
+                #print(f"{channel}, {stim}, {sweep}, pre_stim_median: {pre_stim_median}")
+    print("post", df_data)
+
+    # TODO: Does not work! Takes several minutes and returns NaN on all 'voltage's
+    
+    '''
+    #dfpivot = df[['voltage', 'time']].pivot_table(values='voltage', index = 'time')
+    ser_startmedian = dfpivot.iloc[:,:20].median(axis=1)
+    df_calibrated = dfpivot.subtract(ser_startmedian, axis = 'rows')
+    df_calibrated = df_calibrated.stack().reset_index()
+    df_calibrated.rename(columns = {0: 'voltage'}, inplace=True)
+    df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
+    df_data_a['voltage'] = df_calibrated.voltage'''
+    df_zeroed = df_data
+    return df_zeroed
+
+def assignStimAndSweep(df_data, list_stims):
     # sets stim-column, sorts df_data and builds new dfmean
     if verbose:
-        print(f" - assignStimAndsweep, channels:{df_data.channel.unique()}, list_stims: {list_stims}")
+        print(f" - assignStimAndSweep, channels:{df_data.channel.unique()}, list_stims: {list_stims}")
     nstims = len(list_stims)
     nchannels = df_data.channel.nunique()
     sweeplength = df_data.time.nunique()
     dfcopy = df_data.copy()
     dfcopy = dfcopy.sort_values(by=['datetime', 'channel']).reset_index(drop=True)
-    dfcopy['sweepraw'] = dfcopy.index.to_numpy() // (sweeplength * nchannels)
+    dfcopy['sweep_raw'] = dfcopy.index.to_numpy() // (sweeplength * nchannels)
     dfs = []
     for channel in dfcopy.channel.unique():
         df = dfcopy[dfcopy.channel==channel].copy()
         df['stim'] = ''
         for i, stim in enumerate(list_stims):
-            df.loc[df.sweepraw % nstims == i, 'stim'] = stim
+            df.loc[df.sweep_raw % nstims == i, 'stim'] = stim
         dfs.append(df)
     df = pd.concat(dfs).sort_values(by=['stim', 'datetime']).reset_index(drop=True)
-    df['sweep'] = (df.sweepraw / nstims).apply(lambda x: int(np.floor(x)))
+    df['sweep'] = (df.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
     return df
 
 
@@ -189,7 +221,8 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
                 print(" - - default: two stims per channel")
                 list_stims=["a", "b"]
 
-        df = assignStimAndsweep(df_data = df, list_stims=list_stims)
+        df = assignStimAndSweep(df_data = df, list_stims=list_stims)
+        #df = zeroSweeps(df_data = df)
         dfmean = builddfmean(df)
         persistdf(recording_name, proj_folder, dfdata=df, dfmean=dfmean)
         dictmeta = {'channel': df.channel.unique(), 'stim': df.stim.unique(), 'sweeps': df.sweep.nunique()}
@@ -236,8 +269,8 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
 
     source_folder = Path.home() / "Documents/Brainwash Data Source/"
     proj_folder = Path.home() / "Documents/Brainwash Projects/standalone_test"
-    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"),
-                    str(source_folder / "abf 2 channel/KO_02")]
+    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2")]#,
+#                    str(source_folder / "abf 2 channel/KO_02")]
 #    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"),
 #                    str(source_folder / "abf 2 channel/KO_02/2022_01_24_0000.abf")]
     for _ in range(3):
@@ -273,7 +306,7 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     df = parse_abf(filepath=Path(list_sources[1]))
     sweeplength = df.time.nunique()
     df.index.to_numpy()
-    dfss = assignStimAndsweep(df, list_stims=['a', 'b', 'c', 'd'])
+    dfss = assignStimAndSweep(df, list_stims=['a', 'b', 'c', 'd'])
     print(dfss)
 
 # %%Import_x should be parse, not “import”.
