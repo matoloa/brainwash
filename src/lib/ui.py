@@ -521,7 +521,8 @@ class UIsub(Ui_MainWindow):
             self.timer.timeout.connect(self.checkFocus)
             self.timer.start(1000)  
 
-        self.dict_means = {}
+        self.dict_means = {} # internal storage of all means
+        self.dict_outputs = {} # internal storage of all outputs
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
@@ -1056,37 +1057,69 @@ class UIsub(Ui_MainWindow):
             self.dict_means[key_mean] = dfcopy
             return self.dict_means[key_mean]
 
+    def get_dfoutput(self, row):
+        # returns an internal df output for the selected file. If it does not exist, read it from file first.
+        key_output = self.row2key(row=row) + "_output"
+        if key_output in self.dict_outputs:
+            return self.dict_outputs[key_output]
+        else:
+            recording_name = row['recording_name']
+            channel = row['channel']
+            stim = row['stim']
+
+            # TODO: Placeholder functionality for loading analysis.buildResultFile()
+            file_path = Path(self.projectfolder / (recording_name + ".csv"))
+            if not file_path.exists():
+                print(f"Error: {file_path} not found.")
+                return
+            df_datafile = pd.read_csv(file_path)
+            df_data = df_datafile[(df_datafile['channel']==channel) & (df_datafile['stim']==stim)].copy()
+            df_data.reset_index(inplace=True)
+            all_t = analysis.find_all_t(dfmean=self.get_dfmean(row=row), verbose=verbose)
+            t_EPSP_amp = all_t["t_EPSP_amp"]
+            df_result = analysis.build_df_result(df_data=df_data, t_EPSP_amp=t_EPSP_amp)
+            df_result.reset_index(inplace=True)
+
+            self.dict_outputs[key_output] = df_result
+            return self.dict_outputs[key_output]
+
 
 # Graph handling
 
     def clearGraph(self): # removes all data from canvas_seaborn
-        if hasattr(self, "canvas_seaborn"):
+        if hasattr(self, "canvas_seaborn_mean"):
             if verbose:
-                print("clearGraph: self has attribue canvas_seaborn")
-            print(f"axes: {self.canvas_seaborn.axes}")
-            self.canvas_seaborn.axes.cla()
-            self.canvas_seaborn.draw()
-            self.canvas_seaborn.show()
+                print("clearGraph: self has attribue canvas_seaborn_mean")
+            print(f"axes: {self.canvas_seaborn_mean.axes}")
+            self.canvas_seaborn_mean.axes.cla()
+            self.canvas_seaborn_mean.draw()
+            self.canvas_seaborn_mean.show()
 
     def setGraph(self, df): # plot selected rows, add prim and bis if only one
-        self.canvas_seaborn = MplCanvas(parent=self.graphMean)  # instantiate canvas
+        self.canvas_seaborn_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
+        self.canvas_seaborn_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for MeanGroups
         for i, row in df.iterrows(): # TODO: i to be used later for cycling colours?
             dfmean = self.get_dfmean(row=row)
             dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
-            g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
-        
-        g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+            g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
+            dfoutput = self.get_dfoutput(row=row)
+            h = sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
+        #g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
         if False:#df.shape[0] == 1: # if just one row is selected, also show prim and bis, disabled for now
             dfmean["prim"] = dfmean.prim / dfmean.prim.abs().max()
             dfmean["bis"] = dfmean.bis / dfmean.bis.abs().max()
-            h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
-            i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
+            h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn_mean.axes, color="red")
+            i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn_mean.axes, color="green")
 
-        self.canvas_seaborn.axes.set_xlim(self.graph_xlim)
-        self.canvas_seaborn.axes.set_ylim(self.graph_ylim)
+        self.canvas_seaborn_mean.axes.set_xlim(self.graph_xlim)
+        self.canvas_seaborn_mean.axes.set_ylim(self.graph_ylim)
+        self.canvas_seaborn_output.axes.set_ylim(-0.0015, 0)
 
-        self.canvas_seaborn.draw()
-        self.canvas_seaborn.show()
+        self.canvas_seaborn_mean.draw()
+        self.canvas_seaborn_mean.show()
+
+        self.canvas_seaborn_output.draw()
+        self.canvas_seaborn_output.show()
 
 
 # MeasureWindow
@@ -1119,9 +1152,6 @@ class UIsub(Ui_MainWindow):
         window_name = (recording_name + ",_ch" + str(channel) + ", st" + stim)
         self.measure.setWindowTitle(window_name)
         self.measure.show()
-
-        # TODO: dysfunctional attempt to clear graphs before calculating contents, so that the last version of the window does not linger
-        self.measure_window_sub.clearGraphs()
 
         dfmean = self.get_dfmean(ser_table_row)
         # Analysis.py
@@ -1319,20 +1349,6 @@ class Measure_window_sub(Ui_measure_window):
 
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
-
-    def clearGraphs(self): # TODO: is supposed to CLEAR both graphs. It doesn't.
-        if verbose:
-            print("ClearGraphs()")
-        self.canvas_seaborn_mean = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
-        self.canvas_seaborn_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
-
-        self.canvas_seaborn_mean.axes.cla()
-        self.canvas_seaborn_output.axes.cla()
-
-        self.canvas_seaborn_mean.draw()
-        self.canvas_seaborn_output.draw()
-        self.canvas_seaborn_mean.show()
-        self.canvas_seaborn_output.show()
 
 
 def get_signals(source):
