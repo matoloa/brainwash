@@ -65,7 +65,7 @@ def parse_abf(filepath):
     df = pd.concat(dfs)
     # Convert to SI
     df["time"] = df.sweepX  # time in seconds from start of sweep recording
-    df["voltage"] = df.sweepY / 1000  # mv to V
+    df["voltage_raw"] = df.sweepY / 1000  # mv to V
     # Absolute date and time
     df["timens"] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
     df["datetime"] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
@@ -126,9 +126,6 @@ def zeroSweeps(df_data):
     def getbool(df, channel=0, stim='a'):
         vecbool = (df['channel'] == channel) & (df['stim'] == stim)
         return vecbool
-    #df_data.rename(columns = {'voltage': 'voltage_raw'}, inplace=True)
-    df_data['voltage_raw'] = df_data.voltage
-    print("pre", df_data)
     dfmean = builddfmean(df_data)
     
     for channel in df_data.channel.unique():
