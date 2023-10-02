@@ -521,6 +521,7 @@ class UIsub(Ui_MainWindow):
             self.timer.timeout.connect(self.checkFocus)
             self.timer.start(1000)  
 
+        self.dict_datas = {} # internal storage of all data
         self.dict_means = {} # internal storage of all means
         self.dict_outputs = {} # internal storage of all outputs
 
@@ -1063,10 +1064,24 @@ class UIsub(Ui_MainWindow):
         if key_output in self.dict_outputs:
             return self.dict_outputs[key_output]
         else:
+            df_data = self.get_dfdata(row)
+            all_t = analysis.find_all_t(dfmean=self.get_dfmean(row=row), verbose=verbose)
+            t_EPSP_amp = all_t["t_EPSP_amp"]
+            df_result = analysis.build_df_result(df_data=df_data, t_EPSP_amp=t_EPSP_amp)
+            df_result.reset_index(inplace=True)
+
+            self.dict_outputs[key_output] = df_result
+            return self.dict_outputs[key_output]
+        
+    def get_dfdata(self, row):
+        # returns an internal df output for the selected file. If it does not exist, read it from file first.
+        key_data = self.row2key(row=row)
+        if key_data in self.dict_datas:
+            return self.dict_datas[key_data]
+        else:
             recording_name = row['recording_name']
             channel = row['channel']
             stim = row['stim']
-
             # TODO: Placeholder functionality for loading analysis.buildResultFile()
             file_path = Path(self.projectfolder / (recording_name + ".csv"))
             if not file_path.exists():
@@ -1075,13 +1090,9 @@ class UIsub(Ui_MainWindow):
             df_datafile = pd.read_csv(file_path)
             df_data = df_datafile[(df_datafile['channel']==channel) & (df_datafile['stim']==stim)].copy()
             df_data.reset_index(inplace=True)
-            all_t = analysis.find_all_t(dfmean=self.get_dfmean(row=row), verbose=verbose)
-            t_EPSP_amp = all_t["t_EPSP_amp"]
-            df_result = analysis.build_df_result(df_data=df_data, t_EPSP_amp=t_EPSP_amp)
-            df_result.reset_index(inplace=True)
 
-            self.dict_outputs[key_output] = df_result
-            return self.dict_outputs[key_output]
+            self.dict_datas[key_data] = df_data
+            return self.dict_datas[key_data]
 
 
 # Graph handling
@@ -1179,9 +1190,7 @@ class UIsub(Ui_MainWindow):
         if not file_path.exists():
             print(f"Error: {file_path} not found.")
             return
-        df_datafile = pd.read_csv(file_path)
-        df_data = df_datafile[(df_datafile['channel']==channel) & (df_datafile['stim']==stim)].copy()
-        df_data.reset_index(inplace=True)
+        df_data = self.get_dfdata(row=ser_table_row)
 
         df_result = analysis.build_df_result(df_data=df_data, t_EPSP_amp=t_EPSP_amp)
         df_result.reset_index(inplace=True)
