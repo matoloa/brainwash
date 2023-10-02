@@ -7,6 +7,7 @@ import matplotlib
 
 # import matplotlib.pyplot as plt # TODO: use instead of matplotlib for smaller import?
 import seaborn as sns
+import scipy.stats as stats
 
 import pandas as pd
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -520,9 +521,11 @@ class UIsub(Ui_MainWindow):
             self.timer.timeout.connect(self.checkFocus)
             self.timer.start(1000)  
 
-        self.dict_datas = {} # internal storage of all data
-        self.dict_means = {} # internal storage of all means
-        self.dict_outputs = {} # internal storage of all outputs
+        # Internal storage dicts
+        self.dict_datas = {} # all data
+        self.dict_means = {} # all means
+        self.dict_outputs = {} # all outputs
+        self.dict_group_means = {} # means of all group outputs
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
@@ -1078,6 +1081,24 @@ class UIsub(Ui_MainWindow):
 
             self.dict_datas[key_data] = df_data
             return self.dict_datas[key_data]
+        
+    def get_df_groupmean(self, key_group):
+        # returns an internal df output average of <group>. If it does not exist, create it
+        if key_group in self.dict_group_means:
+            return self.dict_group_means[key_group]
+        else:
+            df_p = self.df_project
+            df_group = df_p[df_p['groups'].str.split(',').apply(lambda x: key_group in x)]
+            dfs = []
+            for i, row in df_group.iterrows():
+                df = self.get_dfoutput(row=row)
+                dfs.append(df)
+            dfs = pd.concat(dfs)
+            group_mean = dfs.groupby('sweep')['EPSP_amp'].agg(['mean', 'sem']).reset_index()
+            group_mean.columns = ['sweep', 'EPSP_amp_mean', 'EPSP_amp_sem']
+            print(f"group_mean: {group_mean}")
+            self.dict_group_means[key_group] = group_mean
+            return self.dict_group_means[key_group]        
 
 
 # Graph handling
@@ -1092,21 +1113,19 @@ class UIsub(Ui_MainWindow):
             self.canvas_seaborn_mean.show()
 
     def setGraph(self, df): # plot selected row(s), or clear graph if empty
-        print(f"df.shape[0]: {df.shape[0]}")
+        #print(f"df.shape[0]: {df.shape[0]}")
         self.canvas_seaborn_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
         self.canvas_seaborn_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for MeanGroups
 
         # add groups, regardless of selection:
-        print(f"Groups: {self.list_groups}")
-        df_p = self.df_project
-        # placeholder color range:
-        list_color = ["red", "green", "blue", "yellow"]
+        # print(f"Groups: {self.list_groups}")
+        list_color = ["red", "green", "blue", "yellow"] # TODO: placeholder color range
         for color, group in enumerate(self.list_groups):
-            df_group = df_p[df_p['groups'].str.split(',').apply(lambda x: group in x)]
-            for i, row in df_group.iterrows():
-                dfoutput = self.get_dfoutput(row=row)
-                sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[color])
-    
+            df_group_mean = self.get_df_groupmean(key_group=group)
+            # TODO: Errorbars: do I have
+            sns.lineplot(data=df_group_mean, y="EPSP_amp_mean", x="sweep", ax=self.canvas_seaborn_output.axes, 
+                         color=list_color[color])            
+
         if df.shape[0] == 0:
             self.canvas_seaborn_mean.axes.cla()
         else:
