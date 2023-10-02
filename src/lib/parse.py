@@ -126,7 +126,6 @@ def zeroSweeps(df_data):
     def getbool(df, channel=0, stim='a'):
         vecbool = (df['channel'] == channel) & (df['stim'] == stim)
         return vecbool
-    
     #df_data.rename(columns = {'voltage': 'voltage_raw'}, inplace=True)
     df_data['voltage_raw'] = df_data.voltage
     print("pre", df_data)
@@ -135,24 +134,12 @@ def zeroSweeps(df_data):
     for channel in df_data.channel.unique():
         for stim in df_data.stim.unique():
             i_stim = dfmean[getbool(dfmean, channel=channel, stim=stim)].reset_index().prim.idxmax()
-            #i_stim = df_meancopy['prim'].idxmax()
-            #print(f"df_meancopy: {df_meancopy}")
-            print(f"i_stim: {i_stim}")
+            #print(f"i_stim: {i_stim}")
             dfpivot = df_data[getbool(df_data, channel=channel, stim=stim)].pivot(index='sweep', columns='time', values='voltage')
             sermedians = dfpivot.iloc[:, i_stim-10:i_stim-5].median(axis=1)
-            print(f"sermedians: {sermedians}")
+            #print(f"sermedians: {sermedians}")
             dfpivot = dfpivot.subtract(sermedians, axis='rows')
-            #print(f"dfpivot: {dfpivot}")
             df_data.loc[getbool(df_data, channel=channel, stim=stim), 'voltage'] = dfpivot.stack().reset_index().sort_values(by=['sweep', 'time'])[0].values
-    
-    '''
-    #dfpivot = df[['voltage', 'time']].pivot_table(values='voltage', index = 'time')
-    ser_startmedian = dfpivot.iloc[:,:20].median(axis=1)
-    df_calibrated = dfpivot.subtract(ser_startmedian, axis = 'rows')
-    df_calibrated = df_calibrated.stack().reset_index()
-    df_calibrated.rename(columns = {0: 'voltage'}, inplace=True)
-    df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
-    df_data_a['voltage'] = df_calibrated.voltage'''
     df_zeroed = df_data
     return df_zeroed
 

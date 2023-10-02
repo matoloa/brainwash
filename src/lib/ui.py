@@ -1112,6 +1112,17 @@ class UIsub(Ui_MainWindow):
             # TODO: Make it import the missing file
             print("Unknown number of sweeps - not imported?")
             return
+        
+        # Open window
+        self.measure = QtWidgets.QDialog()
+        self.measure_window_sub = Measure_window_sub(self.measure)
+        window_name = (recording_name + ",_ch" + str(channel) + ", st" + stim)
+        self.measure.setWindowTitle(window_name)
+        self.measure.show()
+
+        # TODO: dysfunctional attempt to clear graphs before calculating contents, so that the last version of the window does not linger
+        self.measure_window_sub.clearGraphs()
+
         dfmean = self.get_dfmean(ser_table_row)
         # Analysis.py
         all_t = analysis.find_all_t(dfmean=dfmean, verbose=verbose)
@@ -1131,12 +1142,6 @@ class UIsub(Ui_MainWindow):
         dfmean["prim"] = dfmean.prim / dfmean.prim.abs().max()
         dfmean["bis"] = dfmean.bis / dfmean.bis.abs().max()
 
-        # Open window
-        self.measure = QtWidgets.QDialog()
-        self.measure_window_sub = Measure_window_sub(self.measure)
-        window_name = (recording_name + ",_ch" + str(channel) + ", st" + stim)
-        self.measure.setWindowTitle(window_name)
-        self.measure.show()
         self.measure_window_sub.setMeasureGraph(recording_name, dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
 
         # TODO: Placeholder functionality for loading analysis.buildResultFile()
@@ -1151,8 +1156,8 @@ class UIsub(Ui_MainWindow):
         df_result = analysis.build_df_result(df_data=df_data, t_EPSP_amp=t_EPSP_amp)
         df_result.reset_index(inplace=True)
         print(recording_name, channel, stim)
+        
         self.measure_window_sub.setOutputGraph(df_result=df_result)
-
         
             
     @QtCore.pyqtSlot(list)
@@ -1309,13 +1314,25 @@ class Measure_window_sub(Ui_measure_window):
             print("setOutputGraph", df_result)
         self.canvas_seaborn = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
 
-        # fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
         g = sns.lineplot(data=df_result, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn.axes, color="black")
-
         self.canvas_seaborn.axes.set_ylim(-0.0015, 0)
 
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
+
+    def clearGraphs(self): # TODO: is supposed to CLEAR both graphs. It doesn't.
+        if verbose:
+            print("ClearGraphs()")
+        self.canvas_seaborn_mean = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
+        self.canvas_seaborn_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
+
+        self.canvas_seaborn_mean.axes.cla()
+        self.canvas_seaborn_output.axes.cla()
+
+        self.canvas_seaborn_mean.draw()
+        self.canvas_seaborn_output.draw()
+        self.canvas_seaborn_mean.show()
+        self.canvas_seaborn_output.show()
 
 
 def get_signals(source):
