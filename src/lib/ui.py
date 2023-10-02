@@ -498,7 +498,6 @@ class UIsub(Ui_MainWindow):
         self.project_cfg_yaml = self.projectfolder / "project_cfg.yaml"
         self.delete_locked = True
         self.list_groups = []
-        self.dict_groups = {"button_name": "group_name"}
         if self.project_cfg_yaml.exists():
             with self.project_cfg_yaml.open("r") as file:
                 project_cfg = yaml.safe_load(file)
@@ -674,24 +673,10 @@ class UIsub(Ui_MainWindow):
 
 # Non-button event functions
 
-    def showSelected(self, rows):
-        df_p = self.df_project
-        dfSelection = df_p.loc[rows]
-        dfFiltered = dfSelection[dfSelection["sweeps"] != "..."]
-        if not dfFiltered.empty:
-            self.setGraph(dfFiltered)
-        else:
-            print("Selection not analyzed.")
-
     def tableProjSelectionChanged(self):
         selected_rows = self.listSelectedRows()
-        if 0 < len(selected_rows):
-            self.showSelected(rows=selected_rows)
-            return
-        else:
-            print("No rows selected.")
-        # if the file isn't imported, or no file selected, clear the mean graph
-        self.clearGraph()
+        df_selection = self.df_project.loc[selected_rows]
+        self.setGraph(df = df_selection)
 
     def tableProjDoubleClicked(self):
         self.launchMeasureWindow()
@@ -1106,21 +1091,36 @@ class UIsub(Ui_MainWindow):
             self.canvas_seaborn_mean.draw()
             self.canvas_seaborn_mean.show()
 
-    def setGraph(self, df): # plot selected rows, add prim and bis if only one
+    def setGraph(self, df): # plot selected row(s), or clear graph if empty
+        print(f"df.shape[0]: {df.shape[0]}")
         self.canvas_seaborn_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
         self.canvas_seaborn_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for MeanGroups
-        for i, row in df.iterrows(): # TODO: i to be used later for cycling colours?
-            dfmean = self.get_dfmean(row=row)
-            dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
-            g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
-            dfoutput = self.get_dfoutput(row=row)
-            h = sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
-        #g = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
-        if False:#df.shape[0] == 1: # if just one row is selected, also show prim and bis, disabled for now
-            dfmean["prim"] = dfmean.prim / dfmean.prim.abs().max()
-            dfmean["bis"] = dfmean.bis / dfmean.bis.abs().max()
-            h = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn_mean.axes, color="red")
-            i = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn_mean.axes, color="green")
+
+        # add groups, regardless of selection:
+        print(f"Groups: {self.list_groups}")
+        df_p = self.df_project
+        # placeholder color range:
+        list_color = ["red", "green", "blue", "yellow"]
+        for color, group in enumerate(self.list_groups):
+            df_group = df_p[df_p['groups'].str.split(',').apply(lambda x: group in x)]
+            for i, row in df_group.iterrows():
+                dfoutput = self.get_dfoutput(row=row)
+                sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[color])
+    
+        if df.shape[0] == 0:
+            self.canvas_seaborn_mean.axes.cla()
+        else:
+            df_filtered = df[df["sweeps"] != "..."]
+            if df_filtered.empty:
+                print("Selection not analyzed.")
+            else:
+                for i, row in df_filtered.iterrows(): # TODO: i to be used later for cycling colours?
+                    dfmean = self.get_dfmean(row=row)
+                    dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
+                    sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
+                    # add results of selected row(s):
+                    dfoutput = self.get_dfoutput(row=row)
+                    sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
 
         self.canvas_seaborn_mean.axes.set_xlim(self.graph_xlim)
         self.canvas_seaborn_mean.axes.set_ylim(self.graph_ylim)
