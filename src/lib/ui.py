@@ -7,7 +7,7 @@ import matplotlib
 
 # import matplotlib.pyplot as plt # TODO: use instead of matplotlib for smaller import?
 import seaborn as sns
-import scipy.stats as stats
+#import scipy.stats as stats
 
 import pandas as pd
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -1087,18 +1087,32 @@ class UIsub(Ui_MainWindow):
         if key_group in self.dict_group_means:
             return self.dict_group_means[key_group]
         else:
-            df_p = self.df_project
-            df_group = df_p[df_p['groups'].str.split(',').apply(lambda x: key_group in x)]
-            dfs = []
-            for i, row in df_group.iterrows():
-                df = self.get_dfoutput(row=row)
-                dfs.append(df)
-            dfs = pd.concat(dfs)
-            group_mean = dfs.groupby('sweep')['EPSP_amp'].agg(['mean', 'sem']).reset_index()
-            group_mean.columns = ['sweep', 'EPSP_amp_mean', 'EPSP_amp_sem']
+            group_path = Path(self.projectfolder / (key_group + ".csv"))
+            if group_path.exists():
+                if verbose:
+                    print("Loading stored", str(group_path))
+                group_mean = pd.read_csv(str(group_path))
+            else:
+                if verbose:
+                    print("Building new", str(group_path))
+                df_p = self.df_project
+                df_group = df_p[df_p['groups'].str.split(',').apply(lambda x: key_group in x)]
+                dfs = []
+                for i, row in df_group.iterrows():
+                    df = self.get_dfoutput(row=row)
+                    dfs.append(df)
+                dfs = pd.concat(dfs)
+                group_mean = dfs.groupby('sweep')['EPSP_amp'].agg(['mean', 'sem']).reset_index()
+                group_mean.columns = ['sweep', 'EPSP_amp_mean', 'EPSP_amp_sem']
             print(f"group_mean: {group_mean}")
             self.dict_group_means[key_group] = group_mean
-            return self.dict_group_means[key_group]        
+            self.save_dict(dict2save=self.dict_group_means)
+            return self.dict_group_means[key_group]
+
+    def save_dict(self, dict2save): # writes dict to .csv
+        for keyword, df in dict2save.items():
+            filepath = f'{self.projectfolder / keyword}.csv'
+            df.to_csv(filepath, index=False)
 
 
 # Graph handling
