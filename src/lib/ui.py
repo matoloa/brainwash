@@ -613,7 +613,7 @@ class UIsub(Ui_MainWindow):
                     print("created", new_group_name)
                     break
             self.write_project_cfg()
-            self.addGroup(new_group_name)
+            self.addGroupButton(new_group_name)
         else:
             print("Maximum of 12 groups allowed for now.")
 
@@ -801,6 +801,7 @@ class UIsub(Ui_MainWindow):
                     parse.persistdf(recording_name=recording_name, proj_folder=self.projectfolder, dfdata=purged_df, dfmean=purged_dfmean)
             # Regardless of whether or not there was a file, purge the row from df_project
             self.clearGraph()
+            self.setGraph()
             df_p.drop(selected_rows, inplace=True)
             if files_to_purge: # unlink any files that are no longer in df_p
                 set_files_after_purge = set(df_p['recording_name'])
@@ -853,12 +854,7 @@ class UIsub(Ui_MainWindow):
 
 # Data Group functions
 
-    def addGroup(self, new_group_name):
-        if verbose:
-            print("addGroupButton")
-        self.addGroupButton(new_group_name)
-
-    def addGroupButton(self, group):
+    def addGroupButton(self, group): # Create a new group button
         self.new_button = QtWidgets.QPushButton(group, self.centralwidget)
         self.new_button.setObjectName(group)
         self.new_button.clicked.connect(lambda _, button_name=group: self.pushedGroupButton(group))
@@ -874,6 +870,7 @@ class UIsub(Ui_MainWindow):
 
     def addToGroup(self, add_group):
         # Assign all selected files to group "add_group" unless they already belong to that group
+        # Kill dict_group_means and csv
         selected_rows = self.listSelectedRows()
         if 0 < len(selected_rows):
             list_group = ""
@@ -890,15 +887,37 @@ class UIsub(Ui_MainWindow):
                         print(f"{self.df_project.loc[i, 'recording_name']}, channel {self.df_project.loc[i, 'channel']}, stim {self.df_project.loc[i, 'stim']} is already in {add_group}")
                 self.save_df_project()
                 self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
+            self.purgeGroupCache(add_group)
+            df_selection = self.df_project.loc[selected_rows]
+            self.setGraph(df = df_selection)
         else:
             print("No files selected.")
 
+    def purgeGroupCache(self, group): # clear cache so that a new group mean is calculated
+        if verbose:
+            print(f'purgeGroupCache({group})')
+        if group in self.dict_group_means:
+            self.dict_group_means.pop(group)
+        path_group_cache = Path(f'{self.cachefolder}/{group}.csv')
+        if path_group_cache.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
+            print("File found when checking for existence...")
+            try:
+                path_group_cache.unlink()
+                print("...and was successfully unlinked.")
+            except FileNotFoundError:
+                print("...but NOT when attempting to unlink.")
+
     def clearGroupsByRow(self, rows):
+        list_affected_groups = ' '.join(self.df_project.iloc[rows]['groups'])
+        affected_groups = set(re.findall(r'\b\w+\b', list_affected_groups))
         for i in rows:
             self.df_project.loc[i, "groups"] = " "
+        for group in affected_groups:
+            self.purgeGroupCache(group)
         self.save_df_project()
         self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
         self.clearGraph()
+        self.setGraph()
 
 
 # writer functions
@@ -1139,7 +1158,7 @@ class UIsub(Ui_MainWindow):
             self.canvas_seaborn_mean.draw()
             self.canvas_seaborn_mean.show()
 
-    def setGraph(self, df): # plot selected row(s), or clear graph if empty
+    def setGraph(self, df=None): # plot selected row(s), or clear graph if empty
         #print(f"df.shape[0]: {df.shape[0]}")
         self.canvas_seaborn_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
         self.canvas_seaborn_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for MeanGroups
@@ -1429,5 +1448,5 @@ if __name__ == "__main__":
     MainWindow = QtWidgets.QMainWindow()
     ui = UIsub(MainWindow)
     MainWindow.show()
-
+    ui.setGraph()
     sys.exit(app.exec_())
