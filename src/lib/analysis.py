@@ -109,7 +109,7 @@ def find_i_EPSP_peak_max(
 # %%
 def find_i_VEB_prim_peak_max(
     dfmean,
-    i_Stim,
+    i_stim,
     i_EPSP,
     param_minimum_width_of_EPSP=5,  # ms
     param_minimum_width_of_VEB=1,  # ms
@@ -130,7 +130,7 @@ def find_i_VEB_prim_peak_max(
         print(f" . . . sampling_Hz: {sampling_Hz}")
 
     # convert time constraints (where to look for the VEB) to indexes
-    minimum_acceptable_i_for_VEB = int(i_Stim + 0.001 * sampling_Hz)  # The VEB is not within a ms of the i_stim
+    minimum_acceptable_i_for_VEB = int(i_stim + 0.001 * sampling_Hz)  # The VEB is not within a ms of the i_stim
     max_acceptable_i_for_VEB = int(
         i_EPSP - np.floor((param_minimum_width_of_EPSP * 0.001 * sampling_Hz) / 2)
     )  # 0.001 for ms to seconds, *sampling_Hz for seconds to recorded points
@@ -186,7 +186,7 @@ def find_i_EPSP_slope(dfmean, i_VEB, i_EPSP, happy=False):
 
 
 # %%
-def find_i_volleyslope(dfmean, i_Stim, i_VEB, happy=False):  # , param_half_slope_width = 4):
+def find_i_volleyslope(dfmean, i_stim, i_VEB, happy=False):  # , param_half_slope_width = 4):
     """
     DOES NOT USE WIDTH! decided by rolling, earlier?
 
@@ -195,20 +195,20 @@ def find_i_volleyslope(dfmean, i_Stim, i_VEB, happy=False):  # , param_half_slop
         if several are found, it returns the latest one
     """
 
-    dftemp = dfmean.bis[i_Stim:i_VEB]
+    dftemp = dfmean.bis[i_stim:i_VEB]
     i_volleyslope = dftemp[0 < dftemp.apply(np.sign).diff()].index.values
     # print(dftemp.apply(np.sign).diff())
     # print(i_volleyslope)
     if 1 < len(i_volleyslope):
         if not happy:
-            raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[i_Stim: i_VEB]:{i_volleyslope}")
+            raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[i_stim: i_VEB]:{i_volleyslope}")
         else:
             print("More volleys than than we wanted but Im happy, so I pick one and move on.")
     return i_volleyslope[0]
 
 
 # %%
-def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
+def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
     """
     runs all index-detections in the appropriate sequence,
     The function finds VEB, but does not currently report it
@@ -216,19 +216,19 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     Returns a dict of all DETECTED indices: point for amp(litudes), center for slopes.
     """
 
-    i_Stim = np.nan
+    i_stim = np.nan
     i_EPSP_amp = np.nan
     i_VEB = np.nan
     i_EPSP_slope = np.nan
-    i_Stim = find_i_stim_prim_max(dfmean)
+    i_stim = find_i_stim_prim_max(dfmean)
     if verbose:
-        print(f"i_Stim:{i_Stim}")
-    if i_Stim is not np.nan:
+        print(f"i_stim:{i_stim}")
+    if i_stim is not np.nan:
         i_EPSP_amp = find_i_EPSP_peak_max(dfmean)
         if verbose:
             print(f"i_EPSP_amp:{i_EPSP_amp}")
         if i_EPSP_amp is not np.nan:
-            i_VEB = find_i_VEB_prim_peak_max(dfmean, i_Stim, i_EPSP_amp)
+            i_VEB = find_i_VEB_prim_peak_max(dfmean, i_stim, i_EPSP_amp)
             if verbose:
                 print(f"i_VEB:{i_VEB}")
             if i_VEB is not np.nan:
@@ -239,12 +239,12 @@ def find_all_i(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
 
     """
     i_volleyslope = find_i_volleyslope(
-        dfmean, (i_Stim + param_min_time_from_i_Stim), i_VEB, happy=True
+        dfmean, (i_stim + param_min_time_from_i_stim), i_VEB, happy=True
     )
     """
 
     # TODO: change return to {}
-    return {"i_Stim": i_Stim, "i_VEB": i_VEB, "i_EPSP_amp": i_EPSP_amp, "i_EPSP_slope": i_EPSP_slope}
+    return {"i_stim": i_stim, "i_VEB": i_VEB, "i_EPSP_amp": i_EPSP_amp, "i_EPSP_slope": i_EPSP_slope}
 
 
 # %%
@@ -258,7 +258,7 @@ def i2t(dfmean, dict_i, verbose=False):
 
 
 # %%
-def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
+def find_all_t(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
     """
     Acquires indices via find_all_t() for the provided dfmean and converts them to time values
     Returns a dict of all t-values provided by find_all_t()
@@ -266,7 +266,7 @@ def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     if verbose:
         print("find_all_t")
     #print(f' . dfmean: {dfmean}')
-    dict_i = find_all_i(dfmean, param_min_time_from_i_Stim=0.0005)
+    dict_i = find_all_i(dfmean, param_min_time_from_i_stim=0.0005)
     dict_t = {}
     for k, v in dict_i.items():
         k_new = "t" + k[1:]

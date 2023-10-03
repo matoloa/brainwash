@@ -1078,11 +1078,7 @@ class UIsub(Ui_MainWindow):
             if Path(str_output_path).exists():
                 dfoutput = pd.read_csv(str_output_path)
             else:
-                dfdata = self.get_dfdata(row=row)
-                dfmean = self.get_dfmean(row=row)
-                all_t = analysis.find_all_t(dfmean=dfmean, verbose=verbose)
-                t_EPSP_amp = all_t["t_EPSP_amp"]
-                dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=t_EPSP_amp)
+                dfoutput = self.defaultOutput(row=row)
                 dfoutput.reset_index(inplace=True)
             self.dict_outputs[key_output] = dfoutput
             self.save_dict(dict2save=self.dict_outputs)
@@ -1135,7 +1131,7 @@ class UIsub(Ui_MainWindow):
                 dfs = pd.concat(dfs)
                 group_mean = dfs.groupby('sweep')['EPSP_amp'].agg(['mean', 'sem']).reset_index()
                 group_mean.columns = ['sweep', 'EPSP_amp_mean', 'EPSP_amp_sem']
-            print(f"group_mean: {group_mean}")
+            #print(f"group_mean: {group_mean}")
             self.dict_group_means[key_group] = group_mean
             self.save_dict(dict2save=self.dict_group_means)
             return self.dict_group_means[key_group]
@@ -1145,6 +1141,29 @@ class UIsub(Ui_MainWindow):
             self.cachefolder.mkdir(exist_ok=True) 
             filepath = f'{self.cachefolder}/{keyword}.csv'
             df.to_csv(filepath, index=False)
+
+
+# Default_output
+    def defaultOutput(self, row): # TODO: WIP; not updating df_project properly yet
+        '''
+        Generates default results for row (in self.df_project)
+        Stores timepoints, methods and params in their designated columns in self.df_project
+        Returns a df of the results: amplitudes and slopes
+        '''
+        print(f'defaultOutput({row}):')
+        dfdata = self.get_dfdata(row=row)
+        dfmean = self.get_dfmean(row=row)
+        dict_t = analysis.find_all_t(dfmean=dfmean, verbose=False)
+        df_p = self.df_project
+        for key, values in dict_t.items():
+            if key in row:
+                df_p.iloc[row.name][key] = values
+                print(f'Key: {key} now set to {values}')
+        print(self.df_project)
+        return analysis.build_dfoutput(dfdata=dfdata,
+                                       t_EPSP_amp=dict_t["t_EPSP_amp"],
+                                       t_EPSP_slope=dict_t["t_EPSP_slope"])
+
 
 
 # Graph handling
@@ -1237,18 +1256,16 @@ class UIsub(Ui_MainWindow):
         self.measure.show()
 
         dfmean = self.get_dfmean(ser_table_row)
-        # Analysis.py
-        all_t = analysis.find_all_t(dfmean=dfmean, verbose=verbose)
+        # analysis.py
+        dict_t = analysis.find_all_t(dfmean=dfmean, verbose=verbose)
         # Break out to variables
-        t_VEB = all_t["t_VEB"]
-        t_EPSP_amp = all_t["t_EPSP_amp"]
-        t_EPSP_slope = all_t["t_EPSP_slope"]
+        t_VEB = dict_t["t_VEB"]
+        t_EPSP_amp = dict_t["t_EPSP_amp"]
+        t_EPSP_slope = dict_t["t_EPSP_slope"]
         # Store variables in self.df_project
         self.df_project.loc[row_index, "t_VEB"] = t_VEB
         self.df_project.loc[row_index, "t_EPSP_amp"] = t_EPSP_amp
         self.df_project.loc[row_index, "t_EPSP_slope"] = t_EPSP_slope
-        
-        print(f"t_EPSP_amp: {t_EPSP_amp}")
 
         # zero Y
         dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
