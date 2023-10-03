@@ -107,7 +107,8 @@ def builddfmean(df, rollingwidth=3):
     dfs = []
     for channel in df.channel.unique():
         for stim in df.stim.unique():
-            dfmean = pd.DataFrame(df[(df.channel == channel) & (df.stim == stim)].pivot(columns="time", index="sweep", values="voltage").mean())
+            dfmean = pd.DataFrame(df[(df.channel == channel) & (df.stim == stim)].pivot(columns="time", index="sweep", values="voltage_raw").mean())
+            #dfmean.rename(columns={'voltage_raw': 'voltage'}, inplace=True)
             dfmean.columns = ["voltage"]
             dfmean.voltage -= dfmean.voltage.median()
             # generate diffs
@@ -118,38 +119,36 @@ def builddfmean(df, rollingwidth=3):
             dfmean['stim'] = stim
             dfs.append(dfmean)
     dfmean = pd.concat(dfs).reset_index()#drop=True)
-    #print(dfmean)
     return dfmean
 
 
-def zeroSweeps(df_data):
+def zeroSweeps(dfdata, dfmean):
     def getbool(df, channel=0, stim='a'):
         vecbool = (df['channel'] == channel) & (df['stim'] == stim)
         return vecbool
-    dfmean = builddfmean(df_data)
     
-    for channel in df_data.channel.unique():
-        for stim in df_data.stim.unique():
+    for channel in dfdata.channel.unique():
+        for stim in dfdata.stim.unique():
             i_stim = dfmean[getbool(dfmean, channel=channel, stim=stim)].reset_index().prim.idxmax()
             #print(f"i_stim: {i_stim}")
-            dfpivot = df_data[getbool(df_data, channel=channel, stim=stim)].pivot(index='sweep', columns='time', values='voltage')
+            dfpivot = dfdata[getbool(dfdata, channel=channel, stim=stim)].pivot(index='sweep', columns='time', values='voltage_raw')
             sermedians = dfpivot.iloc[:, i_stim-10:i_stim-5].median(axis=1)
             #print(f"sermedians: {sermedians}")
             dfpivot = dfpivot.subtract(sermedians, axis='rows')
-            df_data.loc[getbool(df_data, channel=channel, stim=stim), 'voltage'] = dfpivot.stack().reset_index().sort_values(by=['sweep', 'time'])[0].values
-    df_zeroed = df_data
+            dfdata.loc[getbool(dfdata, channel=channel, stim=stim), 'voltage'] = dfpivot.stack().reset_index().sort_values(by=['sweep', 'time'])[0].values
+    df_zeroed = dfdata
     return df_zeroed
 
 
 # %%
-def assignStimAndSweep(df_data, list_stims):
-    # sets stim-column, sorts df_data and builds new dfmean
+def assignStimAndSweep(dfdata, list_stims):
+    # sets stim-column, sorts dfdata and builds new dfmean
     if verbose:
-        print(f" - assignStimAndSweep, channels:{df_data.channel.unique()}, list_stims: {list_stims}")
+        print(f" - assignStimAndSweep, channels:{dfdata.channel.unique()}, list_stims: {list_stims}")
     nstims = len(list_stims)
-    nchannels = df_data.channel.nunique()
-    sweeplength = df_data.time.nunique()
-    dfcopy = df_data.copy()
+    nchannels = dfdata.channel.nunique()
+    sweeplength = dfdata.time.nunique()
+    dfcopy = dfdata.copy()
     dfcopy = dfcopy.sort_values(by=['datetime', 'channel']).reset_index(drop=True)
     dfcopy['sweep_raw'] = dfcopy.index.to_numpy() // (sweeplength * nchannels)
     dfs = []
@@ -209,9 +208,9 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
                 print(" - - default: two stims per channel")
                 list_stims=["a", "b"]
 
-        df = assignStimAndSweep(df_data = df, list_stims=list_stims)
-        df = zeroSweeps(df_data = df)
-        dfmean = builddfmean(df)  # duplicate build? also done in zeroSweeps
+        df = assignStimAndSweep(dfdata = df, list_stims=list_stims)
+        dfmean = builddfmean(df)
+        df = zeroSweeps(dfdata = df, dfmean=dfmean)
         persistdf(recording_name, proj_folder, dfdata=df, dfmean=dfmean)
         dictmeta = {'channel': df.channel.unique(), 'stim': df.stim.unique(), 'sweeps': df.sweep.nunique()}
         return dictmeta

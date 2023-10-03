@@ -1052,13 +1052,13 @@ class UIsub(Ui_MainWindow):
         if key_output in self.dict_outputs:
             return self.dict_outputs[key_output]
         else:
-            df_data = self.get_dfdata(row)
+            dfdata = self.get_dfdata(row)
             all_t = analysis.find_all_t(dfmean=self.get_dfmean(row=row), verbose=verbose)
             t_EPSP_amp = all_t["t_EPSP_amp"]
-            df_result = analysis.build_df_result(df_data=df_data, t_EPSP_amp=t_EPSP_amp)
-            df_result.reset_index(inplace=True)
+            dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=t_EPSP_amp)
+            dfoutput.reset_index(inplace=True)
 
-            self.dict_outputs[key_output] = df_result
+            self.dict_outputs[key_output] = dfoutput
             return self.dict_outputs[key_output]
         
     def get_dfdata(self, row):
@@ -1075,11 +1075,11 @@ class UIsub(Ui_MainWindow):
             if not file_path.exists():
                 print(f"Error: {file_path} not found.")
                 return
-            df_datafile = pd.read_csv(file_path)
-            df_data = df_datafile[(df_datafile['channel']==channel) & (df_datafile['stim']==stim)].copy()
-            df_data.reset_index(inplace=True)
+            dfdata_file = pd.read_csv(file_path)
+            dfdata = dfdata_file[(dfdata_file['channel']==channel) & (dfdata_file['stim']==stim)].copy()
+            dfdata.reset_index(inplace=True)
 
-            self.dict_datas[key_data] = df_data
+            self.dict_datas[key_data] = dfdata
             return self.dict_datas[key_data]
         
     def get_df_groupmean(self, key_group):
@@ -1134,11 +1134,17 @@ class UIsub(Ui_MainWindow):
         # add groups, regardless of selection:
         # print(f"Groups: {self.list_groups}")
         list_color = ["red", "green", "blue", "yellow"] # TODO: placeholder color range
+        df_p = self.df_project
         for color, group in enumerate(self.list_groups):
+            df_group = df_p[df_p['groups'].str.split(',').apply(lambda x: group in x)]
+            if df_group.empty:
+                if verbose:
+                    print(f"No data in group {group}")
+                break
             df_group_mean = self.get_df_groupmean(key_group=group)
-            # TODO: Errorbars: do I have
+            # TODO: Errorbars, EPSP_amp_SEM is already a column in df
             sns.lineplot(data=df_group_mean, y="EPSP_amp_mean", x="sweep", ax=self.canvas_seaborn_output.axes, 
-                         color=list_color[color])            
+                        color=list_color[color])            
 
         if df.shape[0] == 0:
             self.canvas_seaborn_mean.axes.cla()
@@ -1223,13 +1229,13 @@ class UIsub(Ui_MainWindow):
         if not file_path.exists():
             print(f"Error: {file_path} not found.")
             return
-        df_data = self.get_dfdata(row=ser_table_row)
+        dfdata = self.get_dfdata(row=ser_table_row)
 
-        df_result = analysis.build_df_result(df_data=df_data, t_EPSP_amp=t_EPSP_amp)
-        df_result.reset_index(inplace=True)
+        dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=t_EPSP_amp)
+        dfoutput.reset_index(inplace=True)
         print(recording_name, channel, stim)
         
-        self.measure_window_sub.setOutputGraph(df_result=df_result)
+        self.measure_window_sub.setOutputGraph(dfoutput=dfoutput)
         
             
     @QtCore.pyqtSlot(list)
@@ -1379,14 +1385,14 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
 
-    def setOutputGraph(self, df_result):
-        # get df_result from selected row in UIsub.
+    def setOutputGraph(self, dfoutput):
+        # get dfoutput from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
         if verbose:
-            print("setOutputGraph", df_result)
+            print("setOutputGraph", dfoutput)
         self.canvas_seaborn = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
 
-        g = sns.lineplot(data=df_result, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn.axes, color="black")
+        g = sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn.axes, color="black")
         self.canvas_seaborn.axes.set_ylim(-0.0015, 0)
 
         self.canvas_seaborn.draw()
