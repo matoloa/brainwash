@@ -1082,12 +1082,12 @@ class UIsub(Ui_MainWindow):
             self.dict_datas[key_data] = dfdata
             return self.dict_datas[key_data]
         
-    def get_df_groupmean(self, key_group):
+    def get_dfgroupmean(self, key_group):
         # returns an internal df output average of <group>. If it does not exist, create it
         if key_group in self.dict_group_means:
             return self.dict_group_means[key_group]
         else:
-            group_path = Path(self.projectfolder / (key_group + ".csv"))
+            group_path = Path(f'{self.projectfolder}/cache/{key_group}.csv')
             if group_path.exists():
                 if verbose:
                     print("Loading stored", str(group_path))
@@ -1096,9 +1096,9 @@ class UIsub(Ui_MainWindow):
                 if verbose:
                     print("Building new", str(group_path))
                 df_p = self.df_project
-                df_group = df_p[df_p['groups'].str.split(',').apply(lambda x: key_group in x)]
+                dfgroup = df_p[df_p['groups'].str.split(',').apply(lambda x: key_group in x)]
                 dfs = []
-                for i, row in df_group.iterrows():
+                for i, row in dfgroup.iterrows():
                     df = self.get_dfoutput(row=row)
                     dfs.append(df)
                 dfs = pd.concat(dfs)
@@ -1111,7 +1111,9 @@ class UIsub(Ui_MainWindow):
 
     def save_dict(self, dict2save): # writes dict to .csv
         for keyword, df in dict2save.items():
-            filepath = f'{self.projectfolder / keyword}.csv'
+            path_cache = Path(f'{self.projectfolder}/cache')
+            path_cache.mkdir(exist_ok=True) 
+            filepath = f'{path_cache}/{keyword}.csv'
             df.to_csv(filepath, index=False)
 
 
@@ -1136,14 +1138,14 @@ class UIsub(Ui_MainWindow):
         list_color = ["red", "green", "blue", "yellow"] # TODO: placeholder color range
         df_p = self.df_project
         for color, group in enumerate(self.list_groups):
-            df_group = df_p[df_p['groups'].str.split(',').apply(lambda x: group in x)]
-            if df_group.empty:
+            dfgroup = df_p[df_p['groups'].str.split(',').apply(lambda x: group in x)]
+            if dfgroup.empty:
                 if verbose:
                     print(f"No data in group {group}")
                 break
-            df_group_mean = self.get_df_groupmean(key_group=group)
+            dfgroup_mean = self.get_dfgroupmean(key_group=group)
             # TODO: Errorbars, EPSP_amp_SEM is already a column in df
-            sns.lineplot(data=df_group_mean, y="EPSP_amp_mean", x="sweep", ax=self.canvas_seaborn_output.axes, 
+            sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=self.canvas_seaborn_output.axes, 
                         color=list_color[color])            
 
         if df.shape[0] == 0:

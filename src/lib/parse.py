@@ -22,7 +22,7 @@ dir_source_data = dir_project_root / "dataSource" / "Lactate_2022_abf"
 dir_gen_data = dir_project_root / "dataGenerated"
 
 
-def buildexperimentcsv(dir_gen_data):
+def build_experimentcsv(dir_gen_data):
     """
     Generate overview file of all csv:s
     Assumes no such file exists
@@ -94,7 +94,7 @@ def parse_abfFolder(folderpath):
 
 
 # %%
-def builddfmean(df, rollingwidth=3):
+def build_dfmean(df, rollingwidth=3):
     # TODO: is rollingwidth "radius" or "diameter"?
     """
     dfmean.voltate(V) (a single sweep built on the mean of all time)
@@ -184,7 +184,7 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
     returns a dict of channels and stims, used by ui.py to split a single file with multiple channels
 
     NTH: checks if file is already parsed by checksums
-    calls builddfmean() to create an average, prim and bis file, per channel-stim combo
+    calls build_dfmean() to create an average, prim and bis file, per channel-stim combo
     """
 
     def parser(proj_folder, recording_name, source_path):
@@ -209,7 +209,7 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
                 list_stims=["a", "b"]
 
         df = assignStimAndSweep(dfdata = df, list_stims=list_stims)
-        dfmean = builddfmean(df)
+        dfmean = build_dfmean(df)
         df = zeroSweeps(dfdata = df, dfmean=dfmean)
         persistdf(recording_name, proj_folder, dfdata=df, dfmean=dfmean)
         dictmeta = {'channel': df.channel.unique(), 'stim': df.stim.unique(), 'sweeps': df.sweep.nunique()}
