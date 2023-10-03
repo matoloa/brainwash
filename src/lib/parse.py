@@ -222,23 +222,13 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
 
     if verbose:
         print(f"proj folder: {proj_folder}")
-    if source_path is not None:
-        print(f"recording_name: {recording_name}")
-        print(f"source_path: {source_path}")
-    if df is not None:
-        print(f"recording_name: {df['recording_name']}")
-        print(f"path: {df['path']}")
+        if source_path is not None:
+            print(f"recording_name: {recording_name}")
+            print(f"source_path: {source_path}")
+        if df is not None:
+            print(f"recording_name: {df['recording_name']}")
+            print(f"path: {df['path']}")
 
-    # check for files in the folder.
-    path_proj_folder = Path(proj_folder)
-    path_proj_folder.mkdir(exist_ok=True)  # Try to make a folder
-
-    # list_existingfiles = [
-    #    i for i in path_proj_folder.iterdir() if -1 < i.find("_mean.csv")
-    # ]
-    # list found files
-    # print(list_existingfiles)
-    # remove the found files from the parse que
     if recording_name is not None:
         dictmeta = parser(proj_folder, recording_name=recording_name, source_path=source_path)
         return dictmeta

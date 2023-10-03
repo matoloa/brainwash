@@ -486,6 +486,8 @@ class UIsub(Ui_MainWindow):
         self.tableProj.setModel(self.tablemodel)
 
         self.projectfolder = self.projects_folder / self.projectname
+        self.datafolder = self.projectfolder / "data"
+        self.cachefolder = self.projectfolder / "cache"
         # If projectfile exists, load it, otherwise create it
         if Path(self.projectfolder / "project.brainwash").exists():
             self.load_df_project()
@@ -546,9 +548,6 @@ class UIsub(Ui_MainWindow):
         self.tableProj.doubleClicked.connect(self.tableProjDoubleClicked)
         selection_model = self.tableProj.selectionModel()
         selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
-
-        # place current project as folder in project_root, lock project name for now
-        # self.projectfolder = self.project_root / self.project
 
 # Placeholder tuples (zoom for graphs)
     graph_xlim = (0.006, 0.020)
@@ -740,15 +739,15 @@ class UIsub(Ui_MainWindow):
             row = selected_rows[0]
             df_p = self.df_project
             old_recording_name = df_p.at[row,'recording_name']
-            old_data = self.projectfolder / (old_recording_name + ".csv")
-            old_mean = self.projectfolder / (old_recording_name + "_mean.csv")
+            old_data = self.datafolder / (old_recording_name + ".csv")
+            old_mean = self.cachefolder / (old_recording_name + "_mean.csv")
             RenameDialog = InputDialogPopup()
             new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query='')
             if re.match(r'^[a-zA-Z0-9_-]+$', str(new_recording_name)) is not None: # check if valid filename
                 list_recording_names = set(df_p['recording_name'])
                 if not new_recording_name in list_recording_names: # prevent duplicates
-                    new_data = self.projectfolder / (new_recording_name + ".csv")
-                    new_mean = self.projectfolder / (new_recording_name + "_mean.csv")
+                    new_data = self.datafolder / (new_recording_name + ".csv")
+                    new_mean = self.cachefolder / (new_recording_name + "_mean.csv")
                     if old_data.exists() & old_mean.exists():
                         if verbose:
                             print(f"rename_data: {old_data} to {new_data}")
@@ -787,12 +786,12 @@ class UIsub(Ui_MainWindow):
                     stim = df_p.at[row, 'stim']
                     if verbose:
                         print("Delete:", recording_name, channel, stim)
-                    data_path = Path(self.projectfolder / (recording_name + ".csv"))
+                    data_path = Path(self.datafolder / (recording_name + ".csv"))
                     try:
                         df = pd.read_csv(str(data_path))  # parse csv
                     except FileNotFoundError:
                         print("did not find data .csv to load. Not imported?")
-                    dfmean_path = Path(self.projectfolder / (recording_name + "_mean.csv"))
+                    dfmean_path = Path(self.cachefolder / (recording_name + "_mean.csv"))
                     try:
                         dfmean = pd.read_csv(str(dfmean_path))  # parse _mean.csv
                     except FileNotFoundError:
@@ -807,8 +806,8 @@ class UIsub(Ui_MainWindow):
                 set_files_after_purge = set(df_p['recording_name'])
                 list_delete = [item for item in set_files_before_purge if item not in set_files_after_purge]
                 for file in list_delete:
-                    delete_data = self.projectfolder / (file + ".csv")
-                    delete_mean = self.projectfolder / (file + "_mean.csv")
+                    delete_data = self.datafolder / (file + ".csv")
+                    delete_mean = self.cachefolder / (file + "_mean.csv")
                     if delete_data.exists():
                         delete_data.unlink()
                         if verbose:
@@ -1036,7 +1035,7 @@ class UIsub(Ui_MainWindow):
             recording_name = row['recording_name']
             channel = row['channel']
             stim = row['stim']
-            str_mean_path = f'{self.projectfolder}/cache/{recording_name}_mean.csv'
+            str_mean_path = f'{self.cachefolder}/{recording_name}_mean.csv'
             if Path(str_mean_path).exists():
                 dfmean = pd.read_csv(str_mean_path)
             else:
@@ -1056,7 +1055,7 @@ class UIsub(Ui_MainWindow):
         if key_output in self.dict_outputs:
             return self.dict_outputs[key_output]
         else:
-            str_output_path = f'{self.projectfolder}/cache/{key_output}.csv'
+            str_output_path = f'{self.cachefolder}/{key_output}.csv'
             if Path(str_output_path).exists():
                 dfoutput = pd.read_csv(str_output_path)
             else:
@@ -1080,7 +1079,7 @@ class UIsub(Ui_MainWindow):
             channel = row['channel']
             stim = row['stim']
             # TODO: Placeholder functionality for loading analysis.buildResultFile()
-            path_data = Path(f'{self.projectfolder}/data/{recording_name}.csv')
+            path_data = Path(f'{self.datafolder}/{recording_name}.csv')
             try: # datafile should always exist
                 dfdata_file = pd.read_csv(path_data)
             except FileNotFoundError:
@@ -1100,7 +1099,7 @@ class UIsub(Ui_MainWindow):
         if key_group in self.dict_group_means:
             return self.dict_group_means[key_group]
         else:
-            group_path = Path(f'{self.projectfolder}/cache/{key_group}.csv')
+            group_path = Path(f'{self.cachefolder}/{key_group}.csv')
             if group_path.exists():
                 if verbose:
                     print("Loading stored", str(group_path))
@@ -1124,9 +1123,8 @@ class UIsub(Ui_MainWindow):
 
     def save_dict(self, dict2save): # writes dict to .csv
         for keyword, df in dict2save.items():
-            path_cache = Path(f'{self.projectfolder}/cache')
-            path_cache.mkdir(exist_ok=True) 
-            filepath = f'{path_cache}/{keyword}.csv'
+            self.cachefolder.mkdir(exist_ok=True) 
+            filepath = f'{self.cachefolder}/{keyword}.csv'
             df.to_csv(filepath, index=False)
 
 
@@ -1161,20 +1159,21 @@ class UIsub(Ui_MainWindow):
             sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=self.canvas_seaborn_output.axes, 
                         color=list_color[color])            
 
-        if df.shape[0] == 0:
-            self.canvas_seaborn_mean.axes.cla()
-        else:
-            df_filtered = df[df["sweeps"] != "..."]
-            if df_filtered.empty:
-                print("Selection not analyzed.")
+        if df is not None:
+            if df.shape[0] == 0:
+                self.canvas_seaborn_mean.axes.cla()
             else:
-                for i, row in df_filtered.iterrows(): # TODO: i to be used later for cycling colours?
-                    dfmean = self.get_dfmean(row=row)
-                    dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
-                    sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
-                    # add results of selected row(s):
-                    dfoutput = self.get_dfoutput(row=row)
-                    sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
+                df_filtered = df[df["sweeps"] != "..."]
+                if df_filtered.empty:
+                    print("Selection not analyzed.")
+                else:
+                    for i, row in df_filtered.iterrows(): # TODO: i to be used later for cycling colours?
+                        dfmean = self.get_dfmean(row=row)
+                        dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
+                        sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
+                        # add results of selected row(s):
+                        dfoutput = self.get_dfoutput(row=row)
+                        sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
 
         self.canvas_seaborn_mean.axes.set_xlim(self.graph_xlim)
         self.canvas_seaborn_mean.axes.set_ylim(self.graph_ylim)
@@ -1240,7 +1239,7 @@ class UIsub(Ui_MainWindow):
         self.measure_window_sub.setMeasureGraph(recording_name, dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
 
         # TODO: Placeholder functionality for loading analysis.buildResultFile()
-        file_path = Path(self.projectfolder / (recording_name + ".csv"))
+        file_path = Path(self.datafolder / (recording_name + ".csv"))
         if not file_path.exists():
             print(f"Error: {file_path} not found.")
             return
