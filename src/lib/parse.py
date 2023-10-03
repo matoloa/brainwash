@@ -164,11 +164,14 @@ def assignStimAndSweep(dfdata, list_stims):
 
 
 def persistdf(recording_name, proj_folder, dfdata=None, dfmean=None):
-    savepath = str(Path(proj_folder) / recording_name)
     if dfdata is not None:
-        dfdata.to_csv(savepath + ".csv", index=False)
+        str_data_path = f'{proj_folder}/{recording_name}.csv'
+        dfdata.to_csv(str_data_path, index=False)
     if dfmean is not None:
-        dfmean.to_csv(savepath + "_mean.csv", index=False)
+        cache_path = Path(f'{proj_folder}/cache')
+        cache_path.mkdir(exist_ok=True)
+        str_mean_path = f'{cache_path}/{recording_name}_mean.csv'
+        dfmean.to_csv(str_mean_path, index=False)
 
 
 def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=None, single_stim=False):

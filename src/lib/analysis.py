@@ -246,6 +246,7 @@ def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     """
     if verbose:
         print("find_all_t")
+    print(f' . dfmean: {dfmean}')
     dict_i = find_all_i(dfmean, param_min_time_from_i_Stim=0.0005)
     dict_t = {}
     for k, v in dict_i.items():
@@ -293,7 +294,7 @@ if __name__ == "__main__":
     from pathlib import Path
     import os
     path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/A_21_P0701-S2.csv")
-    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/A_21_P0701-S2_mean.csv")
+    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_mean.csv")
     dfdata = pd.read_csv(str(path_datafile)) # a persisted csv-form of the data file
     df_mean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
     dfdata_a = dfdata[(dfdata['stim']=='a')] # select stim 'a' only in data file

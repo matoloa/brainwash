@@ -1036,13 +1036,17 @@ class UIsub(Ui_MainWindow):
             recording_name = row['recording_name']
             channel = row['channel']
             stim = row['stim']
-            dfmean_path = self.projectfolder / (recording_name + "_mean.csv")
-            try:
-                dfmean = pd.read_csv(dfmean_path)
-            except FileNotFoundError:
-                print("did not find _mean.csv to load. Not imported?")
+            str_mean_path = f'{self.projectfolder}/cache/{recording_name}_mean.csv'
+            if Path(str_mean_path).exists():
+                dfmean = pd.read_csv(str_mean_path)
+            else:
+                dfmean = parse.build_dfmean(self.get_dfdata(row=row, all=True))
+                parse.persistdf(recording_name=recording_name, proj_folder=self.projectfolder, dfmean=dfmean)
+            #print(f'get_dfmean(stim): {stim}')
+            #print(f' . dfmean: {dfmean}')
             dfcopy = dfmean[(dfmean['channel'] == channel) & (dfmean['stim'] == stim)].copy()
             dfcopy.reset_index(inplace=True)
+            #print(f' . dfcopy: {dfcopy}')
             self.dict_means[key_mean] = dfcopy
             return self.dict_means[key_mean]
 
@@ -1052,16 +1056,16 @@ class UIsub(Ui_MainWindow):
         if key_output in self.dict_outputs:
             return self.dict_outputs[key_output]
         else:
-            dfdata = self.get_dfdata(row)
-            all_t = analysis.find_all_t(dfmean=self.get_dfmean(row=row), verbose=verbose)
+            dfdata = self.get_dfdata(row=row)
+            dfmean = self.get_dfmean(row=row)
+            all_t = analysis.find_all_t(dfmean=dfmean, verbose=verbose)
             t_EPSP_amp = all_t["t_EPSP_amp"]
             dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=t_EPSP_amp)
             dfoutput.reset_index(inplace=True)
-
             self.dict_outputs[key_output] = dfoutput
             return self.dict_outputs[key_output]
         
-    def get_dfdata(self, row):
+    def get_dfdata(self, row, all=False):
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
         key_data = self.row2key(row=row)
         if key_data in self.dict_datas:
@@ -1071,16 +1075,20 @@ class UIsub(Ui_MainWindow):
             channel = row['channel']
             stim = row['stim']
             # TODO: Placeholder functionality for loading analysis.buildResultFile()
-            file_path = Path(self.projectfolder / (recording_name + ".csv"))
-            if not file_path.exists():
-                print(f"Error: {file_path} not found.")
-                return
-            dfdata_file = pd.read_csv(file_path)
-            dfdata = dfdata_file[(dfdata_file['channel']==channel) & (dfdata_file['stim']==stim)].copy()
-            dfdata.reset_index(inplace=True)
-
-            self.dict_datas[key_data] = dfdata
-            return self.dict_datas[key_data]
+            path_data = Path(self.projectfolder / (recording_name + ".csv"))
+            try: # datafile should always exist
+                dfdata_file = pd.read_csv(path_data)
+            except FileNotFoundError:
+                print("did not find _mean.csv to load. Not imported?")
+            if all: # return all data; not just current channel and stim. Do not persist in dict.
+                dfdata = dfdata_file.copy()
+                dfdata.reset_index(inplace=True)
+                return dfdata
+            else:
+                dfdata = dfdata_file[(dfdata_file['channel']==channel) & (dfdata_file['stim']==stim)].copy()
+                dfdata.reset_index(inplace=True)
+                self.dict_datas[key_data] = dfdata
+                return self.dict_datas[key_data]
         
     def get_dfgroupmean(self, key_group):
         # returns an internal df output average of <group>. If it does not exist, create it
