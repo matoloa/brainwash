@@ -1056,13 +1056,18 @@ class UIsub(Ui_MainWindow):
         if key_output in self.dict_outputs:
             return self.dict_outputs[key_output]
         else:
-            dfdata = self.get_dfdata(row=row)
-            dfmean = self.get_dfmean(row=row)
-            all_t = analysis.find_all_t(dfmean=dfmean, verbose=verbose)
-            t_EPSP_amp = all_t["t_EPSP_amp"]
-            dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=t_EPSP_amp)
-            dfoutput.reset_index(inplace=True)
+            str_output_path = f'{self.projectfolder}/cache/{key_output}.csv'
+            if Path(str_output_path).exists():
+                dfoutput = pd.read_csv(str_output_path)
+            else:
+                dfdata = self.get_dfdata(row=row)
+                dfmean = self.get_dfmean(row=row)
+                all_t = analysis.find_all_t(dfmean=dfmean, verbose=verbose)
+                t_EPSP_amp = all_t["t_EPSP_amp"]
+                dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=t_EPSP_amp)
+                dfoutput.reset_index(inplace=True)
             self.dict_outputs[key_output] = dfoutput
+            self.save_dict(dict2save=self.dict_outputs)
             return self.dict_outputs[key_output]
         
     def get_dfdata(self, row, all=False):
@@ -1075,7 +1080,7 @@ class UIsub(Ui_MainWindow):
             channel = row['channel']
             stim = row['stim']
             # TODO: Placeholder functionality for loading analysis.buildResultFile()
-            path_data = Path(self.projectfolder / (recording_name + ".csv"))
+            path_data = Path(f'{self.projectfolder}/data/{recording_name}.csv')
             try: # datafile should always exist
                 dfdata_file = pd.read_csv(path_data)
             except FileNotFoundError:

@@ -246,7 +246,7 @@ def find_all_t(dfmean, param_min_time_from_i_Stim=0.0005, verbose=False):
     """
     if verbose:
         print("find_all_t")
-    print(f' . dfmean: {dfmean}')
+    #print(f' . dfmean: {dfmean}')
     dict_i = find_all_i(dfmean, param_min_time_from_i_Stim=0.0005)
     dict_t = {}
     for k, v in dict_i.items():

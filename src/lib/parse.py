@@ -165,12 +165,14 @@ def assignStimAndSweep(dfdata, list_stims):
 
 def persistdf(recording_name, proj_folder, dfdata=None, dfmean=None):
     if dfdata is not None:
-        str_data_path = f'{proj_folder}/{recording_name}.csv'
+        data_folder = Path(f'{proj_folder}/data')
+        data_folder.mkdir(exist_ok=True)
+        str_data_path = f'{data_folder}/{recording_name}.csv'
         dfdata.to_csv(str_data_path, index=False)
     if dfmean is not None:
-        cache_path = Path(f'{proj_folder}/cache')
-        cache_path.mkdir(exist_ok=True)
-        str_mean_path = f'{cache_path}/{recording_name}_mean.csv'
+        cache_folder = Path(f'{proj_folder}/cache')
+        cache_folder.mkdir(exist_ok=True)
+        str_mean_path = f'{cache_folder}/{recording_name}_mean.csv'
         dfmean.to_csv(str_mean_path, index=False)
 
 
