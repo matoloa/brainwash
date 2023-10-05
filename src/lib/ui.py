@@ -1195,7 +1195,7 @@ class UIsub(Ui_MainWindow):
         # print(f"Groups: {self.list_groups}")
         list_color = ["red", "green", "blue", "yellow"] # TODO: placeholder color range
         df_p = self.get_df_project()
-        for color, group in enumerate(self.list_groups):
+        for i_color, group in enumerate(self.list_groups):
             dfgroup = df_p[df_p['groups'].str.split(',').apply(lambda x: group in x)]
             if dfgroup.empty:
                 if verbose:
@@ -1203,11 +1203,14 @@ class UIsub(Ui_MainWindow):
                 break
             dfgroup_mean = self.get_dfgroupmean(key_group=group)
             # TODO: Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
-            #print(f'dfgroup_mean: {dfgroup_mean}')
+            print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
             if dfgroup_mean['EPSP_amp_mean'].notna().any():
-                sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[color])            
+                ax1 = sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[i_color])
+                ax1.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_amp_mean + dfgroup_mean.EPSP_amp_SEM, dfgroup_mean.EPSP_amp_mean - dfgroup_mean.EPSP_amp_SEM, alpha=0.3, color=list_color[i_color])               
             if dfgroup_mean['EPSP_slope_mean'].notna().any():
-                sns.lineplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[color])            
+                ax2 = sns.lineplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[i_color])
+                ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=list_color[i_color])               
+               
 
         if df is not None:
             if df.shape[0] == 0:
