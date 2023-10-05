@@ -1139,8 +1139,8 @@ class UIsub(Ui_MainWindow):
                     df = self.get_dfoutput(row=row)
                     dfs.append(df)
                 dfs = pd.concat(dfs)
-                group_mean = dfs.groupby('sweep')['EPSP_amp'].agg(['mean', 'sem']).reset_index()
-                group_mean.columns = ['sweep', 'EPSP_amp_mean', 'EPSP_amp_sem']
+                group_mean = dfs.groupby('sweep').agg({'EPSP_amp': ['mean', 'sem'], 'EPSP_slope': ['mean', 'sem']}).reset_index()
+                group_mean.columns = ['sweep', 'EPSP_amp_mean', 'EPSP_amp_SEM', 'EPSP_slope_mean', 'EPSP_slope_SEM']
             #print(f"group_mean: {group_mean}")
             self.dict_group_means[key_group] = group_mean
             self.save_dict(dict2save=self.dict_group_means)
@@ -1202,9 +1202,12 @@ class UIsub(Ui_MainWindow):
                     print(f"No data in group {group}")
                 break
             dfgroup_mean = self.get_dfgroupmean(key_group=group)
-            # TODO: Errorbars, EPSP_amp_SEM is already a column in df
-            sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=self.canvas_seaborn_output.axes, 
-                        color=list_color[color])            
+            # TODO: Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
+            #print(f'dfgroup_mean: {dfgroup_mean}')
+            if dfgroup_mean['EPSP_amp_mean'].notna().any():
+                sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[color])            
+            if dfgroup_mean['EPSP_slope_mean'].notna().any():
+                sns.lineplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[color])            
 
         if df is not None:
             if df.shape[0] == 0:
@@ -1296,7 +1299,7 @@ class UIsub(Ui_MainWindow):
             return
         dfdata = self.get_dfdata(row=ser_table_row)
 
-        dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=t_EPSP_amp)
+        dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
         dfoutput.reset_index(inplace=True)
         print(recording_name, channel, stim)
         
@@ -1427,9 +1430,9 @@ class Measure_window_sub(Ui_measure_window):
 
         # fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
         g = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
-        g = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
-        h = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
-        h.axvline(t_EPSP_amp, color="black", linestyle="--")
+        h = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
+        i = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+        i.axvline(t_EPSP_amp, color="black", linestyle="--")
 
         # t_VEB
         print(f"t_VEB: {t_VEB}")
@@ -1457,8 +1460,12 @@ class Measure_window_sub(Ui_measure_window):
             print("setOutputGraph", dfoutput)
         self.canvas_seaborn = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
 
-        g = sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn.axes, color="black")
-        self.canvas_seaborn.axes.set_ylim(-0.0015, 0)
+        if dfoutput['EPSP_amp'].notna().any():
+            sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn.axes, color="black")
+            self.canvas_seaborn.axes.set_ylim(-0.0015, 0)
+        if dfoutput['EPSP_slope'].notna().any():
+            sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_seaborn.axes, color="black")
+            self.canvas_seaborn.axes.set_ylim(-0.0015, 0)
 
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
