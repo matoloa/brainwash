@@ -279,10 +279,15 @@ def find_all_t(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
 # %%
 def measureslope(df, t_slope, halfwidth, name="EPSP"):
     """
-    Generalized function - NOT FUNCTIONAL!
+    Generalized function
     """
-    reg = linear_model.LinearRegression()
+    
+    print(f'measureslope(df: {df}, t_slope: {t_slope}, halfwidth: {halfwidth}, name="EPSP"):')
 
+    # off-challenge: this is what crashes it!
+    t_slope = 0.001
+
+    reg = linear_model.LinearRegression()
     dicts = []
     for sweep in tqdm(df.sweep.unique()): # this is just a progress indicator!
         dftemp1 = df[df.sweep == sweep]
@@ -311,12 +316,16 @@ def measureslope(df, t_slope, halfwidth, name="EPSP"):
 if __name__ == "__main__":
     print("Running as main: standalone test")
     from pathlib import Path
-    path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/A_21_P0701-S2.csv")
-    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_mean.csv")
+    path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/KO_02.csv")
+    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_mean.csv")
+    # path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/A_21_P0701-S2.csv")
+    # path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_mean.csv")
     dfdata = pd.read_csv(str(path_datafile)) # a persisted csv-form of the data file
     df_mean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
-    dfdata_a = dfdata[(dfdata['stim']=='a')] # select stim 'a' only in data file
-    df_mean_a = df_mean[(df_mean['stim']=='a')] # select stim 'a' only in mean file
+    # dfdata_a = dfdata[(dfdata['stim']=='a')] # select stim 'a' only in data file
+    # df_mean_a = df_mean[(df_mean['stim']=='a')] # select stim 'a' only in mean file
+    dfdata_a = dfdata[(dfdata['channel']==0) & (dfdata['stim']=='a')] # select stim 'a' only in data file
+    df_mean_a = df_mean[(df_mean['channel']==0) & (df_mean['stim']=='a')] # select stim 'a' only in mean file
     dict_t = find_all_t(df_mean_a) # use the average all sweeps to determine where all events are located (noise reduction)
     t_EPSP_amp = dict_t['t_EPSP_amp']
     t_EPSP_slope = dict_t['t_EPSP_slope']

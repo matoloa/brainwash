@@ -251,8 +251,8 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
 
     source_folder = Path.home() / "Documents/Brainwash Data Source/"
     proj_folder = Path.home() / "Documents/Brainwash Projects/standalone_test"
-    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2")]#,
-#                    str(source_folder / "abf 2 channel/KO_02")]
+    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"),
+                    str(source_folder / "abf 2 channel/KO_02")]
 #    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"),
 #                    str(source_folder / "abf 2 channel/KO_02/2022_01_24_0000.abf")]
     for _ in range(3):

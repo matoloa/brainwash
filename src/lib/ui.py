@@ -448,6 +448,7 @@ class UIsub(Ui_MainWindow):
         # load cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
+
         self.cfg_yaml = self.repo_root / "cfg.yaml"
         self.projectname = None
         self.inputProjectName.setReadOnly(True)
@@ -485,17 +486,25 @@ class UIsub(Ui_MainWindow):
         self.tablemodel = TableModel(self.df_project)
         self.tableProj.setModel(self.tablemodel)
 
+        self.d_folders = {
+            'project': self.projects_folder / self.projectname,
+            'data': self.projects_folder / self.projectname / 'data',
+            'cache': self.projects_folder / self.projectname / 'cache'
+        }
+
+        # deprecated paths, TODO: delete
         self.projectfolder = self.projects_folder / self.projectname
         self.datafolder = self.projectfolder / "data"
         self.cachefolder = self.projectfolder / "cache"
+
         # If projectfile exists, load it, otherwise create it
-        if Path(self.projectfolder / "project.brainwash").exists():
+        if Path(self.d_folders['project'] / "project.brainwash").exists():
             self.load_df_project()
         else:
-            self.projectname = "My Project"
+            self.d_folders['project'] = "My Project"
             self.projectfolder = self.projects_folder / self.projectname
             self.setTableDf(self.df_project)
-        self.write_cfg()
+            self.write_cfg()
 
         # Write local cfg, for storage of group colours, zoom levels etc.
         self.project_cfg_yaml = self.projectfolder / "project_cfg.yaml"
@@ -995,8 +1004,8 @@ class UIsub(Ui_MainWindow):
     def load_df_project(self): # reads fileversion of df_project to persisted self.df_project, clears graphs and saves cfg
         self.df_project = pd.read_csv(str(self.projectfolder / "project.brainwash"))
         self.setTableDf(self.df_project)  # display self.df_project to table
-        self.inputProjectName.setText(self.projectfolder.stem)  # set folder name to proj name
         self.projectname = self.projectfolder.stem
+        self.inputProjectName.setText(self.projectname)  # set folder name to proj name
         if verbose:
             print(f"loaded project df: {self.df_project}")
         self.clearGraph()
@@ -1150,8 +1159,6 @@ class UIsub(Ui_MainWindow):
         Stores timepoints, methods and params in their designated columns in self.df_project
         Returns a df of the results: amplitudes and slopes
         '''
-        if verbose:
-            print(f'defaultOutput({row}):')
         dfdata = self.get_dfdata(row=row)
         dfmean = self.get_dfmean(row=row)
         dict_t = analysis.find_all_t(dfmean=dfmean, verbose=False)
@@ -1186,7 +1193,7 @@ class UIsub(Ui_MainWindow):
         # add groups, regardless of selection:
         # print(f"Groups: {self.list_groups}")
         list_color = ["red", "green", "blue", "yellow"] # TODO: placeholder color range
-        df_p = self.df_project
+        df_p = self.get_df_project()
         for color, group in enumerate(self.list_groups):
             dfgroup = df_p[df_p['groups'].str.split(',').apply(lambda x: group in x)]
             if dfgroup.empty:
