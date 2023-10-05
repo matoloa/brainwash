@@ -14,7 +14,7 @@ memory = Memory("joblib", verbose=1)
 
 
 # %%
-def build_dfoutput(dfdata, t_EPSP_amp, t_EPSP_slope=None):#, t_volley_amp, t_volley_slope, t_volley_slope_size, output_path):
+def build_dfoutput(dfdata, t_EPSP_amp, t_EPSP_slope):#, t_volley_amp, t_volley_slope, t_volley_slope_size, output_path):
     # Incomplete function: only resolves EPSP_amp for now
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
     Args:
@@ -34,13 +34,18 @@ def build_dfoutput(dfdata, t_EPSP_amp, t_EPSP_slope=None):#, t_volley_amp, t_vol
     dfoutput = pd.DataFrame()
     dfoutput['sweep'] = dfdata.sweep.unique() # one row per unique sweep in data file
     # EPSP_amp
-    print(dfdata)
-    df_EPSP_amp = dfdata[dfdata['time']==t_EPSP_amp].copy() # filter out all time (from sweep start) that do not match t_EPSP_amp
-    df_EPSP_amp.reset_index(inplace=True)
-    dfoutput['EPSP_amp'] = df_EPSP_amp['voltage'] # add the voltage of selected times to dfoutput
+    if t_EPSP_amp is not np.nan:
+        df_EPSP_amp = dfdata[dfdata['time']==t_EPSP_amp].copy() # filter out all time (from sweep start) that do not match t_EPSP_amp
+        df_EPSP_amp.reset_index(inplace=True)
+        dfoutput['EPSP_amp'] = df_EPSP_amp['voltage'] # add the voltage of selected times to dfoutput
+    else:
+        dfoutput['EPSP_amp'] = np.nan
     # EPSP_slope
-    df_EPSP_slope = measureslope(df=dfdata, t_slope=t_EPSP_slope, halfwidth=0.0004)
-    dfoutput['EPSP_slope'] = df_EPSP_slope['value']
+    if t_EPSP_slope is not np.nan:
+        df_EPSP_slope = measureslope(df=dfdata, t_slope=t_EPSP_slope, halfwidth=0.0004)
+        dfoutput['EPSP_slope'] = df_EPSP_slope['value']
+    else:
+        dfoutput['EPSP_slope'] = np.nan
     t1 = time.time()
     print(f'time elapsed: {t1-t0} seconds')
     return dfoutput
@@ -67,7 +72,7 @@ def find_i_EPSP_peak_max(
     """
     if verbose:
         print("find_i_EPSP_peak_max:")
-    
+
     # calculate sampling frequency
     time_delta = dfmean.time[1] - dfmean.time[0]
     sampling_Hz = 1 / time_delta
@@ -213,38 +218,30 @@ def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
     runs all index-detections in the appropriate sequence,
     The function finds VEB, but does not currently report it
     TODO: also report volley amp and slope
-    Returns a dict of all DETECTED indices: point for amp(litudes), center for slopes.
+    Returns a dict of all indices, with np.nan representing detection failure.
     """
-
-    i_stim = np.nan
-    i_EPSP_amp = np.nan
-    i_VEB = np.nan
-    i_EPSP_slope = np.nan
-    i_stim = find_i_stim_prim_max(dfmean)
-    if verbose:
-        print(f"i_stim:{i_stim}")
-    if i_stim is not np.nan:
-        i_EPSP_amp = find_i_EPSP_peak_max(dfmean)
-        if verbose:
-            print(f"i_EPSP_amp:{i_EPSP_amp}")
-        if i_EPSP_amp is not np.nan:
-            i_VEB = find_i_VEB_prim_peak_max(dfmean, i_stim, i_EPSP_amp)
-            if verbose:
-                print(f"i_VEB:{i_VEB}")
-            if i_VEB is not np.nan:
-                i_EPSP_slope = find_i_EPSP_slope(dfmean, i_VEB, i_EPSP_amp, happy=True)
-                if verbose:
-                    print(f"i_EPSP_slope:{i_EPSP_slope}")
-                # if i_EPSP_slope is not np.nan:
-
+    dict_i = { #set default np.nan
+        "i_stim": np.nan,
+        "i_VEB": np.nan,
+        "i_EPSP_amp": np.nan,
+        "i_EPSP_slope": np.nan}
+    dict_i['i_stim'] = find_i_stim_prim_max(dfmean=dfmean,)
+    if dict_i['i_stim'] is np.nan: # TODO: will not happen in current configuration
+        return dict_i
+    dict_i['i_EPSP_amp'] = find_i_EPSP_peak_max(dfmean=dfmean, verbose=True)
+    if dict_i['i_EPSP_amp'] is np.nan: # TODO: will not happen in current configuration
+        return dict_i
+    dict_i['i_VEB'] = find_i_VEB_prim_peak_max(dfmean=dfmean, i_stim=dict_i['i_stim'], i_EPSP=dict_i['i_EPSP_amp'])
+    if dict_i['i_VEB'] is np.nan:
+        return dict_i
+    dict_i['i_EPSP_slope'] = find_i_EPSP_slope(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
     """
     i_volleyslope = find_i_volleyslope(
-        dfmean, (i_stim + param_min_time_from_i_stim), i_VEB, happy=True
-    )
+        dfmean, (i_stim + param_min_time_from_i_stim), i_VEB, happy=True)
     """
+    return dict_i
+ 
 
-    # TODO: change return to {}
-    return {"i_stim": i_stim, "i_VEB": i_VEB, "i_EPSP_amp": i_EPSP_amp, "i_EPSP_slope": i_EPSP_slope}
 
 
 # %%
@@ -267,10 +264,7 @@ def find_all_t(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
         print("find_all_t")
     #print(f' . dfmean: {dfmean}')
     dict_i = find_all_i(dfmean, param_min_time_from_i_stim=0.0005)
-    dict_t = {}
-    for k, v in dict_i.items():
-        k_new = "t" + k[1:]
-        dict_t[k_new] = np.nan if v is np.nan else dfmean.loc[v].time
+    dict_t = i2t(dfmean, dict_i)
     if verbose:
         print(f"dict_t: {dict_t}")
     return dict_t
@@ -314,6 +308,8 @@ def measureslope(df, t_slope, halfwidth, name="EPSP"):
 # %%
 ''' Standalone test:'''
 if __name__ == "__main__":
+    print()
+    print()
     print("Running as main: standalone test")
     from pathlib import Path
     path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/KO_02.csv")
@@ -324,8 +320,9 @@ if __name__ == "__main__":
     df_mean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
     # dfdata_a = dfdata[(dfdata['stim']=='a')] # select stim 'a' only in data file
     # df_mean_a = df_mean[(df_mean['stim']=='a')] # select stim 'a' only in mean file
-    dfdata_a = dfdata[(dfdata['channel']==0) & (dfdata['stim']=='a')] # select stim 'a' only in data file
-    df_mean_a = df_mean[(df_mean['channel']==0) & (df_mean['stim']=='a')] # select stim 'a' only in mean file
+    dfdata_a = dfdata[(dfdata['channel']==0) & (dfdata['stim']=='b')] # select stim 'a' only in data file
+    df_mean_a = df_mean[(df_mean['channel']==0) & (df_mean['stim']=='b')] # select stim 'a' only in mean file
+    df_mean_a.reset_index(inplace=True)
     dict_t = find_all_t(df_mean_a) # use the average all sweeps to determine where all events are located (noise reduction)
     t_EPSP_amp = dict_t['t_EPSP_amp']
     t_EPSP_slope = dict_t['t_EPSP_slope']

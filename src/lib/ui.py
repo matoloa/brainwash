@@ -9,6 +9,7 @@ import matplotlib
 import seaborn as sns
 #import scipy.stats as stats
 
+import numpy as np  # numeric calculations module
 import pandas as pd
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
@@ -1165,7 +1166,7 @@ class UIsub(Ui_MainWindow):
         df_p = self.get_df_project()
         for key, values in dict_t.items():
             if key in row:
-                df_p.loc[row.name,key] = values
+                df_p.loc[row.name, key] = values
             else:
                 print(f'defaultOutput(row: #{row.name}) error: {key} is not a df_project column.')
         self.set_df_project(df=df_p)
@@ -1219,7 +1220,13 @@ class UIsub(Ui_MainWindow):
                         sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
                         # add results of selected row(s):
                         dfoutput = self.get_dfoutput(row=row)
-                        sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
+                        df_p = self.get_df_project() # updated in get_dfoutput; row is not!
+                        t_EPSP_amp = df_p.loc[row.name,'t_EPSP_amp']
+                        t_EPSP_slope = df_p.loc[row.name,'t_EPSP_slope']
+                        if not np.isnan(t_EPSP_amp):
+                            sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
+                        if not np.isnan(t_EPSP_slope):
+                            sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
 
         self.canvas_seaborn_mean.axes.set_xlim(self.graph_xlim)
         self.canvas_seaborn_mean.axes.set_ylim(self.graph_ylim)
