@@ -1150,20 +1150,21 @@ class UIsub(Ui_MainWindow):
         Stores timepoints, methods and params in their designated columns in self.df_project
         Returns a df of the results: amplitudes and slopes
         '''
-        print(f'defaultOutput({row}):')
+        if verbose:
+            print(f'defaultOutput({row}):')
         dfdata = self.get_dfdata(row=row)
         dfmean = self.get_dfmean(row=row)
         dict_t = analysis.find_all_t(dfmean=dfmean, verbose=False)
-        df_p = self.df_project
+        df_p = self.get_df_project()
         for key, values in dict_t.items():
             if key in row:
-                df_p.iloc[row.name][key] = values
-                print(f'Key: {key} now set to {values}')
-        print(self.df_project)
+                df_p.loc[row.name,key] = values
+            else:
+                print(f'defaultOutput(row: #{row.name}) error: {key} is not a df_project column.')
+        self.set_df_project(df=df_p)
         return analysis.build_dfoutput(dfdata=dfdata,
                                        t_EPSP_amp=dict_t["t_EPSP_amp"],
                                        t_EPSP_slope=dict_t["t_EPSP_slope"])
-
 
 
 # Graph handling
