@@ -556,7 +556,7 @@ class UIsub(Ui_MainWindow):
 
 # Placeholder tuples (zoom for graphs)
     graph_xlim = (0.006, 0.020)
-    graph_ylim = (-0.1, 0.02)
+    graph_ylim = (-0.0006, 0.0002)
 
 
 # Debugging tools
@@ -1217,7 +1217,7 @@ class UIsub(Ui_MainWindow):
                 else:
                     for i, row in df_filtered.iterrows(): # TODO: i to be used later for cycling colours?
                         dfmean = self.get_dfmean(row=row)
-                        dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
+                        #dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
                         sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
                         # add results of selected row(s):
                         dfoutput = self.get_dfoutput(row=row)
@@ -1284,11 +1284,11 @@ class UIsub(Ui_MainWindow):
         self.df_project.loc[row_index, "t_EPSP_slope"] = t_EPSP_slope
 
         # zero Y
-        dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
-        dfmean["prim"] = dfmean.prim / dfmean.prim.abs().max()
-        dfmean["bis"] = dfmean.bis / dfmean.bis.abs().max()
+        #dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
+        #dfmean["prim"] = dfmean.prim / dfmean.prim.abs().max()
+        #dfmean["bis"] = dfmean.bis / dfmean.bis.abs().max()
 
-        self.measure_window_sub.setMeanGraph(recording_name=recording_name, dfmean=dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
+        self.measure_window_sub.setMeanGraph(row=ser_table_row, dfmean=dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
 
         # TODO: Placeholder functionality for loading analysis.buildResultFile()
         file_path = Path(self.dict_folders['data'] / (recording_name + ".csv"))
@@ -1301,7 +1301,7 @@ class UIsub(Ui_MainWindow):
         dfoutput.reset_index(inplace=True)
         print(recording_name, channel, stim)
         
-        self.measure_window_sub.setOutputGraph(row=ser_table_row, dfoutput=dfoutput)
+        self.measure_window_sub.setOutputGraph(dfoutput=dfoutput)
     
             
     @QtCore.pyqtSlot(list)
@@ -1328,7 +1328,7 @@ class InputDialogPopup(QtWidgets.QDialog):
     def showInputDialog(self, title, query):
         text, ok = QtWidgets.QInputDialog.getText(self, title, query)
         if ok:
-            print(f'You entered: {text}')
+            print(f"You entered: {text}")
             self.accept()  # Close the dialog when Enter is pressed
             return text
 
@@ -1419,9 +1419,13 @@ class Measure_window_sub(Ui_measure_window):
         if verbose:
             print(" - measure_window init")
 
-    def setMeanGraph(self, recording_name, dfmean, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
+    def setMeanGraph(self, row, dfmean, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
+
+        self.row = row # store an internal version of the row, to be used in meanClicked and outputClicked
+        self.dfmean = dfmean
+
         if verbose:
             print("setMeanGraph", dfmean)
         self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
@@ -1455,13 +1459,12 @@ class Measure_window_sub(Ui_measure_window):
 
         self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
 
-    def setOutputGraph(self, row, dfoutput):
+    def setOutputGraph(self, dfoutput):
         # get dfoutput from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
         if verbose:
             print("setOutputGraph", dfoutput)
         
-        self.row = row # store an internal version of the row, to be used in outputClicked
         self.canvas_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
 
         if dfoutput['EPSP_amp'].notna().any():
@@ -1481,7 +1484,17 @@ class Measure_window_sub(Ui_measure_window):
         if event.inaxes is not None:
             x = event.xdata
             y = event.ydata
-            print(f" . Mean clicked at x={x}, y={y}")
+            #print(f" . Mean clicked at x={x}, y={y}")
+            # find time in self.dfmean closest to x
+            time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
+            #print(f" . time: {time}")
+            #print(f" . self.row.name: {self.row.name}")
+            ui.df_project.loc[self.row.name, "t_EPSP_amp"] = time
+            ui.df_project.loc[self.row.name, "t_EPSP_amp_method"] = "manual"
+            #print(f" . ui.df_project.loc[self.row.name,'t_EPSP_amp']: {ui.df_project.loc[self.row.name,'t_EPSP_amp']}")
+            #print(f" . ui.df_project.loc[self.row.name,'t_EPSP_amp_method']: {ui.df_project.loc[self.row.name,'t_EPSP_amp_method']}")
+            ui.save_df_project()
+
 
     def outputClicked(self, event):
         if event.inaxes is not None:
@@ -1494,8 +1507,7 @@ class Measure_window_sub(Ui_measure_window):
             self.canvas_output.draw()
             # get that specific sweep and superimpose it on canvas_mean
             df = ui.get_dfdata(self.row)
-            df = df[df['sweep'] == int(x)].copy() # copy because we're going to change it
-            df["voltage"] = df.voltage / df.voltage.abs().max()
+            df = df[df['sweep'] == int(x)]
             print(f"int(x): {int(x)}")
             if self.si_sweep is None:
                 self.si_sweep, = self.canvas_mean.axes.plot([], [], color="grey")
