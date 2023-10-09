@@ -1288,7 +1288,7 @@ class UIsub(Ui_MainWindow):
         dfmean["prim"] = dfmean.prim / dfmean.prim.abs().max()
         dfmean["bis"] = dfmean.bis / dfmean.bis.abs().max()
 
-        self.measure_window_sub.setMeasureGraph(recording_name, dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
+        self.measure_window_sub.setMeanGraph(recording_name=recording_name, dfmean=dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
 
         # TODO: Placeholder functionality for loading analysis.buildResultFile()
         file_path = Path(self.dict_folders['data'] / (recording_name + ".csv"))
@@ -1301,7 +1301,7 @@ class UIsub(Ui_MainWindow):
         dfoutput.reset_index(inplace=True)
         print(recording_name, channel, stim)
         
-        self.measure_window_sub.setOutputGraph(dfoutput=dfoutput)
+        self.measure_window_sub.setOutputGraph(row=ser_table_row, dfoutput=dfoutput)
     
             
     @QtCore.pyqtSlot(list)
@@ -1419,17 +1419,19 @@ class Measure_window_sub(Ui_measure_window):
         if verbose:
             print(" - measure_window init")
 
-    def setMeasureGraph(self, recording_name, dfmean, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
+    def setMeanGraph(self, recording_name, dfmean, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
         if verbose:
-            print("setMeasureGraph", dfmean)
-        self.canvas_seaborn = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
+            print("setMeanGraph", dfmean)
+        self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
+        self.si_v = None
+        self.si_sweep = None
 
         # fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
-        g = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_seaborn.axes, color="red")
-        h = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_seaborn.axes, color="green")
-        i = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn.axes, color="black")
+        g = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_mean.axes, color="red")
+        h = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_mean.axes, color="green")
+        i = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_mean.axes, color="black")
         i.axvline(t_EPSP_amp, color="black", linestyle="--")
 
         # t_VEB
@@ -1444,40 +1446,64 @@ class Measure_window_sub(Ui_measure_window):
 
         # if not title is None:
         # ax1.set_title(title)
-        self.canvas_seaborn.axes.set_xlim(ui.graph_xlim)
-        self.canvas_seaborn.axes.set_ylim(ui.graph_ylim)
+        self.canvas_mean.axes.set_xlim(ui.graph_xlim)
+        self.canvas_mean.axes.set_ylim(ui.graph_ylim)
 
         # self.canvas_seaborn.axes.set_xmargin((100,500))
-        self.canvas_seaborn.draw()
-        self.canvas_seaborn.show()
-        self.canvas_seaborn.mpl_connect('button_press_event', self.meanClicked)
+        self.canvas_mean.draw()
+        self.canvas_mean.show()
 
-    def setOutputGraph(self, dfoutput):
+        self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
+
+    def setOutputGraph(self, row, dfoutput):
         # get dfoutput from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
         if verbose:
             print("setOutputGraph", dfoutput)
-        self.canvas_seaborn = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
+        
+        self.row = row # store an internal version of the row, to be used in outputClicked
+        self.canvas_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
 
         if dfoutput['EPSP_amp'].notna().any():
-            sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn.axes, color="black")
-            self.canvas_seaborn.axes.set_ylim(-0.0015, 0)
+            sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_output.axes, color="black")
+            self.canvas_output.axes.set_ylim(-0.0015, 0)
         if dfoutput['EPSP_slope'].notna().any():
-            sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_seaborn.axes, color="black")
-            self.canvas_seaborn.axes.set_ylim(-0.0015, 0)
+            sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_output.axes, color="black")
+            self.canvas_output.axes.set_ylim(-0.0015, 0)
 
-        self.canvas_seaborn.draw()
-        self.canvas_seaborn.show()
+        self.canvas_output.draw()
+        self.canvas_output.show()
 
-        # connect clicks on self.measure.graph_mean to a function that prints the x and y coordatie of the click
-        #self.measure_graph_mean.mousePressEvent = self.meanClick
-        #mpl_connect("button_press_event", self.meanClick)
-    
+        self.canvas_output.mpl_connect('button_press_event', self.outputClicked)
+
+   
     def meanClicked(self, event):
         if event.inaxes is not None:
             x = event.xdata
             y = event.ydata
-            print(f" . Clicked at x={x}, y={y}")
+            print(f" . Mean clicked at x={x}, y={y}")
+
+    def outputClicked(self, event):
+        if event.inaxes is not None:
+            x = event.xdata
+            y = event.ydata
+             # draw a vertical line at the clicked y in self.canvas_output
+            if self.si_v is not None: # remove previous vertical line
+                self.si_v.remove()
+            self.si_v = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="grey", linestyle="--")
+            self.canvas_output.draw()
+            # get that specific sweep and superimpose it on canvas_mean
+            df = ui.get_dfdata(self.row)
+            df = df[df['sweep'] == int(x)].copy() # copy because we're going to change it
+            df["voltage"] = df.voltage / df.voltage.abs().max()
+            print(f"int(x): {int(x)}")
+            if self.si_sweep is None:
+                self.si_sweep, = self.canvas_mean.axes.plot([], [], color="grey")
+            self.si_sweep.set_data(df["time"], df["voltage"])
+            self.canvas_mean.draw()
+
+            #g.axvline(t_EPSP_slope, color="green", linestyle="--")
+
 
 
 def get_signals(source):
