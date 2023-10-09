@@ -1530,6 +1530,14 @@ class Measure_window_sub(Ui_measure_window):
         #update output graph
         self.output_EPSP_amp.lines[0].set_data(dfoutput['sweep'], dfoutput['EPSP_amp'])
         self.output_EPSP_slope.lines[1].set_data(dfoutput['sweep'], dfoutput['EPSP_slope'])
+        print(f"self.output_EPSP_amp.lines[0]: {self.output_EPSP_amp.lines[0]}")
+        print(f"self.output_EPSP_amp.lines[1]: {self.output_EPSP_amp.lines[1]}")
+        print(f"self.output_EPSP_slope.lines[0]: {self.output_EPSP_slope.lines[0]}")
+        print(f"self.output_EPSP_slope.lines[1]: {self.output_EPSP_slope.lines[1]}")
+        print(f"self.output_EPSP_amp.lines[0].__repr__(): {self.output_EPSP_amp.lines[0].__repr__()}")
+        print(f"self.output_EPSP_amp.lines[1].__repr__(): {self.output_EPSP_amp.lines[1].__repr__()}")
+        print(f"self.output_EPSP_slope.lines[0].__repr__(): {self.output_EPSP_slope.lines[0].__repr__()}")
+        print(f"self.output_EPSP_slope.lines[1].__repr__(): {self.output_EPSP_slope.lines[1].__repr__()}")
         self.canvas_output.draw()
 
 
