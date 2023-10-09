@@ -1098,7 +1098,7 @@ class UIsub(Ui_MainWindow):
             recording_name = row['recording_name']
             channel = row['channel']
             stim = row['stim']
-            # TODO: Placeholder functionality for loading analysis.buildResultFile()
+            
             path_data = Path(f'{self.dict_folders["data"]}/{recording_name}.csv')
             try: # datafile should always exist
                 dfdata_file = pd.read_csv(path_data)
@@ -1258,49 +1258,27 @@ class UIsub(Ui_MainWindow):
         recording_name = ser_table_row["recording_name"]
         channel = ser_table_row["channel"]
         stim = ser_table_row["stim"]
+
         sweeps = ser_table_row["sweeps"]
         if sweeps == "...":
             # TODO: Make it import the missing file
             print("Unknown number of sweeps - not imported?")
             return
-        
         # Open window
         self.measure = QtWidgets.QDialog()
         self.measure_window_sub = Measure_window_sub(self.measure)
         window_name = (recording_name + ",_ch" + str(channel) + ", st" + stim)
         self.measure.setWindowTitle(window_name)
         self.measure.show()
-
+        # Get dataframes
         dfmean = self.get_dfmean(ser_table_row)
-        # analysis.py
-        dict_t = analysis.find_all_t(dfmean=dfmean, verbose=verbose)
-        # Break out to variables
-        t_VEB = dict_t["t_VEB"]
-        t_EPSP_amp = dict_t["t_EPSP_amp"]
-        t_EPSP_slope = dict_t["t_EPSP_slope"]
-        # Store variables in self.df_project
-        self.df_project.loc[row_index, "t_VEB"] = t_VEB
-        self.df_project.loc[row_index, "t_EPSP_amp"] = t_EPSP_amp
-        self.df_project.loc[row_index, "t_EPSP_slope"] = t_EPSP_slope
-
-        # zero Y
-        #dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
-        #dfmean["prim"] = dfmean.prim / dfmean.prim.abs().max()
-        #dfmean["bis"] = dfmean.bis / dfmean.bis.abs().max()
-
+        dfoutput = self.get_dfoutput(row=ser_table_row)
+        # Extract variables
+        t_VEB = self.df_project.loc[row_index, "t_VEB"]
+        t_EPSP_amp = self.df_project.loc[row_index, "t_EPSP_amp"]
+        t_EPSP_slope = self.df_project.loc[row_index, "t_EPSP_slope"]
+        # Set graphs
         self.measure_window_sub.setMeanGraph(row=ser_table_row, dfmean=dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
-
-        # TODO: Placeholder functionality for loading analysis.buildResultFile()
-        file_path = Path(self.dict_folders['data'] / (recording_name + ".csv"))
-        if not file_path.exists():
-            print(f"Error: {file_path} not found.")
-            return
-        dfdata = self.get_dfdata(row=ser_table_row)
-
-        dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
-        dfoutput.reset_index(inplace=True)
-        print(recording_name, channel, stim)
-        
         self.measure_window_sub.setOutputGraph(dfoutput=dfoutput)
     
             
@@ -1436,7 +1414,7 @@ class Measure_window_sub(Ui_measure_window):
         g = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_mean.axes, color="red")
         h = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_mean.axes, color="green")
         i = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_mean.axes, color="black")
-        i.axvline(t_EPSP_amp, color="black", linestyle="--")
+        self.v_EPSP_amp = sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
 
         # t_VEB
         print(f"t_VEB: {t_VEB}")
@@ -1468,10 +1446,10 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
 
         if dfoutput['EPSP_amp'].notna().any():
-            sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_output.axes, color="black")
+            self.output_EPSP_amp = sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_output.axes, color="black")
             self.canvas_output.axes.set_ylim(-0.0015, 0)
         if dfoutput['EPSP_slope'].notna().any():
-            sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_output.axes, color="black")
+            self.output_EPSP_slope = sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_output.axes, color="black")
             self.canvas_output.axes.set_ylim(-0.0015, 0)
 
         self.canvas_output.draw()
@@ -1484,16 +1462,36 @@ class Measure_window_sub(Ui_measure_window):
         if event.inaxes is not None:
             x = event.xdata
             y = event.ydata
-            #print(f" . Mean clicked at x={x}, y={y}")
+            # print(f" . Mean clicked at x={x}, y={y}")
             # find time in self.dfmean closest to x
             time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
-            #print(f" . time: {time}")
-            #print(f" . self.row.name: {self.row.name}")
-            ui.df_project.loc[self.row.name, "t_EPSP_amp"] = time
-            ui.df_project.loc[self.row.name, "t_EPSP_amp_method"] = "manual"
-            #print(f" . ui.df_project.loc[self.row.name,'t_EPSP_amp']: {ui.df_project.loc[self.row.name,'t_EPSP_amp']}")
-            #print(f" . ui.df_project.loc[self.row.name,'t_EPSP_amp_method']: {ui.df_project.loc[self.row.name,'t_EPSP_amp_method']}")
+            
+            # TODO: call appropriate function for selected measurement
+            # placeholder: for now, assume t_EPSP_amp, -method and -param
+            ui.df_project.loc[self.row.name, 't_EPSP_amp'] = time
+            ui.df_project.loc[self.row.name, 't_EPSP_amp_param'] = "-"
+            ui.df_project.loc[self.row.name, 't_EPSP_amp_method'] = "manual"
             ui.save_df_project()
+            if verbose:
+                print(f" . ui.df_project.loc[self.row.name,'t_EPSP_amp']: {ui.df_project.loc[self.row.name,'t_EPSP_amp']}")
+                print(f" . ui.df_project.loc[self.row.name,'t_EPSP_amp_method']: {ui.df_project.loc[self.row.name,'t_EPSP_amp_method']}")
+                print(f" . ui.df_project.loc[self.row.name,'t_EPSP_amp_param']: {ui.df_project.loc[self.row.name,'t_EPSP_amp_param']}")
+            #update mean graph
+            self.v_EPSP_amp.remove()
+            self.v_EPSP_amp = sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color="black", linestyle="--")
+            self.canvas_mean.draw()
+            #recalculate EPSP_amp
+            dfdata = ui.get_dfdata(row=self.row)
+            dfoutput = ui.get_dfoutput(row=self.row)
+            df_new_EPSP_amp = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=time)
+            #update output; dict and file
+            dfoutput['EPSP_amp'] = df_new_EPSP_amp['EPSP_amp']
+            key_output = ui.row2key(row=self.row) + "_output"
+            ui.dict_outputs[key_output] = dfoutput
+            ui.save_dict(dict2save=ui.dict_outputs)
+            #update output graph
+            self.output_EPSP_amp.lines[0].set_data(dfoutput['sweep'], dfoutput['EPSP_amp'])
+            self.canvas_output.draw()
 
 
     def outputClicked(self, event):
