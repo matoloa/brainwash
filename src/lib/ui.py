@@ -1414,20 +1414,17 @@ class Measure_window_sub(Ui_measure_window):
         g = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_mean.axes, color="red")
         h = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_mean.axes, color="green")
         i = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_mean.axes, color="black")
-        self.v_EPSP_amp = sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
+        
+        self.v_t_EPSP_amp = sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
+        
+        self.v_t_EPSP_slope =         sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
+        self.v_t_EPSP_slope_start =   sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope - 0.0004, color="green", linestyle=":")
+        self.v_t_EPSP_slope_end =     sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope + 0.0004, color="green", linestyle=":")
 
         # t_VEB
         print(f"t_VEB: {t_VEB}")
         g.axvline(t_VEB, color="grey", linestyle="--")
 
-        # t_EPSP_slope
-        g.axvline(t_EPSP_slope - 0.0004, color="green", linestyle=":")
-        g.axvline(t_EPSP_slope, color="green", linestyle="--")
-        g.axvline(t_EPSP_slope + 0.0004, color="green", linestyle=":")
-        # plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-
-        # if not title is None:
-        # ax1.set_title(title)
         self.canvas_mean.axes.set_xlim(ui.graph_xlim)
         self.canvas_mean.axes.set_ylim(ui.graph_ylim)
 
@@ -1465,33 +1462,8 @@ class Measure_window_sub(Ui_measure_window):
             # print(f" . Mean clicked at x={x}, y={y}")
             # find time in self.dfmean closest to x
             time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
-            
-            # TODO: call appropriate function for selected measurement
-            # placeholder: for now, assume t_EPSP_amp, -method and -param
-            ui.df_project.loc[self.row.name, 't_EPSP_amp'] = time
-            ui.df_project.loc[self.row.name, 't_EPSP_amp_param'] = "-"
-            ui.df_project.loc[self.row.name, 't_EPSP_amp_method'] = "manual"
-            ui.save_df_project()
-            if verbose:
-                print(f" . ui.df_project.loc[self.row.name,'t_EPSP_amp']: {ui.df_project.loc[self.row.name,'t_EPSP_amp']}")
-                print(f" . ui.df_project.loc[self.row.name,'t_EPSP_amp_method']: {ui.df_project.loc[self.row.name,'t_EPSP_amp_method']}")
-                print(f" . ui.df_project.loc[self.row.name,'t_EPSP_amp_param']: {ui.df_project.loc[self.row.name,'t_EPSP_amp_param']}")
-            #update mean graph
-            self.v_EPSP_amp.remove()
-            self.v_EPSP_amp = sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color="black", linestyle="--")
-            self.canvas_mean.draw()
-            #recalculate EPSP_amp
-            dfdata = ui.get_dfdata(row=self.row)
-            dfoutput = ui.get_dfoutput(row=self.row)
-            df_new_EPSP_amp = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=time)
-            #update output; dict and file
-            dfoutput['EPSP_amp'] = df_new_EPSP_amp['EPSP_amp']
-            key_output = ui.row2key(row=self.row) + "_output"
-            ui.dict_outputs[key_output] = dfoutput
-            ui.save_dict(dict2save=ui.dict_outputs)
-            #update output graph
-            self.output_EPSP_amp.lines[0].set_data(dfoutput['sweep'], dfoutput['EPSP_amp'])
-            self.canvas_output.draw()
+            #self.updateOnClick(time=time, value="EPSP_amp")
+            self.updateOnClick(time=time, value="EPSP_slope")
 
 
     def outputClicked(self, event):
@@ -1512,8 +1484,53 @@ class Measure_window_sub(Ui_measure_window):
             self.si_sweep.set_data(df["time"], df["voltage"])
             self.canvas_mean.draw()
 
-            #g.axvline(t_EPSP_slope, color="green", linestyle="--")
 
+    def updateOnClick(self, time, value):
+        t_value  = ("t_" + value)
+        t_method = (t_value + "_method")
+        t_param = (t_value + "_param")
+        # update df_project
+        ui.df_project.loc[self.row.name, t_value] = time
+        ui.df_project.loc[self.row.name, t_method] = "manual"
+        ui.df_project.loc[self.row.name, t_param] = "-"
+        ui.save_df_project()
+        if verbose:
+            print(f" . ui.df_project.loc[self.row.name, t_value]: {ui.df_project.loc[self.row.name, t_value]}")
+            print(f" . ui.df_project.loc[self.row.name, t_method: {ui.df_project.loc[self.row.name, t_method]}")
+            print(f" . ui.df_project.loc[self.row.name, t_param]: {ui.df_project.loc[self.row.name, t_param]}")
+        #recalculate value
+        dfdata = ui.get_dfdata(row=self.row)
+        dfoutput = ui.get_dfoutput(row=self.row)
+        if value == "EPSP_amp":
+            new_dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=time)
+            graph_color = "black"
+            plot_on_mean = {'center': ("v_" + t_value)}
+        elif value == "EPSP_slope":
+            new_dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_slope=time)
+            graph_color = "green"
+            plot_on_mean = {'center': ("v_" + t_value),
+                            'start':  ("v_" + t_value + "_start"),
+                            'end':    ("v_" + t_value + "_end")}
+        #update output; dict and file
+        dfoutput[value] = new_dfoutput[value]
+        key_output = ui.row2key(row=self.row) + "_output"
+        ui.dict_outputs[key_output] = dfoutput
+        ui.save_dict(dict2save=ui.dict_outputs)
+        #update the graphs
+        for key, graph in plot_on_mean.items():
+            #print(f"key: {key}, graph: {graph}")
+            getattr(self, graph).remove() # remove the one which you are about to update
+            if key == "center":
+                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color=graph_color, linestyle="--"))
+            elif key == "start":
+                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time - 0.0004, color=graph_color, linestyle=":"))
+            elif key == "end":
+                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time + 0.0004, color=graph_color, linestyle=":"))
+        self.canvas_mean.draw()
+        #update output graph
+        self.output_EPSP_amp.lines[0].set_data(dfoutput['sweep'], dfoutput['EPSP_amp'])
+        self.output_EPSP_slope.lines[1].set_data(dfoutput['sweep'], dfoutput['EPSP_slope'])
+        self.canvas_output.draw()
 
 
 def get_signals(source):

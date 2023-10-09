@@ -280,9 +280,6 @@ def measureslope(df, t_slope, halfwidth, name="EPSP"):
     
     print(f'measureslope(df: {df}, t_slope: {t_slope}, halfwidth: {halfwidth}, name="EPSP"):')
 
-    # off-challenge: this is what crashes it!
-    t_slope = 0.001
-
     reg = linear_model.LinearRegression()
     dicts = []
     for sweep in tqdm(df.sweep.unique()): # this is just a progress indicator!
