@@ -163,20 +163,18 @@ def assignStimAndSweep(dfdata, list_stims):
     return df
 
 
-def persistdf(recording_name, proj_folder, dfdata=None, dfmean=None):
+def persistdf(recording_name, dict_folders, dfdata=None, dfmean=None):
     if dfdata is not None:
-        data_folder = Path(f'{proj_folder}/data')
-        data_folder.mkdir(exist_ok=True)
-        str_data_path = f'{data_folder}/{recording_name}.csv'
+        dict_folders['data'].mkdir(exist_ok=True)
+        str_data_path = f"{dict_folders['data']}/{recording_name}.csv"
         dfdata.to_csv(str_data_path, index=False)
     if dfmean is not None:
-        cache_folder = Path(f'{proj_folder}/cache')
-        cache_folder.mkdir(exist_ok=True)
-        str_mean_path = f'{cache_folder}/{recording_name}_mean.csv'
+        dict_folders['cache'].mkdir(exist_ok=True)
+        str_mean_path = f"{dict_folders['cache']}/{recording_name}_mean.csv"
         dfmean.to_csv(str_mean_path, index=False)
 
 
-def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=None, single_stim=False):
+def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None, single_stim=False):
     """
     * receives a df of project data file paths built in ui
         files that are already parsed are to be overwritten (ui.py passes filitered list of unparsed files)
@@ -192,7 +190,7 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
     calls build_dfmean() to create an average, prim and bis file, per channel-stim combo
     """
 
-    def parser(proj_folder, recording_name, source_path):
+    def parser(dict_folders, recording_name, source_path):
         if verbose:
             print(f" - parser, source_path: {source_path}")
         if Path(source_path).is_dir():
@@ -216,12 +214,12 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
         df = assignStimAndSweep(dfdata = df, list_stims=list_stims)
         dfmean = build_dfmean(df)
         df = zeroSweeps(dfdata = df, dfmean=dfmean)
-        persistdf(recording_name, proj_folder, dfdata=df, dfmean=dfmean)
+        persistdf(recording_name, dict_folders=dict_folders, dfdata=df, dfmean=dfmean)
         dictmeta = {'channel': df.channel.unique(), 'stim': df.stim.unique(), 'sweeps': df.sweep.nunique()}
         return dictmeta
 
     if verbose:
-        print(f"proj folder: {proj_folder}")
+        print(f"proj folder: {dict_folders['project']}")
         if source_path is not None:
             print(f"recording_name: {recording_name}")
             print(f"source_path: {source_path}")
@@ -230,7 +228,7 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
             print(f"path: {df['path']}")
 
     if recording_name is not None:
-        dictmeta = parser(proj_folder, recording_name=recording_name, source_path=source_path)
+        dictmeta = parser(dict_folders=dict_folders, recording_name=recording_name, source_path=source_path)
         return dictmeta
 
     if df is not None:
@@ -238,7 +236,7 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
         for i, row in df_unique_names.iterrows():
             recording_name = row['recording_name']
             source_path = row['path']
-            dictmeta = parser(proj_folder, recording_name=recording_name, source_path=source_path)
+            dictmeta = parser(dict_folders=dict_folders, recording_name=recording_name, source_path=source_path)
         return dictmeta
 
 # Path.is_dir to check if folder or file
@@ -250,7 +248,9 @@ def parseProjFiles(proj_folder: Path, df=None, recording_name=None, source_path=
 if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
 
     source_folder = Path.home() / "Documents/Brainwash Data Source/"
-    proj_folder = Path.home() / "Documents/Brainwash Projects/standalone_test"
+    dict_folders = {'project': Path.home() / "Documents/Brainwash Projects/standalone_test"}
+    dict_folders['data'] = dict_folders['project'] / "data"
+    dict_folders['cache'] = dict_folders['project'] / "cache"
     list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"),
                     str(source_folder / "abf 2 channel/KO_02")]
 #    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"),
@@ -265,7 +265,7 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
             recording_name = os.path.basename(os.path.dirname(item))
         print(" - processing", item, "as recording_name", recording_name)
         df_files = pd.DataFrame({"path": [item], "recording_name": [recording_name]})
-        dictmeta = parseProjFiles(proj_folder=proj_folder, df=df_files)
+        dictmeta = parseProjFiles(dict_folders=dict_folders, df=df_files)
         print(f" - dictmeta: {dictmeta}")
         print()
 

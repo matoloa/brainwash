@@ -487,28 +487,23 @@ class UIsub(Ui_MainWindow):
         self.tablemodel = TableModel(self.df_project)
         self.tableProj.setModel(self.tablemodel)
 
-        self.d_folders = {
+        self.dict_folders = {
             'project': self.projects_folder / self.projectname,
             'data': self.projects_folder / self.projectname / 'data',
             'cache': self.projects_folder / self.projectname / 'cache'
         }
 
-        # deprecated paths, TODO: delete
-        self.projectfolder = self.projects_folder / self.projectname
-        self.datafolder = self.projectfolder / "data"
-        self.cachefolder = self.projectfolder / "cache"
-
         # If projectfile exists, load it, otherwise create it
-        if Path(self.d_folders['project'] / "project.brainwash").exists():
+        if Path(self.dict_folders['project'] / "project.brainwash").exists():
             self.load_df_project()
         else:
-            self.d_folders['project'] = "My Project"
-            self.projectfolder = self.projects_folder / self.projectname
+            self.dict_folders['project'] = "My Project"
+            self.dict_folders['project'] = self.projects_folder / self.projectname
             self.setTableDf(self.df_project)
             self.write_cfg()
 
         # Write local cfg, for storage of group colours, zoom levels etc.
-        self.project_cfg_yaml = self.projectfolder / "project_cfg.yaml"
+        self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
         self.delete_locked = True
         self.list_groups = []
         if self.project_cfg_yaml.exists():
@@ -644,7 +639,7 @@ class UIsub(Ui_MainWindow):
     def pushedButtonNewProject(self):
         if verbose:
             print("pushedButtonNewProject")
-        self.projectfolder.mkdir(exist_ok=True)
+        self.dict_folders['project'].mkdir(exist_ok=True)
         date = datetime.now().strftime("%Y-%m-%d")
         i = 0
         while True:
@@ -667,7 +662,7 @@ class UIsub(Ui_MainWindow):
         if verbose:
             print(f"Received projectfolder: {str(projectfolder)}")
         if (Path(projectfolder) / "project.brainwash").exists():
-            self.projectfolder = Path(projectfolder)
+            self.dict_folders['project'] = Path(projectfolder)
             self.clearGraph()
             self.load_df_project()
             self.write_cfg()
@@ -749,15 +744,15 @@ class UIsub(Ui_MainWindow):
             row = selected_rows[0]
             df_p = self.df_project
             old_recording_name = df_p.at[row,'recording_name']
-            old_data = self.datafolder / (old_recording_name + ".csv")
-            old_mean = self.cachefolder / (old_recording_name + "_mean.csv")
+            old_data = self.dict_folders['data'] / (old_recording_name + ".csv")
+            old_mean = self.dict_folders['cache'] / (old_recording_name + "_mean.csv")
             RenameDialog = InputDialogPopup()
             new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query='')
             if re.match(r'^[a-zA-Z0-9_-]+$', str(new_recording_name)) is not None: # check if valid filename
                 list_recording_names = set(df_p['recording_name'])
                 if not new_recording_name in list_recording_names: # prevent duplicates
-                    new_data = self.datafolder / (new_recording_name + ".csv")
-                    new_mean = self.cachefolder / (new_recording_name + "_mean.csv")
+                    new_data = self.dict_folders['data'] / (new_recording_name + ".csv")
+                    new_mean = self.dict_folders['cache'] / (new_recording_name + "_mean.csv")
                     if old_data.exists() & old_mean.exists():
                         if verbose:
                             print(f"rename_data: {old_data} to {new_data}")
@@ -796,19 +791,19 @@ class UIsub(Ui_MainWindow):
                     stim = df_p.at[row, 'stim']
                     if verbose:
                         print("Delete:", recording_name, channel, stim)
-                    data_path = Path(self.datafolder / (recording_name + ".csv"))
+                    data_path = Path(self.dict_folders['data'] / (recording_name + ".csv"))
                     try:
                         df = pd.read_csv(str(data_path))  # parse csv
                     except FileNotFoundError:
                         print("did not find data .csv to load. Not imported?")
-                    dfmean_path = Path(self.cachefolder / (recording_name + "_mean.csv"))
+                    dfmean_path = Path(self.dict_folders['cache'] / (recording_name + "_mean.csv"))
                     try:
                         dfmean = pd.read_csv(str(dfmean_path))  # parse _mean.csv
                     except FileNotFoundError:
                         print("did not find _mean.csv to load. Not imported?")
                     purged_df = df[(df['channel'] != channel) | (df['stim'] != stim)]
                     purged_dfmean = dfmean[(dfmean['channel'] != channel) | (dfmean['stim'] != stim)]
-                    parse.persistdf(recording_name=recording_name, proj_folder=self.projectfolder, dfdata=purged_df, dfmean=purged_dfmean)
+                    parse.persistdf(recording_name=recording_name, dict_folders=self.dict_folders, dfdata=purged_df, dfmean=purged_dfmean)
             # Regardless of whether or not there was a file, purge the row from df_project
             self.clearGraph()
             self.setGraph()
@@ -817,8 +812,8 @@ class UIsub(Ui_MainWindow):
                 set_files_after_purge = set(df_p['recording_name'])
                 list_delete = [item for item in set_files_before_purge if item not in set_files_after_purge]
                 for file in list_delete:
-                    delete_data = self.datafolder / (file + ".csv")
-                    delete_mean = self.cachefolder / (file + "_mean.csv")
+                    delete_data = self.dict_folders['data'] / (file + ".csv")
+                    delete_mean = self.dict_folders['cache'] / (file + "_mean.csv")
                     if delete_data.exists():
                         delete_data.unlink()
                         if verbose:
@@ -844,7 +839,7 @@ class UIsub(Ui_MainWindow):
             recording_name = df_proj_row['recording_name']
             source_path = df_proj_row['path']
             if df_proj_row["sweeps"] == "...":  # indicates not read before TODO: Replace with selector!
-                dictmeta = parse.parseProjFiles(self.projectfolder, recording_name=recording_name, source_path=source_path)  # result is a dict of <channel>:<channel ID>
+                dictmeta = parse.parseProjFiles(dict_folders = self.dict_folders, recording_name=recording_name, source_path=source_path)  # result is a dict of <channel>:<channel ID>
                 for channel in dictmeta['channel']:
                     for stim in dictmeta['stim']:
                         df_proj_new_row = df_proj_row.copy()
@@ -908,7 +903,7 @@ class UIsub(Ui_MainWindow):
             print(f'purgeGroupCache({group})')
         if group in self.dict_group_means:
             self.dict_group_means.pop(group)
-        path_group_cache = Path(f'{self.cachefolder}/{group}.csv')
+        path_group_cache = Path(f'{self.dict_folders["cache"]}/{group}.csv')
         if path_group_cache.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
             print("File found when checking for existence...")
             try:
@@ -957,7 +952,7 @@ class UIsub(Ui_MainWindow):
                 print("The target project name already exists")
         else:
             new_projectfolder.mkdir()
-            self.projectfolder = new_projectfolder
+            self.dict_folders['project'] = new_projectfolder
             self.projectname = new_project_name
             self.inputProjectName.setText(self.projectname)
             self.clearGraph()
@@ -967,7 +962,7 @@ class UIsub(Ui_MainWindow):
             self.write_cfg()
 
     def renameProject(self): # changes name of project folder and updates .cfg
-        self.projectfolder.mkdir(exist_ok=True)
+        self.dict_folders['project'].mkdir(exist_ok=True)
         new_project_name = self.inputProjectName.text()
         # check if ok
         if (self.projects_folder / new_project_name).exists():
@@ -975,7 +970,7 @@ class UIsub(Ui_MainWindow):
                 print(f"Project name {new_project_name} already exists.")
             self.inputProjectName.setText(self.projectname)
         elif re.match(r'^[a-zA-Z0-9_-]+$', str(new_project_name)) is not None: # check if valid filename
-            self.projectfolder = self.projectfolder.rename(self.projects_folder / new_project_name)
+            self.dict_folders['project'] = self.dict_folders['project'].rename(self.projects_folder / new_project_name)
             self.projectname = new_project_name
             self.inputProjectName.setReadOnly(True)
             self.write_cfg()
@@ -986,15 +981,15 @@ class UIsub(Ui_MainWindow):
     def setProjectname(self):
         # get_signals(self.children()[1].children()[1].model)
         self.projectname = self.inputProjectName.text()
-        self.projectfolder = self.projects_folder / self.projectname
-        if self.projectfolder.exists():
+        self.dict_folders['project'] = self.projects_folder / self.projectname
+        if self.dict_folders['project'].exists():
             # look for project.brainwash and load it
-            if (self.projectfolder / "project.brainwash").exists():
+            if (self.dict_folders['project'] / "project.brainwash").exists():
                 self.load_df_project()
         else:
-            self.projectfolder.mkdir()
+            self.dict_folders['project'].mkdir()
         if verbose:
-            print(f"setProjectname, folder: {self.projectfolder} exists: {self.projectfolder.exists()}")
+            print(f"setProjectname, folder: {self.dict_folders['project']} exists: {self.dict_folders['project'].exists()}")
 
 
 # Project dataframe handling
@@ -1003,9 +998,9 @@ class UIsub(Ui_MainWindow):
         return self.df_project
 
     def load_df_project(self): # reads fileversion of df_project to persisted self.df_project, clears graphs and saves cfg
-        self.df_project = pd.read_csv(str(self.projectfolder / "project.brainwash"))
+        self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"))
         self.setTableDf(self.df_project)  # display self.df_project to table
-        self.projectname = self.projectfolder.stem
+        self.projectname = self.dict_folders['project'].stem
         self.inputProjectName.setText(self.projectname)  # set folder name to proj name
         if verbose:
             print(f"loaded project df: {self.df_project}")
@@ -1013,7 +1008,7 @@ class UIsub(Ui_MainWindow):
         self.write_cfg()
 
     def save_df_project(self): # writes df_project to .csv
-        self.df_project.to_csv(str(self.projectfolder / "project.brainwash"), index=False)
+        self.df_project.to_csv(str(self.dict_folders['project'] / "project.brainwash"), index=False)
 
     def set_df_project(self, df): # persists df and saves it to .csv
         self.df_project = df
@@ -1064,12 +1059,12 @@ class UIsub(Ui_MainWindow):
             recording_name = row['recording_name']
             channel = row['channel']
             stim = row['stim']
-            str_mean_path = f'{self.cachefolder}/{recording_name}_mean.csv'
+            str_mean_path = f'{self.dict_folders["cache"]}/{recording_name}_mean.csv'
             if Path(str_mean_path).exists():
                 dfmean = pd.read_csv(str_mean_path)
             else:
                 dfmean = parse.build_dfmean(self.get_dfdata(row=row, all=True))
-                parse.persistdf(recording_name=recording_name, proj_folder=self.projectfolder, dfmean=dfmean)
+                parse.persistdf(recording_name=recording_name, proj_folder=self.dict_folders['project'], dfmean=dfmean)
             #print(f'get_dfmean(stim): {stim}')
             #print(f' . dfmean: {dfmean}')
             dfcopy = dfmean[(dfmean['channel'] == channel) & (dfmean['stim'] == stim)].copy()
@@ -1084,7 +1079,7 @@ class UIsub(Ui_MainWindow):
         if key_output in self.dict_outputs:
             return self.dict_outputs[key_output]
         else:
-            str_output_path = f'{self.cachefolder}/{key_output}.csv'
+            str_output_path = f'{self.dict_folders["cache"]}/{key_output}.csv'
             if Path(str_output_path).exists():
                 dfoutput = pd.read_csv(str_output_path)
             else:
@@ -1104,7 +1099,7 @@ class UIsub(Ui_MainWindow):
             channel = row['channel']
             stim = row['stim']
             # TODO: Placeholder functionality for loading analysis.buildResultFile()
-            path_data = Path(f'{self.datafolder}/{recording_name}.csv')
+            path_data = Path(f'{self.dict_folders["data"]}/{recording_name}.csv')
             try: # datafile should always exist
                 dfdata_file = pd.read_csv(path_data)
             except FileNotFoundError:
@@ -1124,7 +1119,7 @@ class UIsub(Ui_MainWindow):
         if key_group in self.dict_group_means:
             return self.dict_group_means[key_group]
         else:
-            group_path = Path(f'{self.cachefolder}/{key_group}.csv')
+            group_path = Path(f'{self.dict_folders["cache"]}/{key_group}.csv')
             if group_path.exists():
                 if verbose:
                     print("Loading stored", str(group_path))
@@ -1148,8 +1143,8 @@ class UIsub(Ui_MainWindow):
 
     def save_dict(self, dict2save): # writes dict to .csv
         for keyword, df in dict2save.items():
-            self.cachefolder.mkdir(exist_ok=True) 
-            filepath = f'{self.cachefolder}/{keyword}.csv'
+            self.dict_folders['cache'].mkdir(exist_ok=True) 
+            filepath = f'{self.dict_folders["cache"]}/{keyword}.csv'
             df.to_csv(filepath, index=False)
 
 
@@ -1296,7 +1291,7 @@ class UIsub(Ui_MainWindow):
         self.measure_window_sub.setMeasureGraph(recording_name, dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
 
         # TODO: Placeholder functionality for loading analysis.buildResultFile()
-        file_path = Path(self.datafolder / (recording_name + ".csv"))
+        file_path = Path(self.dict_folders['data'] / (recording_name + ".csv"))
         if not file_path.exists():
             print(f"Error: {file_path} not found.")
             return
