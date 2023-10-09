@@ -1302,7 +1302,7 @@ class UIsub(Ui_MainWindow):
         print(recording_name, channel, stim)
         
         self.measure_window_sub.setOutputGraph(dfoutput=dfoutput)
-        
+    
             
     @QtCore.pyqtSlot(list)
     def slotPrintPaths(self, mypaths):
@@ -1450,6 +1450,7 @@ class Measure_window_sub(Ui_measure_window):
         # self.canvas_seaborn.axes.set_xmargin((100,500))
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
+        self.canvas_seaborn.mpl_connect('button_press_event', self.meanClicked)
 
     def setOutputGraph(self, dfoutput):
         # get dfoutput from selected row in UIsub.
@@ -1467,6 +1468,16 @@ class Measure_window_sub(Ui_measure_window):
 
         self.canvas_seaborn.draw()
         self.canvas_seaborn.show()
+
+        # connect clicks on self.measure.graph_mean to a function that prints the x and y coordatie of the click
+        #self.measure_graph_mean.mousePressEvent = self.meanClick
+        #mpl_connect("button_press_event", self.meanClick)
+    
+    def meanClicked(self, event):
+        if event.inaxes is not None:
+            x = event.xdata
+            y = event.ydata
+            print(f" . Clicked at x={x}, y={y}")
 
 
 def get_signals(source):
