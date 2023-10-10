@@ -44,7 +44,7 @@ def build_dfoutput(dfdata, t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, 
     # EPSP_slope
     if t_EPSP_slope is not None:
         if t_EPSP_slope is not np.nan:
-            df_EPSP_slope = measureslope(df=dfdata, t_slope=t_EPSP_slope, halfwidth=0.0004)
+            df_EPSP_slope = measureslope_vec(df=dfdata, t_slope=t_EPSP_slope, halfwidth=0.0004)
             dfoutput['EPSP_slope'] = df_EPSP_slope['value']
         else:
             dfoutput['EPSP_slope'] = np.nan
@@ -305,6 +305,60 @@ def measureslope(df, t_slope, halfwidth, name="EPSP"):
     return df_slopes
 
 # %%
+from pathlib import Path
+path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/KO_02.csv")
+# path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/A_21_P0701-S2.csv")
+# path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_mean.csv")
+dfdata = pd.read_csv(str(path_datafile)) # a persisted csv-form of the data file
+
+def getbool(df, channel=0, stim='a'):
+    vecbool = (df['channel'] == channel) & (df['stim'] == stim)
+    return vecbool
+
+channel = 1
+stim = 'a'
+t_slope = 0.0802
+halfwidth = 0.0004
+name="EPSP"
+df = dfdata[getbool(dfdata, channel=channel, stim=stim) & ((t_slope - halfwidth) <= dfdata.time) & (dfdata.time <= (t_slope + halfwidth))]
+dfpivot = df.pivot(index='sweep', columns='time', values='voltage')
+coefs = np.polyfit(dfpivot.columns, dfpivot.T, deg=1).T
+dfslopes = pd.DataFrame(index=dfpivot.index)
+# dfslopes['t0'] = sorted(df.t0.unique())  #TODO: n t0 does not match n sweeps. WHY?
+dfslopes['type'] = name + "_slope"
+dfslopes['algorithm'] = 'linear'
+dfslopes['value'] = coefs[:, 0]  # TODO: verify that it was the correct columns, and that values are reasonable
+dfslopes
+
+
+# %%
+
+# %%
+def measureslope_vec(df, t_slope, halfwidth, name="EPSP", channel=0, stim='a'):  #TODO: shoudl channel and stim go in here? probably not. select before calling
+    """
+    vectorized measure slope
+    """
+    def getbool(df, channel=0, stim='a'):
+        vecbool = (df['channel'] == channel) & (df['stim'] == stim)
+        return vecbool
+
+    print(f'measureslope(df: {df}, t_slope: {t_slope}, halfwidth: {halfwidth}, name="EPSP"):')
+
+    df = dfdata[getbool(dfdata, channel=channel, stim=stim) & ((t_slope - halfwidth) <= dfdata.time) & (dfdata.time <= (t_slope + halfwidth))]
+    dfpivot = df.pivot(index='sweep', columns='time', values='voltage')
+    coefs = np.polyfit(dfpivot.columns, dfpivot.T, deg=1).T
+    dfslopes = pd.DataFrame(index=dfpivot.index)
+    # dfslopes['t0'] = sorted(df.t0.unique())  #TODO: n t0 does not match n sweeps. WHY?
+    dfslopes['type'] = name + "_slope"
+    dfslopes['algorithm'] = 'linear'
+    dfslopes['value'] = coefs[:, 0]  # TODO: verify that it was the correct columns, and that values are reasonable
+
+    return dfslopes
+
+
+# %%
+
+# %%
 ''' Standalone test:'''
 if __name__ == "__main__":
     print()
@@ -444,3 +498,5 @@ if __name__ == "__main__":
 
 # %%
 '''
+
+# %%
