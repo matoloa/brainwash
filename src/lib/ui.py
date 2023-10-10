@@ -214,15 +214,71 @@ class Ui_measure_window(QtCore.QObject):
         self.measure_graph_mean.setSizePolicy(sizePolicy)
         self.measure_graph_mean.setObjectName("measure_graph_mean")
         self.measure_verticalLayout.addWidget(self.measure_graph_mean)
-        self.measure_info = QtWidgets.QTableView(measure)
-        self.measure_info.setObjectName("measure_info")
-        self.measure_verticalLayout.addWidget(self.measure_info)
+        self.measure_toolbox = QtWidgets.QFrame(measure)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.measure_toolbox.sizePolicy().hasHeightForWidth())
+        self.measure_toolbox.setSizePolicy(sizePolicy)
+        self.measure_toolbox.setMinimumSize(QtCore.QSize(0, 130))
+        self.measure_toolbox.setMaximumSize(QtCore.QSize(16777215, 100))
+        self.measure_toolbox.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.measure_toolbox.setFrameShadow(QtWidgets.QFrame.Plain)
+        self.measure_toolbox.setLineWidth(0)
+        self.measure_toolbox.setObjectName("measure_toolbox")
+        self.pushButton_EPSP_slope = QtWidgets.QPushButton(self.measure_toolbox)
+        self.pushButton_EPSP_slope.setGeometry(QtCore.QRect(10, 30, 83, 25))
+        self.pushButton_EPSP_slope.setObjectName("pushButton_EPSP_slope")
+        self.pushButton_EPSP_amp = QtWidgets.QPushButton(self.measure_toolbox)
+        self.pushButton_EPSP_amp.setGeometry(QtCore.QRect(10, 90, 83, 25))
+        self.pushButton_EPSP_amp.setObjectName("pushButton_EPSP_amp")
+        self.pushButton_EPSP_size = QtWidgets.QPushButton(self.measure_toolbox)
+        self.pushButton_EPSP_size.setGeometry(QtCore.QRect(10, 60, 83, 25))
+        self.pushButton_EPSP_size.setObjectName("pushButton_EPSP_size")
+        self.pushButton_volley_size = QtWidgets.QPushButton(self.measure_toolbox)
+        self.pushButton_volley_size.setGeometry(QtCore.QRect(170, 60, 83, 25))
+        self.pushButton_volley_size.setObjectName("pushButton_volley_size")
+        self.pushButton_volley_amp = QtWidgets.QPushButton(self.measure_toolbox)
+        self.pushButton_volley_amp.setGeometry(QtCore.QRect(170, 90, 83, 25))
+        self.pushButton_volley_amp.setObjectName("pushButton_volley_amp")
+        self.pushButton_volley_slope = QtWidgets.QPushButton(self.measure_toolbox)
+        self.pushButton_volley_slope.setGeometry(QtCore.QRect(170, 30, 83, 25))
+        self.pushButton_volley_slope.setObjectName("pushButton_volley_slope")
+        self.label_EPSP_ms = QtWidgets.QLabel(self.measure_toolbox)
+        self.label_EPSP_ms.setGeometry(QtCore.QRect(110, 10, 21, 17))
+        self.label_EPSP_ms.setObjectName("label_EPSP_ms")
+        self.label_volley_ms = QtWidgets.QLabel(self.measure_toolbox)
+        self.label_volley_ms.setGeometry(QtCore.QRect(270, 10, 21, 17))
+        self.label_volley_ms.setObjectName("label_volley_ms")
+        self.lineEdit_volley_slope = QtWidgets.QLineEdit(self.measure_toolbox)
+        self.lineEdit_volley_slope.setGeometry(QtCore.QRect(260, 30, 51, 25))
+        self.lineEdit_volley_slope.setObjectName("lineEdit_volley_slope")
+        self.lineEdit_volley_size = QtWidgets.QLineEdit(self.measure_toolbox)
+        self.lineEdit_volley_size.setGeometry(QtCore.QRect(260, 60, 51, 25))
+        self.lineEdit_volley_size.setObjectName("lineEdit_volley_size")
+        self.lineEdit_volley_amp = QtWidgets.QLineEdit(self.measure_toolbox)
+        self.lineEdit_volley_amp.setGeometry(QtCore.QRect(260, 90, 51, 25))
+        self.lineEdit_volley_amp.setObjectName("lineEdit_volley_amp")
+        self.lineEdit_EPSP_size = QtWidgets.QLineEdit(self.measure_toolbox)
+        self.lineEdit_EPSP_size.setGeometry(QtCore.QRect(100, 60, 51, 25))
+        self.lineEdit_EPSP_size.setObjectName("lineEdit_EPSP_size")
+        self.lineEdit_EPSP_amp = QtWidgets.QLineEdit(self.measure_toolbox)
+        self.lineEdit_EPSP_amp.setGeometry(QtCore.QRect(100, 90, 51, 25))
+        self.lineEdit_EPSP_amp.setObjectName("lineEdit_EPSP_amp")
+        self.lineEdit_EPSP_slope = QtWidgets.QLineEdit(self.measure_toolbox)
+        self.lineEdit_EPSP_slope.setGeometry(QtCore.QRect(100, 30, 51, 25))
+        self.lineEdit_EPSP_slope.setObjectName("lineEdit_EPSP_slope")
+        self.measure_verticalLayout.addWidget(self.measure_toolbox)
         self.measure_graph_output = QtWidgets.QWidget(measure)
         self.measure_graph_output.setObjectName("measure_graph_output")
         self.measure_verticalLayout.addWidget(self.measure_graph_output)
-        self.measure_verticalLayout.setStretch(0, 4)
-        self.measure_verticalLayout.setStretch(1, 1)
-        self.measure_verticalLayout.setStretch(2, 4)
+        self.measure_info = QtWidgets.QTableView(measure)
+        self.measure_info.setMinimumSize(QtCore.QSize(0, 50))
+        self.measure_info.setObjectName("measure_info")
+        self.measure_verticalLayout.addWidget(self.measure_info)
+        self.measure_verticalLayout.setStretch(0, 5)
+        self.measure_verticalLayout.setStretch(2, 5)
+        self.measure_verticalLayout.setStretch(3, 1)
         self.verticalLayout.addLayout(self.measure_verticalLayout)
 
         self.retranslateUi(measure)
@@ -231,6 +287,14 @@ class Ui_measure_window(QtCore.QObject):
     def retranslateUi(self, measure):
         _translate = QtCore.QCoreApplication.translate
         measure.setWindowTitle(_translate("measure", "Placeholder Window Title"))
+        self.pushButton_EPSP_slope.setText(_translate("measure", "EPSP slope"))
+        self.pushButton_EPSP_amp.setText(_translate("measure", "EPSP amp."))
+        self.pushButton_EPSP_size.setText(_translate("measure", "EPSP size"))
+        self.pushButton_volley_size.setText(_translate("measure", "Volley size"))
+        self.pushButton_volley_amp.setText(_translate("measure", "Volley amp."))
+        self.pushButton_volley_slope.setText(_translate("measure", "Volley slope"))
+        self.label_EPSP_ms.setText(_translate("measure", "ms"))
+        self.label_volley_ms.setText(_translate("measure", "ms"))
 
 
 ################################################################
@@ -1394,8 +1458,40 @@ class Measure_window_sub(Ui_measure_window):
         super(Measure_window_sub, self).__init__()
         self.setupUi(measure_window)
         self.parent = parent
+        # TODO: expand this as more aspects are added
+        self.supported_aspects = {"EPSP_slope", "EPSP_amp"}
+        self.toggle(self.pushButton_EPSP_slope, "EPSP_slope") # default for now TODO: Load/Save preference in local .cfg
+        self.pushButton_EPSP_slope.setDown(True) # TODO: setDown works as expected when the button is NOT clicked
         if verbose:
             print(" - measure_window init")
+        self.pushButton_EPSP_slope.setCheckable(True)
+        self.pushButton_EPSP_size.setCheckable(True)
+        self.pushButton_EPSP_amp.setCheckable(True)
+        self.pushButton_volley_slope.setCheckable(True)
+        self.pushButton_volley_size.setCheckable(True)
+        self.pushButton_volley_amp.setCheckable(True)
+        self.pushButton_EPSP_slope.pressed.connect(lambda: self.toggle(self.pushButton_EPSP_slope, "EPSP_slope"))
+        self.pushButton_EPSP_size.pressed.connect(lambda: self.toggle(self.pushButton_EPSP_size, "EPSP_size"))
+        self.pushButton_EPSP_amp.pressed.connect(lambda: self.toggle(self.pushButton_EPSP_amp, "EPSP_amp"))
+        self.pushButton_volley_slope.pressed.connect(lambda: self.toggle(self.pushButton_volley_slope, "volley_slope"))
+        self.pushButton_volley_size.pressed.connect(lambda: self.toggle(self.pushButton_volley_size, "volley_size"))
+        self.pushButton_volley_amp.pressed.connect(lambda: self.toggle(self.pushButton_volley_amp, "volley_amp"))
+    
+    def untoggle(self):
+        self.pushButton_EPSP_slope.setChecked(False)
+        self.pushButton_EPSP_size.setChecked(False)
+        self.pushButton_EPSP_amp.setChecked(False)  
+        self.pushButton_volley_slope.setChecked(False)
+        self.pushButton_volley_size.setChecked(False)
+        self.pushButton_volley_amp.setChecked(False)  
+
+    def toggle(self, button, aspect):
+        self.untoggle()
+        self.aspect = aspect # set which aspect is changed when meangraph is clicked
+        button.setChecked(True)
+        button.setDown(False) # TODO: setDown seems to do the OPPOSITE of what it should do; setting it to True makes the buttons NOT look depressed.
+        #print(f"toggle button {button} isChecked: {button.isChecked()}, "isDown(: {button.isDown()}")         
+
 
     def setMeanGraph(self, row, dfmean, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
         # get dfmean from selected row in UIsub.
@@ -1434,6 +1530,7 @@ class Measure_window_sub(Ui_measure_window):
 
         self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
 
+
     def setOutputGraph(self, dfoutput):
         # get dfoutput from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
@@ -1457,13 +1554,13 @@ class Measure_window_sub(Ui_measure_window):
    
     def meanClicked(self, event):
         if event.inaxes is not None:
+            if self.aspect not in self.supported_aspects:
+                print(f"meanClicked: {self.aspect} not supported.")
+                return
             x = event.xdata
-            y = event.ydata
-            # print(f" . Mean clicked at x={x}, y={y}")
             # find time in self.dfmean closest to x
             time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
-            #self.updateOnClick(time=time, value="EPSP_amp")
-            self.updateOnClick(time=time, value="EPSP_slope")
+            self.updateOnClick(time=time, value=self.aspect)
 
 
     def outputClicked(self, event):
@@ -1486,6 +1583,8 @@ class Measure_window_sub(Ui_measure_window):
 
 
     def updateOnClick(self, time, value):
+        if verbose:
+            print(f"updateOnClick: time={time}, value={value}")
         t_value  = ("t_" + value)
         t_method = (t_value + "_method")
         t_param = (t_value + "_param")
