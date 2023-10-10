@@ -1465,6 +1465,9 @@ class Measure_window_sub(Ui_measure_window):
         self.supported_aspects = {"EPSP_slope", "EPSP_amp"}
         self.toggle(self.pushButton_EPSP_slope, "EPSP_slope") # default for now TODO: Load/Save preference in local .cfg
         self.pushButton_EPSP_slope.setDown(True) # TODO: setDown works as expected when the button is NOT clicked
+
+        # TODO: Iterate through supported_aspects to generate all this code
+
         # lineEdits
         self.lineEdit_EPSP_slope.setText(self.m(row['t_EPSP_slope']))
         #self.lineEdit_EPSP_size.setText(self.m(row['t_EPSP_size'])) # no such column; stash in params?
@@ -1486,9 +1489,34 @@ class Measure_window_sub(Ui_measure_window):
         self.pushButton_volley_size.pressed.connect(lambda: self.toggle(self.pushButton_volley_size, "volley_size"))
         self.pushButton_volley_amp.pressed.connect(lambda: self.toggle(self.pushButton_volley_amp, "volley_amp"))
 
+        self.lineEdit_EPSP_slope.editingFinished.connect(lambda: self.updateOnEdit(self.lineEdit_EPSP_slope, "EPSP_slope"))
+
+
     def m(self, SI):
         # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
         return str(round(SI * 1000, 1)) # TODO: single decimal assumes 10KHz sampling rate; make this more flexible
+
+    def updateOnEdit(self, lineEdit, aspect):
+        # check if time is valid TODO: WIP - Fails everything right now!
+        if not lineEdit.text().isnumeric():
+            print("Invalid input")
+            return
+        # convert lineEdit.text() from milliseconds to seconds
+        time = float(lineEdit.text()) / 1000 # convert to SI
+        # check if value is within dfmean time range
+        if  time < self.dfmean['time'].min() or time > self.dfmean['time'].max():
+            print(f"Time {time}s out of range")
+            return
+        # update df_project
+        t_aspect  = ("t_" + aspect)
+        t_method = (t_aspect + "_method")
+        t_param = (t_aspect + "_param")
+        ui.df_project.loc[self.row.name, t_aspect] = time
+        ui.df_project.loc[self.row.name, t_method] = "manual"
+        ui.df_project.loc[self.row.name, t_param] = "-"
+        ui.save_df_project()
+        # update meangraph with new value
+        # TODO: WIP - not updating graph yet!
 
     def untoggle(self):
         self.pushButton_EPSP_slope.setChecked(False)
