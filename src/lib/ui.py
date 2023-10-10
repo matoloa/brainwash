@@ -1328,12 +1328,6 @@ class UIsub(Ui_MainWindow):
             # TODO: Make it import the missing file
             print("Unknown number of sweeps - not imported?")
             return
-        # Open window
-        self.measure = QtWidgets.QDialog()
-        self.measure_window_sub = Measure_window_sub(self.measure)
-        window_name = (recording_name + ",_ch" + str(channel) + ", st" + stim)
-        self.measure.setWindowTitle(window_name)
-        self.measure.show()
         # Get dataframes
         dfmean = self.get_dfmean(ser_table_row)
         dfoutput = self.get_dfoutput(row=ser_table_row)
@@ -1341,8 +1335,14 @@ class UIsub(Ui_MainWindow):
         t_VEB = self.df_project.loc[row_index, "t_VEB"]
         t_EPSP_amp = self.df_project.loc[row_index, "t_EPSP_amp"]
         t_EPSP_slope = self.df_project.loc[row_index, "t_EPSP_slope"]
+        # Open window
+        self.measure = QtWidgets.QDialog()
+        self.measure_window_sub = Measure_window_sub(self.measure, row=ser_table_row, dfmean=dfmean)
+        window_name = (recording_name + ",_ch" + str(channel) + ", st" + stim)
+        self.measure.setWindowTitle(window_name)
+        self.measure.show()
         # Set graphs
-        self.measure_window_sub.setMeanGraph(row=ser_table_row, dfmean=dfmean, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
+        self.measure_window_sub.setMeanGraph(t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
         self.measure_window_sub.setOutputGraph(dfoutput=dfoutput)
     
             
@@ -1454,16 +1454,25 @@ class Filetreesub(Ui_Dialog):
 
 
 class Measure_window_sub(Ui_measure_window):
-    def __init__(self, measure_window, parent=None, folder="."):
+    def __init__(self, measure_window, parent=None, row=None, dfmean=None, folder="."):
         super(Measure_window_sub, self).__init__()
+        # local versions of row and dfmean that persist unchanged (TODO: check!) while the window is open
+        self.row = row
+        self.dfmean = dfmean
         self.setupUi(measure_window)
         self.parent = parent
         # TODO: expand this as more aspects are added
         self.supported_aspects = {"EPSP_slope", "EPSP_amp"}
         self.toggle(self.pushButton_EPSP_slope, "EPSP_slope") # default for now TODO: Load/Save preference in local .cfg
         self.pushButton_EPSP_slope.setDown(True) # TODO: setDown works as expected when the button is NOT clicked
-        if verbose:
-            print(" - measure_window init")
+        # lineEdits
+        self.lineEdit_EPSP_slope.setText(self.m(row['t_EPSP_slope']))
+        #self.lineEdit_EPSP_size.setText(self.m(row['t_EPSP_size'])) # no such column; stash in params?
+        self.lineEdit_EPSP_amp.setText(self.m(row['t_EPSP_amp']))
+        self.lineEdit_volley_slope.setText(self.m(row['t_volley_slope']))
+        #self.lineEdit_volley_size.setText(self.m(row['t_volley_size'])) # no such column; stash in params?
+        self.lineEdit_volley_amp.setText(self.m(row['t_volley_amp']))
+
         self.pushButton_EPSP_slope.setCheckable(True)
         self.pushButton_EPSP_size.setCheckable(True)
         self.pushButton_EPSP_amp.setCheckable(True)
@@ -1476,7 +1485,11 @@ class Measure_window_sub(Ui_measure_window):
         self.pushButton_volley_slope.pressed.connect(lambda: self.toggle(self.pushButton_volley_slope, "volley_slope"))
         self.pushButton_volley_size.pressed.connect(lambda: self.toggle(self.pushButton_volley_size, "volley_size"))
         self.pushButton_volley_amp.pressed.connect(lambda: self.toggle(self.pushButton_volley_amp, "volley_amp"))
-    
+
+    def m(self, SI):
+        # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
+        return str(round(SI * 1000, 1)) # TODO: single decimal assumes 10KHz sampling rate; make this more flexible
+
     def untoggle(self):
         self.pushButton_EPSP_slope.setChecked(False)
         self.pushButton_EPSP_size.setChecked(False)
@@ -1490,18 +1503,15 @@ class Measure_window_sub(Ui_measure_window):
         self.aspect = aspect # set which aspect is changed when meangraph is clicked
         button.setChecked(True)
         button.setDown(False) # TODO: setDown seems to do the OPPOSITE of what it should do; setting it to True makes the buttons NOT look depressed.
-        #print(f"toggle button {button} isChecked: {button.isChecked()}, "isDown(: {button.isDown()}")         
-
-
-    def setMeanGraph(self, row, dfmean, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
+        #print(f"toggle button {button} isChecked: {button.isChecked()}, "isDown(: {button.isDown()}")
+    
+    def setMeanGraph(self, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
 
-        self.row = row # store an internal version of the row, to be used in meanClicked and outputClicked
-        self.dfmean = dfmean
+        row = self.row # store an internal version of the row, to be used in meanClicked and outputClicked
+        dfmean = self.dfmean
 
-        if verbose:
-            print("setMeanGraph", dfmean)
         self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
         self.si_v = None
         self.si_sweep = None
@@ -1518,7 +1528,6 @@ class Measure_window_sub(Ui_measure_window):
         self.v_t_EPSP_slope_end =     sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope + 0.0004, color="green", linestyle=":")
 
         # t_VEB
-        print(f"t_VEB: {t_VEB}")
         g.axvline(t_VEB, color="grey", linestyle="--")
 
         self.canvas_mean.axes.set_xlim(ui.graph_xlim)
@@ -1560,7 +1569,7 @@ class Measure_window_sub(Ui_measure_window):
             x = event.xdata
             # find time in self.dfmean closest to x
             time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
-            self.updateOnClick(time=time, value=self.aspect)
+            self.updateOnClick(time=time, aspect=self.aspect)
 
 
     def outputClicked(self, event):
@@ -1582,36 +1591,36 @@ class Measure_window_sub(Ui_measure_window):
             self.canvas_mean.draw()
 
 
-    def updateOnClick(self, time, value):
+    def updateOnClick(self, time, aspect):
         if verbose:
-            print(f"updateOnClick: time={time}, value={value}")
-        t_value  = ("t_" + value)
-        t_method = (t_value + "_method")
-        t_param = (t_value + "_param")
+            print(f"updateOnClick: time={time}, aspect={aspect}")
+        t_aspect  = ("t_" + aspect)
+        t_method = (t_aspect + "_method")
+        t_param = (t_aspect + "_param")
         # update df_project
-        ui.df_project.loc[self.row.name, t_value] = time
+        ui.df_project.loc[self.row.name, t_aspect] = time
         ui.df_project.loc[self.row.name, t_method] = "manual"
         ui.df_project.loc[self.row.name, t_param] = "-"
         ui.save_df_project()
         if verbose:
-            print(f" . ui.df_project.loc[self.row.name, t_value]: {ui.df_project.loc[self.row.name, t_value]}")
+            print(f" . ui.df_project.loc[self.row.name, t_aspect]: {ui.df_project.loc[self.row.name, t_aspect]}")
             print(f" . ui.df_project.loc[self.row.name, t_method: {ui.df_project.loc[self.row.name, t_method]}")
             print(f" . ui.df_project.loc[self.row.name, t_param]: {ui.df_project.loc[self.row.name, t_param]}")
-        #recalculate value
+        #recalculate aspect
         dfdata = ui.get_dfdata(row=self.row)
         dfoutput = ui.get_dfoutput(row=self.row)
-        if value == "EPSP_amp":
+        if aspect == "EPSP_amp":
             new_dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=time)
             graph_color = "black"
-            plot_on_mean = {'center': ("v_" + t_value)}
-        elif value == "EPSP_slope":
+            plot_on_mean = {'center': ("v_" + t_aspect)}
+        elif aspect == "EPSP_slope":
             new_dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_slope=time)
             graph_color = "green"
-            plot_on_mean = {'center': ("v_" + t_value),
-                            'start':  ("v_" + t_value + "_start"),
-                            'end':    ("v_" + t_value + "_end")}
+            plot_on_mean = {'center': ("v_" + t_aspect),
+                            'start':  ("v_" + t_aspect + "_start"),
+                            'end':    ("v_" + t_aspect + "_end")}
         #update output; dict and file
-        dfoutput[value] = new_dfoutput[value]
+        dfoutput[aspect] = new_dfoutput[aspect]
         key_output = ui.row2key(row=self.row) + "_output"
         ui.dict_outputs[key_output] = dfoutput
         ui.save_dict(dict2save=ui.dict_outputs)
@@ -1626,6 +1635,10 @@ class Measure_window_sub(Ui_measure_window):
             elif key == "end":
                 setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time + 0.0004, color=graph_color, linestyle=":"))
         self.canvas_mean.draw()
+        #update appropriate lineEdit
+        print(f"lineEdit_{aspect}: time{time} to ms: {self.m(time)}")
+        line2update = getattr(self, "lineEdit_" + aspect)
+        line2update.setText(self.m(time))
         #update output graph
         self.output_EPSP_amp.lines[0].set_data(dfoutput['sweep'], dfoutput['EPSP_amp'])
         self.output_EPSP_slope.lines[1].set_data(dfoutput['sweep'], dfoutput['EPSP_slope'])
@@ -1646,8 +1659,8 @@ def get_signals(source):
     print("get_signals:")
     for subcls in cls.mro():
         clsname = f"{subcls.__module__}.{subcls.__name__}"
-        for key, value in sorted(vars(subcls).items()):
-            if isinstance(value, signal):
+        for key, aspect in sorted(vars(subcls).items()):
+            if isinstance(aspect, signal):
                 print(f"{key} [{clsname}]")
 
 
