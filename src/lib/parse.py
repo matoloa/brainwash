@@ -93,9 +93,9 @@ def parse_abfFolder(folderpath):
     return df
 
 # %%
-def build_dfmean(df, rollingwidth=3):
+def build_dfmean(dfdata, rollingwidth=3):
     # TODO: is rollingwidth "radius" or "diameter"?
-    dfmean = pd.DataFrame(df.pivot(columns='time', index='sweep', values='voltage_raw').mean())
+    dfmean = pd.DataFrame(dfdata.pivot(columns='time', index='sweep', values='voltage_raw').mean())
     dfmean.columns = ['voltage']
     # generate diffs
     dfmean["prim"] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
@@ -104,15 +104,21 @@ def build_dfmean(df, rollingwidth=3):
     dfmean.reset_index(inplace=True)
     i_stim = dfmean.prim.idxmax()
     median = dfmean['voltage'].iloc[i_stim-20:i_stim-5].median() # TODO: hardcoded 20 and 5
-    dfmean['voltage'].subtract(median, axis='rows')
+    #print(f"median: {median}")
+    #print(f"dfmean BEFORE subtract: {dfmean}")
+    dfmean['voltage'] = dfmean['voltage'] - median
+    #print(f"dfmean AFTER subtract: {dfmean}")
     return dfmean
 
 def zeroSweeps(dfdata, dfmean):
+    #print(f"dfdata BEFORE subtract: {dfdata}")
     i_stim = dfmean.prim.idxmax()
     dfpivot = dfdata.pivot(index='sweep', columns='time', values='voltage_raw')
     sermedians = dfpivot.iloc[:, i_stim-20:i_stim-5].median(axis=1) # TODO: hardcoded 20 and 5
+    #print(f"sermedians: {sermedians}")
     dfpivot = dfpivot.subtract(sermedians, axis='rows')
     dfdata['voltage'] = dfpivot.stack().reset_index().sort_values(by=['sweep', 'time'])[0].values
+    #print(f"dfdata AFTER subtract: {dfdata}")
     df_zeroed = dfdata
     return df_zeroed
 
