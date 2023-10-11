@@ -1496,28 +1496,6 @@ class Measure_window_sub(Ui_measure_window):
         # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
         return str(round(SI * 1000, 1)) # TODO: single decimal assumes 10KHz sampling rate; make this more flexible
 
-    def updateOnEdit(self, lineEdit, aspect):
-        # check if time is valid TODO: WIP - Fails everything right now!
-        if not lineEdit.text().isnumeric():
-            print("Invalid input")
-            return
-        # convert lineEdit.text() from milliseconds to seconds
-        time = float(lineEdit.text()) / 1000 # convert to SI
-        # check if value is within dfmean time range
-        if  time < self.dfmean['time'].min() or time > self.dfmean['time'].max():
-            print(f"Time {time}s out of range")
-            return
-        # update df_project
-        t_aspect  = ("t_" + aspect)
-        t_method = (t_aspect + "_method")
-        t_param = (t_aspect + "_param")
-        ui.df_project.loc[self.row.name, t_aspect] = time
-        ui.df_project.loc[self.row.name, t_method] = "manual"
-        ui.df_project.loc[self.row.name, t_param] = "-"
-        ui.save_df_project()
-        # update meangraph with new value
-        # TODO: WIP - not updating graph yet!
-
     def untoggle(self):
         self.pushButton_EPSP_slope.setChecked(False)
         self.pushButton_EPSP_size.setChecked(False)
@@ -1533,6 +1511,7 @@ class Measure_window_sub(Ui_measure_window):
         button.setDown(False) # TODO: setDown seems to do the OPPOSITE of what it should do; setting it to True makes the buttons NOT look depressed.
         #print(f"toggle button {button} isChecked: {button.isChecked()}, "isDown(: {button.isDown()}")
     
+
     def setMeanGraph(self, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
@@ -1571,9 +1550,6 @@ class Measure_window_sub(Ui_measure_window):
     def setOutputGraph(self, dfoutput):
         # get dfoutput from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
-        if verbose:
-            print("setOutputGraph", dfoutput)
-        
         self.canvas_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
 
         if dfoutput['EPSP_amp'].notna().any():
@@ -1679,6 +1655,30 @@ class Measure_window_sub(Ui_measure_window):
         print(f"self.output_EPSP_slope.lines[0].__repr__(): {self.output_EPSP_slope.lines[0].__repr__()}")
         print(f"self.output_EPSP_slope.lines[1].__repr__(): {self.output_EPSP_slope.lines[1].__repr__()}")
         self.canvas_output.draw()
+
+
+    def updateOnEdit(self, lineEdit, aspect):
+        # check if time is valid TODO: WIP - Fails everything right now!
+        input_sanitized = lineEdit.text().replace(",", ".")
+        try:
+            time = float(input_sanitized)/1000 # convert to SI
+        except:
+            print("Invalid input: must be a number.")
+            return
+        # check if value is within dfmean time range
+        if  time < self.dfmean['time'].min() or time > self.dfmean['time'].max():
+            print(f"Time {time}s out of range")
+            return
+        # update df_project
+        t_aspect  = ("t_" + aspect)
+        t_method = (t_aspect + "_method")
+        t_param = (t_aspect + "_param")
+        ui.df_project.loc[self.row.name, t_aspect] = time
+        ui.df_project.loc[self.row.name, t_method] = "manual"
+        ui.df_project.loc[self.row.name, t_param] = "-"
+        ui.save_df_project()
+        # update meangraph with new value
+        # TODO: WIP - not updating graph yet!
 
 
 def get_signals(source):
