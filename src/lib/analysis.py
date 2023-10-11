@@ -289,11 +289,8 @@ def measureslope(df, t_slope, halfwidth, name="EPSP"):
         y = dftemp2.voltage.values.reshape(-1, 1)
 
         reg.fit(x, y)
-        assert dftemp2.t0.nunique() == 1
-        t0 = dftemp2.t0.unique()[0]
         dict_slope = {
             "sweep": sweep,
-            "t0": t0,
             "value": reg.coef_[0][0],
             "type": name + "_slope",
             "algorithm": "linear",
@@ -310,45 +307,41 @@ path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/dat
 # path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/A_21_P0701-S2.csv")
 # path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_mean.csv")
 dfdata = pd.read_csv(str(path_datafile)) # a persisted csv-form of the data file
+df_mean_a = df_mean[(df_mean['channel']==0) & (df_mean['stim']=='b')] # select stim 'a' only in mean file
+df_mean_a.reset_index(inplace=True)
+dict_t = find_all_t(df_mean_a) # use the average all sweeps to determine where all events are located (noise reduction)
+t_EPSP_amp = dict_t['t_EPSP_amp']
+t_EPSP_slope = dict_t['t_EPSP_slope']
 
-def getbool(df, channel=0, stim='a'):
+def getbool(df, channel=0, stim='b'):
     vecbool = (df['channel'] == channel) & (df['stim'] == stim)
     return vecbool
 
-channel = 1
-stim = 'a'
-t_slope = 0.0802
+channel = 0
+stim = 'b'
+t_slope = t_EPSP_slope
 halfwidth = 0.0004
 name="EPSP"
-df = dfdata[getbool(dfdata, channel=channel, stim=stim) & ((t_slope - halfwidth) <= dfdata.time) & (dfdata.time <= (t_slope + halfwidth))]
-dfpivot = df.pivot(index='sweep', columns='time', values='voltage')
-coefs = np.polyfit(dfpivot.columns, dfpivot.T, deg=1).T
-dfslopes = pd.DataFrame(index=dfpivot.index)
-# dfslopes['t0'] = sorted(df.t0.unique())  #TODO: n t0 does not match n sweeps. WHY?
-dfslopes['type'] = name + "_slope"
-dfslopes['algorithm'] = 'linear'
-dfslopes['value'] = coefs[:, 0]  # TODO: verify that it was the correct columns, and that values are reasonable
-dfslopes
+df = dfdata[getbool(dfdata, channel=channel, stim=stim)]
+print(f"dfshape: {df.shape}")
+print(f"dfvalue: {df.sweep.value_counts().unique()}")
+dfslopes = measureslope_vec(df, t_slope, halfwidth)
+dfslopes.value.plot()
 
 
 # %%
-
-# %%
-def measureslope_vec(df, t_slope, halfwidth, name="EPSP", channel=0, stim='a'):  #TODO: shoudl channel and stim go in here? probably not. select before calling
+def measureslope_vec(dfdata, t_slope, halfwidth, name="EPSP"):
     """
     vectorized measure slope
     """
-    def getbool(df, channel=0, stim='a'):
-        vecbool = (df['channel'] == channel) & (df['stim'] == stim)
-        return vecbool
 
-    print(f'measureslope(df: {df}, t_slope: {t_slope}, halfwidth: {halfwidth}, name="EPSP"):')
+    print(f'measureslope(df: {dfdata}, t_slope: {t_slope}, halfwidth: {halfwidth}, name="EPSP"):')
 
-    df = dfdata[getbool(dfdata, channel=channel, stim=stim) & ((t_slope - halfwidth) <= dfdata.time) & (dfdata.time <= (t_slope + halfwidth))]
+    df = dfdata[((t_slope - halfwidth) <= dfdata.time) & (dfdata.time <= (t_slope + halfwidth))]
+    print(f"df before pivot:{df.shape}")
     dfpivot = df.pivot(index='sweep', columns='time', values='voltage')
     coefs = np.polyfit(dfpivot.columns, dfpivot.T, deg=1).T
     dfslopes = pd.DataFrame(index=dfpivot.index)
-    # dfslopes['t0'] = sorted(df.t0.unique())  #TODO: n t0 does not match n sweeps. WHY?
     dfslopes['type'] = name + "_slope"
     dfslopes['algorithm'] = 'linear'
     dfslopes['value'] = coefs[:, 0]  # TODO: verify that it was the correct columns, and that values are reasonable
