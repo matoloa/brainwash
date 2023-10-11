@@ -1462,35 +1462,22 @@ class Measure_window_sub(Ui_measure_window):
         self.setupUi(measure_window)
         self.parent = parent
         # TODO: expand this as more aspects are added
-        self.supported_aspects = {"EPSP_slope", "EPSP_amp"}
-        self.toggle(self.pushButton_EPSP_slope, "EPSP_slope") # default for now TODO: Load/Save preference in local .cfg
-        self.pushButton_EPSP_slope.setDown(True) # TODO: setDown works as expected when the button is NOT clicked
+        self.supported_aspects = [ "EPSP_amp", "EPSP_slope"]
+        self.untoggle()
+        # set default aspect
+        self.toggle(self.pushButton_EPSP_amp, "EPSP_amp") # default for now TODO: Load/Save preference in local .cfg
+        self.pushButton_EPSP_amp.setDown(True) # TODO: setDown works as expected when the button is NOT clicked
 
-        # TODO: Iterate through supported_aspects to generate all this code
-
-        # lineEdits
-        self.lineEdit_EPSP_slope.setText(self.m(row['t_EPSP_slope']))
-        #self.lineEdit_EPSP_size.setText(self.m(row['t_EPSP_size'])) # no such column; stash in params?
-        self.lineEdit_EPSP_amp.setText(self.m(row['t_EPSP_amp']))
-        self.lineEdit_volley_slope.setText(self.m(row['t_volley_slope']))
-        #self.lineEdit_volley_size.setText(self.m(row['t_volley_size'])) # no such column; stash in params?
-        self.lineEdit_volley_amp.setText(self.m(row['t_volley_amp']))
-
-        self.pushButton_EPSP_slope.setCheckable(True)
-        self.pushButton_EPSP_size.setCheckable(True)
-        self.pushButton_EPSP_amp.setCheckable(True)
-        self.pushButton_volley_slope.setCheckable(True)
-        self.pushButton_volley_size.setCheckable(True)
-        self.pushButton_volley_amp.setCheckable(True)
-        self.pushButton_EPSP_slope.pressed.connect(lambda: self.toggle(self.pushButton_EPSP_slope, "EPSP_slope"))
-        self.pushButton_EPSP_size.pressed.connect(lambda: self.toggle(self.pushButton_EPSP_size, "EPSP_size"))
-        self.pushButton_EPSP_amp.pressed.connect(lambda: self.toggle(self.pushButton_EPSP_amp, "EPSP_amp"))
-        self.pushButton_volley_slope.pressed.connect(lambda: self.toggle(self.pushButton_volley_slope, "volley_slope"))
-        self.pushButton_volley_size.pressed.connect(lambda: self.toggle(self.pushButton_volley_size, "volley_size"))
-        self.pushButton_volley_amp.pressed.connect(lambda: self.toggle(self.pushButton_volley_amp, "volley_amp"))
-
-        self.lineEdit_EPSP_slope.editingFinished.connect(lambda: self.updateOnEdit(self.lineEdit_EPSP_slope, "EPSP_slope"))
-
+        # Iterate through supported_aspects to generate all this code
+        def loopConnectAspects(aspect):
+            aspect_button = getattr(self, f"pushButton_{aspect}")
+            aspect_edit = getattr(self, f"lineEdit_{aspect}")
+            aspect_button.setCheckable(True)
+            aspect_button.pressed.connect(lambda: self.toggle(aspect_button, aspect))
+            aspect_edit.setText(self.m(self.row[f"t_{aspect}"]))
+            aspect_edit.editingFinished.connect(lambda: self.updateOnEdit(aspect_edit, aspect))
+        for aspect in self.supported_aspects:
+            loopConnectAspects(aspect=aspect)
 
     def m(self, SI):
         # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
@@ -1507,6 +1494,7 @@ class Measure_window_sub(Ui_measure_window):
     def toggle(self, button, aspect):
         self.untoggle()
         self.aspect = aspect # set which aspect is changed when meangraph is clicked
+        print(f"toggle: {button} {aspect} persisted as self.aspect: {self.aspect}")
         button.setChecked(True)
         button.setDown(False) # TODO: setDown seems to do the OPPOSITE of what it should do; setting it to True makes the buttons NOT look depressed.
         #print(f"toggle button {button} isChecked: {button.isChecked()}, "isDown(: {button.isDown()}")
@@ -1516,7 +1504,7 @@ class Measure_window_sub(Ui_measure_window):
         # get dfmean from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
 
-        row = self.row # store an internal version of the row, to be used in meanClicked and outputClicked
+        #row = self.row # store an internal version of the row, to be used in meanClicked and outputClicked
         dfmean = self.dfmean
 
         self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
@@ -1598,6 +1586,26 @@ class Measure_window_sub(Ui_measure_window):
     def updateOnClick(self, time, aspect):
         if verbose:
             print(f"updateOnClick: time={time}, aspect={aspect}")
+        self.updateAspect(time, aspect)
+
+    def updateOnEdit(self, lineEdit, aspect):
+        print(f"updateOnEdit: lineEdit={lineEdit}, aspect={aspect}")
+        input_sanitized = lineEdit.text().replace(",", ".")
+        try:
+            time = float(input_sanitized)/1000 # convert to SI
+        except:
+            print("Invalid input: must be a number.")
+            lineEdit.setText("")
+            return
+        # check if value is within dfmean time range
+        if  time < self.dfmean['time'].min() or time > self.dfmean['time'].max():
+            print(f"Time {time}s out of range")
+            lineEdit.setText("")
+            return
+        self.updateAspect(time, aspect)
+    
+    def updateAspect(self, time, aspect):
+        # update df_project, dict_outputs, and the graphs
         t_aspect  = ("t_" + aspect)
         t_method = (t_aspect + "_method")
         t_param = (t_aspect + "_param")
@@ -1655,30 +1663,6 @@ class Measure_window_sub(Ui_measure_window):
         print(f"self.output_EPSP_slope.lines[0].__repr__(): {self.output_EPSP_slope.lines[0].__repr__()}")
         print(f"self.output_EPSP_slope.lines[1].__repr__(): {self.output_EPSP_slope.lines[1].__repr__()}")
         self.canvas_output.draw()
-
-
-    def updateOnEdit(self, lineEdit, aspect):
-        # check if time is valid TODO: WIP - Fails everything right now!
-        input_sanitized = lineEdit.text().replace(",", ".")
-        try:
-            time = float(input_sanitized)/1000 # convert to SI
-        except:
-            print("Invalid input: must be a number.")
-            return
-        # check if value is within dfmean time range
-        if  time < self.dfmean['time'].min() or time > self.dfmean['time'].max():
-            print(f"Time {time}s out of range")
-            return
-        # update df_project
-        t_aspect  = ("t_" + aspect)
-        t_method = (t_aspect + "_method")
-        t_param = (t_aspect + "_param")
-        ui.df_project.loc[self.row.name, t_aspect] = time
-        ui.df_project.loc[self.row.name, t_method] = "manual"
-        ui.df_project.loc[self.row.name, t_param] = "-"
-        ui.save_df_project()
-        # update meangraph with new value
-        # TODO: WIP - not updating graph yet!
 
 
 def get_signals(source):
