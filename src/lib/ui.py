@@ -1494,7 +1494,7 @@ class Measure_window_sub(Ui_measure_window):
     def toggle(self, button, aspect):
         self.untoggle()
         self.aspect = aspect # set which aspect is changed when meangraph is clicked
-        print(f"toggle: {button} {aspect} persisted as self.aspect: {self.aspect}")
+        #print(f"toggle: {button} {aspect} persisted as self.aspect: {self.aspect}")
         button.setChecked(True)
         button.setDown(False) # TODO: setDown seems to do the OPPOSITE of what it should do; setting it to True makes the buttons NOT look depressed.
         #print(f"toggle button {button} isChecked: {button.isChecked()}, "isDown(: {button.isDown()}")
