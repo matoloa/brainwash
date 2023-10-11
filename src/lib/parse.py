@@ -7,7 +7,7 @@ import pandas as pd  # dataframe module, think excel, but good
 import pyabf  # read data files atf, abf
 from neo import io  # read data files ibw
 
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from joblib import Memory
 
 memory = Memory("../cache", verbose=1)
@@ -116,14 +116,14 @@ def zeroSweeps(dfdata, dfmean):
     df_zeroed = dfdata
     return df_zeroed
 
-def persistdf(file_name, dict_folders, dfdata=None, dfmean=None):
+def persistdf(file_base, dict_folders, dfdata=None, dfmean=None):
     if dfdata is not None:
         dict_folders['data'].mkdir(exist_ok=True)
-        str_data_path = f"{dict_folders['data']}/{file_name}.csv"
+        str_data_path = f"{dict_folders['data']}/{file_base}.csv"
         dfdata.to_csv(str_data_path, index=False)
     if dfmean is not None:
         dict_folders['cache'].mkdir(exist_ok=True)
-        str_mean_path = f"{dict_folders['cache']}/{file_name}_mean.csv"
+        str_mean_path = f"{dict_folders['cache']}/{file_base}_mean.csv"
         dfmean.to_csv(str_mean_path, index=False)
 
 
@@ -169,19 +169,19 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
         dfcopy = df.copy()
         dfcopy = dfcopy.sort_values(by=['datetime', 'channel']).reset_index(drop=True)
         dfcopy['sweep_raw'] = dfcopy.index.to_numpy() // (sweeplength * nchannels)
-        list_data = []
+        dict_data_nsweeps = {}
         for channel in dfcopy.channel.unique():
             df_ch = dfcopy[dfcopy.channel==channel]
             for i, stim in enumerate(list_stims):
-                file_name = f"{recording_name}_Ch{channel}_{stim}.csv"
-                print(f"file_name: {file_name}")
+                file_base = f"{recording_name}_Ch{channel}_{stim}"
+                print(f"file_base: {file_base}")
                 df_ch_st = df_ch.loc[df_ch.sweep_raw % nstims == i].copy()
                 df_ch_st['sweep'] = (df_ch_st.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
                 dfmean = build_dfmean(df_ch_st)
                 dfdata = zeroSweeps(dfdata=df_ch_st, dfmean=dfmean)
-                persistdf(file_name=file_name, dict_folders=dict_folders, dfdata=dfdata, dfmean=dfmean)
-                list_data.append(f"{recording_name}_Ch{channel}_{stim}")
-        return list_data
+                persistdf(file_base=file_base, dict_folders=dict_folders, dfdata=dfdata, dfmean=dfmean)
+                dict_data_nsweeps[f"{recording_name}_Ch{channel}_{stim}"] = dfdata.sweep.nunique()
+        return dict_data_nsweeps
 
     if verbose:
         print(f"proj folder: {dict_folders['project']}")
@@ -220,15 +220,15 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     for _ in range(3):
         print()
     print("", "*** parse.py standalone test: ***")
-    for item in list_sources:
+    for item in tqdm(list_sources):
         if Path(item).is_dir():
             recording_name = os.path.basename(item)
         else:
             recording_name = os.path.basename(os.path.dirname(item))
         print(" - processing", item, "as recording_name", recording_name)
         df_files = pd.DataFrame({"path": [item], "recording_name": [recording_name]})
-        list_data = parseProjFiles(dict_folders=dict_folders, df=df_files)
-        print(f" - list_data: {list_data}") # what the parsed file turned into
+        dict_data_nsweeps = parseProjFiles(dict_folders=dict_folders, df=df_files)
+        print(f" - dict_data_nsweeps: {dict_data_nsweeps}") # what the parsed file turned into
         print()
 
 '''

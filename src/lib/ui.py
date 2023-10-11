@@ -474,8 +474,6 @@ def df_projectTemplate():
             "path",
             "checksum",
             "recording_name",
-            "channel",
-            "stim",
             "groups",
             "parsetimestamp",
             "sweeps",
@@ -791,8 +789,6 @@ class UIsub(Ui_MainWindow):
         df_p = pd.concat([df_p, dfAdd])
         df_p.reset_index(drop=True, inplace=True)
         df_p["groups"] = df_p["groups"].fillna(" ")
-        df_p["channel"] = df_p["channel"].fillna(" ")
-        df_p["stim"] = df_p["stim"].fillna(" ")
         df_p["sweeps"] = df_p["sweeps"].fillna("...")
         self.set_df_project(df_p)
         if verbose:
@@ -841,58 +837,28 @@ class UIsub(Ui_MainWindow):
             print("Rename: please select one row only for renaming.")
 
     def deleteSelectedRows(self):
-        df_p = self.df_project
-        set_files_before_purge = set(df_p['recording_name'])
+        df_p = self.get_df_project()
         selected_rows = self.listSelectedRows()
         if 0 < len(selected_rows):
-            files_to_purge = False
             for row in selected_rows:
                 sweeps = df_p.at[row, 'sweeps']
                 if sweeps != "...": # if the file is parsed:
-                    files_to_purge = True
                     recording_name = df_p.at[row, 'recording_name']
-                    channel = df_p.at[row, 'channel']
-                    stim = df_p.at[row, 'stim']
                     if verbose:
-                        print("Delete:", recording_name, channel, stim)
+                        print(f"Deleting {recording_name}...")
                     data_path = Path(self.dict_folders['data'] / (recording_name + ".csv"))
-                    try:
-                        df = pd.read_csv(str(data_path))  # parse csv
-                    except FileNotFoundError:
-                        print("did not find data .csv to load. Not imported?")
-                    dfmean_path = Path(self.dict_folders['cache'] / (recording_name + "_mean.csv"))
-                    try:
-                        dfmean = pd.read_csv(str(dfmean_path))  # parse _mean.csv
-                    except FileNotFoundError:
-                        print("did not find _mean.csv to load. Not imported?")
-                    purged_df = df[(df['channel'] != channel) | (df['stim'] != stim)]
-                    purged_dfmean = dfmean[(dfmean['channel'] != channel) | (dfmean['stim'] != stim)]
-                    parse.persistdf(recording_name=recording_name, dict_folders=self.dict_folders, dfdata=purged_df, dfmean=purged_dfmean)
+                    if data_path.exists():
+                        data_path.unlink()
+                    mean_path = Path(self.dict_folders['cache'] / (recording_name + "_mean.csv"))
+                    if mean_path.exists():
+                        mean_path.unlink()
             # Regardless of whether or not there was a file, purge the row from df_project
             self.clearGraph()
             self.setGraph()
             df_p.drop(selected_rows, inplace=True)
-            if files_to_purge: # unlink any files that are no longer in df_p
-                set_files_after_purge = set(df_p['recording_name'])
-                list_delete = [item for item in set_files_before_purge if item not in set_files_after_purge]
-                for file in list_delete:
-                    delete_data = self.dict_folders['data'] / (file + ".csv")
-                    delete_mean = self.dict_folders['cache'] / (file + "_mean.csv")
-                    if delete_data.exists():
-                        delete_data.unlink()
-                        if verbose:
-                            print(f"Deleted data: {delete_data}")
-                    else:
-                        print(f"File not found: {delete_data}")
-                    if delete_mean.exists():
-                        delete_mean.unlink()
-                        if verbose:
-                            print(f"Deleted mean: {delete_mean}")
-                    else:
-                        print(f"File not found: {delete_mean}")
             df_p.reset_index(inplace=True, drop=True)
             self.set_df_project(df_p)
-            self.setTableDf(self.df_project)  # Force update
+            self.setTableDf(df_p)  # Force update
         else:
             print("No files selected.")
 
@@ -903,20 +869,18 @@ class UIsub(Ui_MainWindow):
             recording_name = df_proj_row['recording_name']
             source_path = df_proj_row['path']
             if df_proj_row["sweeps"] == "...":  # indicates not read before TODO: Replace with selector!
-                dictmeta = parse.parseProjFiles(dict_folders = self.dict_folders, recording_name=recording_name, source_path=source_path)  # result is a dict of <channel>:<channel ID>
-                for channel in dictmeta['channel']:
-                    for stim in dictmeta['stim']:
-                        df_proj_new_row = df_proj_row.copy()
-                        df_proj_new_row['channel'] = channel
-                        df_proj_new_row['stim'] = stim
-                        df_proj_new_row['sweeps'] = dictmeta['sweeps']
-                        rows.append(df_proj_new_row)
+                dict_data_nsweeps = parse.parseProjFiles(dict_folders = self.dict_folders, recording_name=recording_name, source_path=source_path)
+                for new_name, nsweeps in dict_data_nsweeps.items():
+                    df_proj_new_row = df_proj_row.copy()
+                    df_proj_new_row['recording_name'] = new_name
+                    df_proj_new_row['sweeps'] = nsweeps
+                    rows.append(df_proj_new_row)
                 update_frame = update_frame[update_frame.recording_name != recording_name]
                 print(f"update_frame: {update_frame}")
                 rows2add = pd.concat(rows, axis=1).transpose()
-                print("rows2add:", rows2add[["recording_name", "channel", "stim", "sweeps" ]])
+                print("rows2add:", rows2add[["recording_name", "sweeps" ]])
                 self.df_project = (pd.concat([update_frame, rows2add])).reset_index(drop=True)
-                print(self.df_project[["recording_name", "channel", "stim", "sweeps" ]])
+                print(self.df_project[["recording_name", "sweeps" ]])
                 self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
                 self.save_df_project()
 
@@ -953,7 +917,7 @@ class UIsub(Ui_MainWindow):
                         list_group.append(add_group)
                         self.df_project.loc[i, "groups"] = ",".join(map(str, sorted(list_group)))
                     else:
-                        print(f"{self.df_project.loc[i, 'recording_name']}, channel {self.df_project.loc[i, 'channel']}, stim {self.df_project.loc[i, 'stim']} is already in {add_group}")
+                        print(f"{self.df_project.loc[i, 'recording_name']} is already in {add_group}")
                 self.save_df_project()
                 self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
             self.purgeGroupCache(add_group)
@@ -1100,9 +1064,7 @@ class UIsub(Ui_MainWindow):
         # hide all columns except these:
         list_show = [df_p.columns.get_loc("recording_name"),
                      df_p.columns.get_loc("groups"),
-                     df_p.columns.get_loc("sweeps"),
-                     df_p.columns.get_loc("channel"),
-                     df_p.columns.get_loc("stim")]
+                     df_p.columns.get_loc("sweeps")]
         num_columns = df_p.shape[1]
         for col in range(num_columns):
             if col in list_show:
@@ -1111,36 +1073,27 @@ class UIsub(Ui_MainWindow):
                 self.tableProj.setColumnHidden(col, True)
 
 # internal dataframe handling
-    def row2key(self, row):
-        return (row['recording_name'] + str(row['channel']) + str(row['stim']))
-
     def get_dfmean(self, row):
         # returns an internal df mean for the selected file. If it does not exist, read it from file first.
-        key_mean = self.row2key(row=row) + "_mean"
+        key_mean = f"{row['recording_name']}_mean"
         if key_mean in self.dict_means:
             return self.dict_means[key_mean]
         else:
             recording_name = row['recording_name']
-            channel = row['channel']
-            stim = row['stim']
             str_mean_path = f'{self.dict_folders["cache"]}/{recording_name}_mean.csv'
             if Path(str_mean_path).exists():
                 dfmean = pd.read_csv(str_mean_path)
             else:
-                dfmean = parse.build_dfmean(self.get_dfdata(row=row, all=True))
-                parse.persistdf(recording_name=recording_name, proj_folder=self.dict_folders['project'], dfmean=dfmean)
-            #print(f'get_dfmean(stim): {stim}')
-            #print(f' . dfmean: {dfmean}')
-            dfcopy = dfmean[(dfmean['channel'] == channel) & (dfmean['stim'] == stim)].copy()
-            dfcopy.reset_index(inplace=True)
-            #print(f' . dfcopy: {dfcopy}')
-            self.dict_means[key_mean] = dfcopy
+                dfmean = parse.build_dfmean(self.get_dfdata(row=row))
+                parse.persistdf(file_base=recording_name, proj_folder=self.dict_folders['project'], dfmean=dfmean)
+            self.dict_means[key_mean] = dfmean
             return self.dict_means[key_mean]
 
     def get_dfoutput(self, row):
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
-        key_output = self.row2key(row=row) + "_output"
+        key_output = f"{row['recording_name']}_output"
         if key_output in self.dict_outputs:
+            print(f"get_dfoutput: {key_output} found in dict_outputs")
             return self.dict_outputs[key_output]
         else:
             str_output_path = f'{self.dict_folders["cache"]}/{key_output}.csv'
@@ -1151,30 +1104,24 @@ class UIsub(Ui_MainWindow):
                 dfoutput.reset_index(inplace=True)
             self.dict_outputs[key_output] = dfoutput
             self.save_dict(dict2save=self.dict_outputs)
+            print(f"get_dfoutput: {key_output} added to dict_outputs")
             return self.dict_outputs[key_output]
         
-    def get_dfdata(self, row, all=False):
+    def get_dfdata(self, row):
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
-        key_data = self.row2key(row=row)
+        key_data = row['recording_name']
+        print(f"get_dfdata: {key_data}")
         if key_data in self.dict_datas:
+            print(f"get_dfdata: {key_data} found in dict_datas")
             return self.dict_datas[key_data]
         else:
-            recording_name = row['recording_name']
-            channel = row['channel']
-            stim = row['stim']
-            
-            path_data = Path(f'{self.dict_folders["data"]}/{recording_name}.csv')
+            path_data = Path(f"{self.dict_folders['data']}/{key_data}.csv")
+            print(f"get_dfdata: {key_data} not found in dict_datas, checking {path_data}")
             try: # datafile should always exist
-                dfdata_file = pd.read_csv(path_data)
+                dfdata = pd.read_csv(path_data)
             except FileNotFoundError:
                 print("did not find _mean.csv to load. Not imported?")
-            if all: # return all data; not just current channel and stim. Do not persist in dict.
-                dfdata = dfdata_file.copy()
-                dfdata.reset_index(inplace=True)
-                return dfdata
             else:
-                dfdata = dfdata_file[(dfdata_file['channel']==channel) & (dfdata_file['stim']==stim)].copy()
-                dfdata.reset_index(inplace=True)
                 self.dict_datas[key_data] = dfdata
                 return self.dict_datas[key_data]
         
@@ -1319,9 +1266,6 @@ class UIsub(Ui_MainWindow):
         qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
         ser_table_row = self.tablemodel.dataRow(qt_index)
         row_index = ser_table_row.name
-        recording_name = ser_table_row["recording_name"]
-        channel = ser_table_row["channel"]
-        stim = ser_table_row["stim"]
 
         sweeps = ser_table_row["sweeps"]
         if sweeps == "...":
@@ -1338,8 +1282,7 @@ class UIsub(Ui_MainWindow):
         # Open window
         self.measure = QtWidgets.QDialog()
         self.measure_window_sub = Measure_window_sub(self.measure, row=ser_table_row, dfmean=dfmean)
-        window_name = (recording_name + ",_ch" + str(channel) + ", st" + stim)
-        self.measure.setWindowTitle(window_name)
+        self.measure.setWindowTitle(ser_table_row["recording_name"])
         self.measure.show()
         # Set graphs
         self.measure_window_sub.setMeanGraph(t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
