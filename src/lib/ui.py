@@ -1576,7 +1576,7 @@ class Measure_window_sub(Ui_measure_window):
                             'end':    ("v_" + t_aspect + "_end")}
         #update output; dict and file
         dfoutput[aspect] = new_dfoutput[aspect]
-        key_output = ui.row2key(row=self.row) + "_output"
+        key_output = f"{self.row['recording_name']}_output"
         ui.dict_outputs[key_output] = dfoutput
         ui.save_dict(dict2save=ui.dict_outputs)
         #update the graphs
