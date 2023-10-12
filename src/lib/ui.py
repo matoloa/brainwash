@@ -1406,11 +1406,10 @@ class Measure_window_sub(Ui_measure_window):
         self.parent = parent
         # TODO: expand this as more aspects are added
         self.supported_aspects = [ "EPSP_amp", "EPSP_slope"]
-        self.untoggle()
+        self.default_color = "background-color: rgb(239, 239, 239);"
+        self.selected_color = "background-color: rgb(100, 100, 255);"
         # set default aspect
         self.toggle(self.pushButton_EPSP_amp, "EPSP_amp") # default for now TODO: Load/Save preference in local .cfg
-        self.pushButton_EPSP_amp.setDown(True) # TODO: setDown works as expected when the button is NOT clicked
-
         # Iterate through supported_aspects to generate all this code
         def loopConnectAspects(aspect):
             aspect_button = getattr(self, f"pushButton_{aspect}")
@@ -1426,22 +1425,12 @@ class Measure_window_sub(Ui_measure_window):
         # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
         return str(round(SI * 1000, 1)) # TODO: single decimal assumes 10KHz sampling rate; make this more flexible
 
-    def untoggle(self):
-        self.pushButton_EPSP_slope.setChecked(False)
-        self.pushButton_EPSP_size.setChecked(False)
-        self.pushButton_EPSP_amp.setChecked(False)  
-        self.pushButton_volley_slope.setChecked(False)
-        self.pushButton_volley_size.setChecked(False)
-        self.pushButton_volley_amp.setChecked(False)  
-
     def toggle(self, button, aspect):
-        self.untoggle()
-        self.aspect = aspect # set which aspect is changed when meangraph is clicked
-        #print(f"toggle: {button} {aspect} persisted as self.aspect: {self.aspect}")
-        button.setChecked(True)
-        button.setDown(False) # TODO: setDown seems to do the OPPOSITE of what it should do; setting it to True makes the buttons NOT look depressed.
-        #print(f"toggle button {button} isChecked: {button.isChecked()}, "isDown(: {button.isDown()}")
-    
+        self.aspect = aspect
+        for i_aspect in self.supported_aspects:
+            un_button = getattr(self, f"pushButton_{i_aspect}")
+            un_button.setStyleSheet(self.default_color)
+        button.setStyleSheet(self.selected_color)
 
     def setMeanGraph(self, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
         # get dfmean from selected row in UIsub.
