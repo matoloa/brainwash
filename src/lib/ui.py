@@ -1471,17 +1471,14 @@ class Measure_window_sub(Ui_measure_window):
         # get dfoutput from selected row in UIsub.
         # display SELECTED from tableProj at measurewindow
         self.canvas_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
-
         if dfoutput['EPSP_amp'].notna().any():
-            self.output_EPSP_amp = sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_output.axes, color="black")
+            _ = sns.lineplot(label="EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_output.axes, color="black")
             self.canvas_output.axes.set_ylim(-0.0015, 0)
         if dfoutput['EPSP_slope'].notna().any():
-            self.output_EPSP_slope = sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_output.axes, color="black")
+            _ = sns.lineplot(label="EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_output.axes, color="black")
             self.canvas_output.axes.set_ylim(-0.0015, 0)
-
         self.canvas_output.draw()
         self.canvas_output.show()
-
         self.canvas_output.mpl_connect('button_press_event', self.outputClicked)
 
    
@@ -1584,17 +1581,15 @@ class Measure_window_sub(Ui_measure_window):
         line2update = getattr(self, "lineEdit_" + aspect)
         line2update.setText(self.m(time))
         #update output graph
-        self.output_EPSP_amp.lines[0].set_data(dfoutput['sweep'], dfoutput['EPSP_amp'])
-        self.output_EPSP_slope.lines[1].set_data(dfoutput['sweep'], dfoutput['EPSP_slope'])
-        print(f"self.output_EPSP_amp.lines[0]: {self.output_EPSP_amp.lines[0]}")
-        print(f"self.output_EPSP_amp.lines[1]: {self.output_EPSP_amp.lines[1]}")
-        print(f"self.output_EPSP_slope.lines[0]: {self.output_EPSP_slope.lines[0]}")
-        print(f"self.output_EPSP_slope.lines[1]: {self.output_EPSP_slope.lines[1]}")
-        print(f"self.output_EPSP_amp.lines[0].__repr__(): {self.output_EPSP_amp.lines[0].__repr__()}")
-        print(f"self.output_EPSP_amp.lines[1].__repr__(): {self.output_EPSP_amp.lines[1].__repr__()}")
-        print(f"self.output_EPSP_slope.lines[0].__repr__(): {self.output_EPSP_slope.lines[0].__repr__()}")
-        print(f"self.output_EPSP_slope.lines[1].__repr__(): {self.output_EPSP_slope.lines[1].__repr__()}")
+        self.canvas_output.axes.lines[self.label2idx(aspect)].set_data(dfoutput['sweep'], dfoutput[aspect])
         self.canvas_output.draw()
+
+    def label2idx(self, aspect):
+        dict_labels = {k.get_label(): v for (v, k) in enumerate(self.canvas_output.axes.lines)}
+        return dict_labels[aspect]
+
+    def deleteLine():
+        print(f"deleteLine: {ui.tableProj.selectionModel().selectedIndexes()}")
 
 
 def get_signals(source):
