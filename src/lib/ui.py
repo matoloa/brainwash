@@ -1471,14 +1471,25 @@ class Measure_window_sub(Ui_measure_window):
 
 
     def meanScroll(self, event):
-        print(f"meanScroll: {event.button}")
-        if event.step > 0: # Scroll up, zoom in
-            self.canvas_mean.axes.set_xlim(self.canvas_mean.axes.get_xlim()[0] * self.scroll_factor, self.canvas_mean.axes.get_xlim()[1] * self.scroll_factor)
-            self.canvas_mean.axes.set_ylim(self.canvas_mean.axes.get_ylim()[0] * self.scroll_factor, self.canvas_mean.axes.get_ylim()[1] * self.scroll_factor)
-        else: # Scroll down, zoom out
-            self.canvas_mean.axes.set_xlim(self.canvas_mean.axes.get_xlim()[0] / self.scroll_factor, self.canvas_mean.axes.get_xlim()[1] / self.scroll_factor)
-            self.canvas_mean.axes.set_ylim(self.canvas_mean.axes.get_ylim()[0] / self.scroll_factor, self.canvas_mean.axes.get_ylim()[1] / self.scroll_factor)
-        self.canvas_mean.draw()
+        xdata, ydata = event.xdata, event.ydata
+        
+        if xdata is not None and ydata is not None:
+            if event.step > 0:
+                # Scroll up, zoom in
+                xlim = [xdata - (xdata - self.canvas_mean.axes.get_xlim()[0]) * self.scroll_factor,
+                        xdata + (self.canvas_mean.axes.get_xlim()[1] - xdata) * self.scroll_factor]
+                ylim = [ydata - (ydata - self.canvas_mean.axes.get_ylim()[0]) * self.scroll_factor,
+                        ydata + (self.canvas_mean.axes.get_ylim()[1] - ydata) * self.scroll_factor]
+            else:
+                # Scroll down, zoom out
+                xlim = [xdata - (xdata - self.canvas_mean.axes.get_xlim()[0]) / self.scroll_factor,
+                        xdata + (self.canvas_mean.axes.get_xlim()[1] - xdata) / self.scroll_factor]
+                ylim = [ydata - (ydata - self.canvas_mean.axes.get_ylim()[0]) / self.scroll_factor,
+                        ydata + (self.canvas_mean.axes.get_ylim()[1] - ydata) / self.scroll_factor]
+
+            self.canvas_mean.axes.set_xlim(xlim[0], xlim[1])
+            self.canvas_mean.axes.set_ylim(ylim[0], ylim[1])
+            self.canvas_mean.draw()
 
 
     def setOutputGraph(self, dfoutput):
