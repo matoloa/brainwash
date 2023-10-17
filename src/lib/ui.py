@@ -1404,8 +1404,10 @@ class Measure_window_sub(Ui_measure_window):
         self.dfmean = dfmean
         self.setupUi(measure_window)
         self.parent = parent
+        self.scroll_factor = 0.9
         # TODO: expand this as more aspects are added
         self.supported_aspects = [ "EPSP_amp", "EPSP_slope"]
+        # set button colors
         self.default_color = "background-color: rgb(239, 239, 239);"
         self.selected_color = "background-color: rgb(100, 100, 255);"
         # set default aspect
@@ -1465,6 +1467,18 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_mean.show()
 
         self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
+        self.canvas_mean.mpl_connect('scroll_event', self.meanScroll)
+
+
+    def meanScroll(self, event):
+        print(f"meanScroll: {event.button}")
+        if event.step > 0: # Scroll up, zoom in
+            self.canvas_mean.axes.set_xlim(self.canvas_mean.axes.get_xlim()[0] * self.scroll_factor, self.canvas_mean.axes.get_xlim()[1] * self.scroll_factor)
+            self.canvas_mean.axes.set_ylim(self.canvas_mean.axes.get_ylim()[0] * self.scroll_factor, self.canvas_mean.axes.get_ylim()[1] * self.scroll_factor)
+        else: # Scroll down, zoom out
+            self.canvas_mean.axes.set_xlim(self.canvas_mean.axes.get_xlim()[0] / self.scroll_factor, self.canvas_mean.axes.get_xlim()[1] / self.scroll_factor)
+            self.canvas_mean.axes.set_ylim(self.canvas_mean.axes.get_ylim()[0] / self.scroll_factor, self.canvas_mean.axes.get_ylim()[1] / self.scroll_factor)
+        self.canvas_mean.draw()
 
 
     def setOutputGraph(self, dfoutput):
