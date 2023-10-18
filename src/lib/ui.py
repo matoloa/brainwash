@@ -419,9 +419,10 @@ class Ui_MainWindow(QtCore.QObject):
         self.retranslateUi(mainWindow)
         QtCore.QMetaObject.connectSlotsByName(mainWindow)
 
+
     def retranslateUi(self, mainWindow):
         _translate = QtCore.QCoreApplication.translate
-        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash 0.4"))
+        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash 0.5"))
         self.pushButtonNewProject.setText(_translate("mainWindow", "New"))
         self.pushButtonOpenProject.setText(_translate("mainWindow", "Open"))
         self.inputProjectName.setText(_translate("mainWindow", "My Project"))
@@ -595,6 +596,18 @@ class UIsub(Ui_MainWindow):
         self.dict_means = {} # all means
         self.dict_outputs = {} # all outputs
         self.dict_group_means = {} # means of all group outputs
+
+        # Addon to make the graphs scaleable
+        self.graphMean.setLayout(QtWidgets.QVBoxLayout())
+        self.canvas_seaborn_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
+        self.graphMean.layout().addWidget(self.canvas_seaborn_mean)
+        self.graphOutput.setLayout(QtWidgets.QVBoxLayout())
+        self.canvas_seaborn_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for Mean
+        self.graphOutput.layout().addWidget(self.canvas_seaborn_output)
+        self.canvas_seaborn_mean.show()
+        self.canvas_seaborn_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_seaborn_mean))
+        self.canvas_seaborn_mean.mpl_connect('button_press_event', self.meanClicked)
+        self.canvas_seaborn_output.show()
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
@@ -1193,10 +1206,8 @@ class UIsub(Ui_MainWindow):
             self.canvas_seaborn_mean.show()
 
     def setGraph(self, df=None): # plot selected row(s), or clear graph if empty
-        #print(f"df.shape[0]: {df.shape[0]}")
-        self.canvas_seaborn_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
-        self.canvas_seaborn_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for MeanGroups
-
+        self.canvas_seaborn_mean.axes.cla()
+        self.canvas_seaborn_output.axes.cla()
         # add groups, regardless of selection:
         # print(f"Groups: {self.list_groups}")
         list_color = ["red", "green", "blue", "yellow"] # TODO: placeholder color range
@@ -1216,48 +1227,36 @@ class UIsub(Ui_MainWindow):
             if dfgroup_mean['EPSP_slope_mean'].notna().any():
                 ax2 = sns.lineplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[i_color])
                 ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=list_color[i_color])               
-               
         if df is not None:
-            if df.shape[0] == 0:
-                self.canvas_seaborn_mean.axes.cla()
+            df_filtered = df[df["sweeps"] != "..."]
+            if df_filtered.empty:
+                print("Selection not analyzed.")
             else:
-                df_filtered = df[df["sweeps"] != "..."]
-                if df_filtered.empty:
-                    print("Selection not analyzed.")
-                else:
-                    for i, row in df_filtered.iterrows(): # TODO: i to be used later for cycling colours?
-                        dfmean = self.get_dfmean(row=row)
-                        #dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
-                        sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
-                        # add results of selected row(s):
-                        dfoutput = self.get_dfoutput(row=row)
-                        df_p = self.get_df_project() # updated in get_dfoutput; row is not!
-                        t_EPSP_amp = df_p.loc[row.name,'t_EPSP_amp']
-                        t_EPSP_slope = df_p.loc[row.name,'t_EPSP_slope']
-                        if not np.isnan(t_EPSP_amp):
-                            sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
-                        if not np.isnan(t_EPSP_slope):
-                            sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
+                for i, row in df_filtered.iterrows(): # TODO: i to be used later for cycling colours?
+                    dfmean = self.get_dfmean(row=row)
+                    #dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
+                    sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
+                    # add results of selected row(s):
+                    dfoutput = self.get_dfoutput(row=row)
+                    df_p = self.get_df_project() # updated in get_dfoutput; row is not!
+                    t_EPSP_amp = df_p.loc[row.name,'t_EPSP_amp']
+                    t_EPSP_slope = df_p.loc[row.name,'t_EPSP_slope']
+                    if not np.isnan(t_EPSP_amp):
+                        sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
+                    if not np.isnan(t_EPSP_slope):
+                        sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
 
         self.canvas_seaborn_mean.axes.set_xlim(self.graph_xlim)
         self.canvas_seaborn_mean.axes.set_ylim(self.graph_ylim)
         self.canvas_seaborn_output.axes.set_ylim(-0.0015, 0)
-
         self.canvas_seaborn_mean.draw()
-        self.canvas_seaborn_mean.show()
-        self.canvas_seaborn_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_seaborn_mean))
-        self.canvas_seaborn_mean.mpl_connect('button_press_event', self.meanClicked)
-
-
         self.canvas_seaborn_output.draw()
-        self.canvas_seaborn_output.show()
 
     def meanClicked(self, event): # maingraph click event
-        print(f"meanClicked: {event.button}")
         if event.inaxes is not None:
             if event.button == 2:
                 zoomReset(canvas=self.canvas_seaborn_mean)
-    
+
 
 # MeasureWindow
 
@@ -1405,8 +1404,6 @@ class Filetreesub(Ui_Dialog):
 
 
 class Measure_window_sub(Ui_measure_window):
-    def getCanvas(self):
-        return self.canvas_mean
     def __init__(self, measure_window, parent=None, row=None, dfmean=None, folder="."):
         super(Measure_window_sub, self).__init__()
         # local versions of row and dfmean that persist unchanged (TODO: check!) while the window is open
