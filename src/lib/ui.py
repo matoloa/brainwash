@@ -308,11 +308,13 @@ class Ui_measure_window(QtCore.QObject):
 class Ui_MainWindow(QtCore.QObject):
     def setupUi(self, mainWindow):
         mainWindow.setObjectName("mainWindow")
-        mainWindow.resize(951, 816)
+        mainWindow.resize(1066, 777)
         self.centralwidget = QtWidgets.QWidget(mainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayoutCentralwidget = QtWidgets.QHBoxLayout(self.centralwidget)
         self.horizontalLayoutCentralwidget.setObjectName("horizontalLayoutCentralwidget")
+        self.horizontalMasterLayout = QtWidgets.QHBoxLayout()
+        self.horizontalMasterLayout.setObjectName("horizontalMasterLayout")
         self.verticalLayoutProj = QtWidgets.QVBoxLayout()
         self.verticalLayoutProj.setObjectName("verticalLayoutProj")
         self.horizontalLayoutProj = QtWidgets.QHBoxLayout()
@@ -375,12 +377,13 @@ class Ui_MainWindow(QtCore.QObject):
         self.gridLayout.setObjectName("gridLayout")
         self.verticalLayoutProj.addLayout(self.gridLayout)
         self.tableProj = QtWidgets.QTableView(self.centralwidget)
+        self.tableProj.setMaximumSize(QtCore.QSize(16777215, 16777215))
         self.tableProj.setAcceptDrops(True)
         self.tableProj.setObjectName("tableProj")
         self.verticalLayoutProj.addWidget(self.tableProj)
-        self.horizontalLayoutCentralwidget.addLayout(self.verticalLayoutProj)
+        self.horizontalMasterLayout.addLayout(self.verticalLayoutProj)
         spacerItem = QtWidgets.QSpacerItem(10, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalLayoutCentralwidget.addItem(spacerItem)
+        self.horizontalMasterLayout.addItem(spacerItem)
         self.verticalLayoutGraph = QtWidgets.QVBoxLayout()
         self.verticalLayoutGraph.setObjectName("verticalLayoutGraph")
         self.labelMeanSweep = QtWidgets.QLabel(self.centralwidget)
@@ -406,10 +409,12 @@ class Ui_MainWindow(QtCore.QObject):
         self.verticalLayoutGraph.setStretch(1, 5)
         self.verticalLayoutGraph.setStretch(3, 5)
         self.verticalLayoutGraph.setStretch(5, 1)
-        self.horizontalLayoutCentralwidget.addLayout(self.verticalLayoutGraph)
+        self.horizontalMasterLayout.addLayout(self.verticalLayoutGraph)
+        self.horizontalMasterLayout.setStretch(2, 1)
+        self.horizontalLayoutCentralwidget.addLayout(self.horizontalMasterLayout)
         mainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(mainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 951, 22))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1066, 22))
         self.menubar.setObjectName("menubar")
         mainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(mainWindow)
@@ -418,7 +423,6 @@ class Ui_MainWindow(QtCore.QObject):
 
         self.retranslateUi(mainWindow)
         QtCore.QMetaObject.connectSlotsByName(mainWindow)
-
 
     def retranslateUi(self, mainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -1196,14 +1200,12 @@ class UIsub(Ui_MainWindow):
 
 # Graph handling
 
-    def clearGraph(self): # removes all data from canvas_seaborn
+    def clearGraph(self): # removes all data from canvas_seaborn_mean - TODO: deprecated?
         if hasattr(self, "canvas_seaborn_mean"):
             if verbose:
-                print("clearGraph: self has attribue canvas_seaborn_mean")
-            print(f"axes: {self.canvas_seaborn_mean.axes}")
+                print(f"axes: {self.canvas_seaborn_mean.axes}")
             self.canvas_seaborn_mean.axes.cla()
             self.canvas_seaborn_mean.draw()
-            self.canvas_seaborn_mean.show()
 
     def setGraph(self, df=None): # plot selected row(s), or clear graph if empty
         self.canvas_seaborn_mean.axes.cla()
@@ -1411,7 +1413,22 @@ class Measure_window_sub(Ui_measure_window):
         self.dfmean = dfmean
         self.setupUi(measure_window)
         self.parent = parent
-        self.scroll_factor = 0.9
+
+        self.measure_graph_mean.setLayout(QtWidgets.QVBoxLayout())
+        self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)
+        self.measure_graph_mean.layout().addWidget(self.canvas_mean)
+        self.canvas_mean.show()
+        self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
+        self.canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_mean))
+
+        self.measure_graph_output.setLayout(QtWidgets.QVBoxLayout())
+        self.canvas_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas for Mean
+        self.measure_graph_output.layout().addWidget(self.canvas_output)
+        self.canvas_output.show()
+        self.canvas_output.mpl_connect('button_press_event', self.outputClicked)
+        self.canvas_output.mpl_connect('motion_notify_event', self.outputDragged)
+        self.canvas_output.mpl_connect('button_release_event', self.outputReleased)
+
         # TODO: expand this as more aspects are added
         self.supported_aspects = [ "EPSP_amp", "EPSP_slope"]
         # set button colors
@@ -1443,8 +1460,8 @@ class Measure_window_sub(Ui_measure_window):
 
     def setMeanGraph(self, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
         # get dfmean from selected row in UIsub.
+        self.canvas_mean.axes.cla()
         dfmean = self.dfmean
-        self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
         self.si_v = None # vertical line in canvas_output, indicating selected sweep
         self.si_sweep = None # lineplot of the selected sweep on canvas_mean
         self.si_v_drag_from = None # vertical line in canvas_output, indicating start of drag
@@ -1462,15 +1479,11 @@ class Measure_window_sub(Ui_measure_window):
         g.axvline(t_VEB, color="grey", linestyle="--")
         self.canvas_mean.axes.set_xlim(ui.graph_xlim)
         self.canvas_mean.axes.set_ylim(ui.graph_ylim)
-        # self.canvas_seaborn.axes.set_xmargin((100,500))
         self.canvas_mean.draw()
-        self.canvas_mean.show()
-        self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
-        self.canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_mean))
 
     def setOutputGraph(self, dfoutput):
         # get dfoutput from selected row in UIsub.
-        self.canvas_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
+        self.canvas_output.axes.cla()
         self.dragging = False
         if dfoutput['EPSP_amp'].notna().any():
             _ = sns.lineplot(label="EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_output.axes, color="black")
@@ -1479,10 +1492,6 @@ class Measure_window_sub(Ui_measure_window):
             _ = sns.lineplot(label="EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_output.axes, color="black")
             self.canvas_output.axes.set_ylim(-0.0015, 0)
         self.canvas_output.draw()
-        self.canvas_output.show()
-        self.canvas_output.mpl_connect('button_press_event', self.outputClicked)
-        self.canvas_output.mpl_connect('motion_notify_event', self.outputDragged)
-        self.canvas_output.mpl_connect('button_release_event', self.outputReleased)
    
     def meanClicked(self, event): # measure window click event
         if event.inaxes is not None:
@@ -1629,7 +1638,7 @@ def get_signals(source):
 
 def zoomOnScroll(event, canvas):
     xdata, ydata = event.xdata, event.ydata
-    scroll_factor = 0.9
+    scroll_factor = 0.9 # TODO: make this a setting
     def xzoom(xdata, factor):
         xlim = [xdata - (xdata - canvas.axes.get_xlim()[0]) * factor,
                 xdata + (canvas.axes.get_xlim()[1] - xdata) * factor]
