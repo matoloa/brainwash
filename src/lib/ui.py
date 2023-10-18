@@ -1248,14 +1248,16 @@ class UIsub(Ui_MainWindow):
         self.canvas_seaborn_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_seaborn_mean))
         self.canvas_seaborn_mean.mpl_connect('button_press_event', self.meanClicked)
 
+
         self.canvas_seaborn_output.draw()
         self.canvas_seaborn_output.show()
 
-    def meanClicked(self, event):
+    def meanClicked(self, event): # maingraph click event
+        print(f"meanClicked: {event.button}")
         if event.inaxes is not None:
             if event.button == 2:
                 zoomReset(canvas=self.canvas_seaborn_mean)
-
+    
 
 # MeasureWindow
 
@@ -1444,44 +1446,35 @@ class Measure_window_sub(Ui_measure_window):
 
     def setMeanGraph(self, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
         # get dfmean from selected row in UIsub.
-        # display SELECTED from tableProj at measurewindow
-
-        #row = self.row # store an internal version of the row, to be used in meanClicked and outputClicked
         dfmean = self.dfmean
-
         self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
-        self.si_v = None
-        self.si_sweep = None
-
+        self.si_v = None # vertical line in canvas_output, indicating selected sweep
+        self.si_sweep = None # lineplot of the selected sweep on canvas_mean
+        self.si_v_drag_from = None # vertical line in canvas_output, indicating start of drag
+        self.si_v_drag_to = None # vertical line in canvas_output, indicating end of drag
+        self.dragplot = None
         # fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
         g = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_mean.axes, color="red")
         h = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_mean.axes, color="green")
         i = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_mean.axes, color="black")
-        
         self.v_t_EPSP_amp = sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
-        
         self.v_t_EPSP_slope =         sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
         self.v_t_EPSP_slope_start =   sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope - 0.0004, color="green", linestyle=":")
         self.v_t_EPSP_slope_end =     sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope + 0.0004, color="green", linestyle=":")
-
         # t_VEB
         g.axvline(t_VEB, color="grey", linestyle="--")
-
         self.canvas_mean.axes.set_xlim(ui.graph_xlim)
         self.canvas_mean.axes.set_ylim(ui.graph_ylim)
-
         # self.canvas_seaborn.axes.set_xmargin((100,500))
         self.canvas_mean.draw()
         self.canvas_mean.show()
-
         self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
         self.canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_mean))
 
-
     def setOutputGraph(self, dfoutput):
         # get dfoutput from selected row in UIsub.
-        # display SELECTED from tableProj at measurewindow
         self.canvas_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
+        self.dragging = False
         if dfoutput['EPSP_amp'].notna().any():
             _ = sns.lineplot(label="EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_output.axes, color="black")
             self.canvas_output.axes.set_ylim(-0.0015, 0)
@@ -1491,9 +1484,10 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_output.draw()
         self.canvas_output.show()
         self.canvas_output.mpl_connect('button_press_event', self.outputClicked)
-
+        self.canvas_output.mpl_connect('motion_notify_event', self.outputDragged)
+        self.canvas_output.mpl_connect('button_release_event', self.outputReleased)
    
-    def meanClicked(self, event):
+    def meanClicked(self, event): # measure window click event
         if event.inaxes is not None:
             if event.button == 1:# Left mouse button clicked
                 if self.aspect not in self.supported_aspects:
@@ -1506,26 +1500,49 @@ class Measure_window_sub(Ui_measure_window):
             elif event.button == 2:
                 zoomReset(canvas=self.canvas_mean)
 
-
     def outputClicked(self, event):
         if event.inaxes is not None:
             x = event.xdata
             y = event.ydata
-             # draw a vertical line at the clicked y in self.canvas_output
-            if self.si_v is not None: # remove previous vertical line
-                self.si_v.remove()
-            self.si_v = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="grey", linestyle="--")
+            if event.button == 1:
+                # draw a vertical line at the clicked y in self.canvas_output
+                if self.si_v is not None: # remove previous vertical line
+                    self.si_v.remove()
+                self.si_v = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="grey", linestyle="--")
+                self.canvas_output.draw()
+                # get that specific sweep and superimpose it on canvas_mean
+                df = ui.get_dfdata(self.row)
+                df = df[df['sweep'] == int(x)]
+                print(f"int(x): {int(x)}")
+                if self.si_sweep is None:
+                    self.si_sweep, = self.canvas_mean.axes.plot([], [], color="grey")
+                self.si_sweep.set_data(df["time"], df["voltage"])
+                self.canvas_mean.draw()
+            elif event.button == 3:            
+                self.drag_start = x
+                self.dragging = True
+                if self.si_v_drag_from is not None: # remove previous vertical line
+                    self.si_v_drag_from.remove()
+                self.si_v_drag_from = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="blue")
+                self.canvas_output.draw()
+    
+    def outputDragged(self, event): # maingraph drag event
+        if self.dragging:
+            # draw a vertical line at the clicked y in self.canvas_output
+            if self.si_v_drag_to is not None: # remove previous vertical line
+                self.si_v_drag_to.remove()
+            self.si_v_drag_to = sns.lineplot(ax=self.canvas_output.axes).axvline(event.xdata, color="blue")
+            if self.dragplot is not None: # remove previous selection
+                self.dragplot.remove()
+            self.dragplot = sns.lineplot(ax=self.canvas_output.axes).axvspan(self.drag_start, event.xdata, color='lightblue', alpha=0.5)
             self.canvas_output.draw()
-            # get that specific sweep and superimpose it on canvas_mean
-            df = ui.get_dfdata(self.row)
-            df = df[df['sweep'] == int(x)]
-            print(f"int(x): {int(x)}")
-            if self.si_sweep is None:
-                self.si_sweep, = self.canvas_mean.axes.plot([], [], color="grey")
-            self.si_sweep.set_data(df["time"], df["voltage"])
-            self.canvas_mean.draw()
-
-
+    
+    def outputReleased(self, event): # maingraph release event
+        if event.button == 3:
+            print(f"meanDragged from: {self.drag_start}")
+            self.dragging = False
+            print(f"meanReleased: {event.xdata}")
+    
     def updateOnClick(self, time, aspect):
         if verbose:
             print(f"updateOnClick: time={time}, aspect={aspect}")
@@ -1601,9 +1618,6 @@ class Measure_window_sub(Ui_measure_window):
     def label2idx(self, aspect):
         dict_labels = {k.get_label(): v for (v, k) in enumerate(self.canvas_output.axes.lines)}
         return dict_labels[aspect]
-
-    def deleteLine():
-        print(f"deleteLine: {ui.tableProj.selectionModel().selectedIndexes()}")
 
 
 def get_signals(source):
