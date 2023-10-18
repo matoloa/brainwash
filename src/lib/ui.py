@@ -1246,9 +1246,15 @@ class UIsub(Ui_MainWindow):
         self.canvas_seaborn_mean.draw()
         self.canvas_seaborn_mean.show()
         self.canvas_seaborn_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_seaborn_mean))
+        self.canvas_seaborn_mean.mpl_connect('button_press_event', self.meanClicked)
 
         self.canvas_seaborn_output.draw()
         self.canvas_seaborn_output.show()
+
+    def meanClicked(self, event):
+        if event.inaxes is not None:
+            if event.button == 2:
+                zoomReset(canvas=self.canvas_seaborn_mean)
 
 
 # MeasureWindow
@@ -1489,13 +1495,16 @@ class Measure_window_sub(Ui_measure_window):
    
     def meanClicked(self, event):
         if event.inaxes is not None:
-            if self.aspect not in self.supported_aspects:
-                print(f"meanClicked: {self.aspect} not supported.")
-                return
-            x = event.xdata
-            # find time in self.dfmean closest to x
-            time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
-            self.updateOnClick(time=time, aspect=self.aspect)
+            if event.button == 1:# Left mouse button clicked
+                if self.aspect not in self.supported_aspects:
+                    print(f"meanClicked: {self.aspect} not supported.")
+                    return
+                x = event.xdata
+                # find time in self.dfmean closest to x
+                time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
+                self.updateOnClick(time=time, aspect=self.aspect)
+            elif event.button == 2:
+                zoomReset(canvas=self.canvas_mean)
 
 
     def outputClicked(self, event):
@@ -1624,6 +1633,11 @@ def zoomOnScroll(event, canvas):
         canvas.axes.set_xlim(xlim[0], xlim[1])
         canvas.axes.set_ylim(ylim[0], ylim[1])
         canvas.draw()
+
+def zoomReset(canvas):
+    canvas.axes.set_xlim(ui.graph_xlim)
+    canvas.axes.set_ylim(ui.graph_ylim)
+    canvas.draw()
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
