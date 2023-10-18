@@ -1217,7 +1217,6 @@ class UIsub(Ui_MainWindow):
                 ax2 = sns.lineplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[i_color])
                 ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=list_color[i_color])               
                
-
         if df is not None:
             if df.shape[0] == 0:
                 self.canvas_seaborn_mean.axes.cla()
@@ -1246,6 +1245,7 @@ class UIsub(Ui_MainWindow):
 
         self.canvas_seaborn_mean.draw()
         self.canvas_seaborn_mean.show()
+        self.canvas_seaborn_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_seaborn_mean))
 
         self.canvas_seaborn_output.draw()
         self.canvas_seaborn_output.show()
@@ -1397,6 +1397,8 @@ class Filetreesub(Ui_Dialog):
 
 
 class Measure_window_sub(Ui_measure_window):
+    def getCanvas(self):
+        return self.canvas_mean
     def __init__(self, measure_window, parent=None, row=None, dfmean=None, folder="."):
         super(Measure_window_sub, self).__init__()
         # local versions of row and dfmean that persist unchanged (TODO: check!) while the window is open
@@ -1467,29 +1469,7 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_mean.show()
 
         self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
-        self.canvas_mean.mpl_connect('scroll_event', self.meanScroll)
-
-
-    def meanScroll(self, event):
-        xdata, ydata = event.xdata, event.ydata
-        
-        if xdata is not None and ydata is not None:
-            if event.step > 0:
-                # Scroll up, zoom in
-                xlim = [xdata - (xdata - self.canvas_mean.axes.get_xlim()[0]) * self.scroll_factor,
-                        xdata + (self.canvas_mean.axes.get_xlim()[1] - xdata) * self.scroll_factor]
-                ylim = [ydata - (ydata - self.canvas_mean.axes.get_ylim()[0]) * self.scroll_factor,
-                        ydata + (self.canvas_mean.axes.get_ylim()[1] - ydata) * self.scroll_factor]
-            else:
-                # Scroll down, zoom out
-                xlim = [xdata - (xdata - self.canvas_mean.axes.get_xlim()[0]) / self.scroll_factor,
-                        xdata + (self.canvas_mean.axes.get_xlim()[1] - xdata) / self.scroll_factor]
-                ylim = [ydata - (ydata - self.canvas_mean.axes.get_ylim()[0]) / self.scroll_factor,
-                        ydata + (self.canvas_mean.axes.get_ylim()[1] - ydata) / self.scroll_factor]
-
-            self.canvas_mean.axes.set_xlim(xlim[0], xlim[1])
-            self.canvas_mean.axes.set_ylim(ylim[0], ylim[1])
-            self.canvas_mean.draw()
+        self.canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_mean))
 
 
     def setOutputGraph(self, dfoutput):
@@ -1627,6 +1607,23 @@ def get_signals(source):
             if isinstance(aspect, signal):
                 print(f"{key} [{clsname}]")
 
+def zoomOnScroll(event, canvas):
+    xdata, ydata = event.xdata, event.ydata
+    scroll_factor = 0.9
+    def xzoom(xdata, factor):
+        xlim = [xdata - (xdata - canvas.axes.get_xlim()[0]) * factor,
+                xdata + (canvas.axes.get_xlim()[1] - xdata) * factor]
+        return xlim
+    def yzoom(ydata, factor):
+        ylim = [ydata - (ydata - canvas.axes.get_ylim()[0]) * factor,
+                ydata + (canvas.axes.get_ylim()[1] - ydata) * factor]
+        return ylim
+    if xdata is not None and ydata is not None:
+        xlim = xzoom(xdata, scroll_factor if event.step > 0 else 1 / scroll_factor)
+        ylim = yzoom(ydata, scroll_factor if event.step > 0 else 1 / scroll_factor)
+        canvas.axes.set_xlim(xlim[0], xlim[1])
+        canvas.axes.set_ylim(ylim[0], ylim[1])
+        canvas.draw()
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
