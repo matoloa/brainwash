@@ -1238,7 +1238,7 @@ class UIsub(Ui_MainWindow):
                 break
             dfgroup_mean = self.get_dfgroupmean(key_group=group)
             # TODO: Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
-            print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
+            # print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
             if dfgroup_mean['EPSP_amp_mean'].notna().any():
                 ax1 = sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[i_color])
                 ax1.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_amp_mean + dfgroup_mean.EPSP_amp_SEM, dfgroup_mean.EPSP_amp_mean - dfgroup_mean.EPSP_amp_SEM, alpha=0.3, color=list_color[i_color])               
@@ -1468,22 +1468,25 @@ class Measure_window_sub(Ui_measure_window):
 
     def accepted_handler(self):
         # update df_project, dict_outputs, and purge group outputs for recalculation
-        ui.df_project.loc[self.row.name] = self.row
+        for column, value in self.row.items():
+            if column != 'groups':
+                ui.df_project.at[self.row.name, column] = value
         ui.save_df_project()
+        new_row = ui.df_project.loc[self.row.name]
         # update output; dict and file
         dfoutput = self.new_dfoutput
-        key_output = f"{self.row['recording_name']}_output"
+        key_output = f"{new_row['recording_name']}_output"
         ui.dict_outputs[key_output] = dfoutput
         ui.save_dict(dict2save=ui.dict_outputs)
         # delete group outputs
-        list_groups = self.row['groups'].split(",")
-        if (self.row['groups'] == " ") or (not list_groups):
+        list_groups = new_row['groups'].split(",")
+        if (new_row['groups'] == " ") or (not list_groups):
             print(f"accepted_handler: row is not in any group")
         else:
             print(f"accepted_handler: list_groups: {list_groups}")
             for group in list_groups:
                 key_group = group.strip()
-                print(f"accepted_handler: deleting {key_group}")
+                print(f"accepted_handler: deleting {key_group} from internal dict")
                 if key_group in ui.dict_group_means:
                     del ui.dict_group_means[key_group]
                     ui.save_dict(dict2save=ui.dict_group_means)
@@ -1492,7 +1495,6 @@ class Measure_window_sub(Ui_measure_window):
                         print(f"accepted_handler: removing {group_path}")
                         group_path.unlink()
                 ui.setGraph()
-
             
     def m(self, SI):
         # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
