@@ -226,54 +226,57 @@ class Ui_measure_window(QtCore.QObject):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.measure_toolbox.sizePolicy().hasHeightForWidth())
         self.measure_toolbox.setSizePolicy(sizePolicy)
-        self.measure_toolbox.setMinimumSize(QtCore.QSize(0, 130))
-        self.measure_toolbox.setMaximumSize(QtCore.QSize(16777215, 130))
+        self.measure_toolbox.setMinimumSize(QtCore.QSize(0, 135))
+        self.measure_toolbox.setMaximumSize(QtCore.QSize(16777215, 135))
         self.measure_toolbox.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.measure_toolbox.setFrameShadow(QtWidgets.QFrame.Plain)
         self.measure_toolbox.setLineWidth(0)
         self.measure_toolbox.setObjectName("measure_toolbox")
         self.pushButton_EPSP_slope = QtWidgets.QPushButton(self.measure_toolbox)
-        self.pushButton_EPSP_slope.setGeometry(QtCore.QRect(10, 30, 83, 25))
+        self.pushButton_EPSP_slope.setGeometry(QtCore.QRect(10, 40, 83, 25))
         self.pushButton_EPSP_slope.setObjectName("pushButton_EPSP_slope")
         self.pushButton_EPSP_amp = QtWidgets.QPushButton(self.measure_toolbox)
-        self.pushButton_EPSP_amp.setGeometry(QtCore.QRect(10, 90, 83, 25))
+        self.pushButton_EPSP_amp.setGeometry(QtCore.QRect(10, 100, 83, 25))
         self.pushButton_EPSP_amp.setObjectName("pushButton_EPSP_amp")
         self.pushButton_EPSP_size = QtWidgets.QPushButton(self.measure_toolbox)
-        self.pushButton_EPSP_size.setGeometry(QtCore.QRect(10, 60, 83, 25))
+        self.pushButton_EPSP_size.setGeometry(QtCore.QRect(10, 70, 83, 25))
         self.pushButton_EPSP_size.setObjectName("pushButton_EPSP_size")
         self.pushButton_volley_size = QtWidgets.QPushButton(self.measure_toolbox)
-        self.pushButton_volley_size.setGeometry(QtCore.QRect(170, 60, 83, 25))
+        self.pushButton_volley_size.setGeometry(QtCore.QRect(170, 70, 83, 25))
         self.pushButton_volley_size.setObjectName("pushButton_volley_size")
         self.pushButton_volley_amp = QtWidgets.QPushButton(self.measure_toolbox)
-        self.pushButton_volley_amp.setGeometry(QtCore.QRect(170, 90, 83, 25))
+        self.pushButton_volley_amp.setGeometry(QtCore.QRect(170, 100, 83, 25))
         self.pushButton_volley_amp.setObjectName("pushButton_volley_amp")
         self.pushButton_volley_slope = QtWidgets.QPushButton(self.measure_toolbox)
-        self.pushButton_volley_slope.setGeometry(QtCore.QRect(170, 30, 83, 25))
+        self.pushButton_volley_slope.setGeometry(QtCore.QRect(170, 40, 83, 25))
         self.pushButton_volley_slope.setObjectName("pushButton_volley_slope")
         self.label_EPSP_ms = QtWidgets.QLabel(self.measure_toolbox)
-        self.label_EPSP_ms.setGeometry(QtCore.QRect(110, 10, 21, 17))
+        self.label_EPSP_ms.setGeometry(QtCore.QRect(110, 20, 21, 17))
         self.label_EPSP_ms.setObjectName("label_EPSP_ms")
         self.label_volley_ms = QtWidgets.QLabel(self.measure_toolbox)
-        self.label_volley_ms.setGeometry(QtCore.QRect(270, 10, 21, 17))
+        self.label_volley_ms.setGeometry(QtCore.QRect(270, 20, 21, 17))
         self.label_volley_ms.setObjectName("label_volley_ms")
         self.lineEdit_volley_slope = QtWidgets.QLineEdit(self.measure_toolbox)
-        self.lineEdit_volley_slope.setGeometry(QtCore.QRect(260, 30, 51, 25))
+        self.lineEdit_volley_slope.setGeometry(QtCore.QRect(260, 40, 51, 25))
         self.lineEdit_volley_slope.setObjectName("lineEdit_volley_slope")
         self.lineEdit_volley_size = QtWidgets.QLineEdit(self.measure_toolbox)
-        self.lineEdit_volley_size.setGeometry(QtCore.QRect(260, 60, 51, 25))
+        self.lineEdit_volley_size.setGeometry(QtCore.QRect(260, 70, 51, 25))
         self.lineEdit_volley_size.setObjectName("lineEdit_volley_size")
         self.lineEdit_volley_amp = QtWidgets.QLineEdit(self.measure_toolbox)
-        self.lineEdit_volley_amp.setGeometry(QtCore.QRect(260, 90, 51, 25))
+        self.lineEdit_volley_amp.setGeometry(QtCore.QRect(260, 100, 51, 25))
         self.lineEdit_volley_amp.setObjectName("lineEdit_volley_amp")
         self.lineEdit_EPSP_size = QtWidgets.QLineEdit(self.measure_toolbox)
-        self.lineEdit_EPSP_size.setGeometry(QtCore.QRect(100, 60, 51, 25))
+        self.lineEdit_EPSP_size.setGeometry(QtCore.QRect(100, 70, 51, 25))
         self.lineEdit_EPSP_size.setObjectName("lineEdit_EPSP_size")
         self.lineEdit_EPSP_amp = QtWidgets.QLineEdit(self.measure_toolbox)
-        self.lineEdit_EPSP_amp.setGeometry(QtCore.QRect(100, 90, 51, 25))
+        self.lineEdit_EPSP_amp.setGeometry(QtCore.QRect(100, 100, 51, 25))
         self.lineEdit_EPSP_amp.setObjectName("lineEdit_EPSP_amp")
         self.lineEdit_EPSP_slope = QtWidgets.QLineEdit(self.measure_toolbox)
-        self.lineEdit_EPSP_slope.setGeometry(QtCore.QRect(100, 30, 51, 25))
+        self.lineEdit_EPSP_slope.setGeometry(QtCore.QRect(100, 40, 51, 25))
         self.lineEdit_EPSP_slope.setObjectName("lineEdit_EPSP_slope")
+        self.pushButtonAuto = QtWidgets.QPushButton(self.measure_toolbox)
+        self.pushButtonAuto.setGeometry(QtCore.QRect(10, 10, 83, 25))
+        self.pushButtonAuto.setObjectName("pushButtonAuto")
         self.measure_verticalLayout.addWidget(self.measure_toolbox)
         self.measure_graph_output = QtWidgets.QWidget(measure)
         self.measure_graph_output.setObjectName("measure_graph_output")
@@ -308,6 +311,7 @@ class Ui_measure_window(QtCore.QObject):
         self.pushButton_volley_slope.setText(_translate("measure", "Volley slope"))
         self.label_EPSP_ms.setText(_translate("measure", "ms"))
         self.label_volley_ms.setText(_translate("measure", "ms"))
+        self.pushButtonAuto.setText(_translate("measure", "Auto"))
 
 
 ################################################################
@@ -1193,7 +1197,7 @@ class UIsub(Ui_MainWindow):
 
 
 # Default_output
-    def defaultOutput(self, row): # TODO: WIP; not updating df_project properly yet
+    def defaultOutput(self, row, update_df_p = True): # TODO: WIP; not updating df_project properly yet
         '''
         Generates default results for row (in self.df_project)
         Stores timepoints, methods and params in their designated columns in self.df_project
@@ -1465,6 +1469,7 @@ class Measure_window_sub(Ui_measure_window):
         for aspect in self.supported_aspects:
             loopConnectAspects(aspect=aspect)
         self.buttonBox.accepted.connect(self.accepted_handler)
+        self.pushButtonAuto.clicked.connect(self.autoCalculate)
 
     def accepted_handler(self):
         # update df_project, dict_outputs, and purge group outputs for recalculation
@@ -1495,7 +1500,18 @@ class Measure_window_sub(Ui_measure_window):
                         print(f"accepted_handler: removing {group_path}")
                         group_path.unlink()
                 ui.setGraph()
-            
+
+    def autoCalculate(self):
+        dfdata = ui.get_dfdata(row=self.row)
+        dict_t = analysis.find_all_t(dfmean=self.dfmean, verbose=False)
+        self.new_dfoutput = analysis.build_dfoutput(dfdata=dfdata,
+                                       t_EPSP_amp=dict_t["t_EPSP_amp"],
+                                       t_EPSP_slope=dict_t["t_EPSP_slope"])
+        self.new_dfoutput.reset_index(inplace=True)
+        for aspect in self.supported_aspects:
+            time = dict_t[f"t_{aspect}"]
+            self.updateAspect(aspect=aspect, time=time, method="Auto")
+
     def m(self, SI):
         # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
         return str(round(SI * 1000, 1)) # TODO: single decimal assumes 10KHz sampling rate; make this more flexible
@@ -1602,7 +1618,7 @@ class Measure_window_sub(Ui_measure_window):
     def updateOnClick(self, time, aspect):
         if verbose:
             print(f"updateOnClick: time={time}, aspect={aspect}")
-        self.updateAspect(time, aspect)
+        self.updateAspect(time=time, aspect=aspect, method="Manual")
 
     def updateOnEdit(self, lineEdit, aspect):
         print(f"updateOnEdit: lineEdit={lineEdit}, aspect={aspect}")
@@ -1618,15 +1634,15 @@ class Measure_window_sub(Ui_measure_window):
             print(f"Time {time}s out of range")
             lineEdit.setText("")
             return
-        self.updateAspect(time, aspect)
+        self.updateAspect(time=time, aspect=aspect, method="Manual")
     
-    def updateAspect(self, time, aspect):
+    def updateAspect(self, time, aspect, method):
         t_aspect  = ("t_" + aspect)
         t_method = (t_aspect + "_method")
         t_params = (t_aspect + "_params")
         # update row
         self.row[t_aspect] = time
-        self.row[t_method] = "manual"
+        self.row[t_method] = method
         self.row[t_params] = "-"
         if verbose:
             print(f" . ui.df_project.loc[self.row.name, t_aspect]: {ui.df_project.loc[self.row.name, t_aspect]}, row[{t_aspect}]: {self.row[t_aspect]}")
