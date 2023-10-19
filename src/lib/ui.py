@@ -308,7 +308,7 @@ class Ui_measure_window(QtCore.QObject):
 class Ui_MainWindow(QtCore.QObject):
     def setupUi(self, mainWindow):
         mainWindow.setObjectName("mainWindow")
-        mainWindow.resize(1066, 777)
+        mainWindow.resize(1400, 1000)
         self.centralwidget = QtWidgets.QWidget(mainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayoutCentralwidget = QtWidgets.QHBoxLayout(self.centralwidget)
@@ -513,6 +513,9 @@ class UIsub(Ui_MainWindow):
         self.setupUi(mainwindow)
         if verbose:
             print(" - UIsub init, verbose mode")  # rename for clarity
+        # move mainwindow to default position (TODO: later to be stored in cfg)
+        self.mainwindow = mainwindow
+        self.mainwindow.setGeometry(0, 0, 1400, 1200)
         # load cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
@@ -1292,6 +1295,8 @@ class UIsub(Ui_MainWindow):
         self.measure = QtWidgets.QDialog()
         self.measure_window_sub = Measure_window_sub(self.measure, row=ser_table_row, dfmean=dfmean)
         self.measure.setWindowTitle(ser_table_row["recording_name"])
+        # move measurewindow to default position (TODO: later to be stored in cfg)
+        self.measure.setGeometry(1400, 0, 800, 1200)
         self.measure.show()
         # Set graphs
         self.measure_window_sub.setMeanGraph(t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
@@ -1459,15 +1464,13 @@ class Measure_window_sub(Ui_measure_window):
         button.setStyleSheet(self.selected_color)
 
     def setMeanGraph(self, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
-        # get dfmean from selected row in UIsub.
         self.canvas_mean.axes.cla()
         dfmean = self.dfmean
         self.si_v = None # vertical line in canvas_output, indicating selected sweep
-        self.si_sweep = None # lineplot of the selected sweep on canvas_mean
+        self.si_sweep, = self.canvas_mean.axes.plot([], [], color="blue") # lineplot of the selected sweep on canvas_mean
         self.si_v_drag_from = None # vertical line in canvas_output, indicating start of drag
         self.si_v_drag_to = None # vertical line in canvas_output, indicating end of drag
         self.dragplot = None
-        # fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
         g = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_mean.axes, color="red")
         h = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_mean.axes, color="green")
         i = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_mean.axes, color="black")
@@ -1475,18 +1478,14 @@ class Measure_window_sub(Ui_measure_window):
         self.v_t_EPSP_slope =         sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
         self.v_t_EPSP_slope_start =   sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope - 0.0004, color="green", linestyle=":")
         self.v_t_EPSP_slope_end =     sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope + 0.0004, color="green", linestyle=":")
-        # t_VEB
         g.axvline(t_VEB, color="grey", linestyle="--")
         self.canvas_mean.axes.set_xlim(ui.graph_xlim)
         self.canvas_mean.axes.set_ylim(ui.graph_ylim)
         self.canvas_mean.draw()
 
     def setOutputGraph(self, dfoutput):
-        # get dfoutput from selected row in UIsub.
         self.canvas_output.axes.cla()
         self.dragging = False
-        #self.sweepmin = dfoutput['sweep'].min()
-        #self.sweepmax = dfoutput['sweep'].max()
         if dfoutput['EPSP_amp'].notna().any():
             _ = sns.lineplot(label="EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_output.axes, color="black")
             self.canvas_output.axes.set_ylim(-0.0015, 0)
@@ -1537,8 +1536,6 @@ class Measure_window_sub(Ui_measure_window):
             if same: # click and release on same: get that specific sweep and superimpose it on canvas_mean
                 self.deOutput(self.si_v_drag_to, self.dragplot)
                 df = df[df['sweep'] == int(self.drag_start)]
-                if self.si_sweep is None:
-                    self.si_sweep, = self.canvas_mean.axes.plot([], [], color="blue")
                 self.si_sweep.set_data(df["time"], df["voltage"])
             else: # get all sweeps between drag_start and x (event.xdata) and superimpose the mean of them on canvas_mean
                 if int(self.drag_start) > int(x):
@@ -1547,8 +1544,6 @@ class Measure_window_sub(Ui_measure_window):
                     df = df[(df['sweep'] >= int(self.drag_start)) & (df['sweep'] <= int(x))]
                 df = df.groupby('time').agg({'voltage': ['mean']}).reset_index()
                 df.columns = ['time', 'voltage']
-                if self.si_sweep is None:
-                    self.si_sweep, = self.canvas_mean.axes.plot([], [], color="blue")
                 self.si_sweep.set_data(df["time"], df["voltage"])
             self.canvas_mean.draw()
             self.canvas_output.draw()
