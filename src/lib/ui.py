@@ -200,9 +200,15 @@ class MplCanvas(FigureCanvasQTAgg):
 class Ui_measure_window(QtCore.QObject):
     def setupUi(self, measure):
         measure.setObjectName("measure")
-        measure.resize(502, 992)
-        self.verticalLayout = QtWidgets.QVBoxLayout(measure)
-        self.verticalLayout.setObjectName("verticalLayout")
+        measure.resize(525, 946)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(1)
+        sizePolicy.setVerticalStretch(1)
+        sizePolicy.setHeightForWidth(measure.sizePolicy().hasHeightForWidth())
+        measure.setSizePolicy(sizePolicy)
+        measure.setMaximumSize(QtCore.QSize(16777215, 16777215))
+        self.gridLayout = QtWidgets.QGridLayout(measure)
+        self.gridLayout.setObjectName("gridLayout")
         self.measure_verticalLayout = QtWidgets.QVBoxLayout()
         self.measure_verticalLayout.setSizeConstraint(QtWidgets.QLayout.SetNoConstraint)
         self.measure_verticalLayout.setObjectName("measure_verticalLayout")
@@ -221,7 +227,7 @@ class Ui_measure_window(QtCore.QObject):
         sizePolicy.setHeightForWidth(self.measure_toolbox.sizePolicy().hasHeightForWidth())
         self.measure_toolbox.setSizePolicy(sizePolicy)
         self.measure_toolbox.setMinimumSize(QtCore.QSize(0, 130))
-        self.measure_toolbox.setMaximumSize(QtCore.QSize(16777215, 100))
+        self.measure_toolbox.setMaximumSize(QtCore.QSize(16777215, 130))
         self.measure_toolbox.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.measure_toolbox.setFrameShadow(QtWidgets.QFrame.Plain)
         self.measure_toolbox.setLineWidth(0)
@@ -276,12 +282,19 @@ class Ui_measure_window(QtCore.QObject):
         self.measure_info.setMinimumSize(QtCore.QSize(0, 50))
         self.measure_info.setObjectName("measure_info")
         self.measure_verticalLayout.addWidget(self.measure_info)
+        self.buttonBox = QtWidgets.QDialogButtonBox(measure)
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName("buttonBox")
+        self.measure_verticalLayout.addWidget(self.buttonBox)
         self.measure_verticalLayout.setStretch(0, 5)
         self.measure_verticalLayout.setStretch(2, 5)
         self.measure_verticalLayout.setStretch(3, 1)
-        self.verticalLayout.addLayout(self.measure_verticalLayout)
+        self.gridLayout.addLayout(self.measure_verticalLayout, 0, 0, 1, 1)
 
         self.retranslateUi(measure)
+        self.buttonBox.accepted.connect(measure.accept) # type: ignore
+        self.buttonBox.rejected.connect(measure.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(measure)
 
     def retranslateUi(self, measure):
@@ -1414,7 +1427,7 @@ class Measure_window_sub(Ui_measure_window):
     def __init__(self, measure_window, parent=None, row=None, dfmean=None, folder="."):
         super(Measure_window_sub, self).__init__()
         # local versions of row and dfmean that persist unchanged (TODO: check!) while the window is open
-        self.row = row
+        self.row = row.copy()
         self.dfmean = dfmean
         self.setupUi(measure_window)
         self.parent = parent
@@ -1451,7 +1464,36 @@ class Measure_window_sub(Ui_measure_window):
             aspect_edit.editingFinished.connect(lambda: self.updateOnEdit(aspect_edit, aspect))
         for aspect in self.supported_aspects:
             loopConnectAspects(aspect=aspect)
+        self.buttonBox.accepted.connect(self.accepted_handler)
 
+    def accepted_handler(self):
+        # update df_project, dict_outputs, and purge group outputs for recalculation
+        ui.df_project.loc[self.row.name] = self.row
+        ui.save_df_project()
+        # update output; dict and file
+        dfoutput = self.new_dfoutput
+        key_output = f"{self.row['recording_name']}_output"
+        ui.dict_outputs[key_output] = dfoutput
+        ui.save_dict(dict2save=ui.dict_outputs)
+        # delete group outputs
+        list_groups = self.row['groups'].split(",")
+        if (self.row['groups'] == " ") or (not list_groups):
+            print(f"accepted_handler: row is not in any group")
+        else:
+            print(f"accepted_handler: list_groups: {list_groups}")
+            for group in list_groups:
+                key_group = group.strip()
+                print(f"accepted_handler: deleting {key_group}")
+                if key_group in ui.dict_group_means:
+                    del ui.dict_group_means[key_group]
+                    ui.save_dict(dict2save=ui.dict_group_means)
+                    group_path = Path(f'{ui.dict_folders["cache"]}/{key_group}.csv')
+                    if group_path.exists():
+                        print(f"accepted_handler: removing {group_path}")
+                        group_path.unlink()
+                ui.setGraph()
+
+            
     def m(self, SI):
         # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
         return str(round(SI * 1000, 1)) # TODO: single decimal assumes 10KHz sampling rate; make this more flexible
@@ -1474,7 +1516,7 @@ class Measure_window_sub(Ui_measure_window):
         g = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_mean.axes, color="red")
         h = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_mean.axes, color="green")
         i = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_mean.axes, color="black")
-        self.v_t_EPSP_amp = sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
+        self.v_t_EPSP_amp =           sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
         self.v_t_EPSP_slope =         sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
         self.v_t_EPSP_slope_start =   sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope - 0.0004, color="green", linestyle=":")
         self.v_t_EPSP_slope_end =     sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope + 0.0004, color="green", linestyle=":")
@@ -1486,6 +1528,7 @@ class Measure_window_sub(Ui_measure_window):
     def setOutputGraph(self, dfoutput):
         self.canvas_output.axes.cla()
         self.dragging = False
+        self.new_dfoutput = dfoutput.copy()
         if dfoutput['EPSP_amp'].notna().any():
             _ = sns.lineplot(label="EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_output.axes, color="black")
             self.canvas_output.axes.set_ylim(-0.0015, 0)
@@ -1576,40 +1619,36 @@ class Measure_window_sub(Ui_measure_window):
         self.updateAspect(time, aspect)
     
     def updateAspect(self, time, aspect):
-        # update df_project, dict_outputs, and the graphs
         t_aspect  = ("t_" + aspect)
         t_method = (t_aspect + "_method")
-        t_param = (t_aspect + "_param")
-        # update df_project
-        ui.df_project.loc[self.row.name, t_aspect] = time
-        ui.df_project.loc[self.row.name, t_method] = "manual"
-        ui.df_project.loc[self.row.name, t_param] = "-"
-        ui.save_df_project()
+        t_params = (t_aspect + "_params")
+        # update row
+        self.row[t_aspect] = time
+        self.row[t_method] = "manual"
+        self.row[t_params] = "-"
         if verbose:
-            print(f" . ui.df_project.loc[self.row.name, t_aspect]: {ui.df_project.loc[self.row.name, t_aspect]}")
-            print(f" . ui.df_project.loc[self.row.name, t_method: {ui.df_project.loc[self.row.name, t_method]}")
-            print(f" . ui.df_project.loc[self.row.name, t_param]: {ui.df_project.loc[self.row.name, t_param]}")
+            print(f" . ui.df_project.loc[self.row.name, t_aspect]: {ui.df_project.loc[self.row.name, t_aspect]}, row[{t_aspect}]: {self.row[t_aspect]}")
+            print(f" . ui.df_project.loc[self.row.name, t_method: {ui.df_project.loc[self.row.name, t_method]}, row[{t_method}]: {self.row[t_method]}")
+            print(f" . ui.df_project.loc[self.row.name, t_params]: {ui.df_project.loc[self.row.name, t_params]}, row[{t_params}]: {self.row[t_params]}")
         #recalculate aspect
         dfdata = ui.get_dfdata(row=self.row)
-        dfoutput = ui.get_dfoutput(row=self.row)
         if aspect == "EPSP_amp":
-            new_dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=time)
+            df = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=time)
             graph_color = "black"
             plot_on_mean = {'center': ("v_" + t_aspect)}
         elif aspect == "EPSP_slope":
-            new_dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_slope=time)
+            df = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_slope=time)
             graph_color = "green"
             plot_on_mean = {'center': ("v_" + t_aspect),
                             'start':  ("v_" + t_aspect + "_start"),
                             'end':    ("v_" + t_aspect + "_end")}
-        #update output; dict and file
-        dfoutput[aspect] = new_dfoutput[aspect]
-        key_output = f"{self.row['recording_name']}_output"
-        ui.dict_outputs[key_output] = dfoutput
-        ui.save_dict(dict2save=ui.dict_outputs)
-        #update the graphs
+        self.new_dfoutput[aspect] = df[aspect]
+        #update appropriate lineEdit
+        print(f"lineEdit_{aspect}: time{time} to ms: {self.m(time)}")
+        line2update = getattr(self, "lineEdit_" + aspect)
+        line2update.setText(self.m(time))
+        #update mean graph
         for key, graph in plot_on_mean.items():
-            #print(f"key: {key}, graph: {graph}")
             getattr(self, graph).remove() # remove the one which you are about to update
             if key == "center":
                 setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color=graph_color, linestyle="--"))
@@ -1618,17 +1657,19 @@ class Measure_window_sub(Ui_measure_window):
             elif key == "end":
                 setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time + 0.0004, color=graph_color, linestyle=":"))
         self.canvas_mean.draw()
-        #update appropriate lineEdit
-        print(f"lineEdit_{aspect}: time{time} to ms: {self.m(time)}")
-        line2update = getattr(self, "lineEdit_" + aspect)
-        line2update.setText(self.m(time))
         #update output graph
-        self.canvas_output.axes.lines[self.label2idx(aspect)].set_data(dfoutput['sweep'], dfoutput[aspect])
+        if self.new_dfoutput[aspect].notna().any():
+            if self.label2idx(f"new_{aspect}"):
+                self.canvas_output.axes.lines[self.label2idx(f"new_{aspect}")].remove()
+            _ = sns.lineplot(label=f"new_{aspect}", data=self.new_dfoutput, y=aspect, x='sweep', ax=self.canvas_output.axes, color='black')
+        self.canvas_output.axes.lines[self.label2idx(aspect)].set_color('gray')#set_data(new_dfoutput['sweep'], new_dfoutput[aspect])
         self.canvas_output.draw()
 
     def label2idx(self, aspect):
         dict_labels = {k.get_label(): v for (v, k) in enumerate(self.canvas_output.axes.lines)}
-        return dict_labels[aspect]
+        if aspect in dict_labels:
+            return dict_labels[aspect]
+        return False
 
 
 def get_signals(source):

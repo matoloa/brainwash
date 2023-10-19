@@ -14,9 +14,15 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_measure(object):
     def setupUi(self, measure):
         measure.setObjectName("measure")
-        measure.resize(502, 992)
-        self.verticalLayout = QtWidgets.QVBoxLayout(measure)
-        self.verticalLayout.setObjectName("verticalLayout")
+        measure.resize(525, 946)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(1)
+        sizePolicy.setVerticalStretch(1)
+        sizePolicy.setHeightForWidth(measure.sizePolicy().hasHeightForWidth())
+        measure.setSizePolicy(sizePolicy)
+        measure.setMaximumSize(QtCore.QSize(16777215, 16777215))
+        self.gridLayout = QtWidgets.QGridLayout(measure)
+        self.gridLayout.setObjectName("gridLayout")
         self.measure_verticalLayout = QtWidgets.QVBoxLayout()
         self.measure_verticalLayout.setSizeConstraint(QtWidgets.QLayout.SetNoConstraint)
         self.measure_verticalLayout.setObjectName("measure_verticalLayout")
@@ -35,7 +41,7 @@ class Ui_measure(object):
         sizePolicy.setHeightForWidth(self.measure_toolbox.sizePolicy().hasHeightForWidth())
         self.measure_toolbox.setSizePolicy(sizePolicy)
         self.measure_toolbox.setMinimumSize(QtCore.QSize(0, 130))
-        self.measure_toolbox.setMaximumSize(QtCore.QSize(16777215, 100))
+        self.measure_toolbox.setMaximumSize(QtCore.QSize(16777215, 130))
         self.measure_toolbox.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.measure_toolbox.setFrameShadow(QtWidgets.QFrame.Plain)
         self.measure_toolbox.setLineWidth(0)
@@ -90,12 +96,19 @@ class Ui_measure(object):
         self.measure_info.setMinimumSize(QtCore.QSize(0, 50))
         self.measure_info.setObjectName("measure_info")
         self.measure_verticalLayout.addWidget(self.measure_info)
+        self.buttonBox = QtWidgets.QDialogButtonBox(measure)
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName("buttonBox")
+        self.measure_verticalLayout.addWidget(self.buttonBox)
         self.measure_verticalLayout.setStretch(0, 5)
         self.measure_verticalLayout.setStretch(2, 5)
         self.measure_verticalLayout.setStretch(3, 1)
-        self.verticalLayout.addLayout(self.measure_verticalLayout)
+        self.gridLayout.addLayout(self.measure_verticalLayout, 0, 0, 1, 1)
 
         self.retranslateUi(measure)
+        self.buttonBox.accepted.connect(measure.accept) # type: ignore
+        self.buttonBox.rejected.connect(measure.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(measure)
 
     def retranslateUi(self, measure):
