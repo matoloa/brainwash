@@ -945,14 +945,14 @@ class UIsub(Ui_MainWindow):
         if 0 < len(selected_rows):
             list_group = ""
             for i in selected_rows:
-                if self.df_project.loc[i, "groups"] == " ":
-                    self.df_project.loc[i, "groups"] = add_group
+                if self.df_project.loc[i, 'groups'] == " ":
+                    self.df_project.loc[i, 'groups'] = add_group
                 else:
-                    list_group = self.df_project.loc[i, "groups"]
-                    list_group = list(list_group.split(","))
+                    str_group = self.df_project.loc[i, 'groups']
+                    list_group = list(str_group.split(","))
                     if add_group not in list_group:
                         list_group.append(add_group)
-                        self.df_project.loc[i, "groups"] = ",".join(map(str, sorted(list_group)))
+                        self.df_project.loc[i, 'groups'] = ",".join(map(str, sorted(list_group)))
                     else:
                         print(f"{self.df_project.loc[i, 'recording_name']} is already in {add_group}")
                 self.save_df_project()
@@ -967,7 +967,7 @@ class UIsub(Ui_MainWindow):
         if verbose:
             print(f'purgeGroupCache({group})')
         if group in self.dict_group_means:
-            self.dict_group_means.pop(group)
+            del self.dict_group_means[group]
         path_group_cache = Path(f'{self.dict_folders["cache"]}/{group}.csv')
         if path_group_cache.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
             print("File found when checking for existence...")
@@ -1473,33 +1473,51 @@ class Measure_window_sub(Ui_measure_window):
 
     def accepted_handler(self):
         # update df_project, dict_outputs, and purge group outputs for recalculation
-        for column, value in self.row.items():
-            if column != 'groups':
-                ui.df_project.at[self.row.name, column] = value
-        ui.save_df_project()
-        new_row = ui.df_project.loc[self.row.name]
-        # update output; dict and file
-        dfoutput = self.new_dfoutput
-        key_output = f"{new_row['recording_name']}_output"
-        ui.dict_outputs[key_output] = dfoutput
-        ui.save_dict(dict2save=ui.dict_outputs)
-        # delete group outputs
-        list_groups = new_row['groups'].split(",")
-        if (new_row['groups'] == " ") or (not list_groups):
-            print(f"accepted_handler: row is not in any group")
+        # find idx of row in ui.df_project with matching recording_name
+        df_p = ui.get_df_project()
+        idx = df_p.index[df_p['recording_name'] == self.row['recording_name']]
+        print(f"accepted_handler: idx: {idx}, type: {type(idx)}")
+        list_keep = ['recording_name', 'groups']
+        if len(idx) == 1:
+            for column, value in self.row.items():
+                if not column in list_keep:
+                    ui.df_project.loc[idx, column] = value
+            ui.save_df_project()
+            new_row = ui.df_project.loc[idx]
+            # update output; dict and file
+            dfoutput = self.new_dfoutput
+            key_output = f"{new_row['recording_name']}_output"
+            ui.dict_outputs[key_output] = dfoutput
+            ui.save_dict(dict2save=ui.dict_outputs)
+            # delete affected group output; dicts and files
+            # build list of groups to purge
+            str_groups = ui.df_project.loc[int(idx.values[0]), 'groups']
+            print(f"accepted_handler: groups_from_df {str_groups}, type: {type(str_groups)}")
+            list_groups = list(str_groups.split(","))
+            print(f"accepted_handler: list_groups: {list_groups}, type: {type(list_groups)}")
+            if (str_groups == " ") or (len(list_groups) == 0):
+                if verbose:
+                    print(f"accepted_handler: row is not in any group")
+            else:
+                if verbose:
+                    print(f"list_groups: {list_groups}")
+                    print(f"ui.dict_group_means: {list(ui.dict_group_means.keys())}")
+                for group in list_groups:
+                    if group in ui.dict_group_means.keys():
+                        if verbose:
+                            print(f"accepted_handler: removing {group} from internal dict")
+                        del ui.dict_group_means[group]
+                        ui.save_dict(dict2save=ui.dict_group_means)
+                        group_path = Path(f'{ui.dict_folders["cache"]}/{group}.csv')
+                        if group_path.exists():
+                            if verbose:
+                                print(f"accepted_handler: deleting {group_path}")
+                            group_path.unlink()
+                    ui.setGraph()
+        elif len(idx) < 1:
+            raise ValueError(f"ERROR (accepted_handler): {self.row['recording_name']} not found in df_project.")
         else:
-            print(f"accepted_handler: list_groups: {list_groups}")
-            for group in list_groups:
-                key_group = group.strip()
-                print(f"accepted_handler: deleting {key_group} from internal dict")
-                if key_group in ui.dict_group_means:
-                    del ui.dict_group_means[key_group]
-                    ui.save_dict(dict2save=ui.dict_group_means)
-                    group_path = Path(f'{ui.dict_folders["cache"]}/{key_group}.csv')
-                    if group_path.exists():
-                        print(f"accepted_handler: removing {group_path}")
-                        group_path.unlink()
-                ui.setGraph()
+            raise ValueError(f"ERROR (accepted_handler): multiple instances of {self.row['recording_name']} in project_df.")
 
     def autoCalculate(self):
         dfdata = ui.get_dfdata(row=self.row)
