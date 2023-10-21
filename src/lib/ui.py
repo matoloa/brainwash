@@ -1231,7 +1231,6 @@ class UIsub(Ui_MainWindow):
         self.canvas_seaborn_mean.axes.cla()
         self.canvas_seaborn_output.axes.cla()
         # add groups, regardless of selection:
-        # print(f"Groups: {self.list_groups}")
         list_color = ["red", "green", "blue", "yellow"] # TODO: placeholder color range
         df_p = self.get_df_project()
         for i_color, group in enumerate(self.list_groups):
@@ -1241,7 +1240,7 @@ class UIsub(Ui_MainWindow):
                     print(f"No data in group {group}")
                 break
             dfgroup_mean = self.get_dfgroupmean(key_group=group)
-            # TODO: Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
+            # Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
             # print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
             if dfgroup_mean['EPSP_amp_mean'].notna().any():
                 ax1 = sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[i_color])
@@ -1267,6 +1266,11 @@ class UIsub(Ui_MainWindow):
                         sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
                     if not np.isnan(t_EPSP_slope):
                         sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
+                        x_start = t_EPSP_slope - 0.0004
+                        x_end = t_EPSP_slope + 0.0004
+                        y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+                        y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+                        self.canvas_seaborn_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
 
         self.canvas_seaborn_mean.axes.set_xlim(self.graph_xlim)
         self.canvas_seaborn_mean.axes.set_ylim(self.graph_ylim)
@@ -1553,9 +1557,16 @@ class Measure_window_sub(Ui_measure_window):
         h = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_mean.axes, color="green")
         i = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_mean.axes, color="black")
         self.v_t_EPSP_amp =           sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
+        x_start = t_EPSP_slope - 0.0004
+        x_end = t_EPSP_slope + 0.0004
         self.v_t_EPSP_slope =         sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
-        self.v_t_EPSP_slope_start =   sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope - 0.0004, color="green", linestyle=":")
-        self.v_t_EPSP_slope_end =     sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope + 0.0004, color="green", linestyle=":")
+        self.v_t_EPSP_slope_start =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
+        self.v_t_EPSP_slope_end =     sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
+        # placeholder start-finish measurement line
+        y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+        y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+        self.canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
+
         g.axvline(t_VEB, color="grey", linestyle="--")
         self.canvas_mean.axes.set_xlim(ui.graph_xlim)
         self.canvas_mean.axes.set_ylim(ui.graph_ylim)
