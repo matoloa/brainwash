@@ -1312,18 +1312,19 @@ class UIsub(Ui_MainWindow):
         dfmean = self.get_dfmean(ser_table_row)
         dfoutput = self.get_dfoutput(row=ser_table_row)
         # Extract variables
-        t_VEB = self.df_project.loc[row_index, "t_VEB"]
-        t_EPSP_amp = self.df_project.loc[row_index, "t_EPSP_amp"]
-        t_EPSP_slope = self.df_project.loc[row_index, "t_EPSP_slope"]
+        t_stim = self.df_project.loc[row_index, 't_stim']
+        t_VEB = self.df_project.loc[row_index, 't_VEB']
+        t_EPSP_amp = self.df_project.loc[row_index, 't_EPSP_amp']
+        t_EPSP_slope = self.df_project.loc[row_index, 't_EPSP_slope']
         # Open window
         self.measure = QtWidgets.QDialog()
         self.measure_window_sub = Measure_window_sub(self.measure, row=ser_table_row, dfmean=dfmean)
-        self.measure.setWindowTitle(ser_table_row["recording_name"])
+        self.measure.setWindowTitle(ser_table_row['recording_name'])
         # move measurewindow to default position (TODO: later to be stored in cfg)
         self.measure.setGeometry(1400, 0, 800, 1200)
         self.measure.show()
         # Set graphs
-        self.measure_window_sub.setMeanGraph(t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
+        self.measure_window_sub.setMeanGraph(t_stim=t_stim, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
         self.measure_window_sub.setOutputGraph(dfoutput=dfoutput)
     
             
@@ -1548,7 +1549,7 @@ class Measure_window_sub(Ui_measure_window):
             un_button.setStyleSheet(self.default_color)
         button.setStyleSheet(self.selected_color)
 
-    def setMeanGraph(self, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
+    def setMeanGraph(self, t_stim=None, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
         self.canvas_mean.axes.cla()
         dfmean = self.dfmean
         self.si_v = None # vertical line in canvas_output, indicating selected sweep
@@ -1556,8 +1557,15 @@ class Measure_window_sub(Ui_measure_window):
         self.si_v_drag_from = None # vertical line in canvas_output, indicating start of drag
         self.si_v_drag_to = None # vertical line in canvas_output, indicating end of drag
         self.dragplot = None
-        g = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_mean.axes, color="red")
-        h = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_mean.axes, color="green")
+        # filter to display only the relevant part of the trace, and rescale prim and bis to match voltage
+        filtered_df = dfmean[(dfmean['time'] > t_stim + 0.001) & (dfmean['time'] < t_EPSP_amp + 0.005)].copy()
+        min_V = filtered_df['voltage'].min()
+        min_prim = filtered_df['prim'].min()
+        min_bis = filtered_df['bis'].min()
+        filtered_df['prim'] = filtered_df['prim'] * (min_V/min_prim)
+        filtered_df['bis'] = filtered_df['bis'] * (min_V/min_bis)
+        g = sns.lineplot(data=filtered_df, y="prim", x="time", ax=self.canvas_mean.axes, color="red", alpha=0.3)
+        h = sns.lineplot(data=filtered_df, y="bis", x="time", ax=self.canvas_mean.axes, color="green", alpha=0.3)
         i = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_mean.axes, color="black")
         self.v_t_EPSP_amp =           sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
         x_start = t_EPSP_slope - 0.0004
