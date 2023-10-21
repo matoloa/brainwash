@@ -1264,6 +1264,9 @@ class UIsub(Ui_MainWindow):
                     t_EPSP_slope = df_p.loc[row.name,'t_EPSP_slope']
                     if not np.isnan(t_EPSP_amp):
                         sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
+                        y_position = dfmean[dfmean.time == t_EPSP_amp].voltage
+                        self.canvas_seaborn_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
+
                     if not np.isnan(t_EPSP_slope):
                         sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
                         x_start = t_EPSP_slope - 0.0004
