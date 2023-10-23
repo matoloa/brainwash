@@ -1037,12 +1037,14 @@ class UIsub(Ui_MainWindow):
             self.write_cfg()
 
     def renameProject(self): # changes name of project folder and updates .cfg
+        if verbose:
+            print("renameProject")
         self.dict_folders['project'].mkdir(exist_ok=True)
         new_project_name = self.inputProjectName.text()
         # check if ok
         if (self.projects_folder / new_project_name).exists():
             if verbose:
-                print(f"Project name {new_project_name} already exists.")
+                print(f"Project name {new_project_name} already exists")
             self.inputProjectName.setText(self.projectname)
         elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_project_name)) is not None: # check if valid filename
             self.dict_folders['project'] = self.dict_folders['project'].rename(self.projects_folder / new_project_name)
@@ -1133,7 +1135,7 @@ class UIsub(Ui_MainWindow):
                 dfmean = pd.read_csv(str_mean_path)
             else:
                 dfmean = parse.build_dfmean(self.get_dfdata(row=row))
-                parse.persistdf(file_base=recording_name, proj_folder=self.dict_folders['project'], dfmean=dfmean)
+                parse.persistdf(file_base=recording_name, dict_folders=self.dict_folders, dfmean=dfmean)
             self.dict_means[key_mean] = dfmean
             return self.dict_means[key_mean]
 

@@ -103,11 +103,25 @@ def build_dfmean(dfdata, rollingwidth=3):
     # find index of stimulus artifact (this requires and index)
     dfmean.reset_index(inplace=True)
     i_stim = dfmean.prim.idxmax()
-    median = dfmean['voltage'].iloc[i_stim-20:i_stim-5].median() # TODO: hardcoded 20 and 5
-    #print(f"median: {median}")
-    #print(f"dfmean BEFORE subtract: {dfmean}")
-    dfmean['voltage'] = dfmean['voltage'] - median
-    #print(f"dfmean AFTER subtract: {dfmean}")
+    y_stim = dfmean.prim.max()
+    threshold = y_stim*0.9
+    min_time_difference = 0.005  # Minimum time difference 5ms TODO: hardcoded
+    # Find the indices where 'prim' is above the threshold
+    above_threshold_indices = np.where(dfmean['prim'] > threshold)[0]
+    print(f"above_threshold_indices: {above_threshold_indices}")
+    # Filter the indices to ensure they are more than min_time_difference apart
+    filtered_indices = [above_threshold_indices[0]]
+    for i in range(1, len(above_threshold_indices)):
+        if dfmean['time'][above_threshold_indices[i]] - dfmean['time'][above_threshold_indices[i - 1]] > min_time_difference:
+            filtered_indices.append(above_threshold_indices[i])
+    n_stim = len(filtered_indices)
+    if n_stim == 1:
+        # subtract median of 20-5 samples before stimulus artifact
+        median = dfmean['voltage'].iloc[i_stim-20:i_stim-5].median() # TODO: hardcoded 20 and 5
+        #print(f"dfmean BEFORE subtract: {dfmean}")
+        dfmean['voltage'] = dfmean['voltage'] - median
+        #print(f"dfmean AFTER subtract: {dfmean}")
+    print(f"n_stim: {n_stim}, filtered_indices: {filtered_indices}")
     return dfmean
 
 def zeroSweeps(dfdata, dfmean):
