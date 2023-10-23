@@ -574,18 +574,12 @@ class UIsub(Ui_MainWindow):
         self.tablemodel = TableModel(self.df_project)
         self.tableProj.setModel(self.tablemodel)
 
-        self.dict_folders = {
-            'project': self.projects_folder / self.projectname,
-            'data': self.projects_folder / self.projectname / 'data',
-            'cache': self.projects_folder / self.projectname / 'cache'
-        }
-
+        self.dict_folders = self.build_dict_folders()
+        
         # If projectfile exists, load it, otherwise create it
         if Path(self.dict_folders['project'] / "project.brainwash").exists():
             self.load_df_project()
         else:
-            self.dict_folders['project'] = "My Project"
-            self.dict_folders['project'] = self.projects_folder / self.projectname
             self.setTableDf(self.df_project)
             self.write_cfg()
 
@@ -615,11 +609,7 @@ class UIsub(Ui_MainWindow):
             self.timer.timeout.connect(self.checkFocus)
             self.timer.start(1000)  
 
-        # Internal storage dicts
-        self.dict_datas = {} # all data
-        self.dict_means = {} # all means
-        self.dict_outputs = {} # all outputs
-        self.dict_group_means = {} # means of all group outputs
+        self.resetCacheDicts() # Internal storage dicts
 
         # Addon to make the graphs scaleable
         self.graphMean.setLayout(QtWidgets.QVBoxLayout())
@@ -673,6 +663,24 @@ class UIsub(Ui_MainWindow):
             print(f"Focused Widget: {focused_widget.objectName()}")
         else:
             print("No widget has focus.")
+
+
+# WIP: TODO: move these to appropriate header in this file
+
+    def build_dict_folders(self):
+        folder = (self.projects_folder / self.projectname)
+        dict_folders = {
+                    'project': folder,
+                    'data': folder / 'data',
+                    'cache': folder / 'cache'
+        }
+        return dict_folders
+
+    def resetCacheDicts(self):
+        self.dict_datas = {} # all data
+        self.dict_means = {} # all means
+        self.dict_outputs = {} # all outputs
+        self.dict_group_means = {} # means of all group outputs
 
 
 # pushedButton functions TODO: break out the big ones to separate functions!
@@ -1019,6 +1027,8 @@ class UIsub(Ui_MainWindow):
             new_projectfolder.mkdir()
             self.dict_folders['project'] = new_projectfolder
             self.projectname = new_project_name
+            self.dict_folders = self.build_dict_folders()
+            self.resetCacheDicts()
             self.inputProjectName.setText(self.projectname)
             self.clearGraph()
             self.df_project = df_projectTemplate()
@@ -1034,10 +1044,11 @@ class UIsub(Ui_MainWindow):
             if verbose:
                 print(f"Project name {new_project_name} already exists.")
             self.inputProjectName.setText(self.projectname)
-        elif re.match(r'^[a-zA-Z0-9_-]+$', str(new_project_name)) is not None: # check if valid filename
+        elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_project_name)) is not None: # check if valid filename
             self.dict_folders['project'] = self.dict_folders['project'].rename(self.projects_folder / new_project_name)
             self.projectname = new_project_name
             self.inputProjectName.setReadOnly(True)
+            self.dict_folders = self.build_dict_folders()
             self.write_cfg()
             print(f"Project renamed to {new_project_name}.")
         else:
