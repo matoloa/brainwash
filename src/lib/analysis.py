@@ -44,7 +44,7 @@ def build_dfoutput(dfdata, t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, 
     # EPSP_slope
     if t_EPSP_slope is not None:
         if t_EPSP_slope is not np.nan:
-            df_EPSP_slope = measureslope_vec(df=dfdata, t_slope=t_EPSP_slope, halfwidth=0.0004)
+            df_EPSP_slope = measureslope_vec(dfdata=dfdata, t_slope=t_EPSP_slope, halfwidth=0.0004)
             dfoutput['EPSP_slope'] = df_EPSP_slope['value']
         else:
             dfoutput['EPSP_slope'] = np.nan
@@ -300,8 +300,8 @@ def measureslope(df, t_slope, halfwidth, name="EPSP"):
     df_slopes = pd.DataFrame(dicts)
 
     return df_slopes
-
 # %%
+'''
 from pathlib import Path
 path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/KO_02.csv")
 # path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/A_21_P0701-S2.csv")
@@ -327,7 +327,7 @@ print(f"dfshape: {df.shape}")
 print(f"dfvalue: {df.sweep.value_counts().unique()}")
 dfslopes = measureslope_vec(df, t_slope, halfwidth)
 dfslopes.value.plot()
-
+'''
 
 # %%
 def measureslope_vec(dfdata, t_slope, halfwidth, name="EPSP"):
@@ -358,21 +358,18 @@ if __name__ == "__main__":
     print()
     print("Running as main: standalone test")
     from pathlib import Path
-    path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/KO_02.csv")
-    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_mean.csv")
+    path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/KO_02_Ch1_a.csv")
+    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_mean.csv")
     # path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/A_21_P0701-S2.csv")
     # path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_mean.csv")
     dfdata = pd.read_csv(str(path_datafile)) # a persisted csv-form of the data file
     df_mean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
     # dfdata_a = dfdata[(dfdata['stim']=='a')] # select stim 'a' only in data file
     # df_mean_a = df_mean[(df_mean['stim']=='a')] # select stim 'a' only in mean file
-    dfdata_a = dfdata[(dfdata['channel']==0) & (dfdata['stim']=='b')] # select stim 'a' only in data file
-    df_mean_a = df_mean[(df_mean['channel']==0) & (df_mean['stim']=='b')] # select stim 'a' only in mean file
-    df_mean_a.reset_index(inplace=True)
-    dict_t = find_all_t(df_mean_a) # use the average all sweeps to determine where all events are located (noise reduction)
+    dict_t = find_all_t(df_mean) # use the average all sweeps to determine where all events are located (noise reduction)
     t_EPSP_amp = dict_t['t_EPSP_amp']
     t_EPSP_slope = dict_t['t_EPSP_slope']
-    dfoutput = build_dfoutput(dfdata=dfdata_a,
+    dfoutput = build_dfoutput(dfdata=dfdata,
                               t_EPSP_amp=t_EPSP_amp,
                               t_EPSP_slope=t_EPSP_slope)
     print(dfoutput)

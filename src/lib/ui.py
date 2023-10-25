@@ -200,9 +200,15 @@ class MplCanvas(FigureCanvasQTAgg):
 class Ui_measure_window(QtCore.QObject):
     def setupUi(self, measure):
         measure.setObjectName("measure")
-        measure.resize(502, 992)
-        self.verticalLayout = QtWidgets.QVBoxLayout(measure)
-        self.verticalLayout.setObjectName("verticalLayout")
+        measure.resize(525, 946)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(1)
+        sizePolicy.setVerticalStretch(1)
+        sizePolicy.setHeightForWidth(measure.sizePolicy().hasHeightForWidth())
+        measure.setSizePolicy(sizePolicy)
+        measure.setMaximumSize(QtCore.QSize(16777215, 16777215))
+        self.gridLayout = QtWidgets.QGridLayout(measure)
+        self.gridLayout.setObjectName("gridLayout")
         self.measure_verticalLayout = QtWidgets.QVBoxLayout()
         self.measure_verticalLayout.setSizeConstraint(QtWidgets.QLayout.SetNoConstraint)
         self.measure_verticalLayout.setObjectName("measure_verticalLayout")
@@ -220,54 +226,57 @@ class Ui_measure_window(QtCore.QObject):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.measure_toolbox.sizePolicy().hasHeightForWidth())
         self.measure_toolbox.setSizePolicy(sizePolicy)
-        self.measure_toolbox.setMinimumSize(QtCore.QSize(0, 130))
-        self.measure_toolbox.setMaximumSize(QtCore.QSize(16777215, 100))
+        self.measure_toolbox.setMinimumSize(QtCore.QSize(0, 135))
+        self.measure_toolbox.setMaximumSize(QtCore.QSize(16777215, 135))
         self.measure_toolbox.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.measure_toolbox.setFrameShadow(QtWidgets.QFrame.Plain)
         self.measure_toolbox.setLineWidth(0)
         self.measure_toolbox.setObjectName("measure_toolbox")
         self.pushButton_EPSP_slope = QtWidgets.QPushButton(self.measure_toolbox)
-        self.pushButton_EPSP_slope.setGeometry(QtCore.QRect(10, 30, 83, 25))
+        self.pushButton_EPSP_slope.setGeometry(QtCore.QRect(10, 40, 83, 25))
         self.pushButton_EPSP_slope.setObjectName("pushButton_EPSP_slope")
         self.pushButton_EPSP_amp = QtWidgets.QPushButton(self.measure_toolbox)
-        self.pushButton_EPSP_amp.setGeometry(QtCore.QRect(10, 90, 83, 25))
+        self.pushButton_EPSP_amp.setGeometry(QtCore.QRect(10, 100, 83, 25))
         self.pushButton_EPSP_amp.setObjectName("pushButton_EPSP_amp")
         self.pushButton_EPSP_size = QtWidgets.QPushButton(self.measure_toolbox)
-        self.pushButton_EPSP_size.setGeometry(QtCore.QRect(10, 60, 83, 25))
+        self.pushButton_EPSP_size.setGeometry(QtCore.QRect(10, 70, 83, 25))
         self.pushButton_EPSP_size.setObjectName("pushButton_EPSP_size")
         self.pushButton_volley_size = QtWidgets.QPushButton(self.measure_toolbox)
-        self.pushButton_volley_size.setGeometry(QtCore.QRect(170, 60, 83, 25))
+        self.pushButton_volley_size.setGeometry(QtCore.QRect(170, 70, 83, 25))
         self.pushButton_volley_size.setObjectName("pushButton_volley_size")
         self.pushButton_volley_amp = QtWidgets.QPushButton(self.measure_toolbox)
-        self.pushButton_volley_amp.setGeometry(QtCore.QRect(170, 90, 83, 25))
+        self.pushButton_volley_amp.setGeometry(QtCore.QRect(170, 100, 83, 25))
         self.pushButton_volley_amp.setObjectName("pushButton_volley_amp")
         self.pushButton_volley_slope = QtWidgets.QPushButton(self.measure_toolbox)
-        self.pushButton_volley_slope.setGeometry(QtCore.QRect(170, 30, 83, 25))
+        self.pushButton_volley_slope.setGeometry(QtCore.QRect(170, 40, 83, 25))
         self.pushButton_volley_slope.setObjectName("pushButton_volley_slope")
         self.label_EPSP_ms = QtWidgets.QLabel(self.measure_toolbox)
-        self.label_EPSP_ms.setGeometry(QtCore.QRect(110, 10, 21, 17))
+        self.label_EPSP_ms.setGeometry(QtCore.QRect(110, 20, 21, 17))
         self.label_EPSP_ms.setObjectName("label_EPSP_ms")
         self.label_volley_ms = QtWidgets.QLabel(self.measure_toolbox)
-        self.label_volley_ms.setGeometry(QtCore.QRect(270, 10, 21, 17))
+        self.label_volley_ms.setGeometry(QtCore.QRect(270, 20, 21, 17))
         self.label_volley_ms.setObjectName("label_volley_ms")
         self.lineEdit_volley_slope = QtWidgets.QLineEdit(self.measure_toolbox)
-        self.lineEdit_volley_slope.setGeometry(QtCore.QRect(260, 30, 51, 25))
+        self.lineEdit_volley_slope.setGeometry(QtCore.QRect(260, 40, 51, 25))
         self.lineEdit_volley_slope.setObjectName("lineEdit_volley_slope")
         self.lineEdit_volley_size = QtWidgets.QLineEdit(self.measure_toolbox)
-        self.lineEdit_volley_size.setGeometry(QtCore.QRect(260, 60, 51, 25))
+        self.lineEdit_volley_size.setGeometry(QtCore.QRect(260, 70, 51, 25))
         self.lineEdit_volley_size.setObjectName("lineEdit_volley_size")
         self.lineEdit_volley_amp = QtWidgets.QLineEdit(self.measure_toolbox)
-        self.lineEdit_volley_amp.setGeometry(QtCore.QRect(260, 90, 51, 25))
+        self.lineEdit_volley_amp.setGeometry(QtCore.QRect(260, 100, 51, 25))
         self.lineEdit_volley_amp.setObjectName("lineEdit_volley_amp")
         self.lineEdit_EPSP_size = QtWidgets.QLineEdit(self.measure_toolbox)
-        self.lineEdit_EPSP_size.setGeometry(QtCore.QRect(100, 60, 51, 25))
+        self.lineEdit_EPSP_size.setGeometry(QtCore.QRect(100, 70, 51, 25))
         self.lineEdit_EPSP_size.setObjectName("lineEdit_EPSP_size")
         self.lineEdit_EPSP_amp = QtWidgets.QLineEdit(self.measure_toolbox)
-        self.lineEdit_EPSP_amp.setGeometry(QtCore.QRect(100, 90, 51, 25))
+        self.lineEdit_EPSP_amp.setGeometry(QtCore.QRect(100, 100, 51, 25))
         self.lineEdit_EPSP_amp.setObjectName("lineEdit_EPSP_amp")
         self.lineEdit_EPSP_slope = QtWidgets.QLineEdit(self.measure_toolbox)
-        self.lineEdit_EPSP_slope.setGeometry(QtCore.QRect(100, 30, 51, 25))
+        self.lineEdit_EPSP_slope.setGeometry(QtCore.QRect(100, 40, 51, 25))
         self.lineEdit_EPSP_slope.setObjectName("lineEdit_EPSP_slope")
+        self.pushButtonAuto = QtWidgets.QPushButton(self.measure_toolbox)
+        self.pushButtonAuto.setGeometry(QtCore.QRect(10, 10, 83, 25))
+        self.pushButtonAuto.setObjectName("pushButtonAuto")
         self.measure_verticalLayout.addWidget(self.measure_toolbox)
         self.measure_graph_output = QtWidgets.QWidget(measure)
         self.measure_graph_output.setObjectName("measure_graph_output")
@@ -276,12 +285,19 @@ class Ui_measure_window(QtCore.QObject):
         self.measure_info.setMinimumSize(QtCore.QSize(0, 50))
         self.measure_info.setObjectName("measure_info")
         self.measure_verticalLayout.addWidget(self.measure_info)
+        self.buttonBox = QtWidgets.QDialogButtonBox(measure)
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName("buttonBox")
+        self.measure_verticalLayout.addWidget(self.buttonBox)
         self.measure_verticalLayout.setStretch(0, 5)
         self.measure_verticalLayout.setStretch(2, 5)
         self.measure_verticalLayout.setStretch(3, 1)
-        self.verticalLayout.addLayout(self.measure_verticalLayout)
+        self.gridLayout.addLayout(self.measure_verticalLayout, 0, 0, 1, 1)
 
         self.retranslateUi(measure)
+        self.buttonBox.accepted.connect(measure.accept) # type: ignore
+        self.buttonBox.rejected.connect(measure.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(measure)
 
     def retranslateUi(self, measure):
@@ -295,6 +311,7 @@ class Ui_measure_window(QtCore.QObject):
         self.pushButton_volley_slope.setText(_translate("measure", "Volley slope"))
         self.label_EPSP_ms.setText(_translate("measure", "ms"))
         self.label_volley_ms.setText(_translate("measure", "ms"))
+        self.pushButtonAuto.setText(_translate("measure", "Auto"))
 
 
 ################################################################
@@ -308,11 +325,13 @@ class Ui_measure_window(QtCore.QObject):
 class Ui_MainWindow(QtCore.QObject):
     def setupUi(self, mainWindow):
         mainWindow.setObjectName("mainWindow")
-        mainWindow.resize(951, 816)
+        mainWindow.resize(1400, 1000)
         self.centralwidget = QtWidgets.QWidget(mainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayoutCentralwidget = QtWidgets.QHBoxLayout(self.centralwidget)
         self.horizontalLayoutCentralwidget.setObjectName("horizontalLayoutCentralwidget")
+        self.horizontalMasterLayout = QtWidgets.QHBoxLayout()
+        self.horizontalMasterLayout.setObjectName("horizontalMasterLayout")
         self.verticalLayoutProj = QtWidgets.QVBoxLayout()
         self.verticalLayoutProj.setObjectName("verticalLayoutProj")
         self.horizontalLayoutProj = QtWidgets.QHBoxLayout()
@@ -375,12 +394,13 @@ class Ui_MainWindow(QtCore.QObject):
         self.gridLayout.setObjectName("gridLayout")
         self.verticalLayoutProj.addLayout(self.gridLayout)
         self.tableProj = QtWidgets.QTableView(self.centralwidget)
+        self.tableProj.setMaximumSize(QtCore.QSize(16777215, 16777215))
         self.tableProj.setAcceptDrops(True)
         self.tableProj.setObjectName("tableProj")
         self.verticalLayoutProj.addWidget(self.tableProj)
-        self.horizontalLayoutCentralwidget.addLayout(self.verticalLayoutProj)
+        self.horizontalMasterLayout.addLayout(self.verticalLayoutProj)
         spacerItem = QtWidgets.QSpacerItem(10, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalLayoutCentralwidget.addItem(spacerItem)
+        self.horizontalMasterLayout.addItem(spacerItem)
         self.verticalLayoutGraph = QtWidgets.QVBoxLayout()
         self.verticalLayoutGraph.setObjectName("verticalLayoutGraph")
         self.labelMeanSweep = QtWidgets.QLabel(self.centralwidget)
@@ -406,10 +426,12 @@ class Ui_MainWindow(QtCore.QObject):
         self.verticalLayoutGraph.setStretch(1, 5)
         self.verticalLayoutGraph.setStretch(3, 5)
         self.verticalLayoutGraph.setStretch(5, 1)
-        self.horizontalLayoutCentralwidget.addLayout(self.verticalLayoutGraph)
+        self.horizontalMasterLayout.addLayout(self.verticalLayoutGraph)
+        self.horizontalMasterLayout.setStretch(2, 1)
+        self.horizontalLayoutCentralwidget.addLayout(self.horizontalMasterLayout)
         mainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(mainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 951, 22))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1066, 22))
         self.menubar.setObjectName("menubar")
         mainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(mainWindow)
@@ -421,7 +443,7 @@ class Ui_MainWindow(QtCore.QObject):
 
     def retranslateUi(self, mainWindow):
         _translate = QtCore.QCoreApplication.translate
-        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash 0.4"))
+        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash 0.5"))
         self.pushButtonNewProject.setText(_translate("mainWindow", "New"))
         self.pushButtonOpenProject.setText(_translate("mainWindow", "Open"))
         self.inputProjectName.setText(_translate("mainWindow", "My Project"))
@@ -474,8 +496,6 @@ def df_projectTemplate():
             "path",
             "checksum",
             "recording_name",
-            "channel",
-            "stim",
             "groups",
             "parsetimestamp",
             "sweeps",
@@ -510,6 +530,9 @@ class UIsub(Ui_MainWindow):
         self.setupUi(mainwindow)
         if verbose:
             print(" - UIsub init, verbose mode")  # rename for clarity
+        # move mainwindow to default position (TODO: later to be stored in cfg)
+        self.mainwindow = mainwindow
+        self.mainwindow.setGeometry(0, 0, 1400, 1200)
         # load cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
@@ -551,18 +574,12 @@ class UIsub(Ui_MainWindow):
         self.tablemodel = TableModel(self.df_project)
         self.tableProj.setModel(self.tablemodel)
 
-        self.dict_folders = {
-            'project': self.projects_folder / self.projectname,
-            'data': self.projects_folder / self.projectname / 'data',
-            'cache': self.projects_folder / self.projectname / 'cache'
-        }
-
+        self.dict_folders = self.build_dict_folders()
+        
         # If projectfile exists, load it, otherwise create it
         if Path(self.dict_folders['project'] / "project.brainwash").exists():
             self.load_df_project()
         else:
-            self.dict_folders['project'] = "My Project"
-            self.dict_folders['project'] = self.projects_folder / self.projectname
             self.setTableDf(self.df_project)
             self.write_cfg()
 
@@ -592,11 +609,19 @@ class UIsub(Ui_MainWindow):
             self.timer.timeout.connect(self.checkFocus)
             self.timer.start(1000)  
 
-        # Internal storage dicts
-        self.dict_datas = {} # all data
-        self.dict_means = {} # all means
-        self.dict_outputs = {} # all outputs
-        self.dict_group_means = {} # means of all group outputs
+        self.resetCacheDicts() # Internal storage dicts
+
+        # Addon to make the graphs scaleable
+        self.graphMean.setLayout(QtWidgets.QVBoxLayout())
+        self.canvas_seaborn_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
+        self.graphMean.layout().addWidget(self.canvas_seaborn_mean)
+        self.graphOutput.setLayout(QtWidgets.QVBoxLayout())
+        self.canvas_seaborn_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for Mean
+        self.graphOutput.layout().addWidget(self.canvas_seaborn_output)
+        self.canvas_seaborn_mean.show()
+        self.canvas_seaborn_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_seaborn_mean))
+        self.canvas_seaborn_mean.mpl_connect('button_press_event', self.meanClicked)
+        self.canvas_seaborn_output.show()
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
@@ -638,6 +663,24 @@ class UIsub(Ui_MainWindow):
             print(f"Focused Widget: {focused_widget.objectName()}")
         else:
             print("No widget has focus.")
+
+
+# WIP: TODO: move these to appropriate header in this file
+
+    def build_dict_folders(self):
+        folder = (self.projects_folder / self.projectname)
+        dict_folders = {
+                    'project': folder,
+                    'data': folder / 'data',
+                    'cache': folder / 'cache'
+        }
+        return dict_folders
+
+    def resetCacheDicts(self):
+        self.dict_datas = {} # all data
+        self.dict_means = {} # all means
+        self.dict_outputs = {} # all outputs
+        self.dict_group_means = {} # means of all group outputs
 
 
 # pushedButton functions TODO: break out the big ones to separate functions!
@@ -791,8 +834,6 @@ class UIsub(Ui_MainWindow):
         df_p = pd.concat([df_p, dfAdd])
         df_p.reset_index(drop=True, inplace=True)
         df_p["groups"] = df_p["groups"].fillna(" ")
-        df_p["channel"] = df_p["channel"].fillna(" ")
-        df_p["stim"] = df_p["stim"].fillna(" ")
         df_p["sweeps"] = df_p["sweeps"].fillna("...")
         self.set_df_project(df_p)
         if verbose:
@@ -841,58 +882,28 @@ class UIsub(Ui_MainWindow):
             print("Rename: please select one row only for renaming.")
 
     def deleteSelectedRows(self):
-        df_p = self.df_project
-        set_files_before_purge = set(df_p['recording_name'])
+        df_p = self.get_df_project()
         selected_rows = self.listSelectedRows()
         if 0 < len(selected_rows):
-            files_to_purge = False
             for row in selected_rows:
                 sweeps = df_p.at[row, 'sweeps']
                 if sweeps != "...": # if the file is parsed:
-                    files_to_purge = True
                     recording_name = df_p.at[row, 'recording_name']
-                    channel = df_p.at[row, 'channel']
-                    stim = df_p.at[row, 'stim']
                     if verbose:
-                        print("Delete:", recording_name, channel, stim)
+                        print(f"Deleting {recording_name}...")
                     data_path = Path(self.dict_folders['data'] / (recording_name + ".csv"))
-                    try:
-                        df = pd.read_csv(str(data_path))  # parse csv
-                    except FileNotFoundError:
-                        print("did not find data .csv to load. Not imported?")
-                    dfmean_path = Path(self.dict_folders['cache'] / (recording_name + "_mean.csv"))
-                    try:
-                        dfmean = pd.read_csv(str(dfmean_path))  # parse _mean.csv
-                    except FileNotFoundError:
-                        print("did not find _mean.csv to load. Not imported?")
-                    purged_df = df[(df['channel'] != channel) | (df['stim'] != stim)]
-                    purged_dfmean = dfmean[(dfmean['channel'] != channel) | (dfmean['stim'] != stim)]
-                    parse.persistdf(recording_name=recording_name, dict_folders=self.dict_folders, dfdata=purged_df, dfmean=purged_dfmean)
+                    if data_path.exists():
+                        data_path.unlink()
+                    mean_path = Path(self.dict_folders['cache'] / (recording_name + "_mean.csv"))
+                    if mean_path.exists():
+                        mean_path.unlink()
             # Regardless of whether or not there was a file, purge the row from df_project
             self.clearGraph()
             self.setGraph()
             df_p.drop(selected_rows, inplace=True)
-            if files_to_purge: # unlink any files that are no longer in df_p
-                set_files_after_purge = set(df_p['recording_name'])
-                list_delete = [item for item in set_files_before_purge if item not in set_files_after_purge]
-                for file in list_delete:
-                    delete_data = self.dict_folders['data'] / (file + ".csv")
-                    delete_mean = self.dict_folders['cache'] / (file + "_mean.csv")
-                    if delete_data.exists():
-                        delete_data.unlink()
-                        if verbose:
-                            print(f"Deleted data: {delete_data}")
-                    else:
-                        print(f"File not found: {delete_data}")
-                    if delete_mean.exists():
-                        delete_mean.unlink()
-                        if verbose:
-                            print(f"Deleted mean: {delete_mean}")
-                    else:
-                        print(f"File not found: {delete_mean}")
             df_p.reset_index(inplace=True, drop=True)
             self.set_df_project(df_p)
-            self.setTableDf(self.df_project)  # Force update
+            self.setTableDf(df_p)  # Force update
         else:
             print("No files selected.")
 
@@ -903,20 +914,18 @@ class UIsub(Ui_MainWindow):
             recording_name = df_proj_row['recording_name']
             source_path = df_proj_row['path']
             if df_proj_row["sweeps"] == "...":  # indicates not read before TODO: Replace with selector!
-                dictmeta = parse.parseProjFiles(dict_folders = self.dict_folders, recording_name=recording_name, source_path=source_path)  # result is a dict of <channel>:<channel ID>
-                for channel in dictmeta['channel']:
-                    for stim in dictmeta['stim']:
-                        df_proj_new_row = df_proj_row.copy()
-                        df_proj_new_row['channel'] = channel
-                        df_proj_new_row['stim'] = stim
-                        df_proj_new_row['sweeps'] = dictmeta['sweeps']
-                        rows.append(df_proj_new_row)
+                dict_data_nsweeps = parse.parseProjFiles(dict_folders = self.dict_folders, recording_name=recording_name, source_path=source_path)
+                for new_name, nsweeps in dict_data_nsweeps.items():
+                    df_proj_new_row = df_proj_row.copy()
+                    df_proj_new_row['recording_name'] = new_name
+                    df_proj_new_row['sweeps'] = nsweeps
+                    rows.append(df_proj_new_row)
                 update_frame = update_frame[update_frame.recording_name != recording_name]
                 print(f"update_frame: {update_frame}")
                 rows2add = pd.concat(rows, axis=1).transpose()
-                print("rows2add:", rows2add[["recording_name", "channel", "stim", "sweeps" ]])
+                print("rows2add:", rows2add[["recording_name", "sweeps" ]])
                 self.df_project = (pd.concat([update_frame, rows2add])).reset_index(drop=True)
-                print(self.df_project[["recording_name", "channel", "stim", "sweeps" ]])
+                print(self.df_project[["recording_name", "sweeps" ]])
                 self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
                 self.save_df_project()
 
@@ -944,16 +953,16 @@ class UIsub(Ui_MainWindow):
         if 0 < len(selected_rows):
             list_group = ""
             for i in selected_rows:
-                if self.df_project.loc[i, "groups"] == " ":
-                    self.df_project.loc[i, "groups"] = add_group
+                if self.df_project.loc[i, 'groups'] == " ":
+                    self.df_project.loc[i, 'groups'] = add_group
                 else:
-                    list_group = self.df_project.loc[i, "groups"]
-                    list_group = list(list_group.split(","))
+                    str_group = self.df_project.loc[i, 'groups']
+                    list_group = list(str_group.split(","))
                     if add_group not in list_group:
                         list_group.append(add_group)
-                        self.df_project.loc[i, "groups"] = ",".join(map(str, sorted(list_group)))
+                        self.df_project.loc[i, 'groups'] = ",".join(map(str, sorted(list_group)))
                     else:
-                        print(f"{self.df_project.loc[i, 'recording_name']}, channel {self.df_project.loc[i, 'channel']}, stim {self.df_project.loc[i, 'stim']} is already in {add_group}")
+                        print(f"{self.df_project.loc[i, 'recording_name']} is already in {add_group}")
                 self.save_df_project()
                 self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
             self.purgeGroupCache(add_group)
@@ -966,7 +975,7 @@ class UIsub(Ui_MainWindow):
         if verbose:
             print(f'purgeGroupCache({group})')
         if group in self.dict_group_means:
-            self.dict_group_means.pop(group)
+            del self.dict_group_means[group]
         path_group_cache = Path(f'{self.dict_folders["cache"]}/{group}.csv')
         if path_group_cache.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
             print("File found when checking for existence...")
@@ -1018,6 +1027,8 @@ class UIsub(Ui_MainWindow):
             new_projectfolder.mkdir()
             self.dict_folders['project'] = new_projectfolder
             self.projectname = new_project_name
+            self.dict_folders = self.build_dict_folders()
+            self.resetCacheDicts()
             self.inputProjectName.setText(self.projectname)
             self.clearGraph()
             self.df_project = df_projectTemplate()
@@ -1026,17 +1037,20 @@ class UIsub(Ui_MainWindow):
             self.write_cfg()
 
     def renameProject(self): # changes name of project folder and updates .cfg
+        if verbose:
+            print("renameProject")
         self.dict_folders['project'].mkdir(exist_ok=True)
         new_project_name = self.inputProjectName.text()
         # check if ok
         if (self.projects_folder / new_project_name).exists():
             if verbose:
-                print(f"Project name {new_project_name} already exists.")
+                print(f"Project name {new_project_name} already exists")
             self.inputProjectName.setText(self.projectname)
-        elif re.match(r'^[a-zA-Z0-9_-]+$', str(new_project_name)) is not None: # check if valid filename
+        elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_project_name)) is not None: # check if valid filename
             self.dict_folders['project'] = self.dict_folders['project'].rename(self.projects_folder / new_project_name)
             self.projectname = new_project_name
             self.inputProjectName.setReadOnly(True)
+            self.dict_folders = self.build_dict_folders()
             self.write_cfg()
             print(f"Project renamed to {new_project_name}.")
         else:
@@ -1100,9 +1114,7 @@ class UIsub(Ui_MainWindow):
         # hide all columns except these:
         list_show = [df_p.columns.get_loc("recording_name"),
                      df_p.columns.get_loc("groups"),
-                     df_p.columns.get_loc("sweeps"),
-                     df_p.columns.get_loc("channel"),
-                     df_p.columns.get_loc("stim")]
+                     df_p.columns.get_loc("sweeps")]
         num_columns = df_p.shape[1]
         for col in range(num_columns):
             if col in list_show:
@@ -1111,36 +1123,27 @@ class UIsub(Ui_MainWindow):
                 self.tableProj.setColumnHidden(col, True)
 
 # internal dataframe handling
-    def row2key(self, row):
-        return (row['recording_name'] + str(row['channel']) + str(row['stim']))
-
     def get_dfmean(self, row):
         # returns an internal df mean for the selected file. If it does not exist, read it from file first.
-        key_mean = self.row2key(row=row) + "_mean"
+        key_mean = f"{row['recording_name']}_mean"
         if key_mean in self.dict_means:
             return self.dict_means[key_mean]
         else:
             recording_name = row['recording_name']
-            channel = row['channel']
-            stim = row['stim']
             str_mean_path = f'{self.dict_folders["cache"]}/{recording_name}_mean.csv'
             if Path(str_mean_path).exists():
                 dfmean = pd.read_csv(str_mean_path)
             else:
-                dfmean = parse.build_dfmean(self.get_dfdata(row=row, all=True))
-                parse.persistdf(recording_name=recording_name, proj_folder=self.dict_folders['project'], dfmean=dfmean)
-            #print(f'get_dfmean(stim): {stim}')
-            #print(f' . dfmean: {dfmean}')
-            dfcopy = dfmean[(dfmean['channel'] == channel) & (dfmean['stim'] == stim)].copy()
-            dfcopy.reset_index(inplace=True)
-            #print(f' . dfcopy: {dfcopy}')
-            self.dict_means[key_mean] = dfcopy
+                dfmean = parse.build_dfmean(self.get_dfdata(row=row))
+                parse.persistdf(file_base=recording_name, dict_folders=self.dict_folders, dfmean=dfmean)
+            self.dict_means[key_mean] = dfmean
             return self.dict_means[key_mean]
 
     def get_dfoutput(self, row):
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
-        key_output = self.row2key(row=row) + "_output"
+        key_output = f"{row['recording_name']}_output"
         if key_output in self.dict_outputs:
+            print(f"get_dfoutput: {key_output} found in dict_outputs")
             return self.dict_outputs[key_output]
         else:
             str_output_path = f'{self.dict_folders["cache"]}/{key_output}.csv'
@@ -1151,30 +1154,24 @@ class UIsub(Ui_MainWindow):
                 dfoutput.reset_index(inplace=True)
             self.dict_outputs[key_output] = dfoutput
             self.save_dict(dict2save=self.dict_outputs)
+            print(f"get_dfoutput: {key_output} added to dict_outputs")
             return self.dict_outputs[key_output]
         
-    def get_dfdata(self, row, all=False):
+    def get_dfdata(self, row):
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
-        key_data = self.row2key(row=row)
+        key_data = row['recording_name']
+        print(f"get_dfdata: {key_data}")
         if key_data in self.dict_datas:
+            print(f"get_dfdata: {key_data} found in dict_datas")
             return self.dict_datas[key_data]
         else:
-            recording_name = row['recording_name']
-            channel = row['channel']
-            stim = row['stim']
-            
-            path_data = Path(f'{self.dict_folders["data"]}/{recording_name}.csv')
+            path_data = Path(f"{self.dict_folders['data']}/{key_data}.csv")
+            print(f"get_dfdata: {key_data} not found in dict_datas, checking {path_data}")
             try: # datafile should always exist
-                dfdata_file = pd.read_csv(path_data)
+                dfdata = pd.read_csv(path_data)
             except FileNotFoundError:
                 print("did not find _mean.csv to load. Not imported?")
-            if all: # return all data; not just current channel and stim. Do not persist in dict.
-                dfdata = dfdata_file.copy()
-                dfdata.reset_index(inplace=True)
-                return dfdata
             else:
-                dfdata = dfdata_file[(dfdata_file['channel']==channel) & (dfdata_file['stim']==stim)].copy()
-                dfdata.reset_index(inplace=True)
                 self.dict_datas[key_data] = dfdata
                 return self.dict_datas[key_data]
         
@@ -1213,7 +1210,7 @@ class UIsub(Ui_MainWindow):
 
 
 # Default_output
-    def defaultOutput(self, row): # TODO: WIP; not updating df_project properly yet
+    def defaultOutput(self, row, update_df_p = True): # TODO: WIP; not updating df_project properly yet
         '''
         Generates default results for row (in self.df_project)
         Stores timepoints, methods and params in their designated columns in self.df_project
@@ -1236,22 +1233,17 @@ class UIsub(Ui_MainWindow):
 
 # Graph handling
 
-    def clearGraph(self): # removes all data from canvas_seaborn
+    def clearGraph(self): # removes all data from canvas_seaborn_mean - TODO: deprecated?
         if hasattr(self, "canvas_seaborn_mean"):
             if verbose:
-                print("clearGraph: self has attribue canvas_seaborn_mean")
-            print(f"axes: {self.canvas_seaborn_mean.axes}")
+                print(f"axes: {self.canvas_seaborn_mean.axes}")
             self.canvas_seaborn_mean.axes.cla()
             self.canvas_seaborn_mean.draw()
-            self.canvas_seaborn_mean.show()
 
     def setGraph(self, df=None): # plot selected row(s), or clear graph if empty
-        #print(f"df.shape[0]: {df.shape[0]}")
-        self.canvas_seaborn_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
-        self.canvas_seaborn_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for MeanGroups
-
+        self.canvas_seaborn_mean.axes.cla()
+        self.canvas_seaborn_output.axes.cla()
         # add groups, regardless of selection:
-        # print(f"Groups: {self.list_groups}")
         list_color = ["red", "green", "blue", "yellow"] # TODO: placeholder color range
         df_p = self.get_df_project()
         for i_color, group in enumerate(self.list_groups):
@@ -1261,47 +1253,51 @@ class UIsub(Ui_MainWindow):
                     print(f"No data in group {group}")
                 break
             dfgroup_mean = self.get_dfgroupmean(key_group=group)
-            # TODO: Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
-            print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
+            # Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
+            # print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
             if dfgroup_mean['EPSP_amp_mean'].notna().any():
                 ax1 = sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[i_color])
                 ax1.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_amp_mean + dfgroup_mean.EPSP_amp_SEM, dfgroup_mean.EPSP_amp_mean - dfgroup_mean.EPSP_amp_SEM, alpha=0.3, color=list_color[i_color])               
             if dfgroup_mean['EPSP_slope_mean'].notna().any():
                 ax2 = sns.lineplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[i_color])
                 ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=list_color[i_color])               
-               
-
         if df is not None:
-            if df.shape[0] == 0:
-                self.canvas_seaborn_mean.axes.cla()
+            df_filtered = df[df["sweeps"] != "..."]
+            if df_filtered.empty:
+                print("Selection not analyzed.")
             else:
-                df_filtered = df[df["sweeps"] != "..."]
-                if df_filtered.empty:
-                    print("Selection not analyzed.")
-                else:
-                    for i, row in df_filtered.iterrows(): # TODO: i to be used later for cycling colours?
-                        dfmean = self.get_dfmean(row=row)
-                        #dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
-                        sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
-                        # add results of selected row(s):
-                        dfoutput = self.get_dfoutput(row=row)
-                        df_p = self.get_df_project() # updated in get_dfoutput; row is not!
-                        t_EPSP_amp = df_p.loc[row.name,'t_EPSP_amp']
-                        t_EPSP_slope = df_p.loc[row.name,'t_EPSP_slope']
-                        if not np.isnan(t_EPSP_amp):
-                            sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
-                        if not np.isnan(t_EPSP_slope):
-                            sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
+                for i, row in df_filtered.iterrows(): # TODO: i to be used later for cycling colours?
+                    dfmean = self.get_dfmean(row=row)
+                    #dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
+                    sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
+                    # add results of selected row(s):
+                    dfoutput = self.get_dfoutput(row=row)
+                    df_p = self.get_df_project() # updated in get_dfoutput; row is not!
+                    t_EPSP_amp = df_p.loc[row.name,'t_EPSP_amp']
+                    t_EPSP_slope = df_p.loc[row.name,'t_EPSP_slope']
+                    if not np.isnan(t_EPSP_amp):
+                        sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
+                        y_position = dfmean[dfmean.time == t_EPSP_amp].voltage
+                        self.canvas_seaborn_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
+
+                    if not np.isnan(t_EPSP_slope):
+                        sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
+                        x_start = t_EPSP_slope - 0.0004
+                        x_end = t_EPSP_slope + 0.0004
+                        y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+                        y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+                        self.canvas_seaborn_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
 
         self.canvas_seaborn_mean.axes.set_xlim(self.graph_xlim)
         self.canvas_seaborn_mean.axes.set_ylim(self.graph_ylim)
         self.canvas_seaborn_output.axes.set_ylim(-0.0015, 0)
-
         self.canvas_seaborn_mean.draw()
-        self.canvas_seaborn_mean.show()
-
         self.canvas_seaborn_output.draw()
-        self.canvas_seaborn_output.show()
+
+    def meanClicked(self, event): # maingraph click event
+        if event.inaxes is not None:
+            if event.button == 2:
+                zoomReset(canvas=self.canvas_seaborn_mean)
 
 
 # MeasureWindow
@@ -1319,9 +1315,6 @@ class UIsub(Ui_MainWindow):
         qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
         ser_table_row = self.tablemodel.dataRow(qt_index)
         row_index = ser_table_row.name
-        recording_name = ser_table_row["recording_name"]
-        channel = ser_table_row["channel"]
-        stim = ser_table_row["stim"]
 
         sweeps = ser_table_row["sweeps"]
         if sweeps == "...":
@@ -1332,17 +1325,19 @@ class UIsub(Ui_MainWindow):
         dfmean = self.get_dfmean(ser_table_row)
         dfoutput = self.get_dfoutput(row=ser_table_row)
         # Extract variables
-        t_VEB = self.df_project.loc[row_index, "t_VEB"]
-        t_EPSP_amp = self.df_project.loc[row_index, "t_EPSP_amp"]
-        t_EPSP_slope = self.df_project.loc[row_index, "t_EPSP_slope"]
+        t_stim = self.df_project.loc[row_index, 't_stim']
+        t_VEB = self.df_project.loc[row_index, 't_VEB']
+        t_EPSP_amp = self.df_project.loc[row_index, 't_EPSP_amp']
+        t_EPSP_slope = self.df_project.loc[row_index, 't_EPSP_slope']
         # Open window
         self.measure = QtWidgets.QDialog()
         self.measure_window_sub = Measure_window_sub(self.measure, row=ser_table_row, dfmean=dfmean)
-        window_name = (recording_name + ",_ch" + str(channel) + ", st" + stim)
-        self.measure.setWindowTitle(window_name)
+        self.measure.setWindowTitle(ser_table_row['recording_name'])
+        # move measurewindow to default position (TODO: later to be stored in cfg)
+        self.measure.setGeometry(1400, 0, 800, 1200)
         self.measure.show()
         # Set graphs
-        self.measure_window_sub.setMeanGraph(t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
+        self.measure_window_sub.setMeanGraph(t_stim=t_stim, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
         self.measure_window_sub.setOutputGraph(dfoutput=dfoutput)
     
             
@@ -1457,17 +1452,33 @@ class Measure_window_sub(Ui_measure_window):
     def __init__(self, measure_window, parent=None, row=None, dfmean=None, folder="."):
         super(Measure_window_sub, self).__init__()
         # local versions of row and dfmean that persist unchanged (TODO: check!) while the window is open
-        self.row = row
+        self.row = row.copy()
         self.dfmean = dfmean
         self.setupUi(measure_window)
         self.parent = parent
+
+        self.measure_graph_mean.setLayout(QtWidgets.QVBoxLayout())
+        self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)
+        self.measure_graph_mean.layout().addWidget(self.canvas_mean)
+        self.canvas_mean.show()
+        self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
+        self.canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_mean))
+
+        self.measure_graph_output.setLayout(QtWidgets.QVBoxLayout())
+        self.canvas_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas for Mean
+        self.measure_graph_output.layout().addWidget(self.canvas_output)
+        self.canvas_output.show()
+        self.canvas_output.mpl_connect('button_press_event', self.outputClicked)
+        self.canvas_output.mpl_connect('motion_notify_event', self.outputDragged)
+        self.canvas_output.mpl_connect('button_release_event', self.outputReleased)
+
         # TODO: expand this as more aspects are added
         self.supported_aspects = [ "EPSP_amp", "EPSP_slope"]
-        self.untoggle()
+        # set button colors
+        self.default_color = "background-color: rgb(239, 239, 239);"
+        self.selected_color = "background-color: rgb(100, 100, 255);"
         # set default aspect
         self.toggle(self.pushButton_EPSP_amp, "EPSP_amp") # default for now TODO: Load/Save preference in local .cfg
-        self.pushButton_EPSP_amp.setDown(True) # TODO: setDown works as expected when the button is NOT clicked
-
         # Iterate through supported_aspects to generate all this code
         def loopConnectAspects(aspect):
             aspect_button = getattr(self, f"pushButton_{aspect}")
@@ -1478,115 +1489,189 @@ class Measure_window_sub(Ui_measure_window):
             aspect_edit.editingFinished.connect(lambda: self.updateOnEdit(aspect_edit, aspect))
         for aspect in self.supported_aspects:
             loopConnectAspects(aspect=aspect)
+        self.buttonBox.accepted.connect(self.accepted_handler)
+        self.pushButtonAuto.clicked.connect(self.autoCalculate)
+
+    def accepted_handler(self):
+        # update df_project, dict_outputs, and purge group outputs for recalculation
+        # find idx of row in ui.df_project with matching recording_name
+        df_p = ui.get_df_project()
+        idx = df_p.index[df_p['recording_name'] == self.row['recording_name']]
+        print(f"accepted_handler: idx: {idx}, type: {type(idx)}")
+        list_keep = ['recording_name', 'groups']
+        if len(idx) == 1:
+            for column, value in self.row.items():
+                if not column in list_keep:
+                    ui.df_project.loc[idx, column] = value
+            ui.save_df_project()
+            new_row = ui.df_project.loc[idx]
+            # update output; dict and file
+            dfoutput = self.new_dfoutput
+            key_output = f"{new_row['recording_name']}_output"
+            ui.dict_outputs[key_output] = dfoutput
+            ui.save_dict(dict2save=ui.dict_outputs)
+            # delete affected group output; dicts and files
+            # build list of groups to purge
+            str_groups = ui.df_project.loc[int(idx.values[0]), 'groups']
+            print(f"accepted_handler: groups_from_df {str_groups}, type: {type(str_groups)}")
+            list_groups = list(str_groups.split(","))
+            print(f"accepted_handler: list_groups: {list_groups}, type: {type(list_groups)}")
+            if (str_groups == " ") or (len(list_groups) == 0):
+                if verbose:
+                    print(f"accepted_handler: row is not in any group")
+            else:
+                if verbose:
+                    print(f"list_groups: {list_groups}")
+                    print(f"ui.dict_group_means: {list(ui.dict_group_means.keys())}")
+                for group in list_groups:
+                    if group in ui.dict_group_means.keys():
+                        if verbose:
+                            print(f"accepted_handler: removing {group} from internal dict")
+                        del ui.dict_group_means[group]
+                        ui.save_dict(dict2save=ui.dict_group_means)
+                        group_path = Path(f'{ui.dict_folders["cache"]}/{group}.csv')
+                        if group_path.exists():
+                            if verbose:
+                                print(f"accepted_handler: deleting {group_path}")
+                            group_path.unlink()
+                    ui.setGraph()
+        elif len(idx) < 1:
+            raise ValueError(f"ERROR (accepted_handler): {self.row['recording_name']} not found in df_project.")
+        else:
+            raise ValueError(f"ERROR (accepted_handler): multiple instances of {self.row['recording_name']} in project_df.")
+
+    def autoCalculate(self):
+        dfdata = ui.get_dfdata(row=self.row)
+        dict_t = analysis.find_all_t(dfmean=self.dfmean, verbose=False)
+        self.new_dfoutput = analysis.build_dfoutput(dfdata=dfdata,
+                                       t_EPSP_amp=dict_t["t_EPSP_amp"],
+                                       t_EPSP_slope=dict_t["t_EPSP_slope"])
+        self.new_dfoutput.reset_index(inplace=True)
+        for aspect in self.supported_aspects:
+            time = dict_t[f"t_{aspect}"]
+            self.updateAspect(aspect=aspect, time=time, method="Auto")
 
     def m(self, SI):
         # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
         return str(round(SI * 1000, 1)) # TODO: single decimal assumes 10KHz sampling rate; make this more flexible
 
-    def untoggle(self):
-        self.pushButton_EPSP_slope.setChecked(False)
-        self.pushButton_EPSP_size.setChecked(False)
-        self.pushButton_EPSP_amp.setChecked(False)  
-        self.pushButton_volley_slope.setChecked(False)
-        self.pushButton_volley_size.setChecked(False)
-        self.pushButton_volley_amp.setChecked(False)  
-
     def toggle(self, button, aspect):
-        self.untoggle()
-        self.aspect = aspect # set which aspect is changed when meangraph is clicked
-        print(f"toggle: {button} {aspect} persisted as self.aspect: {self.aspect}")
-        button.setChecked(True)
-        button.setDown(False) # TODO: setDown seems to do the OPPOSITE of what it should do; setting it to True makes the buttons NOT look depressed.
-        #print(f"toggle button {button} isChecked: {button.isChecked()}, "isDown(: {button.isDown()}")
-    
+        self.aspect = aspect
+        for i_aspect in self.supported_aspects:
+            un_button = getattr(self, f"pushButton_{i_aspect}")
+            un_button.setStyleSheet(self.default_color)
+        button.setStyleSheet(self.selected_color)
 
-    def setMeanGraph(self, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
-        # get dfmean from selected row in UIsub.
-        # display SELECTED from tableProj at measurewindow
-
-        #row = self.row # store an internal version of the row, to be used in meanClicked and outputClicked
+    def setMeanGraph(self, t_stim=None, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
+        self.canvas_mean.axes.cla()
         dfmean = self.dfmean
-
-        self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)  # instantiate canvas
-        self.si_v = None
-        self.si_sweep = None
-
-        # fig, ax1 = plt.subplots(ncols=1, figsize=(20, 10))
-        g = sns.lineplot(data=dfmean, y="prim", x="time", ax=self.canvas_mean.axes, color="red")
-        h = sns.lineplot(data=dfmean, y="bis", x="time", ax=self.canvas_mean.axes, color="green")
+        self.si_v = None # vertical line in canvas_output, indicating selected sweep
+        self.si_sweep, = self.canvas_mean.axes.plot([], [], color="blue") # lineplot of the selected sweep on canvas_mean
+        self.si_v_drag_from = None # vertical line in canvas_output, indicating start of drag
+        self.si_v_drag_to = None # vertical line in canvas_output, indicating end of drag
+        self.dragplot = None
+        # filter to display only the relevant part of the trace, and rescale prim and bis to match voltage
+        filtered_df = dfmean[(dfmean['time'] > t_stim + 0.001) & (dfmean['time'] < t_EPSP_amp + 0.005)].copy()
+        min_V = filtered_df['voltage'].min()
+        min_prim = filtered_df['prim'].min()
+        min_bis = filtered_df['bis'].min()
+        filtered_df['prim'] = filtered_df['prim'] * (min_V/min_prim)
+        filtered_df['bis'] = filtered_df['bis'] * (min_V/min_bis)
+        g = sns.lineplot(data=filtered_df, y="prim", x="time", ax=self.canvas_mean.axes, color="red", alpha=0.3)
+        h = sns.lineplot(data=filtered_df, y="bis", x="time", ax=self.canvas_mean.axes, color="green", alpha=0.3)
         i = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_mean.axes, color="black")
-        
-        self.v_t_EPSP_amp = sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
-        
+        self.v_t_EPSP_amp =           sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
+        x_start = t_EPSP_slope - 0.0004
+        x_end = t_EPSP_slope + 0.0004
         self.v_t_EPSP_slope =         sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
-        self.v_t_EPSP_slope_start =   sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope - 0.0004, color="green", linestyle=":")
-        self.v_t_EPSP_slope_end =     sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope + 0.0004, color="green", linestyle=":")
+        self.v_t_EPSP_slope_start =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
+        self.v_t_EPSP_slope_end =     sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
+        # placeholder start-finish measurement line
+        y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+        y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+        self.canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
 
-        # t_VEB
         g.axvline(t_VEB, color="grey", linestyle="--")
-
         self.canvas_mean.axes.set_xlim(ui.graph_xlim)
         self.canvas_mean.axes.set_ylim(ui.graph_ylim)
-
-        # self.canvas_seaborn.axes.set_xmargin((100,500))
         self.canvas_mean.draw()
-        self.canvas_mean.show()
-
-        self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
-
 
     def setOutputGraph(self, dfoutput):
-        # get dfoutput from selected row in UIsub.
-        # display SELECTED from tableProj at measurewindow
-        self.canvas_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas
-
+        self.canvas_output.axes.cla()
+        self.dragging = False
+        self.new_dfoutput = dfoutput.copy()
         if dfoutput['EPSP_amp'].notna().any():
-            self.output_EPSP_amp = sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_output.axes, color="black")
+            _ = sns.lineplot(label="EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_output.axes, color="black")
             self.canvas_output.axes.set_ylim(-0.0015, 0)
         if dfoutput['EPSP_slope'].notna().any():
-            self.output_EPSP_slope = sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_output.axes, color="black")
+            _ = sns.lineplot(label="EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_output.axes, color="black")
             self.canvas_output.axes.set_ylim(-0.0015, 0)
-
         self.canvas_output.draw()
-        self.canvas_output.show()
-
-        self.canvas_output.mpl_connect('button_press_event', self.outputClicked)
-
    
-    def meanClicked(self, event):
+    def meanClicked(self, event): # measure window click event
         if event.inaxes is not None:
-            if self.aspect not in self.supported_aspects:
-                print(f"meanClicked: {self.aspect} not supported.")
-                return
-            x = event.xdata
-            # find time in self.dfmean closest to x
-            time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
-            self.updateOnClick(time=time, aspect=self.aspect)
+            if event.button == 1:# Left mouse button clicked
+                if self.aspect not in self.supported_aspects:
+                    print(f"meanClicked: {self.aspect} not supported.")
+                    return
+                x = event.xdata
+                # find time in self.dfmean closest to x
+                time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
+                self.updateOnClick(time=time, aspect=self.aspect)
+            elif event.button == 2:
+                zoomReset(canvas=self.canvas_mean)
 
-
-    def outputClicked(self, event):
-        if event.inaxes is not None:
-            x = event.xdata
-            y = event.ydata
-             # draw a vertical line at the clicked y in self.canvas_output
-            if self.si_v is not None: # remove previous vertical line
-                self.si_v.remove()
-            self.si_v = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="grey", linestyle="--")
+    def outputClicked(self, event): # measurewindow output click event
+        x = event.xdata
+        if event.button == 1 and x is not None: # Left mouse button clicked within xdata
+            if event.button == 1: 
+                self.drag_start = x
+                self.dragging = True
+                self.deOutput(self.si_v_drag_from)
+                self.si_v_drag_from = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="blue")
+                self.canvas_output.draw()
+    
+    def outputDragged(self, event): # measurewindow output drag event
+        x = event.xdata
+        if self.dragging:
+            self.deOutput(self.si_v_drag_to, self.dragplot)
+            if x is not None:
+                self.si_v_drag_to = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="blue")
+                self.dragplot = sns.lineplot(ax=self.canvas_output.axes).axvspan(self.drag_start, x, color='lightblue', alpha=0.3)
             self.canvas_output.draw()
-            # get that specific sweep and superimpose it on canvas_mean
+    
+    def outputReleased(self, event): # measurewindow output release event
+        x = event.xdata
+        if (self.dragging) and (event.button == 1) and (x is not None):
+            self.dragging = False
+            same = bool(int(self.drag_start) == int(x))
+            print(f"meanDragged from: {self.drag_start} to {x}: {same}")
             df = ui.get_dfdata(self.row)
-            df = df[df['sweep'] == int(x)]
-            print(f"int(x): {int(x)}")
-            if self.si_sweep is None:
-                self.si_sweep, = self.canvas_mean.axes.plot([], [], color="grey")
-            self.si_sweep.set_data(df["time"], df["voltage"])
+            if same: # click and release on same: get that specific sweep and superimpose it on canvas_mean
+                self.deOutput(self.si_v_drag_to, self.dragplot)
+                df = df[df['sweep'] == int(self.drag_start)]
+                self.si_sweep.set_data(df["time"], df["voltage"])
+            else: # get all sweeps between drag_start and x (event.xdata) and superimpose the mean of them on canvas_mean
+                if int(self.drag_start) > int(x):
+                    df = df[(df['sweep'] >= int(x)) & (df['sweep'] <= int(self.drag_start))]
+                else:
+                    df = df[(df['sweep'] >= int(self.drag_start)) & (df['sweep'] <= int(x))]
+                df = df.groupby('time').agg({'voltage': ['mean']}).reset_index()
+                df.columns = ['time', 'voltage']
+                self.si_sweep.set_data(df["time"], df["voltage"])
             self.canvas_mean.draw()
+            self.canvas_output.draw()
 
-
+    def deOutput(self, *artists): # remove line if it exists on self.canvas_output
+        for artist in artists:
+            artists_on_canvas = self.canvas_output.axes.get_children()
+            if artist in artists_on_canvas:
+                artist.remove()
+    
     def updateOnClick(self, time, aspect):
         if verbose:
             print(f"updateOnClick: time={time}, aspect={aspect}")
-        self.updateAspect(time, aspect)
+        self.updateAspect(time=time, aspect=aspect, method="Manual")
 
     def updateOnEdit(self, lineEdit, aspect):
         print(f"updateOnEdit: lineEdit={lineEdit}, aspect={aspect}")
@@ -1602,43 +1687,39 @@ class Measure_window_sub(Ui_measure_window):
             print(f"Time {time}s out of range")
             lineEdit.setText("")
             return
-        self.updateAspect(time, aspect)
+        self.updateAspect(time=time, aspect=aspect, method="Manual")
     
-    def updateAspect(self, time, aspect):
-        # update df_project, dict_outputs, and the graphs
+    def updateAspect(self, time, aspect, method):
         t_aspect  = ("t_" + aspect)
         t_method = (t_aspect + "_method")
-        t_param = (t_aspect + "_param")
-        # update df_project
-        ui.df_project.loc[self.row.name, t_aspect] = time
-        ui.df_project.loc[self.row.name, t_method] = "manual"
-        ui.df_project.loc[self.row.name, t_param] = "-"
-        ui.save_df_project()
+        t_params = (t_aspect + "_params")
+        # update row
+        self.row[t_aspect] = time
+        self.row[t_method] = method
+        self.row[t_params] = "-"
         if verbose:
-            print(f" . ui.df_project.loc[self.row.name, t_aspect]: {ui.df_project.loc[self.row.name, t_aspect]}")
-            print(f" . ui.df_project.loc[self.row.name, t_method: {ui.df_project.loc[self.row.name, t_method]}")
-            print(f" . ui.df_project.loc[self.row.name, t_param]: {ui.df_project.loc[self.row.name, t_param]}")
+            print(f" . ui.df_project.loc[self.row.name, t_aspect]: {ui.df_project.loc[self.row.name, t_aspect]}, row[{t_aspect}]: {self.row[t_aspect]}")
+            print(f" . ui.df_project.loc[self.row.name, t_method: {ui.df_project.loc[self.row.name, t_method]}, row[{t_method}]: {self.row[t_method]}")
+            print(f" . ui.df_project.loc[self.row.name, t_params]: {ui.df_project.loc[self.row.name, t_params]}, row[{t_params}]: {self.row[t_params]}")
         #recalculate aspect
         dfdata = ui.get_dfdata(row=self.row)
-        dfoutput = ui.get_dfoutput(row=self.row)
         if aspect == "EPSP_amp":
-            new_dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=time)
+            df = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=time)
             graph_color = "black"
             plot_on_mean = {'center': ("v_" + t_aspect)}
         elif aspect == "EPSP_slope":
-            new_dfoutput = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_slope=time)
+            df = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_slope=time)
             graph_color = "green"
             plot_on_mean = {'center': ("v_" + t_aspect),
                             'start':  ("v_" + t_aspect + "_start"),
                             'end':    ("v_" + t_aspect + "_end")}
-        #update output; dict and file
-        dfoutput[aspect] = new_dfoutput[aspect]
-        key_output = ui.row2key(row=self.row) + "_output"
-        ui.dict_outputs[key_output] = dfoutput
-        ui.save_dict(dict2save=ui.dict_outputs)
-        #update the graphs
+        self.new_dfoutput[aspect] = df[aspect]
+        #update appropriate lineEdit
+        print(f"lineEdit_{aspect}: time{time} to ms: {self.m(time)}")
+        line2update = getattr(self, "lineEdit_" + aspect)
+        line2update.setText(self.m(time))
+        #update mean graph
         for key, graph in plot_on_mean.items():
-            #print(f"key: {key}, graph: {graph}")
             getattr(self, graph).remove() # remove the one which you are about to update
             if key == "center":
                 setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color=graph_color, linestyle="--"))
@@ -1647,22 +1728,19 @@ class Measure_window_sub(Ui_measure_window):
             elif key == "end":
                 setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time + 0.0004, color=graph_color, linestyle=":"))
         self.canvas_mean.draw()
-        #update appropriate lineEdit
-        print(f"lineEdit_{aspect}: time{time} to ms: {self.m(time)}")
-        line2update = getattr(self, "lineEdit_" + aspect)
-        line2update.setText(self.m(time))
         #update output graph
-        self.output_EPSP_amp.lines[0].set_data(dfoutput['sweep'], dfoutput['EPSP_amp'])
-        self.output_EPSP_slope.lines[1].set_data(dfoutput['sweep'], dfoutput['EPSP_slope'])
-        print(f"self.output_EPSP_amp.lines[0]: {self.output_EPSP_amp.lines[0]}")
-        print(f"self.output_EPSP_amp.lines[1]: {self.output_EPSP_amp.lines[1]}")
-        print(f"self.output_EPSP_slope.lines[0]: {self.output_EPSP_slope.lines[0]}")
-        print(f"self.output_EPSP_slope.lines[1]: {self.output_EPSP_slope.lines[1]}")
-        print(f"self.output_EPSP_amp.lines[0].__repr__(): {self.output_EPSP_amp.lines[0].__repr__()}")
-        print(f"self.output_EPSP_amp.lines[1].__repr__(): {self.output_EPSP_amp.lines[1].__repr__()}")
-        print(f"self.output_EPSP_slope.lines[0].__repr__(): {self.output_EPSP_slope.lines[0].__repr__()}")
-        print(f"self.output_EPSP_slope.lines[1].__repr__(): {self.output_EPSP_slope.lines[1].__repr__()}")
+        if self.new_dfoutput[aspect].notna().any():
+            if self.label2idx(f"new_{aspect}"):
+                self.canvas_output.axes.lines[self.label2idx(f"new_{aspect}")].remove()
+            _ = sns.lineplot(label=f"new_{aspect}", data=self.new_dfoutput, y=aspect, x='sweep', ax=self.canvas_output.axes, color='black')
+        self.canvas_output.axes.lines[self.label2idx(aspect)].set_color('gray')#set_data(new_dfoutput['sweep'], new_dfoutput[aspect])
         self.canvas_output.draw()
+
+    def label2idx(self, aspect):
+        dict_labels = {k.get_label(): v for (v, k) in enumerate(self.canvas_output.axes.lines)}
+        if aspect in dict_labels:
+            return dict_labels[aspect]
+        return False
 
 
 def get_signals(source):
@@ -1675,6 +1753,28 @@ def get_signals(source):
             if isinstance(aspect, signal):
                 print(f"{key} [{clsname}]")
 
+def zoomOnScroll(event, canvas):
+    xdata, ydata = event.xdata, event.ydata
+    scroll_factor = 0.9 # TODO: make this a setting
+    def xzoom(xdata, factor):
+        xlim = [xdata - (xdata - canvas.axes.get_xlim()[0]) * factor,
+                xdata + (canvas.axes.get_xlim()[1] - xdata) * factor]
+        return xlim
+    def yzoom(ydata, factor):
+        ylim = [ydata - (ydata - canvas.axes.get_ylim()[0]) * factor,
+                ydata + (canvas.axes.get_ylim()[1] - ydata) * factor]
+        return ylim
+    if xdata is not None and ydata is not None:
+        xlim = xzoom(xdata, scroll_factor if event.step > 0 else 1 / scroll_factor)
+        ylim = yzoom(ydata, scroll_factor if event.step > 0 else 1 / scroll_factor)
+        canvas.axes.set_xlim(xlim[0], xlim[1])
+        canvas.axes.set_ylim(ylim[0], ylim[1])
+        canvas.draw()
+
+def zoomReset(canvas):
+    canvas.axes.set_xlim(ui.graph_xlim)
+    canvas.axes.set_ylim(ui.graph_ylim)
+    canvas.draw()
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

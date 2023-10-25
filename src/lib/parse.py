@@ -7,7 +7,7 @@ import pandas as pd  # dataframe module, think excel, but good
 import pyabf  # read data files atf, abf
 from neo import io  # read data files ibw
 
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from joblib import Memory
 
 memory = Memory("../cache", verbose=1)
@@ -92,85 +92,58 @@ def parse_abfFolder(folderpath):
     df['datetime'] = pd.to_datetime(df.datetime)
     return df
 
-
 # %%
-def build_dfmean(df, rollingwidth=3):
+def build_dfmean(dfdata, rollingwidth=3):
     # TODO: is rollingwidth "radius" or "diameter"?
-    """
-    dfmean.voltate(V) (a single sweep built on the mean of all time)
-    dfmean.prim
-    dfmean.bis
-
-    dfabf.pivot(columns='time', index='sweep', values='voltage').mean(axis=0).plot()
-
-    """
-    dfs = []
-    for channel in df.channel.unique():
-        for stim in df.stim.unique():
-            dfmean = pd.DataFrame(df[(df.channel == channel) & (df.stim == stim)].pivot(columns="time", index="sweep", values="voltage_raw").mean())
-            #dfmean.rename(columns={'voltage_raw': 'voltage'}, inplace=True)
-            dfmean.columns = ["voltage"]
-            dfmean.voltage -= dfmean.voltage.median()
-            # generate diffs
-            dfmean["prim"] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
-            dfmean["bis"] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()
-            # tag
-            dfmean['channel'] = channel
-            dfmean['stim'] = stim
-            dfs.append(dfmean)
-    dfmean = pd.concat(dfs).reset_index()#drop=True)
+    dfmean = pd.DataFrame(dfdata.pivot(columns='time', index='sweep', values='voltage_raw').mean())
+    dfmean.columns = ['voltage']
+    # generate diffs
+    dfmean["prim"] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
+    dfmean["bis"] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()
+    # find index of stimulus artifact (this requires and index)
+    dfmean.reset_index(inplace=True)
+    i_stim = dfmean.prim.idxmax()
+    y_stim = dfmean.prim.max()
+    threshold = y_stim*0.9
+    min_time_difference = 0.005  # Minimum time difference 5ms TODO: hardcoded
+    # Find the indices where 'prim' is above the threshold
+    above_threshold_indices = np.where(dfmean['prim'] > threshold)[0]
+    print(f"above_threshold_indices: {above_threshold_indices}")
+    # Filter the indices to ensure they are more than min_time_difference apart
+    filtered_indices = [above_threshold_indices[0]]
+    for i in range(1, len(above_threshold_indices)):
+        if dfmean['time'][above_threshold_indices[i]] - dfmean['time'][above_threshold_indices[i - 1]] > min_time_difference:
+            filtered_indices.append(above_threshold_indices[i])
+    n_stim = len(filtered_indices)
+    if n_stim == 1:
+        # subtract median of 20-5 samples before stimulus artifact
+        median = dfmean['voltage'].iloc[i_stim-20:i_stim-5].median() # TODO: hardcoded 20 and 5
+        #print(f"dfmean BEFORE subtract: {dfmean}")
+        dfmean['voltage'] = dfmean['voltage'] - median
+        #print(f"dfmean AFTER subtract: {dfmean}")
+    print(f"n_stim: {n_stim}, filtered_indices: {filtered_indices}")
     return dfmean
 
-
 def zeroSweeps(dfdata, dfmean):
-    def getbool(df, channel=0, stim='a'):
-        vecbool = (df['channel'] == channel) & (df['stim'] == stim)
-        return vecbool
-    
-    for channel in dfdata.channel.unique():
-        for stim in dfdata.stim.unique():
-            i_stim = dfmean[getbool(dfmean, channel=channel, stim=stim)].reset_index().prim.idxmax()
-            #print(f"i_stim: {i_stim}")
-            dfpivot = dfdata[getbool(dfdata, channel=channel, stim=stim)].pivot(index='sweep', columns='time', values='voltage_raw')
-            sermedians = dfpivot.iloc[:, i_stim-10:i_stim-5].median(axis=1)
-            #print(f"sermedians: {sermedians}")
-            dfpivot = dfpivot.subtract(sermedians, axis='rows')
-            dfdata.loc[getbool(dfdata, channel=channel, stim=stim), 'voltage'] = dfpivot.stack().reset_index().sort_values(by=['sweep', 'time'])[0].values
+    #print(f"dfdata BEFORE subtract: {dfdata}")
+    i_stim = dfmean.prim.idxmax()
+    dfpivot = dfdata.pivot(index='sweep', columns='time', values='voltage_raw')
+    sermedians = dfpivot.iloc[:, i_stim-20:i_stim-5].median(axis=1) # TODO: hardcoded 20 and 5
+    #print(f"sermedians: {sermedians}")
+    dfpivot = dfpivot.subtract(sermedians, axis='rows')
+    dfdata['voltage'] = dfpivot.stack().reset_index().sort_values(by=['sweep', 'time'])[0].values
+    #print(f"dfdata AFTER subtract: {dfdata}")
     df_zeroed = dfdata
     return df_zeroed
 
-
-# %%
-def assignStimAndSweep(dfdata, list_stims):
-    # sets stim-column, sorts dfdata and builds new dfmean
-    if verbose:
-        print(f" - assignStimAndSweep, channels:{dfdata.channel.unique()}, list_stims: {list_stims}")
-    nstims = len(list_stims)
-    nchannels = dfdata.channel.nunique()
-    sweeplength = dfdata.time.nunique()
-    dfcopy = dfdata.copy()
-    dfcopy = dfcopy.sort_values(by=['datetime', 'channel']).reset_index(drop=True)
-    dfcopy['sweep_raw'] = dfcopy.index.to_numpy() // (sweeplength * nchannels)
-    dfs = []
-    for channel in dfcopy.channel.unique():
-        df = dfcopy[dfcopy.channel==channel].copy()
-        df['stim'] = ''
-        for i, stim in enumerate(list_stims):
-            df.loc[df.sweep_raw % nstims == i, 'stim'] = stim
-        dfs.append(df)
-    df = pd.concat(dfs).sort_values(by=['stim', 'datetime']).reset_index(drop=True)
-    df['sweep'] = (df.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
-    return df
-
-
-def persistdf(recording_name, dict_folders, dfdata=None, dfmean=None):
+def persistdf(file_base, dict_folders, dfdata=None, dfmean=None):
     if dfdata is not None:
         dict_folders['data'].mkdir(exist_ok=True)
-        str_data_path = f"{dict_folders['data']}/{recording_name}.csv"
+        str_data_path = f"{dict_folders['data']}/{file_base}.csv"
         dfdata.to_csv(str_data_path, index=False)
     if dfmean is not None:
         dict_folders['cache'].mkdir(exist_ok=True)
-        str_mean_path = f"{dict_folders['cache']}/{recording_name}_mean.csv"
+        str_mean_path = f"{dict_folders['cache']}/{file_base}_mean.csv"
         dfmean.to_csv(str_mean_path, index=False)
 
 
@@ -179,17 +152,17 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
     * receives a df of project data file paths built in ui
         files that are already parsed are to be overwritten (ui.py passes filitered list of unparsed files)
     * checks for or creates project parsed files folder
-    * parses each file by source path
-    * adds columns: channel, stim (default a and b), sweep (0-max for each channel-stim combo)
-    * fetches proj_folder from ui self.project_folder
-    * saves a parsed file into project parsed files folder as .csv
+    * creates a datafile by unique source file/channel/stim combination
+    * Stim defaults to a and b
+    * saves two files:
+        dict_folders['data']<recording_name>_Ch<Ch>_<Stim>.csv
+        dict_folders['cache']<recording_name>_Ch<Ch>_<Stim>_dfmean.csv
     
-    returns a dict of channels and stims, used by ui.py to split a single file with multiple channels
+    returns a list of <recording_name>_Ch<Ch>_<Stim> for updating df_project recording names
 
     NTH: checks if file is already parsed by checksums
     calls build_dfmean() to create an average, prim and bis file, per channel-stim combo
     """
-
     def parser(dict_folders, recording_name, source_path):
         if verbose:
             print(f" - parser, source_path: {source_path}")
@@ -210,13 +183,25 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
             if verbose:
                 print(" - - default: two stims per channel")
                 list_stims=["a", "b"]
-
-        df = assignStimAndSweep(dfdata = df, list_stims=list_stims)
-        dfmean = build_dfmean(df)
-        df = zeroSweeps(dfdata = df, dfmean=dfmean)
-        persistdf(recording_name, dict_folders=dict_folders, dfdata=df, dfmean=dfmean)
-        dictmeta = {'channel': df.channel.unique(), 'stim': df.stim.unique(), 'sweeps': df.sweep.nunique()}
-        return dictmeta
+        nstims = len(list_stims)
+        nchannels = df.channel.nunique()
+        sweeplength = df.time.nunique()
+        dfcopy = df.copy()
+        dfcopy = dfcopy.sort_values(by=['datetime', 'channel']).reset_index(drop=True)
+        dfcopy['sweep_raw'] = dfcopy.index.to_numpy() // (sweeplength * nchannels)
+        dict_data_nsweeps = {}
+        for channel in dfcopy.channel.unique():
+            df_ch = dfcopy[dfcopy.channel==channel]
+            for i, stim in enumerate(list_stims):
+                file_base = f"{recording_name}_Ch{channel}_{stim}"
+                print(f"file_base: {file_base}")
+                df_ch_st = df_ch.loc[df_ch.sweep_raw % nstims == i].copy()
+                df_ch_st['sweep'] = (df_ch_st.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
+                dfmean = build_dfmean(df_ch_st)
+                dfdata = zeroSweeps(dfdata=df_ch_st, dfmean=dfmean)
+                persistdf(file_base=file_base, dict_folders=dict_folders, dfdata=dfdata, dfmean=dfmean)
+                dict_data_nsweeps[f"{recording_name}_Ch{channel}_{stim}"] = dfdata.sweep.nunique()
+        return dict_data_nsweeps
 
     if verbose:
         print(f"proj folder: {dict_folders['project']}")
@@ -228,20 +213,16 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
             print(f"path: {df['path']}")
 
     if recording_name is not None:
-        dictmeta = parser(dict_folders=dict_folders, recording_name=recording_name, source_path=source_path)
-        return dictmeta
+        list_data = parser(dict_folders=dict_folders, recording_name=recording_name, source_path=source_path)
+        return list_data
 
     if df is not None:
         df_unique_names = df.drop_duplicates(subset='recording_name')
         for i, row in df_unique_names.iterrows():
             recording_name = row['recording_name']
             source_path = row['path']
-            dictmeta = parser(dict_folders=dict_folders, recording_name=recording_name, source_path=source_path)
-        return dictmeta
-
-# Path.is_dir to check if folder or file
-# start parsing the queue
-# show progress
+            list_data = parser(dict_folders=dict_folders, recording_name=recording_name, source_path=source_path)
+        return list_data
 
 
 # %%
@@ -251,6 +232,7 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     dict_folders = {'project': Path.home() / "Documents/Brainwash Projects/standalone_test"}
     dict_folders['data'] = dict_folders['project'] / "data"
     dict_folders['cache'] = dict_folders['project'] / "cache"
+    dict_folders['project'].mkdir(exist_ok=True)
     list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"),
                     str(source_folder / "abf 2 channel/KO_02")]
 #    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"),
@@ -258,15 +240,15 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     for _ in range(3):
         print()
     print("", "*** parse.py standalone test: ***")
-    for item in list_sources:
+    for item in tqdm(list_sources):
         if Path(item).is_dir():
             recording_name = os.path.basename(item)
         else:
             recording_name = os.path.basename(os.path.dirname(item))
         print(" - processing", item, "as recording_name", recording_name)
         df_files = pd.DataFrame({"path": [item], "recording_name": [recording_name]})
-        dictmeta = parseProjFiles(dict_folders=dict_folders, df=df_files)
-        print(f" - dictmeta: {dictmeta}")
+        dict_data_nsweeps = parseProjFiles(dict_folders=dict_folders, df=df_files)
+        print(f" - dict_data_nsweeps: {dict_data_nsweeps}") # what the parsed file turned into
         print()
 
 '''
