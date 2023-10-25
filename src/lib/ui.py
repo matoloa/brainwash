@@ -1244,12 +1244,15 @@ class UIsub(Ui_MainWindow):
     def setGraph(self, df=None): # plot selected row(s), or clear graph if empty
         self.clearGraph()
         ax1 = self.canvas_seaborn_output.axes
+        if hasattr(self, "ax2"): # remove ax2 if it exists
+            self.ax2.remove()
         ax2 = ax1.twinx()
+        self.ax2 = ax2  # Store the ax2 instance to prevent garbage collection
         list_color = ["red", "green", "blue", "yellow"] # TODO: placeholder color range
         if self.list_groups: # plot group means
             self.setGraphGroups(ax1, ax2, list_color)
         if df is not None: # plot selected rows
-            self.setGraphSelected(df, ax1, ax2)
+            self.setGraphSelected(df=df, ax1=ax1, ax2=ax2)
         # x and y limits
         self.canvas_seaborn_mean.axes.set_xlim(self.graph_xlim)
         self.canvas_seaborn_mean.axes.set_ylim(self.graph_ylim)
@@ -1261,7 +1264,7 @@ class UIsub(Ui_MainWindow):
         print(f"setGraphSelected: {df}")
         df_filtered = df[df["sweeps"] != "..."]
         if df_filtered.empty:
-            print("Selection not analyzed.")
+            print("Nothing analyzed selected.")
         else:
             for i, row in df_filtered.iterrows(): # TODO: i to be used later for cycling colours?
                 # plot dfmean.voltage on canvas_seaborn_mean
@@ -1279,10 +1282,6 @@ class UIsub(Ui_MainWindow):
                     # output: amp
                     _ = sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=ax1, color="black", linestyle='--')
                 if not np.isnan(t_EPSP_slope):
-                    print(f"{i} Contents on output canvas:")
-                    artists_on_canvas = ax2.get_children()
-                    for artist in artists_on_canvas:
-                        print(f"artist: {artist}")
                     # mean, slope indicator
                     x_start = t_EPSP_slope - 0.0004
                     x_end = t_EPSP_slope + 0.0004
@@ -1290,8 +1289,7 @@ class UIsub(Ui_MainWindow):
                     y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
                     self.canvas_seaborn_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
                     # output:slope
-                    _ = sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=ax2, color="black")
-                    #self.EPSP_slope = sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=ax2, color="black")
+                    _ = sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=ax2, color="black", alpha = 0.3)
 
     def setGraphGroups(self, ax1, ax2, list_color):
         print(f"setGraphGroups: {self.list_groups}")
@@ -1306,13 +1304,13 @@ class UIsub(Ui_MainWindow):
             # Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
             # print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
             if dfgroup_mean['EPSP_amp_mean'].notna().any():
-                _ = sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=ax1, color=list_color[i_color])
+                _ = sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=ax1, color=list_color[i_color], linestyle='--')
                 ax1.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_amp_mean + dfgroup_mean.EPSP_amp_SEM, dfgroup_mean.EPSP_amp_mean - dfgroup_mean.EPSP_amp_SEM, alpha=0.3, color=list_color[i_color])               
-                ax1.axhline(y=0, linestyle='--', color='gray', alpha = 0.3)
+                ax1.axhline(y=0, linestyle='--', color='gray', alpha = 0.2)
             if dfgroup_mean['EPSP_slope_mean'].notna().any():
-                _ = sns.lineplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=ax2, color=list_color[i_color])
+                _ = sns.scatterplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=ax2, color=list_color[i_color], s=4)
                 ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=list_color[i_color])
-                ax2.axhline(y=0, linestyle=':', color='gray', alpha = 0.3)
+                ax2.axhline(y=0, linestyle=':', color='gray', alpha = 0.2)
 
     def meanClicked(self, event): # maingraph click event
         if event.inaxes is not None:
@@ -1553,7 +1551,7 @@ class Measure_window_sub(Ui_measure_window):
                             if verbose:
                                 print(f"accepted_handler: deleting {group_path}")
                             group_path.unlink()
-                    ui.setGraph()
+            ui.setGraph(df_p.iloc[idx])
         elif len(idx) < 1:
             raise ValueError(f"ERROR (accepted_handler): {self.row['recording_name']} not found in df_project.")
         else:
