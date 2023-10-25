@@ -1144,18 +1144,18 @@ class UIsub(Ui_MainWindow):
         key_output = f"{row['recording_name']}_output"
         if key_output in self.dict_outputs:
             print(f"get_dfoutput: {key_output} found in dict_outputs")
-            return self.dict_outputs[key_output]
         else:
             str_output_path = f'{self.dict_folders["cache"]}/{key_output}.csv'
             if Path(str_output_path).exists():
+                print(f"get_dfoutput: {key_output} not cached, {str_output_path} found")
                 dfoutput = pd.read_csv(str_output_path)
             else:
                 dfoutput = self.defaultOutput(row=row)
                 dfoutput.reset_index(inplace=True)
+                print(f"get_dfoutput: {key_output} built by defaultOutput")
             self.dict_outputs[key_output] = dfoutput
             self.save_dict(dict2save=self.dict_outputs)
-            print(f"get_dfoutput: {key_output} added to dict_outputs")
-            return self.dict_outputs[key_output]
+        return self.dict_outputs[key_output]
         
     def get_dfdata(self, row):
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
@@ -1235,16 +1235,66 @@ class UIsub(Ui_MainWindow):
 
     def clearGraph(self): # removes all data from canvas_seaborn_mean - TODO: deprecated?
         if hasattr(self, "canvas_seaborn_mean"):
-            if verbose:
-                print(f"axes: {self.canvas_seaborn_mean.axes}")
             self.canvas_seaborn_mean.axes.cla()
             self.canvas_seaborn_mean.draw()
+        if hasattr(self, "canvas_seaborn_output"):
+            self.canvas_seaborn_output.axes.cla()
+            self.canvas_seaborn_output.draw()
 
     def setGraph(self, df=None): # plot selected row(s), or clear graph if empty
-        self.canvas_seaborn_mean.axes.cla()
-        self.canvas_seaborn_output.axes.cla()
-        # add groups, regardless of selection:
+        self.clearGraph()
+        ax1 = self.canvas_seaborn_output.axes
+        ax2 = ax1.twinx()
         list_color = ["red", "green", "blue", "yellow"] # TODO: placeholder color range
+        if self.list_groups: # plot group means
+            self.setGraphGroups(ax1, ax2, list_color)
+        if df is not None: # plot selected rows
+            self.setGraphSelected(df, ax1, ax2)
+        # x and y limits
+        self.canvas_seaborn_mean.axes.set_xlim(self.graph_xlim)
+        self.canvas_seaborn_mean.axes.set_ylim(self.graph_ylim)
+        ax1.set_ylim(-0.0015, 0)
+        self.canvas_seaborn_mean.draw()
+        self.canvas_seaborn_output.draw()
+
+    def setGraphSelected(self, df, ax1, ax2):
+        print(f"setGraphSelected: {df}")
+        df_filtered = df[df["sweeps"] != "..."]
+        if df_filtered.empty:
+            print("Selection not analyzed.")
+        else:
+            for i, row in df_filtered.iterrows(): # TODO: i to be used later for cycling colours?
+                # plot dfmean.voltage on canvas_seaborn_mean
+                dfmean = self.get_dfmean(row=row)
+                _ = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
+                # plot dfoutput on canvas_seaborn_output
+                dfoutput = self.get_dfoutput(row=row)
+                df_p = self.get_df_project() # updated in get_dfoutput; CAUTION! row is not updated! TODO: evaluate, address
+                t_EPSP_amp = df_p.loc[row.name,'t_EPSP_amp']
+                t_EPSP_slope = df_p.loc[row.name,'t_EPSP_slope']
+                if not np.isnan(t_EPSP_amp):
+                    # mean, amp indicator
+                    y_position = dfmean[dfmean.time == t_EPSP_amp].voltage
+                    self.canvas_seaborn_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
+                    # output: amp
+                    _ = sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=ax1, color="black", linestyle='--')
+                if not np.isnan(t_EPSP_slope):
+                    print(f"{i} Contents on output canvas:")
+                    artists_on_canvas = ax2.get_children()
+                    for artist in artists_on_canvas:
+                        print(f"artist: {artist}")
+                    # mean, slope indicator
+                    x_start = t_EPSP_slope - 0.0004
+                    x_end = t_EPSP_slope + 0.0004
+                    y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+                    y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+                    self.canvas_seaborn_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
+                    # output:slope
+                    _ = sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=ax2, color="black")
+                    #self.EPSP_slope = sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=ax2, color="black")
+
+    def setGraphGroups(self, ax1, ax2, list_color):
+        print(f"setGraphGroups: {self.list_groups}")
         df_p = self.get_df_project()
         for i_color, group in enumerate(self.list_groups):
             dfgroup = df_p[df_p['groups'].str.split(',').apply(lambda x: group in x)]
@@ -1256,43 +1306,13 @@ class UIsub(Ui_MainWindow):
             # Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
             # print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
             if dfgroup_mean['EPSP_amp_mean'].notna().any():
-                ax1 = sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[i_color])
+                _ = sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=ax1, color=list_color[i_color])
                 ax1.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_amp_mean + dfgroup_mean.EPSP_amp_SEM, dfgroup_mean.EPSP_amp_mean - dfgroup_mean.EPSP_amp_SEM, alpha=0.3, color=list_color[i_color])               
+                ax1.axhline(y=0, linestyle='--', color='gray', alpha = 0.3)
             if dfgroup_mean['EPSP_slope_mean'].notna().any():
-                ax2 = sns.lineplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=self.canvas_seaborn_output.axes, color=list_color[i_color])
-                ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=list_color[i_color])               
-        if df is not None:
-            df_filtered = df[df["sweeps"] != "..."]
-            if df_filtered.empty:
-                print("Selection not analyzed.")
-            else:
-                for i, row in df_filtered.iterrows(): # TODO: i to be used later for cycling colours?
-                    dfmean = self.get_dfmean(row=row)
-                    #dfmean["voltage"] = dfmean.voltage / dfmean.voltage.abs().max()
-                    sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_seaborn_mean.axes, color="black")
-                    # add results of selected row(s):
-                    dfoutput = self.get_dfoutput(row=row)
-                    df_p = self.get_df_project() # updated in get_dfoutput; row is not!
-                    t_EPSP_amp = df_p.loc[row.name,'t_EPSP_amp']
-                    t_EPSP_slope = df_p.loc[row.name,'t_EPSP_slope']
-                    if not np.isnan(t_EPSP_amp):
-                        sns.lineplot(data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
-                        y_position = dfmean[dfmean.time == t_EPSP_amp].voltage
-                        self.canvas_seaborn_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
-
-                    if not np.isnan(t_EPSP_slope):
-                        sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_seaborn_output.axes, color="black")
-                        x_start = t_EPSP_slope - 0.0004
-                        x_end = t_EPSP_slope + 0.0004
-                        y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
-                        y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-                        self.canvas_seaborn_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
-
-        self.canvas_seaborn_mean.axes.set_xlim(self.graph_xlim)
-        self.canvas_seaborn_mean.axes.set_ylim(self.graph_ylim)
-        self.canvas_seaborn_output.axes.set_ylim(-0.0015, 0)
-        self.canvas_seaborn_mean.draw()
-        self.canvas_seaborn_output.draw()
+                _ = sns.lineplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=ax2, color=list_color[i_color])
+                ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=list_color[i_color])
+                ax2.axhline(y=0, linestyle=':', color='gray', alpha = 0.3)
 
     def meanClicked(self, event): # maingraph click event
         if event.inaxes is not None:
@@ -1478,7 +1498,7 @@ class Measure_window_sub(Ui_measure_window):
         self.default_color = "background-color: rgb(239, 239, 239);"
         self.selected_color = "background-color: rgb(100, 100, 255);"
         # set default aspect
-        self.toggle(self.pushButton_EPSP_amp, "EPSP_amp") # default for now TODO: Load/Save preference in local .cfg
+        self.toggle(self.pushButton_EPSP_slope, "EPSP_slope") # default for now TODO: Load/Save preference in local .cfg
         # Iterate through supported_aspects to generate all this code
         def loopConnectAspects(aspect):
             aspect_button = getattr(self, f"pushButton_{aspect}")
@@ -1504,11 +1524,10 @@ class Measure_window_sub(Ui_measure_window):
                 if not column in list_keep:
                     ui.df_project.loc[idx, column] = value
             ui.save_df_project()
-            new_row = ui.df_project.loc[idx]
             # update output; dict and file
-            dfoutput = self.new_dfoutput
-            key_output = f"{new_row['recording_name']}_output"
-            ui.dict_outputs[key_output] = dfoutput
+            key_output = f"{ui.df_project.loc[int(idx.values[0]), 'recording_name']}_output"
+            #print(f"key_output: {key_output}")
+            ui.dict_outputs[key_output] = self.new_dfoutput
             ui.save_dict(dict2save=ui.dict_outputs)
             # delete affected group output; dicts and files
             # build list of groups to purge
@@ -1600,10 +1619,10 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_output.axes.cla()
         self.dragging = False
         self.new_dfoutput = dfoutput.copy()
-        if dfoutput['EPSP_amp'].notna().any():
+        if 'EPSP_amp' in dfoutput.columns and dfoutput['EPSP_amp'].notna().any():
             _ = sns.lineplot(label="EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_output.axes, color="black")
             self.canvas_output.axes.set_ylim(-0.0015, 0)
-        if dfoutput['EPSP_slope'].notna().any():
+        if 'EPSP_slope' in dfoutput.columns and dfoutput['EPSP_slope'].notna().any():
             _ = sns.lineplot(label="EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_output.axes, color="black")
             self.canvas_output.axes.set_ylim(-0.0015, 0)
         self.canvas_output.draw()
@@ -1742,7 +1761,6 @@ class Measure_window_sub(Ui_measure_window):
             return dict_labels[aspect]
         return False
 
-
 def get_signals(source):
     cls = source if isinstance(source, type) else type(source)
     signal = type(QtCore.pyqtSignal())
@@ -1775,6 +1793,14 @@ def zoomReset(canvas):
     canvas.axes.set_xlim(ui.graph_xlim)
     canvas.axes.set_ylim(ui.graph_ylim)
     canvas.draw()
+
+def unPlot(canvas, *artists): # remove line if it exists on canvas
+    print(f"unPlot - canvas: {canvas}, artists: {artists}")
+    for artist in artists:
+        artists_on_canvas = canvas.axes.get_children()
+        if artist in artists_on_canvas:
+            print(f"unPlot - removed artist: {artist}")
+            artist.remove()
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

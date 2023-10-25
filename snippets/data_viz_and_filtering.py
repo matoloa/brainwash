@@ -5,7 +5,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -267,13 +267,50 @@ fig.set_xlim(0, 400)
 from scipy.signal import savgol_filter
 start = 65
 cutoff = 1024
-yhat = savgol_filter(dfdata.voltage[start:cutoff], window_length=15, polyorder=1)
+yhat = savgol_filter(dfdata.voltage[start:cutoff], window_length=10, polyorder=2)
 
 fig, axes = plt.subplots(1, 2, figsize=(20, 10))
 axes[0].plot(yhat), axes[1].plot(dfdata.voltage[start:cutoff])
-axes[0].set_ylim(-0.0005, 0.0001), axes[1].set_ylim(-0.0005, 0.0001)
+axes[0].set_ylim(-0.0005, 0.001), axes[1].set_ylim(-0.0005, 0.001)
+axes[0].set_xlim(0, 200), axes[1].set_xlim(0, 200)
+
+# %%
+start = 65
+cutoff = 1024
+yhat = savgol_filter(dfdata.voltage[start:cutoff], window_length=10, polyorder=2)
+
+fig, ax1 = plt.subplots(figsize=(10, 5))
+ax2 = ax1.twinx()
+
+# Plot the filtered data on the left y-axis (ax1)
+ax1.plot(yhat, color='blue', label='Filtered Data')
+ax1.set_ylabel('Filtered Data', color='blue')
+ax1.set_ylim(-0.0005, 0.001)
+ax1.set_xlim(0, 200)
+
+# Plot the original data on the right y-axis (ax2)
+ax2.plot(dfdata.voltage[start:cutoff], color='red', label='Original Data')
+ax2.set_ylabel('Original Data', color='red')
+ax2.set_ylim(-0.0005, 0.001)
+
+# Common x-axis label
+ax1.set_xlabel('X-axis')
+
+# Show legends for both plots
+ax1.legend(loc='upper left')
+ax2.legend(loc='upper right')
+
+# Show the plot
+plt.show()
+
+# %%
+strtest = "param__key1_value1__key2_value2"
+strsplit = strtest.split("__")
+print(f"strsplit: {strsplit}")
 
 # %%
 autocorrelation_plot(yhat)
+
+# %%
 
 # %%

@@ -10,6 +10,8 @@ from neo import io  # read data files ibw
 from tqdm import tqdm
 from joblib import Memory
 
+from scipy.signal import savgol_filter
+
 memory = Memory("../cache", verbose=1)
 
 verbose = True
@@ -108,7 +110,7 @@ def build_dfmean(dfdata, rollingwidth=3):
     min_time_difference = 0.005  # Minimum time difference 5ms TODO: hardcoded
     # Find the indices where 'prim' is above the threshold
     above_threshold_indices = np.where(dfmean['prim'] > threshold)[0]
-    print(f"above_threshold_indices: {above_threshold_indices}")
+    print(f"build_dfmean found {len(above_threshold_indices)} above_threshold_indices.")
     # Filter the indices to ensure they are more than min_time_difference apart
     filtered_indices = [above_threshold_indices[0]]
     for i in range(1, len(above_threshold_indices)):
@@ -233,10 +235,8 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     dict_folders['data'] = dict_folders['project'] / "data"
     dict_folders['cache'] = dict_folders['project'] / "cache"
     dict_folders['project'].mkdir(exist_ok=True)
-    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"),
-                    str(source_folder / "abf 2 channel/KO_02")]
-#    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"),
-#                    str(source_folder / "abf 2 channel/KO_02/2022_01_24_0000.abf")]
+    #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"), str(source_folder / "abf 2 channel/KO_02")]
+    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"), str(source_folder / "abf 2 channel/KO_02/2022_01_24_0000.abf")]
     for _ in range(3):
         print()
     print("", "*** parse.py standalone test: ***")
