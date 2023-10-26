@@ -14,7 +14,7 @@ memory = Memory("joblib", verbose=1)
 
 
 # %%
-def build_dfoutput(dfdata, t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, t_volley_slope, t_volley_slope_size, output_path):
+def build_dfoutput(df, t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, t_volley_slope, t_volley_slope_size, output_path):
     # Incomplete function: only resolves EPSP_amp for now
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
     Args:
@@ -33,11 +33,11 @@ def build_dfoutput(dfdata, t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, 
     print(f"build_dfoutput(t_EPSP_amp: {t_EPSP_amp}, t_EPSP_slope: {t_EPSP_slope}):")
     t0 = time.time()
     dfoutput = pd.DataFrame()
-    dfoutput['sweep'] = dfdata.sweep.unique() # one row per unique sweep in data file
+    dfoutput['sweep'] = df.sweep.unique() # one row per unique sweep in data file
     # EPSP_amp
     if t_EPSP_amp is not None:
         if t_EPSP_amp is not np.nan:
-            df_EPSP_amp = dfdata[dfdata['time']==t_EPSP_amp].copy() # filter out all time (from sweep start) that do not match t_EPSP_amp
+            df_EPSP_amp = df[df['time']==t_EPSP_amp].copy() # filter out all time (from sweep start) that do not match t_EPSP_amp
             df_EPSP_amp.reset_index(inplace=True)
             dfoutput['EPSP_amp'] = df_EPSP_amp['voltage'] # add the voltage of selected times to dfoutput
         else:
@@ -45,7 +45,7 @@ def build_dfoutput(dfdata, t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, 
     # EPSP_slope
     if t_EPSP_slope is not None:
         if t_EPSP_slope is not np.nan:
-            df_EPSP_slope = measureslope_vec(dfdata=dfdata, t_slope=t_EPSP_slope, halfwidth=0.0004)
+            df_EPSP_slope = measureslope_vec(df=df, t_slope=t_EPSP_slope, halfwidth=0.0004)
             dfoutput['EPSP_slope'] = df_EPSP_slope['value']
         else:
             dfoutput['EPSP_slope'] = np.nan
@@ -331,16 +331,16 @@ dfslopes.value.plot()
 '''
 
 # %%
-def measureslope_vec(dfdata, t_slope, halfwidth, name="EPSP"):
+def measureslope_vec(df, t_slope, halfwidth, name="EPSP"):
     """
     vectorized measure slope
     """
 
-    print(f'measureslope(df: {dfdata}, t_slope: {t_slope}, halfwidth: {halfwidth}, name="EPSP"):')
+    print(f'measureslope(df: {df}, t_slope: {t_slope}, halfwidth: {halfwidth}, name="EPSP"):')
 
-    df = dfdata[((t_slope - halfwidth) <= dfdata.time) & (dfdata.time <= (t_slope + halfwidth))]
-    print(f"df before pivot:{df.shape}")
-    dfpivot = df.pivot(index='sweep', columns='time', values='voltage')
+    df_filtered = df[((t_slope - halfwidth) <= df.time) & (df.time <= (t_slope + halfwidth))]
+    print(f"df before pivot:{df_filtered.shape}")
+    dfpivot = df_filtered.pivot(index='sweep', columns='time', values='voltage')
     coefs = np.polyfit(dfpivot.columns, dfpivot.T, deg=1).T
     dfslopes = pd.DataFrame(index=dfpivot.index)
     dfslopes['type'] = name + "_slope"

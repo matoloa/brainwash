@@ -679,7 +679,8 @@ class UIsub(Ui_MainWindow):
         return dict_folders
 
     def resetCacheDicts(self):
-        self.dict_datas = {} # all data
+        self.dict_datas = {} # all raw data
+        self.dict_filters = {} # all processed data
         self.dict_means = {} # all means
         self.dict_outputs = {} # all outputs
         self.dict_group_means = {} # means of all group outputs
@@ -894,10 +895,10 @@ class UIsub(Ui_MainWindow):
                     if mean_path.exists():
                         mean_path.unlink()
             # Regardless of whether or not there was a file, purge the row from df_project
+            self.clearGroupsByRow(selected_rows) # clear cache so that a new group mean is calculated
             df_p.drop(selected_rows, inplace=True)
             df_p.reset_index(inplace=True, drop=True)
             self.set_df_project(df_p)
-            self.clearGroupsByRow(selected_rows) # clear cache so that a new group mean is calculated
             print(f"Deleted {len(list_affected_groups)}, {list_affected_groups} rows.")
             self.setTableDf(df_p)  # Force update
             self.setGraph()
@@ -979,22 +980,20 @@ class UIsub(Ui_MainWindow):
         else:
             print("No files selected.")
 
-    def purgeGroupCache(self, *grouplists): # clear cache so that a new group mean is calculated
+    def purgeGroupCache(self, *groups): # clear cache so that a new group mean is calculated
         if verbose:
-            print(f'purgeGroupCache({grouplists})')
-        for list_group in grouplists:
-            for group in list_group:
-                print(f"group: {group}, len(group): {len(group)}")
-                if group in self.dict_group_means:
-                    del self.dict_group_means[group]
-                path_group_cache = Path(f'{self.dict_folders["cache"]}/{group}.csv')
-                if path_group_cache.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
-                    print("File found when checking for existence...")
-                    try:
-                        path_group_cache.unlink()
-                        print("...and was successfully unlinked.")
-                    except FileNotFoundError:
-                        print("...but NOT when attempting to unlink.")
+            print(f"purgeGroupCache: {groups}, len(group): {len(groups)}")
+        for group in groups:
+            if group in self.dict_group_means:
+                del self.dict_group_means[group]
+            path_group_cache = Path(f'{self.dict_folders["cache"]}/{group}.csv')
+            if path_group_cache.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
+                print(f"{path_group_cache} found when checking for existence...")
+                try:
+                    path_group_cache.unlink()
+                    print("...and was successfully unlinked.")
+                except FileNotFoundError:
+                    print("...but NOT when attempting to unlink.")
 
     def clearGroupsByRow(self, rows):
         list_affected_groups = ' '.join(self.df_project.iloc[rows]['groups'])
@@ -1139,85 +1138,105 @@ class UIsub(Ui_MainWindow):
         key_mean = f"{row['recording_name']}_mean"
         if key_mean in self.dict_means:
             return self.dict_means[key_mean]
+        recording_name = row['recording_name']
+        str_mean_path = f'{self.dict_folders["cache"]}/{recording_name}_mean.csv'
+        if Path(str_mean_path).exists():
+            dfmean = pd.read_csv(str_mean_path)
         else:
-            recording_name = row['recording_name']
-            str_mean_path = f'{self.dict_folders["cache"]}/{recording_name}_mean.csv'
-            if Path(str_mean_path).exists():
-                dfmean = pd.read_csv(str_mean_path)
-            else:
-                dfmean = parse.build_dfmean(self.get_dfdata(row=row))
-                parse.persistdf(file_base=recording_name, dict_folders=self.dict_folders, dfmean=dfmean)
-            self.dict_means[key_mean] = dfmean
-            return self.dict_means[key_mean]
+            dfmean = parse.build_dfmean(self.get_dfdata(row=row))
+            parse.persistdf(file_base=recording_name, dict_folders=self.dict_folders, dfmean=dfmean)
+        self.dict_means[key_mean] = dfmean
+        return self.dict_means[key_mean]
 
     def get_dfoutput(self, row):
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
-        key_output = f"{row['recording_name']}_output"
-        if key_output in self.dict_outputs:
-            print(f"get_dfoutput: {key_output} found in dict_outputs")
-        else:
-            str_output_path = f'{self.dict_folders["cache"]}/{key_output}.csv'
-            if Path(str_output_path).exists():
-                print(f"get_dfoutput: {key_output} not cached, {str_output_path} found")
-                dfoutput = pd.read_csv(str_output_path)
-            else:
-                dfoutput = self.defaultOutput(row=row)
-                dfoutput.reset_index(inplace=True)
-                print(f"get_dfoutput: {key_output} built by defaultOutput")
-            self.dict_outputs[key_output] = dfoutput
-            self.save_dict(dict2save=self.dict_outputs)
-        return self.dict_outputs[key_output]
+        rec_name = f"{row['recording_name']}_output"
+        if rec_name in self.dict_outputs: #1: Return cached
+            return self.dict_outputs[rec_name]
+        str_output_path = f'{self.dict_folders["cache"]}/{rec_name}.csv'
+        if Path(str_output_path).exists(): #2: Read from file
+            print(f"get_dfoutput: {rec_name} not cached, {str_output_path} found")
+            dfoutput = pd.read_csv(str_output_path)
+        else: #3: Create file
+            recording_name = row['recording_name']
+            dfoutput = self.defaultOutput(row=row)
+            dfoutput.reset_index(inplace=True)
+            print(f"get_dfoutput: {rec_name} built by defaultOutput")
+            self.df2csv(df=dfoutput, rec=recording_name, key="output")
+        self.dict_outputs[rec_name] = dfoutput
+        return self.dict_outputs[rec_name]
         
     def get_dfdata(self, row):
-        # returns an internal df output for the selected file. If it does not exist, read it from file first.
+        # returns an internal df for the selected recording_name. If it does not exist, read it from file first.
         key_data = row['recording_name']
         print(f"get_dfdata: {key_data}")
-        if key_data in self.dict_datas:
+        if key_data in self.dict_datas: #1: Return cached
             print(f"get_dfdata: {key_data} found in dict_datas")
             return self.dict_datas[key_data]
-        else:
-            path_data = Path(f"{self.dict_folders['data']}/{key_data}.csv")
-            print(f"get_dfdata: {key_data} not found in dict_datas, checking {path_data}")
-            try: # datafile should always exist
-                dfdata = pd.read_csv(path_data)
-            except FileNotFoundError:
-                print("did not find _mean.csv to load. Not imported?")
-            else:
-                self.dict_datas[key_data] = dfdata
-                return self.dict_datas[key_data]
+        path_data = Path(f"{self.dict_folders['data']}/{key_data}.csv")
+        print(f"get_dfdata: {key_data} not found in dict_datas, checking {path_data}")
+        try: #2: Read from file - datafile should always exist
+            dfdata = pd.read_csv(path_data)
+            self.dict_datas[key_data] = dfdata
+            return self.dict_datas[key_data]
+        except FileNotFoundError:
+            print("did not find _mean.csv to load. Not imported?")
+
+            
+    def get_dffilter(self, row):
+        # returns an internal df_filter for the selected recording_name. If it does not exist, read it from file first.
+        rec_name = row['recording_name']
+        print(f"get_dffilter: {rec_name}")
+        if rec_name in self.dict_filters: #1: Return cached
+            print(f"get_dffilter: {rec_name} found in dict_datas")
+            return self.dict_filters[rec_name]
+        path_filter = Path(f"{self.dict_folders['cache']}/{rec_name}_filter.csv")
+        print(f"get_dffilter: {rec_name} not found in dict_filters, checking {path_filter}")
+        if Path(path_filter).exists(): #2: Read from file
+            dffilter = pd.read_csv(path_filter)
+        else: #3: Create file
+            dffilter = parse.zeroSweeps(self.get_dfdata(row=row), self.get_dfmean(row=row))
+            self.df2csv(df=dffilter, rec=rec_name, key="filter")
+            print("did not find _filter.csv to load. Created and cached.")
+        # Cache and return
+        self.dict_filters[rec_name] = dffilter
+        return self.dict_filters[rec_name]
+        
         
     def get_dfgroupmean(self, key_group):
         # returns an internal df output average of <group>. If it does not exist, create it
-        if key_group in self.dict_group_means:
+        if key_group in self.dict_group_means: # 1: Return cached
             return self.dict_group_means[key_group]
-        else:
-            group_path = Path(f'{self.dict_folders["cache"]}/{key_group}.csv')
-            if group_path.exists():
-                if verbose:
-                    print("Loading stored", str(group_path))
-                group_mean = pd.read_csv(str(group_path))
-            else:
-                if verbose:
-                    print("Building new", str(group_path))
-                df_p = self.df_project
-                dfgroup = df_p[df_p['groups'].str.split(',').apply(lambda x: key_group in x)]
-                dfs = []
-                for i, row in dfgroup.iterrows():
-                    df = self.get_dfoutput(row=row)
-                    dfs.append(df)
-                dfs = pd.concat(dfs)
-                group_mean = dfs.groupby('sweep').agg({'EPSP_amp': ['mean', 'sem'], 'EPSP_slope': ['mean', 'sem']}).reset_index()
-                group_mean.columns = ['sweep', 'EPSP_amp_mean', 'EPSP_amp_SEM', 'EPSP_slope_mean', 'EPSP_slope_SEM']
-            #print(f"group_mean: {group_mean}")
-            self.dict_group_means[key_group] = group_mean
-            self.save_dict(dict2save=self.dict_group_means)
-            return self.dict_group_means[key_group]
+        group_path = Path(f'{self.dict_folders["cache"]}/{key_group}.csv')
+        if group_path.exists(): #2: Read from file
+            if verbose:
+                print("Loading stored", str(group_path))
+            group_mean = pd.read_csv(str(group_path))
+        else: #3: Create file
+            if verbose:
+                print("Building new", str(group_path))
+            df_p = self.df_project
+            dfgroup = df_p[df_p['groups'].str.split(',').apply(lambda x: key_group in x)]
+            dfs = []
+            for i, row in dfgroup.iterrows():
+                df = self.get_dfoutput(row=row)
+                dfs.append(df)
+            dfs = pd.concat(dfs)
+            group_mean = dfs.groupby('sweep').agg({'EPSP_amp': ['mean', 'sem'], 'EPSP_slope': ['mean', 'sem']}).reset_index()
+            group_mean.columns = ['sweep', 'EPSP_amp_mean', 'EPSP_amp_SEM', 'EPSP_slope_mean', 'EPSP_slope_SEM']
+            self.df2csv(df=group_mean, rec=key_group, key="mean")
+        self.dict_group_means[key_group] = group_mean
+        return self.dict_group_means[key_group]
 
-    def save_dict(self, dict2save): # writes dict to .csv
-        for keyword, df in dict2save.items():
-            self.dict_folders['cache'].mkdir(exist_ok=True) 
-            filepath = f'{self.dict_folders["cache"]}/{keyword}.csv'
-            df.to_csv(filepath, index=False)
+
+    def df2csv(self, df, rec, key=None): # writes dict[rec] to rec_{dict}.csv
+        self.dict_folders['cache'].mkdir(exist_ok=True)
+        if key is None:
+            filepath = f'{self.dict_folders["cache"]}/{rec}.csv'
+        else:
+            filepath = f'{self.dict_folders["cache"]}/{rec}_{key}.csv'
+        print(f"saved cache filepath: {filepath}")
+        df.to_csv(filepath, index=False)
 
 
 # Default_output
@@ -1227,7 +1246,7 @@ class UIsub(Ui_MainWindow):
         Stores timepoints, methods and params in their designated columns in self.df_project
         Returns a df of the results: amplitudes and slopes
         '''
-        dfdata = self.get_dfdata(row=row)
+        dffilter = self.get_dffilter(row=row)
         dfmean = self.get_dfmean(row=row)
         df_p = self.get_df_project()
         dict_t = analysis.find_all_t(dfmean=dfmean, verbose=False)
@@ -1241,7 +1260,7 @@ class UIsub(Ui_MainWindow):
                 df_p.loc[row.name, aspect] = value
                 print(f"{aspect} was {old_aspect_value} in df_p, NOT a valid float. Updated df_p.")               
                 self.set_df_project(df=df_p)
-        return analysis.build_dfoutput(dfdata=dfdata,
+        return analysis.build_dfoutput(df=dffilter,
                                        t_EPSP_amp=dict_t["t_EPSP_amp"],
                                        t_EPSP_slope=dict_t["t_EPSP_slope"])
 
@@ -1276,7 +1295,7 @@ class UIsub(Ui_MainWindow):
         self.canvas_seaborn_output.draw()
 
     def setGraphSelected(self, df, ax1, ax2):
-        print(f"setGraphSelected: {df}")
+        print(f"setGraphSelected: {df['recording_name']}")
         df_filtered = df[df["sweeps"] != "..."]
         if df_filtered.empty:
             print("Nothing analyzed selected.")
@@ -1314,7 +1333,7 @@ class UIsub(Ui_MainWindow):
             if dfgroup.empty:
                 if verbose:
                     print(f"No data in group {group}")
-                break
+                continue
             dfgroup_mean = self.get_dfgroupmean(key_group=group)
             # Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
             # print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
@@ -1323,7 +1342,7 @@ class UIsub(Ui_MainWindow):
                 ax1.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_amp_mean + dfgroup_mean.EPSP_amp_SEM, dfgroup_mean.EPSP_amp_mean - dfgroup_mean.EPSP_amp_SEM, alpha=0.3, color=list_color[i_color])               
                 ax1.axhline(y=0, linestyle='--', color='gray', alpha = 0.2)
             if dfgroup_mean['EPSP_slope_mean'].notna().any():
-                _ = sns.scatterplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=ax2, color=list_color[i_color], s=4)
+                _ = sns.scatterplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=ax2, color=list_color[i_color], s=5)
                 ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=list_color[i_color])
                 ax2.axhline(y=0, linestyle=':', color='gray', alpha = 0.2)
 
@@ -1536,10 +1555,10 @@ class Measure_window_sub(Ui_measure_window):
                     ui.df_project.loc[idx, column] = value
             ui.save_df_project()
             # update output; dict and file
-            key_output = f"{ui.df_project.loc[int(idx.values[0]), 'recording_name']}_output"
-            #print(f"key_output: {key_output}")
+            rec_name = ui.df_project.loc[int(idx.values[0]), 'recording_name']
+            key_output = f"{rec_name}_output"
             ui.dict_outputs[key_output] = self.new_dfoutput
-            ui.save_dict(dict2save=ui.dict_outputs)
+            ui.df2csv(df=self.new_dfoutput, rec=rec_name, key="output")
             # delete affected group output; dicts and files
             # build list of groups to purge
             str_groups = ui.df_project.loc[int(idx.values[0]), 'groups']
@@ -1558,7 +1577,7 @@ class Measure_window_sub(Ui_measure_window):
                         if verbose:
                             print(f"accepted_handler: removing {group} from internal dict")
                         del ui.dict_group_means[group]
-                        ui.save_dict(dict2save=ui.dict_group_means)
+                        ui.purgeGroupCache(group)
                         group_path = Path(f'{ui.dict_folders["cache"]}/{group}.csv')
                         if group_path.exists():
                             if verbose:
@@ -1571,9 +1590,9 @@ class Measure_window_sub(Ui_measure_window):
             raise ValueError(f"ERROR (accepted_handler): multiple instances of {self.row['recording_name']} in project_df.")
 
     def autoCalculate(self):
-        dfdata = ui.get_dfdata(row=self.row)
+        dffilter = ui.get_dffilter(row=self.row)
         dict_t = analysis.find_all_t(dfmean=self.dfmean, verbose=False)
-        self.new_dfoutput = analysis.build_dfoutput(dfdata=dfdata,
+        self.new_dfoutput = analysis.build_dfoutput(df=dffilter,
                                        t_EPSP_amp=dict_t["t_EPSP_amp"],
                                        t_EPSP_slope=dict_t["t_EPSP_slope"])
         self.new_dfoutput.reset_index(inplace=True)
@@ -1676,7 +1695,7 @@ class Measure_window_sub(Ui_measure_window):
             self.dragging = False
             same = bool(int(self.drag_start) == int(x))
             print(f"meanDragged from: {self.drag_start} to {x}: {same}")
-            df = ui.get_dfdata(self.row)
+            df = ui.get_dffilter(self.row)
             if same: # click and release on same: get that specific sweep and superimpose it on canvas_mean
                 unPlot(self.canvas_output, self.si_v_drag_to, self.dragplot)
                 df = df[df['sweep'] == int(self.drag_start)]
@@ -1726,13 +1745,13 @@ class Measure_window_sub(Ui_measure_window):
             print(f" . ui.df_project.loc[self.row.name, t_method: {ui.df_project.loc[self.row.name, t_method]}, row[{t_method}]: {self.row[t_method]}")
             print(f" . ui.df_project.loc[self.row.name, t_params]: {ui.df_project.loc[self.row.name, t_params]}, row[{t_params}]: {self.row[t_params]}")
         #recalculate aspect
-        dfdata = ui.get_dfdata(row=self.row)
+        dffilter = ui.get_dffilter(row=self.row)
         if aspect == "EPSP_amp":
-            df = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_amp=time)
+            df = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=time)
             graph_color = "black"
             plot_on_mean = {'center': ("v_" + t_aspect)}
         elif aspect == "EPSP_slope":
-            df = analysis.build_dfoutput(dfdata=dfdata, t_EPSP_slope=time)
+            df = analysis.build_dfoutput(df=dffilter, t_EPSP_slope=time)
             graph_color = "green"
             plot_on_mean = {'center': ("v_" + t_aspect),
                             'start':  ("v_" + t_aspect + "_start"),

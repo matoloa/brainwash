@@ -135,7 +135,7 @@ def zeroSweeps(dfdata, dfmean):
     sermedians = dfpivot.iloc[:, i_stim-20:i_stim-5].median(axis=1) # TODO: hardcoded 20 and 5
     dfpivot = dfpivot.subtract(sermedians, axis='rows')
     df_zeroed['voltage'] = dfpivot.stack().reset_index().sort_values(by=['sweep', 'time'])[0].values
-    df_zeroed.drop(columns=['voltage_raw', 'sweep_raw', 't0'], inplace=True)
+    df_zeroed.drop(columns=['voltage_raw', 'sweep_raw', 't0', 'datetime'], inplace=True)
     return df_zeroed
 
 def persistdf(file_base, dict_folders, dfdata=None, dfmean=None, dffilter=None):
