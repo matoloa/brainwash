@@ -501,6 +501,8 @@ def df_projectTemplate():
             "groups",
             "parsetimestamp",
             "sweeps",
+            "channel",
+            "stim",
             "t_stim",
             "t_stim_method",
             "t_stim_params",
@@ -919,6 +921,8 @@ class UIsub(Ui_MainWindow):
                         df_proj_new_row = df_proj_row.copy()
                         df_proj_new_row['recording_name'] = new_name
                         df_proj_new_row['sweeps'] = nsweeps
+                        df_proj_new_row['channel'] = dict_sub.get('channel', None)
+                        df_proj_new_row['stim'] = dict_sub.get('stim', None)
                         rows.append(df_proj_new_row)
                 update_frame = update_frame[update_frame.recording_name != recording_name]
                 print(f"update_frame: {update_frame}")
