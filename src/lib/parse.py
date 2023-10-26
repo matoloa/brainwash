@@ -110,13 +110,13 @@ def build_dfmean(dfdata, rollingwidth=3):
     min_time_difference = 0.005  # Minimum time difference 5ms TODO: hardcoded
     # Find the indices where 'prim' is above the threshold
     above_threshold_indices = np.where(dfmean['prim'] > threshold)[0]
-    print(f"build_dfmean found {len(above_threshold_indices)} above_threshold_indices.")
     # Filter the indices to ensure they are more than min_time_difference apart
     filtered_indices = [above_threshold_indices[0]]
     for i in range(1, len(above_threshold_indices)):
         if dfmean['time'][above_threshold_indices[i]] - dfmean['time'][above_threshold_indices[i - 1]] > min_time_difference:
             filtered_indices.append(above_threshold_indices[i])
     n_stim = len(filtered_indices)
+    print(f"build_dfmean found {len(above_threshold_indices)} above_threshold_indices in {n_stim} unique stims.")
     if n_stim == 1:
         # subtract median of 20-5 samples before stimulus artifact
         median = dfmean['voltage'].iloc[i_stim-20:i_stim-5].median() # TODO: hardcoded 20 and 5
@@ -130,16 +130,15 @@ def build_dfmean(dfdata, rollingwidth=3):
 def zeroSweeps(dfdata, dfmean):
     #print(f"dfdata BEFORE subtract: {dfdata}")
     i_stim = dfmean.prim.idxmax()
-    dfpivot = dfdata.pivot(index='sweep', columns='time', values='voltage_raw')
+    df_zeroed = dfdata.copy()
+    dfpivot = df_zeroed.pivot(index='sweep', columns='time', values='voltage_raw')
     sermedians = dfpivot.iloc[:, i_stim-20:i_stim-5].median(axis=1) # TODO: hardcoded 20 and 5
-    #print(f"sermedians: {sermedians}")
     dfpivot = dfpivot.subtract(sermedians, axis='rows')
-    dfdata['voltage'] = dfpivot.stack().reset_index().sort_values(by=['sweep', 'time'])[0].values
-    #print(f"dfdata AFTER subtract: {dfdata}")
-    df_zeroed = dfdata
+    df_zeroed['voltage'] = dfpivot.stack().reset_index().sort_values(by=['sweep', 'time'])[0].values
+    df_zeroed.drop(columns=['voltage_raw', 'sweep_raw', 't0'], inplace=True)
     return df_zeroed
 
-def persistdf(file_base, dict_folders, dfdata=None, dfmean=None):
+def persistdf(file_base, dict_folders, dfdata=None, dfmean=None, dffilter=None):
     if dfdata is not None:
         dict_folders['data'].mkdir(exist_ok=True)
         str_data_path = f"{dict_folders['data']}/{file_base}.csv"
@@ -148,6 +147,10 @@ def persistdf(file_base, dict_folders, dfdata=None, dfmean=None):
         dict_folders['cache'].mkdir(exist_ok=True)
         str_mean_path = f"{dict_folders['cache']}/{file_base}_mean.csv"
         dfmean.to_csv(str_mean_path, index=False)
+    if dffilter is not None:
+        dict_folders['cache'].mkdir(exist_ok=True)
+        str_mean_path = f"{dict_folders['cache']}/{file_base}_filter.csv"
+        dffilter.to_csv(str_mean_path, index=False)
 
 
 def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None, single_stim=False):
@@ -192,7 +195,7 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
         dfcopy = df.copy()
         dfcopy = dfcopy.sort_values(by=['datetime', 'channel']).reset_index(drop=True)
         dfcopy['sweep_raw'] = dfcopy.index.to_numpy() // (sweeplength * nchannels)
-        dict_data_nsweeps = {}
+        dict_data = {}
         for channel in dfcopy.channel.unique():
             df_ch = dfcopy[dfcopy.channel==channel]
             for i, stim in enumerate(list_stims):
@@ -200,11 +203,19 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
                 print(f"file_base: {file_base}")
                 df_ch_st = df_ch.loc[df_ch.sweep_raw % nstims == i].copy()
                 df_ch_st['sweep'] = (df_ch_st.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
+                df_ch_st.drop(columns=['channel'], inplace=True)
                 dfmean = build_dfmean(df_ch_st)
-                dfdata = zeroSweeps(dfdata=df_ch_st, dfmean=dfmean)
-                persistdf(file_base=file_base, dict_folders=dict_folders, dfdata=dfdata, dfmean=dfmean)
-                dict_data_nsweeps[f"{recording_name}_Ch{channel}_{stim}"] = dfdata.sweep.nunique()
-        return dict_data_nsweeps
+                dffilter = zeroSweeps(dfdata=df_ch_st, dfmean=dfmean)
+                persistdf(file_base=file_base, dict_folders=dict_folders, dfdata=df_ch_st, dfmean=dfmean, dffilter=dffilter)
+                # Build dict: keys are datafile names, values are a dict of nsweeps, channels, stim, and reset (the first sweep number after every sweep_raw reset: finds recording breaks for display purposes)
+                dict_sub = {
+                    'nsweeps': df_ch_st['sweep'].nunique(),
+                    'Ch': channel,
+                    'stim': stim,
+                    'reset': df_ch_st[(df_ch_st['sweep_raw'] == df_ch_st['sweep_raw'].min()) & (df_ch_st['time'] == 0)]['sweep'].tolist()[1:]
+                }
+                dict_data[f"{recording_name}_Ch{channel}_{stim}"] = dict_sub
+        return dict_data
 
     if verbose:
         print(f"proj folder: {dict_folders['project']}")
@@ -251,33 +262,3 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
         dict_data_nsweeps = parseProjFiles(dict_folders=dict_folders, df=df_files)
         print(f" - dict_data_nsweeps: {dict_data_nsweeps}") # what the parsed file turned into
         print()
-
-'''
-
-# %%
-if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
-
-    item = list_sources[0]
-    recording_name = os.path.basename(os.path.dirname(item))
-    df = pd.read_csv(str(proj_folder / (recording_name + '.csv')))
-    repo_root = Path.home() / "code/brainwash"
-    source_folder = repo_root / "src/lib/test_data"
-    list_sources = [str(source_folder / "A_21_P0701-S2/2022_07_01_0012.abf.gitkeep"), str(source_folder / "KO_02/2022_01_24_0000.abf.gitkeep")]
-
-
-# %%
-if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
-
-    df = parse_abf(filepath=Path(list_sources[1]))
-    sweeplength = df.time.nunique()
-    df.index.to_numpy()
-    dfss = assignStimAndSweep(df, list_stims=['a', 'b', 'c', 'd'])
-    print(dfss)
-
-# %%Import_x should be parse, not “import”.
-if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
-
-    dfvc = dfss[['stim', 'sweepraw']].value_counts()
-    dfvc.sort_index(inplace=True)
-    print(dfvc)
-'''
