@@ -123,7 +123,8 @@ def build_dfmean(dfdata, rollingwidth=3):
         #print(f"dfmean BEFORE subtract: {dfmean}")
         dfmean['voltage'] = dfmean['voltage'] - median
         #print(f"dfmean AFTER subtract: {dfmean}")
-    print(f"n_stim: {n_stim}, filtered_indices: {filtered_indices}")
+    else:
+        raise ValueError(f"build_dfmean found {n_stim} stimulus artifacts. Expected 1.")
     return dfmean
 
 def zeroSweeps(dfdata, dfmean):

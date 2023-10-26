@@ -886,8 +886,14 @@ class UIsub(Ui_MainWindow):
     def deleteSelectedRows(self):
         df_p = self.get_df_project()
         selected_rows = self.listSelectedRows()
+        list_affected_groups = []
         if 0 < len(selected_rows):
             for row in selected_rows:
+                str_group = df_p.at[row, 'groups']
+                list_group = list(str_group.split(","))
+                for group in list_group:
+                    if group not in list_affected_groups:
+                        list_affected_groups.append(group)
                 sweeps = df_p.at[row, 'sweeps']
                 if sweeps != "...": # if the file is parsed:
                     recording_name = df_p.at[row, 'recording_name']
@@ -905,6 +911,8 @@ class UIsub(Ui_MainWindow):
             df_p.drop(selected_rows, inplace=True)
             df_p.reset_index(inplace=True, drop=True)
             self.set_df_project(df_p)
+            print(f"Deleted {len(list_affected_groups)}, {list_affected_groups} rows.")
+            self.purgeGroupCache(list_affected_groups) # clear cache so that a new group mean is calculated
             self.setTableDf(df_p)  # Force update
         else:
             print("No files selected.")
@@ -973,19 +981,22 @@ class UIsub(Ui_MainWindow):
         else:
             print("No files selected.")
 
-    def purgeGroupCache(self, group): # clear cache so that a new group mean is calculated
+    def purgeGroupCache(self, *grouplists): # clear cache so that a new group mean is calculated
         if verbose:
-            print(f'purgeGroupCache({group})')
-        if group in self.dict_group_means:
-            del self.dict_group_means[group]
-        path_group_cache = Path(f'{self.dict_folders["cache"]}/{group}.csv')
-        if path_group_cache.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
-            print("File found when checking for existence...")
-            try:
-                path_group_cache.unlink()
-                print("...and was successfully unlinked.")
-            except FileNotFoundError:
-                print("...but NOT when attempting to unlink.")
+            print(f'purgeGroupCache({grouplists})')
+        for list_group in grouplists:
+            for group in list_group:
+                print(f"group: {group}, len(group): {len(group)}")
+                if group in self.dict_group_means:
+                    del self.dict_group_means[group]
+                path_group_cache = Path(f'{self.dict_folders["cache"]}/{group}.csv')
+                if path_group_cache.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
+                    print("File found when checking for existence...")
+                    try:
+                        path_group_cache.unlink()
+                        print("...and was successfully unlinked.")
+                    except FileNotFoundError:
+                        print("...but NOT when attempting to unlink.")
 
     def clearGroupsByRow(self, rows):
         list_affected_groups = ' '.join(self.df_project.iloc[rows]['groups'])
@@ -1212,7 +1223,7 @@ class UIsub(Ui_MainWindow):
 
 
 # Default_output
-    def defaultOutput(self, row, update_df_p = True): # TODO: WIP; not updating df_project properly yet
+    def defaultOutput(self, row):
         '''
         Generates default results for row (in self.df_project)
         Stores timepoints, methods and params in their designated columns in self.df_project
@@ -1222,20 +1233,16 @@ class UIsub(Ui_MainWindow):
         dfmean = self.get_dfmean(row=row)
         df_p = self.get_df_project()
         dict_t = analysis.find_all_t(dfmean=dfmean, verbose=False)
-        for aspect in supported_aspects:
-            new_aspect = dict_t[f"t_{aspect}"]
-            old_aspect = df_p.loc[row.name, f"t_{aspect}"]
-            if old_aspect == np.NaN:
-                df_p.loc[row.name, f"t_{aspect}"] = new_aspect
-        for key, values in dict_t.items(): # use old numbers if they exist
-            if key in row:
-                if df_p.loc[row.name, f"t_{aspect}"] == np.NaN:
-                    df_p.loc[row.name, key] = values
-                else:
-                    dict_t[key] = df_p.loc[row.name, key]
-            else:
-                print(f'defaultOutput(row: #{row.name}) error: {key} is not a df_project column.')
-        self.set_df_project(df=df_p)
+        for aspect, value in dict_t.items():
+            old_aspect_value = df_p.loc[row.name, aspect]
+            if pd.notna(old_aspect_value):
+                 # if old_aspect IS a valid float, use it: replace in dict_t
+                dict_t[aspect] = old_aspect_value
+                print(f"{aspect} was {old_aspect_value} in df_p, a valid float. Updated dict_t to {value}")
+            else: # if old_aspect is NOT a valid float, replace df_p with dict_t
+                df_p.loc[row.name, aspect] = value
+                print(f"{aspect} was {old_aspect_value} in df_p, NOT a valid float. Updated df_p.")               
+                self.set_df_project(df=df_p)
         return analysis.build_dfoutput(dfdata=dfdata,
                                        t_EPSP_amp=dict_t["t_EPSP_amp"],
                                        t_EPSP_slope=dict_t["t_EPSP_slope"])
@@ -1612,9 +1619,9 @@ class Measure_window_sub(Ui_measure_window):
         self.v_t_EPSP_slope_start =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
         self.v_t_EPSP_slope_end =     sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
         # placeholder start-finish measurement line
-        y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
-        y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-        self.canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
+        #y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+        #y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+        #self.canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
 
         g.axvline(t_VEB, color="grey", linestyle="--")
         self.canvas_mean.axes.set_xlim(ui.graph_xlim)

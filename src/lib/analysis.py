@@ -30,6 +30,7 @@ def build_dfoutput(dfdata, t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, 
     Returns:
         a dataframe. Per sweep (row): EPSP_amp, EPSP_slope, volley_amp, volley_EPSP
     """
+    print(f"build_dfoutput(t_EPSP_amp: {t_EPSP_amp}, t_EPSP_slope: {t_EPSP_slope}):")
     t0 = time.time()
     dfoutput = pd.DataFrame()
     dfoutput['sweep'] = dfdata.sweep.unique() # one row per unique sweep in data file
