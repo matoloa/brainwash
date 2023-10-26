@@ -16,7 +16,7 @@ memory = Memory("joblib", verbose=1)
 
 
 # %%
-def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, t_volley_slope, t_volley_slope_size, output_path):
+def build_dfoutput(df, t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, t_volley_slope, t_volley_slope_size, output_path):
     # Incomplete function: only resolves EPSP_amp for now
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
     Args:
@@ -42,22 +42,15 @@ def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None):#, 
     if t_EPSP_amp is not None:
         if t_EPSP_amp is not np.nan:
             df_EPSP_amp = df[df['time']==t_EPSP_amp].copy() # filter out all time (from sweep start) that do not match t_EPSP_amp
-            df_EPSP_amp.reset_index(inplace=True, drop=True)
-            dfoutput['EPSP_amp'] = df_EPSP_amp[filter] # add the voltage of selected times to dfoutput
-            list_col.append('EPSP_amp')
-            # if the source file has a savgol-filtered column, add that too
-            if (filter == 'voltage') & ('filter_savgol' in df.columns):
-                df_EPSP_amp = df[df['time']==t_EPSP_amp].copy()
-                df_EPSP_amp.reset_index(inplace=True, drop=True)
-                dfoutput['savgol_EPSP_amp'] = df_EPSP_amp['filter_savgol']
-                list_col.append('savgol_EPSP_amp')
+            df_EPSP_amp.reset_index(inplace=True)
+            dfoutput['EPSP_amp'] = df_EPSP_amp['voltage'] # add the voltage of selected times to dfoutput
         else:
             dfoutput['EPSP_amp'] = np.nan
 
     # EPSP_slope
     if t_EPSP_slope is not None:
         if t_EPSP_slope is not np.nan:
-            df_EPSP_slope = measureslope_vec(df=df, filter=filter, t_slope=t_EPSP_slope, halfwidth=0.0004)
+            df_EPSP_slope = measureslope_vec(df=df, t_slope=t_EPSP_slope, halfwidth=0.0004)
             dfoutput['EPSP_slope'] = df_EPSP_slope['value']
             list_col.append('EPSP_slope')
             # if the source file has a savgol-filtered column, add that too
@@ -337,7 +330,7 @@ def measureslope_vec(df, t_slope, halfwidth, name="EPSP", filter='voltage',):
 
     df_filtered = df[((t_slope - halfwidth) <= df.time) & (df.time <= (t_slope + halfwidth))]
     print(f"df before pivot:{df_filtered.shape}")
-    dfpivot = df_filtered.pivot(index='sweep', columns='time', values=filter)
+    dfpivot = df_filtered.pivot(index='sweep', columns='time', values='voltage')
     coefs = np.polyfit(dfpivot.columns, dfpivot.T, deg=1).T
     dfslopes = pd.DataFrame(index=dfpivot.index)
     dfslopes['type'] = name + "_slope"

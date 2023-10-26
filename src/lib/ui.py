@@ -1958,7 +1958,7 @@ class Measure_window_sub(Ui_measure_window):
             df = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=time)
             graph_color = "black"
             plot_on_mean = {'center': ("v_" + t_aspect)}
-        else:# aspect == "EPSP_slope":
+        elif aspect == "EPSP_slope":
             axis = self.ax2
             df = analysis.build_dfoutput(df=dffilter, t_EPSP_slope=time)
             graph_color = "green"
