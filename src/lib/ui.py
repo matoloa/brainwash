@@ -912,12 +912,14 @@ class UIsub(Ui_MainWindow):
             recording_name = df_proj_row['recording_name']
             source_path = df_proj_row['path']
             if df_proj_row["sweeps"] == "...":  # indicates not read before TODO: Replace with selector!
-                dict_data_nsweeps = parse.parseProjFiles(dict_folders = self.dict_folders, recording_name=recording_name, source_path=source_path)
-                for new_name, nsweeps in dict_data_nsweeps.items():
-                    df_proj_new_row = df_proj_row.copy()
-                    df_proj_new_row['recording_name'] = new_name
-                    df_proj_new_row['sweeps'] = nsweeps
-                    rows.append(df_proj_new_row)
+                dict_data = parse.parseProjFiles(dict_folders = self.dict_folders, recording_name=recording_name, source_path=source_path)
+                for new_name, dict_sub in dict_data.items(): # Access 'nsweeps' from the current dictionary
+                    nsweeps = dict_sub.get('nsweeps', None)
+                    if nsweeps is not None:
+                        df_proj_new_row = df_proj_row.copy()
+                        df_proj_new_row['recording_name'] = new_name
+                        df_proj_new_row['sweeps'] = nsweeps
+                        rows.append(df_proj_new_row)
                 update_frame = update_frame[update_frame.recording_name != recording_name]
                 print(f"update_frame: {update_frame}")
                 rows2add = pd.concat(rows, axis=1).transpose()
