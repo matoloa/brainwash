@@ -701,15 +701,7 @@ class UIsub(Ui_MainWindow):
         # print(self.list_groups)
         # print(f"self.gridLayout: {self.gridLayout}")
         # print(f"range(self.gridLayout.count()): {range(self.gridLayout.count())}")
-        for group in self.list_groups:
-            for i in range(self.gridLayout.count()):
-                widget = self.gridLayout.itemAt(i).widget()
-                if widget and widget.text() == group:
-                    widget.deleteLater()
-                    if verbose:
-                        print("Removed", group, f"(widget: {widget}")
-        self.list_groups = []
-        self.write_project_cfg()
+        self.killGroupButtons()
 
     def pushedButtonAddGroup(self):
         if verbose:
@@ -765,9 +757,10 @@ class UIsub(Ui_MainWindow):
 
     def pushedButtonOpenProject(self): # open folder selector dialog
         self.dialog = QtWidgets.QDialog()
+        print(f"pushedButtonOpenProject: self.projects_folder: {self.projects_folder}")
         projectfolder = QtWidgets.QFileDialog.getExistingDirectory(
-            self.dialog, "Open Directory", str(self.projects_folder), QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks
-        )
+            self.dialog, "Open Directory", str(self.projects_folder), QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks)
+        
         if verbose:
             print(f"Received projectfolder: {str(projectfolder)}")
         if (Path(projectfolder) / "project.brainwash").exists():
@@ -889,11 +882,6 @@ class UIsub(Ui_MainWindow):
         list_affected_groups = []
         if 0 < len(selected_rows):
             for row in selected_rows:
-                str_group = df_p.at[row, 'groups']
-                list_group = list(str_group.split(","))
-                for group in list_group:
-                    if group not in list_affected_groups:
-                        list_affected_groups.append(group)
                 sweeps = df_p.at[row, 'sweeps']
                 if sweeps != "...": # if the file is parsed:
                     recording_name = df_p.at[row, 'recording_name']
@@ -906,14 +894,13 @@ class UIsub(Ui_MainWindow):
                     if mean_path.exists():
                         mean_path.unlink()
             # Regardless of whether or not there was a file, purge the row from df_project
-            self.clearGraph()
-            self.setGraph()
             df_p.drop(selected_rows, inplace=True)
             df_p.reset_index(inplace=True, drop=True)
             self.set_df_project(df_p)
+            self.clearGroupsByRow(selected_rows) # clear cache so that a new group mean is calculated
             print(f"Deleted {len(list_affected_groups)}, {list_affected_groups} rows.")
-            self.purgeGroupCache(list_affected_groups) # clear cache so that a new group mean is calculated
             self.setTableDf(df_p)  # Force update
+            self.setGraph()
         else:
             print("No files selected.")
 
@@ -955,6 +942,17 @@ class UIsub(Ui_MainWindow):
             row += 1
         self.gridLayout.addWidget(self.new_button, row, column, 1, 1)
         # self.gridLayout.addWidget(self.new_button, self.gridLayout.rowCount(), 0, 1, 1)
+
+    def killGroupButtons(self):
+        for group in self.list_groups:
+            for i in range(self.gridLayout.count()):
+                widget = self.gridLayout.itemAt(i).widget()
+                if widget and widget.text() == group:
+                    widget.deleteLater()
+                    if verbose:
+                        print("Removed", group, f"(widget: {widget}")
+        self.list_groups = []
+        self.write_project_cfg()
 
     def addToGroup(self, add_group):
         # Assign all selected files to group "add_group" unless they already belong to that group
@@ -1007,7 +1005,6 @@ class UIsub(Ui_MainWindow):
             self.purgeGroupCache(group)
         self.save_df_project()
         self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
-        self.clearGraph()
         self.setGraph()
 
 
@@ -1042,12 +1039,13 @@ class UIsub(Ui_MainWindow):
             self.projectname = new_project_name
             self.dict_folders = self.build_dict_folders()
             self.resetCacheDicts()
+            self.killGroupButtons()
             self.inputProjectName.setText(self.projectname)
-            self.clearGraph()
             self.df_project = df_projectTemplate()
             self.setTableDf(self.df_project)
             self.save_df_project()
             self.write_cfg()
+            self.setGraph()
 
     def renameProject(self): # changes name of project folder and updates .cfg
         if verbose:
