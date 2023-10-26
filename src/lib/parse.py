@@ -210,7 +210,7 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
                 # Build dict: keys are datafile names, values are a dict of nsweeps, channels, stim, and reset (the first sweep number after every sweep_raw reset: finds recording breaks for display purposes)
                 dict_sub = {
                     'nsweeps': df_ch_st['sweep'].nunique(),
-                    'Ch': channel,
+                    'channel': channel,
                     'stim': stim,
                     'reset': df_ch_st[(df_ch_st['sweep_raw'] == df_ch_st['sweep_raw'].min()) & (df_ch_st['time'] == 0)]['sweep'].tolist()[1:]
                 }
