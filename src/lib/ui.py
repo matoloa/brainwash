@@ -26,6 +26,8 @@ matplotlib.use("Qt5Agg")
 
 verbose = True
 track_widget_focus = False
+# TODO: expand this as more aspects are added
+supported_aspects = [ "EPSP_amp", "EPSP_slope"]
 
 
 class TableModel(QtCore.QAbstractTableModel):
@@ -1218,11 +1220,19 @@ class UIsub(Ui_MainWindow):
         '''
         dfdata = self.get_dfdata(row=row)
         dfmean = self.get_dfmean(row=row)
-        dict_t = analysis.find_all_t(dfmean=dfmean, verbose=False)
         df_p = self.get_df_project()
-        for key, values in dict_t.items():
+        dict_t = analysis.find_all_t(dfmean=dfmean, verbose=False)
+        for aspect in supported_aspects:
+            new_aspect = dict_t[f"t_{aspect}"]
+            old_aspect = df_p.loc[row.name, f"t_{aspect}"]
+            if old_aspect == np.NaN:
+                df_p.loc[row.name, f"t_{aspect}"] = new_aspect
+        for key, values in dict_t.items(): # use old numbers if they exist
             if key in row:
-                df_p.loc[row.name, key] = values
+                if df_p.loc[row.name, f"t_{aspect}"] == np.NaN:
+                    df_p.loc[row.name, key] = values
+                else:
+                    dict_t[key] = df_p.loc[row.name, key]
             else:
                 print(f'defaultOutput(row: #{row.name}) error: {key} is not a df_project column.')
         self.set_df_project(df=df_p)
@@ -1490,8 +1500,6 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_output.mpl_connect('motion_notify_event', self.outputDragged)
         self.canvas_output.mpl_connect('button_release_event', self.outputReleased)
 
-        # TODO: expand this as more aspects are added
-        self.supported_aspects = [ "EPSP_amp", "EPSP_slope"]
         # set button colors
         self.default_color = "background-color: rgb(239, 239, 239);"
         self.selected_color = "background-color: rgb(100, 100, 255);"
@@ -1505,7 +1513,7 @@ class Measure_window_sub(Ui_measure_window):
             aspect_button.pressed.connect(lambda: self.toggle(aspect_button, aspect))
             aspect_edit.setText(self.m(self.row[f"t_{aspect}"]))
             aspect_edit.editingFinished.connect(lambda: self.updateOnEdit(aspect_edit, aspect))
-        for aspect in self.supported_aspects:
+        for aspect in supported_aspects:
             loopConnectAspects(aspect=aspect)
         self.buttonBox.accepted.connect(self.accepted_handler)
         self.pushButtonAuto.clicked.connect(self.autoCalculate)
@@ -1564,7 +1572,7 @@ class Measure_window_sub(Ui_measure_window):
                                        t_EPSP_amp=dict_t["t_EPSP_amp"],
                                        t_EPSP_slope=dict_t["t_EPSP_slope"])
         self.new_dfoutput.reset_index(inplace=True)
-        for aspect in self.supported_aspects:
+        for aspect in supported_aspects:
             time = dict_t[f"t_{aspect}"]
             self.updateAspect(aspect=aspect, time=time, method="Auto")
 
@@ -1574,7 +1582,7 @@ class Measure_window_sub(Ui_measure_window):
 
     def toggle(self, button, aspect):
         self.aspect = aspect
-        for i_aspect in self.supported_aspects:
+        for i_aspect in supported_aspects:
             un_button = getattr(self, f"pushButton_{i_aspect}")
             un_button.setStyleSheet(self.default_color)
         button.setStyleSheet(self.selected_color)
@@ -1628,7 +1636,7 @@ class Measure_window_sub(Ui_measure_window):
     def meanClicked(self, event): # measure window click event
         if event.inaxes is not None:
             if event.button == 1:# Left mouse button clicked
-                if self.aspect not in self.supported_aspects:
+                if self.aspect not in supported_aspects:
                     print(f"meanClicked: {self.aspect} not supported.")
                     return
                 x = event.xdata
