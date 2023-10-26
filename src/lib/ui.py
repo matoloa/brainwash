@@ -1644,14 +1644,14 @@ class Measure_window_sub(Ui_measure_window):
             if event.button == 1: 
                 self.drag_start = x
                 self.dragging = True
-                self.deOutput(self.si_v_drag_from)
+                unPlot(self.canvas_output, self.si_v_drag_from)
                 self.si_v_drag_from = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="blue")
                 self.canvas_output.draw()
     
     def outputDragged(self, event): # measurewindow output drag event
         x = event.xdata
         if self.dragging:
-            self.deOutput(self.si_v_drag_to, self.dragplot)
+            unPlot(self.canvas_output, self.si_v_drag_to, self.dragplot)
             if x is not None:
                 self.si_v_drag_to = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="blue")
                 self.dragplot = sns.lineplot(ax=self.canvas_output.axes).axvspan(self.drag_start, x, color='lightblue', alpha=0.3)
@@ -1665,7 +1665,7 @@ class Measure_window_sub(Ui_measure_window):
             print(f"meanDragged from: {self.drag_start} to {x}: {same}")
             df = ui.get_dfdata(self.row)
             if same: # click and release on same: get that specific sweep and superimpose it on canvas_mean
-                self.deOutput(self.si_v_drag_to, self.dragplot)
+                unPlot(self.canvas_output, self.si_v_drag_to, self.dragplot)
                 df = df[df['sweep'] == int(self.drag_start)]
                 self.si_sweep.set_data(df["time"], df["voltage"])
             else: # get all sweeps between drag_start and x (event.xdata) and superimpose the mean of them on canvas_mean
@@ -1678,12 +1678,6 @@ class Measure_window_sub(Ui_measure_window):
                 self.si_sweep.set_data(df["time"], df["voltage"])
             self.canvas_mean.draw()
             self.canvas_output.draw()
-
-    def deOutput(self, *artists): # remove line if it exists on self.canvas_output
-        for artist in artists:
-            artists_on_canvas = self.canvas_output.axes.get_children()
-            if artist in artists_on_canvas:
-                artist.remove()
     
     def updateOnClick(self, time, aspect):
         if verbose:
@@ -1793,11 +1787,11 @@ def zoomReset(canvas):
     canvas.draw()
 
 def unPlot(canvas, *artists): # remove line if it exists on canvas
-    print(f"unPlot - canvas: {canvas}, artists: {artists}")
+    #print(f"unPlot - canvas: {canvas}, artists: {artists}")
     for artist in artists:
         artists_on_canvas = canvas.axes.get_children()
         if artist in artists_on_canvas:
-            print(f"unPlot - removed artist: {artist}")
+            #print(f"unPlot - removed artist: {artist}")
             artist.remove()
 
 if __name__ == "__main__":
