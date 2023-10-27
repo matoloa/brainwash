@@ -202,7 +202,7 @@ class MplCanvas(FigureCanvasQTAgg):
 class Ui_measure_window(QtCore.QObject):
     def setupUi(self, measure):
         measure.setObjectName("measure")
-        measure.resize(525, 946)
+        measure.resize(595, 812)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(1)
         sizePolicy.setVerticalStretch(1)
@@ -222,64 +222,90 @@ class Ui_measure_window(QtCore.QObject):
         self.measure_graph_mean.setSizePolicy(sizePolicy)
         self.measure_graph_mean.setObjectName("measure_graph_mean")
         self.measure_verticalLayout.addWidget(self.measure_graph_mean)
-        self.measure_toolbox = QtWidgets.QFrame(measure)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        self.horizontalLayout = QtWidgets.QHBoxLayout()
+        self.horizontalLayout.setObjectName("horizontalLayout")
+        self.frame_measure_toolbox = QtWidgets.QFrame(measure)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.measure_toolbox.sizePolicy().hasHeightForWidth())
-        self.measure_toolbox.setSizePolicy(sizePolicy)
-        self.measure_toolbox.setMinimumSize(QtCore.QSize(0, 135))
-        self.measure_toolbox.setMaximumSize(QtCore.QSize(16777215, 135))
-        self.measure_toolbox.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.measure_toolbox.setFrameShadow(QtWidgets.QFrame.Plain)
-        self.measure_toolbox.setLineWidth(0)
-        self.measure_toolbox.setObjectName("measure_toolbox")
-        self.pushButton_EPSP_slope = QtWidgets.QPushButton(self.measure_toolbox)
+        sizePolicy.setHeightForWidth(self.frame_measure_toolbox.sizePolicy().hasHeightForWidth())
+        self.frame_measure_toolbox.setSizePolicy(sizePolicy)
+        self.frame_measure_toolbox.setMinimumSize(QtCore.QSize(320, 135))
+        self.frame_measure_toolbox.setMaximumSize(QtCore.QSize(320, 135))
+        self.frame_measure_toolbox.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frame_measure_toolbox.setFrameShadow(QtWidgets.QFrame.Plain)
+        self.frame_measure_toolbox.setLineWidth(0)
+        self.frame_measure_toolbox.setObjectName("frame_measure_toolbox")
+        self.pushButton_EPSP_slope = QtWidgets.QPushButton(self.frame_measure_toolbox)
         self.pushButton_EPSP_slope.setGeometry(QtCore.QRect(10, 40, 83, 25))
         self.pushButton_EPSP_slope.setObjectName("pushButton_EPSP_slope")
-        self.pushButton_EPSP_amp = QtWidgets.QPushButton(self.measure_toolbox)
+        self.pushButton_EPSP_amp = QtWidgets.QPushButton(self.frame_measure_toolbox)
         self.pushButton_EPSP_amp.setGeometry(QtCore.QRect(10, 100, 83, 25))
         self.pushButton_EPSP_amp.setObjectName("pushButton_EPSP_amp")
-        self.pushButton_EPSP_size = QtWidgets.QPushButton(self.measure_toolbox)
+        self.pushButton_EPSP_size = QtWidgets.QPushButton(self.frame_measure_toolbox)
         self.pushButton_EPSP_size.setGeometry(QtCore.QRect(10, 70, 83, 25))
         self.pushButton_EPSP_size.setObjectName("pushButton_EPSP_size")
-        self.pushButton_volley_size = QtWidgets.QPushButton(self.measure_toolbox)
+        self.pushButton_volley_size = QtWidgets.QPushButton(self.frame_measure_toolbox)
         self.pushButton_volley_size.setGeometry(QtCore.QRect(170, 70, 83, 25))
         self.pushButton_volley_size.setObjectName("pushButton_volley_size")
-        self.pushButton_volley_amp = QtWidgets.QPushButton(self.measure_toolbox)
+        self.pushButton_volley_amp = QtWidgets.QPushButton(self.frame_measure_toolbox)
         self.pushButton_volley_amp.setGeometry(QtCore.QRect(170, 100, 83, 25))
         self.pushButton_volley_amp.setObjectName("pushButton_volley_amp")
-        self.pushButton_volley_slope = QtWidgets.QPushButton(self.measure_toolbox)
+        self.pushButton_volley_slope = QtWidgets.QPushButton(self.frame_measure_toolbox)
         self.pushButton_volley_slope.setGeometry(QtCore.QRect(170, 40, 83, 25))
         self.pushButton_volley_slope.setObjectName("pushButton_volley_slope")
-        self.label_EPSP_ms = QtWidgets.QLabel(self.measure_toolbox)
+        self.label_EPSP_ms = QtWidgets.QLabel(self.frame_measure_toolbox)
         self.label_EPSP_ms.setGeometry(QtCore.QRect(110, 20, 21, 17))
         self.label_EPSP_ms.setObjectName("label_EPSP_ms")
-        self.label_volley_ms = QtWidgets.QLabel(self.measure_toolbox)
+        self.label_volley_ms = QtWidgets.QLabel(self.frame_measure_toolbox)
         self.label_volley_ms.setGeometry(QtCore.QRect(270, 20, 21, 17))
         self.label_volley_ms.setObjectName("label_volley_ms")
-        self.lineEdit_volley_slope = QtWidgets.QLineEdit(self.measure_toolbox)
+        self.lineEdit_volley_slope = QtWidgets.QLineEdit(self.frame_measure_toolbox)
         self.lineEdit_volley_slope.setGeometry(QtCore.QRect(260, 40, 51, 25))
         self.lineEdit_volley_slope.setObjectName("lineEdit_volley_slope")
-        self.lineEdit_volley_size = QtWidgets.QLineEdit(self.measure_toolbox)
+        self.lineEdit_volley_size = QtWidgets.QLineEdit(self.frame_measure_toolbox)
         self.lineEdit_volley_size.setGeometry(QtCore.QRect(260, 70, 51, 25))
         self.lineEdit_volley_size.setObjectName("lineEdit_volley_size")
-        self.lineEdit_volley_amp = QtWidgets.QLineEdit(self.measure_toolbox)
+        self.lineEdit_volley_amp = QtWidgets.QLineEdit(self.frame_measure_toolbox)
         self.lineEdit_volley_amp.setGeometry(QtCore.QRect(260, 100, 51, 25))
         self.lineEdit_volley_amp.setObjectName("lineEdit_volley_amp")
-        self.lineEdit_EPSP_size = QtWidgets.QLineEdit(self.measure_toolbox)
+        self.lineEdit_EPSP_size = QtWidgets.QLineEdit(self.frame_measure_toolbox)
         self.lineEdit_EPSP_size.setGeometry(QtCore.QRect(100, 70, 51, 25))
         self.lineEdit_EPSP_size.setObjectName("lineEdit_EPSP_size")
-        self.lineEdit_EPSP_amp = QtWidgets.QLineEdit(self.measure_toolbox)
+        self.lineEdit_EPSP_amp = QtWidgets.QLineEdit(self.frame_measure_toolbox)
         self.lineEdit_EPSP_amp.setGeometry(QtCore.QRect(100, 100, 51, 25))
         self.lineEdit_EPSP_amp.setObjectName("lineEdit_EPSP_amp")
-        self.lineEdit_EPSP_slope = QtWidgets.QLineEdit(self.measure_toolbox)
+        self.lineEdit_EPSP_slope = QtWidgets.QLineEdit(self.frame_measure_toolbox)
         self.lineEdit_EPSP_slope.setGeometry(QtCore.QRect(100, 40, 51, 25))
         self.lineEdit_EPSP_slope.setObjectName("lineEdit_EPSP_slope")
-        self.pushButtonAuto = QtWidgets.QPushButton(self.measure_toolbox)
-        self.pushButtonAuto.setGeometry(QtCore.QRect(10, 10, 83, 25))
-        self.pushButtonAuto.setObjectName("pushButtonAuto")
-        self.measure_verticalLayout.addWidget(self.measure_toolbox)
+        self.pushButton_auto = QtWidgets.QPushButton(self.frame_measure_toolbox)
+        self.pushButton_auto.setGeometry(QtCore.QRect(10, 10, 83, 25))
+        self.pushButton_auto.setObjectName("pushButton_auto")
+        self.horizontalLayout.addWidget(self.frame_measure_toolbox)
+        self.frame_measure_view = QtWidgets.QFrame(measure)
+        self.frame_measure_view.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frame_measure_view.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frame_measure_view.setObjectName("frame_measure_view")
+        self.checkBox_filter_none = QtWidgets.QCheckBox(self.frame_measure_view)
+        self.checkBox_filter_none.setGeometry(QtCore.QRect(10, 30, 90, 23))
+        self.checkBox_filter_none.setObjectName("checkBox_filter_none")
+        self.checkBox_aspect_EPSP_amp = QtWidgets.QCheckBox(self.frame_measure_view)
+        self.checkBox_aspect_EPSP_amp.setGeometry(QtCore.QRect(100, 50, 90, 23))
+        self.checkBox_aspect_EPSP_amp.setObjectName("checkBox_aspect_EPSP_amp")
+        self.checkBox_aspect_EPSP_slope = QtWidgets.QCheckBox(self.frame_measure_view)
+        self.checkBox_aspect_EPSP_slope.setGeometry(QtCore.QRect(100, 30, 90, 23))
+        self.checkBox_aspect_EPSP_slope.setObjectName("checkBox_aspect_EPSP_slope")
+        self.label_filter = QtWidgets.QLabel(self.frame_measure_view)
+        self.label_filter.setGeometry(QtCore.QRect(10, 10, 62, 17))
+        self.label_filter.setObjectName("label_filter")
+        self.label_aspect = QtWidgets.QLabel(self.frame_measure_view)
+        self.label_aspect.setGeometry(QtCore.QRect(100, 10, 62, 17))
+        self.label_aspect.setObjectName("label_aspect")
+        self.checkBox_filter_savgol = QtWidgets.QCheckBox(self.frame_measure_view)
+        self.checkBox_filter_savgol.setGeometry(QtCore.QRect(10, 50, 90, 23))
+        self.checkBox_filter_savgol.setObjectName("checkBox_filter_savgol")
+        self.horizontalLayout.addWidget(self.frame_measure_view)
+        self.measure_verticalLayout.addLayout(self.horizontalLayout)
         self.measure_graph_output = QtWidgets.QWidget(measure)
         self.measure_graph_output.setObjectName("measure_graph_output")
         self.measure_verticalLayout.addWidget(self.measure_graph_output)
@@ -293,13 +319,14 @@ class Ui_measure_window(QtCore.QObject):
         self.buttonBox.setObjectName("buttonBox")
         self.measure_verticalLayout.addWidget(self.buttonBox)
         self.measure_verticalLayout.setStretch(0, 5)
+        self.measure_verticalLayout.setStretch(1, 1)
         self.measure_verticalLayout.setStretch(2, 5)
         self.measure_verticalLayout.setStretch(3, 1)
         self.gridLayout.addLayout(self.measure_verticalLayout, 0, 0, 1, 1)
 
         self.retranslateUi(measure)
-        self.buttonBox.accepted.connect(measure.accept) # type: ignore
-        self.buttonBox.rejected.connect(measure.reject) # type: ignore
+        self.buttonBox.accepted.connect(measure.accept)
+        self.buttonBox.rejected.connect(measure.reject)
         QtCore.QMetaObject.connectSlotsByName(measure)
 
     def retranslateUi(self, measure):
@@ -313,7 +340,14 @@ class Ui_measure_window(QtCore.QObject):
         self.pushButton_volley_slope.setText(_translate("measure", "Volley slope"))
         self.label_EPSP_ms.setText(_translate("measure", "ms"))
         self.label_volley_ms.setText(_translate("measure", "ms"))
-        self.pushButtonAuto.setText(_translate("measure", "Auto"))
+        self.pushButton_auto.setText(_translate("measure", "Auto"))
+        self.checkBox_filter_none.setText(_translate("measure", "None"))
+        self.checkBox_aspect_EPSP_amp.setText(_translate("measure", "EPSP amp."))
+        self.checkBox_aspect_EPSP_slope.setText(_translate("measure", "EPSP slope"))
+        self.label_filter.setText(_translate("measure", "Filter"))
+        self.label_aspect.setText(_translate("measure", "Aspect"))
+        self.checkBox_filter_savgol.setText(_translate("measure", "Sav-Gol"))
+
 
 
 ################################################################
@@ -587,25 +621,31 @@ class UIsub(Ui_MainWindow):
             self.setTableDf(self.df_project)
             self.write_cfg()
 
-        # Write local cfg, for storage of group colours, zoom levels etc.
+        # load or write local cfg, for storage of e.g. group colours, zoom levels etc.
         self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
-        self.delete_locked = True
-        self.list_groups = []
         if self.project_cfg_yaml.exists():
             with self.project_cfg_yaml.open("r") as file:
-                project_cfg = yaml.safe_load(file)
-                self.delete_locked = project_cfg["delete_locked"] == "True"  # Delete lock engaged
-                self.list_groups = project_cfg["list_groups"]
-                # print(f"Found project_cfg['delete_locked']:{project_cfg['delete_locked']}")
-                # print(f"Boolean project_cfg:{self.delete_locked}")
+                self.dict_cfg = yaml.safe_load(file)
         else:
-            project_cfg = {"delete_locked": str(self.delete_locked), "list_groups": self.list_groups}
+            self.dict_cfg = {'list_groups': [],
+                         'list_group_colors': ["red", "green", "blue", "yellow"],
+                         'delete_locked': True,
+                         'filter_none': True,
+                         'filter_savgol': False,
+                         'aspect_EPSP_slope': True,
+                         'aspect_EPSP_amp': True,
+                         'mean_ylim': (-0.0006, 0.0002),
+                         'mean_xlim': (0.006, 0.020),
+                         'output_ax1_ylim': (-0.0015, 0),
+                         'output_ax1_xlim': (0.006, 0.020),
+                         'output_ax2_ylim': (None, None),
+                         'output_ax2_xlim': (None, None),}
             print("Creating project_cfg:", self.project_cfg_yaml)
             self.write_project_cfg()
         # Enforce local cfg
-        self.checkBoxLockDelete.setChecked(self.delete_locked)
-        self.pushButtonDelete.setEnabled(not self.delete_locked)
-        for group in self.list_groups:  # Generate buttons based on groups in project:
+        self.checkBoxLockDelete.setChecked(self.dict_cfg['delete_locked'])
+        self.pushButtonDelete.setEnabled(not self.dict_cfg['delete_locked'])
+        for group in self.dict_cfg['list_groups']:  # Generate buttons based on groups in project:
             self.addGroupButton(group)
 
         if track_widget_focus: # debug mode; prints widget focus every 1000ms
@@ -646,11 +686,6 @@ class UIsub(Ui_MainWindow):
         self.tableProj.doubleClicked.connect(self.tableProjDoubleClicked)
         selection_model = self.tableProj.selectionModel()
         selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
-
-# Placeholder tuples (zoom for graphs)
-    graph_xlim = (0.006, 0.020)
-    graph_ylim = (-0.0006, 0.0002)
-
 
 # Debugging tools
         # self.find_widgets_with_top_left_coordinates(self.centralwidget)
@@ -701,7 +736,6 @@ class UIsub(Ui_MainWindow):
         if verbose:
             print("pushedButtonEditGroups")
         # Placeholder: For now, delete all buttons and groups
-        # print(self.list_groups)
         # print(f"self.gridLayout: {self.gridLayout}")
         # print(f"range(self.gridLayout.count()): {range(self.gridLayout.count())}")
         self.killGroupButtons()
@@ -709,16 +743,16 @@ class UIsub(Ui_MainWindow):
     def pushedButtonAddGroup(self):
         if verbose:
             print("pushedButtonGroups")
-        if len(self.list_groups) < 12: # TODO: hardcoded max nr of groups: move to cfg
+        if len(self.dict_cfg['list_groups']) < 12: # TODO: hardcoded max nr of groups: move to cfg
             i = 0
             while True:
                 new_group_name = "group_" + str(i)
-                if new_group_name in self.list_groups:
+                if new_group_name in self.dict_cfg['list_groups']:
                     if verbose:
                         print(new_group_name, " already exists")
                     i += 1
                 else:
-                    self.list_groups.append(new_group_name)
+                    self.dict_cfg['list_groups'].append(new_group_name)
                     print("created", new_group_name)
                     break
             self.write_project_cfg()
@@ -795,12 +829,12 @@ class UIsub(Ui_MainWindow):
 
     def checkedBoxLockDelete(self, state):
         if state == 2:
-            self.delete_locked = True
+            self.dict_cfg['delete_locked']= True
         else:
-            self.delete_locked = False
-        self.pushButtonDelete.setEnabled(not self.delete_locked)
+            self.dict_cfg['delete_locked']= False
+        self.pushButtonDelete.setEnabled(not self.dict_cfg['delete_locked'])
         if verbose:
-            print(f"checkedBoxLockDelete {state}, self.delete_locked:{self.delete_locked}")
+            print(f"checkedBoxLockDelete {state}, self.dict_cfg['delete_locked']: {self.dict_cfg['delete_locked']}")
         self.write_project_cfg()
 
 
@@ -941,7 +975,7 @@ class UIsub(Ui_MainWindow):
         self.new_button.setObjectName(group)
         self.new_button.clicked.connect(lambda _, button_name=group: self.pushedGroupButton(group))
         # Arrange in rows of 4. TODO: hardcoded number of columns: move to cfg
-        column = self.list_groups.index(group)
+        column = self.dict_cfg['list_groups'].index(group)
         row = 0
         print(row, column)
         while column >= 4:
@@ -951,14 +985,14 @@ class UIsub(Ui_MainWindow):
         # self.gridLayout.addWidget(self.new_button, self.gridLayout.rowCount(), 0, 1, 1)
 
     def killGroupButtons(self):
-        for group in self.list_groups:
+        for group in self.dict_cfg['list_groups']:
             for i in range(self.gridLayout.count()):
                 widget = self.gridLayout.itemAt(i).widget()
                 if widget and widget.text() == group:
                     widget.deleteLater()
                     if verbose:
                         print("Removed", group, f"(widget: {widget}")
-        self.list_groups = []
+        self.dict_cfg['list_groups'] = []
         self.write_project_cfg()
 
     def addToGroup(self, add_group):
@@ -1015,15 +1049,14 @@ class UIsub(Ui_MainWindow):
 
 # writer functions
     
-    def write_cfg(self):  # config file for program, global stuff
+    def write_cfg(self):  # config file for program, global settings
         cfg = {"user_documents": str(self.user_documents), "projects_folder": str(self.projects_folder), "projectname": self.projectname}
-        #        new_projectfolder = self.projects_folder / self.projectname
-        #        new_projectfolder.mkdir(exist_ok=True)
         with self.cfg_yaml.open("w+") as file:
             yaml.safe_dump(cfg, file)
 
-    def write_project_cfg(self):  # config file for project, local stuff
-        project_cfg = {"delete_locked": str(self.delete_locked), "list_groups": self.list_groups}
+    def write_project_cfg(self):  # config file for project, local settings
+        project_cfg = self.dict_cfg
+        print("Writing project_cfg:", self.project_cfg_yaml)
         new_projectfolder = self.projects_folder / self.projectname
         new_projectfolder.mkdir(exist_ok=True)
         with self.project_cfg_yaml.open("w+") as file:
@@ -1288,15 +1321,14 @@ class UIsub(Ui_MainWindow):
             self.ax2.remove()
         ax2 = ax1.twinx()
         self.ax2 = ax2  # Store the ax2 instance to prevent garbage collection
-        list_color = ["red", "green", "blue", "yellow"] # TODO: placeholder color range
-        if self.list_groups: # plot group means
-            self.setGraphGroups(ax1, ax2, list_color)
+        if self.dict_cfg['list_groups']: # plot group means
+            self.setGraphGroups(ax1, ax2, ui.dict_cfg['list_group_colors'])
         if df is not None: # plot selected rows
             self.setGraphSelected(df=df, ax1=ax1, ax2=ax2)
         # x and y limits
-        self.canvas_seaborn_mean.axes.set_xlim(self.graph_xlim)
-        self.canvas_seaborn_mean.axes.set_ylim(self.graph_ylim)
-        ax1.set_ylim(-0.0015, 0)
+        self.canvas_seaborn_mean.axes.set_xlim(self.dict_cfg['mean_xlim'])
+        self.canvas_seaborn_mean.axes.set_ylim(self.dict_cfg['mean_ylim'])
+        ax1.set_ylim(self.dict_cfg['output_ax1_ylim'])
         self.canvas_seaborn_mean.draw()
         self.canvas_seaborn_output.draw()
 
@@ -1332,9 +1364,9 @@ class UIsub(Ui_MainWindow):
                     _ = sns.lineplot(data=dfoutput, y="EPSP_slope", x="sweep", ax=ax2, color="black", alpha = 0.3)
 
     def setGraphGroups(self, ax1, ax2, list_color):
-        print(f"setGraphGroups: {self.list_groups}")
+        print(f"setGraphGroups: {self.dict_cfg['list_groups']}")
         df_p = self.get_df_project()
-        for i_color, group in enumerate(self.list_groups):
+        for i_color, group in enumerate(self.dict_cfg['list_groups']):
             dfgroup = df_p[df_p['groups'].str.split(',').apply(lambda x: group in x)]
             if dfgroup.empty:
                 if verbose:
@@ -1545,8 +1577,21 @@ class Measure_window_sub(Ui_measure_window):
             aspect_edit.editingFinished.connect(lambda: self.updateOnEdit(aspect_edit, aspect))
         for aspect in supported_aspects:
             loopConnectAspects(aspect=aspect)
+        def loopConnectViews(view, key):
+            str_view_key = f"{view}_{key}"
+            key_checkBox = getattr(self, f"checkBox_{str_view_key}")
+            key_checkBox.setChecked(ui.dict_cfg[str_view_key])
+            key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.updateView(state, str_view_key))
+        for key in ["none", "savgol"]:
+            loopConnectViews(view="filter", key=key)
+        for key in supported_aspects:
+            loopConnectViews(view="aspect", key=key)
+        self.pushButton_auto.clicked.connect(self.autoCalculate)
         self.buttonBox.accepted.connect(self.accepted_handler)
-        self.pushButtonAuto.clicked.connect(self.autoCalculate)
+
+    def updateView(self, state, str_view_key):
+        ui.dict_cfg[str_view_key] = (state == 2)
+        ui.write_project_cfg()
 
     def accepted_handler(self):
         # update df_project, dict_outputs, and purge group outputs for recalculation
@@ -1626,7 +1671,7 @@ class Measure_window_sub(Ui_measure_window):
         self.si_v_drag_to = None # vertical line in canvas_output, indicating end of drag
         self.dragplot = None
         # filter to display only the relevant part of the trace, and rescale prim and bis to match voltage
-        filtered_df = dfmean[(dfmean['time'] > t_stim + 0.001) & (dfmean['time'] < t_EPSP_amp + 0.005)].copy()
+        filtered_df = dfmean#[(dfmean['time'] > t_stim + 0.001) & (dfmean['time'] < t_EPSP_amp + 0.005)].copy()
         min_V = filtered_df['voltage'].min()
         min_prim = filtered_df['prim'].min()
         min_bis = filtered_df['bis'].min()
@@ -1647,8 +1692,8 @@ class Measure_window_sub(Ui_measure_window):
         #self.canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
 
         g.axvline(t_VEB, color="grey", linestyle="--")
-        self.canvas_mean.axes.set_xlim(ui.graph_xlim)
-        self.canvas_mean.axes.set_ylim(ui.graph_ylim)
+        self.canvas_mean.axes.set_xlim(ui.dict_cfg['mean_xlim'])
+        self.canvas_mean.axes.set_ylim(ui.dict_cfg['mean_ylim'])
         self.canvas_mean.draw()
 
     def setOutputGraph(self, dfoutput):
@@ -1820,8 +1865,8 @@ def zoomOnScroll(event, canvas):
         canvas.draw()
 
 def zoomReset(canvas):
-    canvas.axes.set_xlim(ui.graph_xlim)
-    canvas.axes.set_ylim(ui.graph_ylim)
+    canvas.axes.set_xlim(ui.dict_cfg['mean_xlim'])
+    canvas.axes.set_ylim(ui.dict_cfg['mean_ylim'])
     canvas.draw()
 
 def unPlot(canvas, *artists): # remove line if it exists on canvas
