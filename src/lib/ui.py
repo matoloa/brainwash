@@ -1404,8 +1404,6 @@ class UIsub(Ui_MainWindow):
 
         qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
         ser_table_row = self.tablemodel.dataRow(qt_index)
-        row_index = ser_table_row.name
-
         sweeps = ser_table_row["sweeps"]
         if sweeps == "...":
             # TODO: Make it import the missing file
@@ -1414,11 +1412,6 @@ class UIsub(Ui_MainWindow):
         # Get dataframes
         dfmean = self.get_dfmean(ser_table_row)
         dfoutput = self.get_dfoutput(row=ser_table_row)
-        # Extract variables
-        t_stim = self.df_project.loc[row_index, 't_stim']
-        t_VEB = self.df_project.loc[row_index, 't_VEB']
-        t_EPSP_amp = self.df_project.loc[row_index, 't_EPSP_amp']
-        t_EPSP_slope = self.df_project.loc[row_index, 't_EPSP_slope']
         # Open window
         self.measure = QtWidgets.QDialog()
         self.measure_window_sub = Measure_window_sub(self.measure, row=ser_table_row, dfmean=dfmean)
@@ -1427,7 +1420,7 @@ class UIsub(Ui_MainWindow):
         self.measure.setGeometry(1400, 0, 800, 1200)
         self.measure.show()
         # Set graphs
-        self.measure_window_sub.setMeanGraph(t_stim=t_stim, t_VEB=t_VEB, t_EPSP_amp=t_EPSP_amp, t_EPSP_slope=t_EPSP_slope)
+        self.measure_window_sub.setMeanGraph()
         self.measure_window_sub.setOutputGraph(dfoutput=dfoutput)
     
             
@@ -1592,6 +1585,7 @@ class Measure_window_sub(Ui_measure_window):
     def updateView(self, state, str_view_key):
         ui.dict_cfg[str_view_key] = (state == 2)
         ui.write_project_cfg()
+        self.updatePlot()
 
     def accepted_handler(self):
         # update df_project, dict_outputs, and purge group outputs for recalculation
@@ -1662,14 +1656,22 @@ class Measure_window_sub(Ui_measure_window):
             un_button.setStyleSheet(self.default_color)
         button.setStyleSheet(self.selected_color)
 
-    def setMeanGraph(self, t_stim=None, t_VEB=None, t_EPSP_amp=None, t_EPSP_slope=None):
-        self.canvas_mean.axes.cla()
+    def setMeanGraph(self):
+        row = self.row
         dfmean = self.dfmean
+        # Extract variables
+        t_VEB = row['t_VEB']
+        t_EPSP_amp = row['t_EPSP_amp']
+        t_EPSP_slope = row['t_EPSP_slope']
+
+        self.canvas_mean.axes.cla()
+        # lines and drag state
         self.si_v = None # vertical line in canvas_output, indicating selected sweep
         self.si_sweep, = self.canvas_mean.axes.plot([], [], color="blue") # lineplot of the selected sweep on canvas_mean
         self.si_v_drag_from = None # vertical line in canvas_output, indicating start of drag
         self.si_v_drag_to = None # vertical line in canvas_output, indicating end of drag
         self.dragplot = None
+        #self.savgol = self.canvas_mean.axes.plot([], [])
         # filter to display only the relevant part of the trace, and rescale prim and bis to match voltage
         filtered_df = dfmean#[(dfmean['time'] > t_stim + 0.001) & (dfmean['time'] < t_EPSP_amp + 0.005)].copy()
         min_V = filtered_df['voltage'].min()
@@ -1677,9 +1679,9 @@ class Measure_window_sub(Ui_measure_window):
         min_bis = filtered_df['bis'].min()
         filtered_df['prim'] = filtered_df['prim'] * (min_V/min_prim)
         filtered_df['bis'] = filtered_df['bis'] * (min_V/min_bis)
-        g = sns.lineplot(data=filtered_df, y="prim", x="time", ax=self.canvas_mean.axes, color="red", alpha=0.3)
-        h = sns.lineplot(data=filtered_df, y="bis", x="time", ax=self.canvas_mean.axes, color="green", alpha=0.3)
-        i = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_mean.axes, color="black")
+
+        _ = sns.lineplot(data=filtered_df, y="prim", x="time", ax=self.canvas_mean.axes, color="red", alpha=0.3)
+        _ = sns.lineplot(data=filtered_df, y="bis", x="time", ax=self.canvas_mean.axes, color="green", alpha=0.3)
         self.v_t_EPSP_amp =           sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
         x_start = t_EPSP_slope - 0.0004
         x_end = t_EPSP_slope + 0.0004
@@ -1690,11 +1692,9 @@ class Measure_window_sub(Ui_measure_window):
         #y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
         #y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
         #self.canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
-
-        g.axvline(t_VEB, color="grey", linestyle="--")
         self.canvas_mean.axes.set_xlim(ui.dict_cfg['mean_xlim'])
         self.canvas_mean.axes.set_ylim(ui.dict_cfg['mean_ylim'])
-        self.canvas_mean.draw()
+        self.updatePlot()
 
     def setOutputGraph(self, dfoutput):
         self.canvas_output.axes.cla()
@@ -1707,7 +1707,25 @@ class Measure_window_sub(Ui_measure_window):
             _ = sns.lineplot(label="EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_output.axes, color="black")
             self.canvas_output.axes.set_ylim(-0.0015, 0)
         self.canvas_output.draw()
-   
+
+    def updatePlot(self):
+        dfmean = self.dfmean
+        self.canvas_mean.axes.cla()
+        if(ui.dict_cfg['filter_none']):
+            print("updatePlot: filter_none")
+            self.voltage = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_mean.axes, color="black")
+        if(ui.dict_cfg['filter_savgol']):
+            print("updatePlot: filter_savgol")
+            if not 'savgol' in dfmean.columns:
+                dfmean['savgol'] = dfmean['voltage']*1.1
+            dffilter = ui.get_dffilter(row=self.row)
+            if not 'dffilter' in dffilter.columns:
+                dffilter['savgol'] = dffilter['voltage']*1.1
+            self.savgol = sns.lineplot(data=dfmean, y="savgol", x="time", ax=self.canvas_mean.axes, color="black")
+        self.canvas_mean.axes.set_xlim(ui.dict_cfg['mean_xlim'])
+        self.canvas_mean.axes.set_ylim(ui.dict_cfg['mean_ylim'])
+        self.canvas_mean.draw()
+
     def meanClicked(self, event): # measure window click event
         if event.inaxes is not None:
             if event.button == 1:# Left mouse button clicked
