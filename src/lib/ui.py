@@ -1411,17 +1411,16 @@ class UIsub(Ui_MainWindow):
             return
         # Get dataframes
         dfmean = self.get_dfmean(ser_table_row)
-        dfoutput = self.get_dfoutput(row=ser_table_row)
         # Open window
         self.measure = QtWidgets.QDialog()
         self.measure_window_sub = Measure_window_sub(self.measure, row=ser_table_row, dfmean=dfmean)
+
         self.measure.setWindowTitle(ser_table_row['recording_name'])
         # move measurewindow to default position (TODO: later to be stored in cfg)
         self.measure.setGeometry(1400, 0, 800, 1200)
         self.measure.show()
         # Set graphs
-        self.measure_window_sub.setMeanGraph()
-        self.measure_window_sub.setOutputGraph(dfoutput=dfoutput)
+        self.measure_window_sub.updatePlots()
     
             
     @QtCore.pyqtSlot(list)
@@ -1535,8 +1534,9 @@ class Measure_window_sub(Ui_measure_window):
     def __init__(self, measure_window, parent=None, row=None, dfmean=None, folder="."):
         super(Measure_window_sub, self).__init__()
         # local versions of row and dfmean that persist unchanged (TODO: check!) while the window is open
-        self.row = row.copy()
-        self.dfmean = dfmean
+        self.row = row.copy() # creates a copy to be modified, then accepted or rejected
+        self.dfmean = dfmean # will not be modified; no need to copy()
+        self.new_dfoutput = ui.get_dfoutput(row).copy() # creates a copy to be modified, then accepted or rejected
         self.setupUi(measure_window)
         self.parent = parent
 
@@ -1554,6 +1554,41 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_output.mpl_connect('button_press_event', self.outputClicked)
         self.canvas_output.mpl_connect('motion_notify_event', self.outputDragged)
         self.canvas_output.mpl_connect('button_release_event', self.outputReleased)
+
+        # Populate canvases - TODO: refactor such that components can be called individually when added later
+        _ = sns.lineplot(ax=self.canvas_mean.axes, label='voltage', data=dfmean, y="voltage", x="time", color="black")
+        # TODO: this creates a (non-savol) placeholder for savgol to test the UI
+        if not 'savgol' in dfmean.columns:
+            dfmean['savgol'] = dfmean['voltage']*1.2
+        dffilter = ui.get_dffilter(row=self.row)
+        if not 'dffilter' in dffilter.columns:
+            dffilter['savgol'] = dffilter['voltage']*1.2
+        _ = sns.lineplot(ax=self.canvas_mean.axes, label='savgol', data=dfmean, y="savgol", x="time", color="black")
+        
+        if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
+            t_EPSP_amp = self.row['t_EPSP_amp']
+            self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
+            _ = sns.lineplot(ax=self.canvas_output.axes, label="EPSP_amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="black")
+        if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
+            t_EPSP_slope = self.row['t_EPSP_slope']
+            x_start = t_EPSP_slope - 0.0004 # TODO: make this a variable
+            x_end = t_EPSP_slope + 0.0004 # TODO: make this the same variable
+            self.v_t_EPSP_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
+            self.v_t_EPSP_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
+            self.v_t_EPSP_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
+            _ = sns.lineplot(ax=self.canvas_output.axes, label="EPSP_slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="black")
+
+        self.canvas_mean.axes.set_xlim(ui.dict_cfg['mean_xlim'])
+        self.canvas_mean.axes.set_ylim(ui.dict_cfg['mean_ylim'])
+        self.canvas_output.axes.set_ylim(ui.dict_cfg['output_ax1_ylim'])
+
+        # lines and drag state
+        self.si_v = None # vertical line in canvas_output, indicating selected sweep
+        self.si_sweep, = self.canvas_mean.axes.plot([], [], color="blue") # lineplot of the selected sweep on canvas_mean
+        self.si_v_drag_from = None # vertical line in canvas_output, indicating start of drag
+        self.si_v_drag_to = None # vertical line in canvas_output, indicating end of drag
+        self.dragplot = None
+        self.dragging = False
 
         # set button colors
         self.default_color = "background-color: rgb(239, 239, 239);"
@@ -1574,7 +1609,7 @@ class Measure_window_sub(Ui_measure_window):
             str_view_key = f"{view}_{key}"
             key_checkBox = getattr(self, f"checkBox_{str_view_key}")
             key_checkBox.setChecked(ui.dict_cfg[str_view_key])
-            key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.updateView(state, str_view_key))
+            key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.viewSettingsChanged(state, str_view_key))
         for key in ["none", "savgol"]:
             loopConnectViews(view="filter", key=key)
         for key in supported_aspects:
@@ -1582,10 +1617,6 @@ class Measure_window_sub(Ui_measure_window):
         self.pushButton_auto.clicked.connect(self.autoCalculate)
         self.buttonBox.accepted.connect(self.accepted_handler)
 
-    def updateView(self, state, str_view_key):
-        ui.dict_cfg[str_view_key] = (state == 2)
-        ui.write_project_cfg()
-        self.updatePlot()
 
     def accepted_handler(self):
         # update df_project, dict_outputs, and purge group outputs for recalculation
@@ -1634,6 +1665,7 @@ class Measure_window_sub(Ui_measure_window):
         else:
             raise ValueError(f"ERROR (accepted_handler): multiple instances of {self.row['recording_name']} in project_df.")
 
+
     def autoCalculate(self):
         dffilter = ui.get_dffilter(row=self.row)
         dict_t = analysis.find_all_t(dfmean=self.dfmean, verbose=False)
@@ -1645,86 +1677,78 @@ class Measure_window_sub(Ui_measure_window):
             time = dict_t[f"t_{aspect}"]
             self.updateAspect(aspect=aspect, time=time, method="Auto")
 
-    def m(self, SI):
-        # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
+
+    def m(self, SI): # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
         return str(round(SI * 1000, 1)) # TODO: single decimal assumes 10KHz sampling rate; make this more flexible
 
-    def toggle(self, button, aspect):
+
+    def toggle(self, button, aspect): # updates aspect, sets "button" to active state, and all other buttons to inactive
         self.aspect = aspect
         for i_aspect in supported_aspects:
             un_button = getattr(self, f"pushButton_{i_aspect}")
             un_button.setStyleSheet(self.default_color)
         button.setStyleSheet(self.selected_color)
 
-    def setMeanGraph(self):
-        row = self.row
-        dfmean = self.dfmean
-        # Extract variables
-        t_VEB = row['t_VEB']
-        t_EPSP_amp = row['t_EPSP_amp']
-        t_EPSP_slope = row['t_EPSP_slope']
 
-        self.canvas_mean.axes.cla()
-        # lines and drag state
-        self.si_v = None # vertical line in canvas_output, indicating selected sweep
-        self.si_sweep, = self.canvas_mean.axes.plot([], [], color="blue") # lineplot of the selected sweep on canvas_mean
-        self.si_v_drag_from = None # vertical line in canvas_output, indicating start of drag
-        self.si_v_drag_to = None # vertical line in canvas_output, indicating end of drag
-        self.dragplot = None
-        #self.savgol = self.canvas_mean.axes.plot([], [])
-        # filter to display only the relevant part of the trace, and rescale prim and bis to match voltage
-        filtered_df = dfmean#[(dfmean['time'] > t_stim + 0.001) & (dfmean['time'] < t_EPSP_amp + 0.005)].copy()
+    def dfmeanDerivates(self, df): # plots prim and bis of df on canvas_mean
+        # Prim and Bis: filter to display only the relevant part of the trace, and rescale to match voltage
+        filtered_df = df.copy()
         min_V = filtered_df['voltage'].min()
         min_prim = filtered_df['prim'].min()
         min_bis = filtered_df['bis'].min()
         filtered_df['prim'] = filtered_df['prim'] * (min_V/min_prim)
         filtered_df['bis'] = filtered_df['bis'] * (min_V/min_bis)
+        self.mean_prim = sns.lineplot(data=filtered_df, y="prim", x="time", ax=self.canvas_mean.axes, color="red", alpha=0.3)
+        self.mean_bis = sns.lineplot(data=filtered_df, y="bis", x="time", ax=self.canvas_mean.axes, color="green", alpha=0.3)
 
-        _ = sns.lineplot(data=filtered_df, y="prim", x="time", ax=self.canvas_mean.axes, color="red", alpha=0.3)
-        _ = sns.lineplot(data=filtered_df, y="bis", x="time", ax=self.canvas_mean.axes, color="green", alpha=0.3)
-        self.v_t_EPSP_amp =           sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
-        x_start = t_EPSP_slope - 0.0004
-        x_end = t_EPSP_slope + 0.0004
-        self.v_t_EPSP_slope =         sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
-        self.v_t_EPSP_slope_start =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
-        self.v_t_EPSP_slope_end =     sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
+
+    def viewSettingsChanged(self, state, str_view_key):
+        # checkboxes for views have changed; save settings and update
+        ui.dict_cfg[str_view_key] = (state == 2)
+        ui.write_project_cfg()
+        self.updatePlots()
+
+
+    def updatePlots(self):
+        # apply settings from ui.dict_cfg to canvas_mean and canvas_output
+        raw = bool(ui.dict_cfg['filter_none'])
+        print(f"updatePlots: raw: {raw}")
+        savgol = bool(ui.dict_cfg['filter_savgol'])
+        print(f"updatePlots: savgol: {savgol}")
+        amp = bool(ui.dict_cfg['aspect_EPSP_amp'])
+        slope = bool(ui.dict_cfg['aspect_EPSP_slope'])
+
+        if label2idx(self.canvas_mean, 'voltage') is not False:
+            print(f"updatePlots: {label2idx(self.canvas_mean, f'voltage')}")
+            self.canvas_mean.axes.lines[label2idx(self.canvas_mean, f"voltage")].set_visible(raw)
+        if label2idx(self.canvas_mean, 'savgol') is not False:
+            print(f"updatePlots: savgol: {label2idx(self.canvas_mean, f'savgol')}")
+            self.canvas_mean.axes.lines[label2idx(self.canvas_mean, f"savgol")].set_visible(savgol)
+ 
+        if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
+            self.v_t_EPSP_amp.set_visible(amp)
+            if label2idx(self.canvas_output, 'EPSP_amp') is not False:
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"EPSP_amp")].set_visible(amp)
+            if label2idx(self.canvas_output, f"new_EPSP_amp") is not False:
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_EPSP_amp")].set_visible(amp)
+
+        if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
+            self.v_t_EPSP_slope.set_visible(slope)
+            self.v_t_EPSP_slope_start.set_visible(slope)
+            self.v_t_EPSP_slope_end.set_visible(slope)
+            if label2idx(self.canvas_output, f"EPSP_slope") is not False:
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"EPSP_slope")].set_visible(slope)
+            if label2idx(self.canvas_output, f"new_EPSP_slope") is not False:
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_EPSP_slope")].set_visible(slope)
+
         # placeholder start-finish measurement line
         #y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
         #y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
         #self.canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
-        self.canvas_mean.axes.set_xlim(ui.dict_cfg['mean_xlim'])
-        self.canvas_mean.axes.set_ylim(ui.dict_cfg['mean_ylim'])
-        self.updatePlot()
 
-    def setOutputGraph(self, dfoutput):
-        self.canvas_output.axes.cla()
-        self.dragging = False
-        self.new_dfoutput = dfoutput.copy()
-        if 'EPSP_amp' in dfoutput.columns and dfoutput['EPSP_amp'].notna().any():
-            _ = sns.lineplot(label="EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", ax=self.canvas_output.axes, color="black")
-            self.canvas_output.axes.set_ylim(-0.0015, 0)
-        if 'EPSP_slope' in dfoutput.columns and dfoutput['EPSP_slope'].notna().any():
-            _ = sns.lineplot(label="EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", ax=self.canvas_output.axes, color="black")
-            self.canvas_output.axes.set_ylim(-0.0015, 0)
+        self.canvas_mean.draw()
         self.canvas_output.draw()
 
-    def updatePlot(self):
-        dfmean = self.dfmean
-        self.canvas_mean.axes.cla()
-        if(ui.dict_cfg['filter_none']):
-            print("updatePlot: filter_none")
-            self.voltage = sns.lineplot(data=dfmean, y="voltage", x="time", ax=self.canvas_mean.axes, color="black")
-        if(ui.dict_cfg['filter_savgol']):
-            print("updatePlot: filter_savgol")
-            if not 'savgol' in dfmean.columns:
-                dfmean['savgol'] = dfmean['voltage']*1.1
-            dffilter = ui.get_dffilter(row=self.row)
-            if not 'dffilter' in dffilter.columns:
-                dffilter['savgol'] = dffilter['voltage']*1.1
-            self.savgol = sns.lineplot(data=dfmean, y="savgol", x="time", ax=self.canvas_mean.axes, color="black")
-        self.canvas_mean.axes.set_xlim(ui.dict_cfg['mean_xlim'])
-        self.canvas_mean.axes.set_ylim(ui.dict_cfg['mean_ylim'])
-        self.canvas_mean.draw()
 
     def meanClicked(self, event): # measure window click event
         if event.inaxes is not None:
@@ -1739,6 +1763,7 @@ class Measure_window_sub(Ui_measure_window):
             elif event.button == 2:
                 zoomReset(canvas=self.canvas_mean)
 
+
     def outputClicked(self, event): # measurewindow output click event
         x = event.xdata
         if event.button == 1 and x is not None: # Left mouse button clicked within xdata
@@ -1749,6 +1774,7 @@ class Measure_window_sub(Ui_measure_window):
                 self.si_v_drag_from = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="blue")
                 self.canvas_output.draw()
     
+
     def outputDragged(self, event): # measurewindow output drag event
         x = event.xdata
         if self.dragging:
@@ -1758,6 +1784,7 @@ class Measure_window_sub(Ui_measure_window):
                 self.dragplot = sns.lineplot(ax=self.canvas_output.axes).axvspan(self.drag_start, x, color='lightblue', alpha=0.3)
             self.canvas_output.draw()
     
+
     def outputReleased(self, event): # measurewindow output release event
         x = event.xdata
         if (self.dragging) and (event.button == 1) and (x is not None):
@@ -1780,10 +1807,12 @@ class Measure_window_sub(Ui_measure_window):
             self.canvas_mean.draw()
             self.canvas_output.draw()
     
+
     def updateOnClick(self, time, aspect):
         if verbose:
             print(f"updateOnClick: time={time}, aspect={aspect}")
         self.updateAspect(time=time, aspect=aspect, method="Manual")
+
 
     def updateOnEdit(self, lineEdit, aspect):
         print(f"updateOnEdit: lineEdit={lineEdit}, aspect={aspect}")
@@ -1801,7 +1830,9 @@ class Measure_window_sub(Ui_measure_window):
             return
         self.updateAspect(time=time, aspect=aspect, method="Manual")
     
+
     def updateAspect(self, time, aspect, method):
+        # changes the measuring points of an aspect and propagates the change to the appropriate columns in df_project
         t_aspect  = ("t_" + aspect)
         t_method = (t_aspect + "_method")
         t_params = (t_aspect + "_params")
@@ -1830,6 +1861,7 @@ class Measure_window_sub(Ui_measure_window):
         print(f"lineEdit_{aspect}: time{time} to ms: {self.m(time)}")
         line2update = getattr(self, "lineEdit_" + aspect)
         line2update.setText(self.m(time))
+
         #update mean graph
         for key, graph in plot_on_mean.items():
             getattr(self, graph).remove() # remove the one which you are about to update
@@ -1842,17 +1874,13 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_mean.draw()
         #update output graph
         if self.new_dfoutput[aspect].notna().any():
-            if self.label2idx(f"new_{aspect}"):
-                self.canvas_output.axes.lines[self.label2idx(f"new_{aspect}")].remove()
+            if label2idx(self.canvas_output, f"new_{aspect}"):
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_{aspect}")].remove()
             _ = sns.lineplot(label=f"new_{aspect}", data=self.new_dfoutput, y=aspect, x='sweep', ax=self.canvas_output.axes, color='black')
-        self.canvas_output.axes.lines[self.label2idx(aspect)].set_color('gray')#set_data(new_dfoutput['sweep'], new_dfoutput[aspect])
+        self.canvas_output.axes.lines[label2idx(self.canvas_output, aspect)].set_color('gray')#set_data(new_dfoutput['sweep'], new_dfoutput[aspect])
         self.canvas_output.draw()
 
-    def label2idx(self, aspect):
-        dict_labels = {k.get_label(): v for (v, k) in enumerate(self.canvas_output.axes.lines)}
-        if aspect in dict_labels:
-            return dict_labels[aspect]
-        return False
+
 
 def get_signals(source):
     cls = source if isinstance(source, type) else type(source)
@@ -1863,6 +1891,8 @@ def get_signals(source):
         for key, aspect in sorted(vars(subcls).items()):
             if isinstance(aspect, signal):
                 print(f"{key} [{clsname}]")
+
+
 
 def zoomOnScroll(event, canvas):
     xdata, ydata = event.xdata, event.ydata
@@ -1882,18 +1912,25 @@ def zoomOnScroll(event, canvas):
         canvas.axes.set_ylim(ylim[0], ylim[1])
         canvas.draw()
 
+
 def zoomReset(canvas):
     canvas.axes.set_xlim(ui.dict_cfg['mean_xlim'])
     canvas.axes.set_ylim(ui.dict_cfg['mean_ylim'])
     canvas.draw()
 
+
 def unPlot(canvas, *artists): # remove line if it exists on canvas
-    #print(f"unPlot - canvas: {canvas}, artists: {artists}")
+    print(f"unPlot - canvas: {canvas}, artists: {artists}")
     for artist in artists:
         artists_on_canvas = canvas.axes.get_children()
         if artist in artists_on_canvas:
-            #print(f"unPlot - removed artist: {artist}")
+            print(f"unPlot - removed artist: {artist}")
             artist.remove()
+
+def label2idx(canvas, aspect):
+    dict_labels = {k.get_label(): v for (v, k) in enumerate(canvas.axes.lines)}
+    return dict_labels.get(aspect, False)
+
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
