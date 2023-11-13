@@ -14,7 +14,7 @@ memory = Memory("joblib", verbose=1)
 
 
 # %%
-def build_dfoutput(df, t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, t_volley_slope, t_volley_slope_size, output_path):
+def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, t_volley_slope, t_volley_slope_size, output_path):
     # Incomplete function: only resolves EPSP_amp for now
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
     Args:
@@ -30,7 +30,7 @@ def build_dfoutput(df, t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, t_vo
     Returns:
         a dataframe. Per sweep (row): EPSP_amp, EPSP_slope, volley_amp, volley_EPSP
     """
-    print(f"build_dfoutput(t_EPSP_amp: {t_EPSP_amp}, t_EPSP_slope: {t_EPSP_slope}):")
+    print(f"build_dfoutput(filter: {filter}, t_EPSP_amp: {t_EPSP_amp}, t_EPSP_slope: {t_EPSP_slope}):")
     t0 = time.time()
     dfoutput = pd.DataFrame()
     dfoutput['sweep'] = df.sweep.unique() # one row per unique sweep in data file
@@ -39,13 +39,13 @@ def build_dfoutput(df, t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, t_vo
         if t_EPSP_amp is not np.nan:
             df_EPSP_amp = df[df['time']==t_EPSP_amp].copy() # filter out all time (from sweep start) that do not match t_EPSP_amp
             df_EPSP_amp.reset_index(inplace=True)
-            dfoutput['EPSP_amp'] = df_EPSP_amp['voltage'] # add the voltage of selected times to dfoutput
+            dfoutput['EPSP_amp'] = df_EPSP_amp[filter] # add the voltage of selected times to dfoutput
         else:
             dfoutput['EPSP_amp'] = np.nan
     # EPSP_slope
     if t_EPSP_slope is not None:
         if t_EPSP_slope is not np.nan:
-            df_EPSP_slope = measureslope_vec(df=df, t_slope=t_EPSP_slope, halfwidth=0.0004)
+            df_EPSP_slope = measureslope_vec(df=df, filter=filter, t_slope=t_EPSP_slope, halfwidth=0.0004)
             dfoutput['EPSP_slope'] = df_EPSP_slope['value']
         else:
             dfoutput['EPSP_slope'] = np.nan
@@ -331,7 +331,7 @@ dfslopes.value.plot()
 '''
 
 # %%
-def measureslope_vec(df, t_slope, halfwidth, name="EPSP"):
+def measureslope_vec(df, t_slope, halfwidth, name="EPSP", filter='voltage',):
     """
     vectorized measure slope
     """
@@ -340,7 +340,7 @@ def measureslope_vec(df, t_slope, halfwidth, name="EPSP"):
 
     df_filtered = df[((t_slope - halfwidth) <= df.time) & (df.time <= (t_slope + halfwidth))]
     print(f"df before pivot:{df_filtered.shape}")
-    dfpivot = df_filtered.pivot(index='sweep', columns='time', values='voltage')
+    dfpivot = df_filtered.pivot(index='sweep', columns='time', values=filter)
     coefs = np.polyfit(dfpivot.columns, dfpivot.T, deg=1).T
     dfslopes = pd.DataFrame(index=dfpivot.index)
     dfslopes['type'] = name + "_slope"
@@ -359,18 +359,18 @@ if __name__ == "__main__":
     print()
     print("Running as main: standalone test")
     from pathlib import Path
-    path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/KO_02_Ch1_a.csv")
+    path_filterfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_filter.csv")
     path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_mean.csv")
     # path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/A_21_P0701-S2.csv")
     # path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_mean.csv")
-    dfdata = pd.read_csv(str(path_datafile)) # a persisted csv-form of the data file
+    dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file
     df_mean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
     # dfdata_a = dfdata[(dfdata['stim']=='a')] # select stim 'a' only in data file
     # df_mean_a = df_mean[(df_mean['stim']=='a')] # select stim 'a' only in mean file
     dict_t = find_all_t(df_mean) # use the average all sweeps to determine where all events are located (noise reduction)
     t_EPSP_amp = dict_t['t_EPSP_amp']
     t_EPSP_slope = dict_t['t_EPSP_slope']
-    dfoutput = build_dfoutput(dfdata=dfdata,
+    dfoutput = build_dfoutput(df=dffilter,
                               t_EPSP_amp=t_EPSP_amp,
                               t_EPSP_slope=t_EPSP_slope)
     print(dfoutput)
