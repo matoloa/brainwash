@@ -1661,19 +1661,15 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_output.mpl_connect('button_release_event', self.outputReleased)
 
         # Populate canvases - TODO: refactor such that components can be called individually when added later
-        _ = sns.lineplot(ax=self.canvas_mean.axes, label='voltage', data=dfmean, y="voltage", x="time", color="black")
-        # TODO: this creates a (non-savol) placeholder for savgol to test the UI
-        if not 'savgol' in dfmean.columns:
-            dfmean['savgol'] = dfmean['voltage']*1.2
-        dffilter = ui.get_dffilter(row=self.row)
-        if not 'dffilter' in dffilter.columns:
-            dffilter['savgol'] = dffilter['voltage']*1.2
-        _ = sns.lineplot(ax=self.canvas_mean.axes, label='savgol', data=dfmean, y="savgol", x="time", color="black")
+        _ = sns.lineplot(ax=self.canvas_mean.axes, label='filter_none', data=dfmean, y="voltage", x="time", color="black")
+        self.filterSavgol()
+        _ = sns.lineplot(ax=self.canvas_mean.axes, label='filter_savgol', data=dfmean, y="savgol", x="time", color="black")
         
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             t_EPSP_amp = self.row['t_EPSP_amp']
             self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
             _ = sns.lineplot(ax=self.canvas_output.axes, label="EPSP_amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="black")
+            _ = sns.lineplot(ax=self.canvas_output.axes, label="savgol_EPSP_amp", data=self.new_dfoutput, y="savgol_EPSP_amp", x="sweep", color="black")
         if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
             t_EPSP_slope = self.row['t_EPSP_slope']
             x_start = t_EPSP_slope - 0.0004 # TODO: make this a variable
@@ -1682,6 +1678,7 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_EPSP_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
             self.v_t_EPSP_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
             _ = sns.lineplot(ax=self.canvas_output.axes, label="EPSP_slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="black")
+            _ = sns.lineplot(ax=self.canvas_output.axes, label="savgol_EPSP_slope", data=self.new_dfoutput, y="savgol_EPSP_slope", x="sweep", color="black")
 
         self.canvas_mean.axes.set_xlim(ui.dict_cfg['mean_xlim'])
         self.canvas_mean.axes.set_ylim(ui.dict_cfg['mean_ylim'])
@@ -1784,6 +1781,21 @@ class Measure_window_sub(Ui_measure_window):
             self.updateAspect(aspect=aspect, time=time, method="Auto")
 
 
+    def filterSavgol(self, window_length=11, polyorder=2):
+       # TODO: this creates a (non-savgol) placeholder for savgol to test the UI
+        dfmean = ui.get_dfmean(row=self.row)
+        if not 'savgol' in dfmean.columns:
+            dfmean['savgol'] = dfmean['voltage']*1.2
+            #parse.persistdf(file_base=self.row['recording_name'], dict_folders=ui.dict_folders, dfmean=dfmean)
+        dffilter = ui.get_dffilter(row=self.row)
+        if not 'dffilter' in dffilter.columns:
+            dffilter['savgol'] = dffilter['voltage']*1.2
+            self.new_dfoutput['savgol_EPSP_amp'] = self.new_dfoutput['EPSP_amp']*1.2
+            self.new_dfoutput['savgol_EPSP_slope'] = self.new_dfoutput['EPSP_slope']*1.2
+            #parse.persistdf(file_base=self.row['recording_name'], dict_folders=ui.dict_folders, dffilter=dffilter)
+            print("Pseudo-savgol built!")
+        
+
     def m(self, SI): # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
         return str(round(SI * 1000, 1)) # TODO: single decimal assumes 10KHz sampling rate; make this more flexible
 
@@ -1817,35 +1829,50 @@ class Measure_window_sub(Ui_measure_window):
 
     def updatePlots(self):
         # apply settings from ui.dict_cfg to canvas_mean and canvas_output
-        raw = bool(ui.dict_cfg['filter_none'])
-        print(f"updatePlots: raw: {raw}")
-        savgol = bool(ui.dict_cfg['filter_savgol'])
-        print(f"updatePlots: savgol: {savgol}")
         amp = bool(ui.dict_cfg['aspect_EPSP_amp'])
         slope = bool(ui.dict_cfg['aspect_EPSP_slope'])
 
-        if label2idx(self.canvas_mean, 'voltage') is not False:
-            print(f"updatePlots: {label2idx(self.canvas_mean, f'voltage')}")
-            self.canvas_mean.axes.lines[label2idx(self.canvas_mean, f"voltage")].set_visible(raw)
-        if label2idx(self.canvas_mean, 'savgol') is not False:
-            print(f"updatePlots: savgol: {label2idx(self.canvas_mean, f'savgol')}")
-            self.canvas_mean.axes.lines[label2idx(self.canvas_mean, f"savgol")].set_visible(savgol)
+        # aspect display:
+        self.v_t_EPSP_amp.set_visible(amp)
+        self.v_t_EPSP_slope.set_visible(slope)
+        self.v_t_EPSP_slope_start.set_visible(slope)
+        self.v_t_EPSP_slope_end.set_visible(slope)
+
+        #TODO: make a loop through filters
+        raw = bool(ui.dict_cfg['filter_none'])
+        savgol = bool(ui.dict_cfg['filter_savgol'])
+
+        # mean graph:
+        if label2idx(self.canvas_mean, 'filter_none') is not False:
+            self.canvas_mean.axes.lines[label2idx(self.canvas_mean, 'filter_none')].set_visible(raw)
+        if label2idx(self.canvas_mean, 'filter_savgol') is not False:
+            self.canvas_mean.axes.lines[label2idx(self.canvas_mean, 'filter_savgol')].set_visible(savgol)
  
+        # output graph:
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
-            self.v_t_EPSP_amp.set_visible(amp)
             if label2idx(self.canvas_output, 'EPSP_amp') is not False:
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"EPSP_amp")].set_visible(amp)
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"EPSP_amp")].set_visible(amp & raw)
             if label2idx(self.canvas_output, f"new_EPSP_amp") is not False:
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_EPSP_amp")].set_visible(amp)
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_EPSP_amp")].set_visible(amp & raw)
 
         if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
-            self.v_t_EPSP_slope.set_visible(slope)
-            self.v_t_EPSP_slope_start.set_visible(slope)
-            self.v_t_EPSP_slope_end.set_visible(slope)
             if label2idx(self.canvas_output, f"EPSP_slope") is not False:
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"EPSP_slope")].set_visible(slope)
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"EPSP_slope")].set_visible(slope & raw)
             if label2idx(self.canvas_output, f"new_EPSP_slope") is not False:
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_EPSP_slope")].set_visible(slope)
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_EPSP_slope")].set_visible(slope & raw)
+
+        if 'savgol_EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['savgol_EPSP_amp'].notna().any():
+            if label2idx(self.canvas_output, 'savgol_EPSP_amp') is not False:
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"savgol_EPSP_amp")].set_visible(amp & savgol)
+            if label2idx(self.canvas_output, f"new_EPSP_amp") is not False:
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_EPSP_amp")].set_visible(amp & savgol)
+
+        if 'savgol_EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['savgol_EPSP_slope'].notna().any():
+            if label2idx(self.canvas_output, f"savgol_EPSP_slope") is not False:
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"savgol_EPSP_slope")].set_visible(slope & savgol)
+            if label2idx(self.canvas_output, f"new_EPSP_slope") is not False:
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_EPSP_slope")].set_visible(slope & savgol)
+
 
         # placeholder start-finish measurement line
         #y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
