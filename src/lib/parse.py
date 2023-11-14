@@ -10,8 +10,6 @@ from neo import io  # read data files ibw
 from tqdm import tqdm
 from joblib import Memory
 
-from scipy.signal import savgol_filter
-
 memory = Memory("../cache", verbose=1)
 
 verbose = True

@@ -2,9 +2,11 @@
 import numpy as np  # numeric calculations module
 import pandas as pd  # dataframe module, think excel, but good
 import scipy  # peakfinder and other useful analysis tools
+from scipy.signal import savgol_filter
 from sklearn import linear_model
 from tqdm import tqdm
 import time
+
 
 # %%
 from joblib import Memory
@@ -52,6 +54,12 @@ def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None):#, 
     t1 = time.time()
     print(f'time elapsed: {t1-t0} seconds')
     return dfoutput
+
+
+def addFilterSavgol(df, window_length=9, polyorder=1):
+    # adds a column containing a smoothed version of the voltage column
+    df['filter_savgol'] = savgol_filter(df.voltage, window_length=window_length, polyorder=polyorder)
+    return df
 
 
 # %%
@@ -301,34 +309,7 @@ def measureslope(df, t_slope, halfwidth, name="EPSP"):
     df_slopes = pd.DataFrame(dicts)
 
     return df_slopes
-# %%
-'''
-from pathlib import Path
-path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/KO_02.csv")
-# path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/A_21_P0701-S2.csv")
-# path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_mean.csv")
-dfdata = pd.read_csv(str(path_datafile)) # a persisted csv-form of the data file
-df_mean_a = df_mean[(df_mean['channel']==0) & (df_mean['stim']=='b')] # select stim 'a' only in mean file
-df_mean_a.reset_index(inplace=True)
-dict_t = find_all_t(df_mean_a) # use the average all sweeps to determine where all events are located (noise reduction)
-t_EPSP_amp = dict_t['t_EPSP_amp']
-t_EPSP_slope = dict_t['t_EPSP_slope']
 
-def getbool(df, channel=0, stim='b'):
-    vecbool = (df['channel'] == channel) & (df['stim'] == stim)
-    return vecbool
-
-channel = 0
-stim = 'b'
-t_slope = t_EPSP_slope
-halfwidth = 0.0004
-name="EPSP"
-df = dfdata[getbool(dfdata, channel=channel, stim=stim)]
-print(f"dfshape: {df.shape}")
-print(f"dfvalue: {df.sweep.value_counts().unique()}")
-dfslopes = measureslope_vec(df, t_slope, halfwidth)
-dfslopes.value.plot()
-'''
 
 # %%
 def measureslope_vec(df, t_slope, halfwidth, name="EPSP", filter='voltage',):
@@ -349,8 +330,6 @@ def measureslope_vec(df, t_slope, halfwidth, name="EPSP", filter='voltage',):
 
     return dfslopes
 
-
-# %%
 
 # %%
 ''' Standalone test:'''
@@ -487,7 +466,4 @@ if __name__ == "__main__":
     df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
     print(df_calibrated)
 
-# %%
 '''
-
-# %%
