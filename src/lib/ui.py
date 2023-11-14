@@ -1828,56 +1828,38 @@ class Measure_window_sub(Ui_measure_window):
 
 
     def updatePlots(self):
-        # apply settings from ui.dict_cfg to canvas_mean and canvas_output
+        # Apply settings from ui.dict_cfg to canvas_mean and canvas_output
         amp = bool(ui.dict_cfg['aspect_EPSP_amp'])
         slope = bool(ui.dict_cfg['aspect_EPSP_slope'])
-
-        # aspect display:
-        self.v_t_EPSP_amp.set_visible(amp)
-        self.v_t_EPSP_slope.set_visible(slope)
-        self.v_t_EPSP_slope_start.set_visible(slope)
-        self.v_t_EPSP_slope_end.set_visible(slope)
-
-        #TODO: make a loop through filters
         raw = bool(ui.dict_cfg['filter_none'])
         savgol = bool(ui.dict_cfg['filter_savgol'])
 
-        # mean graph:
-        if label2idx(self.canvas_mean, 'filter_none') is not False:
-            self.canvas_mean.axes.lines[label2idx(self.canvas_mean, 'filter_none')].set_visible(raw)
-        if label2idx(self.canvas_mean, 'filter_savgol') is not False:
-            self.canvas_mean.axes.lines[label2idx(self.canvas_mean, 'filter_savgol')].set_visible(savgol)
- 
-        # output graph:
+        # Conditions and labels for display of lines in canvas_mean and canvas_output
+        conditions_labels_dict = {
+        'filter_none':      raw,
+        'filter_savgol':    savgol,
+        'EPSP_amp':         raw & amp,
+        'EPSP_slope':       raw & slope,
+        'new_EPSP_amp':     raw & amp,
+        'new_EPSP_slope':   raw & slope,
+        'savgol_EPSP_amp':  savgol & amp,
+        'savgol_EPSP_slope':savgol & slope,
+        }
+
+        # Display apect indicators:
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
-            if label2idx(self.canvas_output, 'EPSP_amp') is not False:
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"EPSP_amp")].set_visible(amp & raw)
-            if label2idx(self.canvas_output, f"new_EPSP_amp") is not False:
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_EPSP_amp")].set_visible(amp & raw)
-
+            self.v_t_EPSP_amp.set_visible(amp)
         if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
-            if label2idx(self.canvas_output, f"EPSP_slope") is not False:
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"EPSP_slope")].set_visible(slope & raw)
-            if label2idx(self.canvas_output, f"new_EPSP_slope") is not False:
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_EPSP_slope")].set_visible(slope & raw)
+            self.v_t_EPSP_slope.set_visible(slope)
+            self.v_t_EPSP_slope_start.set_visible(slope)
+            self.v_t_EPSP_slope_end.set_visible(slope)
 
-        if 'savgol_EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['savgol_EPSP_amp'].notna().any():
-            if label2idx(self.canvas_output, 'savgol_EPSP_amp') is not False:
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"savgol_EPSP_amp")].set_visible(amp & savgol)
-            if label2idx(self.canvas_output, f"new_EPSP_amp") is not False:
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_EPSP_amp")].set_visible(amp & savgol)
-
-        if 'savgol_EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['savgol_EPSP_slope'].notna().any():
-            if label2idx(self.canvas_output, f"savgol_EPSP_slope") is not False:
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"savgol_EPSP_slope")].set_visible(slope & savgol)
-            if label2idx(self.canvas_output, f"new_EPSP_slope") is not False:
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_EPSP_slope")].set_visible(slope & savgol)
-
-
-        # placeholder start-finish measurement line
-        #y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
-        #y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-        #self.canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
+        # Loop through conditions and labels in the dictionary
+        for label, condition in conditions_labels_dict.items():
+            if label2idx(self.canvas_mean, label) is not False:
+                self.canvas_mean.axes.lines[label2idx(self.canvas_mean, label)].set_visible(condition)
+            if label2idx(self.canvas_output, label) is not False:
+                self.canvas_output.axes.lines[label2idx(self.canvas_output, label)].set_visible(condition)
 
         self.canvas_mean.draw()
         self.canvas_output.draw()
