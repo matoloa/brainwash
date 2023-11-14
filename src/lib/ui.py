@@ -1376,8 +1376,9 @@ class UIsub(Ui_MainWindow):
         if hasattr(self, "ax2"): # remove ax2 if it exists
             self.ax2.remove()
         ax2 = ax1.twinx()
-        self.ax2 = ax2  # Store the ax2 instance to prevent garbage collection
-        if self.dict_cfg['list_groups']: # plot group means
+        self.ax2 = ax2  # Store the ax2 instance
+        # Plot group means
+        if self.dict_cfg['list_groups']:
             self.setGraphGroups(ax1, ax2, ui.dict_cfg['list_group_colors'])
         if df is not None: # plot selected rows
             self.setGraphSelected(df=df, ax1=ax1, ax2=ax2)
@@ -1407,59 +1408,35 @@ class UIsub(Ui_MainWindow):
                 self.canvas_seaborn_mean.axes.lines[label2idx(self.canvas_seaborn_mean, voltage_label)].set_visible(raw)
 
                 dfoutput = self.get_dfoutput(row=row)
-                if savgol:
-                    savgol_label = f"{row['recording_name']}_savgol"
-                    # add savgol lines that don't exist
-                    dffilter = self.get_dffilter(row=row)
-                    if 'filter_savgol' not in dffilter.columns:
-                        dffilter = analysis.addFilterSavgol(dffilter)
-                        self.df2csv(df=dffilter, rec=row['recording_name'], key="filter")
-                        self.dict_filters[row['recording_name']] = dffilter
-                    dfmean = self.get_dfmean(row=row)
-                    if 'filter_savgol' not in dfmean.columns:
-                        dfmean = analysis.addFilterSavgol(dfmean)
-                        self.df2csv(df=dfmean, rec=row['recording_name'], key="mean")
-                        self.dict_means[row['recording_name']] = dfmean
-                    if ('savgol_EPSP_amp' not in dfoutput.columns) & (not np.isnan(row["t_EPSP_amp"])):
-                        df_output_savgol_amp = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
-                                            t_EPSP_amp=row["t_EPSP_amp"])
-                        df_output_savgol_amp.columns = ['sweep', 'savgol_EPSP_amp']
-                        print(f"df_output_savgol_amp.columns: {df_output_savgol_amp.columns}")
-                        df_output_savgol_amp.reset_index(drop=True, inplace=True)
-                        dfoutput['savgol_EPSP_amp'] = df_output_savgol_amp.savgol_EPSP_amp
-                        self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
-                        self.dict_outputs[row['recording_name']] = dfoutput
-                    if ('savgol_EPSP_slope' not in dfoutput.columns) & (not np.isnan(row["t_EPSP_slope"])):
-                        df_output_savgol_slope = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
-                                            t_EPSP_slope=row["t_EPSP_slope"])
-                        df_output_savgol_slope.columns = ['sweep', 'savgol_EPSP_slope']
-                        df_output_savgol_slope.reset_index(drop=True, inplace=True)
-                        dfoutput['savgol_EPSP_slope'] = df_output_savgol_slope.savgol_EPSP_slope
-                        self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
-                        self.dict_outputs[row['recording_name']] = dfoutput
-                    # Plot savgol lines
-                    _ = sns.lineplot(ax=self.canvas_seaborn_mean.axes, label=savgol_label, data=dfmean, y="filter_savgol", x="time", color="orange", alpha = 0.5)
-                    if amp & (not np.isnan(row["t_EPSP_amp"])):
-                        _ = sns.lineplot(ax=ax1, label=f"{savgol_label}_EPSP_amp", data=dfoutput, y="savgol_EPSP_amp", x="sweep", color="orange", alpha = 0.5)
-                    if slope & (not np.isnan(row["t_EPSP_slope"])):
-                        _ = sns.lineplot(ax=ax2, label=f"{savgol_label}_EPSP_slope", data=dfoutput, y="savgol_EPSP_slope", x="sweep", color="orange", alpha = 0.5)
+                df_p = self.get_df_project() # updated in get_dfoutput; CAUTION! row is not updated! TODO: evaluate, address
+                t_EPSP_amp = df_p.loc[row.name,'t_EPSP_amp']
+                t_EPSP_slope = df_p.loc[row.name,'t_EPSP_slope']
 
-                if amp & (not np.isnan(row["t_EPSP_amp"])):
+                raw = bool(self.dict_cfg['filter_none'])
+                savgol = bool(self.dict_cfg['filter_savgol'])
+ 
+                if not np.isnan(t_EPSP_amp):
                     # mean, amp indicator
                     y_position = dfmean[dfmean.time == row["t_EPSP_amp"]].voltage
                     self.canvas_seaborn_mean.axes.plot(row["t_EPSP_amp"], y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
                     # output: amp
-                    if raw & (label2idx(ax1, 'EPSP_amp') is False):
+                    if raw:
                         _ = sns.lineplot(ax=ax1, label="EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", color="black", linestyle='--')
-                if slope & (not np.isnan(row["t_EPSP_slope"])):
-                    x_start = row["t_EPSP_slope"] - 0.0004
-                    x_end = row["t_EPSP_slope"] + 0.0004
+                    if savgol and ('savgol_EPSP_amp' in dfoutput):
+                        _ = sns.lineplot(ax=ax1, label="savgol_EPSP_amp", data=dfoutput, y="savgol_EPSP_amp", x="sweep", color="orange", alpha = 0.5, linestyle='--')
+                if not np.isnan(t_EPSP_slope):
+                    # mean, slope indicator
+                    x_start = t_EPSP_slope - 0.0004
+                    x_end = t_EPSP_slope + 0.0004
                     y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
                     y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
                     self.canvas_seaborn_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
-                    _ = sns.lineplot(ax=ax2, label="EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
+                    # output:slope
+                    if raw:
+                        _ = sns.lineplot(ax=ax2, label="EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
+                    if savgol and ('savgol_EPSP_slope' in dfoutput):
+                        _ = sns.lineplot(ax=ax2, label="savgol_EPSP_slope", data=dfoutput,  y="savgol_EPSP_slope", x="sweep", color="orange", alpha = 0.5)
         
-
     def setGraphGroups(self, ax1, ax2, list_color):
         print(f"setGraphGroups: {self.dict_cfg['list_groups']}")
         df_p = self.get_df_project()
