@@ -212,7 +212,7 @@
        </spacer>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="verticalLayoutGraph" stretch="0,5,0,5,0,1">
+       <layout class="QVBoxLayout" name="verticalLayoutGraph" stretch="0,5,0,0,5,0,1">
         <item>
          <widget class="QLabel" name="labelMeanSweep">
           <property name="text">
@@ -229,6 +229,104 @@
            </size>
           </property>
          </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout" stretch="0">
+          <item>
+           <widget class="QFrame" name="frame_main_view">
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>100</height>
+             </size>
+            </property>
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Raised</enum>
+            </property>
+            <widget class="QCheckBox" name="checkBox_filter_none">
+             <property name="geometry">
+              <rect>
+               <x>10</x>
+               <y>30</y>
+               <width>90</width>
+               <height>23</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>None</string>
+             </property>
+            </widget>
+            <widget class="QCheckBox" name="checkBox_aspect_EPSP_amp">
+             <property name="geometry">
+              <rect>
+               <x>100</x>
+               <y>50</y>
+               <width>90</width>
+               <height>23</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>EPSP amp.</string>
+             </property>
+            </widget>
+            <widget class="QCheckBox" name="checkBox_aspect_EPSP_slope">
+             <property name="geometry">
+              <rect>
+               <x>100</x>
+               <y>30</y>
+               <width>90</width>
+               <height>23</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>EPSP slope</string>
+             </property>
+            </widget>
+            <widget class="QLabel" name="label_filter">
+             <property name="geometry">
+              <rect>
+               <x>10</x>
+               <y>10</y>
+               <width>62</width>
+               <height>17</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>Filter</string>
+             </property>
+            </widget>
+            <widget class="QLabel" name="label_aspect">
+             <property name="geometry">
+              <rect>
+               <x>100</x>
+               <y>10</y>
+               <width>62</width>
+               <height>17</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>Aspect</string>
+             </property>
+            </widget>
+            <widget class="QCheckBox" name="checkBox_filter_savgol">
+             <property name="geometry">
+              <rect>
+               <x>10</x>
+               <y>50</y>
+               <width>90</width>
+               <height>23</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>Sav-Gol</string>
+             </property>
+            </widget>
+           </widget>
+          </item>
+         </layout>
         </item>
         <item>
          <widget class="QLabel" name="labelMeanGroups">
