@@ -1843,7 +1843,7 @@ class Measure_window_sub(Ui_measure_window):
                 dfmean = analysis.addFilterSavgol(dfmean)
                 ui.df2csv(df=dfmean, rec=self.row['recording_name'], key="mean")
                 ui.dict_means[self.row['recording_name']] = dfmean
-            if 'filter_savgol' not in self.new_dfoutput:
+            if 'savgol_EPSP_amp' not in self.new_dfoutput:
                 df_output_savgol = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
                                        t_EPSP_amp=self.row["t_EPSP_amp"],
                                        t_EPSP_slope=self.row["t_EPSP_slope"])
