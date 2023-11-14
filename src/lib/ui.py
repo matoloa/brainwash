@@ -1624,13 +1624,17 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_output.mpl_connect('motion_notify_event', self.outputDragged)
         self.canvas_output.mpl_connect('button_release_event', self.outputReleased)
 
+        # split axes
+        self.ax1 = self.canvas_output.axes
+        self.ax2 = self.ax1.twinx()
+
         # Populate canvases - TODO: refactor such that components can be called individually when added later
         _ = sns.lineplot(ax=self.canvas_mean.axes, label='filter_none', data=dfmean, y="voltage", x="time", color="black")
         
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             t_EPSP_amp = self.row['t_EPSP_amp']
             self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
-            _ = sns.lineplot(ax=self.canvas_output.axes, label="EPSP_amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="black")
+            _ = sns.lineplot(ax=self.ax1, label="EPSP_amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="black")
         if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
             t_EPSP_slope = self.row['t_EPSP_slope']
             x_start = t_EPSP_slope - 0.0004 # TODO: make this a variable
@@ -1638,11 +1642,12 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_EPSP_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
             self.v_t_EPSP_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
             self.v_t_EPSP_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
-            _ = sns.lineplot(ax=self.canvas_output.axes, label="EPSP_slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="black")
+            _ = sns.lineplot(ax=self.ax2, label="EPSP_slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="black")
 
         self.canvas_mean.axes.set_xlim(ui.dict_cfg['mean_xlim'])
         self.canvas_mean.axes.set_ylim(ui.dict_cfg['mean_ylim'])
-        self.canvas_output.axes.set_ylim(ui.dict_cfg['output_ax1_ylim'])
+        self.ax1.set_ylim(ui.dict_cfg['output_ax1_ylim'])
+        self.ax2.set_ylim(ui.dict_cfg['output_ax2_ylim'])
 
         # lines and drag state
         self.si_v = None # vertical line in canvas_output, indicating selected sweep
@@ -1807,10 +1812,10 @@ class Measure_window_sub(Ui_measure_window):
             # Plot any missing savgol lines
             if label2idx(self.canvas_mean, 'filter_savgol') is False:
                 _ = sns.lineplot(ax=self.canvas_mean.axes, label='filter_savgol', data=dfmean, y="filter_savgol", x="time", color="orange", alpha = 0.5)
-            if label2idx(self.canvas_output, 'savgol_EPSP_amp') is False:
-                _ = sns.lineplot(ax=self.canvas_output.axes, label="savgol_EPSP_amp", data=self.new_dfoutput, y="savgol_EPSP_amp", x="sweep", color="orange", alpha = 0.5)
-            if label2idx(self.canvas_output, 'savgol_EPSP_slope') is False:
-                _ = sns.lineplot(ax=self.canvas_output.axes, label="savgol_EPSP_slope", data=self.new_dfoutput, y="savgol_EPSP_slope", x="sweep", color="orange", alpha = 0.5)
+            if label2idx(self.ax1, 'savgol_EPSP_amp') is False:
+                _ = sns.lineplot(ax=self.ax1, label="savgol_EPSP_amp", data=self.new_dfoutput, y="savgol_EPSP_amp", x="sweep", color="orange", alpha = 0.5)
+            if label2idx(self.ax2, 'savgol_EPSP_slope') is False:
+                _ = sns.lineplot(ax=self.ax2, label="savgol_EPSP_slope", data=self.new_dfoutput, y="savgol_EPSP_slope", x="sweep", color="orange", alpha = 0.5)
 
 
         # Display apect indicators:
@@ -1821,14 +1826,14 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_EPSP_slope_start.set_visible(slope)
             self.v_t_EPSP_slope_end.set_visible(slope)
 
-        
-
         # Loop through conditions and labels in the dictionary
         for label, condition in dict_label_conditions.items():
             if label2idx(self.canvas_mean, label) is not False:
                 self.canvas_mean.axes.lines[label2idx(self.canvas_mean, label)].set_visible(condition)
-            if label2idx(self.canvas_output, label) is not False:
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, label)].set_visible(condition)
+            if label2idx(self.ax1, label) is not False:
+                self.ax1.lines[label2idx(self.ax1, label)].set_visible(condition)
+            if label2idx(self.ax2, label) is not False:
+                self.ax2.lines[label2idx(self.ax2, label)].set_visible(condition)
 
         self.canvas_mean.draw()
         self.canvas_output.draw()
