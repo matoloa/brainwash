@@ -70,6 +70,12 @@ def addFilterSavgol(df, window_length=9, polyorder=3):
     return df
 
 
+def addFilterSavgol(df, window_length=9, polyorder=1):
+    # adds a column containing a smoothed version of the voltage column
+    df['filter_savgol'] = savgol_filter(df.voltage, window_length=window_length, polyorder=polyorder)
+    return df
+
+
 # %%
 def find_i_stim_prim_max(dfmean):
     # TODO: return an index of sufficiently separated over-threshold x:es instead

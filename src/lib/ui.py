@@ -1662,14 +1662,11 @@ class Measure_window_sub(Ui_measure_window):
 
         # Populate canvases - TODO: refactor such that components can be called individually when added later
         _ = sns.lineplot(ax=self.canvas_mean.axes, label='filter_none', data=dfmean, y="voltage", x="time", color="black")
-        self.filterSavgol()
-        _ = sns.lineplot(ax=self.canvas_mean.axes, label='filter_savgol', data=dfmean, y="savgol", x="time", color="black")
         
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             t_EPSP_amp = self.row['t_EPSP_amp']
             self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
             _ = sns.lineplot(ax=self.canvas_output.axes, label="EPSP_amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="black")
-            _ = sns.lineplot(ax=self.canvas_output.axes, label="savgol_EPSP_amp", data=self.new_dfoutput, y="savgol_EPSP_amp", x="sweep", color="black")
         if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
             t_EPSP_slope = self.row['t_EPSP_slope']
             x_start = t_EPSP_slope - 0.0004 # TODO: make this a variable
@@ -1678,7 +1675,6 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_EPSP_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
             self.v_t_EPSP_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
             _ = sns.lineplot(ax=self.canvas_output.axes, label="EPSP_slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="black")
-            _ = sns.lineplot(ax=self.canvas_output.axes, label="savgol_EPSP_slope", data=self.new_dfoutput, y="savgol_EPSP_slope", x="sweep", color="black")
 
         self.canvas_mean.axes.set_xlim(ui.dict_cfg['mean_xlim'])
         self.canvas_mean.axes.set_ylim(ui.dict_cfg['mean_ylim'])
@@ -1779,21 +1775,6 @@ class Measure_window_sub(Ui_measure_window):
         for aspect in supported_aspects:
             time = dict_t[f"t_{aspect}"]
             self.updateAspect(aspect=aspect, time=time, method="Auto")
-
-
-    def filterSavgol(self, window_length=11, polyorder=2):
-       # TODO: this creates a (non-savgol) placeholder for savgol to test the UI
-        dfmean = ui.get_dfmean(row=self.row)
-        if not 'savgol' in dfmean.columns:
-            dfmean['savgol'] = dfmean['voltage']*1.2
-            #parse.persistdf(file_base=self.row['recording_name'], dict_folders=ui.dict_folders, dfmean=dfmean)
-        dffilter = ui.get_dffilter(row=self.row)
-        if not 'dffilter' in dffilter.columns:
-            dffilter['savgol'] = dffilter['voltage']*1.2
-            self.new_dfoutput['savgol_EPSP_amp'] = self.new_dfoutput['EPSP_amp']*1.2
-            self.new_dfoutput['savgol_EPSP_slope'] = self.new_dfoutput['EPSP_slope']*1.2
-            #parse.persistdf(file_base=self.row['recording_name'], dict_folders=ui.dict_folders, dffilter=dffilter)
-            print("Pseudo-savgol built!")
         
 
     def m(self, SI): # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
@@ -1835,7 +1816,7 @@ class Measure_window_sub(Ui_measure_window):
         savgol = bool(ui.dict_cfg['filter_savgol'])
 
         # Conditions and labels for display of lines in canvas_mean and canvas_output
-        conditions_labels_dict = {
+        dict_label_conditions = {
         'filter_none':      raw,
         'filter_savgol':    savgol,
         'EPSP_amp':         raw & amp,
@@ -1846,6 +1827,34 @@ class Measure_window_sub(Ui_measure_window):
         'savgol_EPSP_slope':savgol & slope,
         }
 
+        if savgol:
+            # add savgol lines that don't exist
+            dffilter = ui.get_dffilter(row=self.row)
+            if 'filter_savgol' not in dffilter:
+                dffilter = analysis.addFilterSavgol(dffilter)
+                ui.df2csv(df=dffilter, rec=self.row['recording_name'], key="filter")
+                ui.dict_filters[self.row['recording_name']] = dffilter
+            dfmean = ui.get_dfmean(row=self.row)
+            if 'filter_savgol' not in dfmean:
+                dfmean = analysis.addFilterSavgol(dfmean)
+                ui.df2csv(df=dfmean, rec=self.row['recording_name'], key="mean")
+                ui.dict_means[self.row['recording_name']] = dfmean
+            if 'filter_savgol' not in self.new_dfoutput:
+                df_output_savgol = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
+                                       t_EPSP_amp=self.row["t_EPSP_amp"],
+                                       t_EPSP_slope=self.row["t_EPSP_slope"])
+                df_output_savgol.reset_index(drop=True, inplace=True)
+                df_output_savgol.columns = ['sweep', 'savgol_EPSP_amp', 'savgol_EPSP_slope']
+                self.new_dfoutput = df_output_savgol.combine_first(self.new_dfoutput)
+            # Plot any missing savgol lines
+            if label2idx(self.canvas_mean, 'filter_savgol') is False:
+                _ = sns.lineplot(ax=self.canvas_mean.axes, label='filter_savgol', data=dfmean, y="filter_savgol", x="time", color="orange", alpha = 0.5)
+            if label2idx(self.canvas_output, 'savgol_EPSP_amp') is False:
+                _ = sns.lineplot(ax=self.canvas_output.axes, label="savgol_EPSP_amp", data=self.new_dfoutput, y="savgol_EPSP_amp", x="sweep", color="orange", alpha = 0.5)
+            if label2idx(self.canvas_output, 'savgol_EPSP_slope') is False:
+                _ = sns.lineplot(ax=self.canvas_output.axes, label="savgol_EPSP_slope", data=self.new_dfoutput, y="savgol_EPSP_slope", x="sweep", color="orange", alpha = 0.5)
+
+
         # Display apect indicators:
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             self.v_t_EPSP_amp.set_visible(amp)
@@ -1854,8 +1863,10 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_EPSP_slope_start.set_visible(slope)
             self.v_t_EPSP_slope_end.set_visible(slope)
 
+        
+
         # Loop through conditions and labels in the dictionary
-        for label, condition in conditions_labels_dict.items():
+        for label, condition in dict_label_conditions.items():
             if label2idx(self.canvas_mean, label) is not False:
                 self.canvas_mean.axes.lines[label2idx(self.canvas_mean, label)].set_visible(condition)
             if label2idx(self.canvas_output, label) is not False:
