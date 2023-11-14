@@ -672,7 +672,7 @@ class UIsub(Ui_MainWindow):
                          'output_ax1_xlim': (0.006, 0.020),
                          'output_ax2_ylim': (None, None),
                          'output_ax2_xlim': (None, None),
-                         'measure_windows_open': [],}
+                         }
             print("Creating project_cfg:", self.project_cfg_yaml)
             self.write_project_cfg()
         # Enforce local cfg
@@ -1484,7 +1484,6 @@ class UIsub(Ui_MainWindow):
         self.measure = QDialog_sub()
         self.measure_window_sub = Measure_window_sub(self.measure, row=ser_table_row, dfmean=dfmean)
         self.measure.setWindowTitle(ser_table_row['recording_name'])
-        self.dict_cfg['measure_windows_open'] = ser_table_row['recording_name']
         # move measurewindow to default position (TODO: later to be stored in cfg)
         self.measure.setGeometry(1400, 0, 800, 1200)
         self.measure.show()
