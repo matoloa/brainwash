@@ -298,24 +298,6 @@ class Ui_measure_window(QtCore.QObject):
         self.frame_measure_view.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame_measure_view.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame_measure_view.setObjectName("frame_measure_view")
-        self.checkBox_filter_none = QtWidgets.QCheckBox(self.frame_measure_view)
-        self.checkBox_filter_none.setGeometry(QtCore.QRect(10, 30, 90, 23))
-        self.checkBox_filter_none.setObjectName("checkBox_filter_none")
-        self.checkBox_aspect_EPSP_amp = QtWidgets.QCheckBox(self.frame_measure_view)
-        self.checkBox_aspect_EPSP_amp.setGeometry(QtCore.QRect(100, 50, 90, 23))
-        self.checkBox_aspect_EPSP_amp.setObjectName("checkBox_aspect_EPSP_amp")
-        self.checkBox_aspect_EPSP_slope = QtWidgets.QCheckBox(self.frame_measure_view)
-        self.checkBox_aspect_EPSP_slope.setGeometry(QtCore.QRect(100, 30, 90, 23))
-        self.checkBox_aspect_EPSP_slope.setObjectName("checkBox_aspect_EPSP_slope")
-        self.label_filter = QtWidgets.QLabel(self.frame_measure_view)
-        self.label_filter.setGeometry(QtCore.QRect(10, 10, 62, 17))
-        self.label_filter.setObjectName("label_filter")
-        self.label_aspect = QtWidgets.QLabel(self.frame_measure_view)
-        self.label_aspect.setGeometry(QtCore.QRect(100, 10, 62, 17))
-        self.label_aspect.setObjectName("label_aspect")
-        self.checkBox_filter_savgol = QtWidgets.QCheckBox(self.frame_measure_view)
-        self.checkBox_filter_savgol.setGeometry(QtCore.QRect(10, 50, 90, 23))
-        self.checkBox_filter_savgol.setObjectName("checkBox_filter_savgol")
         self.horizontalLayout.addWidget(self.frame_measure_view)
         self.measure_verticalLayout.addLayout(self.horizontalLayout)
         self.measure_graph_output = QtWidgets.QWidget(measure)
@@ -337,8 +319,8 @@ class Ui_measure_window(QtCore.QObject):
         self.gridLayout.addLayout(self.measure_verticalLayout, 0, 0, 1, 1)
 
         self.retranslateUi(measure)
-        self.buttonBox.accepted.connect(measure.accept)
-        self.buttonBox.rejected.connect(measure.reject)
+        self.buttonBox.accepted.connect(measure.accept) # type: ignore
+        self.buttonBox.rejected.connect(measure.reject) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(measure)
 
     def retranslateUi(self, measure):
@@ -353,12 +335,6 @@ class Ui_measure_window(QtCore.QObject):
         self.label_EPSP_ms.setText(_translate("measure", "ms"))
         self.label_volley_ms.setText(_translate("measure", "ms"))
         self.pushButton_auto.setText(_translate("measure", "Auto"))
-        self.checkBox_filter_none.setText(_translate("measure", "None"))
-        self.checkBox_aspect_EPSP_amp.setText(_translate("measure", "EPSP amp."))
-        self.checkBox_aspect_EPSP_slope.setText(_translate("measure", "EPSP slope"))
-        self.label_filter.setText(_translate("measure", "Filter"))
-        self.label_aspect.setText(_translate("measure", "Aspect"))
-        self.checkBox_filter_savgol.setText(_translate("measure", "Sav-Gol"))
 
 
 
@@ -695,7 +671,8 @@ class UIsub(Ui_MainWindow):
                          'output_ax1_ylim': (-0.0015, 0),
                          'output_ax1_xlim': (0.006, 0.020),
                          'output_ax2_ylim': (None, None),
-                         'output_ax2_xlim': (None, None),}
+                         'output_ax2_xlim': (None, None),
+                         'measure_windows_open': [],}
             print("Creating project_cfg:", self.project_cfg_yaml)
             self.write_project_cfg()
         # Enforce local cfg
@@ -742,6 +719,17 @@ class UIsub(Ui_MainWindow):
         self.tableProj.doubleClicked.connect(self.tableProjDoubleClicked)
         selection_model = self.tableProj.selectionModel()
         selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
+
+        # connect checkboxes to local functions TODO: refactorize to merge with similar code in __init__(self, measure_window...
+        def loopConnectViews(view, key):
+            str_view_key = f"{view}_{key}"
+            key_checkBox = getattr(self, f"checkBox_{str_view_key}")
+            key_checkBox.setChecked(self.dict_cfg[str_view_key])
+            key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.viewSettingsChanged(state, str_view_key))
+        for key in supported_filters:
+            loopConnectViews(view="filter", key=key)
+        for key in supported_aspects:
+            loopConnectViews(view="aspect", key=key)
 
 # Debugging tools
         # self.find_widgets_with_top_left_coordinates(self.centralwidget)
@@ -1495,8 +1483,8 @@ class UIsub(Ui_MainWindow):
         #self.measure = QtWidgets.QDialog()
         self.measure = QDialog_sub()
         self.measure_window_sub = Measure_window_sub(self.measure, row=ser_table_row, dfmean=dfmean)
-
         self.measure.setWindowTitle(ser_table_row['recording_name'])
+        self.dict_cfg['measure_windows_open'] = ser_table_row['recording_name']
         # move measurewindow to default position (TODO: later to be stored in cfg)
         self.measure.setGeometry(1400, 0, 800, 1200)
         self.measure.show()
@@ -1680,12 +1668,13 @@ class Measure_window_sub(Ui_measure_window):
             aspect_edit.editingFinished.connect(lambda: self.updateOnEdit(aspect_edit, aspect))
         for aspect in supported_aspects:
             loopConnectAspects(aspect=aspect)
+        # connect checkboxes from mainwindow to updatePlots TODO: refactorize to merge with similar code in __init__(self, mainwindow)
         def loopConnectViews(view, key):
             str_view_key = f"{view}_{key}"
-            key_checkBox = getattr(self, f"checkBox_{str_view_key}")
+            key_checkBox = getattr(ui, f"checkBox_{str_view_key}")
             key_checkBox.setChecked(ui.dict_cfg[str_view_key])
-            key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.viewSettingsChanged(state, str_view_key))
-        for key in ["none", "savgol"]:
+            key_checkBox.stateChanged.connect(self.updatePlots)
+        for key in supported_filters:
             loopConnectViews(view="filter", key=key)
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
@@ -1776,13 +1765,6 @@ class Measure_window_sub(Ui_measure_window):
         filtered_df['bis'] = filtered_df['bis'] * (min_V/min_bis)
         self.mean_prim = sns.lineplot(data=filtered_df, y="prim", x="time", ax=self.canvas_mean.axes, color="red", alpha=0.3)
         self.mean_bis = sns.lineplot(data=filtered_df, y="bis", x="time", ax=self.canvas_mean.axes, color="green", alpha=0.3)
-
-
-    def viewSettingsChanged(self, state, str_view_key):
-        # checkboxes for views have changed; save settings and update
-        ui.dict_cfg[str_view_key] = (state == 2)
-        ui.write_project_cfg()
-        self.updatePlots()
 
 
     def updatePlots(self):
