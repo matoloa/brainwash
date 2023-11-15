@@ -208,7 +208,7 @@ class QDialog_sub(QtWidgets.QDialog):
     def closeEvent(self, event):
         for signal, method in self.list_connections:
             signal.disconnect(method)
-        print("Signals disconnected.")
+        print(f"Signals disconnected from subwindow {self.windowTitle()}")
         super(QDialog_sub, self).closeEvent(event)
 
 class Ui_measure_window(QtCore.QObject):
@@ -720,7 +720,7 @@ class UIsub(Ui_MainWindow):
         selection_model = self.tableProj.selectionModel()
         selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
 
-        # connect checkboxes to local functions TODO: refactorize to merge with similar code in __init__(self, measure_window...
+        # connect checkboxes to local functions TODO: refactorize to merge with similar code in __init__(self, measure_frame...
         def loopConnectViews(view, key):
             str_view_key = f"{view}_{key}"
             key_checkBox = getattr(self, f"checkBox_{str_view_key}")
@@ -1489,7 +1489,7 @@ class UIsub(Ui_MainWindow):
 # MeasureWindow
 
     def launchMeasureWindow(self):  # , single_index_range):
-        # TODO:find_ampl_ture_window (if it's already open, focus on it)
+        # Launches a new subwindow for the double-clicked row (if it's already open, focus on it)
         #   How to check for existing windows?
         #   How to shift focus?
         # Display the appropriate recording on the new window's graphs: mean and output
@@ -1507,14 +1507,16 @@ class UIsub(Ui_MainWindow):
             return
         # Get dataframes
         dfmean = self.get_dfmean(ser_table_row)
+        # Close last window, for now. TODO: handle multiple windows (ew)
+        if hasattr(self, "measure_frame"):
+            self.measure_frame.close()
         # Open window
-        #self.measure = QtWidgets.QDialog()
-        self.measure = QDialog_sub()
-        self.measure_window_sub = Measure_window_sub(self.measure, row=ser_table_row, dfmean=dfmean)
-        self.measure.setWindowTitle(ser_table_row['recording_name'])
+        self.measure_frame = QDialog_sub()
+        self.measure_window_sub = Measure_window_sub(self.measure_frame, row=ser_table_row, dfmean=dfmean)
+        self.measure_frame.setWindowTitle(ser_table_row['recording_name'])
         # move measurewindow to default position (TODO: later to be stored in cfg)
-        self.measure.setGeometry(1400, 0, 800, 1200)
-        self.measure.show()
+        self.measure_frame.setGeometry(1400, 0, 800, 1200)
+        self.measure_frame.show()
         # Set graphs
         self.measure_window_sub.updatePlots()
 
@@ -1627,15 +1629,15 @@ class Filetreesub(Ui_Dialog):
 
 
 class Measure_window_sub(Ui_measure_window):
-    def __init__(self, measure_window, parent=None, row=None, dfmean=None, folder="."):
+    def __init__(self, measure_frame, parent=None, row=None, dfmean=None, folder="."):
         super(Measure_window_sub, self).__init__()
         # local versions of row and dfmean that persist unchanged (TODO: check!) while the window is open
         self.row = row.copy() # creates a copy to be modified, then accepted or rejected
         self.dfmean = dfmean # will not be modified; no need to copy()
         self.new_dfoutput = ui.get_dfoutput(row).copy() # creates a copy to be modified, then accepted or rejected
-        self.setupUi(measure_window)
+        self.setupUi(measure_frame)
         self.parent = parent
-        self.measure_window = measure_window
+        self.measure_frame = measure_frame
 
         self.measure_graph_mean.setLayout(QtWidgets.QVBoxLayout())
         self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)
@@ -1706,14 +1708,14 @@ class Measure_window_sub(Ui_measure_window):
             key_checkBox = getattr(ui, f"checkBox_{str_view_key}")
             key_checkBox.setChecked(ui.dict_cfg[str_view_key])
             key_checkBox.stateChanged.connect(self.updatePlots)
-            self.measure_window.list_connections.append((key_checkBox.stateChanged, self.updatePlots))
+            self.measure_frame.list_connections.append((key_checkBox.stateChanged, self.updatePlots))
         for key in supported_filters:
             loopConnectViews(view="filter", key=key)
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
         self.pushButton_auto.clicked.connect(self.autoCalculate)
         self.buttonBox.accepted.connect(self.accepted_handler)
-        self.buttonBox.rejected.connect(self.measure_window.close)
+        self.buttonBox.rejected.connect(self.measure_frame.close)
 
 
     def accepted_handler(self):
@@ -1762,7 +1764,7 @@ class Measure_window_sub(Ui_measure_window):
             raise ValueError(f"ERROR (accepted_handler): {self.row['recording_name']} not found in df_project.")
         else:
             raise ValueError(f"ERROR (accepted_handler): multiple instances of {self.row['recording_name']} in project_df.")
-        self.measure_window.close()
+        self.measure_frame.close()
 
 
     def autoCalculate(self):
