@@ -206,17 +206,17 @@ class QDialog_sub(QtWidgets.QDialog):
         self.list_connections = []
 
     def closeEvent(self, event):
-        signals = True
+        error = None
         for signal, method in self.list_connections:
             try:
                 signal.disconnect(method)
-            except TypeError:
-                signals = False
-                pass # Ignore if the signal is not connected to the method
-        if signals:
+            except TypeError as e:
+                error = e
+                pass
+        if error is None:
             print(f"Signals disconnected from subwindow {self.windowTitle()}")
         else:
-            print(f"Warning: signals were NOT connected to {self.windowTitle()} at closeEvent!") # TODO: Shouldn't happen - why does it?
+            print(f"Warning! {self.windowTitle()}: {error} at closeEvent") # TODO: Shouldn't happen - why does it?
         super(QDialog_sub, self).closeEvent(event)
 
 class Ui_measure_window(QtCore.QObject):
