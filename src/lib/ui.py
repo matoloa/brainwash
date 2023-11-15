@@ -206,9 +206,17 @@ class QDialog_sub(QtWidgets.QDialog):
         self.list_connections = []
 
     def closeEvent(self, event):
+        signals = True
         for signal, method in self.list_connections:
-            signal.disconnect(method)
-        print(f"Signals disconnected from subwindow {self.windowTitle()}")
+            try:
+                signal.disconnect(method)
+            except TypeError:
+                signals = False
+                pass # Ignore if the signal is not connected to the method
+        if signals:
+            print(f"Signals disconnected from subwindow {self.windowTitle()}")
+        else:
+            print(f"Warning: signals were NOT connected to {self.windowTitle()} at closeEvent!") # TODO: Shouldn't happen - why does it?
         super(QDialog_sub, self).closeEvent(event)
 
 class Ui_measure_window(QtCore.QObject):
@@ -924,30 +932,31 @@ class UIsub(Ui_MainWindow):
         if len(selected_rows) == 1:
             row = selected_rows[0]
             df_p = self.df_project
-            old_recording_name = df_p.at[row,'recording_name']
+            old_recording_name = df_p.at[row, 'recording_name']
             old_data = self.dict_folders['data'] / (old_recording_name + ".csv")
             old_mean = self.dict_folders['cache'] / (old_recording_name + "_mean.csv")
+            old_filter = self.dict_folders['cache'] / (old_recording_name + "_filter.csv")
+            old_output = self.dict_folders['cache'] / (old_recording_name + "_output.csv")
             RenameDialog = InputDialogPopup()
             new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query='')
-            if re.match(r'^[a-zA-Z0-9_-]+$', str(new_recording_name)) is not None: # check if valid filename
+            if new_recording_name is not None and re.match(r'^[a-zA-Z0-9_ -]+$', str(new_recording_name)) is not None: # check if valid filename
                 list_recording_names = set(df_p['recording_name'])
                 if not new_recording_name in list_recording_names: # prevent duplicates
                     new_data = self.dict_folders['data'] / (new_recording_name + ".csv")
                     new_mean = self.dict_folders['cache'] / (new_recording_name + "_mean.csv")
-                    if old_data.exists() & old_mean.exists():
-                        if verbose:
-                            print(f"rename_data: {old_data} to {new_data}")
-                            print(f"rename_mean: {old_mean} to {new_mean}")
-                            print(f"new recording_name set: {new_recording_name}")
+                    new_filter = self.dict_folders['cache'] / (new_recording_name + "_filter.csv")
+                    new_output = self.dict_folders['cache'] / (new_recording_name + "_output.csv")
+                    if old_data.exists():
                         os.rename(old_data, new_data)
-                        os.rename(old_mean, new_mean)
-                    else:
-                        print(f"data file exists: {old_data.exists()} : {old_data}")
-                        print(f"mean file exists: {old_mean.exists()} : {old_mean}")
+                    else: # data SHOULD exist
                         raise FileNotFoundError
-                    df_shared_recording_name = df_p[df_p['recording_name'] == old_recording_name]
-                    for i, subrow in df_shared_recording_name.iterrows():
-                        df_p.at[i,'recording_name'] = new_recording_name
+                    if old_mean.exists():
+                        os.rename(old_mean, new_mean)
+                    if old_filter.exists():
+                        os.rename(old_filter, new_filter)
+                    if old_output.exists():
+                        os.rename(old_output, new_output)
+                    df_p.at[row, 'recording_name'] = new_recording_name
                     self.set_df_project(df_p)
                     self.setTableDf(self.df_project)  # Force update
                 else:
@@ -974,6 +983,12 @@ class UIsub(Ui_MainWindow):
                     mean_path = Path(self.dict_folders['cache'] / (recording_name + "_mean.csv"))
                     if mean_path.exists():
                         mean_path.unlink()
+                    filter_path = Path(self.dict_folders['cache'] / (recording_name + "_filter.csv"))
+                    if filter_path.exists():
+                        filter_path.unlink()
+                    output_path = Path(self.dict_folders['cache'] / (recording_name + "_output.csv"))
+                    if output_path.exists():
+                        output_path.unlink()
             # Regardless of whether or not there was a file, purge the row from df_project
             self.clearGroupsByRow(selected_rows) # clear cache so that a new group mean is calculated
             df_p.drop(selected_rows, inplace=True)
@@ -1269,7 +1284,6 @@ class UIsub(Ui_MainWindow):
     def get_dffilter(self, row):
         # returns an internal df_filter for the selected recording_name. If it does not exist, read it from file first.
         rec_name = row['recording_name']
-        print(f"get_dffilter: {rec_name}")
         if rec_name in self.dict_filters: #1: Return cached
             print(f"get_dffilter: {rec_name} found in dict_datas")
             return self.dict_filters[rec_name]
@@ -1509,6 +1523,7 @@ class UIsub(Ui_MainWindow):
         dfmean = self.get_dfmean(ser_table_row)
         # Close last window, for now. TODO: handle multiple windows (ew)
         if hasattr(self, "measure_frame"):
+            print("Closing last window...")
             self.measure_frame.close()
         # Open window
         self.measure_frame = QDialog_sub()
