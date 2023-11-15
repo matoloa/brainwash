@@ -1397,7 +1397,6 @@ class UIsub(Ui_MainWindow):
                 self.canvas_seaborn_mean.axes.lines[label2idx(self.canvas_seaborn_mean, voltage_label)].set_visible(raw)
 
                 dfoutput = self.get_dfoutput(row=row)
-                print("pre:", dfoutput)
                 if savgol:
                     savgol_label = f"{row['recording_name']}_savgol"
                     # add savgol lines that don't exist
@@ -1420,7 +1419,6 @@ class UIsub(Ui_MainWindow):
                         dfoutput['savgol_EPSP_amp'] = df_output_savgol_amp.savgol_EPSP_amp
                         self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
                         self.dict_outputs[row['recording_name']] = dfoutput
-                        print("mid:", dfoutput)
                     if ('savgol_EPSP_slope' not in dfoutput.columns) & (not np.isnan(row["t_EPSP_slope"])):
                         df_output_savgol_slope = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
                                             t_EPSP_slope=row["t_EPSP_slope"])
@@ -1429,7 +1427,6 @@ class UIsub(Ui_MainWindow):
                         dfoutput['savgol_EPSP_slope'] = df_output_savgol_slope.savgol_EPSP_slope
                         self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
                         self.dict_outputs[row['recording_name']] = dfoutput
-                        print("post:", dfoutput)
                     # Plot savgol lines
                     _ = sns.lineplot(ax=self.canvas_seaborn_mean.axes, label=savgol_label, data=dfmean, y="filter_savgol", x="time", color="orange", alpha = 0.5)
                     if amp & (not np.isnan(row["t_EPSP_amp"])):
@@ -1517,7 +1514,7 @@ class UIsub(Ui_MainWindow):
         self.measure.show()
         # Set graphs
         self.measure_window_sub.updatePlots()
-    
+
             
     @QtCore.pyqtSlot(list)
     def slotPrintPaths(self, mypaths):
@@ -1706,12 +1703,14 @@ class Measure_window_sub(Ui_measure_window):
             key_checkBox = getattr(ui, f"checkBox_{str_view_key}")
             key_checkBox.setChecked(ui.dict_cfg[str_view_key])
             key_checkBox.stateChanged.connect(self.updatePlots)
+            self.measure_window.list_connections.append((key_checkBox.stateChanged, self.updatePlots))
         for key in supported_filters:
             loopConnectViews(view="filter", key=key)
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
         self.pushButton_auto.clicked.connect(self.autoCalculate)
         self.buttonBox.accepted.connect(self.accepted_handler)
+        self.buttonBox.rejected.connect(self.measure_window.close)
 
 
     def accepted_handler(self):
@@ -2019,7 +2018,6 @@ def get_signals(source):
         for key, aspect in sorted(vars(subcls).items()):
             if isinstance(aspect, signal):
                 print(f"{key} [{clsname}]")
-
 
 
 def zoomOnScroll(event, canvas):
