@@ -1397,6 +1397,7 @@ class UIsub(Ui_MainWindow):
                 self.canvas_seaborn_mean.axes.lines[label2idx(self.canvas_seaborn_mean, voltage_label)].set_visible(raw)
 
                 dfoutput = self.get_dfoutput(row=row)
+                print("pre:", dfoutput)
                 if savgol:
                     savgol_label = f"{row['recording_name']}_savgol"
                     # add savgol lines that don't exist
@@ -1419,6 +1420,7 @@ class UIsub(Ui_MainWindow):
                         dfoutput['savgol_EPSP_amp'] = df_output_savgol_amp.savgol_EPSP_amp
                         self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
                         self.dict_outputs[row['recording_name']] = dfoutput
+                        print("mid:", dfoutput)
                     if ('savgol_EPSP_slope' not in dfoutput.columns) & (not np.isnan(row["t_EPSP_slope"])):
                         df_output_savgol_slope = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
                                             t_EPSP_slope=row["t_EPSP_slope"])
@@ -1427,6 +1429,7 @@ class UIsub(Ui_MainWindow):
                         dfoutput['savgol_EPSP_slope'] = df_output_savgol_slope.savgol_EPSP_slope
                         self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
                         self.dict_outputs[row['recording_name']] = dfoutput
+                        print("post:", dfoutput)
                     # Plot savgol lines
                     _ = sns.lineplot(ax=self.canvas_seaborn_mean.axes, label=savgol_label, data=dfmean, y="filter_savgol", x="time", color="orange", alpha = 0.5)
                     if amp & (not np.isnan(row["t_EPSP_amp"])):
