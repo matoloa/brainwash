@@ -200,6 +200,17 @@ class MplCanvas(FigureCanvasQTAgg):
 ################################################################
 
 
+class QDialog_sub(QtWidgets.QDialog):
+    def __init__(self):
+        super(QDialog_sub, self).__init__()
+        self.list_connections = []
+
+    def closeEvent(self, event):
+        for signal, method in self.list_connections:
+            signal.disconnect(method)
+        print("Signals disconnected.")
+        super(QDialog_sub, self).closeEvent(event)
+
 class Ui_measure_window(QtCore.QObject):
     def setupUi(self, measure):
         measure.setObjectName("measure")
@@ -1376,7 +1387,6 @@ class UIsub(Ui_MainWindow):
                 self.canvas_seaborn_mean.axes.lines[label2idx(self.canvas_seaborn_mean, voltage_label)].set_visible(raw)
 
                 dfoutput = self.get_dfoutput(row=row)
-                print("pre:", dfoutput)
                 if savgol:
                     savgol_label = f"{row['recording_name']}_savgol"
                     # add savgol lines that don't exist
@@ -1399,7 +1409,6 @@ class UIsub(Ui_MainWindow):
                         dfoutput['savgol_EPSP_amp'] = df_output_savgol_amp.savgol_EPSP_amp
                         self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
                         self.dict_outputs[row['recording_name']] = dfoutput
-                        print("mid:", dfoutput)
                     if ('savgol_EPSP_slope' not in dfoutput.columns) & (not np.isnan(row["t_EPSP_slope"])):
                         df_output_savgol_slope = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
                                             t_EPSP_slope=row["t_EPSP_slope"])
@@ -1408,7 +1417,6 @@ class UIsub(Ui_MainWindow):
                         dfoutput['savgol_EPSP_slope'] = df_output_savgol_slope.savgol_EPSP_slope
                         self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
                         self.dict_outputs[row['recording_name']] = dfoutput
-                        print("post:", dfoutput)
                     # Plot savgol lines
                     _ = sns.lineplot(ax=self.canvas_seaborn_mean.axes, label=savgol_label, data=dfmean, y="filter_savgol", x="time", color="orange", alpha = 0.5)
                     if amp & (not np.isnan(row["t_EPSP_amp"])):
@@ -1487,7 +1495,8 @@ class UIsub(Ui_MainWindow):
         # Get dataframes
         dfmean = self.get_dfmean(ser_table_row)
         # Open window
-        self.measure = QtWidgets.QDialog()
+        #self.measure = QtWidgets.QDialog()
+        self.measure = QDialog_sub()
         self.measure_window_sub = Measure_window_sub(self.measure, row=ser_table_row, dfmean=dfmean)
         self.measure.setWindowTitle(ser_table_row['recording_name'])
         # move measurewindow to default position (TODO: later to be stored in cfg)
@@ -1495,7 +1504,7 @@ class UIsub(Ui_MainWindow):
         self.measure.show()
         # Set graphs
         self.measure_window_sub.updatePlots()
-    
+
             
     @QtCore.pyqtSlot(list)
     def slotPrintPaths(self, mypaths):
@@ -1613,6 +1622,7 @@ class Measure_window_sub(Ui_measure_window):
         self.new_dfoutput = ui.get_dfoutput(row).copy() # creates a copy to be modified, then accepted or rejected
         self.setupUi(measure_window)
         self.parent = parent
+        self.measure_window = measure_window
 
         self.measure_graph_mean.setLayout(QtWidgets.QVBoxLayout())
         self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)
@@ -1683,12 +1693,14 @@ class Measure_window_sub(Ui_measure_window):
             key_checkBox = getattr(ui, f"checkBox_{str_view_key}")
             key_checkBox.setChecked(ui.dict_cfg[str_view_key])
             key_checkBox.stateChanged.connect(self.updatePlots)
+            self.measure_window.list_connections.append((key_checkBox.stateChanged, self.updatePlots))
         for key in supported_filters:
             loopConnectViews(view="filter", key=key)
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
         self.pushButton_auto.clicked.connect(self.autoCalculate)
         self.buttonBox.accepted.connect(self.accepted_handler)
+        self.buttonBox.rejected.connect(self.measure_window.close)
 
 
     def accepted_handler(self):
@@ -1737,6 +1749,7 @@ class Measure_window_sub(Ui_measure_window):
             raise ValueError(f"ERROR (accepted_handler): {self.row['recording_name']} not found in df_project.")
         else:
             raise ValueError(f"ERROR (accepted_handler): multiple instances of {self.row['recording_name']} in project_df.")
+        self.measure_window.close()
 
 
     def autoCalculate(self):
@@ -1995,7 +2008,6 @@ def get_signals(source):
         for key, aspect in sorted(vars(subcls).items()):
             if isinstance(aspect, signal):
                 print(f"{key} [{clsname}]")
-
 
 
 def zoomOnScroll(event, canvas):
