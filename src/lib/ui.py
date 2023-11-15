@@ -1376,6 +1376,7 @@ class UIsub(Ui_MainWindow):
                 self.canvas_seaborn_mean.axes.lines[label2idx(self.canvas_seaborn_mean, voltage_label)].set_visible(raw)
 
                 dfoutput = self.get_dfoutput(row=row)
+                print("pre:", dfoutput)
                 if savgol:
                     savgol_label = f"{row['recording_name']}_savgol"
                     # add savgol lines that don't exist
@@ -1393,18 +1394,21 @@ class UIsub(Ui_MainWindow):
                         df_output_savgol_amp = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
                                             t_EPSP_amp=row["t_EPSP_amp"])
                         df_output_savgol_amp.columns = ['sweep', 'savgol_EPSP_amp']
+                        print(f"df_output_savgol_amp.columns: {df_output_savgol_amp.columns}")
                         df_output_savgol_amp.reset_index(drop=True, inplace=True)
-                        dfoutput = df_output_savgol_amp.combine_first(dfoutput)
+                        dfoutput['savgol_EPSP_amp'] = df_output_savgol_amp.savgol_EPSP_amp
                         self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
                         self.dict_outputs[row['recording_name']] = dfoutput
+                        print("mid:", dfoutput)
                     if ('savgol_EPSP_slope' not in dfoutput.columns) & (not np.isnan(row["t_EPSP_slope"])):
                         df_output_savgol_slope = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
                                             t_EPSP_slope=row["t_EPSP_slope"])
-                        df_output_savgol_slope.columns = ['sweep', 'savgol_EPSP_amp']
+                        df_output_savgol_slope.columns = ['sweep', 'savgol_EPSP_slope']
                         df_output_savgol_slope.reset_index(drop=True, inplace=True)
-                        dfoutput = df_output_savgol_slope.combine_first(dfoutput)
+                        dfoutput['savgol_EPSP_slope'] = df_output_savgol_slope.savgol_EPSP_slope
                         self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
                         self.dict_outputs[row['recording_name']] = dfoutput
+                        print("post:", dfoutput)
                     # Plot savgol lines
                     _ = sns.lineplot(ax=self.canvas_seaborn_mean.axes, label=savgol_label, data=dfmean, y="filter_savgol", x="time", color="orange", alpha = 0.5)
                     if amp & (not np.isnan(row["t_EPSP_amp"])):
@@ -1464,7 +1468,7 @@ class UIsub(Ui_MainWindow):
 # MeasureWindow
 
     def launchMeasureWindow(self):  # , single_index_range):
-        # TODO:find_all_ture_window (if it's already open, focus on it)
+        # TODO:find_ampl_ture_window (if it's already open, focus on it)
         #   How to check for existing windows?
         #   How to shift focus?
         # Display the appropriate recording on the new window's graphs: mean and output
@@ -1549,7 +1553,7 @@ class Filetreesub(Ui_Dialog):
         # self.ftree.model.parent_index   = self.ftree.model.setRootPath(projects_folder)
         # self.ftree.model.root_index     = self.ftree.model.index(projects_folder)
 
-        # Dataframe to add
+        # Dataframe to addamp
         self.names = []
         self.dfAdd = df_projectTemplate()
 
@@ -1635,7 +1639,7 @@ class Measure_window_sub(Ui_measure_window):
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             t_EPSP_amp = self.row['t_EPSP_amp']
             self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
-            _ = sns.lineplot(ax=self.ax1, label="EPSP_amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="black")
+            _ = sns.lineplot(ax=self.ax1, label="EPSP_amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="gray")
         if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
             t_EPSP_slope = self.row['t_EPSP_slope']
             x_start = t_EPSP_slope - 0.0004 # TODO: make this a variable
@@ -1643,7 +1647,7 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_EPSP_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
             self.v_t_EPSP_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
             self.v_t_EPSP_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
-            _ = sns.lineplot(ax=self.ax2, label="EPSP_slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="black")
+            _ = sns.lineplot(ax=self.ax2, label="EPSP_slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="gray")
 
         self.canvas_mean.axes.set_xlim(ui.dict_cfg['mean_xlim'])
         self.canvas_mean.axes.set_ylim(ui.dict_cfg['mean_ylim'])
@@ -1922,6 +1926,7 @@ class Measure_window_sub(Ui_measure_window):
 
     def updateAspect(self, time, aspect, method):
         # changes the measuring points of an aspect and propagates the change to the appropriate columns in df_project
+        savgol = ui.dict_cfg['filter_savgol']
         t_aspect  = ("t_" + aspect)
         t_method = (t_aspect + "_method")
         t_params = (t_aspect + "_params")
@@ -1936,15 +1941,18 @@ class Measure_window_sub(Ui_measure_window):
         #recalculate aspect
         dffilter = ui.get_dffilter(row=self.row)
         if aspect == "EPSP_amp":
+            axis = self.ax1
             df = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=time)
             graph_color = "black"
             plot_on_mean = {'center': ("v_" + t_aspect)}
-        elif aspect == "EPSP_slope":
+        else:# aspect == "EPSP_slope":
+            axis = self.ax2
             df = analysis.build_dfoutput(df=dffilter, t_EPSP_slope=time)
             graph_color = "green"
             plot_on_mean = {'center': ("v_" + t_aspect),
                             'start':  ("v_" + t_aspect + "_start"),
                             'end':    ("v_" + t_aspect + "_end")}
+        print(f"updateAspect, df: {df}")
         self.new_dfoutput[aspect] = df[aspect]
         #update appropriate lineEdit
         print(f"lineEdit_{aspect}: time{time} to ms: {self.m(time)}")
@@ -1953,7 +1961,7 @@ class Measure_window_sub(Ui_measure_window):
 
         #update mean graph
         for key, graph in plot_on_mean.items():
-            getattr(self, graph).remove() # remove the one which you are about to update
+            getattr(self, graph).remove() # remove the one about to be replaced
             if key == "center":
                 setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color=graph_color, linestyle="--"))
             elif key == "start":
@@ -1961,12 +1969,19 @@ class Measure_window_sub(Ui_measure_window):
             elif key == "end":
                 setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time + 0.0004, color=graph_color, linestyle=":"))
         self.canvas_mean.draw()
-        #update output graph
+        #update output graph, voltage
+        while label2idx(axis, f"new_{aspect}"):
+            axis.lines[label2idx(axis, f"new_{aspect}")].remove()
         if self.new_dfoutput[aspect].notna().any():
-            if label2idx(self.canvas_output, f"new_{aspect}"):
-                self.canvas_output.axes.lines[label2idx(self.canvas_output, f"new_{aspect}")].remove()
-            _ = sns.lineplot(label=f"new_{aspect}", data=self.new_dfoutput, y=aspect, x='sweep', ax=self.canvas_output.axes, color='black')
-        self.canvas_output.axes.lines[label2idx(self.canvas_output, aspect)].set_color('gray')#set_data(new_dfoutput['sweep'], new_dfoutput[aspect])
+            _ = sns.lineplot(ax=axis, label=f"new_{aspect}", data=self.new_dfoutput, y=aspect, x='sweep', color='black')
+        #update output graph, savgol
+        if savgol:
+            print(f"updateAspect, self.new_dfoutput: {self.new_dfoutput}")
+            self.new_dfoutput[f"savgol_{aspect}"] = df[f"savgol_{aspect}"]
+            while label2idx(axis, f"new_savgol_{aspect}"):
+                axis.lines[label2idx(axis, f"new_savgol_{aspect}")].remove()
+            if self.new_dfoutput[f"savgol_{aspect}"].notna().any():
+                _ = sns.lineplot(ax=axis, label=f"new_savgol_{aspect}", data=self.new_dfoutput, y=f"savgol_{aspect}", x='sweep', color='orange', alpha=0.5)
         self.canvas_output.draw()
 
 
