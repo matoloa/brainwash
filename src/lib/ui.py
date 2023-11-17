@@ -26,7 +26,8 @@ matplotlib.use("Qt5Agg")
 
 verbose = True
 track_widget_focus = False
-# TODO: expand this as more aspects are added
+# expand as more aspects and filters are added
+# TODO: make these redundant by looping through data columns
 supported_aspects = [ "EPSP_amp", "EPSP_slope"]
 supported_filters = ["none", "savgol"]
 
@@ -201,6 +202,7 @@ class MplCanvas(FigureCanvasQTAgg):
 
 
 class QDialog_sub(QtWidgets.QDialog):
+    # Sub-classed to make a custom closeEvent that disconnects all signals to it, while preserving those in main window
     def __init__(self):
         super(QDialog_sub, self).__init__()
         self.list_connections = []
@@ -738,6 +740,10 @@ class UIsub(Ui_MainWindow):
             loopConnectViews(view="filter", key=key)
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
+
+    def closeEvent(self, event):
+        print("closeEvent")
+        event.accept()
 
 # Debugging tools
         # self.find_widgets_with_top_left_coordinates(self.centralwidget)
@@ -1523,7 +1529,7 @@ class UIsub(Ui_MainWindow):
         dfmean = self.get_dfmean(ser_table_row)
         # Close last window, for now. TODO: handle multiple windows (ew)
         if hasattr(self, "measure_frame"):
-            print("Closing last window...")
+            print(f"Closing last window: {getattr(self, 'measure_frame')}")
             self.measure_frame.close()
         # Open window
         self.measure_frame = QDialog_sub()
@@ -1791,7 +1797,8 @@ class Measure_window_sub(Ui_measure_window):
         self.new_dfoutput.reset_index(inplace=True)
         for aspect in supported_aspects:
             time = dict_t[f"t_{aspect}"]
-            self.updateAspect(aspect=aspect, time=time, method="Auto")
+            if isinstance(time, float) and not np.isnan(time) and time is not None:
+                self.updateAspect(aspect=aspect, time=time, method="Auto")
         
 
     def m(self, SI): # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
@@ -2080,8 +2087,8 @@ def label2idx(canvas, aspect):
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
-    MainWindow = QtWidgets.QMainWindow()
-    ui = UIsub(MainWindow)
-    MainWindow.show()
+    main_window = QtWidgets.QMainWindow()
+    ui = UIsub(main_window)
+    main_window.show()
     ui.setGraph()
     sys.exit(app.exec_())
