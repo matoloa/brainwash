@@ -9,6 +9,7 @@ from neo import io  # read data files ibw
 
 from tqdm import tqdm
 from joblib import Memory
+import time
 
 memory = Memory("../cache", verbose=1)
 
@@ -38,32 +39,54 @@ def build_experimentcsv(dir_gen_data):
     return dfmetadata
 
 
-@memory.cache
+#@memory.cache
 def parse_abf(filepath):
     """
     read .abf and return dataframe with proper SI units
     """
     # parse abf
     abf = pyabf.ABF(filepath)
-
+    #with open(filepath, "r+b") as f:
+    #    mmap_file=mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+    #    abf = pyabf.ABF(mmap_file)
     channels = range(abf.channelCount)
     sweeps = range(abf.sweepCount)
     sampling_Hz = abf.sampleRate
+    n_rows_in_channel = len(abf.getAllXs()) # defaults to 0
     if verbose:
         print(f"abf.channelCount: {channels}")
         print(f"abf.sweepCount): {sweeps}")
         print(f"abf.sampleRate): {sampling_Hz}")
+        print (f"n_rows_in_channel {n_rows_in_channel}")
+
+    # build df
     dfs = []
-    for j in channels:
-        for i in sweeps:
-            # get data
-            abf.setSweep(sweepNumber=i, channel=j)
-            df = pd.DataFrame({"sweepX": abf.sweepX, "sweepY": abf.sweepY})
-            #df["sweep_raw"] = i #TODO: do we need this?
-            df["t0"] = abf.sweepTimesSec[i]
-            df["channel"] = j
-            dfs.append(df)
+    for channel in channels:
+        df = pd.DataFrame(index=range(n_rows_in_channel))
+        df["sweepX"] = abf.getAllXs(channel)
+        df["sweepY"] = abf.getAllYs(channel)
+        df["channel"] = channel
+        df["sweep_raw"] = np.repeat(range(abf.sweepCount), n_rows_in_channel // abf.sweepCount)
+        abf.setSweep(sweepNumber=0, channel=channel)
+        print(f"abf.sweepTimesSec channel {channel}: {abf.sweepTimesSec}")
+        df["t0"] = np.repeat(abf.sweepTimesSec, n_rows_in_channel // len(abf.sweepTimesSec))
+        dfs.append(df)
     df = pd.concat(dfs)
+
+    #df = pd.DataFrame()
+    #dfs = []
+    #for j in channels:
+        #for i in sweeps:
+            # get data
+            #abf.setSweep(sweepNumber=i, channel=j)
+            #df = pd.DataFrame({"sweepX": abf.sweepX, "sweepY": abf.sweepY})
+            #df = pd.DataFrame()
+            #df["sweepX"], df["sweepY"] = abf.sweepX, abf.sweepY
+            #df["sweep_raw"] = i #TODO: do we need this?
+            #df["channel"] = j
+            #df["t0"] = abf.sweepTimesSec[i]
+    #        dfs.append(df)
+    #df = pd.concat(dfs)
     # Convert to SI
     df["time"] = df.sweepX  # time in seconds from start of sweep recording
     df["voltage_raw"] = df.sweepY / 1000  # mv to V
@@ -72,6 +95,8 @@ def parse_abf(filepath):
     df["datetime"] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
     df.drop(columns=["sweepX", "sweepY", "timens"], inplace=True)
     df.reset_index(drop=True, inplace=True)
+    print(f"df: {df}")
+
     return df
 
 
@@ -286,6 +311,8 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     for _ in range(3):
         print()
     print("", "*** parse.py standalone test: ***")
+    t0 = time.time()
+    
     for item in tqdm(list_sources):
         if Path(item).is_dir():
             recording_name = os.path.basename(item)
@@ -295,4 +322,6 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
         df_files = pd.DataFrame({"path": [item], "recording_name": [recording_name]})
         dict_data_nsweeps = parseProjFiles(dict_folders=dict_folders, df=df_files)
         print(f" - dict_data_nsweeps: {dict_data_nsweeps}") # what the parsed file turned into
-        print()
+    t1 = time.time()
+    print(f'time elapsed: {t1-t0} seconds')
+    print()
