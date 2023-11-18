@@ -22,6 +22,7 @@ dir_source_data = dir_project_root / "dataSource" / "Lactate_2022_abf"
 dir_gen_data = dir_project_root / "dataGenerated"
 
 
+# %%
 def build_experimentcsv(dir_gen_data):
     """
     Generate overview file of all csv:s
@@ -70,6 +71,41 @@ def parse_abf(filepath):
     df["timens"] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
     df["datetime"] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
     df.drop(columns=["sweepX", "sweepY", "timens"], inplace=True)
+    df.reset_index(drop=True, inplace=True)
+    return df
+
+
+def parse_abf_fast(filepath):
+    """
+    read .abf and return dataframe with proper SI units
+    """
+    # parse abf
+    abf = pyabf.ABF(filepath)
+
+    channels = range(abf.channelCount)
+    sweeps = range(abf.sweepCount)
+    sampling_Hz = abf.sampleRate
+    if verbose:
+        print(f"abf.channelCount: {channels}")
+        print(f"abf.sweepCount): {sweeps}")
+        print(f"abf.sampleRate): {sampling_Hz}")
+    dfs = []
+    for j in channels:
+        abf.setSweep(sweepNumber=0, channel=j)  # not changing anything need to rethink channel generation maybe?
+        sweepX = np.tile(abf.getAllXs(j)[:abf.sweepPointCount], abf.sweepCount)
+        t0 = np.repeat(abf.sweepTimesSec, len(sweepX) // abf.sweepCount)
+        sweepY = abf.getAllYs(j)
+        df = pd.DataFrame({"sweepX": sweepX, "sweepY": sweepY, "t0": t0})
+        df["channel"] = j
+        dfs.append(df)
+    df = pd.concat(dfs)
+    # Convert to SI
+    df["time"] = df.sweepX  # time in seconds from start of sweep recording
+    df["voltage_raw"] = df.sweepY / 1000  # mv to V
+    # Absolute date and time
+    df["timens"] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
+    df["datetime"] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
+    df.drop(columns=["sweepY", "timens"], inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
 
@@ -246,7 +282,7 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     dict_folders['cache'] = dict_folders['project'] / "cache"
     dict_folders['project'].mkdir(exist_ok=True)
     #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"), str(source_folder / "abf 2 channel/KO_02")]
-    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"), str(source_folder / "abf 2 channel/KO_02/2022_01_24_0000.abf")]
+    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"), str(source_folder / "abf 2 channel/KO_02/2022_01_24_0020.abf")]
     for _ in range(3):
         print()
     print("", "*** parse.py standalone test: ***")
