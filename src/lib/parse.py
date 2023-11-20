@@ -39,7 +39,6 @@ def build_experimentcsv(dir_gen_data):
     return dfmetadata
 
 
-#@memory.cache
 def parse_abf(filepath):
     """
     read .abf and return dataframe with proper SI units
@@ -61,62 +60,7 @@ def parse_abf(filepath):
 
     # build df
     dfs = []
-    for channel in channels:
-        df = pd.DataFrame(index=range(n_rows_in_channel))
-        df["sweepX"] = abf.getAllXs(channel)
-        df["sweepY"] = abf.getAllYs(channel)
-        df["channel"] = channel
-        df["sweep_raw"] = np.repeat(range(abf.sweepCount), n_rows_in_channel // abf.sweepCount)
-        abf.setSweep(sweepNumber=0, channel=channel)
-        print(f"abf.sweepTimesSec channel {channel}: {abf.sweepTimesSec}")
-        df["t0"] = np.repeat(abf.sweepTimesSec, n_rows_in_channel // len(abf.sweepTimesSec))
-        dfs.append(df)
-    df = pd.concat(dfs)
-
-    #df = pd.DataFrame()
-    #dfs = []
-    #for j in channels:
-        #for i in sweeps:
-            # get data
-            #abf.setSweep(sweepNumber=i, channel=j)
-            #df = pd.DataFrame({"sweepX": abf.sweepX, "sweepY": abf.sweepY})
-            #df = pd.DataFrame()
-            #df["sweepX"], df["sweepY"] = abf.sweepX, abf.sweepY
-            #df["sweep_raw"] = i #TODO: do we need this?
-            #df["channel"] = j
-            #df["t0"] = abf.sweepTimesSec[i]
-    #        dfs.append(df)
-    #df = pd.concat(dfs)
-    # Convert to SI
-    df["time"] = df.sweepX  # time in seconds from start of sweep recording
-    df["voltage_raw"] = df.sweepY / 1000  # mv to V
-    # Absolute date and time
-    df["timens"] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
-    df["datetime"] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
-    df.drop(columns=["sweepX", "sweepY", "timens"], inplace=True)
-    df.reset_index(drop=True, inplace=True)
-    print(f"df: {df}")
-
-    return df
-
-
-def parse_abf_fast(filepath):
-    """
-    read .abf and return dataframe with proper SI units
-    """
-    # parse abf
-    abf = pyabf.ABF(filepath)
-
-    channels = range(abf.channelCount)
-    sweeps = range(abf.sweepCount)
-    sampling_Hz = abf.sampleRate
-    if verbose:
-        print(f"abf.channelCount: {channels}")
-        print(f"abf.sweepCount): {sweeps}")
-        print(f"abf.sampleRate): {sampling_Hz}")
-    dfs = []
     for j in channels:
-        abf.setSweep(sweepNumber=0, channel=j)  # not changing anything need to rethink channel generation maybe?
         sweepX = np.tile(abf.getAllXs(j)[:abf.sweepPointCount], abf.sweepCount)
         t0 = np.repeat(abf.sweepTimesSec, len(sweepX) // abf.sweepCount)
         sweepY = abf.getAllYs(j)
