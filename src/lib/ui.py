@@ -686,7 +686,7 @@ class UIsub(Ui_MainWindow):
             print("Creating project_cfg:", self.project_cfg_yaml)
             self.write_project_cfg()
         # Enforce local cfg
-        self.checkBoxLockDelete.setChecked(self.dict_cfg['delete_locked'])
+        self.checkBoxLockDelete.setChecked(bool(self.dict_cfg['delete_locked']))
         self.pushButtonDelete.setEnabled(not self.dict_cfg['delete_locked'])
         for group in self.dict_cfg['list_groups']:  # Generate buttons based on groups in project:
             self.addGroupButton(group)
