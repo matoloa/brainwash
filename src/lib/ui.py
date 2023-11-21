@@ -1394,10 +1394,10 @@ class UIsub(Ui_MainWindow):
         if df_filtered.empty:
             print("Nothing analyzed selected.")
         else:
-            amp = bool(ui.dict_cfg['aspect_EPSP_amp'])
-            slope = bool(ui.dict_cfg['aspect_EPSP_slope'])
-            raw = bool(ui.dict_cfg['filter_none'])
-            savgol = bool(ui.dict_cfg['filter_savgol'])
+            amp = bool(self.dict_cfg['aspect_EPSP_amp'])
+            slope = bool(self.dict_cfg['aspect_EPSP_slope'])
+            raw = bool(self.dict_cfg['filter_none'])
+            savgol = bool(self.dict_cfg['filter_savgol'])
 
             for i, row in df_filtered.iterrows(): # TODO: i to be used later for cycling colours?
                 # plot dfmean.voltage on canvas_seaborn_mean
@@ -1487,7 +1487,7 @@ class UIsub(Ui_MainWindow):
     def meanClicked(self, event): # maingraph click event
         if event.inaxes is not None:
             if event.button == 2:
-                zoomReset(canvas=self.canvas_seaborn_mean)
+                zoomReset(canvas=self.canvas_seaborn_mean, ui=self)
 
     def viewSettingsChanged(self, state, str_view_key):
         # checkboxes for views have changed; save settings and update
@@ -1523,7 +1523,7 @@ class UIsub(Ui_MainWindow):
             self.measure_frame.close()
         # Open window
         self.measure_frame = QDialog_sub()
-        self.measure_window_sub = Measure_window_sub(self.measure_frame, row=ser_table_row, dfmean=dfmean)
+        self.measure_window_sub = Measure_window_sub(self.measure_frame, row=ser_table_row, dfmean=dfmean, parent=self)
         self.measure_frame.setWindowTitle(ser_table_row['recording_name'])
         # move measurewindow to default position (TODO: later to be stored in cfg)
         self.measure_frame.setGeometry(1400, 0, 800, 1200)
@@ -1645,7 +1645,7 @@ class Measure_window_sub(Ui_measure_window):
         # local versions of row and dfmean that persist unchanged (TODO: check!) while the window is open
         self.row = row.copy() # creates a copy to be modified, then accepted or rejected
         self.dfmean = dfmean # will not be modified; no need to copy()
-        self.new_dfoutput = ui.get_dfoutput(row).copy() # creates a copy to be modified, then accepted or rejected
+        self.new_dfoutput = parent.get_dfoutput(row).copy() # creates a copy to be modified, then accepted or rejected
         self.setupUi(measure_frame)
         self.parent = parent
         self.measure_frame = measure_frame
@@ -1685,10 +1685,10 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_EPSP_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
             _ = sns.lineplot(ax=self.ax2, label="EPSP_slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="gray")
 
-        self.canvas_mean.axes.set_xlim(ui.dict_cfg['mean_xlim'])
-        self.canvas_mean.axes.set_ylim(ui.dict_cfg['mean_ylim'])
-        self.ax1.set_ylim(ui.dict_cfg['output_ax1_ylim'])
-        self.ax2.set_ylim(ui.dict_cfg['output_ax2_ylim'])
+        self.canvas_mean.axes.set_xlim(parent.dict_cfg['mean_xlim'])
+        self.canvas_mean.axes.set_ylim(parent.dict_cfg['mean_ylim'])
+        self.ax1.set_ylim(parent.dict_cfg['output_ax1_ylim'])
+        self.ax2.set_ylim(parent.dict_cfg['output_ax2_ylim'])
 
         # lines and drag state
         self.si_v = None # vertical line in canvas_output, indicating selected sweep
@@ -1716,8 +1716,8 @@ class Measure_window_sub(Ui_measure_window):
         # connect checkboxes from mainwindow to updatePlots TODO: refactorize to merge with similar code in __init__(self, mainwindow)
         def loopConnectViews(view, key):
             str_view_key = f"{view}_{key}"
-            key_checkBox = getattr(ui, f"checkBox_{str_view_key}")
-            key_checkBox.setChecked(ui.dict_cfg[str_view_key])
+            key_checkBox = getattr(parent, f"checkBox_{str_view_key}")
+            key_checkBox.setChecked(parent.dict_cfg[str_view_key])
             key_checkBox.stateChanged.connect(self.updatePlots)
             self.measure_frame.list_connections.append((key_checkBox.stateChanged, self.updatePlots))
         for key in supported_filters:
@@ -1731,24 +1731,24 @@ class Measure_window_sub(Ui_measure_window):
 
     def accepted_handler(self):
         # update df_project, dict_outputs, and purge group outputs for recalculation
-        # find idx of row in ui.df_project with matching recording_name
-        df_p = ui.get_df_project()
+        # find idx of row in parent.df_project with matching recording_name
+        df_p = self.parent.get_df_project()
         idx = df_p.index[df_p['recording_name'] == self.row['recording_name']]
         print(f"accepted_handler: idx: {idx}, type: {type(idx)}")
         list_keep = ['recording_name', 'groups']
         if len(idx) == 1:
             for column, value in self.row.items():
                 if not column in list_keep:
-                    ui.df_project.loc[idx, column] = value
-            ui.save_df_project()
+                    self.parent.df_project.loc[idx, column] = value
+            self.parent.save_df_project()
             # update output; dict and file
-            rec_name = ui.df_project.loc[int(idx.values[0]), 'recording_name']
+            rec_name = self.parent.df_project.loc[int(idx.values[0]), 'recording_name']
             key_output = f"{rec_name}_output"
-            ui.dict_outputs[key_output] = self.new_dfoutput
-            ui.df2csv(df=self.new_dfoutput, rec=rec_name, key="output")
+            self.parent.dict_outputs[key_output] = self.new_dfoutput
+            self.parent.df2csv(df=self.new_dfoutput, rec=rec_name, key="output")
             # delete affected group output; dicts and files
             # build list of groups to purge
-            str_groups = ui.df_project.loc[int(idx.values[0]), 'groups']
+            str_groups = self.parent.df_project.loc[int(idx.values[0]), 'groups']
             print(f"accepted_handler: groups_from_df {str_groups}, type: {type(str_groups)}")
             list_groups = list(str_groups.split(","))
             print(f"accepted_handler: list_groups: {list_groups}, type: {type(list_groups)}")
@@ -1758,19 +1758,19 @@ class Measure_window_sub(Ui_measure_window):
             else:
                 if verbose:
                     print(f"list_groups: {list_groups}")
-                    print(f"ui.dict_group_means: {list(ui.dict_group_means.keys())}")
+                    print(f"self.parent.dict_group_means: {list(self.parent.dict_group_means.keys())}")
                 for group in list_groups:
-                    if group in ui.dict_group_means.keys():
+                    if group in self.parent.dict_group_means.keys():
                         if verbose:
                             print(f"accepted_handler: removing {group} from internal dict")
-                        del ui.dict_group_means[group]
-                        ui.purgeGroupCache(group)
-                        group_path = Path(f'{ui.dict_folders["cache"]}/{group}.csv')
+                        del self.parent.dict_group_means[group]
+                        self.parent.purgeGroupCache(group)
+                        group_path = Path(f'{self.parent.dict_folders["cache"]}/{group}.csv')
                         if group_path.exists():
                             if verbose:
                                 print(f"accepted_handler: deleting {group_path}")
                             group_path.unlink()
-            ui.setGraph(df_p.iloc[idx])
+            self.parent.setGraph(df_p.iloc[idx])
         elif len(idx) < 1:
             raise ValueError(f"ERROR (accepted_handler): {self.row['recording_name']} not found in df_project.")
         else:
@@ -1779,7 +1779,7 @@ class Measure_window_sub(Ui_measure_window):
 
 
     def autoCalculate(self):
-        dffilter = ui.get_dffilter(row=self.row)
+        dffilter = self.parent.get_dffilter(row=self.row)
         dict_t = analysis.find_all_t(dfmean=self.dfmean, verbose=False)
         self.new_dfoutput = analysis.build_dfoutput(df=dffilter,
                                        t_EPSP_amp=dict_t["t_EPSP_amp"],
@@ -1816,11 +1816,11 @@ class Measure_window_sub(Ui_measure_window):
 
 
     def updatePlots(self):
-        # Apply settings from ui.dict_cfg to canvas_mean and canvas_output
-        amp = bool(ui.dict_cfg['aspect_EPSP_amp'])
-        slope = bool(ui.dict_cfg['aspect_EPSP_slope'])
-        raw = bool(ui.dict_cfg['filter_none'])
-        savgol = bool(ui.dict_cfg['filter_savgol'])
+        # Apply settings from self.parent.dict_cfg to canvas_mean and canvas_output
+        amp = bool(self.parent.dict_cfg['aspect_EPSP_amp'])
+        slope = bool(self.parent.dict_cfg['aspect_EPSP_slope'])
+        raw = bool(self.parent.dict_cfg['filter_none'])
+        savgol = bool(self.parent.dict_cfg['filter_savgol'])
 
         # Conditions and labels for display of lines in canvas_mean and canvas_output
         dict_label_conditions = {
@@ -1836,16 +1836,16 @@ class Measure_window_sub(Ui_measure_window):
 
         if savgol:
             # add savgol lines that don't exist
-            dffilter = ui.get_dffilter(row=self.row)
+            dffilter = self.parent.get_dffilter(row=self.row)
             if 'filter_savgol' not in dffilter:
                 dffilter = analysis.addFilterSavgol(dffilter)
-                ui.df2csv(df=dffilter, rec=self.row['recording_name'], key="filter")
-                ui.dict_filters[self.row['recording_name']] = dffilter
-            dfmean = ui.get_dfmean(row=self.row)
+                self.parent.df2csv(df=dffilter, rec=self.row['recording_name'], key="filter")
+                self.parent.dict_filters[self.row['recording_name']] = dffilter
+            dfmean = self.parent.get_dfmean(row=self.row)
             if 'filter_savgol' not in dfmean:
                 dfmean = analysis.addFilterSavgol(dfmean)
-                ui.df2csv(df=dfmean, rec=self.row['recording_name'], key="mean")
-                ui.dict_means[self.row['recording_name']] = dfmean
+                self.parent.df2csv(df=dfmean, rec=self.row['recording_name'], key="mean")
+                self.parent.dict_means[self.row['recording_name']] = dfmean
             if 'savgol_EPSP_amp' not in self.new_dfoutput:
                 df_output_savgol = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
                                        t_EPSP_amp=self.row["t_EPSP_amp"],
@@ -1894,7 +1894,7 @@ class Measure_window_sub(Ui_measure_window):
                 time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
                 self.updateOnClick(time=time, aspect=self.aspect)
             elif event.button == 2:
-                zoomReset(canvas=self.canvas_mean)
+                zoomReset(canvas=self.canvas_mean, ui=self.parent)
 
 
     def outputClicked(self, event): # measurewindow output click event
@@ -1924,7 +1924,7 @@ class Measure_window_sub(Ui_measure_window):
             self.dragging = False
             same = bool(int(self.drag_start) == int(x))
             print(f"meanDragged from: {self.drag_start} to {x}: {same}")
-            df = ui.get_dffilter(self.row)
+            df = self.parent.get_dffilter(self.row)
             if same: # click and release on same: get that specific sweep and superimpose it on canvas_mean
                 unPlot(self.canvas_output, self.si_v_drag_to, self.dragplot)
                 df = df[df['sweep'] == int(self.drag_start)]
@@ -1966,7 +1966,7 @@ class Measure_window_sub(Ui_measure_window):
 
     def updateAspect(self, time, aspect, method):
         # changes the measuring points of an aspect and propagates the change to the appropriate columns in df_project
-        savgol = ui.dict_cfg['filter_savgol']
+        savgol = self.parent.dict_cfg['filter_savgol']
         t_aspect  = ("t_" + aspect)
         t_method = (t_aspect + "_method")
         t_params = (t_aspect + "_params")
@@ -1975,11 +1975,11 @@ class Measure_window_sub(Ui_measure_window):
         self.row[t_method] = method
         self.row[t_params] = "-"
         if verbose:
-            print(f" . ui.df_project.loc[self.row.name, t_aspect]: {ui.df_project.loc[self.row.name, t_aspect]}, row[{t_aspect}]: {self.row[t_aspect]}")
-            print(f" . ui.df_project.loc[self.row.name, t_method: {ui.df_project.loc[self.row.name, t_method]}, row[{t_method}]: {self.row[t_method]}")
-            print(f" . ui.df_project.loc[self.row.name, t_params]: {ui.df_project.loc[self.row.name, t_params]}, row[{t_params}]: {self.row[t_params]}")
+            print(f" . self.parent.df_project.loc[self.row.name, t_aspect]: {self.parent.df_project.loc[self.row.name, t_aspect]}, row[{t_aspect}]: {self.row[t_aspect]}")
+            print(f" . self.parent.df_project.loc[self.row.name, t_method: {self.parent.df_project.loc[self.row.name, t_method]}, row[{t_method}]: {self.row[t_method]}")
+            print(f" . self.parent.df_project.loc[self.row.name, t_params]: {self.parent.df_project.loc[self.row.name, t_params]}, row[{t_params}]: {self.row[t_params]}")
         #recalculate aspect
-        dffilter = ui.get_dffilter(row=self.row)
+        dffilter = self.parent.get_dffilter(row=self.row)
         if aspect == "EPSP_amp":
             axis = self.ax1
             df = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=time)
@@ -2056,7 +2056,7 @@ def zoomOnScroll(event, canvas):
         canvas.draw()
 
 
-def zoomReset(canvas):
+def zoomReset(canvas, ui):
     canvas.axes.set_xlim(ui.dict_cfg['mean_xlim'])
     canvas.axes.set_ylim(ui.dict_cfg['mean_ylim'])
     canvas.draw()
