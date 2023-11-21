@@ -1198,7 +1198,6 @@ class UIsub(Ui_MainWindow):
 
 
 # Table handling
-
     def listSelectedRows(self):
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         return [row.row() for row in selected_indexes]
@@ -1563,6 +1562,25 @@ class InputDialogPopup(QtWidgets.QDialog):
 
 class TableProjSub(QtWidgets.QTableView):
     # subclassing to change behavior of keypress event
+    def __init__(self, parent=None):
+        super(TableProjSub, self).__init__(parent)
+        # Initialize the TableProjSub widget
+
+        print("XXX TableProjSub init")
+
+        # Set the drag and drop properties
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+
+        # Install the event filter to handle drop events
+        self.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+            if event.type() == QtCore.QEvent.Drop:
+                self.dropEvent(event)
+                return True
+            return super().eventFilter(obj, event)
+
     def keyPressEvent(self, event):
         # print("a key pressed in CustomTableView")
         if event.key() == QtCore.Qt.Key.Key_F2:
@@ -1572,6 +1590,23 @@ class TableProjSub(QtWidgets.QTableView):
         else:
             # Handle other key events or pass them to the base class
             super().keyPressEvent(event)
+
+    def dropEvent(self, event):
+        print("Drop detected!")
+        mime_data = event.mimeData()
+
+        if mime_data.hasUrls():
+            file_paths = [url.toLocalFile() for url in mime_data.urls()]
+
+            # Update the model with the file paths
+            self.table_model.setFileData(file_paths)
+
+            # Print the file paths
+            print("Dropped Files and Folders:")
+            for path in file_paths:
+                print(path)
+
+        event.accept()
 
 
 class Filetreesub(Ui_Dialog):
