@@ -552,16 +552,6 @@ class Ui_Dialog(QtWidgets.QWidget):
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Dialog"))
-        # connect checkboxes to local functions TODO: refactorize to merge with similar code in __init__(self, measure_window...
-        def loopConnectViews(view, key):
-            str_view_key = f"{view}_{key}"
-            key_checkBox = getattr(self, f"checkBox_{str_view_key}")
-            key_checkBox.setChecked(self.dict_cfg[str_view_key])
-            key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.viewSettingsChanged(state, str_view_key))
-        for key in supported_filters:
-            loopConnectViews(view="filter", key=key)
-        for key in supported_aspects:
-            loopConnectViews(view="aspect", key=key)
 
 
 #######################################################################
@@ -686,7 +676,7 @@ class UIsub(Ui_MainWindow):
             print("Creating project_cfg:", self.project_cfg_yaml)
             self.write_project_cfg()
         # Enforce local cfg
-        self.checkBoxLockDelete.setChecked(bool(self.dict_cfg['delete_locked']))
+        self.checkBoxLockDelete.setChecked(self.dict_cfg['delete_locked'])
         self.pushButtonDelete.setEnabled(not self.dict_cfg['delete_locked'])
         for group in self.dict_cfg['list_groups']:  # Generate buttons based on groups in project:
             self.addGroupButton(group)
