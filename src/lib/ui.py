@@ -15,7 +15,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
 # from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 from datetime import datetime
 import re
 
@@ -627,7 +627,8 @@ class UIsub(Ui_MainWindow):
 
         # replacing table proj with custom to allow changing of keypress event handling
         originalTableView = self.centralwidget.findChild(QtWidgets.QTableView, "tableProj")  # Find and replace the original QTableView in the layout
-        tableProj = TableProjSub(self.centralwidget)  # Create an instance of your custom table view
+        #tableProj = TableProjSub(self.centralwidget)  # Create an instance of your custom table view
+        tableProj = TableProjSub(self)  # Create an instance of your custom table view
         
         # Replace the original QTableView with TableProjSub in the layout
         layout = self.centralwidget.layout()
@@ -730,10 +731,6 @@ class UIsub(Ui_MainWindow):
             loopConnectViews(view="filter", key=key)
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
-
-    def closeEvent(self, event):
-        print("closeEvent")
-        event.accept()
 
 # Debugging tools
         # self.find_widgets_with_top_left_coordinates(self.centralwidget)
@@ -1406,7 +1403,6 @@ class UIsub(Ui_MainWindow):
                 self.canvas_seaborn_mean.axes.lines[label2idx(self.canvas_seaborn_mean, voltage_label)].set_visible(raw)
 
                 dfoutput = self.get_dfoutput(row=row)
-                print("pre:", dfoutput)
                 if savgol:
                     savgol_label = f"{row['recording_name']}_savgol"
                     # add savgol lines that don't exist
@@ -1429,7 +1425,6 @@ class UIsub(Ui_MainWindow):
                         dfoutput['savgol_EPSP_amp'] = df_output_savgol_amp.savgol_EPSP_amp
                         self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
                         self.dict_outputs[row['recording_name']] = dfoutput
-                        print("mid:", dfoutput)
                     if ('savgol_EPSP_slope' not in dfoutput.columns) & (not np.isnan(row["t_EPSP_slope"])):
                         df_output_savgol_slope = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
                                             t_EPSP_slope=row["t_EPSP_slope"])
@@ -1438,7 +1433,6 @@ class UIsub(Ui_MainWindow):
                         dfoutput['savgol_EPSP_slope'] = df_output_savgol_slope.savgol_EPSP_slope
                         self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
                         self.dict_outputs[row['recording_name']] = dfoutput
-                        print("post:", dfoutput)
                     # Plot savgol lines
                     _ = sns.lineplot(ax=self.canvas_seaborn_mean.axes, label=savgol_label, data=dfmean, y="filter_savgol", x="time", color="orange", alpha = 0.5)
                     if amp & (not np.isnan(row["t_EPSP_amp"])):
@@ -1561,52 +1555,35 @@ class InputDialogPopup(QtWidgets.QDialog):
 
 
 class TableProjSub(QtWidgets.QTableView):
-    # subclassing to change behavior of keypress event
     def __init__(self, parent=None):
-        super(TableProjSub, self).__init__(parent)
-        # Initialize the TableProjSub widget
-
-        print("XXX TableProjSub init")
-
-        # Set the drag and drop properties
-        self.setDragEnabled(True)
-        self.setAcceptDrops(True)
-
-        # Install the event filter to handle drop events
-        self.installEventFilter(self)
-
-    def eventFilter(self, obj, event):
-            if event.type() == QtCore.QEvent.Drop:
-                self.dropEvent(event)
-                return True
-            return super().eventFilter(obj, event)
+        super().__init__()
+        self.parent = parent
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            file_urls = [url.toLocalFile() for url in event.mimeData().urls()]
+            print("Files dropped:", file_urls)
+            # Handle the dropped files here
+            dfAdd = df_projectTemplate()
+            dfAdd["path"] = file_urls
+            dfAdd["host"] = "Computer 1"
+            dfAdd["checksum"] = "big number"
+            # NTH: more intelligent default naming; lowest level unique name?
+            # For now, use name + lowest level folder
+            names = []
+            for i in file_urls:
+                names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
+            dfAdd["recording_name"] = names
+            self.parent.addData(dfAdd)
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
     def keyPressEvent(self, event):
-        # print("a key pressed in CustomTableView")
         if event.key() == QtCore.Qt.Key.Key_F2:
             ui.renameRecording()
-            # Forward the key press event to the base class
             super().keyPressEvent(event)
         else:
-            # Handle other key events or pass them to the base class
             super().keyPressEvent(event)
-
-    def dropEvent(self, event):
-        print("Drop detected!")
-        mime_data = event.mimeData()
-
-        if mime_data.hasUrls():
-            file_paths = [url.toLocalFile() for url in mime_data.urls()]
-
-            # Update the model with the file paths
-            self.table_model.setFileData(file_paths)
-
-            # Print the file paths
-            print("Dropped Files and Folders:")
-            for path in file_paths:
-                print(path)
-
-        event.accept()
 
 
 class Filetreesub(Ui_Dialog):
