@@ -1,44 +1,36 @@
-import sys
-from setuptools import find_packages
-from cx_Freeze import setup, Executable
+import os
+import sysconfig
 
-# base="Win32GUI" should be used only for Windows GUI app
-print(f"sys.platform: {sys.platform}")
-base = "Win32GUI" if sys.platform == "win32" else None
+from cx_Freeze import Executable, setup
 
-
+platform = sysconfig.get_platform()
+python_version = sysconfig.get_python_version()
+#dir_name = f"zip.{platform}-{python_version}"
+#build_exe_dir = os.path.join("build", dir_name)
+build_exe_dir = f"brainwash-{platform}-{python_version}"
 # Include the path to the Python script you want to freeze.
 script_path = "main.py"
 # Additional files/directories that should be included in the distribution.
 # You may need to add other dependencies or data files here.
 include_files = ["lib/"]
 # Create an executable.
-exe = Executable(
-    script=script_path,
-    #base=base,
-    #targetName="hello.exe"  # The name of the output executable.
-)
-# Setup cx_Freeze options.
+
 options = {
     "build_exe": {
-        "includes": [],
-        "excludes": [],
+        "build_exe": build_exe_dir,
         "packages": ["pyabf", "neo", "tqdm", "sklearn"],
         "include_files": include_files
     }
 }
 
+executables = [
+    Executable("main.py"),
+]
 
-# Call the setup function.
 setup(
-    name="Brainwash",
-    version="0.1",
-    description="",
-    #packages=find_packages(where="src"),
-    #package_dir={"": "src"},
-    #include_package_data=True,
+    name="brainwash",
+    version="0.5",
+    description="Washes brains",
+    executables=executables,
     options=options,
-    executables=[exe],
-    base=base
 )
-
