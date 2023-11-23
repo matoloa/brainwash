@@ -29,7 +29,6 @@ track_widget_focus = False
 # expand as more aspects and filters are added
 # TODO: make these redundant by looping through data columns
 supported_aspects = [ "EPSP_amp", "EPSP_slope"]
-supported_filters = ["none", "savgol"]
 
 
 class TableModel(QtCore.QAbstractTableModel):
@@ -308,6 +307,35 @@ class Ui_measure_window(QtCore.QObject):
         self.frame_measure_view.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame_measure_view.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame_measure_view.setObjectName("frame_measure_view")
+        self.label_filter = QtWidgets.QLabel(self.frame_measure_view)
+        self.label_filter.setGeometry(QtCore.QRect(10, 10, 62, 17))
+        self.label_filter.setObjectName("label_filter")
+        self.lineEdit_filter_param1 = QtWidgets.QLineEdit(self.frame_measure_view)
+        self.lineEdit_filter_param1.setGeometry(QtCore.QRect(190, 30, 51, 25))
+        self.lineEdit_filter_param1.setObjectName("lineEdit_filter_param1")
+        self.radioButton_filter_placeholder = QtWidgets.QRadioButton(self.frame_measure_view)
+        self.radioButton_filter_placeholder.setGeometry(QtCore.QRect(10, 70, 106, 23))
+        self.radioButton_filter_placeholder.setObjectName("radioButton_filter_placeholder")
+        self.label_filter_param2 = QtWidgets.QLabel(self.frame_measure_view)
+        self.label_filter_param2.setGeometry(QtCore.QRect(110, 70, 71, 23))
+        self.label_filter_param2.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_filter_param2.setObjectName("label_filter_param2")
+        self.lineEdit_filter_param2 = QtWidgets.QLineEdit(self.frame_measure_view)
+        self.lineEdit_filter_param2.setGeometry(QtCore.QRect(190, 70, 51, 25))
+        self.lineEdit_filter_param2.setObjectName("lineEdit_filter_param2")
+        self.label_filter_params = QtWidgets.QLabel(self.frame_measure_view)
+        self.label_filter_params.setGeometry(QtCore.QRect(110, 10, 91, 17))
+        self.label_filter_params.setObjectName("label_filter_params")
+        self.radioButton_filter_savgol = QtWidgets.QRadioButton(self.frame_measure_view)
+        self.radioButton_filter_savgol.setGeometry(QtCore.QRect(10, 50, 106, 23))
+        self.radioButton_filter_savgol.setObjectName("radioButton_filter_savgol")
+        self.radioButton_filter_none = QtWidgets.QRadioButton(self.frame_measure_view)
+        self.radioButton_filter_none.setGeometry(QtCore.QRect(10, 30, 106, 23))
+        self.radioButton_filter_none.setObjectName("radioButton_filter_none")
+        self.label_filter_param1 = QtWidgets.QLabel(self.frame_measure_view)
+        self.label_filter_param1.setGeometry(QtCore.QRect(110, 30, 71, 23))
+        self.label_filter_param1.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label_filter_param1.setObjectName("label_filter_param1")
         self.horizontalLayout.addWidget(self.frame_measure_view)
         self.measure_verticalLayout.addLayout(self.horizontalLayout)
         self.measure_graph_output = QtWidgets.QWidget(measure)
@@ -345,6 +373,14 @@ class Ui_measure_window(QtCore.QObject):
         self.label_EPSP_ms.setText(_translate("measure", "ms"))
         self.label_volley_ms.setText(_translate("measure", "ms"))
         self.pushButton_auto.setText(_translate("measure", "Auto"))
+        self.label_filter.setText(_translate("measure", "Filter"))
+        self.radioButton_filter_placeholder.setText(_translate("measure", "...more"))
+        self.label_filter_param2.setText(_translate("measure", "PolyOrder"))
+        self.label_filter_params.setText(_translate("measure", "Parameters"))
+        self.radioButton_filter_savgol.setText(_translate("measure", "SavGol"))
+        self.radioButton_filter_none.setText(_translate("measure", "No filter"))
+        self.label_filter_param1.setText(_translate("measure", "Window"))
+
 
 
 
@@ -451,24 +487,15 @@ class Ui_MainWindow(QtCore.QObject):
         self.frame_main_view.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame_main_view.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame_main_view.setObjectName("frame_main_view")
-        self.checkBox_filter_none = QtWidgets.QCheckBox(self.frame_main_view)
-        self.checkBox_filter_none.setGeometry(QtCore.QRect(10, 30, 90, 23))
-        self.checkBox_filter_none.setObjectName("checkBox_filter_none")
         self.checkBox_aspect_EPSP_amp = QtWidgets.QCheckBox(self.frame_main_view)
-        self.checkBox_aspect_EPSP_amp.setGeometry(QtCore.QRect(100, 50, 90, 23))
+        self.checkBox_aspect_EPSP_amp.setGeometry(QtCore.QRect(10, 50, 90, 23))
         self.checkBox_aspect_EPSP_amp.setObjectName("checkBox_aspect_EPSP_amp")
         self.checkBox_aspect_EPSP_slope = QtWidgets.QCheckBox(self.frame_main_view)
-        self.checkBox_aspect_EPSP_slope.setGeometry(QtCore.QRect(100, 30, 90, 23))
+        self.checkBox_aspect_EPSP_slope.setGeometry(QtCore.QRect(10, 30, 90, 23))
         self.checkBox_aspect_EPSP_slope.setObjectName("checkBox_aspect_EPSP_slope")
-        self.label_filter = QtWidgets.QLabel(self.frame_main_view)
-        self.label_filter.setGeometry(QtCore.QRect(10, 10, 62, 17))
-        self.label_filter.setObjectName("label_filter")
         self.label_aspect = QtWidgets.QLabel(self.frame_main_view)
-        self.label_aspect.setGeometry(QtCore.QRect(100, 10, 62, 17))
+        self.label_aspect.setGeometry(QtCore.QRect(10, 10, 62, 17))
         self.label_aspect.setObjectName("label_aspect")
-        self.checkBox_filter_savgol = QtWidgets.QCheckBox(self.frame_main_view)
-        self.checkBox_filter_savgol.setGeometry(QtCore.QRect(10, 50, 90, 23))
-        self.checkBox_filter_savgol.setObjectName("checkBox_filter_savgol")
         self.horizontalLayout.addWidget(self.frame_main_view)
         self.verticalLayoutGraph.addLayout(self.horizontalLayout)
         self.labelMeanGroups = QtWidgets.QLabel(self.centralwidget)
@@ -517,15 +544,11 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButtonEditGroups.setText(_translate("mainWindow", "Edit"))
         self.pushButtonClearGroups.setText(_translate("mainWindow", "Clear"))
         self.labelMeanSweep.setText(_translate("mainWindow", "Mean Sweep:"))
-        self.checkBox_filter_none.setText(_translate("mainWindow", "None"))
         self.checkBox_aspect_EPSP_amp.setText(_translate("mainWindow", "EPSP amp."))
         self.checkBox_aspect_EPSP_slope.setText(_translate("mainWindow", "EPSP slope"))
-        self.label_filter.setText(_translate("mainWindow", "Filter"))
         self.label_aspect.setText(_translate("mainWindow", "Aspect"))
-        self.checkBox_filter_savgol.setText(_translate("mainWindow", "Sav-Gol"))
         self.labelMeanGroups.setText(_translate("mainWindow", "Mean Groups:"))
         self.labelMetadata.setText(_translate("mainWindow", "Metadata:"))
-
 
 
 class Ui_Dialog(QtWidgets.QWidget):
@@ -569,6 +592,8 @@ def df_projectTemplate():
             "sweeps",
             "channel",
             "stim",
+            "filter",
+            "filter_params",
             "t_stim",
             "t_stim_method",
             "t_stim_params",
@@ -669,9 +694,7 @@ class UIsub(Ui_MainWindow):
                         'dict_group_name': {}, # group_X: name - how the program displays groups TODO: implement
                         'dict_group_show': {}, # group_X: True/False - whether to show group in graphs
                         'list_group_colors': ["red", "green", "blue", "yellow"], # TODO: build this list properly
-                        'delete_locked': True,
-                        'filter_none': True,
-                        'filter_savgol': False,
+                        'delete_locked': True, # whether to allow deleting of data
                         'aspect_EPSP_slope': True,
                         'aspect_EPSP_amp': True,
                         'mean_ylim': (-0.0006, 0.0002),
@@ -733,8 +756,6 @@ class UIsub(Ui_MainWindow):
             key_checkBox = getattr(self, f"checkBox_{str_view_key}")
             key_checkBox.setChecked(self.dict_cfg[str_view_key])
             key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.viewSettingsChanged(state, str_view_key))
-        for key in supported_filters:
-            loopConnectViews(view="filter", key=key)
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
 
@@ -1421,75 +1442,35 @@ class UIsub(Ui_MainWindow):
 
     def setGraphSelected(self, df, ax1, ax2):
         print(f"setGraphSelected: {df['recording_name']}")
-        df_filtered = df[df["sweeps"] != "..."]
-        if df_filtered.empty:
+        df_analyzed = df[df["sweeps"] != "..."]
+        if df_analyzed.empty:
             print("Nothing analyzed selected.")
         else:
             amp = bool(self.dict_cfg['aspect_EPSP_amp'])
             slope = bool(self.dict_cfg['aspect_EPSP_slope'])
-            raw = bool(self.dict_cfg['filter_none'])
-            savgol = bool(self.dict_cfg['filter_savgol'])
 
-            for i, row in df_filtered.iterrows(): # TODO: i to be used later for cycling colours?
-                # plot dfmean.voltage on canvas_seaborn_mean
+            for i, row in df_analyzed.iterrows(): # TODO: i to be used later for cycling colours?
                 dfmean = self.get_dfmean(row=row)
-                voltage_label = f"{row['recording_name']}_voltage"
-                _ = sns.lineplot(ax=self.canvas_seaborn_mean.axes, label=voltage_label, data=dfmean, y="voltage", x="time", color="black")
-                self.canvas_seaborn_mean.axes.lines[label2idx(self.canvas_seaborn_mean, voltage_label)].set_visible(raw)
-
                 dfoutput = self.get_dfoutput(row=row)
-                if savgol:
-                    savgol_label = f"{row['recording_name']}_savgol"
-                    # add savgol lines that don't exist
-                    dffilter = self.get_dffilter(row=row)
-                    if 'filter_savgol' not in dffilter.columns:
-                        dffilter = analysis.addFilterSavgol(dffilter)
-                        self.df2csv(df=dffilter, rec=row['recording_name'], key="filter")
-                        self.dict_filters[row['recording_name']] = dffilter
-                    dfmean = self.get_dfmean(row=row)
-                    if 'filter_savgol' not in dfmean.columns:
-                        dfmean = analysis.addFilterSavgol(dfmean)
-                        self.df2csv(df=dfmean, rec=row['recording_name'], key="mean")
-                        self.dict_means[row['recording_name']] = dfmean
-                    if ('savgol_EPSP_amp' not in dfoutput.columns) & (not np.isnan(row["t_EPSP_amp"])):
-                        df_output_savgol_amp = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
-                                            t_EPSP_amp=row["t_EPSP_amp"])
-                        df_output_savgol_amp.columns = ['sweep', 'savgol_EPSP_amp']
-                        print(f"df_output_savgol_amp.columns: {df_output_savgol_amp.columns}")
-                        df_output_savgol_amp.reset_index(drop=True, inplace=True)
-                        dfoutput['savgol_EPSP_amp'] = df_output_savgol_amp.savgol_EPSP_amp
-                        self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
-                        self.dict_outputs[row['recording_name']] = dfoutput
-                    if ('savgol_EPSP_slope' not in dfoutput.columns) & (not np.isnan(row["t_EPSP_slope"])):
-                        df_output_savgol_slope = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
-                                            t_EPSP_slope=row["t_EPSP_slope"])
-                        df_output_savgol_slope.columns = ['sweep', 'savgol_EPSP_slope']
-                        df_output_savgol_slope.reset_index(drop=True, inplace=True)
-                        dfoutput['savgol_EPSP_slope'] = df_output_savgol_slope.savgol_EPSP_slope
-                        self.df2csv(df=dfoutput, rec=row['recording_name'], key="output")
-                        self.dict_outputs[row['recording_name']] = dfoutput
-                    # Plot savgol lines
-                    _ = sns.lineplot(ax=self.canvas_seaborn_mean.axes, label=savgol_label, data=dfmean, y="filter_savgol", x="time", color="orange", alpha = 0.5)
-                    if amp & (not np.isnan(row["t_EPSP_amp"])):
-                        _ = sns.lineplot(ax=ax1, label=f"{savgol_label}_EPSP_amp", data=dfoutput, y="savgol_EPSP_amp", x="sweep", color="orange", alpha = 0.5)
-                    if slope & (not np.isnan(row["t_EPSP_slope"])):
-                        _ = sns.lineplot(ax=ax2, label=f"{savgol_label}_EPSP_slope", data=dfoutput, y="savgol_EPSP_slope", x="sweep", color="orange", alpha = 0.5)
+                # plot relevant filter of dfmean on canvas_seaborn_mean
+                label = f"{row['recording_name']}"
+                rec_filter = row['filter'] # the filter currently used for this recording
+                _ = sns.lineplot(ax=self.canvas_seaborn_mean.axes, label=label, data=dfmean, y=rec_filter, x="time", color="black")
+                # plot dfoutput on canvas_seaborn_output
 
                 if amp & (not np.isnan(row["t_EPSP_amp"])):
+                    _ = sns.lineplot(ax=ax1, label=f"{label}_EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", color="black", linestyle='--')
                     # mean, amp indicator
                     y_position = dfmean[dfmean.time == row["t_EPSP_amp"]].voltage
                     self.canvas_seaborn_mean.axes.plot(row["t_EPSP_amp"], y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
-                    # output: amp
-                    if raw & (label2idx(ax1, 'EPSP_amp') is False):
-                        _ = sns.lineplot(ax=ax1, label="EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", color="black", linestyle='--')
                 if slope & (not np.isnan(row["t_EPSP_slope"])):
+                    _ = sns.lineplot(ax=ax2, label=f"{label}_EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
+                    # mean, slope indicator        
                     x_start = row["t_EPSP_slope"] - 0.0004
                     x_end = row["t_EPSP_slope"] + 0.0004
-                    y_start = dfmean['voltage'].iloc[(dfmean['time'] - x_start).abs().idxmin()]
-                    y_end = dfmean['voltage'].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+                    y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+                    y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
                     self.canvas_seaborn_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
-                    _ = sns.lineplot(ax=ax2, label="EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
-        
 
     def setGraphGroups(self, ax1, ax2, list_color):
         print(f"setGraphGroups: {self.dict_cfg['list_groups']}")
@@ -1615,6 +1596,7 @@ class TableProjSub(QtWidgets.QTableView):
             dfAdd["path"] = file_urls
             dfAdd["host"] = "Computer 1"
             dfAdd["checksum"] = "big number"
+            dfAdd["filter"] = "voltage"
             # NTH: more intelligent default naming; lowest level unique name?
             # For now, use name + lowest level folder
             names = []
@@ -1735,7 +1717,7 @@ class Measure_window_sub(Ui_measure_window):
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             t_EPSP_amp = self.row['t_EPSP_amp']
             self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
-            _ = sns.lineplot(ax=self.ax1, label="EPSP_amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="gray")
+            _ = sns.lineplot(ax=self.ax1, label="old EPSP amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="gray")
         if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
             t_EPSP_slope = self.row['t_EPSP_slope']
             x_start = t_EPSP_slope - 0.0004 # TODO: make this a variable
@@ -1743,7 +1725,7 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_EPSP_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
             self.v_t_EPSP_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
             self.v_t_EPSP_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
-            _ = sns.lineplot(ax=self.ax2, label="EPSP_slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="gray")
+            _ = sns.lineplot(ax=self.ax2, label="old EPSP slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="gray")
 
         self.canvas_mean.axes.set_xlim(parent.dict_cfg['mean_xlim'])
         self.canvas_mean.axes.set_ylim(parent.dict_cfg['mean_ylim'])
@@ -1780,13 +1762,12 @@ class Measure_window_sub(Ui_measure_window):
             key_checkBox.setChecked(parent.dict_cfg[str_view_key])
             key_checkBox.stateChanged.connect(self.updatePlots)
             self.measure_frame.list_connections.append((key_checkBox.stateChanged, self.updatePlots))
-        for key in supported_filters:
-            loopConnectViews(view="filter", key=key)
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
         self.pushButton_auto.clicked.connect(self.autoCalculate)
         self.buttonBox.accepted.connect(self.accepted_handler)
         self.buttonBox.rejected.connect(self.measure_frame.close)
+        self.updatePlots()
 
 
     def accepted_handler(self):
@@ -1879,65 +1860,38 @@ class Measure_window_sub(Ui_measure_window):
         # Apply settings from self.parent.dict_cfg to canvas_mean and canvas_output
         amp = bool(self.parent.dict_cfg['aspect_EPSP_amp'])
         slope = bool(self.parent.dict_cfg['aspect_EPSP_slope'])
-        raw = bool(self.parent.dict_cfg['filter_none'])
-        savgol = bool(self.parent.dict_cfg['filter_savgol'])
+        dfmean = self.dfmean
 
-        # Conditions and labels for display of lines in canvas_mean and canvas_output
-        dict_label_conditions = {
-        'filter_none':      raw,
-        'filter_savgol':    savgol,
-        'EPSP_amp':         raw & amp,
-        'EPSP_slope':       raw & slope,
-        'new_EPSP_amp':     raw & amp,
-        'new_EPSP_slope':   raw & slope,
-        'savgol_EPSP_amp':  savgol & amp,
-        'savgol_EPSP_slope':savgol & slope,
-        }
+        label = f"{self.row['filter']}"
+        rec_filter = self.row['filter'] # the filter currently used for this recording
 
-        if savgol:
-            # add savgol lines that don't exist
-            dffilter = self.parent.get_dffilter(row=self.row)
-            if 'filter_savgol' not in dffilter:
-                dffilter = analysis.addFilterSavgol(dffilter)
-                self.parent.df2csv(df=dffilter, rec=self.row['recording_name'], key="filter")
-                self.parent.dict_filters[self.row['recording_name']] = dffilter
-            dfmean = self.parent.get_dfmean(row=self.row)
-            if 'filter_savgol' not in dfmean:
-                dfmean = analysis.addFilterSavgol(dfmean)
-                self.parent.df2csv(df=dfmean, rec=self.row['recording_name'], key="mean")
-                self.parent.dict_means[self.row['recording_name']] = dfmean
-            if 'savgol_EPSP_amp' not in self.new_dfoutput:
-                df_output_savgol = analysis.build_dfoutput(df=dffilter, filter="filter_savgol",
-                                       t_EPSP_amp=self.row["t_EPSP_amp"],
-                                       t_EPSP_slope=self.row["t_EPSP_slope"])
-                df_output_savgol.reset_index(drop=True, inplace=True)
-                df_output_savgol.columns = ['sweep', 'savgol_EPSP_amp', 'savgol_EPSP_slope']
-                self.new_dfoutput = df_output_savgol.combine_first(self.new_dfoutput)
-            # Plot any missing savgol lines
-            if label2idx(self.canvas_mean, 'filter_savgol') is False:
-                _ = sns.lineplot(ax=self.canvas_mean.axes, label='filter_savgol', data=dfmean, y="filter_savgol", x="time", color="orange", alpha = 0.5)
-            if label2idx(self.ax1, 'savgol_EPSP_amp') is False:
-                _ = sns.lineplot(ax=self.ax1, label="savgol_EPSP_amp", data=self.new_dfoutput, y="savgol_EPSP_amp", x="sweep", color="orange", alpha = 0.5)
-            if label2idx(self.ax2, 'savgol_EPSP_slope') is False:
-                _ = sns.lineplot(ax=self.ax2, label="savgol_EPSP_slope", data=self.new_dfoutput, y="savgol_EPSP_slope", x="sweep", color="orange", alpha = 0.5)
+        # Plot relevant filter of dfmean on canvas_mean, or show it if it's already plotted
+        if label2idx(self.canvas_mean, label) is False:
+            _ = sns.lineplot(ax=self.canvas_mean.axes, label=label, data=dfmean, y=rec_filter, x="time", color="black")
+        else:
+            self.canvas_mean.axes.lines[label2idx(self.canvas_mean, label)].set_visible(True)
 
+        # Plot dfoutput on canvas_output, or show it if it's already plotted
+        if label2idx(self.ax1, label) is False:
+            _ = sns.lineplot(ax=self.ax1, label=label, data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="gray", linestyle='--')
+        else:
+            self.ax1.lines[label2idx(self.ax1, label)].set_visible(amp)
 
-        # Display apect indicators:
+        if label2idx(self.ax2, label) is False:
+            _ = sns.lineplot(ax=self.ax2, label=label, data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="gray", alpha = 0.3)
+        else:
+            self.ax2.lines[label2idx(self.ax2, label)].set_visible(slope)
+        self.ax1.lines[label2idx(self.ax1, "old EPSP amp")].set_visible(amp)
+        self.ax2.lines[label2idx(self.ax2, "old EPSP slope")].set_visible(slope)
+            
+    
+        # Display aspect indicators:
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             self.v_t_EPSP_amp.set_visible(amp)
         if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
             self.v_t_EPSP_slope.set_visible(slope)
             self.v_t_EPSP_slope_start.set_visible(slope)
             self.v_t_EPSP_slope_end.set_visible(slope)
-
-        # Loop through conditions and labels in the dictionary
-        for label, condition in dict_label_conditions.items():
-            if label2idx(self.canvas_mean, label) is not False:
-                self.canvas_mean.axes.lines[label2idx(self.canvas_mean, label)].set_visible(condition)
-            if label2idx(self.ax1, label) is not False:
-                self.ax1.lines[label2idx(self.ax1, label)].set_visible(condition)
-            if label2idx(self.ax2, label) is not False:
-                self.ax2.lines[label2idx(self.ax2, label)].set_visible(condition)
 
         self.canvas_mean.draw()
         self.canvas_output.draw()
@@ -2026,7 +1980,6 @@ class Measure_window_sub(Ui_measure_window):
 
     def updateAspect(self, time, aspect, method):
         # changes the measuring points of an aspect and propagates the change to the appropriate columns in df_project
-        savgol = self.parent.dict_cfg['filter_savgol']
         t_aspect  = ("t_" + aspect)
         t_method = (t_aspect + "_method")
         t_params = (t_aspect + "_params")
@@ -2074,14 +2027,6 @@ class Measure_window_sub(Ui_measure_window):
             axis.lines[label2idx(axis, f"new_{aspect}")].remove()
         if self.new_dfoutput[aspect].notna().any():
             _ = sns.lineplot(ax=axis, label=f"new_{aspect}", data=self.new_dfoutput, y=aspect, x='sweep', color='black')
-        #update output graph, savgol
-        if savgol:
-            print(f"updateAspect, self.new_dfoutput: {self.new_dfoutput}")
-            self.new_dfoutput[f"savgol_{aspect}"] = df[f"savgol_{aspect}"]
-            while label2idx(axis, f"new_savgol_{aspect}"):
-                axis.lines[label2idx(axis, f"new_savgol_{aspect}")].remove()
-            if self.new_dfoutput[f"savgol_{aspect}"].notna().any():
-                _ = sns.lineplot(ax=axis, label=f"new_savgol_{aspect}", data=self.new_dfoutput, y=f"savgol_{aspect}", x='sweep', color='orange', alpha=0.5)
         self.canvas_output.draw()
 
 
