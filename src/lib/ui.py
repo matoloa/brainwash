@@ -611,19 +611,26 @@ class UIsub(Ui_MainWindow):
         self.projectname = None
         self.inputProjectName.setReadOnly(True)
 
+        # Set default values for 
+        self.user_documents = Path.home() / "Documents"  # Where to look for raw data
+        self.projects_folder = self.user_documents / "Brainwash Projects"  # Where to save and read parsed data
+        self.projectname = "My Project"
+        # Override default if cfg.yaml exists
         if self.cfg_yaml.exists():
             with self.cfg_yaml.open("r") as file:
                 cfg = yaml.safe_load(file)
-                self.user_documents = Path(cfg["user_documents"])  # Where to look for raw data
-                self.projects_folder = Path(cfg["projects_folder"])  # Where to save and read parsed data
-                self.projectname = cfg["projectname"]
-        else:
-            self.user_documents = Path.home() / "Documents"  # Where to look for raw data
-            self.projects_folder = self.user_documents / "Brainwash Projects"  # Where to save and read parsed data
-            self.projectname = "My Project"
-
+                projectfolder = Path(cfg["projects_folder"]) / cfg["projectname"]
+                if projectfolder.exists():  # if the folder stored in cfg.yaml exists, use it
+                    self.user_documents = Path(cfg["user_documents"])  # Where to look for raw data
+                    self.projects_folder = Path(cfg["projects_folder"])  # Where to save and read parsed data
+                    self.projectname = cfg["projectname"]
+        
+        # Make sure the necessary folders exist
+        self.dict_folders = self.build_dict_folders()
         if not os.path.exists(self.projects_folder):
             os.makedirs(self.projects_folder)
+        if not os.path.exists(self.dict_folders['cache']):
+            os.makedirs(self.dict_folders['cache'])
 
         # replacing table proj with custom to allow changing of keypress event handling
         originalTableView = self.centralwidget.findChild(QtWidgets.QTableView, "tableProj")  # Find and replace the original QTableView in the layout
@@ -644,14 +651,13 @@ class UIsub(Ui_MainWindow):
         self.df_project = df_projectTemplate()
         self.tablemodel = TableModel(self.df_project)
         self.tableProj.setModel(self.tablemodel)
-
-        self.dict_folders = self.build_dict_folders()
-        
+       
         # If projectfile exists, load it, otherwise create it
         if Path(self.dict_folders['project'] / "project.brainwash").exists():
             self.load_df_project()
         else:
             self.setTableDf(self.df_project)
+            print(f"Project file {self.dict_folders['project'] / 'project.brainwash'} not found, creating new project file")
             self.write_cfg()
 
         # load or write local cfg, for storage of e.g. group colours, zoom levels etc.
@@ -674,7 +680,6 @@ class UIsub(Ui_MainWindow):
                          'output_ax2_ylim': (None, None),
                          'output_ax2_xlim': (None, None),
                          }
-            print("Creating project_cfg:", self.project_cfg_yaml)
             self.write_project_cfg()
         # Enforce local cfg
         self.checkBoxLockDelete.setChecked(self.dict_cfg['delete_locked'])
@@ -752,11 +757,10 @@ class UIsub(Ui_MainWindow):
 # WIP: TODO: move these to appropriate header in this file
 
     def build_dict_folders(self):
-        folder = (self.projects_folder / self.projectname)
         dict_folders = {
-                    'project': folder,
-                    'data': folder / 'data',
-                    'cache': folder / 'cache'
+                    'project': self.projects_folder / self.projectname,
+                    'data': self.projects_folder / self.projectname / 'data',
+                    'cache': self.projects_folder / 'cache' / self.projectname
         }
         return dict_folders
 
@@ -827,7 +831,7 @@ class UIsub(Ui_MainWindow):
         i = 0
         while True:
             new_project_name = "Project " + date
-            if i > 0:
+            if 0 < i:
                 new_project_name = new_project_name + "(" + str(i) + ")"
             if (self.projects_folder / new_project_name).exists():
                 if verbose:
@@ -1148,10 +1152,13 @@ class UIsub(Ui_MainWindow):
                 print(f"Project name {new_project_name} already exists")
             self.inputProjectName.setText(self.projectname)
         elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_project_name)) is not None: # check if valid filename
+            #self.dict_folders['data'] = self.dict_folders['data'].rename(self.projects_folder / new_project_name / 'data')
             self.dict_folders['project'] = self.dict_folders['project'].rename(self.projects_folder / new_project_name)
+            self.dict_folders['data'] = self.projects_folder / new_project_name / 'data'
+            self.dict_folders['cache'] = self.dict_folders['cache'].rename(self.projects_folder / 'cache' / new_project_name)
             self.projectname = new_project_name
+            self.inputProjectName.setText(self.projectname)
             self.inputProjectName.setReadOnly(True)
-            self.dict_folders = self.build_dict_folders()
             self.write_cfg()
             print(f"Project renamed to {new_project_name}.")
         else:
