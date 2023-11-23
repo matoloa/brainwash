@@ -15,7 +15,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
 # from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from datetime import datetime
 import re
 
@@ -645,7 +645,6 @@ class UIsub(Ui_MainWindow):
         # Update the layout
         layout.update()
         self.tableProj = tableProj
-        tableProj.setAcceptDrops(True)
         tableProj.setObjectName("tableProj")
 
         self.df_project = df_projectTemplate()
@@ -869,13 +868,17 @@ class UIsub(Ui_MainWindow):
 # Non-button event functions
 
     def tableProjSelectionChanged(self):
+        if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
+            self.tableProj.clearSelection()
+            self.setGraph()
+            return
         selected_rows = self.listSelectedRows()
         df_selection = self.df_project.loc[selected_rows]
         self.setGraph(df = df_selection)
 
     def tableProjDoubleClicked(self):
         self.launchMeasureWindow()
-
+   
     def checkedBoxLockDelete(self, state):
         if state == 2:
             self.dict_cfg['delete_locked']= True
@@ -1152,7 +1155,6 @@ class UIsub(Ui_MainWindow):
                 print(f"Project name {new_project_name} already exists")
             self.inputProjectName.setText(self.projectname)
         elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_project_name)) is not None: # check if valid filename
-            #self.dict_folders['data'] = self.dict_folders['data'].rename(self.projects_folder / new_project_name / 'data')
             self.dict_folders['project'] = self.dict_folders['project'].rename(self.projects_folder / new_project_name)
             self.dict_folders['data'] = self.projects_folder / new_project_name / 'data'
             self.dict_folders['cache'] = self.dict_folders['cache'].rename(self.projects_folder / 'cache' / new_project_name)
@@ -1562,9 +1564,12 @@ class InputDialogPopup(QtWidgets.QDialog):
 
 
 class TableProjSub(QtWidgets.QTableView):
+    # TODO: This class does the weirdest things to events; shifting event numbers around in non-standard ways. Why?
     def __init__(self, parent=None):
         super().__init__()
         self.parent = parent
+        self.setAcceptDrops(True)
+
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             file_urls = [url.toLocalFile() for url in event.mimeData().urls()]
