@@ -665,20 +665,22 @@ class UIsub(Ui_MainWindow):
             with self.project_cfg_yaml.open("r") as file:
                 self.dict_cfg = yaml.safe_load(file)
         else:
-            self.dict_cfg = {'list_groups': [],
-                         'list_group_colors': ["red", "green", "blue", "yellow"],
-                         'delete_locked': True,
-                         'filter_none': True,
-                         'filter_savgol': False,
-                         'aspect_EPSP_slope': True,
-                         'aspect_EPSP_amp': True,
-                         'mean_ylim': (-0.0006, 0.0002),
-                         'mean_xlim': (0.006, 0.020),
-                         'output_ax1_ylim': (-0.0015, 0),
-                         'output_ax1_xlim': (0.006, 0.020),
-                         'output_ax2_ylim': (None, None),
-                         'output_ax2_xlim': (None, None),
-                         }
+            self.dict_cfg = {'list_groups': [], # group_X - how the program regognizes groups
+                        'dict_group_name': {}, # group_X: name - how the program displays groups TODO: implement
+                        'dict_group_show': {}, # group_X: True/False - whether to show group in graphs
+                        'list_group_colors': ["red", "green", "blue", "yellow"], # TODO: build this list properly
+                        'delete_locked': True,
+                        'filter_none': True,
+                        'filter_savgol': False,
+                        'aspect_EPSP_slope': True,
+                        'aspect_EPSP_amp': True,
+                        'mean_ylim': (-0.0006, 0.0002),
+                        'mean_xlim': (0.006, 0.020),
+                        'output_ax1_ylim': (-0.0015, 0),
+                        'output_ax1_xlim': (0.006, 0.020),
+                        'output_ax2_ylim': (None, None),
+                        'output_ax2_xlim': (None, None),
+                        }
             self.write_project_cfg()
         # Enforce local cfg
         self.checkBoxLockDelete.setChecked(self.dict_cfg['delete_locked'])
@@ -794,17 +796,18 @@ class UIsub(Ui_MainWindow):
         if len(self.dict_cfg['list_groups']) < 12: # TODO: hardcoded max nr of groups: move to cfg
             i = 0
             while True:
-                new_group_name = "group_" + str(i)
-                if new_group_name in self.dict_cfg['list_groups']:
+                new_group_internal = "group_" + str(i)
+                if new_group_internal in self.dict_cfg['list_groups']:
                     if verbose:
-                        print(new_group_name, " already exists")
+                        print(new_group_internal, " already exists")
                     i += 1
                 else:
-                    self.dict_cfg['list_groups'].append(new_group_name)
-                    print("created", new_group_name)
+                    self.dict_cfg['list_groups'].append(new_group_internal)
+                    self.dict_cfg['dict_group_show'][new_group_internal] = True
+                    print("created", new_group_internal)
                     break
             self.write_project_cfg()
-            self.addGroupButton(new_group_name)
+            self.addGroupButton(new_group_internal)
         else:
             print("Maximum of 12 groups allowed for now.")
 
@@ -1030,18 +1033,41 @@ class UIsub(Ui_MainWindow):
 # Data Group functions
 
     def addGroupButton(self, group): # Create a new group button
+        hbox = QtWidgets.QHBoxLayout() # hbox for button and checkbox
+
         self.new_button = QtWidgets.QPushButton(group, self.centralwidget)
         self.new_button.setObjectName(group)
-        self.new_button.clicked.connect(lambda _, button_name=group: self.pushedGroupButton(group))
+        self.new_button.clicked.connect(lambda: self.pushedGroupButton(group))
+        hbox.addWidget(self.new_button)
+
+        self.new_checkbox = QtWidgets.QCheckBox(group, self.centralwidget)
+        self.new_checkbox.setObjectName(group)
+        self.new_checkbox.setText("")
+        self.new_checkbox.setChecked(self.dict_cfg['dict_group_show'][group])
+        self.new_checkbox.stateChanged.connect(lambda state, group=group: self.groupCheckboxChanged(state, group))
+        hbox.addWidget(self.new_checkbox)
+
+        # Create a QWidget and set hbox as its layout
+        widget = QtWidgets.QWidget()
+        widget.setLayout(hbox)
+
         # Arrange in rows of 4. TODO: hardcoded number of columns: move to cfg
         column = self.dict_cfg['list_groups'].index(group)
         row = 0
-        print(row, column)
         while column >= 4:
             column -= 4
             row += 1
-        self.gridLayout.addWidget(self.new_button, row, column, 1, 1)
-        # self.gridLayout.addWidget(self.new_button, self.gridLayout.rowCount(), 0, 1, 1)
+        self.gridLayout.addWidget(widget, row, column, 1, 1)
+
+    def groupCheckboxChanged(self, state, group):
+        if verbose:
+            print(f"groupCheckboxChanged: {state}, {group}")
+        if state == 2:
+            self.dict_cfg['dict_group_show'][group] = True
+        else:
+            self.dict_cfg['dict_group_show'][group] = False
+        self.write_project_cfg()
+        self.setGraph()
 
     def killGroupButtons(self):
         for group in self.dict_cfg['list_groups']:
@@ -1383,7 +1409,7 @@ class UIsub(Ui_MainWindow):
         self.ax1 = ax1
         # Plot group means
         if self.dict_cfg['list_groups']:
-            self.setGraphGroups(ax1, ax2, ui.dict_cfg['list_group_colors'])
+            self.setGraphGroups(ax1, ax2, self.dict_cfg['list_group_colors'])
         if df is not None: # plot selected rows
             self.setGraphSelected(df=df, ax1=ax1, ax2=ax2)
         # x and y limits
@@ -1470,10 +1496,15 @@ class UIsub(Ui_MainWindow):
         df_p = self.get_df_project()
         for i_color, group in enumerate(self.dict_cfg['list_groups']):
             dfgroup = df_p[df_p['groups'].str.split(',').apply(lambda x: group in x)]
+            if self.dict_cfg['dict_group_show'][group] == False:
+                if verbose:
+                    print(f"Checkbox for group {group} is not checked")
+                continue
             if dfgroup.empty:
                 if verbose:
                     print(f"No data in group {group}")
                 continue
+
             # abort if any recording in group is an str
             if dfgroup['sweeps'].apply(lambda x: isinstance(x, str)).any():
                 if verbose:
