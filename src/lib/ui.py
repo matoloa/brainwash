@@ -1474,6 +1474,11 @@ class UIsub(Ui_MainWindow):
                 if verbose:
                     print(f"No data in group {group}")
                 continue
+            # abort if any recording in group is an str
+            if dfgroup['sweeps'].apply(lambda x: isinstance(x, str)).any():
+                if verbose:
+                    print(f"Analyse all recordings in {group} to show group output.")
+                continue
             dfgroup_mean = self.get_dfgroupmean(key_group=group)
             # Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
             # print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
