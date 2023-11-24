@@ -74,7 +74,7 @@ def parse_abf(filepath):
     # Absolute date and time
     df["timens"] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
     df["datetime"] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
-    df.drop(columns=["sweepY", "timens"], inplace=True)
+    df.drop(columns=["sweepX", "sweepY", "timens"], inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
 

@@ -18,6 +18,7 @@ from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtWidgets
 from datetime import datetime
 import re
+import time
 
 import parse
 import analysis
@@ -1542,7 +1543,7 @@ class UIsub(Ui_MainWindow):
             self.measure_frame.close()
         # Open window
         self.measure_frame = QDialog_sub()
-        self.measure_window_sub = Measure_window_sub(self.measure_frame, row=ser_table_row, dfmean=dfmean, parent=self)
+        self.measure_window_sub = Measure_window_sub(self.measure_frame, row=ser_table_row, parent=self)
         self.measure_frame.setWindowTitle(ser_table_row['recording_name'])
         # move measurewindow to default position (TODO: later to be stored in cfg)
         self.measure_frame.setGeometry(1400, 0, 800, 1200)
@@ -1659,6 +1660,7 @@ class Filetreesub(Ui_Dialog):
         dfAdd["path"] = paths
         dfAdd["host"] = "Computer 1"
         dfAdd["checksum"] = "big number"
+        dfAdd["filter"] = "voltage"
         # dfAdd['recording_name']=paths
         # dfAdd['groups']=' '
         self.tablemodel.setData(dfAdd)
@@ -1682,15 +1684,19 @@ class Filetreesub(Ui_Dialog):
 
 
 class Measure_window_sub(Ui_measure_window):
-    def __init__(self, measure_frame, parent=None, row=None, dfmean=None, folder="."):
+    def __init__(self, measure_frame, parent=None, row=None):
         super(Measure_window_sub, self).__init__()
-        # local versions of row and dfmean that persist unchanged (TODO: check!) while the window is open
-        self.row = row.copy() # creates a copy to be modified, then accepted or rejected
-        self.dfmean = dfmean # will not be modified; no need to copy()
-        self.new_dfoutput = parent.get_dfoutput(row).copy() # creates a copy to be modified, then accepted or rejected
         self.setupUi(measure_frame)
         self.parent = parent
         self.measure_frame = measure_frame
+        self.row = row.copy() # creates a copy to be modified, then accepted to df_project, or rejected
+        # create local copies of dfmean, dffilter and dfoutput
+        t0 = time.time()
+        self.new_dfmean = self.parent.get_dfmean(row=self.row).copy()
+        self.new_dffilter = self.parent.get_dffilter(row=self.row).copy()
+        self.new_dfoutput = self.parent.get_dfoutput(row=self.row).copy()
+        t1 = time.time()
+        print(f"Measure_window_sub: {t1-t0} seconds to copy dfs")
 
         self.measure_graph_mean.setLayout(QtWidgets.QVBoxLayout())
         self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)
@@ -1712,8 +1718,7 @@ class Measure_window_sub(Ui_measure_window):
         self.ax2 = self.ax1.twinx()
 
         # Populate canvases - TODO: refactor such that components can be called individually when added later
-        _ = sns.lineplot(ax=self.canvas_mean.axes, label='filter_none', data=dfmean, y="voltage", x="time", color="black")
-        
+        _ = sns.lineplot(ax=self.canvas_mean.axes, label='voltage', data=self.new_dfmean, y='voltage', x='time', color='black')
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             t_EPSP_amp = self.row['t_EPSP_amp']
             self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
@@ -1739,10 +1744,12 @@ class Measure_window_sub(Ui_measure_window):
         self.si_v_drag_to = None # vertical line in canvas_output, indicating end of drag
         self.dragplot = None
         self.dragging = False
+        self.last_x = None # remember last x position of mouse; None if no samples are selected
 
         # set button colors
         self.default_color = "background-color: rgb(239, 239, 239);"
         self.selected_color = "background-color: rgb(100, 100, 255);"
+
         # set default aspect
         self.toggle(self.pushButton_EPSP_slope, "EPSP_slope") # default for now TODO: Load/Save preference in local .cfg
         # Iterate through supported_aspects, connecting buttons and lineEdits
@@ -1765,56 +1772,122 @@ class Measure_window_sub(Ui_measure_window):
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
         self.pushButton_auto.clicked.connect(self.autoCalculate)
+        # check the radiobutton of the current filter, per row['filter']
+        row_filter = self.row['filter']
+        self.radioButton_filter_none.setChecked(row_filter=="voltage")
+        self.radioButton_filter_none.clicked.connect(lambda: self.updateFilter("voltage"))
+        self.radioButton_filter_savgol.setChecked(row_filter=="savgol")
+        self.radioButton_filter_savgol.clicked.connect(lambda: self.updateFilter("savgol"))
+
         self.buttonBox.accepted.connect(self.accepted_handler)
         self.buttonBox.rejected.connect(self.measure_frame.close)
         self.updatePlots()
 
 
+    def updateFilter(self, filter):
+        self.row['filter'] = filter
+        self.row['filter_params'] = "toyed with!"
+        self.filter_params_changed = False
+        if filter == "savgol":
+            # TODO: create interface for filter params
+            # make sure the updated filter exists
+            if ('savgol' not in self.new_dffilter) | self.filter_params_changed:
+                self.new_dffilter = analysis.addFilterSavgol(self.new_dffilter)
+            if ('savgol' not in self.new_dfmean) | self.filter_params_changed:
+                self.new_dfmean = analysis.addFilterSavgol(self.new_dfmean)
+        # build new output
+        self.new_dfoutput = analysis.build_dfoutput(df=self.new_dffilter,
+                                    filter=filter,
+                                    t_EPSP_amp=self.row["t_EPSP_amp"],
+                                    t_EPSP_slope=self.row["t_EPSP_slope"])
+        if self.last_x is not None:
+            self.updateSample()
+        self.updatePlots()
+
+
+    def updatePlots(self):
+        # Apply settings from self.parent.dict_cfg to canvas_mean and canvas_output
+        amp = bool(self.parent.dict_cfg['aspect_EPSP_amp'])
+        slope = bool(self.parent.dict_cfg['aspect_EPSP_slope'])
+        rec_filter = self.row['filter'] # the filter currently used for this recording
+        # Plot relevant filter of dfmean on canvas_mean, or show it if it's already plotted
+        if label2idx(self.canvas_mean, rec_filter) is False:
+            _ = sns.lineplot(ax=self.canvas_mean.axes, label=rec_filter, data=self.new_dfmean, y=rec_filter, x="time", color="black")
+        
+        self.canvas_mean.axes.lines[label2idx(self.canvas_mean, 'voltage')].set_visible(rec_filter=='voltage')
+        if label2idx(self.canvas_mean, 'savgol') is not False:
+            self.canvas_mean.axes.lines[label2idx(self.canvas_mean, 'savgol')].set_visible(rec_filter=='savgol')
+   
+        # Plot dfoutput on canvas_output, or show it if it's already plotted
+        if label2idx(self.ax1, "EPSP_amp") is False:
+            _ = sns.lineplot(ax=self.ax1, label="EPSP_amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="black", linestyle='--')
+        else:
+            self.ax1.lines[label2idx(self.ax1, "EPSP_amp")].set_visible(amp)
+        if label2idx(self.ax2, "EPSP_slope") is False:
+            _ = sns.lineplot(ax=self.ax2, label="EPSP_slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="black", alpha = 1)
+        else:
+            self.ax2.lines[label2idx(self.ax2, "EPSP_slope")].set_visible(slope)
+
+        self.ax1.lines[label2idx(self.ax1, "old EPSP amp")].set_visible(amp)
+        self.ax2.lines[label2idx(self.ax2, "old EPSP slope")].set_visible(slope)
+            
+            # Display aspect indicators:
+        if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
+            self.v_t_EPSP_amp.set_visible(amp)
+        if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
+            self.v_t_EPSP_slope.set_visible(slope)
+            self.v_t_EPSP_slope_start.set_visible(slope)
+            self.v_t_EPSP_slope_end.set_visible(slope)
+
+        self.canvas_mean.draw()
+        self.canvas_output.draw()
+
+
     def accepted_handler(self):
-        # update df_project, dict_outputs, and purge group outputs for recalculation
-        # find idx of row in parent.df_project with matching recording_name
+        # Get the project dataframe
         df_p = self.parent.get_df_project()
+        # Find the index of the row with the matching recording_name
         idx = df_p.index[df_p['recording_name'] == self.row['recording_name']]
-        print(f"accepted_handler: idx: {idx}, type: {type(idx)}")
-        list_keep = ['recording_name', 'groups']
+        list_keep = ['recording_name', 'groups'] # Columns to keep
+        # If there's exactly one matching row
         if len(idx) == 1:
+            # Update the row in df_project
             for column, value in self.row.items():
-                if not column in list_keep:
-                    self.parent.df_project.loc[idx, column] = value
-            self.parent.save_df_project()
-            # update output; dict and file
+                if column not in list_keep:
+                    df_p.loc[idx, column] = value
+            # Save the updated df_project
+            self.parent.set_df_project(df_p)
+
+            # Update dfs; dicts and files
             rec_name = self.parent.df_project.loc[int(idx.values[0]), 'recording_name']
             key_output = f"{rec_name}_output"
+            self.parent.dict_means[rec_name] = self.new_dfmean
+            self.parent.df2csv(df=self.new_dfmean, rec=rec_name, key="mean")
+            self.parent.dict_filters[self.row['recording_name']] = self.new_dffilter
+            self.parent.df2csv(df=self.new_dffilter, rec=self.row['recording_name'], key="filter")
             self.parent.dict_outputs[key_output] = self.new_dfoutput
             self.parent.df2csv(df=self.new_dfoutput, rec=rec_name, key="output")
-            # delete affected group output; dicts and files
-            # build list of groups to purge
-            str_groups = self.parent.df_project.loc[int(idx.values[0]), 'groups']
-            print(f"accepted_handler: groups_from_df {str_groups}, type: {type(str_groups)}")
+
+            # Delete affected group output; dicts and files
+            str_groups = df_p.loc[int(idx.values[0]), 'groups']
             list_groups = list(str_groups.split(","))
-            print(f"accepted_handler: list_groups: {list_groups}, type: {type(list_groups)}")
-            if (str_groups == " ") or (len(list_groups) == 0):
-                if verbose:
-                    print(f"accepted_handler: row is not in any group")
-            else:
-                if verbose:
-                    print(f"list_groups: {list_groups}")
-                    print(f"self.parent.dict_group_means: {list(self.parent.dict_group_means.keys())}")
+            if (str_groups == " ") or (len(list_groups) == 0): # If the row is not in any group
+                pass
+            else: # Remove each group from internal dict and purge cache
                 for group in list_groups:
                     if group in self.parent.dict_group_means.keys():
-                        if verbose:
-                            print(f"accepted_handler: removing {group} from internal dict")
                         del self.parent.dict_group_means[group]
                         self.parent.purgeGroupCache(group)
+                        # Delete the group file if it exists
                         group_path = Path(f'{self.parent.dict_folders["cache"]}/{group}.csv')
                         if group_path.exists():
-                            if verbose:
-                                print(f"accepted_handler: deleting {group_path}")
                             group_path.unlink()
-            self.parent.setGraph(df_p.iloc[idx])
-        elif len(idx) < 1:
+            self.parent.setGraph(df_p.iloc[idx]) # draw the updated row
+
+        # Error handling        
+        elif len(idx) < 1: # If no matching row is found
             raise ValueError(f"ERROR (accepted_handler): {self.row['recording_name']} not found in df_project.")
-        else:
+        else: # If multiple matching rows are found
             raise ValueError(f"ERROR (accepted_handler): multiple instances of {self.row['recording_name']} in project_df.")
         self.measure_frame.close()
 
@@ -1856,47 +1929,6 @@ class Measure_window_sub(Ui_measure_window):
         self.mean_bis = sns.lineplot(data=filtered_df, y="bis", x="time", ax=self.canvas_mean.axes, color="green", alpha=0.3)
 
 
-    def updatePlots(self):
-        # Apply settings from self.parent.dict_cfg to canvas_mean and canvas_output
-        amp = bool(self.parent.dict_cfg['aspect_EPSP_amp'])
-        slope = bool(self.parent.dict_cfg['aspect_EPSP_slope'])
-        dfmean = self.dfmean
-
-        label = f"{self.row['filter']}"
-        rec_filter = self.row['filter'] # the filter currently used for this recording
-
-        # Plot relevant filter of dfmean on canvas_mean, or show it if it's already plotted
-        if label2idx(self.canvas_mean, label) is False:
-            _ = sns.lineplot(ax=self.canvas_mean.axes, label=label, data=dfmean, y=rec_filter, x="time", color="black")
-        else:
-            self.canvas_mean.axes.lines[label2idx(self.canvas_mean, label)].set_visible(True)
-
-        # Plot dfoutput on canvas_output, or show it if it's already plotted
-        if label2idx(self.ax1, label) is False:
-            _ = sns.lineplot(ax=self.ax1, label=label, data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="gray", linestyle='--')
-        else:
-            self.ax1.lines[label2idx(self.ax1, label)].set_visible(amp)
-
-        if label2idx(self.ax2, label) is False:
-            _ = sns.lineplot(ax=self.ax2, label=label, data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="gray", alpha = 0.3)
-        else:
-            self.ax2.lines[label2idx(self.ax2, label)].set_visible(slope)
-        self.ax1.lines[label2idx(self.ax1, "old EPSP amp")].set_visible(amp)
-        self.ax2.lines[label2idx(self.ax2, "old EPSP slope")].set_visible(slope)
-            
-    
-        # Display aspect indicators:
-        if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
-            self.v_t_EPSP_amp.set_visible(amp)
-        if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
-            self.v_t_EPSP_slope.set_visible(slope)
-            self.v_t_EPSP_slope_start.set_visible(slope)
-            self.v_t_EPSP_slope_end.set_visible(slope)
-
-        self.canvas_mean.draw()
-        self.canvas_output.draw()
-
-
     def meanClicked(self, event): # measure window click event
         if event.inaxes is not None:
             if event.button == 1:# Left mouse button clicked
@@ -1905,7 +1937,7 @@ class Measure_window_sub(Ui_measure_window):
                     return
                 x = event.xdata
                 # find time in self.dfmean closest to x
-                time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
+                time = self.new_dfmean.iloc[(self.new_dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
                 self.updateOnClick(time=time, aspect=self.aspect)
             elif event.button == 2:
                 zoomReset(canvas=self.canvas_mean, ui=self.parent)
@@ -1933,28 +1965,38 @@ class Measure_window_sub(Ui_measure_window):
     
 
     def outputReleased(self, event): # measurewindow output release event
-        x = event.xdata
-        if (self.dragging) and (event.button == 1) and (x is not None):
+        self.last_x = event.xdata
+        if (self.dragging) and (event.button == 1) and (self.last_x is not None):
             self.dragging = False
-            same = bool(int(self.drag_start) == int(x))
-            print(f"meanDragged from: {self.drag_start} to {x}: {same}")
-            df = self.parent.get_dffilter(self.row)
-            if same: # click and release on same: get that specific sweep and superimpose it on canvas_mean
-                unPlot(self.canvas_output, self.si_v_drag_to, self.dragplot)
-                df = df[df['sweep'] == int(self.drag_start)]
-                self.si_sweep.set_data(df["time"], df["voltage"])
-            else: # get all sweeps between drag_start and x (event.xdata) and superimpose the mean of them on canvas_mean
-                if int(self.drag_start) > int(x):
-                    df = df[(df['sweep'] >= int(x)) & (df['sweep'] <= int(self.drag_start))]
-                else:
-                    df = df[(df['sweep'] >= int(self.drag_start)) & (df['sweep'] <= int(x))]
-                df = df.groupby('time').agg({'voltage': ['mean']}).reset_index()
-                df.columns = ['time', 'voltage']
-                self.si_sweep.set_data(df["time"], df["voltage"])
+            self.updateSample(event)
             self.canvas_mean.draw()
             self.canvas_output.draw()
-    
 
+
+    def updateSample(self, event=None):
+        if event is not None:
+            x = event.xdata
+        else:
+            x = self.last_x
+        same = bool(int(self.drag_start) == int(x))
+        print(f"meanDragged from: {self.drag_start} to {x}: {same}")
+        df = self.new_dffilter
+        rec_filter = self.row['filter'] # the filter currently used for this recording
+        print(f"updateSample: event={event}, rec_filter={rec_filter}")
+        if same: # click and release on same: get that specific sweep and superimpose it on canvas_mean
+            unPlot(self.canvas_output, self.si_v_drag_to, self.dragplot)
+            df = df[df['sweep'] == int(self.drag_start)]
+            self.si_sweep.set_data(df["time"], df[rec_filter])
+        else: # get all sweeps between drag_start and x (event.xdata) and superimpose the mean of them on canvas_mean
+            if int(self.drag_start) > int(x):
+                df = df[(df['sweep'] >= int(x)) & (df['sweep'] <= int(self.drag_start))]
+            else:
+                df = df[(df['sweep'] >= int(self.drag_start)) & (df['sweep'] <= int(x))]
+            df = df.groupby('time').agg({rec_filter: ['mean']}).reset_index()
+            df.columns = ['time', rec_filter]
+            self.si_sweep.set_data(df["time"], df[rec_filter])
+
+    
     def updateOnClick(self, time, aspect):
         if verbose:
             print(f"updateOnClick: time={time}, aspect={aspect}")
@@ -2023,12 +2065,11 @@ class Measure_window_sub(Ui_measure_window):
                 setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time + 0.0004, color=graph_color, linestyle=":"))
         self.canvas_mean.draw()
         #update output graph, voltage
-        while label2idx(axis, f"new_{aspect}"):
-            axis.lines[label2idx(axis, f"new_{aspect}")].remove()
+        while label2idx(axis, aspect):
+            axis.lines[label2idx(axis, aspect)].remove()
         if self.new_dfoutput[aspect].notna().any():
-            _ = sns.lineplot(ax=axis, label=f"new_{aspect}", data=self.new_dfoutput, y=aspect, x='sweep', color='black')
+            _ = sns.lineplot(ax=axis, label=aspect, data=self.new_dfoutput, y=aspect, x='sweep', color='black')
         self.canvas_output.draw()
-
 
 
 def get_signals(source):
