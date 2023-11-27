@@ -40,7 +40,7 @@ def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None):#, 
         if t_EPSP_amp is not np.nan:
             df_EPSP_amp = df[df['time']==t_EPSP_amp].copy() # filter out all time (from sweep start) that do not match t_EPSP_amp
             df_EPSP_amp.reset_index(inplace=True, drop=True)
-            dfoutput['EPSP_amp'] = df_EPSP_amp[filter] # add the voltage of selected times to dfoutput
+            dfoutput['EPSP_amp'] = -1000 * df_EPSP_amp[filter] # invert and convert to mV
         else:
             dfoutput['EPSP_amp'] = np.nan
         list_col.append('EPSP_amp')
@@ -48,7 +48,7 @@ def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None):#, 
     if t_EPSP_slope is not None:
         if t_EPSP_slope is not np.nan:
             df_EPSP_slope = measureslope_vec(df=df, filter=filter, t_slope=t_EPSP_slope, halfwidth=0.0004)
-            dfoutput['EPSP_slope'] = df_EPSP_slope['value']
+            dfoutput['EPSP_slope'] = -df_EPSP_slope['value'] # invert 
         else:
             dfoutput['EPSP_slope'] = np.nan
         list_col.append('EPSP_slope')

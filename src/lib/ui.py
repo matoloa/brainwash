@@ -696,13 +696,13 @@ class UIsub(Ui_MainWindow):
                         'dict_group_show': {}, # group_X: True/False - whether to show group in graphs
                         'list_group_colors': ["red", "green", "blue", "yellow"], # TODO: build this list properly
                         'delete_locked': True, # whether to allow deleting of data
-                        'aspect_EPSP_slope': True,
                         'aspect_EPSP_amp': True,
-                        'mean_ylim': (-0.0006, 0.0002),
+                        'aspect_EPSP_slope': True,
+                        'mean_ylim': (-0.0015, 0.0002),
                         'mean_xlim': (0.006, 0.020),
-                        'output_ax1_ylim': (-0.0015, 0),
-                        'output_ax1_xlim': (0.006, 0.020),
-                        'output_ax2_ylim': (None, None),
+                        'output_ax1_ylim': (0, 2),
+                        'output_ax1_xlim': (None, None),
+                        'output_ax2_ylim': (0, None),
                         'output_ax2_xlim': (None, None),
                         }
             self.write_project_cfg()
@@ -1422,6 +1422,8 @@ class UIsub(Ui_MainWindow):
             self.canvas_seaborn_output.draw()
 
     def setGraph(self, df=None): # plot selected row(s), or clear graph if empty
+        amp = bool(self.dict_cfg['aspect_EPSP_amp'])
+        slope = bool(self.dict_cfg['aspect_EPSP_slope'])
         self.clearGraph()
         ax1 = self.canvas_seaborn_output.axes
         if hasattr(self, "ax2"): # remove ax2 if it exists
@@ -1433,7 +1435,14 @@ class UIsub(Ui_MainWindow):
         if self.dict_cfg['list_groups']:
             self.setGraphGroups(ax1, ax2, self.dict_cfg['list_group_colors'])
         if df is not None: # plot selected rows
-            self.setGraphSelected(df=df, ax1=ax1, ax2=ax2)
+            self.setGraphSelected(df=df, ax1=ax1, ax2=ax2, amp=amp, slope=slope)
+        
+        # add appropriate ticks and axis labels
+        self.canvas_seaborn_mean.axes.set_xlabel("Time (s)")
+        self.canvas_seaborn_mean.axes.set_ylabel("Voltage (V)")
+        self.ax1.set_ylabel("Amplitude (mV)")
+        self.ax2.set_ylabel("Slope (mV/ms)")
+        oneAxisLeft(self.ax1, self.ax2, amp, slope)
         # x and y limits
         self.canvas_seaborn_mean.axes.set_xlim(self.dict_cfg['mean_xlim'])
         self.canvas_seaborn_mean.axes.set_ylim(self.dict_cfg['mean_ylim'])
@@ -1441,15 +1450,12 @@ class UIsub(Ui_MainWindow):
         self.canvas_seaborn_mean.draw()
         self.canvas_seaborn_output.draw()
 
-    def setGraphSelected(self, df, ax1, ax2):
+    def setGraphSelected(self, df, ax1, ax2, amp, slope):
         print(f"setGraphSelected: {df['recording_name']}")
         df_analyzed = df[df["sweeps"] != "..."]
         if df_analyzed.empty:
             print("Nothing analyzed selected.")
         else:
-            amp = bool(self.dict_cfg['aspect_EPSP_amp'])
-            slope = bool(self.dict_cfg['aspect_EPSP_slope'])
-
             for i, row in df_analyzed.iterrows(): # TODO: i to be used later for cycling colours?
                 dfmean = self.get_dfmean(row=row)
                 dfoutput = self.get_dfoutput(row=row)
@@ -1692,8 +1698,10 @@ class Measure_window_sub(Ui_measure_window):
         self.row = row.copy() # creates a copy to be modified, then accepted to df_project, or rejected
         # create local copies of dfmean, dffilter and dfoutput
         t0 = time.time()
-        self.new_dfmean = self.parent.get_dfmean(row=self.row).copy()
-        self.new_dffilter = self.parent.get_dffilter(row=self.row).copy()
+        # do NOT copy these dfs; add filter columns directly
+        self.new_dfmean = self.parent.get_dfmean(row=self.row)
+        self.new_dffilter = self.parent.get_dffilter(row=self.row)
+        # copy this df; only replace if params change
         self.new_dfoutput = self.parent.get_dfoutput(row=self.row).copy()
         t1 = time.time()
         print(f"Measure_window_sub: {t1-t0} seconds to copy dfs")
@@ -1716,6 +1724,12 @@ class Measure_window_sub(Ui_measure_window):
         # split axes
         self.ax1 = self.canvas_output.axes
         self.ax2 = self.ax1.twinx()
+
+        # add appropriate ticks and axis labels
+        self.canvas_mean.axes.set_xlabel("Time (s)")
+        self.canvas_mean.axes.set_ylabel("Voltage (V)")
+        self.ax1.set_ylabel("Amplitude (mV)")
+        self.ax2.set_ylabel("Slope (mV/ms)")
 
         # Populate canvases - TODO: refactor such that components can be called individually when added later
         _ = sns.lineplot(ax=self.canvas_mean.axes, label='voltage', data=self.new_dfmean, y='voltage', x='time', color='black')
@@ -1796,10 +1810,12 @@ class Measure_window_sub(Ui_measure_window):
             if ('savgol' not in self.new_dfmean) | self.filter_params_changed:
                 self.new_dfmean = analysis.addFilterSavgol(self.new_dfmean)
         # build new output
+        print(f"PRE self.new_dfoutput: {self.new_dfoutput}")
         self.new_dfoutput = analysis.build_dfoutput(df=self.new_dffilter,
                                     filter=filter,
                                     t_EPSP_amp=self.row["t_EPSP_amp"],
                                     t_EPSP_slope=self.row["t_EPSP_slope"])
+        print(f"POST self.new_dfoutput: {self.new_dfoutput}")
         if self.last_x is not None:
             self.updateSample()
         self.updatePlots()
@@ -1817,15 +1833,21 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_mean.axes.lines[label2idx(self.canvas_mean, 'voltage')].set_visible(rec_filter=='voltage')
         if label2idx(self.canvas_mean, 'savgol') is not False:
             self.canvas_mean.axes.lines[label2idx(self.canvas_mean, 'savgol')].set_visible(rec_filter=='savgol')
-   
-        # Plot dfoutput on canvas_output, or show it if it's already plotted
+        # hide mean legend
+        if self.canvas_mean.axes.get_legend() is not None:
+            self.canvas_mean.axes.get_legend().set_visible(False)
+
+        # Plot dfoutput on canvas_output, or update and show if already plotted
         if label2idx(self.ax1, "EPSP_amp") is False:
-            _ = sns.lineplot(ax=self.ax1, label="EPSP_amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="black", linestyle='--')
+            _ = sns.lineplot(ax=self.ax1, label='EPSP_amp', data=self.new_dfoutput, y='EPSP_amp', x='sweep', color="black", linestyle='--')
         else:
+            self.ax1.lines[label2idx(self.ax1, "EPSP_amp")].set_data(self.new_dfoutput['sweep'], self.new_dfoutput['EPSP_amp'])
             self.ax1.lines[label2idx(self.ax1, "EPSP_amp")].set_visible(amp)
+
         if label2idx(self.ax2, "EPSP_slope") is False:
             _ = sns.lineplot(ax=self.ax2, label="EPSP_slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="black", alpha = 1)
         else:
+            self.ax2.lines[label2idx(self.ax2, "EPSP_slope")].set_data(self.new_dfoutput['sweep'], self.new_dfoutput['EPSP_slope'])
             self.ax2.lines[label2idx(self.ax2, "EPSP_slope")].set_visible(slope)
 
         self.ax1.lines[label2idx(self.ax1, "old EPSP amp")].set_visible(amp)
@@ -1838,6 +1860,11 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_EPSP_slope.set_visible(slope)
             self.v_t_EPSP_slope_start.set_visible(slope)
             self.v_t_EPSP_slope_end.set_visible(slope)
+
+        # TODO: Update y limits
+
+        # Update axes visibility and position
+        oneAxisLeft(self.ax1, self.ax2, amp, slope)
 
         self.canvas_mean.draw()
         self.canvas_output.draw()
@@ -1861,10 +1888,10 @@ class Measure_window_sub(Ui_measure_window):
             # Update dfs; dicts and files
             rec_name = self.parent.df_project.loc[int(idx.values[0]), 'recording_name']
             key_output = f"{rec_name}_output"
-            self.parent.dict_means[rec_name] = self.new_dfmean
-            self.parent.df2csv(df=self.new_dfmean, rec=rec_name, key="mean")
-            self.parent.dict_filters[self.row['recording_name']] = self.new_dffilter
-            self.parent.df2csv(df=self.new_dffilter, rec=self.row['recording_name'], key="filter")
+            #self.parent.dict_means[rec_name] = self.new_dfmean
+            #self.parent.df2csv(df=self.new_dfmean, rec=rec_name, key="mean")
+            #self.parent.dict_filters[self.row['recording_name']] = self.new_dffilter
+            #self.parent.df2csv(df=self.new_dffilter, rec=self.row['recording_name'], key="filter")
             self.parent.dict_outputs[key_output] = self.new_dfoutput
             self.parent.df2csv(df=self.new_dfoutput, rec=rec_name, key="output")
 
@@ -2106,6 +2133,18 @@ def zoomReset(canvas, ui):
     canvas.axes.set_xlim(ui.dict_cfg['mean_xlim'])
     canvas.axes.set_ylim(ui.dict_cfg['mean_ylim'])
     canvas.draw()
+
+
+def oneAxisLeft(ax1, ax2, amp, slope):
+    # sets ax1 and ax2 visibility and position
+    ax1.set_visible(amp)
+    ax2.set_visible(slope)
+    if slope and not amp:
+        ax2.yaxis.set_label_position("left")
+        ax2.yaxis.set_ticks_position("left")
+    else:
+        ax2.yaxis.set_label_position("right")
+        ax2.yaxis.set_ticks_position("right")
 
 
 def unPlot(canvas, *artists): # remove line if it exists on canvas
