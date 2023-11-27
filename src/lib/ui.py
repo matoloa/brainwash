@@ -1422,8 +1422,6 @@ class UIsub(Ui_MainWindow):
                 self.set_df_project(df=df_p)
         df_output = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=dict_t['t_EPSP_amp'], t_EPSP_slope=dict_t['t_EPSP_slope'])
         print(f"df_output: {df_output}")
-        if row['filter'] == 'savgol':
-            df_output['savgol'] = analysis.addFilterSavgol(df = dffilter)
         return df_output
 
 
@@ -1902,10 +1900,9 @@ class Measure_window_sub(Ui_measure_window):
             self.parent.set_df_project(df_p)
 
             # Update dfs; dicts and files
-            rec_name = self.parent.df_project.loc[int(idx.values[0]), 'recording_name']
-            key_output = f"{rec_name}_output"
-            self.parent.dict_outputs[key_output] = self.new_dfoutput
-            self.parent.df2csv(df=self.new_dfoutput, rec=rec_name, key="output")
+            recording_name = self.parent.df_project.loc[int(idx.values[0]), 'recording_name']
+            self.parent.dict_outputs[recording_name] = self.new_dfoutput
+            self.parent.df2csv(df=self.new_dfoutput, rec=recording_name, key="output")
 
             # Delete affected group output; dicts and files
             str_groups = df_p.loc[int(idx.values[0]), 'groups']
