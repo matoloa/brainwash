@@ -58,9 +58,9 @@ def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None):#, 
 
 
 def addFilterSavgol(df, window_length=9, polyorder=3):
-    # adds a column containing a smoothed version of the voltage column
+    # returns a column containing a smoothed version of the voltage column in a df; dfmean or dffilter
     df['savgol'] = savgol_filter(df.voltage, window_length=window_length, polyorder=polyorder)
-    return df
+    return df['savgol']
 
 
 # %%
@@ -318,10 +318,10 @@ def measureslope_vec(df, t_slope, halfwidth, name="EPSP", filter='voltage',):
     vectorized measure slope
     """
 
-    print(f'measureslope(df: {df}, t_slope: {t_slope}, halfwidth: {halfwidth}, name="EPSP"):')
+    #print(f'measureslope(df: {df}, t_slope: {t_slope}, halfwidth: {halfwidth}, name="EPSP"):')
 
     df_filtered = df[((t_slope - halfwidth) <= df.time) & (df.time <= (t_slope + halfwidth))]
-    print(f"df before pivot:{df_filtered.shape}")
+    #print(f"df before pivot:{df_filtered.shape}")
     dfpivot = df_filtered.pivot(index='sweep', columns='time', values=filter)
     coefs = np.polyfit(dfpivot.columns, dfpivot.T, deg=1).T
     dfslopes = pd.DataFrame(index=dfpivot.index)

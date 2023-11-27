@@ -687,7 +687,7 @@ class UIsub(Ui_MainWindow):
 
         # load or write local cfg, for storage of e.g. group colours, zoom levels etc.
         self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
-        if self.project_cfg_yaml.exists():
+        if False:#self.project_cfg_yaml.exists():
             with self.project_cfg_yaml.open("r") as file:
                 self.dict_cfg = yaml.safe_load(file)
         else:
@@ -698,9 +698,9 @@ class UIsub(Ui_MainWindow):
                         'delete_locked': True, # whether to allow deleting of data
                         'aspect_EPSP_amp': True,
                         'aspect_EPSP_slope': True,
-                        'mean_ylim': (-0.0015, 0.0002),
+                        'mean_ylim': (-0.0015, None),
                         'mean_xlim': (0.006, 0.020),
-                        'output_ax1_ylim': (0, 2),
+                        'output_ax1_ylim': (0, None),
                         'output_ax1_xlim': (None, None),
                         'output_ax2_ylim': (0, None),
                         'output_ax2_xlim': (None, None),
@@ -1282,71 +1282,85 @@ class UIsub(Ui_MainWindow):
 # internal dataframe handling
     def get_dfmean(self, row):
         # returns an internal df mean for the selected file. If it does not exist, read it from file first.
-        key_mean = f"{row['recording_name']}_mean"
-        if key_mean in self.dict_means:
-            return self.dict_means[key_mean]
         recording_name = row['recording_name']
+        if recording_name in self.dict_means: #1: Return cached
+            return self.dict_means[recording_name]
+
+        persist = False
         str_mean_path = f'{self.dict_folders["cache"]}/{recording_name}_mean.csv'
-        if Path(str_mean_path).exists():
+        if Path(str_mean_path).exists(): #2: Read from file
             dfmean = pd.read_csv(str_mean_path)
-        else:
+        else: #3: Create file
             dfmean = parse.build_dfmean(self.get_dfdata(row=row))
-            parse.persistdf(file_base=recording_name, dict_folders=self.dict_folders, dfmean=dfmean)
-        self.dict_means[key_mean] = dfmean
-        return self.dict_means[key_mean]
+            persist = True
+
+        #if the filter is not a column in self.dfmean, create it
+        if row['filter'] == 'savgol':
+            # TODO: extract parameters from df_p, use default for now
+            if 'savgol' not in dfmean.columns:
+                # print number of rows in dfmean
+                dfmean['savgol'] = analysis.addFilterSavgol(df = dfmean)
+                persist = True
+
+        if persist:
+            self.df2csv(df=dfmean, rec=recording_name, key="mean")
+        self.dict_means[recording_name] = dfmean
+        return self.dict_means[recording_name]
 
     def get_dfoutput(self, row):
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
-        rec_name = f"{row['recording_name']}_output"
-        if rec_name in self.dict_outputs: #1: Return cached
-            return self.dict_outputs[rec_name]
-        str_output_path = f'{self.dict_folders["cache"]}/{rec_name}.csv'
+        recording_name = row['recording_name']
+        if recording_name in self.dict_outputs: #1: Return cached
+            return self.dict_outputs[recording_name]
+
+        str_output_path = f"{self.dict_folders['cache']}/{recording_name}_output.csv"
         if Path(str_output_path).exists(): #2: Read from file
-            print(f"get_dfoutput: {rec_name} not cached, {str_output_path} found")
+            print(f"get_dfoutput: {recording_name} not cached, {str_output_path} found")
             dfoutput = pd.read_csv(str_output_path)
         else: #3: Create file
-            recording_name = row['recording_name']
             dfoutput = self.defaultOutput(row=row)
             dfoutput.reset_index(inplace=True)
-            print(f"get_dfoutput: {rec_name} built by defaultOutput")
+            print(f"get_dfoutput: {recording_name} built by defaultOutput")
             self.df2csv(df=dfoutput, rec=recording_name, key="output")
-        self.dict_outputs[rec_name] = dfoutput
-        return self.dict_outputs[rec_name]
+        self.dict_outputs[recording_name] = dfoutput
+        return self.dict_outputs[recording_name]
         
     def get_dfdata(self, row):
         # returns an internal df for the selected recording_name. If it does not exist, read it from file first.
-        key_data = row['recording_name']
-        print(f"get_dfdata: {key_data}")
-        if key_data in self.dict_datas: #1: Return cached
-            print(f"get_dfdata: {key_data} found in dict_datas")
-            return self.dict_datas[key_data]
-        path_data = Path(f"{self.dict_folders['data']}/{key_data}.csv")
-        print(f"get_dfdata: {key_data} not found in dict_datas, checking {path_data}")
+        recording_name = row['recording_name']
+        print(f"get_dfdata: {recording_name}")
+        if recording_name in self.dict_datas: #1: Return cached
+            print(f"get_dfdata: {recording_name} found in dict_datas")
+            return self.dict_datas[recording_name]
+        path_data = Path(f"{self.dict_folders['data']}/{recording_name}.csv")
+        print(f"get_dfdata: {recording_name} not found in dict_datas, checking {path_data}")
         try: #2: Read from file - datafile should always exist
             dfdata = pd.read_csv(path_data)
-            self.dict_datas[key_data] = dfdata
-            return self.dict_datas[key_data]
+            self.dict_datas[recording_name] = dfdata
+            return self.dict_datas[recording_name]
         except FileNotFoundError:
             print("did not find _mean.csv to load. Not imported?")
 
             
     def get_dffilter(self, row):
         # returns an internal df_filter for the selected recording_name. If it does not exist, read it from file first.
-        rec_name = row['recording_name']
-        if rec_name in self.dict_filters: #1: Return cached
-            print(f"get_dffilter: {rec_name} found in dict_datas")
-            return self.dict_filters[rec_name]
-        path_filter = Path(f"{self.dict_folders['cache']}/{rec_name}_filter.csv")
-        print(f"get_dffilter: {rec_name} not found in dict_filters, checking {path_filter}")
+        recording_name = row['recording_name']
+        if recording_name in self.dict_filters: #1: Return cached
+            print(f"get_dffilter: {recording_name} found in dict_datas")
+            return self.dict_filters[recording_name]
+        path_filter = Path(f"{self.dict_folders['cache']}/{recording_name}_filter.csv")
+        print(f"get_dffilter: {recording_name} not found in dict_filters, checking {path_filter}")
         if Path(path_filter).exists(): #2: Read from file
             dffilter = pd.read_csv(path_filter)
         else: #3: Create file
             dffilter = parse.zeroSweeps(self.get_dfdata(row=row), self.get_dfmean(row=row))
-            self.df2csv(df=dffilter, rec=rec_name, key="filter")
+            self.df2csv(df=dffilter, rec=recording_name, key="filter")
+            if row['filter'] == 'savgol':
+                dffilter['savgol'] = analysis.addFilterSavgol(df = dffilter)
             print("did not find _filter.csv to load. Created and cached.")
         # Cache and return
-        self.dict_filters[rec_name] = dffilter
-        return self.dict_filters[rec_name]
+        self.dict_filters[recording_name] = dffilter
+        return self.dict_filters[recording_name]
         
         
     def get_dfgroupmean(self, key_group):
@@ -1406,9 +1420,11 @@ class UIsub(Ui_MainWindow):
                 df_p.loc[row.name, aspect] = value
                 print(f"{aspect} was {old_aspect_value} in df_p, NOT a valid float. Updated df_p.")               
                 self.set_df_project(df=df_p)
-        return analysis.build_dfoutput(df=dffilter,
-                                       t_EPSP_amp=dict_t["t_EPSP_amp"],
-                                       t_EPSP_slope=dict_t["t_EPSP_slope"])
+        df_output = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=dict_t['t_EPSP_amp'], t_EPSP_slope=dict_t['t_EPSP_slope'])
+        print(f"df_output: {df_output}")
+        if row['filter'] == 'savgol':
+            df_output['savgol'] = analysis.addFilterSavgol(df = dffilter)
+        return df_output
 
 
 # Graph handling
@@ -1463,9 +1479,10 @@ class UIsub(Ui_MainWindow):
                 label = f"{row['recording_name']}"
                 rec_filter = row['filter'] # the filter currently used for this recording
                 _ = sns.lineplot(ax=self.canvas_seaborn_mean.axes, label=label, data=dfmean, y=rec_filter, x="time", color="black")
-                # plot dfoutput on canvas_seaborn_output
 
+                # plot dfoutput on canvas_seaborn_output
                 if amp & (not np.isnan(row["t_EPSP_amp"])):
+                    print(f"setGraphSelected: {label}_EPSP_amp, dfoutput: {dfoutput}")
                     _ = sns.lineplot(ax=ax1, label=f"{label}_EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", color="black", linestyle='--')
                     # mean, amp indicator
                     y_position = dfmean[dfmean.time == row["t_EPSP_amp"]].voltage
@@ -1541,8 +1558,6 @@ class UIsub(Ui_MainWindow):
             # TODO: Make it import the missing file
             print("Unknown number of sweeps - not imported?")
             return
-        # Get dataframes
-        dfmean = self.get_dfmean(ser_table_row)
         # Close last window, for now. TODO: handle multiple windows (ew)
         if hasattr(self, "measure_frame"):
             print(f"Closing last window: {getattr(self, 'measure_frame')}")
@@ -1600,10 +1615,10 @@ class TableProjSub(QtWidgets.QTableView):
             print("Files dropped:", file_urls)
             # Handle the dropped files here
             dfAdd = df_projectTemplate()
-            dfAdd["path"] = file_urls
-            dfAdd["host"] = "Computer 1"
-            dfAdd["checksum"] = "big number"
-            dfAdd["filter"] = "voltage"
+            dfAdd['path'] = file_urls
+            dfAdd['host'] = "Computer 1"
+            dfAdd['checksum'] = "big number"
+            dfAdd['filter'] = "voltage"
             # NTH: more intelligent default naming; lowest level unique name?
             # For now, use name + lowest level folder
             names = []
@@ -1699,8 +1714,8 @@ class Measure_window_sub(Ui_measure_window):
         # create local copies of dfmean, dffilter and dfoutput
         t0 = time.time()
         # do NOT copy these dfs; add filter columns directly
-        self.new_dfmean = self.parent.get_dfmean(row=self.row)
-        self.new_dffilter = self.parent.get_dffilter(row=self.row)
+        self.dfmean = self.parent.get_dfmean(row=self.row)
+        self.dffilter = self.parent.get_dffilter(row=self.row)
         # copy this df; only replace if params change
         self.new_dfoutput = self.parent.get_dfoutput(row=self.row).copy()
         t1 = time.time()
@@ -1732,7 +1747,7 @@ class Measure_window_sub(Ui_measure_window):
         self.ax2.set_ylabel("Slope (mV/ms)")
 
         # Populate canvases - TODO: refactor such that components can be called individually when added later
-        _ = sns.lineplot(ax=self.canvas_mean.axes, label='voltage', data=self.new_dfmean, y='voltage', x='time', color='black')
+        _ = sns.lineplot(ax=self.canvas_mean.axes, label='voltage', data=self.dfmean, y='voltage', x='time', color='black')
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             t_EPSP_amp = self.row['t_EPSP_amp']
             self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
@@ -1805,17 +1820,18 @@ class Measure_window_sub(Ui_measure_window):
         if filter == "savgol":
             # TODO: create interface for filter params
             # make sure the updated filter exists
-            if ('savgol' not in self.new_dffilter) | self.filter_params_changed:
-                self.new_dffilter = analysis.addFilterSavgol(self.new_dffilter)
-            if ('savgol' not in self.new_dfmean) | self.filter_params_changed:
-                self.new_dfmean = analysis.addFilterSavgol(self.new_dfmean)
+            if ('savgol' not in self.dfmean) | self.filter_params_changed:
+                self.dfmean['savgol'] = analysis.addFilterSavgol(self.dfmean)
+                parse.persistdf(file_base=self.row['recording_name'], dict_folders=self.parent.dict_folders, dfmean=self.dfmean)
+            if ('savgol' not in self.dffilter) | self.filter_params_changed:
+                self.dffilter['savgol'] = analysis.addFilterSavgol(self.dffilter)
+                parse.persistdf(file_base=self.row['recording_name'], dict_folders=self.parent.dict_folders, dffilter=self.dffilter)
+
         # build new output
-        print(f"PRE self.new_dfoutput: {self.new_dfoutput}")
-        self.new_dfoutput = analysis.build_dfoutput(df=self.new_dffilter,
+        self.new_dfoutput = analysis.build_dfoutput(df=self.dffilter,
                                     filter=filter,
                                     t_EPSP_amp=self.row["t_EPSP_amp"],
                                     t_EPSP_slope=self.row["t_EPSP_slope"])
-        print(f"POST self.new_dfoutput: {self.new_dfoutput}")
         if self.last_x is not None:
             self.updateSample()
         self.updatePlots()
@@ -1828,7 +1844,7 @@ class Measure_window_sub(Ui_measure_window):
         rec_filter = self.row['filter'] # the filter currently used for this recording
         # Plot relevant filter of dfmean on canvas_mean, or show it if it's already plotted
         if label2idx(self.canvas_mean, rec_filter) is False:
-            _ = sns.lineplot(ax=self.canvas_mean.axes, label=rec_filter, data=self.new_dfmean, y=rec_filter, x="time", color="black")
+            _ = sns.lineplot(ax=self.canvas_mean.axes, label=rec_filter, data=self.dfmean, y=rec_filter, x="time", color="black")
         
         self.canvas_mean.axes.lines[label2idx(self.canvas_mean, 'voltage')].set_visible(rec_filter=='voltage')
         if label2idx(self.canvas_mean, 'savgol') is not False:
@@ -1888,10 +1904,6 @@ class Measure_window_sub(Ui_measure_window):
             # Update dfs; dicts and files
             rec_name = self.parent.df_project.loc[int(idx.values[0]), 'recording_name']
             key_output = f"{rec_name}_output"
-            #self.parent.dict_means[rec_name] = self.new_dfmean
-            #self.parent.df2csv(df=self.new_dfmean, rec=rec_name, key="mean")
-            #self.parent.dict_filters[self.row['recording_name']] = self.new_dffilter
-            #self.parent.df2csv(df=self.new_dffilter, rec=self.row['recording_name'], key="filter")
             self.parent.dict_outputs[key_output] = self.new_dfoutput
             self.parent.df2csv(df=self.new_dfoutput, rec=rec_name, key="output")
 
@@ -1909,6 +1921,7 @@ class Measure_window_sub(Ui_measure_window):
                         group_path = Path(f'{self.parent.dict_folders["cache"]}/{group}.csv')
                         if group_path.exists():
                             group_path.unlink()
+            print(f"accepted: {self.new_dfoutput}")
             self.parent.setGraph(df_p.iloc[idx]) # draw the updated row
 
         # Error handling        
@@ -1964,7 +1977,7 @@ class Measure_window_sub(Ui_measure_window):
                     return
                 x = event.xdata
                 # find time in self.dfmean closest to x
-                time = self.new_dfmean.iloc[(self.new_dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
+                time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
                 self.updateOnClick(time=time, aspect=self.aspect)
             elif event.button == 2:
                 zoomReset(canvas=self.canvas_mean, ui=self.parent)
@@ -2007,7 +2020,7 @@ class Measure_window_sub(Ui_measure_window):
             x = self.last_x
         same = bool(int(self.drag_start) == int(x))
         print(f"meanDragged from: {self.drag_start} to {x}: {same}")
-        df = self.new_dffilter
+        df = self.dffilter
         rec_filter = self.row['filter'] # the filter currently used for this recording
         print(f"updateSample: event={event}, rec_filter={rec_filter}")
         if same: # click and release on same: get that specific sweep and superimpose it on canvas_mean
