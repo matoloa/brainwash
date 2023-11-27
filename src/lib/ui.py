@@ -1315,12 +1315,10 @@ class UIsub(Ui_MainWindow):
 
         str_output_path = f"{self.dict_folders['cache']}/{recording_name}_output.csv"
         if Path(str_output_path).exists(): #2: Read from file
-            print(f"get_dfoutput: {recording_name} not cached, {str_output_path} found")
             dfoutput = pd.read_csv(str_output_path)
         else: #3: Create file
             dfoutput = self.defaultOutput(row=row)
             dfoutput.reset_index(inplace=True)
-            print(f"get_dfoutput: {recording_name} built by defaultOutput")
             self.df2csv(df=dfoutput, rec=recording_name, key="output")
         self.dict_outputs[recording_name] = dfoutput
         return self.dict_outputs[recording_name]
@@ -1328,12 +1326,9 @@ class UIsub(Ui_MainWindow):
     def get_dfdata(self, row):
         # returns an internal df for the selected recording_name. If it does not exist, read it from file first.
         recording_name = row['recording_name']
-        print(f"get_dfdata: {recording_name}")
         if recording_name in self.dict_datas: #1: Return cached
-            print(f"get_dfdata: {recording_name} found in dict_datas")
             return self.dict_datas[recording_name]
         path_data = Path(f"{self.dict_folders['data']}/{recording_name}.csv")
-        print(f"get_dfdata: {recording_name} not found in dict_datas, checking {path_data}")
         try: #2: Read from file - datafile should always exist
             dfdata = pd.read_csv(path_data)
             self.dict_datas[recording_name] = dfdata
@@ -1346,10 +1341,8 @@ class UIsub(Ui_MainWindow):
         # returns an internal df_filter for the selected recording_name. If it does not exist, read it from file first.
         recording_name = row['recording_name']
         if recording_name in self.dict_filters: #1: Return cached
-            print(f"get_dffilter: {recording_name} found in dict_datas")
             return self.dict_filters[recording_name]
         path_filter = Path(f"{self.dict_folders['cache']}/{recording_name}_filter.csv")
-        print(f"get_dffilter: {recording_name} not found in dict_filters, checking {path_filter}")
         if Path(path_filter).exists(): #2: Read from file
             dffilter = pd.read_csv(path_filter)
         else: #3: Create file
@@ -1357,7 +1350,6 @@ class UIsub(Ui_MainWindow):
             self.df2csv(df=dffilter, rec=recording_name, key="filter")
             if row['filter'] == 'savgol':
                 dffilter['savgol'] = analysis.addFilterSavgol(df = dffilter)
-            print("did not find _filter.csv to load. Created and cached.")
         # Cache and return
         self.dict_filters[recording_name] = dffilter
         return self.dict_filters[recording_name]
@@ -1421,7 +1413,6 @@ class UIsub(Ui_MainWindow):
                 print(f"{aspect} was {old_aspect_value} in df_p, NOT a valid float. Updated df_p.")               
                 self.set_df_project(df=df_p)
         df_output = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=dict_t['t_EPSP_amp'], t_EPSP_slope=dict_t['t_EPSP_slope'])
-        print(f"df_output: {df_output}")
         return df_output
 
 
@@ -1465,7 +1456,6 @@ class UIsub(Ui_MainWindow):
         self.canvas_seaborn_output.draw()
 
     def setGraphSelected(self, df, ax1, ax2, amp, slope):
-        print(f"setGraphSelected: {df['recording_name']}")
         df_analyzed = df[df["sweeps"] != "..."]
         if df_analyzed.empty:
             print("Nothing analyzed selected.")
@@ -1480,7 +1470,6 @@ class UIsub(Ui_MainWindow):
 
                 # plot dfoutput on canvas_seaborn_output
                 if amp & (not np.isnan(row["t_EPSP_amp"])):
-                    print(f"setGraphSelected: {label}_EPSP_amp, dfoutput: {dfoutput}")
                     _ = sns.lineplot(ax=ax1, label=f"{label}_EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", color="black", linestyle='--')
                     # mean, amp indicator
                     y_position = dfmean[dfmean.time == row["t_EPSP_amp"]].voltage
@@ -1710,14 +1699,14 @@ class Measure_window_sub(Ui_measure_window):
         self.measure_frame = measure_frame
         self.row = row.copy() # creates a copy to be modified, then accepted to df_project, or rejected
         # create local copies of dfmean, dffilter and dfoutput
-        t0 = time.time()
         # do NOT copy these dfs; add filter columns directly
         self.dfmean = self.parent.get_dfmean(row=self.row)
         self.dffilter = self.parent.get_dffilter(row=self.row)
         # copy this df; only replace if params change
+        t0 = time.time()
         self.new_dfoutput = self.parent.get_dfoutput(row=self.row).copy()
         t1 = time.time()
-        print(f"Measure_window_sub: {t1-t0} seconds to copy dfs")
+        print(f"Measure_window_sub: {t1-t0} seconds to copy self.new_dfoutput")
 
         self.measure_graph_mean.setLayout(QtWidgets.QVBoxLayout())
         self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)
@@ -1918,7 +1907,6 @@ class Measure_window_sub(Ui_measure_window):
                         group_path = Path(f'{self.parent.dict_folders["cache"]}/{group}.csv')
                         if group_path.exists():
                             group_path.unlink()
-            print(f"accepted: {self.new_dfoutput}")
             self.parent.setGraph(df_p.iloc[idx]) # draw the updated row
 
         # Error handling        

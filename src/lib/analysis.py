@@ -53,7 +53,7 @@ def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None):#, 
             dfoutput['EPSP_slope'] = np.nan
         list_col.append('EPSP_slope')
     t1 = time.time()
-    print(f'time elapsed: {t1-t0} seconds')
+    print(f'build_dfoutput: {t1-t0} seconds')
     return dfoutput[list_col]
 
 
