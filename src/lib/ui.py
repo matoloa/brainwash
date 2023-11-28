@@ -687,7 +687,7 @@ class UIsub(Ui_MainWindow):
 
         # load or write local cfg, for storage of e.g. group colours, zoom levels etc.
         self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
-        if False:#self.project_cfg_yaml.exists():
+        if self.project_cfg_yaml.exists():
             with self.project_cfg_yaml.open("r") as file:
                 self.dict_cfg = yaml.safe_load(file)
         else:
@@ -698,7 +698,7 @@ class UIsub(Ui_MainWindow):
                         'delete_locked': True, # whether to allow deleting of data
                         'aspect_EPSP_amp': True,
                         'aspect_EPSP_slope': True,
-                        'mean_ylim': (-0.0015, None),
+                        'mean_ylim': (-0.001, 0.0002),
                         'mean_xlim': (0.006, 0.020),
                         'output_ax1_ylim': (0, None),
                         'output_ax1_xlim': (None, None),
@@ -898,8 +898,8 @@ class UIsub(Ui_MainWindow):
             self.setGraph()
             return
         selected_rows = self.listSelectedRows()
-        df_selection = self.df_project.loc[selected_rows]
-        self.setGraph(df = df_selection)
+        df_select = self.df_project.loc[selected_rows]
+        self.setGraph(df_select)
 
     def tableProjDoubleClicked(self):
         self.launchMeasureWindow()
@@ -1123,7 +1123,7 @@ class UIsub(Ui_MainWindow):
                 self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
             self.purgeGroupCache(add_group)
             df_selection = self.df_project.loc[selected_rows]
-            self.setGraph(df = df_selection)
+            self.setGraph(df_selection)
         else:
             print("No files selected.")
 
@@ -1402,6 +1402,7 @@ class UIsub(Ui_MainWindow):
         dfmean = self.get_dfmean(row=row)
         df_p = self.get_df_project()
         dict_t = analysis.find_all_t(dfmean=dfmean, verbose=False)
+        persist = False
         for aspect, value in dict_t.items():
             old_aspect_value = df_p.loc[row.name, aspect]
             if pd.notna(old_aspect_value):
@@ -1410,8 +1411,10 @@ class UIsub(Ui_MainWindow):
                 print(f"{aspect} was {old_aspect_value} in df_p, a valid float. Updated dict_t to {value}")
             else: # if old_aspect is NOT a valid float, replace df_p with dict_t
                 df_p.loc[row.name, aspect] = value
-                print(f"{aspect} was {old_aspect_value} in df_p, NOT a valid float. Updated df_p.")               
-                self.set_df_project(df=df_p)
+                print(f"{aspect} was {old_aspect_value} in df_p, NOT a valid float. Updating df_p...")               
+                persist = True
+        if persist:
+            self.set_df_project(df_p)
         df_output = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=dict_t['t_EPSP_amp'], t_EPSP_slope=dict_t['t_EPSP_slope'])
         return df_output
 
@@ -1426,7 +1429,7 @@ class UIsub(Ui_MainWindow):
             self.canvas_seaborn_output.axes.cla()
             self.canvas_seaborn_output.draw()
 
-    def setGraph(self, df=None): # plot selected row(s), or clear graph if empty
+    def setGraph(self, df_select=None): # plot selected row(s), or clear graph if empty
         amp = bool(self.dict_cfg['aspect_EPSP_amp'])
         slope = bool(self.dict_cfg['aspect_EPSP_slope'])
         self.clearGraph()
@@ -1439,8 +1442,8 @@ class UIsub(Ui_MainWindow):
         # Plot group means
         if self.dict_cfg['list_groups']:
             self.setGraphGroups(ax1, ax2, self.dict_cfg['list_group_colors'])
-        if df is not None: # plot selected rows
-            self.setGraphSelected(df=df, ax1=ax1, ax2=ax2, amp=amp, slope=slope)
+        if df_select is not None: # plot selected rows
+            self.setGraphSelected(df_select=df_select, ax1=ax1, ax2=ax2, amp=amp, slope=slope)
         
         # add appropriate ticks and axis labels
         self.canvas_seaborn_mean.axes.set_xlabel("Time (s)")
@@ -1455,30 +1458,31 @@ class UIsub(Ui_MainWindow):
         self.canvas_seaborn_mean.draw()
         self.canvas_seaborn_output.draw()
 
-    def setGraphSelected(self, df, ax1, ax2, amp, slope):
-        df_analyzed = df[df["sweeps"] != "..."]
+    def setGraphSelected(self, df_select, ax1, ax2, amp, slope):
+        df_analyzed = df_select[df_select["sweeps"] != "..."]
         if df_analyzed.empty:
             print("Nothing analyzed selected.")
         else:
             for i, row in df_analyzed.iterrows(): # TODO: i to be used later for cycling colours?
                 dfmean = self.get_dfmean(row=row)
                 dfoutput = self.get_dfoutput(row=row)
+                t_EPSP_amp = self.get_df_project().loc[i, 't_EPSP_amp']
+                t_EPSP_slope = self.get_df_project().loc[i, 't_EPSP_slope']
                 # plot relevant filter of dfmean on canvas_seaborn_mean
                 label = f"{row['recording_name']}"
                 rec_filter = row['filter'] # the filter currently used for this recording
                 _ = sns.lineplot(ax=self.canvas_seaborn_mean.axes, label=label, data=dfmean, y=rec_filter, x="time", color="black")
-
                 # plot dfoutput on canvas_seaborn_output
-                if amp & (not np.isnan(row["t_EPSP_amp"])):
+                if amp & (not np.isnan(t_EPSP_amp)):
                     _ = sns.lineplot(ax=ax1, label=f"{label}_EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", color="black", linestyle='--')
                     # mean, amp indicator
-                    y_position = dfmean[dfmean.time == row["t_EPSP_amp"]].voltage
-                    self.canvas_seaborn_mean.axes.plot(row["t_EPSP_amp"], y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
-                if slope & (not np.isnan(row["t_EPSP_slope"])):
+                    y_position = dfmean[dfmean.time == t_EPSP_amp].voltage
+                    self.canvas_seaborn_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
+                if slope & (not np.isnan(t_EPSP_slope)):
                     _ = sns.lineplot(ax=ax2, label=f"{label}_EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
                     # mean, slope indicator        
-                    x_start = row["t_EPSP_slope"] - 0.0004
-                    x_end = row["t_EPSP_slope"] + 0.0004
+                    x_start = t_EPSP_slope - 0.0004
+                    x_end = t_EPSP_slope + 0.0004
                     y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
                     y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
                     self.canvas_seaborn_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
