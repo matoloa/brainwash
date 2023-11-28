@@ -740,6 +740,8 @@ class UIsub(Ui_MainWindow):
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
 
+        self.dict_open_measure_windows = {}
+
 # Debugging tools
         # self.find_widgets_with_top_left_coordinates(self.centralwidget)
 
@@ -931,13 +933,15 @@ class UIsub(Ui_MainWindow):
 
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
-        if verbose:
-            print("F2 key pressed in CustomTableView")
         selected_rows = self.listSelectedRows()
         if len(selected_rows) == 1:
             row = selected_rows[0]
             df_p = self.df_project
             old_recording_name = df_p.at[row, 'recording_name']
+            # if the old recording name is a key in in dict_open_measure_windows
+            if old_recording_name in self.dict_open_measure_windows.keys():
+                print(f"Cannot rename {old_recording_name} while it is open in a measure window.")
+                return
             old_data = self.dict_folders['data'] / (old_recording_name + ".csv")
             old_mean = self.dict_folders['cache'] / (old_recording_name + "_mean.csv")
             old_filter = self.dict_folders['cache'] / (old_recording_name + "_filter.csv")
@@ -974,8 +978,12 @@ class UIsub(Ui_MainWindow):
     def deleteSelectedRows(self):
         df_p = self.get_df_project()
         selected_rows = self.listSelectedRows()
-        list_affected_groups = []
         if 0 < len(selected_rows):
+            # If any of the selected rows are open in a measure window, abort
+            if any(df_p.at[row, 'recording_name'] in self.dict_open_measure_windows for row in selected_rows):
+                print(f"Cannot delete recordings that are open in a measure window.")
+                return
+            list_affected_groups = []
             for row in selected_rows:
                 sweeps = df_p.at[row, 'sweeps']
                 if sweeps != "...": # if the file is parsed:
@@ -1533,6 +1541,7 @@ class UIsub(Ui_MainWindow):
         qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
         ser_table_row = self.tablemodel.dataRow(qt_index)
         sweeps = ser_table_row["sweeps"]
+        recording_name = ser_table_row["recording_name"]
         if sweeps == "...":
             # TODO: Make it import the missing file
             print("Unknown number of sweeps - not imported?")
@@ -1544,7 +1553,8 @@ class UIsub(Ui_MainWindow):
         # Open window
         self.measure_frame = QDialog_sub()
         self.measure_window_sub = Measure_window_sub(self.measure_frame, row=ser_table_row, parent=self)
-        self.measure_frame.setWindowTitle(ser_table_row['recording_name'])
+        self.measure_frame.setWindowTitle(recording_name)
+        self.dict_open_measure_windows[recording_name] = self.measure_window_sub
         # move measurewindow to default position (TODO: later to be stored in cfg)
         self.measure_frame.setGeometry(1400, 0, 800, 1200)
         self.measure_frame.show()
