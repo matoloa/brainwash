@@ -1435,6 +1435,14 @@ class UIsub(Ui_MainWindow):
         self.canvas_seaborn_mean.axes.set_xlim(self.dict_cfg['mean_xlim'])
         self.canvas_seaborn_mean.axes.set_ylim(self.dict_cfg['mean_ylim'])
         ax1.set_ylim(self.dict_cfg['output_ax1_ylim'])
+        
+        handles, labels = self.ax1.get_legend_handles_labels()
+        if labels:
+            self.ax1.legend(loc='upper right')
+        handles, labels = self.ax2.get_legend_handles_labels()
+        if labels:
+            self.ax2.legend(loc='lower right')
+
         self.canvas_seaborn_mean.draw()
         self.canvas_seaborn_output.draw()
 
@@ -1682,10 +1690,6 @@ class Measure_window_sub(Ui_measure_window):
         self.parent = parent
         self.measure_frame = measure_frame
         self.row = row.copy() # creates a copy to be modified, then accepted to df_project, or rejected
-        self.dict_filter_params = {}
-        if row['filter'] != 'voltage':
-            self.dict_filter_params = {row['filter']: row['filter_params']} # TODO: read from row
-        # do NOT copy these dfs; add filter columns directly into them
         self.dfmean = self.parent.get_dfmean(row=self.row)
         self.dffilter = self.parent.get_dffilter(row=self.row)
         # copy this df; only replace if params change
@@ -1693,6 +1697,16 @@ class Measure_window_sub(Ui_measure_window):
         self.new_dfoutput = self.parent.get_dfoutput(row=self.row).copy()
         t1 = time.time()
         print(f"Measure_window_sub: {t1-t0} seconds to copy self.new_dfoutput")
+
+        if row['filter'] != 'voltage':
+            self.dict_filter_params = {row['filter']: json.loads(row['filter_params'])} # TODO: read from row
+        else:
+            self.dict_filter_params = {}
+        if row['filter'] not in self.dict_filter_params:            
+            self.measure_filter_defaults(row['filter'])
+
+        # do NOT copy these dfs; add filter columns directly into them
+
 
         self.measure_graph_mean.setLayout(QtWidgets.QVBoxLayout())
         self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)
@@ -1780,7 +1794,9 @@ class Measure_window_sub(Ui_measure_window):
         self.radioButton_filter_none.clicked.connect(lambda: self.updateFilter("voltage"))
         self.radioButton_filter_savgol.setChecked(row_filter=="savgol")
         self.radioButton_filter_savgol.clicked.connect(lambda: self.updateFilter("savgol"))
+
         if row_filter == "savgol":
+            # if self.dict_filter_params has key savgold, use it, otherwise create it
             self.measure_filter_ui_savgol()
 
         self.buttonBox.accepted.connect(self.accepted_handler)
@@ -1795,19 +1811,21 @@ class Measure_window_sub(Ui_measure_window):
             if hasattr(self, "frame_measure_filter_params") and self.frame_measure_filter_params is not None:
                 self.frame_measure_filter_params.deleteLater()
                 self.frame_measure_filter_params = None
+        if filter not in self.dict_filter_params:            
+            self.measure_filter_defaults(filter)
         if filter == "savgol":
-            # if self.dict_filter_params has key savgold, use it, otherwise create it
-            if 'savgol' not in self.dict_filter_params:            
-                self.dict_filter_params = {"savgol": {"window_length": 11, "polyorder": 2}} # TODO: read from row
+            window_length = int(self.dict_filter_params['savgol']['window_length'])
+            polyorder = int(self.dict_filter_params['savgol']['polyorder'])
+            print(f"window_length: {window_length}, polyorder: {polyorder}")
             # TODO: create interface for filter params
             if param_edit == False: # don't redraw the frame if lineEdit changed params
                 self.measure_filter_ui_savgol()
             # make sure the updated filter exists
             if ('savgol' not in self.dfmean) | param_edit:
-                self.dfmean['savgol'] = analysis.addFilterSavgol(self.dfmean, window_length=self.dict_filter_params['savgol']['window_length'], polyorder=self.dict_filter_params['savgol']['polyorder'])
+                self.dfmean['savgol'] = analysis.addFilterSavgol(self.dfmean, window_length=window_length, polyorder=polyorder)
                 parse.persistdf(file_base=self.row['recording_name'], dict_folders=self.parent.dict_folders, dfmean=self.dfmean)
             if ('savgol' not in self.dffilter) | param_edit:
-                self.dffilter['savgol'] = analysis.addFilterSavgol(self.dffilter, window_length=self.dict_filter_params['savgol']['window_length'], polyorder=self.dict_filter_params['savgol']['polyorder'])
+                self.dffilter['savgol'] = analysis.addFilterSavgol(self.dffilter, window_length=window_length, polyorder=polyorder)
                 parse.persistdf(file_base=self.row['recording_name'], dict_folders=self.parent.dict_folders, dffilter=self.dffilter)
         # build new output
         self.new_dfoutput = analysis.build_dfoutput(df=self.dffilter,
@@ -1825,7 +1843,7 @@ class Measure_window_sub(Ui_measure_window):
                 windowLength = int(lineEdit.text())
                 if not 1 <= windowLength <= 21:
                     raise ValueError
-                self.dict_filter_params['savgol']['window_length'] = windowLength
+                self.dict_filter_params['savgol']['window_length'] = str(windowLength)
             except ValueError:
                 print("Invalid input: Window length must be a number between 1 and 21.")
                 lineEdit.setText(str(self.dict_filter_params['savgol']['window_length']))
@@ -1834,10 +1852,18 @@ class Measure_window_sub(Ui_measure_window):
                 polyOrder = int(lineEdit.text())
                 if not 1 <= polyOrder <= 5:
                     raise ValueError
+                self.dict_filter_params['savgol']['window_length'] = str(windowLength)
             except ValueError:
                 print("Invalid input: Polyorder must be a number between 1 and 5.")
                 lineEdit.setText(str(self.dict_filter_params['savgol']['polyorder']))
         self.updateFilter("savgol", param_edit=True)
+
+
+    def measure_filter_defaults(self, filter):
+        if filter == "savgol":
+            self.dict_filter_params = {'savgol': {"window_length": "11", "polyorder": "2"}}
+        else:
+            self.dict_filter_params = {}
 
 
     def measure_filter_ui_savgol(self):
@@ -1852,7 +1878,7 @@ class Measure_window_sub(Ui_measure_window):
         self.lineEdit_filter_savgol_windowLength = QtWidgets.QLineEdit(self.frame_measure_filter_params)
         self.lineEdit_filter_savgol_windowLength.setGeometry(QtCore.QRect(110, 10, 51, 25))
         self.lineEdit_filter_savgol_windowLength.setObjectName("lineEdit_filter_savgol_windowLength")            
-        self.lineEdit_filter_savgol_windowLength.setText(str(self.dict_filter_params['savgol']['window_length']))
+        self.lineEdit_filter_savgol_windowLength.setText(self.dict_filter_params['savgol']['window_length'])
         self.label_filter_savgol_polyOrder = QtWidgets.QLabel(self.frame_measure_filter_params)
         self.label_filter_savgol_polyOrder.setGeometry(QtCore.QRect(10, 40, 100, 23))
         self.label_filter_savgol_polyOrder.setObjectName("label_filter_savgol_polyOrder")
@@ -1860,7 +1886,7 @@ class Measure_window_sub(Ui_measure_window):
         self.lineEdit_filter_savgol_polyOrder = QtWidgets.QLineEdit(self.frame_measure_filter_params)
         self.lineEdit_filter_savgol_polyOrder.setGeometry(QtCore.QRect(110, 40, 51, 25))
         self.lineEdit_filter_savgol_polyOrder.setObjectName("lineEdit_filter_savgol_polyOrder")
-        self.lineEdit_filter_savgol_polyOrder.setText(str(self.dict_filter_params['savgol']['polyorder']))
+        self.lineEdit_filter_savgol_polyOrder.setText(self.dict_filter_params['savgol']['polyorder'])
         self.frame_measure_filter_params.show()
         #connect lineEdits to updateFilterParamsOnEdit
         self.lineEdit_filter_savgol_polyOrder.editingFinished.connect(lambda: self.editFilterParams(self.lineEdit_filter_savgol_polyOrder))
@@ -1921,10 +1947,14 @@ class Measure_window_sub(Ui_measure_window):
         df_p = self.parent.get_df_project()
         # Find the index of the row with the matching recording_name
         idx = df_p.index[df_p['recording_name'] == self.row['recording_name']]
-        self.row['filter_params'] = json.dumps(self.dict_filter_params[self.row['filter']])
-        list_keep = ['recording_name', 'groups'] # Columns to keep
-        # If there's exactly one matching row
-        if len(idx) == 1:
+        if len(idx) == 1: # Only proceed if there's exactly one matching row
+            # Update filters and params in self.row
+            if self.row['filter'] == "voltage":
+                self.row['filter_params'] = json.dumps({})
+            else:
+                self.row['filter_params'] = json.dumps(self.dict_filter_params[self.row['filter']])
+            # List columns to keep
+            list_keep = ['recording_name', 'groups']
             # Update the row in df_project
             for column, value in self.row.items():
                 if column not in list_keep:
