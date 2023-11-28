@@ -304,40 +304,23 @@ class Ui_measure_window(QtCore.QObject):
         self.pushButton_auto.setGeometry(QtCore.QRect(10, 10, 83, 25))
         self.pushButton_auto.setObjectName("pushButton_auto")
         self.horizontalLayout.addWidget(self.frame_measure_toolbox)
-        self.frame_measure_view = QtWidgets.QFrame(measure)
-        self.frame_measure_view.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frame_measure_view.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frame_measure_view.setObjectName("frame_measure_view")
-        self.label_filter = QtWidgets.QLabel(self.frame_measure_view)
+        self.frame_measure_filter = QtWidgets.QFrame(measure)
+        self.frame_measure_filter.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frame_measure_filter.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frame_measure_filter.setObjectName("frame_measure_filter")
+        self.label_filter = QtWidgets.QLabel(self.frame_measure_filter)
         self.label_filter.setGeometry(QtCore.QRect(10, 10, 62, 17))
         self.label_filter.setObjectName("label_filter")
-        self.lineEdit_filter_param1 = QtWidgets.QLineEdit(self.frame_measure_view)
-        self.lineEdit_filter_param1.setGeometry(QtCore.QRect(190, 30, 51, 25))
-        self.lineEdit_filter_param1.setObjectName("lineEdit_filter_param1")
-        self.radioButton_filter_placeholder = QtWidgets.QRadioButton(self.frame_measure_view)
-        self.radioButton_filter_placeholder.setGeometry(QtCore.QRect(10, 70, 106, 23))
-        self.radioButton_filter_placeholder.setObjectName("radioButton_filter_placeholder")
-        self.label_filter_param2 = QtWidgets.QLabel(self.frame_measure_view)
-        self.label_filter_param2.setGeometry(QtCore.QRect(110, 70, 71, 23))
-        self.label_filter_param2.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
-        self.label_filter_param2.setObjectName("label_filter_param2")
-        self.lineEdit_filter_param2 = QtWidgets.QLineEdit(self.frame_measure_view)
-        self.lineEdit_filter_param2.setGeometry(QtCore.QRect(190, 70, 51, 25))
-        self.lineEdit_filter_param2.setObjectName("lineEdit_filter_param2")
-        self.label_filter_params = QtWidgets.QLabel(self.frame_measure_view)
-        self.label_filter_params.setGeometry(QtCore.QRect(110, 10, 91, 17))
+        self.label_filter_params = QtWidgets.QLabel(self.frame_measure_filter)
+        self.label_filter_params.setGeometry(QtCore.QRect(90, 10, 91, 17))
         self.label_filter_params.setObjectName("label_filter_params")
-        self.radioButton_filter_savgol = QtWidgets.QRadioButton(self.frame_measure_view)
+        self.radioButton_filter_savgol = QtWidgets.QRadioButton(self.frame_measure_filter)
         self.radioButton_filter_savgol.setGeometry(QtCore.QRect(10, 50, 106, 23))
         self.radioButton_filter_savgol.setObjectName("radioButton_filter_savgol")
-        self.radioButton_filter_none = QtWidgets.QRadioButton(self.frame_measure_view)
+        self.radioButton_filter_none = QtWidgets.QRadioButton(self.frame_measure_filter)
         self.radioButton_filter_none.setGeometry(QtCore.QRect(10, 30, 106, 23))
         self.radioButton_filter_none.setObjectName("radioButton_filter_none")
-        self.label_filter_param1 = QtWidgets.QLabel(self.frame_measure_view)
-        self.label_filter_param1.setGeometry(QtCore.QRect(110, 30, 71, 23))
-        self.label_filter_param1.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
-        self.label_filter_param1.setObjectName("label_filter_param1")
-        self.horizontalLayout.addWidget(self.frame_measure_view)
+        self.horizontalLayout.addWidget(self.frame_measure_filter)
         self.measure_verticalLayout.addLayout(self.horizontalLayout)
         self.measure_graph_output = QtWidgets.QWidget(measure)
         self.measure_graph_output.setObjectName("measure_graph_output")
@@ -375,13 +358,9 @@ class Ui_measure_window(QtCore.QObject):
         self.label_volley_ms.setText(_translate("measure", "ms"))
         self.pushButton_auto.setText(_translate("measure", "Auto"))
         self.label_filter.setText(_translate("measure", "Filter"))
-        self.radioButton_filter_placeholder.setText(_translate("measure", "...more"))
-        self.label_filter_param2.setText(_translate("measure", "PolyOrder"))
         self.label_filter_params.setText(_translate("measure", "Parameters"))
         self.radioButton_filter_savgol.setText(_translate("measure", "SavGol"))
         self.radioButton_filter_none.setText(_translate("measure", "No filter"))
-        self.label_filter_param1.setText(_translate("measure", "Window"))
-
 
 
 
@@ -1798,7 +1777,8 @@ class Measure_window_sub(Ui_measure_window):
         self.radioButton_filter_none.clicked.connect(lambda: self.updateFilter("voltage"))
         self.radioButton_filter_savgol.setChecked(row_filter=="savgol")
         self.radioButton_filter_savgol.clicked.connect(lambda: self.updateFilter("savgol"))
-
+        if row_filter == "savgol":
+            self.measure_filter_ui_savgol()
         self.buttonBox.accepted.connect(self.accepted_handler)
         self.buttonBox.rejected.connect(self.measure_frame.close)
         self.updatePlots()
@@ -1808,8 +1788,13 @@ class Measure_window_sub(Ui_measure_window):
         self.row['filter'] = filter
         self.row['filter_params'] = "toyed with!"
         self.filter_params_changed = False
+        # if frame_measure_filter_params exists, delete it
+        if hasattr(self, "frame_measure_filter_params") and self.frame_measure_filter_params is not None:
+            self.frame_measure_filter_params.deleteLater()
+            self.frame_measure_filter_params = None
         if filter == "savgol":
             # TODO: create interface for filter params
+            self.measure_filter_ui_savgol()
             # make sure the updated filter exists
             if ('savgol' not in self.dfmean) | self.filter_params_changed:
                 self.dfmean['savgol'] = analysis.addFilterSavgol(self.dfmean)
@@ -1826,6 +1811,42 @@ class Measure_window_sub(Ui_measure_window):
         if self.last_x is not None:
             self.updateSample()
         self.updatePlots()
+
+
+    def editFilterParams(self, lineEdit):
+        print("updateFilterParamsOnEdit")
+        try:
+            polyOrder = int(lineEdit.text())
+            if not 1 <= polyOrder <= 5:
+                raise ValueError
+        except ValueError:
+            print("Invalid input: must be a number between 1 and 5.")
+            lineEdit.setText("")
+
+
+    def measure_filter_ui_savgol(self):
+        self.frame_measure_filter_params = QtWidgets.QFrame(self.frame_measure_filter)
+        self.frame_measure_filter_params.setObjectName("frame_measure_filter_params")
+        self.frame_measure_filter_params.setGeometry(QtCore.QRect(90, 30, 171, 101))
+        self.frame_measure_filter_params.setStyleSheet("background-color: white;")
+        self.label_filter_polyOrder = QtWidgets.QLabel(self.frame_measure_filter_params)
+        self.label_filter_polyOrder.setGeometry(QtCore.QRect(10, 10, 100, 23))
+        self.label_filter_polyOrder.setObjectName("label_filter_polyOrder")
+        self.label_filter_polyOrder.setText("Poly order")
+        self.lineEdit_filter_polyOrder = QtWidgets.QLineEdit(self.frame_measure_filter_params)
+        self.lineEdit_filter_polyOrder.setGeometry(QtCore.QRect(110, 10, 51, 25))
+        self.lineEdit_filter_polyOrder.setObjectName("lineEdit_filter_polyOrder")            
+        self.label_filter_windowLength = QtWidgets.QLabel(self.frame_measure_filter_params)
+        self.label_filter_windowLength.setGeometry(QtCore.QRect(10, 40, 100, 23))
+        self.label_filter_windowLength.setObjectName("label_filter_windowLength")
+        self.label_filter_windowLength.setText("Window length")
+        self.lineEdit_filter_windowLength = QtWidgets.QLineEdit(self.frame_measure_filter_params)
+        self.lineEdit_filter_windowLength.setGeometry(QtCore.QRect(110, 40, 51, 25))
+        self.lineEdit_filter_windowLength.setObjectName("lineEdit_filter_windowLength")            
+        self.frame_measure_filter_params.show()
+        #connect lineEdits to updateFilterParamsOnEdit
+        self.lineEdit_filter_polyOrder.editingFinished.connect(lambda: self.editFilterParams(self.lineEdit_filter_polyOrder))
+        self.lineEdit_filter_windowLength.editingFinished.connect(lambda: self.editFilterParams(self.lineEdit_filter_windowLength))
 
 
     def updatePlots(self):
