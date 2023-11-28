@@ -1286,8 +1286,10 @@ class UIsub(Ui_MainWindow):
         if row['filter'] == 'savgol':
             # TODO: extract parameters from df_p, use default for now
             if 'savgol' not in dfmean.columns:
-                # print number of rows in dfmean
-                dfmean['savgol'] = analysis.addFilterSavgol(df = dfmean)
+                dict_filter_params = json.loads(row['filter_params'])
+                window_length = int(dict_filter_params['window_length'])
+                poly_order = int(dict_filter_params['poly_order'])
+                dfmean['savgol'] = analysis.addFilterSavgol(df = dfmean, window_length=window_length, poly_order=poly_order)
                 persist = True
 
         if persist:
@@ -1337,7 +1339,10 @@ class UIsub(Ui_MainWindow):
             dffilter = parse.zeroSweeps(self.get_dfdata(row=row), self.get_dfmean(row=row))
             self.df2csv(df=dffilter, rec=recording_name, key="filter")
             if row['filter'] == 'savgol':
-                dffilter['savgol'] = analysis.addFilterSavgol(df = dffilter)
+                dict_filter_params = json.loads(row['filter_params'])
+                window_length = int(dict_filter_params['window_length'])
+                poly_order = int(dict_filter_params['poly_order'])
+                dffilter['savgol'] = analysis.addFilterSavgol(df = dffilter, window_length=window_length, poly_order=poly_order)
         # Cache and return
         self.dict_filters[recording_name] = dffilter
         return self.dict_filters[recording_name]
@@ -1825,17 +1830,17 @@ class Measure_window_sub(Ui_measure_window):
             self.measure_filter_defaults(filter)
         if filter == "savgol":
             window_length = int(self.dict_filter_params['savgol']['window_length'])
-            polyorder = int(self.dict_filter_params['savgol']['polyorder'])
-            print(f"window_length: {window_length}, polyorder: {polyorder}")
+            poly_order = int(self.dict_filter_params['savgol']['poly_order'])
+            print(f"window_length: {window_length}, poly_order: {poly_order}")
             # TODO: create interface for filter params
             if param_edit == False: # don't redraw the frame if lineEdit changed params
                 self.measure_filter_ui_savgol()
             # make sure the updated filter exists
             if ('savgol' not in self.dfmean) | param_edit:
-                self.dfmean['savgol'] = analysis.addFilterSavgol(self.dfmean, window_length=window_length, polyorder=polyorder)
+                self.dfmean['savgol'] = analysis.addFilterSavgol(self.dfmean, window_length=window_length, poly_order=poly_order)
                 parse.persistdf(file_base=self.row['recording_name'], dict_folders=self.parent.dict_folders, dfmean=self.dfmean)
             if ('savgol' not in self.dffilter) | param_edit:
-                self.dffilter['savgol'] = analysis.addFilterSavgol(self.dffilter, window_length=window_length, polyorder=polyorder)
+                self.dffilter['savgol'] = analysis.addFilterSavgol(self.dffilter, window_length=window_length, poly_order=poly_order)
                 parse.persistdf(file_base=self.row['recording_name'], dict_folders=self.parent.dict_folders, dffilter=self.dffilter)
         # build new output
         self.new_dfoutput = analysis.build_dfoutput(df=self.dffilter,
@@ -1862,16 +1867,16 @@ class Measure_window_sub(Ui_measure_window):
                 polyOrder = int(lineEdit.text())
                 if not 1 <= polyOrder <= 5:
                     raise ValueError
-                self.dict_filter_params['savgol']['window_length'] = str(windowLength)
+                self.dict_filter_params['savgol']['poly_order'] = str(polyOrder)
             except ValueError:
                 print("Invalid input: Polyorder must be a number between 1 and 5.")
-                lineEdit.setText(str(self.dict_filter_params['savgol']['polyorder']))
+                lineEdit.setText(str(self.dict_filter_params['savgol']['poly_order']))
         self.updateFilter("savgol", param_edit=True)
 
 
     def measure_filter_defaults(self, filter):
         if filter == "savgol":
-            self.dict_filter_params = {'savgol': {"window_length": "11", "polyorder": "2"}}
+            self.dict_filter_params = {'savgol': {"window_length": "11", "poly_order": "2"}}
         else:
             self.dict_filter_params = {}
 
@@ -1879,24 +1884,23 @@ class Measure_window_sub(Ui_measure_window):
     def measure_filter_ui_savgol(self):
         self.frame_measure_filter_params = QtWidgets.QFrame(self.frame_measure_filter)
         self.frame_measure_filter_params.setObjectName("frame_measure_filter_params")
-        self.frame_measure_filter_params.setGeometry(QtCore.QRect(90, 30, 171, 101))
-        self.frame_measure_filter_params.setStyleSheet("background-color: white;")
+        self.frame_measure_filter_params.setGeometry(QtCore.QRect(90, 25, 171, 101))
         self.label_filter_savgol_windowLength = QtWidgets.QLabel(self.frame_measure_filter_params)
-        self.label_filter_savgol_windowLength.setGeometry(QtCore.QRect(10, 10, 100, 23))
+        self.label_filter_savgol_windowLength.setGeometry(QtCore.QRect(10, 5, 100, 23))
         self.label_filter_savgol_windowLength.setObjectName("label_filter_savgol_windowLength")
         self.label_filter_savgol_windowLength.setText("Window length")
         self.lineEdit_filter_savgol_windowLength = QtWidgets.QLineEdit(self.frame_measure_filter_params)
-        self.lineEdit_filter_savgol_windowLength.setGeometry(QtCore.QRect(110, 10, 51, 25))
+        self.lineEdit_filter_savgol_windowLength.setGeometry(QtCore.QRect(110, 5, 51, 25))
         self.lineEdit_filter_savgol_windowLength.setObjectName("lineEdit_filter_savgol_windowLength")            
         self.lineEdit_filter_savgol_windowLength.setText(self.dict_filter_params['savgol']['window_length'])
         self.label_filter_savgol_polyOrder = QtWidgets.QLabel(self.frame_measure_filter_params)
-        self.label_filter_savgol_polyOrder.setGeometry(QtCore.QRect(10, 40, 100, 23))
+        self.label_filter_savgol_polyOrder.setGeometry(QtCore.QRect(10, 35, 100, 23))
         self.label_filter_savgol_polyOrder.setObjectName("label_filter_savgol_polyOrder")
         self.label_filter_savgol_polyOrder.setText("Poly order")
         self.lineEdit_filter_savgol_polyOrder = QtWidgets.QLineEdit(self.frame_measure_filter_params)
-        self.lineEdit_filter_savgol_polyOrder.setGeometry(QtCore.QRect(110, 40, 51, 25))
+        self.lineEdit_filter_savgol_polyOrder.setGeometry(QtCore.QRect(110, 35, 51, 25))
         self.lineEdit_filter_savgol_polyOrder.setObjectName("lineEdit_filter_savgol_polyOrder")
-        self.lineEdit_filter_savgol_polyOrder.setText(self.dict_filter_params['savgol']['polyorder'])
+        self.lineEdit_filter_savgol_polyOrder.setText(self.dict_filter_params['savgol']['poly_order'])
         self.frame_measure_filter_params.show()
         #connect lineEdits to updateFilterParamsOnEdit
         self.lineEdit_filter_savgol_polyOrder.editingFinished.connect(lambda: self.editFilterParams(self.lineEdit_filter_savgol_polyOrder))

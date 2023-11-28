@@ -57,9 +57,9 @@ def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None):#, 
     return dfoutput[list_col]
 
 
-def addFilterSavgol(df, window_length=9, polyorder=3):
+def addFilterSavgol(df, window_length=9, poly_order=3):
     # returns a column containing a smoothed version of the voltage column in a df; dfmean or dffilter
-    df['savgol'] = savgol_filter(df.voltage, window_length=window_length, polyorder=polyorder)
+    df['savgol'] = savgol_filter(df.voltage, window_length=window_length, polyorder=poly_order)
     return df['savgol']
 
 
