@@ -1449,13 +1449,7 @@ class UIsub(Ui_MainWindow):
         self.canvas_seaborn_mean.axes.set_ylim(self.dict_cfg['mean_ylim'])
         ax1.set_ylim(self.dict_cfg['output_ax1_ylim'])
         
-        handles, labels = self.ax1.get_legend_handles_labels()
-        if labels:
-            self.ax1.legend(loc='upper right')
-        handles, labels = self.ax2.get_legend_handles_labels()
-        if labels:
-            self.ax2.legend(loc='lower right')
-
+        sortLegend(self.ax1, self.ax2)
         self.canvas_seaborn_mean.draw()
         self.canvas_seaborn_output.draw()
 
@@ -1705,6 +1699,7 @@ class Measure_window_sub(Ui_measure_window):
         self.parent = parent
         self.measure_frame = measure_frame
         self.row = row.copy() # creates a copy to be modified, then accepted to df_project, or rejected
+        # do NOT copy these dfs; add filter columns directly into them
         self.dfmean = self.parent.get_dfmean(row=self.row)
         self.dffilter = self.parent.get_dffilter(row=self.row)
         # copy this df; only replace if params change
@@ -1720,7 +1715,6 @@ class Measure_window_sub(Ui_measure_window):
         if row['filter'] not in self.dict_filter_params:            
             self.measure_filter_defaults(row['filter'])
 
-        # do NOT copy these dfs; add filter columns directly into them
 
 
         self.measure_graph_mean.setLayout(QtWidgets.QVBoxLayout())
@@ -1939,7 +1933,7 @@ class Measure_window_sub(Ui_measure_window):
         self.ax1.lines[label2idx(self.ax1, "old EPSP amp")].set_visible(amp)
         self.ax2.lines[label2idx(self.ax2, "old EPSP slope")].set_visible(slope)
             
-            # Display aspect indicators:
+        # Display aspect indicators:
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             self.v_t_EPSP_amp.set_visible(amp)
         if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
@@ -1949,8 +1943,8 @@ class Measure_window_sub(Ui_measure_window):
 
         # TODO: Update y limits
 
-        # Update axes visibility and position
-        oneAxisLeft(self.ax1, self.ax2, amp, slope)
+        sortLegend(self.ax1, self.ax2) # amplitude legends up, slopes down
+        oneAxisLeft(self.ax1, self.ax2, amp, slope)# Update axes visibility and position
 
         self.canvas_mean.draw()
         self.canvas_output.draw()
@@ -2235,6 +2229,15 @@ def oneAxisLeft(ax1, ax2, amp, slope):
     else:
         ax2.yaxis.set_label_position("right")
         ax2.yaxis.set_ticks_position("right")
+
+
+def sortLegend(ax1, ax2):
+    handles, labels = ax1.get_legend_handles_labels()
+    if labels:
+        ax1.legend(loc='upper right')
+    handles, labels = ax2.get_legend_handles_labels()
+    if labels:
+        ax2.legend(loc='lower right')
 
 
 def unPlot(canvas, *artists): # remove line if it exists on canvas
