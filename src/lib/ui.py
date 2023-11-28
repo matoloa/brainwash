@@ -19,6 +19,7 @@ from PyQt5 import QtCore, QtWidgets
 from datetime import datetime
 import re
 import time
+import json # for saving and loading dicts as strings
 
 import parse
 import analysis
@@ -304,40 +305,23 @@ class Ui_measure_window(QtCore.QObject):
         self.pushButton_auto.setGeometry(QtCore.QRect(10, 10, 83, 25))
         self.pushButton_auto.setObjectName("pushButton_auto")
         self.horizontalLayout.addWidget(self.frame_measure_toolbox)
-        self.frame_measure_view = QtWidgets.QFrame(measure)
-        self.frame_measure_view.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frame_measure_view.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frame_measure_view.setObjectName("frame_measure_view")
-        self.label_filter = QtWidgets.QLabel(self.frame_measure_view)
+        self.frame_measure_filter = QtWidgets.QFrame(measure)
+        self.frame_measure_filter.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frame_measure_filter.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frame_measure_filter.setObjectName("frame_measure_filter")
+        self.label_filter = QtWidgets.QLabel(self.frame_measure_filter)
         self.label_filter.setGeometry(QtCore.QRect(10, 10, 62, 17))
         self.label_filter.setObjectName("label_filter")
-        self.lineEdit_filter_param1 = QtWidgets.QLineEdit(self.frame_measure_view)
-        self.lineEdit_filter_param1.setGeometry(QtCore.QRect(190, 30, 51, 25))
-        self.lineEdit_filter_param1.setObjectName("lineEdit_filter_param1")
-        self.radioButton_filter_placeholder = QtWidgets.QRadioButton(self.frame_measure_view)
-        self.radioButton_filter_placeholder.setGeometry(QtCore.QRect(10, 70, 106, 23))
-        self.radioButton_filter_placeholder.setObjectName("radioButton_filter_placeholder")
-        self.label_filter_param2 = QtWidgets.QLabel(self.frame_measure_view)
-        self.label_filter_param2.setGeometry(QtCore.QRect(110, 70, 71, 23))
-        self.label_filter_param2.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
-        self.label_filter_param2.setObjectName("label_filter_param2")
-        self.lineEdit_filter_param2 = QtWidgets.QLineEdit(self.frame_measure_view)
-        self.lineEdit_filter_param2.setGeometry(QtCore.QRect(190, 70, 51, 25))
-        self.lineEdit_filter_param2.setObjectName("lineEdit_filter_param2")
-        self.label_filter_params = QtWidgets.QLabel(self.frame_measure_view)
-        self.label_filter_params.setGeometry(QtCore.QRect(110, 10, 91, 17))
+        self.label_filter_params = QtWidgets.QLabel(self.frame_measure_filter)
+        self.label_filter_params.setGeometry(QtCore.QRect(90, 10, 91, 17))
         self.label_filter_params.setObjectName("label_filter_params")
-        self.radioButton_filter_savgol = QtWidgets.QRadioButton(self.frame_measure_view)
+        self.radioButton_filter_savgol = QtWidgets.QRadioButton(self.frame_measure_filter)
         self.radioButton_filter_savgol.setGeometry(QtCore.QRect(10, 50, 106, 23))
         self.radioButton_filter_savgol.setObjectName("radioButton_filter_savgol")
-        self.radioButton_filter_none = QtWidgets.QRadioButton(self.frame_measure_view)
+        self.radioButton_filter_none = QtWidgets.QRadioButton(self.frame_measure_filter)
         self.radioButton_filter_none.setGeometry(QtCore.QRect(10, 30, 106, 23))
         self.radioButton_filter_none.setObjectName("radioButton_filter_none")
-        self.label_filter_param1 = QtWidgets.QLabel(self.frame_measure_view)
-        self.label_filter_param1.setGeometry(QtCore.QRect(110, 30, 71, 23))
-        self.label_filter_param1.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
-        self.label_filter_param1.setObjectName("label_filter_param1")
-        self.horizontalLayout.addWidget(self.frame_measure_view)
+        self.horizontalLayout.addWidget(self.frame_measure_filter)
         self.measure_verticalLayout.addLayout(self.horizontalLayout)
         self.measure_graph_output = QtWidgets.QWidget(measure)
         self.measure_graph_output.setObjectName("measure_graph_output")
@@ -375,13 +359,9 @@ class Ui_measure_window(QtCore.QObject):
         self.label_volley_ms.setText(_translate("measure", "ms"))
         self.pushButton_auto.setText(_translate("measure", "Auto"))
         self.label_filter.setText(_translate("measure", "Filter"))
-        self.radioButton_filter_placeholder.setText(_translate("measure", "...more"))
-        self.label_filter_param2.setText(_translate("measure", "PolyOrder"))
         self.label_filter_params.setText(_translate("measure", "Parameters"))
         self.radioButton_filter_savgol.setText(_translate("measure", "SavGol"))
         self.radioButton_filter_none.setText(_translate("measure", "No filter"))
-        self.label_filter_param1.setText(_translate("measure", "Window"))
-
 
 
 
@@ -698,9 +678,9 @@ class UIsub(Ui_MainWindow):
                         'delete_locked': True, # whether to allow deleting of data
                         'aspect_EPSP_amp': True,
                         'aspect_EPSP_slope': True,
-                        'mean_ylim': (-0.0015, 0.0002),
+                        'mean_ylim': (-0.001, 0.0002),
                         'mean_xlim': (0.006, 0.020),
-                        'output_ax1_ylim': (0, 2),
+                        'output_ax1_ylim': (0, None),
                         'output_ax1_xlim': (None, None),
                         'output_ax2_ylim': (0, None),
                         'output_ax2_xlim': (None, None),
@@ -759,6 +739,8 @@ class UIsub(Ui_MainWindow):
             key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.viewSettingsChanged(state, str_view_key))
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
+
+        self.dict_open_measure_windows = {}
 
 # Debugging tools
         # self.find_widgets_with_top_left_coordinates(self.centralwidget)
@@ -898,8 +880,8 @@ class UIsub(Ui_MainWindow):
             self.setGraph()
             return
         selected_rows = self.listSelectedRows()
-        df_selection = self.df_project.loc[selected_rows]
-        self.setGraph(df = df_selection)
+        df_select = self.df_project.loc[selected_rows]
+        self.setGraph(df_select)
 
     def tableProjDoubleClicked(self):
         self.launchMeasureWindow()
@@ -951,13 +933,15 @@ class UIsub(Ui_MainWindow):
 
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
-        if verbose:
-            print("F2 key pressed in CustomTableView")
         selected_rows = self.listSelectedRows()
         if len(selected_rows) == 1:
             row = selected_rows[0]
             df_p = self.df_project
             old_recording_name = df_p.at[row, 'recording_name']
+            # if the old recording name is a key in in dict_open_measure_windows
+            if old_recording_name in self.dict_open_measure_windows.keys():
+                print(f"Cannot rename {old_recording_name} while it is open in a measure window.")
+                return
             old_data = self.dict_folders['data'] / (old_recording_name + ".csv")
             old_mean = self.dict_folders['cache'] / (old_recording_name + "_mean.csv")
             old_filter = self.dict_folders['cache'] / (old_recording_name + "_filter.csv")
@@ -994,8 +978,12 @@ class UIsub(Ui_MainWindow):
     def deleteSelectedRows(self):
         df_p = self.get_df_project()
         selected_rows = self.listSelectedRows()
-        list_affected_groups = []
         if 0 < len(selected_rows):
+            # If any of the selected rows are open in a measure window, abort
+            if any(df_p.at[row, 'recording_name'] in self.dict_open_measure_windows for row in selected_rows):
+                print(f"Cannot delete recordings that are open in a measure window.")
+                return
+            list_affected_groups = []
             for row in selected_rows:
                 sweeps = df_p.at[row, 'sweeps']
                 if sweeps != "...": # if the file is parsed:
@@ -1123,7 +1111,7 @@ class UIsub(Ui_MainWindow):
                 self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
             self.purgeGroupCache(add_group)
             df_selection = self.df_project.loc[selected_rows]
-            self.setGraph(df = df_selection)
+            self.setGraph(df_selection)
         else:
             print("No files selected.")
 
@@ -1282,71 +1270,77 @@ class UIsub(Ui_MainWindow):
 # internal dataframe handling
     def get_dfmean(self, row):
         # returns an internal df mean for the selected file. If it does not exist, read it from file first.
-        key_mean = f"{row['recording_name']}_mean"
-        if key_mean in self.dict_means:
-            return self.dict_means[key_mean]
         recording_name = row['recording_name']
+        if recording_name in self.dict_means: #1: Return cached
+            return self.dict_means[recording_name]
+
+        persist = False
         str_mean_path = f'{self.dict_folders["cache"]}/{recording_name}_mean.csv'
-        if Path(str_mean_path).exists():
+        if Path(str_mean_path).exists(): #2: Read from file
             dfmean = pd.read_csv(str_mean_path)
-        else:
+        else: #3: Create file
             dfmean = parse.build_dfmean(self.get_dfdata(row=row))
-            parse.persistdf(file_base=recording_name, dict_folders=self.dict_folders, dfmean=dfmean)
-        self.dict_means[key_mean] = dfmean
-        return self.dict_means[key_mean]
+            persist = True
+
+        #if the filter is not a column in self.dfmean, create it
+        if row['filter'] == 'savgol':
+            # TODO: extract parameters from df_p, use default for now
+            if 'savgol' not in dfmean.columns:
+                # print number of rows in dfmean
+                dfmean['savgol'] = analysis.addFilterSavgol(df = dfmean)
+                persist = True
+
+        if persist:
+            self.df2csv(df=dfmean, rec=recording_name, key="mean")
+        self.dict_means[recording_name] = dfmean
+        return self.dict_means[recording_name]
 
     def get_dfoutput(self, row):
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
-        rec_name = f"{row['recording_name']}_output"
-        if rec_name in self.dict_outputs: #1: Return cached
-            return self.dict_outputs[rec_name]
-        str_output_path = f'{self.dict_folders["cache"]}/{rec_name}.csv'
+        recording_name = row['recording_name']
+        if recording_name in self.dict_outputs: #1: Return cached
+            return self.dict_outputs[recording_name]
+
+        str_output_path = f"{self.dict_folders['cache']}/{recording_name}_output.csv"
         if Path(str_output_path).exists(): #2: Read from file
-            print(f"get_dfoutput: {rec_name} not cached, {str_output_path} found")
             dfoutput = pd.read_csv(str_output_path)
         else: #3: Create file
-            recording_name = row['recording_name']
             dfoutput = self.defaultOutput(row=row)
             dfoutput.reset_index(inplace=True)
-            print(f"get_dfoutput: {rec_name} built by defaultOutput")
             self.df2csv(df=dfoutput, rec=recording_name, key="output")
-        self.dict_outputs[rec_name] = dfoutput
-        return self.dict_outputs[rec_name]
+        self.dict_outputs[recording_name] = dfoutput
+        return self.dict_outputs[recording_name]
         
     def get_dfdata(self, row):
         # returns an internal df for the selected recording_name. If it does not exist, read it from file first.
-        key_data = row['recording_name']
-        print(f"get_dfdata: {key_data}")
-        if key_data in self.dict_datas: #1: Return cached
-            print(f"get_dfdata: {key_data} found in dict_datas")
-            return self.dict_datas[key_data]
-        path_data = Path(f"{self.dict_folders['data']}/{key_data}.csv")
-        print(f"get_dfdata: {key_data} not found in dict_datas, checking {path_data}")
+        recording_name = row['recording_name']
+        if recording_name in self.dict_datas: #1: Return cached
+            return self.dict_datas[recording_name]
+        path_data = Path(f"{self.dict_folders['data']}/{recording_name}.csv")
         try: #2: Read from file - datafile should always exist
             dfdata = pd.read_csv(path_data)
-            self.dict_datas[key_data] = dfdata
-            return self.dict_datas[key_data]
+            self.dict_datas[recording_name] = dfdata
+            return self.dict_datas[recording_name]
         except FileNotFoundError:
             print("did not find _mean.csv to load. Not imported?")
 
             
     def get_dffilter(self, row):
         # returns an internal df_filter for the selected recording_name. If it does not exist, read it from file first.
-        rec_name = row['recording_name']
-        if rec_name in self.dict_filters: #1: Return cached
-            print(f"get_dffilter: {rec_name} found in dict_datas")
-            return self.dict_filters[rec_name]
-        path_filter = Path(f"{self.dict_folders['cache']}/{rec_name}_filter.csv")
-        print(f"get_dffilter: {rec_name} not found in dict_filters, checking {path_filter}")
+        recording_name = row['recording_name']
+        if recording_name in self.dict_filters: #1: Return cached
+            return self.dict_filters[recording_name]
+        path_filter = Path(f"{self.dict_folders['cache']}/{recording_name}_filter.csv")
         if Path(path_filter).exists(): #2: Read from file
             dffilter = pd.read_csv(path_filter)
         else: #3: Create file
             dffilter = parse.zeroSweeps(self.get_dfdata(row=row), self.get_dfmean(row=row))
-            self.df2csv(df=dffilter, rec=rec_name, key="filter")
-            print("did not find _filter.csv to load. Created and cached.")
+            self.df2csv(df=dffilter, rec=recording_name, key="filter")
+            if row['filter'] == 'savgol':
+                dffilter['savgol'] = analysis.addFilterSavgol(df = dffilter)
         # Cache and return
-        self.dict_filters[rec_name] = dffilter
-        return self.dict_filters[rec_name]
+        self.dict_filters[recording_name] = dffilter
+        return self.dict_filters[recording_name]
         
         
     def get_dfgroupmean(self, key_group):
@@ -1396,6 +1390,7 @@ class UIsub(Ui_MainWindow):
         dfmean = self.get_dfmean(row=row)
         df_p = self.get_df_project()
         dict_t = analysis.find_all_t(dfmean=dfmean, verbose=False)
+        persist = False
         for aspect, value in dict_t.items():
             old_aspect_value = df_p.loc[row.name, aspect]
             if pd.notna(old_aspect_value):
@@ -1404,11 +1399,12 @@ class UIsub(Ui_MainWindow):
                 print(f"{aspect} was {old_aspect_value} in df_p, a valid float. Updated dict_t to {value}")
             else: # if old_aspect is NOT a valid float, replace df_p with dict_t
                 df_p.loc[row.name, aspect] = value
-                print(f"{aspect} was {old_aspect_value} in df_p, NOT a valid float. Updated df_p.")               
-                self.set_df_project(df=df_p)
-        return analysis.build_dfoutput(df=dffilter,
-                                       t_EPSP_amp=dict_t["t_EPSP_amp"],
-                                       t_EPSP_slope=dict_t["t_EPSP_slope"])
+                print(f"{aspect} was {old_aspect_value} in df_p, NOT a valid float. Updating df_p...")               
+                persist = True
+        if persist:
+            self.set_df_project(df_p)
+        df_output = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=dict_t['t_EPSP_amp'], t_EPSP_slope=dict_t['t_EPSP_slope'])
+        return df_output
 
 
 # Graph handling
@@ -1421,7 +1417,7 @@ class UIsub(Ui_MainWindow):
             self.canvas_seaborn_output.axes.cla()
             self.canvas_seaborn_output.draw()
 
-    def setGraph(self, df=None): # plot selected row(s), or clear graph if empty
+    def setGraph(self, df_select=None): # plot selected row(s), or clear graph if empty
         amp = bool(self.dict_cfg['aspect_EPSP_amp'])
         slope = bool(self.dict_cfg['aspect_EPSP_slope'])
         self.clearGraph()
@@ -1434,8 +1430,8 @@ class UIsub(Ui_MainWindow):
         # Plot group means
         if self.dict_cfg['list_groups']:
             self.setGraphGroups(ax1, ax2, self.dict_cfg['list_group_colors'])
-        if df is not None: # plot selected rows
-            self.setGraphSelected(df=df, ax1=ax1, ax2=ax2, amp=amp, slope=slope)
+        if df_select is not None: # plot selected rows
+            self.setGraphSelected(df_select=df_select, ax1=ax1, ax2=ax2, amp=amp, slope=slope)
         
         # add appropriate ticks and axis labels
         self.canvas_seaborn_mean.axes.set_xlabel("Time (s)")
@@ -1447,34 +1443,42 @@ class UIsub(Ui_MainWindow):
         self.canvas_seaborn_mean.axes.set_xlim(self.dict_cfg['mean_xlim'])
         self.canvas_seaborn_mean.axes.set_ylim(self.dict_cfg['mean_ylim'])
         ax1.set_ylim(self.dict_cfg['output_ax1_ylim'])
+        
+        handles, labels = self.ax1.get_legend_handles_labels()
+        if labels:
+            self.ax1.legend(loc='upper right')
+        handles, labels = self.ax2.get_legend_handles_labels()
+        if labels:
+            self.ax2.legend(loc='lower right')
+
         self.canvas_seaborn_mean.draw()
         self.canvas_seaborn_output.draw()
 
-    def setGraphSelected(self, df, ax1, ax2, amp, slope):
-        print(f"setGraphSelected: {df['recording_name']}")
-        df_analyzed = df[df["sweeps"] != "..."]
+    def setGraphSelected(self, df_select, ax1, ax2, amp, slope):
+        df_analyzed = df_select[df_select["sweeps"] != "..."]
         if df_analyzed.empty:
             print("Nothing analyzed selected.")
         else:
             for i, row in df_analyzed.iterrows(): # TODO: i to be used later for cycling colours?
                 dfmean = self.get_dfmean(row=row)
                 dfoutput = self.get_dfoutput(row=row)
+                t_EPSP_amp = self.get_df_project().loc[i, 't_EPSP_amp']
+                t_EPSP_slope = self.get_df_project().loc[i, 't_EPSP_slope']
                 # plot relevant filter of dfmean on canvas_seaborn_mean
                 label = f"{row['recording_name']}"
                 rec_filter = row['filter'] # the filter currently used for this recording
                 _ = sns.lineplot(ax=self.canvas_seaborn_mean.axes, label=label, data=dfmean, y=rec_filter, x="time", color="black")
                 # plot dfoutput on canvas_seaborn_output
-
-                if amp & (not np.isnan(row["t_EPSP_amp"])):
+                if amp & (not np.isnan(t_EPSP_amp)):
                     _ = sns.lineplot(ax=ax1, label=f"{label}_EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", color="black", linestyle='--')
                     # mean, amp indicator
-                    y_position = dfmean[dfmean.time == row["t_EPSP_amp"]].voltage
-                    self.canvas_seaborn_mean.axes.plot(row["t_EPSP_amp"], y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
-                if slope & (not np.isnan(row["t_EPSP_slope"])):
+                    y_position = dfmean[dfmean.time == t_EPSP_amp].voltage
+                    self.canvas_seaborn_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
+                if slope & (not np.isnan(t_EPSP_slope)):
                     _ = sns.lineplot(ax=ax2, label=f"{label}_EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
                     # mean, slope indicator        
-                    x_start = row["t_EPSP_slope"] - 0.0004
-                    x_end = row["t_EPSP_slope"] + 0.0004
+                    x_start = t_EPSP_slope - 0.0004
+                    x_end = t_EPSP_slope + 0.0004
                     y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
                     y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
                     self.canvas_seaborn_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
@@ -1537,12 +1541,11 @@ class UIsub(Ui_MainWindow):
         qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
         ser_table_row = self.tablemodel.dataRow(qt_index)
         sweeps = ser_table_row["sweeps"]
+        recording_name = ser_table_row["recording_name"]
         if sweeps == "...":
             # TODO: Make it import the missing file
             print("Unknown number of sweeps - not imported?")
             return
-        # Get dataframes
-        dfmean = self.get_dfmean(ser_table_row)
         # Close last window, for now. TODO: handle multiple windows (ew)
         if hasattr(self, "measure_frame"):
             print(f"Closing last window: {getattr(self, 'measure_frame')}")
@@ -1550,7 +1553,8 @@ class UIsub(Ui_MainWindow):
         # Open window
         self.measure_frame = QDialog_sub()
         self.measure_window_sub = Measure_window_sub(self.measure_frame, row=ser_table_row, parent=self)
-        self.measure_frame.setWindowTitle(ser_table_row['recording_name'])
+        self.measure_frame.setWindowTitle(recording_name)
+        self.dict_open_measure_windows[recording_name] = self.measure_window_sub
         # move measurewindow to default position (TODO: later to be stored in cfg)
         self.measure_frame.setGeometry(1400, 0, 800, 1200)
         self.measure_frame.show()
@@ -1600,10 +1604,10 @@ class TableProjSub(QtWidgets.QTableView):
             print("Files dropped:", file_urls)
             # Handle the dropped files here
             dfAdd = df_projectTemplate()
-            dfAdd["path"] = file_urls
-            dfAdd["host"] = "Computer 1"
-            dfAdd["checksum"] = "big number"
-            dfAdd["filter"] = "voltage"
+            dfAdd['path'] = file_urls
+            dfAdd['host'] = "Computer 1"
+            dfAdd['checksum'] = "big number"
+            dfAdd['filter'] = "voltage"
             # NTH: more intelligent default naming; lowest level unique name?
             # For now, use name + lowest level folder
             names = []
@@ -1696,15 +1700,23 @@ class Measure_window_sub(Ui_measure_window):
         self.parent = parent
         self.measure_frame = measure_frame
         self.row = row.copy() # creates a copy to be modified, then accepted to df_project, or rejected
-        # create local copies of dfmean, dffilter and dfoutput
-        t0 = time.time()
-        # do NOT copy these dfs; add filter columns directly
-        self.new_dfmean = self.parent.get_dfmean(row=self.row)
-        self.new_dffilter = self.parent.get_dffilter(row=self.row)
+        self.dfmean = self.parent.get_dfmean(row=self.row)
+        self.dffilter = self.parent.get_dffilter(row=self.row)
         # copy this df; only replace if params change
+        t0 = time.time()
         self.new_dfoutput = self.parent.get_dfoutput(row=self.row).copy()
         t1 = time.time()
-        print(f"Measure_window_sub: {t1-t0} seconds to copy dfs")
+        print(f"Measure_window_sub: {t1-t0} seconds to copy self.new_dfoutput")
+
+        if row['filter'] != 'voltage':
+            self.dict_filter_params = {row['filter']: json.loads(row['filter_params'])} # TODO: read from row
+        else:
+            self.dict_filter_params = {}
+        if row['filter'] not in self.dict_filter_params:            
+            self.measure_filter_defaults(row['filter'])
+
+        # do NOT copy these dfs; add filter columns directly into them
+
 
         self.measure_graph_mean.setLayout(QtWidgets.QVBoxLayout())
         self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)
@@ -1732,7 +1744,7 @@ class Measure_window_sub(Ui_measure_window):
         self.ax2.set_ylabel("Slope (mV/ms)")
 
         # Populate canvases - TODO: refactor such that components can be called individually when added later
-        _ = sns.lineplot(ax=self.canvas_mean.axes, label='voltage', data=self.new_dfmean, y='voltage', x='time', color='black')
+        _ = sns.lineplot(ax=self.canvas_mean.axes, label='voltage', data=self.dfmean, y='voltage', x='time', color='black')
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             t_EPSP_amp = self.row['t_EPSP_amp']
             self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
@@ -1793,32 +1805,102 @@ class Measure_window_sub(Ui_measure_window):
         self.radioButton_filter_savgol.setChecked(row_filter=="savgol")
         self.radioButton_filter_savgol.clicked.connect(lambda: self.updateFilter("savgol"))
 
+        if row_filter == "savgol":
+            # if self.dict_filter_params has key savgold, use it, otherwise create it
+            self.measure_filter_ui_savgol()
+
         self.buttonBox.accepted.connect(self.accepted_handler)
         self.buttonBox.rejected.connect(self.measure_frame.close)
         self.updatePlots()
 
 
-    def updateFilter(self, filter):
+    def updateFilter(self, filter, param_edit=False):
         self.row['filter'] = filter
-        self.row['filter_params'] = "toyed with!"
-        self.filter_params_changed = False
+        # if frame_measure_filter_params exists, delete it
+        if param_edit == False: # don't kill the frame if lineEdit changed params
+            if hasattr(self, "frame_measure_filter_params") and self.frame_measure_filter_params is not None:
+                self.frame_measure_filter_params.deleteLater()
+                self.frame_measure_filter_params = None
+        if filter not in self.dict_filter_params:            
+            self.measure_filter_defaults(filter)
         if filter == "savgol":
+            window_length = int(self.dict_filter_params['savgol']['window_length'])
+            polyorder = int(self.dict_filter_params['savgol']['polyorder'])
+            print(f"window_length: {window_length}, polyorder: {polyorder}")
             # TODO: create interface for filter params
+            if param_edit == False: # don't redraw the frame if lineEdit changed params
+                self.measure_filter_ui_savgol()
             # make sure the updated filter exists
-            if ('savgol' not in self.new_dffilter) | self.filter_params_changed:
-                self.new_dffilter = analysis.addFilterSavgol(self.new_dffilter)
-            if ('savgol' not in self.new_dfmean) | self.filter_params_changed:
-                self.new_dfmean = analysis.addFilterSavgol(self.new_dfmean)
+            if ('savgol' not in self.dfmean) | param_edit:
+                self.dfmean['savgol'] = analysis.addFilterSavgol(self.dfmean, window_length=window_length, polyorder=polyorder)
+                parse.persistdf(file_base=self.row['recording_name'], dict_folders=self.parent.dict_folders, dfmean=self.dfmean)
+            if ('savgol' not in self.dffilter) | param_edit:
+                self.dffilter['savgol'] = analysis.addFilterSavgol(self.dffilter, window_length=window_length, polyorder=polyorder)
+                parse.persistdf(file_base=self.row['recording_name'], dict_folders=self.parent.dict_folders, dffilter=self.dffilter)
         # build new output
-        print(f"PRE self.new_dfoutput: {self.new_dfoutput}")
-        self.new_dfoutput = analysis.build_dfoutput(df=self.new_dffilter,
+        self.new_dfoutput = analysis.build_dfoutput(df=self.dffilter,
                                     filter=filter,
                                     t_EPSP_amp=self.row["t_EPSP_amp"],
                                     t_EPSP_slope=self.row["t_EPSP_slope"])
-        print(f"POST self.new_dfoutput: {self.new_dfoutput}")
         if self.last_x is not None:
             self.updateSample()
         self.updatePlots()
+
+
+    def editFilterParams(self, lineEdit):
+        if lineEdit.objectName() == "lineEdit_filter_savgol_windowLength":
+            try:
+                windowLength = int(lineEdit.text())
+                if not 1 <= windowLength <= 21:
+                    raise ValueError
+                self.dict_filter_params['savgol']['window_length'] = str(windowLength)
+            except ValueError:
+                print("Invalid input: Window length must be a number between 1 and 21.")
+                lineEdit.setText(str(self.dict_filter_params['savgol']['window_length']))
+        elif lineEdit.objectName() == "lineEdit_filter_savgol_polyOrder":
+            try:
+                polyOrder = int(lineEdit.text())
+                if not 1 <= polyOrder <= 5:
+                    raise ValueError
+                self.dict_filter_params['savgol']['window_length'] = str(windowLength)
+            except ValueError:
+                print("Invalid input: Polyorder must be a number between 1 and 5.")
+                lineEdit.setText(str(self.dict_filter_params['savgol']['polyorder']))
+        self.updateFilter("savgol", param_edit=True)
+
+
+    def measure_filter_defaults(self, filter):
+        if filter == "savgol":
+            self.dict_filter_params = {'savgol': {"window_length": "11", "polyorder": "2"}}
+        else:
+            self.dict_filter_params = {}
+
+
+    def measure_filter_ui_savgol(self):
+        self.frame_measure_filter_params = QtWidgets.QFrame(self.frame_measure_filter)
+        self.frame_measure_filter_params.setObjectName("frame_measure_filter_params")
+        self.frame_measure_filter_params.setGeometry(QtCore.QRect(90, 30, 171, 101))
+        self.frame_measure_filter_params.setStyleSheet("background-color: white;")
+        self.label_filter_savgol_windowLength = QtWidgets.QLabel(self.frame_measure_filter_params)
+        self.label_filter_savgol_windowLength.setGeometry(QtCore.QRect(10, 10, 100, 23))
+        self.label_filter_savgol_windowLength.setObjectName("label_filter_savgol_windowLength")
+        self.label_filter_savgol_windowLength.setText("Window length")
+        self.lineEdit_filter_savgol_windowLength = QtWidgets.QLineEdit(self.frame_measure_filter_params)
+        self.lineEdit_filter_savgol_windowLength.setGeometry(QtCore.QRect(110, 10, 51, 25))
+        self.lineEdit_filter_savgol_windowLength.setObjectName("lineEdit_filter_savgol_windowLength")            
+        self.lineEdit_filter_savgol_windowLength.setText(self.dict_filter_params['savgol']['window_length'])
+        self.label_filter_savgol_polyOrder = QtWidgets.QLabel(self.frame_measure_filter_params)
+        self.label_filter_savgol_polyOrder.setGeometry(QtCore.QRect(10, 40, 100, 23))
+        self.label_filter_savgol_polyOrder.setObjectName("label_filter_savgol_polyOrder")
+        self.label_filter_savgol_polyOrder.setText("Poly order")
+        self.lineEdit_filter_savgol_polyOrder = QtWidgets.QLineEdit(self.frame_measure_filter_params)
+        self.lineEdit_filter_savgol_polyOrder.setGeometry(QtCore.QRect(110, 40, 51, 25))
+        self.lineEdit_filter_savgol_polyOrder.setObjectName("lineEdit_filter_savgol_polyOrder")
+        self.lineEdit_filter_savgol_polyOrder.setText(self.dict_filter_params['savgol']['polyorder'])
+        self.frame_measure_filter_params.show()
+        #connect lineEdits to updateFilterParamsOnEdit
+        self.lineEdit_filter_savgol_polyOrder.editingFinished.connect(lambda: self.editFilterParams(self.lineEdit_filter_savgol_polyOrder))
+        self.lineEdit_filter_savgol_windowLength.editingFinished.connect(lambda: self.editFilterParams(self.lineEdit_filter_savgol_windowLength))
 
 
     def updatePlots(self):
@@ -1828,7 +1910,7 @@ class Measure_window_sub(Ui_measure_window):
         rec_filter = self.row['filter'] # the filter currently used for this recording
         # Plot relevant filter of dfmean on canvas_mean, or show it if it's already plotted
         if label2idx(self.canvas_mean, rec_filter) is False:
-            _ = sns.lineplot(ax=self.canvas_mean.axes, label=rec_filter, data=self.new_dfmean, y=rec_filter, x="time", color="black")
+            _ = sns.lineplot(ax=self.canvas_mean.axes, label=rec_filter, data=self.dfmean, y=rec_filter, x="time", color="black")
         
         self.canvas_mean.axes.lines[label2idx(self.canvas_mean, 'voltage')].set_visible(rec_filter=='voltage')
         if label2idx(self.canvas_mean, 'savgol') is not False:
@@ -1875,9 +1957,14 @@ class Measure_window_sub(Ui_measure_window):
         df_p = self.parent.get_df_project()
         # Find the index of the row with the matching recording_name
         idx = df_p.index[df_p['recording_name'] == self.row['recording_name']]
-        list_keep = ['recording_name', 'groups'] # Columns to keep
-        # If there's exactly one matching row
-        if len(idx) == 1:
+        if len(idx) == 1: # Only proceed if there's exactly one matching row
+            # Update filters and params in self.row
+            if self.row['filter'] == "voltage":
+                self.row['filter_params'] = json.dumps({})
+            else:
+                self.row['filter_params'] = json.dumps(self.dict_filter_params[self.row['filter']])
+            # List columns to keep
+            list_keep = ['recording_name', 'groups']
             # Update the row in df_project
             for column, value in self.row.items():
                 if column not in list_keep:
@@ -1886,14 +1973,9 @@ class Measure_window_sub(Ui_measure_window):
             self.parent.set_df_project(df_p)
 
             # Update dfs; dicts and files
-            rec_name = self.parent.df_project.loc[int(idx.values[0]), 'recording_name']
-            key_output = f"{rec_name}_output"
-            #self.parent.dict_means[rec_name] = self.new_dfmean
-            #self.parent.df2csv(df=self.new_dfmean, rec=rec_name, key="mean")
-            #self.parent.dict_filters[self.row['recording_name']] = self.new_dffilter
-            #self.parent.df2csv(df=self.new_dffilter, rec=self.row['recording_name'], key="filter")
-            self.parent.dict_outputs[key_output] = self.new_dfoutput
-            self.parent.df2csv(df=self.new_dfoutput, rec=rec_name, key="output")
+            recording_name = self.parent.df_project.loc[int(idx.values[0]), 'recording_name']
+            self.parent.dict_outputs[recording_name] = self.new_dfoutput
+            self.parent.df2csv(df=self.new_dfoutput, rec=recording_name, key="output")
 
             # Delete affected group output; dicts and files
             str_groups = df_p.loc[int(idx.values[0]), 'groups']
@@ -1964,7 +2046,7 @@ class Measure_window_sub(Ui_measure_window):
                     return
                 x = event.xdata
                 # find time in self.dfmean closest to x
-                time = self.new_dfmean.iloc[(self.new_dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
+                time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
                 self.updateOnClick(time=time, aspect=self.aspect)
             elif event.button == 2:
                 zoomReset(canvas=self.canvas_mean, ui=self.parent)
@@ -1979,6 +2061,14 @@ class Measure_window_sub(Ui_measure_window):
                 unPlot(self.canvas_output, self.si_v_drag_from)
                 self.si_v_drag_from = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="blue")
                 self.canvas_output.draw()
+        elif event.button == 3: # Right mouse button clicked
+            self.drag_start = None
+            self.dragging = False
+            unPlot(self.canvas_mean, self.si_sweep)
+            self.si_sweep, = self.canvas_mean.axes.plot([], [], color="blue")
+            self.canvas_mean.draw()
+            unPlot(self.canvas_output, self.si_v_drag_from, self.si_v_drag_to, self.dragplot)
+            self.canvas_output.draw()
     
 
     def outputDragged(self, event): # measurewindow output drag event
@@ -2006,10 +2096,10 @@ class Measure_window_sub(Ui_measure_window):
         else:
             x = self.last_x
         same = bool(int(self.drag_start) == int(x))
-        print(f"meanDragged from: {self.drag_start} to {x}: {same}")
-        df = self.new_dffilter
+        #print(f"meanDragged from: {self.drag_start} to {x}: {same}")
+        df = self.dffilter
         rec_filter = self.row['filter'] # the filter currently used for this recording
-        print(f"updateSample: event={event}, rec_filter={rec_filter}")
+        #print(f"updateSample: event={event}, rec_filter={rec_filter}")
         if same: # click and release on same: get that specific sweep and superimpose it on canvas_mean
             unPlot(self.canvas_output, self.si_v_drag_to, self.dragplot)
             df = df[df['sweep'] == int(self.drag_start)]
@@ -2034,16 +2124,12 @@ class Measure_window_sub(Ui_measure_window):
         print(f"updateOnEdit: lineEdit={lineEdit}, aspect={aspect}")
         input_sanitized = lineEdit.text().replace(",", ".")
         try:
-            time = float(input_sanitized)/1000 # convert to SI
-        except:
-            print("Invalid input: must be a number.")
+            time = float(input_sanitized) / 1000  # convert to SI
+            if not self.dfmean['time'].min() <= time <= self.dfmean['time'].max():
+                raise ValueError
+        except ValueError:
+            print("Invalid input: must be a number within time range.")
             lineEdit.setText("")
-            return
-        # check if value is within dfmean time range
-        if  time < self.dfmean['time'].min() or time > self.dfmean['time'].max():
-            print(f"Time {time}s out of range")
-            lineEdit.setText("")
-            return
         self.updateAspect(time=time, aspect=aspect, method="Manual")
     
 
@@ -2148,11 +2234,11 @@ def oneAxisLeft(ax1, ax2, amp, slope):
 
 
 def unPlot(canvas, *artists): # remove line if it exists on canvas
-    print(f"unPlot - canvas: {canvas}, artists: {artists}")
+    #print(f"unPlot - canvas: {canvas}, artists: {artists}")
     for artist in artists:
         artists_on_canvas = canvas.axes.get_children()
         if artist in artists_on_canvas:
-            print(f"unPlot - removed artist: {artist}")
+            #print(f"unPlot - removed artist: {artist}")
             artist.remove()
 
 def label2idx(canvas, aspect):
