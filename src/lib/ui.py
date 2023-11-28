@@ -1981,6 +1981,14 @@ class Measure_window_sub(Ui_measure_window):
                 unPlot(self.canvas_output, self.si_v_drag_from)
                 self.si_v_drag_from = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="blue")
                 self.canvas_output.draw()
+        elif event.button == 3: # Right mouse button clicked
+            self.drag_start = None
+            self.dragging = False
+            unPlot(self.canvas_mean, self.si_sweep)
+            self.si_sweep, = self.canvas_mean.axes.plot([], [], color="blue")
+            self.canvas_mean.draw()
+            unPlot(self.canvas_output, self.si_v_drag_from, self.si_v_drag_to, self.dragplot)
+            self.canvas_output.draw()
     
 
     def outputDragged(self, event): # measurewindow output drag event
@@ -2008,10 +2016,10 @@ class Measure_window_sub(Ui_measure_window):
         else:
             x = self.last_x
         same = bool(int(self.drag_start) == int(x))
-        print(f"meanDragged from: {self.drag_start} to {x}: {same}")
+        #print(f"meanDragged from: {self.drag_start} to {x}: {same}")
         df = self.dffilter
         rec_filter = self.row['filter'] # the filter currently used for this recording
-        print(f"updateSample: event={event}, rec_filter={rec_filter}")
+        #print(f"updateSample: event={event}, rec_filter={rec_filter}")
         if same: # click and release on same: get that specific sweep and superimpose it on canvas_mean
             unPlot(self.canvas_output, self.si_v_drag_to, self.dragplot)
             df = df[df['sweep'] == int(self.drag_start)]
@@ -2150,11 +2158,11 @@ def oneAxisLeft(ax1, ax2, amp, slope):
 
 
 def unPlot(canvas, *artists): # remove line if it exists on canvas
-    print(f"unPlot - canvas: {canvas}, artists: {artists}")
+    #print(f"unPlot - canvas: {canvas}, artists: {artists}")
     for artist in artists:
         artists_on_canvas = canvas.axes.get_children()
         if artist in artists_on_canvas:
-            print(f"unPlot - removed artist: {artist}")
+            #print(f"unPlot - removed artist: {artist}")
             artist.remove()
 
 def label2idx(canvas, aspect):
