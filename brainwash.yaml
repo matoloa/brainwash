@@ -21,6 +21,7 @@ dependencies:
   - isort
   - nose2
   - python-neo
+  - igor
   - pip:
     - pyabf
 
