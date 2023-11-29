@@ -23,7 +23,7 @@ import pandas as pd  # dataframe module, think excel, but good
 import pyabf  # read data files atf, abf
 import scipy  # peakfinder and other useful analysis tools
 import seaborn as sns  # plotting
-from neo import io  # read data files ibw
+#from neo import io  # bypassing neo for now, igor2 reads ibw by itself
 import igor2 as igor
 from sklearn import linear_model
 from sklearn.linear_model import HuberRegressor
@@ -41,25 +41,25 @@ ibw_folder0
 list(dir_ibw.glob('*'))
 
 # %%
-ibw = io.IgorIO(list(ibw_folder0.glob('*'))[0])
-#ibw = igor.binarywave.load(list(ibw_folder0.glob('*'))[0])
+#ibw = io.IgorIO(list(ibw_folder0.glob('*'))[0])
+ibw = igor.binarywave.load(list(ibw_folder0.glob('*'))[0])
 
 # %%
-ibw.read_analogsignal()
+#ibw.read_analogsignal()
 
 
 # %%
-ibw.read_block()
+#ibw.read_block()
 
 # %%
-ibw.read_segment()
+#ibw.read_segment()
 
 # %%
-signal = ibw.read_analogsignal()
-signal.as_array()
+#signal = ibw.read_analogsignal()
+#signal.as_array()
 
 # %%
-ibw = io.IgorIO(ibw_folder0.glob('*'))
+#ibw = io.IgorIO(ibw_folder0.glob('*'))
 
 
 # %%
