@@ -29,6 +29,7 @@ from sklearn import linear_model
 from sklearn.linear_model import HuberRegressor
 from tqdm.notebook import tqdm
 from joblib import Parallel, delayed
+#from datetime import datetime, timedelta
 
 # %%
 dir_project_root = Path(os.getcwd().split('notebook')[0])
@@ -94,27 +95,40 @@ def parse_ibw_igor2(folder, dev=True):
         arrays.append(ibw['wave']['wData'])
     return (timestamps, arrays)
     
-timestamps, arrays = parse_ibw_igor2(folder=ibw_folder0, dev=False)
-
+#timestamps, arrays = parse_ibw_igor2(folder=ibw_folder0, dev=False)
 
 # %%
 def parse_ibw_igor2_para(folder, dev=True):
-    files = sorted(list(folder.glob('*')))
+    files = sorted(list(folder.glob('*.ibw')))
     if dev:
         files = files[:100]
-
-
-    meta_sfA = []
-    timestamps = []
-    arrays = []
     results = Parallel(n_jobs=-1)(delayed(ibw_read)(file) for file in tqdm(files))
     keys = results[0].keys()
     res = {}
     for key in keys:
         res[key] = [i[key] for i in results]
-    return (res['timestamp'], res['array'])
+    return res['timestamp'], res['meta_sfA'], res['array']
     
-timestamps, arrays = parse_ibw_igor2_para(folder=ibw_folder0, dev=False)
+timestamps, timesteps, arrays = parse_ibw_igor2_para(folder=ibw_folder0)
+
+# %%
+seconds = (pd.to_datetime("1970-01-01") - pd.to_datetime("1900-01-01")).total_seconds()
+
+timestamp_array = (np.array(timestamps)-seconds)
+measurement_start = min(timestamp_array)
+timestamp_array -= measurement_start
+voltage_raw = np.vstack(arrays)
+
+df = pd.DataFrame(data=voltage_raw, index=timestamp_array)
+
+timestep = timesteps[0][0]
+df.columns = np.round(np.arange(7500) * timestep, int(-np.log(timestep))).tolist()
+df = df.stack().reset_index()
+df.columns = ["t0", "time", "voltage_raw"]
+df.t0 = df.t0.astype("float32")
+df.time = df.time.astype("float32")
+df['datetime'] = pd.to_datetime((measurement_start + df.t0 + df.time) * 1_000_000_000)
+df
 
 # %%
 sns.heatmap(np.vstack(arrays))
