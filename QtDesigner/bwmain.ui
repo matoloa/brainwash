@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Brainwash 0.5</string>
+   <string>Brainwash</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayoutCentralwidget">
@@ -283,6 +283,32 @@
              </property>
              <property name="text">
               <string>Aspect</string>
+             </property>
+            </widget>
+            <widget class="QCheckBox" name="checkBox_paired_stims">
+             <property name="geometry">
+              <rect>
+               <x>120</x>
+               <y>30</y>
+               <width>90</width>
+               <height>23</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>stim / stim</string>
+             </property>
+            </widget>
+            <widget class="QLabel" name="label_paired_data">
+             <property name="geometry">
+              <rect>
+               <x>120</x>
+               <y>10</y>
+               <width>81</width>
+               <height>17</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>Paired data</string>
              </property>
             </widget>
            </widget>

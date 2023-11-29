@@ -115,6 +115,12 @@ class Ui_mainWindow(object):
         self.label_aspect = QtWidgets.QLabel(self.frame_main_view)
         self.label_aspect.setGeometry(QtCore.QRect(10, 10, 62, 17))
         self.label_aspect.setObjectName("label_aspect")
+        self.checkBox_paired_stims = QtWidgets.QCheckBox(self.frame_main_view)
+        self.checkBox_paired_stims.setGeometry(QtCore.QRect(120, 30, 90, 23))
+        self.checkBox_paired_stims.setObjectName("checkBox_paired_stims")
+        self.label_paired_data = QtWidgets.QLabel(self.frame_main_view)
+        self.label_paired_data.setGeometry(QtCore.QRect(120, 10, 81, 17))
+        self.label_paired_data.setObjectName("label_paired_data")
         self.horizontalLayout.addWidget(self.frame_main_view)
         self.verticalLayoutGraph.addLayout(self.horizontalLayout)
         self.labelMeanGroups = QtWidgets.QLabel(self.centralwidget)
@@ -150,7 +156,7 @@ class Ui_mainWindow(object):
 
     def retranslateUi(self, mainWindow):
         _translate = QtCore.QCoreApplication.translate
-        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash 0.5"))
+        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash"))
         self.pushButtonNewProject.setText(_translate("mainWindow", "New"))
         self.pushButtonOpenProject.setText(_translate("mainWindow", "Open"))
         self.inputProjectName.setText(_translate("mainWindow", "My Project"))
@@ -166,5 +172,7 @@ class Ui_mainWindow(object):
         self.checkBox_aspect_EPSP_amp.setText(_translate("mainWindow", "EPSP amp."))
         self.checkBox_aspect_EPSP_slope.setText(_translate("mainWindow", "EPSP slope"))
         self.label_aspect.setText(_translate("mainWindow", "Aspect"))
+        self.checkBox_paired_stims.setText(_translate("mainWindow", "stim / stim"))
+        self.label_paired_data.setText(_translate("mainWindow", "Paired data"))
         self.labelMeanGroups.setText(_translate("mainWindow", "Mean Groups:"))
         self.labelMetadata.setText(_translate("mainWindow", "Metadata:"))

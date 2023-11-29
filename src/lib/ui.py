@@ -477,6 +477,12 @@ class Ui_MainWindow(QtCore.QObject):
         self.label_aspect = QtWidgets.QLabel(self.frame_main_view)
         self.label_aspect.setGeometry(QtCore.QRect(10, 10, 62, 17))
         self.label_aspect.setObjectName("label_aspect")
+        self.checkBox_paired_stims = QtWidgets.QCheckBox(self.frame_main_view)
+        self.checkBox_paired_stims.setGeometry(QtCore.QRect(120, 30, 90, 23))
+        self.checkBox_paired_stims.setObjectName("checkBox_paired_stims")
+        self.label_paired_data = QtWidgets.QLabel(self.frame_main_view)
+        self.label_paired_data.setGeometry(QtCore.QRect(120, 10, 81, 17))
+        self.label_paired_data.setObjectName("label_paired_data")
         self.horizontalLayout.addWidget(self.frame_main_view)
         self.verticalLayoutGraph.addLayout(self.horizontalLayout)
         self.labelMeanGroups = QtWidgets.QLabel(self.centralwidget)
@@ -512,7 +518,7 @@ class Ui_MainWindow(QtCore.QObject):
 
     def retranslateUi(self, mainWindow):
         _translate = QtCore.QCoreApplication.translate
-        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash 0.5"))
+        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash"))
         self.pushButtonNewProject.setText(_translate("mainWindow", "New"))
         self.pushButtonOpenProject.setText(_translate("mainWindow", "Open"))
         self.inputProjectName.setText(_translate("mainWindow", "My Project"))
@@ -528,6 +534,8 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBox_aspect_EPSP_amp.setText(_translate("mainWindow", "EPSP amp."))
         self.checkBox_aspect_EPSP_slope.setText(_translate("mainWindow", "EPSP slope"))
         self.label_aspect.setText(_translate("mainWindow", "Aspect"))
+        self.checkBox_paired_stims.setText(_translate("mainWindow", "stim / stim"))
+        self.label_paired_data.setText(_translate("mainWindow", "Paired data"))
         self.labelMeanGroups.setText(_translate("mainWindow", "Mean Groups:"))
         self.labelMetadata.setText(_translate("mainWindow", "Metadata:"))
 
@@ -667,7 +675,7 @@ class UIsub(Ui_MainWindow):
 
         # load or write local cfg, for storage of e.g. group colours, zoom levels etc.
         self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
-        if self.project_cfg_yaml.exists():
+        if False:#self.project_cfg_yaml.exists():
             with self.project_cfg_yaml.open("r") as file:
                 self.dict_cfg = yaml.safe_load(file)
         else:
@@ -678,6 +686,7 @@ class UIsub(Ui_MainWindow):
                         'delete_locked': True, # whether to allow deleting of data
                         'aspect_EPSP_amp': True,
                         'aspect_EPSP_slope': True,
+                        'paired_stims': False,
                         'mean_ylim': (-0.001, 0.0002),
                         'mean_xlim': (0.006, 0.020),
                         'output_ax1_ylim': (0, None),
@@ -701,15 +710,15 @@ class UIsub(Ui_MainWindow):
 
         # Addon to make the graphs scaleable
         self.graphMean.setLayout(QtWidgets.QVBoxLayout())
-        self.canvas_seaborn_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
-        self.graphMean.layout().addWidget(self.canvas_seaborn_mean)
+        self.main_canvas_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
+        self.graphMean.layout().addWidget(self.main_canvas_mean)
         self.graphOutput.setLayout(QtWidgets.QVBoxLayout())
-        self.canvas_seaborn_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for Mean
-        self.graphOutput.layout().addWidget(self.canvas_seaborn_output)
-        self.canvas_seaborn_mean.show()
-        self.canvas_seaborn_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_seaborn_mean))
-        self.canvas_seaborn_mean.mpl_connect('button_press_event', self.meanClicked)
-        self.canvas_seaborn_output.show()
+        self.main_canvas_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for Mean
+        self.graphOutput.layout().addWidget(self.main_canvas_output)
+        self.main_canvas_mean.show()
+        self.main_canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.main_canvas_mean))
+        self.main_canvas_mean.mpl_connect('button_press_event', self.meanClicked)
+        self.main_canvas_output.show()
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
         # maybe learn more about that later?
@@ -739,6 +748,10 @@ class UIsub(Ui_MainWindow):
             key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.viewSettingsChanged(state, str_view_key))
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
+
+        # connect paired stim checkbox to local function
+        self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
+        self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
 
         self.dict_open_measure_windows = {}
 
@@ -877,15 +890,17 @@ class UIsub(Ui_MainWindow):
     def tableProjSelectionChanged(self):
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableProj.clearSelection()
-            self.setGraph()
-            return
-        selected_rows = self.listSelectedRows()
-        df_select = self.df_project.loc[selected_rows]
-        self.setGraph(df_select)
+        self.setGraph()
 
     def tableProjDoubleClicked(self):
         self.launchMeasureWindow()
    
+    def checkBox_paired_stims_changed(self, state):
+        self.dict_cfg['paired_stims'] = bool(state)
+        print(f"checkBox_paired_stims_changed: {self.dict_cfg['paired_stims']}")
+        self.write_project_cfg()
+        self.setGraph()
+
     def checkedBoxLockDelete(self, state):
         if state == 2:
             self.dict_cfg['delete_locked']= True
@@ -1110,8 +1125,7 @@ class UIsub(Ui_MainWindow):
                 self.save_df_project()
                 self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
             self.purgeGroupCache(add_group)
-            df_selection = self.df_project.loc[selected_rows]
-            self.setGraph(df_selection)
+            self.setGraph()
         else:
             print("No files selected.")
 
@@ -1414,19 +1428,21 @@ class UIsub(Ui_MainWindow):
 
 # Graph handling
 
-    def clearGraph(self): # removes all data from canvas_seaborn_mean - TODO: deprecated?
-        if hasattr(self, "canvas_seaborn_mean"):
-            self.canvas_seaborn_mean.axes.cla()
-            self.canvas_seaborn_mean.draw()
-        if hasattr(self, "canvas_seaborn_output"):
-            self.canvas_seaborn_output.axes.cla()
-            self.canvas_seaborn_output.draw()
+    def clearGraph(self): # removes all data from main_canvas_mean - TODO: deprecated?
+        if hasattr(self, "main_canvas_mean"):
+            self.main_canvas_mean.axes.cla()
+            self.main_canvas_mean.draw()
+        if hasattr(self, "main_canvas_output"):
+            self.main_canvas_output.axes.cla()
+            self.main_canvas_output.draw()
 
     def setGraph(self, df_select=None): # plot selected row(s), or clear graph if empty
+        if df_select is None:
+            df_select = self.df_project.loc[self.listSelectedRows()]
         amp = bool(self.dict_cfg['aspect_EPSP_amp'])
         slope = bool(self.dict_cfg['aspect_EPSP_slope'])
         self.clearGraph()
-        ax1 = self.canvas_seaborn_output.axes
+        ax1 = self.main_canvas_output.axes
         if hasattr(self, "ax2"): # remove ax2 if it exists
             self.ax2.remove()
         ax2 = ax1.twinx()
@@ -1439,48 +1455,54 @@ class UIsub(Ui_MainWindow):
             self.setGraphSelected(df_select=df_select, ax1=ax1, ax2=ax2, amp=amp, slope=slope)
         
         # add appropriate ticks and axis labels
-        self.canvas_seaborn_mean.axes.set_xlabel("Time (s)")
-        self.canvas_seaborn_mean.axes.set_ylabel("Voltage (V)")
+        self.main_canvas_mean.axes.set_xlabel("Time (s)")
+        self.main_canvas_mean.axes.set_ylabel("Voltage (V)")
         self.ax1.set_ylabel("Amplitude (mV)")
         self.ax2.set_ylabel("Slope (mV/ms)")
         oneAxisLeft(self.ax1, self.ax2, amp, slope)
         # x and y limits
-        self.canvas_seaborn_mean.axes.set_xlim(self.dict_cfg['mean_xlim'])
-        self.canvas_seaborn_mean.axes.set_ylim(self.dict_cfg['mean_ylim'])
+        self.main_canvas_mean.axes.set_xlim(self.dict_cfg['mean_xlim'])
+        self.main_canvas_mean.axes.set_ylim(self.dict_cfg['mean_ylim'])
         ax1.set_ylim(self.dict_cfg['output_ax1_ylim'])
         
         sortLegend(self.ax1, self.ax2)
-        self.canvas_seaborn_mean.draw()
-        self.canvas_seaborn_output.draw()
+        self.main_canvas_mean.draw()
+        self.main_canvas_output.draw()
 
     def setGraphSelected(self, df_select, ax1, ax2, amp, slope):
         df_analyzed = df_select[df_select["sweeps"] != "..."]
         if df_analyzed.empty:
             print("Nothing analyzed selected.")
-        else:
-            for i, row in df_analyzed.iterrows(): # TODO: i to be used later for cycling colours?
-                dfmean = self.get_dfmean(row=row)
-                dfoutput = self.get_dfoutput(row=row)
-                t_EPSP_amp = self.get_df_project().loc[i, 't_EPSP_amp']
-                t_EPSP_slope = self.get_df_project().loc[i, 't_EPSP_slope']
-                # plot relevant filter of dfmean on canvas_seaborn_mean
-                label = f"{row['recording_name']}"
-                rec_filter = row['filter'] # the filter currently used for this recording
-                _ = sns.lineplot(ax=self.canvas_seaborn_mean.axes, label=label, data=dfmean, y=rec_filter, x="time", color="black")
-                # plot dfoutput on canvas_seaborn_output
-                if amp & (not np.isnan(t_EPSP_amp)):
-                    _ = sns.lineplot(ax=ax1, label=f"{label}_EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", color="black", linestyle='--')
-                    # mean, amp indicator
-                    y_position = dfmean[dfmean.time == t_EPSP_amp].voltage
-                    self.canvas_seaborn_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
-                if slope & (not np.isnan(t_EPSP_slope)):
-                    _ = sns.lineplot(ax=ax2, label=f"{label}_EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
-                    # mean, slope indicator        
-                    x_start = t_EPSP_slope - 0.0004
-                    x_end = t_EPSP_slope + 0.0004
-                    y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
-                    y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-                    self.canvas_seaborn_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
+            return
+        for i, row in df_analyzed.iterrows(): # TODO: i to be used later for cycling colours?
+            dfmean = self.get_dfmean(row=row)
+            dfoutput = self.get_dfoutput(row=row)
+            t_EPSP_amp = self.get_df_project().loc[i, 't_EPSP_amp']
+            t_EPSP_slope = self.get_df_project().loc[i, 't_EPSP_slope']
+            # plot relevant filter of dfmean on main_canvas_mean
+            label = f"{row['recording_name']}"
+            rec_filter = row['filter'] # the filter currently used for this recording
+            _ = sns.lineplot(ax=self.main_canvas_mean.axes, label=label, data=dfmean, y=rec_filter, x="time", color="black")
+            # plot dfoutput on main_canvas_output
+
+            if self.dict_cfg['paired_stims']:
+                print("paired_stims not implemented yet")
+                return
+
+            # plot dfoutput on main_canvas_output
+            if amp & (not np.isnan(t_EPSP_amp)):
+                _ = sns.lineplot(ax=ax1, label=f"{label}_EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", color="black", linestyle='--')
+                # mean, amp indicator
+                y_position = dfmean[dfmean.time == t_EPSP_amp].voltage
+                self.main_canvas_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
+            if slope & (not np.isnan(t_EPSP_slope)):
+                _ = sns.lineplot(ax=ax2, label=f"{label}_EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
+                # mean, slope indicator        
+                x_start = t_EPSP_slope - 0.0004
+                x_end = t_EPSP_slope + 0.0004
+                y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+                y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+                self.main_canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
 
     def setGraphGroups(self, ax1, ax2, list_color):
         print(f"setGraphGroups: {self.dict_cfg['list_groups']}")
@@ -1516,7 +1538,7 @@ class UIsub(Ui_MainWindow):
     def meanClicked(self, event): # maingraph click event
         if event.inaxes is not None:
             if event.button == 2:
-                zoomReset(canvas=self.canvas_seaborn_mean, ui=self)
+                zoomReset(canvas=self.main_canvas_mean, ui=self)
 
     def viewSettingsChanged(self, state, str_view_key):
         # checkboxes for views have changed; save settings and update
