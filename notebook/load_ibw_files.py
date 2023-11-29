@@ -125,9 +125,9 @@ timestep = timesteps[0][0]
 df.columns = np.round(np.arange(7500) * timestep, int(-np.log(timestep))).tolist()
 df = df.stack().reset_index()
 df.columns = ["t0", "time", "voltage_raw"]
-df.t0 = df.t0.astype("float32")
-df.time = df.time.astype("float32")
-df['datetime'] = pd.to_datetime((measurement_start + df.t0 + df.time) * 1_000_000_000)
+df.t0 = df.t0.astype("float64")
+df.time = df.time.astype("float64")
+df['datetime'] = pd.to_datetime((measurement_start + df.t0 + df.time), unit="s").round("us")
 df
 
 # %%

@@ -5,10 +5,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd  # dataframe module, think excel, but good
 import pyabf  # read data files atf, abf
-from neo import io  # read data files ibw
+import igor2 as igor # read data files ibw
 
 from tqdm import tqdm
 from joblib import Memory
+from joblib import Parallel, delayed
 import time
 
 memory = Memory("../cache", verbose=1)
@@ -97,6 +98,47 @@ def parse_abfFolder(folderpath):
     df['datetime'] = pd.to_datetime(df.datetime)
     return df
 
+
+def ibw_read(file):
+    ibw = igor.binarywave.load(file)
+    timestamp = ibw['wave']['wave_header']['creationDate']
+    meta_sfA = ibw['wave']['wave_header']['sfA']
+    array = ibw['wave']['wData']
+    return {'timestamp': timestamp, 'meta_sfA': meta_sfA, 'array': array}
+
+
+def parse_ibwFolder(folder, dev=False): # igor2, para
+    files = sorted(list(folder.glob('*.ibw')))
+    if dev:
+        files = files[:100]
+    results = Parallel(n_jobs=-1)(delayed(ibw_read)(file) for file in tqdm(files))
+    keys = results[0].keys()
+    res = {}
+    for key in keys:
+        res[key] = [i[key] for i in results]
+    timesteps = res['meta_sfA']
+    arrays = np.vstack(res['array'])
+    timestamps = res['timestamp']       
+
+    seconds = (pd.to_datetime("1970-01-01") - pd.to_datetime("1900-01-01")).total_seconds()
+    timestamp_array = (np.array(timestamps)-seconds)
+    measurement_start = min(timestamp_array)
+    timestamp_array -= measurement_start
+    voltage_raw = np.vstack(arrays)
+
+    df = pd.DataFrame(data=voltage_raw, index=timestamp_array)
+    timestep = timesteps[0][0]
+    df.columns = np.round(np.arange(7500) * timestep, int(-np.log(timestep))).tolist()
+    df = df.stack().reset_index()
+    df.columns = ["t0", "time", "voltage_raw"]
+    df.t0 = df.t0.astype("float64")
+    df.time = df.time.astype("float64")
+    df['datetime'] = pd.to_datetime((measurement_start + df.t0 + df.time), unit="s").round("us")
+    df['channel'] = 0
+
+    return df
+
+
 # %%
 def build_dfmean(dfdata, rollingwidth=3):
     # TODO: is rollingwidth "radius" or "diameter"?
@@ -176,12 +218,21 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
         if verbose:
             print(f" - parser, source_path: {source_path}")
         if Path(source_path).is_dir():
-            df = parse_abfFolder(folderpath=Path(source_path))
-        else:
-            df = parse_abf(filepath=Path(source_path))
-        if verbose:
-            print(f" - - df['channel'].nunique(): {df['channel'].nunique()}")
+            # check contents of folder: .ibw or .abf
+            list_files = [i for i in os.listdir(source_path) if -1 < i.find(".ibw") or -1 < i.find(".abf")]
+            filetype = None
+            if -1 < list_files[0].find(".abf"):
+                filetype = "abf"
+            elif -1 < list_files[0].find(".ibw"):
+                filetype = "ibw"
+            if filetype is None:
+                raise ValueError(f" - - no supported files found in {source_path}")
 
+            if filetype == "abf":
+                df = parse_abfFolder(folderpath=Path(source_path))
+            elif filetype == "ibw":
+                df = parse_ibwFolder(folder=Path(source_path))#, dev=True)
+    
         df = df.sort_values(by='datetime').reset_index(drop=True)
         # sort df2parse in channels and stims (a and b)
         if single_stim:
@@ -195,18 +246,29 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
         nstims = len(list_stims)
         nchannels = df.channel.nunique()
         sweeplength = df.time.nunique()
+
+        # TODO: Why is this copied?
         dfcopy = df.copy()
         dfcopy = dfcopy.sort_values(by=['datetime', 'channel']).reset_index(drop=True)
         dfcopy['sweep_raw'] = dfcopy.index.to_numpy() // (sweeplength * nchannels)
         dict_data = {}
+
         for channel in dfcopy.channel.unique():
             df_ch = dfcopy[dfcopy.channel==channel]
             for i, stim in enumerate(list_stims):
                 file_base = f"{recording_name}_Ch{channel}_{stim}"
                 print(f"file_base: {file_base}")
-                df_ch_st = df_ch.loc[df_ch.sweep_raw % nstims == i].copy()
-                df_ch_st['sweep'] = (df_ch_st.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
+                if filetype == "abf": # split df by % nstims
+                    df_ch_st = df_ch.loc[df_ch.sweep_raw % nstims == i].copy()
+                    df_ch_st['sweep'] = (df_ch_st.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
+                elif filetype == "ibw": # split df; time < 0.5 is stim a, time >= 0.5 is stim b
+                    if stim == "a":
+                        df_ch_st = dfcopy.loc[dfcopy.time < 0.25].copy()
+                    if stim == "b":
+                        df_ch_st = dfcopy.loc[dfcopy.time >= 0.5].copy()  
+                    df_ch_st['sweep'] = df_ch_st.sweep_raw
                 df_ch_st.drop(columns=['channel'], inplace=True)
+                print(f"nunique: {df_ch_st['sweep'].nunique()}")
                 dfmean = build_dfmean(df_ch_st)
                 dffilter = zeroSweeps(dfdata=df_ch_st, dfmean=dfmean)
                 persistdf(file_base=file_base, dict_folders=dict_folders, dfdata=df_ch_st, dfmean=dfmean, dffilter=dffilter)
@@ -218,6 +280,7 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
                     'reset': df_ch_st[(df_ch_st['sweep_raw'] == df_ch_st['sweep_raw'].min()) & (df_ch_st['time'] == 0)]['sweep'].tolist()[1:]
                 }
                 dict_data[f"{recording_name}_Ch{channel}_{stim}"] = dict_sub
+
         return dict_data
 
     if verbose:
@@ -251,7 +314,8 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     dict_folders['cache'] = dict_folders['project'] / "cache"
     dict_folders['project'].mkdir(exist_ok=True)
     #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"), str(source_folder / "abf 2 channel/KO_02")]
-    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"), str(source_folder / "abf 2 channel/KO_02/2022_01_24_0020.abf")]
+    #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"), str(source_folder / "abf 2 channel/KO_02/2022_01_24_0020.abf")]
+    list_sources = [str(source_folder / "ibw 2 events/L11S2")]
     for _ in range(3):
         print()
     print("", "*** parse.py standalone test: ***")
