@@ -581,6 +581,8 @@ def df_projectTemplate():
             "sweeps",
             "channel",
             "stim",
+            "paired_recording",
+            "intervention",
             "filter",
             "filter_params",
             "t_stim",
@@ -788,6 +790,7 @@ class UIsub(Ui_MainWindow):
         self.dict_means = {} # all means
         self.dict_outputs = {} # all outputs
         self.dict_group_means = {} # means of all group outputs
+        self.dict_diffs = {} # all diffs (for paired stim)
 
 
 # pushedButton functions TODO: break out the big ones to separate functions!
@@ -1388,6 +1391,49 @@ class UIsub(Ui_MainWindow):
         return self.dict_group_means[key_group]
 
 
+    def get_dfdiff(self, row):
+        # returns an internal df output for the selected file. If it does not exist, read it from file first.
+        rec_select = row['recording_name']
+        # TODO: check if row has a paired recording
+        # Otherwise, find the paired recording
+        rec_paired = None
+        key_pair = rec_select[:-2] # remove stim id ("_a" or "_b") from selected recording_name
+        # 1: check for cached diff
+        #if key_pair in self.dict_diffs:
+        #    return self.dict_diffs[key_pair]
+        # 2: check for file
+        if Path(f"{self.dict_folders['cache']}/{key_pair}_diff.csv").exists():
+            dfdiff = pd.read_csv(f"{self.dict_folders['cache']}/{key_pair}_diff.csv")
+            self.dict_diffs[key_pair] = dfdiff
+            return dfdiff
+        # 3: build a new diff
+        df_p = self.get_df_project()
+        # set rec_paired to the first recording_name that starts with rec_paired, but isn't rec_select
+        for i, row in df_p.iterrows():
+            if row['recording_name'].startswith(key_pair) and row['recording_name'] != rec_select:
+                rec_paired = row['recording_name']
+                break
+        if rec_paired is None:
+            print("No paired recording found.")
+            return
+        dfout1 = self.get_dfoutput(row=df_p[df_p['recording_name'] == rec_select].iloc[0])
+        dfout2 = self.get_dfoutput(row=df_p[df_p['recording_name'] == rec_paired].iloc[0])
+        dfdiff = pd.DataFrame()
+        dfdiff['sweep'] = dfout1.sweep
+        # TODO: first, check if row['intervention'] is True, False or None
+            # if None: if amp exists, find the dfout with the highest average 'EPSP_amp' value. If no amp, use slope.
+        # TODO: set paired_recording and intervention in df_p
+        if dfout1['EPSP_amp'].mean() > dfout2['EPSP_amp'].mean():
+            dfdiff['EPSP_amp'] = dfout1.EPSP_amp / dfout2.EPSP_amp
+            dfdiff['EPSP_slope'] = dfout1.EPSP_slope / dfout2.EPSP_slope
+        else:
+            dfdiff['EPSP_amp'] = dfout2.EPSP_amp / dfout1.EPSP_amp
+            dfdiff['EPSP_slope'] = dfout2.EPSP_slope / dfout1.EPSP_slope
+        self.df2csv(df=dfdiff, rec=key_pair, key="diff")
+        self.dict_diffs[key_pair] = dfdiff
+        return dfdiff
+        
+
     def df2csv(self, df, rec, key=None): # writes dict[rec] to rec_{dict}.csv
         self.dict_folders['cache'].mkdir(exist_ok=True)
         if key is None:
@@ -1483,20 +1529,23 @@ class UIsub(Ui_MainWindow):
             label = f"{row['recording_name']}"
             rec_filter = row['filter'] # the filter currently used for this recording
             _ = sns.lineplot(ax=self.main_canvas_mean.axes, label=label, data=dfmean, y=rec_filter, x="time", color="black")
+
             # plot dfoutput on main_canvas_output
-
+            out = dfoutput
             if self.dict_cfg['paired_stims']:
-                print("paired_stims not implemented yet")
-                return
-
+                dfdiff = self.get_dfdiff(row=row)
+                if dfdiff is None:
+                    return
+                out = dfdiff
+            
             # plot dfoutput on main_canvas_output
             if amp & (not np.isnan(t_EPSP_amp)):
-                _ = sns.lineplot(ax=ax1, label=f"{label}_EPSP_amp", data=dfoutput, y="EPSP_amp", x="sweep", color="black", linestyle='--')
+                _ = sns.lineplot(ax=ax1, label=f"{label}_EPSP_amp", data=out, y="EPSP_amp", x="sweep", color="black", linestyle='--')
                 # mean, amp indicator
                 y_position = dfmean[dfmean.time == t_EPSP_amp].voltage
                 self.main_canvas_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
             if slope & (not np.isnan(t_EPSP_slope)):
-                _ = sns.lineplot(ax=ax2, label=f"{label}_EPSP_slope", data=dfoutput, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
+                _ = sns.lineplot(ax=ax2, label=f"{label}_EPSP_slope", data=out, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
                 # mean, slope indicator        
                 x_start = t_EPSP_slope - 0.0004
                 x_end = t_EPSP_slope + 0.0004
@@ -1736,8 +1785,6 @@ class Measure_window_sub(Ui_measure_window):
             self.dict_filter_params = {}
         if row['filter'] not in self.dict_filter_params:            
             self.measure_filter_defaults(row['filter'])
-
-
 
         self.measure_graph_mean.setLayout(QtWidgets.QVBoxLayout())
         self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)
