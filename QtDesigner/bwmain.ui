@@ -311,6 +311,19 @@
               <string>Paired data</string>
              </property>
             </widget>
+            <widget class="QPushButton" name="pushButton_paired_data_flip">
+             <property name="geometry">
+              <rect>
+               <x>122</x>
+               <y>50</y>
+               <width>81</width>
+               <height>25</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>Flip C-I</string>
+             </property>
+            </widget>
            </widget>
           </item>
          </layout>

@@ -483,6 +483,9 @@ class Ui_MainWindow(QtCore.QObject):
         self.label_paired_data = QtWidgets.QLabel(self.frame_main_view)
         self.label_paired_data.setGeometry(QtCore.QRect(120, 10, 81, 17))
         self.label_paired_data.setObjectName("label_paired_data")
+        self.pushButton_paired_data_flip = QtWidgets.QPushButton(self.frame_main_view)
+        self.pushButton_paired_data_flip.setGeometry(QtCore.QRect(122, 50, 81, 25))
+        self.pushButton_paired_data_flip.setObjectName("pushButton_paired_data_flip")
         self.horizontalLayout.addWidget(self.frame_main_view)
         self.verticalLayoutGraph.addLayout(self.horizontalLayout)
         self.labelMeanGroups = QtWidgets.QLabel(self.centralwidget)
@@ -536,8 +539,10 @@ class Ui_MainWindow(QtCore.QObject):
         self.label_aspect.setText(_translate("mainWindow", "Aspect"))
         self.checkBox_paired_stims.setText(_translate("mainWindow", "stim / stim"))
         self.label_paired_data.setText(_translate("mainWindow", "Paired data"))
+        self.pushButton_paired_data_flip.setText(_translate("mainWindow", "Flip C-I"))
         self.labelMeanGroups.setText(_translate("mainWindow", "Mean Groups:"))
         self.labelMetadata.setText(_translate("mainWindow", "Metadata:"))
+
 
 
 class Ui_Dialog(QtWidgets.QWidget):
@@ -677,7 +682,7 @@ class UIsub(Ui_MainWindow):
 
         # load or write local cfg, for storage of e.g. group colours, zoom levels etc.
         self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
-        if False:#self.project_cfg_yaml.exists():
+        if self.project_cfg_yaml.exists():
             with self.project_cfg_yaml.open("r") as file:
                 self.dict_cfg = yaml.safe_load(file)
         else:
@@ -751,10 +756,13 @@ class UIsub(Ui_MainWindow):
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
 
-        # connect paired stim checkbox to local function
+        # connect paired stim checkbox and flip button to local functions
         self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
         self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
+        self.pushButton_paired_data_flip.setEnabled(self.dict_cfg['paired_stims'])
+        self.pushButton_paired_data_flip.pressed.connect(self.pushButton_paired_data_flip_pressed)
 
+        # keep track of open measure windows
         self.dict_open_measure_windows = {}
 
 # Debugging tools
@@ -795,10 +803,13 @@ class UIsub(Ui_MainWindow):
 
 # pushedButton functions TODO: break out the big ones to separate functions!
 
+    def pushButton_paired_data_flip_pressed(self):
+        self.flipCI()
+
     def pushedButtonClearGroups(self):
-        selected_rows = self.listSelectedRows()
-        if 0 < len(selected_rows):
-            self.clearGroupsByRow(selected_rows)
+        selected_indices = self.listSelectedIndices()
+        if 0 < len(selected_indices):
+            self.clearGroupsByRow(selected_indices)
         else:
             print("No files selected.")
 
@@ -901,6 +912,7 @@ class UIsub(Ui_MainWindow):
     def checkBox_paired_stims_changed(self, state):
         self.dict_cfg['paired_stims'] = bool(state)
         print(f"checkBox_paired_stims_changed: {self.dict_cfg['paired_stims']}")
+        self.pushButton_paired_data_flip.setEnabled(self.dict_cfg['paired_stims'])
         self.write_project_cfg()
         self.setGraph()
 
@@ -947,13 +959,12 @@ class UIsub(Ui_MainWindow):
         self.set_df_project(df_p)
         if verbose:
             print("addData:", self.get_df_project())
-        self.setTableDf(df_p)
 
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
-        selected_rows = self.listSelectedRows()
-        if len(selected_rows) == 1:
-            row = selected_rows[0]
+        selected_indices = self.listSelectedIndices()
+        if len(selected_indices) == 1:
+            row = selected_indices[0]
             df_p = self.df_project
             old_recording_name = df_p.at[row, 'recording_name']
             # if the old recording name is a key in in dict_open_measure_windows
@@ -985,7 +996,6 @@ class UIsub(Ui_MainWindow):
                         os.rename(old_output, new_output)
                     df_p.at[row, 'recording_name'] = new_recording_name
                     self.set_df_project(df_p)
-                    self.setTableDf(self.df_project)  # Force update
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
             else:
@@ -995,14 +1005,14 @@ class UIsub(Ui_MainWindow):
 
     def deleteSelectedRows(self):
         df_p = self.get_df_project()
-        selected_rows = self.listSelectedRows()
-        if 0 < len(selected_rows):
+        selected_indices = self.listSelectedIndices()
+        if 0 < len(selected_indices):
             # If any of the selected rows are open in a measure window, abort
-            if any(df_p.at[row, 'recording_name'] in self.dict_open_measure_windows for row in selected_rows):
+            if any(df_p.at[row, 'recording_name'] in self.dict_open_measure_windows for row in selected_indices):
                 print(f"Cannot delete recordings that are open in a measure window.")
                 return
             list_affected_groups = []
-            for row in selected_rows:
+            for row in selected_indices:
                 sweeps = df_p.at[row, 'sweeps']
                 if sweeps != "...": # if the file is parsed:
                     recording_name = df_p.at[row, 'recording_name']
@@ -1021,12 +1031,11 @@ class UIsub(Ui_MainWindow):
                     if output_path.exists():
                         output_path.unlink()
             # Regardless of whether or not there was a file, purge the row from df_project
-            self.clearGroupsByRow(selected_rows) # clear cache so that a new group mean is calculated
-            df_p.drop(selected_rows, inplace=True)
+            self.clearGroupsByRow(selected_indices) # clear cache so that a new group mean is calculated
+            df_p.drop(selected_indices, inplace=True)
             df_p.reset_index(inplace=True, drop=True)
             self.set_df_project(df_p)
             print(f"Deleted {len(list_affected_groups)}, {list_affected_groups} rows.")
-            self.setTableDf(df_p)  # Force update
             self.setGraph()
         else:
             print("No files selected.")
@@ -1052,10 +1061,41 @@ class UIsub(Ui_MainWindow):
                 print(f"update_frame: {update_frame}")
                 rows2add = pd.concat(rows, axis=1).transpose()
                 print("rows2add:", rows2add[["recording_name", "sweeps" ]])
-                self.df_project = (pd.concat([update_frame, rows2add])).reset_index(drop=True)
-                print(self.df_project[["recording_name", "sweeps" ]])
-                self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
-                self.save_df_project()
+                self.set_df_project(pd.concat([update_frame, rows2add])).reset_index(drop=True)
+
+    def flipCI(self):
+        selected_indices = self.listSelectedIndices()
+        if 0 < len(selected_indices):
+            df_p = self.get_df_project()
+            already_flipped = []
+            for index in selected_indices:
+                row = df_p.loc[index]
+                name_rec = row['recording_name'] 
+                name_pair = row['paired_recording']
+                index_pair = df_p[df_p['recording_name'] == name_pair].index[0]
+                if index in already_flipped:
+                    print(f"Already flipped {index}")
+                    continue
+                # if row_pair doesn't exist:
+                if pd.isna(name_pair):
+                    print(f"{name_rec} has no paired recording.")
+                    return
+                print(f"Flipping C-I for {name_rec} and {name_pair}...")
+                df_p.at[index, 'intervention'] = not df_p.at[index, 'intervention']
+                df_p.at[index_pair, 'intervention'] = not df_p.at[index_pair, 'intervention']
+                # clear caches and diff files
+                key_pair = name_rec[:-2]
+                self.dict_diffs.pop(key_pair, None)
+                if Path(f"{self.dict_folders['cache']}/{key_pair}_diff.csv").exists():
+                    Path(f"{self.dict_folders['cache']}/{key_pair}_diff.csv").unlink()
+                already_flipped.append(index_pair)
+                self.set_df_project(df_p)
+                self.setGraph()
+        else:
+            print("No files selected.")
+
+
+
 
 
 # Data Group functions
@@ -1111,10 +1151,10 @@ class UIsub(Ui_MainWindow):
     def addToGroup(self, add_group):
         # Assign all selected files to group "add_group" unless they already belong to that group
         # Kill dict_group_means and csv
-        selected_rows = self.listSelectedRows()
-        if 0 < len(selected_rows):
+        selected_indices = self.listSelectedIndices()
+        if 0 < len(selected_indices):
             list_group = ""
-            for i in selected_rows:
+            for i in selected_indices:
                 if self.df_project.loc[i, 'groups'] == " ":
                     self.df_project.loc[i, 'groups'] = add_group
                 else:
@@ -1254,10 +1294,12 @@ class UIsub(Ui_MainWindow):
     def set_df_project(self, df): # persists df and saves it to .csv
         self.df_project = df
         self.save_df_project()
+        self.setTableDf(df)  # Force update table (TODO: why is this required?)
+
 
 
 # Table handling
-    def listSelectedRows(self):
+    def listSelectedIndices(self):
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         return [row.row() for row in selected_indexes]
 
@@ -1274,9 +1316,12 @@ class UIsub(Ui_MainWindow):
         header = self.tableProj.horizontalHeader()
         df_p = self.df_project
         # hide all columns except these:
-        list_show = [df_p.columns.get_loc("recording_name"),
-                     df_p.columns.get_loc("groups"),
-                     df_p.columns.get_loc("sweeps")]
+        list_show = [   df_p.columns.get_loc("recording_name"),
+                        #df_p.columns.get_loc("groups"),
+                        #df_p.columns.get_loc("sweeps"),
+                        #df_p.columns.get_loc("paired_recording"),
+                        df_p.columns.get_loc("intervention"),
+        ]
         num_columns = df_p.shape[1]
         for col in range(num_columns):
             if col in list_show:
@@ -1399,8 +1444,8 @@ class UIsub(Ui_MainWindow):
         rec_paired = None
         key_pair = rec_select[:-2] # remove stim id ("_a" or "_b") from selected recording_name
         # 1: check for cached diff
-        #if key_pair in self.dict_diffs:
-        #    return self.dict_diffs[key_pair]
+        if key_pair in self.dict_diffs:
+            return self.dict_diffs[key_pair]
         # 2: check for file
         if Path(f"{self.dict_folders['cache']}/{key_pair}_diff.csv").exists():
             dfdiff = pd.read_csv(f"{self.dict_folders['cache']}/{key_pair}_diff.csv")
@@ -1408,27 +1453,57 @@ class UIsub(Ui_MainWindow):
             return dfdiff
         # 3: build a new diff
         df_p = self.get_df_project()
-        # set rec_paired to the first recording_name that starts with rec_paired, but isn't rec_select
-        for i, row in df_p.iterrows():
-            if row['recording_name'].startswith(key_pair) and row['recording_name'] != rec_select:
-                rec_paired = row['recording_name']
-                break
-        if rec_paired is None:
-            print("No paired recording found.")
+        # 3.1: does the row have a saved paired recording that exists in df_p?
+        if pd.notna(row['paired_recording']):
+            if row['paired_recording'] in df_p['recording_name'].values:
+                rec_paired = row['paired_recording']
+        # 3.2: if not, find a recording with a matching name
+        if rec_paired is None: # set rec_paired to the first recording_name that starts with rec_paired, but isn't rec_select
+            for i, row_check in df_p.iterrows():
+                if row_check['recording_name'].startswith(key_pair) and row_check['recording_name'] != rec_select:
+                    rec_paired = row_check['recording_name']
+                    break
+        if rec_paired is None: # if still None, return
+            print("Paired recording not found.")
             return
-        dfout1 = self.get_dfoutput(row=df_p[df_p['recording_name'] == rec_select].iloc[0])
-        dfout2 = self.get_dfoutput(row=df_p[df_p['recording_name'] == rec_paired].iloc[0])
-        dfdiff = pd.DataFrame()
-        dfdiff['sweep'] = dfout1.sweep
-        # TODO: first, check if row['intervention'] is True, False or None
-            # if None: if amp exists, find the dfout with the highest average 'EPSP_amp' value. If no amp, use slope.
-        # TODO: set paired_recording and intervention in df_p
-        if dfout1['EPSP_amp'].mean() > dfout2['EPSP_amp'].mean():
-            dfdiff['EPSP_amp'] = dfout1.EPSP_amp / dfout2.EPSP_amp
-            dfdiff['EPSP_slope'] = dfout1.EPSP_slope / dfout2.EPSP_slope
+        # 3.3: get the dfoutputs for both recordings
+        row_paired = df_p[df_p['recording_name'] == rec_paired].iloc[0]
+        df_p.loc[row.name, 'paired_recording'] = rec_paired
+        df_p.loc[row_paired.name, 'paired_recording'] = rec_select
+        self.set_df_project(df_p)
+        dfout_select = self.get_dfoutput(row=row)
+        dfout_paired = self.get_dfoutput(row=row_paired)
+
+        # 3.4: check which of the paired recordings is intervention (the other being control)
+        if pd.isna(row['intervention']):
+            print("intervention is NaN - loop should trigger!")
+            row['intervention'] = False
+            # default: assume intervention has the highest max EPSP_amp, or EPSP_slope if there is no EPSP_amp
+            if any((dfout_select[col].max() > dfout_paired[col].max() for col in ['EPSP_amp', 'EPSP_slope'] if col in dfout_select.columns)):
+                row['intervention'] = True
+                row_paired['intervention'] = False
+                df_p.loc[row.name, 'intervention'] = row['intervention']
+                df_p.loc[row_paired.name, 'intervention'] = row_paired['intervention']
+                print(f"{rec_select} is intervention, {rec_paired} is control. Saving df_p...")
+                self.set_df_project(df_p)
+            elif not any(col in dfout_select.columns for col in ['EPSP_amp', 'EPSP_slope']):
+                print("Selected recording has no measurements.")
+                return
         else:
-            dfdiff['EPSP_amp'] = dfout2.EPSP_amp / dfout1.EPSP_amp
-            dfdiff['EPSP_slope'] = dfout2.EPSP_slope / dfout1.EPSP_slope
+            print("intervention is not NaN")
+        # 3.5: set dfi and dfc    
+        if row['intervention']:
+            dfi = dfout_select # intervention output
+            dfc = dfout_paired # control output
+        else:
+            dfi = dfout_paired
+            dfc = dfout_select
+        # 3.6: build dfdiff
+        dfdiff = pd.DataFrame({'sweep': dfi.sweep})
+        if 'EPSP_amp' in dfi.columns:
+            dfdiff['EPSP_amp'] = dfi.EPSP_amp / dfc.EPSP_amp
+        if 'EPSP_slope' in dfi.columns:
+            dfdiff['EPSP_slope'] = dfi.EPSP_slope / dfc.EPSP_slope
         self.df2csv(df=dfdiff, rec=key_pair, key="diff")
         self.dict_diffs[key_pair] = dfdiff
         return dfdiff
@@ -1484,7 +1559,7 @@ class UIsub(Ui_MainWindow):
 
     def setGraph(self, df_select=None): # plot selected row(s), or clear graph if empty
         if df_select is None:
-            df_select = self.df_project.loc[self.listSelectedRows()]
+            df_select = self.df_project.loc[self.listSelectedIndices()]
         amp = bool(self.dict_cfg['aspect_EPSP_amp'])
         slope = bool(self.dict_cfg['aspect_EPSP_slope'])
         self.clearGraph()
