@@ -210,6 +210,7 @@ def find_i_EPSP_slope_ascend(dfmean, i_VEB, i_EPSP, happy=False):
 
 
 # %%
+# execute find_all_t() cell first!
 if __name__ == "__main__":
     from pathlib import Path
     import matplotlib.pyplot as plt
@@ -217,12 +218,12 @@ if __name__ == "__main__":
     #dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file
     path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch0_b_mean.csv")
     dfmean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
-    dict_t = find_all_t(df_mean) # use the average all sweeps to determine where all events are located (noise reduction)
+    dict_t = find_all_t(dfmean) # use the average all sweeps to determine where all events are located (noise reduction)
     t_EPSP_slope = dict_t['t_EPSP_slope']
     plt.plot(dfmean['time'], dfmean['prim']*10, color='red')
     plt.plot(dfmean['time'], dfmean['bis']*25, color='green')
     dfmean['bis_roll'] = dfmean['bis'].rolling(9, center=True, win_type='blackman').mean()
-    plt.plot(df_mean['time'], dfmean['bis_roll']*25, color='blue')
+    plt.plot(dfmean['time'], dfmean['bis_roll']*25, color='blue')
     plt.axhline(y=0, linestyle='dashed', color='gray')
     plt.axvline(x=t_EPSP_slope, linestyle='dashed', color='gray')
     plt.axvline(x=t_EPSP_slope-0.0004, linestyle='dashed', color='gray')
