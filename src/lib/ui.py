@@ -1083,12 +1083,14 @@ class UIsub(Ui_MainWindow):
                     return
                 print(f"Flipping C-I for {name_rec} and {name_pair}...")
                 df_p.at[index, 'intervention'] = not df_p.at[index, 'intervention']
-                df_p.at[index_pair, 'intervention'] = not df_p.at[index_pair, 'intervention']
+                df_p.at[index_pair, 'intervention'] = not df_p.at[index, 'intervention']
                 # clear caches and diff files
                 key_pair = name_rec[:-2]
                 self.dict_diffs.pop(key_pair, None)
-                if Path(f"{self.dict_folders['cache']}/{key_pair}_diff.csv").exists():
-                    Path(f"{self.dict_folders['cache']}/{key_pair}_diff.csv").unlink()
+                path_diff = Path(f"{self.dict_folders['cache']}/{key_pair}_diff.csv")
+                if path_diff.exists():
+                    path_diff.unlink()
+                # TODO: clear group cache
                 already_flipped.append(index_pair)
                 self.set_df_project(df_p)
                 self.setGraph()
