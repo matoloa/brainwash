@@ -185,7 +185,7 @@ def find_i_VEB_prim_peak_max(
 
 
 # %%
-def find_i_EPSP_slope(dfmean, i_VEB, i_EPSP, happy=False):
+def find_i_EPSP_slope_bis0(dfmean, i_VEB, i_EPSP, happy=False):
     """ """
 
     dftemp = dfmean.bis[i_VEB:i_EPSP]
@@ -200,6 +200,46 @@ def find_i_EPSP_slope(dfmean, i_VEB, i_EPSP, happy=False):
         else:
             print("More EPSPs than we wanted but I'm happy, so I pick the first one and move on.")
     return i_EPSP_slope[0]
+
+# %%
+def find_i_EPSP_slope_ascend(dfmean, i_VEB, i_EPSP, happy=False):
+    print("ascend")
+    i_EPSP_slope = find_i_EPSP_slope_bis0(dfmean, i_VEB, i_EPSP, happy=True)
+    return i_EPSP_slope
+
+
+
+# %%
+if __name__ == "__main__":
+    from pathlib import Path
+    import matplotlib.pyplot as plt
+    #path_filterfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_filter.csv")
+    #dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file
+    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch0_b_mean.csv")
+    dfmean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
+    dict_t = find_all_t(df_mean) # use the average all sweeps to determine where all events are located (noise reduction)
+    t_EPSP_slope = dict_t['t_EPSP_slope']
+    plt.plot(dfmean['time'], dfmean['prim']*10, color='red')
+    plt.plot(dfmean['time'], dfmean['bis']*25, color='green')
+    dfmean['bis_roll'] = dfmean['bis'].rolling(9, center=True, win_type='blackman').mean()
+    plt.plot(df_mean['time'], dfmean['bis_roll']*25, color='blue')
+    plt.axhline(y=0, linestyle='dashed', color='gray')
+    plt.axvline(x=t_EPSP_slope, linestyle='dashed', color='gray')
+    plt.axvline(x=t_EPSP_slope-0.0004, linestyle='dashed', color='gray')
+    plt.axvline(x=t_EPSP_slope+0.0004, linestyle='dashed', color='gray')
+    plt.plot(dfmean['time'], dfmean['voltage'], color='black')
+    mean_ylim = (-0.0006, 0.0005)
+    mean_xlim = (0.006, 0.020)
+    plt.xlim(mean_xlim)
+    plt.ylim(mean_ylim)
+    print(dict_t)
+    '''
+    t_EPSP_amp = dict_t['t_EPSP_amp']
+    t_EPSP_slope = dict_t['t_EPSP_slope']
+    dfoutput = build_dfoutput(df=dffilter,
+                              t_EPSP_amp=t_EPSP_amp,
+                              t_EPSP_slope=t_EPSP_slope)
+    '''
 
 
 # %%
@@ -246,7 +286,7 @@ def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
     dict_i['i_VEB'] = find_i_VEB_prim_peak_max(dfmean=dfmean, i_stim=dict_i['i_stim'], i_EPSP=dict_i['i_EPSP_amp'])
     if dict_i['i_VEB'] is np.nan:
         return dict_i
-    dict_i['i_EPSP_slope'] = find_i_EPSP_slope(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
+    dict_i['i_EPSP_slope'] = find_i_EPSP_slope_ascend(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
     """
     i_volleyslope = find_i_volleyslope(
         dfmean, (i_stim + param_min_time_from_i_stim), i_VEB, happy=True)
@@ -356,115 +396,4 @@ if __name__ == "__main__":
     print(dfoutput)
 
 
-
-# The following section is for rapid prototyping in jupyter lab
-
-'''
-
 # %%
-if __name__ == "__main__":
-    print("Running as main")
-    import parse
-    from pathlib import Path
-    path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/A_21_P0701-S2.csv")
-    #path_datafile = Path("/home/matolo/Documents/Brainwash Projects/My Project/A_21_P0701-S2_2022_07_01_0000.abf.csv")
-    dfdata = pd.read_csv(str(path_datafile))
-    t_EPSP_amp = 0.0128
-    buildResultFile(df=dfdata, t_EPSP_amp=t_EPSP_amp)
-    print(dfdata)
-
-# %%
-if __name__ == "__main__":
-    test = dfdata[dfdata.time == t_EPSP_amp]
-    dfpivot = dfdata[['sweep', 'voltage', 'time']].pivot_table(values='voltage', columns = 'time', index = 'sweep')
-    ser_startmedian = dfpivot.iloc[:,:20].median(axis=1)
-    df_calibrated = dfpivot.subtract(ser_startmedian, axis = 'rows')
-    df_calibrated = df_calibrated.stack().reset_index()
-    df_calibrated.rename(columns = {0: 'volt_cal'}, inplace=True)
-    df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
-    df['volt_cal'] = df_calibrated.volt_cal
-
-# %%
-import matplotlib.pyplot as plt
-if __name__ == "__main__":
-    width = 0.005
-    dfplot = df.copy()
-    dfplot = dfplot[(0.0128-width < dfplot.time) & (dfplot.time < 0.0128+width)]
-    dfplot['odd'] = dfplot.sweep %2 == 0
-    print(dfplot.odd.sum()/dfplot.shape[0])
-    plt.scatter(dfplot[~dfplot.odd]['time'], dfplot[~dfplot.odd]['volt_cal'])
-    plt.scatter(dfplot[dfplot.odd]['time'], dfplot[dfplot.odd]['volt_cal'])
-    #plt.hist(dfplot[~dfplot.odd]['volt_cal'], bins=100)
-    #plt.hist(dfplot[dfplot.odd]['volt_cal'], bins=100)
-
-# %%
-if __name__ == "__main__":
-    df_sample = df[df.sweep.isin([0,1,120,121,240,241,300,301,700,701])]
-    df_sample.plot(x = 'time', y='volt_cal', ylim = (-0.001, 0.0001))
-
-# %%
-if __name__ == "__main__":
-    df['datetime'] = pd.to_datetime(df.datetime)
-    print(df.datetime.dtype)
-    df.sort_values('datetime').datetime.is_monotonic_increasing
-    print(df.datetime.is_monotonic_increasing)
-
-# %%
-if __name__ == "__main__":
-    import seaborn as sns
-    #dfplot = df.copy()
-    #dfplot = dfplot[(0.01 < dfplot.time) & (dfplot.time < 0.02)]
-    #dfplot['odd'] = dfplot.sweep %2 == 0
-    sns.histplot(data=dfplot, x='volt_cal', hue='odd')
-
-# %%
-if __name__ == "__main__":
-    dfplot[~dfplot.odd].volt_cal.std() / dfplot[dfplot.odd].volt_cal.std()
-    #dfplot[~dfplot.odd].volt_cal.quantile(0.0001) / dfplot[dfplot.odd].volt_cal.quantile(0.0001)
-
-# %%
-if __name__ == "__main__":
-    grouping = df[['sweep', 'voltage']].groupby(['sweep']).mean().plot()#x = 'sweep', y='voltage')#, ylim = (-0.001, 0.001))
-    #print(grouping)
-
-# %%
-if __name__ == "__main__":
-    result = dfplot[(dfplot.time == t_EPSP_amp)][['volt_cal','sweep', 'odd']]
-    print(result)
-    #result.plot(x = 'sweep')
-    #result['c_odd'] = '1' if result.odd else '0'
-    sns.lineplot(data = result, x = 'sweep', y = 'volt_cal', hue = 'odd')
-
-# %%
-if __name__ == "__main__":
-    result = df[df.time == 0.001][['sweep', 'volt_cal']]
-    g = result.plot(x = 'sweep')
-    g.hlines(y=[-0.0001, 0.0001], xmin=0, xmax=1000)
-
-# %%
-if __name__ == "__main__":
-    path_meanfile = Path("/home/matolo/Documents/Brainwash Projects/standalone_test/A_21_P0701-S2_mean.csv")
-    df_mean = pd.read_csv(str(path_meanfile))
-    print(df_mean.shape)
-    print(df_mean)
-    sns.lineplot(data = df_mean, x = 'time', y = 'voltage')
-    plt.ylim(-0.0003,0.0001)
-    plt.xlim(0.005,0.04)
-    #sns.set_ylim(ui.graph_ylim)
-
-    #df_mean.plot(x = 'time', y = 'voltage', ymin = -0.001, ymax = 0.0001)
-
-# %%
-if __name__ == "__main__":
-    width = 0.0005
-    result = df[(df.time - width < t_EPSP_amp) & (t_EPSP_amp < df.time + width)][['sweep', 'voltage']]
-    print(result)
-    result.pivot_table(index='sweep', aggfunc='median').plot()
-    #result.pivot_table(index='sweep', aggfunc='median').rolling(50).median().plot()
-
-# %%
-if __name__ == "__main__":
-    df_calibrated.sort_values(by=['sweep', 'time'], inplace=True)
-    print(df_calibrated)
-
-'''
