@@ -1061,7 +1061,8 @@ class UIsub(Ui_MainWindow):
                 print(f"update_frame: {update_frame}")
                 rows2add = pd.concat(rows, axis=1).transpose()
                 print("rows2add:", rows2add[["recording_name", "sweeps" ]])
-                self.set_df_project(pd.concat([update_frame, rows2add])).reset_index(drop=True)
+                df_p = pd.concat([update_frame, rows2add]).reset_index(drop=True)
+                self.set_df_project(df_p)
 
     def flipCI(self):
         selected_indices = self.listSelectedIndices()
@@ -1318,7 +1319,7 @@ class UIsub(Ui_MainWindow):
         # hide all columns except these:
         list_show = [   df_p.columns.get_loc("recording_name"),
                         #df_p.columns.get_loc("groups"),
-                        #df_p.columns.get_loc("sweeps"),
+                        df_p.columns.get_loc("sweeps"),
                         #df_p.columns.get_loc("paired_recording"),
                         df_p.columns.get_loc("intervention"),
         ]
