@@ -722,9 +722,10 @@ class UIsub(Ui_MainWindow):
         self.graphOutput.setLayout(QtWidgets.QVBoxLayout())
         self.main_canvas_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for Mean
         self.graphOutput.layout().addWidget(self.main_canvas_output)
-        self.main_canvas_mean.show()
+        self.main_canvas_mean.mpl_connect('button_press_event', self.mainClicked)
+        self.main_canvas_output.mpl_connect('button_press_event', self.mainClicked)
         self.main_canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.main_canvas_mean))
-        self.main_canvas_mean.mpl_connect('button_press_event', self.meanClicked)
+        self.main_canvas_mean.show()
         self.main_canvas_output.show()
 
         # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
@@ -1600,6 +1601,12 @@ class UIsub(Ui_MainWindow):
         ax1.set_ylim(self.dict_cfg['output_ax1_ylim'])
         
         sortLegend(self.ax1, self.ax2)
+
+        # connect scroll event if not already connected        
+        if not hasattr(self, 'scroll_event_connected') or not self.scroll_event_connected:
+            self.main_canvas_output.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.main_canvas_output, ax1=self.ax1, ax2=self.ax2))
+            self.scroll_event_connected = True
+
         self.main_canvas_mean.draw()
         self.main_canvas_output.draw()
 
@@ -1673,7 +1680,7 @@ class UIsub(Ui_MainWindow):
                 ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=list_color[i_color])
                 ax2.axhline(y=0, linestyle=':', color='gray', alpha = 0.2)
 
-    def meanClicked(self, event): # maingraph click event
+    def mainClicked(self, event): # maingraph click event
         if event.inaxes is not None:
             if event.button == 2:
                 zoomReset(canvas=self.main_canvas_mean, ui=self)
@@ -1878,14 +1885,12 @@ class Measure_window_sub(Ui_measure_window):
         self.measure_graph_mean.setLayout(QtWidgets.QVBoxLayout())
         self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)
         self.measure_graph_mean.layout().addWidget(self.canvas_mean)
-        self.canvas_mean.show()
-        self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
-        self.canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_mean))
 
         self.measure_graph_output.setLayout(QtWidgets.QVBoxLayout())
         self.canvas_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas for Mean
         self.measure_graph_output.layout().addWidget(self.canvas_output)
-        self.canvas_output.show()
+
+        # connect output sample generation
         self.canvas_output.mpl_connect('button_press_event', self.outputClicked)
         self.canvas_output.mpl_connect('motion_notify_event', self.outputDragged)
         self.canvas_output.mpl_connect('button_release_event', self.outputReleased)
@@ -1899,6 +1904,10 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_mean.axes.set_ylabel("Voltage (V)")
         self.ax1.set_ylabel("Amplitude (mV)")
         self.ax2.set_ylabel("Slope (mV/ms)")
+        # connect zoom and reset
+        self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
+        self.canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_mean))
+        self.canvas_output.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, canvas=self.canvas_output, ax1=self.ax1, ax2=self.ax2))
 
         # Populate canvases - TODO: refactor such that components can be called individually when added later
         _ = sns.lineplot(ax=self.canvas_mean.axes, label='voltage', data=self.dfmean, y='voltage', x='time', color='black')
@@ -1919,6 +1928,9 @@ class Measure_window_sub(Ui_measure_window):
         self.canvas_mean.axes.set_ylim(parent.dict_cfg['mean_ylim'])
         self.ax1.set_ylim(parent.dict_cfg['output_ax1_ylim'])
         self.ax2.set_ylim(parent.dict_cfg['output_ax2_ylim'])
+
+        self.canvas_mean.show()
+        self.canvas_output.show()
 
         # lines and drag state
         self.si_v = None # vertical line in canvas_output, indicating selected sweep
@@ -2225,6 +2237,8 @@ class Measure_window_sub(Ui_measure_window):
             self.canvas_mean.draw()
             unPlot(self.canvas_output, self.si_v_drag_from, self.si_v_drag_to, self.dragplot)
             self.canvas_output.draw()
+        elif event.button == 2:
+            zoomReset(canvas=self.canvas_output, ui=self.parent)
     
 
     def outputDragged(self, event): # measurewindow output drag event
@@ -2352,23 +2366,54 @@ def get_signals(source):
                 print(f"{key} [{clsname}]")
 
 
-def zoomOnScroll(event, canvas):
-    xdata, ydata = event.xdata, event.ydata
-    scroll_factor = 0.9 # TODO: make this a setting
-    def xzoom(xdata, factor):
-        xlim = [xdata - (xdata - canvas.axes.get_xlim()[0]) * factor,
-                xdata + (canvas.axes.get_xlim()[1] - xdata) * factor]
-        return xlim
-    def yzoom(ydata, factor):
-        ylim = [ydata - (ydata - canvas.axes.get_ylim()[0]) * factor,
-                ydata + (canvas.axes.get_ylim()[1] - ydata) * factor]
-        return ylim
-    if xdata is not None and ydata is not None:
-        xlim = xzoom(xdata, scroll_factor if event.step > 0 else 1 / scroll_factor)
-        ylim = yzoom(ydata, scroll_factor if event.step > 0 else 1 / scroll_factor)
-        canvas.axes.set_xlim(xlim[0], xlim[1])
-        canvas.axes.set_ylim(ylim[0], ylim[1])
-        canvas.draw()
+def zoomOnScroll(event, canvas, ax1=None, ax2=None):
+    print("zoomOnScroll: ax1={ax1}, ax2={ax2}")
+    # Define invisible rectangles for x and y axis labels and ticks
+    x_rect = matplotlib.patches.Rectangle((0, 0), 1, 0.2, transform=canvas.axes.transAxes, visible=False)
+    in_x = x_rect.contains(event)[0]
+    ax1_rect = matplotlib.patches.Rectangle((0, 0), 0.1, 1, transform=canvas.axes.transAxes, visible=False)
+    in_ax1 = ax1_rect.contains(event)[0]
+    ax2_rect = matplotlib.patches.Rectangle((0.9, 0), 0.1, 1, transform=canvas.axes.transAxes, visible=False)
+    in_ax2 = ax2_rect.contains(event)[0]
+
+    if event.button == 'up':
+        scale_factor = 1/1.02
+    elif event.button == 'down':
+        scale_factor = 1.02
+    else:
+        scale_factor = 1
+
+    if in_x:
+        # Zoom x-axis
+        cur_xlim = canvas.axes.get_xlim()
+        xdata = event.xdata
+        canvas.axes.set_xlim([xdata - (xdata - cur_xlim[0]) * scale_factor,
+                              xdata + (cur_xlim[1] - xdata) * scale_factor])
+
+    elif in_ax1:
+        # Zoom ax1 y-axis
+        print("in_ax1")
+        ydata = event.ydata
+        if ax1 is not None:
+            print("in_ax1 - dual axis")
+            cur_ylim = ax1.get_ylim()
+            ax1.set_ylim([ydata - (ydata - cur_ylim[0]) * scale_factor,
+                        ydata + (cur_ylim[1] - ydata) * scale_factor])
+        else: # mean or single axis
+            print("in_ax1 - mean or single axis")
+            cur_ylim = canvas.axes.get_ylim()
+            canvas.axes.set_ylim([ydata - (ydata - cur_ylim[0]) * scale_factor,
+                        ydata + (cur_ylim[1] - ydata) * scale_factor])
+    elif in_ax2:
+        # Zoom ax2 y-axis
+        print("in_ax2")
+        cur_ylim = ax2.get_ylim()
+        ydata = event.ydata
+        ax2.set_ylim([ydata - (ydata - cur_ylim[0]) * scale_factor,
+                      ydata + (cur_ylim[1] - ydata) * scale_factor])
+
+    canvas.draw()
+
 
 
 def zoomReset(canvas, ui):

@@ -208,7 +208,7 @@ def find_i_EPSP_slope_ascend(dfmean, i_VEB, i_EPSP, happy=False):
     return i_EPSP_slope
 
 
-
+'''
 # %%
 # execute find_all_t() cell first!
 if __name__ == "__main__":
@@ -234,14 +234,8 @@ if __name__ == "__main__":
     plt.xlim(mean_xlim)
     plt.ylim(mean_ylim)
     print(dict_t)
-    '''
-    t_EPSP_amp = dict_t['t_EPSP_amp']
-    t_EPSP_slope = dict_t['t_EPSP_slope']
-    dfoutput = build_dfoutput(df=dffilter,
-                              t_EPSP_amp=t_EPSP_amp,
-                              t_EPSP_slope=t_EPSP_slope)
-    '''
 
+'''
 
 # %%
 def find_i_volleyslope(dfmean, i_stim, i_VEB, happy=False):  # , param_half_slope_width = 4):
