@@ -47,50 +47,73 @@ fig, ax = plt.subplots(figsize=(20, 10), layout="constrained")
 #mean_xlim = (0.006, 0.020)
 #plt.xlim(mean_xlim)
 #plt.ylim(mean_ylim)
+from scipy.stats import expon
 
 import longscurvefitting
 dffit = dfmean[['time', 'voltage']][(0.008 < dfmean.time) & (dfmean.time < 0.040)]
+dffit = dfmean[['time', 'voltage']][(0.004 < dfmean.time) & (dfmean.time < 0.080)]
 ax.plot(dffit.time.values, dffit.voltage.values)
+#ax.plot(dffit.time.values, 0.00073 * expon.cdf((dffit.time.values-.0138)*130) - 0.00077, c='red')
 print(f"dffit shape: {dffit.shape}")
+ax.set_ylim(-0.001, 0.001)
+ax.grid()
 
+
+# %% [markdown]
+# # dynamic function builder with correct args signature
+# import inspect 
+# from types import FunctionType
+# from functools import partial
+#
+# def get_combined_model(models_in_model):  # use as: models_in_model = [_pearson3, _gaussian]
+#     models_str = "+".join([i.__name__ + str(inspect.signature(i)) for i in models_in_model])
+#     models_params = [inspect.signature(i) for i in models_in_model]
+#     print(models_params)
+#     args = []
+#     _ = [args.append(i) for j in models_params for i in j.parameters.keys() if i not in args]  # remove duplicates
+#     model_code = compile(f"def foo({', '.join(args)}): return {models_str}", "<string>", "exec")
+#     model = FunctionType(model_code.co_consts[0], globals(), "foo")
+#     params = inspect.signature(model).parameters 
+#     print(params)
+#     return model
+#
+# gauss_veb = lambda x, amp, wid: _gaussian(x, amp, wid, cen=t_VEB)
+# gauss_veb.__name__ = 'gauss_veb'
+# models = [gauss_veb]
+# model = get_combined_model(models)
 
 # %%
-# dynamic function builder with correct args signature
-import inspect 
-from types import FunctionType
 
-def get_combined_model(models_in_model):  # use as: models_in_model = [_pearson3, _gaussian]
-    models_str = "+".join([i.__name__ + str(inspect.signature(i)) for i in models_in_model])
-    models_params = [inspect.signature(i) for i in models_in_model]
-    print(models_params)
-    args = []
-    _ = [args.append(i) for j in models_params for i in j.parameters.keys() if i not in args]  # remove duplicates
-    model_code = compile(f"def foo({', '.join(args)}): return {models_str}", "<string>", "exec")
-    model = FunctionType(model_code.co_consts[0], globals(), "foo")
-    params = inspect.signature(model).parameters 
-    print(params)
-    return model
+# %%
+def hello(a, b):
+    return a + b
 
+hella = partial(hello, b=2)
+hella(2)
 
 # %%
 # possible approx functions
 # "gaussian(x, p0_0, p0_1, p0_2) + pearson3(x, p1_0, p1_1, p1_2, p1_3)"
 # "logistic(x, p0_0, p0_1, p0_2) + logistic(x, p1_0, p1_1, p1_2)"
 from numpy import exp, loadtxt, pi, sqrt
-from scipy.stats import pearson3, lognorm
+from scipy.stats import pearson3, lognorm, expon
+from scipy.special import expit, logit
 from lmfit import Model
 dffit = dfmean[['time', 'voltage']][((t_VEB - 0.002) < dfmean.time) & (dfmean.time < 0.050)]
-dffit = dfmean[['time', 'voltage']][((t_VEB - 0.0005) < dfmean.time) & (dfmean.time < (0.04))]
+dffit = dfmean[['time', 'voltage']][(0.001 < dfmean.time) & (dfmean.time < (0.08))]
+dffit.loc[dffit.voltage < dffit.voltage.quantile(.005), 'voltage'] = 0
+dffit.loc[dffit.voltage.quantile(.995) < dffit.voltage , 'voltage'] = 0
+
 
 ax.plot(dffit.time.values, dffit.voltage.values)
 print(f"dffit shape: {dffit.shape}")
 x, y = dffit.time.values, dffit.voltage.values
 fig, ax = plt.subplots(figsize=(20, 10), layout="constrained")
 
-def _gaussian(x, amp, wid):
+def _gaussian(x, amp, wid, cen):
     # center = t_VEB
     """1-d gaussian: gaussian(x, amp, cen, wid)"""
-    return (amp / (sqrt(2*pi) * wid)) * exp(-(x-t_VEB+0.0002)**2 / (2*wid**2))
+    return (amp / (sqrt(2*pi) * wid)) * exp(-(x-cen+0.0002)**2 / (2*wid**2))
 
 
 def _pearson3(x, a, b, c, d):
@@ -112,11 +135,25 @@ def _lognorm(x, e, f, g, s):
 def fwrap(x, const, a, b, c, d, amp, wid, e, f, g, s):
     return const + 0.0 * _pearson3(x, a, b, c, d) + _gaussian(x, amp, wid) + _lognorm(x, e, f, g, s) 
 
+gauss_veb = lambda x, ampveb, widveb: _gaussian(x, ampveb, widveb, cen=t_VEB)
+gauss_veb.__name__ = 'gauss_veb'
+gauss_vol = lambda x, ampvol, widvol: _gaussian(x, ampvol, widvol, cen=0.0085)
+gauss_vol.__name__ = 'gauss_vol'
+sigmoid = lambda x, ampsig, widsig: ampsig * expit((x-0.009) / widsig)
+sigmoid.__name__ = 'sigmoid'
+fconst = lambda const: const
+fconst.__name__ = 'fconst'
+expon_epspamp = lambda x, ampe, tscale, t0: ampe * expon.pdf((x-t0) * tscale)
+expon_epspamp.__name__ = 'expon_epspamp'
+
+
+models = [gauss_veb, gauss_vol, fconst, sigmoid, expon_epspamp]
+model = get_combined_model(models)
 
 gmodel = Model(fwrap)
 gmodel = Model(model)
 #   result = gmodel.fit(y, x=x, const=-0.005, a=0.001, b=1, c=0.001, d=1, amp=0.0008, wid=0.01, e=-0.01, f=0.013, g=0.14, s=0.24)
-result = gmodel.fit(y, x=x, a=0.001, b=1, c=0.001, d=1, amp=0.0008, wid=0.01)
+result = gmodel.fit(y, x=x, ampveb=0.0008, widveb=0.01, ampvol=0.0008, widvol=0.001, ampsig=0.0008, widsig=0.001, const=-0.005, ampe=0.00073, tscale=130, t0=0.0138)  # a=0.001, b=1, c=0.001, d=1, 
 
 
 print(result.fit_report())
@@ -126,5 +163,8 @@ plt.plot(x, y, 'o')
 plt.plot(x, result.best_fit, '-', label='best fit')
 plt.legend()
 plt.show()
+
+# %%
+dict_t
 
 # %%
