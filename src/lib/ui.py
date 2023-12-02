@@ -913,6 +913,7 @@ class UIsub(Ui_MainWindow):
         self.dict_cfg['paired_stims'] = bool(state)
         print(f"checkBox_paired_stims_changed: {self.dict_cfg['paired_stims']}")
         self.pushButton_paired_data_flip.setEnabled(self.dict_cfg['paired_stims'])
+        self.purgeGroupCache(*self.dict_cfg['list_groups'])
         self.write_project_cfg()
         self.setGraph()
 
@@ -1320,9 +1321,8 @@ class UIsub(Ui_MainWindow):
         df_p = self.df_project
         # hide all columns except these:
         list_show = [   df_p.columns.get_loc("recording_name"),
-                        #df_p.columns.get_loc("groups"),
+                        df_p.columns.get_loc("groups"),
                         df_p.columns.get_loc("sweeps"),
-                        #df_p.columns.get_loc("paired_recording"),
                         df_p.columns.get_loc("intervention"),
         ]
         num_columns = df_p.shape[1]
@@ -1427,9 +1427,19 @@ class UIsub(Ui_MainWindow):
                 print("Building new", str(group_path))
             df_p = self.df_project
             dfgroup = df_p[df_p['groups'].str.split(',').apply(lambda x: key_group in x)]
+            print(f"dfgroup: {dfgroup}")
             dfs = []
+            list_pairs = [] # prevent diff duplicates
             for i, row in dfgroup.iterrows():
-                df = self.get_dfoutput(row=row)
+                if self.dict_cfg['paired_stims']:
+                    name_rec = row['recording_name']
+                    if name_rec in list_pairs:
+                        continue
+                    name_pair = row['paired_recording']
+                    df = self.get_dfdiff(row=row)
+                    list_pairs.append(name_pair)                    
+                else:
+                    df = self.get_dfoutput(row=row)
                 dfs.append(df)
             dfs = pd.concat(dfs)
             group_mean = dfs.groupby('sweep').agg({'EPSP_amp': ['mean', 'sem'], 'EPSP_slope': ['mean', 'sem']}).reset_index()
