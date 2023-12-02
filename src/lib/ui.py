@@ -640,11 +640,11 @@ class UIsub(Ui_MainWindow):
         if self.cfg_yaml.exists():
             with self.cfg_yaml.open("r") as file:
                 cfg = yaml.safe_load(file)
-                projectfolder = Path(cfg["projects_folder"]) / cfg["projectname"]
+                projectfolder = Path(cfg['projects_folder']) / cfg['projectname']
                 if projectfolder.exists():  # if the folder stored in cfg.yaml exists, use it
-                    self.user_documents = Path(cfg["user_documents"])  # Where to look for raw data
-                    self.projects_folder = Path(cfg["projects_folder"])  # Where to save and read parsed data
-                    self.projectname = cfg["projectname"]
+                    self.user_documents = Path(cfg['user_documents'])  # Where to look for raw data
+                    self.projects_folder = Path(cfg['projects_folder'])  # Where to save and read parsed data
+                    self.projectname = cfg['projectname']
         
         # Make sure the necessary folders exist
         self.dict_folders = self.build_dict_folders()
@@ -954,8 +954,8 @@ class UIsub(Ui_MainWindow):
                 list_recording_names.add(check_recording_name)
         df_p = pd.concat([df_p, dfAdd])
         df_p.reset_index(drop=True, inplace=True)
-        df_p["groups"] = df_p["groups"].fillna(" ")
-        df_p["sweeps"] = df_p["sweeps"].fillna("...")
+        df_p['groups'] = df_p['groups'].fillna(" ")
+        df_p['sweeps'] = df_p['sweeps'].fillna("...")
         self.set_df_project(df_p)
         if verbose:
             print("addData:", self.get_df_project())
@@ -1046,7 +1046,7 @@ class UIsub(Ui_MainWindow):
         for i, df_proj_row in self.df_project.iterrows():
             recording_name = df_proj_row['recording_name']
             source_path = df_proj_row['path']
-            if df_proj_row["sweeps"] == "...":  # indicates not read before TODO: Replace with selector!
+            if df_proj_row['sweeps'] == "...":  # indicates not read before TODO: Replace with selector!
                 dict_data = parse.parseProjFiles(dict_folders = self.dict_folders, recording_name=recording_name, source_path=source_path)
                 for new_name, dict_sub in dict_data.items(): # Access 'nsweeps' from the current dictionary
                     nsweeps = dict_sub.get('nsweeps', None)
@@ -1060,7 +1060,7 @@ class UIsub(Ui_MainWindow):
                 update_frame = update_frame[update_frame.recording_name != recording_name]
                 print(f"update_frame: {update_frame}")
                 rows2add = pd.concat(rows, axis=1).transpose()
-                print("rows2add:", rows2add[["recording_name", "sweeps" ]])
+                print("rows2add:", rows2add[['recording_name', 'sweeps']])
                 df_p = pd.concat([update_frame, rows2add]).reset_index(drop=True)
                 self.set_df_project(df_p)
 
@@ -1181,7 +1181,7 @@ class UIsub(Ui_MainWindow):
         for group in groups:
             if group in self.dict_group_means:
                 del self.dict_group_means[group]
-            path_group_cache = Path(f'{self.dict_folders["cache"]}/{group}.csv')
+            path_group_cache = Path(f"{self.dict_folders['cache']}/{group}.csv")
             if path_group_cache.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
                 print(f"{path_group_cache} found when checking for existence...")
                 try:
@@ -1194,7 +1194,7 @@ class UIsub(Ui_MainWindow):
         list_affected_groups = ' '.join(self.df_project.iloc[rows]['groups'])
         affected_groups = set(re.findall(r'\b\w+\b', list_affected_groups))
         for i in rows:
-            self.df_project.loc[i, "groups"] = " "
+            self.df_project.loc[i, 'groups'] = " "
         for group in affected_groups:
             self.purgeGroupCache(group)
         self.save_df_project()
@@ -1340,7 +1340,7 @@ class UIsub(Ui_MainWindow):
             return self.dict_means[recording_name]
 
         persist = False
-        str_mean_path = f'{self.dict_folders["cache"]}/{recording_name}_mean.csv'
+        str_mean_path = f"{self.dict_folders['cache']}/{recording_name}_mean.csv"
         if Path(str_mean_path).exists(): #2: Read from file
             dfmean = pd.read_csv(str_mean_path)
         else: #3: Create file
@@ -1417,7 +1417,7 @@ class UIsub(Ui_MainWindow):
         # returns an internal df output average of <group>. If it does not exist, create it
         if key_group in self.dict_group_means: # 1: Return cached
             return self.dict_group_means[key_group]
-        group_path = Path(f'{self.dict_folders["cache"]}/{key_group}.csv')
+        group_path = Path(f"{self.dict_folders['cache']}/{key_group}.csv")
         if group_path.exists(): #2: Read from file
             if verbose:
                 print("Loading stored", str(group_path))
@@ -1515,9 +1515,9 @@ class UIsub(Ui_MainWindow):
     def df2csv(self, df, rec, key=None): # writes dict[rec] to rec_{dict}.csv
         self.dict_folders['cache'].mkdir(exist_ok=True)
         if key is None:
-            filepath = f'{self.dict_folders["cache"]}/{rec}.csv'
+            filepath = f"{self.dict_folders['cache']}/{rec}.csv"
         else:
-            filepath = f'{self.dict_folders["cache"]}/{rec}_{key}.csv'
+            filepath = f"{self.dict_folders['cache']}/{rec}_{key}.csv"
         print(f"saved cache filepath: {filepath}")
         df.to_csv(filepath, index=False)
 
@@ -1594,7 +1594,7 @@ class UIsub(Ui_MainWindow):
         self.main_canvas_output.draw()
 
     def setGraphSelected(self, df_select, ax1, ax2, amp, slope):
-        df_analyzed = df_select[df_select["sweeps"] != "..."]
+        df_analyzed = df_select[df_select['sweeps'] != "..."]
         if df_analyzed.empty:
             print("Nothing analyzed selected.")
             return
@@ -1650,6 +1650,7 @@ class UIsub(Ui_MainWindow):
                 if verbose:
                     print(f"Analyse all recordings in {group} to show group output.")
                 continue
+
             dfgroup_mean = self.get_dfgroupmean(key_group=group)
             # Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
             # print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
@@ -1688,8 +1689,8 @@ class UIsub(Ui_MainWindow):
 
         qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
         ser_table_row = self.tablemodel.dataRow(qt_index)
-        sweeps = ser_table_row["sweeps"]
-        recording_name = ser_table_row["recording_name"]
+        sweeps = ser_table_row['sweeps']
+        recording_name = ser_table_row['recording_name']
         if sweeps == "...":
             # TODO: Make it import the missing file
             print("Unknown number of sweeps - not imported?")
@@ -1761,7 +1762,7 @@ class TableProjSub(QtWidgets.QTableView):
             names = []
             for i in file_urls:
                 names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
-            dfAdd["recording_name"] = names
+            dfAdd['recording_name'] = names
             self.parent.addData(dfAdd)
             event.acceptProposedAction()
         else:
@@ -1815,10 +1816,10 @@ class Filetreesub(Ui_Dialog):
         if verbose:
             print("pathsSelectedUpdateTable")
         dfAdd = df_projectTemplate()
-        dfAdd["path"] = paths
-        dfAdd["host"] = "Computer 1"
-        dfAdd["checksum"] = "big number"
-        dfAdd["filter"] = "voltage"
+        dfAdd['path'] = paths
+        dfAdd['host'] = "Computer 1"
+        dfAdd['checksum'] = "big number"
+        dfAdd['filter'] = "voltage"
         # dfAdd['recording_name']=paths
         # dfAdd['groups']=' '
         self.tablemodel.setData(dfAdd)
@@ -1827,7 +1828,7 @@ class Filetreesub(Ui_Dialog):
         names = []
         for i in paths:
             names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
-        dfAdd["recording_name"] = names
+        dfAdd['recording_name'] = names
         self.dfAdd = dfAdd
         # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
         # TODO: names that have been set manually are stored a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)
@@ -1986,8 +1987,8 @@ class Measure_window_sub(Ui_measure_window):
         # build new output
         self.new_dfoutput = analysis.build_dfoutput(df=self.dffilter,
                                     filter=filter,
-                                    t_EPSP_amp=self.row["t_EPSP_amp"],
-                                    t_EPSP_slope=self.row["t_EPSP_slope"])
+                                    t_EPSP_amp=self.row['t_EPSP_amp'],
+                                    t_EPSP_slope=self.row['t_EPSP_slope'])
         if self.last_x is not None:
             self.updateSample()
         self.updatePlots()
@@ -2133,7 +2134,7 @@ class Measure_window_sub(Ui_measure_window):
                         del self.parent.dict_group_means[group]
                         self.parent.purgeGroupCache(group)
                         # Delete the group file if it exists
-                        group_path = Path(f'{self.parent.dict_folders["cache"]}/{group}.csv')
+                        group_path = Path(f"{self.parent.dict_folders['cache']}/{group}.csv")
                         if group_path.exists():
                             group_path.unlink()
             self.parent.setGraph(df_p.iloc[idx]) # draw the updated row
@@ -2150,8 +2151,8 @@ class Measure_window_sub(Ui_measure_window):
         dffilter = self.parent.get_dffilter(row=self.row)
         dict_t = analysis.find_all_t(dfmean=self.dfmean, verbose=False)
         self.new_dfoutput = analysis.build_dfoutput(df=dffilter,
-                                       t_EPSP_amp=dict_t["t_EPSP_amp"],
-                                       t_EPSP_slope=dict_t["t_EPSP_slope"])
+                                       t_EPSP_amp=dict_t['t_EPSP_amp'],
+                                       t_EPSP_slope=dict_t['t_EPSP_slope'])
         self.new_dfoutput.reset_index(inplace=True)
         for aspect in supported_aspects:
             time = dict_t[f"t_{aspect}"]
@@ -2248,7 +2249,7 @@ class Measure_window_sub(Ui_measure_window):
         if same: # click and release on same: get that specific sweep and superimpose it on canvas_mean
             unPlot(self.canvas_output, self.si_v_drag_to, self.dragplot)
             df = df[df['sweep'] == int(self.drag_start)]
-            self.si_sweep.set_data(df["time"], df[rec_filter])
+            self.si_sweep.set_data(df['time'], df[rec_filter])
         else: # get all sweeps between drag_start and x (event.xdata) and superimpose the mean of them on canvas_mean
             if int(self.drag_start) > int(x):
                 df = df[(df['sweep'] >= int(x)) & (df['sweep'] <= int(self.drag_start))]
@@ -2256,7 +2257,7 @@ class Measure_window_sub(Ui_measure_window):
                 df = df[(df['sweep'] >= int(self.drag_start)) & (df['sweep'] <= int(x))]
             df = df.groupby('time').agg({rec_filter: ['mean']}).reset_index()
             df.columns = ['time', rec_filter]
-            self.si_sweep.set_data(df["time"], df[rec_filter])
+            self.si_sweep.set_data(df['time'], df[rec_filter])
 
     
     def updateOnClick(self, time, aspect):

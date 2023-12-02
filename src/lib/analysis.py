@@ -66,7 +66,7 @@ def addFilterSavgol(df, window_length=9, poly_order=3):
 # %%
 def find_i_stim_prim_max(dfmean):
     # TODO: return an index of sufficiently separated over-threshold x:es instead
-    return dfmean["prim"].idxmax()
+    return dfmean['prim'].idxmax()
 
 
 # %%
@@ -100,7 +100,7 @@ def find_i_EPSP_peak_max(
 
     # scipy.signal.find_peaks returns a tuple
     i_peaks, properties = scipy.signal.find_peaks(
-        -dfmean["voltage"],
+        -dfmean['voltage'],
         width=EPSP_minimum_width_i,
         prominence=param_EPSP_minimum_prominence_mV / 1000,
     )
@@ -119,7 +119,7 @@ def find_i_EPSP_peak_max(
     if verbose:
         print(f" . . . dfpeaks:{dfpeaks}")
 
-    i_EPSP = i_peaks[properties["prominences"].argmax()]
+    i_EPSP = i_peaks[properties['prominences'].argmax()]
     return i_EPSP
 
 
@@ -155,7 +155,7 @@ def find_i_VEB_prim_peak_max(
         print(" . . . VEB is between", minimum_acceptable_i_for_VEB, "and", max_acceptable_i_for_VEB)
 
     # create a window to the acceptable range:
-    prim_sample = dfmean["prim"].values[minimum_acceptable_i_for_VEB:max_acceptable_i_for_VEB]
+    prim_sample = dfmean['prim'].values[minimum_acceptable_i_for_VEB:max_acceptable_i_for_VEB]
 
     # find the sufficiently wide and promintent peaks within this range
     i_peaks, properties = scipy.signal.find_peaks(
@@ -177,7 +177,7 @@ def find_i_VEB_prim_peak_max(
     if verbose:
         print(f" . . . properties:{properties}")
 
-    i_VEB = i_peaks[properties["prominences"].argmax()]
+    i_VEB = i_peaks[properties['prominences'].argmax()]
     if verbose:
         print(f" . . . i_VEB: {i_VEB}")
 

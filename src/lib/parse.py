@@ -66,16 +66,16 @@ def parse_abf(filepath):
         t0 = np.repeat(abf.sweepTimesSec, len(sweepX) // abf.sweepCount)
         sweepY = abf.getAllYs(j)
         df = pd.DataFrame({"sweepX": sweepX, "sweepY": sweepY, "t0": t0})
-        df["channel"] = j
+        df['channel'] = j
         dfs.append(df)
     df = pd.concat(dfs)
     # Convert to SI
-    df["time"] = df.sweepX  # time in seconds from start of sweep recording
-    df["voltage_raw"] = df.sweepY / 1000  # mv to V
+    df['time'] = df.sweepX  # time in seconds from start of sweep recording
+    df['voltage_raw'] = df.sweepY / 1000  # mv to V
     # Absolute date and time
-    df["timens"] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
-    df["datetime"] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
-    df.drop(columns=["sweepX", "sweepY", "timens"], inplace=True)
+    df['timens'] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
+    df['datetime'] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
+    df.drop(columns=['sweepX', 'sweepY', 'timens'], inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
 
@@ -130,7 +130,7 @@ def parse_ibwFolder(folder, dev=False): # igor2, para
     timestep = timesteps[0][0]
     df.columns = np.round(np.arange(7500) * timestep, int(-np.log(timestep))).tolist()
     df = df.stack().reset_index()
-    df.columns = ["t0", "time", "voltage_raw"]
+    df.columns = ['t0', 'time', 'voltage_raw']
     df.t0 = df.t0.astype("float64")
     df.time = df.time.astype("float64")
     df['datetime'] = pd.to_datetime((measurement_start + df.t0 + df.time), unit="s").round("us")
@@ -145,8 +145,8 @@ def build_dfmean(dfdata, rollingwidth=3):
     dfmean = pd.DataFrame(dfdata.pivot(columns='time', index='sweep', values='voltage_raw').mean())
     dfmean.columns = ['voltage']
     # generate diffs
-    dfmean["prim"] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
-    dfmean["bis"] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()
+    dfmean['prim'] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
+    dfmean['bis'] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()
     # find index of stimulus artifact (this requires and index)
     dfmean.reset_index(inplace=True)
     i_stim = dfmean.prim.idxmax()
