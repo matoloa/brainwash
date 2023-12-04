@@ -47,7 +47,7 @@ def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None):#, 
     # EPSP_slope
     if t_EPSP_slope is not None:
         if t_EPSP_slope is not np.nan:
-            df_EPSP_slope = measureslope_vec(df=df, filter=filter, t_slope=t_EPSP_slope, halfwidth=0.0004)
+            df_EPSP_slope = measureslope_vec(df=df, filter=filter, t_slope=t_EPSP_slope, halfwidth=0.0003)
             dfoutput['EPSP_slope'] = -df_EPSP_slope['value'] # invert 
         else:
             dfoutput['EPSP_slope'] = np.nan
@@ -201,51 +201,6 @@ def find_i_EPSP_slope_bis0(dfmean, i_VEB, i_EPSP, happy=False):
             print("More EPSPs than we wanted but I'm happy, so I pick the first one and move on.")
     return i_EPSP_slope[0]
 
-# %%
-def find_i_EPSP_slope_ascend(dfmean, i_VEB, i_EPSP, happy=False):
-    print("ascend")
-    i_EPSP_slope = find_i_EPSP_slope_bis0(dfmean, i_VEB, i_EPSP, happy=True)
-    return i_EPSP_slope
-
-
-# execute find_all_t() cell first!
-if __name__ == "__main__":
-    from pathlib import Path
-    import matplotlib.pyplot as plt
-    #path_filterfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_filter.csv")
-    #dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_Ch0_a_mean.csv")
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_Ch0_b_mean.csv")
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_24_P0630-D4_Ch0_a_mean.csv")
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_24_P0630-D4_Ch0_b_mean.csv")
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_22_P0701-D3_Ch0_a_mean.csv")
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_22_P0701-D3_Ch0_b_mean.csv")
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_23_P0630-D3_Ch0_a_mean.csv")
-    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_23_P0630-D3_Ch0_b_mean.csv")
-    
-    dfmean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
-    dfmean['tris'] = dfmean.bis.rolling(3, center=True).mean().diff()
-    dict_t = find_all_t(dfmean) # use the average all sweeps to determine where all events are located (noise reduction)
-    t_EPSP_slope = dict_t['t_EPSP_slope']
-    fig, ax = plt.subplots(figsize=(20,10))
-    plt.plot(dfmean['time'], dfmean['prim']*10, color='red')
-    plt.plot(dfmean['time'], dfmean['bis']*25, color='green')
-    plt.plot(dfmean['time'], dfmean['tris']*25, color='blue')
-    dfmean['bis_roll'] = dfmean['bis'].rolling(9, center=True, win_type='blackman').mean()
-    #plt.plot(dfmean['time'], dfmean['bis_roll']*25, color='blue')
-    plt.axhline(y=0, linestyle='dashed', color='gray')
-    #t_EPSP_slope = 0.0103
-    plt.axvline(x=t_EPSP_slope, linestyle='dashed', color='gray')
-    plt.axvline(x=t_EPSP_slope-0.0003, linestyle='dashed', color='gray')
-    plt.axvline(x=t_EPSP_slope+0.0003, linestyle='dashed', color='gray')
-    plt.plot(dfmean['time'], dfmean['voltage'], color='black')
-    mean_ylim = (-0.0006, 0.0005)
-    mean_xlim = (0.006, 0.020)
-    plt.xlim(mean_xlim)
-    plt.ylim(mean_ylim)
-    print(dict_t)
-
-
 
 # %%
 def find_i_volleyslope(dfmean, i_stim, i_VEB, happy=False):  # , param_half_slope_width = 4):
@@ -291,7 +246,7 @@ def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
     dict_i['i_VEB'] = find_i_VEB_prim_peak_max(dfmean=dfmean, i_stim=dict_i['i_stim'], i_EPSP=dict_i['i_EPSP_amp'])
     if dict_i['i_VEB'] is np.nan:
         return dict_i
-    dict_i['i_EPSP_slope'] = find_i_EPSP_slope_ascend(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
+    dict_i['i_EPSP_slope'] = find_i_EPSP_slope_bis0(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
     """
     i_volleyslope = find_i_volleyslope(
         dfmean, (i_stim + param_min_time_from_i_stim), i_VEB, happy=True)
@@ -380,27 +335,40 @@ def measureslope_vec(df, t_slope, halfwidth, name="EPSP", filter='voltage',):
 # %%
 ''' Standalone test:'''
 if __name__ == "__main__":
+    from pathlib import Path
+    import matplotlib.pyplot as plt
     print()
     print()
     print("Running as main: standalone test")
-    from pathlib import Path
-    path_filterfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_filter.csv")
-    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_mean.csv")
-    # path_datafile = Path.home() / ("Documents/Brainwash Projects/standalone_test/data/A_21_P0701-S2.csv")
-    # path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_mean.csv")
-    dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file
-    df_mean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
-    # dfdata_a = dfdata[(dfdata['stim']=='a')] # select stim 'a' only in data file
-    # df_mean_a = df_mean[(df_mean['stim']=='a')] # select stim 'a' only in mean file
-    dict_t = find_all_t(df_mean) # use the average all sweeps to determine where all events are located (noise reduction)
-    t_EPSP_amp = dict_t['t_EPSP_amp']
+    #path_filterfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_filter.csv")
+    #dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_Ch0_a_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_Ch0_b_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_24_P0630-D4_Ch0_a_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_24_P0630-D4_Ch0_b_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_22_P0701-D3_Ch0_a_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_22_P0701-D3_Ch0_b_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_23_P0630-D3_Ch0_a_mean.csv")
+    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_23_P0630-D3_Ch0_b_mean.csv")
+    
+    dfmean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
+    dfmean['tris'] = dfmean.bis.rolling(3, center=True).mean().diff()
+    dict_t = find_all_t(dfmean) # use the average all sweeps to determine where all events are located (noise reduction)
     t_EPSP_slope = dict_t['t_EPSP_slope']
-    dfoutput = build_dfoutput(df=dffilter,
-                              t_EPSP_amp=t_EPSP_amp,
-                              t_EPSP_slope=t_EPSP_slope)
-    print(dfoutput)
-
-
-# %%
-
-# %%
+    fig, ax = plt.subplots(figsize=(20,10))
+    plt.plot(dfmean['time'], dfmean['prim']*10, color='red')
+    plt.plot(dfmean['time'], dfmean['bis']*25, color='green')
+    plt.plot(dfmean['time'], dfmean['tris']*25, color='blue')
+    dfmean['bis_roll'] = dfmean['bis'].rolling(9, center=True, win_type='blackman').mean()
+    #plt.plot(dfmean['time'], dfmean['bis_roll']*25, color='blue')
+    plt.axhline(y=0, linestyle='dashed', color='gray')
+    #t_EPSP_slope = 0.0103
+    plt.axvline(x=t_EPSP_slope, linestyle='dashed', color='gray')
+    plt.axvline(x=t_EPSP_slope-0.0003, linestyle='dashed', color='gray')
+    plt.axvline(x=t_EPSP_slope+0.0003, linestyle='dashed', color='gray')
+    plt.plot(dfmean['time'], dfmean['voltage'], color='black')
+    mean_ylim = (-0.0006, 0.0005)
+    mean_xlim = (0.006, 0.020)
+    plt.xlim(mean_xlim)
+    plt.ylim(mean_ylim)
+    print(dict_t)

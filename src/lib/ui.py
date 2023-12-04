@@ -1644,8 +1644,8 @@ class UIsub(Ui_MainWindow):
             if slope & (not np.isnan(t_EPSP_slope)):
                 _ = sns.lineplot(ax=ax2, label=f"{label}_EPSP_slope", data=out, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
                 # mean, slope indicator        
-                x_start = t_EPSP_slope - 0.0004
-                x_end = t_EPSP_slope + 0.0004
+                x_start = t_EPSP_slope - 0.0003
+                x_end = t_EPSP_slope + 0.0003
                 y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
                 y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
                 self.main_canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
@@ -1919,8 +1919,8 @@ class Measure_window_sub(Ui_measure_window):
             _ = sns.lineplot(ax=self.ax1, label="old EPSP amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="gray")
         if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
             t_EPSP_slope = self.row['t_EPSP_slope']
-            x_start = t_EPSP_slope - 0.0004 # TODO: make this a variable
-            x_end = t_EPSP_slope + 0.0004 # TODO: make this the same variable
+            x_start = t_EPSP_slope - 0.0003 # TODO: make this a variable
+            x_end = t_EPSP_slope + 0.0003 # TODO: make this the same variable
             self.v_t_EPSP_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
             self.v_t_EPSP_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
             self.v_t_EPSP_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
@@ -2341,13 +2341,14 @@ class Measure_window_sub(Ui_measure_window):
 
         #update mean graph
         for key, graph in plot_on_mean.items():
-            getattr(self, graph).remove() # remove the one about to be replaced
+            if hasattr(self, graph):
+                getattr(self, graph).remove() # remove the one about to be replaced
             if key == "center":
                 setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color=graph_color, linestyle="--"))
             elif key == "start":
-                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time - 0.0004, color=graph_color, linestyle=":"))
+                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time - 0.0003, color=graph_color, linestyle=":"))
             elif key == "end":
-                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time + 0.0004, color=graph_color, linestyle=":"))
+                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time + 0.0003, color=graph_color, linestyle=":"))
         self.canvas_mean.draw()
         #update output graph, voltage
         while label2idx(axis, aspect):
