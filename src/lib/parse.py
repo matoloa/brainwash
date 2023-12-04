@@ -321,10 +321,14 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     dict_folders['data'] = dict_folders['project'] / "data"
     dict_folders['cache'] = dict_folders['project'] / "cache"
     dict_folders['project'].mkdir(exist_ok=True)
-    #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"), str(source_folder / "abf 2 channel/KO_02")]
+    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"),
+                    str(source_folder / "abf 1 channel/A_24_P0630-D4"),
+                    str(source_folder / "abf 1 channel/B_22_P0701-D3"),
+                    str(source_folder / "abf 1 channel/B_23_P0630-D3"),                    
+                   ]
     #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"), str(source_folder / "abf 2 channel/KO_02/2022_01_24_0020.abf")]
     #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"), str(source_folder / "abf 2 channel/KO_02/2022_01_24_0020.abf")]
-    list_sources = [str(source_folder / "abf 1 channel/A_24_P0630-D4")]
+    #list_sources = [str(source_folder / "abf 1 channel/A_24_P0630-D4")]
     for _ in range(3):
         print()
     print("", "*** parse.py standalone test: ***")

@@ -214,20 +214,30 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     #path_filterfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_filter.csv")
     #dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_mean.csv")
-    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_Ch0_b_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_Ch0_a_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_Ch0_b_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_24_P0630-D4_Ch0_a_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_24_P0630-D4_Ch0_b_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_22_P0701-D3_Ch0_a_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_22_P0701-D3_Ch0_b_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_23_P0630-D3_Ch0_a_mean.csv")
+    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_23_P0630-D3_Ch0_b_mean.csv")
+    
     dfmean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
+    dfmean['tris'] = dfmean.bis.rolling(3, center=True).mean().diff()
     dict_t = find_all_t(dfmean) # use the average all sweeps to determine where all events are located (noise reduction)
     t_EPSP_slope = dict_t['t_EPSP_slope']
     fig, ax = plt.subplots(figsize=(20,10))
     plt.plot(dfmean['time'], dfmean['prim']*10, color='red')
     plt.plot(dfmean['time'], dfmean['bis']*25, color='green')
+    plt.plot(dfmean['time'], dfmean['tris']*25, color='blue')
     dfmean['bis_roll'] = dfmean['bis'].rolling(9, center=True, win_type='blackman').mean()
-    plt.plot(dfmean['time'], dfmean['bis_roll']*25, color='blue')
+    #plt.plot(dfmean['time'], dfmean['bis_roll']*25, color='blue')
     plt.axhline(y=0, linestyle='dashed', color='gray')
+    #t_EPSP_slope = 0.0103
     plt.axvline(x=t_EPSP_slope, linestyle='dashed', color='gray')
-    plt.axvline(x=t_EPSP_slope-0.0004, linestyle='dashed', color='gray')
-    plt.axvline(x=t_EPSP_slope+0.0004, linestyle='dashed', color='gray')
+    plt.axvline(x=t_EPSP_slope-0.0003, linestyle='dashed', color='gray')
+    plt.axvline(x=t_EPSP_slope+0.0003, linestyle='dashed', color='gray')
     plt.plot(dfmean['time'], dfmean['voltage'], color='black')
     mean_ylim = (-0.0006, 0.0005)
     mean_xlim = (0.006, 0.020)
@@ -390,5 +400,7 @@ if __name__ == "__main__":
                               t_EPSP_slope=t_EPSP_slope)
     print(dfoutput)
 
+
+# %%
 
 # %%
