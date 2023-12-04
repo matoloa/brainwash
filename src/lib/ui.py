@@ -997,6 +997,8 @@ class UIsub(Ui_MainWindow):
                     if old_output.exists():
                         os.rename(old_output, new_output)
                     df_p.at[row, 'recording_name'] = new_recording_name
+                    # For paired recordings: also rename any references to old_recording_name in df_p['paired_recording']
+                    df_p.loc[df_p['paired_recording'] == old_recording_name, 'paired_recording'] = new_recording_name
                     self.set_df_project(df_p)
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
