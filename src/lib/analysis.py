@@ -208,18 +208,18 @@ def find_i_EPSP_slope_ascend(dfmean, i_VEB, i_EPSP, happy=False):
     return i_EPSP_slope
 
 
-'''
-# %%
 # execute find_all_t() cell first!
 if __name__ == "__main__":
     from pathlib import Path
     import matplotlib.pyplot as plt
     #path_filterfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_filter.csv")
     #dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file
-    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch0_b_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_mean.csv")
+    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_Ch0_b_mean.csv")
     dfmean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
     dict_t = find_all_t(dfmean) # use the average all sweeps to determine where all events are located (noise reduction)
     t_EPSP_slope = dict_t['t_EPSP_slope']
+    fig, ax = plt.subplots(figsize=(20,10))
     plt.plot(dfmean['time'], dfmean['prim']*10, color='red')
     plt.plot(dfmean['time'], dfmean['bis']*25, color='green')
     dfmean['bis_roll'] = dfmean['bis'].rolling(9, center=True, win_type='blackman').mean()
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     plt.ylim(mean_ylim)
     print(dict_t)
 
-'''
+
 
 # %%
 def find_i_volleyslope(dfmean, i_stim, i_VEB, happy=False):  # , param_half_slope_width = 4):

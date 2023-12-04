@@ -215,6 +215,7 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
     calls build_dfmean() to create an average, prim and bis file, per channel-stim combo
     """
     def parser(dict_folders, recording_name, source_path):
+        df = None
         if verbose:
             print(f" - parser, source_path: {source_path}")
         if Path(source_path).is_dir():
@@ -232,7 +233,14 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
                 df = parse_abfFolder(folderpath=Path(source_path))
             elif filetype == "ibw":
                 df = parse_ibwFolder(folder=Path(source_path))#, dev=True)
-    
+        else:
+            # set filetype to last 3 letters of filename
+            filetype = source_path[-3:]
+            if filetype == "abf":
+                df = parse_abf(filepath=Path(source_path))
+            # TODO: add function to parse single .ibw files
+        if df is None:
+            raise ValueError(f" - - no supported files found in {source_path}")
         df = df.sort_values(by='datetime').reset_index(drop=True)
         # sort df2parse in channels and stims (a and b)
         if single_stim:
@@ -315,7 +323,8 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     dict_folders['project'].mkdir(exist_ok=True)
     #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"), str(source_folder / "abf 2 channel/KO_02")]
     #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"), str(source_folder / "abf 2 channel/KO_02/2022_01_24_0020.abf")]
-    list_sources = [str(source_folder / "ibw 2 events/L11S2")]
+    #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"), str(source_folder / "abf 2 channel/KO_02/2022_01_24_0020.abf")]
+    list_sources = [str(source_folder / "abf 1 channel/A_24_P0630-D4")]
     for _ in range(3):
         print()
     print("", "*** parse.py standalone test: ***")
@@ -333,3 +342,5 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     t1 = time.time()
     print(f'time elapsed: {t1-t0} seconds')
     print()
+
+# %%

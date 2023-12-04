@@ -49,7 +49,7 @@ fig, ax = plt.subplots(figsize=(20, 10), layout="constrained")
 #plt.ylim(mean_ylim)
 from scipy.stats import expon
 
-import longscurvefitting
+#import longscurvefitting
 dffit = dfmean[['time', 'voltage']][(0.008 < dfmean.time) & (dfmean.time < 0.040)]
 dffit = dfmean[['time', 'voltage']][(0.004 < dfmean.time) & (dfmean.time < 0.080)]
 ax.plot(dffit.time.values, dffit.voltage.values)
@@ -58,38 +58,39 @@ print(f"dffit shape: {dffit.shape}")
 ax.set_ylim(-0.001, 0.001)
 ax.grid()
 
+# %%
+# dynamic function builder with correct args signature
+import inspect 
+from types import FunctionType
+from functools import partial
 
-# %% [markdown]
-# # dynamic function builder with correct args signature
-# import inspect 
-# from types import FunctionType
-# from functools import partial
-#
-# def get_combined_model(models_in_model):  # use as: models_in_model = [_pearson3, _gaussian]
-#     models_str = "+".join([i.__name__ + str(inspect.signature(i)) for i in models_in_model])
-#     models_params = [inspect.signature(i) for i in models_in_model]
-#     print(models_params)
-#     args = []
-#     _ = [args.append(i) for j in models_params for i in j.parameters.keys() if i not in args]  # remove duplicates
-#     model_code = compile(f"def foo({', '.join(args)}): return {models_str}", "<string>", "exec")
-#     model = FunctionType(model_code.co_consts[0], globals(), "foo")
-#     params = inspect.signature(model).parameters 
-#     print(params)
-#     return model
-#
-# gauss_veb = lambda x, amp, wid: _gaussian(x, amp, wid, cen=t_VEB)
-# gauss_veb.__name__ = 'gauss_veb'
-# models = [gauss_veb]
-# model = get_combined_model(models)
+def get_combined_model(models_in_model):  # use as: models_in_model = [_pearson3, _gaussian]
+    models_str = "+".join([i.__name__ + str(inspect.signature(i)) for i in models_in_model])
+    models_params = [inspect.signature(i) for i in models_in_model]
+    print(models_params)
+    args = []
+    _ = [args.append(i) for j in models_params for i in j.parameters.keys() if i not in args]  # remove duplicates
+    model_code = compile(f"def foo({', '.join(args)}): return {models_str}", "<string>", "exec")
+    model = FunctionType(model_code.co_consts[0], globals(), "foo")
+    params = inspect.signature(model).parameters 
+    print(params)
+    return model
+
+gauss_veb = lambda x, amp, wid: _gaussian(x, amp, wid, cen=t_VEB)
+gauss_veb.__name__ = 'gauss_veb'
+models = [gauss_veb]
+model = get_combined_model(models)
 
 # %%
 
 # %%
+'''
 def hello(a, b):
     return a + b
 
 hella = partial(hello, b=2)
 hella(2)
+'''
 
 # %%
 # possible approx functions
@@ -150,7 +151,7 @@ expon_epspamp.__name__ = 'expon_epspamp'
 models = [gauss_veb, gauss_vol, fconst, sigmoid, expon_epspamp]
 model = get_combined_model(models)
 
-gmodel = Model(fwrap)
+#gmodel = Model(fwrap)
 gmodel = Model(model)
 #   result = gmodel.fit(y, x=x, const=-0.005, a=0.001, b=1, c=0.001, d=1, amp=0.0008, wid=0.01, e=-0.01, f=0.013, g=0.14, s=0.24)
 result = gmodel.fit(y, x=x, ampveb=0.0008, widveb=0.01, ampvol=0.0008, widvol=0.001, ampsig=0.0008, widsig=0.001, const=-0.005, ampe=0.00073, tscale=130, t0=0.0138)  # a=0.001, b=1, c=0.001, d=1, 
