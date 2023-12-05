@@ -1144,13 +1144,10 @@ class UIsub(Ui_MainWindow):
         self.setGraph()
 
     def killGroupButtons(self):
-        for group in self.dict_cfg['list_groups']:
-            for i in range(self.gridLayout.count()):
-                widget = self.gridLayout.itemAt(i).widget()
-                if widget and widget.text() == group:
-                    widget.deleteLater()
-                    if verbose:
-                        print("Removed", group, f"(widget: {widget}")
+        for i in reversed(range(self.gridLayout.count())):  # Iterate in reverse order to prevent skipping
+            widget = self.gridLayout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
         self.dict_cfg['list_groups'] = []
         self.write_project_cfg()
 
@@ -1253,10 +1250,11 @@ class UIsub(Ui_MainWindow):
             if verbose:
                 print(f"Project name {new_project_name} already exists")
             self.inputProjectName.setText(self.projectname)
-        elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_project_name)) is not None: # check if valid filename
+        elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_project_name)) is not None: # True if valid filename
             self.dict_folders['project'] = self.dict_folders['project'].rename(self.projects_folder / new_project_name)
             self.dict_folders['data'] = self.projects_folder / new_project_name / 'data'
-            self.dict_folders['cache'] = self.dict_folders['cache'].rename(self.projects_folder / 'cache' / new_project_name)
+            if Path(self.dict_folders['cache']).exists():
+                self.dict_folders['cache'] = self.dict_folders['cache'].rename(self.projects_folder / 'cache' / new_project_name)
             self.projectname = new_project_name
             self.inputProjectName.setText(self.projectname)
             self.inputProjectName.setReadOnly(True)
