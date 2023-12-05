@@ -676,7 +676,7 @@ class UIsub(Ui_MainWindow):
         if Path(self.dict_folders['project'] / "project.brainwash").exists():
             self.load_df_project()
         else:
-            self.setTableDf(self.df_project)
+            self.tableFormat()
             print(f"Project file {self.dict_folders['project'] / 'project.brainwash'} not found, creating new project file")
             self.write_cfg()
 
@@ -720,7 +720,7 @@ class UIsub(Ui_MainWindow):
         self.main_canvas_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
         self.graphMean.layout().addWidget(self.main_canvas_mean)
         self.graphOutput.setLayout(QtWidgets.QVBoxLayout())
-        self.main_canvas_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for Mean
+        self.main_canvas_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for Output
         self.graphOutput.layout().addWidget(self.main_canvas_output)
         self.main_canvas_mean.mpl_connect('button_press_event', lambda event: self.mainClicked(event, self.main_canvas_mean))
         self.main_canvas_output.mpl_connect('button_press_event', lambda event: self.mainClicked(event, self.main_canvas_output, out=True))
@@ -958,6 +958,7 @@ class UIsub(Ui_MainWindow):
         df_p['groups'] = df_p['groups'].fillna(" ")
         df_p['sweeps'] = df_p['sweeps'].fillna("...")
         self.set_df_project(df_p)
+        self.tableUpdate()
         if verbose:
             print("addData:", self.get_df_project())
 
@@ -999,6 +1000,7 @@ class UIsub(Ui_MainWindow):
                     # For paired recordings: also rename any references to old_recording_name in df_p['paired_recording']
                     df_p.loc[df_p['paired_recording'] == old_recording_name, 'paired_recording'] = new_recording_name
                     self.set_df_project(df_p)
+                    self.tableUpdate()
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
             else:
@@ -1038,13 +1040,15 @@ class UIsub(Ui_MainWindow):
             df_p.drop(selected_indices, inplace=True)
             df_p.reset_index(inplace=True, drop=True)
             self.set_df_project(df_p)
+            self.tableUpdate()
             print(f"Deleted {len(list_affected_groups)}, {list_affected_groups} rows.")
             self.setGraph()
         else:
             print("No files selected.")
 
     def parse_data(self): # parse data files and modify self.df_project accordingly
-        update_frame = self.df_project.copy()  # copy from which to remove rows without confusing index
+        df_p = self.get_df_project()
+        update_frame = df_p.copy()  # copy from which to remove rows without confusing index
         rows = []
         for i, df_proj_row in self.df_project.iterrows():
             recording_name = df_proj_row['recording_name']
@@ -1066,6 +1070,7 @@ class UIsub(Ui_MainWindow):
                 print("rows2add:", rows2add[['recording_name', 'sweeps']])
                 df_p = pd.concat([update_frame, rows2add]).reset_index(drop=True)
                 self.set_df_project(df_p)
+                self.tableUpdate()
 
     def flipCI(self):
         selected_indices = self.listSelectedIndices()
@@ -1096,6 +1101,7 @@ class UIsub(Ui_MainWindow):
                 # TODO: clear group cache
                 already_flipped.append(index_pair)
                 self.set_df_project(df_p)
+                self.tableUpdate()
                 self.setGraph()
         else:
             print("No files selected.")
@@ -1169,7 +1175,7 @@ class UIsub(Ui_MainWindow):
                     else:
                         print(f"{self.df_project.loc[i, 'recording_name']} is already in {add_group}")
                 self.save_df_project()
-                self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
+                self.tableUpdate()
             self.purgeGroupCache(add_group)
             self.setGraph()
         else:
@@ -1197,8 +1203,8 @@ class UIsub(Ui_MainWindow):
             self.df_project.loc[i, 'groups'] = " "
         for group in affected_groups:
             self.purgeGroupCache(group)
-        self.save_df_project()
-        self.setTableDf(self.df_project)  # Force update table (TODO: why is this required?)
+        self.set_df_project(self.df_project)
+        self.tableUpdate()
         self.setGraph()
 
 
@@ -1235,7 +1241,7 @@ class UIsub(Ui_MainWindow):
             self.killGroupButtons()
             self.inputProjectName.setText(self.projectname)
             self.df_project = df_projectTemplate()
-            self.setTableDf(self.df_project)
+            self.tableFormat()
             self.save_df_project()
             self.write_cfg()
             self.setGraph()
@@ -1284,7 +1290,7 @@ class UIsub(Ui_MainWindow):
 
     def load_df_project(self): # reads fileversion of df_project to persisted self.df_project, clears graphs and saves cfg
         self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"))
-        self.setTableDf(self.df_project)  # display self.df_project to table
+        self.tableFormat()
         self.projectname = self.dict_folders['project'].stem
         self.inputProjectName.setText(self.projectname)  # set folder name to proj name
         if verbose:
@@ -1296,10 +1302,9 @@ class UIsub(Ui_MainWindow):
         self.df_project.to_csv(str(self.dict_folders['project'] / "project.brainwash"), index=False)
 
     def set_df_project(self, df): # persists df and saves it to .csv
+        print("set_df_project")
         self.df_project = df
         self.save_df_project()
-        self.setTableDf(df)  # Force update table (TODO: why is this required?)
-
 
 
 # Table handling
@@ -1307,16 +1312,10 @@ class UIsub(Ui_MainWindow):
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         return [row.row() for row in selected_indexes]
 
-    def setTableDf(self, data):
+    def tableFormat(self):
         if verbose:
             print("setTableDf")
-        self.tablemodel.setData(data)
-        self.formatTableProj() # hide/resize columns
-        self.tableProj.update()
-
-    def formatTableProj(self): # hide/resize columns
-        if verbose:
-            print("formatTableProj")
+        self.tablemodel.setData(self.get_df_project())
         header = self.tableProj.horizontalHeader()
         df_p = self.df_project
         # hide all columns except these:
@@ -1331,6 +1330,17 @@ class UIsub(Ui_MainWindow):
                 header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
             else:
                 self.tableProj.setColumnHidden(col, True)
+    
+    def tableUpdate(self):
+        # Save current selection
+        selected_rows = self.tableProj.selectionModel().selectedRows()
+        print(f"selected_rows: {selected_rows}")
+        # Update model
+        self.tablemodel.setData(self.get_df_project())
+        # Restore selection
+        for index in selected_rows:
+            self.tableProj.selectionModel().select(index, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
+
 
 # internal dataframe handling
     def get_dfmean(self, row):
@@ -1373,7 +1383,6 @@ class UIsub(Ui_MainWindow):
             dfoutput = pd.read_csv(str_output_path)
         else: #3: Create file
             dfoutput = self.defaultOutput(row=row)
-            dfoutput.reset_index(inplace=True)
             self.df2csv(df=dfoutput, rec=recording_name, key="output")
         self.dict_outputs[recording_name] = dfoutput
         return self.dict_outputs[recording_name]
@@ -1556,8 +1565,9 @@ class UIsub(Ui_MainWindow):
                 persist = True
         if persist:
             self.set_df_project(df_p)
-        df_output = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=dict_t['t_EPSP_amp'], t_EPSP_slope=dict_t['t_EPSP_slope'])
-        return df_output
+        dfoutput = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=dict_t['t_EPSP_amp'], t_EPSP_slope=dict_t['t_EPSP_slope'])
+        dfoutput.reset_index(inplace=True)
+        return dfoutput
 
 
 # Graph handling
@@ -1727,7 +1737,7 @@ class UIsub(Ui_MainWindow):
         # Set graphs
         self.measure_window_sub.updatePlots()
 
-            
+    '''         
     @QtCore.pyqtSlot(list)
     def slotPrintPaths(self, mypaths):
         if verbose:
@@ -1736,8 +1746,7 @@ class UIsub(Ui_MainWindow):
         self.textBrowser.setText(strmystr)
         list_display_names = ["/".join(i.split("/")[-2:]) for i in mypaths]
         dftable = pd.DataFrame({"path_source": mypaths, "recording_name": list_display_names})
-        self.setTableDf(dftable)
-
+    '''
     @QtCore.pyqtSlot()
     def slotAddDfData(self, df):
         self.addData(df)
