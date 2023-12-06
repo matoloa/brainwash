@@ -694,12 +694,11 @@ class UIsub(Ui_MainWindow):
                         'aspect_EPSP_amp': True,
                         'aspect_EPSP_slope': True,
                         'paired_stims': False,
-                        'mean_ylim': (-0.001, 0.0002),
                         'mean_xlim': (0.006, 0.020),
+                        'mean_ylim': (-0.001, 0.0002),
+                        'output_xlim': (0, None),
                         'output_ax1_ylim': (0, None),
-                        'output_ax1_xlim': (None, None),
                         'output_ax2_ylim': (0, None),
-                        'output_ax2_xlim': (None, None),
                         }
             self.write_project_cfg()
         # Enforce local cfg
@@ -1592,6 +1591,14 @@ class UIsub(Ui_MainWindow):
         ax2 = ax1.twinx()
         self.ax2 = ax2  # Store the ax2 instance
         self.ax1 = ax1
+        # find the highest 'sweeps' value in df_select
+        self.dict_cfg['output_xlim'] = [0, None]
+        if self.dict_cfg['output_xlim'][1] is None:
+            max_sweeps = df_select['sweeps'].apply(lambda x: int(x) if isinstance(x, int) or str(x).isdigit() else 0).max()
+            print(f"max_sweeps: {max_sweeps}")
+            self.dict_cfg['output_xlim'] = [0, max_sweeps]
+            self.write_cfg()
+
         # Plot group means
         if self.dict_cfg['list_groups']:
             self.setGraphGroups(ax1, ax2, self.dict_cfg['list_group_colors'])
@@ -2441,6 +2448,8 @@ def zoomReset(canvas, ui, out=False):
                 ax.set_ylim(ui.dict_cfg['output_ax1_ylim'])
             elif ax.get_ylabel() == "Slope (mV/ms)":
                 ax.set_ylim(ui.dict_cfg['output_ax2_ylim'])
+            print(f"zoomReset: ax.get_ylabel(): {ax.get_ylabel()}, ui.dict_cfg['output_xlim: {ui.dict_cfg['output_xlim']}")
+            ax.set_xlim(ui.dict_cfg['output_xlim'])
     else:
         canvas.axes.set_xlim(ui.dict_cfg['mean_xlim'])
         canvas.axes.set_ylim(ui.dict_cfg['mean_ylim'])
