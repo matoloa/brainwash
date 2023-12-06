@@ -678,7 +678,7 @@ class UIsub(Ui_MainWindow):
         else:
             self.tableFormat()
             print(f"Project file {self.dict_folders['project'] / 'project.brainwash'} not found, creating new project file")
-            self.write_cfg()
+            self.write_bw_cfg()
 
         # load or write local cfg, for storage of e.g. group colours, zoom levels etc.
         self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
@@ -885,7 +885,7 @@ class UIsub(Ui_MainWindow):
             self.dict_folders['project'] = Path(projectfolder)
             self.clearGraph()
             self.load_df_project()
-            self.write_cfg()
+            self.write_bw_cfg()
 
     def pushedButtonAddData(self): # creates file tree for file selection
         if verbose:
@@ -1209,7 +1209,7 @@ class UIsub(Ui_MainWindow):
 
 # writer functions
     
-    def write_cfg(self):  # config file for program, global settings
+    def write_bw_cfg(self):  # config file for program, global settings
         cfg = {"user_documents": str(self.user_documents), "projects_folder": str(self.projects_folder), "projectname": self.projectname}
         with self.cfg_yaml.open("w+") as file:
             yaml.safe_dump(cfg, file)
@@ -1242,7 +1242,7 @@ class UIsub(Ui_MainWindow):
             self.df_project = df_projectTemplate()
             self.tableFormat()
             self.save_df_project()
-            self.write_cfg()
+            self.write_bw_cfg()
             self.setGraph()
 
     def renameProject(self): # changes name of project folder and updates .cfg
@@ -1263,7 +1263,7 @@ class UIsub(Ui_MainWindow):
             self.projectname = new_project_name
             self.inputProjectName.setText(self.projectname)
             self.inputProjectName.setReadOnly(True)
-            self.write_cfg()
+            self.write_bw_cfg()
             print(f"Project renamed to {new_project_name}.")
         else:
             print(f"Project name {new_project_name} is not a valid path.")
@@ -1295,7 +1295,7 @@ class UIsub(Ui_MainWindow):
         if verbose:
             print(f"loaded project df: {self.df_project}")
         self.clearGraph()
-        self.write_cfg()
+        self.write_bw_cfg()
 
     def save_df_project(self): # writes df_project to .csv
         self.df_project.to_csv(str(self.dict_folders['project'] / "project.brainwash"), index=False)
@@ -1591,19 +1591,17 @@ class UIsub(Ui_MainWindow):
         ax2 = ax1.twinx()
         self.ax2 = ax2  # Store the ax2 instance
         self.ax1 = ax1
-        # find the highest 'sweeps' value in df_select
-        self.dict_cfg['output_xlim'] = [0, None]
-        if self.dict_cfg['output_xlim'][1] is None:
-            max_sweeps = df_select['sweeps'].apply(lambda x: int(x) if isinstance(x, int) or str(x).isdigit() else 0).max()
-            print(f"max_sweeps: {max_sweeps}")
-            self.dict_cfg['output_xlim'] = [0, max_sweeps]
-            self.write_cfg()
 
         # Plot group means
         if self.dict_cfg['list_groups']:
             self.setGraphGroups(ax1, ax2, self.dict_cfg['list_group_colors'])
-        if df_select is not None: # plot selected rows
-            self.setGraphSelected(df_select=df_select, ax1=ax1, ax2=ax2, amp=amp, slope=slope)
+        # Plot analyzed means
+        df_analyzed = df_select[df_select['sweeps'] != "..."]
+        if not df_analyzed.empty:
+            if self.dict_cfg['output_xlim'][1] is None:
+                self.dict_cfg['output_xlim'] = [0, df_analyzed['sweeps'].max()]
+                self.write_project_cfg()
+            self.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2, amp=amp, slope=slope)
         
         # add appropriate ticks and axis labels
         self.main_canvas_mean.axes.set_xlabel("Time (s)")
@@ -1627,11 +1625,7 @@ class UIsub(Ui_MainWindow):
         self.main_canvas_mean.draw()
         self.main_canvas_output.draw()
 
-    def setGraphSelected(self, df_select, ax1, ax2, amp, slope):
-        df_analyzed = df_select[df_select['sweeps'] != "..."]
-        if df_analyzed.empty:
-            print("Nothing analyzed selected.")
-            return
+    def setGraphSelected(self, df_analyzed, ax1, ax2, amp, slope):
         for i, row in df_analyzed.iterrows(): # TODO: i to be used later for cycling colours?
             dfmean = self.get_dfmean(row=row)
             dfoutput = self.get_dfoutput(row=row)
@@ -1706,7 +1700,7 @@ class UIsub(Ui_MainWindow):
         # checkboxes for views have changed; save settings and update
         self.dict_cfg[str_view_key] = (state == 2)
         self.write_project_cfg()
-        self.tableProjSelectionChanged()
+        self.setGraph()
 
 
 # MeasureWindow
@@ -2448,7 +2442,6 @@ def zoomReset(canvas, ui, out=False):
                 ax.set_ylim(ui.dict_cfg['output_ax1_ylim'])
             elif ax.get_ylabel() == "Slope (mV/ms)":
                 ax.set_ylim(ui.dict_cfg['output_ax2_ylim'])
-            print(f"zoomReset: ax.get_ylabel(): {ax.get_ylabel()}, ui.dict_cfg['output_xlim: {ui.dict_cfg['output_xlim']}")
             ax.set_xlim(ui.dict_cfg['output_xlim'])
     else:
         canvas.axes.set_xlim(ui.dict_cfg['mean_xlim'])
