@@ -27,9 +27,9 @@ import analysis
 matplotlib.use("Qt5Agg")
 
 verbose = True
+talkback = True
 track_widget_focus = False
-# expand as more aspects and filters are added
-# TODO: make these redundant by looping through data columns
+# expand as more aspects and filters are added. # TODO: make these redundant by looping through data columns
 supported_aspects = [ "EPSP_amp", "EPSP_slope"]
 
 
@@ -787,7 +787,7 @@ class UIsub(Ui_MainWindow):
         dict_folders = {
                     'project': self.projects_folder / self.projectname,
                     'data': self.projects_folder / self.projectname / 'data',
-                    'cache': self.projects_folder / 'cache' / self.projectname
+                    'cache': self.projects_folder / 'cache' / self.projectname,
         }
         return dict_folders
 
@@ -2131,6 +2131,34 @@ class Measure_window_sub(Ui_measure_window):
 
 
     def accepted_handler(self):
+        if talkback:
+            # save the event from dfmean.voltage
+            if self.row['t_stim'] is None:
+                print("Abort: t_stim is None")
+                return
+            t_start = self.row['t_stim'] - 0.002
+            t_end = self.row['t_stim'] + 0.018
+            dfevent = self.dfmean[(self.dfmean['time'] >= t_start) & (self.dfmean['time'] < t_end)]
+            dfevent = dfevent[['time', 'voltage']]
+            path_talkback_df = Path(f"{self.parent.projects_folder}/talkback/{self.row['recording_name']}_df.csv")
+            if not path_talkback_df.parent.exists():
+                path_talkback.parent.mkdir(parents=True, exist_ok=True)
+            dfevent.to_csv(path_talkback_df, index=False)
+            # save the event data as a dict
+            dict_event = {}
+            dict_event['t_EPSP_amp'] = self.row['t_EPSP_amp']
+            dict_event['t_EPSP_amp_method'] = self.row['t_EPSP_amp_method']
+            dict_event['t_EPSP_amp_params'] = self.row['t_EPSP_amp_params']
+            dict_event['t_EPSP_slope'] = self.row['t_EPSP_slope']
+            dict_event['t_EPSP_slope_method'] = self.row['t_EPSP_slope_method']
+            dict_event['t_EPSP_slope_params'] = self.row['t_EPSP_slope_params']
+            # TODO: Volley
+            # store dict_event as .csv named after recording_name
+            path_talkback = Path(f"{self.parent.projects_folder}/talkback/{self.row['recording_name']}.csv")
+            # make sure the library exists
+            with open(path_talkback, 'w') as f:
+                json.dump(dict_event, f)
+
         # Get the project dataframe
         df_p = self.parent.get_df_project()
         # Find the index of the row with the matching recording_name
