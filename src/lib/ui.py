@@ -28,6 +28,8 @@ matplotlib.use("Qt5Agg")
 
 verbose = True
 talkback = True
+if talkback:
+    dict_usage = {}
 track_widget_focus = False
 # expand as more aspects and filters are added. # TODO: make these redundant by looping through data columns
 supported_aspects = [ "EPSP_amp", "EPSP_slope"]
@@ -679,7 +681,6 @@ class UIsub(Ui_MainWindow):
             self.tableFormat()
             print(f"Project file {self.dict_folders['project'] / 'project.brainwash'} not found, creating new project file")
             self.write_bw_cfg()
-
         # load or write local cfg, for storage of e.g. group colours, zoom levels etc.
         self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
         if self.project_cfg_yaml.exists():
@@ -799,13 +800,29 @@ class UIsub(Ui_MainWindow):
         self.dict_group_means = {} # means of all group outputs
         self.dict_diffs = {} # all diffs (for paired stim)
 
+    def usage(self, ui_component): # Talkback function
+        if verbose:
+            print(f"usage: {ui_component}")
+        if not talkback:
+            return
+        if ui_component not in dict_usage.keys():
+            dict_usage[ui_component] = 0
+        dict_usage[ui_component] += 1
+        path_usage = Path(f"{self.dict_folders['project']}/talkback/usage.csv")
+        if not path_usage.parent.exists():
+            path_usage.parent.mkdir(parents=True, exist_ok=True)
+        with path_usage.open("w") as file:
+            json.dump(dict_usage, file)
+
 
 # pushedButton functions TODO: break out the big ones to separate functions!
 
     def pushButton_paired_data_flip_pressed(self):
+        self.usage("pushButton_paired_data_flip_pressed")
         self.flipCI()
 
     def pushedButtonClearGroups(self):
+        self.usage("pushedButtonClearGroups")
         selected_indices = self.listSelectedIndices()
         if 0 < len(selected_indices):
             self.clearGroupsByRow(selected_indices)
@@ -813,6 +830,7 @@ class UIsub(Ui_MainWindow):
             print("No files selected.")
 
     def pushedButtonEditGroups(self): # Open groups UI (not built)
+        self.usage("pushedButtonEditGroups")
         if verbose:
             print("pushedButtonEditGroups")
         # Placeholder: For now, delete all buttons and groups
@@ -821,6 +839,7 @@ class UIsub(Ui_MainWindow):
         self.killGroupButtons()
 
     def pushedButtonAddGroup(self):
+        self.usage("pushedButtonAddGroup")
         if verbose:
             print("pushedButtonGroups")
         if len(self.dict_cfg['list_groups']) < 12: # TODO: hardcoded max nr of groups: move to cfg
@@ -842,22 +861,20 @@ class UIsub(Ui_MainWindow):
             print("Maximum of 12 groups allowed for now.")
 
     def pushedGroupButton(self, button_name):
-        if verbose:
-            print("pushedGroupButton", button_name)
+        self.usage(f"pushedGroupButton_{button_name}")
         self.addToGroup(button_name)
 
     def pushedButtonDelete(self):
+        self.usage("pushedButtonDelete")
         self.deleteSelectedRows()
 
     def pushedButtonRenameProject(self): # renameProject
-        if verbose:
-            print("pushedButtonRenameProject")
+        self.usage("pushedButtonRenameProject")
         self.inputProjectName.setReadOnly(False)
         self.inputProjectName.editingFinished.connect(self.renameProject)
 
     def pushedButtonNewProject(self):
-        if verbose:
-            print("pushedButtonNewProject")
+        self.usage("pushedButtonNewProject")
         self.dict_folders['project'].mkdir(exist_ok=True)
         date = datetime.now().strftime("%Y-%m-%d")
         i = 0
@@ -874,11 +891,11 @@ class UIsub(Ui_MainWindow):
                 break
 
     def pushedButtonOpenProject(self): # open folder selector dialog
+        self.usage("pushedButtonOpenProject")
         self.dialog = QtWidgets.QDialog()
         print(f"pushedButtonOpenProject: self.projects_folder: {self.projects_folder}")
         projectfolder = QtWidgets.QFileDialog.getExistingDirectory(
             self.dialog, "Open Directory", str(self.projects_folder), QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks)
-        
         if verbose:
             print(f"Received projectfolder: {str(projectfolder)}")
         if (Path(projectfolder) / "project.brainwash").exists():
@@ -888,27 +905,30 @@ class UIsub(Ui_MainWindow):
             self.write_bw_cfg()
 
     def pushedButtonAddData(self): # creates file tree for file selection
-        if verbose:
-            print("pushedButtonAddData")
+        self.usage("pushedButtonAddData")
         self.dialog = QtWidgets.QDialog()
         self.ftree = Filetreesub(self.dialog, parent=self, folder=self.user_documents)
         self.dialog.show()
 
     def pushedButtonParse(self): # parse non-parsed files and folders in self.df_project
+        self.usage("pushedButtonParse")
         self.parse_data()
 
 
 # Non-button event functions
 
     def tableProjSelectionChanged(self):
+        self.usage("tableProjSelectionChanged")
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableProj.clearSelection()
         self.setGraph()
 
     def tableProjDoubleClicked(self):
+        self.usage("tableProjDoubleClicked")
         self.launchMeasureWindow()
    
     def checkBox_paired_stims_changed(self, state):
+        self.usage("checkBox_paired_stims_changed")
         self.dict_cfg['paired_stims'] = bool(state)
         print(f"checkBox_paired_stims_changed: {self.dict_cfg['paired_stims']}")
         self.pushButton_paired_data_flip.setEnabled(self.dict_cfg['paired_stims'])
@@ -917,6 +937,7 @@ class UIsub(Ui_MainWindow):
         self.setGraph()
 
     def checkedBoxLockDelete(self, state):
+        self.usage("checkedBoxLockDelete")
         if state == 2:
             self.dict_cfg['delete_locked']= True
         else:
@@ -1692,11 +1713,13 @@ class UIsub(Ui_MainWindow):
                 ax2.axhline(y=0, linestyle=':', color='gray', alpha = 0.2)
 
     def mainClicked(self, event, canvas, out=False): # maingraph click event
+        self.usage(f"mainClicked_output={out}")
         if event.inaxes is not None:
             if event.button == 2:
                 zoomReset(canvas=canvas, ui=self, out=out)
 
     def viewSettingsChanged(self, state, str_view_key):
+        self.usage(f"viewSettingsChanged_{str_view_key}")
         # checkboxes for views have changed; save settings and update
         self.dict_cfg[str_view_key] = (state == 2)
         self.write_project_cfg()
@@ -2140,7 +2163,7 @@ class Measure_window_sub(Ui_measure_window):
             t_end = self.row['t_stim'] + 0.018
             dfevent = self.dfmean[(self.dfmean['time'] >= t_start) & (self.dfmean['time'] < t_end)]
             dfevent = dfevent[['time', 'voltage']]
-            path_talkback_df = Path(f"{self.parent.projects_folder}/talkback/{self.row['recording_name']}_df.csv")
+            path_talkback_df = Path(f"{self.parent.dict_folders['project']}/talkback/{self.row['recording_name']}_df.csv")
             if not path_talkback_df.parent.exists():
                 path_talkback.parent.mkdir(parents=True, exist_ok=True)
             dfevent.to_csv(path_talkback_df, index=False)
@@ -2154,7 +2177,7 @@ class Measure_window_sub(Ui_measure_window):
             dict_event['t_EPSP_slope_params'] = self.row['t_EPSP_slope_params']
             # TODO: Volley
             # store dict_event as .csv named after recording_name
-            path_talkback = Path(f"{self.parent.projects_folder}/talkback/{self.row['recording_name']}.csv")
+            path_talkback = Path(f"{self.parent.dict_folders['project']}/talkback/{self.row['recording_name']}.csv")
             # make sure the library exists
             with open(path_talkback, 'w') as f:
                 json.dump(dict_event, f)
