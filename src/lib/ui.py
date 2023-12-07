@@ -34,7 +34,12 @@ talkback = True
 if talkback:
     fqdn = socket.getfqdn() # computer and domain name for sorting data by computers
     os_name = platform.system() # get OS name for usage tracking
-    dict_usage = {'fqdn': fqdn, 'os_name': os_name}
+    path_usage = Path.home() / "Documents/Brainwash Projects/talkback/usage.yaml"
+    if path_usage.exists():
+        with path_usage.open("r") as file:
+            dict_usage = yaml.safe_load(file)
+    dict_usage['fqdn'] = fqdn
+    dict_usage['os_name'] = os_name
 track_widget_focus = False
 # expand as more aspects and filters are added. # TODO: make these redundant by looping through data columns
 supported_aspects = [ "EPSP_amp", "EPSP_slope"]
@@ -2174,7 +2179,7 @@ class Measure_window_sub(Ui_measure_window):
             t_end = self.row['t_stim'] + 0.018
             dfevent = self.dfmean[(self.dfmean['time'] >= t_start) & (self.dfmean['time'] < t_end)]
             dfevent = dfevent[['time', 'voltage']]
-            path_talkback_df = Path(f"{self.parent.projects_folder}/talkback/{self.parent.projectname}/{self.row['recording_name']}_df.csv")
+            path_talkback_df = Path(f"{self.parent.projects_folder}/talkback/{self.parent.projectname}/talkback_slice_{self.row['recording_name']}.csv")
             if not path_talkback_df.parent.exists():
                 path_talkback_df.parent.mkdir(parents=True, exist_ok=True)
             dfevent.to_csv(path_talkback_df, index=False)
@@ -2188,7 +2193,7 @@ class Measure_window_sub(Ui_measure_window):
             dict_event['t_EPSP_slope_params'] = self.row['t_EPSP_slope_params']
             # TODO: Volley
             # store dict_event as .csv named after recording_name
-            path_talkback = Path(f"{self.parent.projects_folder}/talkback/{self.parent.projectname}/{self.row['recording_name']}.csv")
+            path_talkback = Path(f"{self.parent.projects_folder}/talkback/{self.parent.projectname}/talkback_meta_{self.row['recording_name']}.csv")
             with open(path_talkback, 'w') as f:
                 json.dump(dict_event, f)
 
