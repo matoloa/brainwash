@@ -16,10 +16,11 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 # from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtWidgets
-from datetime import datetime
-import re
-import time
+from datetime import datetime # used in project name defaults
+import re # regular expressions
+import time # counting time for functions
 import json # for saving and loading dicts as strings
+import uuid # for generating unique ids
 
 import parse
 import analysis
@@ -206,9 +207,10 @@ class MplCanvas(FigureCanvasQTAgg):
 
 class QDialog_sub(QtWidgets.QDialog):
     # Sub-classed to make a custom closeEvent that disconnects all signals to it, while preserving those in main window
-    def __init__(self):
+    def __init__(self, dict_open_measure_windows):
         super(QDialog_sub, self).__init__()
         self.list_connections = []
+        self.dict_open_measure_windows = dict_open_measure_windows  # Store the dictionary as an instance variable
 
     def closeEvent(self, event):
         error = None
@@ -222,6 +224,8 @@ class QDialog_sub(QtWidgets.QDialog):
             print(f"Signals disconnected from subwindow {self.windowTitle()}")
         else:
             print(f"Warning! {self.windowTitle()}: {error} at closeEvent") # TODO: Shouldn't happen - why does it?
+        # Remove the key windowTitle (=recording name) from the dictionary
+        self.dict_open_measure_windows.pop(self.windowTitle(), None)
         super(QDialog_sub, self).closeEvent(event)
 
 class Ui_measure_window(QtCore.QObject):
@@ -1751,7 +1755,7 @@ class UIsub(Ui_MainWindow):
             print(f"Closing last window: {getattr(self, 'measure_frame')}")
             self.measure_frame.close()
         # Open window
-        self.measure_frame = QDialog_sub()
+        self.measure_frame = QDialog_sub(self.dict_open_measure_windows)
         self.measure_window_sub = Measure_window_sub(self.measure_frame, row=ser_table_row, parent=self)
         self.measure_frame.setWindowTitle(recording_name)
         self.dict_open_measure_windows[recording_name] = self.measure_window_sub
