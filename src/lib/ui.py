@@ -20,7 +20,9 @@ from datetime import datetime # used in project name defaults
 import re # regular expressions
 import time # counting time for functions
 import json # for saving and loading dicts as strings
-import uuid # for generating unique ids
+
+import socket # for getting computer name
+import platform # for getting OS name
 
 import parse
 import analysis
@@ -30,7 +32,9 @@ matplotlib.use("Qt5Agg")
 verbose = True
 talkback = True
 if talkback:
-    dict_usage = {}
+    fqdn = socket.getfqdn() # computer and domain name for sorting data by computers
+    os_name = platform.system() # get OS name for usage tracking
+    dict_usage = {'fqdn': fqdn, 'os_name': os_name}
 track_widget_focus = False
 # expand as more aspects and filters are added. # TODO: make these redundant by looping through data columns
 supported_aspects = [ "EPSP_amp", "EPSP_slope"]
@@ -712,6 +716,8 @@ class UIsub(Ui_MainWindow):
         for group in self.dict_cfg['list_groups']:  # Generate buttons based on groups in project:
             self.addGroupButton(group)
 
+        self.fqdn = socket.getfqdn() # get computer name, for project file and usage tracking
+
         if track_widget_focus: # debug mode; prints widget focus every 1000ms
             self.timer = QtCore.QTimer(self)
             self.timer.timeout.connect(self.checkFocus)
@@ -812,11 +818,12 @@ class UIsub(Ui_MainWindow):
         if ui_component not in dict_usage.keys():
             dict_usage[ui_component] = 0
         dict_usage[ui_component] += 1
-        path_usage = Path(f"{self.dict_folders['project']}/talkback/usage.csv")
+        path_usage = Path(f"{self.projects_folder}/talkback/usage.yaml")
         if not path_usage.parent.exists():
             path_usage.parent.mkdir(parents=True, exist_ok=True)
         with path_usage.open("w") as file:
-            json.dump(dict_usage, file)
+            #json.dump(dict_usage, file)
+            yaml.safe_dump(dict_usage, file)
 
 
 # pushedButton functions TODO: break out the big ones to separate functions!
@@ -2167,9 +2174,9 @@ class Measure_window_sub(Ui_measure_window):
             t_end = self.row['t_stim'] + 0.018
             dfevent = self.dfmean[(self.dfmean['time'] >= t_start) & (self.dfmean['time'] < t_end)]
             dfevent = dfevent[['time', 'voltage']]
-            path_talkback_df = Path(f"{self.parent.dict_folders['project']}/talkback/{self.row['recording_name']}_df.csv")
+            path_talkback_df = Path(f"{self.parent.projects_folder}/talkback/{self.parent.projectname}/{self.row['recording_name']}_df.csv")
             if not path_talkback_df.parent.exists():
-                path_talkback.parent.mkdir(parents=True, exist_ok=True)
+                path_talkback_df.parent.mkdir(parents=True, exist_ok=True)
             dfevent.to_csv(path_talkback_df, index=False)
             # save the event data as a dict
             dict_event = {}
@@ -2181,8 +2188,7 @@ class Measure_window_sub(Ui_measure_window):
             dict_event['t_EPSP_slope_params'] = self.row['t_EPSP_slope_params']
             # TODO: Volley
             # store dict_event as .csv named after recording_name
-            path_talkback = Path(f"{self.parent.dict_folders['project']}/talkback/{self.row['recording_name']}.csv")
-            # make sure the library exists
+            path_talkback = Path(f"{self.parent.projects_folder}/talkback/{self.parent.projectname}/{self.row['recording_name']}.csv")
             with open(path_talkback, 'w') as f:
                 json.dump(dict_event, f)
 
