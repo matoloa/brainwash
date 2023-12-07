@@ -38,8 +38,10 @@ if talkback:
     if path_usage.exists():
         with path_usage.open("r") as file:
             dict_usage = yaml.safe_load(file)
-    dict_usage['fqdn'] = fqdn
-    dict_usage['os_name'] = os_name
+        dict_usage['fqdn'] = fqdn
+        dict_usage['os_name'] = os_name
+    else:
+        dict_usage = {'fqdn': fqdn, 'os_name': os_name, 'usage_creation_time': datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 track_widget_focus = False
 # expand as more aspects and filters are added. # TODO: make these redundant by looping through data columns
 supported_aspects = [ "EPSP_amp", "EPSP_slope"]
@@ -721,7 +723,8 @@ class UIsub(Ui_MainWindow):
         for group in self.dict_cfg['list_groups']:  # Generate buttons based on groups in project:
             self.addGroupButton(group)
 
-        self.fqdn = socket.getfqdn() # get computer name, for project file and usage tracking
+        self.fqdn = socket.getfqdn() # get computer name and local domain, for project file
+        print (f"fqdn: {self.fqdn}")
 
         if track_widget_focus: # debug mode; prints widget focus every 1000ms
             self.timer = QtCore.QTimer(self)
@@ -1819,8 +1822,9 @@ class TableProjSub(QtWidgets.QTableView):
             print("Files dropped:", file_urls)
             # Handle the dropped files here
             dfAdd = df_projectTemplate()
+            dfAdd['host'] = str(self.parent.fqdn)
+            print(f"host: {dfAdd['host']}")
             dfAdd['path'] = file_urls
-            dfAdd['host'] = "Computer 1"
             dfAdd['checksum'] = "big number"
             dfAdd['filter'] = "voltage"
             # NTH: more intelligent default naming; lowest level unique name?
@@ -2175,13 +2179,10 @@ class Measure_window_sub(Ui_measure_window):
         # Find the index of the row with the matching recording_name
         idx = df_p.index[df_p['recording_name'] == self.row['recording_name']]
         # Check if row values are different from corresponding row in df_project
-        print ("row", self.row)
         df_p_row = df_p.iloc[idx].squeeze()
-        print ("iloc", df_p_row)
         if df_p_row.equals(self.row):
             print("No changes detected.")
             return
-
         if talkback:
             # save the event from dfmean.voltage
             if self.row['t_stim'] is None:
