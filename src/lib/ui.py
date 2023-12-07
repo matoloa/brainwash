@@ -673,7 +673,7 @@ class UIsub(Ui_MainWindow):
         # replacing table proj with custom to allow changing of keypress event handling
         originalTableView = self.centralwidget.findChild(QtWidgets.QTableView, "tableProj")  # Find and replace the original QTableView in the layout
         #tableProj = TableProjSub(self.centralwidget)  # Create an instance of your custom table view
-        tableProj = TableProjSub(self)  # Create an instance of your custom table view
+        tableProj = TableProjSub(parent=self)  # Create an instance of your custom table view
         
         # Replace the original QTableView with TableProjSub in the layout
         layout = self.centralwidget.layout()
@@ -1822,9 +1822,8 @@ class TableProjSub(QtWidgets.QTableView):
             print("Files dropped:", file_urls)
             # Handle the dropped files here
             dfAdd = df_projectTemplate()
+            dfAdd['path'] = file_urls # needs to be first, as it sets the number of rows
             dfAdd['host'] = str(self.parent.fqdn)
-            print(f"host: {dfAdd['host']}")
-            dfAdd['path'] = file_urls
             dfAdd['checksum'] = "big number"
             dfAdd['filter'] = "voltage"
             # NTH: more intelligent default naming; lowest level unique name?
