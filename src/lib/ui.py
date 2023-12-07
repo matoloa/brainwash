@@ -2170,6 +2170,18 @@ class Measure_window_sub(Ui_measure_window):
 
 
     def accepted_handler(self):
+        # Get the project dataframe
+        df_p = self.parent.get_df_project()
+        # Find the index of the row with the matching recording_name
+        idx = df_p.index[df_p['recording_name'] == self.row['recording_name']]
+        # Check if row values are different from corresponding row in df_project
+        print ("row", self.row)
+        df_p_row = df_p.iloc[idx].squeeze()
+        print ("iloc", df_p_row)
+        if df_p_row.equals(self.row):
+            print("No changes detected.")
+            return
+
         if talkback:
             # save the event from dfmean.voltage
             if self.row['t_stim'] is None:
@@ -2191,16 +2203,17 @@ class Measure_window_sub(Ui_measure_window):
             dict_event['t_EPSP_slope'] = self.row['t_EPSP_slope']
             dict_event['t_EPSP_slope_method'] = self.row['t_EPSP_slope_method']
             dict_event['t_EPSP_slope_params'] = self.row['t_EPSP_slope_params']
-            # TODO: Volley
+            dict_event['t_volley_amp'] = self.row['t_volley_amp']
+            dict_event['t_volley_amp_method'] = self.row['t_volley_amp_method']
+            dict_event['t_volley_amp_params'] = self.row['t_volley_amp_params']
+            dict_event['t_volley_slope'] = self.row['t_volley_slope']
+            dict_event['t_volley_slope_method'] = self.row['t_volley_slope_method']
+            dict_event['t_volley_slope_params'] = self.row['t_volley_slope_params']
             # store dict_event as .csv named after recording_name
             path_talkback = Path(f"{self.parent.projects_folder}/talkback/{self.parent.projectname}/talkback_meta_{self.row['recording_name']}.csv")
             with open(path_talkback, 'w') as f:
                 json.dump(dict_event, f)
 
-        # Get the project dataframe
-        df_p = self.parent.get_df_project()
-        # Find the index of the row with the matching recording_name
-        idx = df_p.index[df_p['recording_name'] == self.row['recording_name']]
         if len(idx) == 1: # Only proceed if there's exactly one matching row
             # Update filters and params in self.row
             if self.row['filter'] == "voltage":
