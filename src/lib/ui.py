@@ -682,7 +682,6 @@ class UIsub(Ui_MainWindow):
         if Path(self.dict_folders['project'] / "project.brainwash").exists():
             self.load_df_project()
         else:
-            self.tableFormat()
             print(f"Project file {self.dict_folders['project'] / 'project.brainwash'} not found, creating new project file")
             self.write_bw_cfg()
         # load or write local cfg, for storage of e.g. group colours, zoom levels etc.
@@ -706,6 +705,9 @@ class UIsub(Ui_MainWindow):
                         'output_ax2_ylim': (0, None),
                         }
             self.write_project_cfg()
+        
+        self.tableFormat()
+        
         # Enforce local cfg
         self.checkBoxLockDelete.setChecked(self.dict_cfg['delete_locked'])
         self.pushButtonDelete.setEnabled(not self.dict_cfg['delete_locked'])
@@ -927,6 +929,7 @@ class UIsub(Ui_MainWindow):
             self.dict_folders['project'] = Path(projectfolder)
             self.clearGraph()
             self.load_df_project()
+            self.tableFormat()
             self.write_bw_cfg()
 
     def pushedButtonAddData(self): # creates file tree for file selection
@@ -959,6 +962,7 @@ class UIsub(Ui_MainWindow):
         self.pushButton_paired_data_flip.setEnabled(self.dict_cfg['paired_stims'])
         self.purgeGroupCache(*self.dict_cfg['list_groups'])
         self.write_project_cfg()
+        self.tableFormat()
         self.setGraph()
 
     def checkedBoxLockDelete(self, state):
@@ -1061,7 +1065,6 @@ class UIsub(Ui_MainWindow):
             if any(df_p.at[row, 'recording_name'] in self.dict_open_measure_windows for row in selected_indices):
                 print(f"Cannot delete recordings that are open in a measure window.")
                 return
-            list_affected_groups = []
             for row in selected_indices:
                 sweeps = df_p.at[row, 'sweeps']
                 if sweeps != "...": # if the file is parsed:
@@ -1218,8 +1221,8 @@ class UIsub(Ui_MainWindow):
                         self.df_project.loc[i, 'groups'] = ",".join(map(str, sorted(list_group)))
                     else:
                         print(f"{self.df_project.loc[i, 'recording_name']} is already in {add_group}")
-                self.save_df_project()
-                self.tableUpdate()
+            self.save_df_project()
+            self.tableUpdate()
             self.purgeGroupCache(add_group)
             self.setGraph()
         else:
@@ -1321,6 +1324,7 @@ class UIsub(Ui_MainWindow):
             # look for project.brainwash and load it
             if (self.dict_folders['project'] / "project.brainwash").exists():
                 self.load_df_project()
+                self.tableFormat()
         else:
             self.dict_folders['project'].mkdir()
         if verbose:
@@ -1334,7 +1338,6 @@ class UIsub(Ui_MainWindow):
 
     def load_df_project(self): # reads fileversion of df_project to persisted self.df_project, clears graphs and saves cfg
         self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"))
-        self.tableFormat()
         self.projectname = self.dict_folders['project'].stem
         self.inputProjectName.setText(self.projectname)  # set folder name to proj name
         if verbose:
@@ -1365,13 +1368,15 @@ class UIsub(Ui_MainWindow):
         # hide all columns except these:
         list_show = [   df_p.columns.get_loc("recording_name"),
                         df_p.columns.get_loc("groups"),
-                        df_p.columns.get_loc("sweeps"),
-                        df_p.columns.get_loc("intervention"),
-        ]
+                        df_p.columns.get_loc("sweeps")
+                    ]
+        if self.dict_cfg['paired_stims']:
+            list_show.append(df_p.columns.get_loc("intervention"))
         num_columns = df_p.shape[1]
         for col in range(num_columns):
             if col in list_show:
                 header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+                self.tableProj.setColumnHidden(col, False)
             else:
                 self.tableProj.setColumnHidden(col, True)
     
