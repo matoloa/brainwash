@@ -21,8 +21,8 @@ import re # regular expressions
 import time # counting time for functions
 import json # for saving and loading dicts as strings
 
-import socket # for getting computer name
-import platform # for getting OS name
+import uuid # generating unique talkback ID
+import socket # getting computer name and localdomain for df_project['host'] (not reported in talkback)
 
 import parse
 import analysis
@@ -31,17 +31,6 @@ matplotlib.use("Qt5Agg")
 
 verbose = True
 talkback = True
-if talkback:
-    fqdn = socket.getfqdn() # computer and domain name for sorting data by computers
-    os_name = platform.system() # get OS name for usage tracking
-    path_usage = Path.home() / "Documents/Brainwash Projects/talkback/usage.yaml"
-    if path_usage.exists():
-        with path_usage.open("r") as file:
-            dict_usage = yaml.safe_load(file)
-        dict_usage['fqdn'] = fqdn
-        dict_usage['os_name'] = os_name
-    else:
-        dict_usage = {'fqdn': fqdn, 'os_name': os_name, 'usage_creation_time': datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 track_widget_focus = False
 # expand as more aspects and filters are added. # TODO: make these redundant by looping through data columns
 supported_aspects = [ "EPSP_amp", "EPSP_slope"]
@@ -723,9 +712,6 @@ class UIsub(Ui_MainWindow):
         for group in self.dict_cfg['list_groups']:  # Generate buttons based on groups in project:
             self.addGroupButton(group)
 
-        self.fqdn = socket.getfqdn() # get computer name and local domain, for project file
-        print (f"fqdn: {self.fqdn}")
-
         if track_widget_focus: # debug mode; prints widget focus every 1000ms
             self.timer = QtCore.QTimer(self)
             self.timer.timeout.connect(self.checkFocus)
@@ -783,8 +769,19 @@ class UIsub(Ui_MainWindow):
         # keep track of open measure windows
         self.dict_open_measure_windows = {}
 
-# Debugging tools
-        # self.find_widgets_with_top_left_coordinates(self.centralwidget)
+        self.fqdn = socket.getfqdn() # get computer name and local domain, for project file
+        if talkback:
+            path_usage = Path(f"{self.projects_folder}/talkback/usage.yaml")
+            if path_usage.exists():
+                with path_usage.open("r") as file:
+                    self.dict_usage = yaml.safe_load(file)
+            else:
+                os_name = sys.platform
+                self.dict_usage = {'WARNING': "Do NOT set your alias to anything that can be used to identify you!", 'alias': "", 'ID': str(uuid.uuid4()), 'os_name': os_name, 'ID_created': datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                self.write_usage()
+
+    # Debugging tools
+            # self.find_widgets_with_top_left_coordinates(self.centralwidget)
 
     def find_widgets_with_top_left_coordinates(self, widget):
         print(f"trying child geometry")
@@ -823,15 +820,22 @@ class UIsub(Ui_MainWindow):
             print(f"usage: {ui_component}")
         if not talkback:
             return
-        if ui_component not in dict_usage.keys():
-            dict_usage[ui_component] = 0
-        dict_usage[ui_component] += 1
+        if ui_component not in self.dict_usage.keys():
+            self.dict_usage[ui_component] = 0
+        self.dict_usage[ui_component] += 1
+        self.write_usage()
+
+    def write_usage(self):
         path_usage = Path(f"{self.projects_folder}/talkback/usage.yaml")
         if not path_usage.parent.exists():
             path_usage.parent.mkdir(parents=True, exist_ok=True)
+        # make sure 'WARNING' and 'alias' are printed first
+        top_keys = ['WARNING', 'alias']
+        dict_bottom = self.dict_usage.copy()
+        top_data = {key: dict_bottom.pop(key, None) for key in top_keys}
         with path_usage.open("w") as file:
-            #json.dump(dict_usage, file)
-            yaml.safe_dump(dict_usage, file)
+            yaml.safe_dump(top_data, file, default_flow_style=False)
+            yaml.safe_dump(dict_bottom, file, default_flow_style=False)
 
 
 # pushedButton functions TODO: break out the big ones to separate functions!
