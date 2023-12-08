@@ -19,37 +19,11 @@
      <layout class="QHBoxLayout" name="horizontalMasterLayout" stretch="0,0,1">
       <item>
        <layout class="QVBoxLayout" name="verticalLayoutProj" stretch="0,0,0,0">
+        <property name="sizeConstraint">
+         <enum>QLayout::SetMinimumSize</enum>
+        </property>
         <item>
          <layout class="QHBoxLayout" name="horizontalLayoutProj">
-          <item>
-           <widget class="QPushButton" name="pushButtonNewProject">
-            <property name="maximumSize">
-             <size>
-              <width>50</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>New</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="pushButtonOpenProject">
-            <property name="enabled">
-             <bool>true</bool>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>50</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>Open</string>
-            </property>
-           </widget>
-          </item>
           <item>
            <widget class="QLineEdit" name="inputProjectName">
             <property name="minimumSize">
@@ -70,12 +44,19 @@
            <widget class="QPushButton" name="pushButtonRenameProject">
             <property name="maximumSize">
              <size>
-              <width>65</width>
+              <width>25</width>
               <height>16777215</height>
              </size>
             </property>
             <property name="text">
-             <string>Rename</string>
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="pushButtonParse">
+            <property name="text">
+             <string>Import</string>
             </property>
            </widget>
           </item>
@@ -86,49 +67,6 @@
           <property name="sizeConstraint">
            <enum>QLayout::SetMinAndMaxSize</enum>
           </property>
-          <item>
-           <widget class="QPushButton" name="pushButtonAddData">
-            <property name="text">
-             <string>Add Data</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="pushButtonParse">
-            <property name="text">
-             <string>Analyze</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QCheckBox" name="checkBoxLockDelete">
-            <property name="maximumSize">
-             <size>
-              <width>15</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string/>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="pushButtonDelete">
-            <property name="maximumSize">
-             <size>
-              <width>60</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>Delete</string>
-            </property>
-           </widget>
-          </item>
           <item>
            <widget class="QLabel" name="label">
             <property name="text">
@@ -150,19 +88,6 @@
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="pushButtonEditGroups">
-            <property name="maximumSize">
-             <size>
-              <width>40</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>Edit</string>
-            </property>
-           </widget>
-          </item>
-          <item>
            <widget class="QPushButton" name="pushButtonClearGroups">
             <property name="maximumSize">
              <size>
@@ -175,6 +100,19 @@
             </property>
            </widget>
           </item>
+          <item>
+           <widget class="QPushButton" name="pushButtonEditGroups">
+            <property name="maximumSize">
+             <size>
+              <width>40</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>Edit</string>
+            </property>
+           </widget>
+          </item>
          </layout>
         </item>
         <item>
@@ -182,6 +120,12 @@
         </item>
         <item>
          <widget class="QTableView" name="tableProj">
+          <property name="minimumSize">
+           <size>
+            <width>400</width>
+            <height>0</height>
+           </size>
+          </property>
           <property name="maximumSize">
            <size>
             <width>16777215</width>
@@ -237,7 +181,7 @@
             <property name="minimumSize">
              <size>
               <width>0</width>
-              <height>100</height>
+              <height>90</height>
              </size>
             </property>
             <property name="frameShape">
@@ -251,7 +195,7 @@
               <rect>
                <x>10</x>
                <y>50</y>
-               <width>90</width>
+               <width>101</width>
                <height>23</height>
               </rect>
              </property>
@@ -264,7 +208,7 @@
               <rect>
                <x>10</x>
                <y>30</y>
-               <width>90</width>
+               <width>101</width>
                <height>23</height>
               </rect>
              </property>
@@ -288,7 +232,7 @@
             <widget class="QCheckBox" name="checkBox_paired_stims">
              <property name="geometry">
               <rect>
-               <x>120</x>
+               <x>248</x>
                <y>30</y>
                <width>90</width>
                <height>23</height>
@@ -301,7 +245,7 @@
             <widget class="QLabel" name="label_paired_data">
              <property name="geometry">
               <rect>
-               <x>120</x>
+               <x>248</x>
                <y>10</y>
                <width>81</width>
                <height>17</height>
@@ -314,7 +258,7 @@
             <widget class="QPushButton" name="pushButton_paired_data_flip">
              <property name="geometry">
               <rect>
-               <x>122</x>
+               <x>250</x>
                <y>50</y>
                <width>81</width>
                <height>25</height>
@@ -322,6 +266,32 @@
              </property>
              <property name="text">
               <string>Flip C-I</string>
+             </property>
+            </widget>
+            <widget class="QCheckBox" name="checkBox_aspect_volley_amp">
+             <property name="geometry">
+              <rect>
+               <x>110</x>
+               <y>50</y>
+               <width>101</width>
+               <height>23</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>volley amp.</string>
+             </property>
+            </widget>
+            <widget class="QCheckBox" name="checkBox_aspect_volley_slope">
+             <property name="geometry">
+              <rect>
+               <x>110</x>
+               <y>30</y>
+               <width>101</width>
+               <height>23</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>volley slope</string>
              </property>
             </widget>
            </widget>
@@ -370,6 +340,30 @@
      <height>22</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>File</string>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>Edit</string>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menuData">
+    <property name="title">
+     <string>Data</string>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menuGroups">
+    <property name="title">
+     <string>Groups</string>
+    </property>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuEdit"/>
+   <addaction name="menuData"/>
+   <addaction name="menuGroups"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
