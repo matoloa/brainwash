@@ -585,7 +585,6 @@ def df_projectTemplate():
         columns=[
             "host",
             "path",
-            "checksum",
             "recording_name",
             "groups",
             "parsetimestamp",
@@ -1828,7 +1827,6 @@ class TableProjSub(QtWidgets.QTableView):
             dfAdd = df_projectTemplate()
             dfAdd['path'] = file_urls # needs to be first, as it sets the number of rows
             dfAdd['host'] = str(self.parent.fqdn)
-            dfAdd['checksum'] = "big number"
             dfAdd['filter'] = "voltage"
             # NTH: more intelligent default naming; lowest level unique name?
             # For now, use name + lowest level folder
@@ -1885,13 +1883,12 @@ class Filetreesub(Ui_Dialog):
         self.parent.slotAddDfData(self.dfAdd)
 
     def pathsSelectedUpdateTable(self, paths):
-        # TODO: Extract host, checksum, group
+        # TODO: Extract host and group
         if verbose:
             print("pathsSelectedUpdateTable")
         dfAdd = df_projectTemplate()
         dfAdd['path'] = paths
-        dfAdd['host'] = "Computer 1"
-        dfAdd['checksum'] = "big number"
+        dfAdd['host'] = str(self.parent.fqdn)
         dfAdd['filter'] = "voltage"
         # dfAdd['recording_name']=paths
         # dfAdd['groups']=' '
@@ -1909,7 +1906,6 @@ class Filetreesub(Ui_Dialog):
         header = self.tableView.horizontalHeader()
         self.tableView.setColumnHidden(0, True)  # host
         header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)  # path
-        self.tableView.setColumnHidden(2, True)  # checksum
         header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # name
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # group
         self.tableView.update()
