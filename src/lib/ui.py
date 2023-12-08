@@ -1086,7 +1086,6 @@ class UIsub(Ui_MainWindow):
             df_p.reset_index(inplace=True, drop=True)
             self.set_df_project(df_p)
             self.tableUpdate()
-            print(f"Deleted {len(list_affected_groups)}, {list_affected_groups} rows.")
             self.setGraph()
         else:
             print("No files selected.")
@@ -1846,6 +1845,11 @@ class TableProjSub(QtWidgets.QTableView):
         if event.key() == QtCore.Qt.Key.Key_F2:
             ui.renameRecording()
             super().keyPressEvent(event)
+        elif event.key() == QtCore.Qt.Key.Key_Delete:
+            if ui.dict_cfg['delete_locked'] == False:
+                ui.deleteSelectedRows()
+            else:
+                print("Delete is locked. Unlock in settings.")
         else:
             super().keyPressEvent(event)
 
