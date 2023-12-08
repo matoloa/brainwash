@@ -743,7 +743,6 @@ class UIsub(Ui_MainWindow):
         # maybe learn more about that later?
         # however, I kinda like the control of putting each of them explicit here and use designer just to get the boxes right visually
         # connecting the same signals we had in original ui test
-        #self.pushButtonNewProject.pressed.connect(self.pushedButtonNewProject)
         #self.pushButtonOpenProject.pressed.connect(self.pushedButtonOpenProject)
         #self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
         self.pushButtonParse.pressed.connect(self.pushedButtonParse)
@@ -754,6 +753,48 @@ class UIsub(Ui_MainWindow):
         self.pushButtonClearGroups.pressed.connect(self.pushedButtonClearGroups)
         #self.pushButtonDelete.pressed.connect(self.pushedButtonDelete)
         #self.checkBoxLockDelete.stateChanged.connect(self.checkedBoxLockDelete)
+
+#       File menu
+        self.actionNew = QtWidgets.QAction("New project", self)
+        self.actionNew.triggered.connect(self.pushedButtonNewProject)
+        self.actionNew.setShortcut("Ctrl+N")
+        self.menuFile.addAction(self.actionNew)
+        self.actionOpen = QtWidgets.QAction("Open project", self)
+        self.actionOpen.triggered.connect(self.pushedButtonOpenProject)
+        self.menuFile.addAction(self.actionOpen)
+        self.actionOpen.setShortcut("Ctrl+O")
+        self.actionRename = QtWidgets.QAction("Rename project", self)
+        self.actionRename.triggered.connect(self.pushedButtonRenameProject)
+        self.menuFile.addAction(self.actionRename)
+        self.actionRename.setShortcut("Ctrl+R")
+
+#       Data menu
+        self.actionAddData = QtWidgets.QAction("Add data files", self)
+        self.actionAddData.triggered.connect(self.pushedButtonAddData)
+        self.menuData.addAction(self.actionAddData)
+        self.actionParse = QtWidgets.QAction("Import all added datafiles", self)
+        self.actionParse.triggered.connect(self.pushedButtonParse)
+        self.menuData.addAction(self.actionParse)
+        self.actionParse.setShortcut("Ctrl+I")
+        self.actionDelete = QtWidgets.QAction("Delete selected data", self)
+        self.actionDelete.triggered.connect(self.pushedButtonDelete)
+        self.menuData.addAction(self.actionDelete)
+        self.actionDelete.setShortcut("DEL")
+
+#       Group menu
+        self.actionAddGroup = QtWidgets.QAction("Add a group", self)
+        self.actionAddGroup.triggered.connect(self.pushedButtonAddGroup)
+        self.menuGroups.addAction(self.actionAddGroup)
+        self.actionClearGroups = QtWidgets.QAction("Clear group(s) in selection", self)
+        self.actionClearGroups.triggered.connect(self.pushedButtonClearGroups)
+        self.menuGroups.addAction(self.actionClearGroups)
+        self.actionResetGroups = QtWidgets.QAction("Remove all groups", self)
+        self.actionResetGroups.triggered.connect(self.pushedButtonEditGroups)
+        self.menuGroups.addAction(self.actionResetGroups)
+
+
+
+
 
         self.tableProj.setSelectionBehavior(TableProjSub.SelectRows)
         self.tableProj.doubleClicked.connect(self.tableProjDoubleClicked)
@@ -865,17 +906,12 @@ class UIsub(Ui_MainWindow):
 
     def pushedButtonEditGroups(self): # Open groups UI (not built)
         self.usage("pushedButtonEditGroups")
-        if verbose:
-            print("pushedButtonEditGroups")
         # Placeholder: For now, delete all buttons and groups
-        # print(f"self.gridLayout: {self.gridLayout}")
-        # print(f"range(self.gridLayout.count()): {range(self.gridLayout.count())}")
+
         self.killGroupButtons()
 
     def pushedButtonAddGroup(self):
         self.usage("pushedButtonAddGroup")
-        if verbose:
-            print("pushedButtonGroups")
         if len(self.dict_cfg['list_groups']) < 12: # TODO: hardcoded max nr of groups: move to cfg
             i = 0
             while True:
@@ -907,7 +943,12 @@ class UIsub(Ui_MainWindow):
         self.inputProjectName.setReadOnly(False)
         self.inputProjectName.selectAll()  # Select all text
         self.inputProjectName.setFocus()  # Set focus
-        self.inputProjectName.editingFinished.connect(self.renameProject)
+        try: # Only disconnect if connected
+            self.inputProjectName.editingFinished.disconnect()
+        except TypeError:
+            pass  # Ignore the TypeError that is raised when the signal isn't connected to any slots
+        finally:
+            self.inputProjectName.editingFinished.connect(self.renameProject)
 
     def pushedButtonNewProject(self):
         self.usage("pushedButtonNewProject")
@@ -1016,7 +1057,7 @@ class UIsub(Ui_MainWindow):
         df_p['groups'] = df_p['groups'].fillna(" ")
         df_p['sweeps'] = df_p['sweeps'].fillna("...")
         self.set_df_project(df_p)
-        self.tableUpdate()
+        self.tableFormat()
         if verbose:
             print("addData:", self.get_df_project())
 
@@ -1303,8 +1344,6 @@ class UIsub(Ui_MainWindow):
             self.setGraph()
 
     def renameProject(self): # changes name of project folder and updates .cfg
-        if verbose:
-            print("renameProject")
         self.dict_folders['project'].mkdir(exist_ok=True)
         new_project_name = self.inputProjectName.text()
         # check if ok
@@ -1322,6 +1361,7 @@ class UIsub(Ui_MainWindow):
             self.inputProjectName.setReadOnly(True)
             self.write_bw_cfg()
             print(f"Project renamed to {new_project_name}.")
+            self.inputProjectName.editingFinished.disconnect(self.renameProject)
         else:
             print(f"Project name {new_project_name} is not a valid path.")
 
@@ -1862,11 +1902,12 @@ class TableProjSub(QtWidgets.QTableView):
         if event.key() == QtCore.Qt.Key.Key_F2:
             ui.renameRecording()
             super().keyPressEvent(event)
-        elif event.key() == QtCore.Qt.Key.Key_Delete:
-            if ui.dict_cfg['delete_locked'] == False:
-                ui.deleteSelectedRows()
-            else:
-                print("Delete is locked. Unlock in settings.")
+#        Redundant by menu hotkeys
+#        elif event.key() == QtCore.Qt.Key.Key_Delete:
+#            if ui.dict_cfg['delete_locked'] == False:
+#                ui.deleteSelectedRows()
+#            else:
+#                print("Delete is locked. Unlock in settings.")
         else:
             super().keyPressEvent(event)
 
