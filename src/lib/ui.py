@@ -905,6 +905,8 @@ class UIsub(Ui_MainWindow):
     def pushedButtonRenameProject(self): # renameProject
         self.usage("pushedButtonRenameProject")
         self.inputProjectName.setReadOnly(False)
+        self.inputProjectName.selectAll()  # Select all text
+        self.inputProjectName.setFocus()  # Set focus
         self.inputProjectName.editingFinished.connect(self.renameProject)
 
     def pushedButtonNewProject(self):
@@ -1368,7 +1370,9 @@ class UIsub(Ui_MainWindow):
 
     def tableFormat(self):
         if verbose:
-            print("setTableDf")
+            print("tableFormat")
+        selected_rows = self.tableProj.selectionModel().selectedRows()
+        self.tableProj.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.tablemodel.setData(self.get_df_project())
         header = self.tableProj.horizontalHeader()
         df_p = self.df_project
@@ -1386,17 +1390,18 @@ class UIsub(Ui_MainWindow):
                 self.tableProj.setColumnHidden(col, False)
             else:
                 self.tableProj.setColumnHidden(col, True)
-    
-    def tableUpdate(self):
-        # Save current selection
-        selected_rows = self.tableProj.selectionModel().selectedRows()
-        print(f"selected_rows: {selected_rows}")
-        # Update model
-        self.tablemodel.setData(self.get_df_project())
-        # Restore selection
+        self.tableProj.resizeColumnsToContents()
+        total_width = 13 + sum([self.tableProj.columnWidth(i) for i in range(self.tableProj.model().columnCount(QtCore.QModelIndex())) if not self.tableProj.isColumnHidden(i)])
+        self.tableProj.setMinimumWidth(total_width)
         for index in selected_rows:
             self.tableProj.selectionModel().select(index, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
-
+    
+    def tableUpdate(self):
+        selected_rows = self.tableProj.selectionModel().selectedRows() # Save selection
+        self.tablemodel.setData(self.get_df_project())
+        self.tableProj.resizeColumnsToContents()
+        for index in selected_rows: # Restore selection
+            self.tableProj.selectionModel().select(index, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
 
 # internal dataframe handling
     def get_dfmean(self, row):
