@@ -907,7 +907,9 @@ class UIsub(Ui_MainWindow):
     def pushedButtonEditGroups(self): # Open groups UI (not built)
         self.usage("pushedButtonEditGroups")
         # Placeholder: For now, delete all buttons and groups
-
+        # clearGroupsByRow on ALL rows of df_project
+        df_p = self.get_df_project()
+        self.clearGroupsByRow(df_p.index)
         self.killGroupButtons()
 
     def pushedButtonAddGroup(self):
