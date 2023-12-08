@@ -29,6 +29,7 @@ import analysis
 
 matplotlib.use("Qt5Agg")
 
+version = "0.6.0"
 verbose = True
 talkback = True
 track_widget_focus = False
@@ -527,7 +528,7 @@ class Ui_MainWindow(QtCore.QObject):
 
     def retranslateUi(self, mainWindow):
         _translate = QtCore.QCoreApplication.translate
-        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash"))
+        mainWindow.setWindowTitle(_translate("mainWindow", f"Brainwash {version}"))
         self.pushButtonNewProject.setText(_translate("mainWindow", "New"))
         self.pushButtonOpenProject.setText(_translate("mainWindow", "Open"))
         self.inputProjectName.setText(_translate("mainWindow", "My Project"))
@@ -771,13 +772,15 @@ class UIsub(Ui_MainWindow):
         self.fqdn = socket.getfqdn() # get computer name and local domain, for project file
         if talkback:
             path_usage = Path(f"{self.projects_folder}/talkback/usage.yaml")
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             if path_usage.exists():
                 with path_usage.open("r") as file:
                     self.dict_usage = yaml.safe_load(file)
+                self.dict_usage[f"last_used_{version}"] = now
             else:
                 os_name = sys.platform
-                self.dict_usage = {'WARNING': "Do NOT set your alias to anything that can be used to identify you!", 'alias': "", 'ID': str(uuid.uuid4()), 'os_name': os_name, 'ID_created': datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-                self.write_usage()
+                self.dict_usage = {'WARNING': "Do NOT set your alias to anything that can be used to identify you!", 'alias': "", 'ID': str(uuid.uuid4()), 'os': os_name, 'ID_created': now, f"last_used_{version}": now}
+            self.write_usage()
 
     # Debugging tools
             # self.find_widgets_with_top_left_coordinates(self.centralwidget)
