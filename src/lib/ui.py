@@ -593,7 +593,7 @@ def df_projectTemplate():
             "channel",
             "stim",
             "paired_recording",
-            "intervention",
+            "Tx",
             "filter",
             "filter_params",
             "t_stim",
@@ -1189,8 +1189,8 @@ class UIsub(Ui_MainWindow):
                     print(f"{name_rec} has no paired recording.")
                     return
                 print(f"Flipping C-I for {name_rec} and {name_pair}...")
-                df_p.at[index, 'intervention'] = not df_p.at[index, 'intervention']
-                df_p.at[index_pair, 'intervention'] = not df_p.at[index, 'intervention']
+                df_p.at[index, 'Tx'] = not df_p.at[index, 'Tx']
+                df_p.at[index_pair, 'Tx'] = not df_p.at[index, 'Tx']
                 # clear caches and diff files
                 key_pair = name_rec[:-2]
                 self.dict_diffs.pop(key_pair, None)
@@ -1420,12 +1420,12 @@ class UIsub(Ui_MainWindow):
         header = self.tableProj.horizontalHeader()
         df_p = self.df_project
         # hide all columns except these:
-        list_show = [   df_p.columns.get_loc("recording_name"),
-                        df_p.columns.get_loc("groups"),
-                        df_p.columns.get_loc("sweeps")
+        list_show = [   df_p.columns.get_loc('recording_name'),
+                        df_p.columns.get_loc('groups'),
+                        df_p.columns.get_loc('sweeps')
                     ]
         if self.dict_cfg['paired_stims']:
-            list_show.append(df_p.columns.get_loc("intervention"))
+            list_show.append(df_p.columns.get_loc('Tx'))
         num_columns = df_p.shape[1]
         for col in range(num_columns):
             if col in list_show:
@@ -1600,26 +1600,26 @@ class UIsub(Ui_MainWindow):
         dfout_select = self.get_dfoutput(row=row)
         dfout_paired = self.get_dfoutput(row=row_paired)
 
-        # 3.4: check which of the paired recordings is intervention (the other being control)
-        if pd.isna(row['intervention']):
-            print("intervention is NaN - loop should trigger!")
-            row['intervention'] = False
-            # default: assume intervention has the highest max EPSP_amp, or EPSP_slope if there is no EPSP_amp
+        # 3.4: check which of the paired recordings is Tx (the other being control)
+        if pd.isna(row['Tx']):
+            print("Tx is NaN - loop should trigger!")
+            row['Tx'] = False
+            # default: assume Tx has the highest max EPSP_amp, or EPSP_slope if there is no EPSP_amp
             if any((dfout_select[col].max() > dfout_paired[col].max() for col in ['EPSP_amp', 'EPSP_slope'] if col in dfout_select.columns)):
-                row['intervention'] = True
-                row_paired['intervention'] = False
-                df_p.loc[row.name, 'intervention'] = row['intervention']
-                df_p.loc[row_paired.name, 'intervention'] = row_paired['intervention']
-                print(f"{rec_select} is intervention, {rec_paired} is control. Saving df_p...")
+                row['Tx'] = True
+                row_paired['Tx'] = False
+                df_p.loc[row.name, 'Tx'] = row['Tx']
+                df_p.loc[row_paired.name, 'Tx'] = row_paired['Tx']
+                print(f"{rec_select} is Tx, {rec_paired} is control. Saving df_p...")
                 self.set_df_project(df_p)
             elif not any(col in dfout_select.columns for col in ['EPSP_amp', 'EPSP_slope']):
                 print("Selected recording has no measurements.")
                 return
         else:
-            print("intervention is not NaN")
+            print("Tx is not NaN")
         # 3.5: set dfi and dfc    
-        if row['intervention']:
-            dfi = dfout_select # intervention output
+        if row['Tx']:
+            dfi = dfout_select # Tx output
             dfc = dfout_paired # control output
         else:
             dfi = dfout_paired
@@ -2534,7 +2534,7 @@ class Measure_window_sub(Ui_measure_window):
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
             self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, "line_EPSP_slope")].set_data([x_start, x_end], [y_start, y_end])
         self.canvas_mean.draw()
-        
+
         #update output graph
         while label2idx(axis, aspect):
             axis.lines[label2idx(axis, aspect)].remove()
