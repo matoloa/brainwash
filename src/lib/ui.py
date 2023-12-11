@@ -1361,6 +1361,7 @@ class UIsub(Ui_MainWindow):
             self.projectname = new_project_name
             self.inputProjectName.setText(self.projectname)
             self.inputProjectName.setReadOnly(True)
+            self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
             self.write_bw_cfg()
             print(f"Project renamed to {new_project_name}.")
             self.inputProjectName.editingFinished.disconnect(self.renameProject)
@@ -1753,7 +1754,7 @@ class UIsub(Ui_MainWindow):
                 _ = sns.lineplot(ax=ax1, label=f"{label}_EPSP_amp", data=out, y="EPSP_amp", x="sweep", color="black", linestyle='--')
                 # mean, amp indicator
                 y_position = dfmean[dfmean.time == t_EPSP_amp].voltage
-                self.main_canvas_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
+                self.main_canvas_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha = 0.3)
             if slope & (not np.isnan(t_EPSP_slope)):
                 _ = sns.lineplot(ax=ax2, label=f"{label}_EPSP_slope", data=out, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
                 # mean, slope indicator        
@@ -1761,7 +1762,7 @@ class UIsub(Ui_MainWindow):
                 x_end = t_EPSP_slope + 0.0003
                 y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
                 y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-                self.main_canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
+                self.main_canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='green', linewidth=10, alpha=0.3)
 
     def setGraphGroups(self, ax1, ax2, list_color):
         print(f"setGraphGroups: {self.dict_cfg['list_groups']}")
@@ -2041,6 +2042,7 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_EPSP_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
             self.v_t_EPSP_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
             self.v_t_EPSP_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
+ 
             _ = sns.lineplot(ax=self.ax2, label="old EPSP slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="gray")
 
         self.canvas_mean.axes.set_xlim(parent.dict_cfg['mean_xlim'])
@@ -2196,32 +2198,31 @@ class Measure_window_sub(Ui_measure_window):
         slope = bool(self.parent.dict_cfg['aspect_EPSP_slope'])
         rec_filter = self.row['filter'] # the filter currently used for this recording
         # Plot relevant filter of dfmean on canvas_mean, or show it if it's already plotted
-        if label2idx(self.canvas_mean, rec_filter) is False:
-            _ = sns.lineplot(ax=self.canvas_mean.axes, label=rec_filter, data=self.dfmean, y=rec_filter, x="time", color="black")
-        
-        self.canvas_mean.axes.lines[label2idx(self.canvas_mean, 'voltage')].set_visible(rec_filter=='voltage')
-        if label2idx(self.canvas_mean, 'savgol') is not False:
-            self.canvas_mean.axes.lines[label2idx(self.canvas_mean, 'savgol')].set_visible(rec_filter=='savgol')
-        # hide mean legend
-        if self.canvas_mean.axes.get_legend() is not None:
-            self.canvas_mean.axes.get_legend().set_visible(False)
-
+        self.updateMean(rec_filter=rec_filter, amp=amp, slope=slope)
         # Plot dfoutput on canvas_output, or update and show if already plotted
-        if label2idx(self.ax1, "EPSP_amp") is False:
-            _ = sns.lineplot(ax=self.ax1, label='EPSP_amp', data=self.new_dfoutput, y='EPSP_amp', x='sweep', color="black", linestyle='--')
-        else:
-            self.ax1.lines[label2idx(self.ax1, "EPSP_amp")].set_data(self.new_dfoutput['sweep'], self.new_dfoutput['EPSP_amp'])
-            self.ax1.lines[label2idx(self.ax1, "EPSP_amp")].set_visible(amp)
-
-        if label2idx(self.ax2, "EPSP_slope") is False:
-            _ = sns.lineplot(ax=self.ax2, label="EPSP_slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="black", alpha = 1)
-        else:
-            self.ax2.lines[label2idx(self.ax2, "EPSP_slope")].set_data(self.new_dfoutput['sweep'], self.new_dfoutput['EPSP_slope'])
-            self.ax2.lines[label2idx(self.ax2, "EPSP_slope")].set_visible(slope)
-
+        self.updateOutputLine(aspect='EPSP_amp', visible=amp)
+        self.updateOutputLine(aspect='EPSP_slope', visible=slope)
+        # set visibility on old EPSP amp and slope
         self.ax1.lines[label2idx(self.ax1, "old EPSP amp")].set_visible(amp)
         self.ax2.lines[label2idx(self.ax2, "old EPSP slope")].set_visible(slope)
-            
+
+        # TODO: Update y limits
+
+        sortLegend(self.ax1, self.ax2) # amplitude legends up, slopes down
+        oneAxisLeft(self.ax1, self.ax2, amp, slope)# Update axes visibility and position
+        self.canvas_mean.draw()
+        self.canvas_output.draw()
+
+    def updateMean(self, rec_filter, amp, slope):
+        ax = self.canvas_mean.axes
+        canvas = ax.figure.canvas
+        if label2idx(canvas, rec_filter) is False:
+            _ = sns.lineplot(ax=ax, label=rec_filter, data=self.dfmean, y=rec_filter, x="time", color="black")
+        ax.lines[label2idx(canvas, 'voltage')].set_visible(rec_filter=='voltage')
+        if label2idx(canvas, 'savgol') is not False:
+            ax.lines[label2idx(self.canvas_mean, 'savgol')].set_visible(rec_filter=='savgol')
+        if ax.get_legend() is not None: # hide mean legend
+            ax.get_legend().set_visible(False)
         # Display aspect indicators:
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             self.v_t_EPSP_amp.set_visible(amp)
@@ -2229,15 +2230,30 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_EPSP_slope.set_visible(slope)
             self.v_t_EPSP_slope_start.set_visible(slope)
             self.v_t_EPSP_slope_end.set_visible(slope)
+            # mean, slope indicator
+            if label2idx(self.canvas_mean, "line_EPSP_slope") is False:
+                self.canvas_mean.axes.plot([], [], color='green', linewidth=10, alpha=0.3, label="line_EPSP_slope")
+            t_EPSP_slope = self.row['t_EPSP_slope'] 
+            dfmean = self.dfmean
+            x_start = t_EPSP_slope - 0.0003
+            x_end = t_EPSP_slope + 0.0003
+            y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+            y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+            self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, "line_EPSP_slope")].set_data([x_start, x_end], [y_start, y_end])
+            self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, "line_EPSP_slope")].set_visible(slope)
 
-        # TODO: Update y limits
-
-        sortLegend(self.ax1, self.ax2) # amplitude legends up, slopes down
-        oneAxisLeft(self.ax1, self.ax2, amp, slope)# Update axes visibility and position
-
-        self.canvas_mean.draw()
-        self.canvas_output.draw()
-
+    def updateOutputLine(self, aspect, visible):
+        if aspect == 'EPSP_amp':
+            ax = self.ax1
+            style = '--'
+        else:
+            ax = self.ax2
+            style = '-'
+        if label2idx(ax, aspect) is False:
+            _ = sns.lineplot(ax=ax, label=aspect, data=self.new_dfoutput, y=aspect, x='sweep', color="black", linestyle=style)
+        else:
+            ax.lines[label2idx(ax, aspect)].set_data(self.new_dfoutput['sweep'], self.new_dfoutput[aspect])
+            ax.lines[label2idx(ax, aspect)].set_visible(visible)
 
     def accepted_handler(self):
         # Get the project dataframe
@@ -2486,25 +2502,40 @@ class Measure_window_sub(Ui_measure_window):
             plot_on_mean = {'center': ("v_" + t_aspect),
                             'start':  ("v_" + t_aspect + "_start"),
                             'end':    ("v_" + t_aspect + "_end")}
-        print(f"updateAspect, df: {df}")
+        # print(f"updateAspect, df: {df}")
         self.new_dfoutput[aspect] = df[aspect]
-        #update appropriate lineEdit
-        print(f"lineEdit_{aspect}: time{time} to ms: {self.m(time)}")
+        # update appropriate lineEdit
+        # print(f"lineEdit_{aspect}: time {time} to ms: {self.m(time)}")
         line2update = getattr(self, "lineEdit_" + aspect)
         line2update.setText(self.m(time))
 
         #update mean graph
-        for key, graph in plot_on_mean.items():
-            if hasattr(self, graph):
-                getattr(self, graph).remove() # remove the one about to be replaced
-            if key == "center":
-                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color=graph_color, linestyle="--"))
-            elif key == "start":
-                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time - 0.0003, color=graph_color, linestyle=":"))
-            elif key == "end":
-                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time + 0.0003, color=graph_color, linestyle=":"))
+        if aspect == "EPSP_slope":
+            for key, graph in plot_on_mean.items():
+                if hasattr(self, graph):
+                    getattr(self, graph).remove() # remove the one about to be replaced
+                if key == "center":
+                    setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color=graph_color, linestyle="--"))
+                elif key == "start":
+                    setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time - 0.0003, color=graph_color, linestyle=":"))
+                elif key == "end":
+                    setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time + 0.0003, color=graph_color, linestyle=":"))
+                else:
+                    print(f"updateAspect: key {key} not supported.")
+            # mean, slope indicator
+            if label2idx(self.canvas_mean, "line_EPSP_slope") is False:
+                self.canvas_mean.axes.plot([], [], color='green', linewidth=10, alpha=0.3, label="line_EPSP_slope")
+            t_EPSP_slope = self.row['t_EPSP_slope'] 
+            dfmean = self.dfmean
+            rec_filter = self.row['filter'] # the filter currently used for this recording
+            x_start = t_EPSP_slope - 0.0003
+            x_end = t_EPSP_slope + 0.0003
+            y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+            y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+            self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, "line_EPSP_slope")].set_data([x_start, x_end], [y_start, y_end])
         self.canvas_mean.draw()
-        #update output graph, voltage
+        
+        #update output graph
         while label2idx(axis, aspect):
             axis.lines[label2idx(axis, aspect)].remove()
         if self.new_dfoutput[aspect].notna().any():
