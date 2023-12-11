@@ -636,7 +636,7 @@ class UIsub(Ui_MainWindow):
 
         # Icon on rename button
         icon = QtGui.QIcon()
-        icon_path = os.path.join(self.repo_root, "rename.svg")
+        icon_path = os.path.join(self.repo_root, "rename.png")
         icon.addPixmap(QtGui.QPixmap(icon_path), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.pushButtonRenameProject.setIcon(icon)
 
