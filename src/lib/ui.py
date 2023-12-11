@@ -696,11 +696,18 @@ class UIsub(Ui_MainWindow):
             with self.project_cfg_yaml.open("r") as file:
                 self.dict_cfg = yaml.safe_load(file)
         else:
-            self.dict_cfg = {'list_groups': [], # group_X - how the program regognizes groups
+            dict_EPSP_slope_params_default = {'size': "0.0003"} # how long the slope extends in either direction from its center
+            dict_volley_slope_params_default = {'size': "0.0001"} # how long the slope extends in either direction from its center
+            self.dict_cfg = {'list_groups': [], # group_X - ID X is how the program regognizes groups, for buttons and data
                         'dict_group_name': {}, # group_X: name - how the program displays groups TODO: implement
                         'dict_group_show': {}, # group_X: True/False - whether to show group in graphs
                         'list_group_colors': ["red", "green", "blue", "yellow"], # TODO: build this list properly
-                        'delete_locked': True, # whether to allow deleting of data
+                        # defaults; if not specified in row, these are used
+                        'EPSP_slope_method_default': {},
+                        'EPSP_slope_params_default': json.dumps(dict_EPSP_slope_params_default),
+                        'volley_slope_method_default': {},
+                        'volley_slope_params_default': json.dumps(dict_volley_slope_params_default),
+                        'delete_locked': False, # whether to allow deleting of data TODO: re-implement
                         'aspect_EPSP_amp': True,
                         'aspect_EPSP_slope': True,
                         'paired_stims': False,
@@ -1958,8 +1965,6 @@ class Filetreesub(Ui_Dialog):
         dfAdd['path'] = paths
         dfAdd['host'] = str(self.parent.fqdn)
         dfAdd['filter'] = "voltage"
-        # dfAdd['recording_name']=paths
-        # dfAdd['groups']=' '
         self.tablemodel.setData(dfAdd)
         # NTH: more intelligent default naming; lowest level unique name?
         # For now, use name + lowest level folder
@@ -2343,10 +2348,24 @@ class Measure_window_sub(Ui_measure_window):
 
     def autoCalculate(self):
         dffilter = self.parent.get_dffilter(row=self.row)
+
         dict_t = analysis.find_all_t(dfmean=self.dfmean, verbose=False)
+        dict_EPSP_slope_params = {}
+        dict_volley_slope_params = {}
+        if not pd.isna(self.row['t_EPSP_slope_params']):
+            dict_EPSP_slope_params = json.loads(self.row['t_EPSP_slope_params'])
+            print(f"Stored EPSP_slope_size: {dict_EPSP_slope_params['size']}")
+        else: # read default from cfg
+            dict_EPSP_param_defaults = json.loads(self.parent.dict_cfg['EPSP_slope_params_default'])
+            dict_EPSP_slope_params['size'] = dict_EPSP_param_defaults['size']
+            self.row['t_EPSP_slope_params'] = json.dumps(dict_EPSP_slope_params)
+            print(f"Default EPSP_slope_size: {dict_EPSP_slope_params['size']}, dtype row: {type(self.row['t_EPSP_slope_params'])}")
+
+        EPSP_slope_size = float(dict_EPSP_slope_params['size'])
         self.new_dfoutput = analysis.build_dfoutput(df=dffilter,
                                        t_EPSP_amp=dict_t['t_EPSP_amp'],
-                                       t_EPSP_slope=dict_t['t_EPSP_slope'])
+                                       t_EPSP_slope=dict_t['t_EPSP_slope'],
+                                       EPSP_slope_size=EPSP_slope_size)
         self.new_dfoutput.reset_index(inplace=True)
         for aspect in supported_aspects:
             time = dict_t[f"t_{aspect}"]
@@ -2483,11 +2502,11 @@ class Measure_window_sub(Ui_measure_window):
         # update row
         self.row[t_aspect] = time
         self.row[t_method] = method
-        self.row[t_params] = "-"
+        #self.row[t_params] = "-"
         if verbose:
             print(f" . self.parent.df_project.loc[self.row.name, t_aspect]: {self.parent.df_project.loc[self.row.name, t_aspect]}, row[{t_aspect}]: {self.row[t_aspect]}")
             print(f" . self.parent.df_project.loc[self.row.name, t_method: {self.parent.df_project.loc[self.row.name, t_method]}, row[{t_method}]: {self.row[t_method]}")
-            print(f" . self.parent.df_project.loc[self.row.name, t_params]: {self.parent.df_project.loc[self.row.name, t_params]}, row[{t_params}]: {self.row[t_params]}")
+            print(f" . self.parent.df_project.loc[self.row.name, t_params]: {self.parent.df_project.loc[self.row.name, t_params]}, row[{t_params}]: {self.row[t_params]}, type: {type(self.row[t_params])}")
         #recalculate aspect
         dffilter = self.parent.get_dffilter(row=self.row)
         if aspect == "EPSP_amp":
@@ -2511,27 +2530,27 @@ class Measure_window_sub(Ui_measure_window):
 
         #update mean graph
         if aspect == "EPSP_slope":
+            dfmean = self.dfmean
+            rec_filter = self.row['filter'] # the filter currently used for this recording
+            t_EPSP_slope_size = float(json.loads(self.row['t_EPSP_slope_params'])['size'])
+            x_start = time - t_EPSP_slope_size
+            x_end = time + t_EPSP_slope_size
+            y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+            y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
             for key, graph in plot_on_mean.items():
                 if hasattr(self, graph):
                     getattr(self, graph).remove() # remove the one about to be replaced
                 if key == "center":
                     setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color=graph_color, linestyle="--"))
                 elif key == "start":
-                    setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time - 0.0003, color=graph_color, linestyle=":"))
+                    setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color=graph_color, linestyle=":"))
                 elif key == "end":
-                    setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time + 0.0003, color=graph_color, linestyle=":"))
+                    setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color=graph_color, linestyle=":"))
                 else:
                     print(f"updateAspect: key {key} not supported.")
             # mean, slope indicator
             if label2idx(self.canvas_mean, "line_EPSP_slope") is False:
                 self.canvas_mean.axes.plot([], [], color='green', linewidth=10, alpha=0.3, label="line_EPSP_slope")
-            t_EPSP_slope = self.row['t_EPSP_slope'] 
-            dfmean = self.dfmean
-            rec_filter = self.row['filter'] # the filter currently used for this recording
-            x_start = t_EPSP_slope - 0.0003
-            x_end = t_EPSP_slope + 0.0003
-            y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
-            y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
             self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, "line_EPSP_slope")].set_data([x_start, x_end], [y_start, y_end])
         self.canvas_mean.draw()
 

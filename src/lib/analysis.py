@@ -16,7 +16,7 @@ memory = Memory("joblib", verbose=1)
 
 
 # %%
-def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None):#, t_volley_amp, t_volley_slope, t_volley_slope_size, output_path):
+def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None, EPSP_slope_size=None):#, t_volley_amp, t_volley_slope, volley_slope_size, output_path):
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
     Args:
         df: a dataframe containing numbered sweeps, timestamps and voltage
