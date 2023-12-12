@@ -600,19 +600,21 @@ def df_projectTemplate():
             "t_stim",
             "t_stim_method",
             "t_stim_params",
-            "t_VEB",
-            "t_VEB_method",
-            "t_VEB_params",
             "t_volley_amp",
             "t_volley_amp_method",
             "t_volley_amp_params",
             "t_volley_slope",
+            "t_volley_slope_size",
             "t_volley_slope_method",
             "t_volley_slope_params",
+            "t_VEB",
+            "t_VEB_method",
+            "t_VEB_params",
             "t_EPSP_amp",
             "t_EPSP_amp_method",
             "t_EPSP_amp_params",
             "t_EPSP_slope",
+            "t_EPSP_slope_size",
             "t_EPSP_slope_method",
             "t_EPSP_slope_params",
             "exclude",
@@ -697,17 +699,17 @@ class UIsub(Ui_MainWindow):
             with self.project_cfg_yaml.open("r") as file:
                 self.dict_cfg = yaml.safe_load(file)
         else:
-            dict_EPSP_slope_params_default = {'size': "0.0003"} # how long the slope extends in either direction from its center
-            dict_volley_slope_params_default = {'size': "0.0001"} # how long the slope extends in either direction from its center
             self.dict_cfg = {'list_groups': [], # group_X - ID X is how the program regognizes groups, for buttons and data
                         'dict_group_name': {}, # group_X: name - how the program displays groups TODO: implement
                         'dict_group_show': {}, # group_X: True/False - whether to show group in graphs
                         'list_group_colors': ["red", "green", "blue", "yellow"], # TODO: build this list properly
                         # defaults; if not specified in row, these are used
+                        'EPSP_slope_size_default': 0.0003,
                         'EPSP_slope_method_default': {},
-                        'EPSP_slope_params_default': json.dumps(dict_EPSP_slope_params_default),
+                        'EPSP_slope_params_default': {},
+                        'volley_slope_size_default': 0.0001,
                         'volley_slope_method_default': {},
-                        'volley_slope_params_default': json.dumps(dict_volley_slope_params_default),
+                        'volley_slope_params_default': {},
                         'delete_locked': False, # whether to allow deleting of data TODO: re-implement
                         'aspect_EPSP_amp': True,
                         'aspect_EPSP_slope': True,
@@ -863,7 +865,7 @@ class UIsub(Ui_MainWindow):
         dict_folders = {
                     'project': self.projects_folder / self.projectname,
                     'data': self.projects_folder / self.projectname / 'data',
-                    'cache': self.projects_folder / 'cache' / self.projectname,
+                    'cache': self.projects_folder / f'cache {version}' / self.projectname,
         }
         return dict_folders
 
@@ -1161,9 +1163,10 @@ class UIsub(Ui_MainWindow):
             recording_name = df_proj_row['recording_name']
             source_path = df_proj_row['path']
             if df_proj_row['sweeps'] == "...":  # indicates not read before TODO: Replace with selector!
+                # if the source_path ends with .csv
                 dict_data = parse.parseProjFiles(dict_folders = self.dict_folders, recording_name=recording_name, source_path=source_path)
-                for new_name, dict_sub in dict_data.items(): # Access 'nsweeps' from the current dictionary
-                    nsweeps = dict_sub.get('nsweeps', None)
+                for new_name, dict_sub in dict_data.items():
+                    nsweeps = dict_sub.get('nsweeps', None) # Access 'nsweeps' from the current dictionary
                     if nsweeps is not None:
                         df_proj_new_row = df_proj_row.copy()
                         df_proj_new_row['ID'] = uuid.uuid4()
@@ -1900,6 +1903,8 @@ class TableProjSub(QtWidgets.QTableView):
             dfAdd['path'] = file_urls # needs to be first, as it sets the number of rows
             dfAdd['host'] = str(self.parent.fqdn)
             dfAdd['filter'] = "voltage"
+            dfAdd['t_EPSP_slope_size'] = self.parent.dict_cfg['EPSP_slope_size_default']
+            dfAdd['t_volley_slope_size'] = self.parent.dict_cfg['volley_slope_size_default']
             # NTH: more intelligent default naming; lowest level unique name?
             # For now, use name + lowest level folder
             names = []
@@ -2282,7 +2287,7 @@ class Measure_window_sub(Ui_measure_window):
             t_end = self.row['t_stim'] + 0.018
             dfevent = self.dfmean[(self.dfmean['time'] >= t_start) & (self.dfmean['time'] < t_end)]
             dfevent = dfevent[['time', 'voltage']]
-            path_talkback_df = Path(f"{self.parent.projects_folder}/talkback/{self.parent.projectname}/talkback_slice_{self.row['recording_name']}.csv")
+            path_talkback_df = Path(f"{self.parent.projects_folder}/talkback/talkback_slice_{self.row['ID']}.csv")
             if not path_talkback_df.parent.exists():
                 path_talkback_df.parent.mkdir(parents=True, exist_ok=True)
             dfevent.to_csv(path_talkback_df, index=False)
@@ -2292,16 +2297,19 @@ class Measure_window_sub(Ui_measure_window):
             dict_event['t_EPSP_amp_method'] = self.row['t_EPSP_amp_method']
             dict_event['t_EPSP_amp_params'] = self.row['t_EPSP_amp_params']
             dict_event['t_EPSP_slope'] = self.row['t_EPSP_slope']
+            dict_event['t_EPSP_slope_size'] = self.row['t_EPSP_slope_size']
             dict_event['t_EPSP_slope_method'] = self.row['t_EPSP_slope_method']
             dict_event['t_EPSP_slope_params'] = self.row['t_EPSP_slope_params']
+            # TODO: For the future
             dict_event['t_volley_amp'] = self.row['t_volley_amp']
             dict_event['t_volley_amp_method'] = self.row['t_volley_amp_method']
             dict_event['t_volley_amp_params'] = self.row['t_volley_amp_params']
             dict_event['t_volley_slope'] = self.row['t_volley_slope']
+            dict_event['t_volley_slope_size'] = self.row['t_volley_slope_size']
             dict_event['t_volley_slope_method'] = self.row['t_volley_slope_method']
             dict_event['t_volley_slope_params'] = self.row['t_volley_slope_params']
             # store dict_event as .csv named after recording_name
-            path_talkback = Path(f"{self.parent.projects_folder}/talkback/{self.parent.projectname}/talkback_meta_{self.row['recording_name']}.csv")
+            path_talkback = Path(f"{self.parent.projects_folder}/talkback/talkback_meta_{self.row['ID']}.csv")
             with open(path_talkback, 'w') as f:
                 json.dump(dict_event, f)
 
@@ -2351,20 +2359,14 @@ class Measure_window_sub(Ui_measure_window):
 
     def autoCalculate(self):
         dffilter = self.parent.get_dffilter(row=self.row)
-
         dict_t = analysis.find_all_t(dfmean=self.dfmean, verbose=False)
-        dict_EPSP_slope_params = {}
-        dict_volley_slope_params = {}
-        if not pd.isna(self.row['t_EPSP_slope_params']):
-            dict_EPSP_slope_params = json.loads(self.row['t_EPSP_slope_params'])
-            print(f"Stored EPSP_slope_size: {dict_EPSP_slope_params['size']}")
+        if not pd.isna(self.row['t_EPSP_slope_size']):
+            EPSP_slope_size = self.row['t_EPSP_slope_size']
+            print(f"Local EPSP_slope_size: {EPSP_slope_size}, type: {type(EPSP_slope_size)}")
         else: # read default from cfg
-            dict_EPSP_param_defaults = json.loads(self.parent.dict_cfg['EPSP_slope_params_default'])
-            dict_EPSP_slope_params['size'] = dict_EPSP_param_defaults['size']
-            self.row['t_EPSP_slope_params'] = json.dumps(dict_EPSP_slope_params)
-            print(f"Default EPSP_slope_size: {dict_EPSP_slope_params['size']}, dtype row: {type(self.row['t_EPSP_slope_params'])}")
-
-        EPSP_slope_size = float(dict_EPSP_slope_params['size'])
+            EPSP_slope_size = self.parent.dict_cfg['EPSP_slope_size_default']
+            print(f"Default EPSP_slope_size: {EPSP_slope_size}, type: {type(EPSP_slope_size)}")
+            self.row['t_EPSP_slope_size'] = EPSP_slope_size
         self.new_dfoutput = analysis.build_dfoutput(df=dffilter,
                                        t_EPSP_amp=dict_t['t_EPSP_amp'],
                                        t_EPSP_slope=dict_t['t_EPSP_slope'],
@@ -2500,14 +2502,15 @@ class Measure_window_sub(Ui_measure_window):
     def updateAspect(self, time, aspect, method):
         # changes the measuring points of an aspect and propagates the change to the appropriate columns in df_project
         t_aspect  = ("t_" + aspect)
+        t_size = (t_aspect + "_size")
         t_method = (t_aspect + "_method")
         t_params = (t_aspect + "_params")
         # update row
         self.row[t_aspect] = time
         self.row[t_method] = method
-        #self.row[t_params] = "-"
         if verbose:
             print(f" . self.parent.df_project.loc[self.row.name, t_aspect]: {self.parent.df_project.loc[self.row.name, t_aspect]}, row[{t_aspect}]: {self.row[t_aspect]}")
+            print(f" . self.parent.df_project.loc[self.row.name, t_size]: {self.parent.df_project.loc[self.row.name, t_size]}, row[{t_size}]: {self.row[t_size]}")
             print(f" . self.parent.df_project.loc[self.row.name, t_method: {self.parent.df_project.loc[self.row.name, t_method]}, row[{t_method}]: {self.row[t_method]}")
             print(f" . self.parent.df_project.loc[self.row.name, t_params]: {self.parent.df_project.loc[self.row.name, t_params]}, row[{t_params}]: {self.row[t_params]}, type: {type(self.row[t_params])}")
         #recalculate aspect
@@ -2535,7 +2538,7 @@ class Measure_window_sub(Ui_measure_window):
         if aspect == "EPSP_slope":
             dfmean = self.dfmean
             rec_filter = self.row['filter'] # the filter currently used for this recording
-            t_EPSP_slope_size = float(json.loads(self.row['t_EPSP_slope_params'])['size'])
+            t_EPSP_slope_size = self.row['t_EPSP_slope_size']
             x_start = time - t_EPSP_slope_size
             x_end = time + t_EPSP_slope_size
             y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
@@ -2669,7 +2672,7 @@ def sortLegend(ax1, ax2):
         ax2.legend(loc='lower right')
 
 
-def unPlot(canvas, *artists): # remove line if it exists on canvas
+def unPlot(canvas, *artists): # Remove line if it exists on canvas
     #print(f"unPlot - canvas: {canvas}, artists: {artists}")
     for artist in artists:
         artists_on_canvas = canvas.axes.get_children()
@@ -2677,10 +2680,22 @@ def unPlot(canvas, *artists): # remove line if it exists on canvas
             #print(f"unPlot - removed artist: {artist}")
             artist.remove()
 
-def label2idx(canvas, aspect):
+def label2idx(canvas, aspect): # Returns the index of the line labeled 'aspect' on 'canvas', or False if there is none.
     dict_labels = {k.get_label(): v for (v, k) in enumerate(canvas.axes.lines)}
     return dict_labels.get(aspect, False)
 
+def outputAutoScale(ax, df, aspect): # Sets the y limits of ax to the min and max of df[aspect] TODO: not used
+    if aspect == "EPSP_amp":
+        ax.set_ylim(df['EPSP_amp'].min() - 0.1, df['EPSP_amp'].max() + 0.1)
+    elif aspect == "EPSP_slope":
+        ax.set_ylim(df['EPSP_slope'].min() - 0.1, df['EPSP_slope'].max() + 0.1)
+    else:
+        print(f"autoScale: {aspect} not supported.")
+
+def setKey(cell, key, value):  # convert string to dict, update key with value, and return the updated dict as string
+    dict = json.loads(cell)
+    dict[key] = str(value)
+    return json.dumps(dict)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

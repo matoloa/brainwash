@@ -216,6 +216,7 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
     """
     def parser(dict_folders, recording_name, source_path):
         df = None
+        dict_data = {}
         if verbose:
             print(f" - parser, source_path: {source_path}")
         if Path(source_path).is_dir():
@@ -236,7 +237,24 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
         else:
             # set filetype to last 3 letters of filename
             filetype = source_path[-3:]
-            if filetype == "abf":
+            if filetype == "csv":
+                df = pd.read_csv(source_path)
+                #file_base for .csv is the filename without the filetype
+                file_base = source_path.split("/")[-1].split(".")[0]
+                persistdf(file_base=file_base, dict_folders=dict_folders, dfdata=df)
+                dict_sub = {
+                    'nsweeps': df['sweep'].nunique(),
+                    # channel is comes after the last Ch in the filename, and ends before the first _
+                    'channel': source_path.split("Ch")[-1].split("_")[0],
+                    # stim is the last letter in the filename, before the .csv
+                    'stim': source_path.split("_")[-1].split(".")[0],
+                    # reset is the first sweep number after every sweep_raw reset: finds recording breaks for display purposes
+                    # TODO: this is not implemented for .csv files
+                    }
+                # TODO: Add checks for csv files; must be brainwash formatted!
+                dict_data[file_base] = dict_sub
+                return dict_data
+            elif filetype == "abf":
                 df = parse_abf(filepath=Path(source_path))
             # TODO: add function to parse single .ibw files
         if df is None:
@@ -259,7 +277,6 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
         dfcopy = df.copy()
         dfcopy = dfcopy.sort_values(by=['datetime', 'channel']).reset_index(drop=True)
         dfcopy['sweep_raw'] = dfcopy.index.to_numpy() // (sweeplength * nchannels)
-        dict_data = {}
 
         for channel in dfcopy.channel.unique():
             df_ch = dfcopy[dfcopy.channel==channel]
@@ -288,7 +305,6 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
                     'reset': df_ch_st[(df_ch_st['sweep_raw'] == df_ch_st['sweep_raw'].min()) & (df_ch_st['time'] == 0)]['sweep'].tolist()[1:]
                 }
                 dict_data[f"{recording_name}_Ch{channel}_{stim}"] = dict_sub
-
         return dict_data
 
     if verbose:
