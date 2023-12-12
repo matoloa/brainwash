@@ -584,6 +584,7 @@ class Ui_Dialog(QtWidgets.QWidget):
 def df_projectTemplate():
     return pd.DataFrame(
         columns=[
+            "ID",
             "host",
             "path",
             "recording_name",
@@ -999,7 +1000,7 @@ class UIsub(Ui_MainWindow):
 
     def pushedButtonParse(self): # parse non-parsed files and folders in self.df_project
         self.usage("pushedButtonParse")
-        self.parse_data()
+        self.parseData()
 
 
 # Non-button event functions
@@ -1152,7 +1153,7 @@ class UIsub(Ui_MainWindow):
         else:
             print("No files selected.")
 
-    def parse_data(self): # parse data files and modify self.df_project accordingly
+    def parseData(self): # parse data files and modify self.df_project accordingly
         df_p = self.get_df_project()
         update_frame = df_p.copy()  # copy from which to remove rows without confusing index
         rows = []
@@ -1165,6 +1166,7 @@ class UIsub(Ui_MainWindow):
                     nsweeps = dict_sub.get('nsweeps', None)
                     if nsweeps is not None:
                         df_proj_new_row = df_proj_row.copy()
+                        df_proj_new_row['ID'] = uuid.uuid4()
                         df_proj_new_row['recording_name'] = new_name
                         df_proj_new_row['sweeps'] = nsweeps
                         df_proj_new_row['channel'] = dict_sub.get('channel', None)
@@ -1427,7 +1429,8 @@ class UIsub(Ui_MainWindow):
         header = self.tableProj.horizontalHeader()
         df_p = self.df_project
         # hide all columns except these:
-        list_show = [   df_p.columns.get_loc('recording_name'),
+        list_show = [   
+                        df_p.columns.get_loc('recording_name'),
                         df_p.columns.get_loc('groups'),
                         df_p.columns.get_loc('sweeps')
                     ]
