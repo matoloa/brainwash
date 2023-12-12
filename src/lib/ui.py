@@ -2084,9 +2084,9 @@ class Measure_window_sub(Ui_measure_window):
         # Iterate through supported_aspects, connecting buttons and lineEdits
         def loopConnectAspects(aspect):
             aspect_button = getattr(self, f"pushButton_{aspect}")
-            aspect_edit = getattr(self, f"lineEdit_{aspect}")
             aspect_button.setCheckable(True)
             aspect_button.pressed.connect(lambda: self.toggle(aspect_button, aspect))
+            aspect_edit = getattr(self, f"lineEdit_{aspect}")
             aspect_edit.setText(self.m(self.row[f"t_{aspect}"]))
             aspect_edit.editingFinished.connect(lambda: self.updateOnEdit(aspect_edit, aspect))
         for aspect in supported_aspects:
@@ -2101,6 +2101,17 @@ class Measure_window_sub(Ui_measure_window):
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
         self.pushButton_auto.clicked.connect(self.autoCalculate)
+        def loopConnectSizes(slope):
+            size_button = getattr(self, f"pushButton_{slope}_size")
+            size_button.setCheckable(True)
+            size_button.pressed.connect(lambda: self.toggle(size_button, slope))
+            size_edit = getattr(self, f"lineEdit_{slope}_size")
+            size_edit.setText(self.m(self.row[f"t_{slope}_slope_size"]))
+            size_edit.editingFinished.connect(lambda: self.updateSize(time=size_edit.text(), slope=slope))
+        self.slopes = ["EPSP", "volley"]
+        for slope in self.slopes:
+            loopConnectSizes(slope=slope)
+
         # check the radiobutton of the current filter, per row['filter']
         row_filter = self.row['filter']
         self.radioButton_filter_none.setChecked(row_filter=="voltage")
@@ -2116,6 +2127,23 @@ class Measure_window_sub(Ui_measure_window):
         self.buttonBox.rejected.connect(self.measure_frame.close)
         self.updatePlots()
 
+
+    def updateSize(self, time, slope):
+        # update the size of the selected sample
+        print(f"updateSize: {time}, {slope}")
+
+
+    def toggle(self, button, aspect): # updates aspect, sets "button" to active state, and all other buttons to inactive
+        if aspect in supported_aspects:
+            self.aspect = aspect
+        else:
+            print(f"toggle: {aspect} is not a supported aspect.")
+            return
+        for i_aspect in supported_aspects:
+            un_button = getattr(self, f"pushButton_{i_aspect}")
+            un_button.setStyleSheet(self.default_color)
+        button.setStyleSheet(self.selected_color)
+        
 
     def updateFilter(self, filter, param_edit=False):
         self.row['filter'] = filter
@@ -2382,14 +2410,6 @@ class Measure_window_sub(Ui_measure_window):
         return str(round(SI * 1000, 1)) # TODO: single decimal assumes 10KHz sampling rate; make this more flexible
 
 
-    def toggle(self, button, aspect): # updates aspect, sets "button" to active state, and all other buttons to inactive
-        self.aspect = aspect
-        for i_aspect in supported_aspects:
-            un_button = getattr(self, f"pushButton_{i_aspect}")
-            un_button.setStyleSheet(self.default_color)
-        button.setStyleSheet(self.selected_color)
-
-
     def dfmeanDerivates(self, df): # plots prim and bis of df on canvas_mean
         # Prim and Bis: filter to display only the relevant part of the trace, and rescale to match voltage
         filtered_df = df.copy()
@@ -2497,7 +2517,7 @@ class Measure_window_sub(Ui_measure_window):
             print("Invalid input: must be a number within time range.")
             lineEdit.setText("")
         self.updateAspect(time=time, aspect=aspect, method="Manual")
-    
+
 
     def updateAspect(self, time, aspect, method):
         # changes the measuring points of an aspect and propagates the change to the appropriate columns in df_project
