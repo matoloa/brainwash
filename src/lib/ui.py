@@ -1669,6 +1669,9 @@ class UIsub(Ui_MainWindow):
         dfmean = self.get_dfmean(row=row)
         df_p = self.get_df_project()
         dict_t = analysis.find_all_t(dfmean=dfmean, verbose=False)
+        # Default sizes
+        dict_t['t_EPSP_slope_size'] = self.dict_cfg['EPSP_slope_size_default']
+        dict_t['t_volley_slope_size'] = self.dict_cfg['volley_slope_size_default']
         persist = False
         for aspect, value in dict_t.items():
             old_aspect_value = df_p.loc[row.name, aspect]
@@ -1682,7 +1685,7 @@ class UIsub(Ui_MainWindow):
                 persist = True
         if persist:
             self.set_df_project(df_p)
-        dfoutput = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=dict_t['t_EPSP_amp'], t_EPSP_slope=dict_t['t_EPSP_slope'])
+        dfoutput = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=dict_t['t_EPSP_amp'], t_EPSP_slope=dict_t['t_EPSP_slope'], t_EPSP_slope_size=dict_t['t_EPSP_slope_size'], t_volley_amp=dict_t['t_volley_amp'], t_volley_slope=dict_t['t_volley_slope'], t_volley_slope_size=dict_t['t_volley_slope_size'])
         dfoutput.reset_index(inplace=True)
         return dfoutput
 
@@ -1775,8 +1778,10 @@ class UIsub(Ui_MainWindow):
                 # mean, slope indicator        
                 x_start = t_EPSP_slope - t_EPSP_slope_size
                 x_end = t_EPSP_slope + t_EPSP_slope_size
+                print(f"t_EPSP_slope: {t_EPSP_slope}, x_start: {x_start}, x_end: {x_end}, dtype: {type(t_EPSP_slope)}, {type(x_start)}, {type(x_end)}")
                 y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
                 y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+                print(f"y_start: {y_start}, y_end: {y_end}, dtype: {type(y_start)}, {type(y_end)}")
                 self.main_canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='green', linewidth=10, alpha=0.3)
 
     def setGraphGroups(self, ax1, ax2, list_color):
@@ -1905,8 +1910,6 @@ class TableProjSub(QtWidgets.QTableView):
             dfAdd['path'] = file_urls # needs to be first, as it sets the number of rows
             dfAdd['host'] = str(self.parent.fqdn)
             dfAdd['filter'] = "voltage"
-            dfAdd['t_EPSP_slope_size'] = self.parent.dict_cfg['EPSP_slope_size_default']
-            dfAdd['t_volley_slope_size'] = self.parent.dict_cfg['volley_slope_size_default']
             # NTH: more intelligent default naming; lowest level unique name?
             # For now, use name + lowest level folder
             names = []
@@ -2326,6 +2329,7 @@ class Measure_window_sub(Ui_measure_window):
             dfevent.to_csv(path_talkback_df, index=False)
             # save the event data as a dict
             dict_event = {}
+            dict_event['alias'] = self.row['alias']
             dict_event['t_EPSP_amp'] = self.row['t_EPSP_amp']
             dict_event['t_EPSP_amp_method'] = self.row['t_EPSP_amp_method']
             dict_event['t_EPSP_amp_params'] = self.row['t_EPSP_amp_params']
@@ -2393,7 +2397,7 @@ class Measure_window_sub(Ui_measure_window):
     def autoCalculate(self):
         dffilter = self.parent.get_dffilter(row=self.row)
         dict_t = analysis.find_all_t(dfmean=self.dfmean, verbose=False)
-        # Default size
+        # Default sizes
         dict_t['t_EPSP_slope_size'] = self.parent.dict_cfg['EPSP_slope_size_default']
         dict_t['t_volley_slope_size'] = self.parent.dict_cfg['volley_slope_size_default']
         print(f"dict_t: {dict_t}")
