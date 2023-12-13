@@ -16,18 +16,16 @@ memory = Memory("joblib", verbose=1)
 
 
 # %%
-def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None, EPSP_slope_size=None):#, t_volley_amp, t_volley_slope, volley_slope_size, output_path):
+def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None, t_EPSP_slope_size=None, t_volley_amp=None, t_volley_slope=None, t_volley_slope_size=None):
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
     Args:
         df: a dataframe containing numbered sweeps, timestamps and voltage
         t_EPSP_amp: time of lowest point of EPSP
         t_EPSP_slope: time of centre of EPSP_slope
-        t_EPSP_slope_size: width of EPSP slope
+        t_EPSP_slope_size: width of EPSP slope (radius)
         t_volley_amp: time of lowest point of volley
         t_volley_slope: time of centre of volley_slope
-        t_volley_slope_size: width of volley slope
-        Optional
-            output_path: if present, store results to this path (csv)
+        t_volley_slope_size: width of volley slope (radius)
     Returns:
         a dataframe. Per sweep (row): EPSP_amp, EPSP_slope, volley_amp, volley_EPSP
     """
@@ -45,15 +43,32 @@ def build_dfoutput(df, filter='voltage', t_EPSP_amp=None, t_EPSP_slope=None, EPS
             dfoutput['EPSP_amp'] = np.nan
         list_col.append('EPSP_amp')
     # EPSP_slope
-    if t_EPSP_slope is not None:
+    if t_EPSP_slope is not None and t_EPSP_slope_size is not None:
         if t_EPSP_slope is not np.nan:
-            df_EPSP_slope = measureslope_vec(df=df, filter=filter, t_slope=t_EPSP_slope, halfwidth=0.0003)
+            df_EPSP_slope = measureslope_vec(df=df, filter=filter, t_slope=t_EPSP_slope, halfwidth=t_EPSP_slope_size)
             dfoutput['EPSP_slope'] = -df_EPSP_slope['value'] # invert 
         else:
             dfoutput['EPSP_slope'] = np.nan
         list_col.append('EPSP_slope')
+    # volley_amp
+    if t_volley_amp is not None:
+        if t_volley_amp is not np.nan:
+            df_volley_amp = df[df['time']==t_volley_amp].copy() # filter out all time (from sweep start) that do not match t_volley_amp
+            df_volley_amp.reset_index(inplace=True, drop=True)
+            dfoutput['volley_amp'] = -1000 * df_volley_amp[filter] # invert and convert to mV
+        else:
+            dfoutput['volley_amp'] = np.nan
+        list_col.append('volley_amp')
+    # volley_slope
+    if t_volley_slope is not None and t_volley_slope_size is not None:
+        if t_volley_slope is not np.nan:
+            df_volley_slope = measureslope_vec(df=df, filter=filter, t_slope=t_volley_slope, halfwidth=t_volley_slope_size)
+            dfoutput['volley_slope'] = -df_volley_slope['value'] # invert 
+        else:
+            dfoutput['volley_slope'] = np.nan
+        list_col.append('volley_slope')
     t1 = time.time()
-    print(f'build_dfoutput: {t1-t0} seconds')
+    print(f'build_dfoutput: {t1-t0} seconds, list_col: {list_col}')
     return dfoutput[list_col]
 
 
@@ -236,7 +251,10 @@ def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
         "i_stim": np.nan,
         "i_VEB": np.nan,
         "i_EPSP_amp": np.nan,
-        "i_EPSP_slope": np.nan}
+        "i_EPSP_slope": np.nan,
+        "i_volley_amp": np.nan,
+        "i_volley_slope": np.nan,
+        }
     dict_i['i_stim'] = find_i_stim_prim_max(dfmean=dfmean,)
     if dict_i['i_stim'] is np.nan: # TODO: will not happen in current configuration
         return dict_i
@@ -247,13 +265,13 @@ def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
     if dict_i['i_VEB'] is np.nan:
         return dict_i
     dict_i['i_EPSP_slope'] = find_i_EPSP_slope_bis0(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
-    """
-    i_volleyslope = find_i_volleyslope(
-        dfmean, (i_stim + param_min_time_from_i_stim), i_VEB, happy=True)
-    """
+    if dict_i['i_EPSP_slope'] is np.nan:
+        return dict_i
+    dict_i['i_volley_slope'] = find_i_volleyslope(dfmean=dfmean, i_stim=dict_i['i_stim'], i_VEB=dict_i['i_VEB'], happy=True)
+    if dict_i['i_volley_slope'] is np.nan:
+        return dict_i
+    dict_i['i_volley_amp'] = dict_i['i_volley_slope'] + 3 # TODO: This is a placeholder
     return dict_i
- 
-
 
 
 # %%
@@ -276,6 +294,7 @@ def find_all_t(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
         print("find_all_t")
     #print(f' . dfmean: {dfmean}')
     dict_i = find_all_i(dfmean, param_min_time_from_i_stim=0.0005)
+    print (f"dict_i: {dict_i}")
     dict_t = i2t(dfmean, dict_i)
     if verbose:
         print(f"dict_t: {dict_t}")

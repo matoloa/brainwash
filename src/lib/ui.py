@@ -272,12 +272,12 @@ class Ui_measure_window(QtCore.QObject):
         self.pushButton_EPSP_amp = QtWidgets.QPushButton(self.frame_measure_toolbox)
         self.pushButton_EPSP_amp.setGeometry(QtCore.QRect(10, 100, 83, 25))
         self.pushButton_EPSP_amp.setObjectName("pushButton_EPSP_amp")
-        self.pushButton_EPSP_size = QtWidgets.QPushButton(self.frame_measure_toolbox)
-        self.pushButton_EPSP_size.setGeometry(QtCore.QRect(10, 70, 83, 25))
-        self.pushButton_EPSP_size.setObjectName("pushButton_EPSP_size")
-        self.pushButton_volley_size = QtWidgets.QPushButton(self.frame_measure_toolbox)
-        self.pushButton_volley_size.setGeometry(QtCore.QRect(170, 70, 83, 25))
-        self.pushButton_volley_size.setObjectName("pushButton_volley_size")
+        self.pushButton_EPSP_slope_size = QtWidgets.QPushButton(self.frame_measure_toolbox)
+        self.pushButton_EPSP_slope_size.setGeometry(QtCore.QRect(10, 70, 83, 25))
+        self.pushButton_EPSP_slope_size.setObjectName("pushButton_EPSP_slope_size")
+        self.pushButton_volley_slope_size = QtWidgets.QPushButton(self.frame_measure_toolbox)
+        self.pushButton_volley_slope_size.setGeometry(QtCore.QRect(170, 70, 83, 25))
+        self.pushButton_volley_slope_size.setObjectName("pushButton_volley_slope_size")
         self.pushButton_volley_amp = QtWidgets.QPushButton(self.frame_measure_toolbox)
         self.pushButton_volley_amp.setGeometry(QtCore.QRect(170, 100, 83, 25))
         self.pushButton_volley_amp.setObjectName("pushButton_volley_amp")
@@ -293,15 +293,15 @@ class Ui_measure_window(QtCore.QObject):
         self.lineEdit_volley_slope = QtWidgets.QLineEdit(self.frame_measure_toolbox)
         self.lineEdit_volley_slope.setGeometry(QtCore.QRect(260, 40, 51, 25))
         self.lineEdit_volley_slope.setObjectName("lineEdit_volley_slope")
-        self.lineEdit_volley_size = QtWidgets.QLineEdit(self.frame_measure_toolbox)
-        self.lineEdit_volley_size.setGeometry(QtCore.QRect(260, 70, 51, 25))
-        self.lineEdit_volley_size.setObjectName("lineEdit_volley_size")
+        self.lineEdit_volley_slope_size = QtWidgets.QLineEdit(self.frame_measure_toolbox)
+        self.lineEdit_volley_slope_size.setGeometry(QtCore.QRect(260, 70, 51, 25))
+        self.lineEdit_volley_slope_size.setObjectName("lineEdit_volley_slope_size")
         self.lineEdit_volley_amp = QtWidgets.QLineEdit(self.frame_measure_toolbox)
         self.lineEdit_volley_amp.setGeometry(QtCore.QRect(260, 100, 51, 25))
         self.lineEdit_volley_amp.setObjectName("lineEdit_volley_amp")
-        self.lineEdit_EPSP_size = QtWidgets.QLineEdit(self.frame_measure_toolbox)
-        self.lineEdit_EPSP_size.setGeometry(QtCore.QRect(100, 70, 51, 25))
-        self.lineEdit_EPSP_size.setObjectName("lineEdit_EPSP_size")
+        self.lineEdit_EPSP_slope_size = QtWidgets.QLineEdit(self.frame_measure_toolbox)
+        self.lineEdit_EPSP_slope_size.setGeometry(QtCore.QRect(100, 70, 51, 25))
+        self.lineEdit_EPSP_slope_size.setObjectName("lineEdit_EPSP_slope_size")
         self.lineEdit_EPSP_amp = QtWidgets.QLineEdit(self.frame_measure_toolbox)
         self.lineEdit_EPSP_amp.setGeometry(QtCore.QRect(100, 100, 51, 25))
         self.lineEdit_EPSP_amp.setObjectName("lineEdit_EPSP_amp")
@@ -358,8 +358,8 @@ class Ui_measure_window(QtCore.QObject):
         measure.setWindowTitle(_translate("measure", "Placeholder Window Title"))
         self.pushButton_EPSP_slope.setText(_translate("measure", "EPSP slope"))
         self.pushButton_EPSP_amp.setText(_translate("measure", "EPSP amp."))
-        self.pushButton_EPSP_size.setText(_translate("measure", "EPSP size"))
-        self.pushButton_volley_size.setText(_translate("measure", "Volley size"))
+        self.pushButton_EPSP_slope_size.setText(_translate("measure", "EPSP size"))
+        self.pushButton_volley_slope_size.setText(_translate("measure", "Volley size"))
         self.pushButton_volley_amp.setText(_translate("measure", "Volley amp."))
         self.pushButton_volley_slope.setText(_translate("measure", "Volley slope"))
         self.label_EPSP_ms.setText(_translate("measure", "ms"))
@@ -1747,8 +1747,10 @@ class UIsub(Ui_MainWindow):
         for i, row in df_analyzed.iterrows(): # TODO: i to be used later for cycling colours?
             dfmean = self.get_dfmean(row=row)
             dfoutput = self.get_dfoutput(row=row)
-            t_EPSP_amp = self.get_df_project().loc[i, 't_EPSP_amp']
-            t_EPSP_slope = self.get_df_project().loc[i, 't_EPSP_slope']
+            df_p = self.get_df_project()
+            t_EPSP_amp = df_p.loc[i, 't_EPSP_amp']
+            t_EPSP_slope = df_p.loc[i, 't_EPSP_slope']
+            t_EPSP_slope_size = df_p.loc[i, 't_EPSP_slope_size']
             # plot relevant filter of dfmean on main_canvas_mean
             label = f"{row['recording_name']}"
             rec_filter = row['filter'] # the filter currently used for this recording
@@ -1771,8 +1773,8 @@ class UIsub(Ui_MainWindow):
             if slope & (not np.isnan(t_EPSP_slope)):
                 _ = sns.lineplot(ax=ax2, label=f"{label}_EPSP_slope", data=out, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
                 # mean, slope indicator        
-                x_start = t_EPSP_slope - 0.0003
-                x_end = t_EPSP_slope + 0.0003
+                x_start = t_EPSP_slope - t_EPSP_slope_size
+                x_end = t_EPSP_slope + t_EPSP_slope_size
                 y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
                 y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
                 self.main_canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='green', linewidth=10, alpha=0.3)
@@ -2050,13 +2052,24 @@ class Measure_window_sub(Ui_measure_window):
             _ = sns.lineplot(ax=self.ax1, label="old EPSP amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="gray")
         if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
             t_EPSP_slope = self.row['t_EPSP_slope']
-            x_start = t_EPSP_slope - 0.0003 # TODO: make this a variable
-            x_end = t_EPSP_slope + 0.0003 # TODO: make this the same variable
+            x_start = t_EPSP_slope - self.row['t_EPSP_slope_size']
+            x_end = t_EPSP_slope + self.row['t_EPSP_slope_size']
             self.v_t_EPSP_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
             self.v_t_EPSP_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
             self.v_t_EPSP_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
- 
             _ = sns.lineplot(ax=self.ax2, label="old EPSP slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="gray")
+        if 'volley_amp' in self.new_dfoutput.columns and self.new_dfoutput['volley_amp'].notna().any():
+            t_volley_amp = self.row['t_volley_amp']
+            self.v_t_volley_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_volley_amp, color="blue", linestyle="--")
+            _ = sns.lineplot(ax=self.ax1, label="old volley amp", data=self.new_dfoutput, y="volley_amp", x="sweep", color="gray")
+        if 'volley_slope' in self.new_dfoutput.columns and self.new_dfoutput['volley_slope'].notna().any():
+            t_volley_slope = self.row['t_volley_slope']
+            x_start = t_volley_slope - self.row['t_volley_slope_size']
+            x_end = t_volley_slope + self.row['t_volley_slope_size']
+            self.v_t_volley_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_volley_slope, color="blue", linestyle="--")
+            self.v_t_volley_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="blue", linestyle=":")
+            self.v_t_volley_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="blue", linestyle=":")
+            _ = sns.lineplot(ax=self.ax2, label="old volley slope", data=self.new_dfoutput, y="volley_slope", x="sweep", color="gray")
 
         self.canvas_mean.axes.set_xlim(parent.dict_cfg['mean_xlim'])
         self.canvas_mean.axes.set_ylim(parent.dict_cfg['mean_ylim'])
@@ -2076,21 +2089,25 @@ class Measure_window_sub(Ui_measure_window):
         self.last_x = None # remember last x position of mouse; None if no samples are selected
 
         # set button colors
-        self.default_color = "background-color: rgb(239, 239, 239);"
-        self.selected_color = "background-color: rgb(100, 100, 255);"
+        self.dict_color = { 'default': "background-color: rgb(239, 239, 239);",
+                            'EPSP': "background-color: rgb(100, 239, 100);",
+                            'volley': "background-color: rgb(100, 100, 239);",
+                            }
+
+        self.list_edit_modes = ["EPSP_amp", "EPSP_slope", "EPSP_slope_size", "volley_amp", "volley_slope", "volley_slope_size"]
+        # Iterate through supported_aspects, connecting buttons and lineEdits
+        for edit_mode in self.list_edit_modes:
+            button = getattr(self, f"pushButton_{edit_mode}")
+            button.setCheckable(True)
+            button.pressed.connect(lambda edit_mode=edit_mode, button=button: self.toggle(button, edit_mode))
+            print(f"button: {button}, edit_mode: {edit_mode}")
+            edit = getattr(self, f"lineEdit_{edit_mode}")
+            edit.setText(self.m(self.row[f"t_{edit_mode}"]))
+            edit.editingFinished.connect(lambda edit_mode=edit_mode, edit=edit: self.updateOnEdit(edit, edit_mode))
 
         # set default aspect
         self.toggle(self.pushButton_EPSP_slope, "EPSP_slope") # default for now TODO: Load/Save preference in local .cfg
-        # Iterate through supported_aspects, connecting buttons and lineEdits
-        def loopConnectAspects(aspect):
-            aspect_button = getattr(self, f"pushButton_{aspect}")
-            aspect_button.setCheckable(True)
-            aspect_button.pressed.connect(lambda: self.toggle(aspect_button, aspect))
-            aspect_edit = getattr(self, f"lineEdit_{aspect}")
-            aspect_edit.setText(self.m(self.row[f"t_{aspect}"]))
-            aspect_edit.editingFinished.connect(lambda: self.updateOnEdit(aspect_edit, aspect))
-        for aspect in supported_aspects:
-            loopConnectAspects(aspect=aspect)
+        
         # connect checkboxes from mainwindow to updatePlots TODO: refactorize to merge with similar code in __init__(self, mainwindow)
         def loopConnectViews(view, key):
             str_view_key = f"{view}_{key}"
@@ -2101,16 +2118,6 @@ class Measure_window_sub(Ui_measure_window):
         for key in supported_aspects:
             loopConnectViews(view="aspect", key=key)
         self.pushButton_auto.clicked.connect(self.autoCalculate)
-        def loopConnectSizes(slope):
-            size_button = getattr(self, f"pushButton_{slope}_size")
-            size_button.setCheckable(True)
-            size_button.pressed.connect(lambda: self.toggle(size_button, slope))
-            size_edit = getattr(self, f"lineEdit_{slope}_size")
-            size_edit.setText(self.m(self.row[f"t_{slope}_slope_size"]))
-            size_edit.editingFinished.connect(lambda: self.updateSize(time=size_edit.text(), slope=slope))
-        self.slopes = ["EPSP", "volley"]
-        for slope in self.slopes:
-            loopConnectSizes(slope=slope)
 
         # check the radiobutton of the current filter, per row['filter']
         row_filter = self.row['filter']
@@ -2128,21 +2135,17 @@ class Measure_window_sub(Ui_measure_window):
         self.updatePlots()
 
 
-    def updateSize(self, time, slope):
-        # update the size of the selected sample
-        print(f"updateSize: {time}, {slope}")
-
-
-    def toggle(self, button, aspect): # updates aspect, sets "button" to active state, and all other buttons to inactive
-        if aspect in supported_aspects:
-            self.aspect = aspect
+    def toggle(self, button, now_setting): # updates aspect, sets "button" to active state, and all other buttons to inactive
+        self.now_setting = now_setting
+        print (f"toggle: {now_setting}, button: {button}")
+        for edit_mode in self.list_edit_modes:
+            un_button = getattr(self, f"pushButton_{edit_mode}")
+            un_button.setStyleSheet(self.dict_color['default'])
+        # if now.setting contains the word "volley", set volley button to active
+        if "volley" in now_setting:
+            button.setStyleSheet(self.dict_color['volley'])
         else:
-            print(f"toggle: {aspect} is not a supported aspect.")
-            return
-        for i_aspect in supported_aspects:
-            un_button = getattr(self, f"pushButton_{i_aspect}")
-            un_button.setStyleSheet(self.default_color)
-        button.setStyleSheet(self.selected_color)
+            button.setStyleSheet(self.dict_color['EPSP'])
         
 
     def updateFilter(self, filter, param_edit=False):
@@ -2276,8 +2279,8 @@ class Measure_window_sub(Ui_measure_window):
                 self.canvas_mean.axes.plot([], [], color='green', linewidth=10, alpha=0.3, label="line_EPSP_slope")
             t_EPSP_slope = self.row['t_EPSP_slope'] 
             dfmean = self.dfmean
-            x_start = t_EPSP_slope - 0.0003
-            x_end = t_EPSP_slope + 0.0003
+            x_start = t_EPSP_slope - self.row['t_EPSP_slope_size']
+            x_end = t_EPSP_slope + self.row['t_EPSP_slope_size']
             y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
             self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, "line_EPSP_slope")].set_data([x_start, x_end], [y_start, y_end])
@@ -2304,6 +2307,8 @@ class Measure_window_sub(Ui_measure_window):
         # Check if row values are different from corresponding row in df_project
         df_p_row = df_p.iloc[idx].squeeze()
         if df_p_row.equals(self.row):
+            print(f"df_p: {df_p_row['t_volley_slope']}")
+            print(f"row: {self.row['t_volley_slope']}")
             print("No changes detected.")
             return
         if talkback:
@@ -2388,22 +2393,22 @@ class Measure_window_sub(Ui_measure_window):
     def autoCalculate(self):
         dffilter = self.parent.get_dffilter(row=self.row)
         dict_t = analysis.find_all_t(dfmean=self.dfmean, verbose=False)
-        if not pd.isna(self.row['t_EPSP_slope_size']):
-            EPSP_slope_size = self.row['t_EPSP_slope_size']
-            print(f"Local EPSP_slope_size: {EPSP_slope_size}, type: {type(EPSP_slope_size)}")
-        else: # read default from cfg
-            EPSP_slope_size = self.parent.dict_cfg['EPSP_slope_size_default']
-            print(f"Default EPSP_slope_size: {EPSP_slope_size}, type: {type(EPSP_slope_size)}")
-            self.row['t_EPSP_slope_size'] = EPSP_slope_size
+        # Default size
+        dict_t['t_EPSP_slope_size'] = self.parent.dict_cfg['EPSP_slope_size_default']
+        dict_t['t_volley_slope_size'] = self.parent.dict_cfg['volley_slope_size_default']
+        print(f"dict_t: {dict_t}")
         self.new_dfoutput = analysis.build_dfoutput(df=dffilter,
                                        t_EPSP_amp=dict_t['t_EPSP_amp'],
                                        t_EPSP_slope=dict_t['t_EPSP_slope'],
-                                       EPSP_slope_size=EPSP_slope_size)
+                                       t_EPSP_slope_size=dict_t['t_EPSP_slope_size'])
         self.new_dfoutput.reset_index(inplace=True)
-        for aspect in supported_aspects:
-            time = dict_t[f"t_{aspect}"]
-            if isinstance(time, float) and not np.isnan(time) and time is not None:
-                self.updateAspect(aspect=aspect, time=time, method="Auto")
+        # Enforce dict_t
+        for edit_mode in self.list_edit_modes:
+            if not edit_mode.startswith("volley"): # TODO: permit volleys when supported
+                set_float = dict_t[f"t_{edit_mode}"]
+                print(f"set_float: {set_float}")
+                if isinstance(set_float, float) and not np.isnan(set_float) and set_float is not None:
+                    self.updateAspect(edit_mode=edit_mode, set_float=set_float, method="Auto")
         
 
     def m(self, SI): # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
@@ -2425,13 +2430,10 @@ class Measure_window_sub(Ui_measure_window):
     def meanClicked(self, event): # measure window click event
         if event.inaxes is not None:
             if event.button == 1:# Left mouse button clicked
-                if self.aspect not in supported_aspects:
-                    print(f"meanClicked: {self.aspect} not supported.")
-                    return
                 x = event.xdata
                 # find time in self.dfmean closest to x
                 time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
-                self.updateOnClick(time=time, aspect=self.aspect)
+                self.updateOnClick(time=time, edit_mode=self.now_setting)
             elif event.button == 2:
                 zoomReset(canvas=self.canvas_mean, ui=self.parent)
 
@@ -2500,84 +2502,99 @@ class Measure_window_sub(Ui_measure_window):
             self.si_sweep.set_data(df['time'], df[rec_filter])
 
     
-    def updateOnClick(self, time, aspect):
+    def updateOnClick(self, time, edit_mode):
         if verbose:
-            print(f"updateOnClick: time={time}, aspect={aspect}")
-        self.updateAspect(time=time, aspect=aspect, method="Manual")
+            print(f"updateOnClick: time={time}, edit_mode={edit_mode}")
+        if edit_mode.endswith("_size"):
+            t_aspect = f"t_{edit_mode.replace('_size', '')}"
+            time = max(0.0001, abs(self.row[t_aspect]-time))
+        self.updateAspect(set_float=time, edit_mode=edit_mode, method="Manual")
 
 
-    def updateOnEdit(self, lineEdit, aspect):
-        print(f"updateOnEdit: lineEdit={lineEdit}, aspect={aspect}")
+    def updateOnEdit(self, lineEdit, edit_mode):
+        print(f"updateOnEdit: lineEdit={lineEdit}, edit_mode={edit_mode}")
         input_sanitized = lineEdit.text().replace(",", ".")
-        try:
-            time = float(input_sanitized) / 1000  # convert to SI
-            if not self.dfmean['time'].min() <= time <= self.dfmean['time'].max():
-                raise ValueError
-        except ValueError:
-            print("Invalid input: must be a number within time range.")
-            lineEdit.setText("")
-        self.updateAspect(time=time, aspect=aspect, method="Manual")
+        t_edit_mode = f"t_{edit_mode}"
+        # if edit_mode ends in _size...
+        if edit_mode.endswith("_size"):
+            try:
+                set_float = float(input_sanitized) / 1000  # convert to SI
+                if not 0.0001 <= set_float <= 0.002:
+                    raise ValueError
+                self.row[t_edit_mode] = set_float
+            except ValueError:
+                print("Invalid input: must be a number between 0.1 and 2ms.")
+                lineEdit.setText(str(self.row[t_edit_mode]))
+        else:
+            try:
+                set_float = float(input_sanitized) / 1000  # convert to SI
+                if not self.dfmean['time'].min() <= set_float <= self.dfmean['time'].max():
+                    raise ValueError
+            except ValueError:
+                print("Invalid input: must be a number within time range.")
+                lineEdit.setText(str(self.row[t_edit_mode]))
+        self.updateAspect(set_float=set_float, edit_mode=edit_mode, method="Manual")
 
 
-    def updateAspect(self, time, aspect, method):
+    def updateAspect(self, set_float, edit_mode, method):
         # changes the measuring points of an aspect and propagates the change to the appropriate columns in df_project
-        t_aspect  = ("t_" + aspect)
-        t_size = (t_aspect + "_size")
-        t_method = (t_aspect + "_method")
-        t_params = (t_aspect + "_params")
+        t_edit_mode = f"t_{edit_mode}"
+        aspect = edit_mode.replace("_size", "")
+        t_aspect = f"t_{aspect}"
+        t_method = f"t_{aspect}_method"
         # update row
-        self.row[t_aspect] = time
+        self.row[t_edit_mode] = set_float
         self.row[t_method] = method
-        if verbose:
-            print(f" . self.parent.df_project.loc[self.row.name, t_aspect]: {self.parent.df_project.loc[self.row.name, t_aspect]}, row[{t_aspect}]: {self.row[t_aspect]}")
-            print(f" . self.parent.df_project.loc[self.row.name, t_size]: {self.parent.df_project.loc[self.row.name, t_size]}, row[{t_size}]: {self.row[t_size]}")
-            print(f" . self.parent.df_project.loc[self.row.name, t_method: {self.parent.df_project.loc[self.row.name, t_method]}, row[{t_method}]: {self.row[t_method]}")
-            print(f" . self.parent.df_project.loc[self.row.name, t_params]: {self.parent.df_project.loc[self.row.name, t_params]}, row[{t_params}]: {self.row[t_params]}, type: {type(self.row[t_params])}")
-        #recalculate aspect
+        # update lineEdit
+        line2update = getattr(self, "lineEdit_" + edit_mode)
+        line2update.setText(self.m(set_float))
+        # refresh dfoutput
         dffilter = self.parent.get_dffilter(row=self.row)
-        if aspect == "EPSP_amp":
-            axis = self.ax1
-            df = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=time)
-            graph_color = "black"
-            plot_on_mean = {'center': ("v_" + t_aspect)}
-        else:# aspect == "EPSP_slope":
-            axis = self.ax2
-            df = analysis.build_dfoutput(df=dffilter, t_EPSP_slope=time)
+        time = self.row[t_aspect]
+
+        if aspect.startswith("EPSP"):
             graph_color = "green"
+        else: # aspect is volley
+            graph_color = "blue"
+        if aspect.endswith("_amp"):
+            df = analysis.build_dfoutput(df=dffilter, **{t_aspect: time})
+            axis = self.ax1
+            plot_on_mean = {'center': ("v_" + t_aspect)}
+            if hasattr(self, "line_EPSP_amp"):
+                self.line_EPSP_amp.remove()
+            self.line_EPSP_amp = sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color=graph_color, linestyle="--")
+        else: # aspect is slope
+            t_size = t_aspect + "_size"
+            size = self.row[t_aspect + "_size"]
+            axis = self.ax2
             plot_on_mean = {'center': ("v_" + t_aspect),
                             'start':  ("v_" + t_aspect + "_start"),
                             'end':    ("v_" + t_aspect + "_end")}
-        # print(f"updateAspect, df: {df}")
-        self.new_dfoutput[aspect] = df[aspect]
-        # update appropriate lineEdit
-        # print(f"lineEdit_{aspect}: time {time} to ms: {self.m(time)}")
-        line2update = getattr(self, "lineEdit_" + aspect)
-        line2update.setText(self.m(time))
-
-        #update mean graph
-        if aspect == "EPSP_slope":
             dfmean = self.dfmean
             rec_filter = self.row['filter'] # the filter currently used for this recording
-            t_EPSP_slope_size = self.row['t_EPSP_slope_size']
-            x_start = time - t_EPSP_slope_size
-            x_end = time + t_EPSP_slope_size
+            slope_size = self.row[t_aspect + '_size']
+            x_start = time - slope_size
+            x_end = time + slope_size
             y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-            for key, graph in plot_on_mean.items():
-                if hasattr(self, graph):
-                    getattr(self, graph).remove() # remove the one about to be replaced
-                if key == "center":
-                    setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color=graph_color, linestyle="--"))
-                elif key == "start":
-                    setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color=graph_color, linestyle=":"))
-                elif key == "end":
-                    setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color=graph_color, linestyle=":"))
-                else:
-                    print(f"updateAspect: key {key} not supported.")
+            df = analysis.build_dfoutput(df=dffilter, **{t_aspect: time}, **{t_size: size})
             # mean, slope indicator
-            if label2idx(self.canvas_mean, "line_EPSP_slope") is False:
-                self.canvas_mean.axes.plot([], [], color='green', linewidth=10, alpha=0.3, label="line_EPSP_slope")
-            self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, "line_EPSP_slope")].set_data([x_start, x_end], [y_start, y_end])
+            line_name = "line_" + aspect
+            if label2idx(self.canvas_mean, line_name) is False:
+                self.canvas_mean.axes.plot([], [], color=graph_color, linewidth=10, alpha=0.3, label=line_name)
+            self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, line_name)].set_data([x_start, x_end], [y_start, y_end])
+
+        self.new_dfoutput[aspect] = df[aspect]
+        # Update graphs
+        for key, graph in plot_on_mean.items():
+            if hasattr(self, graph):
+                getattr(self, graph).remove() # remove the one about to be replaced
+            if key == "start":
+                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color=graph_color, linestyle=":"))
+            elif key == "end":
+                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color=graph_color, linestyle=":"))
+            else:
+                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color=graph_color, linestyle="--"))
         self.canvas_mean.draw()
 
         #update output graph
