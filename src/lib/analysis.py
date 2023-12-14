@@ -224,7 +224,7 @@ def find_i_volley_slope(dfmean, i_stim, i_VEB, happy=False):
         as identified by positive zero-crossings in the second order derivative
         if several are found, it returns the latest one
     """
-    dftemp = dfmean.prim[i_VEB-15:i_VEB]
+    dftemp = dfmean.prim[i_VEB-12:i_VEB]
     i_volleyslope = dftemp.idxmin()
 
     # dftemp = dfmean.bis[i_VEB-15:i_VEB]
