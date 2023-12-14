@@ -2369,6 +2369,7 @@ class Measure_window_sub(Ui_measure_window):
             graph_alpha = 0.3
         if aspect.startswith('volley_'):
             graph_color = 'blue'
+            ax.axhline(y=self.row[f'{aspect}_mean'], color='blue', alpha = graph_alpha, linestyle=style)
         else: # EPSP_
             graph_color = 'green'
         if label2idx(ax, aspect) is False:
