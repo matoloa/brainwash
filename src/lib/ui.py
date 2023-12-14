@@ -29,12 +29,10 @@ import analysis
 
 matplotlib.use("Qt5Agg")
 
-version = "0.6.0"
+version = "0.6.1"
 verbose = True
 talkback = True
 track_widget_focus = False
-# expand as more aspects and filters are added. # TODO: make these redundant by looping through data columns
-supported_aspects = [ "EPSP_amp", "EPSP_slope"]
 
 
 class TableModel(QtCore.QAbstractTableModel):
@@ -713,6 +711,8 @@ class UIsub(Ui_MainWindow):
                         'delete_locked': False, # whether to allow deleting of data TODO: re-implement
                         'aspect_EPSP_amp': True,
                         'aspect_EPSP_slope': True,
+                        'aspect_volley_amp': False,
+                        'aspect_volley_slope': False,
                         'paired_stims': False,
                         'mean_xlim': (0.006, 0.020),
                         'mean_ylim': (-0.001, 0.0002),
@@ -817,7 +817,8 @@ class UIsub(Ui_MainWindow):
             key_checkBox = getattr(self, f"checkBox_{str_view_key}")
             key_checkBox.setChecked(self.dict_cfg[str_view_key])
             key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.viewSettingsChanged(state, str_view_key))
-        for key in supported_aspects:
+        list_views = ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
+        for key in list_views:
             loopConnectViews(view="aspect", key=key)
 
         # connect paired stim checkbox and flip button to local functions
@@ -1703,8 +1704,12 @@ class UIsub(Ui_MainWindow):
     def setGraph(self, df_select=None): # plot selected row(s), or clear graph if empty
         if df_select is None:
             df_select = self.df_project.loc[self.listSelectedIndices()]
-        amp = bool(self.dict_cfg['aspect_EPSP_amp'])
-        slope = bool(self.dict_cfg['aspect_EPSP_slope'])
+        dict_view = {aspect: self.dict_cfg[f'aspect_{aspect}'] for aspect in ['EPSP_amp', 'volley_amp', 'EPSP_slope', 'volley_slope']}
+        amp = bool(dict_view['EPSP_amp'] or dict_view['volley_amp'])
+        slope = bool(dict_view['EPSP_slope'] or dict_view['volley_slope'])
+        if not (amp or slope):
+            print("No aspects selected.")
+            return
         self.clearGraph()
         ax1 = self.main_canvas_output.axes
         if hasattr(self, "ax2"): # remove ax2 if it exists
@@ -1722,7 +1727,7 @@ class UIsub(Ui_MainWindow):
             if self.dict_cfg['output_xlim'][1] is None:
                 self.dict_cfg['output_xlim'] = [0, df_analyzed['sweeps'].max()]
                 self.write_project_cfg()
-            self.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2, amp=amp, slope=slope)
+            self.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2, dict_view=dict_view)
         
         # add appropriate ticks and axis labels
         self.main_canvas_mean.axes.set_xlabel("Time (s)")
@@ -1746,7 +1751,7 @@ class UIsub(Ui_MainWindow):
         self.main_canvas_mean.draw()
         self.main_canvas_output.draw()
 
-    def setGraphSelected(self, df_analyzed, ax1, ax2, amp, slope):
+    def setGraphSelected(self, df_analyzed, ax1, ax2, dict_view):
         for i, row in df_analyzed.iterrows(): # TODO: i to be used later for cycling colours?
             dfmean = self.get_dfmean(row=row)
             dfoutput = self.get_dfoutput(row=row)
@@ -1754,9 +1759,14 @@ class UIsub(Ui_MainWindow):
             t_EPSP_amp = df_p.loc[i, 't_EPSP_amp']
             t_EPSP_slope = df_p.loc[i, 't_EPSP_slope']
             t_EPSP_slope_size = df_p.loc[i, 't_EPSP_slope_size']
+            t_volley_amp = df_p.loc[i, 't_volley_amp']
+            t_volley_slope = df_p.loc[i, 't_volley_slope']
+            t_volley_slope_size = df_p.loc[i, 't_volley_slope_size']
             # plot relevant filter of dfmean on main_canvas_mean
             label = f"{row['recording_name']}"
             rec_filter = row['filter'] # the filter currently used for this recording
+            if rec_filter != 'voltage':
+                label = f"{label} ({rec_filter})"
             _ = sns.lineplot(ax=self.main_canvas_mean.axes, label=label, data=dfmean, y=rec_filter, x="time", color="black")
 
             # plot dfoutput on main_canvas_output
@@ -1767,22 +1777,31 @@ class UIsub(Ui_MainWindow):
                     return
                 out = dfdiff
             
-            # plot dfoutput on main_canvas_output
-            if amp & (not np.isnan(t_EPSP_amp)):
-                _ = sns.lineplot(ax=ax1, label=f"{label}_EPSP_amp", data=out, y="EPSP_amp", x="sweep", color="black", linestyle='--')
-                # mean, amp indicator
-                y_position = dfmean[dfmean.time == t_EPSP_amp].voltage
-                self.main_canvas_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha = 0.3)
-            if slope & (not np.isnan(t_EPSP_slope)):
-                _ = sns.lineplot(ax=ax2, label=f"{label}_EPSP_slope", data=out, y="EPSP_slope", x="sweep", color="black", alpha = 0.3)
-                # mean, slope indicator        
-                x_start = t_EPSP_slope - t_EPSP_slope_size
-                x_end = t_EPSP_slope + t_EPSP_slope_size
-                print(f"t_EPSP_slope: {t_EPSP_slope}, x_start: {x_start}, x_end: {x_end}, dtype: {type(t_EPSP_slope)}, {type(x_start)}, {type(x_end)}")
-                y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
-                y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-                print(f"y_start: {y_start}, y_end: {y_end}, dtype: {type(y_start)}, {type(y_end)}")
-                self.main_canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='green', linewidth=10, alpha=0.3)
+            for key, value in dict_view.items():
+                if value:
+                    if key == 'EPSP_amp':
+                        _ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", linestyle='--')
+                        y_position = dfmean.loc[dfmean.time == t_EPSP_amp, rec_filter]
+                        self.main_canvas_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha = 0.3)
+                    if key == 'volley_amp':
+                        _ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="blue", linestyle='--', alpha = 0.3)
+                        y_position = dfmean.loc[dfmean.time == t_volley_amp, rec_filter]
+                        self.main_canvas_mean.axes.plot(t_volley_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
+                    if key == 'EPSP_slope':
+                        _ = sns.lineplot(ax=ax2, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", alpha = 0.3)
+                        x_start = t_EPSP_slope - t_EPSP_slope_size
+                        x_end = t_EPSP_slope + t_EPSP_slope_size
+                        y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+                        y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+                        self.main_canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='green', linewidth=10, alpha=0.3)
+                    if key == 'volley_slope':
+                        _ = sns.lineplot(ax=ax2, label=f"{label}_{key}", data=out, y=key, x="sweep", color="blue", alpha = 0.3)
+                        x_start = t_volley_slope - t_volley_slope_size
+                        x_end = t_volley_slope + t_volley_slope_size
+                        y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+                        y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+                        self.main_canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
+
 
     def setGraphGroups(self, ax1, ax2, list_color):
         print(f"setGraphGroups: {self.dict_cfg['list_groups']}")
@@ -2051,8 +2070,8 @@ class Measure_window_sub(Ui_measure_window):
         _ = sns.lineplot(ax=self.canvas_mean.axes, label='voltage', data=self.dfmean, y='voltage', x='time', color='black')
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             t_EPSP_amp = self.row['t_EPSP_amp']
-            self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="black", linestyle="--")
-            _ = sns.lineplot(ax=self.ax1, label="old EPSP amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="gray")
+            self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="green", linestyle="--")
+            _ = sns.lineplot(ax=self.ax1, label="old EPSP amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="gray", linestyle="--")
         if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
             t_EPSP_slope = self.row['t_EPSP_slope']
             x_start = t_EPSP_slope - self.row['t_EPSP_slope_size']
@@ -2060,11 +2079,11 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_EPSP_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
             self.v_t_EPSP_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
             self.v_t_EPSP_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
-            _ = sns.lineplot(ax=self.ax2, label="old EPSP slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="gray")
+            _ = sns.lineplot(ax=self.ax2, label="old EPSP slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="gray", alpha=0.3)
         if 'volley_amp' in self.new_dfoutput.columns and self.new_dfoutput['volley_amp'].notna().any():
             t_volley_amp = self.row['t_volley_amp']
             self.v_t_volley_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_volley_amp, color="blue", linestyle="--")
-            _ = sns.lineplot(ax=self.ax1, label="old volley amp", data=self.new_dfoutput, y="volley_amp", x="sweep", color="gray")
+            _ = sns.lineplot(ax=self.ax1, label="old volley amp", data=self.new_dfoutput, y="volley_amp", x="sweep", color="gray", linestyle="--")
         if 'volley_slope' in self.new_dfoutput.columns and self.new_dfoutput['volley_slope'].notna().any():
             t_volley_slope = self.row['t_volley_slope']
             x_start = t_volley_slope - self.row['t_volley_slope_size']
@@ -2072,15 +2091,15 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_volley_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_volley_slope, color="blue", linestyle="--")
             self.v_t_volley_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="blue", linestyle=":")
             self.v_t_volley_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="blue", linestyle=":")
-            _ = sns.lineplot(ax=self.ax2, label="old volley slope", data=self.new_dfoutput, y="volley_slope", x="sweep", color="gray")
+            _ = sns.lineplot(ax=self.ax2, label="old volley slope", data=self.new_dfoutput, y="volley_slope", x="sweep", color="gray", alpha=0.3)
 
         self.canvas_mean.axes.set_xlim(parent.dict_cfg['mean_xlim'])
         self.canvas_mean.axes.set_ylim(parent.dict_cfg['mean_ylim'])
         self.ax1.set_ylim(parent.dict_cfg['output_ax1_ylim'])
         self.ax2.set_ylim(parent.dict_cfg['output_ax2_ylim'])
 
-        self.canvas_mean.show()
-        self.canvas_output.show()
+#        self.canvas_mean.show()
+#        self.canvas_output.show()
 
         # lines and drag state
         self.si_v = None # vertical line in canvas_output, indicating selected sweep
@@ -2097,17 +2116,17 @@ class Measure_window_sub(Ui_measure_window):
                             'volley': "background-color: rgb(100, 100, 239);",
                             }
 
-        self.list_edit_modes = ["EPSP_amp", "EPSP_slope", "EPSP_slope_size", "volley_amp", "volley_slope", "volley_slope_size"]
-        # Iterate through supported_aspects, connecting buttons and lineEdits
+        self.list_aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
+        self.list_edit_modes = self.list_aspects.copy()
+        self.list_edit_modes.extend(['EPSP_slope_size', 'volley_slope_size'])
+        # Iterate through edit_modes, connecting buttons and lineEdits
         for edit_mode in self.list_edit_modes:
             button = getattr(self, f"pushButton_{edit_mode}")
             button.setCheckable(True)
             button.pressed.connect(lambda edit_mode=edit_mode, button=button: self.toggle(button, edit_mode))
-            print(f"button: {button}, edit_mode: {edit_mode}")
             edit = getattr(self, f"lineEdit_{edit_mode}")
             edit.setText(self.m(self.row[f"t_{edit_mode}"]))
             edit.editingFinished.connect(lambda edit_mode=edit_mode, edit=edit: self.updateOnEdit(edit, edit_mode))
-
         # set default aspect
         self.toggle(self.pushButton_EPSP_slope, "EPSP_slope") # default for now TODO: Load/Save preference in local .cfg
         
@@ -2118,7 +2137,7 @@ class Measure_window_sub(Ui_measure_window):
             key_checkBox.setChecked(parent.dict_cfg[str_view_key])
             key_checkBox.stateChanged.connect(self.updatePlots)
             self.measure_frame.list_connections.append((key_checkBox.stateChanged, self.updatePlots))
-        for key in supported_aspects:
+        for key in self.list_aspects:
             loopConnectViews(view="aspect", key=key)
         self.pushButton_auto.clicked.connect(self.autoCalculate)
 
@@ -2140,7 +2159,6 @@ class Measure_window_sub(Ui_measure_window):
 
     def toggle(self, button, now_setting): # updates aspect, sets "button" to active state, and all other buttons to inactive
         self.now_setting = now_setting
-        print (f"toggle: {now_setting}, button: {button}")
         for edit_mode in self.list_edit_modes:
             un_button = getattr(self, f"pushButton_{edit_mode}")
             un_button.setStyleSheet(self.dict_color['default'])
@@ -2178,7 +2196,12 @@ class Measure_window_sub(Ui_measure_window):
         self.new_dfoutput = analysis.build_dfoutput(df=self.dffilter,
                                     filter=filter,
                                     t_EPSP_amp=self.row['t_EPSP_amp'],
-                                    t_EPSP_slope=self.row['t_EPSP_slope'])
+                                    t_EPSP_slope=self.row['t_EPSP_slope'],
+                                    t_EPSP_slope_size=self.row['t_EPSP_slope_size'],
+                                    t_volley_amp=self.row['t_volley_amp'],
+                                    t_volley_slope=self.row['t_volley_slope'],
+                                    t_volley_slope_size=self.row['t_volley_slope_size'])
+        print(f"updateFilter: {self.new_dfoutput.columns}")
         if self.last_x is not None:
             self.updateSample()
         self.updatePlots()
@@ -2241,63 +2264,76 @@ class Measure_window_sub(Ui_measure_window):
 
     def updatePlots(self):
         # Apply settings from self.parent.dict_cfg to canvas_mean and canvas_output
-        amp = bool(self.parent.dict_cfg['aspect_EPSP_amp'])
-        slope = bool(self.parent.dict_cfg['aspect_EPSP_slope'])
-        rec_filter = self.row['filter'] # the filter currently used for this recording
+        aspects = self.list_aspects
+        rec_filter = self.row['filter']  # the filter currently used for this recording
         # Plot relevant filter of dfmean on canvas_mean, or show it if it's already plotted
-        self.updateMean(rec_filter=rec_filter, amp=amp, slope=slope)
-        # Plot dfoutput on canvas_output, or update and show if already plotted
-        self.updateOutputLine(aspect='EPSP_amp', visible=amp)
-        self.updateOutputLine(aspect='EPSP_slope', visible=slope)
-        # set visibility on old EPSP amp and slope
-        self.ax1.lines[label2idx(self.ax1, "old EPSP amp")].set_visible(amp)
-        self.ax2.lines[label2idx(self.ax2, "old EPSP slope")].set_visible(slope)
-
+        self.updateMean(rec_filter=rec_filter, **{aspect: bool(self.parent.dict_cfg[f'aspect_{aspect}']) for aspect in aspects})
+        for aspect in aspects :
+            visible = bool(self.parent.dict_cfg[f'aspect_{aspect}'])
+            self.updateOutputLine(aspect=aspect, visible=visible)
+            # set visibility on old aspects
+            self.ax1.lines[label2idx(self.ax1, f"old {aspect}")].set_visible(visible)
+            self.ax2.lines[label2idx(self.ax2, f"old {aspect}")].set_visible(visible)
         # TODO: Update y limits
-
         sortLegend(self.ax1, self.ax2) # amplitude legends up, slopes down
+        amp = bool(self.parent.dict_cfg['aspect_EPSP_amp'] or self.parent.dict_cfg['aspect_volley_amp'])
+        slope = bool(self.parent.dict_cfg['aspect_EPSP_slope'] or self.parent.dict_cfg['aspect_volley_slope'])
         oneAxisLeft(self.ax1, self.ax2, amp, slope)# Update axes visibility and position
         self.canvas_mean.draw()
         self.canvas_output.draw()
 
-    def updateMean(self, rec_filter, amp, slope):
+    def updateMean(self, rec_filter, **kwargs):
         ax = self.canvas_mean.axes
         canvas = ax.figure.canvas
+        # If the filter is not already plotted, plot it
         if label2idx(canvas, rec_filter) is False:
             _ = sns.lineplot(ax=ax, label=rec_filter, data=self.dfmean, y=rec_filter, x="time", color="black")
+        # Set visibility of voltage and savgol lines based on the filter
         ax.lines[label2idx(canvas, 'voltage')].set_visible(rec_filter=='voltage')
         if label2idx(canvas, 'savgol') is not False:
             ax.lines[label2idx(self.canvas_mean, 'savgol')].set_visible(rec_filter=='savgol')
-        if ax.get_legend() is not None: # hide mean legend
+        # Hide the legend
+        if ax.get_legend() is not None:
             ax.get_legend().set_visible(False)
-        # Display aspect indicators:
-        if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
-            self.v_t_EPSP_amp.set_visible(amp)
-        if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
-            self.v_t_EPSP_slope.set_visible(slope)
-            self.v_t_EPSP_slope_start.set_visible(slope)
-            self.v_t_EPSP_slope_end.set_visible(slope)
-            # mean, slope indicator
-            if label2idx(self.canvas_mean, "line_EPSP_slope") is False:
-                self.canvas_mean.axes.plot([], [], color='green', linewidth=10, alpha=0.3, label="line_EPSP_slope")
-            t_EPSP_slope = self.row['t_EPSP_slope'] 
-            dfmean = self.dfmean
-            x_start = t_EPSP_slope - self.row['t_EPSP_slope_size']
-            x_end = t_EPSP_slope + self.row['t_EPSP_slope_size']
-            y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
-            y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-            self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, "line_EPSP_slope")].set_data([x_start, x_end], [y_start, y_end])
-            self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, "line_EPSP_slope")].set_visible(slope)
+        # For each aspect (EPSP and volley), set visibility and plot lines
+        for aspect in ['EPSP', 'volley']:
+            if f'{aspect}_amp' in self.new_dfoutput.columns and self.new_dfoutput[f'{aspect}_amp'].notna().any():
+                getattr(self, f'v_t_{aspect}_amp').set_visible(kwargs.get(f'{aspect}_amp', False))
+            if f'{aspect}_slope' in self.new_dfoutput.columns and self.new_dfoutput[f'{aspect}_slope'].notna().any():
+                for item in [f'v_t_{aspect}_slope', f'v_t_{aspect}_slope_start', f'v_t_{aspect}_slope_end']:
+                    getattr(self, item).set_visible(kwargs.get(f'{aspect}_slope', False))
+                # Plot slope indicator
+                if label2idx(self.canvas_mean, f"line_{aspect}_slope") is False:
+                    if aspect == 'volley':
+                        graph_color = 'blue'
+                    else:
+                        graph_color = 'green'
+                    self.canvas_mean.axes.plot([], [], color=graph_color, linewidth=10, alpha=0.3, label=f"line_{aspect}_slope")
+                t_aspect_slope = self.row[f't_{aspect}_slope']
+                dfmean = self.dfmean
+                x_start = t_aspect_slope - self.row[f't_{aspect}_slope_size']
+                x_end = t_aspect_slope + self.row[f't_{aspect}_slope_size']
+                y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
+                y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+                self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, f"line_{aspect}_slope")].set_data([x_start, x_end], [y_start, y_end])
+                self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, f"line_{aspect}_slope")].set_visible(kwargs.get(f'{aspect}_slope', False))
 
     def updateOutputLine(self, aspect, visible):
-        if aspect == 'EPSP_amp':
+        print (self.new_dfoutput.columns)
+        graph_alpha = 1
+        if aspect.endswith('_amp'):
             ax = self.ax1
             style = '--'
-        else:
+        else: # _slope
             ax = self.ax2
-            style = '-'
+            style = None
+        if aspect.startswith('volley_'):
+            graph_color = 'blue'
+            graph_alpha = 0.3
+        else: # EPSP_
+            graph_color = 'green'
         if label2idx(ax, aspect) is False:
-            _ = sns.lineplot(ax=ax, label=aspect, data=self.new_dfoutput, y=aspect, x='sweep', color="black", linestyle=style)
+            _ = sns.lineplot(ax=ax, label=aspect, data=self.new_dfoutput, y=aspect, x='sweep', color=graph_color, linestyle=style, alpha=graph_alpha)
         else:
             ax.lines[label2idx(ax, aspect)].set_data(self.new_dfoutput['sweep'], self.new_dfoutput[aspect])
             ax.lines[label2idx(ax, aspect)].set_visible(visible)
@@ -2329,7 +2365,6 @@ class Measure_window_sub(Ui_measure_window):
             dfevent.to_csv(path_talkback_df, index=False)
             # save the event data as a dict
             dict_event = {}
-            dict_event['alias'] = self.row['alias']
             dict_event['t_EPSP_amp'] = self.row['t_EPSP_amp']
             dict_event['t_EPSP_amp_method'] = self.row['t_EPSP_amp_method']
             dict_event['t_EPSP_amp_params'] = self.row['t_EPSP_amp_params']
