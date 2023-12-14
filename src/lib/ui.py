@@ -630,7 +630,7 @@ class UIsub(Ui_MainWindow):
             print(" - UIsub init, verbose mode")  # rename for clarity
         # move mainwindow to default position (TODO: later to be stored in cfg)
         self.mainwindow = mainwindow
-        self.mainwindow.setGeometry(0, 0, 1400, 1200)
+        self.mainwindow.setGeometry(0, 0, 1400, 1000)
         # load cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
@@ -779,9 +779,7 @@ class UIsub(Ui_MainWindow):
         self.menuGroups.addAction(self.actionResetGroups)
 
 
-
-
-
+        # tableProj
         self.tableProj.setSelectionBehavior(TableProjSub.SelectRows)
         self.tableProj.doubleClicked.connect(self.tableProjDoubleClicked)
         selection_model = self.tableProj.selectionModel()
@@ -791,16 +789,13 @@ class UIsub(Ui_MainWindow):
         def loopConnectViews(view, key):
             str_view_key = f"{view}_{key}"
             key_checkBox = getattr(self, f"checkBox_{str_view_key}")
-            key_checkBox.setChecked(self.dict_cfg[str_view_key])
             key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.viewSettingsChanged(state, str_view_key))
         list_views = ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
         for key in list_views:
             loopConnectViews(view="aspect", key=key)
-
+        self.cfgEnforce() # apply stored checkbox settings
         # connect paired stim checkbox and flip button to local functions
-        self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
         self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
-        self.pushButton_paired_data_flip.setEnabled(self.dict_cfg['paired_stims'])
         self.pushButton_paired_data_flip.pressed.connect(self.pushButton_paired_data_flip_pressed)
 
         # keep track of open measure windows
@@ -863,6 +858,14 @@ class UIsub(Ui_MainWindow):
 
 
 # WIP: TODO: move these to appropriate header in this file
+
+    def cfgEnforce(self):    
+        list_views = ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
+        for view in list_views:
+            viewBox = f"checkBox_aspect_{view}"
+            key_checkBox = getattr(self, viewBox)
+            key_checkBox.setChecked(self.dict_cfg[f"aspect_{view}"])
+        self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
 
     def build_dict_folders(self):
         dict_folders = {
@@ -991,11 +994,10 @@ class UIsub(Ui_MainWindow):
         if verbose:
             print(f"Received projectfolder: {str(projectfolder)}")
         if (Path(projectfolder) / "project.brainwash").exists():
+            if verbose:
+                print(f"Projectfolder exists, loading project")
             self.dict_folders['project'] = Path(projectfolder)
-            self.clearGraph()
             self.load_df_project()
-            self.tableFormat()
-            self.write_bw_cfg()
 
     def pushedButtonAddData(self): # creates file tree for file selection
         self.usage("pushedButtonAddData")
@@ -1355,10 +1357,12 @@ class UIsub(Ui_MainWindow):
             self.resetCacheDicts()
             self.killGroupButtons()
             self.inputProjectName.setText(self.projectname)
-            self.df_project = df_projectTemplate()
-            self.save_df_project()
+            self.set_df_project(df_projectTemplate())
             self.tableFormat()
             self.build_dict_cfg()
+            self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
+            self.write_project_cfg()
+            self.cfgEnforce() # apply new checkbox settings
             self.write_bw_cfg()
             self.setGraph()
 
@@ -1374,7 +1378,7 @@ class UIsub(Ui_MainWindow):
             self.projectname = new_project_name
             self.inputProjectName.setText(self.projectname)
             self.inputProjectName.setReadOnly(True)
-            self.build_dict_folders()
+            self.dict_folders = self.build_dict_folders()
             self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
             self.write_bw_cfg() # update boot-up-path in bw_cfg.yaml to new project folder
             print(f"Project renamed to {new_project_name}.")
@@ -1382,7 +1386,7 @@ class UIsub(Ui_MainWindow):
         else:
             print(f"Project name {new_project_name} is not a valid path.")
 
-    def setProjectname(self):
+    def setProjectname(self): # TODO: deprecated?
         # get_signals(self.children()[1].children()[1].model)
         self.projectname = self.inputProjectName.text()
         self.dict_folders['project'] = self.projects_folder / self.projectname
@@ -1390,7 +1394,6 @@ class UIsub(Ui_MainWindow):
             # look for project.brainwash and load it
             if (self.dict_folders['project'] / "project.brainwash").exists():
                 self.load_df_project()
-                self.tableFormat()
         else:
             self.dict_folders['project'].mkdir()
         if verbose:
@@ -1403,17 +1406,19 @@ class UIsub(Ui_MainWindow):
         return self.df_project
 
     def load_df_project(self): # reads or builds project cfg, reads fileversion of df_project, clears graphs and saves bw_cfg
+        self.clearGraph()
         self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
         if self.project_cfg_yaml.exists():
             with self.project_cfg_yaml.open("r") as file:
                 self.dict_cfg = yaml.safe_load(file)
         else:
             self.build_dict_cfg()
+        self.cfgEnforce() # apply loaded checkbox settings
         self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"))
         self.projectname = self.dict_folders['project'].stem
         self.inputProjectName.setText(self.projectname)  # set folder name to proj name
         self.dict_folders = self.build_dict_folders()
-        self.clearGraph()
+        self.tableFormat()
         self.write_bw_cfg()
 
     def save_df_project(self): # writes df_project to .csv
