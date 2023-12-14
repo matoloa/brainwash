@@ -29,7 +29,7 @@ import analysis
 
 matplotlib.use("Qt5Agg")
 
-version = "0.6.1"
+version = "0.6.2"
 verbose = True
 talkback = True
 track_widget_focus = False
