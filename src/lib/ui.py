@@ -1405,8 +1405,11 @@ class UIsub(Ui_MainWindow):
     def get_df_project(self): # returns a copy of the persistent df_project TODO: make these functions the only way to get to it.
         return self.df_project
 
-    def load_df_project(self): # reads or builds project cfg, reads fileversion of df_project, clears graphs and saves bw_cfg
+    def load_df_project(self): # reads or builds project cfg, reads fileversion of df_project and saves bw_cfg
         self.clearGraph()
+        self.resetCacheDicts() # clear internal caches
+        self.projectname = self.dict_folders['project'].stem
+        self.dict_folders = self.build_dict_folders()
         self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
         if self.project_cfg_yaml.exists():
             with self.project_cfg_yaml.open("r") as file:
@@ -1415,9 +1418,7 @@ class UIsub(Ui_MainWindow):
             self.build_dict_cfg()
         self.cfgEnforce() # apply loaded checkbox settings
         self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"))
-        self.projectname = self.dict_folders['project'].stem
         self.inputProjectName.setText(self.projectname)  # set folder name to proj name
-        self.dict_folders = self.build_dict_folders()
         self.tableFormat()
         self.write_bw_cfg()
 
@@ -1434,6 +1435,12 @@ class UIsub(Ui_MainWindow):
     def listSelectedIndices(self):
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         return [row.row() for row in selected_indexes]
+    
+    def setButtonParse(self):
+        if self.df_project['sweeps'].eq("...").any():
+            self.pushButtonParse.setEnabled(True)
+        else:
+            self.pushButtonParse.setEnabled(False)
 
     def tableFormat(self):
         if verbose:
@@ -1463,6 +1470,7 @@ class UIsub(Ui_MainWindow):
         self.tableProj.setMinimumWidth(total_width)
         for index in selected_rows:
             self.tableProj.selectionModel().select(index, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
+        self.setButtonParse()
     
     def tableUpdate(self):
         selected_rows = self.tableProj.selectionModel().selectedRows() # Save selection
@@ -2659,7 +2667,7 @@ class Measure_window_sub(Ui_measure_window):
         while label2idx(axis, aspect):
             axis.lines[label2idx(axis, aspect)].remove()
         if self.new_dfoutput[aspect].notna().any():
-            _ = sns.lineplot(ax=axis, label=aspect, data=self.new_dfoutput, y=aspect, x='sweep', color='black')
+            _ = sns.lineplot(ax=axis, label=aspect, data=self.new_dfoutput, y=aspect, x='sweep', color=graph_color, alpha=0.5)
         self.canvas_output.draw()
 
 
