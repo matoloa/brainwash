@@ -641,7 +641,7 @@ class UIsub(Ui_MainWindow):
         icon.addPixmap(QtGui.QPixmap(icon_path), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.pushButtonRenameProject.setIcon(icon)
 
-        self.cfg_yaml = self.repo_root / "cfg.yaml"
+        self.bw_cfg_yaml = self.repo_root / "cfg.yaml"
         self.projectname = None
         self.inputProjectName.setReadOnly(True)
 
@@ -650,8 +650,8 @@ class UIsub(Ui_MainWindow):
         self.projects_folder = self.user_documents / "Brainwash Projects"  # Where to save and read parsed data
         self.projectname = "My Project"
         # Override default if cfg.yaml exists
-        if self.cfg_yaml.exists():
-            with self.cfg_yaml.open("r") as file:
+        if self.bw_cfg_yaml.exists():
+            with self.bw_cfg_yaml.open("r") as file:
                 cfg = yaml.safe_load(file)
                 projectfolder = Path(cfg['projects_folder']) / cfg['projectname']
                 if projectfolder.exists():  # if the folder stored in cfg.yaml exists, use it
@@ -697,31 +697,7 @@ class UIsub(Ui_MainWindow):
             with self.project_cfg_yaml.open("r") as file:
                 self.dict_cfg = yaml.safe_load(file)
         else:
-            self.dict_cfg = {'list_groups': [], # group_X - ID X is how the program regognizes groups, for buttons and data
-                        'dict_group_name': {}, # group_X: name - how the program displays groups TODO: implement
-                        'dict_group_show': {}, # group_X: True/False - whether to show group in graphs
-                        'list_group_colors': ["red", "green", "blue", "yellow"], # TODO: build this list properly
-                        # defaults; if not specified in row, these are used
-                        'EPSP_slope_size_default': 0.0003,
-                        'EPSP_slope_method_default': {},
-                        'EPSP_slope_params_default': {},
-                        'volley_slope_size_default': 0.0001,
-                        'volley_slope_method_default': {},
-                        'volley_slope_params_default': {},
-                        'delete_locked': False, # whether to allow deleting of data TODO: re-implement
-                        'aspect_EPSP_amp': True,
-                        'aspect_EPSP_slope': True,
-                        'aspect_volley_amp': False,
-                        'aspect_volley_slope': False,
-                        'paired_stims': False,
-                        'mean_xlim': (0.006, 0.020),
-                        'mean_ylim': (-0.001, 0.0002),
-                        'output_xlim': (0, None),
-                        'output_ax1_ylim': (0, None),
-                        'output_ax2_ylim': (0, None),
-                        }
-            self.write_project_cfg()
-        
+            self.build_dict_cfg()
         self.tableFormat()
         
         # Enforce local cfg
@@ -842,6 +818,32 @@ class UIsub(Ui_MainWindow):
                 os_name = sys.platform
                 self.dict_usage = {'WARNING': "Do NOT set your alias to anything that can be used to identify you!", 'alias': "", 'ID': str(uuid.uuid4()), 'os': os_name, 'ID_created': now, f"last_used_{version}": now}
             self.write_usage()
+
+    def build_dict_cfg(self):
+        self.dict_cfg = {'list_groups': [], # group_X - ID X is how the program regognizes groups, for buttons and data
+                        'dict_group_name': {}, # group_X: name - how the program displays groups TODO: implement
+                        'dict_group_show': {}, # group_X: True/False - whether to show group in graphs
+                        'list_group_colors': ["red", "green", "blue", "yellow"], # TODO: build this list properly
+                        # defaults; if not specified in row, these are used
+                        'EPSP_slope_size_default': 0.0003,
+                        'EPSP_slope_method_default': {},
+                        'EPSP_slope_params_default': {},
+                        'volley_slope_size_default': 0.0001,
+                        'volley_slope_method_default': {},
+                        'volley_slope_params_default': {},
+                        'delete_locked': False, # whether to allow deleting of data TODO: re-implement
+                        'aspect_EPSP_amp': True,
+                        'aspect_EPSP_slope': True,
+                        'aspect_volley_amp': False,
+                        'aspect_volley_slope': False,
+                        'paired_stims': False,
+                        'mean_xlim': (0.006, 0.020),
+                        'mean_ylim': (-0.001, 0.0002),
+                        'output_xlim': (0, None),
+                        'output_ax1_ylim': (0, None),
+                        'output_ax2_ylim': (0, None),
+                        }
+        self.write_project_cfg()
 
     # Debugging tools
             # self.find_widgets_with_top_left_coordinates(self.centralwidget)
@@ -1010,9 +1012,11 @@ class UIsub(Ui_MainWindow):
 
     def tableProjSelectionChanged(self):
         self.usage("tableProjSelectionChanged")
+        t0 = time.time()
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableProj.clearSelection()
         self.setGraph()
+        print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
 
     def tableProjDoubleClicked(self):
         self.usage("tableProjDoubleClicked")
@@ -1324,7 +1328,7 @@ class UIsub(Ui_MainWindow):
     
     def write_bw_cfg(self):  # config file for program, global settings
         cfg = {"user_documents": str(self.user_documents), "projects_folder": str(self.projects_folder), "projectname": self.projectname}
-        with self.cfg_yaml.open("w+") as file:
+        with self.bw_cfg_yaml.open("w+") as file:
             yaml.safe_dump(cfg, file)
 
     def write_project_cfg(self):  # config file for project, local settings
@@ -1346,15 +1350,15 @@ class UIsub(Ui_MainWindow):
                 print("The target project name already exists")
         else:
             new_projectfolder.mkdir()
-            self.dict_folders['project'] = new_projectfolder
             self.projectname = new_project_name
             self.dict_folders = self.build_dict_folders()
             self.resetCacheDicts()
             self.killGroupButtons()
             self.inputProjectName.setText(self.projectname)
             self.df_project = df_projectTemplate()
-            self.tableFormat()
             self.save_df_project()
+            self.tableFormat()
+            self.build_dict_cfg()
             self.write_bw_cfg()
             self.setGraph()
 
@@ -1367,15 +1371,12 @@ class UIsub(Ui_MainWindow):
                 print(f"Project name {new_project_name} already exists")
             self.inputProjectName.setText(self.projectname)
         elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_project_name)) is not None: # True if valid filename
-            self.dict_folders['project'] = self.dict_folders['project'].rename(self.projects_folder / new_project_name)
-            self.dict_folders['data'] = self.projects_folder / new_project_name / 'data'
-            if Path(self.dict_folders['cache']).exists():
-                self.dict_folders['cache'] = self.dict_folders['cache'].rename(self.projects_folder / 'cache' / new_project_name)
             self.projectname = new_project_name
             self.inputProjectName.setText(self.projectname)
             self.inputProjectName.setReadOnly(True)
+            self.build_dict_folders()
             self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
-            self.write_bw_cfg()
+            self.write_bw_cfg() # update boot-up-path in bw_cfg.yaml to new project folder
             print(f"Project renamed to {new_project_name}.")
             self.inputProjectName.editingFinished.disconnect(self.renameProject)
         else:
@@ -1401,12 +1402,17 @@ class UIsub(Ui_MainWindow):
     def get_df_project(self): # returns a copy of the persistent df_project TODO: make these functions the only way to get to it.
         return self.df_project
 
-    def load_df_project(self): # reads fileversion of df_project to persisted self.df_project, clears graphs and saves cfg
+    def load_df_project(self): # reads or builds project cfg, reads fileversion of df_project, clears graphs and saves bw_cfg
+        self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
+        if self.project_cfg_yaml.exists():
+            with self.project_cfg_yaml.open("r") as file:
+                self.dict_cfg = yaml.safe_load(file)
+        else:
+            self.build_dict_cfg()
         self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"))
         self.projectname = self.dict_folders['project'].stem
         self.inputProjectName.setText(self.projectname)  # set folder name to proj name
-        if verbose:
-            print(f"loaded project df: {self.df_project}")
+        self.dict_folders = self.build_dict_folders()
         self.clearGraph()
         self.write_bw_cfg()
 
@@ -2379,7 +2385,6 @@ class Measure_window_sub(Ui_measure_window):
             dict_event['t_EPSP_slope_size'] = self.row['t_EPSP_slope_size']
             dict_event['t_EPSP_slope_method'] = self.row['t_EPSP_slope_method']
             dict_event['t_EPSP_slope_params'] = self.row['t_EPSP_slope_params']
-            # TODO: For the future
             dict_event['t_volley_amp'] = self.row['t_volley_amp']
             dict_event['t_volley_amp_method'] = self.row['t_volley_amp_method']
             dict_event['t_volley_amp_params'] = self.row['t_volley_amp_params']
