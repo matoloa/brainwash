@@ -1778,7 +1778,7 @@ class UIsub(Ui_MainWindow):
                 out = dfdiff
             
             for key, value in dict_view.items():
-                if value:
+                if value and key in out.columns:
                     if key == 'EPSP_amp':
                         _ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", linestyle='--')
                         y_position = dfmean.loc[dfmean.time == t_EPSP_amp, rec_filter]
@@ -2068,6 +2068,10 @@ class Measure_window_sub(Ui_measure_window):
 
         # Populate canvases - TODO: refactor such that components can be called individually when added later
         _ = sns.lineplot(ax=self.canvas_mean.axes, label='voltage', data=self.dfmean, y='voltage', x='time', color='black')
+        t_VEB = row['t_VEB']
+        if pd.notnull(t_VEB):
+            y_position = self.dfmean.loc[self.dfmean.time == t_VEB, 'voltage']
+            self.canvas_mean.axes.plot(t_VEB, y_position, marker='^', markerfacecolor='gray', markeredgecolor='gray', markersize=10, alpha = 0.3)
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             t_EPSP_amp = self.row['t_EPSP_amp']
             self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="green", linestyle="--")
@@ -2269,6 +2273,9 @@ class Measure_window_sub(Ui_measure_window):
         # Plot relevant filter of dfmean on canvas_mean, or show it if it's already plotted
         self.updateMean(rec_filter=rec_filter, **{aspect: bool(self.parent.dict_cfg[f'aspect_{aspect}']) for aspect in aspects})
         for aspect in aspects :
+            # check if aspect exists in new_dfoutput
+            if aspect not in self.new_dfoutput.columns:
+                continue
             visible = bool(self.parent.dict_cfg[f'aspect_{aspect}'])
             self.updateOutputLine(aspect=aspect, visible=visible)
             # set visibility on old aspects
@@ -2439,15 +2446,17 @@ class Measure_window_sub(Ui_measure_window):
         self.new_dfoutput = analysis.build_dfoutput(df=dffilter,
                                        t_EPSP_amp=dict_t['t_EPSP_amp'],
                                        t_EPSP_slope=dict_t['t_EPSP_slope'],
-                                       t_EPSP_slope_size=dict_t['t_EPSP_slope_size'])
+                                       t_EPSP_slope_size=dict_t['t_EPSP_slope_size'],
+                                        t_volley_amp=dict_t['t_volley_amp'],
+                                        t_volley_slope=dict_t['t_volley_slope'],
+                                        t_volley_slope_size=dict_t['t_volley_slope_size'])
         self.new_dfoutput.reset_index(inplace=True)
         # Enforce dict_t
         for edit_mode in self.list_edit_modes:
-            if not edit_mode.startswith("volley"): # TODO: permit volleys when supported
-                set_float = dict_t[f"t_{edit_mode}"]
-                print(f"set_float: {set_float}")
-                if isinstance(set_float, float) and not np.isnan(set_float) and set_float is not None:
-                    self.updateAspect(edit_mode=edit_mode, set_float=set_float, method="Auto")
+            set_float = dict_t[f"t_{edit_mode}"]
+            print(f"set_float: {set_float}")
+            if isinstance(set_float, float) and not np.isnan(set_float) and set_float is not None:
+                self.updateAspect(edit_mode=edit_mode, set_float=set_float, method="Auto")
         
 
     def m(self, SI): # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY

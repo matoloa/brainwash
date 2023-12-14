@@ -218,25 +218,25 @@ def find_i_EPSP_slope_bis0(dfmean, i_VEB, i_EPSP, happy=False):
 
 
 # %%
-def find_i_volleyslope(dfmean, i_stim, i_VEB, happy=False):  # , param_half_slope_width = 4):
+def find_i_volley_slope(dfmean, i_stim, i_VEB, happy=False):
     """
-    DOES NOT USE WIDTH! decided by rolling, earlier?
-
     returns time of volley slope center,
         as identified by positive zero-crossings in the second order derivative
         if several are found, it returns the latest one
     """
+    dftemp = dfmean.prim[i_VEB-15:i_VEB]
+    i_volleyslope = dftemp.idxmin()
 
-    dftemp = dfmean.bis[i_stim:i_VEB]
-    i_volleyslope = dftemp[0 < dftemp.apply(np.sign).diff()].index.values
+    # dftemp = dfmean.bis[i_VEB-15:i_VEB]
+    # i_volleyslope = dftemp[0 < dftemp.apply(np.sign).diff()].index.values
     # print(dftemp.apply(np.sign).diff())
     # print(i_volleyslope)
-    if 1 < len(i_volleyslope):
-        if not happy:
-            raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[i_stim: i_VEB]:{i_volleyslope}")
-        else:
-            print("More volleys than than we wanted but Im happy, so I pick one and move on.")
-    return i_volleyslope[0]
+    # if 1 < len(i_volleyslope):
+    #     if not happy:
+    #         raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[i_stim: i_VEB]:{i_volleyslope}")
+    #     else:
+    #         print("More volleys than than we wanted but Im happy, so I pick one and move on.")
+    return i_volleyslope#[0]
 
 
 # %%
@@ -267,10 +267,10 @@ def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
     dict_i['i_EPSP_slope'] = find_i_EPSP_slope_bis0(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
     if dict_i['i_EPSP_slope'] is np.nan:
         return dict_i
-    dict_i['i_volley_slope'] = find_i_volleyslope(dfmean=dfmean, i_stim=dict_i['i_stim'], i_VEB=dict_i['i_VEB'], happy=True)
+    dict_i['i_volley_slope'] = find_i_volley_slope(dfmean=dfmean, i_stim=dict_i['i_stim'], i_VEB=dict_i['i_VEB'], happy=True)
     if dict_i['i_volley_slope'] is np.nan:
         return dict_i
-    dict_i['i_volley_amp'] = dict_i['i_volley_slope'] + 3 # TODO: This is a placeholder
+    dict_i['i_volley_amp']= dfmean.loc[dict_i['i_volley_slope']:dict_i['i_VEB'], 'voltage'].idxmin() # TODO: make proper function
     return dict_i
 
 
