@@ -632,7 +632,8 @@ class UIsub(Ui_MainWindow):
             print(" - UIsub init, verbose mode")  # rename for clarity
         # move mainwindow to default position (TODO: later to be stored in cfg)
         self.mainwindow = mainwindow
-        self.mainwindow.setGeometry(0, 0, 1400, 1000)
+        screen = QtWidgets.QDesktopWidget().screenGeometry()
+        self.mainwindow.setGeometry(0, 0, screen.width() - 1000, screen.height())
         # load cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
@@ -1903,7 +1904,8 @@ class UIsub(Ui_MainWindow):
         self.measure_frame.setWindowTitle(recording_name)
         self.dict_open_measure_windows[recording_name] = self.measure_window_sub
         # move measurewindow to default position (TODO: later to be stored in cfg)
-        self.measure_frame.setGeometry(1400, 0, 800, 1200)
+        screen = QtWidgets.QDesktopWidget().screenGeometry()
+        self.measure_frame.setGeometry(screen.width() - 1000, 0, 1000, screen.height())
         self.measure_frame.show()
         # Set graphs
         self.measure_window_sub.updatePlots()
