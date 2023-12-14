@@ -601,10 +601,12 @@ def df_projectTemplate():
             "t_volley_amp",
             "t_volley_amp_method",
             "t_volley_amp_params",
+            "volley_amp_mean",
             "t_volley_slope",
             "t_volley_slope_size",
             "t_volley_slope_method",
             "t_volley_slope_params",
+            "volley_slope_mean",
             "t_VEB",
             "t_VEB_method",
             "t_VEB_params",
@@ -789,12 +791,13 @@ class UIsub(Ui_MainWindow):
         def loopConnectViews(view, key):
             str_view_key = f"{view}_{key}"
             key_checkBox = getattr(self, f"checkBox_{str_view_key}")
+            key_checkBox.setChecked(self.dict_cfg[str_view_key])
             key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.viewSettingsChanged(state, str_view_key))
         list_views = ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
         for key in list_views:
             loopConnectViews(view="aspect", key=key)
-        self.cfgEnforce() # apply stored checkbox settings
         # connect paired stim checkbox and flip button to local functions
+        self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
         self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
         self.pushButton_paired_data_flip.pressed.connect(self.pushButton_paired_data_flip_pressed)
 
@@ -813,6 +816,7 @@ class UIsub(Ui_MainWindow):
                 os_name = sys.platform
                 self.dict_usage = {'WARNING': "Do NOT set your alias to anything that can be used to identify you!", 'alias': "", 'ID': str(uuid.uuid4()), 'os': os_name, 'ID_created': now, f"last_used_{version}": now}
             self.write_usage()
+
 
     def build_dict_cfg(self):
         self.dict_cfg = {'list_groups': [], # group_X - ID X is how the program regognizes groups, for buttons and data
@@ -1692,7 +1696,6 @@ class UIsub(Ui_MainWindow):
         # Default sizes
         dict_t['t_EPSP_slope_size'] = self.dict_cfg['EPSP_slope_size_default']
         dict_t['t_volley_slope_size'] = self.dict_cfg['volley_slope_size_default']
-        persist = False
         for aspect, value in dict_t.items():
             old_aspect_value = df_p.loc[row.name, aspect]
             if pd.notna(old_aspect_value):
@@ -1702,11 +1705,10 @@ class UIsub(Ui_MainWindow):
             else: # if old_aspect is NOT a valid float, replace df_p with dict_t
                 df_p.loc[row.name, aspect] = value
                 print(f"{aspect} was {old_aspect_value} in df_p, NOT a valid float. Updating df_p...")               
-                persist = True
-        if persist:
-            self.set_df_project(df_p)
         dfoutput = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=dict_t['t_EPSP_amp'], t_EPSP_slope=dict_t['t_EPSP_slope'], t_EPSP_slope_size=dict_t['t_EPSP_slope_size'], t_volley_amp=dict_t['t_volley_amp'], t_volley_slope=dict_t['t_volley_slope'], t_volley_slope_size=dict_t['t_volley_slope_size'])
-        dfoutput.reset_index(inplace=True)
+        df_p.loc[row.name, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
+        df_p.loc[row.name, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
+        self.set_df_project(df_p)
         return dfoutput
 
 
@@ -2224,6 +2226,8 @@ class Measure_window_sub(Ui_measure_window):
                                     t_volley_amp=self.row['t_volley_amp'],
                                     t_volley_slope=self.row['t_volley_slope'],
                                     t_volley_slope_size=self.row['t_volley_slope_size'])
+        self.row['volley_amp_mean'] = self.new_dfoutput['volley_amp'].mean()
+        self.row['volley_slope_mean'] = self.new_dfoutput['volley_slope'].mean()
         print(f"updateFilter: {self.new_dfoutput.columns}")
         if self.last_x is not None:
             self.updateSample()
@@ -2468,7 +2472,8 @@ class Measure_window_sub(Ui_measure_window):
                                         t_volley_amp=dict_t['t_volley_amp'],
                                         t_volley_slope=dict_t['t_volley_slope'],
                                         t_volley_slope_size=dict_t['t_volley_slope_size'])
-        self.new_dfoutput.reset_index(inplace=True)
+        self.row['volley_amp_mean'] = self.new_dfoutput['volley_amp'].mean()
+        self.row['volley_slope_mean'] = self.new_dfoutput['volley_slope'].mean()
         # Enforce dict_t
         for edit_mode in self.list_edit_modes:
             set_float = dict_t[f"t_{edit_mode}"]
@@ -2617,11 +2622,13 @@ class Measure_window_sub(Ui_measure_window):
         # refresh dfoutput
         dffilter = self.parent.get_dffilter(row=self.row)
         time = self.row[t_aspect]
+        update_mean = False
 
         if aspect.startswith("EPSP"):
             graph_color = "green"
         else: # aspect is volley
             graph_color = "blue"
+            update_mean = True
         if aspect.endswith("_amp"):
             df = analysis.build_dfoutput(df=dffilter, **{t_aspect: time})
             axis = self.ax1
@@ -2649,6 +2656,8 @@ class Measure_window_sub(Ui_measure_window):
             if label2idx(self.canvas_mean, line_name) is False:
                 self.canvas_mean.axes.plot([], [], color=graph_color, linewidth=10, alpha=0.3, label=line_name)
             self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, line_name)].set_data([x_start, x_end], [y_start, y_end])
+        if update_mean:
+            self.row[f'{aspect}_mean'] = df[aspect].mean()
 
         self.new_dfoutput[aspect] = df[aspect]
         # Update graphs
