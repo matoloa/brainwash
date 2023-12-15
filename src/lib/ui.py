@@ -640,7 +640,7 @@ class UIsub(Ui_MainWindow):
 
         # Icon on rename button
         icon = QtGui.QIcon()
-        icon_path = os.path.join(self.repo_root, "rename.png")
+        icon_path = os.path.join(self.repo_root, "graphics/rename.png")
         icon.addPixmap(QtGui.QPixmap(icon_path), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.pushButtonRenameProject.setIcon(icon)
 
@@ -701,13 +701,6 @@ class UIsub(Ui_MainWindow):
                 self.dict_cfg = yaml.safe_load(file)
         else:
             self.build_dict_cfg()
-        self.tableFormat()
-        
-        # Enforce local cfg
-#        self.checkBoxLockDelete.setChecked(self.dict_cfg['delete_locked'])
-#        self.pushButtonDelete.setEnabled(not self.dict_cfg['delete_locked'])
-        for group in self.dict_cfg['list_groups']:  # Generate buttons based on groups in project:
-            self.addGroupButton(group)
 
         if track_widget_focus: # debug mode; prints widget focus every 1000ms
             self.timer = QtCore.QTimer(self)
@@ -740,8 +733,6 @@ class UIsub(Ui_MainWindow):
         self.pushButtonEditGroups.pressed.connect(self.pushedButtonEditGroups) # TODO: create UI for editing groups
         self.pushButtonEditGroups.setText("Reset") # describe placeholder function
         self.pushButtonClearGroups.pressed.connect(self.pushedButtonClearGroups)
-        #self.pushButtonDelete.pressed.connect(self.pushedButtonDelete)
-        #self.checkBoxLockDelete.stateChanged.connect(self.checkedBoxLockDelete)
 
 #       File menu
         self.actionNew = QtWidgets.QAction("New project", self)
@@ -832,7 +823,6 @@ class UIsub(Ui_MainWindow):
                         'volley_slope_size_default': 0.0001,
                         'volley_slope_method_default': {},
                         'volley_slope_params_default': {},
-                        'delete_locked': False, # whether to allow deleting of data TODO: re-implement
                         'aspect_EPSP_amp': True,
                         'aspect_EPSP_slope': True,
                         'aspect_volley_amp': False,
@@ -872,6 +862,9 @@ class UIsub(Ui_MainWindow):
             key_checkBox = getattr(self, viewBox)
             key_checkBox.setChecked(self.dict_cfg[f"aspect_{view}"])
         self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
+        self.killGroupButtons()
+        for group in self.dict_cfg['list_groups']:  # Generate buttons based on groups in project:
+            self.addGroupButton(group)
 
     def build_dict_folders(self):
         dict_folders = {
@@ -932,6 +925,7 @@ class UIsub(Ui_MainWindow):
         # clearGroupsByRow on ALL rows of df_project
         df_p = self.get_df_project()
         self.clearGroupsByRow(df_p.index)
+        self.dict_cfg['list_groups'] = []
         self.killGroupButtons()
 
     def pushedButtonAddGroup(self):
@@ -1040,16 +1034,6 @@ class UIsub(Ui_MainWindow):
         self.tableFormat()
         self.setGraph()
 
-    def checkedBoxLockDelete(self, state):
-        self.usage("checkedBoxLockDelete")
-        if state == 2:
-            self.dict_cfg['delete_locked']= True
-        else:
-            self.dict_cfg['delete_locked']= False
-        self.pushButtonDelete.setEnabled(not self.dict_cfg['delete_locked'])
-        if verbose:
-            print(f"checkedBoxLockDelete {state}, self.dict_cfg['delete_locked']: {self.dict_cfg['delete_locked']}")
-        self.write_project_cfg()
 
 
 # Data Editing functions
@@ -1278,8 +1262,6 @@ class UIsub(Ui_MainWindow):
             widget = self.gridLayout.itemAt(i).widget()
             if widget:
                 widget.deleteLater()
-        self.dict_cfg['list_groups'] = []
-        self.write_project_cfg()
 
     def addToGroup(self, add_group):
         # Assign all selected files to group "add_group" unless they already belong to that group
@@ -1970,12 +1952,6 @@ class TableProjSub(QtWidgets.QTableView):
         if event.key() == QtCore.Qt.Key.Key_F2:
             ui.renameRecording()
             super().keyPressEvent(event)
-#        Redundant by menu hotkeys
-#        elif event.key() == QtCore.Qt.Key.Key_Delete:
-#            if ui.dict_cfg['delete_locked'] == False:
-#                ui.deleteSelectedRows()
-#            else:
-#                print("Delete is locked. Unlock in settings.")
         else:
             super().keyPressEvent(event)
 
