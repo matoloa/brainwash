@@ -218,6 +218,23 @@ def find_i_EPSP_slope_bis0(dfmean, i_VEB, i_EPSP, happy=False):
 
 
 # %%
+def find_i_EPSP_slope_mindist_bis0(dfmean, i_VEB, i_EPSP, EPSP_slope_size=3, happy=False): # TODO: set rolling_width to 2(EPSP width)+1
+    """ Look for lowest sum of deviation from straight line (= 0 bis)"""
+    width = 2 * EPSP_slope_size + 1
+    sertemp = dfmean.bis[i_VEB:i_EPSP].abs()
+    sertemp = sertemp.rolling(width, center=True).mean().diff()
+
+    i_EPSP_slope = sertemp[0 < sertemp.apply(np.sign)].index.values
+    if 1 < len(i_EPSP_slope):
+        if not happy:
+            raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[i_VEB: i_EPSP]:{i_EPSP_slope}")
+        else:
+            print("More EPSPs than we wanted but I'm happy, so I pick the first one and move on.")
+    print(f" . . . i_EPSP_slope: {i_EPSP_slope}")
+    return i_EPSP_slope[0]
+
+
+# %%
 def find_i_volley_slope(dfmean, i_stim, i_VEB, happy=False):
     """
     returns time of volley slope center,
@@ -264,7 +281,7 @@ def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
     dict_i['i_VEB'] = find_i_VEB_prim_peak_max(dfmean=dfmean, i_stim=dict_i['i_stim'], i_EPSP=dict_i['i_EPSP_amp'])
     if dict_i['i_VEB'] is np.nan:
         return dict_i
-    dict_i['i_EPSP_slope'] = find_i_EPSP_slope_bis0(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
+    dict_i['i_EPSP_slope'] = find_i_EPSP_slope_mindist_bis0(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
     if dict_i['i_EPSP_slope'] is np.nan:
         return dict_i
     dict_i['i_volley_slope'] = find_i_volley_slope(dfmean=dfmean, i_stim=dict_i['i_stim'], i_VEB=dict_i['i_VEB'], happy=True)

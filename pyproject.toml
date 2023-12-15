@@ -12,7 +12,7 @@ line_length = 100
 
 [project]
 name = "brainwash"
-version = "0.5.0"
+version = "0.6.3"
 
 [tool.distutils.build_exe]
 excludes = ["tkinter", "unittest"]

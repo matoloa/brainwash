@@ -23,13 +23,17 @@ import json # for saving and loading dicts as strings
 
 import uuid # generating unique talkback ID
 import socket # getting computer name and localdomain for df_project['host'] (not reported in talkback)
+import toml # for reading pyproject.toml
 
 import parse
 import analysis
 
 matplotlib.use("Qt5Agg")
 
-version = "0.6.2"
+# TODO: import from pyproject.toml
+pyproject = toml.load("pyproject.toml")
+version = pyproject['project']['version']
+
 verbose = True
 talkback = True
 track_widget_focus = False
@@ -525,7 +529,7 @@ class Ui_MainWindow(QtCore.QObject):
 
     def retranslateUi(self, mainWindow):
         _translate = QtCore.QCoreApplication.translate
-        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash"))
+        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash, no version number, that means devs need to fix ui.py"))
         self.inputProjectName.setText(_translate("mainWindow", "My Project"))
         self.pushButtonParse.setText(_translate("mainWindow", "Import"))
         self.label.setText(_translate("mainWindow", "Groups:"))
@@ -549,6 +553,9 @@ class Ui_MainWindow(QtCore.QObject):
         self.menuGroups.setTitle(_translate("mainWindow", "Groups"))
 
 
+
+        # DO NOT PASTE below this line
+        mainWindow.setWindowTitle(_translate("mainWindow", f"Brainwash {version}"))
 
 class Ui_Dialog(QtWidgets.QWidget):
     def setupUi(self, Dialog):
@@ -2803,6 +2810,8 @@ def setKey(cell, key, value):  # convert string to dict, update key with value, 
     return json.dumps(dict)
 
 if __name__ == "__main__":
+    print()
+    print(f"brainwash version {version}")
     app = QtWidgets.QApplication(sys.argv)
     main_window = QtWidgets.QMainWindow()
     ui = UIsub(main_window)

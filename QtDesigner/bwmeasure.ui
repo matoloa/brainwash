@@ -98,7 +98,7 @@
            <string>EPSP amp.</string>
           </property>
          </widget>
-         <widget class="QPushButton" name="pushButton_EPSP_size">
+         <widget class="QPushButton" name="pushButton_EPSP_slope_size">
           <property name="geometry">
            <rect>
             <x>10</x>
@@ -111,7 +111,7 @@
            <string>EPSP size</string>
           </property>
          </widget>
-         <widget class="QPushButton" name="pushButton_volley_size">
+         <widget class="QPushButton" name="pushButton_volley_slope_size">
           <property name="geometry">
            <rect>
             <x>170</x>
@@ -186,7 +186,7 @@
            </rect>
           </property>
          </widget>
-         <widget class="QLineEdit" name="lineEdit_volley_size">
+         <widget class="QLineEdit" name="lineEdit_volley_slope_size">
           <property name="geometry">
            <rect>
             <x>260</x>
@@ -206,7 +206,7 @@
            </rect>
           </property>
          </widget>
-         <widget class="QLineEdit" name="lineEdit_EPSP_size">
+         <widget class="QLineEdit" name="lineEdit_EPSP_slope_size">
           <property name="geometry">
            <rect>
             <x>100</x>
@@ -309,22 +309,6 @@
           </property>
           <property name="text">
            <string>No filter</string>
-          </property>
-         </widget>
-         <widget class="QFrame" name="frame_measure_filter_params">
-          <property name="geometry">
-           <rect>
-            <x>90</x>
-            <y>30</y>
-            <width>151</width>
-            <height>101</height>
-           </rect>
-          </property>
-          <property name="frameShape">
-           <enum>QFrame::StyledPanel</enum>
-          </property>
-          <property name="frameShadow">
-           <enum>QFrame::Raised</enum>
           </property>
          </widget>
         </widget>

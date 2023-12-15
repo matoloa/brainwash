@@ -23,7 +23,7 @@ options = {
     "build_exe": {
         "includes": [],
         "excludes": [],
-        "packages": ["pyabf", "neo", "tqdm", "sklearn"],
+        "packages": ["pyabf", "igor2", "neo", "tqdm", "sklearn"],
         "include_files": include_files
     }
 }
@@ -32,7 +32,7 @@ options = {
 # Call the setup function.
 setup(
     name="Brainwash",
-    version="0.1",
+    version="0.6.3", # also update in pyproject.toml
     description="",
     #packages=find_packages(where="src"),
     #package_dir={"": "src"},
