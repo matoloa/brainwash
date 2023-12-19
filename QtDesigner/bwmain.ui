@@ -25,35 +25,6 @@
         <item>
          <layout class="QHBoxLayout" name="horizontalLayoutProj">
           <item>
-           <widget class="QLineEdit" name="inputProjectName">
-            <property name="minimumSize">
-             <size>
-              <width>150</width>
-              <height>0</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>My Project</string>
-            </property>
-            <property name="readOnly">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="pushButtonRenameProject">
-            <property name="maximumSize">
-             <size>
-              <width>25</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string/>
-            </property>
-           </widget>
-          </item>
-          <item>
            <widget class="QPushButton" name="pushButtonParse">
             <property name="text">
              <string>Import</string>
@@ -156,14 +127,7 @@
        </spacer>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="verticalLayoutGraph" stretch="0,5,0,0,5,0,1">
-        <item>
-         <widget class="QLabel" name="labelMeanSweep">
-          <property name="text">
-           <string>Mean Sweep:</string>
-          </property>
-         </widget>
-        </item>
+       <layout class="QVBoxLayout" name="verticalLayoutGraph" stretch="5,0,0,5,1">
         <item>
          <widget class="QWidget" name="graphMean" native="true">
           <property name="minimumSize">
@@ -299,9 +263,9 @@
          </layout>
         </item>
         <item>
-         <widget class="QLabel" name="labelMeanGroups">
+         <widget class="QLabel" name="labelOutput">
           <property name="text">
-           <string>Mean Groups:</string>
+           <string>Output:</string>
           </property>
          </widget>
         </item>
@@ -312,13 +276,6 @@
             <width>0</width>
             <height>100</height>
            </size>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="labelMetadata">
-          <property name="text">
-           <string>Metadata:</string>
           </property>
          </widget>
         </item>
@@ -337,7 +294,7 @@
      <x>0</x>
      <y>0</y>
      <width>1066</width>
-     <height>22</height>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

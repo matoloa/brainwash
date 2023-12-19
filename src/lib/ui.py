@@ -404,16 +404,6 @@ class Ui_MainWindow(QtCore.QObject):
         self.verticalLayoutProj.setObjectName("verticalLayoutProj")
         self.horizontalLayoutProj = QtWidgets.QHBoxLayout()
         self.horizontalLayoutProj.setObjectName("horizontalLayoutProj")
-        self.inputProjectName = QtWidgets.QLineEdit(self.centralwidget)
-        self.inputProjectName.setMinimumSize(QtCore.QSize(150, 0))
-        self.inputProjectName.setReadOnly(True)
-        self.inputProjectName.setObjectName("inputProjectName")
-        self.horizontalLayoutProj.addWidget(self.inputProjectName)
-        self.pushButtonRenameProject = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButtonRenameProject.setMaximumSize(QtCore.QSize(25, 16777215))
-        self.pushButtonRenameProject.setText("")
-        self.pushButtonRenameProject.setObjectName("pushButtonRenameProject")
-        self.horizontalLayoutProj.addWidget(self.pushButtonRenameProject)
         self.pushButtonParse = QtWidgets.QPushButton(self.centralwidget)
         self.pushButtonParse.setObjectName("pushButtonParse")
         self.horizontalLayoutProj.addWidget(self.pushButtonParse)
@@ -451,9 +441,6 @@ class Ui_MainWindow(QtCore.QObject):
         self.horizontalMasterLayout.addItem(spacerItem)
         self.verticalLayoutGraph = QtWidgets.QVBoxLayout()
         self.verticalLayoutGraph.setObjectName("verticalLayoutGraph")
-        self.labelMeanSweep = QtWidgets.QLabel(self.centralwidget)
-        self.labelMeanSweep.setObjectName("labelMeanSweep")
-        self.verticalLayoutGraph.addWidget(self.labelMeanSweep)
         self.graphMean = QtWidgets.QWidget(self.centralwidget)
         self.graphMean.setMinimumSize(QtCore.QSize(0, 100))
         self.graphMean.setObjectName("graphMean")
@@ -491,28 +478,25 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBox_aspect_volley_slope.setObjectName("checkBox_aspect_volley_slope")
         self.horizontalLayout.addWidget(self.frame_main_view)
         self.verticalLayoutGraph.addLayout(self.horizontalLayout)
-        self.labelMeanGroups = QtWidgets.QLabel(self.centralwidget)
-        self.labelMeanGroups.setObjectName("labelMeanGroups")
-        self.verticalLayoutGraph.addWidget(self.labelMeanGroups)
+        self.labelOutput = QtWidgets.QLabel(self.centralwidget)
+        self.labelOutput.setObjectName("labelOutput")
+        self.verticalLayoutGraph.addWidget(self.labelOutput)
         self.graphOutput = QtWidgets.QWidget(self.centralwidget)
         self.graphOutput.setMinimumSize(QtCore.QSize(0, 100))
         self.graphOutput.setObjectName("graphOutput")
         self.verticalLayoutGraph.addWidget(self.graphOutput)
-        self.labelMetadata = QtWidgets.QLabel(self.centralwidget)
-        self.labelMetadata.setObjectName("labelMetadata")
-        self.verticalLayoutGraph.addWidget(self.labelMetadata)
         self.tableMetadata = QtWidgets.QTableView(self.centralwidget)
         self.tableMetadata.setObjectName("tableMetadata")
         self.verticalLayoutGraph.addWidget(self.tableMetadata)
-        self.verticalLayoutGraph.setStretch(1, 5)
-        self.verticalLayoutGraph.setStretch(4, 5)
-        self.verticalLayoutGraph.setStretch(6, 1)
+        self.verticalLayoutGraph.setStretch(0, 5)
+        self.verticalLayoutGraph.setStretch(3, 5)
+        self.verticalLayoutGraph.setStretch(4, 1)
         self.horizontalMasterLayout.addLayout(self.verticalLayoutGraph)
         self.horizontalMasterLayout.setStretch(2, 1)
         self.horizontalLayoutCentralwidget.addLayout(self.horizontalMasterLayout)
         mainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(mainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1066, 22))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1066, 26))
         self.menubar.setObjectName("menubar")
         self.menuFile = QtWidgets.QMenu(self.menubar)
         self.menuFile.setObjectName("menuFile")
@@ -536,14 +520,12 @@ class Ui_MainWindow(QtCore.QObject):
 
     def retranslateUi(self, mainWindow):
         _translate = QtCore.QCoreApplication.translate
-        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash, no version number, that means devs need to fix ui.py"))
-        self.inputProjectName.setText(_translate("mainWindow", "My Project"))
+        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash"))
         self.pushButtonParse.setText(_translate("mainWindow", "Import"))
         self.label.setText(_translate("mainWindow", "Groups:"))
         self.pushButtonAddGroup.setText(_translate("mainWindow", "Add"))
         self.pushButtonClearGroups.setText(_translate("mainWindow", "Clear"))
         self.pushButtonEditGroups.setText(_translate("mainWindow", "Edit"))
-        self.labelMeanSweep.setText(_translate("mainWindow", "Mean Sweep:"))
         self.checkBox_aspect_EPSP_amp.setText(_translate("mainWindow", "EPSP amp."))
         self.checkBox_aspect_EPSP_slope.setText(_translate("mainWindow", "EPSP slope"))
         self.label_aspect.setText(_translate("mainWindow", "Aspect"))
@@ -552,17 +534,13 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButton_paired_data_flip.setText(_translate("mainWindow", "Flip C-I"))
         self.checkBox_aspect_volley_amp.setText(_translate("mainWindow", "volley amp."))
         self.checkBox_aspect_volley_slope.setText(_translate("mainWindow", "volley slope"))
-        self.labelMeanGroups.setText(_translate("mainWindow", "Mean Groups:"))
-        self.labelMetadata.setText(_translate("mainWindow", "Metadata:"))
+        self.labelOutput.setText(_translate("mainWindow", "Output:"))
         self.menuFile.setTitle(_translate("mainWindow", "File"))
         self.menuEdit.setTitle(_translate("mainWindow", "Edit"))
         self.menuData.setTitle(_translate("mainWindow", "Data"))
         self.menuGroups.setTitle(_translate("mainWindow", "Groups"))
 
 
-
-        # DO NOT PASTE below this line
-        mainWindow.setWindowTitle(_translate("mainWindow", f"Brainwash {version}"))
 
 class Ui_Dialog(QtWidgets.QWidget):
     def setupUi(self, Dialog):
@@ -652,17 +630,8 @@ class UIsub(Ui_MainWindow):
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
 
-        # Icon on rename button
-        icon = QtGui.QIcon()
-        icon_path = os.path.join(self.repo_root, "graphics/rename.png")
-        icon.addPixmap(QtGui.QPixmap(icon_path), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-        self.pushButtonRenameProject.setIcon(icon)
-
-        self.bw_cfg_yaml = self.repo_root / "cfg.yaml"
-        self.projectname = None
-        self.inputProjectName.setReadOnly(True)
-
-        # Set default values for 
+        self.bw_cfg_yaml = self.repo_root / "cfg.yaml"  # Path to cfg.yaml
+        # Set default values for bw_cfg.yaml
         self.user_documents = Path.home() / "Documents"  # Where to look for raw data
         self.projects_folder = self.user_documents / "Brainwash Projects"  # Where to save and read parsed data
         self.projectname = "My Project"
@@ -676,6 +645,9 @@ class UIsub(Ui_MainWindow):
                     self.projects_folder = Path(cfg['projects_folder'])  # Where to save and read parsed data
                     self.projectname = cfg['projectname']
         
+        # et window title to projectname
+        self.mainwindow.setWindowTitle(f"Brainwash {version} - {self.projectname}")
+
         # Make sure the necessary folders exist
         self.dict_folders = self.build_dict_folders()
         if not os.path.exists(self.projects_folder):
@@ -742,7 +714,6 @@ class UIsub(Ui_MainWindow):
         #self.pushButtonOpenProject.pressed.connect(self.pushedButtonOpenProject)
         #self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
         self.pushButtonParse.pressed.connect(self.pushedButtonParse)
-        self.pushButtonRenameProject.pressed.connect(self.pushedButtonRenameProject)
         self.pushButtonAddGroup.pressed.connect(self.pushedButtonAddGroup)
         self.pushButtonEditGroups.pressed.connect(self.pushedButtonEditGroups) # TODO: create UI for editing groups
         self.pushButtonEditGroups.setText("Reset") # describe placeholder function
@@ -757,10 +728,10 @@ class UIsub(Ui_MainWindow):
         self.actionOpen.triggered.connect(self.pushedButtonOpenProject)
         self.menuFile.addAction(self.actionOpen)
         self.actionOpen.setShortcut("Ctrl+O")
-        self.actionRename = QtWidgets.QAction("Rename project", self)
-        self.actionRename.triggered.connect(self.pushedButtonRenameProject)
-        self.menuFile.addAction(self.actionRename)
-        self.actionRename.setShortcut("Ctrl+R")
+        self.actionRenameProject = QtWidgets.QAction("Rename project", self)
+        self.actionRenameProject.triggered.connect(self.renameProject)
+        self.menuFile.addAction(self.actionRenameProject)
+        self.actionRenameProject.setShortcut("Ctrl+R")
 
 #       Data menu
         self.actionAddData = QtWidgets.QAction("Add data files", self)
@@ -774,6 +745,10 @@ class UIsub(Ui_MainWindow):
         self.actionDelete.triggered.connect(self.pushedButtonDelete)
         self.menuData.addAction(self.actionDelete)
         self.actionDelete.setShortcut("DEL")
+        self.actionRenameRecording = QtWidgets.QAction("Rename recording", self)
+        self.actionRenameRecording.triggered.connect(self.renameRecording)
+        self.menuData.addAction(self.actionRenameRecording)
+        self.actionRenameRecording.setShortcut("F2")
 
 #       Group menu
         self.actionAddGroup = QtWidgets.QAction("Add a group", self)
@@ -1012,6 +987,7 @@ class UIsub(Ui_MainWindow):
                 print(f"Projectfolder exists, loading project")
             self.dict_folders['project'] = Path(projectfolder)
             self.load_df_project()
+            self.mainwindow.setWindowTitle(f"Brainwash {version} - {self.projectname}")
 
     def pushedButtonAddData(self): # creates file tree for file selection
         self.usage("pushedButtonAddData")
@@ -1100,7 +1076,7 @@ class UIsub(Ui_MainWindow):
             old_filter = self.dict_folders['cache'] / (old_recording_name + "_filter.csv")
             old_output = self.dict_folders['cache'] / (old_recording_name + "_output.csv")
             RenameDialog = InputDialogPopup()
-            new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query='')
+            new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query=old_recording_name)
             if new_recording_name is not None and re.match(r'^[a-zA-Z0-9_ -]+$', str(new_recording_name)) is not None: # check if valid filename
                 list_recording_names = set(df_p['recording_name'])
                 if not new_recording_name in list_recording_names: # prevent duplicates
@@ -1370,12 +1346,12 @@ class UIsub(Ui_MainWindow):
 
     def renameProject(self): # changes name of project folder and updates .cfg
         #self.dict_folders['project'].mkdir(exist_ok=True)
-        new_project_name = self.inputProjectName.text()
+        RenameDialog = InputDialogPopup()
+        new_project_name = RenameDialog.showInputDialog(title='Rename project', query='')
         # check if ok
         if (self.projects_folder / new_project_name).exists():
             if verbose:
                 print(f"Project name {new_project_name} already exists")
-            self.inputProjectName.setText(self.projectname)
         elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_project_name)) is not None: # True if valid filename
             dict_old = self.dict_folders
             self.projectname = new_project_name
@@ -1385,25 +1361,10 @@ class UIsub(Ui_MainWindow):
                 dict_old['cache'].rename(self.dict_folders['cache'])
             self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
             self.write_bw_cfg() # update boot-up-path in bw_cfg.yaml to new project folder
-            print(f"Project renamed to {new_project_name}.")
-            self.inputProjectName.editingFinished.disconnect(self.renameProject)
-            self.inputProjectName.setText(self.projectname)
-            self.inputProjectName.setReadOnly(True)
+            self.mainwindow.setWindowTitle(f"Brainwash {version} - {self.projectname}")
         else:
             print(f"Project name {new_project_name} is not a valid path.")
 
-    def setProjectname(self): # TODO: deprecated?
-        # get_signals(self.children()[1].children()[1].model)
-        self.projectname = self.inputProjectName.text()
-        self.dict_folders['project'] = self.projects_folder / self.projectname
-        if self.dict_folders['project'].exists():
-            # look for project.brainwash and load it
-            if (self.dict_folders['project'] / "project.brainwash").exists():
-                self.load_df_project()
-        else:
-            self.dict_folders['project'].mkdir()
-        if verbose:
-            print(f"setProjectname, folder: {self.dict_folders['project']} exists: {self.dict_folders['project'].exists()}")
 
 
 # Project dataframe handling
@@ -1424,7 +1385,6 @@ class UIsub(Ui_MainWindow):
             self.build_dict_cfg()
         self.cfgEnforce() # apply loaded checkbox settings
         self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"))
-        self.inputProjectName.setText(self.projectname)  # set folder name to proj name
         self.tableFormat()
         self.write_bw_cfg()
 
@@ -1928,18 +1888,26 @@ class UIsub(Ui_MainWindow):
 
 #####################################
 
-
 class InputDialogPopup(QtWidgets.QDialog):
     def __init__(self):
         super().__init__()
+        self.input = QtWidgets.QLineEdit(self)
+        self.buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel, QtCore.Qt.Horizontal, self)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self.input)
+        layout.addWidget(self.buttonBox)
 
     def showInputDialog(self, title, query):
-        text, ok = QtWidgets.QInputDialog.getText(self, title, query)
-        if ok:
+        self.setWindowTitle(title)
+        self.input.setPlaceholderText(query)
+        self.setFixedSize(300, 150)  # Set the fixed width and height of the dialog
+        result = self.exec_()
+        text = self.input.text()
+        if result == QtWidgets.QDialog.Accepted:
             print(f"You entered: {text}")
-            self.accept()  # Close the dialog when Enter is pressed
             return text
-
 
 class TableProjSub(QtWidgets.QTableView):
     # TODO: This class does the weirdest things to events; shifting event numbers around in non-standard ways. Why?
@@ -1968,12 +1936,12 @@ class TableProjSub(QtWidgets.QTableView):
         else:
             event.ignore()
 
-    def keyPressEvent(self, event):
-        if event.key() == QtCore.Qt.Key.Key_F2:
-            ui.renameRecording()
-            super().keyPressEvent(event)
-        else:
-            super().keyPressEvent(event)
+    # def keyPressEvent(self, event):
+    #     if event.key() == QtCore.Qt.Key.Key_F2:
+    #         ui.renameRecording()
+    #         super().keyPressEvent(event)
+    #     else:
+    #         super().keyPressEvent(event)
 
 
 class Filetreesub(Ui_Dialog):
