@@ -1366,7 +1366,7 @@ class UIsub(Ui_MainWindow):
             self.setGraph()
 
     def renameProject(self): # changes name of project folder and updates .cfg
-        self.dict_folders['project'].mkdir(exist_ok=True)
+        #self.dict_folders['project'].mkdir(exist_ok=True)
         new_project_name = self.inputProjectName.text()
         # check if ok
         if (self.projects_folder / new_project_name).exists():
@@ -1374,14 +1374,18 @@ class UIsub(Ui_MainWindow):
                 print(f"Project name {new_project_name} already exists")
             self.inputProjectName.setText(self.projectname)
         elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_project_name)) is not None: # True if valid filename
+            dict_old = self.dict_folders
             self.projectname = new_project_name
-            self.inputProjectName.setText(self.projectname)
-            self.inputProjectName.setReadOnly(True)
             self.dict_folders = self.build_dict_folders()
+            dict_old['project'].rename(self.dict_folders['project'])
+            if Path(dict_old['cache']).exists():
+                dict_old['cache'].rename(self.dict_folders['cache'])
             self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
             self.write_bw_cfg() # update boot-up-path in bw_cfg.yaml to new project folder
             print(f"Project renamed to {new_project_name}.")
             self.inputProjectName.editingFinished.disconnect(self.renameProject)
+            self.inputProjectName.setText(self.projectname)
+            self.inputProjectName.setReadOnly(True)
         else:
             print(f"Project name {new_project_name} is not a valid path.")
 
