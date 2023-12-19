@@ -35,9 +35,13 @@ pyproject = toml.load("pyproject.toml")
 version = pyproject['project']['version']
 
 verbose = True
-talkback = True
+talkback = False
 track_widget_focus = False
 
+# for development, leave space below program to view terminal messages
+terminal_space = 300
+# Nonsense for correctly placing measurewindow on work laptop
+dict_laptop = {'mw_right': 10, 'mw_down': 38}
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
@@ -640,7 +644,7 @@ class UIsub(Ui_MainWindow):
         # move mainwindow to default position (TODO: later to be stored in cfg)
         self.mainwindow = mainwindow
         screen = QtWidgets.QDesktopWidget().screenGeometry()
-        self.mainwindow.setGeometry(0, 0, int(screen.width() * 0.6), int(screen.height()))
+        self.mainwindow.setGeometry(0, 0, int(screen.width() * 0.6), int(screen.height())-terminal_space)
         # load cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
@@ -1894,7 +1898,8 @@ class UIsub(Ui_MainWindow):
         self.dict_open_measure_windows[recording_name] = self.measure_window_sub
         # move measurewindow to default position (TODO: later to be stored in cfg)
         screen = QtWidgets.QDesktopWidget().screenGeometry()
-        self.measure_frame.setGeometry(int(screen.width() * 0.6), 0, int(screen.width() * 0.4), int(screen.height()))
+        #self.measure_frame.setGeometry(int(screen.width() * 0.6), 0, int(screen.width() * 0.4), int(screen.height())-terminal_space)
+        self.measure_frame.setGeometry(int(screen.width() * 0.6)+dict_laptop['mw_right'], 0+dict_laptop['mw_down'], int(screen.width() * 0.4)-dict_laptop['mw_right'], int(screen.height())-terminal_space)
         self.measure_frame.show()
         # Set graphs
         self.measure_window_sub.updatePlots()
