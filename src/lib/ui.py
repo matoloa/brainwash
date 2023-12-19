@@ -40,8 +40,11 @@ track_widget_focus = False
 
 # for development, leave space below program to view terminal messages
 terminal_space = 300
-# Nonsense for correctly placing measurewindow on work laptop
-dict_laptop = {'mw_right': 10, 'mw_down': 38}
+# Nonsense for correctly placing measurewindow on Mats work laptop;
+dict_laptop = None
+if str(socket.getfqdn()) == 'physiol-matand-lap10.physiol.local':
+    print("Useless laptop mode engaged")
+    dict_laptop = {'mw_right': 10, 'mw_down': 38}
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
@@ -1902,8 +1905,9 @@ class UIsub(Ui_MainWindow):
         self.dict_open_measure_windows[recording_name] = self.measure_window_sub
         # move measurewindow to default position (TODO: later to be stored in cfg)
         screen = QtWidgets.QDesktopWidget().screenGeometry()
-        #self.measure_frame.setGeometry(int(screen.width() * 0.6), 0, int(screen.width() * 0.4), int(screen.height())-terminal_space)
-        self.measure_frame.setGeometry(int(screen.width() * 0.6)+dict_laptop['mw_right'], 0+dict_laptop['mw_down'], int(screen.width() * 0.4)-dict_laptop['mw_right'], int(screen.height())-terminal_space)
+        self.measure_frame.setGeometry(int(screen.width() * 0.6), 0, int(screen.width() * 0.4), int(screen.height())-terminal_space)
+        if dict_laptop is not None: # TODO: remove this
+            self.measure_frame.setGeometry(int(screen.width() * 0.6)+dict_laptop['mw_right'], 0+dict_laptop['mw_down'], int(screen.width() * 0.4)-dict_laptop['mw_right'], int(screen.height())-terminal_space)
         self.measure_frame.show()
         # Set graphs
         self.measure_window_sub.updatePlots()
