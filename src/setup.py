@@ -11,7 +11,7 @@ base = "Win32GUI" if sys.platform == "win32" else None
 script_path = "main.py"
 # Additional files/directories that should be included in the distribution.
 # You may need to add other dependencies or data files here.
-include_files = ["lib/"]
+include_files = ["lib/", "pyproject.toml"]
 # Create an executable.
 exe = Executable(
     script=script_path,
@@ -23,7 +23,7 @@ options = {
     "build_exe": {
         "includes": [],
         "excludes": [],
-        "packages": ["pyabf", "igor2", "neo", "tqdm", "sklearn"],
+        "packages": ["pyabf", "igor2", "seaborn", "tqdm", "sklearn", "numpy"],
         "include_files": include_files
     }
 }

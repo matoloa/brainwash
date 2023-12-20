@@ -408,28 +408,6 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButtonParse.setObjectName("pushButtonParse")
         self.horizontalLayoutProj.addWidget(self.pushButtonParse)
         self.verticalLayoutProj.addLayout(self.horizontalLayoutProj)
-        self.horizontalLayoutData = QtWidgets.QHBoxLayout()
-        self.horizontalLayoutData.setSizeConstraint(QtWidgets.QLayout.SetMinAndMaxSize)
-        self.horizontalLayoutData.setObjectName("horizontalLayoutData")
-        self.label = QtWidgets.QLabel(self.centralwidget)
-        self.label.setObjectName("label")
-        self.horizontalLayoutData.addWidget(self.label)
-        self.pushButtonAddGroup = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButtonAddGroup.setMaximumSize(QtCore.QSize(40, 16777215))
-        self.pushButtonAddGroup.setObjectName("pushButtonAddGroup")
-        self.horizontalLayoutData.addWidget(self.pushButtonAddGroup)
-        self.pushButtonClearGroups = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButtonClearGroups.setMaximumSize(QtCore.QSize(40, 16777215))
-        self.pushButtonClearGroups.setObjectName("pushButtonClearGroups")
-        self.horizontalLayoutData.addWidget(self.pushButtonClearGroups)
-        self.pushButtonEditGroups = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButtonEditGroups.setMaximumSize(QtCore.QSize(40, 16777215))
-        self.pushButtonEditGroups.setObjectName("pushButtonEditGroups")
-        self.horizontalLayoutData.addWidget(self.pushButtonEditGroups)
-        self.verticalLayoutProj.addLayout(self.horizontalLayoutData)
-        self.gridLayout = QtWidgets.QGridLayout()
-        self.gridLayout.setObjectName("gridLayout")
-        self.verticalLayoutProj.addLayout(self.gridLayout)
         self.tableProj = QtWidgets.QTableView(self.centralwidget)
         self.tableProj.setMinimumSize(QtCore.QSize(400, 0))
         self.tableProj.setMaximumSize(QtCore.QSize(16777215, 16777215))
@@ -445,8 +423,8 @@ class Ui_MainWindow(QtCore.QObject):
         self.graphMean.setMinimumSize(QtCore.QSize(0, 100))
         self.graphMean.setObjectName("graphMean")
         self.verticalLayoutGraph.addWidget(self.graphMean)
-        self.horizontalLayout = QtWidgets.QHBoxLayout()
-        self.horizontalLayout.setObjectName("horizontalLayout")
+        self.horizontalLayoutControls = QtWidgets.QHBoxLayout()
+        self.horizontalLayoutControls.setObjectName("horizontalLayoutControls")
         self.frame_main_view = QtWidgets.QFrame(self.centralwidget)
         self.frame_main_view.setMinimumSize(QtCore.QSize(0, 90))
         self.frame_main_view.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -476,11 +454,21 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBox_aspect_volley_slope = QtWidgets.QCheckBox(self.frame_main_view)
         self.checkBox_aspect_volley_slope.setGeometry(QtCore.QRect(110, 30, 101, 23))
         self.checkBox_aspect_volley_slope.setObjectName("checkBox_aspect_volley_slope")
-        self.horizontalLayout.addWidget(self.frame_main_view)
+        self.horizontalLayoutControls.addWidget(self.frame_main_view)
+        self.verticalLayoutGraph.addLayout(self.horizontalLayoutControls)
+        self.horizontalLayout = QtWidgets.QHBoxLayout()
+        self.horizontalLayout.setObjectName("horizontalLayout")
+        self.frameGroups = QtWidgets.QFrame(self.centralwidget)
+        self.frameGroups.setMinimumSize(QtCore.QSize(0, 25))
+        self.frameGroups.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frameGroups.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frameGroups.setObjectName("frameGroups")
+        self.labelGroups = QtWidgets.QLabel(self.frameGroups)
+        self.labelGroups.setGeometry(QtCore.QRect(0, 0, 614, 16))
+        self.labelGroups.setText("")
+        self.labelGroups.setObjectName("labelGroups")
+        self.horizontalLayout.addWidget(self.frameGroups)
         self.verticalLayoutGraph.addLayout(self.horizontalLayout)
-        self.labelOutput = QtWidgets.QLabel(self.centralwidget)
-        self.labelOutput.setObjectName("labelOutput")
-        self.verticalLayoutGraph.addWidget(self.labelOutput)
         self.graphOutput = QtWidgets.QWidget(self.centralwidget)
         self.graphOutput.setMinimumSize(QtCore.QSize(0, 100))
         self.graphOutput.setObjectName("graphOutput")
@@ -500,8 +488,6 @@ class Ui_MainWindow(QtCore.QObject):
         self.menubar.setObjectName("menubar")
         self.menuFile = QtWidgets.QMenu(self.menubar)
         self.menuFile.setObjectName("menuFile")
-        self.menuEdit = QtWidgets.QMenu(self.menubar)
-        self.menuEdit.setObjectName("menuEdit")
         self.menuData = QtWidgets.QMenu(self.menubar)
         self.menuData.setObjectName("menuData")
         self.menuGroups = QtWidgets.QMenu(self.menubar)
@@ -511,7 +497,6 @@ class Ui_MainWindow(QtCore.QObject):
         self.statusbar.setObjectName("statusbar")
         mainWindow.setStatusBar(self.statusbar)
         self.menubar.addAction(self.menuFile.menuAction())
-        self.menubar.addAction(self.menuEdit.menuAction())
         self.menubar.addAction(self.menuData.menuAction())
         self.menubar.addAction(self.menuGroups.menuAction())
 
@@ -522,10 +507,6 @@ class Ui_MainWindow(QtCore.QObject):
         _translate = QtCore.QCoreApplication.translate
         mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash"))
         self.pushButtonParse.setText(_translate("mainWindow", "Import"))
-        self.label.setText(_translate("mainWindow", "Groups:"))
-        self.pushButtonAddGroup.setText(_translate("mainWindow", "Add"))
-        self.pushButtonClearGroups.setText(_translate("mainWindow", "Clear"))
-        self.pushButtonEditGroups.setText(_translate("mainWindow", "Edit"))
         self.checkBox_aspect_EPSP_amp.setText(_translate("mainWindow", "EPSP amp."))
         self.checkBox_aspect_EPSP_slope.setText(_translate("mainWindow", "EPSP slope"))
         self.label_aspect.setText(_translate("mainWindow", "Aspect"))
@@ -534,9 +515,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButton_paired_data_flip.setText(_translate("mainWindow", "Flip C-I"))
         self.checkBox_aspect_volley_amp.setText(_translate("mainWindow", "volley amp."))
         self.checkBox_aspect_volley_slope.setText(_translate("mainWindow", "volley slope"))
-        self.labelOutput.setText(_translate("mainWindow", "Output:"))
         self.menuFile.setTitle(_translate("mainWindow", "File"))
-        self.menuEdit.setTitle(_translate("mainWindow", "Edit"))
         self.menuData.setTitle(_translate("mainWindow", "Data"))
         self.menuGroups.setTitle(_translate("mainWindow", "Groups"))
 
@@ -633,7 +612,7 @@ class UIsub(Ui_MainWindow):
         self.bw_cfg_yaml = self.repo_root / "cfg.yaml"  # Path to cfg.yaml
         # Set default values for bw_cfg.yaml
         self.user_documents = Path.home() / "Documents"  # Where to look for raw data
-        self.projects_folder = self.user_documents / "Brainwash Projects"  # Where to save and read parsed data
+        self.projects_folder = self.user_documents / "Brainwash Projects"  # Where to store projects
         self.projectname = "My Project"
         # Override default if cfg.yaml exists
         if self.bw_cfg_yaml.exists():
@@ -711,55 +690,59 @@ class UIsub(Ui_MainWindow):
         # maybe learn more about that later?
         # however, I kinda like the control of putting each of them explicit here and use designer just to get the boxes right visually
         # connecting the same signals we had in original ui test
-        #self.pushButtonOpenProject.pressed.connect(self.pushedButtonOpenProject)
-        #self.pushButtonAddData.pressed.connect(self.pushedButtonAddData)
-        self.pushButtonParse.pressed.connect(self.pushedButtonParse)
-        self.pushButtonAddGroup.pressed.connect(self.pushedButtonAddGroup)
-        self.pushButtonEditGroups.pressed.connect(self.pushedButtonEditGroups) # TODO: create UI for editing groups
-        self.pushButtonEditGroups.setText("Reset") # describe placeholder function
-        self.pushButtonClearGroups.pressed.connect(self.pushedButtonClearGroups)
+        self.pushButtonParse.pressed.connect(self.triggerParse)
 
 #       File menu
         self.actionNew = QtWidgets.QAction("New project", self)
-        self.actionNew.triggered.connect(self.pushedButtonNewProject)
+        self.actionNew.triggered.connect(self.triggerNewProject)
         self.actionNew.setShortcut("Ctrl+N")
         self.menuFile.addAction(self.actionNew)
         self.actionOpen = QtWidgets.QAction("Open project", self)
-        self.actionOpen.triggered.connect(self.pushedButtonOpenProject)
-        self.menuFile.addAction(self.actionOpen)
+        self.actionOpen.triggered.connect(self.triggerOpenProject)
         self.actionOpen.setShortcut("Ctrl+O")
+        self.menuFile.addAction(self.actionOpen)
         self.actionRenameProject = QtWidgets.QAction("Rename project", self)
         self.actionRenameProject.triggered.connect(self.renameProject)
-        self.menuFile.addAction(self.actionRenameProject)
         self.actionRenameProject.setShortcut("Ctrl+R")
+        self.menuFile.addAction(self.actionRenameProject)
 
 #       Data menu
         self.actionAddData = QtWidgets.QAction("Add data files", self)
-        self.actionAddData.triggered.connect(self.pushedButtonAddData)
+        self.actionAddData.triggered.connect(self.triggerAddData)
         self.menuData.addAction(self.actionAddData)
         self.actionParse = QtWidgets.QAction("Import all added datafiles", self)
-        self.actionParse.triggered.connect(self.pushedButtonParse)
-        self.menuData.addAction(self.actionParse)
+        self.actionParse.triggered.connect(self.triggerParse)
         self.actionParse.setShortcut("Ctrl+I")
+        self.menuData.addAction(self.actionParse)
         self.actionDelete = QtWidgets.QAction("Delete selected data", self)
-        self.actionDelete.triggered.connect(self.pushedButtonDelete)
-        self.menuData.addAction(self.actionDelete)
+        self.actionDelete.triggered.connect(self.triggerDelete)
         self.actionDelete.setShortcut("DEL")
+        self.menuData.addAction(self.actionDelete)
         self.actionRenameRecording = QtWidgets.QAction("Rename recording", self)
-        self.actionRenameRecording.triggered.connect(self.renameRecording)
-        self.menuData.addAction(self.actionRenameRecording)
+        self.actionRenameRecording.triggered.connect(self.triggerRenameRecording)
         self.actionRenameRecording.setShortcut("F2")
+        self.menuData.addAction(self.actionRenameRecording)
 
 #       Group menu
         self.actionAddGroup = QtWidgets.QAction("Add a group", self)
-        self.actionAddGroup.triggered.connect(self.pushedButtonAddGroup)
+        self.actionAddGroup.triggered.connect(self.triggerAddGroup)
+        self.actionAddGroup.setShortcut("+")
         self.menuGroups.addAction(self.actionAddGroup)
+        self.actionRemoveEmptyGroup = QtWidgets.QAction("Remove last empty group", self)
+        self.actionRemoveEmptyGroup.triggered.connect(self.triggerRemoveEmptyGroup)
+        self.actionRemoveEmptyGroup.setShortcut("-")
+        self.menuGroups.addAction(self.actionRemoveEmptyGroup)
+        self.actionRemoveGroup = QtWidgets.QAction("Force remove last group", self)
+        self.actionRemoveGroup.triggered.connect(self.triggerRemoveGroup)
+        self.actionRemoveGroup.setShortcut("Ctrl+-")
+        self.menuGroups.addAction(self.actionRemoveGroup)
         self.actionClearGroups = QtWidgets.QAction("Clear group(s) in selection", self)
-        self.actionClearGroups.triggered.connect(self.pushedButtonClearGroups)
+        self.actionClearGroups.triggered.connect(self.triggerClearGroups)
         self.menuGroups.addAction(self.actionClearGroups)
         self.actionResetGroups = QtWidgets.QAction("Remove all groups", self)
-        self.actionResetGroups.triggered.connect(self.pushedButtonEditGroups)
+        self.actionResetGroups.triggered.connect(self.triggerEditGroups)
         self.menuGroups.addAction(self.actionResetGroups)
+    
 
 
         # tableProj
@@ -851,9 +834,9 @@ class UIsub(Ui_MainWindow):
             key_checkBox = getattr(self, viewBox)
             key_checkBox.setChecked(self.dict_cfg[f"aspect_{view}"])
         self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
-        self.killGroupButtons()
-        for group in self.dict_cfg['list_groups']:  # Generate buttons based on groups in project:
-            self.addGroupButton(group)
+#        self.killGroupButtons()
+#        for group in self.dict_cfg['list_groups']:  # Generate buttons based on groups in project:
+#            self.addGroupControls(group)
 
     def build_dict_folders(self):
         dict_folders = {
@@ -894,22 +877,26 @@ class UIsub(Ui_MainWindow):
             yaml.safe_dump(dict_bottom, file, default_flow_style=False)
 
 
-# pushedButton functions TODO: break out the big ones to separate functions!
+# trigger functions TODO: break out the big ones to separate functions!
 
     def pushButton_paired_data_flip_pressed(self):
         self.usage("pushButton_paired_data_flip_pressed")
         self.flipCI()
 
-    def pushedButtonClearGroups(self):
-        self.usage("pushedButtonClearGroups")
+    def triggerRenameRecording(self):
+        self.usage("triggerRenameRecording")
+        self.renameRecording()
+
+    def triggerClearGroups(self):
+        self.usage("triggerClearGroups")
         selected_indices = self.listSelectedIndices()
         if 0 < len(selected_indices):
             self.clearGroupsByRow(selected_indices)
         else:
             print("No files selected.")
 
-    def pushedButtonEditGroups(self): # Open groups UI (not built)
-        self.usage("pushedButtonEditGroups")
+    def triggerEditGroups(self): # Open groups UI (not built)
+        self.usage("triggerEditGroups")
         # Placeholder: For now, delete all buttons and groups
         # clearGroupsByRow on ALL rows of df_project
         df_p = self.get_df_project()
@@ -917,36 +904,52 @@ class UIsub(Ui_MainWindow):
         self.dict_cfg['list_groups'] = []
         self.killGroupButtons()
 
-    def pushedButtonAddGroup(self):
-        self.usage("pushedButtonAddGroup")
-        if len(self.dict_cfg['list_groups']) < 12: # TODO: hardcoded max nr of groups: move to cfg
+    def triggerAddGroup(self):
+        self.usage("triggerAddGroup")
+        if len(self.dict_cfg['list_groups']) < 9: # TODO: hardcoded max nr of groups: move to cfg
             i = 0
             while True:
                 new_group_internal = "group_" + str(i)
                 if new_group_internal in self.dict_cfg['list_groups']:
-                    if verbose:
-                        print(new_group_internal, " already exists")
                     i += 1
                 else:
                     self.dict_cfg['list_groups'].append(new_group_internal)
                     self.dict_cfg['dict_group_show'][new_group_internal] = True
+                    
+                    self.actionAddToGroup = QtWidgets.QAction(f"Add selection to group {i}", self)
+                    self.actionAddGroup.triggered.connect(self.triggerAddGroup)
+                    self.actionAddGroup.setShortcut("+")
+                    self.menuGroups.addAction(self.actionAddGroup)                    
                     print("created", new_group_internal)
                     break
             self.write_project_cfg()
-            self.addGroupButton(new_group_internal)
+            self.addGroupControls(new_group_internal)
         else:
-            print("Maximum of 12 groups allowed for now.")
+            print("Maximum of 9 groups allowed for now.")
 
-    def pushedGroupButton(self, button_name):
-        self.usage(f"pushedGroupButton_{button_name}")
+    def triggerRemoveGroup(self):
+        self.usage("triggerRemoveGroup")
+        if 0 < len(self.dict_cfg['list_groups']):
+            self.dict_cfg['list_groups'].pop()
+            self.write_project_cfg()
+
+    def triggerRemoveEmptyGroup(self):
+        self.usage("triggerRemoveEmptyGroup")
+        list_groups = self.dict_cfg['list_groups']
+        if 0 < len(list_groups):
+            print(f"Removed {list_groups[-1]}")
+            self.dict_cfg['list_groups'].pop()
+
+    def triggerGroupButton(self, button_name):
+        self.usage(f"triggerGroupButton_{button_name}")
         self.addToGroup(button_name)
 
-    def pushedButtonDelete(self):
-        self.usage("pushedButtonDelete")
+    def triggerDelete(self):
+        self.usage("triggerDelete")
         self.deleteSelectedRows()
 
-    def pushedButtonRenameProject(self): # renameProject
-        self.usage("pushedButtonRenameProject")
+    def triggerRenameProject(self): # renameProject
+        self.usage("triggerRenameProject")
         self.inputProjectName.setReadOnly(False)
         self.inputProjectName.selectAll()  # Select all text
         self.inputProjectName.setFocus()  # Set focus
@@ -957,8 +960,8 @@ class UIsub(Ui_MainWindow):
         finally:
             self.inputProjectName.editingFinished.connect(self.renameProject)
 
-    def pushedButtonNewProject(self):
-        self.usage("pushedButtonNewProject")
+    def triggerNewProject(self):
+        self.usage("triggerNewProject")
         self.dict_folders['project'].mkdir(exist_ok=True)
         date = datetime.now().strftime("%Y-%m-%d")
         i = 0
@@ -974,10 +977,10 @@ class UIsub(Ui_MainWindow):
                 self.newProject(new_project_name)
                 break
 
-    def pushedButtonOpenProject(self): # open folder selector dialog
-        self.usage("pushedButtonOpenProject")
+    def triggerOpenProject(self): # open folder selector dialog
+        self.usage("triggerOpenProject")
         self.dialog = QtWidgets.QDialog()
-        print(f"pushedButtonOpenProject: self.projects_folder: {self.projects_folder}")
+        print(f"triggerOpenProject: self.projects_folder: {self.projects_folder}")
         projectfolder = QtWidgets.QFileDialog.getExistingDirectory(
             self.dialog, "Open Directory", str(self.projects_folder), QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks)
         if verbose:
@@ -989,15 +992,16 @@ class UIsub(Ui_MainWindow):
             self.load_df_project()
             self.mainwindow.setWindowTitle(f"Brainwash {version} - {self.projectname}")
 
-    def pushedButtonAddData(self): # creates file tree for file selection
-        self.usage("pushedButtonAddData")
+    def triggerAddData(self): # creates file tree for file selection
+        self.usage("triggerAddData")
         self.dialog = QtWidgets.QDialog()
         self.ftree = Filetreesub(self.dialog, parent=self, folder=self.user_documents)
         self.dialog.show()
 
-    def pushedButtonParse(self): # parse non-parsed files and folders in self.df_project
-        self.usage("pushedButtonParse")
+    def triggerParse(self): # parse non-parsed files and folders in self.df_project
+        self.usage("triggerParse")
         self.parseData()
+        self.setButtonParse()
 
 
 # Non-button event functions
@@ -1210,13 +1214,8 @@ class UIsub(Ui_MainWindow):
 
 # Data Group functions
 
-    def addGroupButton(self, group): # Create a new group button
+    def addGroupControls(self, group): # Create menu for adding to group and checkbox for showing group
         hbox = QtWidgets.QHBoxLayout() # hbox for button and checkbox
-
-        self.new_button = QtWidgets.QPushButton(group, self.centralwidget)
-        self.new_button.setObjectName(group)
-        self.new_button.clicked.connect(lambda: self.pushedGroupButton(group))
-        hbox.addWidget(self.new_button)
 
         self.new_checkbox = QtWidgets.QCheckBox(group, self.centralwidget)
         self.new_checkbox.setObjectName(group)
@@ -1404,9 +1403,9 @@ class UIsub(Ui_MainWindow):
     
     def setButtonParse(self):
         if self.df_project['sweeps'].eq("...").any():
-            self.pushButtonParse.setEnabled(True)
+            self.pushButtonParse.setVisible(True)
         else:
-            self.pushButtonParse.setEnabled(False)
+            self.pushButtonParse.setVisible(False)
 
     def tableFormat(self):
         if verbose:
