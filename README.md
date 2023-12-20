@@ -6,3 +6,11 @@ Output is stored as .csv-files for compatibility.
 
 ### Contact
 Mats Andersson (mats.olof.andersson@gu.se). We're happy to receive feedback and suggestions, or to discuss collaborations.
+
+
+
+### Windows builds
+This requires a development version of cx_freeze:
+pip install --upgrade --pre --extra-index-url https://marcelotduarte.github.io/packages/ cx_Freeze
+Build from src folder [SIC]; there's a copy of pyproject.toml in there for that purpose
+Build syntax: python setup.py build
