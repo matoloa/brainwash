@@ -915,7 +915,7 @@ class UIsub(Ui_MainWindow):
                 else:
                     self.dict_cfg['list_groups'].append(new_group_internal)
                     self.dict_cfg['dict_group_show'][new_group_internal] = True
-                    
+                    # TODO: link triggerAddGroup to appropriate menu; lambda i?
                     self.actionAddToGroup = QtWidgets.QAction(f"Add selection to group {i}", self)
                     self.actionAddGroup.triggered.connect(self.triggerAddGroup)
                     self.actionAddGroup.setShortcut("+")
