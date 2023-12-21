@@ -456,19 +456,9 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBox_aspect_volley_slope.setObjectName("checkBox_aspect_volley_slope")
         self.horizontalLayoutControls.addWidget(self.frame_main_view)
         self.verticalLayoutGraph.addLayout(self.horizontalLayoutControls)
-        self.horizontalLayout = QtWidgets.QHBoxLayout()
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        self.frameGroups = QtWidgets.QFrame(self.centralwidget)
-        self.frameGroups.setMinimumSize(QtCore.QSize(0, 25))
-        self.frameGroups.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frameGroups.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frameGroups.setObjectName("frameGroups")
-        self.labelGroups = QtWidgets.QLabel(self.frameGroups)
-        self.labelGroups.setGeometry(QtCore.QRect(0, 0, 614, 16))
-        self.labelGroups.setText("")
-        self.labelGroups.setObjectName("labelGroups")
-        self.horizontalLayout.addWidget(self.frameGroups)
-        self.verticalLayoutGraph.addLayout(self.horizontalLayout)
+        self.horizontalLayoutGroups = QtWidgets.QHBoxLayout()
+        self.horizontalLayoutGroups.setObjectName("horizontalLayoutGroups")
+        self.verticalLayoutGraph.addLayout(self.horizontalLayoutGroups)
         self.graphOutput = QtWidgets.QWidget(self.centralwidget)
         self.graphOutput.setMinimumSize(QtCore.QSize(0, 100))
         self.graphOutput.setObjectName("graphOutput")
@@ -608,7 +598,6 @@ class UIsub(Ui_MainWindow):
         # load cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
-
         self.bw_cfg_yaml = self.repo_root / "cfg.yaml"  # Path to cfg.yaml
         # Set default values for bw_cfg.yaml
         self.user_documents = Path.home() / "Documents"  # Where to look for raw data
@@ -623,10 +612,60 @@ class UIsub(Ui_MainWindow):
                     self.user_documents = Path(cfg['user_documents'])  # Where to look for raw data
                     self.projects_folder = Path(cfg['projects_folder'])  # Where to save and read parsed data
                     self.projectname = cfg['projectname']
-        
-        # et window title to projectname
+# set window title to projectname
         self.mainwindow.setWindowTitle(f"Brainwash {version} - {self.projectname}")
+        
+#       File menu
+        self.actionNew = QtWidgets.QAction("New project", self)
+        self.actionNew.triggered.connect(self.triggerNewProject)
+        self.actionNew.setShortcut("Ctrl+N")
+        self.menuFile.addAction(self.actionNew)
+        self.actionOpen = QtWidgets.QAction("Open project", self)
+        self.actionOpen.triggered.connect(self.triggerOpenProject)
+        self.actionOpen.setShortcut("Ctrl+O")
+        self.menuFile.addAction(self.actionOpen)
+        self.actionRenameProject = QtWidgets.QAction("Rename project", self)
+        self.actionRenameProject.triggered.connect(self.renameProject)
+        self.actionRenameProject.setShortcut("Ctrl+R")
+        self.menuFile.addAction(self.actionRenameProject)
 
+#       Data menu
+        self.actionAddData = QtWidgets.QAction("Add data files", self)
+        self.actionAddData.triggered.connect(self.triggerAddData)
+        self.menuData.addAction(self.actionAddData)
+        self.actionParse = QtWidgets.QAction("Import all added datafiles", self)
+        self.actionParse.triggered.connect(self.triggerParse)
+        self.actionParse.setShortcut("Ctrl+I")
+        self.menuData.addAction(self.actionParse)
+        self.actionDelete = QtWidgets.QAction("Delete selected data", self)
+        self.actionDelete.triggered.connect(self.triggerDelete)
+        self.actionDelete.setShortcut("DEL")
+        self.menuData.addAction(self.actionDelete)
+        self.actionRenameRecording = QtWidgets.QAction("Rename recording", self)
+        self.actionRenameRecording.triggered.connect(self.triggerRenameRecording)
+        self.actionRenameRecording.setShortcut("F2")
+        self.menuData.addAction(self.actionRenameRecording)
+
+#       Group menu
+        self.actionNewGroup = QtWidgets.QAction("Add a group", self)
+        self.actionNewGroup.triggered.connect(self.triggerNewGroup)
+        self.actionNewGroup.setShortcut("+")
+        self.menuGroups.addAction(self.actionNewGroup)
+        self.actionRemoveEmptyGroup = QtWidgets.QAction("Remove last empty group", self)
+        self.actionRemoveEmptyGroup.triggered.connect(self.triggerRemoveLastEmptyGroup)
+        self.actionRemoveEmptyGroup.setShortcut("-")
+        self.menuGroups.addAction(self.actionRemoveEmptyGroup)
+        self.actionRemoveGroup = QtWidgets.QAction("Force remove last group", self)
+        self.actionRemoveGroup.triggered.connect(self.triggerRemoveLastGroup)
+        self.actionRemoveGroup.setShortcut("Ctrl+-")
+        self.menuGroups.addAction(self.actionRemoveGroup)
+        self.actionClearGroups = QtWidgets.QAction("Clear group(s) in selection", self)
+        self.actionClearGroups.triggered.connect(self.triggerClearGroups)
+        self.menuGroups.addAction(self.actionClearGroups)
+        self.actionResetGroups = QtWidgets.QAction("Remove all groups", self)
+        self.actionResetGroups.triggered.connect(self.triggerEditGroups)
+        self.menuGroups.addAction(self.actionResetGroups)
+    
         # Make sure the necessary folders exist
         self.dict_folders = self.build_dict_folders()
         if not os.path.exists(self.projects_folder):
@@ -692,59 +731,6 @@ class UIsub(Ui_MainWindow):
         # connecting the same signals we had in original ui test
         self.pushButtonParse.pressed.connect(self.triggerParse)
 
-#       File menu
-        self.actionNew = QtWidgets.QAction("New project", self)
-        self.actionNew.triggered.connect(self.triggerNewProject)
-        self.actionNew.setShortcut("Ctrl+N")
-        self.menuFile.addAction(self.actionNew)
-        self.actionOpen = QtWidgets.QAction("Open project", self)
-        self.actionOpen.triggered.connect(self.triggerOpenProject)
-        self.actionOpen.setShortcut("Ctrl+O")
-        self.menuFile.addAction(self.actionOpen)
-        self.actionRenameProject = QtWidgets.QAction("Rename project", self)
-        self.actionRenameProject.triggered.connect(self.renameProject)
-        self.actionRenameProject.setShortcut("Ctrl+R")
-        self.menuFile.addAction(self.actionRenameProject)
-
-#       Data menu
-        self.actionAddData = QtWidgets.QAction("Add data files", self)
-        self.actionAddData.triggered.connect(self.triggerAddData)
-        self.menuData.addAction(self.actionAddData)
-        self.actionParse = QtWidgets.QAction("Import all added datafiles", self)
-        self.actionParse.triggered.connect(self.triggerParse)
-        self.actionParse.setShortcut("Ctrl+I")
-        self.menuData.addAction(self.actionParse)
-        self.actionDelete = QtWidgets.QAction("Delete selected data", self)
-        self.actionDelete.triggered.connect(self.triggerDelete)
-        self.actionDelete.setShortcut("DEL")
-        self.menuData.addAction(self.actionDelete)
-        self.actionRenameRecording = QtWidgets.QAction("Rename recording", self)
-        self.actionRenameRecording.triggered.connect(self.triggerRenameRecording)
-        self.actionRenameRecording.setShortcut("F2")
-        self.menuData.addAction(self.actionRenameRecording)
-
-#       Group menu
-        self.actionAddGroup = QtWidgets.QAction("Add a group", self)
-        self.actionAddGroup.triggered.connect(self.triggerAddGroup)
-        self.actionAddGroup.setShortcut("+")
-        self.menuGroups.addAction(self.actionAddGroup)
-        self.actionRemoveEmptyGroup = QtWidgets.QAction("Remove last empty group", self)
-        self.actionRemoveEmptyGroup.triggered.connect(self.triggerRemoveEmptyGroup)
-        self.actionRemoveEmptyGroup.setShortcut("-")
-        self.menuGroups.addAction(self.actionRemoveEmptyGroup)
-        self.actionRemoveGroup = QtWidgets.QAction("Force remove last group", self)
-        self.actionRemoveGroup.triggered.connect(self.triggerRemoveGroup)
-        self.actionRemoveGroup.setShortcut("Ctrl+-")
-        self.menuGroups.addAction(self.actionRemoveGroup)
-        self.actionClearGroups = QtWidgets.QAction("Clear group(s) in selection", self)
-        self.actionClearGroups.triggered.connect(self.triggerClearGroups)
-        self.menuGroups.addAction(self.actionClearGroups)
-        self.actionResetGroups = QtWidgets.QAction("Remove all groups", self)
-        self.actionResetGroups.triggered.connect(self.triggerEditGroups)
-        self.menuGroups.addAction(self.actionResetGroups)
-    
-
-
         # tableProj
         self.tableProj.setSelectionBehavior(TableProjSub.SelectRows)
         self.tableProj.doubleClicked.connect(self.tableProjDoubleClicked)
@@ -783,11 +769,16 @@ class UIsub(Ui_MainWindow):
 
 
     def build_dict_cfg(self):
+        # Generate a list of 9 colors
+        colors = matplotlib.pyplot.cm.cool(np.linspace(0, 1, 9))
+        # Convert colors to hexadecimal
+        colors = [matplotlib.colors.rgb2hex(color) for color in colors]
+
+
         self.dict_cfg = {'list_groups': [], # group_X - ID X is how the program regognizes groups, for buttons and data
                         'dict_group_name': {}, # group_X: name - how the program displays groups TODO: implement
                         'dict_group_show': {}, # group_X: True/False - whether to show group in graphs
-                        'list_group_colors': ["red", "green", "blue", "yellow"], # TODO: build this list properly
-                        # defaults; if not specified in row, these are used
+                        'list_group_colors': colors,
                         'last_edit_mode': 'EPSP_slope',
                         'EPSP_slope_size_default': 0.0003,
                         'EPSP_slope_method_default': {},
@@ -834,9 +825,11 @@ class UIsub(Ui_MainWindow):
             key_checkBox = getattr(self, viewBox)
             key_checkBox.setChecked(self.dict_cfg[f"aspect_{view}"])
         self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
-#        self.killGroupButtons()
-#        for group in self.dict_cfg['list_groups']:  # Generate buttons based on groups in project:
-#            self.addGroupControls(group)
+        print(f"cfgEnforce: {self.dict_cfg['list_groups']}")
+        self.removeAllGroupControls()
+        for i in self.dict_cfg['list_groups']:
+            print("adding", i)
+            self.addGroupControls(int(i[-1]))
 
     def build_dict_folders(self):
         dict_folders = {
@@ -902,47 +895,42 @@ class UIsub(Ui_MainWindow):
         df_p = self.get_df_project()
         self.clearGroupsByRow(df_p.index)
         self.dict_cfg['list_groups'] = []
-        self.killGroupButtons()
+        self.removeAllGroupControls()
 
-    def triggerAddGroup(self):
-        self.usage("triggerAddGroup")
+    def triggerNewGroup(self):
+        self.usage("triggerNewGroup")
         if len(self.dict_cfg['list_groups']) < 9: # TODO: hardcoded max nr of groups: move to cfg
-            i = 0
-            while True:
-                new_group_internal = "group_" + str(i)
-                if new_group_internal in self.dict_cfg['list_groups']:
-                    i += 1
-                else:
-                    self.dict_cfg['list_groups'].append(new_group_internal)
-                    self.dict_cfg['dict_group_show'][new_group_internal] = True
-                    # TODO: link triggerAddGroup to appropriate menu; lambda i?
-                    self.actionAddToGroup = QtWidgets.QAction(f"Add selection to group {i}", self)
-                    self.actionAddGroup.triggered.connect(self.triggerAddGroup)
-                    self.actionAddGroup.setShortcut("+")
-                    self.menuGroups.addAction(self.actionAddGroup)                    
-                    print("created", new_group_internal)
-                    break
+            i = 1 # start at 1; no group_0
+            new_group = "group_" + str(i)
+            while new_group in self.dict_cfg['list_groups']:
+                i += 1
+                new_group = "group_" + str(i)
+            self.dict_cfg['list_groups'].append(new_group)
+            self.dict_cfg['dict_group_show'][new_group] = True
             self.write_project_cfg()
-            self.addGroupControls(new_group_internal)
+            self.addGroupControls(i)
+            print("created", new_group)
         else:
             print("Maximum of 9 groups allowed for now.")
 
-    def triggerRemoveGroup(self):
-        self.usage("triggerRemoveGroup")
-        if 0 < len(self.dict_cfg['list_groups']):
-            self.dict_cfg['list_groups'].pop()
+    def triggerRemoveLastGroup(self):
+        self.usage("triggerRemoveLastGroup")
+        if self.dict_cfg['list_groups']:  # Check if the list is not empty
+            self.removeGroupControls(self.dict_cfg['list_groups'].pop())
             self.write_project_cfg()
 
-    def triggerRemoveEmptyGroup(self):
-        self.usage("triggerRemoveEmptyGroup")
-        list_groups = self.dict_cfg['list_groups']
-        if 0 < len(list_groups):
-            print(f"Removed {list_groups[-1]}")
-            self.dict_cfg['list_groups'].pop()
-
-    def triggerGroupButton(self, button_name):
-        self.usage(f"triggerGroupButton_{button_name}")
-        self.addToGroup(button_name)
+    def triggerRemoveLastEmptyGroup(self):
+        self.usage("triggerRemoveLastEmptyGroup")
+        if self.dict_cfg['list_groups']:  # Check if the list is not empty
+            df_p = self.get_df_project()
+            group_to_remove = self.dict_cfg['list_groups'][-1]
+            # check if group_to_remove is in any string in df_p['groups']
+            if not df_p['groups'].str.contains(group_to_remove).any():
+                self.triggerRemoveLastGroup()
+            else:
+                print(f"{group_to_remove} is not empty.")
+        else:
+            print("No groups to remove.")
 
     def triggerDelete(self):
         self.usage("triggerDelete")
@@ -1210,31 +1198,41 @@ class UIsub(Ui_MainWindow):
 
 
 
-
-
 # Data Group functions
 
-    def addGroupControls(self, group): # Create menu for adding to group and checkbox for showing group
-        hbox = QtWidgets.QHBoxLayout() # hbox for button and checkbox
-
+    def addGroupControls(self, i): # Create menu for adding to group and checkbox for showing group
+        group = f"group_{str(i)}"
+        color = self.dict_cfg['list_group_colors'][i-1]
+        print(f"addGroupControls: {group}, {color}")
+        setattr(self, f"actionAddTo_{group}", QtWidgets.QAction(f"Add selection to {group}", self))
+        self.new_group_menu_item = getattr(self, f"actionAddTo_{group}")
+        self.new_group_menu_item.triggered.connect(lambda checked, add_group=group: self.addToGroup(add_group))
+        self.new_group_menu_item.setShortcut(f"{str(i)}")
+        self.menuGroups.addAction(self.new_group_menu_item)                    
         self.new_checkbox = QtWidgets.QCheckBox(group, self.centralwidget)
         self.new_checkbox.setObjectName(group)
-        self.new_checkbox.setText("")
+        self.new_checkbox.setText(group)
+        self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the text color
+        #self.new_checkbox.setStyleSheet(f"color: {color};")  # Set the text color
         self.new_checkbox.setChecked(self.dict_cfg['dict_group_show'][group])
         self.new_checkbox.stateChanged.connect(lambda state, group=group: self.groupCheckboxChanged(state, group))
-        hbox.addWidget(self.new_checkbox)
+        self.horizontalLayoutGroups.addWidget(self.new_checkbox)
 
-        # Create a QWidget and set hbox as its layout
-        widget = QtWidgets.QWidget()
-        widget.setLayout(hbox)
+    def removeAllGroupControls(self):
+        for i in range(1, 10): # clear group controls 1-9
+            group = f"group_{i}"
+            self.removeGroupControls(group)
 
-        # Arrange in rows of 4. TODO: hardcoded number of columns: move to cfg
-        column = self.dict_cfg['list_groups'].index(group)
-        row = 0
-        while column >= 4:
-            column -= 4
-            row += 1
-        self.gridLayout.addWidget(widget, row, column, 1, 1)
+    def removeGroupControls(self, group):
+        # get the widget named group and remove it
+        widget = self.centralwidget.findChild(QtWidgets.QWidget, group)
+        if widget:
+            widget.deleteLater()
+        # get the action named actionAddTo_{group} and remove it
+        action = getattr(self, f"actionAddTo_{group}", None)
+        if action:
+            self.menuGroups.removeAction(action)
+            delattr(self, f"actionAddTo_{group}")
 
     def groupCheckboxChanged(self, state, group):
         if verbose:
@@ -1246,14 +1244,11 @@ class UIsub(Ui_MainWindow):
         self.write_project_cfg()
         self.setGraph()
 
-    def killGroupButtons(self):
-        for i in reversed(range(self.gridLayout.count())):  # Iterate in reverse order to prevent skipping
-            widget = self.gridLayout.itemAt(i).widget()
-            if widget:
-                widget.deleteLater()
 
     def addToGroup(self, add_group):
-        # Assign all selected files to group "add_group" unless they already belong to that group
+        self.usage("addToGroup")
+        print(f"addToGroup: {add_group}")
+        # Assign all selected recordings to group "add_group" unless they already belong to that group
         # Kill dict_group_means and csv
         selected_indices = self.listSelectedIndices()
         if 0 < len(selected_indices):
@@ -1261,12 +1256,14 @@ class UIsub(Ui_MainWindow):
             for i in selected_indices:
                 if self.df_project.loc[i, 'groups'] == " ":
                     self.df_project.loc[i, 'groups'] = add_group
+                    print(f"{self.df_project.loc[i, 'recording_name']} added to {add_group}")
                 else:
                     str_group = self.df_project.loc[i, 'groups']
                     list_group = list(str_group.split(","))
                     if add_group not in list_group:
                         list_group.append(add_group)
                         self.df_project.loc[i, 'groups'] = ",".join(map(str, sorted(list_group)))
+                        print(f"{self.df_project.loc[i, 'recording_name']} added to {add_group}")
                     else:
                         print(f"{self.df_project.loc[i, 'recording_name']} is already in {add_group}")
             self.save_df_project()
@@ -1330,10 +1327,9 @@ class UIsub(Ui_MainWindow):
         else:
             new_projectfolder.mkdir()
             self.projectname = new_project_name
+            self.mainwindow.setWindowTitle(f"Brainwash {version} - {self.projectname}")
             self.dict_folders = self.build_dict_folders()
             self.resetCacheDicts()
-            self.killGroupButtons()
-            self.inputProjectName.setText(self.projectname)
             self.set_df_project(df_projectTemplate())
             self.tableFormat()
             self.build_dict_cfg()
@@ -1382,6 +1378,7 @@ class UIsub(Ui_MainWindow):
                 self.dict_cfg = yaml.safe_load(file)
         else:
             self.build_dict_cfg()
+                # add groups to UI
         self.cfgEnforce() # apply loaded checkbox settings
         self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"))
         self.tableFormat()
@@ -1699,10 +1696,9 @@ class UIsub(Ui_MainWindow):
         ax2 = ax1.twinx()
         self.ax2 = ax2  # Store the ax2 instance
         self.ax1 = ax1
-
-        # Plot group means
-        if self.dict_cfg['list_groups']:
-            self.setGraphGroups(ax1, ax2, self.dict_cfg['list_group_colors'])
+        if df_select.shape[0] < 2:
+            if self.dict_cfg['list_groups']:
+                self.setGraphGroups(ax1, ax2, self.dict_cfg['list_group_colors'])
         # Plot analyzed means
         df_analyzed = df_select[df_select['sweeps'] != "..."]
         if not df_analyzed.empty:

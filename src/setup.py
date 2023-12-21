@@ -23,7 +23,7 @@ options = {
     "build_exe": {
         "includes": [],
         "excludes": [],
-        "packages": ["pyabf", "igor2", "seaborn", "tqdm", "sklearn", "numpy"],
+        "packages": ["pyabf", "igor2", "seaborn", "tqdm", "sklearn"],
         "include_files": include_files
     }
 }

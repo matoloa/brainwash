@@ -207,37 +207,7 @@
          </layout>
         </item>
         <item>
-         <layout class="QHBoxLayout" name="horizontalLayout">
-          <item>
-           <widget class="QFrame" name="frameGroups">
-            <property name="minimumSize">
-             <size>
-              <width>0</width>
-              <height>25</height>
-             </size>
-            </property>
-            <property name="frameShape">
-             <enum>QFrame::StyledPanel</enum>
-            </property>
-            <property name="frameShadow">
-             <enum>QFrame::Raised</enum>
-            </property>
-            <widget class="QLabel" name="labelGroups">
-             <property name="geometry">
-              <rect>
-               <x>0</x>
-               <y>0</y>
-               <width>614</width>
-               <height>16</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string/>
-             </property>
-            </widget>
-           </widget>
-          </item>
-         </layout>
+         <layout class="QHBoxLayout" name="horizontalLayoutGroups"/>
         </item>
         <item>
          <widget class="QWidget" name="graphOutput" native="true">
