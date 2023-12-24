@@ -1,6 +1,11 @@
 import sys
 from setuptools import find_packages
 from cx_Freeze import setup, Executable
+import toml  # for reading pyproject.toml
+
+
+pyproject = toml.load("../pyproject.toml")
+version = pyproject['project']['version']
 
 # base="Win32GUI" should be used only for Windows GUI app
 print(f"sys.platform: {sys.platform}")
@@ -23,7 +28,7 @@ options = {
     "build_exe": {
         "includes": [],
         "excludes": [],
-        "packages": ["pyabf", "igor2", "seaborn", "tqdm", "sklearn"],
+        "packages": ["pyabf", "igor2", "tqdm", "sklearn"],
         "include_files": include_files
     }
 }
@@ -32,7 +37,7 @@ options = {
 # Call the setup function.
 setup(
     name="Brainwash",
-    version="0.6.3", # also update in pyproject.toml
+    version=version,
     description="",
     #packages=find_packages(where="src"),
     #package_dir={"": "src"},
