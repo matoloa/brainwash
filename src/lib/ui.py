@@ -31,7 +31,8 @@ import analysis
 matplotlib.use("Qt5Agg")
 
 # TODO: import from pyproject.toml
-pathtoml =  "lib/pyproject.toml" if getattr(sys, "frozen", False) else "../pyproject.toml"
+#pathtoml = "pyproject.toml" if getattr(sys, "frozen", False) else "../pyproject.toml"
+pathtoml = [i + "/pyproject.toml" for i in ["..", ".", "lib"] if Path(i + "/pyproject.toml").is_file()][0]
 pyproject = toml.load(pathtoml)
 version = pyproject['project']['version']
 
