@@ -10,6 +10,7 @@ Mats Andersson (mats.olof.andersson@gu.se). We're happy to receive feedback and 
 
 
 ## Distribution builds
+se also specific build document in docs.
 This requires a development version of cx_freeze (v6.16):
 pip install --upgrade --pre --extra-index-url https://marcelotduarte.github.io/packages/ cx_Freeze
 Build from src folder [SIC], this is needed as cxfreeze does not handle our repo structure cracefully. When it does, it should be from repo root.
