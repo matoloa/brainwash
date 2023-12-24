@@ -27,11 +27,11 @@ exe = Executable(
 options = {
     "build_exe": {
         "includes": [],
-        "excludes": ["http", "statsmodels", "jedi", "fonttools"],  # unsure about statsmodels
-        "packages": ["pyabf", "igor2", "tqdm"],
+        "excludes": ["statsmodels", "jedi", "fonttools"],  # unsure about statsmodels
+        "packages": ["pyabf", "igor2", "tqdm", "joblib", "scipy", "sklearn"],
         "include_files": include_files,
         "zip_include_packages": ["scipy", "sklearn", "pandas"],
-        "bin_excludes": ["libicudata.so", "libstdc++.so", "libcrypto.so"],  # removing some big qt5 files that are probably not used by app. suspect this if qt fails
+        "bin_excludes": ["libstdc++.so", "libcrypto.so"],  # removing some big qt5 files that are probably not used by app. suspect this if qt fails
     }
 }
 

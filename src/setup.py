@@ -36,7 +36,7 @@ options = {
 
 # Call the setup function.
 setup(
-    name="Brainwash",
+    name="brainwash",
     version=version,
     description="",
     #packages=find_packages(where="src"),
