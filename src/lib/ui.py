@@ -1685,10 +1685,10 @@ class UIsub(Ui_MainWindow):
         dict_view = {aspect: self.dict_cfg[f'aspect_{aspect}'] for aspect in ['EPSP_amp', 'volley_amp', 'EPSP_slope', 'volley_slope']}
         amp = bool(dict_view['EPSP_amp'] or dict_view['volley_amp'])
         slope = bool(dict_view['EPSP_slope'] or dict_view['volley_slope'])
+        self.clearGraph()
         if not (amp or slope):
             print("No aspects selected.")
             return
-        self.clearGraph()
         ax1 = self.main_canvas_output.axes
         if hasattr(self, "ax2"): # remove ax2 if it exists
             self.ax2.remove()
@@ -1708,8 +1708,10 @@ class UIsub(Ui_MainWindow):
                 for group in list_group:
                     if group != " ":
                         df_groupmean = self.get_dfgroupmean(key_group=group)
-                        if not df_groupmean.empty:
-                            print(f"plotting {group} mean...")
+                        if not df_groupmean.empty and self.dict_cfg['dict_group_show'][group]:
+                            group_index = self.dict_cfg['list_groups'].index(group)
+                            color = self.dict_cfg['list_group_colors'][group_index]
+                            self.plotGroup(ax1, ax2, group, color, alpha=0.05)
         else: # if none of the selected are analyzed, plot groups instead
             if self.dict_cfg['list_groups']:
                 self.setGraphGroups(ax1, ax2, self.dict_cfg['list_group_colors'])
@@ -1809,19 +1811,20 @@ class UIsub(Ui_MainWindow):
                 if verbose:
                     print(f"Analyse all recordings in {group} to show group output.")
                 continue
+            self.plotGroup(ax1, ax2, group, list_color[i_color])
 
-            # TODO: WIP : refactorize for low alpha background if single selected!
-            dfgroup_mean = self.get_dfgroupmean(key_group=group)
+    def plotGroup(self, ax1, ax2, group, groupcolor, alpha=0.3):
+        dfgroup_mean = self.get_dfgroupmean(key_group=group)
             # Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
             # print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
-            if dfgroup_mean['EPSP_amp_mean'].notna().any():
-                _ = sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=ax1, color=list_color[i_color], linestyle='--')
-                ax1.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_amp_mean + dfgroup_mean.EPSP_amp_SEM, dfgroup_mean.EPSP_amp_mean - dfgroup_mean.EPSP_amp_SEM, alpha=0.3, color=list_color[i_color])               
-                ax1.axhline(y=0, linestyle='--', color='gray', alpha = 0.2)
-            if dfgroup_mean['EPSP_slope_mean'].notna().any():
-                _ = sns.scatterplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=ax2, color=list_color[i_color], s=5)
-                ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=list_color[i_color])
-                ax2.axhline(y=0, linestyle=':', color='gray', alpha = 0.2)
+        if dfgroup_mean['EPSP_amp_mean'].notna().any():
+            _ = sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=ax1, color=groupcolor, linestyle='--', alpha=alpha)
+            ax1.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_amp_mean + dfgroup_mean.EPSP_amp_SEM, dfgroup_mean.EPSP_amp_mean - dfgroup_mean.EPSP_amp_SEM, alpha=0.3, color=groupcolor)
+            ax1.axhline(y=0, linestyle='--', color=groupcolor, alpha = 0.2)
+        if dfgroup_mean['EPSP_slope_mean'].notna().any():
+            _ = sns.scatterplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=ax2, color=groupcolor, s=5, alpha=alpha)
+            ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=groupcolor)
+            ax2.axhline(y=0, linestyle=':', color=groupcolor, alpha = 0.2)
 
     def mainClicked(self, event, canvas, out=False): # maingraph click event
         self.usage(f"mainClicked_output={out}")
