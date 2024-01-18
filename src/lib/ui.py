@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 import yaml
 
-import matplotlib
+from matplotlib import use as matplotlib_use
 
 # import matplotlib.pyplot as plt # TODO: use instead of matplotlib for smaller import?
 import seaborn as sns
@@ -28,7 +28,7 @@ import toml # for reading pyproject.toml
 import parse
 import analysis
 
-matplotlib.use("Qt5Agg")
+matplotlib_use("Qt5Agg")
 
 # TODO: import from pyproject.toml
 #pathtoml = "pyproject.toml" if getattr(sys, "frozen", False) else "../pyproject.toml"
@@ -771,12 +771,8 @@ class UIsub(Ui_MainWindow):
 
 
     def build_dict_cfg(self):
-        # Generate a list of 9 colors
-        colors = matplotlib.pyplot.cm.cool(np.linspace(0, 1, 9))
-        # Convert colors to hexadecimal
-        colors = [matplotlib.colors.rgb2hex(color) for color in colors]
-
-
+        # Generate a list of 9 colors for groups, hex format
+        colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000']
         self.dict_cfg = {'list_groups': [], # group_X - ID X is how the program regognizes groups, for buttons and data
                         'dict_group_name': {}, # group_X: name - how the program displays groups TODO: implement
                         'dict_group_show': {}, # group_X: True/False - whether to show group in graphs
@@ -1215,6 +1211,7 @@ class UIsub(Ui_MainWindow):
         self.new_checkbox.setObjectName(group)
         self.new_checkbox.setText(group)
         self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the text color
+        self.new_checkbox.setMaximumWidth(100)  # Set the maximum width
         #self.new_checkbox.setStyleSheet(f"color: {color};")  # Set the text color
         self.new_checkbox.setChecked(self.dict_cfg['dict_group_show'][group])
         self.new_checkbox.stateChanged.connect(lambda state, group=group: self.groupCheckboxChanged(state, group))
@@ -1698,9 +1695,6 @@ class UIsub(Ui_MainWindow):
         ax2 = ax1.twinx()
         self.ax2 = ax2  # Store the ax2 instance
         self.ax1 = ax1
-        if df_select.shape[0] < 2:
-            if self.dict_cfg['list_groups']:
-                self.setGraphGroups(ax1, ax2, self.dict_cfg['list_group_colors'])
         # Plot analyzed means
         df_analyzed = df_select[df_select['sweeps'] != "..."]
         if not df_analyzed.empty:
@@ -1708,6 +1702,17 @@ class UIsub(Ui_MainWindow):
                 self.dict_cfg['output_xlim'] = [0, df_analyzed['sweeps'].max()]
                 self.write_project_cfg()
             self.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2, dict_view=dict_view)
+            # if just one selected, plot its group's mean
+            if len(df_analyzed) == 1:
+                list_group = df_analyzed['groups'].iloc[0].split(',')
+                for group in list_group:
+                    if group != " ":
+                        df_groupmean = self.get_dfgroupmean(key_group=group)
+                        if not df_groupmean.empty:
+                            print(f"plotting {group} mean...")
+        else: # if none of the selected are analyzed, plot groups instead
+            if self.dict_cfg['list_groups']:
+                self.setGraphGroups(ax1, ax2, self.dict_cfg['list_group_colors'])
         
         # add appropriate ticks and axis labels
         self.main_canvas_mean.axes.set_xlabel("Time (s)")
@@ -1805,6 +1810,7 @@ class UIsub(Ui_MainWindow):
                     print(f"Analyse all recordings in {group} to show group output.")
                 continue
 
+            # TODO: WIP : refactorize for low alpha background if single selected!
             dfgroup_mean = self.get_dfgroupmean(key_group=group)
             # Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
             # print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
