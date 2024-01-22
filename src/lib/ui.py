@@ -883,6 +883,8 @@ class UIsub(Ui_MainWindow):
         selected_indices = self.listSelectedIndices()
         if 0 < len(selected_indices):
             self.clearGroupsByRow(selected_indices)
+            self.tableUpdate()
+            self.setGraph()
         else:
             print("No files selected.")
 
@@ -894,6 +896,8 @@ class UIsub(Ui_MainWindow):
         self.clearGroupsByRow(df_p.index)
         self.dict_cfg['list_groups'] = []
         self.removeAllGroupControls()
+        self.tableUpdate()
+        self.setGraph()
 
     def triggerNewGroup(self):
         self.usage("triggerNewGroup")
@@ -1110,6 +1114,20 @@ class UIsub(Ui_MainWindow):
                     recording_name = df_p.at[row, 'recording_name']
                     if verbose:
                         print(f"Deleting {recording_name}...")
+                    # remove from internal cache
+                    if recording_name in self.dict_datas.keys():
+                        print(f"Deleting {recording_name} from internal dict_datas cache...")
+                    self.dict_datas.pop(recording_name, None)
+                    if recording_name in self.dict_means.keys():
+                        print(f"Deleting {recording_name} from internal dict_means cache...")
+                    self.dict_means.pop(recording_name, None)
+                    if recording_name in self.dict_filters.keys():
+                        print(f"Deleting {recording_name} from internal dict_filters cache...")
+                    self.dict_filters.pop(recording_name, None)
+                    if recording_name in self.dict_outputs.keys():
+                        print(f"Deleting {recording_name} from internal dict_outputs cache...")
+                    self.dict_outputs.pop(recording_name, None)
+                    # remove from disk
                     data_path = Path(self.dict_folders['data'] / (recording_name + ".csv"))
                     if data_path.exists():
                         data_path.unlink()
@@ -1124,8 +1142,10 @@ class UIsub(Ui_MainWindow):
                         output_path.unlink()
             # Regardless of whether or not there was a file, purge the row from df_project
             self.clearGroupsByRow(selected_indices) # clear cache so that a new group mean is calculated
+            print(f"df_p pre-delete: {df_p}")
             df_p.drop(selected_indices, inplace=True)
             df_p.reset_index(inplace=True, drop=True)
+            print(f"df_p post-delete: {df_p}")
             self.set_df_project(df_p)
             self.tableUpdate()
             self.setGraph()
@@ -1266,8 +1286,8 @@ class UIsub(Ui_MainWindow):
                     else:
                         print(f"{self.df_project.loc[i, 'recording_name']} is already in {add_group}")
             self.save_df_project()
-            self.tableUpdate()
             self.purgeGroupCache(add_group)
+            self.tableUpdate()
             self.setGraph()
         else:
             print("No files selected.")
@@ -1295,8 +1315,6 @@ class UIsub(Ui_MainWindow):
         for group in affected_groups:
             self.purgeGroupCache(group)
         self.set_df_project(self.df_project)
-        self.tableUpdate()
-        self.setGraph()
 
 
 # writer functions
