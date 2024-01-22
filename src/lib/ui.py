@@ -1931,8 +1931,18 @@ class TableProjSub(QtWidgets.QTableView):
             # NTH: more intelligent default naming; lowest level unique name?
             # For now, use name + lowest level folder
             names = []
+            duplicates = [] # remove these from dfAdd
             for i in file_urls:
-                names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
+                # check if file is already in df_project
+                if i in self.parent.df_project['path'].values:
+                    print(f"File {i} already in df_project")
+                    duplicates.append(i)
+                else:
+                    names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
+            if not names:
+                print("No new files to add.")
+                return
+            dfAdd = dfAdd.drop(dfAdd[dfAdd['path'].isin(duplicates)].index)
             dfAdd['recording_name'] = names
             self.parent.addData(dfAdd)
             event.acceptProposedAction()
