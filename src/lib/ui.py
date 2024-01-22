@@ -37,11 +37,11 @@ pyproject = toml.load(pathtoml)
 version = pyproject['project']['version']
 
 verbose = True
-talkback = False
+talkback = True
 track_widget_focus = False
 
-# for development, leave space below program to view terminal messages
-terminal_space = 300
+# for development, leave e.g. 300 pixels below program to view terminal messages
+terminal_space = 0
 # Nonsense for correctly placing measurewindow on Mats work laptop;
 dict_laptop = None
 if str(socket.getfqdn()) == 'physiol-matand-lap10.physiol.local':
@@ -2731,9 +2731,9 @@ def zoomOnScroll(event, parent, canvas, ax1=None, ax2=None, dict_cfg=None):
     else:
         return
     # Define the boundaries of the invisible rectangles
-    left = 0.15 * parent.width()
-    right = 0.85 * parent.width()
-    bottom = 0.15 * parent.height() # NB: counts from bottom up!
+    left = 0.12 * parent.width()
+    right = 0.88 * parent.width()
+    bottom = 0.12 * parent.height() # NB: counts from bottom up!
     x_rect = [0, 0, parent.width(), bottom]
     if slope_left:
         ax2_rect = [0, 0, left, parent.height()]
