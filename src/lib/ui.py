@@ -41,12 +41,15 @@ talkback = True
 track_widget_focus = False
 
 # for development, leave e.g. 300 pixels below program to view terminal messages
-terminal_space = 50
+terminal_space = 72
 # Nonsense for correctly placing measurewindow on Mats work laptop;
-dict_laptop = None
+dict_screen = None
+# TODO: windows specific offset:
+dict_screen = {'mw_right': 10, 'mw_down': 31}
+
 if str(socket.getfqdn()) == 'physiol-matand-lap10.physiol.local':
     print("Useless laptop mode engaged")
-    dict_laptop = {'mw_right': 10, 'mw_down': 38}
+    dict_screen = {'mw_right': 10, 'mw_down': 38}
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
@@ -1790,23 +1793,25 @@ class UIsub(Ui_MainWindow):
             
             for key, value in dict_view.items():
                 if value and key in out.columns:
-                    if key == 'EPSP_amp':
+                    if key == 'EPSP_amp' and not np.isnan(t_EPSP_amp):
                         _ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", linestyle='--')
+                        print(f"t_EPSP_amp: {t_EPSP_amp} - {np.isnan(t_EPSP_amp)}")
                         y_position = dfmean.loc[dfmean.time == t_EPSP_amp, rec_filter]
+                        print(f"y_position: {y_position}")
                         self.main_canvas_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha = 0.3)
-                    if key == 'volley_amp':
+                    if key == 'volley_amp' and not np.isnan(t_volley_amp):
                         ax1.axhline(y=df_p.loc[i, 'volley_amp_mean'], color='blue', alpha = 0.3, linestyle='--')
                         #_ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="blue", linestyle='--', alpha = 0.3)
                         y_position = dfmean.loc[dfmean.time == t_volley_amp, rec_filter]
                         self.main_canvas_mean.axes.plot(t_volley_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
-                    if key == 'EPSP_slope':
+                    if key == 'EPSP_slope' and not np.isnan(t_EPSP_slope):
                         _ = sns.lineplot(ax=ax2, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", alpha = 0.3)
                         x_start = t_EPSP_slope - t_EPSP_slope_size
                         x_end = t_EPSP_slope + t_EPSP_slope_size
                         y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
                         y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
                         self.main_canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='green', linewidth=10, alpha=0.3)
-                    if key == 'volley_slope':
+                    if key == 'volley_slope' and not np.isnan(t_volley_slope):
                         ax2.axhline(y=df_p.loc[i, 'volley_slope_mean'], color='blue', alpha = 0.3)
                         #_ = sns.lineplot(ax=ax2, label=f"{label}_{key}", data=out, y=key, x="sweep", color="blue", alpha = 0.3)
                         x_start = t_volley_slope - t_volley_slope_size
@@ -1896,8 +1901,8 @@ class UIsub(Ui_MainWindow):
         # move measurewindow to default position (TODO: later to be stored in cfg)
         screen = QtWidgets.QDesktopWidget().screenGeometry()
         self.measure_frame.setGeometry(int(screen.width() * 0.6), 0, int(screen.width() * 0.4), int(screen.height())-terminal_space)
-        if dict_laptop is not None: # TODO: remove this
-            self.measure_frame.setGeometry(int(screen.width() * 0.6)+dict_laptop['mw_right'], 0+dict_laptop['mw_down'], int(screen.width() * 0.4)-dict_laptop['mw_right'], int(screen.height())-terminal_space)
+        if dict_screen is not None:
+            self.measure_frame.setGeometry(int(screen.width() * 0.6)+dict_screen['mw_right'], 0+dict_screen['mw_down'], int(screen.width() * 0.4)-dict_screen['mw_right'], int(screen.height())-terminal_space)
         self.measure_frame.show()
         # Set graphs
         self.measure_window_sub.updatePlots()
@@ -2102,11 +2107,11 @@ class Measure_window_sub(Ui_measure_window):
         if pd.notnull(t_VEB):
             y_position = self.dfmean.loc[self.dfmean.time == t_VEB, 'voltage']
             self.canvas_mean.axes.plot(t_VEB, y_position, marker='^', markerfacecolor='gray', markeredgecolor='gray', markersize=10, alpha = 0.3)
-        # Old measurements
+        # TODO: Old measurements show an incorrect reading as "old", even at first launch. Disabled for now, here and in updatePlots().
         if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
             t_EPSP_amp = self.row['t_EPSP_amp']
             self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="green", linestyle="--")
-            _ = sns.lineplot(ax=self.ax1, label="old EPSP amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="gray", linestyle="--", alpha=0.3)
+            #_ = sns.lineplot(ax=self.ax1, label="old EPSP amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="gray", linestyle="--", alpha=0.3)
         if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
             t_EPSP_slope = self.row['t_EPSP_slope']
             x_start = t_EPSP_slope - self.row['t_EPSP_slope_size']
@@ -2114,11 +2119,11 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_EPSP_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
             self.v_t_EPSP_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
             self.v_t_EPSP_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
-            _ = sns.lineplot(ax=self.ax2, label="old EPSP slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="gray", alpha=0.3)
+            #_ = sns.lineplot(ax=self.ax2, label="old EPSP slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="gray", alpha=0.3)
         if 'volley_amp' in self.new_dfoutput.columns and self.new_dfoutput['volley_amp'].notna().any():
             t_volley_amp = self.row['t_volley_amp']
             self.v_t_volley_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_volley_amp, color="blue", linestyle="--")
-            _ = sns.lineplot(ax=self.ax1, label="old volley amp", data=self.new_dfoutput, y="volley_amp", x="sweep", color="gray", linestyle="--", alpha=0.3)
+            #_ = sns.lineplot(ax=self.ax1, label="old volley amp", data=self.new_dfoutput, y="volley_amp", x="sweep", color="gray", linestyle="--", alpha=0.3)
         if 'volley_slope' in self.new_dfoutput.columns and self.new_dfoutput['volley_slope'].notna().any():
             t_volley_slope = self.row['t_volley_slope']
             x_start = t_volley_slope - self.row['t_volley_slope_size']
@@ -2126,8 +2131,8 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_volley_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_volley_slope, color="blue", linestyle="--")
             self.v_t_volley_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="blue", linestyle=":")
             self.v_t_volley_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="blue", linestyle=":")
-            _ = sns.lineplot(ax=self.ax2, label="old volley slope", data=self.new_dfoutput, y="volley_slope", x="sweep", color="gray", alpha=0.3)
-
+            #_ = sns.lineplot(ax=self.ax2, label="old volley slope", data=self.new_dfoutput, y="volley_slope", x="sweep", color="gray", alpha=0.3)
+        
         self.canvas_mean.axes.set_xlim(parent.dict_cfg['mean_xlim'])
         self.canvas_mean.axes.set_ylim(parent.dict_cfg['mean_ylim'])
         self.ax1.set_ylim(parent.dict_cfg['output_ax1_ylim'])
@@ -2193,7 +2198,7 @@ class Measure_window_sub(Ui_measure_window):
 
         self.buttonBox.accepted.connect(self.accepted_handler)
         self.buttonBox.rejected.connect(self.measure_frame.close)
-        self.updatePlots()
+        #self.updatePlots()
 
 
     def toggle(self, button, now_setting): 
@@ -2325,9 +2330,9 @@ class Measure_window_sub(Ui_measure_window):
                 continue
             visible = bool(self.parent.dict_cfg[f'aspect_{aspect}'])
             self.updateOutputLine(aspect=aspect, visible=visible)
-            # set visibility on old aspects
-            self.ax1.lines[label2idx(self.ax1, f"old {aspect}")].set_visible(visible)
-            self.ax2.lines[label2idx(self.ax2, f"old {aspect}")].set_visible(visible)
+            # TODO: set visibility on old aspects, disabled for now, here and in Measure_window_sub init
+            #self.ax1.lines[label2idx(self.ax1, f"old {aspect}")].set_visible(visible)
+            #self.ax2.lines[label2idx(self.ax2, f"old {aspect}")].set_visible(visible)
         # TODO: Update y limits
         sortLegend(self.ax1, self.ax2) # amplitude legends up, slopes down
         amp = bool(self.parent.dict_cfg['aspect_EPSP_amp'] or self.parent.dict_cfg['aspect_volley_amp'])
