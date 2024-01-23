@@ -9,10 +9,10 @@ import time
 
 
 # %%
-from joblib import Memory
+#from joblib import Memory
 
 # %%
-memory = Memory("joblib", verbose=1)
+#memory = Memory("joblib", verbose=1)
 
 
 # %%

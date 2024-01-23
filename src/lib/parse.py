@@ -8,11 +8,11 @@ import pyabf  # read data files atf, abf
 import igor2 as igor # read data files ibw
 
 from tqdm import tqdm
-from joblib import Memory
-from joblib import Parallel, delayed
+#from joblib import Memory
+#from joblib import Parallel, delayed
 import time
 
-memory = Memory("../cache", verbose=1)
+#memory = Memory("../cache", verbose=1)
 
 verbose = True
 
