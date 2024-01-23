@@ -41,7 +41,7 @@ talkback = True
 track_widget_focus = False
 
 # for development, leave e.g. 300 pixels below program to view terminal messages
-terminal_space = 0
+terminal_space = 50
 # Nonsense for correctly placing measurewindow on Mats work laptop;
 dict_laptop = None
 if str(socket.getfqdn()) == 'physiol-matand-lap10.physiol.local':
@@ -510,6 +510,12 @@ class Ui_MainWindow(QtCore.QObject):
         self.menuFile.setTitle(_translate("mainWindow", "File"))
         self.menuData.setTitle(_translate("mainWindow", "Data"))
         self.menuGroups.setTitle(_translate("mainWindow", "Groups"))
+
+# Hide these in Deploy
+        self.pushButtonParse.setVisible(False)
+        self.label_paired_data.setVisible(False)
+        self.pushButton_paired_data_flip.setVisible(False)
+        self.checkBox_paired_stims.setVisible(False)
 
 
 
@@ -2141,8 +2147,8 @@ class Measure_window_sub(Ui_measure_window):
 
         # set button colors
         self.dict_color = { 'default': "background-color: rgb(239, 239, 239);",
-                            'EPSP': "background-color: rgb(100, 239, 100);",
-                            'volley': "background-color: rgb(100, 100, 239);",
+                            'EPSP': "background-color: rgb(150, 239, 150);",
+                            'volley': "background-color: rgb(150, 150, 239);",
                             }
 
         self.list_aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
@@ -2153,6 +2159,7 @@ class Measure_window_sub(Ui_measure_window):
             button = getattr(self, f"pushButton_{edit_mode}")
             button.setCheckable(True)
             button.pressed.connect(lambda edit_mode=edit_mode, button=button: self.toggle(button, edit_mode))
+            button.setCheckable(True)
             edit = getattr(self, f"lineEdit_{edit_mode}")
             edit.setText(self.m(self.row[f"t_{edit_mode}"]))
             edit.editingFinished.connect(lambda edit_mode=edit_mode, edit=edit: self.updateOnEdit(edit, edit_mode))
@@ -2189,16 +2196,18 @@ class Measure_window_sub(Ui_measure_window):
         self.updatePlots()
 
 
-    def toggle(self, button, now_setting): # updates aspect, sets "button" to active state, and all other buttons to inactive
+    def toggle(self, button, now_setting): 
         self.now_setting = now_setting
         for edit_mode in self.list_edit_modes:
             un_button = getattr(self, f"pushButton_{edit_mode}")
             un_button.setStyleSheet(self.dict_color['default'])
+            un_button.setChecked(False)  # set other buttons to not be in depressed state
         # if now.setting contains the word "volley", set volley button to active
         if "volley" in now_setting:
             button.setStyleSheet(self.dict_color['volley'])
         else:
             button.setStyleSheet(self.dict_color['EPSP'])
+        button.setChecked(True)  # set the toggled button to be depressed
         self.parent.dict_cfg['last_edit_mode'] = now_setting
         self.parent.write_project_cfg()
         
@@ -2244,25 +2253,31 @@ class Measure_window_sub(Ui_measure_window):
 
 
     def editFilterParams(self, lineEdit):
+        changed = False
         if lineEdit.objectName() == "lineEdit_filter_savgol_windowLength":
-            try:
-                windowLength = int(lineEdit.text())
-                if not 1 <= windowLength <= 21:
-                    raise ValueError
+            windowLength = int(lineEdit.text())
+            polyOrder = int(self.lineEdit_filter_savgol_polyOrder.text())
+            if 21 < windowLength:
+                windowLength = 21
+            if windowLength <= polyOrder:
+                windowLength = polyOrder+1
+            if windowLength != int(self.dict_filter_params['savgol']['window_length']):
                 self.dict_filter_params['savgol']['window_length'] = str(windowLength)
-            except ValueError:
-                print("Invalid input: Window length must be a number between 1 and 21.")
-                lineEdit.setText(str(self.dict_filter_params['savgol']['window_length']))
+                changed = True
+            lineEdit.setText(str(self.dict_filter_params['savgol']['window_length']))
         elif lineEdit.objectName() == "lineEdit_filter_savgol_polyOrder":
-            try:
-                polyOrder = int(lineEdit.text())
-                if not 1 <= polyOrder <= 5:
-                    raise ValueError
+            windowLength = int(self.lineEdit_filter_savgol_windowLength.text())
+            polyOrder = int(lineEdit.text())
+            if polyOrder < 1:
+                polyOrder = 1
+            if 5 < polyOrder | polyOrder >= windowLength:
+                polyOrder = min(5, windowLength-1)
+            if polyOrder != int(self.dict_filter_params['savgol']['poly_order']):
                 self.dict_filter_params['savgol']['poly_order'] = str(polyOrder)
-            except ValueError:
-                print("Invalid input: Polyorder must be a number between 1 and 5.")
-                lineEdit.setText(str(self.dict_filter_params['savgol']['poly_order']))
-        self.updateFilter("savgol", param_edit=True)
+                changed = True
+            lineEdit.setText(str(self.dict_filter_params['savgol']['poly_order']))
+        if changed:
+            self.updateFilter("savgol", param_edit=True)
 
 
     def measure_filter_defaults(self, filter):
