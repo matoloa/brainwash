@@ -40,8 +40,8 @@ verbose = True
 talkback = True
 track_widget_focus = False
 
-# for development, leave e.g. 300 pixels below program to view terminal messages
-terminal_space = 72
+# for development, leave e.g. 300 pixels below program to view terminal messages, or 72 for win-mode (resolution-specific?)
+terminal_space = 372
 # Nonsense for correctly placing measurewindow on Mats work laptop;
 dict_screen = None
 # TODO: windows specific offset:
@@ -1849,11 +1849,11 @@ class UIsub(Ui_MainWindow):
         if dfgroup_mean['EPSP_amp_mean'].notna().any():
             _ = sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=ax1, color=groupcolor, linestyle='--', alpha=alpha)
             ax1.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_amp_mean + dfgroup_mean.EPSP_amp_SEM, dfgroup_mean.EPSP_amp_mean - dfgroup_mean.EPSP_amp_SEM, alpha=0.3, color=groupcolor)
-            ax1.axhline(y=0, linestyle='--', color=groupcolor, alpha = 0.2)
+            ax1.axhline(y=0, linestyle='--', color=groupcolor, alpha = 0.4)
         if dfgroup_mean['EPSP_slope_mean'].notna().any():
             _ = sns.scatterplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=ax2, color=groupcolor, s=5, alpha=alpha)
             ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=groupcolor)
-            ax2.axhline(y=0, linestyle=':', color=groupcolor, alpha = 0.2)
+            ax2.axhline(y=0, linestyle=':', color=groupcolor, alpha = 0.4)
 
     def mainClicked(self, event, canvas, out=False): # maingraph click event
         self.usage(f"mainClicked_output={out}")
@@ -2198,7 +2198,7 @@ class Measure_window_sub(Ui_measure_window):
 
         self.buttonBox.accepted.connect(self.accepted_handler)
         self.buttonBox.rejected.connect(self.measure_frame.close)
-        #self.updatePlots()
+        self.updatePlots()
 
 
     def toggle(self, button, now_setting): 
@@ -2382,11 +2382,11 @@ class Measure_window_sub(Ui_measure_window):
         if aspect.endswith('_amp'):
             ax = self.ax1
             style = '--'
-            graph_alpha = 0.6
+            graph_alpha = 0.2
         else: # _slope
             ax = self.ax2
             style = None
-            graph_alpha = 0.3
+            graph_alpha = 0.1
         if aspect.startswith('volley_'):
             graph_color = 'blue'
             if label2idx(ax, f'{aspect}_mean') is False:
@@ -2397,6 +2397,7 @@ class Measure_window_sub(Ui_measure_window):
         else: # EPSP_
             graph_color = 'green'
         if label2idx(ax, aspect) is False:
+            print(f"updateOutputLine: adding {aspect}")
             _ = sns.lineplot(ax=ax, label=aspect, data=self.new_dfoutput, y=aspect, x='sweep', color=graph_color, linestyle=style, alpha=graph_alpha)
         else:
             ax.lines[label2idx(ax, aspect)].set_data(self.new_dfoutput['sweep'], self.new_dfoutput[aspect])
@@ -2715,7 +2716,8 @@ class Measure_window_sub(Ui_measure_window):
         while label2idx(axis, aspect):
             axis.lines[label2idx(axis, aspect)].remove()
         if self.new_dfoutput[aspect].notna().any():
-            _ = sns.lineplot(ax=axis, label=aspect, data=self.new_dfoutput, y=aspect, x='sweep', color=graph_color, linestyle=linestyle, alpha=0.6)
+            _ = sns.lineplot(ax=axis, label=aspect, data=self.new_dfoutput, y=aspect, x='sweep', color=graph_color, linestyle=linestyle, alpha=0.8)
+        sortLegend(self.ax1, self.ax2) # amplitude legends up, slopes down
         self.canvas_output.draw()
 
 
