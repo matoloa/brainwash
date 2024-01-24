@@ -2797,6 +2797,12 @@ class Measure_window_sub(Ui_measure_window):
         if (self.dragging) and (event.button == 1) and (self.last_x is not None):
             self.dragging = False
             self.updateSample(event)
+            # update sample range in lineEdits
+            drag_start = min(int(self.drag_start), int(self.last_x))
+            drag_end = max(int(self.drag_start), int(self.last_x))
+            self.lineEdit_sample_from.setText(str(drag_start))
+            self.lineEdit_sample_to.setText(str(drag_end))
+            
             self.canvas_mean.draw()
             self.canvas_output.draw()
 
