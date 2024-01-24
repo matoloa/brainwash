@@ -1154,6 +1154,7 @@ class UIsub(Ui_MainWindow):
         self.label_relative_to.setVisible(norm)
         self.dict_cfg['norm_EPSP'] = norm
         self.write_project_cfg()
+        self.setGraph()
     
     def editNormRange(self, lineEdit):
         self.usage("editNormRange")
@@ -1173,19 +1174,32 @@ class UIsub(Ui_MainWindow):
             self.dict_cfg['norm_EPSP_on'][1] = num
         lineEdit.setText(str(num))
         self.write_project_cfg()
-        # WIP: TODO: decision: replace output columns, or add new columns?
-        # re(build) columns EPSP_amp_norm and EPSP_slope_norm in ALL dfoutputs
-        df_p = self.get_df_project()
-        for index, row in df_p.iterrows():
-            dfoutput = self.get_dfoutput(row=row)
-            if dfoutput is not None:
-                print(f"editNormRange: rebuilding norm columns for {row['recording_name']}")
-
-
-                #dfoutput = self.buildNormColumns(dfoutput, recording_name)
+        # rebuild columns EPSP_amp and EPSP_slope to their norm equivalents
+        self.normOutputs()
         self.purgeGroupCache(*self.dict_cfg['list_groups'])
         self.tableFormat()
         self.setGraph()
+
+    def normOutputs(self): # TODO: also norm diffs (paired stim) when applicable
+        df_p = self.get_df_project()
+        for index, row in df_p.iterrows():
+            dfoutput = self.get_dfoutput(row=row)
+            print(f"editNormRange: rebuilding norm columns for {row['recording_name']}")
+            # if the column has EPSP_amp, rebuild it
+            normFrom = self.dict_cfg['norm_EPSP_on'][0] # start
+            normTo = self.dict_cfg['norm_EPSP_on'][1] # end
+            if 'EPSP_amp' in dfoutput.columns:
+                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_amp']
+                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
+                dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
+            if 'EPSP_slope' in dfoutput.columns:
+                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_slope']
+                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
+                dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
+            recording_name = row['recording_name']
+            self.dict_outputs[recording_name] = dfoutput
+            self.df2csv(df=dfoutput, rec=recording_name, key="output")
+
 
 
 # Data Editing functions
@@ -1905,13 +1919,21 @@ class UIsub(Ui_MainWindow):
         # add appropriate ticks and axis labels
         self.main_canvas_mean.axes.set_xlabel("Time (s)")
         self.main_canvas_mean.axes.set_ylabel("Voltage (V)")
-        self.ax1.set_ylabel("Amplitude (mV)")
-        self.ax2.set_ylabel("Slope (mV/ms)")
+        if self.dict_cfg['norm_EPSP']:
+            self.ax1.set_ylabel("Amplitude %")
+            self.ax2.set_ylabel("Slope %")
+        else:
+            self.ax1.set_ylabel("Amplitude (mV)")
+            self.ax2.set_ylabel("Slope (mV/ms)")
         oneAxisLeft(self.ax1, self.ax2, amp, slope)
         # x and y limits
         self.main_canvas_mean.axes.set_xlim(self.dict_cfg['mean_xlim'])
         self.main_canvas_mean.axes.set_ylim(self.dict_cfg['mean_ylim'])
-        ax1.set_ylim(self.dict_cfg['output_ax1_ylim'])
+        if self.dict_cfg['norm_EPSP']:
+            ax1.set_ylim(0, 650)
+            ax2.set_ylim(0, 650)
+        else:
+            ax1.set_ylim(self.dict_cfg['output_ax1_ylim'])
         
         sortLegend(self.ax1, self.ax2)
 
@@ -1950,26 +1972,34 @@ class UIsub(Ui_MainWindow):
                     return
                 out = dfdiff
             
+            # Make sure the norm columns exist
+            if self.dict_cfg['norm_EPSP'] and "EPSP_amp_norm" not in out.columns:
+                self.normOutputs()
+
             for key, value in dict_view.items():
+                # if the key starts with EPSP and relative is checked, use the norm column
+                if key.startswith('EPSP') & self.dict_cfg['norm_EPSP']:
+                    key = f"{key}_norm"
+                    print(f"key {key} in out.columns: {key in out.columns}")
                 if value and key in out.columns:
-                    if key == 'EPSP_amp' and not np.isnan(t_EPSP_amp):
+                    if key.startswith('EPSP_amp') and not np.isnan(t_EPSP_amp):
                         _ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", linestyle='--')
                         print(f"t_EPSP_amp: {t_EPSP_amp} - {np.isnan(t_EPSP_amp)}")
                         y_position = dfmean.loc[dfmean.time == t_EPSP_amp, rec_filter]
                         print(f"y_position: {y_position}")
                         self.main_canvas_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha = 0.3)
-                    if key == 'volley_amp' and not np.isnan(t_volley_amp):
-                        ax1.axhline(y=df_p.loc[i, 'volley_amp_mean'], color='blue', alpha = 0.3, linestyle='--')
-                        #_ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="blue", linestyle='--', alpha = 0.3)
-                        y_position = dfmean.loc[dfmean.time == t_volley_amp, rec_filter]
-                        self.main_canvas_mean.axes.plot(t_volley_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
-                    if key == 'EPSP_slope' and not np.isnan(t_EPSP_slope):
+                    if key.startswith('EPSP_slope')  and not np.isnan(t_EPSP_slope):
                         _ = sns.lineplot(ax=ax2, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", alpha = 0.3)
                         x_start = t_EPSP_slope - t_EPSP_slope_size
                         x_end = t_EPSP_slope + t_EPSP_slope_size
                         y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
                         y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
                         self.main_canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='green', linewidth=10, alpha=0.3)
+                    if key == 'volley_amp' and not np.isnan(t_volley_amp):
+                        ax1.axhline(y=df_p.loc[i, 'volley_amp_mean'], color='blue', alpha = 0.3, linestyle='--')
+                        #_ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="blue", linestyle='--', alpha = 0.3)
+                        y_position = dfmean.loc[dfmean.time == t_volley_amp, rec_filter]
+                        self.main_canvas_mean.axes.plot(t_volley_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
                     if key == 'volley_slope' and not np.isnan(t_volley_slope):
                         ax2.axhline(y=df_p.loc[i, 'volley_slope_mean'], color='blue', alpha = 0.3)
                         #_ = sns.lineplot(ax=ax2, label=f"{label}_{key}", data=out, y=key, x="sweep", color="blue", alpha = 0.3)
@@ -2623,6 +2653,20 @@ class Measure_window_sub(Ui_measure_window):
             # Save the updated df_project
             self.parent.set_df_project(df_p)
 
+            # Update or drop the norm columns
+            EPSP_columns = ['EPSP_amp', 'EPSP_slope']
+            normFrom = self.parent.dict_cfg['norm_EPSP_on'][0] # start
+            normTo = self.parent.dict_cfg['norm_EPSP_on'][1] # end
+            relative = self.parent.dict_cfg['norm_EPSP'] # bool
+            for column in EPSP_columns:
+                norm_column = column + '_norm'
+                if relative and column in self.new_dfoutput.columns:
+                    selected_values = self.new_dfoutput.loc[normFrom:normTo, column]
+                    norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
+                    self.new_dfoutput[norm_column] = self.new_dfoutput[column] / norm_mean
+                elif norm_column in self.new_dfoutput.columns:
+                    self.new_dfoutput.drop(columns=norm_column, inplace=True)
+                
             # Update dfs; dicts and files
             recording_name = self.parent.df_project.loc[int(idx.values[0]), 'recording_name']
             self.parent.dict_outputs[recording_name] = self.new_dfoutput
