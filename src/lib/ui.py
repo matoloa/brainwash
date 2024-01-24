@@ -515,27 +515,27 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBox_aspect_volley_slope = QtWidgets.QCheckBox(self.frame_main_view)
         self.checkBox_aspect_volley_slope.setGeometry(QtCore.QRect(10, 70, 101, 23))
         self.checkBox_aspect_volley_slope.setObjectName("checkBox_aspect_volley_slope")
-        self.label_percent = QtWidgets.QLabel(self.frame_main_view)
-        self.label_percent.setGeometry(QtCore.QRect(140, 10, 81, 17))
+        self.label_scaling = QtWidgets.QLabel(self.frame_main_view)
+        self.label_scaling.setGeometry(QtCore.QRect(140, 10, 81, 17))
         font = QtGui.QFont()
         font.setFamily("DejaVu Sans")
         font.setBold(True)
         font.setWeight(75)
-        self.label_percent.setFont(font)
-        self.label_percent.setObjectName("label_percent")
-        self.checkBox_percent = QtWidgets.QCheckBox(self.frame_main_view)
-        self.checkBox_percent.setGeometry(QtCore.QRect(140, 30, 111, 23))
-        self.checkBox_percent.setObjectName("checkBox_percent")
-        self.lineEdit_percent_from = QtWidgets.QLineEdit(self.frame_main_view)
-        self.lineEdit_percent_from.setGeometry(QtCore.QRect(140, 70, 41, 25))
-        self.lineEdit_percent_from.setObjectName("lineEdit_percent_from")
-        self.label_percent_to = QtWidgets.QLabel(self.frame_main_view)
-        self.label_percent_to.setGeometry(QtCore.QRect(140, 50, 131, 20))
-        self.label_percent_to.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
-        self.label_percent_to.setObjectName("label_percent_to")
-        self.lineEdit_percent_to = QtWidgets.QLineEdit(self.frame_main_view)
-        self.lineEdit_percent_to.setGeometry(QtCore.QRect(200, 70, 41, 25))
-        self.lineEdit_percent_to.setObjectName("lineEdit_percent_to")
+        self.label_scaling.setFont(font)
+        self.label_scaling.setObjectName("label_scaling")
+        self.checkBox_relative = QtWidgets.QCheckBox(self.frame_main_view)
+        self.checkBox_relative.setGeometry(QtCore.QRect(140, 30, 111, 23))
+        self.checkBox_relative.setObjectName("checkBox_relative")
+        self.lineEdit_norm_on_start = QtWidgets.QLineEdit(self.frame_main_view)
+        self.lineEdit_norm_on_start.setGeometry(QtCore.QRect(140, 70, 41, 25))
+        self.lineEdit_norm_on_start.setObjectName("lineEdit_norm_on_start")
+        self.label_norm_on_sweep = QtWidgets.QLabel(self.frame_main_view)
+        self.label_norm_on_sweep.setGeometry(QtCore.QRect(140, 50, 131, 20))
+        self.label_norm_on_sweep.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
+        self.label_norm_on_sweep.setObjectName("label_norm_on_sweep")
+        self.lineEdit_norm_on_end = QtWidgets.QLineEdit(self.frame_main_view)
+        self.lineEdit_norm_on_end.setGeometry(QtCore.QRect(200, 70, 41, 25))
+        self.lineEdit_norm_on_end.setObjectName("lineEdit_norm_on_end")
         self.label_export = QtWidgets.QLabel(self.frame_main_view)
         self.label_export.setGeometry(QtCore.QRect(410, 10, 81, 17))
         font = QtGui.QFont()
@@ -547,10 +547,10 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButton_export_jpeg = QtWidgets.QPushButton(self.frame_main_view)
         self.pushButton_export_jpeg.setGeometry(QtCore.QRect(410, 30, 41, 25))
         self.pushButton_export_jpeg.setObjectName("pushButton_export_jpeg")
-        self.label_sample_to = QtWidgets.QLabel(self.frame_main_view)
-        self.label_sample_to.setGeometry(QtCore.QRect(190, 70, 21, 20))
-        self.label_sample_to.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
-        self.label_sample_to.setObjectName("label_sample_to")
+        self.label_relative_to = QtWidgets.QLabel(self.frame_main_view)
+        self.label_relative_to.setGeometry(QtCore.QRect(190, 70, 21, 20))
+        self.label_relative_to.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
+        self.label_relative_to.setObjectName("label_relative_to")
         self.horizontalLayoutControls.addWidget(self.frame_main_view)
         self.verticalLayoutGraph.addLayout(self.horizontalLayoutControls)
         self.horizontalLayoutGroups = QtWidgets.QHBoxLayout()
@@ -602,15 +602,16 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButton_paired_data_flip.setText(_translate("mainWindow", "Flip C-I"))
         self.checkBox_aspect_volley_amp.setText(_translate("mainWindow", "volley amp."))
         self.checkBox_aspect_volley_slope.setText(_translate("mainWindow", "volley slope"))
-        self.label_percent.setText(_translate("mainWindow", "Scaling"))
-        self.checkBox_percent.setText(_translate("mainWindow", "Relative"))
-        self.label_percent_to.setText(_translate("mainWindow", "Norm on sweep(s)"))
+        self.label_scaling.setText(_translate("mainWindow", "Scaling"))
+        self.checkBox_relative.setText(_translate("mainWindow", "Relative"))
+        self.label_norm_on_sweep.setText(_translate("mainWindow", "Norm on sweep(s)"))
         self.label_export.setText(_translate("mainWindow", "Export"))
         self.pushButton_export_jpeg.setText(_translate("mainWindow", "jpeg"))
-        self.label_sample_to.setText(_translate("mainWindow", "-"))
+        self.label_relative_to.setText(_translate("mainWindow", "-"))
         self.menuFile.setTitle(_translate("mainWindow", "File"))
         self.menuData.setTitle(_translate("mainWindow", "Data"))
         self.menuGroups.setTitle(_translate("mainWindow", "Groups"))
+
 
 
 ################################################################
@@ -864,6 +865,17 @@ class UIsub(Ui_MainWindow):
         self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
         self.pushButton_paired_data_flip.pressed.connect(self.pushButton_paired_data_flip_pressed)
 
+        # connect Relative checkbox and lineedits to local functions
+        norm = self.dict_cfg['norm_EPSP']
+        self.checkBox_relative.setChecked(norm)
+        self.checkBox_relative.stateChanged.connect(lambda state: self.checkBox_relative_changed(state))
+        self.label_norm_on_sweep.setVisible(norm)
+        self.label_relative_to.setVisible(norm)
+        self.lineEdit_norm_on_start.setVisible(norm)
+        self.lineEdit_norm_on_end.setVisible(norm)
+        self.lineEdit_norm_on_start.setText(f"{self.dict_cfg['norm_EPSP_on'][0]}")
+        self.lineEdit_norm_on_end.setText(f"{self.dict_cfg['norm_EPSP_on'][1]}")
+
         # keep track of open measure windows
         self.dict_open_measure_windows = {}
 
@@ -895,6 +907,8 @@ class UIsub(Ui_MainWindow):
                         'volley_slope_size_default': 0.0001,
                         'volley_slope_method_default': {},
                         'volley_slope_params_default': {},
+                        'norm_EPSP': False,
+                        'norm_EPSP_on': [1, 1],
                         'aspect_EPSP_amp': True,
                         'aspect_EPSP_slope': True,
                         'aspect_volley_amp': False,
@@ -1128,6 +1142,16 @@ class UIsub(Ui_MainWindow):
         self.write_project_cfg()
         self.tableFormat()
         self.setGraph()
+
+    def checkBox_relative_changed(self, state):
+        self.usage("checkBox_relative_changed")
+        norm = bool(state)
+        self.lineEdit_norm_on_start.setVisible(norm)
+        self.lineEdit_norm_on_end.setVisible(norm)
+        self.label_norm_on_sweep.setVisible(norm)
+        self.label_relative_to.setVisible(norm)
+        self.dict_cfg['norm_EPSP'] = norm
+        self.write_project_cfg()
 
 
 

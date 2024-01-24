@@ -216,7 +216,7 @@
               <string>volley slope</string>
              </property>
             </widget>
-            <widget class="QLabel" name="label_percent">
+            <widget class="QLabel" name="label_scaling">
              <property name="geometry">
               <rect>
                <x>140</x>
@@ -236,7 +236,7 @@
               <string>Scaling</string>
              </property>
             </widget>
-            <widget class="QCheckBox" name="checkBox_percent">
+            <widget class="QCheckBox" name="checkBox_relative">
              <property name="geometry">
               <rect>
                <x>140</x>
@@ -249,7 +249,7 @@
               <string>Relative</string>
              </property>
             </widget>
-            <widget class="QLineEdit" name="lineEdit_percent_from">
+            <widget class="QLineEdit" name="lineEdit_norm_on_start">
              <property name="geometry">
               <rect>
                <x>140</x>
@@ -259,7 +259,7 @@
               </rect>
              </property>
             </widget>
-            <widget class="QLabel" name="label_percent_to">
+            <widget class="QLabel" name="label_norm_on_sweep">
              <property name="geometry">
               <rect>
                <x>140</x>
@@ -275,7 +275,7 @@
               <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
              </property>
             </widget>
-            <widget class="QLineEdit" name="lineEdit_percent_to">
+            <widget class="QLineEdit" name="lineEdit_norm_on_end">
              <property name="geometry">
               <rect>
                <x>200</x>
@@ -318,7 +318,7 @@
               <string>jpeg</string>
              </property>
             </widget>
-            <widget class="QLabel" name="label_sample_to">
+            <widget class="QLabel" name="label_relative_to">
              <property name="geometry">
               <rect>
                <x>190</x>
