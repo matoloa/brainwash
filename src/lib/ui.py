@@ -38,18 +38,21 @@ version = pyproject['project']['version']
 
 verbose = True
 talkback = True
+hide_experimental = False # Hide experimental features
 track_widget_focus = False
 
 # for development, leave e.g. 300 pixels below program to view terminal messages, or 72 for win-mode (resolution-specific?)
 terminal_space = 372
 # Nonsense for correctly placing measurewindow on Mats work laptop;
-dict_screen = None
 # TODO: windows specific offset:
-dict_screen = {'mw_right': 10, 'mw_down': 31}
+dict_screen = None
+# dict_screen = {'mw_right': 10, 'mw_down': 31}
 
 if str(socket.getfqdn()) == 'physiol-matand-lap10.physiol.local':
     print("Useless laptop mode engaged")
     dict_screen = {'mw_right': 10, 'mw_down': 38}
+
+
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
@@ -514,11 +517,15 @@ class Ui_MainWindow(QtCore.QObject):
         self.menuData.setTitle(_translate("mainWindow", "Data"))
         self.menuGroups.setTitle(_translate("mainWindow", "Groups"))
 
-# Hide these in Deploy
-        self.pushButtonParse.setVisible(False)
-        self.label_paired_data.setVisible(False)
-        self.pushButton_paired_data_flip.setVisible(False)
-        self.checkBox_paired_stims.setVisible(False)
+
+################################################################
+#        Hiding experimental features for deploy
+################################################################
+        self.pushButtonParse.setVisible(False) # explicit hide command required for Windows, but not Linux (?)
+        if hide_experimental:
+            self.label_paired_data.setVisible(False)
+            self.pushButton_paired_data_flip.setVisible(False)
+            self.checkBox_paired_stims.setVisible(False)
 
 
 
