@@ -875,6 +875,8 @@ class UIsub(Ui_MainWindow):
         self.lineEdit_norm_on_end.setVisible(norm)
         self.lineEdit_norm_on_start.setText(f"{self.dict_cfg['norm_EPSP_on'][0]}")
         self.lineEdit_norm_on_end.setText(f"{self.dict_cfg['norm_EPSP_on'][1]}")
+        self.lineEdit_norm_on_start.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_on_start))
+        self.lineEdit_norm_on_end.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_on_end))
 
         # keep track of open measure windows
         self.dict_open_measure_windows = {}
@@ -908,7 +910,7 @@ class UIsub(Ui_MainWindow):
                         'volley_slope_method_default': {},
                         'volley_slope_params_default': {},
                         'norm_EPSP': False,
-                        'norm_EPSP_on': [1, 1],
+                        'norm_EPSP_on': [0, 0],
                         'aspect_EPSP_amp': True,
                         'aspect_EPSP_slope': True,
                         'aspect_volley_amp': False,
@@ -1152,7 +1154,38 @@ class UIsub(Ui_MainWindow):
         self.label_relative_to.setVisible(norm)
         self.dict_cfg['norm_EPSP'] = norm
         self.write_project_cfg()
+    
+    def editNormRange(self, lineEdit):
+        self.usage("editNormRange")
+        try:
+            num = max(0, int(lineEdit.text()))
+        except ValueError:
+            num = 0
+        if lineEdit.objectName() == "lineEdit_norm_on_start": # start, cannot be higher than end
+            if num == self.dict_cfg['norm_EPSP_on'][0]:
+                return # no change
+            self.lineEdit_norm_on_end.setText(str(max(num, int(self.lineEdit_norm_on_end.text()))))
+            self.dict_cfg['norm_EPSP_on'][0] = num
+        else: # end, cannot be lower than start
+            if num == self.dict_cfg['norm_EPSP_on'][1]:
+                return # no change
+            self.lineEdit_norm_on_start.setText(str(min(num, int(self.lineEdit_norm_on_start.text()))))
+            self.dict_cfg['norm_EPSP_on'][1] = num
+        lineEdit.setText(str(num))
+        self.write_project_cfg()
+        # WIP: TODO: decision: replace output columns, or add new columns?
+        # re(build) columns EPSP_amp_norm and EPSP_slope_norm in ALL dfoutputs
+        df_p = self.get_df_project()
+        for index, row in df_p.iterrows():
+            dfoutput = self.get_dfoutput(row=row)
+            if dfoutput is not None:
+                print(f"editNormRange: rebuilding norm columns for {row['recording_name']}")
 
+
+                #dfoutput = self.buildNormColumns(dfoutput, recording_name)
+        self.purgeGroupCache(*self.dict_cfg['list_groups'])
+        self.tableFormat()
+        self.setGraph()
 
 
 # Data Editing functions
