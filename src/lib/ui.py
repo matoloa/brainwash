@@ -1164,13 +1164,17 @@ class UIsub(Ui_MainWindow):
             num = 0
         if lineEdit.objectName() == "lineEdit_norm_on_start": # start, cannot be higher than end
             if num == self.dict_cfg['norm_EPSP_on'][0]:
+                self.lineEdit_norm_on_start.setText(str(num))
                 return # no change
-            self.lineEdit_norm_on_end.setText(str(max(num, int(self.lineEdit_norm_on_end.text()))))
+            self.dict_cfg['norm_EPSP_on'][1] = max(num, int(self.lineEdit_norm_on_end.text()))
+            self.lineEdit_norm_on_end.setText(str(self.dict_cfg['norm_EPSP_on'][1]))
             self.dict_cfg['norm_EPSP_on'][0] = num
         else: # end, cannot be lower than start
             if num == self.dict_cfg['norm_EPSP_on'][1]:
+                self.lineEdit_norm_on_end.setText(str(num))
                 return # no change
-            self.lineEdit_norm_on_start.setText(str(min(num, int(self.lineEdit_norm_on_start.text()))))
+            self.dict_cfg['norm_EPSP_on'][0] = min(num, int(self.lineEdit_norm_on_start.text()))
+            self.lineEdit_norm_on_start.setText(str(self.dict_cfg['norm_EPSP_on'][0]))
             self.dict_cfg['norm_EPSP_on'][1] = num
         lineEdit.setText(str(num))
         self.write_project_cfg()
@@ -1179,26 +1183,29 @@ class UIsub(Ui_MainWindow):
         self.purgeGroupCache(*self.dict_cfg['list_groups'])
         self.tableFormat()
         self.setGraph()
-
+        print(f"editNormRange: {self.dict_cfg['norm_EPSP_on']}")
+    
     def normOutputs(self): # TODO: also norm diffs (paired stim) when applicable
         df_p = self.get_df_project()
         for index, row in df_p.iterrows():
             dfoutput = self.get_dfoutput(row=row)
             print(f"editNormRange: rebuilding norm columns for {row['recording_name']}")
-            # if the column has EPSP_amp, rebuild it
-            normFrom = self.dict_cfg['norm_EPSP_on'][0] # start
-            normTo = self.dict_cfg['norm_EPSP_on'][1] # end
-            if 'EPSP_amp' in dfoutput.columns:
-                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_amp']
-                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
-                dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
-            if 'EPSP_slope' in dfoutput.columns:
-                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_slope']
-                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
-                dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
-            recording_name = row['recording_name']
-            self.dict_outputs[recording_name] = dfoutput
-            self.df2csv(df=dfoutput, rec=recording_name, key="output")
+            self.normOutput(row, dfoutput)
+
+    def normOutput(self, row, dfoutput):
+        normFrom = self.dict_cfg['norm_EPSP_on'][0] # start
+        normTo = self.dict_cfg['norm_EPSP_on'][1] # end
+        if 'EPSP_amp' in dfoutput.columns:
+            selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_amp']
+            norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
+            dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
+        if 'EPSP_slope' in dfoutput.columns:
+            selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_slope']
+            norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
+            dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
+        recording_name = row['recording_name']
+        self.dict_outputs[recording_name] = dfoutput
+        self.df2csv(df=dfoutput, rec=recording_name, key="output")
 
 
 
@@ -1747,9 +1754,14 @@ class UIsub(Ui_MainWindow):
                     list_pairs.append(name_pair)                    
                 else:
                     df = self.get_dfoutput(row=row)
+                    if self.dict_cfg['norm_EPSP']:
+                        self.normOutput(row, df)
                 dfs.append(df)
             dfs = pd.concat(dfs)
-            group_mean = dfs.groupby('sweep').agg({'EPSP_amp': ['mean', 'sem'], 'EPSP_slope': ['mean', 'sem']}).reset_index()
+            if self.dict_cfg['norm_EPSP']:
+                group_mean = dfs.groupby('sweep').agg({'EPSP_amp_norm': ['mean', 'sem'], 'EPSP_slope_norm': ['mean', 'sem']}).reset_index()
+            else:
+                group_mean = dfs.groupby('sweep').agg({'EPSP_amp': ['mean', 'sem'], 'EPSP_slope': ['mean', 'sem']}).reset_index()
             group_mean.columns = ['sweep', 'EPSP_amp_mean', 'EPSP_amp_SEM', 'EPSP_slope_mean', 'EPSP_slope_SEM']
             self.df2csv(df=group_mean, rec=key_group, key="mean")
         self.dict_group_means[key_group] = group_mean
@@ -1930,8 +1942,8 @@ class UIsub(Ui_MainWindow):
         self.main_canvas_mean.axes.set_xlim(self.dict_cfg['mean_xlim'])
         self.main_canvas_mean.axes.set_ylim(self.dict_cfg['mean_ylim'])
         if self.dict_cfg['norm_EPSP']:
-            ax1.set_ylim(0, 650)
-            ax2.set_ylim(0, 650)
+            ax1.set_ylim(0, 550)
+            ax2.set_ylim(0, 550)
         else:
             ax1.set_ylim(self.dict_cfg['output_ax1_ylim'])
         
@@ -2024,7 +2036,7 @@ class UIsub(Ui_MainWindow):
                     print(f"No data in group {group}")
                 continue
 
-            # abort if any recording in group is an str
+            # abort if any recording in group is a str
             if dfgroup['sweeps'].apply(lambda x: isinstance(x, str)).any():
                 if verbose:
                     print(f"Analyse all recordings in {group} to show group output.")
