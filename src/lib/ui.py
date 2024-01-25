@@ -3,18 +3,18 @@ import sys
 from pathlib import Path
 import yaml
 
-from matplotlib import use as matplotlib_use
 
-# import matplotlib.pyplot as plt # TODO: use instead of matplotlib for smaller import?
-import seaborn as sns
-#import scipy.stats as stats
 
 import numpy as np  # numeric calculations module
 import pandas as pd
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+import seaborn as sns
+#import scipy.stats as stats
 
-# from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib import use as matplotlib_use
 from matplotlib.figure import Figure
+# from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+
 from PyQt5 import QtCore, QtWidgets, QtGui
 from datetime import datetime # used in project name defaults
 import re # regular expressions
@@ -1134,7 +1134,7 @@ class UIsub(Ui_MainWindow):
     def tableProjDoubleClicked(self):
         self.usage("tableProjDoubleClicked")
         self.launchMeasureWindow()
-   
+
     def checkBox_paired_stims_changed(self, state):
         self.usage("checkBox_paired_stims_changed")
         self.dict_cfg['paired_stims'] = bool(state)
@@ -1154,8 +1154,9 @@ class UIsub(Ui_MainWindow):
         self.label_relative_to.setVisible(norm)
         self.dict_cfg['norm_EPSP'] = norm
         self.write_project_cfg()
+        self.purgeGroupCache(*self.dict_cfg['list_groups'])
         self.setGraph()
-    
+
     def editNormRange(self, lineEdit):
         self.usage("editNormRange")
         try:
@@ -1990,9 +1991,9 @@ class UIsub(Ui_MainWindow):
 
             for key, value in dict_view.items():
                 # if the key starts with EPSP and relative is checked, use the norm column
-                if key.startswith('EPSP') & self.dict_cfg['norm_EPSP']:
+                if key.startswith('EPSP') and self.dict_cfg['norm_EPSP']:
                     key = f"{key}_norm"
-                    print(f"key {key} in out.columns: {key in out.columns}")
+                    print(f"key {key} in out.columns: {key in out.columns} relative: {self.dict_cfg['norm_EPSP']}")
                 if value and key in out.columns:
                     if key.startswith('EPSP_amp') and not np.isnan(t_EPSP_amp):
                         _ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", linestyle='--')
@@ -2386,6 +2387,8 @@ class Measure_window_sub(Ui_measure_window):
             loopConnectViews(view="aspect", key=key)
         self.pushButton_auto.clicked.connect(self.autoCalculate)
 
+        self.pushButton_sample_add.clicked.connect(self.pushButton_sample_add_pressed)
+
         # check the radiobutton of the current filter, per row['filter']
         row_filter = self.row['filter']
         self.radioButton_filter_none.setChecked(row_filter=="voltage")
@@ -2400,6 +2403,36 @@ class Measure_window_sub(Ui_measure_window):
         self.buttonBox.accepted.connect(self.accepted_handler)
         self.buttonBox.rejected.connect(self.measure_frame.close)
         self.updatePlots()
+
+
+    def pushButton_sample_add_pressed(self):
+        self.sampleAdd()
+
+
+
+
+    def sampleAdd(self):
+        try:
+            sample_from = int(self.lineEdit_sample_from.text())
+            sample_to = int(self.lineEdit_sample_to.text())
+        except:
+            print("sampleAdd: invalid input")
+            return
+        print(f"sampleAdd {sample_from} - {sample_to}")
+
+        # Create a new figure and add a subplot at the top left corner
+        fig = Figure()
+        ax1 = fig.add_axes([0.1, 0.7, 0.3, 0.3])  # left, bottom, width, height
+
+        # Plot self.si_sweep in the subplot using seaborn
+        sns.lineplot(data=self.si_sweep, ax=ax1)
+
+        # Plot the rest of your data in the main plot
+        # sns.lineplot(data=your_data, ax=ax2)  # Add your main plot data here using seaborn
+
+        # Create a canvas and add it to your GUI
+        canvas = FigureCanvasQTAgg(fig)
+        # Add the canvas to your GUI here
 
 
     def toggle(self, button, now_setting): 
