@@ -2409,8 +2409,6 @@ class Measure_window_sub(Ui_measure_window):
         self.sampleAdd()
 
 
-
-
     def sampleAdd(self):
         try:
             sample_from = int(self.lineEdit_sample_from.text())
@@ -2419,20 +2417,32 @@ class Measure_window_sub(Ui_measure_window):
             print("sampleAdd: invalid input")
             return
         print(f"sampleAdd {sample_from} - {sample_to}")
-
-        # Create a new figure and add a subplot at the top left corner
+    ''' Haven't figured out how to do this yet
+        # Create a new figure
         fig = Figure()
-        ax1 = fig.add_axes([0.1, 0.7, 0.3, 0.3])  # left, bottom, width, height
-
-        # Plot self.si_sweep in the subplot using seaborn
-        sns.lineplot(data=self.si_sweep, ax=ax1)
 
         # Plot the rest of your data in the main plot
-        # sns.lineplot(data=your_data, ax=ax2)  # Add your main plot data here using seaborn
+        self.canvas_output = fig.add_subplot(111)  # Add your main plot data here
+        # sns.lineplot(data=your_data, ax=ax_main)  # Add your main plot data here using seaborn
+
+        # Add a subplot at the top left corner and make it transparent
+        ax1 = fig.add_axes([0.1, 0.7, 0.3, 0.3], facecolor='none')  # left, bottom, width, height
+
+        # Plot self.si_sweep in the subplot using seaborn
+        df = self.dffilter
+        rec_filter = self.row['filter'] 
+        sns.lineplot(data=(df['time'], df[rec_filter]), ax=ax1)
 
         # Create a canvas and add it to your GUI
         canvas = FigureCanvasQTAgg(fig)
-        # Add the canvas to your GUI here
+        canvas.setParent(self.measure_graph_output)
+
+        # Make the canvas background transparent
+        canvas.setStyleSheet("background-color:transparent;")
+
+        # Add the canvas to your GUI
+        self.measure_graph_output.addWidget(canvas)
+        '''
 
 
     def toggle(self, button, now_setting): 
