@@ -27,6 +27,9 @@ import toml # for reading pyproject.toml
 
 import parse
 import analysis
+import ui_state_classes
+
+uistate = ui_state_classes.UIstate() # global variable for storing state of UI
 
 matplotlib_use("Qt5Agg")
 
@@ -852,14 +855,17 @@ class UIsub(Ui_MainWindow):
         selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
 
         # connect checkboxes to local functions TODO: refactorize to merge with similar code in __init__(self, measure_frame...
-        def loopConnectViews(view, key):
-            str_view_key = f"{view}_{key}"
-            key_checkBox = getattr(self, f"checkBox_{str_view_key}")
-            key_checkBox.setChecked(self.dict_cfg[str_view_key])
-            key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.viewSettingsChanged(state, str_view_key))
-        list_views = ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
-        for key in list_views:
-            loopConnectViews(view="aspect", key=key)
+        uistate.loopConnectViews(self)
+
+        # def loopConnectViews(view, key):
+        #     str_view_key = f"{view}_{key}"
+        #     key_checkBox = getattr(self, f"checkBox_{str_view_key}")
+        #     key_checkBox.setChecked(self.dict_cfg[str_view_key])
+        #     key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.viewSettingsChanged(state, str_view_key))
+        # list_views = ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
+        # for key in list_views:
+        #     loopConnectViews(view="aspect", key=key)
+
         # connect paired stim checkbox and flip button to local functions
         self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
         self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
@@ -1895,13 +1901,13 @@ class UIsub(Ui_MainWindow):
     def setGraph(self, df_select=None): # plot selected row(s), or clear graph if empty
         if df_select is None:
             df_select = self.df_project.loc[self.listSelectedIndices()]
-        dict_view = {aspect: self.dict_cfg[f'aspect_{aspect}'] for aspect in ['EPSP_amp', 'volley_amp', 'EPSP_slope', 'volley_slope']}
-        amp = bool(dict_view['EPSP_amp'] or dict_view['volley_amp'])
-        slope = bool(dict_view['EPSP_slope'] or dict_view['volley_slope'])
+#        dict_view = {aspect: self.dict_cfg[f'aspect_{aspect}'] for aspect in ['EPSP_amp', 'volley_amp', 'EPSP_slope', 'volley_slope']}
         self.clearGraph()
-        if not (amp or slope):
+        if not uistate.anyView():
             print("No aspects selected.")
             return
+        else:
+            print(f"setGraph: {uistate.aspect}")
         ax1 = self.main_canvas_output.axes
         if hasattr(self, "ax2"): # remove ax2 if it exists
             self.ax2.remove()
@@ -1914,7 +1920,7 @@ class UIsub(Ui_MainWindow):
             if self.dict_cfg['output_xlim'][1] is None:
                 self.dict_cfg['output_xlim'] = [0, df_analyzed['sweeps'].max()]
                 self.write_project_cfg()
-            self.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2, dict_view=dict_view)
+            self.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2)
             # if just one selected, plot its group's mean
             if len(df_analyzed) == 1:
                 list_group = df_analyzed['groups'].iloc[0].split(',')
@@ -1938,7 +1944,7 @@ class UIsub(Ui_MainWindow):
         else:
             self.ax1.set_ylabel("Amplitude (mV)")
             self.ax2.set_ylabel("Slope (mV/ms)")
-        oneAxisLeft(self.ax1, self.ax2, amp, slope)
+        oneAxisLeft(self.ax1, self.ax2, uistate.ampView, uistate.slopeView)
         # x and y limits
         self.main_canvas_mean.axes.set_xlim(self.dict_cfg['mean_xlim'])
         self.main_canvas_mean.axes.set_ylim(self.dict_cfg['mean_ylim'])
@@ -1959,7 +1965,7 @@ class UIsub(Ui_MainWindow):
         self.main_canvas_mean.draw()
         self.main_canvas_output.draw()
 
-    def setGraphSelected(self, df_analyzed, ax1, ax2, dict_view):
+    def setGraphSelected(self, df_analyzed, ax1, ax2):
         for i, row in df_analyzed.iterrows(): # TODO: i to be used later for cycling colours?
             dfmean = self.get_dfmean(row=row)
             dfoutput = self.get_dfoutput(row=row)
@@ -1989,7 +1995,7 @@ class UIsub(Ui_MainWindow):
             if self.dict_cfg['norm_EPSP'] and "EPSP_amp_norm" not in out.columns:
                 self.normOutputs()
 
-            for key, value in dict_view.items():
+            for key, value in uistate.aspect.items():
                 # if the key starts with EPSP and relative is checked, use the norm column
                 if key.startswith('EPSP') and self.dict_cfg['norm_EPSP']:
                     key = f"{key}_norm"
@@ -2063,12 +2069,12 @@ class UIsub(Ui_MainWindow):
             if event.button == 2:
                 zoomReset(canvas=canvas, ui=self, out=out)
 
-    def viewSettingsChanged(self, state, str_view_key):
-        self.usage(f"viewSettingsChanged_{str_view_key}")
-        # checkboxes for views have changed; save settings and update
-        self.dict_cfg[str_view_key] = (state == 2)
-        self.write_project_cfg()
-        self.setGraph()
+    # def viewSettingsChanged(self, state, str_view_key):
+    #     self.usage(f"viewSettingsChanged_{str_view_key}")
+    #     # checkboxes for views have changed; save settings and update
+    #     self.dict_cfg[str_view_key] = (state == 2)
+    #     self.write_project_cfg()
+    #     self.setGraph()
 
 
 # MeasureWindow
@@ -3119,7 +3125,7 @@ if __name__ == "__main__":
     print(f"brainwash version {version}")
     app = QtWidgets.QApplication(sys.argv)
     main_window = QtWidgets.QMainWindow()
-    ui = UIsub(main_window)
+    uisub = UIsub(main_window)
     main_window.show()
-    ui.setGraph()
+    uisub.setGraph()
     sys.exit(app.exec_())
