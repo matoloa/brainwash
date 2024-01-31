@@ -4,16 +4,17 @@ class UIstate:
         'EPSP_amp': False,
         'EPSP_slope': False,
         'volley_amp': False,
-        'volley_slope': False
+        'volley_slope': False,
         }
-
-    def loopConnectViews(self, uisub):
+    
+    def load(self, uisub):
         aspect = self.aspect
         for key in aspect.keys():
+            dict_key = f"aspect_{key}"
+            aspect[key] = uisub.dict_cfg[dict_key]
             key_checkBox = getattr(uisub, f"checkBox_aspect_{key}")
             key_checkBox.setChecked(aspect[key])
-            print(f"loopConnectViews_{key} {aspect[key]}, checkBox_aspect_{key}")
-            key_checkBox.stateChanged.connect(lambda state: self.viewSettingsChanged(uisub, key, state))
+            key_checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(uisub, key, state))
 
     def viewSettingsChanged(self, uisub, key, state):
         aspect = self.aspect
@@ -21,6 +22,7 @@ class UIstate:
         aspect[key] = (state == 2)
         print(f"viewSettingsChanged_{key} {aspect[key]}")
         uisub.setGraph()
+        self.persist(uisub)
     
     def ampView(self):
         aspect = self.aspect
@@ -33,7 +35,14 @@ class UIstate:
     def anyView(self):
         aspect = self.aspect
         return any(aspect.values())
-
+    
+    def persist(self, uisub): # save state to project config file
+        aspect = self.aspect
+        for key in aspect.keys():
+            dict_key = f"aspect_{key}"
+            uisub.dict_cfg[dict_key] = aspect[key]
+        uisub.write_project_cfg()
+        
 
 if __name__ == "__main__":
     # test instantiation

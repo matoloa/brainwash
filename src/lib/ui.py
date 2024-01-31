@@ -854,18 +854,6 @@ class UIsub(Ui_MainWindow):
         selection_model = self.tableProj.selectionModel()
         selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
 
-        # connect checkboxes to local functions TODO: refactorize to merge with similar code in __init__(self, measure_frame...
-        uistate.loopConnectViews(self)
-
-        # def loopConnectViews(view, key):
-        #     str_view_key = f"{view}_{key}"
-        #     key_checkBox = getattr(self, f"checkBox_{str_view_key}")
-        #     key_checkBox.setChecked(self.dict_cfg[str_view_key])
-        #     key_checkBox.stateChanged.connect(lambda state, str_view_key=str_view_key: self.viewSettingsChanged(state, str_view_key))
-        # list_views = ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
-        # for key in list_views:
-        #     loopConnectViews(view="aspect", key=key)
-
         # connect paired stim checkbox and flip button to local functions
         self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
         self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
@@ -1901,7 +1889,6 @@ class UIsub(Ui_MainWindow):
     def setGraph(self, df_select=None): # plot selected row(s), or clear graph if empty
         if df_select is None:
             df_select = self.df_project.loc[self.listSelectedIndices()]
-#        dict_view = {aspect: self.dict_cfg[f'aspect_{aspect}'] for aspect in ['EPSP_amp', 'volley_amp', 'EPSP_slope', 'volley_slope']}
         self.clearGraph()
         if not uistate.anyView():
             print("No aspects selected.")
@@ -2054,11 +2041,11 @@ class UIsub(Ui_MainWindow):
         dfgroup_mean = self.get_dfgroupmean(key_group=group)
             # Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
             # print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
-        if dfgroup_mean['EPSP_amp_mean'].notna().any():
+        if dfgroup_mean['EPSP_amp_mean'].notna().any() & uistate.aspect['EPSP_amp']:
             _ = sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=ax1, color=groupcolor, linestyle='--', alpha=alpha)
             ax1.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_amp_mean + dfgroup_mean.EPSP_amp_SEM, dfgroup_mean.EPSP_amp_mean - dfgroup_mean.EPSP_amp_SEM, alpha=0.3, color=groupcolor)
             ax1.axhline(y=0, linestyle='--', color=groupcolor, alpha = 0.4)
-        if dfgroup_mean['EPSP_slope_mean'].notna().any():
+        if dfgroup_mean['EPSP_slope_mean'].notna().any() & uistate.aspect['EPSP_slope']:
             _ = sns.scatterplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=ax2, color=groupcolor, s=5, alpha=alpha)
             ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=groupcolor)
             ax2.axhline(y=0, linestyle=':', color=groupcolor, alpha = 0.4)
@@ -2068,13 +2055,6 @@ class UIsub(Ui_MainWindow):
         if event.inaxes is not None:
             if event.button == 2:
                 zoomReset(canvas=canvas, ui=self, out=out)
-
-    # def viewSettingsChanged(self, state, str_view_key):
-    #     self.usage(f"viewSettingsChanged_{str_view_key}")
-    #     # checkboxes for views have changed; save settings and update
-    #     self.dict_cfg[str_view_key] = (state == 2)
-    #     self.write_project_cfg()
-    #     self.setGraph()
 
 
 # MeasureWindow
@@ -3126,6 +3106,7 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     main_window = QtWidgets.QMainWindow()
     uisub = UIsub(main_window)
+    uistate.load(uisub)
     main_window.show()
     uisub.setGraph()
     sys.exit(app.exec_())
