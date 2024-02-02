@@ -16,7 +16,7 @@ class UIstate:
     def load_cfg(self, dict_cfg): # load state from project config file
         aspect = self.aspect
         for key in aspect.keys():
-            aspect[key] = dict_cfg[f"aspect_{key}"]
+            aspect[key] = dict_cfg[key]
             # key_checkBox = getattr(uisub, f"checkBox_aspect_{key}")
             # key_checkBox.setChecked(aspect[key])
             # key_checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(uisub, key, state))

@@ -98,7 +98,7 @@
             <property name="frameShadow">
              <enum>QFrame::Raised</enum>
             </property>
-            <widget class="QCheckBox" name="checkBox_aspect_EPSP_amp">
+            <widget class="QCheckBox" name="checkBox_EPSP_amp">
              <property name="geometry">
               <rect>
                <x>10</x>
@@ -111,7 +111,7 @@
               <string>EPSP amp.</string>
              </property>
             </widget>
-            <widget class="QCheckBox" name="checkBox_aspect_EPSP_slope">
+            <widget class="QCheckBox" name="checkBox_EPSP_slope">
              <property name="geometry">
               <rect>
                <x>10</x>
@@ -190,7 +190,7 @@
               <string>Flip C-I</string>
              </property>
             </widget>
-            <widget class="QCheckBox" name="checkBox_aspect_volley_amp">
+            <widget class="QCheckBox" name="checkBox_volley_amp">
              <property name="geometry">
               <rect>
                <x>10</x>
@@ -203,7 +203,7 @@
               <string>volley amp.</string>
              </property>
             </widget>
-            <widget class="QCheckBox" name="checkBox_aspect_volley_slope">
+            <widget class="QCheckBox" name="checkBox_volley_slope">
              <property name="geometry">
               <rect>
                <x>10</x>
@@ -236,7 +236,7 @@
               <string>Scaling</string>
              </property>
             </widget>
-            <widget class="QCheckBox" name="checkBox_relative">
+            <widget class="QCheckBox" name="checkBox_norm_EPSP">
              <property name="geometry">
               <rect>
                <x>140</x>
@@ -249,7 +249,7 @@
               <string>Relative</string>
              </property>
             </widget>
-            <widget class="QLineEdit" name="lineEdit_norm_on_start">
+            <widget class="QLineEdit" name="lineEdit_norm_EPSP_start">
              <property name="geometry">
               <rect>
                <x>140</x>
@@ -275,7 +275,7 @@
               <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
              </property>
             </widget>
-            <widget class="QLineEdit" name="lineEdit_norm_on_end">
+            <widget class="QLineEdit" name="lineEdit_norm_EPSP_end">
              <property name="geometry">
               <rect>
                <x>200</x>

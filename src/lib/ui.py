@@ -484,12 +484,12 @@ class Ui_MainWindow(QtCore.QObject):
         self.frame_main_view.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame_main_view.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame_main_view.setObjectName("frame_main_view")
-        self.checkBox_aspect_EPSP_amp = QtWidgets.QCheckBox(self.frame_main_view)
-        self.checkBox_aspect_EPSP_amp.setGeometry(QtCore.QRect(10, 50, 101, 23))
-        self.checkBox_aspect_EPSP_amp.setObjectName("checkBox_aspect_EPSP_amp")
-        self.checkBox_aspect_EPSP_slope = QtWidgets.QCheckBox(self.frame_main_view)
-        self.checkBox_aspect_EPSP_slope.setGeometry(QtCore.QRect(10, 30, 101, 23))
-        self.checkBox_aspect_EPSP_slope.setObjectName("checkBox_aspect_EPSP_slope")
+        self.checkBox_EPSP_amp = QtWidgets.QCheckBox(self.frame_main_view)
+        self.checkBox_EPSP_amp.setGeometry(QtCore.QRect(10, 50, 101, 23))
+        self.checkBox_EPSP_amp.setObjectName("checkBox_EPSP_amp")
+        self.checkBox_EPSP_slope = QtWidgets.QCheckBox(self.frame_main_view)
+        self.checkBox_EPSP_slope.setGeometry(QtCore.QRect(10, 30, 101, 23))
+        self.checkBox_EPSP_slope.setObjectName("checkBox_EPSP_slope")
         self.label_aspect = QtWidgets.QLabel(self.frame_main_view)
         self.label_aspect.setGeometry(QtCore.QRect(10, 10, 62, 17))
         font = QtGui.QFont()
@@ -512,12 +512,12 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButton_paired_data_flip = QtWidgets.QPushButton(self.frame_main_view)
         self.pushButton_paired_data_flip.setGeometry(QtCore.QRect(290, 50, 81, 25))
         self.pushButton_paired_data_flip.setObjectName("pushButton_paired_data_flip")
-        self.checkBox_aspect_volley_amp = QtWidgets.QCheckBox(self.frame_main_view)
-        self.checkBox_aspect_volley_amp.setGeometry(QtCore.QRect(10, 90, 101, 23))
-        self.checkBox_aspect_volley_amp.setObjectName("checkBox_aspect_volley_amp")
-        self.checkBox_aspect_volley_slope = QtWidgets.QCheckBox(self.frame_main_view)
-        self.checkBox_aspect_volley_slope.setGeometry(QtCore.QRect(10, 70, 101, 23))
-        self.checkBox_aspect_volley_slope.setObjectName("checkBox_aspect_volley_slope")
+        self.checkBox_volley_amp = QtWidgets.QCheckBox(self.frame_main_view)
+        self.checkBox_volley_amp.setGeometry(QtCore.QRect(10, 90, 101, 23))
+        self.checkBox_volley_amp.setObjectName("checkBox_volley_amp")
+        self.checkBox_volley_slope = QtWidgets.QCheckBox(self.frame_main_view)
+        self.checkBox_volley_slope.setGeometry(QtCore.QRect(10, 70, 101, 23))
+        self.checkBox_volley_slope.setObjectName("checkBox_volley_slope")
         self.label_scaling = QtWidgets.QLabel(self.frame_main_view)
         self.label_scaling.setGeometry(QtCore.QRect(140, 10, 81, 17))
         font = QtGui.QFont()
@@ -526,19 +526,19 @@ class Ui_MainWindow(QtCore.QObject):
         font.setWeight(75)
         self.label_scaling.setFont(font)
         self.label_scaling.setObjectName("label_scaling")
-        self.checkBox_relative = QtWidgets.QCheckBox(self.frame_main_view)
-        self.checkBox_relative.setGeometry(QtCore.QRect(140, 30, 111, 23))
-        self.checkBox_relative.setObjectName("checkBox_relative")
-        self.lineEdit_norm_on_start = QtWidgets.QLineEdit(self.frame_main_view)
-        self.lineEdit_norm_on_start.setGeometry(QtCore.QRect(140, 70, 41, 25))
-        self.lineEdit_norm_on_start.setObjectName("lineEdit_norm_on_start")
+        self.checkBox_norm_EPSP = QtWidgets.QCheckBox(self.frame_main_view)
+        self.checkBox_norm_EPSP.setGeometry(QtCore.QRect(140, 30, 111, 23))
+        self.checkBox_norm_EPSP.setObjectName("checkBox_norm_EPSP")
+        self.lineEdit_norm_EPSP_start = QtWidgets.QLineEdit(self.frame_main_view)
+        self.lineEdit_norm_EPSP_start.setGeometry(QtCore.QRect(140, 70, 41, 25))
+        self.lineEdit_norm_EPSP_start.setObjectName("lineEdit_norm_EPSP_start")
         self.label_norm_on_sweep = QtWidgets.QLabel(self.frame_main_view)
         self.label_norm_on_sweep.setGeometry(QtCore.QRect(140, 50, 131, 20))
         self.label_norm_on_sweep.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
         self.label_norm_on_sweep.setObjectName("label_norm_on_sweep")
-        self.lineEdit_norm_on_end = QtWidgets.QLineEdit(self.frame_main_view)
-        self.lineEdit_norm_on_end.setGeometry(QtCore.QRect(200, 70, 41, 25))
-        self.lineEdit_norm_on_end.setObjectName("lineEdit_norm_on_end")
+        self.lineEdit_norm_EPSP_end = QtWidgets.QLineEdit(self.frame_main_view)
+        self.lineEdit_norm_EPSP_end.setGeometry(QtCore.QRect(200, 70, 41, 25))
+        self.lineEdit_norm_EPSP_end.setObjectName("lineEdit_norm_EPSP_end")
         self.label_export = QtWidgets.QLabel(self.frame_main_view)
         self.label_export.setGeometry(QtCore.QRect(410, 10, 81, 17))
         font = QtGui.QFont()
@@ -597,16 +597,16 @@ class Ui_MainWindow(QtCore.QObject):
         _translate = QtCore.QCoreApplication.translate
         mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash"))
         self.pushButtonParse.setText(_translate("mainWindow", "Import"))
-        self.checkBox_aspect_EPSP_amp.setText(_translate("mainWindow", "EPSP amp."))
-        self.checkBox_aspect_EPSP_slope.setText(_translate("mainWindow", "EPSP slope"))
+        self.checkBox_EPSP_amp.setText(_translate("mainWindow", "EPSP amp."))
+        self.checkBox_EPSP_slope.setText(_translate("mainWindow", "EPSP slope"))
         self.label_aspect.setText(_translate("mainWindow", "Aspect"))
         self.checkBox_paired_stims.setText(_translate("mainWindow", "stim / stim"))
         self.label_paired_data.setText(_translate("mainWindow", "Paired data"))
         self.pushButton_paired_data_flip.setText(_translate("mainWindow", "Flip C-I"))
-        self.checkBox_aspect_volley_amp.setText(_translate("mainWindow", "volley amp."))
-        self.checkBox_aspect_volley_slope.setText(_translate("mainWindow", "volley slope"))
+        self.checkBox_volley_amp.setText(_translate("mainWindow", "volley amp."))
+        self.checkBox_volley_slope.setText(_translate("mainWindow", "volley slope"))
         self.label_scaling.setText(_translate("mainWindow", "Scaling"))
-        self.checkBox_relative.setText(_translate("mainWindow", "Relative"))
+        self.checkBox_norm_EPSP.setText(_translate("mainWindow", "Relative"))
         self.label_norm_on_sweep.setText(_translate("mainWindow", "Norm on sweep(s)"))
         self.label_export.setText(_translate("mainWindow", "Export"))
         self.pushButton_export_jpeg.setText(_translate("mainWindow", "jpeg"))
@@ -855,16 +855,16 @@ class UIsub(Ui_MainWindow):
 
         # connect Relative checkbox and lineedits to local functions
         norm = self.dict_cfg['norm_EPSP']
-        self.checkBox_relative.setChecked(norm)
-        self.checkBox_relative.stateChanged.connect(lambda state: self.checkBox_relative_changed(state))
+        self.checkBox_norm_EPSP.setChecked(norm)
+        self.checkBox_norm_EPSP.stateChanged.connect(lambda state: self.checkBox_norm_EPSP_changed(state))
         self.label_norm_on_sweep.setVisible(norm)
         self.label_relative_to.setVisible(norm)
-        self.lineEdit_norm_on_start.setVisible(norm)
-        self.lineEdit_norm_on_end.setVisible(norm)
-        self.lineEdit_norm_on_start.setText(f"{self.dict_cfg['norm_EPSP_on'][0]}")
-        self.lineEdit_norm_on_end.setText(f"{self.dict_cfg['norm_EPSP_on'][1]}")
-        self.lineEdit_norm_on_start.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_on_start))
-        self.lineEdit_norm_on_end.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_on_end))
+        self.lineEdit_norm_EPSP_start.setVisible(norm)
+        self.lineEdit_norm_EPSP_end.setVisible(norm)
+        self.lineEdit_norm_EPSP_start.setText(f"{self.dict_cfg['norm_EPSP_on'][0]}")
+        self.lineEdit_norm_EPSP_end.setText(f"{self.dict_cfg['norm_EPSP_on'][1]}")
+        self.lineEdit_norm_EPSP_start.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_on_start))
+        self.lineEdit_norm_EPSP_end.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_on_end))
 
         # keep track of open measure windows
         self.dict_open_measure_windows = {}
@@ -904,10 +904,10 @@ class UIsub(Ui_MainWindow):
                         'volley_slope_params_default': {},
                         'norm_EPSP': False,
                         'norm_EPSP_on': [0, 0],
-                        'aspect_EPSP_amp': True,
-                        'aspect_EPSP_slope': True,
-                        'aspect_volley_amp': False,
-                        'aspect_volley_slope': False,
+                        'EPSP_amp': True,
+                        'EPSP_slope': True,
+                        'volley_amp': False,
+                        'volley_slope': False,
                         'paired_stims': False,
                         'mean_xlim': (0.006, 0.020),
                         'mean_ylim': (-0.001, 0.0002),
@@ -937,10 +937,10 @@ class UIsub(Ui_MainWindow):
 # WIP: TODO: move these to appropriate header in this file
 
     def connectUIstate(self):
-        self.checkBox_aspect_EPSP_amp.setChecked(uistate.aspect['EPSP_amp'])
-        self.checkBox_aspect_EPSP_slope.setChecked(uistate.aspect['EPSP_slope'])
-        self.checkBox_aspect_volley_amp.setChecked(uistate.aspect['volley_amp'])
-        self.checkBox_aspect_volley_slope.setChecked(uistate.aspect['volley_slope'])
+        self.checkBox_EPSP_amp.setChecked(uistate.aspect['EPSP_amp'])
+        self.checkBox_EPSP_slope.setChecked(uistate.aspect['EPSP_slope'])
+        self.checkBox_volley_amp.setChecked(uistate.aspect['volley_amp'])
+        self.checkBox_volley_slope.setChecked(uistate.aspect['volley_slope'])
         
         #self.checkBox_paired_stims.setChecked(uistate.paired_stims)
 
@@ -953,9 +953,9 @@ class UIsub(Ui_MainWindow):
     def cfgEnforce(self):    
         list_views = ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
         for view in list_views:
-            viewBox = f"checkBox_aspect_{view}"
+            viewBox = f"checkBox_{view}"
             key_checkBox = getattr(self, viewBox)
-            key_checkBox.setChecked(self.dict_cfg[f"aspect_{view}"])
+            key_checkBox.setChecked(self.dict_cfg[view])
         self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
         print(f"cfgEnforce: {self.dict_cfg['list_groups']}")
         self.removeAllGroupControls()
@@ -1152,11 +1152,11 @@ class UIsub(Ui_MainWindow):
         self.tableFormat()
         self.setGraph()
 
-    def checkBox_relative_changed(self, state):
-        self.usage("checkBox_relative_changed")
+    def checkBox_norm_EPSP_changed(self, state):
+        self.usage("checkBox_norm_EPSP_changed")
         norm = bool(state)
-        self.lineEdit_norm_on_start.setVisible(norm)
-        self.lineEdit_norm_on_end.setVisible(norm)
+        self.lineEdit_norm_EPSP_start.setVisible(norm)
+        self.lineEdit_norm_EPSP_end.setVisible(norm)
         self.label_norm_on_sweep.setVisible(norm)
         self.label_relative_to.setVisible(norm)
         self.dict_cfg['norm_EPSP'] = norm
