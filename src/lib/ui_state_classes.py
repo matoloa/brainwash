@@ -6,24 +6,27 @@ class UIstate:
         'volley_amp': False,
         'volley_slope': False,
         }
+        self.mod = { # settings for "modules" TODO: load from list of modules
+            'norm_EPSP': False,
+            'paired_stims': False,
+        }     
+#             'norm_EPSP_onset': [0, 0],
+
     
-    def load(self, uisub):
+    def load_cfg(self, dict_cfg): # load state from project config file
         aspect = self.aspect
         for key in aspect.keys():
-            dict_key = f"aspect_{key}"
-            aspect[key] = uisub.dict_cfg[dict_key]
-            key_checkBox = getattr(uisub, f"checkBox_aspect_{key}")
-            key_checkBox.setChecked(aspect[key])
-            key_checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(uisub, key, state))
+            aspect[key] = dict_cfg[f"aspect_{key}"]
+            # key_checkBox = getattr(uisub, f"checkBox_aspect_{key}")
+            # key_checkBox.setChecked(aspect[key])
+            # key_checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(uisub, key, state))
+        #for key in self.mod.keys():
+        #    self.mod[key] = dict_cfg[key]
+            # key_checkBox = getattr(uisub, f"checkBox_{key}")
+            # key_checkBox.setChecked(self.mod[key])
+            # key_checkBox.stateChanged.connect(lambda state, key=key: self.modSettingsChanged(uisub, key, state))
 
-    def viewSettingsChanged(self, uisub, key, state):
-        aspect = self.aspect
-        uisub.usage(f"viewSettingsChanged_{key}")
-        aspect[key] = (state == 2)
-        print(f"viewSettingsChanged_{key} {aspect[key]}")
-        uisub.setGraph()
-        self.persist(uisub)
-    
+   
     def ampView(self):
         aspect = self.aspect
         return (aspect['EPSP_amp'] or aspect['volley_amp'])
@@ -36,13 +39,6 @@ class UIstate:
         aspect = self.aspect
         return any(aspect.values())
     
-    def persist(self, uisub): # save state to project config file
-        aspect = self.aspect
-        for key in aspect.keys():
-            dict_key = f"aspect_{key}"
-            uisub.dict_cfg[dict_key] = aspect[key]
-        uisub.write_project_cfg()
-        
 
 if __name__ == "__main__":
     # test instantiation

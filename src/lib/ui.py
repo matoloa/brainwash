@@ -808,6 +808,8 @@ class UIsub(Ui_MainWindow):
         self.df_project = df_projectTemplate()
         self.tablemodel = TableModel(self.df_project)
         self.tableProj.setModel(self.tablemodel)
+
+        self.resetCacheDicts() # Clear internal storage dicts
        
         # If projectfile exists, load it, otherwise create it
         if Path(self.dict_folders['project'] / "project.brainwash").exists():
@@ -822,15 +824,9 @@ class UIsub(Ui_MainWindow):
                 self.dict_cfg = yaml.safe_load(file)
         else:
             self.build_dict_cfg()
+        uistate.load_cfg(self.dict_cfg)
 
-        if track_widget_focus: # debug mode; prints widget focus every 1000ms
-            self.timer = QtCore.QTimer(self)
-            self.timer.timeout.connect(self.checkFocus)
-            self.timer.start(1000)  
-
-        self.resetCacheDicts() # Internal storage dicts
-
-        # Addon to make the graphs scaleable
+        # make the graphs scaleable
         self.graphMean.setLayout(QtWidgets.QVBoxLayout())
         self.main_canvas_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
         self.graphMean.layout().addWidget(self.main_canvas_mean)
@@ -842,17 +838,15 @@ class UIsub(Ui_MainWindow):
         self.main_canvas_mean.show()
         self.main_canvas_output.show()
 
-        # I'm guessing that all these signals and slots and connections can be defined in QT designer, and autocoded through pyuic
-        # maybe learn more about that later?
-        # however, I kinda like the control of putting each of them explicit here and use designer just to get the boxes right visually
-        # connecting the same signals we had in original ui test
+        # tableProj
         self.pushButtonParse.pressed.connect(self.triggerParse)
 
-        # tableProj
         self.tableProj.setSelectionBehavior(TableProjSub.SelectRows)
         self.tableProj.doubleClicked.connect(self.tableProjDoubleClicked)
         selection_model = self.tableProj.selectionModel()
         selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
+
+        self.connectUIstate() # connect checkboxes TODO: and lineedits to local functions
 
         # connect paired stim checkbox and flip button to local functions
         self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
@@ -888,6 +882,11 @@ class UIsub(Ui_MainWindow):
                 self.dict_usage = {'WARNING': "Do NOT set your alias to anything that can be used to identify you!", 'alias': "", 'ID': str(uuid.uuid4()), 'os': os_name, 'ID_created': now, f"last_used_{version}": now}
             self.write_usage()
 
+        # debug mode; prints widget focus every 1000ms
+        if track_widget_focus:
+            self.timer = QtCore.QTimer(self)
+            self.timer.timeout.connect(self.checkFocus)
+            self.timer.start(1000)
 
     def build_dict_cfg(self):
         # Generate a list of 9 colors for groups, hex format
@@ -936,6 +935,20 @@ class UIsub(Ui_MainWindow):
 
 
 # WIP: TODO: move these to appropriate header in this file
+
+    def connectUIstate(self):
+        self.checkBox_aspect_EPSP_amp.setChecked(uistate.aspect['EPSP_amp'])
+        self.checkBox_aspect_EPSP_slope.setChecked(uistate.aspect['EPSP_slope'])
+        self.checkBox_aspect_volley_amp.setChecked(uistate.aspect['volley_amp'])
+        self.checkBox_aspect_volley_slope.setChecked(uistate.aspect['volley_slope'])
+        
+        #self.checkBox_paired_stims.setChecked(uistate.paired_stims)
+
+    def viewSettingsChanged(self, key, state):
+        self.usage(f"viewSettingsChanged_{key}")
+        uistate.aspect[key] = (state == 2)
+        self.setGraph()
+        self.write_project_cfg()
 
     def cfgEnforce(self):    
         list_views = ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
@@ -3106,7 +3119,6 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     main_window = QtWidgets.QMainWindow()
     uisub = UIsub(main_window)
-    uistate.load(uisub)
     main_window.show()
     uisub.setGraph()
     sys.exit(app.exec_())
