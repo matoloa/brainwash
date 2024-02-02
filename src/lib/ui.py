@@ -849,14 +849,14 @@ class UIsub(Ui_MainWindow):
         self.connectUIstate() # connect checkboxes TODO: and lineedits to local functions
 
         # connect paired stim checkbox and flip button to local functions
-        self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
-        self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
+        #self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
+        #self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
         self.pushButton_paired_data_flip.pressed.connect(self.pushButton_paired_data_flip_pressed)
 
         # connect Relative checkbox and lineedits to local functions
         norm = self.dict_cfg['norm_EPSP']
-        self.checkBox_norm_EPSP.setChecked(norm)
-        self.checkBox_norm_EPSP.stateChanged.connect(lambda state: self.checkBox_norm_EPSP_changed(state))
+        #self.checkBox_norm_EPSP.setChecked(norm)
+        #self.checkBox_norm_EPSP.stateChanged.connect(lambda state: self.checkBox_norm_EPSP_changed(state))
         self.label_norm_on_sweep.setVisible(norm)
         self.label_relative_to.setVisible(norm)
         self.lineEdit_norm_EPSP_start.setVisible(norm)
@@ -937,26 +937,28 @@ class UIsub(Ui_MainWindow):
 # WIP: TODO: move these to appropriate header in this file
 
     def connectUIstate(self):
-        self.checkBox_EPSP_amp.setChecked(uistate.aspect['EPSP_amp'])
-        self.checkBox_EPSP_slope.setChecked(uistate.aspect['EPSP_slope'])
-        self.checkBox_volley_amp.setChecked(uistate.aspect['volley_amp'])
-        self.checkBox_volley_slope.setChecked(uistate.aspect['volley_slope'])
-        
-        #self.checkBox_paired_stims.setChecked(uistate.paired_stims)
+        dict_states = uistate.dict_states()
+        for key, value in dict_states.items():
+            print(f"connecting {key} to {value}")
+            widget = getattr(self, f"checkBox_{key}")
+            widget.setChecked(value)
+            widget.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
 
     def viewSettingsChanged(self, key, state):
         self.usage(f"viewSettingsChanged_{key}")
-        uistate.aspect[key] = (state == 2)
+        if key in uistate.aspect.keys():
+            uistate.aspect[key] = (state == 2)
+        elif key in uistate.mod.keys():
+            uistate.mod[key] = (state == 2)
         self.setGraph()
         self.write_project_cfg()
 
-    def cfgEnforce(self):    
-        list_views = ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
-        for view in list_views:
-            viewBox = f"checkBox_{view}"
-            key_checkBox = getattr(self, viewBox)
-            key_checkBox.setChecked(self.dict_cfg[view])
-        self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
+    def cfgEnforce(self):
+        list_state_keys = uistate.list_states()
+        for key in list_state_keys:
+            print (f"cfgEnforce key {key}")
+            widget = getattr(self, f"checkBox_{key}")
+            widget.setChecked(uistate.aspect[key])
         print(f"cfgEnforce: {self.dict_cfg['list_groups']}")
         self.removeAllGroupControls()
         for i in self.dict_cfg['list_groups']:
@@ -1522,12 +1524,12 @@ class UIsub(Ui_MainWindow):
             yaml.safe_dump(cfg, file)
 
     def write_project_cfg(self):  # config file for project, local settings
-        project_cfg = self.dict_cfg
+        self.dict_cfg = uistate.update_cfg(self.dict_cfg)
         print("Writing project_cfg:", self.project_cfg_yaml)
         new_projectfolder = self.projects_folder / self.projectname
         new_projectfolder.mkdir(exist_ok=True)
         with self.project_cfg_yaml.open("w+") as file:
-            yaml.safe_dump(project_cfg, file)
+            yaml.safe_dump(self.dict_cfg, file)
 
 
 # Project functions
@@ -1593,6 +1595,7 @@ class UIsub(Ui_MainWindow):
         else:
             self.build_dict_cfg()
                 # add groups to UI
+        uistate.load_cfg(self.dict_cfg, self)
         self.cfgEnforce() # apply loaded checkbox settings
         self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"))
         self.tableFormat()

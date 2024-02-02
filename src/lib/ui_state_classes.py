@@ -1,10 +1,10 @@
 class UIstate:
     def __init__(self):
         self.aspect = {
-        'EPSP_amp': False,
-        'EPSP_slope': False,
-        'volley_amp': False,
-        'volley_slope': False,
+            'EPSP_amp': False,
+            'EPSP_slope': False,
+            'volley_amp': False,
+            'volley_slope': False,
         }
         self.mod = { # settings for "modules" TODO: load from list of modules
             'norm_EPSP': False,
@@ -12,20 +12,26 @@ class UIstate:
         }     
 #             'norm_EPSP_onset': [0, 0],
 
+    def list_keys(self): # returns a list of keys from aspect and mod
+        return [key for dict in [self.aspect, self.mod] for key in dict.keys()]
+
+    def dict_states(self): # return concatenated dicts of aspect and mod
+        return {**self.aspect, **self.mod}
     
     def load_cfg(self, dict_cfg): # load state from project config file
         aspect = self.aspect
         for key in aspect.keys():
             aspect[key] = dict_cfg[key]
-            # key_checkBox = getattr(uisub, f"checkBox_aspect_{key}")
-            # key_checkBox.setChecked(aspect[key])
-            # key_checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(uisub, key, state))
-        #for key in self.mod.keys():
-        #    self.mod[key] = dict_cfg[key]
-            # key_checkBox = getattr(uisub, f"checkBox_{key}")
-            # key_checkBox.setChecked(self.mod[key])
-            # key_checkBox.stateChanged.connect(lambda state, key=key: self.modSettingsChanged(uisub, key, state))
+        for key in self.mod.keys():
+            self.mod[key] = dict_cfg[key]
 
+    def update_cfg(self, dict_cfg): # save state to project config file
+        aspect = self.aspect
+        for key in aspect.keys():
+            dict_cfg[key] = aspect[key]
+        for key in self.mod.keys():
+            dict_cfg[key] = self.mod[key]
+        return dict_cfg
    
     def ampView(self):
         aspect = self.aspect
