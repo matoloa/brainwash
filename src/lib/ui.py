@@ -24,12 +24,16 @@ import json # for saving and loading dicts as strings
 import uuid # generating unique talkback ID
 import socket # getting computer name and localdomain for df_project['host'] (not reported in talkback)
 import toml # for reading pyproject.toml
+import importlib # for reloading modules
 
 import parse
 import analysis
 import ui_state_classes
+import ui_plot
 
 uistate = ui_state_classes.UIstate() # global variable for storing state of UI
+importlib.reload(ui_plot)
+uiplot = ui_plot.UIplot(uistate)
 
 matplotlib_use("Qt5Agg")
 
@@ -710,9 +714,9 @@ class UIsub(Ui_MainWindow):
             print(" - UIsub init, verbose mode")  # rename for clarity
         # move mainwindow to default position (TODO: later to be stored in cfg)
         self.mainwindow = mainwindow
-        screen = QtWidgets.QDesktopWidget().screenGeometry()
         self.mainwindow.setGeometry(0, 0, int(screen.width() * 0.6), int(screen.height())-terminal_space)
-        # load cfg if present
+        screen = QtWidgets.QDesktopWidget().screenGeometry()
+        # load program bw_cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
         self.bw_cfg_yaml = self.repo_root / "cfg.yaml"  # Path to cfg.yaml
@@ -888,32 +892,17 @@ class UIsub(Ui_MainWindow):
             self.timer.timeout.connect(self.checkFocus)
             self.timer.start(1000)
 
-    def build_dict_cfg(self):
+    def defaultGroups(self):
         # Generate a list of 9 colors for groups, hex format
         colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000']
-        self.dict_cfg = {'list_groups': [], # group_X - ID X is how the program regognizes groups, for buttons and data
-                        'dict_group_name': {}, # group_X: name - how the program displays groups TODO: implement
-                        'dict_group_show': {}, # group_X: True/False - whether to show group in graphs
+        self.dict_groups = {
+                        'list_ID': [], # group_X - ID X is how the program regognizes groups, for buttons and data
+                        'dict_names': {}, # group_X: name - how the program displays groups TODO: implement
                         'list_group_colors': colors,
-                        'last_edit_mode': 'EPSP_slope',
-                        'EPSP_slope_size_default': 0.0003,
-                        'EPSP_slope_method_default': {},
-                        'EPSP_slope_params_default': {},
-                        'volley_slope_size_default': 0.0001,
-                        'volley_slope_method_default': {},
-                        'volley_slope_params_default': {},
-                        'norm_EPSP': False,
-                        'norm_EPSP_on': [0, 0],
-                        'EPSP_amp': True,
-                        'EPSP_slope': True,
-                        'volley_amp': False,
-                        'volley_slope': False,
-                        'paired_stims': False,
-                        'mean_xlim': (0.006, 0.020),
-                        'mean_ylim': (-0.001, 0.0002),
-                        'output_xlim': (0, None),
-                        'output_ax1_ylim': (0, None),
-                        'output_ax2_ylim': (0, None),
+        }
+
+    def build_dict_cfg(self): # TODO: deprecate
+        self.dict_cfg = {
                         }
         self.write_project_cfg()
 
@@ -3111,10 +3100,7 @@ def outputAutoScale(ax, df, aspect): # Sets the y limits of ax to the min and ma
     else:
         print(f"autoScale: {aspect} not supported.")
 
-def setKey(cell, key, value):  # convert string to dict, update key with value, and return the updated dict as string
-    dict = json.loads(cell)
-    dict[key] = str(value)
-    return json.dumps(dict)
+
 
 if __name__ == "__main__":
     print()
