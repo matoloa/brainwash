@@ -1,20 +1,25 @@
+import pickle
+
 class UIstate:
     def __init__(self):
-        self.show = {
+        self.reset()
+
+    def reset(self): # reset all states to False
+        self.version = "0.0.0"
+        self.group_show = {}
+        self.checkBox = {
             'EPSP_amp': False,
-            'EPSP_slope': False,
+            'EPSP_slope': True,
             'volley_amp': False,
             'volley_slope': False,
-            'dict_groups': {} # key: group_ID, value: bool (show or don't show group)
+            # break these out to separate mod-class?
+            'norm_EPSP': False,
+            'paired_stims': False,
         }
-        self.defaults = {
-            'last_edit_mode': 'EPSP_slope',
-            'EPSP_slope_size_default': 0.0003,
-            'EPSP_slope_method_default': {},
-            'EPSP_slope_params_default': {},
-            'volley_slope_size_default': 0.0001,
-            'volley_slope_method_default': {},
-            'volley_slope_params_default': {},
+        self.lineEdit = {
+            'norm_EPSP_on': [0, 0],
+        }
+        self.pushButton = {
         }
         self.zoom = {
             'mean_xlim': (0.006, 0.020),
@@ -23,51 +28,90 @@ class UIstate:
             'output_ax1_ylim': (0, None),
             'output_ax2_ylim': (0, None),
         }
-        self.mod = { # settings for "modules" TODO: load from list of modules
-            'norm_EPSP': False,
-            'norm_EPSP_on': [0, 0],
-            'paired_stims': False,            
-        }     
+        self.default = {
+            'last_edit_mode': 'EPSP_slope',
+            'EPSP_slope_size_default': 0.0003,
+            'EPSP_slope_method_default': {},
+            'EPSP_slope_params_default': {},
+            'volley_slope_size_default': 0.0001,
+            'volley_slope_method_default': {},
+            'volley_slope_params_default': {},
+        }
 
-    def list_keys(self): # returns a list of keys from show and mod
-        return [key for dict in [self.show, self.mod] for key in dict.keys()]
-
-    def dict_states(self): # return concatenated dicts of show and mod
-        return {**self.show, **self.mod}
+    def get_state(self):
+        return {
+            'version': self.version,
+            'group_show': self.group_show,
+            'checkBox': self.checkBox,
+            'lineEdit': self.lineEdit,
+            'pushButton': self.pushButton,
+            'zoom': self.zoom,
+            'default': self.default,
+        }
     
-    def load_cfg(self, dict_cfg): # load state from project config file
-        show = self.show
-        for key in show.keys():
-            show[key] = dict_cfg[key]
-        for key in self.mod.keys():
-            self.mod[key] = dict_cfg[key]
+    def set_state(self, state):
+        self.version = state['version']
+        self.group_show = state['group_show']
+        self.checkBox = state['checkBox']
+        self.lineEdit = state['lineEdit']
+        self.pushButton = state['pushButton']
+        self.zoom = state['zoom']
+        self.default = state['default']
 
-    def update_cfg(self, dict_cfg): # save state to project config file
-        show = self.show
-        for key in show.keys():
-            dict_cfg[key] = show[key]
-        for key in self.mod.keys():
-            dict_cfg[key] = self.mod[key]
-        return dict_cfg
-   
+    def load_cfg(self, projectfolder, bw_version): # load state from project config file
+        path_pkl = projectfolder / "cfg.pkl"
+        if path_pkl.exists():
+            with open(path_pkl, 'rb') as f:
+                data = pickle.load(f)
+            if data is not None:
+                self.set_state(data)
+            #check if version is compatible
+            if bw_version != self.version:
+                print(f"Warning: project_cfg.yaml is from {self.version} - current version is {bw_version}")
+                cfg_v = self.version.split('.')
+                bw_v = bw_version.split('.')
+                if cfg_v[0] != bw_v[0]:
+                    print("Major version mismatch: Project may not load correctly")
+                elif cfg_v[1] != bw_v[1]:
+                    print("Minor version mismatch: Some settings may not load correctly")
+                elif cfg_v[2] != bw_v[2]:
+                    print("Patch version mismatch: Minor changes may not load correctly")
+        else:
+            self.save_cfg(projectfolder, bw_version)
+
+    def save_cfg(self, projectfolder, bw_version=None): # save state to project config file
+        path_pkl = projectfolder / "cfg.pkl"
+        data = self.get_state()
+        if bw_version is not None:
+            data['version'] = bw_version
+        if not path_pkl.parent.exists():
+            path_pkl.parent.mkdir(parents=True, exist_ok=True)
+        print(f"Saving project config to {path_pkl}: {data}")
+        with open(path_pkl, 'wb') as f:
+            pickle.dump(data, f)
+
     def ampView(self):
-        show = self.show
+        show = self.checkBox
         return (show['EPSP_amp'] or show['volley_amp'])
     
     def slopeView(self):
-        show = self.show
+        show = self.checkBox
         return (show['EPSP_slope'] or show['volley_slope'])
     
+    def slopeOnly(self):
+        show = self.checkBox
+        return (show['EPSP_slope'] and not show['EPSP_amp'])
+  
     def anyView(self):
-        show = self.show
+        show = self.checkBox
         return any(show.values())
     
 
 if __name__ == "__main__":
     # test instantiation
     uistate = UIstate()
-    assert uistate.anyView() == False
-    uistate.show['EPSP_amp'] = True
     assert uistate.anyView() == True
+    uistate.checkBox['EPSP_slope'] = False
+    assert uistate.anyView() == False
     print("test passed")
     

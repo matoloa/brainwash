@@ -714,8 +714,8 @@ class UIsub(Ui_MainWindow):
             print(" - UIsub init, verbose mode")  # rename for clarity
         # move mainwindow to default position (TODO: later to be stored in cfg)
         self.mainwindow = mainwindow
-        self.mainwindow.setGeometry(0, 0, int(screen.width() * 0.6), int(screen.height())-terminal_space)
         screen = QtWidgets.QDesktopWidget().screenGeometry()
+        self.mainwindow.setGeometry(0, 0, int(screen.width() * 0.6), int(screen.height())-terminal_space)
         # load program bw_cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
@@ -794,7 +794,7 @@ class UIsub(Ui_MainWindow):
         if not os.path.exists(self.dict_folders['cache']):
             os.makedirs(self.dict_folders['cache'])
 
-        # replacing table proj with custom to allow changing of keypress event handling
+        # replacing table proj with custom to allow changing of keypress event handling TODO: F2 deprecate - not needed with hotkeys
         originalTableView = self.centralwidget.findChild(QtWidgets.QTableView, "tableProj")  # Find and replace the original QTableView in the layout
         #tableProj = TableProjSub(self.centralwidget)  # Create an instance of your custom table view
         tableProj = TableProjSub(parent=self)  # Create an instance of your custom table view
@@ -815,20 +815,22 @@ class UIsub(Ui_MainWindow):
 
         self.resetCacheDicts() # Clear internal storage dicts
        
-        # If projectfile exists, load it, otherwise create it
+        # If local project.brainwash exists, load it, otherwise create it
         if Path(self.dict_folders['project'] / "project.brainwash").exists():
             self.load_df_project()
         else:
             print(f"Project file {self.dict_folders['project'] / 'project.brainwash'} not found, creating new project file")
             self.write_bw_cfg()
-        # load or write local cfg, for storage of e.g. group colours, zoom levels etc.
-        self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
-        if self.project_cfg_yaml.exists():
-            with self.project_cfg_yaml.open("r") as file:
-                self.dict_cfg = yaml.safe_load(file)
+
+        # If local project.cfg exists, load it, otherwise create it
+        uistate.load_cfg(projectfolder=self.dict_folders['project'], bw_version=version)
+
+        # If local groups.brainwash exists, load it, otherwise create it
+        groups_yaml = self.dict_folders['project'] / "groups.yaml"
+        if groups_yaml.exists():
+            self.loadGroups()
         else:
-            self.build_dict_cfg()
-        uistate.load_cfg(self.dict_cfg)
+            self.defaultGroups()
 
         # make the graphs scaleable
         self.graphMean.setLayout(QtWidgets.QVBoxLayout())
@@ -850,23 +852,23 @@ class UIsub(Ui_MainWindow):
         selection_model = self.tableProj.selectionModel()
         selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
 
-        self.connectUIstate() # connect checkboxes TODO: and lineedits to local functions
+        self.connectUIstate() # connect UI elements to uistate
 
         # connect paired stim checkbox and flip button to local functions
-        #self.checkBox_paired_stims.setChecked(self.dict_cfg['paired_stims'])
+        #self.checkBox_paired_stims.setChecked(uistate.checkBox['paired_stims'])
         #self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
         self.pushButton_paired_data_flip.pressed.connect(self.pushButton_paired_data_flip_pressed)
 
         # connect Relative checkbox and lineedits to local functions
-        norm = self.dict_cfg['norm_EPSP']
+        norm = uistate.checkBox['norm_EPSP']
         #self.checkBox_norm_EPSP.setChecked(norm)
         #self.checkBox_norm_EPSP.stateChanged.connect(lambda state: self.checkBox_norm_EPSP_changed(state))
         self.label_norm_on_sweep.setVisible(norm)
         self.label_relative_to.setVisible(norm)
         self.lineEdit_norm_EPSP_start.setVisible(norm)
         self.lineEdit_norm_EPSP_end.setVisible(norm)
-        self.lineEdit_norm_EPSP_start.setText(f"{self.dict_cfg['norm_EPSP_on'][0]}")
-        self.lineEdit_norm_EPSP_end.setText(f"{self.dict_cfg['norm_EPSP_on'][1]}")
+        self.lineEdit_norm_EPSP_start.setText(f"{uistate.lineEdit['norm_EPSP_on'][0]}")
+        self.lineEdit_norm_EPSP_end.setText(f"{uistate.lineEdit['norm_EPSP_on'][1]}")
         self.lineEdit_norm_EPSP_start.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_on_start))
         self.lineEdit_norm_EPSP_end.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_on_end))
 
@@ -900,11 +902,29 @@ class UIsub(Ui_MainWindow):
                         'dict_names': {}, # group_X: name - how the program displays groups TODO: implement
                         'list_group_colors': colors,
         }
+        df_p = self.get_df_project()
+        self.clearGroupsByRow(df_p.index) # clear all groups from all rows in df_project
+        uistate.group_show = {}
+        self.saveGroups()
 
-    def build_dict_cfg(self): # TODO: deprecate
-        self.dict_cfg = {
-                        }
-        self.write_project_cfg()
+    def saveGroups(self):
+        path_groups = self.dict_folders['project'] / "groups.yaml"
+        if not path_groups.parent.exists():
+            path_groups.parent.mkdir(parents=True, exist_ok=True)
+        with path_groups.open("w") as file:
+            yaml.safe_dump(self.dict_groups, file, default_flow_style=False)
+
+    def loadGroups(self):
+        path_groups = self.dict_folders['project'] / "groups.yaml"
+        if path_groups.exists():
+            with path_groups.open("r") as file:
+                self.dict_groups = yaml.safe_load(file)
+            if uistate.group_show == {}:
+                for item in self.dict_groups['list_ID']:
+                    uistate.group_show[item] = True
+        else:
+            self.defaultGroups()
+
 
     # Debugging tools
             # self.find_widgets_with_top_left_coordinates(self.centralwidget)
@@ -925,32 +945,38 @@ class UIsub(Ui_MainWindow):
 
 # WIP: TODO: move these to appropriate header in this file
 
-    def connectUIstate(self):
-        dict_states = uistate.dict_states()
-        for key, value in dict_states.items():
-            print(f"connecting {key} to {value}")
-            widget = getattr(self, f"checkBox_{key}")
-            widget.setChecked(value)
-            widget.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
+    def connectUIstate(self): # Connect UI elements to uistate
+        # checkBoxes 
+        for key, value in uistate.checkBox.items():
+            print(f"connecting checkbox {key} to {value}")
+            checkBox = getattr(self, f"checkBox_{key}")
+            checkBox.setChecked(value)
+            checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
+        # lineEdits
+        # pushButtons
+        # comboBoxes
+        # mods?...
 
     def viewSettingsChanged(self, key, state):
         self.usage(f"viewSettingsChanged_{key}")
-        if key in uistate.aspect.keys():
-            uistate.aspect[key] = (state == 2)
-        elif key in uistate.mod.keys():
-            uistate.mod[key] = (state == 2)
+        if key in uistate.checkBox.keys():
+            uistate.checkBox[key] = (state == 2)
         self.setGraph()
-        self.write_project_cfg()
+        uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
-    def cfgEnforce(self):
-        list_state_keys = uistate.list_states()
-        for key in list_state_keys:
-            print (f"cfgEnforce key {key}")
-            widget = getattr(self, f"checkBox_{key}")
-            widget.setChecked(uistate.aspect[key])
-        print(f"cfgEnforce: {self.dict_cfg['list_groups']}")
+    def setUIstate(self):
+        # checkBoxes 
+        for key, value in uistate.checkBox.items():
+            print(f"setting checkbox {key} to {value}")
+            checkBox = getattr(self, f"checkBox_{key}")
+            checkBox.setChecked(value)
+        # lineEdits
+        # pushButtons
+        # comboBoxes
+        # mods?...
+        # reset group controls
         self.removeAllGroupControls()
-        for i in self.dict_cfg['list_groups']:
+        for i in self.dict_groups['list_ID']:
             print("adding", i)
             self.addGroupControls(int(i[-1]))
 
@@ -1017,40 +1043,40 @@ class UIsub(Ui_MainWindow):
         self.usage("triggerEditGroups")
         # Placeholder: For now, delete all buttons and groups
         # clearGroupsByRow on ALL rows of df_project
-        df_p = self.get_df_project()
-        self.clearGroupsByRow(df_p.index)
-        self.dict_cfg['list_groups'] = []
         self.removeAllGroupControls()
+        self.defaultGroups()
         self.tableUpdate()
         self.setGraph()
 
     def triggerNewGroup(self):
         self.usage("triggerNewGroup")
-        if len(self.dict_cfg['list_groups']) < 9: # TODO: hardcoded max nr of groups: move to cfg
+        if len(self.dict_groups['list_ID']) < 9: # TODO: hardcoded max nr of groups: move to bw cfg
             i = 1 # start at 1; no group_0
-            new_group = "group_" + str(i)
-            while new_group in self.dict_cfg['list_groups']:
+            new_ID = "group_" + str(i)
+            while new_ID in self.dict_groups['list_ID']:
                 i += 1
-                new_group = "group_" + str(i)
-            self.dict_cfg['list_groups'].append(new_group)
-            self.dict_cfg['dict_group_show'][new_group] = True
-            self.write_project_cfg()
+                new_ID = "group_" + str(i)
+            self.dict_groups['list_ID'].append(new_ID)
+            self.dict_groups['dict_names'][new_ID] = f"${new_ID}" # set name to default upon creation
+            uistate.group_show[new_ID] = True # add show group to uistate
+            self.saveGroups()
             self.addGroupControls(i)
-            print("created", new_group)
+            print("created", new_ID)
         else:
             print("Maximum of 9 groups allowed for now.")
 
     def triggerRemoveLastGroup(self):
         self.usage("triggerRemoveLastGroup")
-        if self.dict_cfg['list_groups']:  # Check if the list is not empty
-            self.removeGroupControls(self.dict_cfg['list_groups'].pop())
-            self.write_project_cfg()
+        if self.dict_groups['list_ID']:  # Check if the list is not empty
+            self.removeGroupControls(self.dict_groups['list_ID'].pop())
+            uistate.group_show.popitem() # remove last item from uistate.group_show
+            self.saveGroups()
 
     def triggerRemoveLastEmptyGroup(self):
         self.usage("triggerRemoveLastEmptyGroup")
-        if self.dict_cfg['list_groups']:  # Check if the list is not empty
+        if self.dict_groups['list_ID']:  # Check if the list is not empty
             df_p = self.get_df_project()
-            group_to_remove = self.dict_cfg['list_groups'][-1]
+            group_to_remove = self.dict_groups['list_ID'][-1]
             # check if group_to_remove is in any string in df_p['groups']
             if not df_p['groups'].str.contains(group_to_remove).any():
                 self.triggerRemoveLastGroup()
@@ -1135,11 +1161,11 @@ class UIsub(Ui_MainWindow):
 
     def checkBox_paired_stims_changed(self, state):
         self.usage("checkBox_paired_stims_changed")
-        self.dict_cfg['paired_stims'] = bool(state)
-        print(f"checkBox_paired_stims_changed: {self.dict_cfg['paired_stims']}")
-        self.pushButton_paired_data_flip.setEnabled(self.dict_cfg['paired_stims'])
-        self.purgeGroupCache(*self.dict_cfg['list_groups'])
-        self.write_project_cfg()
+        uistate.checkBox['paired_stims'] = bool(state)
+        print(f"checkBox_paired_stims_changed: {uistate.checkBox['paired_stims']}")
+        self.pushButton_paired_data_flip.setEnabled(uistate.checkBox['paired_stims'])
+        self.purgeGroupCache(*self.dict_groups['list_ID'])
+        uistate.save_cfg()
         self.tableFormat()
         self.setGraph()
 
@@ -1150,9 +1176,9 @@ class UIsub(Ui_MainWindow):
         self.lineEdit_norm_EPSP_end.setVisible(norm)
         self.label_norm_on_sweep.setVisible(norm)
         self.label_relative_to.setVisible(norm)
-        self.dict_cfg['norm_EPSP'] = norm
-        self.write_project_cfg()
-        self.purgeGroupCache(*self.dict_cfg['list_groups'])
+        uistate.checkBox['norm_EPSP'] = norm
+        uistate.save_cfg()
+        self.purgeGroupCache(*self.dict_groups['list_ID'])
         self.setGraph()
 
     def editNormRange(self, lineEdit):
@@ -1162,27 +1188,27 @@ class UIsub(Ui_MainWindow):
         except ValueError:
             num = 0
         if lineEdit.objectName() == "lineEdit_norm_on_start": # start, cannot be higher than end
-            if num == self.dict_cfg['norm_EPSP_on'][0]:
+            if num == uistate.lineEdit['norm_EPSP_on'][0]:
                 self.lineEdit_norm_on_start.setText(str(num))
                 return # no change
-            self.dict_cfg['norm_EPSP_on'][1] = max(num, int(self.lineEdit_norm_on_end.text()))
-            self.lineEdit_norm_on_end.setText(str(self.dict_cfg['norm_EPSP_on'][1]))
-            self.dict_cfg['norm_EPSP_on'][0] = num
+            uistate.lineEdit['norm_EPSP_on'][1] = max(num, int(self.lineEdit_norm_on_end.text()))
+            self.lineEdit_norm_on_end.setText(str(uistate.lineEdit['norm_EPSP_on'][1]))
+            uistate.lineEdit['norm_EPSP_on'][0] = num
         else: # end, cannot be lower than start
-            if num == self.dict_cfg['norm_EPSP_on'][1]:
+            if num == uistate.lineEdit['norm_EPSP_on'][1]:
                 self.lineEdit_norm_on_end.setText(str(num))
                 return # no change
-            self.dict_cfg['norm_EPSP_on'][0] = min(num, int(self.lineEdit_norm_on_start.text()))
-            self.lineEdit_norm_on_start.setText(str(self.dict_cfg['norm_EPSP_on'][0]))
-            self.dict_cfg['norm_EPSP_on'][1] = num
+            uistate.lineEdit['norm_EPSP_on'][0] = min(num, int(self.lineEdit_norm_on_start.text()))
+            self.lineEdit_norm_on_start.setText(str(uistate.lineEdit['norm_EPSP_on'][0]))
+            uistate.lineEdit['norm_EPSP_on'][1] = num
         lineEdit.setText(str(num))
-        self.write_project_cfg()
+        uistate.save_cfg(projectfolder=self.dict_folders['project'])
         # rebuild columns EPSP_amp and EPSP_slope to their norm equivalents
         self.normOutputs()
-        self.purgeGroupCache(*self.dict_cfg['list_groups'])
+        self.purgeGroupCache(*self.dict_groups['list_ID'])
         self.tableFormat()
         self.setGraph()
-        print(f"editNormRange: {self.dict_cfg['norm_EPSP_on']}")
+        print(f"editNormRange: {uistate.lineEdit['norm_EPSP_on']}")
     
     def normOutputs(self): # TODO: also norm diffs (paired stim) when applicable
         df_p = self.get_df_project()
@@ -1192,8 +1218,8 @@ class UIsub(Ui_MainWindow):
             self.normOutput(row, dfoutput)
 
     def normOutput(self, row, dfoutput):
-        normFrom = self.dict_cfg['norm_EPSP_on'][0] # start
-        normTo = self.dict_cfg['norm_EPSP_on'][1] # end
+        normFrom = uistate.lineEdit['norm_EPSP_on'][0] # start
+        normTo = uistate.lineEdit['norm_EPSP_on'][1] # end
         if 'EPSP_amp' in dfoutput.columns:
             selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_amp']
             norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
@@ -1408,7 +1434,7 @@ class UIsub(Ui_MainWindow):
 
     def addGroupControls(self, i): # Create menu for adding to group and checkbox for showing group
         group = f"group_{str(i)}"
-        color = self.dict_cfg['list_group_colors'][i-1]
+        color = self.dict_groups['list_group_colors'][i-1]
         print(f"addGroupControls: {group}, {color}")
         setattr(self, f"actionAddTo_{group}", QtWidgets.QAction(f"Add selection to {group}", self))
         self.new_group_menu_item = getattr(self, f"actionAddTo_{group}")
@@ -1420,8 +1446,7 @@ class UIsub(Ui_MainWindow):
         self.new_checkbox.setText(group)
         self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the text color
         self.new_checkbox.setMaximumWidth(100)  # Set the maximum width
-        #self.new_checkbox.setStyleSheet(f"color: {color};")  # Set the text color
-        self.new_checkbox.setChecked(self.dict_cfg['dict_group_show'][group])
+        self.new_checkbox.setChecked(uistate.group_show[group])
         self.new_checkbox.stateChanged.connect(lambda state, group=group: self.groupCheckboxChanged(state, group))
         self.horizontalLayoutGroups.addWidget(self.new_checkbox)
 
@@ -1444,11 +1469,8 @@ class UIsub(Ui_MainWindow):
     def groupCheckboxChanged(self, state, group):
         if verbose:
             print(f"groupCheckboxChanged: {state}, {group}")
-        if state == 2:
-            self.dict_cfg['dict_group_show'][group] = True
-        else:
-            self.dict_cfg['dict_group_show'][group] = False
-        self.write_project_cfg()
+        uistate.group_show[group] = state == 2
+        uistate.save_cfg(projectfolder=self.dict_folders['project'])
         self.setGraph()
 
 
@@ -1512,14 +1534,6 @@ class UIsub(Ui_MainWindow):
         with self.bw_cfg_yaml.open("w+") as file:
             yaml.safe_dump(cfg, file)
 
-    def write_project_cfg(self):  # config file for project, local settings
-        self.dict_cfg = uistate.update_cfg(self.dict_cfg)
-        print("Writing project_cfg:", self.project_cfg_yaml)
-        new_projectfolder = self.projects_folder / self.projectname
-        new_projectfolder.mkdir(exist_ok=True)
-        with self.project_cfg_yaml.open("w+") as file:
-            yaml.safe_dump(self.dict_cfg, file)
-
 
 # Project functions
 
@@ -1536,12 +1550,10 @@ class UIsub(Ui_MainWindow):
             self.dict_folders = self.build_dict_folders()
             self.resetCacheDicts()
             self.set_df_project(df_projectTemplate())
+            self.write_bw_cfg() # update project to open at boot
+            uistate.reset()
+            uistate.save_cfg(projectfolder=self.dict_folders['project'])
             self.tableFormat()
-            self.build_dict_cfg()
-            self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
-            self.write_project_cfg()
-            self.cfgEnforce() # apply new checkbox settings
-            self.write_bw_cfg()
             self.setGraph()
 
     def renameProject(self): # changes name of project folder and updates .cfg
@@ -1559,8 +1571,8 @@ class UIsub(Ui_MainWindow):
             dict_old['project'].rename(self.dict_folders['project'])
             if Path(dict_old['cache']).exists():
                 dict_old['cache'].rename(self.dict_folders['cache'])
-            self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
-            self.write_bw_cfg() # update boot-up-path in bw_cfg.yaml to new project folder
+            # self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
+            # self.write_bw_cfg() # update boot-up-path in bw_cfg.yaml to new project folder
             self.mainwindow.setWindowTitle(f"Brainwash {version} - {self.projectname}")
         else:
             print(f"Project name {new_project_name} is not a valid path.")
@@ -1572,21 +1584,15 @@ class UIsub(Ui_MainWindow):
     def get_df_project(self): # returns a copy of the persistent df_project TODO: make these functions the only way to get to it.
         return self.df_project
 
-    def load_df_project(self): # reads or builds project cfg, reads fileversion of df_project and saves bw_cfg
+    def load_df_project(self): # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
         self.clearGraph()
         self.resetCacheDicts() # clear internal caches
         self.projectname = self.dict_folders['project'].stem
         self.dict_folders = self.build_dict_folders()
-        self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
-        if self.project_cfg_yaml.exists():
-            with self.project_cfg_yaml.open("r") as file:
-                self.dict_cfg = yaml.safe_load(file)
-        else:
-            self.build_dict_cfg()
-                # add groups to UI
-        uistate.load_cfg(self.dict_cfg, self)
-        self.cfgEnforce() # apply loaded checkbox settings
         self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"))
+        self.loadGroups()
+        uistate.load_cfg(self.dict_folders['project'], version)
+        self.setUIstate()
         self.tableFormat()
         self.write_bw_cfg()
 
@@ -1624,7 +1630,7 @@ class UIsub(Ui_MainWindow):
                         df_p.columns.get_loc('groups'),
                         df_p.columns.get_loc('sweeps')
                     ]
-        if self.dict_cfg['paired_stims']:
+        if uistate.checkBox['paired_stims']:
             list_show.append(df_p.columns.get_loc('Tx'))
         num_columns = df_p.shape[1]
         for col in range(num_columns):
@@ -1745,7 +1751,7 @@ class UIsub(Ui_MainWindow):
             dfs = []
             list_pairs = [] # prevent diff duplicates
             for i, row in dfgroup.iterrows():
-                if self.dict_cfg['paired_stims']:
+                if uistate.checkBox['paired_stims']:
                     name_rec = row['recording_name']
                     if name_rec in list_pairs:
                         continue
@@ -1754,11 +1760,11 @@ class UIsub(Ui_MainWindow):
                     list_pairs.append(name_pair)                    
                 else:
                     df = self.get_dfoutput(row=row)
-                    if self.dict_cfg['norm_EPSP']:
+                    if uistate.checkBox['norm_EPSP']:
                         self.normOutput(row, df)
                 dfs.append(df)
             dfs = pd.concat(dfs)
-            if self.dict_cfg['norm_EPSP']:
+            if uistate.checkBox['norm_EPSP']:
                 group_mean = dfs.groupby('sweep').agg({'EPSP_amp_norm': ['mean', 'sem'], 'EPSP_slope_norm': ['mean', 'sem']}).reset_index()
             else:
                 group_mean = dfs.groupby('sweep').agg({'EPSP_amp': ['mean', 'sem'], 'EPSP_slope': ['mean', 'sem']}).reset_index()
@@ -1863,8 +1869,8 @@ class UIsub(Ui_MainWindow):
         df_p = self.get_df_project()
         dict_t = analysis.find_all_t(dfmean=dfmean, verbose=False)
         # Default sizes
-        dict_t['t_EPSP_slope_size'] = self.dict_cfg['EPSP_slope_size_default']
-        dict_t['t_volley_slope_size'] = self.dict_cfg['volley_slope_size_default']
+        dict_t['t_EPSP_slope_size'] = uistate.default['EPSP_slope_size_default']
+        dict_t['t_volley_slope_size'] = uistate.default['volley_slope_size_default']
         for aspect, value in dict_t.items():
             old_aspect_value = df_p.loc[row.name, aspect]
             if pd.notna(old_aspect_value):
@@ -1898,8 +1904,6 @@ class UIsub(Ui_MainWindow):
         if not uistate.anyView():
             print("No aspects selected.")
             return
-        else:
-            print(f"setGraph: {uistate.aspect}")
         ax1 = self.main_canvas_output.axes
         if hasattr(self, "ax2"): # remove ax2 if it exists
             self.ax2.remove()
@@ -1909,9 +1913,9 @@ class UIsub(Ui_MainWindow):
         # Plot analyzed means
         df_analyzed = df_select[df_select['sweeps'] != "..."]
         if not df_analyzed.empty:
-            if self.dict_cfg['output_xlim'][1] is None:
-                self.dict_cfg['output_xlim'] = [0, df_analyzed['sweeps'].max()]
-                self.write_project_cfg()
+            if uistate.zoom['output_xlim'][1] is None:
+                uistate.zoom['output_xlim'] = [0, df_analyzed['sweeps'].max()]
+                uistate.save_cfg(projectfolder=self.dict_folders['project'])
             self.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2)
             # if just one selected, plot its group's mean
             if len(df_analyzed) == 1:
@@ -1919,39 +1923,39 @@ class UIsub(Ui_MainWindow):
                 for group in list_group:
                     if group != " ":
                         df_groupmean = self.get_dfgroupmean(key_group=group)
-                        if not df_groupmean.empty and self.dict_cfg['dict_group_show'][group]:
-                            group_index = self.dict_cfg['list_groups'].index(group)
-                            color = self.dict_cfg['list_group_colors'][group_index]
+                        if not df_groupmean.empty and uistate.group_show[group]:
+                            group_index = self.dict_groups['list_ID'].index(group)
+                            color = self.dict_groups['list_group_colors'][group_index]
                             self.plotGroup(ax1, ax2, group, color, alpha=0.05)
         else: # if none of the selected are analyzed, plot groups instead
-            if self.dict_cfg['list_groups']:
-                self.setGraphGroups(ax1, ax2, self.dict_cfg['list_group_colors'])
+            if self.dict_groups['list_ID']:
+                self.setGraphGroups(ax1, ax2, self.dict_groups['list_group_colors'])
         
         # add appropriate ticks and axis labels
         self.main_canvas_mean.axes.set_xlabel("Time (s)")
         self.main_canvas_mean.axes.set_ylabel("Voltage (V)")
-        if self.dict_cfg['norm_EPSP']:
+        if uistate.checkBox['norm_EPSP']:
             self.ax1.set_ylabel("Amplitude %")
             self.ax2.set_ylabel("Slope %")
         else:
             self.ax1.set_ylabel("Amplitude (mV)")
             self.ax2.set_ylabel("Slope (mV/ms)")
-        oneAxisLeft(self.ax1, self.ax2, uistate.ampView, uistate.slopeView)
+        oneAxisLeft(self.ax1, self.ax2)
         # x and y limits
-        self.main_canvas_mean.axes.set_xlim(self.dict_cfg['mean_xlim'])
-        self.main_canvas_mean.axes.set_ylim(self.dict_cfg['mean_ylim'])
-        if self.dict_cfg['norm_EPSP']:
+        self.main_canvas_mean.axes.set_xlim(uistate.zoom['mean_xlim'])
+        self.main_canvas_mean.axes.set_ylim(uistate.zoom['mean_ylim'])
+        if uistate.checkBox['norm_EPSP']:
             ax1.set_ylim(0, 550)
             ax2.set_ylim(0, 550)
         else:
-            ax1.set_ylim(self.dict_cfg['output_ax1_ylim'])
+            ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
         
         sortLegend(self.ax1, self.ax2)
 
         # connect scroll event if not already connected        
         if not hasattr(self, 'scroll_event_connected') or not self.scroll_event_connected:
             self.main_canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.graphMean, canvas=self.main_canvas_mean, ax1=self.main_canvas_mean.axes))
-            self.main_canvas_output.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.main_canvas_output, ax1=self.ax1, ax2=self.ax2, dict_cfg=self.dict_cfg))
+            self.main_canvas_output.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.main_canvas_output, ax1=self.ax1, ax2=self.ax2))
             self.scroll_event_connected = True
 
         self.main_canvas_mean.draw()
@@ -1977,21 +1981,20 @@ class UIsub(Ui_MainWindow):
 
             # plot dfoutput on main_canvas_output
             out = dfoutput
-            if self.dict_cfg['paired_stims']:
+            if uistate.checkBox['paired_stims']:
                 dfdiff = self.get_dfdiff(row=row)
                 if dfdiff is None:
                     return
                 out = dfdiff
             
             # Make sure the norm columns exist
-            if self.dict_cfg['norm_EPSP'] and "EPSP_amp_norm" not in out.columns:
+            if uistate.checkBox['norm_EPSP'] and "EPSP_amp_norm" not in out.columns:
                 self.normOutputs()
-
-            for key, value in uistate.aspect.items():
-                # if the key starts with EPSP and relative is checked, use the norm column
-                if key.startswith('EPSP') and self.dict_cfg['norm_EPSP']:
+            aspect = {"EPSP_amp": uistate.checkBox['EPSP_amp'], "EPSP_slope": uistate.checkBox['EPSP_slope'], "volley_amp": uistate.checkBox['volley_amp'], "volley_slope": uistate.checkBox['volley_slope']}
+            for key, value in aspect.items():
+                if key.startswith('EPSP') and uistate.checkBox['norm_EPSP']:
                     key = f"{key}_norm"
-                    print(f"key {key} in out.columns: {key in out.columns} relative: {self.dict_cfg['norm_EPSP']}")
+                    print(f"key {key} in out.columns: {key in out.columns} relative: {uistate.checkBox['norm_EPSP']}")
                 if value and key in out.columns:
                     if key.startswith('EPSP_amp') and not np.isnan(t_EPSP_amp):
                         _ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", linestyle='--')
@@ -2022,11 +2025,11 @@ class UIsub(Ui_MainWindow):
 
 
     def setGraphGroups(self, ax1, ax2, list_color):
-        print(f"setGraphGroups: {self.dict_cfg['list_groups']}")
+        print(f"setGraphGroups: {self.dict_groups['list_ID']}")
         df_p = self.get_df_project()
-        for i_color, group in enumerate(self.dict_cfg['list_groups']):
+        for i_color, group in enumerate(self.dict_groups['list_ID']):
             dfgroup = df_p[df_p['groups'].str.split(',').apply(lambda x: group in x)]
-            if self.dict_cfg['dict_group_show'][group] == False:
+            if uistate.group_show[group] == False:
                 if verbose:
                     print(f"Checkbox for group {group} is not checked")
                 continue
@@ -2046,11 +2049,11 @@ class UIsub(Ui_MainWindow):
         dfgroup_mean = self.get_dfgroupmean(key_group=group)
             # Errorbars, EPSP_amp_SEM and EPSP_slope_SEM are already a column in df
             # print(f'dfgroup_mean.columns: {dfgroup_mean.columns}')
-        if dfgroup_mean['EPSP_amp_mean'].notna().any() & uistate.aspect['EPSP_amp']:
+        if dfgroup_mean['EPSP_amp_mean'].notna().any() & uistate.checkBox['EPSP_amp']:
             _ = sns.lineplot(data=dfgroup_mean, y="EPSP_amp_mean", x="sweep", ax=ax1, color=groupcolor, linestyle='--', alpha=alpha)
             ax1.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_amp_mean + dfgroup_mean.EPSP_amp_SEM, dfgroup_mean.EPSP_amp_mean - dfgroup_mean.EPSP_amp_SEM, alpha=0.3, color=groupcolor)
             ax1.axhline(y=0, linestyle='--', color=groupcolor, alpha = 0.4)
-        if dfgroup_mean['EPSP_slope_mean'].notna().any() & uistate.aspect['EPSP_slope']:
+        if dfgroup_mean['EPSP_slope_mean'].notna().any() & uistate.checkBox['EPSP_slope']:
             _ = sns.scatterplot(data=dfgroup_mean, y="EPSP_slope_mean", x="sweep", ax=ax2, color=groupcolor, s=5, alpha=alpha)
             ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=groupcolor)
             ax2.axhline(y=0, linestyle=':', color=groupcolor, alpha = 0.4)
@@ -2059,7 +2062,7 @@ class UIsub(Ui_MainWindow):
         self.usage(f"mainClicked_output={out}")
         if event.inaxes is not None:
             if event.button == 2:
-                zoomReset(canvas=canvas, ui=self, out=out)
+                zoomReset(canvas=canvas, out=out)
 
 
 # MeasureWindow
@@ -2292,7 +2295,7 @@ class Measure_window_sub(Ui_measure_window):
         # connect zoom and reset
         self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
         self.canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.measure_graph_mean, canvas=self.canvas_mean, ax1=self.canvas_mean.axes))
-        self.canvas_output.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.measure_graph_output, canvas=self.canvas_output, ax1=self.ax1, ax2=self.ax2, dict_cfg=self.parent.dict_cfg))
+        self.canvas_output.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.measure_graph_output, canvas=self.canvas_output, ax1=self.ax1, ax2=self.ax2))
 
         # Populate canvases - TODO: refactor such that components can be called individually when added later
         _ = sns.lineplot(ax=self.canvas_mean.axes, label='voltage', data=self.dfmean, y='voltage', x='time', color='black')
@@ -2326,10 +2329,10 @@ class Measure_window_sub(Ui_measure_window):
             self.v_t_volley_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="blue", linestyle=":")
             #_ = sns.lineplot(ax=self.ax2, label="old volley slope", data=self.new_dfoutput, y="volley_slope", x="sweep", color="gray", alpha=0.3)
         
-        self.canvas_mean.axes.set_xlim(parent.dict_cfg['mean_xlim'])
-        self.canvas_mean.axes.set_ylim(parent.dict_cfg['mean_ylim'])
-        self.ax1.set_ylim(parent.dict_cfg['output_ax1_ylim'])
-        self.ax2.set_ylim(parent.dict_cfg['output_ax2_ylim'])
+        self.canvas_mean.axes.set_xlim(uistate.zoom['mean_xlim'])
+        self.canvas_mean.axes.set_ylim(uistate.zoom['mean_ylim'])
+        self.ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
+        self.ax2.set_ylim(uistate.zoom['output_ax2_ylim'])
 
 #        self.canvas_mean.show()
 #        self.canvas_output.show()
@@ -2362,20 +2365,18 @@ class Measure_window_sub(Ui_measure_window):
             edit.setText(self.m(self.row[f"t_{edit_mode}"]))
             edit.editingFinished.connect(lambda edit_mode=edit_mode, edit=edit: self.updateOnEdit(edit, edit_mode))
         # set edit_mode
-        print(f"__init__: self.parent.dict_cfg['last_edit_mode']: {self.parent.dict_cfg['last_edit_mode']}")
-        last_edit_mode = self.parent.dict_cfg['last_edit_mode']
+        last_edit_mode = uistate.default['last_edit_mode']
         last_button = getattr(self, f"pushButton_{last_edit_mode}")
         self.toggle(last_button, last_edit_mode)
         
         # connect checkboxes from mainwindow to updatePlots TODO: refactorize to merge with similar code in __init__(self, mainwindow)
-        def loopConnectViews(view, key):
-            str_view_key = f"{view}_{key}"
-            key_checkBox = getattr(parent, f"checkBox_{str_view_key}")
-            key_checkBox.setChecked(parent.dict_cfg[str_view_key])
+        def loopConnectViews(key):
+            key_checkBox = getattr(parent, f"checkBox_{key}")
+            key_checkBox.setChecked(uistate.checkBox[key])
             key_checkBox.stateChanged.connect(self.updatePlots)
             self.measure_frame.list_connections.append((key_checkBox.stateChanged, self.updatePlots))
         for key in self.list_aspects:
-            loopConnectViews(view="aspect", key=key)
+            loopConnectViews(key=key)
         self.pushButton_auto.clicked.connect(self.autoCalculate)
 
         self.pushButton_sample_add.clicked.connect(self.pushButton_sample_add_pressed)
@@ -2448,8 +2449,8 @@ class Measure_window_sub(Ui_measure_window):
         else:
             button.setStyleSheet(self.dict_color['EPSP'])
         button.setChecked(True)  # set the toggled button to be depressed
-        self.parent.dict_cfg['last_edit_mode'] = now_setting
-        self.parent.write_project_cfg()
+        uistate.default['last_edit_mode'] = now_setting
+        uistate.save_cfg(projectfolder=self.parent.dict_folders['project'])
         
 
     def updateFilter(self, filter, param_edit=False):
@@ -2554,25 +2555,23 @@ class Measure_window_sub(Ui_measure_window):
 
 
     def updatePlots(self):
-        # Apply settings from self.parent.dict_cfg to canvas_mean and canvas_output
+        # Apply settings from uistate to canvas_mean and canvas_output
         aspects = self.list_aspects
         rec_filter = self.row['filter']  # the filter currently used for this recording
         # Plot relevant filter of dfmean on canvas_mean, or show it if it's already plotted
-        self.updateMean(rec_filter=rec_filter, **{aspect: bool(self.parent.dict_cfg[f'aspect_{aspect}']) for aspect in aspects})
+        self.updateMean(rec_filter=rec_filter, **{aspect: bool(uistate.checkBox[aspect]) for aspect in aspects})
         for aspect in aspects :
             # check if aspect exists in new_dfoutput
             if aspect not in self.new_dfoutput.columns:
                 continue
-            visible = bool(self.parent.dict_cfg[f'aspect_{aspect}'])
+            visible = bool(uistate.checkBox[aspect])
             self.updateOutputLine(aspect=aspect, visible=visible)
             # TODO: set visibility on old aspects, disabled for now, here and in Measure_window_sub init
             #self.ax1.lines[label2idx(self.ax1, f"old {aspect}")].set_visible(visible)
             #self.ax2.lines[label2idx(self.ax2, f"old {aspect}")].set_visible(visible)
         # TODO: Update y limits
         sortLegend(self.ax1, self.ax2) # amplitude legends up, slopes down
-        amp = bool(self.parent.dict_cfg['aspect_EPSP_amp'] or self.parent.dict_cfg['aspect_volley_amp'])
-        slope = bool(self.parent.dict_cfg['aspect_EPSP_slope'] or self.parent.dict_cfg['aspect_volley_slope'])
-        oneAxisLeft(self.ax1, self.ax2, amp, slope)# Update axes visibility and position
+        oneAxisLeft(self.ax1, self.ax2) # Update axes visibility and position
         self.canvas_mean.draw()
         self.canvas_output.draw()
 
@@ -2701,9 +2700,9 @@ class Measure_window_sub(Ui_measure_window):
 
             # Update or drop the norm columns
             EPSP_columns = ['EPSP_amp', 'EPSP_slope']
-            normFrom = self.parent.dict_cfg['norm_EPSP_on'][0] # start
-            normTo = self.parent.dict_cfg['norm_EPSP_on'][1] # end
-            relative = self.parent.dict_cfg['norm_EPSP'] # bool
+            relative = uistate.checkBox['norm_EPSP'] # bool
+            normFrom = uistate.lineEdit['norm_EPSP_on'][0] # start
+            normTo = uistate.lineEdit['norm_EPSP_on'][1] # end
             for column in EPSP_columns:
                 norm_column = column + '_norm'
                 if relative and column in self.new_dfoutput.columns:
@@ -2746,8 +2745,8 @@ class Measure_window_sub(Ui_measure_window):
         dffilter = self.parent.get_dffilter(row=self.row)
         dict_t = analysis.find_all_t(dfmean=self.dfmean, verbose=False)
         # Default sizes
-        dict_t['t_EPSP_slope_size'] = self.parent.dict_cfg['EPSP_slope_size_default']
-        dict_t['t_volley_slope_size'] = self.parent.dict_cfg['volley_slope_size_default']
+        dict_t['t_EPSP_slope_size'] = uistate.default['EPSP_slope_size_default']
+        dict_t['t_volley_slope_size'] = uistate.default['volley_slope_size_default']
         print(f"dict_t: {dict_t}")
         self.new_dfoutput = analysis.build_dfoutput(df=dffilter,
                                        t_EPSP_amp=dict_t['t_EPSP_amp'],
@@ -2764,8 +2763,8 @@ class Measure_window_sub(Ui_measure_window):
             print(f"set_float: {set_float}")
             if isinstance(set_float, float) and not np.isnan(set_float) and set_float is not None:
                 self.updateAspect(edit_mode=edit_mode, set_float=set_float, method="Auto")
-        self.ax1.set_ylim(self.parent.dict_cfg['output_ax1_ylim'])
-        self.ax2.set_ylim(self.parent.dict_cfg['output_ax2_ylim'])
+        self.ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
+        self.ax2.set_ylim(uistate.zoom['output_ax2_ylim'])
         
 
     def m(self, SI): # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
@@ -2792,7 +2791,7 @@ class Measure_window_sub(Ui_measure_window):
                 time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
                 self.updateOnClick(time=time, edit_mode=self.now_setting)
             elif event.button == 2:
-                zoomReset(canvas=self.canvas_mean, ui=self.parent)
+                zoomReset(canvas=self.canvas_mean)
 
 
     def outputClicked(self, event): # measurewindow output click event
@@ -2813,7 +2812,7 @@ class Measure_window_sub(Ui_measure_window):
             unPlot(self.canvas_output, self.si_v_drag_from, self.si_v_drag_to, self.dragplot)
             self.canvas_output.draw()
         elif event.button == 2:
-            zoomReset(canvas=self.canvas_output, ui=self.parent, out=True)
+            zoomReset(canvas=self.canvas_output, out=True)
     
 
     def outputDragged(self, event): # measurewindow output drag event
@@ -2911,7 +2910,7 @@ class Measure_window_sub(Ui_measure_window):
         # update lineEdit
         line2update = getattr(self, "lineEdit_" + edit_mode)
         line2update.setText(self.m(set_float))
-        if not self.parent.dict_cfg['aspect_' + aspect]: # stop if aspect is not visible
+        if not uistate.checkBox[aspect]: # stop if aspect is not visible
             return
         # refresh dfoutput
         dffilter = self.parent.get_dffilter(row=self.row)
@@ -2987,7 +2986,7 @@ def get_signals(source):
                 print(f"{key} [{clsname}]")
 
 
-def zoomOnScroll(event, parent, canvas, ax1=None, ax2=None, dict_cfg=None):
+def zoomOnScroll(event, parent, canvas, ax1=None, ax2=None):
     x = event.xdata
     y = event.ydata
     y2 = event.ydata
@@ -2997,10 +2996,6 @@ def zoomOnScroll(event, parent, canvas, ax1=None, ax2=None, dict_cfg=None):
         y = y_display * (ax1.get_ylim()[1] - ax1.get_ylim()[0]) + ax1.get_ylim()[0]
         if ax2 is not None:
             y2 = y_display * (ax2.get_ylim()[1] - ax2.get_ylim()[0]) + ax2.get_ylim()[0]
-    if dict_cfg is not None: # if only slope, ax2 has labels on left side
-        slope_left = dict_cfg['aspect_EPSP_slope'] & ~dict_cfg['aspect_EPSP_amp']
-    else:
-        slope_left = False
     if event.button == 'up':
         zoom = 1.05
     elif event.button == 'down':
@@ -3012,6 +3007,7 @@ def zoomOnScroll(event, parent, canvas, ax1=None, ax2=None, dict_cfg=None):
     right = 0.88 * parent.width()
     bottom = 0.12 * parent.height() # NB: counts from bottom up!
     x_rect = [0, 0, parent.width(), bottom]
+    slope_left = uistate.slopeOnly()
     if slope_left:
         ax2_rect = [0, 0, left, parent.height()]
     else:
@@ -3044,26 +3040,26 @@ def zoomOnScroll(event, parent, canvas, ax1=None, ax2=None, dict_cfg=None):
             ax2.set_ylim(y2 - (y2 - ax2.get_ylim()[0]) / zoom, y2 + (ax2.get_ylim()[1] - y2) / zoom)
     canvas.draw()
 
-def zoomReset(canvas, ui, out=False):
+def zoomReset(canvas, out=False):
     if out:
         axes_in_figure = canvas.figure.get_axes()
         for ax in axes_in_figure:
             if ax.get_ylabel() == "Amplitude (mV)":
-                ax.set_ylim(ui.dict_cfg['output_ax1_ylim'])
+                ax.set_ylim(uistate.zoom['output_ax1_ylim'])
             elif ax.get_ylabel() == "Slope (mV/ms)":
-                ax.set_ylim(ui.dict_cfg['output_ax2_ylim'])
-            ax.set_xlim(ui.dict_cfg['output_xlim'])
+                ax.set_ylim(uistate.zoom['output_ax2_ylim'])
+            ax.set_xlim(uistate.zoom['output_xlim'])
     else:
-        canvas.axes.set_xlim(ui.dict_cfg['mean_xlim'])
-        canvas.axes.set_ylim(ui.dict_cfg['mean_ylim'])
+        canvas.axes.set_xlim(uistate.zoom['mean_xlim'])
+        canvas.axes.set_ylim(uistate.zoom['mean_ylim'])
     canvas.draw()
 
 
-def oneAxisLeft(ax1, ax2, amp, slope):
+def oneAxisLeft(ax1, ax2):
     # sets ax1 and ax2 visibility and position
-    ax1.set_visible(amp)
-    ax2.set_visible(slope)
-    if slope and not amp:
+    ax1.set_visible(uistate.ampView)
+    ax2.set_visible(uistate.slopeView)
+    if uistate.slopeOnly():
         ax2.yaxis.set_label_position("left")
         ax2.yaxis.set_ticks_position("left")
     else:
