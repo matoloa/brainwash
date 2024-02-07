@@ -1962,67 +1962,22 @@ class UIsub(Ui_MainWindow):
         self.main_canvas_output.draw()
 
     def setGraphSelected(self, df_analyzed, ax1, ax2):
-        for i, row in df_analyzed.iterrows(): # TODO: i to be used later for cycling colours?
+        df_p = self.get_df_project()
+        for i, row in df_analyzed.iterrows():
+            dict_row = df_p.loc[i].to_dict()
             dfmean = self.get_dfmean(row=row)
-            dfoutput = self.get_dfoutput(row=row)
-            df_p = self.get_df_project()
-            t_EPSP_amp = df_p.loc[i, 't_EPSP_amp']
-            t_EPSP_slope = df_p.loc[i, 't_EPSP_slope']
-            t_EPSP_slope_size = df_p.loc[i, 't_EPSP_slope_size']
-            t_volley_amp = df_p.loc[i, 't_volley_amp']
-            t_volley_slope = df_p.loc[i, 't_volley_slope']
-            t_volley_slope_size = df_p.loc[i, 't_volley_slope_size']
-            # plot relevant filter of dfmean on main_canvas_mean
-            label = f"{row['recording_name']}"
-            rec_filter = row['filter'] # the filter currently used for this recording
-            if rec_filter != 'voltage':
-                label = f"{label} ({rec_filter})"
-            _ = sns.lineplot(ax=self.main_canvas_mean.axes, label=label, data=dfmean, y=rec_filter, x="time", color="black")
-
-            # plot dfoutput on main_canvas_output
-            out = dfoutput
             if uistate.checkBox['paired_stims']:
-                dfdiff = self.get_dfdiff(row=row)
-                if dfdiff is None:
-                    return
-                out = dfdiff
-            
+                dfoutput = self.get_dfdiff(row=row)
+            else:
+                dfoutput = self.get_dfoutput(row=row)
+            if dfoutput is None:
+                return
             # Make sure the norm columns exist
-            if uistate.checkBox['norm_EPSP'] and "EPSP_amp_norm" not in out.columns:
+            if uistate.checkBox['norm_EPSP'] and "EPSP_amp_norm" not in dfoutput.columns:
                 self.normOutputs()
-            aspect = {"EPSP_amp": uistate.checkBox['EPSP_amp'], "EPSP_slope": uistate.checkBox['EPSP_slope'], "volley_amp": uistate.checkBox['volley_amp'], "volley_slope": uistate.checkBox['volley_slope']}
-            for key, value in aspect.items():
-                if key.startswith('EPSP') and uistate.checkBox['norm_EPSP']:
-                    key = f"{key}_norm"
-                    print(f"key {key} in out.columns: {key in out.columns} relative: {uistate.checkBox['norm_EPSP']}")
-                if value and key in out.columns:
-                    if key.startswith('EPSP_amp') and not np.isnan(t_EPSP_amp):
-                        _ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", linestyle='--')
-                        print(f"t_EPSP_amp: {t_EPSP_amp} - {np.isnan(t_EPSP_amp)}")
-                        y_position = dfmean.loc[dfmean.time == t_EPSP_amp, rec_filter]
-                        print(f"y_position: {y_position}")
-                        self.main_canvas_mean.axes.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha = 0.3)
-                    if key.startswith('EPSP_slope')  and not np.isnan(t_EPSP_slope):
-                        _ = sns.lineplot(ax=ax2, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", alpha = 0.3)
-                        x_start = t_EPSP_slope - t_EPSP_slope_size
-                        x_end = t_EPSP_slope + t_EPSP_slope_size
-                        y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
-                        y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-                        self.main_canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='green', linewidth=10, alpha=0.3)
-                    if key == 'volley_amp' and not np.isnan(t_volley_amp):
-                        ax1.axhline(y=df_p.loc[i, 'volley_amp_mean'], color='blue', alpha = 0.3, linestyle='--')
-                        #_ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="blue", linestyle='--', alpha = 0.3)
-                        y_position = dfmean.loc[dfmean.time == t_volley_amp, rec_filter]
-                        self.main_canvas_mean.axes.plot(t_volley_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
-                    if key == 'volley_slope' and not np.isnan(t_volley_slope):
-                        ax2.axhline(y=df_p.loc[i, 'volley_slope_mean'], color='blue', alpha = 0.3)
-                        #_ = sns.lineplot(ax=ax2, label=f"{label}_{key}", data=out, y=key, x="sweep", color="blue", alpha = 0.3)
-                        x_start = t_volley_slope - t_volley_slope_size
-                        x_end = t_volley_slope + t_volley_slope_size
-                        y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
-                        y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-                        self.main_canvas_mean.axes.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3)
-
+            axm = self.main_canvas_mean.axes
+            uiplot.graph(dict_row, dfmean, dfoutput, axm, ax1, ax2)
+            
 
     def setGraphGroups(self, ax1, ax2, list_color):
         print(f"setGraphGroups: {self.dict_groups['list_ID']}")
@@ -2141,7 +2096,7 @@ class InputDialogPopup(QtWidgets.QDialog):
             return text
 
 class TableProjSub(QtWidgets.QTableView):
-    # TODO: This class does the weirdest things to events; shifting event numbers around in non-standard ways. Why?
+    # TODO: This class does the weirdest things to events; shifting event numbers around in non-standard ways and refuses to notice drops - but drag-into works. Why?
     def __init__(self, parent=None):
         super().__init__()
         self.parent = parent
@@ -2176,13 +2131,6 @@ class TableProjSub(QtWidgets.QTableView):
             event.acceptProposedAction()
         else:
             event.ignore()
-
-    # def keyPressEvent(self, event):
-    #     if event.key() == QtCore.Qt.Key.Key_F2:
-    #         ui.renameRecording()
-    #         super().keyPressEvent(event)
-    #     else:
-    #         super().keyPressEvent(event)
 
 
 class Filetreesub(Ui_Dialog):
