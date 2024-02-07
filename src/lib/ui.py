@@ -60,7 +60,6 @@ if str(socket.getfqdn()) == 'physiol-matand-lap10.physiol.local':
     dict_screen = {'mw_right': 10, 'mw_down': 38}
 
 
-
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
         super(TableModel, self).__init__()
@@ -3003,8 +3002,9 @@ def zoomReset(canvas, out=False):
 
 def oneAxisLeft(ax1, ax2):
     # sets ax1 and ax2 visibility and position
-    ax1.set_visible(uistate.ampView)
-    ax2.set_visible(uistate.slopeView)
+    ax1.set_visible(uistate.ampView())
+    ax2.set_visible(uistate.slopeView())
+    # print(f"oneAxisLeft - uistate.ampView: {uistate.ampView()}, uistate.slopeView: {uistate.slopeView()}, uistate.slopeOnly: {uistate.slopeOnly()}")
     if uistate.slopeOnly():
         ax2.yaxis.set_label_position("left")
         ax2.yaxis.set_ticks_position("left")
