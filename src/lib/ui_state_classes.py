@@ -1,4 +1,5 @@
 import pickle
+import pandas as pd
 
 class UIstate:
     def __init__(self):
@@ -6,6 +7,7 @@ class UIstate:
 
     def reset(self): # reset all states to False
         self.version = "0.0.0"
+        self.selected = []
         self.group_show = {}
         self.checkBox = {
             'EPSP_amp': False,
@@ -18,8 +20,6 @@ class UIstate:
         }
         self.lineEdit = {
             'norm_EPSP_on': [0, 0],
-        }
-        self.pushButton = {
         }
         self.zoom = {
             'mean_xlim': (0.006, 0.020),
@@ -37,26 +37,44 @@ class UIstate:
             'volley_slope_method_default': {},
             'volley_slope_params_default': {},
         }
-
+    
+    def toDraw(self, df_p=None):
+        show = self.checkBox
+        all_aspects = {"EPSP_amp": show['EPSP_amp'], "EPSP_slope": show['EPSP_slope'], "volley_amp": show['volley_amp'], "volley_slope": show['volley_slope']}
+        true_aspects = [k for k, v in all_aspects.items() if v is True]
+        # returns a dict of what to draw
+        if self.selected:
+            df_select = df_p.loc[self.selected]
+        else: # placeholder df to prevent key error when no rows are selected
+            df_select = pd.DataFrame().assign(sweeps=[])
+        df_analyzed = df_select[df_select['sweeps'] != "..."]
+        print(f"df_analyzed: {df_analyzed}")
+        for i, row in df_analyzed.iterrows():
+            for aspect in true_aspects:
+                print(f"{row['recording_name'].replace('_', ' ')} {aspect.replace('_', ' ')}")
+        
     def get_state(self):
-        return {
-            'version': self.version,
-            'group_show': self.group_show,
-            'checkBox': self.checkBox,
-            'lineEdit': self.lineEdit,
-            'pushButton': self.pushButton,
-            'zoom': self.zoom,
-            'default': self.default,
-        }
+        try:
+            return {
+                'version': self.version,
+                'selected': self.selected,
+                'group_show': self.group_show,
+                'checkBox': self.checkBox,
+                'lineEdit': self.lineEdit,
+                'zoom': self.zoom,
+                'default': self.default,
+            }
+        except KeyError:
+            self.reset()
     
     def set_state(self, state):
-        self.version = state['version']
-        self.group_show = state['group_show']
-        self.checkBox = state['checkBox']
-        self.lineEdit = state['lineEdit']
-        self.pushButton = state['pushButton']
-        self.zoom = state['zoom']
-        self.default = state['default']
+        self.version = state.get('version')
+        self.selected = state.get('selected')
+        self.group_show = state.get('group_show')
+        self.checkBox = state.get('checkBox')
+        self.lineEdit = state.get('lineEdit')
+        self.zoom = state.get('zoom')
+        self.default = state.get('default')
 
     def load_cfg(self, projectfolder, bw_version): # load state from project config file
         path_pkl = projectfolder / "cfg.pkl"

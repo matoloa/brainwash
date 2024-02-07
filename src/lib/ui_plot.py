@@ -26,6 +26,7 @@ class UIplot():
         out = dfoutput
         show = uistate.checkBox
         aspect = {"EPSP_amp": show['EPSP_amp'], "EPSP_slope": show['EPSP_slope'], "volley_amp": show['volley_amp'], "volley_slope": show['volley_slope']}
+        aspect = {k: v for k, v in aspect.items() if v is True}
         
         for key, value in aspect.items():
             if key.startswith('EPSP') and uistate.checkBox['norm_EPSP']:
@@ -48,7 +49,7 @@ class UIplot():
                     ax1.axhline(y=volley_amp_mean, color='blue', alpha = 0.3, linestyle='--')
                     #_ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="blue", linestyle='--', alpha = 0.3)
                     y_position = dfmean.loc[dfmean.time == t_volley_amp, rec_filter]
-                    axm(t_volley_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
+                    axm.plot(t_volley_amp, y_position, marker='v', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3)
                 if key == 'volley_slope' and not np.isnan(t_volley_slope):
                     ax2.axhline(y=volley_slope_mean, color='blue', alpha = 0.3)
                     #_ = sns.lineplot(ax=ax2, label=f"{label}_{key}", data=out, y=key, x="sweep", color="blue", alpha = 0.3)

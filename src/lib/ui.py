@@ -1031,9 +1031,8 @@ class UIsub(Ui_MainWindow):
 
     def triggerClearGroups(self):
         self.usage("triggerClearGroups")
-        selected_indices = self.listSelectedIndices()
-        if 0 < len(selected_indices):
-            self.clearGroupsByRow(selected_indices)
+        if 0 < len(uistate.selected):
+            self.clearGroupsByRow(uistate.selected)
             self.tableUpdate()
             self.setGraph()
         else:
@@ -1152,6 +1151,9 @@ class UIsub(Ui_MainWindow):
         t0 = time.time()
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableProj.clearSelection()
+        selected_indexes = self.tableProj.selectionModel().selectedRows()
+        uistate.selected = [row.row() for row in selected_indexes]
+        print(f"uistate.selected: {uistate.selected}")
         self.setGraph()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
 
@@ -1270,9 +1272,8 @@ class UIsub(Ui_MainWindow):
 
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
-        selected_indices = self.listSelectedIndices()
-        if len(selected_indices) == 1:
-            row = selected_indices[0]
+        if len(uistate.selected) == 1:
+            row = uistate.selected[0]
             df_p = self.df_project
             old_recording_name = df_p.at[row, 'recording_name']
             # if the old recording name is a key in in dict_open_measure_windows
@@ -1316,13 +1317,12 @@ class UIsub(Ui_MainWindow):
 
     def deleteSelectedRows(self):
         df_p = self.get_df_project()
-        selected_indices = self.listSelectedIndices()
-        if 0 < len(selected_indices):
+        if 0 < len(uistate.selected):
             # If any of the selected rows are open in a measure window, abort
-            if any(df_p.at[row, 'recording_name'] in self.dict_open_measure_windows for row in selected_indices):
+            if any(df_p.at[row, 'recording_name'] in self.dict_open_measure_windows for row in uistate.selected):
                 print(f"Cannot delete recordings that are open in a measure window.")
                 return
-            for row in selected_indices:
+            for row in uistate.selected:
                 sweeps = df_p.at[row, 'sweeps']
                 if sweeps != "...": # if the file is parsed:
                     recording_name = df_p.at[row, 'recording_name']
@@ -1355,9 +1355,9 @@ class UIsub(Ui_MainWindow):
                     if output_path.exists():
                         output_path.unlink()
             # Regardless of whether or not there was a file, purge the row from df_project
-            self.clearGroupsByRow(selected_indices) # clear cache so that a new group mean is calculated
+            self.clearGroupsByRow(uistate.selected) # clear cache so that a new group mean is calculated
             print(f"df_p pre-delete: {df_p}")
-            df_p.drop(selected_indices, inplace=True)
+            df_p.drop(uistate.selected, inplace=True)
             df_p.reset_index(inplace=True, drop=True)
             print(f"df_p post-delete: {df_p}")
             self.set_df_project(df_p)
@@ -1395,11 +1395,10 @@ class UIsub(Ui_MainWindow):
                 self.tableUpdate()
 
     def flipCI(self):
-        selected_indices = self.listSelectedIndices()
-        if 0 < len(selected_indices):
+        if 0 < len(uistate.selected):
             df_p = self.get_df_project()
             already_flipped = []
-            for index in selected_indices:
+            for index in uistate.selected:
                 row = df_p.loc[index]
                 name_rec = row['recording_name'] 
                 name_pair = row['paired_recording']
@@ -1479,10 +1478,9 @@ class UIsub(Ui_MainWindow):
         print(f"addToGroup: {add_group}")
         # Assign all selected recordings to group "add_group" unless they already belong to that group
         # Kill dict_group_means and csv
-        selected_indices = self.listSelectedIndices()
-        if 0 < len(selected_indices):
+        if 0 < len(uistate.selected):
             list_group = ""
-            for i in selected_indices:
+            for i in uistate.selected:
                 if self.df_project.loc[i, 'groups'] == " ":
                     self.df_project.loc[i, 'groups'] = add_group
                     print(f"{self.df_project.loc[i, 'recording_name']} added to {add_group}")
@@ -1606,10 +1604,6 @@ class UIsub(Ui_MainWindow):
 
 
 # Table handling
-    def listSelectedIndices(self):
-        selected_indexes = self.tableProj.selectionModel().selectedRows()
-        return [row.row() for row in selected_indexes]
-    
     def setButtonParse(self):
         if self.df_project['sweeps'].eq("...").any():
             self.pushButtonParse.setVisible(True)
@@ -1879,7 +1873,7 @@ class UIsub(Ui_MainWindow):
                 print(f"{aspect} was {old_aspect_value} in df_p, a valid float. Updated dict_t to {value}")
             else: # if old_aspect is NOT a valid float, replace df_p with dict_t
                 df_p.loc[row.name, aspect] = value
-                print(f"{aspect} was {old_aspect_value} in df_p, NOT a valid float. Updating df_p...")               
+                print(f"{aspect} was {old_aspect_value} in df_p, NOT a valid float. Updating df_p...")
         dfoutput = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=dict_t['t_EPSP_amp'], t_EPSP_slope=dict_t['t_EPSP_slope'], t_EPSP_slope_size=dict_t['t_EPSP_slope_size'], t_volley_amp=dict_t['t_volley_amp'], t_volley_slope=dict_t['t_volley_slope'], t_volley_slope_size=dict_t['t_volley_slope_size'])
         df_p.loc[row.name, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
         df_p.loc[row.name, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
@@ -1897,9 +1891,14 @@ class UIsub(Ui_MainWindow):
             self.main_canvas_output.axes.cla()
             self.main_canvas_output.draw()
 
-    def setGraph(self, df_select=None): # plot selected row(s), or clear graph if empty
-        if df_select is None:
-            df_select = self.df_project.loc[self.listSelectedIndices()]
+    def setGraph(self): # plot selected row(s), or clear graph if empty
+        uistate.toDraw(df_p=self.get_df_project())
+        print("uistate.selected:", uistate.selected)
+        if uistate.selected:
+            df_select = self.df_project.loc[uistate.selected]
+        else: # placeholder df to prevent key error when no rows are selected
+            df_select = pd.DataFrame().assign(sweeps=[])
+        print (f"df_select: {df_select}")
         self.clearGraph()
         if not uistate.anyView():
             print("No aspects selected.")
@@ -1975,8 +1974,7 @@ class UIsub(Ui_MainWindow):
             # Make sure the norm columns exist
             if uistate.checkBox['norm_EPSP'] and "EPSP_amp_norm" not in dfoutput.columns:
                 self.normOutputs()
-            axm = self.main_canvas_mean.axes
-            uiplot.graph(dict_row, dfmean, dfoutput, axm, ax1, ax2)
+            uiplot.graph(dict_row=dict_row, dfmean=dfmean, dfoutput=dfoutput, axm=self.main_canvas_mean.axes, ax1=ax1, ax2=ax2)
             
 
     def setGraphGroups(self, ax1, ax2, list_color):
