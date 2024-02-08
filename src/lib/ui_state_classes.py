@@ -1,5 +1,4 @@
 import pickle
-import pandas as pd
 
 class UIstate:
     def __init__(self):
@@ -37,21 +36,6 @@ class UIstate:
             'volley_slope_method_default': {},
             'volley_slope_params_default': {},
         }
-    
-    def toDraw(self, df_p=None):
-        show = self.checkBox
-        all_aspects = {"EPSP_amp": show['EPSP_amp'], "EPSP_slope": show['EPSP_slope'], "volley_amp": show['volley_amp'], "volley_slope": show['volley_slope']}
-        true_aspects = [k for k, v in all_aspects.items() if v is True]
-        # returns a dict of what to draw
-        if self.selected:
-            df_select = df_p.loc[self.selected]
-        else: # placeholder df to prevent key error when no rows are selected
-            df_select = pd.DataFrame().assign(sweeps=[])
-        df_analyzed = df_select[df_select['sweeps'] != "..."]
-        print(f"df_analyzed: {df_analyzed}")
-        for i, row in df_analyzed.iterrows():
-            for aspect in true_aspects:
-                print(f"{row['recording_name'].replace('_', ' ')} {aspect.replace('_', ' ')}")
         
     def get_state(self):
         try:

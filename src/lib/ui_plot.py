@@ -25,9 +25,11 @@ class UIplot():
         _ = sns.lineplot(ax=axm, label=label, data=dfmean, y=rec_filter, x="time", color="black")
         out = dfoutput
         show = uistate.checkBox
+        true_aspects = [aspect for aspect in ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope'] if uistate.checkBox[aspect]]# returns a dict of what to draw
+
         aspect = {"EPSP_amp": show['EPSP_amp'], "EPSP_slope": show['EPSP_slope'], "volley_amp": show['volley_amp'], "volley_slope": show['volley_slope']}
         aspect = {k: v for k, v in aspect.items() if v is True}
-        
+        # aspects = [aspect for aspect in ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope'] if uistate.checkBox[aspect]]
         for key, value in aspect.items():
             if key.startswith('EPSP') and uistate.checkBox['norm_EPSP']:
                 key = f"{key}_norm"

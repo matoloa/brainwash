@@ -1881,7 +1881,6 @@ class UIsub(Ui_MainWindow):
 
 
 # Graph handling
-
     def clearGraph(self): # removes all data from main_canvas_mean - TODO: deprecated?
         if hasattr(self, "main_canvas_mean"):
             self.main_canvas_mean.axes.cla()
@@ -1891,8 +1890,6 @@ class UIsub(Ui_MainWindow):
             self.main_canvas_output.draw()
 
     def setGraph(self): # plot selected row(s), or clear graph if empty
-        uistate.toDraw(df_p=self.get_df_project())
-        print("uistate.selected:", uistate.selected)
         if uistate.selected:
             df_select = self.df_project.loc[uistate.selected]
         else: # placeholder df to prevent key error when no rows are selected
