@@ -24,24 +24,37 @@ class UIplot():
             label = f"{label} ({rec_filter})"
         _ = sns.lineplot(ax=axm, label=label, data=dfmean, y=rec_filter, x="time", color="black")
         out = dfoutput
-        show = uistate.checkBox
-        true_aspects = [aspect for aspect in ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope'] if uistate.checkBox[aspect]]# returns a dict of what to draw
+        aspects = [aspect for aspect in ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope'] if uistate.checkBox[aspect]]
+        # cycle through all aspects and plot them if they are in the output dataframe
+        # list the labels of the objects drawn on axes ax1 and ax2
 
-        aspect = {"EPSP_amp": show['EPSP_amp'], "EPSP_slope": show['EPSP_slope'], "volley_amp": show['volley_amp'], "volley_slope": show['volley_slope']}
-        aspect = {k: v for k, v in aspect.items() if v is True}
-        # aspects = [aspect for aspect in ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope'] if uistate.checkBox[aspect]]
-        for key, value in aspect.items():
+        # Get all lines on axm, ax1, and ax2
+        lines_axm = axm.get_lines()
+        lines_ax1 = ax1.get_lines()
+        lines_ax2 = ax2.get_lines()
+
+        # Print all lines, texts, and patches
+        print("Lines on axm:", lines_axm)
+        print("Lines on ax1:", lines_ax1)
+        print("Lines on ax2:", lines_ax2)
+
+        for key in aspects:
             if key.startswith('EPSP') and uistate.checkBox['norm_EPSP']:
                 key = f"{key}_norm"
-            if value and key in out.columns:
+            # make an attribute named (label + ' ' + key)
+
+
+
+                    
+            if key in out.columns:
                 if key.startswith('EPSP_amp') and not np.isnan(t_EPSP_amp):
-                    _ = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", linestyle='--')
+                    self.a = sns.lineplot(ax=ax1, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", linestyle='--')
                     print(f"t_EPSP_amp: {t_EPSP_amp} - {np.isnan(t_EPSP_amp)}")
                     y_position = dfmean.loc[dfmean.time == t_EPSP_amp, rec_filter]
                     print(f"y_position: {y_position}")
                     axm.plot(t_EPSP_amp, y_position, marker='v', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha = 0.3)
                 if key.startswith('EPSP_slope')  and not np.isnan(t_EPSP_slope):
-                    _ = sns.lineplot(ax=ax2, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", alpha = 0.3)
+                    self.b = sns.lineplot(ax=ax2, label=f"{label}_{key}", data=out, y=key, x="sweep", color="green", alpha = 0.3)
                     x_start = t_EPSP_slope - t_EPSP_slope_size
                     x_end = t_EPSP_slope + t_EPSP_slope_size
                     y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]

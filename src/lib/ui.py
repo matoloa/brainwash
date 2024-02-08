@@ -1894,7 +1894,6 @@ class UIsub(Ui_MainWindow):
             df_select = self.df_project.loc[uistate.selected]
         else: # placeholder df to prevent key error when no rows are selected
             df_select = pd.DataFrame().assign(sweeps=[])
-        print (f"df_select: {df_select}")
         self.clearGraph()
         if not uistate.anyView():
             print("No aspects selected.")
