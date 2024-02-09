@@ -13,6 +13,8 @@ import seaborn as sns
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib import use as matplotlib_use
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
+
 # from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 from PyQt5 import QtCore, QtWidgets, QtGui
@@ -1894,10 +1896,11 @@ class UIsub(Ui_MainWindow):
             df_select = self.df_project.loc[uistate.selected]
         else: # placeholder df to prevent key error when no rows are selected
             df_select = pd.DataFrame().assign(sweeps=[])
-        self.clearGraph()
+        #self.clearGraph()
         if not uistate.anyView():
             print("No aspects selected.")
             return
+        self.axm = self.main_canvas_mean.axes
         ax1 = self.main_canvas_output.axes
         if hasattr(self, "ax2"): # remove ax2 if it exists
             self.ax2.remove()
@@ -1910,7 +1913,8 @@ class UIsub(Ui_MainWindow):
             if uistate.zoom['output_xlim'][1] is None:
                 uistate.zoom['output_xlim'] = [0, df_analyzed['sweeps'].max()]
                 uistate.save_cfg(projectfolder=self.dict_folders['project'])
-            self.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2)
+            self.updateGraphs(axm=self.axm, ax1=ax1, ax2=ax2)
+            #self.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2) 
             # if just one selected, plot its group's mean
             if len(df_analyzed) == 1:
                 list_group = df_analyzed['groups'].iloc[0].split(',')
@@ -1955,8 +1959,28 @@ class UIsub(Ui_MainWindow):
         self.main_canvas_mean.draw()
         self.main_canvas_output.draw()
 
-    def setGraphSelected(self, df_analyzed, ax1, ax2):
-        df_p = self.get_df_project()
+    def updateGraphs(self, axm, ax1, ax2, rows=None):
+        if rows is None: # unless fed a specific row, make a list of the selected
+            df_select = self.get_df_project().loc[uistate.selected]
+            rows = df_select[df_select['sweeps'] != "..."]
+        return
+        # create a list of items that SHOULD be on axm
+
+        # make lists of all lines in axm, ax1 and ax2
+        # Get all lines on axm
+        lines_axm = [item for item in axm.get_children() if isinstance(item, Line2D)]
+        #lines_ax1 = [item for item in ax1.get_children() if isinstance(item, Line2D)]
+        #lines_ax2 = [item for item in ax2.get_children() if isinstance(item, Line2D)]
+
+        print("Lines on axm:")
+        for line in lines_axm:
+            print(line)
+
+
+        #remove all these lines from axm
+        for line in lines_axm:
+            line.remove()
+
         for i, row in df_analyzed.iterrows():
             dict_row = df_p.loc[i].to_dict()
             dfmean = self.get_dfmean(row=row)
@@ -1969,8 +1993,8 @@ class UIsub(Ui_MainWindow):
             # Make sure the norm columns exist
             if uistate.checkBox['norm_EPSP'] and "EPSP_amp_norm" not in dfoutput.columns:
                 self.normOutputs()
-            uiplot.graph(dict_row=dict_row, dfmean=dfmean, dfoutput=dfoutput, axm=self.main_canvas_mean.axes, ax1=ax1, ax2=ax2)
-            
+            uiplot.graph(dict_row=dict_row, dfmean=dfmean, dfoutput=dfoutput, axm=axm, ax1=ax1, ax2=ax2)
+
 
     def setGraphGroups(self, ax1, ax2, list_color):
         print(f"setGraphGroups: {self.dict_groups['list_ID']}")
