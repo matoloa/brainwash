@@ -1907,93 +1907,17 @@ class UIsub(Ui_MainWindow):
         ax2 = ax1.twinx()
         self.ax2 = ax2  # Store the ax2 instance
         self.ax1 = ax1
-        # Plot analyzed means
-        df_analyzed = df_select[df_select['sweeps'] != "..."]
-        if not df_analyzed.empty:
-            if uistate.zoom['output_xlim'][1] is None:
-                uistate.zoom['output_xlim'] = [0, df_analyzed['sweeps'].max()]
-                uistate.save_cfg(projectfolder=self.dict_folders['project'])
-            self.updateGraphs(axm=self.axm, ax1=ax1, ax2=ax2)
-            #self.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2) 
-            # if just one selected, plot its group's mean
-            if len(df_analyzed) == 1:
-                list_group = df_analyzed['groups'].iloc[0].split(',')
-                for group in list_group:
-                    if group != " ":
-                        df_groupmean = self.get_dfgroupmean(key_group=group)
-                        if not df_groupmean.empty and uistate.group_show[group]:
-                            group_index = self.dict_groups['list_ID'].index(group)
-                            color = self.dict_groups['list_group_colors'][group_index]
-                            self.plotGroup(ax1, ax2, group, color, alpha=0.05)
-        else: # if none of the selected are analyzed, plot groups instead
-            if self.dict_groups['list_ID']:
-                self.setGraphGroups(ax1, ax2, self.dict_groups['list_group_colors'])
-        
-        # add appropriate ticks and axis labels
-        self.main_canvas_mean.axes.set_xlabel("Time (s)")
-        self.main_canvas_mean.axes.set_ylabel("Voltage (V)")
-        if uistate.checkBox['norm_EPSP']:
-            self.ax1.set_ylabel("Amplitude %")
-            self.ax2.set_ylabel("Slope %")
-        else:
-            self.ax1.set_ylabel("Amplitude (mV)")
-            self.ax2.set_ylabel("Slope (mV/ms)")
-        oneAxisLeft(self.ax1, self.ax2)
-        # x and y limits
-        self.main_canvas_mean.axes.set_xlim(uistate.zoom['mean_xlim'])
-        self.main_canvas_mean.axes.set_ylim(uistate.zoom['mean_ylim'])
-        if uistate.checkBox['norm_EPSP']:
-            ax1.set_ylim(0, 550)
-            ax2.set_ylim(0, 550)
-        else:
-            ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
-        
-        sortLegend(self.ax1, self.ax2)
 
-        # connect scroll event if not already connected        
+        # connect scroll event if not already connected #TODO: when setGraph is updated to be called only once, the check should be redundant
         if not hasattr(self, 'scroll_event_connected') or not self.scroll_event_connected:
             self.main_canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.graphMean, canvas=self.main_canvas_mean, ax1=self.main_canvas_mean.axes))
             self.main_canvas_output.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.main_canvas_output, ax1=self.ax1, ax2=self.ax2))
             self.scroll_event_connected = True
+        
+        graphUpdate(axm=self.main_canvas_mean.axes, ax1=ax1, ax2=ax2, df=df_select)
 
-        self.main_canvas_mean.draw()
-        self.main_canvas_output.draw()
-
-    def updateGraphs(self, axm, ax1, ax2, rows=None):
-        if rows is None: # unless fed a specific row, make a list of the selected
-            df_select = self.get_df_project().loc[uistate.selected]
-            rows = df_select[df_select['sweeps'] != "..."]
-        return
-        # create a list of items that SHOULD be on axm
-
-        # make lists of all lines in axm, ax1 and ax2
-        # Get all lines on axm
-        lines_axm = [item for item in axm.get_children() if isinstance(item, Line2D)]
-        #lines_ax1 = [item for item in ax1.get_children() if isinstance(item, Line2D)]
-        #lines_ax2 = [item for item in ax2.get_children() if isinstance(item, Line2D)]
-
-        print("Lines on axm:")
-        for line in lines_axm:
-            print(line)
-
-
-        #remove all these lines from axm
-        for line in lines_axm:
-            line.remove()
-
-        for i, row in df_analyzed.iterrows():
-            dict_row = df_p.loc[i].to_dict()
-            dfmean = self.get_dfmean(row=row)
-            if uistate.checkBox['paired_stims']:
-                dfoutput = self.get_dfdiff(row=row)
-            else:
-                dfoutput = self.get_dfoutput(row=row)
-            if dfoutput is None:
-                return
-            # Make sure the norm columns exist
-            if uistate.checkBox['norm_EPSP'] and "EPSP_amp_norm" not in dfoutput.columns:
-                self.normOutputs()
-            uiplot.graph(dict_row=dict_row, dfmean=dfmean, dfoutput=dfoutput, axm=axm, ax1=ax1, ax2=ax2)
+        #self.main_canvas_mean.draw()
+        #self.main_canvas_output.draw()
 
 
     def setGraphGroups(self, ax1, ax2, list_color):
@@ -2949,6 +2873,87 @@ def get_signals(source):
         for key, aspect in sorted(vars(subcls).items()):
             if isinstance(aspect, signal):
                 print(f"{key} [{clsname}]")
+
+
+
+def graphUpdate(axm, ax1, ax2, df):
+    
+    # Plot analyzed means
+    df_analyzed = df[df['sweeps'] != "..."]
+    if not df_analyzed.empty:
+        if uistate.zoom['output_xlim'][1] is None:
+            uistate.zoom['output_xlim'] = [0, df_analyzed['sweeps'].max()]
+            uistate.save_cfg(projectfolder=uisub.dict_folders['project'])
+        if rows is None: # unless fed a specific row, make a list of the selected
+            df_select = uisub.get_df_project().loc[uistate.selected]
+        rows = df_select[df_select['sweeps'] != "..."]
+        # create a list of items that SHOULD be on axm
+
+        # make lists of all lines in axm, ax1 and ax2
+        # Get all lines on axm
+        lines_axm = [item for item in axm.get_children() if isinstance(item, Line2D)]
+        #lines_ax1 = [item for item in ax1.get_children() if isinstance(item, Line2D)]
+        #lines_ax2 = [item for item in ax2.get_children() if isinstance(item, Line2D)]
+
+        print("Lines on axm:")
+        for line in lines_axm:
+            print(line)
+        return
+
+
+        #remove all these lines from axm
+        for line in lines_axm:
+            line.remove()
+
+        for i, row in df_analyzed.iterrows():
+            dict_row = df_p.loc[i].to_dict()
+            dfmean = self.get_dfmean(row=row)
+            if uistate.checkBox['paired_stims']:
+                dfoutput = self.get_dfdiff(row=row)
+            else:
+                dfoutput = self.get_dfoutput(row=row)
+            if dfoutput is None:
+                return
+            # Make sure the norm columns exist
+            if uistate.checkBox['norm_EPSP'] and "EPSP_amp_norm" not in dfoutput.columns:
+                self.normOutputs()
+            uiplot.graph(dict_row=dict_row, dfmean=dfmean, dfoutput=dfoutput, axm=axm, ax1=ax1, ax2=ax2)
+        #uisub.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2)
+        # if just one selected, plot its group's mean
+        # if len(df_analyzed) == 1:
+        #     list_group = df_analyzed['groups'].iloc[0].split(',')
+        #     for group in list_group:
+        #         if group != " ":
+        #             df_groupmean = self.get_dfgroupmean(key_group=group)
+        #             if not df_groupmean.empty and uistate.group_show[group]:
+        #                 group_index = self.dict_groups['list_ID'].index(group)
+        #                 color = self.dict_groups['list_group_colors'][group_index]
+        #                 self.plotGroup(ax1, ax2, group, color, alpha=0.05)
+    #else: # if none of the selected are analyzed, plot groups instead
+    #    if self.dict_groups['list_ID']:
+    #        self.setGraphGroups(ax1, ax2, self.dict_groups['list_group_colors'])
+    
+    # add appropriate ticks and axis labels
+    axm.set_xlabel("Time (s)")
+    axm.set_ylabel("Voltage (V)")
+    if uistate.checkBox['norm_EPSP']:
+        ax1.set_ylabel("Amplitude %")
+        ax2.set_ylabel("Slope %")
+    else:
+        ax1.set_ylabel("Amplitude (mV)")
+        ax2.set_ylabel("Slope (mV/ms)")
+    oneAxisLeft(ax1, ax2)
+    # x and y limits
+    axm.set_xlim(uistate.zoom['mean_xlim'])
+    axm.set_ylim(uistate.zoom['mean_ylim'])
+    if uistate.checkBox['norm_EPSP']:
+        ax1.set_ylim(0, 550)
+        ax2.set_ylim(0, 550)
+    else:
+        ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
+    sortLegend(ax1, ax2)
+    axm.figure.canvas.draw()
+    ax1.figure.canvas.draw()
 
 
 def zoomOnScroll(event, parent, canvas, ax1=None, ax2=None):

@@ -6,7 +6,8 @@ class UIstate:
 
     def reset(self): # reset all states to False
         self.version = "0.0.0"
-        self.selected = []
+        self.selected = [] # selected lines in df_project
+        self.changed = [] # these need to be updated
         self.group_show = {}
         self.checkBox = {
             'EPSP_amp': False,
