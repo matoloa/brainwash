@@ -41,13 +41,32 @@ class UIstate:
             'volley_slope_params_default': {},
         }
 
-    def list_axm(self):
-        print("axm:", self.axm)
+    def dict_axm(self, df_p): # these are the lines that are supposed to be on axm
+        if not self.anyView():
+            return
+        selected_indices = list(self.selected.keys())
+        df = df_p.loc[selected_indices]
+        axm = {}
+        for index, row in df.iterrows():
+            rec_name = row['recording_name']
+            rec_filter = row['filter']
+            if rec_filter != 'voltage':
+                value = f"{rec_name} ({rec_filter})"
+            else:
+                value = rec_name
+            axm[index] = value
+        print ("axm:", axm)
+        return axm
 
-    def list_ax1(self):
+    def list_ax1(self, df_p):
+        if not self.ampView():
+            return
+        
         print("ax1:", self.ax1)
 
-    def list_ax2(self):
+    def list_ax2(self, df_p):
+        if not self.slopeView():
+            return
         print("ax2:", self.ax2)
 
     def get_state(self):
@@ -55,6 +74,10 @@ class UIstate:
             return {
                 'version': self.version,
                 'selected': self.selected,
+                'axm': self.axm,
+                'ax1': self.ax1,
+                'ax2': self.ax2,
+                'changed': self.changed,
                 'group_show': self.group_show,
                 'checkBox': self.checkBox,
                 'lineEdit': self.lineEdit,
@@ -67,6 +90,10 @@ class UIstate:
     def set_state(self, state):
         self.version = state.get('version')
         self.selected = state.get('selected')
+        self.axm = state.get('axm')
+        self.ax1 = state.get('ax1')
+        self.ax2 = state.get('ax2')
+        self.changed = state.get('changed')
         self.group_show = state.get('group_show')
         self.checkBox = state.get('checkBox')
         self.lineEdit = state.get('lineEdit')

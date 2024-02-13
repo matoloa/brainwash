@@ -2887,7 +2887,7 @@ def get_signals(source):
 
 def graphUpdate(axm, ax1, ax2, df):
     if df is None: # unless fed a specific row, make a list of the selected
-        selected_indices = selected_indices = list(uistate.selected.keys())
+        selected_indices = list(uistate.selected.keys())
         df_select = uisub.get_df_project().loc[selected_indices]    
     # remove lines that are not imported
     df_select = df[df['sweeps'] != "..."]
@@ -2897,22 +2897,59 @@ def graphUpdate(axm, ax1, ax2, df):
         uistate.zoom['output_xlim'] = [0, df_select['sweeps'].max()]
         uistate.save_cfg(projectfolder=uisub.dict_folders['project'])
 
-    # create a list of items that SHOULD be on axm
+    # make dicts of all the lines currently on axm, ax1 and ax2 - label : object
+    dict_old_axm = {item.get_label(): item for item in axm.get_children() if isinstance(item, Line2D)}
+    dict_old_ax1 = [item for item in ax1.get_children() if isinstance(item, Line2D)]
+    dict_old_ax2 = [item for item in ax2.get_children() if isinstance(item, Line2D)]
 
-    # make lists of all the lines currently on axm, ax1 and ax2
-    old_axm = [item for item in axm.get_children() if isinstance(item, Line2D)]
-    old_ax1 = [item for item in ax1.get_children() if isinstance(item, Line2D)]
-    old_ax2 = [item for item in ax2.get_children() if isinstance(item, Line2D)]
+    # make dicts of all the lines that are supposed to be on axm, ax1 and ax2 - index : label
+    df_p = uisub.get_df_project()
+    dict_new_axm = uistate.dict_axm(df_p)
+    new_ax1 = uistate.list_ax1(df_p)
+    new_ax2 = uistate.list_ax2(df_p)
 
-    # make lists of all the lines that are supposed to be on axm, ax1 and ax2
-    new_axm = uistate.list_axm()
-    new_ax1 = uistate.list_ax1()
-    new_ax2 = uistate.list_ax2()
+    print (f"dict_old_axm keys: {list(dict_old_axm.keys())}, new_axm: {dict_new_axm.values()}")
+    # if a key in dict_old_axm is not in new_axm, remove it
+    for label, line in dict_old_axm.items():
+        if label not in dict_new_axm.values():
+            line.remove()
+    # if a key in new_axm is not in dict_old_axm, add it
+    for index, label in dict_new_axm.items():
+        if label not in dict_old_axm.keys():
+            row = df_select.loc[index]
+            dfmean = uisub.get_dfmean(row=row)
+            if uistate.checkBox['paired_stims']:
+                dfoutput = uisub.get_dfdiff(row=row)
+            else:
+                dfoutput = uisub.get_dfoutput(row=row)
+            if dfoutput is None:
+                return
+            uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=axm, ax1=ax1, ax2=ax2)
+
+    # arrange axes and labels
+    axm.set_xlabel("Time (s)")
+    axm.set_ylabel("Voltage (V)")
+    if uistate.checkBox['norm_EPSP']:
+        ax1.set_ylabel("Amplitude %")
+        ax2.set_ylabel("Slope %")
+    else:
+        ax1.set_ylabel("Amplitude (mV)")
+        ax2.set_ylabel("Slope (mV/ms)")
+    oneAxisLeft(ax1, ax2)
+    # x and y limits
+    axm.set_xlim(uistate.zoom['mean_xlim'])
+    axm.set_ylim(uistate.zoom['mean_ylim'])
+    if uistate.checkBox['norm_EPSP']:
+        ax1.set_ylim(0, 550)
+        ax2.set_ylim(0, 550)
+    else:
+        ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
+    sortLegend(ax1, ax2)
+    # redraw
+    axm.figure.canvas.draw()
+    ax1.figure.canvas.draw()
     
-    #remove all these lines from axm
-    #for line in lines_axm:
-    #    line.remove()
-
+    return
     for i, row in df_select.iterrows():
         dict_row = df_select.loc[i].to_dict()
         dfmean = uisub.get_dfmean(row=row)
@@ -2941,27 +2978,7 @@ def graphUpdate(axm, ax1, ax2, df):
     #    if self.dict_groups['list_ID']:
     #        self.setGraphGroups(ax1, ax2, self.dict_groups['list_group_colors'])
 
-    # add appropriate ticks and axis labels
-    axm.set_xlabel("Time (s)")
-    axm.set_ylabel("Voltage (V)")
-    if uistate.checkBox['norm_EPSP']:
-        ax1.set_ylabel("Amplitude %")
-        ax2.set_ylabel("Slope %")
-    else:
-        ax1.set_ylabel("Amplitude (mV)")
-        ax2.set_ylabel("Slope (mV/ms)")
-    oneAxisLeft(ax1, ax2)
-    # x and y limits
-    axm.set_xlim(uistate.zoom['mean_xlim'])
-    axm.set_ylim(uistate.zoom['mean_ylim'])
-    if uistate.checkBox['norm_EPSP']:
-        ax1.set_ylim(0, 550)
-        ax2.set_ylim(0, 550)
-    else:
-        ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
-    sortLegend(ax1, ax2)
-    axm.figure.canvas.draw()
-    ax1.figure.canvas.draw()
+
 
 
 def zoomOnScroll(event, parent, canvas, ax1=None, ax2=None):
