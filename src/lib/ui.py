@@ -1032,8 +1032,9 @@ class UIsub(Ui_MainWindow):
 
     def triggerClearGroups(self):
         self.usage("triggerClearGroups")
-        if 0 < len(uistate.selected):
-            self.clearGroupsByRow(uistate.selected)
+        if uistate.selected:
+            selected_indices = list(uistate.selected.keys())
+            self.clearGroupsByRow(selected_indices)
             self.tableUpdate()
             self.setGraph()
         else:
@@ -1153,7 +1154,12 @@ class UIsub(Ui_MainWindow):
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableProj.clearSelection()
         selected_indexes = self.tableProj.selectionModel().selectedRows()
-        uistate.selected = [row.row() for row in selected_indexes]
+        df_p = self.get_df_project()
+        # build the dict uistate.selected: key=index, value=recording_name
+        uistate.selected = {}
+        for index in selected_indexes:
+            row = df_p.iloc[index.row()]
+            uistate.selected[index.row()] = row['recording_name']
         print(f"uistate.selected: {uistate.selected}")
         self.setGraph()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
@@ -1274,9 +1280,7 @@ class UIsub(Ui_MainWindow):
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
         if len(uistate.selected) == 1:
-            row = uistate.selected[0]
-            df_p = self.df_project
-            old_recording_name = df_p.at[row, 'recording_name']
+            row, old_recording_name = next(iter(uistate.selected.items()))
             # if the old recording name is a key in in dict_open_measure_windows
             if old_recording_name in self.dict_open_measure_windows.keys():
                 print(f"Cannot rename {old_recording_name} while it is open in a measure window.")
@@ -1287,7 +1291,9 @@ class UIsub(Ui_MainWindow):
             old_output = self.dict_folders['cache'] / (old_recording_name + "_output.csv")
             RenameDialog = InputDialogPopup()
             new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query=old_recording_name)
-            if new_recording_name is not None and re.match(r'^[a-zA-Z0-9_ -]+$', str(new_recording_name)) is not None: # check if valid filename
+             # check if the new name is a valid filename
+            if new_recording_name is not None and re.match(r'^[a-zA-Z0-9_ -]+$', str(new_recording_name)) is not None:
+                df_p = self.df_project
                 list_recording_names = set(df_p['recording_name'])
                 if not new_recording_name in list_recording_names: # prevent duplicates
                     new_data = self.dict_folders['data'] / (new_recording_name + ".csv")
@@ -1317,55 +1323,55 @@ class UIsub(Ui_MainWindow):
             print("Rename: please select one row only for renaming.")
 
     def deleteSelectedRows(self):
-        df_p = self.get_df_project()
-        if 0 < len(uistate.selected):
-            # If any of the selected rows are open in a measure window, abort
-            if any(df_p.at[row, 'recording_name'] in self.dict_open_measure_windows for row in uistate.selected):
-                print(f"Cannot delete recordings that are open in a measure window.")
-                return
-            for row in uistate.selected:
-                sweeps = df_p.at[row, 'sweeps']
-                if sweeps != "...": # if the file is parsed:
-                    recording_name = df_p.at[row, 'recording_name']
-                    if verbose:
-                        print(f"Deleting {recording_name}...")
-                    # remove from internal cache
-                    if recording_name in self.dict_datas.keys():
-                        print(f"Deleting {recording_name} from internal dict_datas cache...")
-                    self.dict_datas.pop(recording_name, None)
-                    if recording_name in self.dict_means.keys():
-                        print(f"Deleting {recording_name} from internal dict_means cache...")
-                    self.dict_means.pop(recording_name, None)
-                    if recording_name in self.dict_filters.keys():
-                        print(f"Deleting {recording_name} from internal dict_filters cache...")
-                    self.dict_filters.pop(recording_name, None)
-                    if recording_name in self.dict_outputs.keys():
-                        print(f"Deleting {recording_name} from internal dict_outputs cache...")
-                    self.dict_outputs.pop(recording_name, None)
-                    # remove from disk
-                    data_path = Path(self.dict_folders['data'] / (recording_name + ".csv"))
-                    if data_path.exists():
-                        data_path.unlink()
-                    mean_path = Path(self.dict_folders['cache'] / (recording_name + "_mean.csv"))
-                    if mean_path.exists():
-                        mean_path.unlink()
-                    filter_path = Path(self.dict_folders['cache'] / (recording_name + "_filter.csv"))
-                    if filter_path.exists():
-                        filter_path.unlink()
-                    output_path = Path(self.dict_folders['cache'] / (recording_name + "_output.csv"))
-                    if output_path.exists():
-                        output_path.unlink()
-            # Regardless of whether or not there was a file, purge the row from df_project
-            self.clearGroupsByRow(uistate.selected) # clear cache so that a new group mean is calculated
-            print(f"df_p pre-delete: {df_p}")
-            df_p.drop(uistate.selected, inplace=True)
-            df_p.reset_index(inplace=True, drop=True)
-            print(f"df_p post-delete: {df_p}")
-            self.set_df_project(df_p)
-            self.tableUpdate()
-            self.setGraph()
-        else:
+        if not uistate.selected:
             print("No files selected.")
+            return
+        # If any of the selected rows are open in a measure window, abort
+        if any(key in self.dict_open_measure_windows for key in uistate.selected):
+            print(f"Cannot delete recordings that are open in a measure window.")
+            return
+        for row, recording_name in uistate.selected:
+            sweeps = df_p.at[row, 'sweeps']
+            if sweeps != "...": # if the file is parsed:
+                if verbose:
+                    print(f"Deleting {recording_name}...")
+                # remove from internal cache
+                if recording_name in self.dict_datas.keys():
+                    print(f"Deleting {recording_name} from internal dict_datas cache...")
+                self.dict_datas.pop(recording_name, None)
+                if recording_name in self.dict_means.keys():
+                    print(f"Deleting {recording_name} from internal dict_means cache...")
+                self.dict_means.pop(recording_name, None)
+                if recording_name in self.dict_filters.keys():
+                    print(f"Deleting {recording_name} from internal dict_filters cache...")
+                self.dict_filters.pop(recording_name, None)
+                if recording_name in self.dict_outputs.keys():
+                    print(f"Deleting {recording_name} from internal dict_outputs cache...")
+                self.dict_outputs.pop(recording_name, None)
+                # remove from disk
+                data_path = Path(self.dict_folders['data'] / (recording_name + ".csv"))
+                if data_path.exists():
+                    data_path.unlink()
+                mean_path = Path(self.dict_folders['cache'] / (recording_name + "_mean.csv"))
+                if mean_path.exists():
+                    mean_path.unlink()
+                filter_path = Path(self.dict_folders['cache'] / (recording_name + "_filter.csv"))
+                if filter_path.exists():
+                    filter_path.unlink()
+                output_path = Path(self.dict_folders['cache'] / (recording_name + "_output.csv"))
+                if output_path.exists():
+                    output_path.unlink()
+        # Regardless of whether or not there was a file, purge the row from df_project
+        selected_indices = list(uistate.selected.keys())
+        self.clearGroupsByRow(selected_indices) # clear cache so that a new group mean is calculated
+        df_p = self.get_df_project()
+        print(f"df_p pre-delete: {df_p}")
+        df_p.drop(selected_indices, inplace=True)
+        df_p.reset_index(inplace=True, drop=True)
+        print(f"df_p post-delete: {df_p}")
+        self.set_df_project(df_p)
+        self.tableUpdate()
+        self.setGraph()
 
     def parseData(self): # parse data files and modify self.df_project accordingly
         df_p = self.get_df_project()
@@ -1396,10 +1402,11 @@ class UIsub(Ui_MainWindow):
                 self.tableUpdate()
 
     def flipCI(self):
-        if 0 < len(uistate.selected):
+        if uistate.selected:
             df_p = self.get_df_project()
             already_flipped = []
-            for index in uistate.selected:
+            selected_indices = list(uistate.selected.keys())
+            for index in selected_indices:
                 row = df_p.loc[index]
                 name_rec = row['recording_name'] 
                 name_pair = row['paired_recording']
@@ -1479,9 +1486,10 @@ class UIsub(Ui_MainWindow):
         print(f"addToGroup: {add_group}")
         # Assign all selected recordings to group "add_group" unless they already belong to that group
         # Kill dict_group_means and csv
-        if 0 < len(uistate.selected):
+        if uistate.selected:
+            selected_indices = list(uistate.selected.keys())
             list_group = ""
-            for i in uistate.selected:
+            for i in selected_indices:
                 if self.df_project.loc[i, 'groups'] == " ":
                     self.df_project.loc[i, 'groups'] = add_group
                     print(f"{self.df_project.loc[i, 'recording_name']} added to {add_group}")
@@ -1893,7 +1901,8 @@ class UIsub(Ui_MainWindow):
 
     def setGraph(self): # plot selected row(s), or clear graph if empty
         if uistate.selected:
-            df_select = self.df_project.loc[uistate.selected]
+            selected_indices = list(uistate.selected.keys())
+            df_select = self.df_project.loc[selected_indices]
         else: # placeholder df to prevent key error when no rows are selected
             df_select = pd.DataFrame().assign(sweeps=[])
         #self.clearGraph()
@@ -2877,47 +2886,46 @@ def get_signals(source):
 
 
 def graphUpdate(axm, ax1, ax2, df):
-    
-    # Plot analyzed means
-    df_analyzed = df[df['sweeps'] != "..."]
-    if not df_analyzed.empty:
-        if uistate.zoom['output_xlim'][1] is None:
-            uistate.zoom['output_xlim'] = [0, df_analyzed['sweeps'].max()]
-            uistate.save_cfg(projectfolder=uisub.dict_folders['project'])
-        if rows is None: # unless fed a specific row, make a list of the selected
-            df_select = uisub.get_df_project().loc[uistate.selected]
-        rows = df_select[df_select['sweeps'] != "..."]
-        # create a list of items that SHOULD be on axm
-
-        # make lists of all lines in axm, ax1 and ax2
-        # Get all lines on axm
-        lines_axm = [item for item in axm.get_children() if isinstance(item, Line2D)]
-        #lines_ax1 = [item for item in ax1.get_children() if isinstance(item, Line2D)]
-        #lines_ax2 = [item for item in ax2.get_children() if isinstance(item, Line2D)]
-
-        print("Lines on axm:")
-        for line in lines_axm:
-            print(line)
+    if df is None: # unless fed a specific row, make a list of the selected
+        selected_indices = selected_indices = list(uistate.selected.keys())
+        df_select = uisub.get_df_project().loc[selected_indices]    
+    # remove lines that are not imported
+    df_select = df[df['sweeps'] != "..."]
+    if df_select.empty:
         return
+    if uistate.zoom['output_xlim'][1] is None:
+        uistate.zoom['output_xlim'] = [0, df_select['sweeps'].max()]
+        uistate.save_cfg(projectfolder=uisub.dict_folders['project'])
 
+    # create a list of items that SHOULD be on axm
 
-        #remove all these lines from axm
-        for line in lines_axm:
-            line.remove()
+    # make lists of all the lines currently on axm, ax1 and ax2
+    old_axm = [item for item in axm.get_children() if isinstance(item, Line2D)]
+    old_ax1 = [item for item in ax1.get_children() if isinstance(item, Line2D)]
+    old_ax2 = [item for item in ax2.get_children() if isinstance(item, Line2D)]
 
-        for i, row in df_analyzed.iterrows():
-            dict_row = df_p.loc[i].to_dict()
-            dfmean = self.get_dfmean(row=row)
-            if uistate.checkBox['paired_stims']:
-                dfoutput = self.get_dfdiff(row=row)
-            else:
-                dfoutput = self.get_dfoutput(row=row)
-            if dfoutput is None:
-                return
-            # Make sure the norm columns exist
-            if uistate.checkBox['norm_EPSP'] and "EPSP_amp_norm" not in dfoutput.columns:
-                self.normOutputs()
-            uiplot.graph(dict_row=dict_row, dfmean=dfmean, dfoutput=dfoutput, axm=axm, ax1=ax1, ax2=ax2)
+    # make lists of all the lines that are supposed to be on axm, ax1 and ax2
+    new_axm = uistate.list_axm()
+    new_ax1 = uistate.list_ax1()
+    new_ax2 = uistate.list_ax2()
+    
+    #remove all these lines from axm
+    #for line in lines_axm:
+    #    line.remove()
+
+    for i, row in df_select.iterrows():
+        dict_row = df_select.loc[i].to_dict()
+        dfmean = uisub.get_dfmean(row=row)
+        if uistate.checkBox['paired_stims']:
+            dfoutput = uisub.get_dfdiff(row=row)
+        else:
+            dfoutput = uisub.get_dfoutput(row=row)
+        if dfoutput is None:
+            return
+        # Make sure the norm columns exist
+        if uistate.checkBox['norm_EPSP'] and "EPSP_amp_norm" not in dfoutput.columns:
+            uisub.normOutputs()
+        uiplot.graph(dict_row=dict_row, dfmean=dfmean, dfoutput=dfoutput, axm=axm, ax1=ax1, ax2=ax2)
         #uisub.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2)
         # if just one selected, plot its group's mean
         # if len(df_analyzed) == 1:
@@ -2932,7 +2940,7 @@ def graphUpdate(axm, ax1, ax2, df):
     #else: # if none of the selected are analyzed, plot groups instead
     #    if self.dict_groups['list_ID']:
     #        self.setGraphGroups(ax1, ax2, self.dict_groups['list_group_colors'])
-    
+
     # add appropriate ticks and axis labels
     axm.set_xlabel("Time (s)")
     axm.set_ylabel("Voltage (V)")

@@ -6,8 +6,11 @@ class UIstate:
 
     def reset(self): # reset all states to False
         self.version = "0.0.0"
-        self.selected = [] # selected lines in df_project
-        self.changed = [] # these need to be updated
+        self.selected = {} # dict of selected files {index: recording_name}
+        self.axm = [] # list of items that are supposed to be on axm
+        self.ax1 = [] # list of items that are supposed to be on ax1
+        self.ax2 = [] # list of items that are supposed to be on ax2
+        self.changed = [] # these need to be updated, even if they are already on an axis
         self.group_show = {}
         self.checkBox = {
             'EPSP_amp': False,
@@ -37,7 +40,16 @@ class UIstate:
             'volley_slope_method_default': {},
             'volley_slope_params_default': {},
         }
-        
+
+    def list_axm(self):
+        print("axm:", self.axm)
+
+    def list_ax1(self):
+        print("ax1:", self.ax1)
+
+    def list_ax2(self):
+        print("ax2:", self.ax2)
+
     def get_state(self):
         try:
             return {
