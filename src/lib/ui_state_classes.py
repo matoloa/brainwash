@@ -41,30 +41,28 @@ class UIstate:
             'volley_slope_params_default': {},
         }
 
-    def dict_axm(self, df_p): # these are the lines that are supposed to be on axm
+    def to_axm(self, df_p): # lines that are supposed to be on axm - label: index
         if not self.anyView():
             return
         selected_indices = list(self.selected.keys())
         df = df_p.loc[selected_indices]
         axm = {}
         for index, row in df.iterrows():
-            rec_name = row['recording_name']
             rec_filter = row['filter']
             if rec_filter != 'voltage':
-                value = f"{rec_name} ({rec_filter})"
+                key = f"{row['recording_name']} ({rec_filter})"
             else:
-                value = rec_name
-            axm[index] = value
-        print ("axm:", axm)
+                key = row['recording_name']
+            axm[key] = index
         return axm
 
-    def list_ax1(self, df_p):
+    def to_ax1(self, df_p):
         if not self.ampView():
             return
         
         print("ax1:", self.ax1)
 
-    def list_ax2(self, df_p):
+    def to_ax2(self, df_p):
         if not self.slopeView():
             return
         print("ax2:", self.ax2)

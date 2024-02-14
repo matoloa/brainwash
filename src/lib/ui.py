@@ -962,7 +962,7 @@ class UIsub(Ui_MainWindow):
         self.usage(f"viewSettingsChanged_{key}")
         if key in uistate.checkBox.keys():
             uistate.checkBox[key] = (state == 2)
-        self.setGraph()
+        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
     def setUIstate(self):
@@ -1036,7 +1036,7 @@ class UIsub(Ui_MainWindow):
             selected_indices = list(uistate.selected.keys())
             self.clearGroupsByRow(selected_indices)
             self.tableUpdate()
-            self.setGraph()
+            graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         else:
             print("No files selected.")
 
@@ -1047,7 +1047,7 @@ class UIsub(Ui_MainWindow):
         self.removeAllGroupControls()
         self.defaultGroups()
         self.tableUpdate()
-        self.setGraph()
+        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def triggerNewGroup(self):
         self.usage("triggerNewGroup")
@@ -1161,7 +1161,7 @@ class UIsub(Ui_MainWindow):
             row = df_p.iloc[index.row()]
             uistate.selected[index.row()] = row['recording_name']
         print(f"uistate.selected: {uistate.selected}")
-        self.setGraph()
+        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
 
     def tableProjDoubleClicked(self):
@@ -1176,7 +1176,7 @@ class UIsub(Ui_MainWindow):
         self.purgeGroupCache(*self.dict_groups['list_ID'])
         uistate.save_cfg()
         self.tableFormat()
-        self.setGraph()
+        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def checkBox_norm_EPSP_changed(self, state):
         self.usage("checkBox_norm_EPSP_changed")
@@ -1188,7 +1188,7 @@ class UIsub(Ui_MainWindow):
         uistate.checkBox['norm_EPSP'] = norm
         uistate.save_cfg()
         self.purgeGroupCache(*self.dict_groups['list_ID'])
-        self.setGraph()
+        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def editNormRange(self, lineEdit):
         self.usage("editNormRange")
@@ -1216,7 +1216,7 @@ class UIsub(Ui_MainWindow):
         self.normOutputs()
         self.purgeGroupCache(*self.dict_groups['list_ID'])
         self.tableFormat()
-        self.setGraph()
+        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         print(f"editNormRange: {uistate.lineEdit['norm_EPSP_on']}")
     
     def normOutputs(self): # TODO: also norm diffs (paired stim) when applicable
@@ -1371,7 +1371,7 @@ class UIsub(Ui_MainWindow):
         print(f"df_p post-delete: {df_p}")
         self.set_df_project(df_p)
         self.tableUpdate()
-        self.setGraph()
+        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def parseData(self): # parse data files and modify self.df_project accordingly
         df_p = self.get_df_project()
@@ -1431,7 +1431,7 @@ class UIsub(Ui_MainWindow):
                 already_flipped.append(index_pair)
                 self.set_df_project(df_p)
                 self.tableUpdate()
-                self.setGraph()
+                graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         else:
             print("No files selected.")
 
@@ -1478,7 +1478,7 @@ class UIsub(Ui_MainWindow):
             print(f"groupCheckboxChanged: {state}, {group}")
         uistate.group_show[group] = state == 2
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
-        self.setGraph()
+        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
 
     def addToGroup(self, add_group):
@@ -1505,7 +1505,7 @@ class UIsub(Ui_MainWindow):
             self.save_df_project()
             self.purgeGroupCache(add_group)
             self.tableUpdate()
-            self.setGraph()
+            graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         else:
             print("No files selected.")
 
@@ -1561,7 +1561,7 @@ class UIsub(Ui_MainWindow):
             uistate.reset()
             uistate.save_cfg(projectfolder=self.dict_folders['project'])
             self.tableFormat()
-            self.setGraph()
+            graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def renameProject(self): # changes name of project folder and updates .cfg
         #self.dict_folders['project'].mkdir(exist_ok=True)
@@ -1592,7 +1592,7 @@ class UIsub(Ui_MainWindow):
         return self.df_project
 
     def load_df_project(self): # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
-        self.clearGraph()
+        self.graphMainWipe()
         self.resetCacheDicts() # clear internal caches
         self.projectname = self.dict_folders['project'].stem
         self.dict_folders = self.build_dict_folders()
@@ -1890,8 +1890,8 @@ class UIsub(Ui_MainWindow):
         return dfoutput
 
 
-# Graph handling
-    def clearGraph(self): # removes all data from main_canvas_mean - TODO: deprecated?
+# Maingraph handling
+    def graphMainWipe(self): # removes all data from main_canvas_mean - TODO: deprecated? Used by load_df_project!
         if hasattr(self, "main_canvas_mean"):
             self.main_canvas_mean.axes.cla()
             self.main_canvas_mean.draw()
@@ -1899,16 +1899,7 @@ class UIsub(Ui_MainWindow):
             self.main_canvas_output.axes.cla()
             self.main_canvas_output.draw()
 
-    def setGraph(self): # plot selected row(s), or clear graph if empty
-        if uistate.selected:
-            selected_indices = list(uistate.selected.keys())
-            df_select = self.df_project.loc[selected_indices]
-        else: # placeholder df to prevent key error when no rows are selected
-            df_select = pd.DataFrame().assign(sweeps=[])
-        #self.clearGraph()
-        if not uistate.anyView():
-            print("No aspects selected.")
-            return
+    def graphMainAxes(self): # plot selected row(s), or clear graph if empty
         self.axm = self.main_canvas_mean.axes
         ax1 = self.main_canvas_output.axes
         if hasattr(self, "ax2"): # remove ax2 if it exists
@@ -1916,20 +1907,19 @@ class UIsub(Ui_MainWindow):
         ax2 = ax1.twinx()
         self.ax2 = ax2  # Store the ax2 instance
         self.ax1 = ax1
-
-        # connect scroll event if not already connected #TODO: when setGraph is updated to be called only once, the check should be redundant
+        # connect scroll event if not already connected #TODO: when graphMainAxes is called only once, the check should be redundant
         if not hasattr(self, 'scroll_event_connected') or not self.scroll_event_connected:
             self.main_canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.graphMean, canvas=self.main_canvas_mean, ax1=self.main_canvas_mean.axes))
             self.main_canvas_output.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.main_canvas_output, ax1=self.ax1, ax2=self.ax2))
             self.scroll_event_connected = True
-        
-        graphUpdate(axm=self.main_canvas_mean.axes, ax1=ax1, ax2=ax2, df=df_select)
+        graphReplot(axm=self.axm, ax1=ax1, ax2=ax2)
+    
+    def graphMainSet(self, row=None): # select and plot row
+        self.usage("graphMainSet")
+        if row is not None:
+            graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2, row=row)
 
-        #self.main_canvas_mean.draw()
-        #self.main_canvas_output.draw()
-
-
-    def setGraphGroups(self, ax1, ax2, list_color):
+    def setGraphGroups(self, ax1, ax2, list_color): # TODO: depreacte
         print(f"setGraphGroups: {self.dict_groups['list_ID']}")
         df_p = self.get_df_project()
         for i_color, group in enumerate(self.dict_groups['list_ID']):
@@ -2629,7 +2619,7 @@ class Measure_window_sub(Ui_measure_window):
                         group_path = Path(f"{self.parent.dict_folders['cache']}/{group}.csv")
                         if group_path.exists():
                             group_path.unlink()
-            self.parent.setGraph(df_p.iloc[idx]) # draw the updated row
+            self.parent.graphMainSet(row=df_p.iloc[idx]) # draw the updated row
 
         # Error handling        
         elif len(idx) < 1: # If no matching row is found
@@ -2884,13 +2874,19 @@ def get_signals(source):
                 print(f"{key} [{clsname}]")
 
 
+def graphUpdate(axm, ax1, ax2, df=None):
+    # toggle show/hide of lines on axm, ax1 and ax2: show only selected and imported lines, only appropriate aspects
+    print("graphUpdate")
+    graphReplot(axm, ax1, ax2, df=df)
 
-def graphUpdate(axm, ax1, ax2, df):
+
+def graphReplot(axm, ax1, ax2, df=None):
     if df is None: # unless fed a specific row, make a list of the selected
         selected_indices = list(uistate.selected.keys())
         df_select = uisub.get_df_project().loc[selected_indices]    
     # remove lines that are not imported
-    df_select = df[df['sweeps'] != "..."]
+    else:
+        df_select = df[df['sweeps'] != "..."]
     if df_select.empty:
         return
     if uistate.zoom['output_xlim'][1] is None:
@@ -2902,19 +2898,19 @@ def graphUpdate(axm, ax1, ax2, df):
     dict_old_ax1 = [item for item in ax1.get_children() if isinstance(item, Line2D)]
     dict_old_ax2 = [item for item in ax2.get_children() if isinstance(item, Line2D)]
 
-    # make dicts of all the lines that are supposed to be on axm, ax1 and ax2 - index : label
+    # make dicts of all the lines that are supposed to be on axm, ax1 and ax2 - label: index
     df_p = uisub.get_df_project()
-    dict_new_axm = uistate.dict_axm(df_p)
-    new_ax1 = uistate.list_ax1(df_p)
-    new_ax2 = uistate.list_ax2(df_p)
+    dict_new_axm = uistate.to_axm(df_p)
+    dict_new_ax1 = uistate.to_ax1(df_p)
+    dict_new_ax2 = uistate.to_ax2(df_p)
 
-    print (f"dict_old_axm keys: {list(dict_old_axm.keys())}, new_axm: {dict_new_axm.values()}")
+    print (f"dict_old_axm keys: {list(dict_old_axm.keys())}, new_axm: {dict_new_axm.keys()}")
     # if a key in dict_old_axm is not in new_axm, remove it
     for label, line in dict_old_axm.items():
-        if label not in dict_new_axm.values():
+        if label not in dict_new_axm.keys():
             line.remove()
     # if a key in new_axm is not in dict_old_axm, add it
-    for index, label in dict_new_axm.items():
+    for label, index in dict_new_axm.items():
         if label not in dict_old_axm.keys():
             row = df_select.loc[index]
             dfmean = uisub.get_dfmean(row=row)
@@ -2949,32 +2945,18 @@ def graphUpdate(axm, ax1, ax2, df):
     axm.figure.canvas.draw()
     ax1.figure.canvas.draw()
     
-    return
-    for i, row in df_select.iterrows():
-        dict_row = df_select.loc[i].to_dict()
-        dfmean = uisub.get_dfmean(row=row)
-        if uistate.checkBox['paired_stims']:
-            dfoutput = uisub.get_dfdiff(row=row)
-        else:
-            dfoutput = uisub.get_dfoutput(row=row)
-        if dfoutput is None:
-            return
-        # Make sure the norm columns exist
-        if uistate.checkBox['norm_EPSP'] and "EPSP_amp_norm" not in dfoutput.columns:
-            uisub.normOutputs()
-        uiplot.graph(dict_row=dict_row, dfmean=dfmean, dfoutput=dfoutput, axm=axm, ax1=ax1, ax2=ax2)
-        #uisub.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2)
-        # if just one selected, plot its group's mean
-        # if len(df_analyzed) == 1:
-        #     list_group = df_analyzed['groups'].iloc[0].split(',')
-        #     for group in list_group:
-        #         if group != " ":
-        #             df_groupmean = self.get_dfgroupmean(key_group=group)
-        #             if not df_groupmean.empty and uistate.group_show[group]:
-        #                 group_index = self.dict_groups['list_ID'].index(group)
-        #                 color = self.dict_groups['list_group_colors'][group_index]
-        #                 self.plotGroup(ax1, ax2, group, color, alpha=0.05)
-    #else: # if none of the selected are analyzed, plot groups instead
+    #uisub.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2)
+    # if just one selected, plot its group's mean
+    # if len(df_analyzed) == 1:
+    #     list_group = df_analyzed['groups'].iloc[0].split(',')
+    #     for group in list_group:
+    #         if group != " ":
+    #             df_groupmean = self.get_dfgroupmean(key_group=group)
+    #             if not df_groupmean.empty and uistate.group_show[group]:
+    #                 group_index = self.dict_groups['list_ID'].index(group)
+    #                 color = self.dict_groups['list_group_colors'][group_index]
+    #                 self.plotGroup(ax1, ax2, group, color, alpha=0.05)
+    # else: # if none of the selected are analyzed, plot groups instead
     #    if self.dict_groups['list_ID']:
     #        self.setGraphGroups(ax1, ax2, self.dict_groups['list_group_colors'])
 
@@ -3101,5 +3083,5 @@ if __name__ == "__main__":
     main_window = QtWidgets.QMainWindow()
     uisub = UIsub(main_window)
     main_window.show()
-    uisub.setGraph()
+    uisub.graphMainAxes() # set up axes for the graphs
     sys.exit(app.exec_())
