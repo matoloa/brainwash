@@ -1153,6 +1153,7 @@ class UIsub(Ui_MainWindow):
         t0 = time.time()
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableProj.clearSelection()
+            print("Right click")
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         df_p = self.get_df_project()
         # build the dict uistate.selected: key=index, value=recording_name
@@ -1912,12 +1913,29 @@ class UIsub(Ui_MainWindow):
             self.main_canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.graphMean, canvas=self.main_canvas_mean, ax1=self.main_canvas_mean.axes))
             self.main_canvas_output.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.main_canvas_output, ax1=self.ax1, ax2=self.ax2))
             self.scroll_event_connected = True
-        graphReplot(axm=self.axm, ax1=ax1, ax2=ax2)
+        self.graphMainPreload()
     
-    def graphMainSet(self, row=None): # select and plot row
+    def graphMainSet(self, row=None): # select and (re) plot one row
         self.usage("graphMainSet")
         if row is not None:
             graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2, row=row)
+
+    def graphMainPreload(self): # plot and hide all imported rows in df_project
+        self.usage("graphMainPreload")
+        df_p = self.get_df_project()
+        df = df_p.loc[df_p['sweeps'] != "..."]
+        for i, row in df.iterrows():
+            dfmean = uisub.get_dfmean(row=row)
+            if uistate.checkBox['paired_stims']:
+                dfoutput = uisub.get_dfdiff(row=row)
+            else:
+                dfoutput = uisub.get_dfoutput(row=row)
+            if dfoutput is None:
+                return
+            uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+            print(f"Preloaded {row['recording_name']}")
+        uiplot.hideAll(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def setGraphGroups(self, ax1, ax2, list_color): # TODO: depreacte
         print(f"setGraphGroups: {self.dict_groups['list_ID']}")
@@ -2877,8 +2895,55 @@ def get_signals(source):
 def graphUpdate(axm, ax1, ax2, df=None):
     # toggle show/hide of lines on axm, ax1 and ax2: show only selected and imported lines, only appropriate aspects
     print("graphUpdate")
-    graphReplot(axm, ax1, ax2, df=df)
+    #graphReplot(axm, ax1, ax2, df=df)
+    if df is None: # unless fed a specific row, make a list of the selected
+        selected_indices = list(uistate.selected.keys())
+        df = uisub.get_df_project().loc[selected_indices]    
+    else: # remove lines that are not imported
+        df = df[df['sweeps'] != "..."]
+    if df.empty:
+        uiplot.hideAll(axm, ax1, ax2)
 
+    # axm, set visibility of lines and build legend
+    graphLegend(axis=axm, selected=uistate.to_axm(df))
+    graphLegend(axis=ax1, selected=uistate.to_ax1(df))
+    graphLegend(axis=ax2, selected=uistate.to_ax2(df))
+
+    # arrange axes and labels
+    axm.set_xlabel("Time (s)")
+    axm.set_ylabel("Voltage (V)")
+    if uistate.checkBox['norm_EPSP']:
+        ax1.set_ylabel("Amplitude %")
+        ax2.set_ylabel("Slope %")
+    else:
+        ax1.set_ylabel("Amplitude (mV)")
+        ax2.set_ylabel("Slope (mV/ms)")
+    oneAxisLeft(ax1, ax2)
+    # x and y limits
+    axm.set_xlim(uistate.zoom['mean_xlim'])
+    axm.set_ylim(uistate.zoom['mean_ylim'])
+    if axm.legend_ is not None:
+        axm.legend_.remove()
+
+    if uistate.checkBox['norm_EPSP']:
+        ax1.set_ylim(0, 550)
+        ax2.set_ylim(0, 550)
+    else:
+        ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
+    sortLegend(ax1, ax2)
+    # redraw
+    axm.figure.canvas.draw()
+    ax1.figure.canvas.draw() 
+
+def graphLegend(axis, selected): # toggles visibility per selection and sets Legend of axis
+    dict_lines = {item.get_label(): item for item in axis.get_children() if isinstance(item, Line2D)}
+    dict_legend = {}
+    for label, line in dict_lines.items():
+        visible = label in selected
+        line.set_visible(visible)
+        if visible:
+            dict_legend[label] = line
+    axis.legend(dict_legend.values(), dict_legend.keys())
 
 def graphReplot(axm, ax1, ax2, df=None):
     if df is None: # unless fed a specific row, make a list of the selected
@@ -2921,29 +2986,6 @@ def graphReplot(axm, ax1, ax2, df=None):
             if dfoutput is None:
                 return
             uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=axm, ax1=ax1, ax2=ax2)
-
-    # arrange axes and labels
-    axm.set_xlabel("Time (s)")
-    axm.set_ylabel("Voltage (V)")
-    if uistate.checkBox['norm_EPSP']:
-        ax1.set_ylabel("Amplitude %")
-        ax2.set_ylabel("Slope %")
-    else:
-        ax1.set_ylabel("Amplitude (mV)")
-        ax2.set_ylabel("Slope (mV/ms)")
-    oneAxisLeft(ax1, ax2)
-    # x and y limits
-    axm.set_xlim(uistate.zoom['mean_xlim'])
-    axm.set_ylim(uistate.zoom['mean_ylim'])
-    if uistate.checkBox['norm_EPSP']:
-        ax1.set_ylim(0, 550)
-        ax2.set_ylim(0, 550)
-    else:
-        ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
-    sortLegend(ax1, ax2)
-    # redraw
-    axm.figure.canvas.draw()
-    ax1.figure.canvas.draw()
     
     #uisub.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2)
     # if just one selected, plot its group's mean

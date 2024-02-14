@@ -6,6 +6,12 @@ class UIplot():
         self.uistate = uistate
         print(f"UIplot instantiated {self.uistate.anyView()}")
 
+    def hideAll(self, axm, ax1, ax2):
+        for ax in [axm, ax1, ax2]:
+            for line in ax.get_lines():
+                line.set_visible(False)
+        print("All lines hidden")
+
     def graph(self, dict_row, dfmean, dfoutput, axm, ax1, ax2):
         uistate = self.uistate
         rec_name = dict_row['recording_name']
@@ -28,8 +34,9 @@ class UIplot():
         
 
 
+        # plot and hide the lineplot
         _ = sns.lineplot(ax=axm, label=label, data=dfmean, y=rec_filter, x="time", color="black")
-
+       
         # create a list of items that SHOULD be on mean canvas        
         # update the items that ARE on the list
         # remove the items other items
