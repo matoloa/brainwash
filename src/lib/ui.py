@@ -2905,9 +2905,9 @@ def graphUpdate(axm, ax1, ax2, df=None):
         uiplot.hideAll(axm, ax1, ax2)
 
     # axm, set visibility of lines and build legend
-    graphLegend(axis=axm, selected=uistate.to_axm(df))
-    graphLegend(axis=ax1, selected=uistate.to_ax1(df))
-    graphLegend(axis=ax2, selected=uistate.to_ax2(df))
+    axm_legend = graphLegend(axis=axm, selected=uistate.to_axm(df))
+    ax1_legend = graphLegend(axis=ax1, selected=uistate.to_ax1(df))
+    ax2_legend = graphLegend(axis=ax2, selected=uistate.to_ax2(df))
 
     # arrange axes and labels
     axm.set_xlabel("Time (s)")
@@ -2930,6 +2930,9 @@ def graphUpdate(axm, ax1, ax2, df=None):
         ax2.set_ylim(0, 550)
     else:
         ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
+    axm.legend(axm_legend.values(), axm_legend.keys())
+    ax1.legend(ax1_legend.values(), ax1_legend.keys())
+    ax2.legend(ax2_legend.values(), ax2_legend.keys())
     sortLegend(ax1, ax2)
     # redraw
     axm.figure.canvas.draw()
@@ -2943,7 +2946,7 @@ def graphLegend(axis, selected): # toggles visibility per selection and sets Leg
         line.set_visible(visible)
         if visible:
             dict_legend[label] = line
-    axis.legend(dict_legend.values(), dict_legend.keys())
+    return dict_legend
 
 def graphReplot(axm, ax1, ax2, df=None):
     if df is None: # unless fed a specific row, make a list of the selected
