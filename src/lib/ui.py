@@ -1033,8 +1033,7 @@ class UIsub(Ui_MainWindow):
     def triggerClearGroups(self):
         self.usage("triggerClearGroups")
         if uistate.selected:
-            selected_indices = list(uistate.selected.keys())
-            self.clearGroupsByRow(selected_indices)
+            self.clearGroupsByRow(uistate.selected)
             self.tableUpdate()
             graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         else:
@@ -1155,13 +1154,8 @@ class UIsub(Ui_MainWindow):
             self.tableProj.clearSelection()
             print("Right click")
         selected_indexes = self.tableProj.selectionModel().selectedRows()
-        df_p = self.get_df_project()
-        # build the dict uistate.selected: key=index, value=recording_name
-        uistate.selected = {}
-        for index in selected_indexes:
-            row = df_p.iloc[index.row()]
-            uistate.selected[index.row()] = row['recording_name']
-        print(f"uistate.selected: {uistate.selected}")
+        # build the list uistate.selected with indices
+        uistate.selected = [index.row() for index in selected_indexes]
         graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
 
@@ -1281,7 +1275,8 @@ class UIsub(Ui_MainWindow):
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
         if len(uistate.selected) == 1:
-            row, old_recording_name = next(iter(uistate.selected.items()))
+            df_p = self.get_df_project()
+            old_recording_name = df_p.at[uistate.selected[0], 'recording_name']
             # if the old recording name is a key in in dict_open_measure_windows
             if old_recording_name in self.dict_open_measure_windows.keys():
                 print(f"Cannot rename {old_recording_name} while it is open in a measure window.")
@@ -1292,9 +1287,8 @@ class UIsub(Ui_MainWindow):
             old_output = self.dict_folders['cache'] / (old_recording_name + "_output.csv")
             RenameDialog = InputDialogPopup()
             new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query=old_recording_name)
-             # check if the new name is a valid filename
+            # check if the new name is a valid filename
             if new_recording_name is not None and re.match(r'^[a-zA-Z0-9_ -]+$', str(new_recording_name)) is not None:
-                df_p = self.df_project
                 list_recording_names = set(df_p['recording_name'])
                 if not new_recording_name in list_recording_names: # prevent duplicates
                     new_data = self.dict_folders['data'] / (new_recording_name + ".csv")
@@ -1311,11 +1305,12 @@ class UIsub(Ui_MainWindow):
                         os.rename(old_filter, new_filter)
                     if old_output.exists():
                         os.rename(old_output, new_output)
-                    df_p.at[row, 'recording_name'] = new_recording_name
+                    df_p.at[uistate.selected[0], 'recording_name'] = new_recording_name
                     # For paired recordings: also rename any references to old_recording_name in df_p['paired_recording']
                     df_p.loc[df_p['paired_recording'] == old_recording_name, 'paired_recording'] = new_recording_name
                     self.set_df_project(df_p)
                     self.tableUpdate()
+                    graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
             else:
@@ -1328,27 +1323,27 @@ class UIsub(Ui_MainWindow):
             print("No files selected.")
             return
         # If any of the selected rows are open in a measure window, abort
-        if any(key in self.dict_open_measure_windows for key in uistate.selected):
+        if any(index in self.dict_open_measure_windows for index in uistate.selected):
             print(f"Cannot delete recordings that are open in a measure window.")
             return
-        for row, recording_name in uistate.selected:
-            sweeps = df_p.at[row, 'sweeps']
+        for index in uistate.selected:
+            df_p = self.get_df_project()
+            recording_name = df_p.at[index, 'recording_name']
+            sweeps = df_p.at[index, 'sweeps']
             if sweeps != "...": # if the file is parsed:
-                if verbose:
-                    print(f"Deleting {recording_name}...")
                 # remove from internal cache
                 if recording_name in self.dict_datas.keys():
                     print(f"Deleting {recording_name} from internal dict_datas cache...")
-                self.dict_datas.pop(recording_name, None)
+                    self.dict_datas.pop(recording_name, None)
                 if recording_name in self.dict_means.keys():
                     print(f"Deleting {recording_name} from internal dict_means cache...")
-                self.dict_means.pop(recording_name, None)
+                    self.dict_means.pop(recording_name, None)
                 if recording_name in self.dict_filters.keys():
                     print(f"Deleting {recording_name} from internal dict_filters cache...")
-                self.dict_filters.pop(recording_name, None)
+                    self.dict_filters.pop(recording_name, None)
                 if recording_name in self.dict_outputs.keys():
                     print(f"Deleting {recording_name} from internal dict_outputs cache...")
-                self.dict_outputs.pop(recording_name, None)
+                    self.dict_outputs.pop(recording_name, None)
                 # remove from disk
                 data_path = Path(self.dict_folders['data'] / (recording_name + ".csv"))
                 if data_path.exists():
@@ -1363,16 +1358,14 @@ class UIsub(Ui_MainWindow):
                 if output_path.exists():
                     output_path.unlink()
         # Regardless of whether or not there was a file, purge the row from df_project
-        selected_indices = list(uistate.selected.keys())
-        self.clearGroupsByRow(selected_indices) # clear cache so that a new group mean is calculated
+        self.clearGroupsByRow(uistate.selected) # clear cache so that a new group mean is calculated
         df_p = self.get_df_project()
-        print(f"df_p pre-delete: {df_p}")
-        df_p.drop(selected_indices, inplace=True)
+        df_p.drop(uistate.selected, inplace=True)
+        uistate.selected = []
         df_p.reset_index(inplace=True, drop=True)
-        print(f"df_p post-delete: {df_p}")
         self.set_df_project(df_p)
         self.tableUpdate()
-        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def parseData(self): # parse data files and modify self.df_project accordingly
         df_p = self.get_df_project()
@@ -1407,8 +1400,7 @@ class UIsub(Ui_MainWindow):
         if uistate.selected:
             df_p = self.get_df_project()
             already_flipped = []
-            selected_indices = list(uistate.selected.keys())
-            for index in selected_indices:
+            for index in uistate.selected:
                 row = df_p.loc[index]
                 name_rec = row['recording_name'] 
                 name_pair = row['paired_recording']
@@ -1489,9 +1481,7 @@ class UIsub(Ui_MainWindow):
         # Assign all selected recordings to group "add_group" unless they already belong to that group
         # Kill dict_group_means and csv
         if uistate.selected:
-            selected_indices = list(uistate.selected.keys())
-            list_group = ""
-            for i in selected_indices:
+            for i in uistate.selected:
                 if self.df_project.loc[i, 'groups'] == " ":
                     self.df_project.loc[i, 'groups'] = add_group
                     print(f"{self.df_project.loc[i, 'recording_name']} added to {add_group}")
@@ -2896,13 +2886,12 @@ def graphUpdate(axm, ax1, ax2, df=None):
     # toggle show/hide of lines on axm, ax1 and ax2: show only selected and imported lines, only appropriate aspects
     print("graphUpdate")
     if df is None: # unless fed specific rows, make a list of the selected
-        selected_indices = list(uistate.selected.keys())
-        df = uisub.get_df_project().loc[selected_indices]    
+        df = uisub.get_df_project().loc[uistate.selected]    
     df = df[df['sweeps'] != "..."]
     if df.empty or not uistate.anyView():
         uiplot.hideAll(axm, ax1, ax2)
     else:
-        print(f"df: {df}")
+        #print(f"df: {df}")
         # axm, set visibility of lines and build legend
         axm_legend = graphVisible(axis=axm, show=uistate.to_axm(df))
         axm.legend(axm_legend.values(), axm_legend.keys(), loc='upper right')
@@ -2935,6 +2924,7 @@ def graphUpdate(axm, ax1, ax2, df=None):
 
 def graphVisible(axis, show): # toggles visibility per selection and sets Legend of axis
     dict_lines = {item.get_label(): item for item in axis.get_children() if isinstance(item, Line2D)}
+    print(f"dict_lines: {dict_lines.keys()}")
     dict_legend = {}
     for label, line in dict_lines.items():
         visible = label in show if show else False
@@ -2946,18 +2936,21 @@ def graphVisible(axis, show): # toggles visibility per selection and sets Legend
 def graphReplot(axm, ax1, ax2, df=None):
     if df is None: # unless fed a specific row, (re)plot the whole df_project
         df_p = uisub.get_df_project()
-        df_select = df_p[df_p['sweeps'] != "..."] # remove lines that are not imported
-    if df_select.empty:
+        df_imported = df_p[df_p['sweeps'] != "..."] # remove lines that are not imported
+    if df_imported.empty:
         return
     # update output graph x limits based on max number of sweeps in df_project
     if uistate.zoom['output_xlim'][1] is None:
-        uistate.zoom['output_xlim'] = [0, df_select['sweeps'].max()]
+        uistate.zoom['output_xlim'] = [0, df_imported['sweeps'].max()]
         uistate.save_cfg(projectfolder=uisub.dict_folders['project'])
 
-    list_recs = df_select['recording_name'].tolist()
-    if uistate.plotted: # remove lines that are not in df_select
+    list_recs = df_imported['recording_name'].tolist()
+    print(f"list_recs: {list_recs}")
+    if uistate.plotted: # remove plotted lines that are not in df_select
         for rec in uistate.plotted:
+            print(f"checking {rec}...")
             if rec not in list_recs:
+                print(f"purging {rec}")
                 uiplot.purge(rec=rec, axm=axm, ax1=ax1, ax2=ax2)
                 uistate.plotted.remove(rec)
     for rec in uistate.plotted: # remove already plotted recs from list_recs
@@ -2965,7 +2958,7 @@ def graphReplot(axm, ax1, ax2, df=None):
     if not list_recs:
         return
     for rec in list_recs: # plot the remaining recs
-        row = df_select[df_select['recording_name'] == rec].iloc[0]
+        row = df_imported[df_imported['recording_name'] == rec].iloc[0]
         dfmean = uisub.get_dfmean(row=row)
         if uistate.checkBox['paired_stims']:
             dfoutput = uisub.get_dfdiff(row=row)

@@ -6,7 +6,6 @@ class UIstate:
 
     def reset(self): # reset all states to False
         self.version = "0.0.0"
-        self.selected = {} # dict of selected files {index: recording_name}
         self.axm = [] # list of items that are supposed to be on axm
         self.ax1 = [] # list of items that are supposed to be on ax1
         self.ax2 = [] # list of items that are supposed to be on ax2
@@ -41,6 +40,7 @@ class UIstate:
             'volley_slope_params_default': {},
         }
         # Do NOT persist these
+        self.selected = [] # list of selected indices
         self.plotted = []
         
     def to_axm(self,df): # lines that are supposed to be on axm - label: index
@@ -112,7 +112,6 @@ class UIstate:
     
     def set_state(self, state):
         self.version = state.get('version')
-        self.selected = state.get('selected')
         self.axm = state.get('axm')
         self.ax1 = state.get('ax1')
         self.ax2 = state.get('ax2')

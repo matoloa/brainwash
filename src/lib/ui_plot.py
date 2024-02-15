@@ -33,7 +33,6 @@ class UIplot():
         t_volley_slope = dict_row['t_volley_slope']
         t_volley_slope_size = dict_row['t_volley_slope_size']
         volley_slope_mean = dict_row['volley_slope_mean']
-        print(f"uiplot.graph - dict_row: {dict_row}")
         # plot relevant filter of dfmean on main_canvas_mean
         if rec_filter != 'voltage':
             label = f"{rec_name} ({rec_filter})"
