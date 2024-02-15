@@ -53,19 +53,54 @@ class UIstate:
                 key = f"{row['recording_name']} ({rec_filter})"
             else:
                 key = row['recording_name']
+            if self.checkBox['EPSP_amp']:
+                axm[f"{key} EPSP amp marker"] = index
+            if self.checkBox['EPSP_slope']:
+                axm[f"{key} EPSP slope marker"] = index
+            if self.checkBox['volley_amp']:
+                axm[f"{key} volley amp marker"] = index
+            if self.checkBox['volley_slope']:
+                axm[f"{key} volley slope marker"] = index
             axm[key] = index
         return axm
 
     def to_ax1(self, df_p):
         if not self.ampView():
             return
-        
-        print("ax1:", self.ax1)
+        selected_indices = list(self.selected.keys())
+        df = df_p.loc[selected_indices]
+        ax1 = {}
+        for index, row in df.iterrows():
+            rec_filter = row['filter']
+            if rec_filter != 'voltage':
+                key = f"{row['recording_name']} ({rec_filter})"
+            else:
+                key = row['recording_name']
+            if self.checkBox['EPSP_amp']:
+                ax1[f"{key} EPSP amp"] = index
+            if self.checkBox['volley_amp']:
+                ax1[f"{key} volley amp "] = index
+            ax1[key] = index
+        return ax1
 
     def to_ax2(self, df_p):
         if not self.slopeView():
             return
-        print("ax2:", self.ax2)
+        selected_indices = list(self.selected.keys())
+        df = df_p.loc[selected_indices]
+        ax2 = {}
+        for index, row in df.iterrows():
+            rec_filter = row['filter']
+            if rec_filter != 'voltage':
+                key = f"{row['recording_name']} ({rec_filter})"
+            else:
+                key = row['recording_name']
+            if self.checkBox['EPSP_slope']:
+                ax2[f"{key} EPSP slope"] = index
+            if self.checkBox['volley_slope']:
+                ax2[f"{key} volley slope "] = index
+            ax2[key] = index
+        return ax2
 
     def get_state(self):
         try:

@@ -1934,7 +1934,7 @@ class UIsub(Ui_MainWindow):
                 return
             uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
             print(f"Preloaded {row['recording_name']}")
-        uiplot.hideAll(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        #uiplot.hideAll(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def setGraphGroups(self, ax1, ax2, list_color): # TODO: depreacte
@@ -2901,50 +2901,49 @@ def graphUpdate(axm, ax1, ax2, df=None):
         df = uisub.get_df_project().loc[selected_indices]    
     else: # remove lines that are not imported
         df = df[df['sweeps'] != "..."]
-    if df.empty:
+    if df.empty or not uistate.anyView():
         uiplot.hideAll(axm, ax1, ax2)
-
-    # axm, set visibility of lines and build legend
-    axm_legend = graphLegend(axis=axm, selected=uistate.to_axm(df))
-    ax1_legend = graphLegend(axis=ax1, selected=uistate.to_ax1(df))
-    ax2_legend = graphLegend(axis=ax2, selected=uistate.to_ax2(df))
-
-    # arrange axes and labels
-    axm.set_xlabel("Time (s)")
-    axm.set_ylabel("Voltage (V)")
-    if uistate.checkBox['norm_EPSP']:
-        ax1.set_ylabel("Amplitude %")
-        ax2.set_ylabel("Slope %")
     else:
-        ax1.set_ylabel("Amplitude (mV)")
-        ax2.set_ylabel("Slope (mV/ms)")
-    oneAxisLeft(ax1, ax2)
-    # x and y limits
-    axm.set_xlim(uistate.zoom['mean_xlim'])
-    axm.set_ylim(uistate.zoom['mean_ylim'])
-    if axm.legend_ is not None:
-        axm.legend_.remove()
+        # axm, set visibility of lines and build legend
+        axm_legend = graphVisible(axis=axm, selected=uistate.to_axm(df))
+        ax1_legend = graphVisible(axis=ax1, selected=uistate.to_ax1(df))
+        ax2_legend = graphVisible(axis=ax2, selected=uistate.to_ax2(df))
 
-    if uistate.checkBox['norm_EPSP']:
-        ax1.set_ylim(0, 550)
-        ax2.set_ylim(0, 550)
-    else:
-        ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
-    axm.legend(axm_legend.values(), axm_legend.keys())
-    ax1.legend(ax1_legend.values(), ax1_legend.keys())
-    ax2.legend(ax2_legend.values(), ax2_legend.keys())
-    sortLegend(ax1, ax2)
+        # arrange axes and labels
+        axm.set_xlabel("Time (s)")
+        axm.set_ylabel("Voltage (V)")
+        if uistate.checkBox['norm_EPSP']:
+            ax1.set_ylabel("Amplitude %")
+            ax2.set_ylabel("Slope %")
+        else:
+            ax1.set_ylabel("Amplitude (mV)")
+            ax2.set_ylabel("Slope (mV/ms)")
+        oneAxisLeft(ax1, ax2)
+        # x and y limits
+        axm.set_xlim(uistate.zoom['mean_xlim'])
+        axm.set_ylim(uistate.zoom['mean_ylim'])
+        if axm.legend_ is not None:
+            axm.legend_.remove()
+
+        if uistate.checkBox['norm_EPSP']:
+            ax1.set_ylim(0, 550)
+            ax2.set_ylim(0, 550)
+        else:
+            ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
+        axm.legend(axm_legend.values(), axm_legend.keys(), loc='upper right')
+        ax1.legend(ax1_legend.values(), ax1_legend.keys(), loc='upper right')
+        ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
     # redraw
     axm.figure.canvas.draw()
     ax1.figure.canvas.draw() 
 
-def graphLegend(axis, selected): # toggles visibility per selection and sets Legend of axis
+def graphVisible(axis, selected): # toggles visibility per selection and sets Legend of axis
     dict_lines = {item.get_label(): item for item in axis.get_children() if isinstance(item, Line2D)}
     dict_legend = {}
     for label, line in dict_lines.items():
         visible = label in selected
         line.set_visible(visible)
-        if visible:
+        if visible and not label.endswith(" marker"):
             dict_legend[label] = line
     return dict_legend
 
@@ -3088,15 +3087,6 @@ def oneAxisLeft(ax1, ax2):
     else:
         ax2.yaxis.set_label_position("right")
         ax2.yaxis.set_ticks_position("right")
-
-
-def sortLegend(ax1, ax2):
-    handles, labels = ax1.get_legend_handles_labels()
-    if labels:
-        ax1.legend(loc='upper right')
-    handles, labels = ax2.get_legend_handles_labels()
-    if labels:
-        ax2.legend(loc='lower right')
 
 
 def unPlot(canvas, *artists): # Remove line if it exists on canvas
