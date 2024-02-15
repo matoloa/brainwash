@@ -28,8 +28,8 @@ class UIstate:
             'mean_xlim': (0.006, 0.020),
             'mean_ylim': (-0.001, 0.0002),
             'output_xlim': (0, None),
-            'output_ax1_ylim': (0, None),
-            'output_ax2_ylim': (0, None),
+            'output_ax1_ylim': (0, 1.2),
+            'output_ax2_ylim': (0, 1.2),
         }
         self.default = {
             'last_edit_mode': 'EPSP_slope',
@@ -40,12 +40,10 @@ class UIstate:
             'volley_slope_method_default': {},
             'volley_slope_params_default': {},
         }
-
-    def to_axm(self, df_p): # lines that are supposed to be on axm - label: index
-        if not self.anyView():
-            return
-        selected_indices = list(self.selected.keys())
-        df = df_p.loc[selected_indices]
+        # Do NOT persist these
+        self.plotted = []
+        
+    def to_axm(self,df): # lines that are supposed to be on axm - label: index
         axm = {}
         for index, row in df.iterrows():
             rec_filter = row['filter']
@@ -64,41 +62,33 @@ class UIstate:
             axm[key] = index
         return axm
 
-    def to_ax1(self, df_p):
-        if not self.ampView():
-            return
-        selected_indices = list(self.selected.keys())
-        df = df_p.loc[selected_indices]
+    def to_ax1(self, df):
         ax1 = {}
         for index, row in df.iterrows():
-            rec_filter = row['filter']
-            if rec_filter != 'voltage':
-                key = f"{row['recording_name']} ({rec_filter})"
+            key = row['recording_name']
+            if self.checkBox['norm_EPSP']:
+                norm = " norm"
             else:
-                key = row['recording_name']
+                norm = ""
             if self.checkBox['EPSP_amp']:
-                ax1[f"{key} EPSP amp"] = index
+                ax1[f"{key} EPSP amp{norm}"] = index
             if self.checkBox['volley_amp']:
-                ax1[f"{key} volley amp "] = index
+                ax1[f"{key} volley amp mean"] = index
             ax1[key] = index
         return ax1
 
-    def to_ax2(self, df_p):
-        if not self.slopeView():
-            return
-        selected_indices = list(self.selected.keys())
-        df = df_p.loc[selected_indices]
+    def to_ax2(self, df):
         ax2 = {}
         for index, row in df.iterrows():
-            rec_filter = row['filter']
-            if rec_filter != 'voltage':
-                key = f"{row['recording_name']} ({rec_filter})"
+            key = row['recording_name']
+            if self.checkBox['norm_EPSP']:
+                norm = " norm"
             else:
-                key = row['recording_name']
+                norm = ""
             if self.checkBox['EPSP_slope']:
-                ax2[f"{key} EPSP slope"] = index
+                ax2[f"{key} EPSP slope{norm}"] = index
             if self.checkBox['volley_slope']:
-                ax2[f"{key} volley slope "] = index
+                ax2[f"{key} volley slope mean"] = index
             ax2[key] = index
         return ax2
 
@@ -161,17 +151,16 @@ class UIstate:
             data['version'] = bw_version
         if not path_pkl.parent.exists():
             path_pkl.parent.mkdir(parents=True, exist_ok=True)
-        print(f"Saving project config to {path_pkl}: {data}")
         with open(path_pkl, 'wb') as f:
             pickle.dump(data, f)
 
     def ampView(self):
         show = self.checkBox
-        return (show['EPSP_amp'] or show['volley_amp'])
+        return (show['EPSP_amp'])
     
     def slopeView(self):
         show = self.checkBox
-        return (show['EPSP_slope'] or show['volley_slope'])
+        return (show['EPSP_slope'])
     
     def slopeOnly(self):
         show = self.checkBox

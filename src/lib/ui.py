@@ -1399,8 +1399,9 @@ class UIsub(Ui_MainWindow):
                 rows2add = pd.concat(rows, axis=1).transpose()
                 print("rows2add:", rows2add[['recording_name', 'sweeps']])
                 df_p = pd.concat([update_frame, rows2add]).reset_index(drop=True)
-                self.set_df_project(df_p)
-                self.tableUpdate()
+        self.set_df_project(df_p)
+        self.tableUpdate()
+        graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def flipCI(self):
         if uistate.selected:
@@ -1432,7 +1433,7 @@ class UIsub(Ui_MainWindow):
                 already_flipped.append(index_pair)
                 self.set_df_project(df_p)
                 self.tableUpdate()
-                graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+            graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         else:
             print("No files selected.")
 
@@ -1692,7 +1693,6 @@ class UIsub(Ui_MainWindow):
         recording_name = row['recording_name']
         if recording_name in self.dict_outputs: #1: Return cached
             return self.dict_outputs[recording_name]
-
         str_output_path = f"{self.dict_folders['cache']}/{recording_name}_output.csv"
         if Path(str_output_path).exists(): #2: Read from file
             dfoutput = pd.read_csv(str_output_path)
@@ -1876,18 +1876,21 @@ class UIsub(Ui_MainWindow):
         dict_t['t_EPSP_slope_size'] = uistate.default['EPSP_slope_size_default']
         dict_t['t_volley_slope_size'] = uistate.default['volley_slope_size_default']
         for aspect, value in dict_t.items():
-            old_aspect_value = df_p.loc[row.name, aspect]
+            # Get the row ID
+            row_id = row['ID']
+            old_aspect_value = df_p.loc[df_p['ID'] == row_id, aspect].values[0]
             if pd.notna(old_aspect_value):
-                 # if old_aspect IS a valid float, use it: replace in dict_t
+                # if old_aspect IS a valid float, use it: replace in dict_t
                 dict_t[aspect] = old_aspect_value
                 print(f"{aspect} was {old_aspect_value} in df_p, a valid float. Updated dict_t to {value}")
             else: # if old_aspect is NOT a valid float, replace df_p with dict_t
-                df_p.loc[row.name, aspect] = value
+                df_p.loc[df_p['ID'] == row_id, aspect] = value
                 print(f"{aspect} was {old_aspect_value} in df_p, NOT a valid float. Updating df_p...")
         dfoutput = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=dict_t['t_EPSP_amp'], t_EPSP_slope=dict_t['t_EPSP_slope'], t_EPSP_slope_size=dict_t['t_EPSP_slope_size'], t_volley_amp=dict_t['t_volley_amp'], t_volley_slope=dict_t['t_volley_slope'], t_volley_slope_size=dict_t['t_volley_slope_size'])
-        df_p.loc[row.name, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
-        df_p.loc[row.name, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
+        df_p.loc[df_p['ID'] == row_id, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
+        df_p.loc[df_p['ID'] == row_id, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
         self.set_df_project(df_p)
+        self.normOutput(row=row, dfoutput=dfoutput)
         return dfoutput
 
 
@@ -1917,8 +1920,7 @@ class UIsub(Ui_MainWindow):
     
     def graphMainSet(self, row=None): # select and (re) plot one row
         self.usage("graphMainSet")
-        if row is not None:
-            graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2, row=row)
+        graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2, row=row)
 
     def graphMainPreload(self): # plot and hide all imported rows in df_project
         self.usage("graphMainPreload")
@@ -1932,9 +1934,9 @@ class UIsub(Ui_MainWindow):
                 dfoutput = uisub.get_dfoutput(row=row)
             if dfoutput is None:
                 return
+            row = df_p.loc[i] # get_dfoutput updates df_project - update row!
             uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
             print(f"Preloaded {row['recording_name']}")
-        #uiplot.hideAll(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def setGraphGroups(self, ax1, ax2, list_color): # TODO: depreacte
@@ -2476,7 +2478,6 @@ class Measure_window_sub(Ui_measure_window):
             #self.ax1.lines[label2idx(self.ax1, f"old {aspect}")].set_visible(visible)
             #self.ax2.lines[label2idx(self.ax2, f"old {aspect}")].set_visible(visible)
         # TODO: Update y limits
-        sortLegend(self.ax1, self.ax2) # amplitude legends up, slopes down
         oneAxisLeft(self.ax1, self.ax2) # Update axes visibility and position
         self.canvas_mean.draw()
         self.canvas_output.draw()
@@ -2877,7 +2878,6 @@ class Measure_window_sub(Ui_measure_window):
             axis.lines[label2idx(axis, aspect)].remove()
         if self.new_dfoutput[aspect].notna().any():
             _ = sns.lineplot(ax=axis, label=aspect, data=self.new_dfoutput, y=aspect, x='sweep', color=graph_color, linestyle=linestyle, alpha=0.8)
-        sortLegend(self.ax1, self.ax2) # amplitude legends up, slopes down
         self.canvas_output.draw()
 
 
@@ -2895,99 +2895,89 @@ def get_signals(source):
 def graphUpdate(axm, ax1, ax2, df=None):
     # toggle show/hide of lines on axm, ax1 and ax2: show only selected and imported lines, only appropriate aspects
     print("graphUpdate")
-    #graphReplot(axm, ax1, ax2, df=df)
-    if df is None: # unless fed a specific row, make a list of the selected
+    if df is None: # unless fed specific rows, make a list of the selected
         selected_indices = list(uistate.selected.keys())
         df = uisub.get_df_project().loc[selected_indices]    
-    else: # remove lines that are not imported
-        df = df[df['sweeps'] != "..."]
+    df = df[df['sweeps'] != "..."]
     if df.empty or not uistate.anyView():
         uiplot.hideAll(axm, ax1, ax2)
     else:
+        print(f"df: {df}")
         # axm, set visibility of lines and build legend
-        axm_legend = graphVisible(axis=axm, selected=uistate.to_axm(df))
-        ax1_legend = graphVisible(axis=ax1, selected=uistate.to_ax1(df))
-        ax2_legend = graphVisible(axis=ax2, selected=uistate.to_ax2(df))
-
-        # arrange axes and labels
-        axm.set_xlabel("Time (s)")
-        axm.set_ylabel("Voltage (V)")
-        if uistate.checkBox['norm_EPSP']:
-            ax1.set_ylabel("Amplitude %")
-            ax2.set_ylabel("Slope %")
-        else:
-            ax1.set_ylabel("Amplitude (mV)")
-            ax2.set_ylabel("Slope (mV/ms)")
-        oneAxisLeft(ax1, ax2)
-        # x and y limits
-        axm.set_xlim(uistate.zoom['mean_xlim'])
-        axm.set_ylim(uistate.zoom['mean_ylim'])
-        if axm.legend_ is not None:
-            axm.legend_.remove()
-
-        if uistate.checkBox['norm_EPSP']:
-            ax1.set_ylim(0, 550)
-            ax2.set_ylim(0, 550)
-        else:
-            ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
+        axm_legend = graphVisible(axis=axm, show=uistate.to_axm(df))
         axm.legend(axm_legend.values(), axm_legend.keys(), loc='upper right')
+        ax1_legend = graphVisible(axis=ax1, show=uistate.to_ax1(df))
         ax1.legend(ax1_legend.values(), ax1_legend.keys(), loc='upper right')
+        ax2_legend = graphVisible(axis=ax2, show=uistate.to_ax2(df))
         ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
+
+    # arrange axes and labels
+    axm.set_xlabel("Time (s)")
+    axm.set_ylabel("Voltage (V)")
+    # x and y limits
+    axm.set_xlim(uistate.zoom['mean_xlim'])
+    axm.set_ylim(uistate.zoom['mean_ylim'])
+
+    if uistate.checkBox['norm_EPSP']:
+        ax1.set_ylabel("Amplitude %")
+        ax2.set_ylabel("Slope %")
+        ax1.set_ylim(0, 550)
+        ax2.set_ylim(0, 550)
+    else:
+        ax1.set_ylabel("Amplitude (mV)")
+        ax2.set_ylabel("Slope (mV/ms)")
+        ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
+        ax2.set_ylim(uistate.zoom['output_ax2_ylim'])
+    oneAxisLeft(ax1, ax2)
     # redraw
     axm.figure.canvas.draw()
-    ax1.figure.canvas.draw() 
+    ax1.figure.canvas.draw() # ax2 should be on the same canvas
 
-def graphVisible(axis, selected): # toggles visibility per selection and sets Legend of axis
+def graphVisible(axis, show): # toggles visibility per selection and sets Legend of axis
     dict_lines = {item.get_label(): item for item in axis.get_children() if isinstance(item, Line2D)}
     dict_legend = {}
     for label, line in dict_lines.items():
-        visible = label in selected
+        visible = label in show if show else False
         line.set_visible(visible)
         if visible and not label.endswith(" marker"):
             dict_legend[label] = line
     return dict_legend
 
 def graphReplot(axm, ax1, ax2, df=None):
-    if df is None: # unless fed a specific row, make a list of the selected
-        selected_indices = list(uistate.selected.keys())
-        df_select = uisub.get_df_project().loc[selected_indices]    
-    # remove lines that are not imported
-    else:
-        df_select = df[df['sweeps'] != "..."]
+    if df is None: # unless fed a specific row, (re)plot the whole df_project
+        df_p = uisub.get_df_project()
+        df_select = df_p[df_p['sweeps'] != "..."] # remove lines that are not imported
     if df_select.empty:
         return
+    # update output graph x limits based on max number of sweeps in df_project
     if uistate.zoom['output_xlim'][1] is None:
         uistate.zoom['output_xlim'] = [0, df_select['sweeps'].max()]
         uistate.save_cfg(projectfolder=uisub.dict_folders['project'])
 
-    # make dicts of all the lines currently on axm, ax1 and ax2 - label : object
-    dict_old_axm = {item.get_label(): item for item in axm.get_children() if isinstance(item, Line2D)}
-    dict_old_ax1 = [item for item in ax1.get_children() if isinstance(item, Line2D)]
-    dict_old_ax2 = [item for item in ax2.get_children() if isinstance(item, Line2D)]
-
-    # make dicts of all the lines that are supposed to be on axm, ax1 and ax2 - label: index
-    df_p = uisub.get_df_project()
-    dict_new_axm = uistate.to_axm(df_p)
-    dict_new_ax1 = uistate.to_ax1(df_p)
-    dict_new_ax2 = uistate.to_ax2(df_p)
-
-    print (f"dict_old_axm keys: {list(dict_old_axm.keys())}, new_axm: {dict_new_axm.keys()}")
-    # if a key in dict_old_axm is not in new_axm, remove it
-    for label, line in dict_old_axm.items():
-        if label not in dict_new_axm.keys():
-            line.remove()
-    # if a key in new_axm is not in dict_old_axm, add it
-    for label, index in dict_new_axm.items():
-        if label not in dict_old_axm.keys():
-            row = df_select.loc[index]
-            dfmean = uisub.get_dfmean(row=row)
-            if uistate.checkBox['paired_stims']:
-                dfoutput = uisub.get_dfdiff(row=row)
-            else:
-                dfoutput = uisub.get_dfoutput(row=row)
-            if dfoutput is None:
-                return
-            uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=axm, ax1=ax1, ax2=ax2)
+    list_recs = df_select['recording_name'].tolist()
+    if uistate.plotted: # remove lines that are not in df_select
+        for rec in uistate.plotted:
+            if rec not in list_recs:
+                uiplot.purge(rec=rec, axm=axm, ax1=ax1, ax2=ax2)
+                uistate.plotted.remove(rec)
+    for rec in uistate.plotted: # remove already plotted recs from list_recs
+        list_recs.remove(rec)
+    if not list_recs:
+        return
+    for rec in list_recs: # plot the remaining recs
+        row = df_select[df_select['recording_name'] == rec].iloc[0]
+        dfmean = uisub.get_dfmean(row=row)
+        if uistate.checkBox['paired_stims']:
+            dfoutput = uisub.get_dfdiff(row=row)
+        else:
+            dfoutput = uisub.get_dfoutput(row=row)
+        if dfoutput is None:
+            return
+        df_p = uisub.get_df_project() # get_dfoutput updates df_project - update row!
+        row = df_p[df_p['recording_name'] == rec].iloc[0]
+        uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=axm, ax1=ax1, ax2=ax2)
+        uistate.plotted.append(rec)
+    graphUpdate(axm, ax1, ax2)
     
     #uisub.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2)
     # if just one selected, plot its group's mean
@@ -3003,8 +2993,6 @@ def graphReplot(axm, ax1, ax2, df=None):
     # else: # if none of the selected are analyzed, plot groups instead
     #    if self.dict_groups['list_ID']:
     #        self.setGraphGroups(ax1, ax2, self.dict_groups['list_group_colors'])
-
-
 
 
 def zoomOnScroll(event, parent, canvas, ax1=None, ax2=None):
@@ -3069,6 +3057,8 @@ def zoomReset(canvas, out=False):
                 ax.set_ylim(uistate.zoom['output_ax1_ylim'])
             elif ax.get_ylabel() == "Slope (mV/ms)":
                 ax.set_ylim(uistate.zoom['output_ax2_ylim'])
+            df_p = uisub.get_df_project()
+            uistate.zoom['output_xlim'] = [0, df_p['sweeps'].max()]
             ax.set_xlim(uistate.zoom['output_xlim'])
     else:
         canvas.axes.set_xlim(uistate.zoom['mean_xlim'])
