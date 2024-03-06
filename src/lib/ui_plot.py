@@ -19,8 +19,13 @@ class UIplot():
         # remove() all lines with labels that start with rec, from axm, ax1, ax2
         for ax in [axm, ax1, ax2]:
             for line in ax.get_lines():
-                if line.get_label().startswith(rec):
+                label = line.get_label()
+                if label.startswith(rec):
+                    print(f"Removing line {label}")
                     line.remove()
+                    if label == rec:
+                        self.uistate.plotted.remove(label)
+
 
     def graph(self, dict_row, dfmean, dfoutput, axm, ax1, ax2):
         rec_name = dict_row['recording_name']
@@ -38,9 +43,10 @@ class UIplot():
             label = f"{rec_name} ({rec_filter})"
         else:
             label = rec_name
-        # persist a custom-named lineplot
 
+        # persist a custom-named lineplot and list in uisate.plotted
         _ = sns.lineplot(ax=axm, label=label, data=dfmean, y=rec_filter, x="time", color="black")
+        self.uistate.plotted.append(label)
    
         # plot them all, don't bother with show/hide
         out = dfoutput # TODO: enable switch to dfdiff?

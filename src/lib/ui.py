@@ -1326,8 +1326,8 @@ class UIsub(Ui_MainWindow):
         if any(index in self.dict_open_measure_windows for index in uistate.selected):
             print(f"Cannot delete recordings that are open in a measure window.")
             return
+        df_p = self.get_df_project()
         for index in uistate.selected:
-            df_p = self.get_df_project()
             recording_name = df_p.at[index, 'recording_name']
             sweeps = df_p.at[index, 'sweeps']
             if sweeps != "...": # if the file is parsed:
@@ -1357,13 +1357,14 @@ class UIsub(Ui_MainWindow):
                 output_path = Path(self.dict_folders['cache'] / (recording_name + "_output.csv"))
                 if output_path.exists():
                     output_path.unlink()
+                # remove from graphs
+                uiplot.purge(rec=recording_name, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         # Regardless of whether or not there was a file, purge the row from df_project
         self.clearGroupsByRow(uistate.selected) # clear cache so that a new group mean is calculated
-        df_p = self.get_df_project()
         df_p.drop(uistate.selected, inplace=True)
-        uistate.selected = []
         df_p.reset_index(inplace=True, drop=True)
         self.set_df_project(df_p)
+        uistate.selected = []
         self.tableUpdate()
         graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
@@ -2885,8 +2886,9 @@ def get_signals(source):
 def graphUpdate(axm, ax1, ax2, df=None):
     # toggle show/hide of lines on axm, ax1 and ax2: show only selected and imported lines, only appropriate aspects
     print("graphUpdate")
+    print("uistate.plotted: ", uistate.plotted)
     if df is None: # unless fed specific rows, make a list of the selected
-        df = uisub.get_df_project().loc[uistate.selected]    
+        df = uisub.get_df_project().loc[uistate.selected]
     df = df[df['sweeps'] != "..."]
     if df.empty or not uistate.anyView():
         uiplot.hideAll(axm, ax1, ax2)
@@ -2934,25 +2936,30 @@ def graphVisible(axis, show): # toggles visibility per selection and sets Legend
     return dict_legend
 
 def graphReplot(axm, ax1, ax2, df=None):
+    print("graphReplot")
     if df is None: # unless fed a specific row, (re)plot the whole df_project
         df_p = uisub.get_df_project()
         df_imported = df_p[df_p['sweeps'] != "..."] # remove lines that are not imported
     if df_imported.empty:
+        print("graphReplot: df_imported is empty")
+        axm.cla()
+        ax1.cla()
+        ax2.cla()
+        axm.figure.canvas.draw()
+        ax1.figure.canvas.draw()
+        ax2.figure.canvas.draw()
         return
     # update output graph x limits based on max number of sweeps in df_project
     if uistate.zoom['output_xlim'][1] is None:
         uistate.zoom['output_xlim'] = [0, df_imported['sweeps'].max()]
         uistate.save_cfg(projectfolder=uisub.dict_folders['project'])
-
     list_recs = df_imported['recording_name'].tolist()
-    print(f"list_recs: {list_recs}")
     if uistate.plotted: # remove plotted lines that are not in df_select
         for rec in uistate.plotted:
             print(f"checking {rec}...")
             if rec not in list_recs:
                 print(f"purging {rec}")
                 uiplot.purge(rec=rec, axm=axm, ax1=ax1, ax2=ax2)
-                uistate.plotted.remove(rec)
     for rec in uistate.plotted: # remove already plotted recs from list_recs
         list_recs.remove(rec)
     if not list_recs:
@@ -2969,8 +2976,7 @@ def graphReplot(axm, ax1, ax2, df=None):
         df_p = uisub.get_df_project() # get_dfoutput updates df_project - update row!
         row = df_p[df_p['recording_name'] == rec].iloc[0]
         uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=axm, ax1=ax1, ax2=ax2)
-        uistate.plotted.append(rec)
-    graphUpdate(axm, ax1, ax2)
+    graphUpdate(axm=axm, ax1=ax1, ax2=ax2)
     
     #uisub.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2)
     # if just one selected, plot its group's mean
