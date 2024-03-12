@@ -3002,11 +3002,9 @@ def graphMouseOver(event, axm): # maingraph mouseover event
     if x is None or y is None:
         return
     # When this function is called, there should be exactly one item in uistate.selected
-    # list lines on axm, startswith rec_name endswith "slope marker"
 
-
-    rec_idx = uistate.selected[0]
-    rec_name = uisub.get_df_project().loc[rec_idx, 'recording_name']
+    df_p = uisub.get_df_project()
+    rec_name = df_p.loc[uistate.selected[0], 'recording_name']
     subplots = uistate.plotted[rec_name]
     
     if event.inaxes == axm:
@@ -3016,6 +3014,7 @@ def graphMouseOver(event, axm): # maingraph mouseover event
                 if label in subplots:
                     xdata = line.get_xdata()
                     ydata = line.get_ydata()
+                    # TODO: separate x- and y match; needs both. Operate on Y value of mean at df_p slope measuring point
                     distance = np.sqrt((xdata - x)**2 + (ydata - y)**2)
                     if np.min(distance) < 0.0005:  # adjust the threshold as needed
                         print(f"Mouse is over the graph: x={x}, y={y}")
