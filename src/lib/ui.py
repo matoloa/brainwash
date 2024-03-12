@@ -1156,6 +1156,12 @@ class UIsub(Ui_MainWindow):
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         # build the list uistate.selected with indices
         uistate.selected = [index.row() for index in selected_indexes]
+        # drop any prior mouseOver event connections
+        if hasattr(self, 'mouseOver'):
+            self.main_canvas_mean.mpl_disconnect(self.mouseOver)
+        # if only one item is selected, make a new mouseOver event connection
+        if len(uistate.selected) == 1:
+            self.mouseOver = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseOver(event=event, axm=self.axm))
         graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
 
@@ -1970,6 +1976,7 @@ class UIsub(Ui_MainWindow):
         if event.inaxes is not None:
             if event.button == 2:
                 zoomReset(canvas=canvas, out=out)
+
 
 
 # MeasureWindow
@@ -2987,6 +2994,32 @@ def graphReplot(axm, ax1, ax2, df=None, row=None): # TODO: allow update of only 
     # else: # if none of the selected are analyzed, plot groups instead
     #    if self.dict_groups['list_ID']:
     #        self.setGraphGroups(ax1, ax2, self.dict_groups['list_group_colors'])
+
+
+def graphMouseOver(event, axm): # maingraph mouseover event
+    x = event.xdata
+    y = event.ydata
+    if x is None or y is None:
+        return
+    # When this function is called, there should be exactly one item in uistate.selected
+    # list lines on axm, startswith rec_name endswith "slope marker"
+
+
+    rec_idx = uistate.selected[0]
+    rec_name = uisub.get_df_project().loc[rec_idx, 'recording_name']
+    subplots = uistate.plotted[rec_name]
+    
+    if event.inaxes == axm:
+        for line in axm.lines:
+            label = line.get_label()
+            if label == f"{rec_name} EPSP slope marker":
+                if label in subplots:
+                    xdata = line.get_xdata()
+                    ydata = line.get_ydata()
+                    distance = np.sqrt((xdata - x)**2 + (ydata - y)**2)
+                    if np.min(distance) < 0.0005:  # adjust the threshold as needed
+                        print(f"Mouse is over the graph: x={x}, y={y}")
+                        break
 
 
 def zoomOnScroll(event, parent, canvas, ax1=None, ax2=None):
