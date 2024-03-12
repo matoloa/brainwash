@@ -1310,6 +1310,7 @@ class UIsub(Ui_MainWindow):
                     df_p.loc[df_p['paired_recording'] == old_recording_name, 'paired_recording'] = new_recording_name
                     self.set_df_project(df_p)
                     self.tableUpdate()
+                    uiplot.purge(rec=old_recording_name, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
                     graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
@@ -1886,7 +1887,7 @@ class UIsub(Ui_MainWindow):
 
 
 # Maingraph handling
-    def graphMainWipe(self): # removes all data from main_canvas_mean - TODO: deprecated? Used by load_df_project!
+    def graphMainWipe(self): # removes all plots from main_canvas_mean and main_canvas_output
         if hasattr(self, "main_canvas_mean"):
             self.main_canvas_mean.axes.cla()
             self.main_canvas_mean.draw()
@@ -2926,7 +2927,7 @@ def graphUpdate(axm, ax1, ax2, df=None):
 
 def graphVisible(axis, show): # toggles visibility per selection and sets Legend of axis
     dict_lines = {item.get_label(): item for item in axis.get_children() if isinstance(item, Line2D)}
-    print(f"dict_lines: {dict_lines.keys()}")
+    #print(f"dict_lines: {dict_lines.keys()}")
     dict_legend = {}
     for label, line in dict_lines.items():
         visible = label in show if show else False
@@ -2935,35 +2936,29 @@ def graphVisible(axis, show): # toggles visibility per selection and sets Legend
             dict_legend[label] = line
     return dict_legend
 
-def graphReplot(axm, ax1, ax2, df=None):
+def graphReplot(axm, ax1, ax2, df=None, row=None): # TODO: allow update of only specific row
     print("graphReplot")
     if df is None: # unless fed a specific row, (re)plot the whole df_project
         df_p = uisub.get_df_project()
         df_imported = df_p[df_p['sweeps'] != "..."] # remove lines that are not imported
     if df_imported.empty:
         print("graphReplot: df_imported is empty")
-        axm.cla()
-        ax1.cla()
-        ax2.cla()
-        axm.figure.canvas.draw()
-        ax1.figure.canvas.draw()
-        ax2.figure.canvas.draw()
+        uisub.graphMainWipe()
         return
     # update output graph x limits based on max number of sweeps in df_project
     if uistate.zoom['output_xlim'][1] is None:
         uistate.zoom['output_xlim'] = [0, df_imported['sweeps'].max()]
         uistate.save_cfg(projectfolder=uisub.dict_folders['project'])
     list_recs = df_imported['recording_name'].tolist()
-    if uistate.plotted: # remove plotted lines that are not in df_select
-        for rec in uistate.plotted:
-            print(f"checking {rec}...")
+    if uistate.plotted: # A (mostly redundant?) check to remove plotted lines that are not in df_select
+        for rec in list(uistate.plotted.keys()): # create a list from dict keys to avoid RuntimeError
             if rec not in list_recs:
-                print(f"purging {rec}")
+                print(f"WARNING! {rec} was plotted, but not in list_rec. It should have been uiplot.purge:d upon delete - check delete sequence!")
                 uiplot.purge(rec=rec, axm=axm, ax1=ax1, ax2=ax2)
-    for rec in uistate.plotted: # remove already plotted recs from list_recs
-        list_recs.remove(rec)
-    if not list_recs:
-        return
+        for rec in list(uistate.plotted.keys()): # remove already plotted recs from list_recs
+            list_recs.remove(rec)
+        if not list_recs:
+            return
     for rec in list_recs: # plot the remaining recs
         row = df_imported[df_imported['recording_name'] == rec].iloc[0]
         dfmean = uisub.get_dfmean(row=row)

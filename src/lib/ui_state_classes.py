@@ -41,7 +41,7 @@ class UIstate:
         }
         # Do NOT persist these
         self.selected = [] # list of selected indices
-        self.plotted = []
+        self.plotted = {} # dict: key=name (also meanplot), value=list of subplots
         
     def to_axm(self,df): # lines that are supposed to be on axm - label: index
         axm = {}
