@@ -6,6 +6,7 @@ class UIstate:
 
     def reset(self): # reset all states to False
         self.version = "0.0.0"
+        self.margin = 0.5 # extra space, relative to data range, to include in mouseover zone
         self.axm = [] # list of items that are supposed to be on axm
         self.ax1 = [] # list of items that are supposed to be on ax1
         self.ax2 = [] # list of items that are supposed to be on ax2
@@ -41,13 +42,35 @@ class UIstate:
         }
         # Do NOT persist these
         self.selected = [] # list of selected indices
-        self.plotted = {} # dict: key=name (also meanplot), value=list of subplots
-        self.mouseover_aspect = None # name of the currently mouseovered aspect
-        self.mouseover_plot = None # plot of the currently mouseovered aspect
-        self.EPSP_slope_range = {} # dict: key=x/y, value=range (min, max). Set upon selection.
-        self.EPSP_slope_zone = {} # dict: key=x/y, value=range (min, max), clickzone: including margin. Set upon selection.
-        
-    def to_axm(self,df): # lines that are supposed to be on axm - label: index
+        self.plotted = {} # dict: key=name (meanplot), value=[subplots]
+        self.row_copy = None # copy of selected row from df_project
+        self.mouseover_aspect = None # name of mouseovered aspect
+        self.mouseover_plot = None # plot of mouseovered aspect
+        self.mouseover_out = None # output of dragged aspect
+        self.dragging = False # dragging state
+        self.EPSP_slope_zone = {} # dict: key=x,y, value=start,end. clickzone: including margin. Set upon selection.
+        self.EPSP_slope_range = {} # dict: key=x,y, value=min,max. Set upon selection.
+
+    def updateSlopeDrag(self, t=None, xdata=None, ydata=None): # update slope drag zone
+        # if xdata or ydata are None, use the current mouseover_plot
+        if xdata is None or ydata is None:
+            x = self.mouseover_plot[0].get_xdata()
+            y = self.mouseover_plot[0].get_ydata()
+        else:
+            x = xdata
+            y = ydata
+        x_window = min(x), max(x)
+        y_window = min(y), max(y)
+        x_margin = (max(x)-min(x)) * self.margin
+        y_margin = (max(y)-min(y)) * self.margin
+        self.EPSP_slope_range['x'] = x
+        self.EPSP_slope_range['y'] = y
+        self.EPSP_slope_zone['x'] = x_window[0]-x_margin, x_window[1]+x_margin
+        self.EPSP_slope_zone['y'] = y_window[0]-y_margin, y_window[1]+y_margin
+        if t is not None:
+            self.row_copy['t_EPSP_slope'] = t
+
+    def to_axm(self, df): # lines that are supposed to be on axm - label: index
         axm = {}
         for index, row in df.iterrows():
             rec_filter = row['filter']
