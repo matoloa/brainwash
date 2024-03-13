@@ -42,6 +42,10 @@ class UIstate:
         # Do NOT persist these
         self.selected = [] # list of selected indices
         self.plotted = {} # dict: key=name (also meanplot), value=list of subplots
+        self.mouseover_aspect = None # name of the currently mouseovered aspect
+        self.mouseover_plot = None # plot of the currently mouseovered aspect
+        self.EPSP_slope_range = {} # dict: key=x/y, value=range (min, max). Set upon selection.
+        self.EPSP_slope_zone = {} # dict: key=x/y, value=range (min, max), clickzone: including margin. Set upon selection.
         
     def to_axm(self,df): # lines that are supposed to be on axm - label: index
         axm = {}
