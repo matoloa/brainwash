@@ -1165,17 +1165,17 @@ class UIsub(Ui_MainWindow):
             rec_name = df_p.loc[uistate.selected[0], 'recording_name']
             for line in self.axm.lines:
                 if line.get_label() == f"{rec_name} EPSP slope marker":
-                    margin = 0.5  # define the margin here
                     xdata = line.get_xdata()
                     ydata = line.get_ydata()
+                    margin = 0.5 # extra space, relative to data range, to include in mouseover zone
                     x_window = min(xdata), max(xdata)
                     y_window = min(ydata), max(ydata)
-                    x_range = (max(xdata)-min(xdata))
-                    y_range = (max(ydata)-min(ydata))
+                    x_margin = (max(xdata)-min(xdata)) * margin
+                    y_margin = (max(ydata)-min(ydata)) * margin
                     uistate.EPSP_slope_range['x'] = xdata
                     uistate.EPSP_slope_range['y'] = ydata
-                    uistate.EPSP_slope_zone['x'] = x_window[0] - x_range * margin, x_window[1] + x_range * margin
-                    uistate.EPSP_slope_zone['y'] = y_window[0] - y_range * margin, y_window[1] + y_range * margin
+                    uistate.EPSP_slope_zone['x'] = x_window[0]-x_margin, x_window[1]+x_margin
+                    uistate.EPSP_slope_zone['y'] = y_window[0]-y_margin, y_window[1]+y_margin
                     self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseover(event=event, axm=self.axm, rec_name=rec_name))
         graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
