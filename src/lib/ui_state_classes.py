@@ -46,6 +46,7 @@ class UIstate:
         self.row_copy = None # copy of selected row from df_project
         self.mouseover_aspect = None # name of mouseovered aspect
         self.mouseover_plot = None # plot of mouseovered aspect
+        self.last_x = None # last x value of mouseovered aspect; prevents needless update when holding drag still
         self.mouseover_out = None # output of dragged aspect
         self.dragging = False # dragging state
         self.EPSP_slope_zone = {} # dict: key=x,y, value=start,end. clickzone: including margin. Set upon selection.
@@ -67,8 +68,6 @@ class UIstate:
         self.EPSP_slope_range['y'] = y
         self.EPSP_slope_zone['x'] = x_window[0]-x_margin, x_window[1]+x_margin
         self.EPSP_slope_zone['y'] = y_window[0]-y_margin, y_window[1]+y_margin
-        if t is not None:
-            self.row_copy['t_EPSP_slope'] = t
 
     def to_axm(self, df): # lines that are supposed to be on axm - label: index
         axm = {}
