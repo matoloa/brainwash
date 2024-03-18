@@ -45,17 +45,17 @@ class UIstate:
         self.plotted = {} # dict: key=name (meanplot), value=[subplots]
         self.row_copy = None # copy of selected row from df_project
         self.mouseover_aspect = None # name of mouseovered aspect
-        self.mouseover_plot = None # plot of mouseovered aspect
+        self.mouseover_EPSP_slope = None # plot of tentative EPSP slope
         self.mouseover_out = None # output of dragged aspect
         self.dragging = False # dragging state
         self.EPSP_slope_zone = {} # dict: key=x,y, value=start,end. clickzone: including margin. Set upon selection.
         self.EPSP_slope_range = {} # dict: key=x,y, value=min,max. Set upon selection.
 
     def updateSlopeDrag(self, t=None, xdata=None, ydata=None): # update slope drag zone
-        # if xdata or ydata are None, use the current mouseover_plot
+        # if xdata or ydata are None, use the current mouseover_EPSP_slope
         if xdata is None or ydata is None:
-            x = self.mouseover_plot[0].get_xdata()
-            y = self.mouseover_plot[0].get_ydata()
+            x = self.mouseover_EPSP_slope[0].get_xdata()
+            y = self.mouseover_EPSP_slope[0].get_ydata()
         else:
             x = xdata
             y = ydata
