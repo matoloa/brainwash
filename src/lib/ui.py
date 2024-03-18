@@ -1163,10 +1163,7 @@ class UIsub(Ui_MainWindow):
         if len(uistate.selected) == 1:
             df_p = self.get_df_project()
             uistate.row_copy = df_p.loc[uistate.selected[0]].copy()
-            print(f"uistate.mouseover_EPSP_slope: {uistate.mouseover_EPSP_slope}")
-            if uistate.mouseover_EPSP_slope is not None:
-                uistate.mouseover_EPSP_slope[0].remove()
-                uistate.mouseover_EPSP_slope = None
+            uistate.mouseover_out = None
             for line in self.axm.lines:
                 if line.get_label() == f"{uistate.row_copy['recording_name']} EPSP slope marker":
                     xdata = line.get_xdata()
@@ -2026,6 +2023,7 @@ class UIsub(Ui_MainWindow):
         self.main_canvas_mean.mpl_disconnect(self.mouse_drag)
         self.main_canvas_mean.mpl_disconnect(self.mouse_release)
         uistate.dragging = False
+        uistate.last_x = None
 
         # update window zone and reconnect mouseover
         uistate.updateSlopeDrag(t=event.xdata)
@@ -2063,12 +2061,16 @@ class UIsub(Ui_MainWindow):
         # self.mainDragUpdate(x=last_x, slope_size=slope_size)
 
     def mainDragUpdate(self, x, slope_size): # maingraph drag event
-        out = analysis.build_dfoutput(df=self.dffilter, t_EPSP_slope=x, t_EPSP_slope_size=slope_size)
-        if uistate.mouseover_out is None:
-            uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_slope'], color='green')
-        else:
-            uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope'])
-        self.main_canvas_output.draw()
+        if x != uistate.last_x:
+            uistate.last_x = x
+            out = analysis.build_dfoutput(df=self.dffilter, t_EPSP_slope=x, t_EPSP_slope_size=slope_size)
+            if uistate.mouseover_out is None:
+                print("Found no mouseover_out")
+                uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_slope'], color='green')
+            else:
+                uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope'])
+                print("Found mouseover_out")
+            self.main_canvas_output.draw()
 
 
 # MeasureWindow
