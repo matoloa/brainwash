@@ -1163,7 +1163,12 @@ class UIsub(Ui_MainWindow):
         if len(uistate.selected) == 1:
             df_p = self.get_df_project()
             uistate.row_copy = df_p.loc[uistate.selected[0]].copy()
-            uistate.mouseover_out = None
+            if uistate.mouseover_EPSP_slope is not None:
+                uistate.mouseover_EPSP_slope[0].remove()
+                uistate.mouseover_EPSP_slope = None
+            if uistate.mouseover_out is not None:
+                uistate.mouseover_out[0].remove()
+                uistate.mouseover_out = None
             for line in self.axm.lines:
                 if line.get_label() == f"{uistate.row_copy['recording_name']} EPSP slope marker":
                     xdata = line.get_xdata()
