@@ -1163,19 +1163,20 @@ class UIsub(Ui_MainWindow):
         if len(uistate.selected) == 1:
             df_p = self.get_df_project()
             uistate.row_copy = df_p.loc[uistate.selected[0]].copy()
+            # drop previous mouseover markers and output
             if uistate.mouseover_EPSP_slope is not None:
                 uistate.mouseover_EPSP_slope[0].remove()
                 uistate.mouseover_EPSP_slope = None
             if uistate.mouseover_out is not None:
                 uistate.mouseover_out[0].remove()
                 uistate.mouseover_out = None
+            # set new mouseover event connection
             for line in self.axm.lines:
                 if line.get_label() == f"{uistate.row_copy['recording_name']} EPSP slope marker":
                     xdata = line.get_xdata()
                     ydata = line.get_ydata()
                     uistate.updateSlopeDrag(xdata=xdata, ydata=ydata)
-                    self.dfmean = self.get_dfmean(row=uistate.row_copy)
-                    self.dffilter = self.get_dffilter(row=uistate.row_copy)
+                    self.dfmean = self.get_dfmean(row=uistate.row_copy) # ISSUE: persisted dfmean overwritten only on selecting new single line
                     self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseover(event=event, axm=self.axm))
         graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
@@ -1941,6 +1942,7 @@ class UIsub(Ui_MainWindow):
         df = df_p.loc[df_p['sweeps'] != "..."]
         for i, row in df.iterrows():
             dfmean = uisub.get_dfmean(row=row)
+            _ = uisub.get_dffilter(row=row) # cache for mouseover
             if uistate.checkBox['paired_stims']:
                 dfoutput = uisub.get_dfdiff(row=row)
             else:
@@ -2035,30 +2037,27 @@ class UIsub(Ui_MainWindow):
         self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseover(event=event, axm=self.axm))
 
         # update df_p and dfoutput
-        df_p = self.get_df_project()
         row_id = uistate.row_copy['ID']
-        # update df_p[uistate.mouseover_aspect] on row with matching ID
+        df_p = self.get_df_project()
+        print(f" - x was {df_p.loc[df_p['ID'] == row_id, uistate.mouseover_aspect].values[0]}, set to {uistate.row_copy[uistate.mouseover_aspect]}")
         df_p.loc[df_p['ID'] == row_id, uistate.mouseover_aspect] = uistate.row_copy[uistate.mouseover_aspect]
         self.set_df_project(df_p)
-        dfmean = self.get_dfmean(uistate.row_copy)
-        rec_filter = uistate.row_copy['filter']
-        rec_name = uistate.row_copy['recording_name']
 
-        if rec_filter != 'voltage':
-            label = f"{rec_name} ({rec_filter})"
-        else:
-            label = rec_name
+        rec_name = uistate.row_copy['recording_name']
+        rec_filter = uistate.row_copy['filter']
+
+        # take filters into account when labeling
+        #if rec_filter != 'voltage':
+        #    label = f"{rec_name} ({rec_filter})"
+        #else:
+        #    label = rec_name
 
         # update the graph
-        uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP slope', dfmean=dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax2)
+        uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP slope', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax2)
         
         # TODO: update dfoutput; dict and file
-
-        # dfoutput = self.get_dfoutput(uistate.row_copy)
-        # ui_plot does not have access to dfoutput; can't be done in plotUpdate
-        # accepted_handler updates of dfoutput with these lines:
-        # self.parent.dict_outputs[recording_name] = self.new_dfoutput
-        # self.parent.df2csv(df=self.new_dfoutput, rec=recording_name, key="output")
+        new_dfoutput = self.get_dfoutput(uistate.row_copy)
+        self.df2csv(df=new_dfoutput, rec=rec_name, key="output")
 
         # Reconnect these for update-only-on-release
         # last_x = event.xdata
@@ -2068,13 +2067,13 @@ class UIsub(Ui_MainWindow):
     def mainDragUpdate(self, x, slope_size): # maingraph drag event
         if x != uistate.last_x:
             uistate.last_x = x
-            out = analysis.build_dfoutput(df=self.dffilter, t_EPSP_slope=x, t_EPSP_slope_size=slope_size)
+            dffilter = self.get_dffilter(row=uistate.row_copy)
+            out = analysis.build_dfoutput(df=dffilter, t_EPSP_slope=x, t_EPSP_slope_size=slope_size)
             if uistate.mouseover_out is None:
                 print("Found no mouseover_out")
                 uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_slope'], color='green')
             else:
                 uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope'])
-                print("Found mouseover_out")
             self.main_canvas_output.draw()
 
 
@@ -3109,7 +3108,7 @@ def graphMouseover(event, axm): # maingraph mouseover event
             x_range = uistate.EPSP_slope_range['x']
             y_range = uistate.EPSP_slope_range['y']
             if uistate.mouseover_EPSP_slope is None:
-                uistate.mouseover_EPSP_slope = axm.plot(x_range, y_range, color='green', linewidth=12, alpha=0.8, label="mouseover")
+                uistate.mouseover_EPSP_slope = axm.plot(x_range, y_range, color='green', linewidth=12, alpha=0.5, label="mouseover")
             else:
                 uistate.mouseover_EPSP_slope[0].set_data(x_range, y_range)
                 uistate.mouseover_EPSP_slope[0].set_linewidth(12)
