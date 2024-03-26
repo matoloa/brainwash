@@ -3,8 +3,6 @@ import sys
 from pathlib import Path
 import yaml
 
-
-
 import numpy as np  # numeric calculations module
 import pandas as pd
 import seaborn as sns
@@ -49,17 +47,7 @@ verbose = True
 talkback = True
 hide_experimental = False # Hide experimental features
 track_widget_focus = False
-
-# for development, leave e.g. 300 pixels below program to view terminal messages, or 72 for win-mode (resolution-specific?)
-terminal_space = 372
-# Nonsense for correctly placing measurewindow on Mats work laptop;
-# TODO: windows specific offset:
-dict_screen = None
-# dict_screen = {'mw_right': 10, 'mw_down': 31}
-
-if str(socket.getfqdn()) == 'physiol-matand-lap10.physiol.local':
-    print("Useless laptop mode engaged")
-    dict_screen = {'mw_right': 10, 'mw_down': 38}
+terminal_space = 372 # for development, leave e.g. 300 pixels below program to view terminal messages, or 72 for win-mode (resolution-specific?)
 
 
 class TableModel(QtCore.QAbstractTableModel):
@@ -254,190 +242,6 @@ class QDialog_sub(QtWidgets.QDialog):
         self.dict_open_measure_windows.pop(self.windowTitle(), None)
         super(QDialog_sub, self).closeEvent(event)
 
-class Ui_measure_window(QtCore.QObject):
-    def setupUi(self, measure):
-        measure.setObjectName("measure")
-        measure.resize(654, 812)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        sizePolicy.setHorizontalStretch(1)
-        sizePolicy.setVerticalStretch(1)
-        sizePolicy.setHeightForWidth(measure.sizePolicy().hasHeightForWidth())
-        measure.setSizePolicy(sizePolicy)
-        measure.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        self.gridLayout = QtWidgets.QGridLayout(measure)
-        self.gridLayout.setObjectName("gridLayout")
-        self.measure_verticalLayout = QtWidgets.QVBoxLayout()
-        self.measure_verticalLayout.setSizeConstraint(QtWidgets.QLayout.SetNoConstraint)
-        self.measure_verticalLayout.setObjectName("measure_verticalLayout")
-        self.measure_graph_mean = QtWidgets.QWidget(measure)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.measure_graph_mean.sizePolicy().hasHeightForWidth())
-        self.measure_graph_mean.setSizePolicy(sizePolicy)
-        self.measure_graph_mean.setObjectName("measure_graph_mean")
-        self.measure_verticalLayout.addWidget(self.measure_graph_mean)
-        self.horizontalLayout = QtWidgets.QHBoxLayout()
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        self.frame_measure_toolbox = QtWidgets.QFrame(measure)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.frame_measure_toolbox.sizePolicy().hasHeightForWidth())
-        self.frame_measure_toolbox.setSizePolicy(sizePolicy)
-        self.frame_measure_toolbox.setMinimumSize(QtCore.QSize(320, 135))
-        self.frame_measure_toolbox.setMaximumSize(QtCore.QSize(320, 135))
-        self.frame_measure_toolbox.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frame_measure_toolbox.setFrameShadow(QtWidgets.QFrame.Plain)
-        self.frame_measure_toolbox.setLineWidth(0)
-        self.frame_measure_toolbox.setObjectName("frame_measure_toolbox")
-        self.pushButton_EPSP_slope = QtWidgets.QPushButton(self.frame_measure_toolbox)
-        self.pushButton_EPSP_slope.setGeometry(QtCore.QRect(10, 40, 83, 25))
-        self.pushButton_EPSP_slope.setObjectName("pushButton_EPSP_slope")
-        self.pushButton_EPSP_amp = QtWidgets.QPushButton(self.frame_measure_toolbox)
-        self.pushButton_EPSP_amp.setGeometry(QtCore.QRect(10, 100, 83, 25))
-        self.pushButton_EPSP_amp.setObjectName("pushButton_EPSP_amp")
-        self.pushButton_EPSP_slope_size = QtWidgets.QPushButton(self.frame_measure_toolbox)
-        self.pushButton_EPSP_slope_size.setGeometry(QtCore.QRect(10, 70, 83, 25))
-        self.pushButton_EPSP_slope_size.setObjectName("pushButton_EPSP_slope_size")
-        self.pushButton_volley_slope_size = QtWidgets.QPushButton(self.frame_measure_toolbox)
-        self.pushButton_volley_slope_size.setGeometry(QtCore.QRect(170, 70, 83, 25))
-        self.pushButton_volley_slope_size.setObjectName("pushButton_volley_slope_size")
-        self.pushButton_volley_amp = QtWidgets.QPushButton(self.frame_measure_toolbox)
-        self.pushButton_volley_amp.setGeometry(QtCore.QRect(170, 100, 83, 25))
-        self.pushButton_volley_amp.setObjectName("pushButton_volley_amp")
-        self.pushButton_volley_slope = QtWidgets.QPushButton(self.frame_measure_toolbox)
-        self.pushButton_volley_slope.setGeometry(QtCore.QRect(170, 40, 83, 25))
-        self.pushButton_volley_slope.setObjectName("pushButton_volley_slope")
-        self.label_EPSP_ms = QtWidgets.QLabel(self.frame_measure_toolbox)
-        self.label_EPSP_ms.setGeometry(QtCore.QRect(110, 20, 21, 17))
-        self.label_EPSP_ms.setObjectName("label_EPSP_ms")
-        self.label_volley_ms = QtWidgets.QLabel(self.frame_measure_toolbox)
-        self.label_volley_ms.setGeometry(QtCore.QRect(270, 20, 21, 17))
-        self.label_volley_ms.setObjectName("label_volley_ms")
-        self.lineEdit_volley_slope = QtWidgets.QLineEdit(self.frame_measure_toolbox)
-        self.lineEdit_volley_slope.setGeometry(QtCore.QRect(260, 40, 51, 25))
-        self.lineEdit_volley_slope.setObjectName("lineEdit_volley_slope")
-        self.lineEdit_volley_slope_size = QtWidgets.QLineEdit(self.frame_measure_toolbox)
-        self.lineEdit_volley_slope_size.setGeometry(QtCore.QRect(260, 70, 51, 25))
-        self.lineEdit_volley_slope_size.setObjectName("lineEdit_volley_slope_size")
-        self.lineEdit_volley_amp = QtWidgets.QLineEdit(self.frame_measure_toolbox)
-        self.lineEdit_volley_amp.setGeometry(QtCore.QRect(260, 100, 51, 25))
-        self.lineEdit_volley_amp.setObjectName("lineEdit_volley_amp")
-        self.lineEdit_EPSP_slope_size = QtWidgets.QLineEdit(self.frame_measure_toolbox)
-        self.lineEdit_EPSP_slope_size.setGeometry(QtCore.QRect(100, 70, 51, 25))
-        self.lineEdit_EPSP_slope_size.setObjectName("lineEdit_EPSP_slope_size")
-        self.lineEdit_EPSP_amp = QtWidgets.QLineEdit(self.frame_measure_toolbox)
-        self.lineEdit_EPSP_amp.setGeometry(QtCore.QRect(100, 100, 51, 25))
-        self.lineEdit_EPSP_amp.setObjectName("lineEdit_EPSP_amp")
-        self.lineEdit_EPSP_slope = QtWidgets.QLineEdit(self.frame_measure_toolbox)
-        self.lineEdit_EPSP_slope.setGeometry(QtCore.QRect(100, 40, 51, 25))
-        self.lineEdit_EPSP_slope.setObjectName("lineEdit_EPSP_slope")
-        self.pushButton_auto = QtWidgets.QPushButton(self.frame_measure_toolbox)
-        self.pushButton_auto.setGeometry(QtCore.QRect(10, 10, 83, 25))
-        self.pushButton_auto.setObjectName("pushButton_auto")
-        self.horizontalLayout.addWidget(self.frame_measure_toolbox)
-        self.frame_measure_filter = QtWidgets.QFrame(measure)
-        self.frame_measure_filter.setMinimumSize(QtCore.QSize(180, 0))
-        self.frame_measure_filter.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frame_measure_filter.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frame_measure_filter.setObjectName("frame_measure_filter")
-        self.label_filter = QtWidgets.QLabel(self.frame_measure_filter)
-        self.label_filter.setGeometry(QtCore.QRect(10, 10, 62, 17))
-        font = QtGui.QFont()
-        font.setFamily("DejaVu Sans")
-        font.setBold(True)
-        font.setWeight(75)
-        self.label_filter.setFont(font)
-        self.label_filter.setObjectName("label_filter")
-        self.label_filter_params = QtWidgets.QLabel(self.frame_measure_filter)
-        self.label_filter_params.setGeometry(QtCore.QRect(90, 10, 91, 17))
-        self.label_filter_params.setObjectName("label_filter_params")
-        self.radioButton_filter_savgol = QtWidgets.QRadioButton(self.frame_measure_filter)
-        self.radioButton_filter_savgol.setGeometry(QtCore.QRect(10, 50, 106, 23))
-        self.radioButton_filter_savgol.setObjectName("radioButton_filter_savgol")
-        self.radioButton_filter_none = QtWidgets.QRadioButton(self.frame_measure_filter)
-        self.radioButton_filter_none.setGeometry(QtCore.QRect(10, 30, 106, 23))
-        self.radioButton_filter_none.setObjectName("radioButton_filter_none")
-        self.horizontalLayout.addWidget(self.frame_measure_filter)
-        self.frame_samples = QtWidgets.QFrame(measure)
-        self.frame_samples.setMinimumSize(QtCore.QSize(120, 0))
-        self.frame_samples.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frame_samples.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frame_samples.setObjectName("frame_samples")
-        self.label_sample = QtWidgets.QLabel(self.frame_samples)
-        self.label_sample.setGeometry(QtCore.QRect(10, 10, 62, 17))
-        font = QtGui.QFont()
-        font.setFamily("DejaVu Sans")
-        font.setBold(True)
-        font.setWeight(75)
-        self.label_sample.setFont(font)
-        self.label_sample.setObjectName("label_sample")
-        self.comboBox_samples = QtWidgets.QComboBox(self.frame_samples)
-        self.comboBox_samples.setGeometry(QtCore.QRect(10, 30, 101, 25))
-        self.comboBox_samples.setObjectName("comboBox_samples")
-        self.lineEdit_sample_from = QtWidgets.QLineEdit(self.frame_samples)
-        self.lineEdit_sample_from.setGeometry(QtCore.QRect(10, 60, 41, 25))
-        self.lineEdit_sample_from.setObjectName("lineEdit_sample_from")
-        self.label_sample_to = QtWidgets.QLabel(self.frame_samples)
-        self.label_sample_to.setGeometry(QtCore.QRect(60, 60, 16, 20))
-        self.label_sample_to.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
-        self.label_sample_to.setObjectName("label_sample_to")
-        self.lineEdit_sample_to = QtWidgets.QLineEdit(self.frame_samples)
-        self.lineEdit_sample_to.setGeometry(QtCore.QRect(70, 60, 41, 25))
-        self.lineEdit_sample_to.setObjectName("lineEdit_sample_to")
-        self.pushButton_sample_add = QtWidgets.QPushButton(self.frame_samples)
-        self.pushButton_sample_add.setGeometry(QtCore.QRect(10, 90, 31, 25))
-        self.pushButton_sample_add.setObjectName("pushButton_sample_add")
-        self.pushButton_sample_remove = QtWidgets.QPushButton(self.frame_samples)
-        self.pushButton_sample_remove.setGeometry(QtCore.QRect(50, 90, 61, 25))
-        self.pushButton_sample_remove.setObjectName("pushButton_sample_remove")
-        self.horizontalLayout.addWidget(self.frame_samples)
-        self.measure_verticalLayout.addLayout(self.horizontalLayout)
-        self.measure_graph_output = QtWidgets.QWidget(measure)
-        self.measure_graph_output.setObjectName("measure_graph_output")
-        self.measure_verticalLayout.addWidget(self.measure_graph_output)
-        self.measure_info = QtWidgets.QTableView(measure)
-        self.measure_info.setMinimumSize(QtCore.QSize(0, 50))
-        self.measure_info.setObjectName("measure_info")
-        self.measure_verticalLayout.addWidget(self.measure_info)
-        self.buttonBox = QtWidgets.QDialogButtonBox(measure)
-        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
-        self.buttonBox.setObjectName("buttonBox")
-        self.measure_verticalLayout.addWidget(self.buttonBox)
-        self.measure_verticalLayout.setStretch(0, 5)
-        self.measure_verticalLayout.setStretch(1, 1)
-        self.measure_verticalLayout.setStretch(2, 5)
-        self.measure_verticalLayout.setStretch(3, 1)
-        self.gridLayout.addLayout(self.measure_verticalLayout, 0, 0, 1, 1)
-
-        self.retranslateUi(measure)
-        self.buttonBox.accepted.connect(measure.accept) # type: ignore
-        self.buttonBox.rejected.connect(measure.reject) # type: ignore
-        QtCore.QMetaObject.connectSlotsByName(measure)
-
-    def retranslateUi(self, measure):
-        _translate = QtCore.QCoreApplication.translate
-        measure.setWindowTitle(_translate("measure", "Placeholder Window Title"))
-        self.pushButton_EPSP_slope.setText(_translate("measure", "EPSP slope"))
-        self.pushButton_EPSP_amp.setText(_translate("measure", "EPSP amp."))
-        self.pushButton_EPSP_slope_size.setText(_translate("measure", "EPSP size"))
-        self.pushButton_volley_slope_size.setText(_translate("measure", "Volley size"))
-        self.pushButton_volley_amp.setText(_translate("measure", "Volley amp."))
-        self.pushButton_volley_slope.setText(_translate("measure", "Volley slope"))
-        self.label_EPSP_ms.setText(_translate("measure", "ms"))
-        self.label_volley_ms.setText(_translate("measure", "ms"))
-        self.pushButton_auto.setText(_translate("measure", "Auto"))
-        self.label_filter.setText(_translate("measure", "Filter"))
-        self.label_filter_params.setText(_translate("measure", "Parameters"))
-        self.radioButton_filter_savgol.setText(_translate("measure", "SavGol"))
-        self.radioButton_filter_none.setText(_translate("measure", "No filter"))
-        self.label_sample.setText(_translate("measure", "Sample"))
-        self.label_sample_to.setText(_translate("measure", "-"))
-        self.pushButton_sample_add.setText(_translate("measure", "Add"))
-        self.pushButton_sample_remove.setText(_translate("measure", "Remove"))
-
 
 
 ################################################################
@@ -447,15 +251,16 @@ class Ui_measure_window(QtCore.QObject):
 # 'object' to 'QtCore.QObject' for the pyqtSlot(list) to work  #
 ################################################################
 
-
 class Ui_MainWindow(QtCore.QObject):
     def setupUi(self, mainWindow):
         mainWindow.setObjectName("mainWindow")
-        mainWindow.resize(1065, 812)
+        mainWindow.resize(1215, 717)
         self.centralwidget = QtWidgets.QWidget(mainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayoutCentralwidget = QtWidgets.QHBoxLayout(self.centralwidget)
         self.horizontalLayoutCentralwidget.setObjectName("horizontalLayoutCentralwidget")
+        self.verticalMasterLayout = QtWidgets.QVBoxLayout()
+        self.verticalMasterLayout.setObjectName("verticalMasterLayout")
         self.horizontalMasterLayout = QtWidgets.QHBoxLayout()
         self.horizontalMasterLayout.setObjectName("horizontalMasterLayout")
         self.verticalLayoutProj = QtWidgets.QVBoxLayout()
@@ -468,7 +273,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.horizontalLayoutProj.addWidget(self.pushButtonParse)
         self.verticalLayoutProj.addLayout(self.horizontalLayoutProj)
         self.tableProj = QtWidgets.QTableView(self.centralwidget)
-        self.tableProj.setMinimumSize(QtCore.QSize(400, 0))
+        self.tableProj.setMinimumSize(QtCore.QSize(420, 0))
         self.tableProj.setMaximumSize(QtCore.QSize(16777215, 16777215))
         self.tableProj.setAcceptDrops(True)
         self.tableProj.setObjectName("tableProj")
@@ -479,23 +284,39 @@ class Ui_MainWindow(QtCore.QObject):
         self.verticalLayoutGraph = QtWidgets.QVBoxLayout()
         self.verticalLayoutGraph.setObjectName("verticalLayoutGraph")
         self.graphMean = QtWidgets.QWidget(self.centralwidget)
-        self.graphMean.setMinimumSize(QtCore.QSize(0, 100))
+        self.graphMean.setMinimumSize(QtCore.QSize(100, 100))
         self.graphMean.setObjectName("graphMean")
         self.verticalLayoutGraph.addWidget(self.graphMean)
         self.horizontalLayoutControls = QtWidgets.QHBoxLayout()
         self.horizontalLayoutControls.setObjectName("horizontalLayoutControls")
-        self.frame_main_view = QtWidgets.QFrame(self.centralwidget)
-        self.frame_main_view.setMinimumSize(QtCore.QSize(0, 120))
-        self.frame_main_view.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frame_main_view.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frame_main_view.setObjectName("frame_main_view")
-        self.checkBox_EPSP_amp = QtWidgets.QCheckBox(self.frame_main_view)
+        self.verticalLayoutGraph.addLayout(self.horizontalLayoutControls)
+        self.horizontalLayoutGroups = QtWidgets.QHBoxLayout()
+        self.horizontalLayoutGroups.setObjectName("horizontalLayoutGroups")
+        self.verticalLayoutGraph.addLayout(self.horizontalLayoutGroups)
+        self.graphOutput = QtWidgets.QWidget(self.centralwidget)
+        self.graphOutput.setMinimumSize(QtCore.QSize(100, 100))
+        self.graphOutput.setObjectName("graphOutput")
+        self.verticalLayoutGraph.addWidget(self.graphOutput)
+        self.verticalLayoutGraph.setStretch(0, 5)
+        self.verticalLayoutGraph.setStretch(3, 5)
+        self.horizontalMasterLayout.addLayout(self.verticalLayoutGraph)
+        self.tableMetadata = QtWidgets.QTableView(self.centralwidget)
+        self.tableMetadata.setObjectName("tableMetadata")
+        self.horizontalMasterLayout.addWidget(self.tableMetadata)
+        self.horizontalMasterLayout.setStretch(2, 1)
+        self.verticalMasterLayout.addLayout(self.horizontalMasterLayout)
+        self.addon_frame = QtWidgets.QFrame(self.centralwidget)
+        self.addon_frame.setMinimumSize(QtCore.QSize(0, 120))
+        self.addon_frame.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.addon_frame.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.addon_frame.setObjectName("addon_frame")
+        self.checkBox_EPSP_amp = QtWidgets.QCheckBox(self.addon_frame)
         self.checkBox_EPSP_amp.setGeometry(QtCore.QRect(10, 50, 101, 23))
         self.checkBox_EPSP_amp.setObjectName("checkBox_EPSP_amp")
-        self.checkBox_EPSP_slope = QtWidgets.QCheckBox(self.frame_main_view)
+        self.checkBox_EPSP_slope = QtWidgets.QCheckBox(self.addon_frame)
         self.checkBox_EPSP_slope.setGeometry(QtCore.QRect(10, 30, 101, 23))
         self.checkBox_EPSP_slope.setObjectName("checkBox_EPSP_slope")
-        self.label_aspect = QtWidgets.QLabel(self.frame_main_view)
+        self.label_aspect = QtWidgets.QLabel(self.addon_frame)
         self.label_aspect.setGeometry(QtCore.QRect(10, 10, 62, 17))
         font = QtGui.QFont()
         font.setFamily("DejaVu Sans")
@@ -503,10 +324,10 @@ class Ui_MainWindow(QtCore.QObject):
         font.setWeight(75)
         self.label_aspect.setFont(font)
         self.label_aspect.setObjectName("label_aspect")
-        self.checkBox_paired_stims = QtWidgets.QCheckBox(self.frame_main_view)
+        self.checkBox_paired_stims = QtWidgets.QCheckBox(self.addon_frame)
         self.checkBox_paired_stims.setGeometry(QtCore.QRect(288, 30, 90, 23))
         self.checkBox_paired_stims.setObjectName("checkBox_paired_stims")
-        self.label_paired_data = QtWidgets.QLabel(self.frame_main_view)
+        self.label_paired_data = QtWidgets.QLabel(self.addon_frame)
         self.label_paired_data.setGeometry(QtCore.QRect(288, 10, 91, 17))
         font = QtGui.QFont()
         font.setFamily("DejaVu Sans")
@@ -514,16 +335,16 @@ class Ui_MainWindow(QtCore.QObject):
         font.setWeight(75)
         self.label_paired_data.setFont(font)
         self.label_paired_data.setObjectName("label_paired_data")
-        self.pushButton_paired_data_flip = QtWidgets.QPushButton(self.frame_main_view)
+        self.pushButton_paired_data_flip = QtWidgets.QPushButton(self.addon_frame)
         self.pushButton_paired_data_flip.setGeometry(QtCore.QRect(290, 50, 81, 25))
         self.pushButton_paired_data_flip.setObjectName("pushButton_paired_data_flip")
-        self.checkBox_volley_amp = QtWidgets.QCheckBox(self.frame_main_view)
+        self.checkBox_volley_amp = QtWidgets.QCheckBox(self.addon_frame)
         self.checkBox_volley_amp.setGeometry(QtCore.QRect(10, 90, 101, 23))
         self.checkBox_volley_amp.setObjectName("checkBox_volley_amp")
-        self.checkBox_volley_slope = QtWidgets.QCheckBox(self.frame_main_view)
+        self.checkBox_volley_slope = QtWidgets.QCheckBox(self.addon_frame)
         self.checkBox_volley_slope.setGeometry(QtCore.QRect(10, 70, 101, 23))
         self.checkBox_volley_slope.setObjectName("checkBox_volley_slope")
-        self.label_scaling = QtWidgets.QLabel(self.frame_main_view)
+        self.label_scaling = QtWidgets.QLabel(self.addon_frame)
         self.label_scaling.setGeometry(QtCore.QRect(140, 10, 81, 17))
         font = QtGui.QFont()
         font.setFamily("DejaVu Sans")
@@ -531,20 +352,20 @@ class Ui_MainWindow(QtCore.QObject):
         font.setWeight(75)
         self.label_scaling.setFont(font)
         self.label_scaling.setObjectName("label_scaling")
-        self.checkBox_norm_EPSP = QtWidgets.QCheckBox(self.frame_main_view)
+        self.checkBox_norm_EPSP = QtWidgets.QCheckBox(self.addon_frame)
         self.checkBox_norm_EPSP.setGeometry(QtCore.QRect(140, 30, 111, 23))
         self.checkBox_norm_EPSP.setObjectName("checkBox_norm_EPSP")
-        self.lineEdit_norm_EPSP_start = QtWidgets.QLineEdit(self.frame_main_view)
+        self.lineEdit_norm_EPSP_start = QtWidgets.QLineEdit(self.addon_frame)
         self.lineEdit_norm_EPSP_start.setGeometry(QtCore.QRect(140, 70, 41, 25))
         self.lineEdit_norm_EPSP_start.setObjectName("lineEdit_norm_EPSP_start")
-        self.label_norm_on_sweep = QtWidgets.QLabel(self.frame_main_view)
+        self.label_norm_on_sweep = QtWidgets.QLabel(self.addon_frame)
         self.label_norm_on_sweep.setGeometry(QtCore.QRect(140, 50, 131, 20))
         self.label_norm_on_sweep.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
         self.label_norm_on_sweep.setObjectName("label_norm_on_sweep")
-        self.lineEdit_norm_EPSP_end = QtWidgets.QLineEdit(self.frame_main_view)
+        self.lineEdit_norm_EPSP_end = QtWidgets.QLineEdit(self.addon_frame)
         self.lineEdit_norm_EPSP_end.setGeometry(QtCore.QRect(200, 70, 41, 25))
         self.lineEdit_norm_EPSP_end.setObjectName("lineEdit_norm_EPSP_end")
-        self.label_export = QtWidgets.QLabel(self.frame_main_view)
+        self.label_export = QtWidgets.QLabel(self.addon_frame)
         self.label_export.setGeometry(QtCore.QRect(410, 10, 81, 17))
         font = QtGui.QFont()
         font.setFamily("DejaVu Sans")
@@ -552,34 +373,18 @@ class Ui_MainWindow(QtCore.QObject):
         font.setWeight(75)
         self.label_export.setFont(font)
         self.label_export.setObjectName("label_export")
-        self.pushButton_export_jpeg = QtWidgets.QPushButton(self.frame_main_view)
+        self.pushButton_export_jpeg = QtWidgets.QPushButton(self.addon_frame)
         self.pushButton_export_jpeg.setGeometry(QtCore.QRect(410, 30, 41, 25))
         self.pushButton_export_jpeg.setObjectName("pushButton_export_jpeg")
-        self.label_relative_to = QtWidgets.QLabel(self.frame_main_view)
+        self.label_relative_to = QtWidgets.QLabel(self.addon_frame)
         self.label_relative_to.setGeometry(QtCore.QRect(190, 70, 21, 20))
         self.label_relative_to.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
         self.label_relative_to.setObjectName("label_relative_to")
-        self.horizontalLayoutControls.addWidget(self.frame_main_view)
-        self.verticalLayoutGraph.addLayout(self.horizontalLayoutControls)
-        self.horizontalLayoutGroups = QtWidgets.QHBoxLayout()
-        self.horizontalLayoutGroups.setObjectName("horizontalLayoutGroups")
-        self.verticalLayoutGraph.addLayout(self.horizontalLayoutGroups)
-        self.graphOutput = QtWidgets.QWidget(self.centralwidget)
-        self.graphOutput.setMinimumSize(QtCore.QSize(0, 100))
-        self.graphOutput.setObjectName("graphOutput")
-        self.verticalLayoutGraph.addWidget(self.graphOutput)
-        self.tableMetadata = QtWidgets.QTableView(self.centralwidget)
-        self.tableMetadata.setObjectName("tableMetadata")
-        self.verticalLayoutGraph.addWidget(self.tableMetadata)
-        self.verticalLayoutGraph.setStretch(0, 5)
-        self.verticalLayoutGraph.setStretch(3, 5)
-        self.verticalLayoutGraph.setStretch(4, 1)
-        self.horizontalMasterLayout.addLayout(self.verticalLayoutGraph)
-        self.horizontalMasterLayout.setStretch(2, 1)
-        self.horizontalLayoutCentralwidget.addLayout(self.horizontalMasterLayout)
+        self.verticalMasterLayout.addWidget(self.addon_frame)
+        self.horizontalLayoutCentralwidget.addLayout(self.verticalMasterLayout)
         mainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(mainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1065, 22))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1215, 22))
         self.menubar.setObjectName("menubar")
         self.menuFile = QtWidgets.QMenu(self.menubar)
         self.menuFile.setObjectName("menuFile")
@@ -619,7 +424,6 @@ class Ui_MainWindow(QtCore.QObject):
         self.menuFile.setTitle(_translate("mainWindow", "File"))
         self.menuData.setTitle(_translate("mainWindow", "Data"))
         self.menuGroups.setTitle(_translate("mainWindow", "Groups"))
-
 
 
 ################################################################
@@ -716,7 +520,7 @@ class UIsub(Ui_MainWindow):
         # move mainwindow to default position (TODO: later to be stored in cfg)
         self.mainwindow = mainwindow
         screen = QtWidgets.QDesktopWidget().screenGeometry()
-        self.mainwindow.setGeometry(0, 0, int(screen.width() * 0.6), int(screen.height())-terminal_space)
+        self.mainwindow.setGeometry(0, 0, int(screen.width()*0.96), int(screen.height())-terminal_space)
         # load program bw_cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
         self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
@@ -872,9 +676,6 @@ class UIsub(Ui_MainWindow):
         self.lineEdit_norm_EPSP_end.setText(f"{uistate.lineEdit['norm_EPSP_on'][1]}")
         self.lineEdit_norm_EPSP_start.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_on_start))
         self.lineEdit_norm_EPSP_end.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_on_end))
-
-        # keep track of open measure windows
-        self.dict_open_measure_windows = {}
 
         self.fqdn = socket.getfqdn() # get computer name and local domain, for project file
         if talkback:
@@ -1183,7 +984,6 @@ class UIsub(Ui_MainWindow):
 
     def tableProjDoubleClicked(self):
         self.usage("tableProjDoubleClicked")
-        self.launchMeasureWindow()
 
     def checkBox_paired_stims_changed(self, state):
         self.usage("checkBox_paired_stims_changed")
@@ -1299,10 +1099,6 @@ class UIsub(Ui_MainWindow):
         if len(uistate.selected) == 1:
             df_p = self.get_df_project()
             old_recording_name = df_p.at[uistate.selected[0], 'recording_name']
-            # if the old recording name is a key in in dict_open_measure_windows
-            if old_recording_name in self.dict_open_measure_windows.keys():
-                print(f"Cannot rename {old_recording_name} while it is open in a measure window.")
-                return
             old_data = self.dict_folders['data'] / (old_recording_name + ".csv")
             old_mean = self.dict_folders['cache'] / (old_recording_name + "_mean.csv")
             old_filter = self.dict_folders['cache'] / (old_recording_name + "_filter.csv")
@@ -1344,10 +1140,6 @@ class UIsub(Ui_MainWindow):
     def deleteSelectedRows(self):
         if not uistate.selected:
             print("No files selected.")
-            return
-        # If any of the selected rows are open in a measure window, abort
-        if any(index in self.dict_open_measure_windows for index in uistate.selected):
-            print(f"Cannot delete recordings that are open in a measure window.")
             return
         df_p = self.get_df_project()
         for index in uistate.selected:
@@ -2077,44 +1869,6 @@ class UIsub(Ui_MainWindow):
             self.main_canvas_output.draw()
 
 
-# MeasureWindow
-
-    def launchMeasureWindow(self):  # , single_index_range):
-        # Launches a new subwindow for the double-clicked row (if it's already open, focus on it)
-        #   How to check for existing windows?
-        #   How to shift focus?
-        # Display the appropriate recording on the new window's graphs: mean and output
-        #   Construct a sensible interface: drag-drop on measurement middle, start and finish points
-        #   UI for toggling displayed measurement methods. Drag-drop forces Manual.
-
-        # table_row should already have t_ values; otherwise do not attempt to draw them
-
-        qt_index = self.tableProj.selectionModel().selectedIndexes()[0]
-        ser_table_row = self.tablemodel.dataRow(qt_index)
-        sweeps = ser_table_row['sweeps']
-        recording_name = ser_table_row['recording_name']
-        if sweeps == "...":
-            # TODO: Make it import the missing file
-            print("Unknown number of sweeps - not imported?")
-            return
-        # Close last window, for now. TODO: handle multiple windows (ew)
-        if hasattr(self, "measure_frame"):
-            print(f"Closing last window: {getattr(self, 'measure_frame')}")
-            self.measure_frame.close()
-        # Open window
-        self.measure_frame = QDialog_sub(self.dict_open_measure_windows)
-        self.measure_window_sub = Measure_window_sub(self.measure_frame, row=ser_table_row, parent=self)
-        self.measure_frame.setWindowTitle(recording_name)
-        self.dict_open_measure_windows[recording_name] = self.measure_window_sub
-        # move measurewindow to default position (TODO: later to be stored in cfg)
-        screen = QtWidgets.QDesktopWidget().screenGeometry()
-        self.measure_frame.setGeometry(int(screen.width() * 0.6), 0, int(screen.width() * 0.4), int(screen.height())-terminal_space)
-        if dict_screen is not None:
-            self.measure_frame.setGeometry(int(screen.width() * 0.6)+dict_screen['mw_right'], 0+dict_screen['mw_down'], int(screen.width() * 0.4)-dict_screen['mw_right'], int(screen.height())-terminal_space)
-        self.measure_frame.show()
-        # Set graphs
-        self.measure_window_sub.updatePlots()
-
     '''         
     @QtCore.pyqtSlot(list)
     def slotPrintPaths(self, mypaths):
@@ -2250,732 +2004,6 @@ class Filetreesub(Ui_Dialog):
         header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # name
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # group
         self.tableView.update()
-
-
-class Measure_window_sub(Ui_measure_window):
-    def __init__(self, measure_frame, parent=None, row=None):
-        super(Measure_window_sub, self).__init__()
-        self.setupUi(measure_frame)
-        self.parent = parent
-        self.measure_frame = measure_frame
-        self.row = row.copy() # creates a copy to be modified, then accepted to df_project, or rejected
-        # do NOT copy these dfs; add filter columns directly into them
-        self.dfmean = self.parent.get_dfmean(row=self.row)
-        self.dffilter = self.parent.get_dffilter(row=self.row)
-        # copy this df; only replace if params change
-        t0 = time.time()
-        self.new_dfoutput = self.parent.get_dfoutput(row=self.row).copy()
-        t1 = time.time()
-        print(f"Measure_window_sub: {t1-t0} seconds to copy self.new_dfoutput")
-
-        if row['filter'] != 'voltage':
-            self.dict_filter_params = {row['filter']: json.loads(row['filter_params'])} # TODO: read from row
-        else:
-            self.dict_filter_params = {}
-        if row['filter'] not in self.dict_filter_params:            
-            self.measure_filter_defaults(row['filter'])
-
-        self.measure_graph_mean.setLayout(QtWidgets.QVBoxLayout())
-        self.canvas_mean = MplCanvas(parent=self.measure_graph_mean)
-        self.measure_graph_mean.layout().addWidget(self.canvas_mean)
-
-        self.measure_graph_output.setLayout(QtWidgets.QVBoxLayout())
-        self.canvas_output = MplCanvas(parent=self.measure_graph_output)  # instantiate canvas for Mean
-        self.measure_graph_output.layout().addWidget(self.canvas_output)
-
-        # connect output sample generation
-        self.canvas_output.mpl_connect('button_press_event', self.outputClicked)
-        self.canvas_output.mpl_connect('motion_notify_event', self.outputDragged)
-        self.canvas_output.mpl_connect('button_release_event', self.outputReleased)
-
-        # split axes
-        self.ax1 = self.canvas_output.axes
-        self.ax2 = self.ax1.twinx()
-
-        # add appropriate ticks and axis labels
-        self.canvas_mean.axes.set_xlabel("Time (s)")
-        self.canvas_mean.axes.set_ylabel("Voltage (V)")
-        self.ax1.set_ylabel("Amplitude (mV)")
-        self.ax2.set_ylabel("Slope (mV/ms)")
-        # connect zoom and reset
-        self.canvas_mean.mpl_connect('button_press_event', self.meanClicked)
-        self.canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.measure_graph_mean, canvas=self.canvas_mean, ax1=self.canvas_mean.axes))
-        self.canvas_output.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.measure_graph_output, canvas=self.canvas_output, ax1=self.ax1, ax2=self.ax2))
-
-        # Populate canvases - TODO: refactor such that components can be called individually when added later
-        _ = sns.lineplot(ax=self.canvas_mean.axes, label='voltage', data=self.dfmean, y='voltage', x='time', color='black')
-        t_VEB = row['t_VEB']
-        if pd.notnull(t_VEB):
-            y_position = self.dfmean.loc[self.dfmean.time == t_VEB, 'voltage']
-            self.canvas_mean.axes.plot(t_VEB, y_position, marker='^', markerfacecolor='gray', markeredgecolor='gray', markersize=10, alpha = 0.3)
-        # TODO: Old measurements show an incorrect reading as "old", even at first launch. Disabled for now, here and in updatePlots().
-        if 'EPSP_amp' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_amp'].notna().any():
-            t_EPSP_amp = self.row['t_EPSP_amp']
-            self.v_t_EPSP_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_amp, color="green", linestyle="--")
-            #_ = sns.lineplot(ax=self.ax1, label="old EPSP amp", data=self.new_dfoutput, y="EPSP_amp", x="sweep", color="gray", linestyle="--", alpha=0.3)
-        if 'EPSP_slope' in self.new_dfoutput.columns and self.new_dfoutput['EPSP_slope'].notna().any():
-            t_EPSP_slope = self.row['t_EPSP_slope']
-            x_start = t_EPSP_slope - self.row['t_EPSP_slope_size']
-            x_end = t_EPSP_slope + self.row['t_EPSP_slope_size']
-            self.v_t_EPSP_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_EPSP_slope, color="green", linestyle="--")
-            self.v_t_EPSP_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="green", linestyle=":")
-            self.v_t_EPSP_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="green", linestyle=":")
-            #_ = sns.lineplot(ax=self.ax2, label="old EPSP slope", data=self.new_dfoutput, y="EPSP_slope", x="sweep", color="gray", alpha=0.3)
-        if 'volley_amp' in self.new_dfoutput.columns and self.new_dfoutput['volley_amp'].notna().any():
-            t_volley_amp = self.row['t_volley_amp']
-            self.v_t_volley_amp =    sns.lineplot(ax=self.canvas_mean.axes).axvline(t_volley_amp, color="blue", linestyle="--")
-            #_ = sns.lineplot(ax=self.ax1, label="old volley amp", data=self.new_dfoutput, y="volley_amp", x="sweep", color="gray", linestyle="--", alpha=0.3)
-        if 'volley_slope' in self.new_dfoutput.columns and self.new_dfoutput['volley_slope'].notna().any():
-            t_volley_slope = self.row['t_volley_slope']
-            x_start = t_volley_slope - self.row['t_volley_slope_size']
-            x_end = t_volley_slope + self.row['t_volley_slope_size']
-            self.v_t_volley_slope =       sns.lineplot(ax=self.canvas_mean.axes).axvline(t_volley_slope, color="blue", linestyle="--")
-            self.v_t_volley_slope_start = sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color="blue", linestyle=":")
-            self.v_t_volley_slope_end =   sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color="blue", linestyle=":")
-            #_ = sns.lineplot(ax=self.ax2, label="old volley slope", data=self.new_dfoutput, y="volley_slope", x="sweep", color="gray", alpha=0.3)
-        
-        self.canvas_mean.axes.set_xlim(uistate.zoom['mean_xlim'])
-        self.canvas_mean.axes.set_ylim(uistate.zoom['mean_ylim'])
-        self.ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
-        self.ax2.set_ylim(uistate.zoom['output_ax2_ylim'])
-
-#        self.canvas_mean.show()
-#        self.canvas_output.show()
-
-        # lines and drag state
-        self.si_v = None # vertical line in canvas_output, indicating selected sweep
-        self.si_sweep, = self.canvas_mean.axes.plot([], [], color="blue") # lineplot of the selected sweep on canvas_mean
-        self.si_v_drag_from = None # vertical line in canvas_output, indicating start of drag
-        self.si_v_drag_to = None # vertical line in canvas_output, indicating end of drag
-        self.dragplot = None
-        self.dragging = False
-        self.last_x = None # remember last x position of mouse; None if no samples are selected
-
-        # set button colors
-        self.dict_color = { 'default': "background-color: rgb(239, 239, 239);",
-                            'EPSP': "background-color: rgb(150, 239, 150);",
-                            'volley': "background-color: rgb(150, 150, 239);",
-                            }
-
-        self.list_aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
-        self.list_edit_modes = self.list_aspects.copy()
-        self.list_edit_modes.extend(['EPSP_slope_size', 'volley_slope_size'])
-        # Iterate through edit_modes, connecting buttons and lineEdits
-        for edit_mode in self.list_edit_modes:
-            button = getattr(self, f"pushButton_{edit_mode}")
-            button.setCheckable(True)
-            button.pressed.connect(lambda edit_mode=edit_mode, button=button: self.toggle(button, edit_mode))
-            button.setCheckable(True)
-            edit = getattr(self, f"lineEdit_{edit_mode}")
-            edit.setText(self.m(self.row[f"t_{edit_mode}"]))
-            edit.editingFinished.connect(lambda edit_mode=edit_mode, edit=edit: self.updateOnEdit(edit, edit_mode))
-        # set edit_mode
-        last_edit_mode = uistate.default['last_edit_mode']
-        last_button = getattr(self, f"pushButton_{last_edit_mode}")
-        self.toggle(last_button, last_edit_mode)
-        
-        # connect checkboxes from mainwindow to updatePlots TODO: refactorize to merge with similar code in __init__(self, mainwindow)
-        def loopConnectViews(key):
-            key_checkBox = getattr(parent, f"checkBox_{key}")
-            key_checkBox.setChecked(uistate.checkBox[key])
-            key_checkBox.stateChanged.connect(self.updatePlots)
-            self.measure_frame.list_connections.append((key_checkBox.stateChanged, self.updatePlots))
-        for key in self.list_aspects:
-            loopConnectViews(key=key)
-        self.pushButton_auto.clicked.connect(self.autoCalculate)
-
-        self.pushButton_sample_add.clicked.connect(self.pushButton_sample_add_pressed)
-
-        # check the radiobutton of the current filter, per row['filter']
-        row_filter = self.row['filter']
-        self.radioButton_filter_none.setChecked(row_filter=="voltage")
-        self.radioButton_filter_none.clicked.connect(lambda: self.updateFilter("voltage"))
-        self.radioButton_filter_savgol.setChecked(row_filter=="savgol")
-        self.radioButton_filter_savgol.clicked.connect(lambda: self.updateFilter("savgol"))
-
-        if row_filter == "savgol":
-            # if self.dict_filter_params has key savgold, use it, otherwise create it
-            self.measure_filter_ui_savgol()
-
-        self.buttonBox.accepted.connect(self.accepted_handler)
-        self.buttonBox.rejected.connect(self.measure_frame.close)
-        self.updatePlots()
-
-
-    def pushButton_sample_add_pressed(self):
-        self.sampleAdd()
-
-
-    def sampleAdd(self):
-        try:
-            sample_from = int(self.lineEdit_sample_from.text())
-            sample_to = int(self.lineEdit_sample_to.text())
-        except:
-            print("sampleAdd: invalid input")
-            return
-        print(f"sampleAdd {sample_from} - {sample_to}")
-    ''' Haven't figured out how to do this yet
-        # Create a new figure
-        fig = Figure()
-
-        # Plot the rest of your data in the main plot
-        self.canvas_output = fig.add_subplot(111)  # Add your main plot data here
-        # sns.lineplot(data=your_data, ax=ax_main)  # Add your main plot data here using seaborn
-
-        # Add a subplot at the top left corner and make it transparent
-        ax1 = fig.add_axes([0.1, 0.7, 0.3, 0.3], facecolor='none')  # left, bottom, width, height
-
-        # Plot self.si_sweep in the subplot using seaborn
-        df = self.dffilter
-        rec_filter = self.row['filter'] 
-        sns.lineplot(data=(df['time'], df[rec_filter]), ax=ax1)
-
-        # Create a canvas and add it to your GUI
-        canvas = FigureCanvasQTAgg(fig)
-        canvas.setParent(self.measure_graph_output)
-
-        # Make the canvas background transparent
-        canvas.setStyleSheet("background-color:transparent;")
-
-        # Add the canvas to your GUI
-        self.measure_graph_output.addWidget(canvas)
-        '''
-
-
-    def toggle(self, button, now_setting): 
-        self.now_setting = now_setting
-        for edit_mode in self.list_edit_modes:
-            un_button = getattr(self, f"pushButton_{edit_mode}")
-            un_button.setStyleSheet(self.dict_color['default'])
-            un_button.setChecked(False)  # set other buttons to not be in depressed state
-        # if now.setting contains the word "volley", set volley button to active
-        if "volley" in now_setting:
-            button.setStyleSheet(self.dict_color['volley'])
-        else:
-            button.setStyleSheet(self.dict_color['EPSP'])
-        button.setChecked(True)  # set the toggled button to be depressed
-        uistate.default['last_edit_mode'] = now_setting
-        uistate.save_cfg(projectfolder=self.parent.dict_folders['project'])
-        
-
-    def updateFilter(self, filter, param_edit=False):
-        self.row['filter'] = filter
-        # if frame_measure_filter_params exists, delete it
-        if param_edit == False: # don't kill the frame if lineEdit changed params
-            if hasattr(self, "frame_measure_filter_params") and self.frame_measure_filter_params is not None:
-                self.frame_measure_filter_params.deleteLater()
-                self.frame_measure_filter_params = None
-        if filter not in self.dict_filter_params:            
-            self.measure_filter_defaults(filter)
-        if filter == "savgol":
-            window_length = int(self.dict_filter_params['savgol']['window_length'])
-            poly_order = int(self.dict_filter_params['savgol']['poly_order'])
-            print(f"window_length: {window_length}, poly_order: {poly_order}")
-            # TODO: create interface for filter params
-            if param_edit == False: # don't redraw the frame if lineEdit changed params
-                self.measure_filter_ui_savgol()
-            # make sure the updated filter exists
-            if ('savgol' not in self.dfmean) | param_edit:
-                self.dfmean['savgol'] = analysis.addFilterSavgol(self.dfmean, window_length=window_length, poly_order=poly_order)
-                parse.persistdf(file_base=self.row['recording_name'], dict_folders=self.parent.dict_folders, dfmean=self.dfmean)
-            if ('savgol' not in self.dffilter) | param_edit:
-                self.dffilter['savgol'] = analysis.addFilterSavgol(self.dffilter, window_length=window_length, poly_order=poly_order)
-                parse.persistdf(file_base=self.row['recording_name'], dict_folders=self.parent.dict_folders, dffilter=self.dffilter)
-        # build new output
-        self.new_dfoutput = analysis.build_dfoutput(df=self.dffilter,
-                                    filter=filter,
-                                    t_EPSP_amp=self.row['t_EPSP_amp'],
-                                    t_EPSP_slope=self.row['t_EPSP_slope'],
-                                    t_EPSP_slope_size=self.row['t_EPSP_slope_size'],
-                                    t_volley_amp=self.row['t_volley_amp'],
-                                    t_volley_slope=self.row['t_volley_slope'],
-                                    t_volley_slope_size=self.row['t_volley_slope_size'])
-        self.row['volley_amp_mean'] = self.new_dfoutput['volley_amp'].mean()
-        self.row['volley_slope_mean'] = self.new_dfoutput['volley_slope'].mean()
-        print(f"updateFilter: {self.new_dfoutput.columns}")
-        if self.last_x is not None:
-            self.updateSample()
-        self.updatePlots()
-
-
-    def editFilterParams(self, lineEdit):
-        changed = False
-        if lineEdit.objectName() == "lineEdit_filter_savgol_windowLength":
-            windowLength = int(lineEdit.text())
-            polyOrder = int(self.lineEdit_filter_savgol_polyOrder.text())
-            if 21 < windowLength:
-                windowLength = 21
-            if windowLength <= polyOrder:
-                windowLength = polyOrder+1
-            if windowLength != int(self.dict_filter_params['savgol']['window_length']):
-                self.dict_filter_params['savgol']['window_length'] = str(windowLength)
-                changed = True
-            lineEdit.setText(str(self.dict_filter_params['savgol']['window_length']))
-        elif lineEdit.objectName() == "lineEdit_filter_savgol_polyOrder":
-            windowLength = int(self.lineEdit_filter_savgol_windowLength.text())
-            polyOrder = int(lineEdit.text())
-            if polyOrder < 1:
-                polyOrder = 1
-            if 5 < polyOrder | polyOrder >= windowLength:
-                polyOrder = min(5, windowLength-1)
-            if polyOrder != int(self.dict_filter_params['savgol']['poly_order']):
-                self.dict_filter_params['savgol']['poly_order'] = str(polyOrder)
-                changed = True
-            lineEdit.setText(str(self.dict_filter_params['savgol']['poly_order']))
-        if changed:
-            self.updateFilter("savgol", param_edit=True)
-
-
-    def measure_filter_defaults(self, filter):
-        if filter == "savgol":
-            self.dict_filter_params = {'savgol': {"window_length": "11", "poly_order": "2"}}
-        else:
-            self.dict_filter_params = {}
-
-
-    def measure_filter_ui_savgol(self):
-        self.frame_measure_filter_params = QtWidgets.QFrame(self.frame_measure_filter)
-        self.frame_measure_filter_params.setObjectName("frame_measure_filter_params")
-        self.frame_measure_filter_params.setGeometry(QtCore.QRect(90, 25, 171, 101))
-        self.label_filter_savgol_windowLength = QtWidgets.QLabel(self.frame_measure_filter_params)
-        self.label_filter_savgol_windowLength.setGeometry(QtCore.QRect(10, 5, 100, 23))
-        self.label_filter_savgol_windowLength.setObjectName("label_filter_savgol_windowLength")
-        self.label_filter_savgol_windowLength.setText("Window length")
-        self.lineEdit_filter_savgol_windowLength = QtWidgets.QLineEdit(self.frame_measure_filter_params)
-        self.lineEdit_filter_savgol_windowLength.setGeometry(QtCore.QRect(110, 5, 51, 25))
-        self.lineEdit_filter_savgol_windowLength.setObjectName("lineEdit_filter_savgol_windowLength")            
-        self.lineEdit_filter_savgol_windowLength.setText(self.dict_filter_params['savgol']['window_length'])
-        self.label_filter_savgol_polyOrder = QtWidgets.QLabel(self.frame_measure_filter_params)
-        self.label_filter_savgol_polyOrder.setGeometry(QtCore.QRect(10, 35, 100, 23))
-        self.label_filter_savgol_polyOrder.setObjectName("label_filter_savgol_polyOrder")
-        self.label_filter_savgol_polyOrder.setText("Poly order")
-        self.lineEdit_filter_savgol_polyOrder = QtWidgets.QLineEdit(self.frame_measure_filter_params)
-        self.lineEdit_filter_savgol_polyOrder.setGeometry(QtCore.QRect(110, 35, 51, 25))
-        self.lineEdit_filter_savgol_polyOrder.setObjectName("lineEdit_filter_savgol_polyOrder")
-        self.lineEdit_filter_savgol_polyOrder.setText(self.dict_filter_params['savgol']['poly_order'])
-        self.frame_measure_filter_params.show()
-        #connect lineEdits to updateFilterParamsOnEdit
-        self.lineEdit_filter_savgol_polyOrder.editingFinished.connect(lambda: self.editFilterParams(self.lineEdit_filter_savgol_polyOrder))
-        self.lineEdit_filter_savgol_windowLength.editingFinished.connect(lambda: self.editFilterParams(self.lineEdit_filter_savgol_windowLength))
-
-
-    def updatePlots(self):
-        # Apply settings from uistate to canvas_mean and canvas_output
-        aspects = self.list_aspects
-        rec_filter = self.row['filter']  # the filter currently used for this recording
-        # Plot relevant filter of dfmean on canvas_mean, or show it if it's already plotted
-        self.updateMean(rec_filter=rec_filter, **{aspect: bool(uistate.checkBox[aspect]) for aspect in aspects})
-        for aspect in aspects :
-            # check if aspect exists in new_dfoutput
-            if aspect not in self.new_dfoutput.columns:
-                continue
-            visible = bool(uistate.checkBox[aspect])
-            self.updateOutputLine(aspect=aspect, visible=visible)
-            # TODO: set visibility on old aspects, disabled for now, here and in Measure_window_sub init
-            #self.ax1.lines[label2idx(self.ax1, f"old {aspect}")].set_visible(visible)
-            #self.ax2.lines[label2idx(self.ax2, f"old {aspect}")].set_visible(visible)
-        # TODO: Update y limits
-        oneAxisLeft(self.ax1, self.ax2) # Update axes visibility and position
-        self.canvas_mean.draw()
-        self.canvas_output.draw()
-
-    def updateMean(self, rec_filter, **kwargs):
-        ax = self.canvas_mean.axes
-        canvas = ax.figure.canvas
-        # If the filter is not already plotted, plot it
-        if label2idx(canvas, rec_filter) is False:
-            _ = sns.lineplot(ax=ax, label=rec_filter, data=self.dfmean, y=rec_filter, x="time", color="black")
-        # Set visibility of voltage and savgol lines based on the filter
-        ax.lines[label2idx(canvas, 'voltage')].set_visible(rec_filter=='voltage')
-        if label2idx(canvas, 'savgol') is not False:
-            ax.lines[label2idx(self.canvas_mean, 'savgol')].set_visible(rec_filter=='savgol')
-        # Hide the legend
-        if ax.get_legend() is not None:
-            ax.get_legend().set_visible(False)
-        # For each aspect (EPSP and volley), set visibility and plot lines
-        for aspect in ['EPSP', 'volley']:
-            if f'{aspect}_amp' in self.new_dfoutput.columns and self.new_dfoutput[f'{aspect}_amp'].notna().any():
-                getattr(self, f'v_t_{aspect}_amp').set_visible(kwargs.get(f'{aspect}_amp', False))
-            if f'{aspect}_slope' in self.new_dfoutput.columns and self.new_dfoutput[f'{aspect}_slope'].notna().any():
-                for item in [f'v_t_{aspect}_slope', f'v_t_{aspect}_slope_start', f'v_t_{aspect}_slope_end']:
-                    getattr(self, item).set_visible(kwargs.get(f'{aspect}_slope', False))
-                # Plot slope indicator
-                if label2idx(self.canvas_mean, f"line_{aspect}_slope") is False:
-                    if aspect == 'volley':
-                        graph_color = 'blue'
-                    else:
-                        graph_color = 'green'
-                    self.canvas_mean.axes.plot([], [], color=graph_color, linewidth=10, alpha=0.3, label=f"line_{aspect}_slope")
-                t_aspect_slope = self.row[f't_{aspect}_slope']
-                dfmean = self.dfmean
-                x_start = t_aspect_slope - self.row[f't_{aspect}_slope_size']
-                x_end = t_aspect_slope + self.row[f't_{aspect}_slope_size']
-                y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
-                y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-                self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, f"line_{aspect}_slope")].set_data([x_start, x_end], [y_start, y_end])
-                self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, f"line_{aspect}_slope")].set_visible(kwargs.get(f'{aspect}_slope', False))
-
-    def updateOutputLine(self, aspect, visible):
-        #columnsprint (self.new_dfoutput.columns)
-        if aspect.endswith('_amp'):
-            ax = self.ax1
-            style = '--'
-            graph_alpha = 0.2
-        else: # _slope
-            ax = self.ax2
-            style = None
-            graph_alpha = 0.1
-        if aspect.startswith('volley_'):
-            graph_color = 'blue'
-            if label2idx(ax, f'{aspect}_mean') is False:
-                ax.axhline(label=f'{aspect}_mean', y=self.row[f'{aspect}_mean'], color='blue', alpha = graph_alpha, linestyle=style)
-            else:
-                ax.lines[label2idx(ax, f'{aspect}_mean')].set_data(ax.get_xlim(), [self.row[f'{aspect}_mean'], self.row[f'{aspect}_mean']])
-            ax.lines[label2idx(ax, f'{aspect}_mean')].set_visible(visible)
-        else: # EPSP_
-            graph_color = 'green'
-        if label2idx(ax, aspect) is False:
-            print(f"updateOutputLine: adding {aspect}")
-            _ = sns.lineplot(ax=ax, label=aspect, data=self.new_dfoutput, y=aspect, x='sweep', color=graph_color, linestyle=style, alpha=graph_alpha)
-        else:
-            ax.lines[label2idx(ax, aspect)].set_data(self.new_dfoutput['sweep'], self.new_dfoutput[aspect])
-            ax.lines[label2idx(ax, aspect)].set_visible(visible)
-
-    def accepted_handler(self):
-        # Get the project dataframe
-        df_p = self.parent.get_df_project()
-        # Find the index of the row with the matching recording_name
-        idx = df_p.index[df_p['recording_name'] == self.row['recording_name']]
-        # Check if row values are different from corresponding row in df_project
-        df_p_row = df_p.iloc[idx].squeeze()
-        if df_p_row.equals(self.row):
-            print(f"df_p: {df_p_row['t_volley_slope']}")
-            print(f"row: {self.row['t_volley_slope']}")
-            print("No changes detected.")
-            return
-        if talkback:
-            # save the event from dfmean.voltage
-            if self.row['t_stim'] is None:
-                print("Abort: t_stim is None")
-                return
-            t_start = self.row['t_stim'] - 0.002
-            t_end = self.row['t_stim'] + 0.018
-            dfevent = self.dfmean[(self.dfmean['time'] >= t_start) & (self.dfmean['time'] < t_end)]
-            dfevent = dfevent[['time', 'voltage']]
-            path_talkback_df = Path(f"{self.parent.projects_folder}/talkback/talkback_slice_{self.row['ID']}.csv")
-            if not path_talkback_df.parent.exists():
-                path_talkback_df.parent.mkdir(parents=True, exist_ok=True)
-            dfevent.to_csv(path_talkback_df, index=False)
-            # save the event data as a dict
-            dict_event = {}
-            dict_event['t_EPSP_amp'] = self.row['t_EPSP_amp']
-            dict_event['t_EPSP_amp_method'] = self.row['t_EPSP_amp_method']
-            dict_event['t_EPSP_amp_params'] = self.row['t_EPSP_amp_params']
-            dict_event['t_EPSP_slope'] = self.row['t_EPSP_slope']
-            dict_event['t_EPSP_slope_size'] = self.row['t_EPSP_slope_size']
-            dict_event['t_EPSP_slope_method'] = self.row['t_EPSP_slope_method']
-            dict_event['t_EPSP_slope_params'] = self.row['t_EPSP_slope_params']
-            dict_event['t_volley_amp'] = self.row['t_volley_amp']
-            dict_event['t_volley_amp_method'] = self.row['t_volley_amp_method']
-            dict_event['t_volley_amp_params'] = self.row['t_volley_amp_params']
-            dict_event['t_volley_slope'] = self.row['t_volley_slope']
-            dict_event['t_volley_slope_size'] = self.row['t_volley_slope_size']
-            dict_event['t_volley_slope_method'] = self.row['t_volley_slope_method']
-            dict_event['t_volley_slope_params'] = self.row['t_volley_slope_params']
-            # store dict_event as .csv named after recording_name
-            path_talkback = Path(f"{self.parent.projects_folder}/talkback/talkback_meta_{self.row['ID']}.csv")
-            with open(path_talkback, 'w') as f:
-                json.dump(dict_event, f)
-
-        if len(idx) == 1: # Only proceed if there's exactly one matching row
-            # Update filters and params in self.row
-            if self.row['filter'] == "voltage":
-                self.row['filter_params'] = json.dumps({})
-            else:
-                self.row['filter_params'] = json.dumps(self.dict_filter_params[self.row['filter']])
-            # List columns to keep
-            list_keep = ['recording_name', 'groups']
-            # Update the row in df_project
-            for column, value in self.row.items():
-                if column not in list_keep:
-                    df_p.loc[idx, column] = value
-            # Save the updated df_project
-            self.parent.set_df_project(df_p)
-
-            # Update or drop the norm columns
-            EPSP_columns = ['EPSP_amp', 'EPSP_slope']
-            relative = uistate.checkBox['norm_EPSP'] # bool
-            normFrom = uistate.lineEdit['norm_EPSP_on'][0] # start
-            normTo = uistate.lineEdit['norm_EPSP_on'][1] # end
-            for column in EPSP_columns:
-                norm_column = column + '_norm'
-                if relative and column in self.new_dfoutput.columns:
-                    selected_values = self.new_dfoutput.loc[normFrom:normTo, column]
-                    norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
-                    self.new_dfoutput[norm_column] = self.new_dfoutput[column] / norm_mean
-                elif norm_column in self.new_dfoutput.columns:
-                    self.new_dfoutput.drop(columns=norm_column, inplace=True)
-                
-            # Update dfs; dicts and files
-            recording_name = self.parent.df_project.loc[int(idx.values[0]), 'recording_name']
-            self.parent.dict_outputs[recording_name] = self.new_dfoutput
-            self.parent.df2csv(df=self.new_dfoutput, rec=recording_name, key="output")
-
-            # Delete affected group output; dicts and files
-            str_groups = df_p.loc[int(idx.values[0]), 'groups']
-            list_groups = list(str_groups.split(","))
-            if (str_groups == " ") or (len(list_groups) == 0): # If the row is not in any group
-                pass
-            else: # Remove each group from internal dict and purge cache
-                for group in list_groups:
-                    if group in self.parent.dict_group_means.keys():
-                        del self.parent.dict_group_means[group]
-                        self.parent.purgeGroupCache(group)
-                        # Delete the group file if it exists
-                        group_path = Path(f"{self.parent.dict_folders['cache']}/{group}.csv")
-                        if group_path.exists():
-                            group_path.unlink()
-            self.parent.graphMainSet(row=df_p.iloc[idx]) # draw the updated row
-
-        # Error handling        
-        elif len(idx) < 1: # If no matching row is found
-            raise ValueError(f"ERROR (accepted_handler): {self.row['recording_name']} not found in df_project.")
-        else: # If multiple matching rows are found
-            raise ValueError(f"ERROR (accepted_handler): multiple instances of {self.row['recording_name']} in project_df.")
-        self.measure_frame.close()
-
-
-    def autoCalculate(self):
-        dffilter = self.parent.get_dffilter(row=self.row)
-        dict_t = analysis.find_all_t(dfmean=self.dfmean, verbose=False)
-        # Default sizes
-        dict_t['t_EPSP_slope_size'] = uistate.default['EPSP_slope_size_default']
-        dict_t['t_volley_slope_size'] = uistate.default['volley_slope_size_default']
-        print(f"dict_t: {dict_t}")
-        self.new_dfoutput = analysis.build_dfoutput(df=dffilter,
-                                       t_EPSP_amp=dict_t['t_EPSP_amp'],
-                                       t_EPSP_slope=dict_t['t_EPSP_slope'],
-                                       t_EPSP_slope_size=dict_t['t_EPSP_slope_size'],
-                                        t_volley_amp=dict_t['t_volley_amp'],
-                                        t_volley_slope=dict_t['t_volley_slope'],
-                                        t_volley_slope_size=dict_t['t_volley_slope_size'])
-        self.row['volley_amp_mean'] = self.new_dfoutput['volley_amp'].mean()
-        self.row['volley_slope_mean'] = self.new_dfoutput['volley_slope'].mean()
-        # Enforce dict_t
-        for edit_mode in self.list_edit_modes:
-            set_float = dict_t[f"t_{edit_mode}"]
-            print(f"set_float: {set_float}")
-            if isinstance(set_float, float) and not np.isnan(set_float) and set_float is not None:
-                self.updateAspect(edit_mode=edit_mode, set_float=set_float, method="Auto")
-        self.ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
-        self.ax2.set_ylim(uistate.zoom['output_ax2_ylim'])
-        
-
-    def m(self, SI): # convert seconds to milliseconds, or V to mV, returning a str for display purposes ONLY
-        return str(round(SI * 1000, 1)) # TODO: single decimal assumes 10KHz sampling rate; make this more flexible
-
-
-    def dfmeanDerivates(self, df): # plots prim and bis of df on canvas_mean
-        # Prim and Bis: filter to display only the relevant part of the trace, and rescale to match voltage
-        filtered_df = df.copy()
-        min_V = filtered_df['voltage'].min()
-        min_prim = filtered_df['prim'].min()
-        min_bis = filtered_df['bis'].min()
-        filtered_df['prim'] = filtered_df['prim'] * (min_V/min_prim)
-        filtered_df['bis'] = filtered_df['bis'] * (min_V/min_bis)
-        self.mean_prim = sns.lineplot(data=filtered_df, y="prim", x="time", ax=self.canvas_mean.axes, color="red", alpha=0.3)
-        self.mean_bis = sns.lineplot(data=filtered_df, y="bis", x="time", ax=self.canvas_mean.axes, color="green", alpha=0.3)
-
-
-    def meanClicked(self, event): # measure window click event
-        if event.inaxes is not None:
-            if event.button == 1:# Left mouse button clicked
-                x = event.xdata
-                # find time in self.dfmean closest to x
-                time = self.dfmean.iloc[(self.dfmean['time'] - x).abs().argsort()[:1]]['time'].values[0]
-                self.updateOnClick(time=time, edit_mode=self.now_setting)
-            elif event.button == 2:
-                zoomReset(canvas=self.canvas_mean)
-
-
-    def outputClicked(self, event): # measurewindow output click event
-        x = event.xdata
-        if event.button == 1 and x is not None: # Left mouse button clicked within xdata
-            if event.button == 1: 
-                self.drag_start = x
-                self.dragging = True
-                unPlot(self.canvas_output, self.si_v_drag_from)
-                self.si_v_drag_from = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="blue")
-                self.canvas_output.draw()
-        elif event.button == 3: # Right mouse button clicked
-            self.drag_start = None
-            self.dragging = False
-            unPlot(self.canvas_mean, self.si_sweep)
-            self.si_sweep, = self.canvas_mean.axes.plot([], [], color="blue")
-            self.canvas_mean.draw()
-            unPlot(self.canvas_output, self.si_v_drag_from, self.si_v_drag_to, self.dragplot)
-            self.canvas_output.draw()
-        elif event.button == 2:
-            zoomReset(canvas=self.canvas_output, out=True)
-    
-
-    def outputDragged(self, event): # measurewindow output drag event
-        x = event.xdata
-        if self.dragging:
-            unPlot(self.canvas_output, self.si_v_drag_to, self.dragplot)
-            if x is not None:
-                self.si_v_drag_to = sns.lineplot(ax=self.canvas_output.axes).axvline(x, color="blue")
-                self.dragplot = sns.lineplot(ax=self.canvas_output.axes).axvspan(self.drag_start, x, color='lightblue', alpha=0.3)
-            self.canvas_output.draw()
-    
-
-    def outputReleased(self, event): # measurewindow output release event
-        self.last_x = event.xdata
-        if (self.dragging) and (event.button == 1) and (self.last_x is not None):
-            self.dragging = False
-            self.updateSample(event)
-            # update sample range in lineEdits
-            drag_start = min(int(self.drag_start), int(self.last_x))
-            drag_end = max(int(self.drag_start), int(self.last_x))
-            self.lineEdit_sample_from.setText(str(drag_start))
-            self.lineEdit_sample_to.setText(str(drag_end))
-            
-            self.canvas_mean.draw()
-            self.canvas_output.draw()
-
-
-    def updateSample(self, event=None):
-        if event is not None:
-            x = event.xdata
-        else:
-            x = self.last_x
-        same = bool(int(self.drag_start) == int(x))
-        #print(f"meanDragged from: {self.drag_start} to {x}: {same}")
-        df = self.dffilter
-        rec_filter = self.row['filter'] # the filter currently used for this recording
-        #print(f"updateSample: event={event}, rec_filter={rec_filter}")
-        if same: # click and release on same: get that specific sweep and superimpose it on canvas_mean
-            unPlot(self.canvas_output, self.si_v_drag_to, self.dragplot)
-            df = df[df['sweep'] == int(self.drag_start)]
-            self.si_sweep.set_data(df['time'], df[rec_filter])
-        else: # get all sweeps between drag_start and x (event.xdata) and superimpose the mean of them on canvas_mean
-            if int(self.drag_start) > int(x):
-                df = df[(df['sweep'] >= int(x)) & (df['sweep'] <= int(self.drag_start))]
-            else:
-                df = df[(df['sweep'] >= int(self.drag_start)) & (df['sweep'] <= int(x))]
-            df = df.groupby('time').agg({rec_filter: ['mean']}).reset_index()
-            df.columns = ['time', rec_filter]
-            self.si_sweep.set_data(df['time'], df[rec_filter])
-
-    
-    def updateOnClick(self, time, edit_mode):
-        if verbose:
-            print(f"updateOnClick: time={time}, edit_mode={edit_mode}")
-        if edit_mode.endswith("_size"):
-            t_aspect = f"t_{edit_mode.replace('_size', '')}"
-            time = max(0.0001, abs(self.row[t_aspect]-time))
-        self.updateAspect(set_float=time, edit_mode=edit_mode, method="Manual")
-
-
-    def updateOnEdit(self, lineEdit, edit_mode):
-        print(f"updateOnEdit: lineEdit={lineEdit}, edit_mode={edit_mode}")
-        input_sanitized = lineEdit.text().replace(",", ".")
-        t_edit_mode = f"t_{edit_mode}"
-        # if edit_mode ends in _size...
-        if edit_mode.endswith("_size"):
-            try:
-                set_float = float(input_sanitized) / 1000  # convert to SI
-                if not 0.0001 <= set_float <= 0.002:
-                    raise ValueError
-                self.row[t_edit_mode] = set_float
-            except ValueError:
-                print("Invalid input: must be a number between 0.1 and 2ms.")
-                lineEdit.setText(str(self.row[t_edit_mode]))
-        else:
-            try:
-                set_float = float(input_sanitized) / 1000  # convert to SI
-                if not self.dfmean['time'].min() <= set_float <= self.dfmean['time'].max():
-                    raise ValueError
-            except ValueError:
-                print("Invalid input: must be a number within time range.")
-                lineEdit.setText(str(self.row[t_edit_mode]))
-        self.updateAspect(set_float=set_float, edit_mode=edit_mode, method="Manual")
-
-
-    def updateAspect(self, set_float, edit_mode, method):
-        # changes the measuring points of an aspect and propagates the change to the appropriate columns in df_project
-        t_edit_mode = f"t_{edit_mode}"
-        aspect = edit_mode.replace("_size", "")
-        t_aspect = f"t_{aspect}"
-        t_method = f"t_{aspect}_method"
-        # update row
-        self.row[t_edit_mode] = set_float
-        self.row[t_method] = method
-        # update lineEdit
-        line2update = getattr(self, "lineEdit_" + edit_mode)
-        line2update.setText(self.m(set_float))
-        if not uistate.checkBox[aspect]: # stop if aspect is not visible
-            return
-        # refresh dfoutput
-        dffilter = self.parent.get_dffilter(row=self.row)
-        time = self.row[t_aspect]
-        update_mean = False
-        if aspect.startswith("EPSP"):
-            graph_color = "green"
-        else: # aspect is volley
-            graph_color = "blue"
-            update_mean = True
-        if aspect.endswith("_amp"):
-            df = analysis.build_dfoutput(df=dffilter, **{t_aspect: time})
-            axis = self.ax1
-            plot_on_mean = {'center': ("v_" + t_aspect)}
-            linestyle = "--"
-            if hasattr(self, "line_EPSP_amp"):
-                self.line_EPSP_amp.remove()
-            self.line_EPSP_amp = sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color=graph_color, linestyle="--")
-        else: # aspect is slope
-            t_size = t_aspect + "_size"
-            size = self.row[t_aspect + "_size"]
-            axis = self.ax2
-            plot_on_mean = {'center': ("v_" + t_aspect),
-                            'start':  ("v_" + t_aspect + "_start"),
-                            'end':    ("v_" + t_aspect + "_end")}
-            linestyle = None
-            dfmean = self.dfmean
-            rec_filter = self.row['filter'] # the filter currently used for this recording
-            slope_size = self.row[t_aspect + '_size']
-            x_start = time - slope_size
-            x_end = time + slope_size
-            y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
-            y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-            df = analysis.build_dfoutput(df=dffilter, **{t_aspect: time}, **{t_size: size})
-            # mean, slope indicator
-            line_name = "line_" + aspect
-            if label2idx(self.canvas_mean, line_name) is False:
-                self.canvas_mean.axes.plot([], [], color=graph_color, linewidth=10, alpha=0.3, label=line_name)
-            self.canvas_mean.axes.lines[label2idx(self.canvas_mean.axes, line_name)].set_data([x_start, x_end], [y_start, y_end])
-        if update_mean:
-            self.row[f'{aspect}_mean'] = df[aspect].mean()
-
-        self.new_dfoutput[aspect] = df[aspect]
-        # Update graphs
-        for key, graph in plot_on_mean.items():
-            if hasattr(self, graph):
-                getattr(self, graph).remove() # remove the one about to be replaced
-            if key == "start":
-                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(x_start, color=graph_color, linestyle=":"))
-            elif key == "end":
-                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(x_end, color=graph_color, linestyle=":"))
-            else:
-                setattr(self, graph, sns.lineplot(ax=self.canvas_mean.axes).axvline(time, color=graph_color, linestyle="--"))
-        self.canvas_mean.draw()
-
-        #update output graph
-        while label2idx(axis, aspect):
-            axis.lines[label2idx(axis, aspect)].remove()
-        if self.new_dfoutput[aspect].notna().any():
-            _ = sns.lineplot(ax=axis, label=aspect, data=self.new_dfoutput, y=aspect, x='sweep', color=graph_color, linestyle=linestyle, alpha=0.8)
-        self.canvas_output.draw()
 
 
 def get_signals(source):
