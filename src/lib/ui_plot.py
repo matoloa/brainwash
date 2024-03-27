@@ -33,12 +33,12 @@ class UIplot():
         rec_name = dict_row['recording_name']
         rec_filter = dict_row['filter'] # the filter currently used for this recording
         t_EPSP_amp = dict_row['t_EPSP_amp']
-        t_EPSP_slope = dict_row['t_EPSP_slope']
-        t_EPSP_slope_size = dict_row['t_EPSP_slope_size']
+        t_EPSP_slope_start = dict_row['t_EPSP_slope_start']
+        t_EPSP_slope_end = dict_row['t_EPSP_slope_end']
         t_volley_amp = dict_row['t_volley_amp']
         volley_amp_mean = dict_row['volley_amp_mean']
-        t_volley_slope = dict_row['t_volley_slope']
-        t_volley_slope_size = dict_row['t_volley_slope_size']
+        t_volley_slope_start = dict_row['t_volley_slope_start']
+        t_volley_slope_end = dict_row['t_volley_slope_end']
         volley_slope_mean = dict_row['volley_slope_mean']
         # plot relevant filter of dfmean on main_canvas_mean
         if rec_filter != 'voltage':
@@ -64,9 +64,9 @@ class UIplot():
                 subplot = f"{label} EPSP amp norm"
                 plotted.append(subplot)
                 _ = sns.lineplot(ax=ax1, data=out, y='EPSP_amp_norm', x="sweep", color="green", linestyle='--', label=subplot)
-        if not np.isnan(t_EPSP_slope):
-            x_start = t_EPSP_slope - t_EPSP_slope_size
-            x_end = t_EPSP_slope + t_EPSP_slope_size
+        if not np.isnan(t_EPSP_slope_start):
+            x_start = t_EPSP_slope_start
+            x_end = t_EPSP_slope_end
             y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
             subplot = f"{label} EPSP slope marker"
@@ -75,6 +75,7 @@ class UIplot():
             subplot = f"{label} EPSP slope"
             plotted.append(subplot)
             _ = sns.lineplot(ax=ax2, data=out, y='EPSP_slope', x="sweep", color="green", alpha = 0.3, label=subplot)
+            print(f"EPSP_slope: {out['EPSP_slope'].mean()}")
             #if out has the column 'EPSP_slope_norm', plot it
             if 'EPSP_slope_norm' in out.columns:
                 subplot = f"{label} EPSP slope norm"
@@ -88,9 +89,9 @@ class UIplot():
             subplot = f"{label} volley amp mean"
             plotted.append(subplot)
             ax1.axhline(y=volley_amp_mean, color='blue', alpha = 0.3, linestyle='--', label=subplot)
-        if not np.isnan(t_volley_slope):
-            x_start = t_volley_slope - t_volley_slope_size
-            x_end = t_volley_slope + t_volley_slope_size
+        if not np.isnan(t_volley_slope_start):
+            x_start = t_volley_slope_start
+            x_end = t_volley_slope_end
             y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
             subplot = f"{label} volley slope marker"
@@ -101,19 +102,15 @@ class UIplot():
             ax2.axhline(y=volley_slope_mean, color='blue', alpha = 0.3, label=subplot)
 
     def plotUpdate(self, row, aspect, dfmean, mouseover_out, axm, ax_out):
+        print(f"Updating {row['recording_name']} {aspect}...")
         rec_filter = row['filter'] # the filter currently used for this recording
         #t_EPSP_amp = row['t_EPSP_amp']
-        t_EPSP_slope = row['t_EPSP_slope']
-        t_EPSP_slope_size = row['t_EPSP_slope_size']
-        #t_volley_amp = row['t_volley_amp']
-        #volley_amp_mean = row['volley_amp_mean']
-        #t_volley_slope = row['t_volley_slope']
-        #t_volley_slope_size = row['t_volley_slope_size']
-        #volley_slope_mean = row['volley_slope_mean']
+        t_EPSP_slope_start = row['t_EPSP_slope_start']
+        t_EPSP_slope_end = row['t_EPSP_slope_end']
 
         plot_to_update = f"{row['recording_name']} {aspect} marker"
-        x_start = t_EPSP_slope - t_EPSP_slope_size
-        x_end = t_EPSP_slope + t_EPSP_slope_size
+        x_start = t_EPSP_slope_start
+        x_end = t_EPSP_slope_end
         y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
         y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
         # print(f"Updating {plot_to_update} to {x_start}, {x_end}, {y_start}, {y_end}")

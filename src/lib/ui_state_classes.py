@@ -32,27 +32,31 @@ class UIstate:
             'output_ax2_ylim': (0, 1.2),
         }
         self.default = {
-            'last_edit_mode': 'EPSP_slope',
-            'EPSP_slope_size_default': 0.0003,
-            'EPSP_slope_method_default': {},
-            'EPSP_slope_params_default': {},
-            'volley_slope_size_default': 0.0001,
-            'volley_slope_method_default': {},
-            'volley_slope_params_default': {},
+            't_volley_slope_width': 0.0003,
+            't_volley_slope_halfwidth': 0.0001,
+            't_volley_slope_method': 'auto detect',
+            't_volley_slope_params': 'NA',
+              't_EPSP_slope_width': 0.0007,
+              't_EPSP_slope_halfwidth': 0.0003,
+              't_EPSP_slope_method': 'auto detect',
+              't_EPSP_slope_params': 'NA',
         }
+        self.last_edit_mode = 'EPSP_slope'
+
         # Do NOT persist these
         self.selected = [] # list of selected indices
         self.plotted = {} # dict: key=name (meanplot), value=[subplots]
         self.row_copy = None # copy of selected row from df_project
         self.mouseover_aspect = None # name of mouseovered aspect
         self.mouseover_EPSP_slope = None # plot of tentative EPSP slope
-        self.last_x = None # last x value of mouseovered aspect; prevents needless update when holding drag still
+        self.x_idx = None # current x value of dragging
+        self.last_x_idx = None # last x value within the same dragging event; prevents needless update when holding drag still
+        self.prior_x_idx = None # x value of the last stored slope
         self.mouseover_out = None # output of dragged aspect
-        self.dragging = False # dragging state
         self.EPSP_slope_zone = {} # dict: key=x,y, value=start,end. clickzone: including margin. Set upon selection.
         self.EPSP_slope_range = {} # dict: key=x,y, value=min,max. Set upon selection.
 
-    def updateSlopeDrag(self, t=None, xdata=None, ydata=None): # update slope drag zone
+    def updateSlopeDragZone(self, xdata=None, ydata=None): # update the mouseover zone for dragging EPSP slope
         # if xdata or ydata are None, use the current mouseover_EPSP_slope
         if xdata is None or ydata is None:
             x = self.mouseover_EPSP_slope[0].get_xdata()

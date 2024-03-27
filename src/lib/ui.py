@@ -488,11 +488,13 @@ def df_projectTemplate():
             "t_volley_amp",
             "t_volley_amp_method",
             "t_volley_amp_params",
-            "volley_amp_mean",
-            "t_volley_slope",
-            "t_volley_slope_size",
+            "t_volley_slope_width",
+            "t_volley_slope_halfwidth",
+            "t_volley_slope_start",
+            "t_volley_slope_end",
             "t_volley_slope_method",
             "t_volley_slope_params",
+            "volley_amp_mean",
             "volley_slope_mean",
             "t_VEB",
             "t_VEB_method",
@@ -500,8 +502,10 @@ def df_projectTemplate():
             "t_EPSP_amp",
             "t_EPSP_amp_method",
             "t_EPSP_amp_params",
-            "t_EPSP_slope",
-            "t_EPSP_slope_size",
+            "t_EPSP_slope_width",
+            "t_EPSP_slope_halfwidth",
+            "t_EPSP_slope_start",
+            "t_EPSP_slope_end",
             "t_EPSP_slope_method",
             "t_EPSP_slope_params",
             "exclude",
@@ -976,8 +980,8 @@ class UIsub(Ui_MainWindow):
                 if line.get_label() == f"{uistate.row_copy['recording_name']} EPSP slope marker":
                     xdata = line.get_xdata()
                     ydata = line.get_ydata()
-                    uistate.updateSlopeDrag(xdata=xdata, ydata=ydata)
-                    self.dfmean = self.get_dfmean(row=uistate.row_copy) # ISSUE: persisted dfmean overwritten only on selecting new single line
+                    uistate.updateSlopeDragZone(xdata=xdata, ydata=ydata)
+                    self.dfmean = self.get_dfmean(row=uistate.row_copy) # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
                     self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseover(event=event, axm=self.axm))
         graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
@@ -1439,7 +1443,13 @@ class UIsub(Ui_MainWindow):
         list_show = [   
                         df_p.columns.get_loc('recording_name'),
                         df_p.columns.get_loc('groups'),
-                        df_p.columns.get_loc('sweeps')
+                        df_p.columns.get_loc('sweeps'),
+
+                        df_p.columns.get_loc('t_EPSP_slope_start'),
+                        df_p.columns.get_loc('t_EPSP_slope_end'),
+                        df_p.columns.get_loc('t_EPSP_slope_width'),
+                        df_p.columns.get_loc('t_EPSP_slope_halfwidth'),
+                        df_p.columns.get_loc('t_EPSP_slope_method'),
                     ]
         if uistate.checkBox['paired_stims']:
             list_show.append(df_p.columns.get_loc('Tx'))
@@ -1674,25 +1684,28 @@ class UIsub(Ui_MainWindow):
         Stores timepoints, methods and params in their designated columns in self.df_project
         Returns a df of the results: amplitudes and slopes
         '''
+        print("defaultOutput")
         dffilter = self.get_dffilter(row=row)
         dfmean = self.get_dfmean(row=row)
         df_p = self.get_df_project()
-        dict_t = analysis.find_all_t(dfmean=dfmean, verbose=False)
-        # Default sizes
-        dict_t['t_EPSP_slope_size'] = uistate.default['EPSP_slope_size_default']
-        dict_t['t_volley_slope_size'] = uistate.default['volley_slope_size_default']
-        for aspect, value in dict_t.items():
+        dict_t = uistate.default.copy() # Default sizes
+        print(f"dict_t: {dict_t}")
+        dict_t.update(analysis.find_all_t(dfmean=dfmean, 
+                                          volley_slope_halfwidth=dict_t['t_volley_slope_halfwidth'], 
+                                          EPSP_slope_halfwidth=dict_t['t_EPSP_slope_halfwidth'], 
+                                          verbose=False))
+        for key, value in dict_t.items():
             # Get the row ID
             row_id = row['ID']
-            old_aspect_value = df_p.loc[df_p['ID'] == row_id, aspect].values[0]
+            old_aspect_value = df_p.loc[df_p['ID'] == row_id, key].values[0]
             if pd.notna(old_aspect_value):
                 # if old_aspect IS a valid float, use it: replace in dict_t
-                dict_t[aspect] = old_aspect_value
-                print(f"{aspect} was {old_aspect_value} in df_p, a valid float. Updated dict_t to {value}")
+                dict_t[key] = old_aspect_value
+                print(f"{key} was {old_aspect_value} in df_p, a valid float. Updated dict_t to {value}")
             else: # if old_aspect is NOT a valid float, replace df_p with dict_t
-                df_p.loc[df_p['ID'] == row_id, aspect] = value
-                print(f"{aspect} was {old_aspect_value} in df_p, NOT a valid float. Updating df_p...")
-        dfoutput = analysis.build_dfoutput(df=dffilter, t_EPSP_amp=dict_t['t_EPSP_amp'], t_EPSP_slope=dict_t['t_EPSP_slope'], t_EPSP_slope_size=dict_t['t_EPSP_slope_size'], t_volley_amp=dict_t['t_volley_amp'], t_volley_slope=dict_t['t_volley_slope'], t_volley_slope_size=dict_t['t_volley_slope_size'])
+                df_p.loc[df_p['ID'] == row_id, key] = value
+                print(f"{key} was {old_aspect_value} in df_p, NOT a valid float. Updating df_p...")
+        dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
         df_p.loc[df_p['ID'] == row_id, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
         df_p.loc[df_p['ID'] == row_id, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
         self.set_df_project(df_p)
@@ -1781,60 +1794,86 @@ class UIsub(Ui_MainWindow):
             ax2.axhline(y=0, linestyle=':', color=groupcolor, alpha = 0.4)
 
     def mainClicked(self, event, canvas, out=False): # maingraph click event
-        # do not make copies of dfs in uistate!
+        # TODO: do not make copies of dfs in uistate!
         # this is still in uisub; use get_dfmean(row), get_dffilter(row)...
         # pass references along from tableProjSelectionChanged
-        
-        uistate.dfmean = self.get_dfmean(uistate.row_copy)
-        self.usage(f"mainClicked_output={out}")
+        x = event.xdata
+        time_values = self.dfmean['time'].values
+        print (f"time_values: {time_values}")
+        uistate.prior_x_idx = np.abs(time_values - x).argmin() # nearest x-index to click
         if event.inaxes is not None:
             if event.button == 1:
                 if uistate.mouseover_aspect == "t_EPSP_slope":
-                    uistate.dragging = True
-                    self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', self.mainDragged)
+                    prior_slope_start = uistate.row_copy['t_EPSP_slope_start']
+                    prior_slope_end = uistate.row_copy['t_EPSP_slope_end']
+                    self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event',
+                        lambda event: self.mainDragged(event, time_values, prior_slope_start, prior_slope_end))
                     self.mouse_release = self.main_canvas_mean.mpl_connect('button_release_event', self.mainReleased)
+                uistate.dragging = True
             elif event.button == 2:
                 zoomReset(canvas=canvas, out=out)
 
-    def mainDragged(self, event): # maingraph release event
+    def mainDragged(self, event, time_values, prior_slope_start, prior_slope_end): # maingraph dragging event
         self.main_canvas_mean.mpl_disconnect(self.mouseover)
         if event.xdata is None:
             return
-        x = event.xdata
+        uistate.x_idx = np.abs(time_values - event.xdata).argmin()  # update x to the nearest x-value on the plot
+        if uistate.x_idx == uistate.last_x_idx: # if the dragged event hasn't moved an index point, change nothing
+            return
+        precision = len(str(time_values[1] - time_values[0]).split('.')[1])
+        #print(f"precision: {precision}")
+        time_diff = time_values[uistate.x_idx] - time_values[uistate.prior_x_idx]
+        x_start = round(prior_slope_start + time_diff, precision)
+        x_end = round(prior_slope_end + time_diff, precision)
         rec_filter = uistate.row_copy['filter']
-        time_values = self.dfmean['time'].values
-        nearest_index = np.abs(time_values - x).argmin()
-        x = time_values[nearest_index]  # update x to the nearest x-value on the plot
-        uistate.row_copy['t_EPSP_slope'] = x
-        slope_size = uistate.row_copy['t_EPSP_slope_size']
-        x_start = x - slope_size
-        x_end = x + slope_size
         y_start = self.dfmean[rec_filter].iloc[(self.dfmean['time'] - x_start).abs().idxmin()]
         y_end = self.dfmean[rec_filter].iloc[(self.dfmean['time'] - x_end).abs().idxmin()]
         uistate.mouseover_EPSP_slope[0].set_data([x_start, x_end], [y_start, y_end])
+        uistate.last_x_idx = uistate.x_idx
         self.main_canvas_mean.draw()
-        self.mainDragUpdate(x=x, slope_size=slope_size)
+        self.mainDragUpdate(x_start, x_end)
+
+    def mainDragUpdate(self, x_start, x_end): # maingraph drag event
+        dffilter = self.get_dffilter(row=uistate.row_copy)
+        #print(f"mainDragUpdate: {x_start}, {x_end}")
+        uistate.row_copy['t_EPSP_slope_start'] = x_start
+        uistate.row_copy['t_EPSP_slope_end'] = x_end
+        dict_t = {
+            "t_EPSP_slope_start": x_start,
+            "t_EPSP_slope_end": x_end
+        }
+        out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+        if uistate.mouseover_out is None:
+            print("Found no mouseover_out")
+            uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_slope'], color='green')
+        else:
+            uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope'])
+        self.main_canvas_output.draw()
 
     def mainReleased(self, event): # maingraph release event
         self.usage("mainReleased")
-        if uistate.mouseover_aspect == "EPSP_slope":
-            print("EPSP_slope released")
+        print(f" - uistate.mouseover_aspect: {uistate.mouseover_aspect}")
         self.main_canvas_mean.mpl_disconnect(self.mouse_drag)
         self.main_canvas_mean.mpl_disconnect(self.mouse_release)
-        uistate.dragging = False
-        uistate.last_x = None
+        uistate.last_x_idx = None
+        if uistate.x_idx == uistate.prior_x_idx: # nothing to update
+            print("x_idx == prior_x_idx")
+            return
 
         # update window zone and reconnect mouseover
-        uistate.updateSlopeDrag(t=event.xdata)
+        uistate.updateSlopeDragZone(event.xdata)
         self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseover(event=event, axm=self.axm))
+        uistate.row_copy['t_EPSP_slope_method'] = "manual"
 
-        # update df_p and dfoutput
-        row_id = uistate.row_copy['ID']
+        # update df_p with uistate.row_copy, allocated by unique ID
         df_p = self.get_df_project()
-        print(f" - x was {df_p.loc[df_p['ID'] == row_id, uistate.mouseover_aspect].values[0]}, set to {uistate.row_copy[uistate.mouseover_aspect]}")
-        df_p.loc[df_p['ID'] == row_id, uistate.mouseover_aspect] = uistate.row_copy[uistate.mouseover_aspect]
+        df_update = pd.DataFrame(uistate.row_copy).T.set_index('ID')
+        df_p.set_index('ID', inplace=True)
+        df_p.update(df_update)
+        df_p.reset_index(inplace=True)
         self.set_df_project(df_p)
 
+        # Get rec_name and rec_filter
         rec_name = uistate.row_copy['recording_name']
         rec_filter = uistate.row_copy['filter']
 
@@ -1850,23 +1889,7 @@ class UIsub(Ui_MainWindow):
         # TODO: update dfoutput; dict and file
         new_dfoutput = self.get_dfoutput(uistate.row_copy)
         self.df2csv(df=new_dfoutput, rec=rec_name, key="output")
-
-        # Reconnect these for update-only-on-release
-        # last_x = event.xdata
-        # slope_size = uistate.row_copy['t_EPSP_slope_size']
-        # self.mainDragUpdate(x=last_x, slope_size=slope_size)
-
-    def mainDragUpdate(self, x, slope_size): # maingraph drag event
-        if x != uistate.last_x:
-            uistate.last_x = x
-            dffilter = self.get_dffilter(row=uistate.row_copy)
-            out = analysis.build_dfoutput(df=dffilter, t_EPSP_slope=x, t_EPSP_slope_size=slope_size)
-            if uistate.mouseover_out is None:
-                print("Found no mouseover_out")
-                uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_slope'], color='green')
-            else:
-                uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope'])
-            self.main_canvas_output.draw()
+        self.tableUpdate()
 
 
     '''         
