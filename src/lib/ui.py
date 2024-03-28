@@ -767,7 +767,7 @@ class UIsub(Ui_MainWindow):
         self.usage(f"viewSettingsChanged_{key}")
         if key in uistate.checkBox.keys():
             uistate.checkBox[key] = (state == 2)
-        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        self.updateMouseover()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
     def setUIstate(self):
@@ -840,7 +840,7 @@ class UIsub(Ui_MainWindow):
         if uistate.selected:
             self.clearGroupsByRow(uistate.selected)
             self.tableUpdate()
-            graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+            self.updateMouseover()
         else:
             print("No files selected.")
 
@@ -851,7 +851,7 @@ class UIsub(Ui_MainWindow):
         self.removeAllGroupControls()
         self.defaultGroups()
         self.tableUpdate()
-        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        self.updateMouseover()
 
     def triggerNewGroup(self):
         self.usage("triggerNewGroup")
@@ -961,32 +961,7 @@ class UIsub(Ui_MainWindow):
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         # build the list uistate.selected with indices
         uistate.selected = [index.row() for index in selected_indexes]
-        # drop any prior mouseover event connections
-        if hasattr(self, 'mouseover'):
-            self.main_canvas_mean.mpl_disconnect(self.mouseover)
-        # if only one item is selected, make a new mouseover event connection
-        if len(uistate.selected) == 1:
-            df_p = self.get_df_project()
-            uistate.row_copy = df_p.loc[uistate.selected[0]].copy()
-            # drop previous mouseover markers and output
-            if uistate.mouseover_plot is not None:
-                uistate.mouseover_plot[0].remove()
-                uistate.mouseover_plot = None
-            if uistate.mouseover_blob is not None:
-                uistate.mouseover_blob.remove()
-                uistate.mouseover_blob = None
-            if uistate.mouseover_out is not None:
-                uistate.mouseover_out[0].remove()
-                uistate.mouseover_out = None
-            # set new mouseover event connection
-            for line in self.axm.lines:
-                if line.get_label() == f"{uistate.row_copy['recording_name']} EPSP slope marker":
-                    xdata = line.get_xdata()
-                    ydata = line.get_ydata()
-                    uistate.updateSlopeDragZones(xdata=xdata, ydata=ydata)
-                    self.dfmean = self.get_dfmean(row=uistate.row_copy) # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
-                    self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseover(event=event, axm=self.axm))
-        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        self.updateMouseover()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
 
     def tableProjDoubleClicked(self):
@@ -1000,7 +975,7 @@ class UIsub(Ui_MainWindow):
         self.purgeGroupCache(*self.dict_groups['list_ID'])
         uistate.save_cfg()
         self.tableFormat()
-        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        self.updateMouseover()
 
     def checkBox_norm_EPSP_changed(self, state):
         self.usage("checkBox_norm_EPSP_changed")
@@ -1012,7 +987,7 @@ class UIsub(Ui_MainWindow):
         uistate.checkBox['norm_EPSP'] = norm
         uistate.save_cfg()
         self.purgeGroupCache(*self.dict_groups['list_ID'])
-        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        self.updateMouseover()
 
     def editNormRange(self, lineEdit):
         self.usage("editNormRange")
@@ -1248,7 +1223,7 @@ class UIsub(Ui_MainWindow):
                 already_flipped.append(index_pair)
                 self.set_df_project(df_p)
                 self.tableUpdate()
-            graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+            self.updateMouseover()
         else:
             print("No files selected.")
 
@@ -1295,7 +1270,7 @@ class UIsub(Ui_MainWindow):
             print(f"groupCheckboxChanged: {state}, {group}")
         uistate.group_show[group] = state == 2
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
-        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        self.updateMouseover()
 
 
     def addToGroup(self, add_group):
@@ -1320,7 +1295,7 @@ class UIsub(Ui_MainWindow):
             self.save_df_project()
             self.purgeGroupCache(add_group)
             self.tableUpdate()
-            graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+            self.updateMouseover()
         else:
             print("No files selected.")
 
@@ -1814,6 +1789,37 @@ class UIsub(Ui_MainWindow):
             elif event.button == 2:
                 zoomReset(canvas=canvas, out=out)
 
+    def updateMouseover(self):
+        # drop any prior mouseover event connections and plots
+        if hasattr(self, 'mouseover'):
+            self.main_canvas_mean.mpl_disconnect(self.mouseover)
+        if uistate.mouseover_plot is not None:
+            uistate.mouseover_plot[0].remove()
+            uistate.mouseover_plot = None
+        if uistate.mouseover_blob is not None:
+            uistate.mouseover_blob.remove()
+            uistate.mouseover_blob = None
+        if uistate.mouseover_out is not None:
+            uistate.mouseover_out[0].remove()
+            uistate.mouseover_out = None
+        # if only one item is selected, make a new mouseover event connection
+        if len(uistate.selected) == 1:
+            df_p = self.get_df_project()
+            uistate.row_copy = df_p.loc[uistate.selected[0]].copy()
+            self.dfmean = self.get_dfmean(row=uistate.row_copy) # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
+            connect = False
+            for line in self.axm.lines: # this only connects plotted lines
+                label = line.get_label()
+                if label == f"{uistate.row_copy['recording_name']} EPSP slope marker":
+                    uistate.updateSlopeDragZones(aspect="EPSP slope", axm=self.axm, x=line.get_xdata(), y=line.get_ydata())
+                    connect = True
+                elif label == f"{uistate.row_copy['recording_name']} EPSP amp marker":
+                    uistate.updateSlopeDragZones(aspect="EPSP amp", axm=self.axm, x=line.get_xdata(), y=line.get_ydata())
+                    connect = True
+            if connect: # set new mouseover event connection
+                self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseover(event=event, axm=self.axm))
+        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+
     def mainDragged(self, event, time_values, action, prior_slope_start, prior_slope_end): # maingraph dragging event
         self.main_canvas_mean.mpl_disconnect(self.mouseover)
         if event.xdata is None:
@@ -1862,7 +1868,6 @@ class UIsub(Ui_MainWindow):
         })
         out = analysis.build_dfoutput(df=dffilter, dict_t=uistate.row_copy)
         if uistate.mouseover_out is None:
-            print("Found no mouseover_out")
             uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_slope'], color='green')
         else:
             uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope'])
@@ -1879,9 +1884,9 @@ class UIsub(Ui_MainWindow):
             return
 
         # update window zone and reconnect mouseover
-        uistate.updateSlopeDragZones()#event.xdata, event.ydata)
-        self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseover(event=event, axm=self.axm))
         uistate.row_copy['t_EPSP_slope_method'] = "manual"
+        uistate.updateSlopeDragZones()
+        self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseover(event=event, axm=self.axm))
 
         # update df_p with uistate.row_copy, allocated by unique ID
         df_p = self.get_df_project()
@@ -1908,6 +1913,7 @@ class UIsub(Ui_MainWindow):
         new_dfoutput = self.get_dfoutput(uistate.row_copy)
         self.df2csv(df=new_dfoutput, rec=rec_name, key="output")
         self.tableUpdate()
+        self.updateMouseover()
 
 
     '''         

@@ -1,4 +1,6 @@
 import pickle
+from matplotlib.transforms import Bbox
+
 
 class UIstate:
     def __init__(self):
@@ -6,7 +8,6 @@ class UIstate:
 
     def reset(self): # reset all states to False
         self.version = "0.0.0"
-        self.margin = 0.5 # extra space, relative to data range, to include in mouseover zone
         self.axm = [] # list of items that are supposed to be on axm
         self.ax1 = [] # list of items that are supposed to be on ax1
         self.ax2 = [] # list of items that are supposed to be on ax2
@@ -41,40 +42,50 @@ class UIstate:
               't_EPSP_slope_method': 'auto detect',
               't_EPSP_slope_params': 'NA',
         }
-        self.last_edit_mode = 'EPSP_slope'
 
-        # Do NOT persist these
+    # Do NOT persist these
         self.selected = [] # list of selected indices
         self.plotted = {} # dict: key=name (meanplot), value=[subplots]
         self.row_copy = None # copy of selected row from df_project
-        self.mouseover_action = None # name of action to take if cliked at current mouseover
+        self.mouseover_action = None # name of action to take if clicked at current mouseover
+            # volley amp move, volley slope move/resize, EPSP amp move, EPSP slope move/resize
         self.mouseover_plot = None # plot of tentative EPSP slope
         self.mouseover_blob = None
+        self.x_margin = None # for mouseover detection boundaries
+        self.y_margin = None # for mouseover detection boundaries
         self.x_idx = None # current x value of dragging
         self.last_x_idx = None # last x value within the same dragging event; prevents needless update when holding drag still
         self.prior_x_idx = None # x value of the last stored slope
         self.mouseover_out = None # output of dragged aspect
-        self.EPSP_slope_move_zone = {} # dict: key=x,y, value=start,end. clickzone: including margin. Set upon selection.
-        self.EPSP_slope_resize_zone = {} # dict: key=x,y, value=start,end. clickzone: including margin. Set upon selection.
-        self.EPSP_slope_xy = None # x,y data of the slope line. Set upon selection.
+        # coordinates. Set upon selection.
+        self.EPSP_amp_xy = None # x,y
+        self.EPSP_slope_xy = None # x[0-1],y[0-1]
+        # clickzones: including margin. Set upon selection.
+        self.EPSP_amp_move_zone = {} # dict: key=x,y, value=start,end. 
+        self.EPSP_slope_move_zone = {} # dict: key=x,y, value=start,end.
+        self.EPSP_slope_resize_zone = {} # dict: key=x,y, value=start,end.
 
-    def updateSlopeDragZones(self, xdata=None, ydata=None): # update the mouseover zone for dragging EPSP slope
-        # if xdata or ydata are None, use the current mouseover_plot
-        if xdata is None or ydata is None:
+    def updateSlopeDragZones(self, aspect=None, axm=None, x=None, y=None): # update the mouseover zone for dragging EPSP slope
+        # NB only pass arguments when first setting the zone; for updates, pass nothing (using stored values)
+        if axm is not None: # ALL args passed: this is an "init". Set up margins and use passed xy.
+            self.mouseover_action = aspect
+            pixels = 12 # margin in pixels TODO: make this a setting
+            self.x_margin = axm.transData.inverted().transform((pixels, 0))[0] - axm.transData.inverted().transform((0, 0))[0]
+            self.y_margin = axm.transData.inverted().transform((0, pixels))[1] - axm.transData.inverted().transform((0, 0))[1]
+        else: # NO args passed: this is an update. Use stored xy.
             x = self.mouseover_plot[0].get_xdata()
             y = self.mouseover_plot[0].get_ydata()
-        else:
-            x = xdata
-            y = ydata
+
         x_window = min(x), max(x)
         y_window = min(y), max(y)
-        x_margin = (max(x)-min(x)) * self.margin
-        y_margin = (max(y)-min(y)) * self.margin
-        self.EPSP_slope_xy = x, y
-        self.EPSP_slope_move_zone['x'] = x_window[0]-x_margin, x_window[-1]+x_margin
-        self.EPSP_slope_move_zone['y'] = y_window[0]-y_margin, y_window[-1]+y_margin
-        self.EPSP_slope_resize_zone['x'] = x[-1]-x_margin, x[-1]+x_margin
-        self.EPSP_slope_resize_zone['y'] = y[-1]-y_margin, y[-1]+y_margin
+        if self.mouseover_action == 'EPSP amp move':
+            self.EPSP_amp_xy = x, y
+        elif self.mouseover_action.startswith('EPSP slope'):
+            self.EPSP_slope_xy = x, y
+            self.EPSP_slope_move_zone['x'] = x_window[0]-self.x_margin, x_window[-1]+self.x_margin
+            self.EPSP_slope_move_zone['y'] = y_window[0]-self.y_margin, y_window[-1]+self.y_margin
+            self.EPSP_slope_resize_zone['x'] = x[-1]-self.x_margin, x[-1]+self.x_margin
+            self.EPSP_slope_resize_zone['y'] = y[-1]-self.y_margin, y[-1]+self.y_margin
 
     def to_axm(self, df): # lines that are supposed to be on axm - label: index
         axm = {}
