@@ -47,20 +47,22 @@ class UIstate:
         self.selected = [] # list of selected indices
         self.plotted = {} # dict: key=name (meanplot), value=[subplots]
         self.row_copy = None # copy of selected row from df_project
-        self.mouseover_aspect = None # name of mouseovered aspect
-        self.mouseover_EPSP_slope = None # plot of tentative EPSP slope
+        self.mouseover_action = None # name of action to take if cliked at current mouseover
+        self.mouseover_plot = None # plot of tentative EPSP slope
+        self.mouseover_blob = None
         self.x_idx = None # current x value of dragging
         self.last_x_idx = None # last x value within the same dragging event; prevents needless update when holding drag still
         self.prior_x_idx = None # x value of the last stored slope
         self.mouseover_out = None # output of dragged aspect
-        self.EPSP_slope_zone = {} # dict: key=x,y, value=start,end. clickzone: including margin. Set upon selection.
-        self.EPSP_slope_range = {} # dict: key=x,y, value=min,max. Set upon selection.
+        self.EPSP_slope_move_zone = {} # dict: key=x,y, value=start,end. clickzone: including margin. Set upon selection.
+        self.EPSP_slope_resize_zone = {} # dict: key=x,y, value=start,end. clickzone: including margin. Set upon selection.
+        self.EPSP_slope_xy = None # x,y data of the slope line. Set upon selection.
 
-    def updateSlopeDragZone(self, xdata=None, ydata=None): # update the mouseover zone for dragging EPSP slope
-        # if xdata or ydata are None, use the current mouseover_EPSP_slope
+    def updateSlopeDragZones(self, xdata=None, ydata=None): # update the mouseover zone for dragging EPSP slope
+        # if xdata or ydata are None, use the current mouseover_plot
         if xdata is None or ydata is None:
-            x = self.mouseover_EPSP_slope[0].get_xdata()
-            y = self.mouseover_EPSP_slope[0].get_ydata()
+            x = self.mouseover_plot[0].get_xdata()
+            y = self.mouseover_plot[0].get_ydata()
         else:
             x = xdata
             y = ydata
@@ -68,10 +70,11 @@ class UIstate:
         y_window = min(y), max(y)
         x_margin = (max(x)-min(x)) * self.margin
         y_margin = (max(y)-min(y)) * self.margin
-        self.EPSP_slope_range['x'] = x
-        self.EPSP_slope_range['y'] = y
-        self.EPSP_slope_zone['x'] = x_window[0]-x_margin, x_window[1]+x_margin
-        self.EPSP_slope_zone['y'] = y_window[0]-y_margin, y_window[1]+y_margin
+        self.EPSP_slope_xy = x, y
+        self.EPSP_slope_move_zone['x'] = x_window[0]-x_margin, x_window[-1]+x_margin
+        self.EPSP_slope_move_zone['y'] = y_window[0]-y_margin, y_window[-1]+y_margin
+        self.EPSP_slope_resize_zone['x'] = x[-1]-x_margin, x[-1]+x_margin
+        self.EPSP_slope_resize_zone['y'] = y[-1]-y_margin, y[-1]+y_margin
 
     def to_axm(self, df): # lines that are supposed to be on axm - label: index
         axm = {}
