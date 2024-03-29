@@ -65,27 +65,41 @@ class UIstate:
         self.EPSP_slope_move_zone = {} # dict: key=x,y, value=start,end.
         self.EPSP_slope_resize_zone = {} # dict: key=x,y, value=start,end.
 
-    def updateSlopeDragZones(self, aspect=None, axm=None, x=None, y=None): # update the mouseover zone for dragging EPSP slope
-        # NB only pass arguments when first setting the zone; for updates, pass nothing (using stored values)
-        if axm is not None: # ALL args passed: this is an "init". Set up margins and use passed xy.
+    def setMargins(self, axm, pixels=12): # set margins for mouseover detection
+        self.x_margin = axm.transData.inverted().transform((pixels, 0))[0] - axm.transData.inverted().transform((0, 0))[0]
+        self.y_margin = axm.transData.inverted().transform((0, pixels))[1] - axm.transData.inverted().transform((0, 0))[1]
+
+    def updatePointDragZone(self, aspect=None, x=None, y=None): # update the mouseover zone for amp move
+        if aspect == None:
+            aspect = self.mouseover_action
+            x, y = self.mouseover_blob.get_offsets()[0].tolist()
+        else:
             self.mouseover_action = aspect
-            pixels = 12 # margin in pixels TODO: make this a setting
-            self.x_margin = axm.transData.inverted().transform((pixels, 0))[0] - axm.transData.inverted().transform((0, 0))[0]
-            self.y_margin = axm.transData.inverted().transform((0, pixels))[1] - axm.transData.inverted().transform((0, 0))[1]
-        else: # NO args passed: this is an update. Use stored xy.
+            print(f" - - updatePointDragZone SET: {self.mouseover_action}")
+        if aspect == "EPSP amp move":
+            self.EPSP_amp_xy = x, y
+            self.EPSP_amp_move_zone['x'] = x-self.x_margin, x+self.x_margin
+            self.EPSP_amp_move_zone['y'] = y-self.y_margin, y+self.y_margin
+        print(f" - - updatePointDragZone: {aspect} move_x {self.EPSP_amp_move_zone['x']}")
+
+    def updateSlopeDragZones(self, aspect=None, x=None, y=None): # update the mouseover zones for slope move/resize
+        # NB only pass arguments when first setting the zone; for updates, pass nothing (using stored values)
+        if aspect is None:
+            aspect = self.mouseover_action
             x = self.mouseover_plot[0].get_xdata()
             y = self.mouseover_plot[0].get_ydata()
-
-        x_window = min(x), max(x)
-        y_window = min(y), max(y)
-        if self.mouseover_action == 'EPSP amp move':
-            self.EPSP_amp_xy = x, y
-        elif self.mouseover_action.startswith('EPSP slope'):
+        else:
+            self.mouseover_action = aspect
+            print(f" - - updateSlopeDragZones SET: {self.mouseover_action}")
+        if self.mouseover_action.startswith("EPSP slope"):
             self.EPSP_slope_xy = x, y
+            x_window = min(x), max(x)
+            y_window = min(y), max(y)
             self.EPSP_slope_move_zone['x'] = x_window[0]-self.x_margin, x_window[-1]+self.x_margin
             self.EPSP_slope_move_zone['y'] = y_window[0]-self.y_margin, y_window[-1]+self.y_margin
             self.EPSP_slope_resize_zone['x'] = x[-1]-self.x_margin, x[-1]+self.x_margin
             self.EPSP_slope_resize_zone['y'] = y[-1]-self.y_margin, y[-1]+self.y_margin
+        print(f" - - updateSlopeDragZones: {aspect} move_x {self.EPSP_slope_move_zone['x']}, resize_x {self.EPSP_slope_resize_zone['y']}")
 
     def to_axm(self, df): # lines that are supposed to be on axm - label: index
         axm = {}

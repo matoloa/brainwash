@@ -85,7 +85,7 @@
            </widget>
           </item>
           <item>
-           <layout class="QHBoxLayout" name="horizontalLayoutControls" stretch=""/>
+           <layout class="QHBoxLayout" name="horizontalLayoutControls"/>
           </item>
           <item>
            <layout class="QHBoxLayout" name="horizontalLayoutGroups"/>
@@ -108,7 +108,7 @@
        </layout>
       </item>
       <item>
-       <widget class="QFrame" name="addon_frame">
+       <widget class="QFrame" name="addonFrame">
         <property name="minimumSize">
          <size>
           <width>0</width>
@@ -357,6 +357,13 @@
           <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
          </property>
         </widget>
+       </widget>
+      </item>
+      <item>
+       <widget class="QProgressBar" name="progressBar">
+        <property name="value">
+         <number>24</number>
+        </property>
        </widget>
       </item>
      </layout>
