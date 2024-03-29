@@ -75,12 +75,12 @@ class UIstate:
             x, y = self.mouseover_blob.get_offsets()[0].tolist()
         else:
             self.mouseover_action = aspect
-            print(f" - - updatePointDragZone SET: {self.mouseover_action}")
+            #print(f" - - updatePointDragZone SET: {self.mouseover_action}")
         if aspect == "EPSP amp move":
             self.EPSP_amp_xy = x, y
             self.EPSP_amp_move_zone['x'] = x-self.x_margin, x+self.x_margin
             self.EPSP_amp_move_zone['y'] = y-self.y_margin, y+self.y_margin
-        print(f" - - updatePointDragZone: {aspect} move_x {self.EPSP_amp_move_zone['x']}")
+        #print(f" - - updatePointDragZone: {aspect} move_x {self.EPSP_amp_move_zone['x']}")
 
     def updateSlopeDragZones(self, aspect=None, x=None, y=None): # update the mouseover zones for slope move/resize
         # NB only pass arguments when first setting the zone; for updates, pass nothing (using stored values)
@@ -90,7 +90,7 @@ class UIstate:
             y = self.mouseover_plot[0].get_ydata()
         else:
             self.mouseover_action = aspect
-            print(f" - - updateSlopeDragZones SET: {self.mouseover_action}")
+            #print(f" - - updateSlopeDragZones SET: {self.mouseover_action}")
         if self.mouseover_action.startswith("EPSP slope"):
             self.EPSP_slope_xy = x, y
             x_window = min(x), max(x)
@@ -99,7 +99,7 @@ class UIstate:
             self.EPSP_slope_move_zone['y'] = y_window[0]-self.y_margin, y_window[-1]+self.y_margin
             self.EPSP_slope_resize_zone['x'] = x[-1]-self.x_margin, x[-1]+self.x_margin
             self.EPSP_slope_resize_zone['y'] = y[-1]-self.y_margin, y[-1]+self.y_margin
-        print(f" - - updateSlopeDragZones: {aspect} move_x {self.EPSP_slope_move_zone['x']}, resize_x {self.EPSP_slope_resize_zone['y']}")
+        #print(f" - - updateSlopeDragZones: {aspect} move_x {self.EPSP_slope_move_zone['x']}, resize_x {self.EPSP_slope_resize_zone['y']}")
 
     def to_axm(self, df): # lines that are supposed to be on axm - label: index
         axm = {}

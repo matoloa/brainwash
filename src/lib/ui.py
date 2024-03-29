@@ -212,38 +212,6 @@ class MplCanvas(FigureCanvasQTAgg):
         super(MplCanvas, self).__init__(fig)
         self.setParent(parent)
 
-
-################################################################
-# section directly copied from output from pyuic, do not alter #
-# WARNING: changed parent class 'object' to 'QtCore.QObject'   #
-################################################################
-
-
-class QDialog_sub(QtWidgets.QDialog):
-    # Sub-classed to make a custom closeEvent that disconnects all signals to it, while preserving those in main window
-    def __init__(self, dict_open_measure_windows):
-        super(QDialog_sub, self).__init__()
-        self.list_connections = []
-        self.dict_open_measure_windows = dict_open_measure_windows  # Store the dictionary as an instance variable
-
-    def closeEvent(self, event):
-        error = None
-        for signal, method in self.list_connections:
-            try:
-                signal.disconnect(method)
-            except TypeError as e:
-                error = e
-                pass
-        if error is None:
-            print(f"Signals disconnected from subwindow {self.windowTitle()}")
-        else:
-            print(f"Warning! {self.windowTitle()}: {error} at closeEvent") # TODO: Shouldn't happen - why does it?
-        # Remove the key windowTitle (=recording name) from the dictionary
-        self.dict_open_measure_windows.pop(self.windowTitle(), None)
-        super(QDialog_sub, self).closeEvent(event)
-
-
-
 ################################################################
 # section directly copied from output from pyuic, do not alter #
 # trying to make all the rest work with it                     #
@@ -305,18 +273,18 @@ class Ui_MainWindow(QtCore.QObject):
         self.horizontalMasterLayout.addWidget(self.tableMetadata)
         self.horizontalMasterLayout.setStretch(2, 1)
         self.verticalMasterLayout.addLayout(self.horizontalMasterLayout)
-        self.addon_frame = QtWidgets.QFrame(self.centralwidget)
-        self.addon_frame.setMinimumSize(QtCore.QSize(0, 120))
-        self.addon_frame.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.addon_frame.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.addon_frame.setObjectName("addon_frame")
-        self.checkBox_EPSP_amp = QtWidgets.QCheckBox(self.addon_frame)
+        self.addonFrame = QtWidgets.QFrame(self.centralwidget)
+        self.addonFrame.setMinimumSize(QtCore.QSize(0, 120))
+        self.addonFrame.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.addonFrame.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.addonFrame.setObjectName("addonFrame")
+        self.checkBox_EPSP_amp = QtWidgets.QCheckBox(self.addonFrame)
         self.checkBox_EPSP_amp.setGeometry(QtCore.QRect(10, 50, 101, 23))
         self.checkBox_EPSP_amp.setObjectName("checkBox_EPSP_amp")
-        self.checkBox_EPSP_slope = QtWidgets.QCheckBox(self.addon_frame)
+        self.checkBox_EPSP_slope = QtWidgets.QCheckBox(self.addonFrame)
         self.checkBox_EPSP_slope.setGeometry(QtCore.QRect(10, 30, 101, 23))
         self.checkBox_EPSP_slope.setObjectName("checkBox_EPSP_slope")
-        self.label_aspect = QtWidgets.QLabel(self.addon_frame)
+        self.label_aspect = QtWidgets.QLabel(self.addonFrame)
         self.label_aspect.setGeometry(QtCore.QRect(10, 10, 62, 17))
         font = QtGui.QFont()
         font.setFamily("DejaVu Sans")
@@ -324,10 +292,10 @@ class Ui_MainWindow(QtCore.QObject):
         font.setWeight(75)
         self.label_aspect.setFont(font)
         self.label_aspect.setObjectName("label_aspect")
-        self.checkBox_paired_stims = QtWidgets.QCheckBox(self.addon_frame)
+        self.checkBox_paired_stims = QtWidgets.QCheckBox(self.addonFrame)
         self.checkBox_paired_stims.setGeometry(QtCore.QRect(288, 30, 90, 23))
         self.checkBox_paired_stims.setObjectName("checkBox_paired_stims")
-        self.label_paired_data = QtWidgets.QLabel(self.addon_frame)
+        self.label_paired_data = QtWidgets.QLabel(self.addonFrame)
         self.label_paired_data.setGeometry(QtCore.QRect(288, 10, 91, 17))
         font = QtGui.QFont()
         font.setFamily("DejaVu Sans")
@@ -335,16 +303,16 @@ class Ui_MainWindow(QtCore.QObject):
         font.setWeight(75)
         self.label_paired_data.setFont(font)
         self.label_paired_data.setObjectName("label_paired_data")
-        self.pushButton_paired_data_flip = QtWidgets.QPushButton(self.addon_frame)
+        self.pushButton_paired_data_flip = QtWidgets.QPushButton(self.addonFrame)
         self.pushButton_paired_data_flip.setGeometry(QtCore.QRect(290, 50, 81, 25))
         self.pushButton_paired_data_flip.setObjectName("pushButton_paired_data_flip")
-        self.checkBox_volley_amp = QtWidgets.QCheckBox(self.addon_frame)
+        self.checkBox_volley_amp = QtWidgets.QCheckBox(self.addonFrame)
         self.checkBox_volley_amp.setGeometry(QtCore.QRect(10, 90, 101, 23))
         self.checkBox_volley_amp.setObjectName("checkBox_volley_amp")
-        self.checkBox_volley_slope = QtWidgets.QCheckBox(self.addon_frame)
+        self.checkBox_volley_slope = QtWidgets.QCheckBox(self.addonFrame)
         self.checkBox_volley_slope.setGeometry(QtCore.QRect(10, 70, 101, 23))
         self.checkBox_volley_slope.setObjectName("checkBox_volley_slope")
-        self.label_scaling = QtWidgets.QLabel(self.addon_frame)
+        self.label_scaling = QtWidgets.QLabel(self.addonFrame)
         self.label_scaling.setGeometry(QtCore.QRect(140, 10, 81, 17))
         font = QtGui.QFont()
         font.setFamily("DejaVu Sans")
@@ -352,20 +320,20 @@ class Ui_MainWindow(QtCore.QObject):
         font.setWeight(75)
         self.label_scaling.setFont(font)
         self.label_scaling.setObjectName("label_scaling")
-        self.checkBox_norm_EPSP = QtWidgets.QCheckBox(self.addon_frame)
+        self.checkBox_norm_EPSP = QtWidgets.QCheckBox(self.addonFrame)
         self.checkBox_norm_EPSP.setGeometry(QtCore.QRect(140, 30, 111, 23))
         self.checkBox_norm_EPSP.setObjectName("checkBox_norm_EPSP")
-        self.lineEdit_norm_EPSP_start = QtWidgets.QLineEdit(self.addon_frame)
+        self.lineEdit_norm_EPSP_start = QtWidgets.QLineEdit(self.addonFrame)
         self.lineEdit_norm_EPSP_start.setGeometry(QtCore.QRect(140, 70, 41, 25))
         self.lineEdit_norm_EPSP_start.setObjectName("lineEdit_norm_EPSP_start")
-        self.label_norm_on_sweep = QtWidgets.QLabel(self.addon_frame)
+        self.label_norm_on_sweep = QtWidgets.QLabel(self.addonFrame)
         self.label_norm_on_sweep.setGeometry(QtCore.QRect(140, 50, 131, 20))
         self.label_norm_on_sweep.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
         self.label_norm_on_sweep.setObjectName("label_norm_on_sweep")
-        self.lineEdit_norm_EPSP_end = QtWidgets.QLineEdit(self.addon_frame)
+        self.lineEdit_norm_EPSP_end = QtWidgets.QLineEdit(self.addonFrame)
         self.lineEdit_norm_EPSP_end.setGeometry(QtCore.QRect(200, 70, 41, 25))
         self.lineEdit_norm_EPSP_end.setObjectName("lineEdit_norm_EPSP_end")
-        self.label_export = QtWidgets.QLabel(self.addon_frame)
+        self.label_export = QtWidgets.QLabel(self.addonFrame)
         self.label_export.setGeometry(QtCore.QRect(410, 10, 81, 17))
         font = QtGui.QFont()
         font.setFamily("DejaVu Sans")
@@ -373,14 +341,18 @@ class Ui_MainWindow(QtCore.QObject):
         font.setWeight(75)
         self.label_export.setFont(font)
         self.label_export.setObjectName("label_export")
-        self.pushButton_export_jpeg = QtWidgets.QPushButton(self.addon_frame)
+        self.pushButton_export_jpeg = QtWidgets.QPushButton(self.addonFrame)
         self.pushButton_export_jpeg.setGeometry(QtCore.QRect(410, 30, 41, 25))
         self.pushButton_export_jpeg.setObjectName("pushButton_export_jpeg")
-        self.label_relative_to = QtWidgets.QLabel(self.addon_frame)
+        self.label_relative_to = QtWidgets.QLabel(self.addonFrame)
         self.label_relative_to.setGeometry(QtCore.QRect(190, 70, 21, 20))
         self.label_relative_to.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
         self.label_relative_to.setObjectName("label_relative_to")
-        self.verticalMasterLayout.addWidget(self.addon_frame)
+        self.verticalMasterLayout.addWidget(self.addonFrame)
+        self.progressBar = QtWidgets.QProgressBar(self.centralwidget)
+        self.progressBar.setProperty("value", 24)
+        self.progressBar.setObjectName("progressBar")
+        self.verticalMasterLayout.addWidget(self.progressBar)
         self.horizontalLayoutCentralwidget.addLayout(self.verticalMasterLayout)
         mainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(mainWindow)
@@ -430,6 +402,7 @@ class Ui_MainWindow(QtCore.QObject):
 #        Hiding experimental features for deploy
 ################################################################
         self.pushButtonParse.setVisible(False) # explicit hide command required for Windows, but not Linux (?)
+        self.progressBar.setVisible(False)
         if hide_experimental:
             self.label_paired_data.setVisible(False)
             self.pushButton_paired_data_flip.setVisible(False)
@@ -764,7 +737,7 @@ class UIsub(Ui_MainWindow):
         # mods?...
 
     def viewSettingsChanged(self, key, state):
-        self.usage(f"viewSettingsChanged_{key}")
+        self.usage(f"viewSettingsChanged_{key}, {state == 2}")
         if key in uistate.checkBox.keys():
             uistate.checkBox[key] = (state == 2)
         self.updateMouseover()
@@ -1794,18 +1767,14 @@ class UIsub(Ui_MainWindow):
             uistate.setMargins(axm=self.axm)
             connect = False
             for line in self.axm.lines: # this only connects plotted lines
+                # check if line is visible
                 label = line.get_label()
                 if label == f"{uistate.row_copy['recording_name']} EPSP slope marker":
                     uistate.updateSlopeDragZones(aspect="EPSP slope", x=line.get_xdata(), y=line.get_ydata())
                     connect = True
                 elif label == f"{uistate.row_copy['recording_name']} EPSP amp marker":
-                    print(f"EPSP amp marker found at {line.get_xdata()[0]}")
-                    x_data = line.get_xdata()
-                    y_data = line.get_ydata()
-                    print(f"x_data: {x_data, type(x_data)}, y_data: {y_data, type(y_data)}")
-                    if len(x_data) > 0 and len(y_data) > 0:
-                        uistate.updatePointDragZone(aspect="EPSP amp move", x=x_data[0], y=y_data[0])
-                        connect = True
+                    uistate.updatePointDragZone(aspect="EPSP amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
+                    connect = True
             if connect: # set new mouseover event connection
                 self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseover(event=event, axm=self.axm))
         graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
@@ -2216,53 +2185,56 @@ def graphMouseover(event, axm): # determine which maingraph event is being mouse
         EPSP_slope_move_zone_y = uistate.EPSP_slope_move_zone['y']
         EPSP_amp_move_zone_x = uistate.EPSP_amp_move_zone['x']
         EPSP_amp_move_zone_y = uistate.EPSP_amp_move_zone['y']
-        #print(f" - - EPSP_amp_move_zone_x: {EPSP_amp_move_zone_x}")
-        #print(f" - - EPSP_amp_move_zone_y: {EPSP_amp_move_zone_y}")
-        # mouseover EPSP slope resize zone
-        if (EPSP_slope_resize_zone_x[0] <= x <= EPSP_slope_resize_zone_x[1]) and (EPSP_slope_resize_zone_y[0] <= y <= EPSP_slope_resize_zone_y[1]):
-            uistate.mouseover_action = "EPSP slope resize"
-            x_range, y_range = uistate.EPSP_slope_xy
-            if uistate.mouseover_plot is None:
-                uistate.mouseover_plot = axm.plot(x_range, y_range, color='green', linewidth=2, alpha=0.8, label="mouseover")
-            else:
-                uistate.mouseover_plot[0].set_data(x_range, y_range)
-                uistate.mouseover_plot[0].set_linewidth(5)
-            if uistate.mouseover_blob is None:
-                uistate.mouseover_blob = axm.scatter(x_range[-1], y_range[-1], color='green', s=100, alpha=0.8)
-            else:
-                uistate.mouseover_blob.set_offsets([x_range[-1], y_range[-1]])
-                uistate.mouseover_blob.set_sizes([100])
-        # mouseover EPSP slope move zone
-        elif (EPSP_slope_move_zone_x[0] <= x <= EPSP_slope_move_zone_x[1]) and (EPSP_slope_move_zone_y[0] <= y <= EPSP_slope_move_zone_y[1]):
-            uistate.mouseover_action = "EPSP slope move"
-            x_range, y_range = uistate.EPSP_slope_xy
-            if uistate.mouseover_blob is not None:
-                uistate.mouseover_blob.set_sizes([0])
-            if uistate.mouseover_plot is None:
-                uistate.mouseover_plot = axm.plot(x_range, y_range, color='green', linewidth=12, alpha=0.5, label="mouseover")
-            else:
-                uistate.mouseover_plot[0].set_data(x_range, y_range)
-                uistate.mouseover_plot[0].set_linewidth(12)
-        # mouseover EPSP amp move zone
-        elif (EPSP_amp_move_zone_x[0] <= x <= EPSP_amp_move_zone_x[1]) and (EPSP_amp_move_zone_y[0] <= y <= EPSP_amp_move_zone_y[1]):
-            uistate.mouseover_action = "EPSP amp move"
-            x_point, y_point = uistate.EPSP_amp_xy
-            if uistate.mouseover_plot is not None: # shrink when not mouseovered
-                uistate.mouseover_plot[0].set_linewidth(8)
-            if uistate.mouseover_blob is None:
-                uistate.mouseover_blob = axm.scatter(x_point, y_point, color='green', s=100, alpha=0.8)
-            else:
-                # print(f" - - x_point: {x_point}")
-                # print(f" - - y_point: {y_point}")
-                uistate.mouseover_blob.set_offsets([x_point, y_point])
-                uistate.mouseover_blob.set_sizes([100])
+
+        uistate.mouseover_action = None
+        if uistate.checkBox.get('EPSP_slope', False):
+            # mouseover EPSP slope resize zone
+            if (EPSP_slope_resize_zone_x[0] <= x <= EPSP_slope_resize_zone_x[1]) and (EPSP_slope_resize_zone_y[0] <= y <= EPSP_slope_resize_zone_y[1]):
+                uistate.mouseover_action = "EPSP slope resize"
+                x_range, y_range = uistate.EPSP_slope_xy
+                if uistate.mouseover_plot is None:
+                    uistate.mouseover_plot = axm.plot(x_range, y_range, color='green', linewidth=2, alpha=0.8, label="mouseover")
+                else:
+                    uistate.mouseover_plot[0].set_data(x_range, y_range)
+                    uistate.mouseover_plot[0].set_linewidth(5)
+                if uistate.mouseover_blob is None:
+                    uistate.mouseover_blob = axm.scatter(x_range[-1], y_range[-1], color='green', s=100, alpha=0.8)
+                else:
+                    uistate.mouseover_blob.set_offsets([x_range[-1], y_range[-1]])
+                    uistate.mouseover_blob.set_sizes([100])
+
+            # mouseover EPSP slope move zone
+            elif (EPSP_slope_move_zone_x[0] <= x <= EPSP_slope_move_zone_x[1]) and (EPSP_slope_move_zone_y[0] <= y <= EPSP_slope_move_zone_y[1]):
+                uistate.mouseover_action = "EPSP slope move"
+                x_range, y_range = uistate.EPSP_slope_xy
+                if uistate.mouseover_blob is not None:
+                    uistate.mouseover_blob.set_sizes([0])
+                if uistate.mouseover_plot is None:
+                    uistate.mouseover_plot = axm.plot(x_range, y_range, color='green', linewidth=12, alpha=0.5, label="mouseover")
+                else:
+                    uistate.mouseover_plot[0].set_data(x_range, y_range)
+                    uistate.mouseover_plot[0].set_linewidth(12)
+
+        if uistate.checkBox.get('EPSP_amp', False):
+            # mouseover EPSP amp move zone
+            if (EPSP_amp_move_zone_x[0] <= x <= EPSP_amp_move_zone_x[1]) and (EPSP_amp_move_zone_y[0] <= y <= EPSP_amp_move_zone_y[1]):
+                uistate.mouseover_action = "EPSP amp move"
+                x_point, y_point = uistate.EPSP_amp_xy
+                if uistate.mouseover_plot is not None: # shrink when not mouseovered
+                    uistate.mouseover_plot[0].set_linewidth(8)
+                if uistate.mouseover_blob is None:
+                    uistate.mouseover_blob = axm.scatter(x_point, y_point, color='green', s=100, alpha=0.8)
+                else:
+                    uistate.mouseover_blob.set_offsets([x_point, y_point])
+                    uistate.mouseover_blob.set_sizes([100])
+
         # mouseover outside zones
-        else:
-            uistate.mouseover_action = None
+        if uistate.mouseover_action == None:
             if uistate.mouseover_blob is not None:
                 uistate.mouseover_blob.set_sizes([0])
             if uistate.mouseover_plot is not None: # shrink when not mouseovered
                 uistate.mouseover_plot[0].set_linewidth(8)
+
         axm.figure.canvas.draw()
 
 def zoomOnScroll(event, parent, canvas, ax1=None, ax2=None):

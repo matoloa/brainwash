@@ -102,7 +102,7 @@ class UIplot():
             ax2.axhline(y=volley_slope_mean, color='blue', alpha = 0.3, label=subplot)
 
     def plotUpdate(self, row, aspect, dfmean, mouseover_out, axm, ax_out):
-        print(f"Updating {row['recording_name']} {aspect}...")
+        #print(f"Updating {row['recording_name']} {aspect}...")
         rec_filter = row['filter'] # the filter currently used for this recording
         t_EPSP_amp = row['t_EPSP_amp']
         t_EPSP_slope_start = row['t_EPSP_slope_start']
@@ -115,7 +115,7 @@ class UIplot():
             x_end = t_EPSP_slope_end
             y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-            print(f"Updating {plot_to_update} to {x_start}, {x_end}, {y_start}, {y_end}")
+            #print(f"Updating {plot_to_update} to {x_start}, {x_end}, {y_start}, {y_end}")
             for line in axm.get_lines():
                 if line.get_label() == plot_to_update:
                     line.set_xdata([x_start, x_end])
@@ -125,7 +125,7 @@ class UIplot():
                     break
         elif aspect == 'EPSP amp':
             y_position = dfmean.loc[dfmean.time == t_EPSP_amp, rec_filter].item()
-            print(f"Updating {plot_to_update} to {t_EPSP_amp, type(t_EPSP_amp)}, {y_position, type(y_position)}")
+            #print(f"Updating {plot_to_update} to {t_EPSP_amp, type(t_EPSP_amp)}, {y_position, type(y_position)}")
             for line in axm.get_lines():
                 if line.get_label() == plot_to_update:
                     line.set_xdata(t_EPSP_amp)
