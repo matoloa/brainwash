@@ -1769,12 +1769,16 @@ class UIsub(Ui_MainWindow):
             for line in self.axm.lines: # this only connects plotted lines
                 # check if line is visible
                 label = line.get_label()
-                if label == f"{uistate.row_copy['recording_name']} EPSP slope marker":
+                rec_name = uistate.row_copy['recording_name']
+                if label == f"{rec_name} EPSP slope marker":
                     uistate.updateSlopeDragZones(aspect="EPSP slope", x=line.get_xdata(), y=line.get_ydata())
                     connect = True
-                elif label == f"{uistate.row_copy['recording_name']} EPSP amp marker":
+                elif label == f"{rec_name} EPSP amp marker":
                     uistate.updatePointDragZone(aspect="EPSP amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
                     connect = True
+                #elif label == f"{rec_name} volley amp marker":
+                #    uistate.updatePointDragZone(aspect="volley amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
+                #    connect = True
             if connect: # set new mouseover event connection
                 self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseover(event=event, axm=self.axm))
         graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
@@ -1787,7 +1791,8 @@ class UIsub(Ui_MainWindow):
             if event.button == 1:
                 # determine what is being dragged
                 action = uistate.mouseover_action
-                if uistate.mouseover_action.startswith("EPSP slope"):
+                print(f"action: {action}")
+                if action.startswith("EPSP slope"):
                     start, end = uistate.row_copy['t_EPSP_slope_start'], uistate.row_copy['t_EPSP_slope_end']
                     self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragSlope(event, time_values, action, start, end))
                 elif action == 'EPSP amp move':
@@ -1891,6 +1896,7 @@ class UIsub(Ui_MainWindow):
         uistate.last_x_idx = None
         if uistate.x_idx == uistate.prior_x_idx: # nothing to update
             print("x_idx == prior_x_idx")
+            self.updateMouseover()
             return
         
         if uistate.mouseover_action.startswith("EPSP slope"):
