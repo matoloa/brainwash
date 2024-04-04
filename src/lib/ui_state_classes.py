@@ -60,12 +60,17 @@ class UIstate:
         # coordinates. Set upon selection.
         self.EPSP_amp_xy = None # x,y
         self.EPSP_slope_xy = None # x[0-1],y[0-1]
-        # clickzones: including margin. Set upon selection.
+        self.volley_amp_xy = None # x,y
+        self.volley_slope_xy = None # x[0-1],y[0-1]
+        # clickzones: coordinates including margins. Set upon selection.
         self.EPSP_amp_move_zone = {} # dict: key=x,y, value=start,end. 
         self.EPSP_slope_move_zone = {} # dict: key=x,y, value=start,end.
         self.EPSP_slope_resize_zone = {} # dict: key=x,y, value=start,end.
+        self.volley_amp_move_zone = {} # dict: key=x,y, value=start,end. 
+        self.volley_slope_move_zone = {} # dict: key=x,y, value=start,end.
+        self.volley_slope_resize_zone = {} # dict: key=x,y, value=start,end.
 
-    def setMargins(self, axm, pixels=12): # set margins for mouseover detection
+    def setMargins(self, axm, pixels=10): # set margins for mouseover detection
         self.x_margin = axm.transData.inverted().transform((pixels, 0))[0] - axm.transData.inverted().transform((0, 0))[0]
         self.y_margin = axm.transData.inverted().transform((0, pixels))[1] - axm.transData.inverted().transform((0, 0))[1]
 
@@ -80,6 +85,10 @@ class UIstate:
             self.EPSP_amp_xy = x, y
             self.EPSP_amp_move_zone['x'] = x-self.x_margin, x+self.x_margin
             self.EPSP_amp_move_zone['y'] = y-self.y_margin, y+self.y_margin
+        if aspect == "volley amp move":
+            self.volley_amp_xy = x, y
+            self.volley_amp_move_zone['x'] = x-self.x_margin, x+self.x_margin
+            self.volley_amp_move_zone['y'] = y-self.y_margin, y+self.y_margin
         #print(f" - - updatePointDragZone: {aspect} move_x {self.EPSP_amp_move_zone['x']}")
 
     def updateSlopeDragZones(self, aspect=None, x=None, y=None): # update the mouseover zones for slope move/resize
@@ -99,7 +108,14 @@ class UIstate:
             self.EPSP_slope_move_zone['y'] = y_window[0]-self.y_margin, y_window[-1]+self.y_margin
             self.EPSP_slope_resize_zone['x'] = x[-1]-self.x_margin, x[-1]+self.x_margin
             self.EPSP_slope_resize_zone['y'] = y[-1]-self.y_margin, y[-1]+self.y_margin
-        #print(f" - - updateSlopeDragZones: {aspect} move_x {self.EPSP_slope_move_zone['x']}, resize_x {self.EPSP_slope_resize_zone['y']}")
+        elif self.mouseover_action.startswith("volley slope"):
+            self.volley_slope_xy = x, y
+            x_window = min(x), max(x)
+            y_window = min(y), max(y)
+            self.volley_slope_move_zone['x'] = x_window[0]-self.x_margin, x_window[-1]+self.x_margin
+            self.volley_slope_move_zone['y'] = y_window[0]-self.y_margin, y_window[-1]+self.y_margin
+            self.volley_slope_resize_zone['x'] = x[-1]-self.x_margin, x[-1]+self.x_margin
+            self.volley_slope_resize_zone['y'] = y[-1]-self.y_margin, y[-1]+self.y_margin
 
     def to_axm(self, df): # lines that are supposed to be on axm - label: index
         axm = {}
