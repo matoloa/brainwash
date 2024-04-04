@@ -998,20 +998,26 @@ class UIsub(Ui_MainWindow):
             print(f"editNormRange: rebuilding norm columns for {row['recording_name']}")
             self.normOutput(row, dfoutput)
 
-    def normOutput(self, row, dfoutput):
+    def normOutput(self, row, dfoutput, aspect=None):
         normFrom = uistate.lineEdit['norm_EPSP_on'][0] # start
         normTo = uistate.lineEdit['norm_EPSP_on'][1] # end
-        if 'EPSP_amp' in dfoutput.columns:
-            selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_amp']
+        rec_name = row['recording_name']
+        if aspect is None: # norm all existing columns and save file
+            if 'EPSP_amp' in dfoutput.columns:
+                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_amp']
+                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
+                dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
+            if 'EPSP_slope' in dfoutput.columns:
+                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_slope']
+                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
+                dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
+            self.dict_outputs[rec_name] = dfoutput
+            self.df2csv(df=dfoutput, rec=rec_name, key="output")
+        else: # norm specific column and DO NOT SAVE file (dragged on-the-fly-graphs are saved only on mouse release)
+            selected_values = dfoutput.loc[normFrom:normTo, aspect]
             norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
-            dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
-        if 'EPSP_slope' in dfoutput.columns:
-            selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_slope']
-            norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
-            dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
-        recording_name = row['recording_name']
-        self.dict_outputs[recording_name] = dfoutput
-        self.df2csv(df=dfoutput, rec=recording_name, key="output")
+            dfoutput[f'{aspect}_norm'] = dfoutput[aspect] / norm_mean
+            return dfoutput
 
 
 
@@ -1404,11 +1410,11 @@ class UIsub(Ui_MainWindow):
 #                        df_p.columns.get_loc('t_EPSP_slope_halfwidth'),
 #                        df_p.columns.get_loc('t_EPSP_slope_method'),
                         df_p.columns.get_loc('t_volley_amp'),
-                        df_p.columns.get_loc('volley_amp_mean'),
+#                        df_p.columns.get_loc('volley_amp_mean'),
                         df_p.columns.get_loc('t_volley_amp_method'),
                         df_p.columns.get_loc('t_volley_slope_start'),
                         df_p.columns.get_loc('t_volley_slope_end'),
-                        df_p.columns.get_loc('volley_slope_mean'),
+#                        df_p.columns.get_loc('volley_slope_mean'),
 #                        df_p.columns.get_loc('t_volley_slope_width'),
 #                        df_p.columns.get_loc('t_volley_slope_halfwidth'),
 #                        df_p.columns.get_loc('t_volley_slope_method'),
@@ -1775,7 +1781,7 @@ class UIsub(Ui_MainWindow):
             self.dfmean = self.get_dfmean(row=uistate.row_copy) # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
             uistate.setMargins(axm=self.axm)
             connect = False
-            for line in self.axm.lines: # this only connects plotted lines
+            for line in self.axm.lines: # connects plotted lines
                 label = line.get_label()
                 rec_name = uistate.row_copy['recording_name']
                 if label == f"{rec_name} EPSP slope marker":
@@ -1799,8 +1805,8 @@ class UIsub(Ui_MainWindow):
         time_values = self.dfmean['time'].values
         uistate.prior_x_idx = np.abs(time_values - x).argmin() # nearest x-index to click
         if event.inaxes is not None:
-            if event.button == 1:
-                # determine what is being dragged
+            if (event.button == 1 or event.button == 3) and (uistate.mouseover_action is not None):
+                # mouseover what?
                 action = uistate.mouseover_action
                 print(f"action: {action}")
                 if action.startswith("EPSP slope"):
@@ -1894,17 +1900,33 @@ class UIsub(Ui_MainWindow):
             color = 'green'
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
-                uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_slope'], color=color)
+                if uistate.checkBox['norm_EPSP']:
+                    out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_slope')
+                    uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_slope_norm'], color=color)
+                else:
+                    uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_slope'], color=color)
             else:
-                uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope'])
+                if uistate.checkBox['norm_EPSP']:
+                    out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_slope')
+                    uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope_norm'])
+                else:
+                    uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope'])
         elif action == "EPSP amp move":
             dict_t = {'t_EPSP_amp': x_start}
             color = 'green'
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
-                uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_amp'], color=color,  linestyle='--')
+                if uistate.checkBox['norm_EPSP']:
+                    out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_amp')
+                    uistate.mouseover_out = self.ax1.plot(out['sweep'], out['EPSP_amp_norm'], color=color)
+                else:
+                    uistate.mouseover_out = self.ax1.plot(out['sweep'], out['EPSP_amp'], color=color)
             else:
-                uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_amp'])
+                if uistate.checkBox['norm_EPSP']:
+                    out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_amp')
+                    uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_amp_norm'])
+                else:
+                    uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_amp'])
         elif action.startswith("volley slope"):
             dict_t = {
                 't_volley_slope_start': x_start,

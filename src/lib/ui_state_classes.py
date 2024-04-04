@@ -37,10 +37,14 @@ class UIstate:
             't_volley_slope_halfwidth': 0.0001,
             't_volley_slope_method': 'auto detect',
             't_volley_slope_params': 'NA',
-              't_EPSP_slope_width': 0.0007,
-              't_EPSP_slope_halfwidth': 0.0003,
-              't_EPSP_slope_method': 'auto detect',
-              't_EPSP_slope_params': 'NA',
+            't_volley_amp_method': 'auto detect',
+            't_volley_amp_params': 'NA',
+            't_EPSP_slope_width': 0.0007,
+            't_EPSP_slope_halfwidth': 0.0003,
+            't_EPSP_slope_method': 'auto detect',
+            't_EPSP_slope_params': 'NA',
+            't_EPSP_amp_method': 'auto detect',
+            't_EPSP_amp_params': 'NA',
         }
 
     # Do NOT persist these
