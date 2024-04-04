@@ -1393,16 +1393,25 @@ class UIsub(Ui_MainWindow):
         # hide all columns except these:
         list_show = [   
                         df_p.columns.get_loc('recording_name'),
-                        df_p.columns.get_loc('groups'),
-                        df_p.columns.get_loc('sweeps'),
+#                        df_p.columns.get_loc('groups'),
+#                        df_p.columns.get_loc('sweeps'),
 
                         df_p.columns.get_loc('t_EPSP_amp'),
                         df_p.columns.get_loc('t_EPSP_amp_method'),
                         df_p.columns.get_loc('t_EPSP_slope_start'),
                         df_p.columns.get_loc('t_EPSP_slope_end'),
-                        df_p.columns.get_loc('t_EPSP_slope_width'),
-                        df_p.columns.get_loc('t_EPSP_slope_halfwidth'),
-                        df_p.columns.get_loc('t_EPSP_slope_method'),
+#                        df_p.columns.get_loc('t_EPSP_slope_width'),
+#                        df_p.columns.get_loc('t_EPSP_slope_halfwidth'),
+#                        df_p.columns.get_loc('t_EPSP_slope_method'),
+                        df_p.columns.get_loc('t_volley_amp'),
+                        df_p.columns.get_loc('volley_amp_mean'),
+                        df_p.columns.get_loc('t_volley_amp_method'),
+                        df_p.columns.get_loc('t_volley_slope_start'),
+                        df_p.columns.get_loc('t_volley_slope_end'),
+                        df_p.columns.get_loc('volley_slope_mean'),
+#                        df_p.columns.get_loc('t_volley_slope_width'),
+#                        df_p.columns.get_loc('t_volley_slope_halfwidth'),
+#                        df_p.columns.get_loc('t_volley_slope_method'),
                     ]
         if uistate.checkBox['paired_stims']:
             list_show.append(df_p.columns.get_loc('Tx'))
@@ -1799,6 +1808,11 @@ class UIsub(Ui_MainWindow):
                     self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragSlope(event, time_values, action, start, end))
                 elif action == 'EPSP amp move':
                     self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragPoint(event, time_values, action, uistate.row_copy['t_EPSP_amp']))
+                elif action.startswith("volley slope"):
+                    start, end = uistate.row_copy['t_volley_slope_start'], uistate.row_copy['t_volley_slope_end']
+                    self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragSlope(event, time_values, action, start, end))
+                elif action == 'volley amp move':
+                    self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragPoint(event, time_values, action, uistate.row_copy['t_volley_amp']))
                 self.mouse_release = self.main_canvas_mean.mpl_connect('button_release_event', self.mainReleased)
             elif event.button == 2:
                 zoomReset(canvas=canvas, out=out)
@@ -1815,9 +1829,9 @@ class UIsub(Ui_MainWindow):
 
         # get the x values of the slope
         blob = True # only moving amplitudes and resizing slopes have a blob
-        if action == 'EPSP slope resize':
+        if action.endswith('resize'):
             x_start = prior_slope_start
-        elif action == 'EPSP slope move':
+        elif action.endswith('move'):
             x_start = round(prior_slope_start + time_diff, precision)
             blob = False
         x_end = round(prior_slope_end + time_diff, precision)
@@ -1836,6 +1850,7 @@ class UIsub(Ui_MainWindow):
 
         # update the mouseover plot
         uistate.mouseover_plot[0].set_data([x_start, x_end], [y_start, y_end])
+
         if blob:
             uistate.mouseover_blob.set_offsets([x_end, y_end])
         self.main_canvas_mean.draw()
@@ -1857,7 +1872,7 @@ class UIsub(Ui_MainWindow):
         rec_filter = uistate.row_copy['filter']
         y_point = self.dfmean[rec_filter].iloc[x_idx]
 
-        print(f"prior_point: {prior_point}, x_point: {x_point}, x_idx: {x_idx}, y_point: {y_point}")
+        #print(f"prior_point: {prior_point}, x_point: {x_point}, x_idx: {x_idx}, y_point: {y_point}")
 
         # remember the last x index
         uistate.last_x_idx = uistate.x_idx
@@ -1869,25 +1884,53 @@ class UIsub(Ui_MainWindow):
   
     def mainDragUpdate(self, x_start, x_end, precision): # update output; this is a separate function to allow the user to make it happen live (current) or on release (for low compute per data)
         dffilter = self.get_dffilter(row=uistate.row_copy)
-        if uistate.mouseover_action.startswith("EPSP slope"):
+        action = uistate.mouseover_action
+        if action.startswith("EPSP slope"):
             dict_t = { # only pass these values to build_dfoutput, so it won't rebuild unchanged values
                 't_EPSP_slope_start': x_start,
                 't_EPSP_slope_end': x_end,
                 't_EPSP_slope_width': round(x_end - x_start, precision),
             }
+            color = 'green'
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
-                uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_slope'], color='green')
+                uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_slope'], color=color)
             else:
                 uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope'])
-        elif uistate.mouseover_action == "EPSP amp move":
+        elif action == "EPSP amp move":
             dict_t = {'t_EPSP_amp': x_start}
+            color = 'green'
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
-                uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_amp'], color='green',  linestyle='--')
+                uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_amp'], color=color,  linestyle='--')
             else:
                 uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_amp'])
-        uistate.row_copy.update(dict_t)
+        elif action.startswith("volley slope"):
+            dict_t = {
+                't_volley_slope_start': x_start,
+                't_volley_slope_end': x_end,
+                't_volley_slope_width': round(x_end - x_start, precision),
+            }
+            color = 'blue'
+            out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+            if uistate.mouseover_out is None:
+                uistate.mouseover_out = self.ax2.plot(out['sweep'], out['volley_slope'], color=color)
+            else:
+                uistate.mouseover_out[0].set_data(out['sweep'], out['volley_slope'])
+            dict_t['volley_slope_mean'] = out['volley_slope'].mean()
+
+        elif action == "volley amp move":
+            dict_t = {'t_volley_amp': x_start}
+            color = 'blue'
+            out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+            if uistate.mouseover_out is None:
+                uistate.mouseover_out = self.ax2.plot(out['sweep'], out['volley_amp'], color=color,  linestyle='--')
+            else:
+                uistate.mouseover_out[0].set_data(out['sweep'], out['volley_amp'])
+            dict_t['volley_amp_mean'] = out['volley_amp'].mean()
+        
+        if dict_t:
+            uistate.row_copy.update(dict_t)
         self.main_canvas_output.draw()
 
     def mainReleased(self, event): # maingraph release event
@@ -1905,9 +1948,17 @@ class UIsub(Ui_MainWindow):
             uistate.row_copy['t_EPSP_slope_method'] = "manual"
             uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP slope', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax2)
             uistate.updateDragZones()
-        if uistate.mouseover_action == 'EPSP amp move':
+        elif uistate.mouseover_action == 'EPSP amp move':
             uistate.row_copy['t_EPSP_amp_method'] = "manual"
             uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP amp', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax1)
+            uistate.updatePointDragZone()
+        elif uistate.mouseover_action.startswith("volley slope"):
+            uistate.row_copy['t_volley_slope_method'] = "manual"
+            uiplot.plotUpdate(row=uistate.row_copy, aspect='volley slope', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax2)
+            uistate.updateDragZones()
+        elif uistate.mouseover_action == 'volley amp move':
+            uistate.row_copy['t_volley_amp_method'] = "manual"
+            uiplot.plotUpdate(row=uistate.row_copy, aspect='volley amp', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax1)
             uistate.updatePointDragZone()
 
         # update df_p with uistate.row_copy, allocated by unique ID
@@ -2211,8 +2262,10 @@ def graphMouseover(event, axm): # determine which maingraph event is being mouse
         axm.figure.canvas.draw()
 
 def plotMouseover(action, axm):
+    alpha = 0.8
+    linewidth = 3 if 'resize' in action else 10
+
     if 'slope' in action:
-        alpha = 0.8
         if 'EPSP' in action:
             x_range = uistate.EPSP_slope_start_xy[0], uistate.EPSP_slope_end_xy[0]
             y_range = uistate.EPSP_slope_start_xy[1], uistate.EPSP_slope_end_xy[1]
@@ -2221,16 +2274,14 @@ def plotMouseover(action, axm):
             x_range = uistate.volley_slope_start_xy[0], uistate.volley_slope_end_xy[0]
             y_range = uistate.volley_slope_start_xy[1], uistate.volley_slope_end_xy[1]
             color = 'blue'
-        if 'resize' in action:
-            linewidth = 5
-            if uistate.mouseover_blob is None:
-                uistate.mouseover_blob = axm.scatter(x_range[1], y_range[1], color=color, s=100, alpha=alpha)
-            else:
-                uistate.mouseover_blob.set_offsets([x_range[1], y_range[1]])
-                uistate.mouseover_blob.set_sizes([100])
-                uistate.mouseover_blob.set_color(color)
+
+        if uistate.mouseover_blob is None:
+            uistate.mouseover_blob = axm.scatter(x_range[1], y_range[1], color=color, s=100, alpha=alpha)
         else:
-            linewidth = 10
+            uistate.mouseover_blob.set_offsets([x_range[1], y_range[1]])
+            uistate.mouseover_blob.set_sizes([100])
+            uistate.mouseover_blob.set_color(color)
+
         if uistate.mouseover_plot is None:
             uistate.mouseover_plot = axm.plot(x_range, y_range, color=color, linewidth=linewidth, alpha=alpha, label="mouseover")
         else:
@@ -2238,17 +2289,17 @@ def plotMouseover(action, axm):
             uistate.mouseover_plot[0].set_linewidth(linewidth)
             uistate.mouseover_plot[0].set_alpha(alpha)
             uistate.mouseover_plot[0].set_color(color)
+
     elif 'amp' in action:
         if 'EPSP' in action:
-            x = uistate.EPSP_amp_xy[0]
-            y = uistate.EPSP_amp_xy[1]
+            x, y = uistate.EPSP_amp_xy
             color = 'green'
         elif 'volley' in action:
-            x = uistate.volley_amp_xy[0]
-            y = uistate.volley_amp_xy[1]
+            x, y = uistate.volley_amp_xy
             color = 'blue'
+
         if uistate.mouseover_blob is None:
-            uistate.mouseover_blob = axm.scatter(x, y, color=color, s=100, alpha=0.8)
+            uistate.mouseover_blob = axm.scatter(x, y, color=color, s=100, alpha=alpha)
         else:
             uistate.mouseover_blob.set_offsets([x, y])
             uistate.mouseover_blob.set_sizes([100])

@@ -56,14 +56,14 @@ class UIplot():
 
         if not np.isnan(t_EPSP_amp):
             y_position = dfmean.loc[dfmean.time == t_EPSP_amp, rec_filter]
-            axm.plot(t_EPSP_amp, y_position, marker='o', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha = 0.3, label=f"{label} EPSP amp marker")
+            axm.plot(t_EPSP_amp, y_position, marker='o', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha=0.3, label=f"{label} EPSP amp marker")
             subplot = f"{label} EPSP amp"
             plotted.append(subplot)
-            _ = sns.lineplot(ax=ax1, data=out, y='EPSP_amp', x="sweep", color="green", linestyle='--', label=subplot)
+            _ = sns.lineplot(ax=ax1, data=out, y='EPSP_amp', x="sweep", color="green", linestyle='--', alpha=0.5, label=subplot)
             if 'EPSP_amp_norm' in out.columns:
                 subplot = f"{label} EPSP amp norm"
                 plotted.append(subplot)
-                _ = sns.lineplot(ax=ax1, data=out, y='EPSP_amp_norm', x="sweep", color="green", linestyle='--', label=subplot)
+                _ = sns.lineplot(ax=ax1, data=out, y='EPSP_amp_norm', x="sweep", color="green", linestyle='--', alpha=0.5, label=subplot)
         if not np.isnan(t_EPSP_slope_start):
             x_start = t_EPSP_slope_start
             x_end = t_EPSP_slope_end
@@ -102,42 +102,49 @@ class UIplot():
             ax2.axhline(y=volley_slope_mean, color='blue', alpha = 0.3, label=subplot)
 
     def plotUpdate(self, row, aspect, dfmean, mouseover_out, axm, ax_out):
-        #print(f"Updating {row['recording_name']} {aspect}...")
-        rec_filter = row['filter'] # the filter currently used for this recording
-        t_EPSP_amp = row['t_EPSP_amp']
-        t_EPSP_slope_start = row['t_EPSP_slope_start']
-        t_EPSP_slope_end = row['t_EPSP_slope_end']
-
+        rec_filter = row['filter']  # the filter currently used for this recording
         plot_to_update = f"{row['recording_name']} {aspect} marker"
 
-        if aspect == 'EPSP slope':
-            x_start = t_EPSP_slope_start
-            x_end = t_EPSP_slope_end
+        if aspect in ['EPSP slope', 'volley slope']:
+            x_start = row[f't_{aspect.replace(" ", "_")}_start']
+            x_end = row[f't_{aspect.replace(" ", "_")}_end']
             y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-            #print(f"Updating {plot_to_update} to {x_start}, {x_end}, {y_start}, {y_end}")
-            for line in axm.get_lines():
-                if line.get_label() == plot_to_update:
-                    line.set_xdata([x_start, x_end])
-                    line.set_ydata([y_start, y_end])
-                    # redraw canvas
-                    axm.figure.canvas.draw()
-                    break
-        elif aspect == 'EPSP amp':
-            y_position = dfmean.loc[dfmean.time == t_EPSP_amp, rec_filter].item()
-            #print(f"Updating {plot_to_update} to {t_EPSP_amp, type(t_EPSP_amp)}, {y_position, type(y_position)}")
-            for line in axm.get_lines():
-                if line.get_label() == plot_to_update:
-                    line.set_xdata(t_EPSP_amp)
-                    line.set_ydata(y_position)
-                    # redraw canvas
-                    axm.figure.canvas.draw()
-                    break
+            self.updateLine(axm, plot_to_update, [x_start, x_end], [y_start, y_end])
+            if aspect == 'volley slope':
+                self.updateOutMean(ax_out, aspect, row)
+
+        elif aspect in ['EPSP amp', 'volley amp']:
+            t_amp = row[f't_{aspect.replace(" ", "_")}']
+            y_position = dfmean.loc[dfmean.time == t_amp, rec_filter].item()
+            self.updateLine(axm, plot_to_update, t_amp, y_position)
+            if aspect == 'volley amp':
+                self.updateOutMean(ax_out, aspect, row)
+
+        self.updateOutLine(ax_out, row, aspect, mouseover_out)
+
+    def updateLine(self, axm, plot_to_update, x_data, y_data):
+        for line in axm.get_lines():
+            if line.get_label() == plot_to_update:
+                line.set_xdata(x_data)
+                line.set_ydata(y_data)
+                axm.figure.canvas.draw()
+                break
+
+    def updateOutLine(self, ax_out, row, aspect, mouseover_out):
         for line in ax_out.get_lines():
             if line.get_label() == f"{row['recording_name']} {aspect}":
                 line.set_ydata(mouseover_out[0].get_ydata())
-                # mouseover_out[0] = None
                 ax_out.figure.canvas.draw()
                 break
-                
+
+    def updateOutMean(self, ax_out, aspect, row):
+        rec_name = row['recording_name']
+        mean = row[f'{aspect.replace(" ", "_")}_mean']
+        for line in ax_out.get_lines():
+            if line.get_label() == f"{rec_name} {aspect} mean":
+                line.set_ydata(mean)
+                ax_out.figure.canvas.draw()
+                break
+
                 
