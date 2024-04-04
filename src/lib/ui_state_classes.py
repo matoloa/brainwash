@@ -59,9 +59,13 @@ class UIstate:
         self.mouseover_out = None # output of dragged aspect
         # coordinates. Set upon selection.
         self.EPSP_amp_xy = None # x,y
-        self.EPSP_slope_xy = None # x[0-1],y[0-1]
+        #self.EPSP_slope_xy = None # x[0-1],y[0-1] DEPRECATE
+        self.EPSP_slope_start_xy = None # x,y
+        self.EPSP_slope_end_xy = None # x,y
         self.volley_amp_xy = None # x,y
-        self.volley_slope_xy = None # x[0-1],y[0-1]
+        #self.volley_slope_xy = None # x[0-1],y[0-1]
+        self.volley_slope_start_xy = None # x,y
+        self.volley_slope_end_xy = None # x,y
         # clickzones: coordinates including margins. Set upon selection.
         self.EPSP_amp_move_zone = {} # dict: key=x,y, value=start,end. 
         self.EPSP_slope_move_zone = {} # dict: key=x,y, value=start,end.
@@ -74,48 +78,64 @@ class UIstate:
         self.x_margin = axm.transData.inverted().transform((pixels, 0))[0] - axm.transData.inverted().transform((0, 0))[0]
         self.y_margin = axm.transData.inverted().transform((0, pixels))[1] - axm.transData.inverted().transform((0, 0))[1]
 
-    def updatePointDragZone(self, aspect=None, x=None, y=None): # update the mouseover zone for amp move
-        if aspect == None:
-            aspect = self.mouseover_action
-            x, y = self.mouseover_blob.get_offsets()[0].tolist()
-        else:
-            self.mouseover_action = aspect
-            #print(f" - - updatePointDragZone SET: {self.mouseover_action}")
-        if aspect == "EPSP amp move":
-            self.EPSP_amp_xy = x, y
-            self.EPSP_amp_move_zone['x'] = x-self.x_margin, x+self.x_margin
-            self.EPSP_amp_move_zone['y'] = y-self.y_margin, y+self.y_margin
-        if aspect == "volley amp move":
-            self.volley_amp_xy = x, y
-            self.volley_amp_move_zone['x'] = x-self.x_margin, x+self.x_margin
-            self.volley_amp_move_zone['y'] = y-self.y_margin, y+self.y_margin
-        #print(f" - - updatePointDragZone: {aspect} move_x {self.EPSP_amp_move_zone['x']}")
-
-    def updateSlopeDragZones(self, aspect=None, x=None, y=None): # update the mouseover zones for slope move/resize
-        # NB only pass arguments when first setting the zone; for updates, pass nothing (using stored values)
+    def updateDragZones(self, aspect=None, x=None, y=None):
         if aspect is None:
             aspect = self.mouseover_action
             x = self.mouseover_plot[0].get_xdata()
             y = self.mouseover_plot[0].get_ydata()
         else:
             self.mouseover_action = aspect
-            #print(f" - - updateSlopeDragZones SET: {self.mouseover_action}")
+
         if self.mouseover_action.startswith("EPSP slope"):
-            self.EPSP_slope_xy = x, y
-            x_window = min(x), max(x)
-            y_window = min(y), max(y)
-            self.EPSP_slope_move_zone['x'] = x_window[0]-self.x_margin, x_window[-1]+self.x_margin
-            self.EPSP_slope_move_zone['y'] = y_window[0]-self.y_margin, y_window[-1]+self.y_margin
-            self.EPSP_slope_resize_zone['x'] = x[-1]-self.x_margin, x[-1]+self.x_margin
-            self.EPSP_slope_resize_zone['y'] = y[-1]-self.y_margin, y[-1]+self.y_margin
+            self.updateSlopeZone('EPSP', x, y)
         elif self.mouseover_action.startswith("volley slope"):
-            self.volley_slope_xy = x, y
-            x_window = min(x), max(x)
-            y_window = min(y), max(y)
-            self.volley_slope_move_zone['x'] = x_window[0]-self.x_margin, x_window[-1]+self.x_margin
-            self.volley_slope_move_zone['y'] = y_window[0]-self.y_margin, y_window[-1]+self.y_margin
-            self.volley_slope_resize_zone['x'] = x[-1]-self.x_margin, x[-1]+self.x_margin
-            self.volley_slope_resize_zone['y'] = y[-1]-self.y_margin, y[-1]+self.y_margin
+            self.updateSlopeZone('volley', x, y)
+
+        if aspect is None:
+            aspect = self.mouseover_action
+            x, y = self.mouseover_blob.get_offsets()[0].tolist()
+        else:
+            self.mouseover_action = aspect
+
+        if aspect == "EPSP amp move":
+            self.updateAmpZone('EPSP', x, y)
+        elif aspect == "volley amp move":
+            self.updateAmpZone('volley', x, y)
+
+    def updateSlopeZone(self, type, x, y):
+        slope_start = x[0], y[0]
+        slope_end = x[-1], y[-1]
+        x_window = min(x), max(x)
+        y_window = min(y), max(y)
+
+        setattr(self, f'{type}_slope_start_xy', slope_start)
+        setattr(self, f'{type}_slope_end_xy', slope_end)
+        getattr(self, f'{type}_slope_move_zone')['x'] = x_window[0]-self.x_margin, x_window[-1]+self.x_margin
+        getattr(self, f'{type}_slope_move_zone')['y'] = y_window[0]-self.y_margin, y_window[-1]+self.y_margin
+        getattr(self, f'{type}_slope_resize_zone')['x'] = x[-1]-self.x_margin, x[-1]+self.x_margin
+        getattr(self, f'{type}_slope_resize_zone')['y'] = y[-1]-self.y_margin, y[-1]+self.y_margin
+
+    def updateAmpZone(self, type, x, y):
+        amp_xy = x, y
+        amp_move_zone = x-self.x_margin, x+self.x_margin, y-self.y_margin, y+self.y_margin
+
+        setattr(self, f'{type}_amp_xy', amp_xy)
+        getattr(self, f'{type}_amp_move_zone')['x'] = amp_move_zone[0], amp_move_zone[1]
+        getattr(self, f'{type}_amp_move_zone')['y'] = amp_move_zone[2], amp_move_zone[3]
+
+    def updatePointDragZone(self, aspect=None, x=None, y=None):
+        if aspect is None:
+            aspect = self.mouseoverAction
+            x, y = self.mouseover_blob.get_offsets()[0].tolist()
+        else:
+            self.mouseoverAction = aspect
+
+        if aspect == "EPSP amp move":
+            self.updateAmpZone('EPSP', x, y)
+        elif aspect == "volley amp move":
+            self.updateAmpZone('volley', x, y)
+
+
 
     def to_axm(self, df): # lines that are supposed to be on axm - label: index
         axm = {}
