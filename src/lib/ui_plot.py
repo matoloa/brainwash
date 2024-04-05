@@ -28,8 +28,9 @@ class UIplot():
                     if line.get_label() in subplots:
                         line.remove()
                 del self.uistate.plotted[rec]
-
+    
     def graph(self, dict_row, dfmean, dfoutput, axm, ax1, ax2):
+        print(f"Graphing {dict_row['recording_name']}...")
         rec_name = dict_row['recording_name']
         rec_filter = dict_row['filter'] # the filter currently used for this recording
         t_EPSP_amp = dict_row['t_EPSP_amp']
@@ -62,8 +63,11 @@ class UIplot():
             _ = sns.lineplot(ax=ax1, data=out, y='EPSP_amp', x="sweep", color="green", linestyle='--', alpha=0.5, label=subplot)
             if 'EPSP_amp_norm' in out.columns:
                 subplot = f"{label} EPSP amp norm"
+                print(f"EPSP_amp_norm in {rec_name} out")
                 plotted.append(subplot)
                 _ = sns.lineplot(ax=ax1, data=out, y='EPSP_amp_norm', x="sweep", color="green", linestyle='--', alpha=0.5, label=subplot)
+            else:
+                print(f"EPSP_amp_norm not in {rec_name} out")
         if not np.isnan(t_EPSP_slope_start):
             x_start = t_EPSP_slope_start
             x_end = t_EPSP_slope_end
@@ -75,12 +79,14 @@ class UIplot():
             subplot = f"{label} EPSP slope"
             plotted.append(subplot)
             _ = sns.lineplot(ax=ax2, data=out, y='EPSP_slope', x="sweep", color="green", alpha = 0.3, label=subplot)
-            print(f"EPSP_slope: {out['EPSP_slope'].mean()}")
             #if out has the column 'EPSP_slope_norm', plot it
             if 'EPSP_slope_norm' in out.columns:
                 subplot = f"{label} EPSP slope norm"
+                print(f"EPSP_slope_norm in {rec_name} out")
                 plotted.append(subplot)
                 _ = sns.lineplot(ax=ax2, data=out, y='EPSP_slope_norm', x="sweep", color="green", alpha = 0.3, label=subplot)
+            else:
+                print(f"EPSP_slope_norm not in {rec_name} out")
         if not np.isnan(t_volley_amp):
             y_position = dfmean.loc[dfmean.time == t_volley_amp, rec_filter]
             subplot = f"{label} volley amp marker"
@@ -121,10 +127,11 @@ class UIplot():
             if aspect == 'volley amp':
                 self.updateOutMean(ax_out, aspect, row)
 
-        if norm: # EPSP
+        if norm:
             self.updateOutLine(ax_out, row, f"{aspect} norm", mouseover_out)
         else:
             self.updateOutLine(ax_out, row, aspect, mouseover_out)
+
 
     def updateLine(self, axm, plot_to_update, x_data, y_data):
         for line in axm.get_lines():
@@ -135,6 +142,7 @@ class UIplot():
                 break
 
     def updateOutLine(self, ax_out, row, aspect, mouseover_out):
+        print(f"Updating {row['recording_name']} {aspect}")
         for line in ax_out.get_lines():
             if line.get_label() == f"{row['recording_name']} {aspect}":
                 line.set_ydata(mouseover_out[0].get_ydata())
@@ -150,4 +158,17 @@ class UIplot():
                 ax_out.figure.canvas.draw()
                 break
 
-                
+    def updateEPSPout(self, rec_name, out, ax1, ax2):
+        for line in ax1.get_lines():
+            if line.get_label() == f"{rec_name} EPSP amp":
+                line.set_ydata(out['EPSP_amp'])
+            if line.get_label() == f"{rec_name} EPSP amp norm":
+                line.set_ydata(out['EPSP_amp_norm'])
+                ax1.figure.canvas.draw()
+        for line in ax2.get_lines():
+            if line.get_label() == f"{rec_name} EPSP slope":
+                line.set_ydata(out['EPSP_slope'])
+            if line.get_label() == f"{rec_name} EPSP slope norm":
+                line.set_ydata(out['EPSP_slope_norm'])
+                ax2.figure.canvas.draw()
+

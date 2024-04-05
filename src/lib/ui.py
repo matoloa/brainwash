@@ -643,16 +643,14 @@ class UIsub(Ui_MainWindow):
 
         # connect Relative checkbox and lineedits to local functions
         norm = uistate.checkBox['norm_EPSP']
-        #self.checkBox_norm_EPSP.setChecked(norm)
-        #self.checkBox_norm_EPSP.stateChanged.connect(lambda state: self.checkBox_norm_EPSP_changed(state))
         self.label_norm_on_sweep.setVisible(norm)
         self.label_relative_to.setVisible(norm)
         self.lineEdit_norm_EPSP_start.setVisible(norm)
         self.lineEdit_norm_EPSP_end.setVisible(norm)
         self.lineEdit_norm_EPSP_start.setText(f"{uistate.lineEdit['norm_EPSP_on'][0]}")
         self.lineEdit_norm_EPSP_end.setText(f"{uistate.lineEdit['norm_EPSP_on'][1]}")
-        self.lineEdit_norm_EPSP_start.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_on_start))
-        self.lineEdit_norm_EPSP_end.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_on_end))
+        self.lineEdit_norm_EPSP_start.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_EPSP_start))
+        self.lineEdit_norm_EPSP_end.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_EPSP_end))
 
         self.fqdn = socket.getfqdn() # get computer name and local domain, for project file
         if talkback:
@@ -672,6 +670,9 @@ class UIsub(Ui_MainWindow):
             self.timer = QtCore.QTimer(self)
             self.timer.timeout.connect(self.checkFocus)
             self.timer.start(1000)
+
+
+
 
     def defaultGroups(self):
         # Generate a list of 9 colors for groups, hex format
@@ -740,6 +741,16 @@ class UIsub(Ui_MainWindow):
         self.usage(f"viewSettingsChanged_{key}, {state == 2}")
         if key in uistate.checkBox.keys():
             uistate.checkBox[key] = (state == 2)
+            if key == 'norm_EPSP':
+                self.label_norm_on_sweep.setVisible(state == 2)
+                self.label_relative_to.setVisible(state == 2)
+                self.lineEdit_norm_EPSP_start.setVisible(state == 2)
+                self.lineEdit_norm_EPSP_end.setVisible(state == 2)
+                for idx in uistate.selected:
+                    row = self.get_df_project().loc[idx]
+                    rec_name = row['recording_name']
+                    out = self.dict_outputs[rec_name]
+                    uiplot.updateEPSPout(rec_name, out, self.ax1, self.ax2)
         self.updateMouseover()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
@@ -968,27 +979,31 @@ class UIsub(Ui_MainWindow):
             num = max(0, int(lineEdit.text()))
         except ValueError:
             num = 0
-        if lineEdit.objectName() == "lineEdit_norm_on_start": # start, cannot be higher than end
+        if lineEdit.objectName() == "lineEdit_norm_EPSP_start": # start, cannot be higher than end
             if num == uistate.lineEdit['norm_EPSP_on'][0]:
-                self.lineEdit_norm_on_start.setText(str(num))
+                self.lineEdit_norm_EPSP_start.setText(str(num))
                 return # no change
-            uistate.lineEdit['norm_EPSP_on'][1] = max(num, int(self.lineEdit_norm_on_end.text()))
-            self.lineEdit_norm_on_end.setText(str(uistate.lineEdit['norm_EPSP_on'][1]))
+            uistate.lineEdit['norm_EPSP_on'][1] = max(num, int(self.lineEdit_norm_EPSP_end.text()))
+            self.lineEdit_norm_EPSP_end.setText(str(uistate.lineEdit['norm_EPSP_on'][1]))
             uistate.lineEdit['norm_EPSP_on'][0] = num
         else: # end, cannot be lower than start
             if num == uistate.lineEdit['norm_EPSP_on'][1]:
-                self.lineEdit_norm_on_end.setText(str(num))
+                self.lineEdit_norm_EPSP_end.setText(str(num))
                 return # no change
-            uistate.lineEdit['norm_EPSP_on'][0] = min(num, int(self.lineEdit_norm_on_start.text()))
-            self.lineEdit_norm_on_start.setText(str(uistate.lineEdit['norm_EPSP_on'][0]))
+            uistate.lineEdit['norm_EPSP_on'][0] = min(num, int(self.lineEdit_norm_EPSP_start.text()))
+            self.lineEdit_norm_EPSP_start.setText(str(uistate.lineEdit['norm_EPSP_on'][0]))
             uistate.lineEdit['norm_EPSP_on'][1] = num
         lineEdit.setText(str(num))
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
-        # rebuild columns EPSP_amp and EPSP_slope to their norm equivalents
-        self.normOutputs()
+        self.normOutputs() # ...of all recordings in df_p
         self.purgeGroupCache(*self.dict_groups['list_ID'])
         self.tableFormat()
-        graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        # cycle through all selected recordings and update norm outputs
+        for idx in uistate.selected:
+            row = self.df_project.iloc[idx]
+            rec_name = row['recording_name']
+            out = self.get_dfoutput(row=row)
+            uiplot.updateEPSPout(rec_name, out, self.ax1, self.ax2)
         print(f"editNormRange: {uistate.lineEdit['norm_EPSP_on']}")
     
     def normOutputs(self): # TODO: also norm diffs (paired stim) when applicable
@@ -1654,7 +1669,7 @@ class UIsub(Ui_MainWindow):
         dfmean = self.get_dfmean(row=row)
         df_p = self.get_df_project()
         dict_t = uistate.default.copy() # Default sizes
-        print(f"dict_t: {dict_t}")
+        #print(f"dict_t: {dict_t}")
         dict_t.update(analysis.find_all_t(dfmean=dfmean, 
                                           volley_slope_halfwidth=dict_t['t_volley_slope_halfwidth'], 
                                           EPSP_slope_halfwidth=dict_t['t_EPSP_slope_halfwidth'], 
@@ -1665,11 +1680,11 @@ class UIsub(Ui_MainWindow):
             old_aspect_value = df_p.loc[df_p['ID'] == row_id, key].values[0]
             if pd.notna(old_aspect_value):
                 # if old_aspect IS a valid float, use it: replace in dict_t
+                print(f"{key} was {old_aspect_value} in df_p, a valid float. Updated dict_t from {value}")
                 dict_t[key] = old_aspect_value
-                print(f"{key} was {old_aspect_value} in df_p, a valid float. Updated dict_t to {value}")
             else: # if old_aspect is NOT a valid float, replace df_p with dict_t
+                print(f"{key} was {old_aspect_value} in df_p, NOT a valid float. Updating df_p with {value}.")
                 df_p.loc[df_p['ID'] == row_id, key] = value
-                print(f"{key} was {old_aspect_value} in df_p, NOT a valid float. Updating df_p...")
         dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
         df_p.loc[df_p['ID'] == row_id, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
         df_p.loc[df_p['ID'] == row_id, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
@@ -1967,18 +1982,22 @@ class UIsub(Ui_MainWindow):
             uistate.row_copy['t_EPSP_slope_method'] = "manual"
             uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP slope', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax2, norm=uistate.checkBox['norm_EPSP'])
             uistate.updateDragZones()
+            dict_t = {'t_EPSP_slope_start': uistate.row_copy['t_EPSP_slope_start'], 't_EPSP_slope_end': uistate.row_copy['t_EPSP_slope_end']}
         elif uistate.mouseover_action == 'EPSP amp move':
             uistate.row_copy['t_EPSP_amp_method'] = "manual"
             uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP amp', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax1, norm=uistate.checkBox['norm_EPSP'])
             uistate.updatePointDragZone()
+            dict_t = {'t_EPSP_amp': uistate.row_copy['t_EPSP_amp']}
         elif uistate.mouseover_action.startswith("volley slope"):
             uistate.row_copy['t_volley_slope_method'] = "manual"
             uiplot.plotUpdate(row=uistate.row_copy, aspect='volley slope', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax2)
             uistate.updateDragZones()
+            dict_t = {'t_volley_slope_start': uistate.row_copy['t_volley_slope_start'], 't_volley_slope_end': uistate.row_copy['t_volley_slope_end']}
         elif uistate.mouseover_action == 'volley amp move':
             uistate.row_copy['t_volley_amp_method'] = "manual"
             uiplot.plotUpdate(row=uistate.row_copy, aspect='volley amp', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax1)
             uistate.updatePointDragZone()
+            dict_t = {'t_volley_amp': uistate.row_copy['t_volley_amp']}
 
         # update df_p with uistate.row_copy, allocated by unique ID
         df_p = self.get_df_project()
@@ -1988,12 +2007,15 @@ class UIsub(Ui_MainWindow):
         df_p.reset_index(inplace=True)
         self.set_df_project(df_p)
 
-        # update dfoutput; dict and file
-        rec_name = uistate.row_copy['recording_name']
-        new_dfoutput = self.get_dfoutput(uistate.row_copy)
-        self.df2csv(df=new_dfoutput, rec=rec_name, key="output")
-        self.tableUpdate()
-
+        # update dfoutput; dict and file, with normalized columns if applicable
+        row = uistate.row_copy
+        dfoutput = self.get_dfoutput(row=row)
+        dffilter = self.get_dffilter(row=uistate.row_copy)
+        new_dfoutput_columns = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+        for col in new_dfoutput_columns.columns:
+            dfoutput[col] = new_dfoutput_columns[col]
+        if uistate.mouseover_action.startswith("EPSP"): # add normalized EPSP columns
+            self.normOutput(row=row, dfoutput=dfoutput)
         self.updateMouseover()
 
 
@@ -2188,7 +2210,7 @@ def graphUpdate(axm, ax1, ax2, df=None):
 
 def graphVisible(axis, show): # toggles visibility per selection and sets Legend of axis
     dict_lines = {item.get_label(): item for item in axis.get_children() if isinstance(item, Line2D)}
-    print(f"dict_lines: {dict_lines.keys()}")
+    #print(f"dict_lines: {dict_lines.keys()}")
     dict_legend = {}
     for label, line in dict_lines.items():
         visible = label in show if show else False
