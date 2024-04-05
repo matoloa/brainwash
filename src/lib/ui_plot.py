@@ -29,6 +29,10 @@ class UIplot():
                         line.remove()
                 del self.uistate.plotted[rec]
     
+    def graphGroups(self, dict_group_means, ax1, ax2):
+        print("Graphing groups...")
+        print(f"dict_group_means: {dict_group_means.keys()}")
+
     def graph(self, dict_row, dfmean, dfoutput, axm, ax1, ax2):
         print(f"Graphing {dict_row['recording_name']}...")
         rec_name = dict_row['recording_name']

@@ -2212,6 +2212,11 @@ def graphUpdate(axm, ax1, ax2, df=None):
     axm.figure.canvas.draw()
     ax1.figure.canvas.draw() # ax2 should be on the same canvas
 
+# TODO: WIP, plotting groups
+    if len(uistate.group_show) > 0:
+        uiplot.graphGroups(uisub.dict_group_means, ax1, ax2)
+
+
 def graphVisible(axis, show): # toggles visibility per selection and sets Legend of axis
     dict_lines = {item.get_label(): item for item in axis.get_children() if isinstance(item, Line2D)}
     #print(f"dict_lines: {dict_lines.keys()}")
