@@ -8,10 +8,11 @@ class UIstate:
 
     def reset(self): # reset all states to False
         self.version = "0.0.0"
+        self.colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000'] # TODO: Use
         self.axm = [] # list of items that are supposed to be on axm
         self.ax1 = [] # list of items that are supposed to be on ax1
         self.ax2 = [] # list of items that are supposed to be on ax2
-        self.changed = [] # these need to be updated, even if they are already on an axis
+        self.changed = [] # TODO: not used yet: meant to be a list of what needs to be updated, even if they are already on an axis
         self.group_show = {}
         self.checkBox = {
             'EPSP_amp': False,
@@ -32,7 +33,7 @@ class UIstate:
             'output_ax1_ylim': (0, 1.2),
             'output_ax2_ylim': (0, 1.2),
         }
-        self.default = {
+        self.default = { # default values for df_project
             't_volley_slope_width': 0.0003,
             't_volley_slope_halfwidth': 0.0001,
             't_volley_slope_method': 'auto detect',
