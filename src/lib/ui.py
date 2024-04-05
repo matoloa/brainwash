@@ -864,11 +864,11 @@ class UIsub(Ui_MainWindow):
         df_p = self.get_df_project()
         group_to_remove = str(self.df_groups.iloc[-1]['group_ID'])
         print(f"Removing group {group_to_remove}...")
-        if not df_p['group_IDs'].astype(str).str.contains(group_to_remove).any():
-            self.triggerRemoveLastGroup()
-            print(f"{group_to_remove} removed.")
-        else:
+        if df_p['group_IDs'].astype(str).str.contains(group_to_remove).any():
             print(f"{group_to_remove} is not empty.")
+            return
+        self.triggerRemoveLastGroup()
+        print(f"{group_to_remove} removed.")
 
     def triggerDelete(self):
         self.usage("triggerDelete")
@@ -2017,6 +2017,7 @@ class UIsub(Ui_MainWindow):
         new_dfoutput_columns = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
         for col in new_dfoutput_columns.columns:
             dfoutput[col] = new_dfoutput_columns[col]
+        self.tableUpdate()
         if uistate.mouseover_action.startswith("EPSP"): # add normalized EPSP columns
             self.normOutput(row=row, dfoutput=dfoutput)
         self.updateMouseover()
