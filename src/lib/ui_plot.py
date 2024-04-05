@@ -101,7 +101,7 @@ class UIplot():
             plotted.append(subplot)
             ax2.axhline(y=volley_slope_mean, color='blue', alpha = 0.3, label=subplot)
 
-    def plotUpdate(self, row, aspect, dfmean, mouseover_out, axm, ax_out):
+    def plotUpdate(self, row, aspect, dfmean, mouseover_out, axm, ax_out, norm=False):
         rec_filter = row['filter']  # the filter currently used for this recording
         plot_to_update = f"{row['recording_name']} {aspect} marker"
 
@@ -121,7 +121,10 @@ class UIplot():
             if aspect == 'volley amp':
                 self.updateOutMean(ax_out, aspect, row)
 
-        self.updateOutLine(ax_out, row, aspect, mouseover_out)
+        if norm: # EPSP
+            self.updateOutLine(ax_out, row, f"{aspect} norm", mouseover_out)
+        else:
+            self.updateOutLine(ax_out, row, aspect, mouseover_out)
 
     def updateLine(self, axm, plot_to_update, x_data, y_data):
         for line in axm.get_lines():

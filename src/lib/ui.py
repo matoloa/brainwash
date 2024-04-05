@@ -1107,34 +1107,7 @@ class UIsub(Ui_MainWindow):
             recording_name = df_p.at[index, 'recording_name']
             sweeps = df_p.at[index, 'sweeps']
             if sweeps != "...": # if the file is parsed:
-                # remove from internal cache
-                if recording_name in self.dict_datas.keys():
-                    print(f"Deleting {recording_name} from internal dict_datas cache...")
-                    self.dict_datas.pop(recording_name, None)
-                if recording_name in self.dict_means.keys():
-                    print(f"Deleting {recording_name} from internal dict_means cache...")
-                    self.dict_means.pop(recording_name, None)
-                if recording_name in self.dict_filters.keys():
-                    print(f"Deleting {recording_name} from internal dict_filters cache...")
-                    self.dict_filters.pop(recording_name, None)
-                if recording_name in self.dict_outputs.keys():
-                    print(f"Deleting {recording_name} from internal dict_outputs cache...")
-                    self.dict_outputs.pop(recording_name, None)
-                # remove from disk
-                data_path = Path(self.dict_folders['data'] / (recording_name + ".csv"))
-                if data_path.exists():
-                    data_path.unlink()
-                mean_path = Path(self.dict_folders['cache'] / (recording_name + "_mean.csv"))
-                if mean_path.exists():
-                    mean_path.unlink()
-                filter_path = Path(self.dict_folders['cache'] / (recording_name + "_filter.csv"))
-                if filter_path.exists():
-                    filter_path.unlink()
-                output_path = Path(self.dict_folders['cache'] / (recording_name + "_output.csv"))
-                if output_path.exists():
-                    output_path.unlink()
-                # remove from graphs
-                uiplot.purge(rec=recording_name, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+                self.purgeRecordingData(recording_name)
         # Regardless of whether or not there was a file, purge the row from df_project
         self.clearGroupsByRow(uistate.selected) # clear cache so that a new group mean is calculated
         df_p.drop(uistate.selected, inplace=True)
@@ -1143,6 +1116,30 @@ class UIsub(Ui_MainWindow):
         uistate.selected = []
         self.tableUpdate()
         graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+
+    def purgeRecordingData(self, recording_name):
+        # remove from internal cache
+        self.removeFromCache(recording_name, 'dict_datas')
+        self.removeFromCache(recording_name, 'dict_means')
+        self.removeFromCache(recording_name, 'dict_filters')
+        self.removeFromCache(recording_name, 'dict_outputs')
+        # remove from disk
+        self.removeFromDisk(recording_name, 'data', '.csv')
+        self.removeFromDisk(recording_name, 'cache', '_mean.csv')
+        self.removeFromDisk(recording_name, 'cache', '_filter.csv')
+        self.removeFromDisk(recording_name, 'cache', '_output.csv')
+        # remove from graphs
+        uiplot.purge(rec=recording_name, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+
+    def removeFromCache(self, recording_name, cache_name):
+        if recording_name in getattr(self, cache_name).keys():
+            print(f"Deleting {recording_name} from internal {cache_name} cache...")
+            getattr(self, cache_name).pop(recording_name, None)
+
+    def removeFromDisk(self, recording_name, folder_name, file_suffix):
+        file_path = Path(self.dict_folders[folder_name] / (recording_name + file_suffix))
+        if file_path.exists():
+            file_path.unlink()
 
     def parseData(self): # parse data files and modify self.df_project accordingly
         df_p = self.get_df_project()
@@ -1968,11 +1965,11 @@ class UIsub(Ui_MainWindow):
         
         if uistate.mouseover_action.startswith("EPSP slope"):
             uistate.row_copy['t_EPSP_slope_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP slope', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax2)
+            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP slope', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax2, norm=uistate.checkBox['norm_EPSP'])
             uistate.updateDragZones()
         elif uistate.mouseover_action == 'EPSP amp move':
             uistate.row_copy['t_EPSP_amp_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP amp', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax1)
+            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP amp', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax1, norm=uistate.checkBox['norm_EPSP'])
             uistate.updatePointDragZone()
         elif uistate.mouseover_action.startswith("volley slope"):
             uistate.row_copy['t_volley_slope_method'] = "manual"
@@ -1991,9 +1988,9 @@ class UIsub(Ui_MainWindow):
         df_p.reset_index(inplace=True)
         self.set_df_project(df_p)
 
-        # TODO: update dfoutput; dict and file
-        new_dfoutput = self.get_dfoutput(uistate.row_copy)
+        # update dfoutput; dict and file
         rec_name = uistate.row_copy['recording_name']
+        new_dfoutput = self.get_dfoutput(uistate.row_copy)
         self.df2csv(df=new_dfoutput, rec=rec_name, key="output")
         self.tableUpdate()
 
@@ -2191,7 +2188,7 @@ def graphUpdate(axm, ax1, ax2, df=None):
 
 def graphVisible(axis, show): # toggles visibility per selection and sets Legend of axis
     dict_lines = {item.get_label(): item for item in axis.get_children() if isinstance(item, Line2D)}
-    #print(f"dict_lines: {dict_lines.keys()}")
+    print(f"dict_lines: {dict_lines.keys()}")
     dict_legend = {}
     for label, line in dict_lines.items():
         visible = label in show if show else False
