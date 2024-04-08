@@ -1258,7 +1258,7 @@ class UIsub(Ui_MainWindow):
                     self.df_project.loc[i, 'group_IDs'] = str_add_group_ID
                     print(f"{self.df_project.loc[i, 'recording_name']} set to {str_add_group_ID}")
                 else:
-                    str_group_IDs = self.df_project.loc[i, 'group_IDs']
+                    str_group_IDs = str(self.df_project.loc[i, 'group_IDs'])
                     list_groups = list(str_group_IDs.split(","))
                     if str_add_group_ID not in list_groups:
                         list_groups.append(str_add_group_ID)
@@ -1538,9 +1538,10 @@ class UIsub(Ui_MainWindow):
         
     def get_dfgroupmean(self, key_group):
         # returns an internal df output average of <group>. If it does not exist, create it
+        key_group = str(key_group) # TODO: make sure this isn't necessary
         if key_group in self.dict_group_means: # 1: Return cached
             return self.dict_group_means[key_group]
-        group_path = Path(f"{self.dict_folders['cache']}/{key_group}.csv")
+        group_path = Path(f"{self.dict_folders['cache']}/group_{key_group}.csv")
         if group_path.exists(): #2: Read from file
             if verbose:
                 print("Loading stored", str(group_path))
@@ -1549,11 +1550,12 @@ class UIsub(Ui_MainWindow):
             if verbose:
                 print("Building new", str(group_path))
             df_p = self.df_project
-            dfgroup = df_p[df_p['groups'].str.split(',').apply(lambda x: key_group in x)]
-            print(f"dfgroup: {dfgroup}")
+            # create dfgroup_IDs. containing ONLY lines that have key group in their group_IDs
+            dfgroup_IDs = df_p[df_p['group_IDs'].str.contains(key_group, na=False)]
+            print(f"dfgroup_IDs: {dfgroup_IDs}")
             dfs = []
             list_pairs = [] # prevent diff duplicates
-            for i, row in dfgroup.iterrows():
+            for i, row in dfgroup_IDs.iterrows():
                 if uistate.checkBox['paired_stims']:
                     name_rec = row['recording_name']
                     if name_rec in list_pairs:
@@ -2169,7 +2171,12 @@ def graphUpdate(axm, ax1, ax2, df=None):
     ax1.figure.canvas.draw() # ax2 should be on the same canvas
 
 # TODO: WIP, plotting groups
-    if len(uistate.group_show) > 0:
+    if len(uistate.group_show) > 0: # TODO: only if groups are checked to be displayed
+        # cycle all groups from uistate.group_show.keys()
+        for key in uistate.group_show.keys():
+            print(f"graphUpdate, group: {key}, type: {type(key)}")
+            # uisub.dict_group_means[key] = uisub.get_dfgroupmean(key_group=key)
+            print(f"")
         uiplot.graphGroups(uisub.dict_group_means, ax1, ax2)
 
 
