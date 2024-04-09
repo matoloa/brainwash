@@ -28,12 +28,21 @@ class UIplot():
                     if line.get_label() in subplots:
                         line.remove()
                 del self.uistate.plotted[rec]
-    
-    def graphGroups(self, dict_group_means, ax1, ax2):
-        print("Graphing groups...")
-        for group in dict_group_means.keys():
-                print(f"Group {group}:")
 
+    def graphGroups(self, df_groups, dict_group_means, ax1, ax2):
+        print(f"Graphing groups {df_groups.group_ID.unique()}:")
+        # cycle through the reows of df_groups and print the group_ID, group_name, and color for each one
+        for index, row in df_groups.iterrows():
+            group_ID = row['group_ID']
+            group_name = row['group_name']
+            color = row['color']
+            print(f"group_ID: {group_ID}, group_name: {group_name}, color: {color}")
+            df = dict_group_means[group_ID]
+            _ = sns.lineplot(ax=ax2, data=df, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label=f"{group_name} EPSP slope")
+            #_ = sns.lineplot(ax=ax1, data=df, y='EPSP_amp_mean', x="sweep", color=color, alpha=0.5, label="EPSP amp")
+            #_ = sns.lineplot(ax=ax1, data=df, y='volley_amp_mean', x="sweep", color=color, alpha=0.5, label="volley amp")
+            #_ = sns.lineplot(ax=ax2, data=df, y='volley_slope_mean', x="sweep", color=color, alpha=0.5, label="volley slope")
+            #_ = sns.lineplot(ax=ax2, data=df, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label="EPSP slope")
 
     def graph(self, dict_row, dfmean, dfoutput, axm, ax1, ax2):
         print(f"Graphing {dict_row['recording_name']}...")

@@ -1541,6 +1541,7 @@ class UIsub(Ui_MainWindow):
     def get_dfgroupmean(self, str_ID):
         # returns an internal df output average of <group>. If it does not exist, create it
         if str_ID in self.dict_group_means: # 1: Return cached
+            print(f"Returning cached group mean for {str_ID}")
             return self.dict_group_means[str_ID]
         group_path = Path(f"{self.dict_folders['cache']}/group_{str_ID}.csv")
         if group_path.exists(): #2: Read from file
@@ -1733,6 +1734,7 @@ class UIsub(Ui_MainWindow):
 
     def graphMainPreload(self): # plot and hide all imported rows in df_project
         self.usage("graphMainPreload")
+        t0 = time.time()
         df_p = self.get_df_project()
         df = df_p.loc[df_p['sweeps'] != "..."]
         for i, row in df.iterrows():
@@ -1747,6 +1749,7 @@ class UIsub(Ui_MainWindow):
             row = df_p.loc[i] # get_dfoutput updates df_project - update row!
             uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
             print(f"Preloaded {row['recording_name']}")
+        print(f"Preloaded recordings in {time.time()-t0:.2f} seconds.")
         graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def updateMouseover(self):
@@ -2140,17 +2143,16 @@ def graphUpdate(axm, ax1, ax2, df=None):
     #print("uistate.plotted: ", uistate.plotted)
     if df is None: # unless fed specific rows, make a list of the selected
         df = uisub.get_df_project().loc[uistate.selected]
-    df = df[df['sweeps'] != "..."]
-    if df.empty or not uistate.anyView():
+    df_parsed_selection = df[df['sweeps'] != "..."]
+    if df_parsed_selection.empty or not uistate.anyView():
         uiplot.hideAll(axm, ax1, ax2)
     else:
-        #print(f"df: {df}")
         # axm, set visibility of lines and build legend
-        axm_legend = graphVisible(axis=axm, show=uistate.to_axm(df))
+        axm_legend = graphVisible(axis=axm, show=uistate.to_axm(df_parsed_selection))
         axm.legend(axm_legend.values(), axm_legend.keys(), loc='upper right')
-        ax1_legend = graphVisible(axis=ax1, show=uistate.to_ax1(df))
+        ax1_legend = graphVisible(axis=ax1, show=uistate.to_ax1(df_parsed_selection))
         ax1.legend(ax1_legend.values(), ax1_legend.keys(), loc='upper right')
-        ax2_legend = graphVisible(axis=ax2, show=uistate.to_ax2(df))
+        ax2_legend = graphVisible(axis=ax2, show=uistate.to_ax2(df_parsed_selection))
         ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
 
     # arrange axes and labels
@@ -2175,14 +2177,21 @@ def graphUpdate(axm, ax1, ax2, df=None):
     axm.figure.canvas.draw()
     ax1.figure.canvas.draw() # ax2 should be on the same canvas
 
-# TODO: WIP, plotting groups
-    if len(uistate.group_show) > 0: # TODO: only if groups are checked to be displayed
-        # cycle all groups from uistate.group_show.keys()
-        for key in uistate.group_show.keys():
-            print(f"graphUpdate, group: {key}, type: {type(key)}")
-            uisub.dict_group_means[key] = uisub.get_dfgroupmean(str_ID=key)
-        uiplot.graphGroups(uisub.dict_group_means, ax1, ax2)
 
+    # Below is the instruction to plot groups. TODO: Move to a separate functions
+    if len(uistate.group_show) < 1:
+        return
+    
+    if df_parsed_selection.empty: # If df is empty, get all group_IDs from uisub.df_groups
+        group_IDs_to_plot = uisub.df_groups['group_ID'].tolist()
+        df_groups = uisub.df_groups
+    else: # If df is not empty, get group_IDs from df (selected and parsed rows)
+        group_IDs_to_plot = df_parsed_selection['group_IDs'].str.split(',').sum()
+        df_groups = uisub.df_groups[uisub.df_groups['group_ID'].isin(group_IDs_to_plot)]
+    print(f"group_IDs_to_plot: {group_IDs_to_plot}")
+    for str_ID in group_IDs_to_plot:
+        uisub.get_dfgroupmean(str_ID)
+    uiplot.graphGroups(df_groups, uisub.dict_group_means, ax1, ax2)
 
 def graphVisible(axis, show): # toggles visibility per selection and sets Legend of axis
     dict_lines = {item.get_label(): item for item in axis.get_children() if isinstance(item, Line2D)}
