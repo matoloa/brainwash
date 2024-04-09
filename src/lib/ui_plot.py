@@ -31,7 +31,9 @@ class UIplot():
     
     def graphGroups(self, dict_group_means, ax1, ax2):
         print("Graphing groups...")
-        print(f"dict_group_means: {dict_group_means.keys()}")
+        for group in dict_group_means.keys():
+                print(f"Group {group}:")
+
 
     def graph(self, dict_row, dfmean, dfoutput, axm, ax1, ax2):
         print(f"Graphing {dict_row['recording_name']}...")

@@ -6,7 +6,7 @@ class UIstate:
     def __init__(self):
         self.reset()
 
-    def reset(self): # reset all states to False
+    def reset(self): # (re)set all persisted states
         self.version = "0.0.0"
         self.colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000'] # TODO: Use
         self.axm = [] # list of items that are supposed to be on axm

@@ -690,11 +690,12 @@ class UIsub(Ui_MainWindow):
         path_groups = self.dict_folders['project'] / "groups.csv"
         if path_groups.exists():
             self.df_groups = pd.read_csv(str(path_groups))
+            self.df_groups = self.df_groups.astype(str) # force string format
         else:
             self.defaultGroups()
         if uistate.group_show == {}:
             for group_id in self.df_groups['group_ID']:
-                uistate.group_show[group_id] = True
+                uistate.group_show[str(group_id)] = True
 
     # Debugging tools
             # self.find_widgets_with_top_left_coordinates(self.centralwidget)
@@ -837,14 +838,15 @@ class UIsub(Ui_MainWindow):
             print("Maximum of 9 groups allowed for now.")
             return
         i = 1 # start at 1; no group_0
-        while i in self.df_groups['group_ID'].values:
+        while str(i) in self.df_groups['group_ID'].values:
             i += 1
-        new_group = pd.Series({'group_ID': i, 'group_name': f"group {str(i)}", 'color': uistate.colors[i-1]})
-        print(f"new_group {i}: {new_group}")
+        str_ID = str(i)
+        new_group = pd.Series({'group_ID': str_ID, 'group_name': f"group {str_ID}", 'color': uistate.colors[i-1]})
         self.df_groups = pd.concat([self.df_groups, new_group.to_frame().T]).reset_index(drop=True)
-        uistate.group_show[i] = True # add show group to uistate
+        print(f"self.df_groups: {self.df_groups}")
+        uistate.group_show[str_ID] = True # add show group to uistate
         self.saveGroups()
-        self.addGroupControls(i)
+        self.addGroupControls(str_ID)
 
     def triggerRemoveLastGroup(self):
         self.usage("triggerRemoveLastGroup")
@@ -864,7 +866,7 @@ class UIsub(Ui_MainWindow):
         df_p = self.get_df_project()
         group_to_remove = str(self.df_groups.iloc[-1]['group_ID'])
         print(f"Removing group {group_to_remove}...")
-        if df_p['group_IDs'].astype(str).str.contains(group_to_remove).any():
+        if df_p['group_IDs'].str.contains(group_to_remove).any():
             print(f"{group_to_remove} is not empty.")
             return
         self.triggerRemoveLastGroup()
@@ -1204,23 +1206,23 @@ class UIsub(Ui_MainWindow):
 
 # Data Group functions
 
-    def addGroupControls(self, i): # Create menu for adding to group and checkbox for showing group
-        group = f"group_{str(i)}"
-        print(f"addGroupControls: {group}, i: {i}")
+    def addGroupControls(self, str_ID): # Create menu for adding to group and checkbox for showing group
+        group = f"group_{str_ID}"
+        print(f"addGroupControls: {group}, i: {str_ID}")
         print(f"df_groups: {self.df_groups}")
-        color = self.df_groups.loc[i-1, 'color']
+        color = self.df_groups.loc[int(str_ID)-1, 'color']
         print(f"addGroupControls: {group}, {color}")
         setattr(self, f"actionAddTo_{group}", QtWidgets.QAction(f"Add selection to {group}", self))
         self.new_group_menu_item = getattr(self, f"actionAddTo_{group}")
-        self.new_group_menu_item.triggered.connect(lambda checked, add_group_ID=i: self.addToGroup(add_group_ID))
-        self.new_group_menu_item.setShortcut(f"{str(i)}")
+        self.new_group_menu_item.triggered.connect(lambda checked, add_group_ID=str_ID: self.addToGroup(add_group_ID))
+        self.new_group_menu_item.setShortcut(f"{str_ID}")
         self.menuGroups.addAction(self.new_group_menu_item)                    
         self.new_checkbox = QtWidgets.QCheckBox(group, self.centralwidget)
         self.new_checkbox.setObjectName(group)
         self.new_checkbox.setText(group)
         self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the text color
         self.new_checkbox.setMaximumWidth(100)  # Set the maximum width
-        self.new_checkbox.setChecked(uistate.group_show[i])
+        self.new_checkbox.setChecked(uistate.group_show[str_ID])
         self.new_checkbox.stateChanged.connect(lambda state, group=group: self.groupCheckboxChanged(state, group))
         self.horizontalLayoutGroups.addWidget(self.new_checkbox)
 
@@ -1307,7 +1309,7 @@ class UIsub(Ui_MainWindow):
                     print("...but NOT when attempting to unlink.")
 
     def clearGroupsByRow(self, rows):
-        list_affected_groups = ' '.join(self.df_project.iloc[rows]['group_IDs'].astype(str))
+        list_affected_groups = ' '.join(self.df_project.iloc[rows]['group_IDs'])
         affected_groups = set(re.findall(r'\b\w+\b', list_affected_groups))
         for i in rows:
             self.df_project.loc[i, 'group_IDs'] = " "
@@ -1536,12 +1538,11 @@ class UIsub(Ui_MainWindow):
         return self.dict_filters[recording_name]
         
         
-    def get_dfgroupmean(self, key_group):
+    def get_dfgroupmean(self, str_ID):
         # returns an internal df output average of <group>. If it does not exist, create it
-        key_group = str(key_group) # TODO: make sure this isn't necessary
-        if key_group in self.dict_group_means: # 1: Return cached
-            return self.dict_group_means[key_group]
-        group_path = Path(f"{self.dict_folders['cache']}/group_{key_group}.csv")
+        if str_ID in self.dict_group_means: # 1: Return cached
+            return self.dict_group_means[str_ID]
+        group_path = Path(f"{self.dict_folders['cache']}/group_{str_ID}.csv")
         if group_path.exists(): #2: Read from file
             if verbose:
                 print("Loading stored", str(group_path))
@@ -1551,7 +1552,7 @@ class UIsub(Ui_MainWindow):
                 print("Building new", str(group_path))
             df_p = self.df_project
             # create dfgroup_IDs. containing ONLY lines that have key group in their group_IDs
-            dfgroup_IDs = df_p[df_p['group_IDs'].str.contains(key_group, na=False)]
+            dfgroup_IDs = df_p[df_p['group_IDs'].str.contains(str_ID, na=False)]
             print(f"dfgroup_IDs: {dfgroup_IDs}")
             dfs = []
             list_pairs = [] # prevent diff duplicates
@@ -1568,15 +1569,19 @@ class UIsub(Ui_MainWindow):
                     if uistate.checkBox['norm_EPSP']:
                         self.normOutput(row, df)
                 dfs.append(df)
-            dfs = pd.concat(dfs)
+            if dfs:
+                dfs = pd.concat(dfs)
+            else:
+                print(f"No recordings in group_ID {str_ID}.")
+                return
             if uistate.checkBox['norm_EPSP']:
                 group_mean = dfs.groupby('sweep').agg({'EPSP_amp_norm': ['mean', 'sem'], 'EPSP_slope_norm': ['mean', 'sem']}).reset_index()
             else:
                 group_mean = dfs.groupby('sweep').agg({'EPSP_amp': ['mean', 'sem'], 'EPSP_slope': ['mean', 'sem']}).reset_index()
             group_mean.columns = ['sweep', 'EPSP_amp_mean', 'EPSP_amp_SEM', 'EPSP_slope_mean', 'EPSP_slope_SEM']
-            self.df2csv(df=group_mean, rec=key_group, key="mean")
-        self.dict_group_means[key_group] = group_mean
-        return self.dict_group_means[key_group]
+            self.df2csv(df=group_mean, rec=f"group_{str_ID}", key="mean")
+        self.dict_group_means[str_ID] = group_mean
+        return self.dict_group_means[str_ID]
 
 
     def get_dfdiff(self, row):
@@ -1652,7 +1657,7 @@ class UIsub(Ui_MainWindow):
         return dfdiff
         
 
-    def df2csv(self, df, rec, key=None): # writes dict[rec] to rec_{dict}.csv
+    def df2csv(self, df, rec, key=None): # "writes dict[rec] to rec_{dict}.csv" TODO: Update, better description; replace "rec"
         self.dict_folders['cache'].mkdir(exist_ok=True)
         if key is None:
             filepath = f"{self.dict_folders['cache']}/{rec}.csv"
@@ -2175,8 +2180,7 @@ def graphUpdate(axm, ax1, ax2, df=None):
         # cycle all groups from uistate.group_show.keys()
         for key in uistate.group_show.keys():
             print(f"graphUpdate, group: {key}, type: {type(key)}")
-            # uisub.dict_group_means[key] = uisub.get_dfgroupmean(key_group=key)
-            print(f"")
+            uisub.dict_group_means[key] = uisub.get_dfgroupmean(str_ID=key)
         uiplot.graphGroups(uisub.dict_group_means, ax1, ax2)
 
 
