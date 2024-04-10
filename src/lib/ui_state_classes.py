@@ -50,6 +50,7 @@ class UIstate:
 
     # Do NOT persist these
         self.selected = [] # list of selected indices
+        self.df_recs2plot = None # df_project copy; all PARSED recordings (if any are selected, only selected ones)
         self.plotted = {} # dict: key=name (meanplot), value=[subplots]
         self.row_copy = None # copy of selected row from df_project
         self.mouseover_action = None # name of action to take if clicked at current mouseover

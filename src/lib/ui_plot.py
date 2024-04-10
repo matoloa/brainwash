@@ -46,21 +46,20 @@ class UIplot():
             #_ = sns.lineplot(ax=ax2, data=df, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label="EPSP slope")
 
 
-    def graphUpdate(self, df_selected, axm, ax1, ax2):
+    def graphUpdate(self, axm, ax1, ax2):
         # toggle show/hide of lines on axm, ax1 and ax2: show only selected and imported lines, only appropriate aspects
         print("graphUpdate")
         uistate = self.uistate
         #print("uistate.plotted: ", uistate.plotted)
-        df_parsed_selection = df_selected[df_selected['sweeps'] != "..."]
-        if df_parsed_selection.empty or not uistate.anyView():
+        if uistate.df_recs2plot.empty or not uistate.anyView():
             self.hideAll(axm, ax1, ax2)
         else:
             # axm, set visibility of lines and build legend
-            axm_legend = self.graphVisible(axis=axm, show=uistate.to_axm(df_parsed_selection))
+            axm_legend = self.graphVisible(axis=axm, show=uistate.to_axm(uistate.df_recs2plot))
             axm.legend(axm_legend.values(), axm_legend.keys(), loc='upper right')
-            ax1_legend = self.graphVisible(axis=ax1, show=uistate.to_ax1(df_parsed_selection))
+            ax1_legend = self.graphVisible(axis=ax1, show=uistate.to_ax1(uistate.df_recs2plot))
             ax1.legend(ax1_legend.values(), ax1_legend.keys(), loc='upper right')
-            ax2_legend = self.graphVisible(axis=ax2, show=uistate.to_ax2(df_parsed_selection))
+            ax2_legend = self.graphVisible(axis=ax2, show=uistate.to_ax2(uistate.df_recs2plot))
             ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
 
         # arrange axes and labels

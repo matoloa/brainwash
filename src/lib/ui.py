@@ -943,6 +943,12 @@ class UIsub(Ui_MainWindow):
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         # build the list uistate.selected with indices
         uistate.selected = [index.row() for index in selected_indexes]
+        if not selected_indexes:
+            df_project_selected = self.get_df_project()
+        else:
+            df_project_selected = self.get_df_project().iloc[uistate.selected]
+        uistate.df_recs2plot = df_project_selected[df_project_selected['sweeps'] != "..."]
+        print(f"df_recs2plot: {uistate.df_recs2plot}")
         self.updateMouseover()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
 
@@ -1346,8 +1352,7 @@ class UIsub(Ui_MainWindow):
             uistate.reset()
             uistate.save_cfg(projectfolder=self.dict_folders['project'])
             self.tableFormat()
-            df_selected = self.get_df_project().loc[uistate.selected]
-            uiplot.graphUpdate(df_selected, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+            uiplot.graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def renameProject(self): # changes name of project folder and updates .cfg
         #self.dict_folders['project'].mkdir(exist_ok=True)
@@ -1751,8 +1756,9 @@ class UIsub(Ui_MainWindow):
             uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
             print(f"Preloaded {row['recording_name']}")
         print(f"Preloaded recordings in {time.time()-t0:.2f} seconds.")
-        df_selected = self.get_df_project().loc[uistate.selected]
-        uiplot.graphUpdate(df_selected, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+
+        uistate.df_recs2plot = df
+        uiplot.graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def updateMouseover(self):
         # drop any prior mouseover event connections and plots
@@ -1791,8 +1797,7 @@ class UIsub(Ui_MainWindow):
                     connect = True
             if connect: # set new mouseover event connection
                 self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseover(event=event, axm=self.axm))
-        df_selected = self.get_df_project().loc[uistate.selected]
-        uiplot.graphUpdate(df_selected, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        uiplot.graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def mainClicked(self, event, canvas, out=False): # maingraph click event
         x = event.xdata
@@ -2174,8 +2179,7 @@ def graphReplot(axm, ax1, ax2, df=None, row=None): # TODO: allow update of only 
         df_p = uisub.get_df_project() # get_dfoutput updates df_project - update row!
         row = df_p[df_p['recording_name'] == rec].iloc[0]
         uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=axm, ax1=ax1, ax2=ax2)
-    df_selected = uisub.get_df_project().loc[uistate.selected]
-    uiplot.graphUpdate(df_selected, axm=axm, ax1=ax1, ax2=ax2)
+    uiplot.graphUpdate(axm=axm, ax1=ax1, ax2=ax2)
     
 def graphMouseover(event, axm): # determine which maingraph event is being mouseovered
     x = event.xdata
