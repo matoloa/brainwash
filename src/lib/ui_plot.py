@@ -1,5 +1,6 @@
 import seaborn as sns
 import numpy as np
+from matplotlib.lines import Line2D 
 
 class UIplot():
     def __init__(self, uistate):
@@ -43,6 +44,87 @@ class UIplot():
             #_ = sns.lineplot(ax=ax1, data=df, y='volley_amp_mean', x="sweep", color=color, alpha=0.5, label="volley amp")
             #_ = sns.lineplot(ax=ax2, data=df, y='volley_slope_mean', x="sweep", color=color, alpha=0.5, label="volley slope")
             #_ = sns.lineplot(ax=ax2, data=df, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label="EPSP slope")
+
+
+    def graphUpdate(self, df_selected, axm, ax1, ax2):
+        # toggle show/hide of lines on axm, ax1 and ax2: show only selected and imported lines, only appropriate aspects
+        print("graphUpdate")
+        uistate = self.uistate
+        #print("uistate.plotted: ", uistate.plotted)
+        df_parsed_selection = df_selected[df_selected['sweeps'] != "..."]
+        if df_parsed_selection.empty or not uistate.anyView():
+            self.hideAll(axm, ax1, ax2)
+        else:
+            # axm, set visibility of lines and build legend
+            axm_legend = self.graphVisible(axis=axm, show=uistate.to_axm(df_parsed_selection))
+            axm.legend(axm_legend.values(), axm_legend.keys(), loc='upper right')
+            ax1_legend = self.graphVisible(axis=ax1, show=uistate.to_ax1(df_parsed_selection))
+            ax1.legend(ax1_legend.values(), ax1_legend.keys(), loc='upper right')
+            ax2_legend = self.graphVisible(axis=ax2, show=uistate.to_ax2(df_parsed_selection))
+            ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
+
+        # arrange axes and labels
+        axm.set_xlabel("Time (s)")
+        axm.set_ylabel("Voltage (V)")
+        # x and y limits
+        axm.set_xlim(uistate.zoom['mean_xlim'])
+        axm.set_ylim(uistate.zoom['mean_ylim'])
+
+        if uistate.checkBox['norm_EPSP']:
+            ax1.set_ylabel("Amplitude %")
+            ax2.set_ylabel("Slope %")
+            ax1.set_ylim(0, 550)
+            ax2.set_ylim(0, 550)
+        else:
+            ax1.set_ylabel("Amplitude (mV)")
+            ax2.set_ylabel("Slope (mV/ms)")
+            ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
+            ax2.set_ylim(uistate.zoom['output_ax2_ylim'])
+        self.oneAxisLeft(ax1, ax2)
+        # redraw
+        axm.figure.canvas.draw()
+        ax1.figure.canvas.draw() # ax2 should be on the same canvas
+
+
+        # # Below is the instruction to plot groups. TODO: Move to a separate functions
+        # if len(uistate.group_show) < 1:
+        #     return
+        
+        # if df_parsed_selection.empty: # If df is empty, get all group_IDs from uisub.df_groups
+        #     group_IDs_to_plot = uisub.df_groups['group_ID'].tolist()
+        #     df_groups = uisub.df_groups
+        # else: # If df is not empty, get group_IDs from df (selected and parsed rows)
+        #     group_IDs_to_plot = df_parsed_selection['group_IDs'].str.split(',').sum()
+        #     df_groups = uisub.df_groups[uisub.df_groups['group_ID'].isin(group_IDs_to_plot)]
+        # print(f"group_IDs_to_plot: {group_IDs_to_plot}")
+        # for str_ID in group_IDs_to_plot:
+        #     uisub.get_dfgroupmean(str_ID)
+        # self.graphGroups(df_groups, uisub.dict_group_means, ax1, ax2)
+
+    def graphVisible(self, axis, show): # toggles visibility per selection and sets Legend of axis
+        dict_lines = {item.get_label(): item for item in axis.get_children() if isinstance(item, Line2D)}
+        #print(f"dict_lines: {dict_lines.keys()}")
+        dict_legend = {}
+        for label, line in dict_lines.items():
+            visible = label in show if show else False
+            line.set_visible(visible)
+            if visible and not label.endswith(" marker"):
+                dict_legend[label] = line
+        return dict_legend
+
+
+    def oneAxisLeft(self, ax1, ax2):
+        uistate = self.uistate
+        # sets ax1 and ax2 visibility and position
+        ax1.set_visible(uistate.ampView())
+        ax2.set_visible(uistate.slopeView())
+        # print(f"oneAxisLeft - uistate.ampView: {uistate.ampView()}, uistate.slopeView: {uistate.slopeView()}, uistate.slopeOnly: {uistate.slopeOnly()}")
+        if uistate.slopeOnly():
+            ax2.yaxis.set_label_position("left")
+            ax2.yaxis.set_ticks_position("left")
+        else:
+            ax2.yaxis.set_label_position("right")
+            ax2.yaxis.set_ticks_position("right")
 
     def graph(self, dict_row, dfmean, dfoutput, axm, ax1, ax2):
         print(f"Graphing {dict_row['recording_name']}...")
