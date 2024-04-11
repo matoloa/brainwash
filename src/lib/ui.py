@@ -563,53 +563,7 @@ class Filetreesub(Ui_Dialog):
 #######################################################################
 
 
-def df_projectTemplate():
-    return pd.DataFrame(
-        columns=[
-            "ID",
-            "host",
-            "path",
-            "recording_name",
-            "groups",
-            "group_IDs",
-            "parsetimestamp",
-            "sweeps",
-            "channel",
-            "stim",
-            "paired_recording",
-            "Tx",
-            "filter",
-            "filter_params",
-            "t_stim",
-            "t_stim_method",
-            "t_stim_params",
-            "t_volley_amp",
-            "t_volley_amp_method",
-            "t_volley_amp_params",
-            "t_volley_slope_width",
-            "t_volley_slope_halfwidth",
-            "t_volley_slope_start",
-            "t_volley_slope_end",
-            "t_volley_slope_method",
-            "t_volley_slope_params",
-            "volley_amp_mean",
-            "volley_slope_mean",
-            "t_VEB",
-            "t_VEB_method",
-            "t_VEB_params",
-            "t_EPSP_amp",
-            "t_EPSP_amp_method",
-            "t_EPSP_amp_params",
-            "t_EPSP_slope_width",
-            "t_EPSP_slope_halfwidth",
-            "t_EPSP_slope_start",
-            "t_EPSP_slope_end",
-            "t_EPSP_slope_method",
-            "t_EPSP_slope_params",
-            "exclude",
-            "comment",
-        ]
-    )
+
 
 
 # subclassing Ui_MainWindow to be able to use the unaltered output file from pyuic and QT designer
@@ -841,7 +795,7 @@ class UIsub(Ui_MainWindow):
                     row = self.get_df_project().loc[idx]
                     rec_name = row['recording_name']
                     out = self.dict_outputs[rec_name]
-                    uiplot.updateEPSPout(rec_name, out, self.ax1, self.ax2)
+                    uiplot.updateEPSPout(rec_name, out, uistate.ax1, uistate.ax1)
         self.updateMouseover()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
@@ -1048,9 +1002,14 @@ class UIsub(Ui_MainWindow):
         else:
             df_project_selected = self.get_df_project().iloc[uistate.selected]
             uistate.df_recs2plot = df_project_selected[df_project_selected['sweeps'] != "..."]
-        print(f"df_recs2plot: {uistate.df_recs2plot}")
-        self.updateMouseover()
+            if uistate.df_recs2plot.empty:
+                uistate.df_recs2plot = None
+        if uistate.df_recs2plot is not None:
+            self.updateMouseover()
+        else:
+            uiplot.graphRefresh()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
+        report()
 
     def checkBox_paired_stims_changed(self, state):
         self.usage("checkBox_paired_stims_changed")
@@ -1092,7 +1051,7 @@ class UIsub(Ui_MainWindow):
             row = self.df_project.iloc[idx]
             rec_name = row['recording_name']
             out = self.get_dfoutput(row=row)
-            uiplot.updateEPSPout(rec_name, out, self.ax1, self.ax2)
+            uiplot.updateEPSPout(rec_name, out, uistate.ax1, uistate.ax1)
         print(f"editNormRange: {uistate.lineEdit['norm_EPSP_on']}")
     
     def normOutputs(self): # TODO: also norm diffs (paired stim) when applicable
@@ -1194,8 +1153,8 @@ class UIsub(Ui_MainWindow):
                     df_p.loc[df_p['paired_recording'] == old_recording_name, 'paired_recording'] = new_recording_name
                     self.set_df_project(df_p)
                     self.tableUpdate()
-                    uiplot.purge(rec=old_recording_name, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
-                    graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+                    uiplot.purge(rec=old_recording_name)
+                    self.graphUpdate(axm=uistate.axm, ax1=uistate.ax1, ax2=uistate.ax1)
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
             else:
@@ -1220,7 +1179,7 @@ class UIsub(Ui_MainWindow):
         self.set_df_project(df_p)
         uistate.selected = []
         self.tableUpdate()
-        graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        self.graphUpdate(axm=uistate.axm, ax1=uistate.ax1, ax2=uistate.ax1)
 
     def purgeRecordingData(self, recording_name):
         def removeFromCache(cache_name):
@@ -1235,7 +1194,7 @@ class UIsub(Ui_MainWindow):
             removeFromCache(cache_name)
         for folder_name, file_suffix in [('data', '.csv'), ('cache', '_mean.csv'), ('cache', '_filter.csv'), ('cache', '_output.csv')]:
             removeFromDisk(folder_name, file_suffix)
-        uiplot.purge(rec=recording_name, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        uiplot.purge(rec=recording_name)
 
     def parseData(self): # parse data files and modify self.df_project accordingly
         df_p = self.get_df_project()
@@ -1264,7 +1223,7 @@ class UIsub(Ui_MainWindow):
                 df_p = pd.concat([update_frame, rows2add]).reset_index(drop=True)
         self.set_df_project(df_p)
         self.tableUpdate()
-        graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        self.graphUpdate(axm=uistate.axm, ax1=uistate.ax1, ax2=uistate.ax1)
 
     def flipCI(self):
         if uistate.selected:
@@ -1478,7 +1437,7 @@ class UIsub(Ui_MainWindow):
             uistate.reset()
             uistate.save_cfg(projectfolder=self.dict_folders['project'])
             self.tableFormat()
-            uiplot.graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+            uiplot.graphRefresh()
 
     def renameProject(self): # changes name of project folder and updates .cfg
         #self.dict_folders['project'].mkdir(exist_ok=True)
@@ -1827,7 +1786,7 @@ class UIsub(Ui_MainWindow):
 
 
 
-# Maingraph handling
+# Graph interface
 
     def graphMainWipe(self): # removes all plots from main_canvas_mean and main_canvas_output
         if hasattr(self, "main_canvas_mean"):
@@ -1838,17 +1797,18 @@ class UIsub(Ui_MainWindow):
             self.main_canvas_output.draw()
 
     def graphMainAxes(self): # plot selected row(s), or clear graph if empty
-        self.axm = self.main_canvas_mean.axes
+        uistate.axm = self.main_canvas_mean.axes
         ax1 = self.main_canvas_output.axes
-        if hasattr(self, "ax2"): # remove ax2 if it exists
-            self.ax2.remove()
+        if uistate.ax2 is not None and hasattr(uistate, "ax2"):  # remove ax2 if it exists
+            uistate.ax2.remove()
         ax2 = ax1.twinx()
-        self.ax2 = ax2  # Store the ax2 instance
-        self.ax1 = ax1
+        uistate.ax2 = ax2  # Store the ax2 instance
+        uistate.ax1 = ax1
         # connect scroll event if not already connected #TODO: when graphMainAxes is called only once, the check should be redundant
         if not hasattr(self, 'scroll_event_connected') or not self.scroll_event_connected:
-            self.main_canvas_mean.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.graphMean, canvas=self.main_canvas_mean, ax1=self.main_canvas_mean.axes))
-            self.main_canvas_output.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.main_canvas_output, ax1=self.ax1, ax2=self.ax2))
+            self.main_canvas_mean.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphMean, canvas=self.main_canvas_mean, ax1=self.main_canvas_mean.axes))
+            self.main_canvas_output.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.main_canvas_output, ax1=uistate.ax1, ax2=uistate.ax1))
+
             self.scroll_event_connected = True
         self.graphMainPreload()
 
@@ -1867,10 +1827,44 @@ class UIsub(Ui_MainWindow):
             if dfoutput is None:
                 return
             row = df_p.loc[i] # get_dfoutput updates df_project - update row!
-            uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+            uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
             print(f"Preloaded {row['recording_name']}")
         print(f"Preloaded recordings in {time.time()-t0:.2f} seconds.")
-        uiplot.graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+        uiplot.graphRefresh()
+
+    def graphUpdate(self, axm, ax1, ax2, df=None, row=None): # TODO: allow update of only specific row
+        if df is None: # unless fed a specific row, (re)plot the whole df_project
+            df_imported = uistate.recs2plot()
+        if df_imported.empty:
+            print("graphUpdate: df_p is empty")
+            return
+        # update output graph x limits based on max number of sweeps in df_project
+        if uistate.zoom['output_xlim'][1] is None:
+            uistate.zoom['output_xlim'] = [0, df_imported['sweeps'].max()]
+            uistate.save_cfg(projectfolder=uisub.dict_folders['project'])
+        list_recs = df_imported['recording_name'].tolist()
+        if uistate.plotted: # A (mostly redundant?) check to remove plotted lines that are not in df_select
+            for rec in list(uistate.plotted.keys()): # create a list from dict keys to avoid RuntimeError
+                if rec not in list_recs:
+                    print(f"WARNING! {rec} was plotted, but not in list_rec. It should have been uiplot.purge:d upon delete - check delete sequence!")
+                    uiplot.purge(rec=rec)
+            for rec in list(uistate.plotted.keys()): # remove already plotted recs from list_recs
+                list_recs.remove(rec)
+            if not list_recs:
+                return
+        for rec in list_recs: # plot the remaining recs
+            row = df_imported[df_imported['recording_name'] == rec].iloc[0]
+            dfmean = uisub.get_dfmean(row=row)
+            if uistate.checkBox['paired_stims']:
+                dfoutput = uisub.get_dfdiff(row=row)
+            else:
+                dfoutput = uisub.get_dfoutput(row=row)
+            if dfoutput is None:
+                return
+            df_p = uisub.get_df_project() # get_dfoutput updates df_project - update row!
+            row = df_p[df_p['recording_name'] == rec].iloc[0]
+            uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
+        uiplot.graphRefresh()
 
     def updateMouseover(self):
         # drop any prior mouseover event connections and plots
@@ -1890,9 +1884,9 @@ class UIsub(Ui_MainWindow):
             df_p = self.get_df_project()
             uistate.row_copy = df_p.loc[uistate.selected[0]].copy()
             self.dfmean = self.get_dfmean(row=uistate.row_copy) # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
-            uistate.setMargins(axm=self.axm)
+            uistate.setMargins(axm=uistate.axm)
             connect = False
-            for line in self.axm.lines: # connects plotted lines
+            for line in uistate.axm.lines: # connects plotted lines
                 label = line.get_label()
                 rec_name = uistate.row_copy['recording_name']
                 if label == f"{rec_name} EPSP slope marker":
@@ -1908,8 +1902,8 @@ class UIsub(Ui_MainWindow):
                     uistate.updatePointDragZone(aspect="volley amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
                     connect = True
             if connect: # set new mouseover event connection
-                self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: graphMouseover(event=event, axm=self.axm))
-        uiplot.graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
+                self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: uiplot.graphMouseover(event=event, axm=uistate.axm))
+        uiplot.graphRefresh()
 
     def mainClicked(self, event, canvas, out=False): # maingraph click event
         x = event.xdata
@@ -1924,15 +1918,15 @@ class UIsub(Ui_MainWindow):
                     start, end = uistate.row_copy['t_EPSP_slope_start'], uistate.row_copy['t_EPSP_slope_end']
                     self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragSlope(event, time_values, action, start, end))
                 elif action == 'EPSP amp move':
-                    self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragPoint(event, time_values, action, uistate.row_copy['t_EPSP_amp']))
+                    self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragPoint(event, time_values))
                 elif action.startswith("volley slope"):
                     start, end = uistate.row_copy['t_volley_slope_start'], uistate.row_copy['t_volley_slope_end']
                     self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragSlope(event, time_values, action, start, end))
                 elif action == 'volley amp move':
-                    self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragPoint(event, time_values, action, uistate.row_copy['t_volley_amp']))
+                    self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragPoint(event, time_values))
                 self.mouse_release = self.main_canvas_mean.mpl_connect('button_release_event', self.mainReleased)
             elif event.button == 2:
-                zoomReset(canvas=canvas, out=out)
+                self.zoomReset(canvas=canvas, out=out)
 
     def mainDragSlope(self, event, time_values, action, prior_slope_start, prior_slope_end): # maingraph dragging event
         self.main_canvas_mean.mpl_disconnect(self.mouseover)
@@ -2011,9 +2005,9 @@ class UIsub(Ui_MainWindow):
             if uistate.mouseover_out is None:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_slope')
-                    uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_slope_norm'], color=color)
+                    uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_slope_norm'], color=color)
                 else:
-                    uistate.mouseover_out = self.ax2.plot(out['sweep'], out['EPSP_slope'], color=color)
+                    uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_slope'], color=color)
             else:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_slope')
@@ -2027,9 +2021,9 @@ class UIsub(Ui_MainWindow):
             if uistate.mouseover_out is None:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_amp')
-                    uistate.mouseover_out = self.ax1.plot(out['sweep'], out['EPSP_amp_norm'], color=color)
+                    uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_amp_norm'], color=color)
                 else:
-                    uistate.mouseover_out = self.ax1.plot(out['sweep'], out['EPSP_amp'], color=color)
+                    uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_amp'], color=color)
             else:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_amp')
@@ -2045,7 +2039,7 @@ class UIsub(Ui_MainWindow):
             color = 'blue'
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
-                uistate.mouseover_out = self.ax2.plot(out['sweep'], out['volley_slope'], color=color)
+                uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['volley_slope'], color=color)
             else:
                 uistate.mouseover_out[0].set_data(out['sweep'], out['volley_slope'])
             dict_t['volley_slope_mean'] = out['volley_slope'].mean()
@@ -2055,7 +2049,7 @@ class UIsub(Ui_MainWindow):
             color = 'blue'
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
-                uistate.mouseover_out = self.ax2.plot(out['sweep'], out['volley_amp'], color=color,  linestyle='--')
+                uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['volley_amp'], color=color,  linestyle='--')
             else:
                 uistate.mouseover_out[0].set_data(out['sweep'], out['volley_amp'])
             dict_t['volley_amp_mean'] = out['volley_amp'].mean()
@@ -2077,22 +2071,22 @@ class UIsub(Ui_MainWindow):
         
         if uistate.mouseover_action.startswith("EPSP slope"):
             uistate.row_copy['t_EPSP_slope_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP slope', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax2, norm=uistate.checkBox['norm_EPSP'])
+            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP slope', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=uistate.axm, ax_out=uistate.ax1, norm=uistate.checkBox['norm_EPSP'])
             uistate.updateDragZones()
             dict_t = {'t_EPSP_slope_start': uistate.row_copy['t_EPSP_slope_start'], 't_EPSP_slope_end': uistate.row_copy['t_EPSP_slope_end']}
         elif uistate.mouseover_action == 'EPSP amp move':
             uistate.row_copy['t_EPSP_amp_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP amp', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax1, norm=uistate.checkBox['norm_EPSP'])
+            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP amp', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=uistate.axm, ax_out=uistate.ax1, norm=uistate.checkBox['norm_EPSP'])
             uistate.updatePointDragZone()
             dict_t = {'t_EPSP_amp': uistate.row_copy['t_EPSP_amp']}
         elif uistate.mouseover_action.startswith("volley slope"):
             uistate.row_copy['t_volley_slope_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='volley slope', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax2)
+            uiplot.plotUpdate(row=uistate.row_copy, aspect='volley slope', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=uistate.axm, ax_out=uistate.ax1)
             uistate.updateDragZones()
             dict_t = {'t_volley_slope_start': uistate.row_copy['t_volley_slope_start'], 't_volley_slope_end': uistate.row_copy['t_volley_slope_end']}
         elif uistate.mouseover_action == 'volley amp move':
             uistate.row_copy['t_volley_amp_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='volley amp', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=self.axm, ax_out=self.ax1)
+            uiplot.plotUpdate(row=uistate.row_copy, aspect='volley amp', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=uistate.axm, ax_out=uistate.ax1)
             uistate.updatePointDragZone()
             dict_t = {'t_volley_amp': uistate.row_copy['t_volley_amp']}
 
@@ -2116,11 +2110,86 @@ class UIsub(Ui_MainWindow):
             self.normOutput(row=row, dfoutput=dfoutput)
         self.updateMouseover()
 
+    def zoomOnScroll(self, event, parent, canvas, ax1=None, ax2=None):
+        x = event.xdata
+        y = event.ydata
+        y2 = event.ydata
+        if x is None or y is None: # if the click was outside the canvas, extrapolate x and y
+            x_display, y_display = ax1.transAxes.inverted().transform((event.x, event.y))
+            x = x_display * (ax1.get_xlim()[1] - ax1.get_xlim()[0]) + ax1.get_xlim()[0]
+            y = y_display * (ax1.get_ylim()[1] - ax1.get_ylim()[0]) + ax1.get_ylim()[0]
+            if ax2 is not None:
+                y2 = y_display * (ax2.get_ylim()[1] - ax2.get_ylim()[0]) + ax2.get_ylim()[0]
+        if event.button == 'up':
+            zoom = 1.05
+        elif event.button == 'down':
+            zoom = 1 / 1.05
+        else:
+            return
+        # Define the boundaries of the invisible rectangles
+        left = 0.12 * parent.width()
+        right = 0.88 * parent.width()
+        bottom = 0.12 * parent.height() # NB: counts from bottom up!
+        x_rect = [0, 0, parent.width(), bottom]
+        slope_left = uistate.slopeOnly()
+        if slope_left:
+            ax2_rect = [0, 0, left, parent.height()]
+        else:
+            ax1_rect = [0, 0, left, parent.height()]
+            ax2_rect = [right, 0, parent.width()-right, parent.height()]
+
+        # Check if the event is within each rectangle
+        in_x = x_rect[0] <= event.x <= x_rect[0] + x_rect[2] and x_rect[1] <= event.y <= x_rect[1] + x_rect[3]
+        if slope_left:
+            in_ax1 = False
+        else:
+            in_ax1 = ax1_rect[0] <= event.x <= ax1_rect[0] + ax1_rect[2] and ax1_rect[1] <= event.y <= ax1_rect[1] + ax1_rect[3]
+        if ax2 is not None:
+            in_ax2 = ax2_rect[0] <= event.x <= ax2_rect[0] + ax2_rect[2] and ax2_rect[1] <= event.y <= ax2_rect[1] + ax2_rect[3]
+        else:
+            in_ax2 = False
+        
+        if in_x:
+            ax1.set_xlim(x - (x - ax1.get_xlim()[0]) / zoom, x + (ax1.get_xlim()[1] - x) / zoom)
+        if in_ax1:
+            ax1.set_ylim(y - (y - ax1.get_ylim()[0]) / zoom, y + (ax1.get_ylim()[1] - y) / zoom)
+        if ax2 is not None:
+            if in_ax2:
+                ax2.set_ylim(y2 - (y2 - ax2.get_ylim()[0]) / zoom, y2 + (ax2.get_ylim()[1] - y2) / zoom)
+        # if all in_s are false, zoom all axes
+        if not in_x and not in_ax1 and not in_ax2:
+            ax1.set_xlim(x - (x - ax1.get_xlim()[0]) / zoom, x + (ax1.get_xlim()[1] - x) / zoom)
+            ax1.set_ylim(y - (y - ax1.get_ylim()[0]) / zoom, y + (ax1.get_ylim()[1] - y) / zoom)
+            if ax2 is not None:
+                ax2.set_ylim(y2 - (y2 - ax2.get_ylim()[0]) / zoom, y2 + (ax2.get_ylim()[1] - y2) / zoom)
+        canvas.draw()
+
+    def zoomReset(self, canvas, out=False):
+        if out:
+            axes_in_figure = canvas.figure.get_axes()
+            for ax in axes_in_figure:
+                if ax.get_ylabel() == "Amplitude (mV)":
+                    ax.set_ylim(uistate.zoom['output_ax1_ylim'])
+                elif ax.get_ylabel() == "Slope (mV/ms)":
+                    ax.set_ylim(uistate.zoom['output_ax2_ylim'])
+                df_p = uisub.get_df_project()
+                uistate.zoom['output_xlim'] = [0, df_p['sweeps'].max()]
+                ax.set_xlim(uistate.zoom['output_xlim'])
+        else:
+            canvas.axes.set_xlim(uistate.zoom['mean_xlim'])
+            canvas.axes.set_ylim(uistate.zoom['mean_ylim'])
+        canvas.draw()
 
 
+
+# pyqtSlot decorators
     @QtCore.pyqtSlot()
     def slotAddDfData(self, df):
         self.addData(df)
+
+
+
+# Root functions
 
 def get_signals(source):
     cls = source if isinstance(source, type) else type(source)
@@ -2132,206 +2201,58 @@ def get_signals(source):
             if isinstance(aspect, signal):
                 print(f"{key} [{clsname}]")
 
-def graphReplot(self, axm, ax1, ax2, df=None, row=None): # TODO: allow update of only specific row
-    print("graphReplot")
-    uistate = self.uistate
-    if df is None: # unless fed a specific row, (re)plot the whole df_project
-        df_imported = uistate.recs2plot()
-    if df_imported.empty:
-        print("graphReplot: df_p is empty")
-        return
-    # update output graph x limits based on max number of sweeps in df_project
-    if uistate.zoom['output_xlim'][1] is None:
-        uistate.zoom['output_xlim'] = [0, df_imported['sweeps'].max()]
-        uistate.save_cfg(projectfolder=uisub.dict_folders['project'])
-    list_recs = df_imported['recording_name'].tolist()
-    if uistate.plotted: # A (mostly redundant?) check to remove plotted lines that are not in df_select
-        for rec in list(uistate.plotted.keys()): # create a list from dict keys to avoid RuntimeError
-            if rec not in list_recs:
-                print(f"WARNING! {rec} was plotted, but not in list_rec. It should have been uiplot.purge:d upon delete - check delete sequence!")
-                uiplot.purge(rec=rec, axm=axm, ax1=ax1, ax2=ax2)
-        for rec in list(uistate.plotted.keys()): # remove already plotted recs from list_recs
-            list_recs.remove(rec)
-        if not list_recs:
-            return
-    for rec in list_recs: # plot the remaining recs
-        row = df_imported[df_imported['recording_name'] == rec].iloc[0]
-        dfmean = uisub.get_dfmean(row=row)
-        if uistate.checkBox['paired_stims']:
-            dfoutput = uisub.get_dfdiff(row=row)
-        else:
-            dfoutput = uisub.get_dfoutput(row=row)
-        if dfoutput is None:
-            return
-        df_p = uisub.get_df_project() # get_dfoutput updates df_project - update row!
-        row = df_p[df_p['recording_name'] == rec].iloc[0]
-        uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=axm, ax1=ax1, ax2=ax2)
-    uiplot.graphUpdate(axm=axm, ax1=ax1, ax2=ax2)
+def df_projectTemplate():
+    return pd.DataFrame(
+        columns=[
+            "ID",
+            "host",
+            "path",
+            "recording_name",
+            "groups",
+            "group_IDs",
+            "parsetimestamp",
+            "sweeps",
+            "channel",
+            "stim",
+            "paired_recording",
+            "Tx",
+            "filter",
+            "filter_params",
+            "t_stim",
+            "t_stim_method",
+            "t_stim_params",
+            "t_volley_amp",
+            "t_volley_amp_method",
+            "t_volley_amp_params",
+            "t_volley_slope_width",
+            "t_volley_slope_halfwidth",
+            "t_volley_slope_start",
+            "t_volley_slope_end",
+            "t_volley_slope_method",
+            "t_volley_slope_params",
+            "volley_amp_mean",
+            "volley_slope_mean",
+            "t_VEB",
+            "t_VEB_method",
+            "t_VEB_params",
+            "t_EPSP_amp",
+            "t_EPSP_amp_method",
+            "t_EPSP_amp_params",
+            "t_EPSP_slope_width",
+            "t_EPSP_slope_halfwidth",
+            "t_EPSP_slope_start",
+            "t_EPSP_slope_end",
+            "t_EPSP_slope_method",
+            "t_EPSP_slope_params",
+            "exclude",
+            "comment",
+        ]
+    )
+
+def report(): # debug function to report custom aspects of the current state of the program
+    if False:
+        print ("\n REPORT:")
     
-def graphMouseover(event, axm): # determine which maingraph event is being mouseovered
-    x = event.xdata
-    y = event.ydata
-    if x is None or y is None:
-        return
-    if event.inaxes == axm:
-        zones = {
-            'EPSP slope resize': uistate.EPSP_slope_resize_zone,
-            'EPSP slope move': uistate.EPSP_slope_move_zone,
-            'EPSP amp move': uistate.EPSP_amp_move_zone,
-            'volley slope resize': uistate.volley_slope_resize_zone,
-            'volley slope move': uistate.volley_slope_move_zone,
-            'volley amp move': uistate.volley_amp_move_zone,
-        }
-        uistate.mouseover_action = None
-        for action, zone in zones.items():
-            checkbox_key = '_'.join(action.split(' ')[:2])  # Split the action string and use the first two parts as the checkbox key
-            if uistate.checkBox.get(checkbox_key, False) and zone['x'][0] <= x <= zone['x'][1] and zone['y'][0] <= y <= zone['y'][1]:
-                uistate.mouseover_action = action
-                plotMouseover(action, axm)
-                break
-
-        if uistate.mouseover_action is None:
-            if uistate.mouseover_blob is not None:
-                uistate.mouseover_blob.set_sizes([0])
-            if uistate.mouseover_plot is not None:
-                uistate.mouseover_plot[0].set_linewidth(0)
-
-        axm.figure.canvas.draw()
-
-def plotMouseover(action, axm):
-    alpha = 0.8
-    linewidth = 3 if 'resize' in action else 10
-
-    if 'slope' in action:
-        if 'EPSP' in action:
-            x_range = uistate.EPSP_slope_start_xy[0], uistate.EPSP_slope_end_xy[0]
-            y_range = uistate.EPSP_slope_start_xy[1], uistate.EPSP_slope_end_xy[1]
-            color = 'green'
-        elif 'volley' in action:
-            x_range = uistate.volley_slope_start_xy[0], uistate.volley_slope_end_xy[0]
-            y_range = uistate.volley_slope_start_xy[1], uistate.volley_slope_end_xy[1]
-            color = 'blue'
-
-        if uistate.mouseover_blob is None:
-            uistate.mouseover_blob = axm.scatter(x_range[1], y_range[1], color=color, s=100, alpha=alpha)
-        else:
-            uistate.mouseover_blob.set_offsets([x_range[1], y_range[1]])
-            uistate.mouseover_blob.set_sizes([100])
-            uistate.mouseover_blob.set_color(color)
-
-        if uistate.mouseover_plot is None:
-            uistate.mouseover_plot = axm.plot(x_range, y_range, color=color, linewidth=linewidth, alpha=alpha, label="mouseover")
-        else:
-            uistate.mouseover_plot[0].set_data(x_range, y_range)
-            uistate.mouseover_plot[0].set_linewidth(linewidth)
-            uistate.mouseover_plot[0].set_alpha(alpha)
-            uistate.mouseover_plot[0].set_color(color)
-
-    elif 'amp' in action:
-        if 'EPSP' in action:
-            x, y = uistate.EPSP_amp_xy
-            color = 'green'
-        elif 'volley' in action:
-            x, y = uistate.volley_amp_xy
-            color = 'blue'
-
-        if uistate.mouseover_blob is None:
-            uistate.mouseover_blob = axm.scatter(x, y, color=color, s=100, alpha=alpha)
-        else:
-            uistate.mouseover_blob.set_offsets([x, y])
-            uistate.mouseover_blob.set_sizes([100])
-            uistate.mouseover_blob.set_color(color)
-
-
-def zoomOnScroll(event, parent, canvas, ax1=None, ax2=None):
-    x = event.xdata
-    y = event.ydata
-    y2 = event.ydata
-    if x is None or y is None: # if the click was outside the canvas, extrapolate x and y
-        x_display, y_display = ax1.transAxes.inverted().transform((event.x, event.y))
-        x = x_display * (ax1.get_xlim()[1] - ax1.get_xlim()[0]) + ax1.get_xlim()[0]
-        y = y_display * (ax1.get_ylim()[1] - ax1.get_ylim()[0]) + ax1.get_ylim()[0]
-        if ax2 is not None:
-            y2 = y_display * (ax2.get_ylim()[1] - ax2.get_ylim()[0]) + ax2.get_ylim()[0]
-    if event.button == 'up':
-        zoom = 1.05
-    elif event.button == 'down':
-        zoom = 1 / 1.05
-    else:
-        return
-    # Define the boundaries of the invisible rectangles
-    left = 0.12 * parent.width()
-    right = 0.88 * parent.width()
-    bottom = 0.12 * parent.height() # NB: counts from bottom up!
-    x_rect = [0, 0, parent.width(), bottom]
-    slope_left = uistate.slopeOnly()
-    if slope_left:
-        ax2_rect = [0, 0, left, parent.height()]
-    else:
-        ax1_rect = [0, 0, left, parent.height()]
-        ax2_rect = [right, 0, parent.width()-right, parent.height()]
-
-    # Check if the event is within each rectangle
-    in_x = x_rect[0] <= event.x <= x_rect[0] + x_rect[2] and x_rect[1] <= event.y <= x_rect[1] + x_rect[3]
-    if slope_left:
-        in_ax1 = False
-    else:
-        in_ax1 = ax1_rect[0] <= event.x <= ax1_rect[0] + ax1_rect[2] and ax1_rect[1] <= event.y <= ax1_rect[1] + ax1_rect[3]
-    if ax2 is not None:
-        in_ax2 = ax2_rect[0] <= event.x <= ax2_rect[0] + ax2_rect[2] and ax2_rect[1] <= event.y <= ax2_rect[1] + ax2_rect[3]
-    else:
-        in_ax2 = False
-    
-    if in_x:
-        ax1.set_xlim(x - (x - ax1.get_xlim()[0]) / zoom, x + (ax1.get_xlim()[1] - x) / zoom)
-    if in_ax1:
-        ax1.set_ylim(y - (y - ax1.get_ylim()[0]) / zoom, y + (ax1.get_ylim()[1] - y) / zoom)
-    if ax2 is not None:
-        if in_ax2:
-            ax2.set_ylim(y2 - (y2 - ax2.get_ylim()[0]) / zoom, y2 + (ax2.get_ylim()[1] - y2) / zoom)
-    # if all in_s are false, zoom all axes
-    if not in_x and not in_ax1 and not in_ax2:
-        ax1.set_xlim(x - (x - ax1.get_xlim()[0]) / zoom, x + (ax1.get_xlim()[1] - x) / zoom)
-        ax1.set_ylim(y - (y - ax1.get_ylim()[0]) / zoom, y + (ax1.get_ylim()[1] - y) / zoom)
-        if ax2 is not None:
-            ax2.set_ylim(y2 - (y2 - ax2.get_ylim()[0]) / zoom, y2 + (ax2.get_ylim()[1] - y2) / zoom)
-    canvas.draw()
-
-def zoomReset(canvas, out=False):
-    if out:
-        axes_in_figure = canvas.figure.get_axes()
-        for ax in axes_in_figure:
-            if ax.get_ylabel() == "Amplitude (mV)":
-                ax.set_ylim(uistate.zoom['output_ax1_ylim'])
-            elif ax.get_ylabel() == "Slope (mV/ms)":
-                ax.set_ylim(uistate.zoom['output_ax2_ylim'])
-            df_p = uisub.get_df_project()
-            uistate.zoom['output_xlim'] = [0, df_p['sweeps'].max()]
-            ax.set_xlim(uistate.zoom['output_xlim'])
-    else:
-        canvas.axes.set_xlim(uistate.zoom['mean_xlim'])
-        canvas.axes.set_ylim(uistate.zoom['mean_ylim'])
-    canvas.draw()
-
-def unPlot(canvas, *artists): # Remove line if it exists on canvas
-    #print(f"unPlot - canvas: {canvas}, artists: {artists}")
-    for artist in artists:
-        artists_on_canvas = canvas.axes.get_children()
-        if artist in artists_on_canvas:
-            #print(f"unPlot - removed artist: {artist}")
-            artist.remove()
-
-def label2idx(canvas, aspect): # Returns the index of the line labeled 'aspect' on 'canvas', or False if there is none.
-    dict_labels = {k.get_label(): v for (v, k) in enumerate(canvas.axes.lines)}
-    return dict_labels.get(aspect, False)
-
-def outputAutoScale(ax, df, aspect): # Sets the y limits of ax to the min and max of df[aspect] TODO: not used
-    if aspect == "EPSP_amp":
-        ax.set_ylim(df['EPSP_amp'].min() - 0.1, df['EPSP_amp'].max() + 0.1)
-    elif aspect == "EPSP_slope":
-        ax.set_ylim(df['EPSP_slope'].min() - 0.1, df['EPSP_slope'].max() + 0.1)
-    else:
-        print(f"autoScale: {aspect} not supported.")
 
 
 

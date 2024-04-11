@@ -1,6 +1,4 @@
 import pickle
-from matplotlib.transforms import Bbox
-
 
 class UIstate:
     def __init__(self):
@@ -8,10 +6,7 @@ class UIstate:
 
     def reset(self): # (re)set all persisted states
         self.version = "0.0.0"
-        self.colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000'] # TODO: Use
-        self.axm = [] # list of items that are supposed to be on axm
-        self.ax1 = [] # list of items that are supposed to be on ax1
-        self.ax2 = [] # list of items that are supposed to be on ax2
+        self.colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000']
         self.changed = [] # TODO: not used yet: meant to be a list of what needs to be updated, even if they are already on an axis
         self.group_show = {}
         self.checkBox = {
@@ -49,30 +44,32 @@ class UIstate:
         }
 
     # Do NOT persist these
+        self.axm = None # axis of mean graph
+        self.ax1 = None # axis of output graph for amplitudes
+        self.ax2 = None # axis of output graph for slopes
         self.selected = [] # list of selected indices
         self.df_recs2plot = None # df_project copy; all PARSED recordings (if any are selected, only selected ones)
         self.plotted = {} # dict: key=name (meanplot), value=[subplots]
         self.row_copy = None # copy of selected row from df_project
-        self.mouseover_action = None # name of action to take if clicked at current mouseover
-            # volley amp move, volley slope move/resize, EPSP amp move, EPSP slope move/resize
+        self.mouseover_action = None # name of action to take if clicked at current mouseover: EPSP amp move, EPSP slope move/resize, volley amp move, volley slope move/resize
         self.mouseover_plot = None # plot of tentative EPSP slope
-        self.mouseover_blob = None
+        self.mouseover_blob = None # scatterplot indicating mouseover of dragable point; move point or resize slope
         self.x_margin = None # for mouseover detection boundaries
         self.y_margin = None # for mouseover detection boundaries
         self.x_idx = None # current x value of dragging
         self.last_x_idx = None # last x value within the same dragging event; prevents needless update when holding drag still
         self.prior_x_idx = None # x value of the last stored slope
         self.mouseover_out = None # output of dragged aspect
-        # coordinates. Set upon selection.
+
+        # coordinates. Set on row selection.
         self.EPSP_amp_xy = None # x,y
-        #self.EPSP_slope_xy = None # x[0-1],y[0-1] DEPRECATE
         self.EPSP_slope_start_xy = None # x,y
         self.EPSP_slope_end_xy = None # x,y
         self.volley_amp_xy = None # x,y
-        #self.volley_slope_xy = None # x[0-1],y[0-1]
         self.volley_slope_start_xy = None # x,y
         self.volley_slope_end_xy = None # x,y
-        # clickzones: coordinates including margins. Set upon selection.
+
+        # clickzones: coordinates including margins. Set on row selection.
         self.EPSP_amp_move_zone = {} # dict: key=x,y, value=start,end. 
         self.EPSP_slope_move_zone = {} # dict: key=x,y, value=start,end.
         self.EPSP_slope_resize_zone = {} # dict: key=x,y, value=start,end.
@@ -143,7 +140,7 @@ class UIstate:
 
 
 
-    def to_axm(self, df): # lines that are supposed to be on axm - label: index
+    def to_axm(self, df): # dict of lines that are supposed to be on axm - label: index
         axm = {}
         for index, row in df.iterrows():
             rec_filter = row['filter']
@@ -162,7 +159,7 @@ class UIstate:
             axm[key] = index
         return axm
 
-    def to_ax1(self, df):
+    def to_ax1(self, df): # dict of lines that are supposed to be on ax1 - label: index
         ax1 = {}
         for index, row in df.iterrows():
             key = row['recording_name']
@@ -177,7 +174,7 @@ class UIstate:
             ax1[key] = index
         return ax1
 
-    def to_ax2(self, df):
+    def to_ax2(self, df): # dict of lines that are supposed to be on ax2 - label: index
         ax2 = {}
         for index, row in df.iterrows():
             key = row['recording_name']
@@ -197,9 +194,6 @@ class UIstate:
             return {
                 'version': self.version,
                 'selected': self.selected,
-                'axm': self.axm,
-                'ax1': self.ax1,
-                'ax2': self.ax2,
                 'changed': self.changed,
                 'group_show': self.group_show,
                 'checkBox': self.checkBox,
@@ -212,9 +206,6 @@ class UIstate:
     
     def set_state(self, state):
         self.version = state.get('version')
-        self.axm = state.get('axm')
-        self.ax1 = state.get('ax1')
-        self.ax2 = state.get('ax2')
         self.changed = state.get('changed')
         self.group_show = state.get('group_show')
         self.checkBox = state.get('checkBox')

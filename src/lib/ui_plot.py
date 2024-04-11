@@ -7,7 +7,8 @@ class UIplot():
         self.uistate = uistate
         print(f"UIplot instantiated {self.uistate.anyView()}")
 
-    def hideAll(self, axm, ax1, ax2):
+    def hideAll(self):
+        axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
         for ax in [axm, ax1, ax2]:
             for line in ax.get_lines():
                 line.set_visible(False)
@@ -16,7 +17,8 @@ class UIplot():
                 legend.remove()
         print("All lines hidden")
 
-    def purge(self, rec, axm, ax1, ax2):
+    def purge(self, rec):
+        axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
         print(f"Purging {rec}...")
         # remove the line named rec from axm
         for line in axm.get_lines():
@@ -30,7 +32,8 @@ class UIplot():
                         line.remove()
                 del self.uistate.plotted[rec]
 
-    def graphGroups(self, df_groups, dict_group_means, ax1, ax2):
+    def graphGroups(self, df_groups, dict_group_means):
+        axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
         print(f"Graphing groups {df_groups.group_ID.unique()}:")
         # cycle through the reows of df_groups and print the group_ID, group_name, and color for each one
         for index, row in df_groups.iterrows():
@@ -46,13 +49,14 @@ class UIplot():
             #_ = sns.lineplot(ax=ax2, data=df, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label="EPSP slope")
 
 
-    def graphUpdate(self, axm, ax1, ax2):
+    def graphRefresh(self):
         # toggle show/hide of lines on axm, ax1 and ax2: show only selected and imported lines, only appropriate aspects
-        print("graphUpdate")
+        axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
+        print("graphRefresh")
         uistate = self.uistate
         #print("uistate.plotted: ", uistate.plotted)
         if uistate.df_recs2plot is None or not uistate.anyView():
-            self.hideAll(axm, ax1, ax2)
+            self.hideAll()
         else:
             # axm, set visibility of lines and build legend
             axm_legend = self.graphVisible(axis=axm, show=uistate.to_axm(uistate.df_recs2plot))
@@ -79,7 +83,7 @@ class UIplot():
             ax2.set_ylabel("Slope (mV/ms)")
             ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
             ax2.set_ylim(uistate.zoom['output_ax2_ylim'])
-        self.oneAxisLeft(ax1, ax2)
+        self.oneAxisLeft()
         # redraw
         axm.figure.canvas.draw()
         ax1.figure.canvas.draw() # ax2 should be on the same canvas
@@ -112,7 +116,8 @@ class UIplot():
         return dict_legend
 
 
-    def oneAxisLeft(self, ax1, ax2):
+    def oneAxisLeft(self):
+        ax1, ax2 = self.uistate.ax1, self.uistate.ax2
         uistate = self.uistate
         # sets ax1 and ax2 visibility and position
         ax1.set_visible(uistate.ampView())
@@ -125,7 +130,8 @@ class UIplot():
             ax2.yaxis.set_label_position("right")
             ax2.yaxis.set_ticks_position("right")
 
-    def graph(self, dict_row, dfmean, dfoutput, axm, ax1, ax2):
+    def graph(self, dict_row, dfmean, dfoutput):
+        axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
         print(f"Graphing {dict_row['recording_name']}...")
         rec_name = dict_row['recording_name']
         rec_filter = dict_row['filter'] # the filter currently used for this recording
@@ -230,6 +236,7 @@ class UIplot():
 
 
     def updateLine(self, axm, plot_to_update, x_data, y_data):
+        axm = self.uistate.axm
         for line in axm.get_lines():
             if line.get_label() == plot_to_update:
                 line.set_xdata(x_data)
@@ -255,6 +262,7 @@ class UIplot():
                 break
 
     def updateEPSPout(self, rec_name, out, ax1, ax2):
+        ax1, ax2 = self.uistate.ax1, self.uistate.ax2
         for line in ax1.get_lines():
             if line.get_label() == f"{rec_name} EPSP amp":
                 line.set_ydata(out['EPSP_amp'])
@@ -268,3 +276,100 @@ class UIplot():
                 line.set_ydata(out['EPSP_slope_norm'])
                 ax2.figure.canvas.draw()
 
+    def graphMouseover(self, event, axm): # determine which maingraph event is being mouseovered
+        axm = self.uistate.axm
+        uistate = self.uistate
+        def plotMouseover(action, axm):
+            alpha = 0.8
+            linewidth = 3 if 'resize' in action else 10
+            if 'slope' in action:
+                if 'EPSP' in action:
+                    x_range = uistate.EPSP_slope_start_xy[0], uistate.EPSP_slope_end_xy[0]
+                    y_range = uistate.EPSP_slope_start_xy[1], uistate.EPSP_slope_end_xy[1]
+                    color = 'green'
+                elif 'volley' in action:
+                    x_range = uistate.volley_slope_start_xy[0], uistate.volley_slope_end_xy[0]
+                    y_range = uistate.volley_slope_start_xy[1], uistate.volley_slope_end_xy[1]
+                    color = 'blue'
+
+                if uistate.mouseover_blob is None:
+                    uistate.mouseover_blob = axm.scatter(x_range[1], y_range[1], color=color, s=100, alpha=alpha)
+                else:
+                    uistate.mouseover_blob.set_offsets([x_range[1], y_range[1]])
+                    uistate.mouseover_blob.set_sizes([100])
+                    uistate.mouseover_blob.set_color(color)
+
+                if uistate.mouseover_plot is None:
+                    uistate.mouseover_plot = axm.plot(x_range, y_range, color=color, linewidth=linewidth, alpha=alpha, label="mouseover")
+                else:
+                    uistate.mouseover_plot[0].set_data(x_range, y_range)
+                    uistate.mouseover_plot[0].set_linewidth(linewidth)
+                    uistate.mouseover_plot[0].set_alpha(alpha)
+                    uistate.mouseover_plot[0].set_color(color)
+
+            elif 'amp' in action:
+                if 'EPSP' in action:
+                    x, y = uistate.EPSP_amp_xy
+                    color = 'green'
+                elif 'volley' in action:
+                    x, y = uistate.volley_amp_xy
+                    color = 'blue'
+
+                if uistate.mouseover_blob is None:
+                    uistate.mouseover_blob = axm.scatter(x, y, color=color, s=100, alpha=alpha)
+                else:
+                    uistate.mouseover_blob.set_offsets([x, y])
+                    uistate.mouseover_blob.set_sizes([100])
+                    uistate.mouseover_blob.set_color(color)
+        x = event.xdata
+        y = event.ydata
+        if x is None or y is None:
+            return
+        if event.inaxes == axm:
+            zones = {
+                'EPSP slope resize': uistate.EPSP_slope_resize_zone,
+                'EPSP slope move': uistate.EPSP_slope_move_zone,
+                'EPSP amp move': uistate.EPSP_amp_move_zone,
+                'volley slope resize': uistate.volley_slope_resize_zone,
+                'volley slope move': uistate.volley_slope_move_zone,
+                'volley amp move': uistate.volley_amp_move_zone,
+            }
+            uistate.mouseover_action = None
+            for action, zone in zones.items():
+                checkbox_key = '_'.join(action.split(' ')[:2])  # Split the action string and use the first two parts as the checkbox key
+                if uistate.checkBox.get(checkbox_key, False) and zone['x'][0] <= x <= zone['x'][1] and zone['y'][0] <= y <= zone['y'][1]:
+                    uistate.mouseover_action = action
+                    plotMouseover(action, axm)
+                    break
+
+            if uistate.mouseover_action is None:
+                if uistate.mouseover_blob is not None:
+                    uistate.mouseover_blob.set_sizes([0])
+                if uistate.mouseover_plot is not None:
+                    uistate.mouseover_plot[0].set_linewidth(0)
+
+            axm.figure.canvas.draw()
+
+
+
+### Not used
+
+def label2idx(canvas, aspect): # Returns the index of the line labeled 'aspect' on 'canvas', or False if there is none.
+    dict_labels = {k.get_label(): v for (v, k) in enumerate(canvas.axes.lines)}
+    return dict_labels.get(aspect, False)
+
+def unPlot(canvas, *artists): # Remove line if it exists on canvas
+    #print(f"unPlot - canvas: {canvas}, artists: {artists}")
+    for artist in artists:
+        artists_on_canvas = canvas.axes.get_children()
+        if artist in artists_on_canvas:
+            #print(f"unPlot - removed artist: {artist}")
+            artist.remove()
+
+def outputAutoScale(ax, df, aspect): # Sets the y limits of ax to the min and max of df[aspect]
+    if aspect == "EPSP_amp":
+        ax.set_ylim(df['EPSP_amp'].min() - 0.1, df['EPSP_amp'].max() + 0.1)
+    elif aspect == "EPSP_slope":
+        ax.set_ylim(df['EPSP_slope'].min() - 0.1, df['EPSP_slope'].max() + 0.1)
+    else:
+        print(f"autoScale: {aspect} not supported.")
