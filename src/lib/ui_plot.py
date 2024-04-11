@@ -32,9 +32,10 @@ class UIplot():
                         line.remove()
                 del self.uistate.plotted[rec]
 
-    def graphGroups(self, df_groups, dict_group_means):
+    def addGroup(self, df_groups, dict_group_means):
         axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
         print(f"Graphing groups {df_groups.group_ID.unique()}:")
+        return
         # cycle through the reows of df_groups and print the group_ID, group_name, and color for each one
         for index, row in df_groups.iterrows():
             group_ID = row['group_ID']
@@ -48,6 +49,23 @@ class UIplot():
             #_ = sns.lineplot(ax=ax2, data=df, y='volley_slope_mean', x="sweep", color=color, alpha=0.5, label="volley slope")
             #_ = sns.lineplot(ax=ax2, data=df, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label="EPSP slope")
 
+      # # Below is the instruction to plot groups. TODO: Move to a separate functions
+        # if len(uistate.group_show) < 1:
+        #     return
+        
+        # if df_parsed_selection.empty: # If df is empty, get all group_IDs from uisub.df_groups
+        #     group_IDs_to_plot = uisub.df_groups['group_ID'].tolist()
+        #     df_groups = uisub.df_groups
+        # else: # If df is not empty, get group_IDs from df (selected and parsed rows)
+        #     group_IDs_to_plot = df_parsed_selection['group_IDs'].str.split(',').sum()
+        #     df_groups = uisub.df_groups[uisub.df_groups['group_ID'].isin(group_IDs_to_plot)]
+        # print(f"group_IDs_to_plot: {group_IDs_to_plot}")
+        # for str_ID in group_IDs_to_plot:
+        #     uisub.get_dfgroupmean(str_ID)
+        # self.graphGroups(df_groups, uisub.dict_group_means, ax1, ax2)
+        # make a list of group_IDs in selection
+
+        uiplot.graphRefresh()
 
     def graphRefresh(self):
         # toggle show/hide of lines on axm, ax1 and ax2: show only selected and imported lines, only appropriate aspects
@@ -89,21 +107,6 @@ class UIplot():
         ax1.figure.canvas.draw() # ax2 should be on the same canvas
 
 
-        # # Below is the instruction to plot groups. TODO: Move to a separate functions
-        # if len(uistate.group_show) < 1:
-        #     return
-        
-        # if df_parsed_selection.empty: # If df is empty, get all group_IDs from uisub.df_groups
-        #     group_IDs_to_plot = uisub.df_groups['group_ID'].tolist()
-        #     df_groups = uisub.df_groups
-        # else: # If df is not empty, get group_IDs from df (selected and parsed rows)
-        #     group_IDs_to_plot = df_parsed_selection['group_IDs'].str.split(',').sum()
-        #     df_groups = uisub.df_groups[uisub.df_groups['group_ID'].isin(group_IDs_to_plot)]
-        # print(f"group_IDs_to_plot: {group_IDs_to_plot}")
-        # for str_ID in group_IDs_to_plot:
-        #     uisub.get_dfgroupmean(str_ID)
-        # self.graphGroups(df_groups, uisub.dict_group_means, ax1, ax2)
-
     def graphVisible(self, axis, show): # toggles visibility per selection and sets Legend of axis
         dict_lines = {item.get_label(): item for item in axis.get_children() if isinstance(item, Line2D)}
         #print(f"dict_lines: {dict_lines.keys()}")
@@ -130,7 +133,7 @@ class UIplot():
             ax2.yaxis.set_label_position("right")
             ax2.yaxis.set_ticks_position("right")
 
-    def graph(self, dict_row, dfmean, dfoutput):
+    def addRow(self, dict_row, dfmean, dfoutput):
         axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
         print(f"Graphing {dict_row['recording_name']}...")
         rec_name = dict_row['recording_name']

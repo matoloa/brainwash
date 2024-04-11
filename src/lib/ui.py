@@ -1008,6 +1008,7 @@ class UIsub(Ui_MainWindow):
             self.updateMouseover()
         else:
             uiplot.graphRefresh()
+        self.graphGroups()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
         report()
 
@@ -1818,30 +1819,30 @@ class UIsub(Ui_MainWindow):
         df_p = self.get_df_project()
         df = df_p.loc[df_p['sweeps'] != "..."]
         for i, row in df.iterrows():
-            dfmean = uisub.get_dfmean(row=row)
-            _ = uisub.get_dffilter(row=row) # cache for mouseover
+            dfmean = self.get_dfmean(row=row)
+            _ = self.get_dffilter(row=row) # cache for mouseover
             if uistate.checkBox['paired_stims']:
-                dfoutput = uisub.get_dfdiff(row=row)
+                dfoutput = self.get_dfdiff(row=row)
             else:
-                dfoutput = uisub.get_dfoutput(row=row)
+                dfoutput = self.get_dfoutput(row=row)
             if dfoutput is None:
                 return
             row = df_p.loc[i] # get_dfoutput updates df_project - update row!
-            uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
+            uiplot.addRow(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
             print(f"Preloaded {row['recording_name']}")
         print(f"Preloaded recordings in {time.time()-t0:.2f} seconds.")
         uiplot.graphRefresh()
 
     def graphUpdate(self, df=None, row=None): # TODO: allow update of only specific row
         if row is not None: # process a specific row
-            dfmean = uisub.get_dfmean(row=row)
+            dfmean = self.get_dfmean(row=row)
             if uistate.checkBox['paired_stims']:
-                dfoutput = uisub.get_dfdiff(row=row)
+                dfoutput = self.get_dfdiff(row=row)
             else:
-                dfoutput = uisub.get_dfoutput(row=row)
+                dfoutput = self.get_dfoutput(row=row)
             if dfoutput is None:
                 return
-            uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
+            uiplot.addRow(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
             uiplot.graphRefresh()
             return
         if df is None: # unless fed a specific row, (re)plot the whole df_project
@@ -1854,7 +1855,7 @@ class UIsub(Ui_MainWindow):
         # update output graph x limits based on max number of sweeps in df_project
         if uistate.zoom['output_xlim'][1] is None:
             uistate.zoom['output_xlim'] = [0, df_imported['sweeps'].max()]
-            uistate.save_cfg(projectfolder=uisub.dict_folders['project'])
+            uistate.save_cfg(projectfolder=self.dict_folders['project'])
         if uistate.plotted: # A (mostly redundant?) check to remove plotted lines that are not in df_select
             for rec in list(uistate.plotted.keys()): # create a list from dict keys to avoid RuntimeError
                 if rec not in list_recs:
@@ -1866,17 +1867,34 @@ class UIsub(Ui_MainWindow):
                 return
         for rec in list_recs: # plot the remaining recs
             row = df_imported[df_imported['recording_name'] == rec].iloc[0]
-            dfmean = uisub.get_dfmean(row=row)
+            dfmean = self.get_dfmean(row=row)
             if uistate.checkBox['paired_stims']:
-                dfoutput = uisub.get_dfdiff(row=row)
+                dfoutput = self.get_dfdiff(row=row)
             else:
-                dfoutput = uisub.get_dfoutput(row=row)
+                dfoutput = self.get_dfoutput(row=row)
             if dfoutput is None:
                 return
-            df_p = uisub.get_df_project() # get_dfoutput updates df_project - update row!
+            df_p = self.get_df_project() # get_dfoutput updates df_project - update row!
             row = df_p[df_p['recording_name'] == rec].iloc[0]
-            uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
+            uiplot.addRow(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
         uiplot.graphRefresh()
+
+    def graphGroups(self): # check if groups need to be updated, call uiplot.addGroup as needed
+        self.usage("graphGroups")
+# TODO NOW: make functional
+        df_p = self.get_df_project()
+        list_groups = []
+        for i in uistate.selected:
+            list_groups.extend(df_p.loc[i, 'group_IDs'].split(","))
+        list_groups = list(set(list_groups))
+        print(f"list_groups: {list_groups}")
+        for group in list_groups:
+            print(f"Group {group} is of type {type(group)}")
+        # filter out groups that are not shown
+        list_groups = [group for group in list_groups if uistate.group_show[group]]
+        if list_groups:
+            for group in list_groups:
+                print(f"Adding group {group}")
 
     def updateMouseover(self):
         # drop any prior mouseover event connections and plots
@@ -2184,7 +2202,7 @@ class UIsub(Ui_MainWindow):
                     ax.set_ylim(uistate.zoom['output_ax1_ylim'])
                 elif ax.get_ylabel() == "Slope (mV/ms)":
                     ax.set_ylim(uistate.zoom['output_ax2_ylim'])
-                df_p = uisub.get_df_project()
+                df_p = self.get_df_project()
                 uistate.zoom['output_xlim'] = [0, df_p['sweeps'].max()]
                 ax.set_xlim(uistate.zoom['output_xlim'])
         else:
