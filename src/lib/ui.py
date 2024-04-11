@@ -410,6 +410,10 @@ class Ui_MainWindow(QtCore.QObject):
 
 
 
+################################################################
+#        Additional classes (moved from bottom of file)        #
+################################################################
+
 class Ui_Dialog(QtWidgets.QWidget):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
@@ -435,6 +439,126 @@ class Ui_Dialog(QtWidgets.QWidget):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Dialog"))
 
+
+class InputDialogPopup(QtWidgets.QDialog):
+    def __init__(self):
+        super().__init__()
+        self.input = QtWidgets.QLineEdit(self)
+        self.buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel, QtCore.Qt.Horizontal, self)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self.input)
+        layout.addWidget(self.buttonBox)
+
+    def showInputDialog(self, title, query):
+        self.setWindowTitle(title)
+        self.input.setPlaceholderText(query)
+        self.setFixedSize(300, 150)  # Set the fixed width and height of the dialog
+        result = self.exec_()
+        text = self.input.text()
+        if result == QtWidgets.QDialog.Accepted:
+            print(f"You entered: {text}")
+            return text
+
+class TableProjSub(QtWidgets.QTableView):
+    # TODO: This class does the weirdest things to events; shifting event numbers around in non-standard ways and refuses to notice drops - but drag-into works. Why?
+    def __init__(self, parent=None):
+        super().__init__()
+        self.parent = parent
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            file_urls = [url.toLocalFile() for url in event.mimeData().urls()]
+            print("Files dropped:", file_urls)
+            # Handle the dropped files here
+            dfAdd = df_projectTemplate()
+            dfAdd['path'] = file_urls # needs to be first, as it sets the number of rows
+            dfAdd['host'] = str(self.parent.fqdn)
+            dfAdd['filter'] = "voltage"
+            # NTH: more intelligent default naming; lowest level unique name?
+            # For now, use name + lowest level folder
+            names = []
+            duplicates = [] # remove these from dfAdd
+            for i in file_urls:
+                # check if file is already in df_project
+                if i in self.parent.df_project['path'].values:
+                    print(f"File {i} already in df_project")
+                    duplicates.append(i)
+                else:
+                    names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
+            if not names:
+                print("No new files to add.")
+                return
+            dfAdd = dfAdd.drop(dfAdd[dfAdd['path'].isin(duplicates)].index)
+            dfAdd['recording_name'] = names
+            self.parent.addData(dfAdd)
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+
+class Filetreesub(Ui_Dialog):
+    def __init__(self, dialog, parent=None, folder="."):
+        super(Filetreesub, self).__init__()
+        self.setupUi(dialog)
+        self.parent = parent
+        if verbose:
+            print(" - Filetreesub init")
+
+        self.ftree = self.widget
+        # set root_path for file tree model
+        self.ftree.delayedInitForRootPath(folder)
+        # self.ftree.model.parent_index   = self.ftree.model.setRootPath(projects_folder)
+        # self.ftree.model.root_index     = self.ftree.model.index(projects_folder)
+
+        # Dataframe to addamp
+        self.names = []
+        self.dfAdd = df_projectTemplate()
+
+        self.buttonBoxAddGroup = QtWidgets.QDialogButtonBox(dialog)
+        self.buttonBoxAddGroup.setGeometry(QtCore.QRect(470, 20, 91, 491))
+        self.buttonBoxAddGroup.setLayoutDirection(QtCore.Qt.LeftToRight)
+        self.buttonBoxAddGroup.setOrientation(QtCore.Qt.Vertical)
+        self.buttonBoxAddGroup.setStandardButtons(QtWidgets.QDialogButtonBox.NoButton)
+        self.buttonBoxAddGroup.setObjectName("buttonBoxAddGroup")
+
+        self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
+        self.ftree.model.paths_selected.connect(self.pathsSelectedUpdateTable)
+        self.buttonBox.accepted.connect(self.addDf)
+
+        self.tablemodel = TableModel(self.dfAdd)
+        self.tableView.setModel(self.tablemodel)
+
+    def addDf(self):
+        self.parent.slotAddDfData(self.dfAdd)
+
+    def pathsSelectedUpdateTable(self, paths):
+        # TODO: Extract host and group
+        if verbose:
+            print("pathsSelectedUpdateTable")
+        dfAdd = df_projectTemplate()
+        dfAdd['path'] = paths
+        dfAdd['host'] = str(self.parent.fqdn)
+        dfAdd['filter'] = "voltage"
+        self.tablemodel.setData(dfAdd)
+        # NTH: more intelligent default naming; lowest level unique name?
+        # For now, use name + lowest level folder
+        names = []
+        for i in paths:
+            names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
+        dfAdd['recording_name'] = names
+        self.dfAdd = dfAdd
+        # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
+        # TODO: names that have been set manually are stored a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)
+        # format tableView
+        header = self.tableView.horizontalHeader()
+        self.tableView.setColumnHidden(0, True)  # host
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)  # path
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # name
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # group
+        self.tableView.update()
 
 #######################################################################
 
@@ -670,32 +794,6 @@ class UIsub(Ui_MainWindow):
             self.timer.timeout.connect(self.checkFocus)
             self.timer.start(1000)
 
-    def defaultGroups(self):
-        # Generate a list of 9 colors for groups, hex format
-        import pandas as pd
-        self.df_groups = pd.DataFrame(columns=['group_ID', 'group_name', 'color'])
-        print (self.df_groups)
-        df_p = self.get_df_project()
-        self.clearGroupsByRow(df_p.index) # clear all groups from all rows in df_project
-        uistate.group_show = {}
-        self.saveGroups()
-
-    def saveGroups(self):
-        path_groups = self.dict_folders['project'] / "groups.csv"
-        if not path_groups.parent.exists():
-            path_groups.parent.mkdir(parents=True, exist_ok=True)
-        self.df_groups.to_csv(str(path_groups), index=False)
-
-    def loadGroups(self):
-        path_groups = self.dict_folders['project'] / "groups.csv"
-        if path_groups.exists():
-            self.df_groups = pd.read_csv(str(path_groups))
-            self.df_groups = self.df_groups.astype(str) # force string format
-        else:
-            self.defaultGroups()
-        if uistate.group_show == {}:
-            for group_id in self.df_groups['group_ID']:
-                uistate.group_show[str(group_id)] = True
 
     # Debugging tools
             # self.find_widgets_with_top_left_coordinates(self.centralwidget)
@@ -712,6 +810,8 @@ class UIsub(Ui_MainWindow):
             print(f"Focused Widget: {focused_widget.objectName()}")
         else:
             print("No widget has focus.")
+
+
 
 
 # WIP: TODO: move these to appropriate header in this file
@@ -758,7 +858,7 @@ class UIsub(Ui_MainWindow):
         # mods?...
 
         # reset group controls
-        self.removeAllGroupControls()
+        self.removeGroupControls()
         for group in self.df_groups['group_ID'].tolist():
             print(f"adding group {group}")
             if group not in uistate.group_show.keys():
@@ -827,7 +927,7 @@ class UIsub(Ui_MainWindow):
         self.usage("triggerEditGroups")
         # Placeholder: For now, delete all buttons and groups
         # clearGroupsByRow on ALL rows of df_project
-        self.removeAllGroupControls()
+        self.removeGroupControls()
         self.defaultGroups()
         self.tableUpdate()
         self.updateMouseover()
@@ -944,10 +1044,10 @@ class UIsub(Ui_MainWindow):
         # build the list uistate.selected with indices
         uistate.selected = [index.row() for index in selected_indexes]
         if not selected_indexes:
-            df_project_selected = self.get_df_project()
+            uistate.df_recs2plot = None
         else:
             df_project_selected = self.get_df_project().iloc[uistate.selected]
-        uistate.df_recs2plot = df_project_selected[df_project_selected['sweeps'] != "..."]
+            uistate.df_recs2plot = df_project_selected[df_project_selected['sweeps'] != "..."]
         print(f"df_recs2plot: {uistate.df_recs2plot}")
         self.updateMouseover()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
@@ -1123,28 +1223,19 @@ class UIsub(Ui_MainWindow):
         graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def purgeRecordingData(self, recording_name):
-        # remove from internal cache
-        self.removeFromCache(recording_name, 'dict_datas')
-        self.removeFromCache(recording_name, 'dict_means')
-        self.removeFromCache(recording_name, 'dict_filters')
-        self.removeFromCache(recording_name, 'dict_outputs')
-        # remove from disk
-        self.removeFromDisk(recording_name, 'data', '.csv')
-        self.removeFromDisk(recording_name, 'cache', '_mean.csv')
-        self.removeFromDisk(recording_name, 'cache', '_filter.csv')
-        self.removeFromDisk(recording_name, 'cache', '_output.csv')
-        # remove from graphs
+        def removeFromCache(cache_name):
+            cache = getattr(self, cache_name)
+            if recording_name in cache.keys():
+                cache.pop(recording_name, None)
+        def removeFromDisk(folder_name, file_suffix):
+            file_path = Path(self.dict_folders[folder_name] / (recording_name + file_suffix))
+            if file_path.exists():
+                file_path.unlink()
+        for cache_name in ['dict_datas', 'dict_means', 'dict_filters', 'dict_outputs']:
+            removeFromCache(cache_name)
+        for folder_name, file_suffix in [('data', '.csv'), ('cache', '_mean.csv'), ('cache', '_filter.csv'), ('cache', '_output.csv')]:
+            removeFromDisk(folder_name, file_suffix)
         uiplot.purge(rec=recording_name, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
-
-    def removeFromCache(self, recording_name, cache_name):
-        if recording_name in getattr(self, cache_name).keys():
-            print(f"Deleting {recording_name} from internal {cache_name} cache...")
-            getattr(self, cache_name).pop(recording_name, None)
-
-    def removeFromDisk(self, recording_name, folder_name, file_suffix):
-        file_path = Path(self.dict_folders[folder_name] / (recording_name + file_suffix))
-        if file_path.exists():
-            file_path.unlink()
 
     def parseData(self): # parse data files and modify self.df_project accordingly
         df_p = self.get_df_project()
@@ -1212,6 +1303,31 @@ class UIsub(Ui_MainWindow):
 
 # Data Group functions
 
+    def defaultGroups(self):
+        # Generate a list of 9 colors for groups, hex format
+        self.df_groups = pd.DataFrame(columns=['group_ID', 'group_name', 'color'])
+        df_p = self.get_df_project()
+        self.clearGroupsByRow(df_p.index) # clear all groups from all rows in df_project
+        uistate.group_show = {}
+        self.saveGroups()
+
+    def saveGroups(self):
+        path_groups = self.dict_folders['project'] / "groups.csv"
+        if not path_groups.parent.exists():
+            path_groups.parent.mkdir(parents=True, exist_ok=True)
+        self.df_groups.to_csv(str(path_groups), index=False)
+
+    def loadGroups(self):
+        path_groups = self.dict_folders['project'] / "groups.csv"
+        if path_groups.exists():
+            self.df_groups = pd.read_csv(str(path_groups))
+            self.df_groups = self.df_groups.astype(str) # force string format
+        else:
+            self.defaultGroups()
+        if uistate.group_show == {}:
+            for group_id in self.df_groups['group_ID']:
+                uistate.group_show[str(group_id)] = True
+
     def addGroupControls(self, str_ID): # Create menu for adding to group and checkbox for showing group
         group = f"group_{str_ID}"
         print(f"addGroupControls: {group}, i: {str_ID}")
@@ -1232,21 +1348,21 @@ class UIsub(Ui_MainWindow):
         self.new_checkbox.stateChanged.connect(lambda state, group=group: self.groupCheckboxChanged(state, group))
         self.horizontalLayoutGroups.addWidget(self.new_checkbox)
 
-    def removeAllGroupControls(self):
-        for i in range(1, 10): # clear group controls 1-9
-            self.removeGroupControls(i)
-
-    def removeGroupControls(self, i):
-        group = f"group_{str(i)}"
-        # get the widget named group and remove it
-        widget = self.centralwidget.findChild(QtWidgets.QWidget, group)
-        if widget:
-            widget.deleteLater()
-        # get the action named actionAddTo_{group} and remove it
-        action = getattr(self, f"actionAddTo_{group}", None)
-        if action:
-            self.menuGroups.removeAction(action)
-            delattr(self, f"actionAddTo_{group}")
+    def removeGroupControls(self, i=None):
+        if i is None:  # if i is not provided, remove all group controls
+            for i in range(1, 10):  # clear group controls 1-9
+                self.removeGroupControls(i)
+        else:
+            group = f"group_{str(i)}"
+            # get the widget named group and remove it
+            widget = self.centralwidget.findChild(QtWidgets.QWidget, group)
+            if widget:
+                widget.deleteLater()
+            # get the action named actionAddTo_{group} and remove it
+            action = getattr(self, f"actionAddTo_{group}", None)
+            if action:
+                self.menuGroups.removeAction(action)
+                delattr(self, f"actionAddTo_{group}")
 
     def groupCheckboxChanged(self, state, group):
         if verbose:
@@ -1325,12 +1441,22 @@ class UIsub(Ui_MainWindow):
         self.set_df_project(self.df_project)
 
 
-# writer functions
+# Writer functions
     
     def write_bw_cfg(self):  # config file for program, global settings
         cfg = {"user_documents": str(self.user_documents), "projects_folder": str(self.projects_folder), "projectname": self.projectname}
         with self.bw_cfg_yaml.open("w+") as file:
             yaml.safe_dump(cfg, file)
+    
+    def df2csv(self, df, rec, key=None): # "writes dict[rec] to rec_{dict}.csv" TODO: Update, better description; replace "rec"
+        self.dict_folders['cache'].mkdir(exist_ok=True)
+        if key is None:
+            filepath = f"{self.dict_folders['cache']}/{rec}.csv"
+        else:
+            filepath = f"{self.dict_folders['cache']}/{rec}_{key}.csv"
+        print(f"saved cache filepath: {filepath}")
+        df.to_csv(filepath, index=False)
+
 
 
 # Project functions
@@ -1382,6 +1508,11 @@ class UIsub(Ui_MainWindow):
     def get_df_project(self): # returns a copy of the persistent df_project TODO: make these functions the only way to get to it.
         return self.df_project
 
+    def set_df_project(self, df): # persists df and saves it to .csv
+        print("set_df_project")
+        self.df_project = df
+        self.save_df_project()
+
     def load_df_project(self): # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
         self.graphMainWipe()
         self.resetCacheDicts() # clear internal caches
@@ -1397,13 +1528,10 @@ class UIsub(Ui_MainWindow):
     def save_df_project(self): # writes df_project to .csv
         self.df_project.to_csv(str(self.dict_folders['project'] / "project.brainwash"), index=False)
 
-    def set_df_project(self, df): # persists df and saves it to .csv
-        print("set_df_project")
-        self.df_project = df
-        self.save_df_project()
 
 
 # Table handling
+
     def setButtonParse(self):
         if self.df_project['sweeps'].eq("...").any():
             self.pushButtonParse.setVisible(True)
@@ -1465,7 +1593,10 @@ class UIsub(Ui_MainWindow):
         for index in selected_rows: # Restore selection
             self.tableProj.selectionModel().select(index, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
 
-# internal dataframe handling
+
+
+# Internal dataframe handling
+
     def get_dfmean(self, row):
         # returns an internal df mean for the selected file. If it does not exist, read it from file first.
         recording_name = row['recording_name']
@@ -1521,7 +1652,6 @@ class UIsub(Ui_MainWindow):
             return self.dict_datas[recording_name]
         except FileNotFoundError:
             print("did not find _mean.csv to load. Not imported?")
-
             
     def get_dffilter(self, row):
         # returns an internal df_filter for the selected recording_name. If it does not exist, read it from file first.
@@ -1542,54 +1672,6 @@ class UIsub(Ui_MainWindow):
         # Cache and return
         self.dict_filters[recording_name] = dffilter
         return self.dict_filters[recording_name]
-        
-        
-    def get_dfgroupmean(self, str_ID):
-        # returns an internal df output average of <group>. If it does not exist, create it
-        if str_ID in self.dict_group_means: # 1: Return cached
-            print(f"Returning cached group mean for {str_ID}")
-            return self.dict_group_means[str_ID]
-        group_path = Path(f"{self.dict_folders['cache']}/group_{str_ID}.csv")
-        if group_path.exists(): #2: Read from file
-            if verbose:
-                print("Loading stored", str(group_path))
-            group_mean = pd.read_csv(str(group_path))
-        else: #3: Create file
-            if verbose:
-                print("Building new", str(group_path))
-            df_p = self.df_project
-            # create dfgroup_IDs. containing ONLY lines that have key group in their group_IDs
-            dfgroup_IDs = df_p[df_p['group_IDs'].str.contains(str_ID, na=False)]
-            print(f"dfgroup_IDs: {dfgroup_IDs}")
-            dfs = []
-            list_pairs = [] # prevent diff duplicates
-            for i, row in dfgroup_IDs.iterrows():
-                if uistate.checkBox['paired_stims']:
-                    name_rec = row['recording_name']
-                    if name_rec in list_pairs:
-                        continue
-                    name_pair = row['paired_recording']
-                    df = self.get_dfdiff(row=row)
-                    list_pairs.append(name_pair)                    
-                else:
-                    df = self.get_dfoutput(row=row)
-                    if uistate.checkBox['norm_EPSP']:
-                        self.normOutput(row, df)
-                dfs.append(df)
-            if dfs:
-                dfs = pd.concat(dfs)
-            else:
-                print(f"No recordings in group_ID {str_ID}.")
-                return
-            if uistate.checkBox['norm_EPSP']:
-                group_mean = dfs.groupby('sweep').agg({'EPSP_amp_norm': ['mean', 'sem'], 'EPSP_slope_norm': ['mean', 'sem']}).reset_index()
-            else:
-                group_mean = dfs.groupby('sweep').agg({'EPSP_amp': ['mean', 'sem'], 'EPSP_slope': ['mean', 'sem']}).reset_index()
-            group_mean.columns = ['sweep', 'EPSP_amp_mean', 'EPSP_amp_SEM', 'EPSP_slope_mean', 'EPSP_slope_SEM']
-            self.df2csv(df=group_mean, rec=f"group_{str_ID}", key="mean")
-        self.dict_group_means[str_ID] = group_mean
-        return self.dict_group_means[str_ID]
-
 
     def get_dfdiff(self, row):
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
@@ -1661,20 +1743,54 @@ class UIsub(Ui_MainWindow):
             dfdiff['EPSP_slope'] = dfi.EPSP_slope / dfc.EPSP_slope
         self.df2csv(df=dfdiff, rec=key_pair, key="diff")
         self.dict_diffs[key_pair] = dfdiff
-        return dfdiff
+        return dfdiff        
         
+    def get_dfgroupmean(self, str_ID):
+        # returns an internal df output average of <group>. If it does not exist, create it
+        if str_ID in self.dict_group_means: # 1: Return cached
+            print(f"Returning cached group mean for {str_ID}")
+            return self.dict_group_means[str_ID]
+        group_path = Path(f"{self.dict_folders['cache']}/group_{str_ID}.csv")
+        if group_path.exists(): #2: Read from file
+            if verbose:
+                print("Loading stored", str(group_path))
+            group_mean = pd.read_csv(str(group_path))
+        else: #3: Create file
+            if verbose:
+                print("Building new", str(group_path))
+            df_p = self.df_project
+            # create dfgroup_IDs. containing ONLY lines that have key group in their group_IDs
+            dfgroup_IDs = df_p[df_p['group_IDs'].str.contains(str_ID, na=False)]
+            print(f"dfgroup_IDs: {dfgroup_IDs}")
+            dfs = []
+            list_pairs = [] # prevent diff duplicates
+            for i, row in dfgroup_IDs.iterrows():
+                if uistate.checkBox['paired_stims']:
+                    name_rec = row['recording_name']
+                    if name_rec in list_pairs:
+                        continue
+                    name_pair = row['paired_recording']
+                    df = self.get_dfdiff(row=row)
+                    list_pairs.append(name_pair)                    
+                else:
+                    df = self.get_dfoutput(row=row)
+                    if uistate.checkBox['norm_EPSP']:
+                        self.normOutput(row, df)
+                dfs.append(df)
+            if dfs:
+                dfs = pd.concat(dfs)
+            else:
+                print(f"No recordings in group_ID {str_ID}.")
+                return
+            if uistate.checkBox['norm_EPSP']:
+                group_mean = dfs.groupby('sweep').agg({'EPSP_amp_norm': ['mean', 'sem'], 'EPSP_slope_norm': ['mean', 'sem']}).reset_index()
+            else:
+                group_mean = dfs.groupby('sweep').agg({'EPSP_amp': ['mean', 'sem'], 'EPSP_slope': ['mean', 'sem']}).reset_index()
+            group_mean.columns = ['sweep', 'EPSP_amp_mean', 'EPSP_amp_SEM', 'EPSP_slope_mean', 'EPSP_slope_SEM']
+            self.df2csv(df=group_mean, rec=f"group_{str_ID}", key="mean")
+        self.dict_group_means[str_ID] = group_mean
+        return self.dict_group_means[str_ID]
 
-    def df2csv(self, df, rec, key=None): # "writes dict[rec] to rec_{dict}.csv" TODO: Update, better description; replace "rec"
-        self.dict_folders['cache'].mkdir(exist_ok=True)
-        if key is None:
-            filepath = f"{self.dict_folders['cache']}/{rec}.csv"
-        else:
-            filepath = f"{self.dict_folders['cache']}/{rec}_{key}.csv"
-        print(f"saved cache filepath: {filepath}")
-        df.to_csv(filepath, index=False)
-
-
-# Default_output
     def defaultOutput(self, row):
         '''
         Generates default results for row (in self.df_project)
@@ -1710,7 +1826,9 @@ class UIsub(Ui_MainWindow):
         return dfoutput
 
 
+
 # Maingraph handling
+
     def graphMainWipe(self): # removes all plots from main_canvas_mean and main_canvas_output
         if hasattr(self, "main_canvas_mean"):
             self.main_canvas_mean.axes.cla()
@@ -1733,10 +1851,6 @@ class UIsub(Ui_MainWindow):
             self.main_canvas_output.mpl_connect('scroll_event', lambda event: zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.main_canvas_output, ax1=self.ax1, ax2=self.ax2))
             self.scroll_event_connected = True
         self.graphMainPreload()
-    
-    def graphMainSet(self, row=None): # select and (re) plot one row
-        self.usage("graphMainSet")
-        graphReplot(axm=self.axm, ax1=self.ax1, ax2=self.ax2, row=row)
 
     def graphMainPreload(self): # plot and hide all imported rows in df_project
         self.usage("graphMainPreload")
@@ -1756,8 +1870,6 @@ class UIsub(Ui_MainWindow):
             uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput, axm=self.axm, ax1=self.ax1, ax2=self.ax2)
             print(f"Preloaded {row['recording_name']}")
         print(f"Preloaded recordings in {time.time()-t0:.2f} seconds.")
-
-        uistate.df_recs2plot = df
         uiplot.graphUpdate(axm=self.axm, ax1=self.ax1, ax2=self.ax2)
 
     def updateMouseover(self):
@@ -1861,7 +1973,7 @@ class UIsub(Ui_MainWindow):
         self.main_canvas_mean.draw()
         self.mainDragUpdate(x_start, x_end, precision)
 
-    def mainDragPoint(self, event, time_values, action, prior_point): # maingraph dragging event
+    def mainDragPoint(self, event, time_values): # maingraph dragging event
         self.main_canvas_mean.mpl_disconnect(self.mouseover)
         if event.xdata is None:
             return
@@ -1876,8 +1988,6 @@ class UIsub(Ui_MainWindow):
         # get y values from the appropriate filter of persisted dfmean
         rec_filter = uistate.row_copy['filter']
         y_point = self.dfmean[rec_filter].iloc[x_idx]
-
-        #print(f"prior_point: {prior_point}, x_point: {x_point}, x_idx: {x_idx}, y_point: {y_point}")
 
         # remember the last x index
         uistate.last_x_idx = uistate.x_idx
@@ -2007,132 +2117,10 @@ class UIsub(Ui_MainWindow):
         self.updateMouseover()
 
 
+
     @QtCore.pyqtSlot()
     def slotAddDfData(self, df):
         self.addData(df)
-
-#####################################
-
-class InputDialogPopup(QtWidgets.QDialog):
-    def __init__(self):
-        super().__init__()
-        self.input = QtWidgets.QLineEdit(self)
-        self.buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel, QtCore.Qt.Horizontal, self)
-        self.buttonBox.accepted.connect(self.accept)
-        self.buttonBox.rejected.connect(self.reject)
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.addWidget(self.input)
-        layout.addWidget(self.buttonBox)
-
-    def showInputDialog(self, title, query):
-        self.setWindowTitle(title)
-        self.input.setPlaceholderText(query)
-        self.setFixedSize(300, 150)  # Set the fixed width and height of the dialog
-        result = self.exec_()
-        text = self.input.text()
-        if result == QtWidgets.QDialog.Accepted:
-            print(f"You entered: {text}")
-            return text
-
-class TableProjSub(QtWidgets.QTableView):
-    # TODO: This class does the weirdest things to events; shifting event numbers around in non-standard ways and refuses to notice drops - but drag-into works. Why?
-    def __init__(self, parent=None):
-        super().__init__()
-        self.parent = parent
-        self.setAcceptDrops(True)
-
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls():
-            file_urls = [url.toLocalFile() for url in event.mimeData().urls()]
-            print("Files dropped:", file_urls)
-            # Handle the dropped files here
-            dfAdd = df_projectTemplate()
-            dfAdd['path'] = file_urls # needs to be first, as it sets the number of rows
-            dfAdd['host'] = str(self.parent.fqdn)
-            dfAdd['filter'] = "voltage"
-            # NTH: more intelligent default naming; lowest level unique name?
-            # For now, use name + lowest level folder
-            names = []
-            duplicates = [] # remove these from dfAdd
-            for i in file_urls:
-                # check if file is already in df_project
-                if i in self.parent.df_project['path'].values:
-                    print(f"File {i} already in df_project")
-                    duplicates.append(i)
-                else:
-                    names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
-            if not names:
-                print("No new files to add.")
-                return
-            dfAdd = dfAdd.drop(dfAdd[dfAdd['path'].isin(duplicates)].index)
-            dfAdd['recording_name'] = names
-            self.parent.addData(dfAdd)
-            event.acceptProposedAction()
-        else:
-            event.ignore()
-
-
-class Filetreesub(Ui_Dialog):
-    def __init__(self, dialog, parent=None, folder="."):
-        super(Filetreesub, self).__init__()
-        self.setupUi(dialog)
-        self.parent = parent
-        if verbose:
-            print(" - Filetreesub init")
-
-        self.ftree = self.widget
-        # set root_path for file tree model
-        self.ftree.delayedInitForRootPath(folder)
-        # self.ftree.model.parent_index   = self.ftree.model.setRootPath(projects_folder)
-        # self.ftree.model.root_index     = self.ftree.model.index(projects_folder)
-
-        # Dataframe to addamp
-        self.names = []
-        self.dfAdd = df_projectTemplate()
-
-        self.buttonBoxAddGroup = QtWidgets.QDialogButtonBox(dialog)
-        self.buttonBoxAddGroup.setGeometry(QtCore.QRect(470, 20, 91, 491))
-        self.buttonBoxAddGroup.setLayoutDirection(QtCore.Qt.LeftToRight)
-        self.buttonBoxAddGroup.setOrientation(QtCore.Qt.Vertical)
-        self.buttonBoxAddGroup.setStandardButtons(QtWidgets.QDialogButtonBox.NoButton)
-        self.buttonBoxAddGroup.setObjectName("buttonBoxAddGroup")
-
-        self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
-        self.ftree.model.paths_selected.connect(self.pathsSelectedUpdateTable)
-        self.buttonBox.accepted.connect(self.addDf)
-
-        self.tablemodel = TableModel(self.dfAdd)
-        self.tableView.setModel(self.tablemodel)
-
-    def addDf(self):
-        self.parent.slotAddDfData(self.dfAdd)
-
-    def pathsSelectedUpdateTable(self, paths):
-        # TODO: Extract host and group
-        if verbose:
-            print("pathsSelectedUpdateTable")
-        dfAdd = df_projectTemplate()
-        dfAdd['path'] = paths
-        dfAdd['host'] = str(self.parent.fqdn)
-        dfAdd['filter'] = "voltage"
-        self.tablemodel.setData(dfAdd)
-        # NTH: more intelligent default naming; lowest level unique name?
-        # For now, use name + lowest level folder
-        names = []
-        for i in paths:
-            names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
-        dfAdd['recording_name'] = names
-        self.dfAdd = dfAdd
-        # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
-        # TODO: names that have been set manually are stored a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)
-        # format tableView
-        header = self.tableView.horizontalHeader()
-        self.tableView.setColumnHidden(0, True)  # host
-        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)  # path
-        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # name
-        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # group
-        self.tableView.update()
-
 
 def get_signals(source):
     cls = source if isinstance(source, type) else type(source)
@@ -2144,14 +2132,13 @@ def get_signals(source):
             if isinstance(aspect, signal):
                 print(f"{key} [{clsname}]")
 
-def graphReplot(axm, ax1, ax2, df=None, row=None): # TODO: allow update of only specific row
+def graphReplot(self, axm, ax1, ax2, df=None, row=None): # TODO: allow update of only specific row
     print("graphReplot")
+    uistate = self.uistate
     if df is None: # unless fed a specific row, (re)plot the whole df_project
-        df_p = uisub.get_df_project()
-        df_imported = df_p[df_p['sweeps'] != "..."] # remove lines that are not imported
+        df_imported = uistate.recs2plot()
     if df_imported.empty:
-        print("graphReplot: df_imported is empty")
-        uisub.graphMainWipe()
+        print("graphReplot: df_p is empty")
         return
     # update output graph x limits based on max number of sweeps in df_project
     if uistate.zoom['output_xlim'][1] is None:
@@ -2349,7 +2336,7 @@ def outputAutoScale(ax, df, aspect): # Sets the y limits of ax to the min and ma
 
 
 if __name__ == "__main__":
-    print()
+    print("\n" * 3)
     print(f"brainwash version {version}")
     app = QtWidgets.QApplication(sys.argv) # "QtWidgets.QApplication(sys.argv) appears to cause Qt: Session management error: None of the authentication protocols specified are supported"
     main_window = QtWidgets.QMainWindow()

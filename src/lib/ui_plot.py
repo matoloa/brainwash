@@ -51,7 +51,7 @@ class UIplot():
         print("graphUpdate")
         uistate = self.uistate
         #print("uistate.plotted: ", uistate.plotted)
-        if uistate.df_recs2plot.empty or not uistate.anyView():
+        if uistate.df_recs2plot is None or not uistate.anyView():
             self.hideAll(axm, ax1, ax2)
         else:
             # axm, set visibility of lines and build legend
