@@ -1154,7 +1154,7 @@ class UIsub(Ui_MainWindow):
                     self.set_df_project(df_p)
                     self.tableUpdate()
                     uiplot.purge(rec=old_recording_name)
-                    self.graphUpdate(axm=uistate.axm, ax1=uistate.ax1, ax2=uistate.ax1)
+                    self.graphUpdate(row = df_p.loc[uistate.selected[0]])
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
             else:
@@ -1179,7 +1179,7 @@ class UIsub(Ui_MainWindow):
         self.set_df_project(df_p)
         uistate.selected = []
         self.tableUpdate()
-        self.graphUpdate(axm=uistate.axm, ax1=uistate.ax1, ax2=uistate.ax1)
+        self.graphUpdate()
 
     def purgeRecordingData(self, recording_name):
         def removeFromCache(cache_name):
@@ -1223,7 +1223,7 @@ class UIsub(Ui_MainWindow):
                 df_p = pd.concat([update_frame, rows2add]).reset_index(drop=True)
         self.set_df_project(df_p)
         self.tableUpdate()
-        self.graphUpdate(axm=uistate.axm, ax1=uistate.ax1, ax2=uistate.ax1)
+        self.graphUpdate()
 
     def flipCI(self):
         if uistate.selected:
@@ -1832,17 +1832,29 @@ class UIsub(Ui_MainWindow):
         print(f"Preloaded recordings in {time.time()-t0:.2f} seconds.")
         uiplot.graphRefresh()
 
-    def graphUpdate(self, axm, ax1, ax2, df=None, row=None): # TODO: allow update of only specific row
+    def graphUpdate(self, df=None, row=None): # TODO: allow update of only specific row
+        if row is not None: # process a specific row
+            dfmean = uisub.get_dfmean(row=row)
+            if uistate.checkBox['paired_stims']:
+                dfoutput = uisub.get_dfdiff(row=row)
+            else:
+                dfoutput = uisub.get_dfoutput(row=row)
+            if dfoutput is None:
+                return
+            uiplot.graph(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
+            uiplot.graphRefresh()
+            return
         if df is None: # unless fed a specific row, (re)plot the whole df_project
             df_imported = uistate.recs2plot()
         if df_imported.empty:
             print("graphUpdate: df_p is empty")
             return
+        else: # plot all rows in df_imported
+            list_recs = df_imported['recording_name'].tolist()
         # update output graph x limits based on max number of sweeps in df_project
         if uistate.zoom['output_xlim'][1] is None:
             uistate.zoom['output_xlim'] = [0, df_imported['sweeps'].max()]
             uistate.save_cfg(projectfolder=uisub.dict_folders['project'])
-        list_recs = df_imported['recording_name'].tolist()
         if uistate.plotted: # A (mostly redundant?) check to remove plotted lines that are not in df_select
             for rec in list(uistate.plotted.keys()): # create a list from dict keys to avoid RuntimeError
                 if rec not in list_recs:
