@@ -782,7 +782,6 @@ class UIsub(Ui_MainWindow):
 
 
 
-
 # WIP: TODO: move these to appropriate header in this file
 
     def connectUIstate(self): # Connect UI elements to uistate
@@ -873,21 +872,14 @@ class UIsub(Ui_MainWindow):
             yaml.safe_dump(dict_bottom, file, default_flow_style=False)
 
 
+
 # trigger functions TODO: break out the big ones to separate functions!
 
     def triggerDarkmode(self):
         self.usage("triggerDarkmode")
         uistate.darkmode = not uistate.darkmode
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
-        if self.mainwindow.styleSheet() == "":
-            self.mainwindow.setStyleSheet("background-color: #333; color: #fff;")
-        else:
-            self.mainwindow.setStyleSheet("")
-        uiplot.styleUpdate()
-        self.main_canvas_mean.draw()
-        self.main_canvas_output.draw()
-
-        self.tableFormat()
+        self.darkmode()
 
     def pushButton_paired_data_flip_pressed(self):
         self.usage("pushButton_paired_data_flip_pressed")
@@ -1016,6 +1008,29 @@ class UIsub(Ui_MainWindow):
 
 
 # Non-button event functions
+    def darkmode(self):
+        if uistate.darkmode:
+            self.mainwindow.setStyleSheet("background-color: #333; color: #fff;")
+            self.tableProj.setStyleSheet("""
+                QTableView::item:selected {
+                    background-color: #555;
+                    color: #FFF;
+                }
+                QHeaderView::section {
+                    background-color: #333;
+                    color: #FFF;
+                }
+                QTableCornerButton::section {
+                    background-color: #333;
+                    color: #FFF;
+                }
+            """)
+        else:
+            self.mainwindow.setStyleSheet("")
+            self.tableProj.setStyleSheet("")
+        uiplot.styleUpdate()
+        self.main_canvas_mean.draw()
+        self.main_canvas_output.draw()
 
     def tableProjSelectionChanged(self):
         self.usage("tableProjSelectionChanged")
@@ -1573,25 +1588,6 @@ class UIsub(Ui_MainWindow):
         self.tableProj.setMinimumWidth(total_width)
         for index in selected_rows:
             self.tableProj.selectionModel().select(index, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
-        if uistate.darkmode:
-            #self.mainWindow.setStyleSheet("background-color: #333; color: #FFF;")
-            self.tableProj.setStyleSheet("""
-                QTableView::item:selected {
-                    background-color: #555;
-                    color: #FFF;
-                }
-                QHeaderView::section {
-                    background-color: #333;
-                    color: #FFF;
-                }
-                QTableCornerButton::section {
-                    background-color: #333;
-                    color: #FFF;
-                }
-            """)
-        else:
-            self.tableProj.setStyleSheet("")
-        #self.tableProj.verticalHeader().setStyleSheet("color: #FFF; background-color: #333;")
         self.setButtonParse()
     
     def tableUpdate(self):
@@ -1858,6 +1854,7 @@ class UIsub(Ui_MainWindow):
             self.main_canvas_mean.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphMean, canvas=self.main_canvas_mean, ax1=self.main_canvas_mean.axes))
             self.main_canvas_output.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.main_canvas_output, ax1=uistate.ax1, ax2=uistate.ax1))
             self.scroll_event_connected = True
+        self.darkmode() # set darkmode if set in cfg
         self.graphMainPreload()
 
     def graphMainPreload(self): # plot and hide all imported rows in df_project

@@ -12,10 +12,10 @@ class UIplot():
             self.styleUpdate()
     
     def styleUpdate(self):
-        axm, ax1 = self.uistate.axm, self.uistate.ax1
+        axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
         if self.uistate.darkmode:
             style.use('dark_background')
-            for ax in [axm, ax1]:
+            for ax in [axm, ax1, ax2]:
                 ax.figure.patch.set_facecolor('#333333')
                 ax.set_facecolor('#333333')
                 ax.xaxis.label.set_color('white')
@@ -24,7 +24,7 @@ class UIplot():
             print("Dark mode activated")
         else:
             style.use('default')
-            for ax in [axm, ax1]:
+            for ax in [axm, ax1, ax2]:
                 ax.figure.patch.set_facecolor('white')
                 ax.set_facecolor('white')
                 ax.xaxis.label.set_color('black')
@@ -60,8 +60,7 @@ class UIplot():
     def addGroup(self, df_groups, dict_group_means):
         axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
         print(f"Graphing groups {df_groups.group_ID.unique()}:")
-        return
-        # cycle through the reows of df_groups and print the group_ID, group_name, and color for each one
+        # cycle through the rows of df_groups and print the group_ID, group_name, and color for each one
         for index, row in df_groups.iterrows():
             group_ID = row['group_ID']
             group_name = row['group_name']
