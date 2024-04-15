@@ -1008,6 +1008,33 @@ class UIsub(Ui_MainWindow):
 
 
 # Non-button event functions
+    def talkback(self):
+        row = uistate.row_copy
+        dfmean = self.dfmean
+
+        t_start = row['t_stim'] - 0.002
+        t_end = row['t_stim'] + 0.018
+        dfevent = dfmean[(dfmean['time'] >= t_start) & (dfmean['time'] < t_end)]
+        dfevent = dfevent[['time', 'voltage']]
+        path_talkback_df = Path(f"{self.projects_folder}/talkback/talkback_slice_{row['ID']}.csv")
+        if not path_talkback_df.parent.exists():
+            path_talkback_df.parent.mkdir(parents=True, exist_ok=True)
+        dfevent.to_csv(path_talkback_df, index=False)
+        # save the event data as a dict
+        keys = [
+            't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params',
+            't_EPSP_slope_start', 't_EPSP_slope_end', 't_EPSP_slope_method', 't_EPSP_slope_params',
+            't_volley_amp', 't_volley_amp_method', 't_volley_amp_params',
+            't_volley_slope_start', 't_volley_slope_end', 't_volley_slope_method', 't_volley_slope_params'
+        ]
+        dict_event = {key: row[key] for key in keys}
+        print(f"talkback dict_event: {dict_event}")
+        # store dict_event as .csv named after recording_name
+        path_talkback = Path(f"{self.projects_folder}/talkback/talkback_meta_{row['ID']}.csv")
+        with open(path_talkback, 'w') as f:
+            json.dump(dict_event, f)
+
+
     def darkmode(self):
         if uistate.darkmode:
             self.mainwindow.setStyleSheet("background-color: #333; color: #fff;")
@@ -1216,15 +1243,22 @@ class UIsub(Ui_MainWindow):
             recording_name = df_p.at[index, 'recording_name']
             sweeps = df_p.at[index, 'sweeps']
             if sweeps != "...": # if the file is parsed:
+                print(f"Deleting {recording_name}...")
                 self.purgeRecordingData(recording_name)
         # Regardless of whether or not there was a file, purge the row from df_project
         self.clearGroupsByRow(uistate.selected) # clear cache so that a new group mean is calculated
+        # store the ID of the line below the last selected row
+        reselect_ID = None
+        if uistate.selected[-1] < len(df_p) - 1:
+            reselect_ID = df_p.at[uistate.selected[-1] + 1, 'ID']
         df_p.drop(uistate.selected, inplace=True)
         df_p.reset_index(inplace=True, drop=True)
         self.set_df_project(df_p)
-        uistate.selected = []
         self.tableUpdate()
-        self.graphUpdate()
+        # reselect the line below the last selected row
+        if reselect_ID:
+            uistate.selected = df_p[df_p['ID'] == reselect_ID].index[0]
+        self.tableProjSelectionChanged()
 
     def purgeRecordingData(self, recording_name):
         def removeFromCache(cache_name):
@@ -1553,14 +1587,14 @@ class UIsub(Ui_MainWindow):
         # hide all columns except these:
         list_show = [   
                         df_p.columns.get_loc('recording_name'),
-                        df_p.columns.get_loc('groups'),
-                        df_p.columns.get_loc('group_IDs'),
+#                        df_p.columns.get_loc('groups'),
+                        #df_p.columns.get_loc('group_IDs'),
                         df_p.columns.get_loc('sweeps'),
 
 #                        df_p.columns.get_loc('t_EPSP_amp'),
-                        df_p.columns.get_loc('t_EPSP_amp_method'),
-#                        df_p.columns.get_loc('t_EPSP_slope_start'),
-#                        df_p.columns.get_loc('t_EPSP_slope_end'),
+#                        df_p.columns.get_loc('t_EPSP_amp_method'),
+                        df_p.columns.get_loc('t_EPSP_slope_start'),
+                        df_p.columns.get_loc('t_EPSP_slope_end'),
 #                        df_p.columns.get_loc('t_EPSP_slope_width'),
 #                        df_p.columns.get_loc('t_EPSP_slope_halfwidth'),
 #                        df_p.columns.get_loc('t_EPSP_slope_method'),
@@ -1890,7 +1924,7 @@ class UIsub(Ui_MainWindow):
             uiplot.graphRefresh()
             return
         if df is None: # unless fed a specific row, (re)plot the whole df_project
-            df_imported = uistate.df_recs2plot()
+            df_imported = uistate.df_recs2plot
         if df_imported.empty:
             print("graphUpdate: df_p is empty")
             return
@@ -2183,6 +2217,8 @@ class UIsub(Ui_MainWindow):
         if uistate.mouseover_action.startswith("EPSP"): # add normalized EPSP columns
             self.normOutput(row=row, dfoutput=dfoutput)
         self.updateMouseover()
+        if talkback:
+            self.talkback()
 
     def zoomOnScroll(self, event, parent, canvas, ax1=None, ax2=None):
         x = event.xdata

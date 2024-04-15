@@ -15,6 +15,10 @@ import time
 #memory = Memory("joblib", verbose=1)
 
 
+def valid(num):
+    print(f"num: {num}, type: {type(num)}")
+    return num is not None and not np.isnan(num)
+
 # %%
 def build_dfoutput(df, dict_t, filter='voltage'):
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
@@ -37,7 +41,7 @@ def build_dfoutput(df, dict_t, filter='voltage'):
     # EPSP_amp
     if 't_EPSP_amp' in dict_t.keys():
         t_EPSP_amp = dict_t['t_EPSP_amp']
-        if t_EPSP_amp is not np.nan:
+        if valid(t_EPSP_amp):
             df_EPSP_amp = df[df['time']==t_EPSP_amp].copy() # filter out all time (from sweep start) that do not match t_EPSP_amp
             df_EPSP_amp.reset_index(inplace=True, drop=True)
             dfoutput['EPSP_amp'] = -1000 * df_EPSP_amp[filter] # invert and convert to mV
@@ -48,7 +52,7 @@ def build_dfoutput(df, dict_t, filter='voltage'):
     if 't_EPSP_slope_start' in dict_t.keys():
         t_EPSP_slope_start = dict_t['t_EPSP_slope_start']
         t_EPSP_slope_end = dict_t['t_EPSP_slope_end']
-        if t_EPSP_slope_start is not np.nan:
+        if valid(t_EPSP_slope_start):
             df_EPSP_slope = measureslope_vec(df=df, filter=filter, t_start=t_EPSP_slope_start, t_end=t_EPSP_slope_end)
             dfoutput['EPSP_slope'] = -df_EPSP_slope['value'] # invert 
         else:
@@ -57,7 +61,7 @@ def build_dfoutput(df, dict_t, filter='voltage'):
     # volley_amp
     if 't_volley_amp' in dict_t.keys():
         t_volley_amp = dict_t['t_volley_amp']
-        if t_volley_amp is not np.nan:
+        if valid(t_volley_amp):
             df_volley_amp = df[df['time']==t_volley_amp].copy() # filter out all time (from sweep start) that do not match t_volley_amp
             df_volley_amp.reset_index(inplace=True, drop=True)
             dfoutput['volley_amp'] = -1000 * df_volley_amp[filter] # invert and convert to mV
@@ -68,7 +72,7 @@ def build_dfoutput(df, dict_t, filter='voltage'):
     if 't_volley_slope_start' in dict_t.keys():
         t_volley_slope_start = dict_t['t_volley_slope_start']
         t_volley_slope_end = dict_t['t_volley_slope_end']
-        if t_volley_slope_start is not np.nan:
+        if valid(t_volley_slope_start):
             df_volley_slope = measureslope_vec(df=df, filter=filter,  t_start=t_volley_slope_start, t_end=t_volley_slope_end)
             dfoutput['volley_slope'] = -df_volley_slope['value'] # invert 
         else:
