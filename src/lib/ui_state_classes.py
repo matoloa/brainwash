@@ -5,8 +5,10 @@ class UIstate:
         self.reset()
 
     def reset(self): # (re)set all persisted states
+        print(" - - - resetting UIstate")
         self.version = "0.0.0"
         self.colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000']
+        self.darkmode = False
         self.changed = [] # TODO: not used yet: meant to be a list of what needs to be updated, even if they are already on an axis
         self.group_show = {}
         self.checkBox = {
@@ -193,6 +195,7 @@ class UIstate:
         try:
             return {
                 'version': self.version,
+                'darkmode': self.darkmode,
                 'selected': self.selected,
                 'changed': self.changed,
                 'group_show': self.group_show,
@@ -206,6 +209,7 @@ class UIstate:
     
     def set_state(self, state):
         self.version = state.get('version')
+        self.darkmode = state.get('darkmode')
         self.changed = state.get('changed')
         self.group_show = state.get('group_show')
         self.checkBox = state.get('checkBox')

@@ -1,11 +1,36 @@
 import seaborn as sns
 import numpy as np
-from matplotlib.lines import Line2D 
+from matplotlib import style
+from matplotlib.lines import Line2D
+
 
 class UIplot():
     def __init__(self, uistate):
         self.uistate = uistate
         print(f"UIplot instantiated {self.uistate.anyView()}")
+        if uistate.darkmode:
+            self.styleUpdate()
+    
+    def styleUpdate(self):
+        axm, ax1 = self.uistate.axm, self.uistate.ax1
+        if self.uistate.darkmode:
+            style.use('dark_background')
+            for ax in [axm, ax1]:
+                ax.figure.patch.set_facecolor('#333333')
+                ax.set_facecolor('#333333')
+                ax.xaxis.label.set_color('white')
+                ax.yaxis.label.set_color('white')
+                ax.tick_params(colors='white')
+            print("Dark mode activated")
+        else:
+            style.use('default')
+            for ax in [axm, ax1]:
+                ax.figure.patch.set_facecolor('white')
+                ax.set_facecolor('white')
+                ax.xaxis.label.set_color('black')
+                ax.yaxis.label.set_color('black')
+                ax.tick_params(colors='black')
+            print("Default mode activated")
 
     def hideAll(self):
         axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2

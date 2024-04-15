@@ -376,7 +376,7 @@
      <x>0</x>
      <y>0</y>
      <width>1215</width>
-     <height>22</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -394,7 +394,13 @@
      <string>Groups</string>
     </property>
    </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>Edit</string>
+    </property>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuEdit"/>
    <addaction name="menuData"/>
    <addaction name="menuGroups"/>
   </widget>

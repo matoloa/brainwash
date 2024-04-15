@@ -356,7 +356,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.horizontalLayoutCentralwidget.addLayout(self.verticalMasterLayout)
         mainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(mainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1215, 22))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1215, 21))
         self.menubar.setObjectName("menubar")
         self.menuFile = QtWidgets.QMenu(self.menubar)
         self.menuFile.setObjectName("menuFile")
@@ -364,11 +364,14 @@ class Ui_MainWindow(QtCore.QObject):
         self.menuData.setObjectName("menuData")
         self.menuGroups = QtWidgets.QMenu(self.menubar)
         self.menuGroups.setObjectName("menuGroups")
+        self.menuEdit = QtWidgets.QMenu(self.menubar)
+        self.menuEdit.setObjectName("menuEdit")
         mainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(mainWindow)
         self.statusbar.setObjectName("statusbar")
         mainWindow.setStatusBar(self.statusbar)
         self.menubar.addAction(self.menuFile.menuAction())
+        self.menubar.addAction(self.menuEdit.menuAction())
         self.menubar.addAction(self.menuData.menuAction())
         self.menubar.addAction(self.menuGroups.menuAction())
 
@@ -396,6 +399,8 @@ class Ui_MainWindow(QtCore.QObject):
         self.menuFile.setTitle(_translate("mainWindow", "File"))
         self.menuData.setTitle(_translate("mainWindow", "Data"))
         self.menuGroups.setTitle(_translate("mainWindow", "Groups"))
+        self.menuEdit.setTitle(_translate("mainWindow", "Edit"))
+
 
 
 ################################################################
@@ -411,7 +416,7 @@ class Ui_MainWindow(QtCore.QObject):
 
 
 ################################################################
-#        Additional classes (moved from bottom of file)        #
+#        Dialog and table classes                              #
 ################################################################
 
 class Ui_Dialog(QtWidgets.QWidget):
@@ -610,6 +615,16 @@ class UIsub(Ui_MainWindow):
         self.actionRenameProject.triggered.connect(self.renameProject)
         self.actionRenameProject.setShortcut("Ctrl+R")
         self.menuFile.addAction(self.actionRenameProject)
+
+#       Edit menu
+        self.actionUndo = QtWidgets.QAction("Undo (coming soon)", self)
+        #self.actionUndo.triggered.connect(self.triggerUndo)
+        self.actionUndo.setShortcut("Ctrl+Z")
+        self.menuEdit.addAction(self.actionUndo)
+        self.actionDarkmode = QtWidgets.QAction("Toggle Darkmoode", self)
+        self.actionDarkmode.triggered.connect(self.triggerDarkmode)
+        self.actionDarkmode.setShortcut("Ctrl+D")
+        self.menuEdit.addAction(self.actionDarkmode)
 
 #       Data menu
         self.actionAddData = QtWidgets.QAction("Add data files", self)
@@ -859,6 +874,20 @@ class UIsub(Ui_MainWindow):
 
 
 # trigger functions TODO: break out the big ones to separate functions!
+
+    def triggerDarkmode(self):
+        self.usage("triggerDarkmode")
+        uistate.darkmode = not uistate.darkmode
+        uistate.save_cfg(projectfolder=self.dict_folders['project'])
+        if self.mainwindow.styleSheet() == "":
+            self.mainwindow.setStyleSheet("background-color: #333; color: #fff;")
+        else:
+            self.mainwindow.setStyleSheet("")
+        uiplot.styleUpdate()
+        self.main_canvas_mean.draw()
+        self.main_canvas_output.draw()
+
+        self.tableFormat()
 
     def pushButton_paired_data_flip_pressed(self):
         self.usage("pushButton_paired_data_flip_pressed")
@@ -1544,6 +1573,25 @@ class UIsub(Ui_MainWindow):
         self.tableProj.setMinimumWidth(total_width)
         for index in selected_rows:
             self.tableProj.selectionModel().select(index, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
+        if uistate.darkmode:
+            #self.mainWindow.setStyleSheet("background-color: #333; color: #FFF;")
+            self.tableProj.setStyleSheet("""
+                QTableView::item:selected {
+                    background-color: #555;
+                    color: #FFF;
+                }
+                QHeaderView::section {
+                    background-color: #333;
+                    color: #FFF;
+                }
+                QTableCornerButton::section {
+                    background-color: #333;
+                    color: #FFF;
+                }
+            """)
+        else:
+            self.tableProj.setStyleSheet("")
+        #self.tableProj.verticalHeader().setStyleSheet("color: #FFF; background-color: #333;")
         self.setButtonParse()
     
     def tableUpdate(self):
@@ -1809,7 +1857,6 @@ class UIsub(Ui_MainWindow):
         if not hasattr(self, 'scroll_event_connected') or not self.scroll_event_connected:
             self.main_canvas_mean.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphMean, canvas=self.main_canvas_mean, ax1=self.main_canvas_mean.axes))
             self.main_canvas_output.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.main_canvas_output, ax1=uistate.ax1, ax2=uistate.ax1))
-
             self.scroll_event_connected = True
         self.graphMainPreload()
 
@@ -1846,7 +1893,7 @@ class UIsub(Ui_MainWindow):
             uiplot.graphRefresh()
             return
         if df is None: # unless fed a specific row, (re)plot the whole df_project
-            df_imported = uistate.recs2plot()
+            df_imported = uistate.df_recs2plot()
         if df_imported.empty:
             print("graphUpdate: df_p is empty")
             return
@@ -1881,12 +1928,12 @@ class UIsub(Ui_MainWindow):
 
     def graphGroups(self): # check if groups need to be updated, call uiplot.addGroup as needed
         self.usage("graphGroups")
-# TODO NOW: make functional
         df_p = self.get_df_project()
         list_groups = []
         for i in uistate.selected:
             list_groups.extend(df_p.loc[i, 'group_IDs'].split(","))
-        list_groups = list(set(list_groups))
+        # Filter out ' ' and convert to set to remove duplicates
+        list_groups = list(set(group for group in list_groups if group.strip() != ''))
         print(f"list_groups: {list_groups}")
         for group in list_groups:
             print(f"Group {group} is of type {type(group)}")
