@@ -1,4 +1,43 @@
 # Functions that are not in use anymore, but might be useful again in the future
+
+def label2idx(canvas, aspect): # Returns the index of the line labeled 'aspect' on 'canvas', or False if there is none.
+    dict_labels = {k.get_label(): v for (v, k) in enumerate(canvas.axes.lines)}
+    return dict_labels.get(aspect, False)
+
+def unPlot(canvas, *artists): # Remove line if it exists on canvas
+    #print(f"unPlot - canvas: {canvas}, artists: {artists}")
+    for artist in artists:
+        artists_on_canvas = canvas.axes.get_children()
+        if artist in artists_on_canvas:
+            #print(f"unPlot - removed artist: {artist}")
+            artist.remove()
+
+def outputAutoScale(ax, df, aspect): # Sets the y limits of ax to the min and max of df[aspect]
+    if aspect == "EPSP_amp":
+        ax.set_ylim(df['EPSP_amp'].min() - 0.1, df['EPSP_amp'].max() + 0.1)
+    elif aspect == "EPSP_slope":
+        ax.set_ylim(df['EPSP_slope'].min() - 0.1, df['EPSP_slope'].max() + 0.1)
+    else:
+        print(f"autoScale: {aspect} not supported.")
+
+
+def graphGroups(self): # check if groups need to be updated, call uiplot.addGroup as needed
+    self.usage("graphGroups")
+    df_p = self.get_df_project()
+    list_groups = []
+    for i in uistate.selected:
+        list_groups.extend(df_p.loc[i, 'group_IDs'].split(","))
+    # Filter out ' ' and convert to set to remove duplicates
+    list_groups = list(set(group for group in list_groups if group.strip() != ''))
+    print(f"list_groups: {list_groups}")
+    for group in list_groups:
+        print(f"Group {group} is of type {type(group)}")
+    # filter out groups that are not shown
+    list_groups = [group for group in list_groups if uistate.group_show[group]]
+    if list_groups:
+        for group in list_groups:
+            print(f"Adding group {group}")
+
 def setGraphGroups(self, ax1, ax2, list_color): # TODO: deprecate
     print(f"setGraphGroups: {self.dict_groups['list_ID']}")
     df_p = self.get_df_project()
@@ -33,7 +72,7 @@ def plotGroup(self, ax1, ax2, group, groupcolor, alpha=0.3): # TODO: deprecate
         ax2.fill_between(dfgroup_mean.sweep, dfgroup_mean.EPSP_slope_mean + dfgroup_mean.EPSP_slope_SEM, dfgroup_mean.EPSP_slope_mean - dfgroup_mean.EPSP_slope_SEM, alpha=0.3, color=groupcolor)
         ax2.axhline(y=0, linestyle=':', color=groupcolor, alpha = 0.4)
 
-#uisub.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2)
+    #uisub.setGraphSelected(df_analyzed=df_analyzed, ax1=ax1, ax2=ax2)
     # if just one selected, plot its group's mean
     # if len(df_analyzed) == 1:
     #     list_group = df_analyzed['groups'].iloc[0].split(',')
@@ -51,13 +90,13 @@ def plotGroup(self, ax1, ax2, group, groupcolor, alpha=0.3): # TODO: deprecate
 
 
 
-    '''         
-    @QtCore.pyqtSlot(list)
-    def slotPrintPaths(self, mypaths):
-        if verbose:
-            print(f"mystr: {mypaths}")
-        strmystr = "\n".join(sorted(["/".join(i.split("/")[-2:]) for i in mypaths]))
-        self.textBrowser.setText(strmystr)
-        list_display_names = ["/".join(i.split("/")[-2:]) for i in mypaths]
-        dftable = pd.DataFrame({"path_source": mypaths, "recording_name": list_display_names})
-    '''
+'''         
+@QtCore.pyqtSlot(list)
+def slotPrintPaths(self, mypaths):
+    if verbose:
+        print(f"mystr: {mypaths}")
+    strmystr = "\n".join(sorted(["/".join(i.split("/")[-2:]) for i in mypaths]))
+    self.textBrowser.setText(strmystr)
+    list_display_names = ["/".join(i.split("/")[-2:]) for i in mypaths]
+    dftable = pd.DataFrame({"path_source": mypaths, "recording_name": list_display_names})
+'''

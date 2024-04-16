@@ -701,13 +701,6 @@ class UIsub(Ui_MainWindow):
         # If local project.cfg exists, load it, otherwise create it
         uistate.load_cfg(projectfolder=self.dict_folders['project'], bw_version=version)
 
-        # If local groups.brainwash exists, load it, otherwise create it
-        groups_file = self.dict_folders['project'] / "groups.csv"
-        if groups_file.exists():
-            self.loadGroups()
-        else:
-            self.defaultGroups()
-
         # make the graphs scaleable
         self.graphMean.setLayout(QtWidgets.QVBoxLayout())
         self.main_canvas_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
@@ -814,9 +807,10 @@ class UIsub(Ui_MainWindow):
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
     def setUIstate(self):
+        print("setUIstate")
         # checkBoxes 
         for key, value in uistate.checkBox.items():
-            print(f"setting checkbox {key} to {value}")
+            print(f" - setting checkbox {key} to {value}")
             checkBox = getattr(self, f"checkBox_{key}")
             checkBox.setChecked(value)
         # These are currently handled elsewhere: TODO: move here?
@@ -827,11 +821,10 @@ class UIsub(Ui_MainWindow):
 
         # reset group controls
         self.removeGroupControls()
-        for group in self.df_groups['group_ID'].tolist():
-            print(f"adding group {group}")
-            if group not in uistate.group_show.keys():
-                uistate.group_show[group] = True
-            self.addGroupControls(group)
+        print (f"setUIstate: uistate.df_groups: {uistate.df_groups}")
+        for str_ID in uistate.df_groups['group_ID'].tolist():
+            print(f"setUIstate: adding group {str_ID}")
+            self.addGroupControls(str_ID)
 
     def build_dict_folders(self):
         dict_folders = {
@@ -903,43 +896,42 @@ class UIsub(Ui_MainWindow):
         # Placeholder: For now, delete all buttons and groups
         # clearGroupsByRow on ALL rows of df_project
         self.removeGroupControls()
-        self.defaultGroups()
+        self.groupsClear()
         self.tableUpdate()
         self.updateMouseover()
 
     def triggerNewGroup(self):
         self.usage("triggerNewGroup")
-        if len(self.df_groups) > 8: # TODO: hardcoded max nr of groups: move to bw cfg
+        df_groups = uistate.df_groups
+        if len(df_groups) > 8: # TODO: hardcoded max nr of groups: move to bw cfg
             print("Maximum of 9 groups allowed for now.")
             return
         i = 1 # start at 1; no group_0
-        while str(i) in self.df_groups['group_ID'].values:
+        while str(i) in df_groups['group_ID'].values:
             i += 1
         str_ID = str(i)
-        new_group = pd.Series({'group_ID': str_ID, 'group_name': f"group {str_ID}", 'color': uistate.colors[i-1]})
-        self.df_groups = pd.concat([self.df_groups, new_group.to_frame().T]).reset_index(drop=True)
-        print(f"self.df_groups: {self.df_groups}")
-        uistate.group_show[str_ID] = True # add show group to uistate
-        self.saveGroups()
+        new_group = pd.Series({'group_ID': str_ID, 'group_name': f"group {str_ID}", 'color': uistate.colors[i-1], 'show': "True"})
+        uistate.df_groups = pd.concat([df_groups, new_group.to_frame().T]).reset_index(drop=True)
+        print(f" - uistate.df_groups: {uistate.df_groups}")
+        uistate.save_cfg(projectfolder=self.dict_folders['project'])
         self.addGroupControls(str_ID)
 
     def triggerRemoveLastGroup(self):
         self.usage("triggerRemoveLastGroup")
-        if not self.df_groups.empty:  # Check if the DataFrame is not empty
-            group__ID_to_remove = self.df_groups.iloc[-1]['group_ID']
+        if not uistate.df_groups.empty:  # Check if the DataFrame is not empty
+            group__ID_to_remove = uistate.df_groups.iloc[-1]['group_ID']
             self.removeGroupControls(group__ID_to_remove)
-            self.df_groups.drop(self.df_groups.index[-1], inplace=True)
-            uistate.group_show.popitem() # remove last item from uistate.group_show
-            self.saveGroups()
+            uistate.df_groups.drop(uistate.df_groups.index[-1], inplace=True)
+            uistate.save_cfg(projectfolder=self.dict_folders['project'])
             self.removeFromGroup(group__ID_to_remove, self.get_df_project().index)
 
     def triggerRemoveLastEmptyGroup(self):
         self.usage("triggerRemoveLastEmptyGroup")
-        if len(self.df_groups) < 1:  # Check if the DataFrame is not empty
+        if len(uistate.df_groups) < 1:  # Check if the DataFrame is not empty
             print("No groups to remove.")
             return
         df_p = self.get_df_project()
-        group_to_remove = str(self.df_groups.iloc[-1]['group_ID'])
+        group_to_remove = str(uistate.df_groups.iloc[-1]['group_ID'])
         print(f"Removing group {group_to_remove}...")
         if df_p['group_IDs'].str.contains(group_to_remove).any():
             print(f"{group_to_remove} is not empty.")
@@ -1079,7 +1071,6 @@ class UIsub(Ui_MainWindow):
             self.updateMouseover()
         else:
             uiplot.graphRefresh()
-        self.graphGroups()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
         report()
 
@@ -1088,7 +1079,7 @@ class UIsub(Ui_MainWindow):
         uistate.checkBox['paired_stims'] = bool(state)
         print(f"checkBox_paired_stims_changed: {uistate.checkBox['paired_stims']}")
         self.pushButton_paired_data_flip.setEnabled(uistate.checkBox['paired_stims'])
-        self.purgeGroupCache(*self.df_groups['group_ID'].tolist())
+        self.purgeGroupCache(*uistate.df_groups['group_ID'].tolist())
         uistate.save_cfg()
         self.tableFormat()
         self.updateMouseover()
@@ -1116,7 +1107,7 @@ class UIsub(Ui_MainWindow):
         lineEdit.setText(str(num))
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
         self.normOutputs() # ...of all recordings in df_p
-        self.purgeGroupCache(*self.df_groups['group_ID'].tolist())
+        self.purgeGroupCache(*uistate.df_groups['group_ID'].tolist())
         self.tableFormat()
         # cycle through all selected recordings and update norm outputs
         for idx in uistate.selected:
@@ -1341,49 +1332,37 @@ class UIsub(Ui_MainWindow):
 
 # Data Group functions
 
-    def defaultGroups(self):
+    def groupsClear(self):
         # Generate a list of 9 colors for groups, hex format
-        self.df_groups = pd.DataFrame(columns=['group_ID', 'group_name', 'color'])
+        uistate.df_groups = pd.DataFrame(columns=['group_ID', 'group_name', 'color', 'show'])
         df_p = self.get_df_project()
         self.clearGroupsByRow(df_p.index) # clear all groups from all rows in df_project
-        uistate.group_show = {}
-        self.saveGroups()
-
-    def saveGroups(self):
-        path_groups = self.dict_folders['project'] / "groups.csv"
-        if not path_groups.parent.exists():
-            path_groups.parent.mkdir(parents=True, exist_ok=True)
-        self.df_groups.to_csv(str(path_groups), index=False)
-
-    def loadGroups(self):
-        path_groups = self.dict_folders['project'] / "groups.csv"
-        if path_groups.exists():
-            self.df_groups = pd.read_csv(str(path_groups))
-            self.df_groups = self.df_groups.astype(str) # force string format
-        else:
-            self.defaultGroups()
-        if uistate.group_show == {}:
-            for group_id in self.df_groups['group_ID']:
-                uistate.group_show[str(group_id)] = True
+        uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
     def addGroupControls(self, str_ID): # Create menu for adding to group and checkbox for showing group
-        group = f"group_{str_ID}"
-        print(f"addGroupControls: {group}, i: {str_ID}")
-        print(f"df_groups: {self.df_groups}")
-        color = self.df_groups.loc[int(str_ID)-1, 'color']
-        print(f"addGroupControls: {group}, {color}")
-        setattr(self, f"actionAddTo_{group}", QtWidgets.QAction(f"Add selection to {group}", self))
-        self.new_group_menu_item = getattr(self, f"actionAddTo_{group}")
+        group_name = f"group_{str_ID}" # backend group name for object naming
+        print(f"addGroupControls, str_ID: {str_ID}, type: {type(str_ID)} group_name: {group_name}")
+        dict_row = uistate.df_groups.loc[uistate.df_groups['group_ID'] == str_ID].to_dict(orient='records')[0]
+        if not dict_row:
+            print(f"addGroupControls: {str_ID} not found in uistate.df_groups:")
+            print(uistate.df_groups)
+            return
+        for column, value in dict_row.items():
+            print(f"Column: {column}, Value: {value}, Type: {type(value)}")
+        color = dict_row['color']
+        print(f"addGroupControls: {group_name}, {color}, type: {type(color)}")
+        setattr(self, f"actionAddTo_{group_name}", QtWidgets.QAction(f"Add selection to {group_name}", self))
+        self.new_group_menu_item = getattr(self, f"actionAddTo_{group_name}")
         self.new_group_menu_item.triggered.connect(lambda checked, add_group_ID=str_ID: self.addToGroup(add_group_ID))
         self.new_group_menu_item.setShortcut(f"{str_ID}")
         self.menuGroups.addAction(self.new_group_menu_item)                    
-        self.new_checkbox = QtWidgets.QCheckBox(group, self.centralwidget)
-        self.new_checkbox.setObjectName(group)
-        self.new_checkbox.setText(group)
-        self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the text color
+        self.new_checkbox = QtWidgets.QCheckBox(group_name, self.centralwidget)
+        self.new_checkbox.setObjectName(group_name)
+        self.new_checkbox.setText(group_name)
+        self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the background color
         self.new_checkbox.setMaximumWidth(100)  # Set the maximum width
-        self.new_checkbox.setChecked(uistate.group_show[str_ID])
-        self.new_checkbox.stateChanged.connect(lambda state, group=group: self.groupCheckboxChanged(state, group))
+        self.new_checkbox.setChecked(bool(dict_row['show']))
+        self.new_checkbox.stateChanged.connect(lambda state, str_ID=str_ID: self.groupCheckboxChanged(state, str_ID))
         self.horizontalLayoutGroups.addWidget(self.new_checkbox)
 
     def removeGroupControls(self, i=None):
@@ -1402,10 +1381,10 @@ class UIsub(Ui_MainWindow):
                 self.menuGroups.removeAction(action)
                 delattr(self, f"actionAddTo_{group}")
 
-    def groupCheckboxChanged(self, state, group):
+    def groupCheckboxChanged(self, state, str_ID):
         if verbose:
-            print(f"groupCheckboxChanged: {state}, {group}")
-        uistate.group_show[group] = state == 2
+            print(f"groupCheckboxChanged: {str_ID} = {state}")
+        uistate.df_group.loc[uistate.df_groups['group_ID'] == str_ID, 'show'] = str(state == 2)
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
         self.updateMouseover()
 
@@ -1557,7 +1536,6 @@ class UIsub(Ui_MainWindow):
         self.projectname = self.dict_folders['project'].stem
         self.dict_folders = self.build_dict_folders()
         self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"))
-        self.loadGroups()
         uistate.load_cfg(self.dict_folders['project'], version)
         self.setUIstate()
         self.tableFormat()
@@ -1587,14 +1565,14 @@ class UIsub(Ui_MainWindow):
         # hide all columns except these:
         list_show = [   
                         df_p.columns.get_loc('recording_name'),
-#                        df_p.columns.get_loc('groups'),
-                        #df_p.columns.get_loc('group_IDs'),
+                        df_p.columns.get_loc('groups'),
+                        df_p.columns.get_loc('group_IDs'),
                         df_p.columns.get_loc('sweeps'),
 
 #                        df_p.columns.get_loc('t_EPSP_amp'),
 #                        df_p.columns.get_loc('t_EPSP_amp_method'),
-                        df_p.columns.get_loc('t_EPSP_slope_start'),
-                        df_p.columns.get_loc('t_EPSP_slope_end'),
+#                        df_p.columns.get_loc('t_EPSP_slope_start'),
+#                        df_p.columns.get_loc('t_EPSP_slope_end'),
 #                        df_p.columns.get_loc('t_EPSP_slope_width'),
 #                        df_p.columns.get_loc('t_EPSP_slope_halfwidth'),
 #                        df_p.columns.get_loc('t_EPSP_slope_method'),
@@ -1908,6 +1886,13 @@ class UIsub(Ui_MainWindow):
             row = df_p.loc[i] # get_dfoutput updates df_project - update row!
             uiplot.addRow(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
             print(f"Preloaded {row['recording_name']}")
+        df_group_show = uistate.df_groups[uistate.df_groups['show'] == 'True']
+        for index, df_group_row in df_group_show.iterrows():
+            str_ID = df_group_row['group_ID']
+            print(f"Preloaded group {str_ID}, name: {df_group_row['group_name']}")
+            groupmean = self.get_dfgroupmean(str_ID=str_ID)
+            uiplot.addGroup(df_group_row, groupmean)
+
         print(f"Preloaded recordings in {time.time()-t0:.2f} seconds.")
         uiplot.graphRefresh()
 
@@ -1956,23 +1941,6 @@ class UIsub(Ui_MainWindow):
             row = df_p[df_p['recording_name'] == rec].iloc[0]
             uiplot.addRow(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
         uiplot.graphRefresh()
-
-    def graphGroups(self): # check if groups need to be updated, call uiplot.addGroup as needed
-        self.usage("graphGroups")
-        df_p = self.get_df_project()
-        list_groups = []
-        for i in uistate.selected:
-            list_groups.extend(df_p.loc[i, 'group_IDs'].split(","))
-        # Filter out ' ' and convert to set to remove duplicates
-        list_groups = list(set(group for group in list_groups if group.strip() != ''))
-        print(f"list_groups: {list_groups}")
-        for group in list_groups:
-            print(f"Group {group} is of type {type(group)}")
-        # filter out groups that are not shown
-        list_groups = [group for group in list_groups if uistate.group_show[group]]
-        if list_groups:
-            for group in list_groups:
-                print(f"Adding group {group}")
 
     def updateMouseover(self):
         # drop any prior mouseover event connections and plots

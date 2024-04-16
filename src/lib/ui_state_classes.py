@@ -1,3 +1,4 @@
+import pandas as pd
 import pickle
 
 class UIstate:
@@ -9,8 +10,7 @@ class UIstate:
         self.version = "0.0.0"
         self.colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000']
         self.darkmode = False
-        self.changed = [] # TODO: not used yet: meant to be a list of what needs to be updated, even if they are already on an axis
-        self.group_show = {}
+        self.df_groups = pd.DataFrame(columns=['group_ID', 'group_name', 'color', 'show'])
         self.checkBox = {
             'EPSP_amp': False,
             'EPSP_slope': True,
@@ -197,8 +197,7 @@ class UIstate:
                 'version': self.version,
                 'darkmode': self.darkmode,
                 'selected': self.selected,
-                'changed': self.changed,
-                'group_show': self.group_show,
+                'df_groups': self.df_groups,
                 'checkBox': self.checkBox,
                 'lineEdit': self.lineEdit,
                 'zoom': self.zoom,
@@ -210,8 +209,7 @@ class UIstate:
     def set_state(self, state):
         self.version = state.get('version')
         self.darkmode = state.get('darkmode')
-        self.changed = state.get('changed')
-        self.group_show = state.get('group_show')
+        self.df_groups = state.get('df_groups')
         self.checkBox = state.get('checkBox')
         self.lineEdit = state.get('lineEdit')
         self.zoom = state.get('zoom')
@@ -237,6 +235,7 @@ class UIstate:
                     print("Patch version mismatch: Minor changes may not load correctly")
         else:
             self.save_cfg(projectfolder, bw_version)
+        print(f" *** loaded df_groups: {self.df_groups}")
 
     def save_cfg(self, projectfolder, bw_version=None): # save state to project config file
         path_pkl = projectfolder / "cfg.pkl"
