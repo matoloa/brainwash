@@ -1,5 +1,5 @@
 # Functions that are not in use anymore, but might be useful again in the future
-
+'''
 def label2idx(canvas, aspect): # Returns the index of the line labeled 'aspect' on 'canvas', or False if there is none.
     dict_labels = {k.get_label(): v for (v, k) in enumerate(canvas.axes.lines)}
     return dict_labels.get(aspect, False)
@@ -90,7 +90,7 @@ def plotGroup(self, ax1, ax2, group, groupcolor, alpha=0.3): # TODO: deprecate
 
 
 
-'''         
+         
 @QtCore.pyqtSlot(list)
 def slotPrintPaths(self, mypaths):
     if verbose:

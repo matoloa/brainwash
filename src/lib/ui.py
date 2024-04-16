@@ -719,6 +719,7 @@ class UIsub(Ui_MainWindow):
         selection_model = self.tableProj.selectionModel()
         selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
 
+        self.groupControlsRefresh() # add group controls to UI
         self.connectUIstate() # connect UI elements to uistate
 
         # connect paired stim checkbox and flip button to local functions
@@ -1014,7 +1015,6 @@ class UIsub(Ui_MainWindow):
         path_talkback = Path(f"{self.projects_folder}/talkback/talkback_meta_{row['ID']}.csv")
         with open(path_talkback, 'w') as f:
             json.dump(dict_event, f)
-
 
     def darkmode(self):
         if uistate.darkmode:
@@ -1397,6 +1397,8 @@ class UIsub(Ui_MainWindow):
             self.save_df_project()
             self.purgeGroupCache(add_group_ID)
             self.tableUpdate()
+            uiplot.unPlot(add_group_ID) # TODO: This is a temporary fix. It should be handled by graphUpdate; set data rather than unPlot.
+            self.graphUpdate()
             self.updateMouseover()
         else:
             print("No files selected.")
@@ -1872,16 +1874,31 @@ class UIsub(Ui_MainWindow):
             row = df_p.loc[i] # get_dfoutput updates df_project - update row!
             uiplot.addRow(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
             print(f"Preloaded {row['recording_name']}")
-        df_group_show = uistate.df_groups[uistate.df_groups['show'] == 'True']
-        for index, df_group_row in df_group_show.iterrows():
-            str_ID = df_group_row['group_ID']
-            print(f"Preloaded group {str_ID}, name: {df_group_row['group_name']}")
-            groupmean = self.get_dfgroupmean(str_ID=str_ID)
-            uiplot.addGroup(df_group_row, groupmean)
+        self.graphGroups()
         print(f"Preloaded recordings and groups in {time.time()-t0:.2f} seconds.")
         uiplot.graphRefresh()
 
+    def graphGroups(self):
+        print("graphGroups")
+        df_group_show = uistate.df_groups[uistate.df_groups['show'] == 'True']
+        df_p = self.get_df_project()
+        list_all_groups = ' '.join(self.df_project['group_IDs'].astype(str))
+        set_all_groups = set(re.findall(r'\b\w+\b', list_all_groups))
+        for index, df_group_row in df_group_show.iterrows():
+            str_ID = df_group_row['group_ID']
+            if str_ID not in uistate.dict_label_ID_line.values(): # already plotted?
+                if str_ID in set_all_groups: # group has recordings?
+                    df_groupmean = self.get_dfgroupmean(str_ID=str_ID)
+                    uiplot.addGroup(df_group_row, df_groupmean)
+                    print(f"Loaded group {str_ID}, name: {df_group_row['group_name']}")
+                else:
+                    print(f"Group {str_ID} has no recordings.")
+            else:
+                print(f"Group {str_ID} already plotted.")
+
+
     def graphUpdate(self, df=None, row=None): # TODO: allow update of only specific row
+        self.graphGroups()
         if row is not None: # process a specific row
             dfmean = self.get_dfmean(row=row)
             if uistate.checkBox['paired_stims']:

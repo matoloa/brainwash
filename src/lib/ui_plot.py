@@ -8,8 +8,6 @@ class UIplot():
     def __init__(self, uistate):
         self.uistate = uistate
         print(f"UIplot instantiated {self.uistate.anyView()}")
-        if uistate.darkmode:
-            self.styleUpdate()
     
     def styleUpdate(self):
         axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
@@ -41,6 +39,14 @@ class UIplot():
             if legend is not None:
                 legend.remove()
         print("All lines hidden")
+
+    def unPlot(self, rec_ID):
+        list_unplot = [value[1] for value in self.uistate.dict_label_ID_line.values() if rec_ID == value[0]]
+        i = 0
+        for line in list_unplot:
+            i += 1
+            line.remove()
+        print(f"unPlot: {rec_ID}, {i} lines removed.")
 
     def purge(self, rec):
         axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
@@ -74,9 +80,11 @@ class UIplot():
             ax2_legend = self.set_visible_get_legend(axis=ax2, show=uistate.to_ax2(uistate.df_recs2plot))
             ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
 
-        for label, line in uistate.dict_group_output_lines.items():
-            line.set_visible(True)
-            print(f"Setting visibility of {label}")
+        for label, ID_line in uistate.dict_label_ID_line.items():
+            rec_ID = ID_line[0]
+            str_show = uistate.df_groups.loc[uistate.df_groups['group_ID'] == rec_ID, 'show'].values[0]
+            show = bool(str_show == 'True')
+            ID_line[1].set_visible(show)
 
         # arrange axes and labels
         axm.set_xlabel("Time (s)")
@@ -202,37 +210,18 @@ class UIplot():
             plotted.append(subplot)
             ax2.axhline(y=volley_slope_mean, color='blue', alpha = 0.3, label=subplot)
 
-    def addGroup(self, df_group_row, groupmean):
-        axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
-        df = groupmean
+    def addGroup(self, df_group_row, df_groupmean):
+        ax1, ax2 = self.uistate.ax1, self.uistate.ax2
+        group_ID = df_group_row['group_ID']
         group_name = df_group_row['group_name']
         color = df_group_row['color']
         print(f"addGroup - df_group_row: {df_group_row}")
         label = f"{group_name} EPSP slope"
-        _ = sns.lineplot(ax=ax2, data=df, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label=label)
-        self.uistate.dict_group_output_lines[label] = ax2.lines[-1]
-        #_ = sns.lineplot(ax=ax1, data=df, y='EPSP_amp_mean', x="sweep", color=color, alpha=0.5, label="EPSP amp")
-        #_ = sns.lineplot(ax=ax1, data=df, y='volley_amp_mean', x="sweep", color=color, alpha=0.5, label="volley amp")
-        #_ = sns.lineplot(ax=ax2, data=df, y='volley_slope_mean', x="sweep", color=color, alpha=0.5, label="volley slope")
-        #_ = sns.lineplot(ax=ax2, data=df, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label="EPSP slope")
-
-      # # Below is the instruction to plot groups. TODO: Move to a separate functions
-        # if len(uistate.group_show) < 1:
-        #     return
-        
-        # if df_parsed_selection.empty: # If df is empty, get all group_IDs from uisub.df_groups
-        #     group_IDs_to_plot = uisub.df_groups['group_ID'].tolist()
-        #     df_groups = uisub.df_groups
-        # else: # If df is not empty, get group_IDs from df (selected and parsed rows)
-        #     group_IDs_to_plot = df_parsed_selection['group_IDs'].str.split(',').sum()
-        #     df_groups = uisub.df_groups[uisub.df_groups['group_ID'].isin(group_IDs_to_plot)]
-        # print(f"group_IDs_to_plot: {group_IDs_to_plot}")
-        # for str_ID in group_IDs_to_plot:
-        #     uisub.get_dfgroupmean(str_ID)
-        # self.graphGroups(df_groups, uisub.dict_group_means, ax1, ax2)
-        # make a list of group_IDs in selection
-
-        # self.graphRefresh()
+        _ = sns.lineplot(ax=ax2, data=df_groupmean, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label=label)
+        self.uistate.dict_label_ID_line[label] = group_ID, ax2.lines[-1]
+        label = f"{group_name} EPSP amp"
+        _ = sns.lineplot(ax=ax1, data=df_groupmean, y='EPSP_amp_mean', x="sweep", color=color, alpha=0.5, linestyle='--', label=label)
+        self.uistate.dict_label_ID_line[label] = group_ID, ax1.lines[-1]
 
     def plotUpdate(self, row, aspect, dfmean, mouseover_out, axm, ax_out, norm=False):
         rec_filter = row['filter']  # the filter currently used for this recording
