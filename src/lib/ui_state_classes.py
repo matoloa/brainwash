@@ -52,6 +52,7 @@ class UIstate:
         self.selected = [] # list of selected indices
         self.df_recs2plot = None # df_project copy; all PARSED recordings (if any are selected, only selected ones)
         self.plotted = {} # dict: key=name (meanplot), value=[subplots]
+        self.dict_group_output_lines = {} # dict: key=label, value=line
         self.row_copy = None # copy of selected row from df_project
         self.mouseover_action = None # name of action to take if clicked at current mouseover: EPSP amp move, EPSP slope move/resize, volley amp move, volley slope move/resize
         self.mouseover_plot = None # plot of tentative EPSP slope

@@ -74,6 +74,10 @@ class UIplot():
             ax2_legend = self.set_visible_get_legend(axis=ax2, show=uistate.to_ax2(uistate.df_recs2plot))
             ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
 
+        for label, line in uistate.dict_group_output_lines.items():
+            line.set_visible(True)
+            print(f"Setting visibility of {label}")
+
         # arrange axes and labels
         axm.set_xlabel("Time (s)")
         axm.set_ylabel("Voltage (V)")
@@ -158,11 +162,9 @@ class UIplot():
             _ = sns.lineplot(ax=ax1, data=out, y='EPSP_amp', x="sweep", color="green", linestyle='--', alpha=0.5, label=subplot)
             if 'EPSP_amp_norm' in out.columns:
                 subplot = f"{label} EPSP amp norm"
-                print(f"EPSP_amp_norm in {rec_name} out")
+                #print(f"EPSP_amp_norm in {rec_name} out")
                 plotted.append(subplot)
                 _ = sns.lineplot(ax=ax1, data=out, y='EPSP_amp_norm', x="sweep", color="green", linestyle='--', alpha=0.5, label=subplot)
-            else:
-                print(f"EPSP_amp_norm not in {rec_name} out")
         if not np.isnan(t_EPSP_slope_start):
             x_start = t_EPSP_slope_start
             x_end = t_EPSP_slope_end
@@ -177,11 +179,9 @@ class UIplot():
             #if out has the column 'EPSP_slope_norm', plot it
             if 'EPSP_slope_norm' in out.columns:
                 subplot = f"{label} EPSP slope norm"
-                print(f"EPSP_slope_norm in {rec_name} out")
+                #print(f"EPSP_slope_norm in {rec_name} out")
                 plotted.append(subplot)
                 _ = sns.lineplot(ax=ax2, data=out, y='EPSP_slope_norm', x="sweep", color="green", alpha = 0.3, label=subplot)
-            else:
-                print(f"EPSP_slope_norm not in {rec_name} out")
         if not np.isnan(t_volley_amp):
             y_position = dfmean.loc[dfmean.time == t_volley_amp, rec_filter]
             subplot = f"{label} volley amp marker"
@@ -204,13 +204,17 @@ class UIplot():
 
     def addGroup(self, df_group_row, groupmean):
         axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
-        # cycle through the rows of df_groups and print the group_ID, group_name, and color for each one
+        df = groupmean
+        group_name = df_group_row['group_name']
+        color = df_group_row['color']
         print(f"addGroup - df_group_row: {df_group_row}")
-            #_ = sns.lineplot(ax=ax2, data=df, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label=f"{group_name} EPSP slope")
-            #_ = sns.lineplot(ax=ax1, data=df, y='EPSP_amp_mean', x="sweep", color=color, alpha=0.5, label="EPSP amp")
-            #_ = sns.lineplot(ax=ax1, data=df, y='volley_amp_mean', x="sweep", color=color, alpha=0.5, label="volley amp")
-            #_ = sns.lineplot(ax=ax2, data=df, y='volley_slope_mean', x="sweep", color=color, alpha=0.5, label="volley slope")
-            #_ = sns.lineplot(ax=ax2, data=df, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label="EPSP slope")
+        label = f"{group_name} EPSP slope"
+        _ = sns.lineplot(ax=ax2, data=df, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label=label)
+        self.uistate.dict_group_output_lines[label] = ax2.lines[-1]
+        #_ = sns.lineplot(ax=ax1, data=df, y='EPSP_amp_mean', x="sweep", color=color, alpha=0.5, label="EPSP amp")
+        #_ = sns.lineplot(ax=ax1, data=df, y='volley_amp_mean', x="sweep", color=color, alpha=0.5, label="volley amp")
+        #_ = sns.lineplot(ax=ax2, data=df, y='volley_slope_mean', x="sweep", color=color, alpha=0.5, label="volley slope")
+        #_ = sns.lineplot(ax=ax2, data=df, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label="EPSP slope")
 
       # # Below is the instruction to plot groups. TODO: Move to a separate functions
         # if len(uistate.group_show) < 1:

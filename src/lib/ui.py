@@ -780,7 +780,7 @@ class UIsub(Ui_MainWindow):
     def connectUIstate(self): # Connect UI elements to uistate
         # checkBoxes 
         for key, value in uistate.checkBox.items():
-            print(f"connecting checkbox {key} to {value}")
+            print(f" - connecting checkbox {key} to {value}")
             checkBox = getattr(self, f"checkBox_{key}")
             checkBox.setChecked(value)
             checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
@@ -806,24 +806,11 @@ class UIsub(Ui_MainWindow):
         self.updateMouseover()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
-    def setUIstate(self):
-        print("setUIstate")
-        # checkBoxes 
-        for key, value in uistate.checkBox.items():
-            print(f" - setting checkbox {key} to {value}")
-            checkBox = getattr(self, f"checkBox_{key}")
-            checkBox.setChecked(value)
-        # These are currently handled elsewhere: TODO: move here?
-        # lineEdits
-        # pushButtons
-        # comboBoxes
-        # mods?...
-
-        # reset group controls
+    def groupControlsRefresh(self):
         self.removeGroupControls()
-        print (f"setUIstate: uistate.df_groups: {uistate.df_groups}")
+        print (f"groupControlsRefresh: uistate.df_groups: {uistate.df_groups}")
         for str_ID in uistate.df_groups['group_ID'].tolist():
-            print(f"setUIstate: adding group {str_ID}")
+            print(f" - adding group {str_ID}")
             self.addGroupControls(str_ID)
 
     def build_dict_folders(self):
@@ -985,6 +972,8 @@ class UIsub(Ui_MainWindow):
                 print(f"Projectfolder exists, loading project")
             self.dict_folders['project'] = Path(projectfolder)
             self.load_df_project()
+            self.connectUIstate()
+            self.groupControlsRefresh()
             self.mainwindow.setWindowTitle(f"Brainwash {version} - {self.projectname}")
 
     def triggerAddData(self): # creates file tree for file selection
@@ -1347,10 +1336,8 @@ class UIsub(Ui_MainWindow):
             print(f"addGroupControls: {str_ID} not found in uistate.df_groups:")
             print(uistate.df_groups)
             return
-        for column, value in dict_row.items():
-            print(f"Column: {column}, Value: {value}, Type: {type(value)}")
         color = dict_row['color']
-        print(f"addGroupControls: {group_name}, {color}, type: {type(color)}")
+        # print(f"addGroupControls: {group_name}, {color}, type: {type(color)}")
         setattr(self, f"actionAddTo_{group_name}", QtWidgets.QAction(f"Add selection to {group_name}", self))
         self.new_group_menu_item = getattr(self, f"actionAddTo_{group_name}")
         self.new_group_menu_item.triggered.connect(lambda checked, add_group_ID=str_ID: self.addToGroup(add_group_ID))
@@ -1384,7 +1371,7 @@ class UIsub(Ui_MainWindow):
     def groupCheckboxChanged(self, state, str_ID):
         if verbose:
             print(f"groupCheckboxChanged: {str_ID} = {state}")
-        uistate.df_group.loc[uistate.df_groups['group_ID'] == str_ID, 'show'] = str(state == 2)
+        uistate.df_groups.loc[uistate.df_groups['group_ID'] == str_ID, 'show'] = str(state == 2)
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
         self.updateMouseover()
 
@@ -1537,7 +1524,6 @@ class UIsub(Ui_MainWindow):
         self.dict_folders = self.build_dict_folders()
         self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"))
         uistate.load_cfg(self.dict_folders['project'], version)
-        self.setUIstate()
         self.tableFormat()
         self.write_bw_cfg()
 
@@ -1777,7 +1763,7 @@ class UIsub(Ui_MainWindow):
             df_p = self.df_project
             # create dfgroup_IDs. containing ONLY lines that have key group in their group_IDs
             dfgroup_IDs = df_p[df_p['group_IDs'].str.contains(str_ID, na=False)]
-            print(f"dfgroup_IDs: {dfgroup_IDs}")
+            # print(f"dfgroup_IDs: {dfgroup_IDs}")
             dfs = []
             list_pairs = [] # prevent diff duplicates
             for i, row in dfgroup_IDs.iterrows():
@@ -1892,8 +1878,7 @@ class UIsub(Ui_MainWindow):
             print(f"Preloaded group {str_ID}, name: {df_group_row['group_name']}")
             groupmean = self.get_dfgroupmean(str_ID=str_ID)
             uiplot.addGroup(df_group_row, groupmean)
-
-        print(f"Preloaded recordings in {time.time()-t0:.2f} seconds.")
+        print(f"Preloaded recordings and groups in {time.time()-t0:.2f} seconds.")
         uiplot.graphRefresh()
 
     def graphUpdate(self, df=None, row=None): # TODO: allow update of only specific row
