@@ -207,7 +207,11 @@ class UIplot():
         _ = sns.lineplot(ax=ax1, data=df_groupmean, y='EPSP_amp_mean', x="sweep", color=color, alpha=0.5, linestyle='--', label=label)
         self.uistate.dict_group_label_ID_line[label] = group_ID, ax1.lines[-1]
 
-    def plotUpdate(self, row, aspect, dfmean, mouseover_out, axm, ax_out, norm=False):
+
+    def plotUpdate(self, row, aspect, dfmean):
+        ax1, ax2 = self.uistate.ax1, self.uistate.ax2
+        mouseover_out = self.uistate.mouseover_out
+        norm = self.uistate.checkBox['norm_EPSP']
         rec_filter = row['filter']  # the filter currently used for this recording
         plot_to_update = f"{row['recording_name']} {aspect} marker"
 
@@ -216,24 +220,28 @@ class UIplot():
             x_end = row[f't_{aspect.replace(" ", "_")}_end']
             y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
-            self.updateLine(axm, plot_to_update, [x_start, x_end], [y_start, y_end])
+            self.updateLine(plot_to_update, [x_start, x_end], [y_start, y_end])
             if aspect == 'volley slope':
-                self.updateOutMean(ax_out, aspect, row)
-
+                self.updateOutMean(ax2, aspect, row)
+            else:
+                if norm:
+                    self.updateOutLine(ax2, row, f"{aspect} norm")
+                else:
+                    self.updateOutLine(ax2, row, f"{aspect}")
         elif aspect in ['EPSP amp', 'volley amp']:
             t_amp = row[f't_{aspect.replace(" ", "_")}']
             y_position = dfmean.loc[dfmean.time == t_amp, rec_filter].item()
-            self.updateLine(axm, plot_to_update, t_amp, y_position)
+            self.updateLine(plot_to_update, t_amp, y_position)
             if aspect == 'volley amp':
-                self.updateOutMean(ax_out, aspect, row)
+                self.updateOutMean(ax1, aspect, row)
+            else:
+                if norm:
+                    self.updateOutLine(ax1, row, f"{aspect} norm")
+                else:
+                    self.updateOutLine(ax1, row, f"{aspect}")
 
-        if norm:
-            self.updateOutLine(ax_out, row, f"{aspect} norm", mouseover_out)
-        else:
-            self.updateOutLine(ax_out, row, aspect, mouseover_out)
 
-
-    def updateLine(self, axm, plot_to_update, x_data, y_data):
+    def updateLine(self, plot_to_update, x_data, y_data):
         axm = self.uistate.axm
         for line in axm.get_lines():
             if line.get_label() == plot_to_update:
@@ -242,7 +250,8 @@ class UIplot():
                 axm.figure.canvas.draw()
                 break
 
-    def updateOutLine(self, ax_out, row, aspect, mouseover_out):
+    def updateOutLine(self, ax_out, row, aspect):
+        mouseover_out = self.uistate.mouseover_out
         print(f"Updating {row['recording_name']} {aspect}")
         for line in ax_out.get_lines():
             if line.get_label() == f"{row['recording_name']} {aspect}":
@@ -259,7 +268,7 @@ class UIplot():
                 ax_out.figure.canvas.draw()
                 break
 
-    def updateEPSPout(self, rec_name, out, ax1, ax2):
+    def updateEPSPout(self, rec_name, out):
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
         for line in ax1.get_lines():
             if line.get_label() == f"{rec_name} EPSP amp":

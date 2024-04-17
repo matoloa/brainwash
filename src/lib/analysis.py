@@ -16,7 +16,7 @@ import time
 
 
 def valid(num):
-    print(f"num: {num}, type: {type(num)}")
+    #print(f"num: {num}, type: {type(num)}")
     return num is not None and not np.isnan(num)
 
 # %%

@@ -907,7 +907,7 @@ class UIsub(Ui_MainWindow):
                     row = self.get_df_project().loc[idx]
                     rec_name = row['recording_name']
                     out = self.dict_outputs[rec_name]
-                    uiplot.updateEPSPout(rec_name, out, uistate.ax1, uistate.ax1)
+                    uiplot.updateEPSPout(rec_name, out)
         self.updateMouseover()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
@@ -1212,7 +1212,7 @@ class UIsub(Ui_MainWindow):
             row = self.df_project.iloc[idx]
             rec_name = row['recording_name']
             out = self.get_dfoutput(row=row)
-            uiplot.updateEPSPout(rec_name, out, uistate.ax1, uistate.ax1)
+            uiplot.updateEPSPout(rec_name, out)
         print(f"editNormRange: {uistate.lineEdit['norm_EPSP_on']}")
     
 
@@ -2138,6 +2138,7 @@ class UIsub(Ui_MainWindow):
         if uistate.mouseover_out is not None:
             uistate.mouseover_out[0].remove()
             uistate.mouseover_out = None
+        uistate.mouseover_action = None
 
     def mainClicked(self, event, canvas, out=False): # maingraph click event
         x = event.xdata
@@ -2231,6 +2232,7 @@ class UIsub(Ui_MainWindow):
     def mainDragUpdate(self, x_start, x_end, precision): # update output; this is a separate function to allow the user to make it happen live (current) or on release (for low compute per data)
         dffilter = self.get_dffilter(row=uistate.row_copy)
         action = uistate.mouseover_action
+        
         if action.startswith("EPSP slope"):
             dict_t = { # only pass these values to build_dfoutput, so it won't rebuild unchanged values
                 't_EPSP_slope_start': x_start,
@@ -2242,9 +2244,9 @@ class UIsub(Ui_MainWindow):
             if uistate.mouseover_out is None:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_slope')
-                    uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_slope_norm'], color=color)
+                    uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['EPSP_slope_norm'], color=color)
                 else:
-                    uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_slope'], color=color)
+                    uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['EPSP_slope'], color=color)
             else:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_slope')
@@ -2276,7 +2278,7 @@ class UIsub(Ui_MainWindow):
             color = 'blue'
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
-                uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['volley_slope'], color=color)
+                uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['volley_slope'], color=color)
             else:
                 uistate.mouseover_out[0].set_data(out['sweep'], out['volley_slope'])
             dict_t['volley_slope_mean'] = out['volley_slope'].mean()
@@ -2290,7 +2292,7 @@ class UIsub(Ui_MainWindow):
             else:
                 uistate.mouseover_out[0].set_data(out['sweep'], out['volley_amp'])
             dict_t['volley_amp_mean'] = out['volley_amp'].mean()
-        
+
         if dict_t:
             uistate.row_copy.update(dict_t)
         self.main_canvas_output.draw()
@@ -2309,22 +2311,22 @@ class UIsub(Ui_MainWindow):
         
         if uistate.mouseover_action.startswith("EPSP slope"):
             uistate.row_copy['t_EPSP_slope_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP slope', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=uistate.axm, ax_out=uistate.ax1, norm=uistate.checkBox['norm_EPSP'])
+            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP slope', dfmean=self.dfmean)
             uistate.updateDragZones()
             dict_t = {'t_EPSP_slope_start': uistate.row_copy['t_EPSP_slope_start'], 't_EPSP_slope_end': uistate.row_copy['t_EPSP_slope_end']}
         elif uistate.mouseover_action == 'EPSP amp move':
             uistate.row_copy['t_EPSP_amp_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP amp', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=uistate.axm, ax_out=uistate.ax1, norm=uistate.checkBox['norm_EPSP'])
+            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP amp', dfmean=self.dfmean)
             uistate.updatePointDragZone()
             dict_t = {'t_EPSP_amp': uistate.row_copy['t_EPSP_amp']}
         elif uistate.mouseover_action.startswith("volley slope"):
             uistate.row_copy['t_volley_slope_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='volley slope', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=uistate.axm, ax_out=uistate.ax1)
+            uiplot.plotUpdate(row=uistate.row_copy, aspect='volley slope', dfmean=self.dfmean)
             uistate.updateDragZones()
             dict_t = {'t_volley_slope_start': uistate.row_copy['t_volley_slope_start'], 't_volley_slope_end': uistate.row_copy['t_volley_slope_end']}
         elif uistate.mouseover_action == 'volley amp move':
             uistate.row_copy['t_volley_amp_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='volley amp', dfmean=self.dfmean, mouseover_out=uistate.mouseover_out, axm=uistate.axm, ax_out=uistate.ax1)
+            uiplot.plotUpdate(row=uistate.row_copy, aspect='volley amp', dfmean=self.dfmean)
             uistate.updatePointDragZone()
             dict_t = {'t_volley_amp': uistate.row_copy['t_volley_amp']}
 
