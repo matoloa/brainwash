@@ -274,6 +274,33 @@ class ParseDataThread(QtCore.QThread):
                     self.rows.append(df_proj_new_row)
 
 
+class GraphMainPreloadThread(QtCore.QThread):
+    finished = QtCore.pyqtSignal()
+
+    def __init__(self, df_p, uistate, uiplot, uisub):
+        super().__init__()
+        self.df_p = df_p
+        self.uistate = uistate
+        self.uiplot = uiplot
+        self.uisub = uisub
+
+    def run(self):
+        df = self.df_p.loc[self.df_p['sweeps'] != "..."]
+        for i, row in df.iterrows():
+            dfmean = self.uisub.get_dfmean(row=row)
+            _ = self.uisub.get_dffilter(row=row) # cache for mouseover
+            if self.uistate.checkBox['paired_stims']:
+                dfoutput = self.uisub.get_dfdiff(row=row)
+            else:
+                dfoutput = self.uisub.get_dfoutput(row=row)
+            if dfoutput is None:
+                return
+            row = self.df_p.loc[i] # get_dfoutput updates df_project - update row!
+            self.uiplot.addRow(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
+            print(f"Preloaded {row['recording_name']}")
+        self.finished.emit()
+
+
 
 ################################################################
 # section directly copied from output from pyuic, do not alter #
@@ -1975,26 +2002,21 @@ class UIsub(Ui_MainWindow):
         self.darkmode() # set darkmode if set in cfg
         self.graphMainPreload()
 
+
     def graphMainPreload(self): # plot and hide all imported rows in df_project
         self.usage("graphMainPreload")
         t0 = time.time()
         df_p = self.get_df_project()
-        df = df_p.loc[df_p['sweeps'] != "..."]
-        for i, row in df.iterrows():
-            dfmean = self.get_dfmean(row=row)
-            _ = self.get_dffilter(row=row) # cache for mouseover
-            if uistate.checkBox['paired_stims']:
-                dfoutput = self.get_dfdiff(row=row)
-            else:
-                dfoutput = self.get_dfoutput(row=row)
-            if dfoutput is None:
-                return
-            row = df_p.loc[i] # get_dfoutput updates df_project - update row!
-            uiplot.addRow(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
-            print(f"Preloaded {row['recording_name']}")
+
+        self.thread = GraphMainPreloadThread(df_p, uistate, uiplot, self)
+        self.thread.finished.connect(lambda: self.onGraphMainPreloadFinished(t0))
+        self.thread.start()
+
+    def onGraphMainPreloadFinished(self, t0):
         self.graphGroups()
         print(f"Preloaded recordings and groups in {time.time()-t0:.2f} seconds.")
         uiplot.graphRefresh()
+
 
     def graphGroups(self):
         group_ids = set(uistate.df_groups['group_ID'])
