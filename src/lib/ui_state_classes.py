@@ -50,10 +50,12 @@ class UIstate:
         self.ax1 = None # axis of output graph for amplitudes
         self.ax2 = None # axis of output graph for slopes
         self.selected = [] # list of selected indices
-        self.df_recs2plot = None # df_project copy; all PARSED recordings (if any are selected, only selected ones)
-        self.plotted = {} # dict: key=name (meanplot), value=[subplots]
-        self.dict_label_ID_line = {} # dict: key=label, value=(rec_ID/group_ID, 2Dline object)
-        self.row_copy = None # copy of selected row from df_project
+        self.row_copy = None # copy of single-selected row from df_project, for storing measure points until either saved or rejected
+        self.df_recs2plot = None # df_project copy of selected PARSED recordings (or all parsed, if none are selected)
+        self.dict_rec_label_ID_line = {} # dict of all plotted recording lines: key=label, value=(rec_ID, 2Dline object)
+        self.dict_group_label_ID_line = {} # dict of all plotted group lines: key=label, value=(group_ID, 2Dline object)
+
+    # Mouseover variables
         self.mouseover_action = None # name of action to take if clicked at current mouseover: EPSP amp move, EPSP slope move/resize, volley amp move, volley slope move/resize
         self.mouseover_plot = None # plot of tentative EPSP slope
         self.mouseover_blob = None # scatterplot indicating mouseover of dragable point; move point or resize slope
@@ -64,7 +66,7 @@ class UIstate:
         self.prior_x_idx = None # x value of the last stored slope
         self.mouseover_out = None # output of dragged aspect
 
-        # coordinates. Set on row selection.
+        # Mouseover coordinates, for plotting. Set on row selection.
         self.EPSP_amp_xy = None # x,y
         self.EPSP_slope_start_xy = None # x,y
         self.EPSP_slope_end_xy = None # x,y
@@ -72,7 +74,7 @@ class UIstate:
         self.volley_slope_start_xy = None # x,y
         self.volley_slope_end_xy = None # x,y
 
-        # clickzones: coordinates including margins. Set on row selection.
+        # Mouseover clickzones: coordinates including margins. Set on row selection.
         self.EPSP_amp_move_zone = {} # dict: key=x,y, value=start,end. 
         self.EPSP_slope_move_zone = {} # dict: key=x,y, value=start,end.
         self.EPSP_slope_resize_zone = {} # dict: key=x,y, value=start,end.
@@ -141,6 +143,13 @@ class UIstate:
         elif aspect == "volley amp move":
             self.updateAmpZone('volley', x, y)
 
+    def get_recSet(self): # returns a set of all recs that are currently plotted
+        return set([value[0] for value in self.dict_rec_label_ID_line.values()])
+
+    def get_groupSet(self): # returns a set of all groups that are currently plotted
+        return set([value[0] for value in self.dict_group_label_ID_line.values()])
+
+    #def get_recs_in_group(self):
 
 
     def to_axm(self, df): # dict of lines that are supposed to be on axm - label: index

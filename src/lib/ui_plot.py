@@ -30,6 +30,7 @@ class UIplot():
                 ax.tick_params(colors='black')
             print("Default mode activated")
 
+
     def hideAll(self):
         axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
         for ax in [axm, ax1, ax2]:
@@ -40,35 +41,22 @@ class UIplot():
                 legend.remove()
         print("All lines hidden")
 
-    def unPlot(self, rec_ID):
-        list_unplot = [value[1] for value in self.uistate.dict_label_ID_line.values() if rec_ID == value[0]]
-        i = 0
-        for line in list_unplot:
-            i += 1
-            line.remove()
-        print(f"unPlot: {rec_ID}, {i} lines removed.")
 
-    def purge(self, rec):
-        axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
-        print(f"Purging {rec}...")
-        # remove the line named rec from axm
-        for line in axm.get_lines():
-            if line.get_label() == rec:
-                line.remove()
-                # remove subplots via uistate.plotted
-                subplots = self.uistate.plotted[rec] # list of subplots of rec
-                all_plots = axm.get_lines() + ax1.get_lines() + ax2.get_lines() # list of all lines
-                for line in all_plots:
-                    if line.get_label() in subplots:
-                        line.remove()
-                del self.uistate.plotted[rec]
+    def unPlot(self, rec_ID):
+        def remove_lines_and_keys(dict_label_ID_line):
+            keys_to_remove = [key for key, value in dict_label_ID_line.items() if rec_ID == value[0]]
+            for key in keys_to_remove:
+                dict_label_ID_line[key][1].remove()
+                del dict_label_ID_line[key]
+        remove_lines_and_keys(self.uistate.dict_rec_label_ID_line)
+        remove_lines_and_keys(self.uistate.dict_group_label_ID_line)
+
 
     def graphRefresh(self):
         # toggle show/hide of lines on axm, ax1 and ax2: show only selected and imported lines, only appropriate aspects
         axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
         print("graphRefresh")
         uistate = self.uistate
-        #print("uistate.plotted: ", uistate.plotted)
         if uistate.df_recs2plot is None or not uistate.anyView():
             self.hideAll()
         else:
@@ -80,9 +68,9 @@ class UIplot():
             ax2_legend = self.set_visible_get_legend(axis=ax2, show=uistate.to_ax2(uistate.df_recs2plot))
             ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
 
-        for label, ID_line in uistate.dict_label_ID_line.items():
-            rec_ID = ID_line[0]
-            str_show = uistate.df_groups.loc[uistate.df_groups['group_ID'] == rec_ID, 'show'].values[0]
+        for label, ID_line in uistate.dict_group_label_ID_line.items():
+            group_ID = ID_line[0]
+            str_show = uistate.df_groups.loc[uistate.df_groups['group_ID'] == group_ID, 'show'].values[0]
             show = bool(str_show == 'True')
             ID_line[1].set_visible(show)
 
@@ -137,8 +125,9 @@ class UIplot():
 
     def addRow(self, dict_row, dfmean, dfoutput):
         axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
-        print(f"Graphing {dict_row['recording_name']}...")
+        rec_ID = dict_row['ID']
         rec_name = dict_row['recording_name']
+        print(f"Graphing {rec_name}...")
         rec_filter = dict_row['filter'] # the filter currently used for this recording
         t_EPSP_amp = dict_row['t_EPSP_amp']
         t_EPSP_slope_start = dict_row['t_EPSP_slope_start']
@@ -154,10 +143,8 @@ class UIplot():
         else:
             label = rec_name
 
-        # persist a custom-named lineplot and list in uisate.plotted
         _ = sns.lineplot(ax=axm, label=label, data=dfmean, y=rec_filter, x="time", color="black")
-        self.uistate.plotted[label] = []
-        plotted = self.uistate.plotted[label]
+        self.uistate.dict_rec_label_ID_line[label] = rec_ID, axm.lines[-1]
    
         # plot them all, don't bother with show/hide
         out = dfoutput # TODO: enable switch to dfdiff?
@@ -166,49 +153,46 @@ class UIplot():
             y_position = dfmean.loc[dfmean.time == t_EPSP_amp, rec_filter]
             axm.plot(t_EPSP_amp, y_position, marker='o', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha=0.3, label=f"{label} EPSP amp marker")
             subplot = f"{label} EPSP amp"
-            plotted.append(subplot)
             _ = sns.lineplot(ax=ax1, data=out, y='EPSP_amp', x="sweep", color="green", linestyle='--', alpha=0.5, label=subplot)
+            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, ax1.lines[-1]
             if 'EPSP_amp_norm' in out.columns:
                 subplot = f"{label} EPSP amp norm"
-                #print(f"EPSP_amp_norm in {rec_name} out")
-                plotted.append(subplot)
                 _ = sns.lineplot(ax=ax1, data=out, y='EPSP_amp_norm', x="sweep", color="green", linestyle='--', alpha=0.5, label=subplot)
+                self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, ax1.lines[-1]
         if not np.isnan(t_EPSP_slope_start):
             x_start = t_EPSP_slope_start
             x_end = t_EPSP_slope_end
             y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
             subplot = f"{label} EPSP slope marker"
-            plotted.append(subplot)
             axm.plot([x_start, x_end], [y_start, y_end], color='green', linewidth=10, alpha=0.3, label=subplot)
+            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, axm.lines[-1]
             subplot = f"{label} EPSP slope"
-            plotted.append(subplot)
             _ = sns.lineplot(ax=ax2, data=out, y='EPSP_slope', x="sweep", color="green", alpha = 0.3, label=subplot)
-            #if out has the column 'EPSP_slope_norm', plot it
+            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, ax2.lines[-1]
             if 'EPSP_slope_norm' in out.columns:
                 subplot = f"{label} EPSP slope norm"
-                #print(f"EPSP_slope_norm in {rec_name} out")
-                plotted.append(subplot)
                 _ = sns.lineplot(ax=ax2, data=out, y='EPSP_slope_norm', x="sweep", color="green", alpha = 0.3, label=subplot)
+                self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, ax2.lines[-1]
         if not np.isnan(t_volley_amp):
             y_position = dfmean.loc[dfmean.time == t_volley_amp, rec_filter]
             subplot = f"{label} volley amp marker"
-            plotted.append(subplot)
             axm.plot(t_volley_amp, y_position, marker='o', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3, label=subplot)
+            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, axm.lines[-1]
             subplot = f"{label} volley amp mean"
-            plotted.append(subplot)
             ax1.axhline(y=volley_amp_mean, color='blue', alpha = 0.3, linestyle='--', label=subplot)
+            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, ax1.lines[-1]
         if not np.isnan(t_volley_slope_start):
             x_start = t_volley_slope_start
             x_end = t_volley_slope_end
             y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
             subplot = f"{label} volley slope marker"
-            plotted.append(subplot)
             axm.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3, label=subplot)
+            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, axm.lines[-1]
             subplot = f"{label} volley slope mean"
-            plotted.append(subplot)
             ax2.axhline(y=volley_slope_mean, color='blue', alpha = 0.3, label=subplot)
+            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, ax2.lines[-1]
 
     def addGroup(self, df_group_row, df_groupmean):
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
@@ -218,10 +202,10 @@ class UIplot():
         print(f"addGroup - df_group_row: {df_group_row}")
         label = f"{group_name} EPSP slope"
         _ = sns.lineplot(ax=ax2, data=df_groupmean, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label=label)
-        self.uistate.dict_label_ID_line[label] = group_ID, ax2.lines[-1]
+        self.uistate.dict_group_label_ID_line[label] = group_ID, ax2.lines[-1]
         label = f"{group_name} EPSP amp"
         _ = sns.lineplot(ax=ax1, data=df_groupmean, y='EPSP_amp_mean', x="sweep", color=color, alpha=0.5, linestyle='--', label=label)
-        self.uistate.dict_label_ID_line[label] = group_ID, ax1.lines[-1]
+        self.uistate.dict_group_label_ID_line[label] = group_ID, ax1.lines[-1]
 
     def plotUpdate(self, row, aspect, dfmean, mouseover_out, axm, ax_out, norm=False):
         rec_filter = row['filter']  # the filter currently used for this recording

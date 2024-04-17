@@ -11,9 +11,8 @@ import seaborn as sns
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib import use as matplotlib_use
 from matplotlib.figure import Figure
-from matplotlib.lines import Line2D
-
-# from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+#from matplotlib.lines import Line2D
+#from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 from PyQt5 import QtCore, QtWidgets, QtGui
 from datetime import datetime # used in project name defaults
@@ -211,6 +210,20 @@ class MplCanvas(FigureCanvasQTAgg):
         self.axes = fig.add_subplot(111)
         super(MplCanvas, self).__init__(fig)
         self.setParent(parent)
+
+
+class CustomCheckBox(QtWidgets.QCheckBox):
+# Custom checkbox to allow right-click to rename group
+    rightClicked = QtCore.pyqtSignal(str)  # Define a new signal that carries a string
+    def __init__(self, str_ID, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.str_ID = str_ID
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.RightButton:
+            self.rightClicked.emit(self.str_ID)
+        else:
+            super().mousePressEvent(event)
+
 
 ################################################################
 # section directly copied from output from pyuic, do not alter #
@@ -1205,7 +1218,7 @@ class UIsub(Ui_MainWindow):
                     df_p.loc[df_p['paired_recording'] == old_recording_name, 'paired_recording'] = new_recording_name
                     self.set_df_project(df_p)
                     self.tableUpdate()
-                    uiplot.purge(rec=old_recording_name)
+                    uiplot.unPlot(old_recording_name)
                     self.graphUpdate(row = df_p.loc[uistate.selected[0]])
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
@@ -1253,7 +1266,7 @@ class UIsub(Ui_MainWindow):
             removeFromCache(cache_name)
         for folder_name, file_suffix in [('data', '.csv'), ('cache', '_mean.csv'), ('cache', '_filter.csv'), ('cache', '_output.csv')]:
             removeFromDisk(folder_name, file_suffix)
-        uiplot.purge(rec=recording_name)
+        uiplot.unPlot(recording_name)
 
     def parseData(self): # parse data files and modify self.df_project accordingly
         df_p = self.get_df_project()
@@ -1329,7 +1342,8 @@ class UIsub(Ui_MainWindow):
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
     def addGroupControls(self, str_ID): # Create menu for adding to group and checkbox for showing group
-        group_name = f"group_{str_ID}" # backend group name for object naming
+        group_ID = f"group_{str_ID}" # backend group name for object naming
+        group_name = uistate.df_groups.loc[uistate.df_groups['group_ID'] == str_ID, 'group_name'].values[0]
         print(f"addGroupControls, str_ID: {str_ID}, type: {type(str_ID)} group_name: {group_name}")
         dict_row = uistate.df_groups.loc[uistate.df_groups['group_ID'] == str_ID].to_dict(orient='records')[0]
         if not dict_row:
@@ -1338,19 +1352,36 @@ class UIsub(Ui_MainWindow):
             return
         color = dict_row['color']
         # print(f"addGroupControls: {group_name}, {color}, type: {type(color)}")
-        setattr(self, f"actionAddTo_{group_name}", QtWidgets.QAction(f"Add selection to {group_name}", self))
-        self.new_group_menu_item = getattr(self, f"actionAddTo_{group_name}")
+        setattr(self, f"actionAddTo_{group_ID}", QtWidgets.QAction(f"Add selection to {group_name}", self))
+        self.new_group_menu_item = getattr(self, f"actionAddTo_{group_ID}")
         self.new_group_menu_item.triggered.connect(lambda checked, add_group_ID=str_ID: self.addToGroup(add_group_ID))
         self.new_group_menu_item.setShortcut(f"{str_ID}")
         self.menuGroups.addAction(self.new_group_menu_item)                    
-        self.new_checkbox = QtWidgets.QCheckBox(group_name, self.centralwidget)
-        self.new_checkbox.setObjectName(group_name)
-        self.new_checkbox.setText(group_name)
+        self.new_checkbox = CustomCheckBox(str_ID)
+        self.new_checkbox.rightClicked.connect(self.triggerGroupRename)
+        self.new_checkbox.setObjectName(group_ID)
+        self.new_checkbox.setText(f"{str_ID}. {group_name}")
         self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the background color
         self.new_checkbox.setMaximumWidth(100)  # Set the maximum width
         self.new_checkbox.setChecked(bool(dict_row['show']))
         self.new_checkbox.stateChanged.connect(lambda state, str_ID=str_ID: self.groupCheckboxChanged(state, str_ID))
         self.horizontalLayoutGroups.addWidget(self.new_checkbox)
+
+
+    def triggerGroupRename(self, str_ID):
+        print(f"triggerGroupRename: {str_ID}")
+        RenameDialog = InputDialogPopup()
+        new_group_name = RenameDialog.showInputDialog(title='Rename group', query='')
+        # check if ok
+        if new_group_name in uistate.df_groups['group_name'].values:
+            print(f"Group name {new_group_name} already exists.")
+        elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_group_name)) is not None: # True if valid filename
+            uistate.df_groups.loc[uistate.df_groups['group_ID'] == str_ID, 'group_name'] = new_group_name
+            uistate.save_cfg(projectfolder=self.dict_folders['project'])
+            self.groupControlsRefresh()
+        else:
+            print(f"Group name {new_group_name} is not a valid name.")
+
 
     def removeGroupControls(self, i=None):
         if i is None:  # if i is not provided, remove all group controls
@@ -1381,25 +1412,33 @@ class UIsub(Ui_MainWindow):
         print(f"addToGroup: {add_group_ID}")
         # Assign all selected recordings to group "add_group" unless they already belong to that group
         if uistate.selected:
-            for i in uistate.selected:
-                if self.df_project.loc[i, 'group_IDs'] == " ":
-                    self.df_project.loc[i, 'group_IDs'] = str_add_group_ID
-                    print(f"{self.df_project.loc[i, 'recording_name']} set to {str_add_group_ID}")
-                else:
-                    str_group_IDs = str(self.df_project.loc[i, 'group_IDs'])
+            #if all selected are in the group, remove them from the group
+            if all(self.df_project.loc[uistate.selected, 'group_IDs'].str.contains(str_add_group_ID)):
+                for i in uistate.selected:
+                    str_group_IDs = self.df_project.loc[i, 'group_IDs']
                     list_groups = list(str_group_IDs.split(","))
-                    if str_add_group_ID not in list_groups:
-                        list_groups.append(str_add_group_ID)
-                        self.df_project.loc[i, 'group_IDs'] = ",".join(map(str, sorted(list_groups)))  # Corrected column name
-                        print(f"{self.df_project.loc[i, 'recording_name']} added to {str_add_group_ID}")
+                    list_groups.remove(str_add_group_ID)
+                    self.df_project.loc[i, 'group_IDs'] = ",".join(map(str, sorted(list_groups)))
+            else:
+                for i in uistate.selected:
+                    if self.df_project.loc[i, 'group_IDs'] == " ":
+                        self.df_project.loc[i, 'group_IDs'] = str_add_group_ID
+                        print(f"{self.df_project.loc[i, 'recording_name']} set to {str_add_group_ID}")
                     else:
-                        print(f"{self.df_project.loc[i, 'recording_name']} is already in {str_add_group_ID}")
+                        str_group_IDs = str(self.df_project.loc[i, 'group_IDs'])
+                        list_groups = list(str_group_IDs.split(","))
+                        if str_add_group_ID not in list_groups:
+                            list_groups.append(str_add_group_ID)
+                            self.df_project.loc[i, 'group_IDs'] = ",".join(map(str, sorted(list_groups)))  # Corrected column name
+                            print(f"{self.df_project.loc[i, 'recording_name']} added to {str_add_group_ID}")
+                        else:
+                            print(f"{self.df_project.loc[i, 'recording_name']} is already in {str_add_group_ID}")
             self.save_df_project()
             self.purgeGroupCache(add_group_ID)
             self.tableUpdate()
             uiplot.unPlot(add_group_ID) # TODO: This is a temporary fix. It should be handled by graphUpdate; set data rather than unPlot.
             self.graphUpdate()
-            self.updateMouseover()
+            #self.updateMouseover()
         else:
             print("No files selected.")
     
@@ -1879,70 +1918,45 @@ class UIsub(Ui_MainWindow):
         uiplot.graphRefresh()
 
     def graphGroups(self):
-        print("graphGroups")
-        df_group_show = uistate.df_groups[uistate.df_groups['show'] == 'True']
-        df_p = self.get_df_project()
-        list_all_groups = ' '.join(self.df_project['group_IDs'].astype(str))
-        set_all_groups = set(re.findall(r'\b\w+\b', list_all_groups))
-        for index, df_group_row in df_group_show.iterrows():
-            str_ID = df_group_row['group_ID']
-            if str_ID not in uistate.dict_label_ID_line.values(): # already plotted?
-                if str_ID in set_all_groups: # group has recordings?
-                    df_groupmean = self.get_dfgroupmean(str_ID=str_ID)
-                    uiplot.addGroup(df_group_row, df_groupmean)
-                    print(f"Loaded group {str_ID}, name: {df_group_row['group_name']}")
-                else:
-                    print(f"Group {str_ID} has no recordings.")
-            else:
-                print(f"Group {str_ID} already plotted.")
+        group_ids = set(uistate.df_groups['group_ID'])
+        groups_with_recs = set(group_id for group_ids in self.df_project['group_IDs'] for group_id in group_ids.split(','))
+        already_plotted = set(uistate.get_groupSet())
+        print(f"groups already plotted: {already_plotted}")
+        groups_to_plot = (group_ids & groups_with_recs) - already_plotted
+        if groups_to_plot:
+            df_groups_to_plot = uistate.df_groups[uistate.df_groups['group_ID'].isin(groups_to_plot)]
+            print(f"groups to plot {df_groups_to_plot}")
+            for _, df_group_row in df_groups_to_plot.iterrows():
+                str_ID = df_group_row['group_ID']
+                df_groupmean = self.get_dfgroupmean(str_ID=str_ID)
+                uiplot.addGroup(df_group_row, df_groupmean)
+                print(f"Loaded group {str_ID}, name: {df_group_row['group_name']}")
 
 
-    def graphUpdate(self, df=None, row=None): # TODO: allow update of only specific row
+    def graphUpdate(self, df=None, row=None):
+        def processRow(row):
+            dfmean = self.get_dfmean(row=row)
+            dfoutput = self.get_dfdiff(row=row) if uistate.checkBox['paired_stims'] else self.get_dfoutput(row=row)
+            if dfoutput is not None:
+                uiplot.addRow(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
+        def processDataFrame(df):
+            list_to_plot = [rec for rec in df['recording_name'].tolist() if rec not in uistate.get_recSet()]
+            for rec in list_to_plot:
+                row = df[df['recording_name'] == rec].iloc[0]
+                processRow(row)
+
         self.graphGroups()
-        if row is not None: # process a specific row
-            dfmean = self.get_dfmean(row=row)
-            if uistate.checkBox['paired_stims']:
-                dfoutput = self.get_dfdiff(row=row)
-            else:
-                dfoutput = self.get_dfoutput(row=row)
-            if dfoutput is None:
-                return
-            uiplot.addRow(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
-            uiplot.graphRefresh()
-            return
-        if df is None: # unless fed a specific row, (re)plot the whole df_project
-            df_imported = uistate.df_recs2plot
-        if df_imported.empty:
-            print("graphUpdate: df_p is empty")
-            return
-        else: # plot all rows in df_imported
-            list_recs = df_imported['recording_name'].tolist()
-        # update output graph x limits based on max number of sweeps in df_project
+        if row is not None:
+            processRow(row)
+        else:
+            df = df or uistate.df_recs2plot
+            if not df.empty:
+                processDataFrame(df)
         if uistate.zoom['output_xlim'][1] is None:
-            uistate.zoom['output_xlim'] = [0, df_imported['sweeps'].max()]
+            uistate.zoom['output_xlim'] = [0, df['sweeps'].max()]
             uistate.save_cfg(projectfolder=self.dict_folders['project'])
-        if uistate.plotted: # A (mostly redundant?) check to remove plotted lines that are not in df_select
-            for rec in list(uistate.plotted.keys()): # create a list from dict keys to avoid RuntimeError
-                if rec not in list_recs:
-                    print(f"WARNING! {rec} was plotted, but not in list_rec. It should have been uiplot.purge:d upon delete - check delete sequence!")
-                    uiplot.purge(rec=rec)
-            for rec in list(uistate.plotted.keys()): # remove already plotted recs from list_recs
-                list_recs.remove(rec)
-            if not list_recs:
-                return
-        for rec in list_recs: # plot the remaining recs
-            row = df_imported[df_imported['recording_name'] == rec].iloc[0]
-            dfmean = self.get_dfmean(row=row)
-            if uistate.checkBox['paired_stims']:
-                dfoutput = self.get_dfdiff(row=row)
-            else:
-                dfoutput = self.get_dfoutput(row=row)
-            if dfoutput is None:
-                return
-            df_p = self.get_df_project() # get_dfoutput updates df_project - update row!
-            row = df_p[df_p['recording_name'] == rec].iloc[0]
-            uiplot.addRow(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
         uiplot.graphRefresh()
+
 
     def updateMouseover(self):
         # drop any prior mouseover event connections and plots
@@ -1982,6 +1996,7 @@ class UIsub(Ui_MainWindow):
             if connect: # set new mouseover event connection
                 self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: uiplot.graphMouseover(event=event, axm=uistate.axm))
         uiplot.graphRefresh()
+
 
     def mainClicked(self, event, canvas, out=False): # maingraph click event
         x = event.xdata
