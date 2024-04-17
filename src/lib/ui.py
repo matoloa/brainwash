@@ -225,6 +225,23 @@ class CustomCheckBox(QtWidgets.QCheckBox):
             super().mousePressEvent(event)
 
 
+class ProgressBarManager:
+    def __init__(self, progressBar, total):
+        self.progressBar = progressBar
+        self.total = total
+
+    def __enter__(self):
+        self.progressBar.setVisible(True)
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.progressBar.setVisible(False)
+
+    def update(self, i):
+        percentage = int((i+1) * 100 / self.total)
+        self.progressBar.setValue(percentage)
+
+
 ################################################################
 # section directly copied from output from pyuic, do not alter #
 # trying to make all the rest work with it                     #
@@ -1029,6 +1046,7 @@ class UIsub(Ui_MainWindow):
         with open(path_talkback, 'w') as f:
             json.dump(dict_event, f)
 
+
     def darkmode(self):
         if uistate.darkmode:
             self.mainwindow.setStyleSheet("background-color: #333; color: #fff;")
@@ -1052,6 +1070,7 @@ class UIsub(Ui_MainWindow):
         uiplot.styleUpdate()
         uiplot.graphRefresh()
 
+
     def tableProjSelectionChanged(self):
         self.usage("tableProjSelectionChanged")
         t0 = time.time()
@@ -1061,19 +1080,21 @@ class UIsub(Ui_MainWindow):
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         # build the list uistate.selected with indices
         uistate.selected = [index.row() for index in selected_indexes]
-        if not selected_indexes:
-            uistate.df_recs2plot = None
-        else:
+        self.update_recs2plot()
+        self.updateMouseover()
+        print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
+        report()
+
+
+    def update_recs2plot(self):
+        if uistate.selected:
             df_project_selected = self.get_df_project().iloc[uistate.selected]
             uistate.df_recs2plot = df_project_selected[df_project_selected['sweeps'] != "..."]
             if uistate.df_recs2plot.empty:
                 uistate.df_recs2plot = None
-        if uistate.df_recs2plot is not None:
-            self.updateMouseover()
         else:
-            uiplot.graphRefresh()
-        print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
-        report()
+            uistate.df_recs2plot = None
+
 
     def checkBox_paired_stims_changed(self, state):
         self.usage("checkBox_paired_stims_changed")
@@ -1084,6 +1105,7 @@ class UIsub(Ui_MainWindow):
         uistate.save_cfg()
         self.tableFormat()
         self.updateMouseover()
+
 
     def editNormRange(self, lineEdit):
         self.usage("editNormRange")
@@ -1118,12 +1140,14 @@ class UIsub(Ui_MainWindow):
             uiplot.updateEPSPout(rec_name, out, uistate.ax1, uistate.ax1)
         print(f"editNormRange: {uistate.lineEdit['norm_EPSP_on']}")
     
+
     def normOutputs(self): # TODO: also norm diffs (paired stim) when applicable
         df_p = self.get_df_project()
         for index, row in df_p.iterrows():
             dfoutput = self.get_dfoutput(row=row)
             print(f"editNormRange: rebuilding norm columns for {row['recording_name']}")
             self.normOutput(row, dfoutput)
+
 
     def normOutput(self, row, dfoutput, aspect=None):
         normFrom = uistate.lineEdit['norm_EPSP_on'][0] # start
@@ -1183,6 +1207,7 @@ class UIsub(Ui_MainWindow):
         if verbose:
             print("addData:", self.get_df_project())
 
+
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
         if len(uistate.selected) == 1:
@@ -1226,6 +1251,7 @@ class UIsub(Ui_MainWindow):
         else:
             print("Rename: please select one row only for renaming.")
 
+
     def deleteSelectedRows(self):
         if not uistate.selected:
             print("No files selected.")
@@ -1252,6 +1278,7 @@ class UIsub(Ui_MainWindow):
             uistate.selected = df_p[df_p['ID'] == reselect_ID].index[0]
         self.tableProjSelectionChanged()
 
+
     def purgeRecordingData(self, recording_name):
         def removeFromCache(cache_name):
             cache = getattr(self, cache_name)
@@ -1267,34 +1294,36 @@ class UIsub(Ui_MainWindow):
             removeFromDisk(folder_name, file_suffix)
         uiplot.unPlot(recording_name)
 
-    def parseData(self): # parse data files and modify self.df_project accordingly
+
+    def parseData(self): 
+        def create_new_row(df_proj_row, new_name, dict_sub):
+            df_proj_new_row = df_proj_row.copy()
+            df_proj_new_row['ID'] = uuid.uuid4()
+            df_proj_new_row['recording_name'] = new_name
+            df_proj_new_row['sweeps'] = dict_sub.get('nsweeps', None)
+            df_proj_new_row['channel'] = dict_sub.get('channel', None)
+            df_proj_new_row['stim'] = dict_sub.get('stim', None)
+            return df_proj_new_row
         df_p = self.get_df_project()
-        update_frame = df_p.copy()  # copy from which to remove rows without confusing index
+        df_p_to_update = df_p[df_p['sweeps'] == "..."].copy()
         rows = []
-        for i, df_proj_row in self.df_project.iterrows():
-            recording_name = df_proj_row['recording_name']
-            source_path = df_proj_row['path']
-            if df_proj_row['sweeps'] == "...":  # indicates not read before TODO: Replace with selector!
-                # if the source_path ends with .csv
+        with ProgressBarManager(self.progressBar, df_p_to_update.shape[0]) as pbm:
+            for i, (_, df_proj_row) in enumerate(df_p_to_update.iterrows()):
+                pbm.update(i)
+                recording_name = df_proj_row['recording_name']
+                source_path = df_proj_row['path']
                 dict_data = parse.parseProjFiles(dict_folders = self.dict_folders, recording_name=recording_name, source_path=source_path)
                 for new_name, dict_sub in dict_data.items():
-                    nsweeps = dict_sub.get('nsweeps', None) # Access 'nsweeps' from the current dictionary
+                    nsweeps = dict_sub.get('nsweeps', None) 
                     if nsweeps is not None:
-                        df_proj_new_row = df_proj_row.copy()
-                        df_proj_new_row['ID'] = uuid.uuid4()
-                        df_proj_new_row['recording_name'] = new_name
-                        df_proj_new_row['sweeps'] = nsweeps
-                        df_proj_new_row['channel'] = dict_sub.get('channel', None)
-                        df_proj_new_row['stim'] = dict_sub.get('stim', None)
+                        df_proj_new_row = create_new_row(df_proj_row, new_name, dict_sub)
                         rows.append(df_proj_new_row)
-                update_frame = update_frame[update_frame.recording_name != recording_name]
-                print(f"update_frame: {update_frame}")
-                rows2add = pd.concat(rows, axis=1).transpose()
-                print("rows2add:", rows2add[['recording_name', 'sweeps']])
-                df_p = pd.concat([update_frame, rows2add]).reset_index(drop=True)
+        rows2add = pd.concat(rows, axis=1).transpose()
+        df_p = pd.concat([df_p[df_p['sweeps'] != "..."], rows2add]).reset_index(drop=True)
         self.set_df_project(df_p)
         self.tableUpdate()
         self.graphUpdate()
+
 
     def flipCI(self):
         if uistate.selected:
@@ -1963,17 +1992,20 @@ class UIsub(Ui_MainWindow):
             for rec in list_to_plot:
                 row = df[df['recording_name'] == rec].iloc[0]
                 processRow(row)
+        def updateZoom(df):
+            if uistate.zoom['output_xlim'][1] is None:
+                uistate.zoom['output_xlim'] = [0, df['sweeps'].max()]
+                uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
         self.graphGroups()
         if row is not None:
             processRow(row)
+            updateZoom(df)
         else:
             df = df or uistate.df_recs2plot
-            if not df.empty:
+            if df is not None and not df.empty:
                 processDataFrame(df)
-        if uistate.zoom['output_xlim'][1] is None:
-            uistate.zoom['output_xlim'] = [0, df['sweeps'].max()]
-            uistate.save_cfg(projectfolder=self.dict_folders['project'])
+                updateZoom(df)
         print("graphUpdate calls uiplot.graphRefresh()")
         uiplot.graphRefresh()
 
@@ -2042,6 +2074,7 @@ class UIsub(Ui_MainWindow):
             elif event.button == 2:
                 self.zoomReset(canvas=canvas, out=out)
 
+
     def mainDragSlope(self, event, time_values, action, prior_slope_start, prior_slope_end): # maingraph dragging event
         self.main_canvas_mean.mpl_disconnect(self.mouseover)
         if event.xdata is None:
@@ -2081,6 +2114,7 @@ class UIsub(Ui_MainWindow):
         self.main_canvas_mean.draw()
         self.mainDragUpdate(x_start, x_end, precision)
 
+
     def mainDragPoint(self, event, time_values): # maingraph dragging event
         self.main_canvas_mean.mpl_disconnect(self.mouseover)
         if event.xdata is None:
@@ -2105,6 +2139,7 @@ class UIsub(Ui_MainWindow):
         self.main_canvas_mean.draw()
         self.mainDragUpdate(x_point, x_point, precision)
   
+
     def mainDragUpdate(self, x_start, x_end, precision): # update output; this is a separate function to allow the user to make it happen live (current) or on release (for low compute per data)
         dffilter = self.get_dffilter(row=uistate.row_copy)
         action = uistate.mouseover_action
@@ -2172,6 +2207,7 @@ class UIsub(Ui_MainWindow):
             uistate.row_copy.update(dict_t)
         self.main_canvas_output.draw()
 
+
     def mainReleased(self, event): # maingraph release event
         self.usage("mainReleased")
         print(f" - uistate.mouseover_action: {uistate.mouseover_action}")
@@ -2226,6 +2262,7 @@ class UIsub(Ui_MainWindow):
         if talkback:
             self.talkback()
 
+
     def zoomOnScroll(self, event, parent, canvas, ax1=None, ax2=None):
         x = event.xdata
         y = event.ydata
@@ -2279,6 +2316,7 @@ class UIsub(Ui_MainWindow):
             if ax2 is not None:
                 ax2.set_ylim(y2 - (y2 - ax2.get_ylim()[0]) / zoom, y2 + (ax2.get_ylim()[1] - y2) / zoom)
         canvas.draw()
+
 
     def zoomReset(self, canvas, out=False):
         if out:
