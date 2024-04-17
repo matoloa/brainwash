@@ -60,7 +60,7 @@ class UIplot():
         if uistate.df_recs2plot is None or not uistate.anyView():
             self.hideAll()
         else:
-            # axm, set visibility of lines and build legend
+            # set visibility of recording lines and build legend
             axm_legend = self.set_visible_get_legend(axis=axm, show=uistate.to_axm(uistate.df_recs2plot))
             axm.legend(axm_legend.values(), axm_legend.keys(), loc='upper right')
             ax1_legend = self.set_visible_get_legend(axis=ax1, show=uistate.to_ax1(uistate.df_recs2plot))
@@ -68,7 +68,7 @@ class UIplot():
             ax2_legend = self.set_visible_get_legend(axis=ax2, show=uistate.to_ax2(uistate.df_recs2plot))
             ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
 
-        for label, ID_line in uistate.dict_group_label_ID_line.items():
+        for _, ID_line in uistate.dict_group_label_ID_line.items():
             group_ID = ID_line[0]
             str_show = uistate.df_groups.loc[uistate.df_groups['group_ID'] == group_ID, 'show'].values[0]
             show = bool(str_show == 'True')

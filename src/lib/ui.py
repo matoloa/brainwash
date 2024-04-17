@@ -1050,8 +1050,7 @@ class UIsub(Ui_MainWindow):
             self.mainwindow.setStyleSheet("")
             self.tableProj.setStyleSheet("")
         uiplot.styleUpdate()
-        self.main_canvas_mean.draw()
-        self.main_canvas_output.draw()
+        uiplot.graphRefresh()
 
     def tableProjSelectionChanged(self):
         self.usage("tableProjSelectionChanged")
@@ -1378,7 +1377,14 @@ class UIsub(Ui_MainWindow):
         elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_group_name)) is not None: # True if valid filename
             uistate.df_groups.loc[uistate.df_groups['group_ID'] == str_ID, 'group_name'] = new_group_name
             uistate.save_cfg(projectfolder=self.dict_folders['project'])
+            df_p = self.get_df_project()
+            indexes_with_str_ID = [i for i in df_p.index if str_ID in df_p.loc[i, 'group_IDs'].split(",")]
+            for i in indexes_with_str_ID:
+                self.group_remove_from_row(i, str_ID)
+                self.group_add_to_row(i, str_ID, new_group_name)
+            self.save_df_project()
             self.groupControlsRefresh()
+            self.tableFormat()
         else:
             print(f"Group name {new_group_name} is not a valid name.")
 
@@ -1406,41 +1412,54 @@ class UIsub(Ui_MainWindow):
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
         self.updateMouseover()
 
+    def group_remove_from_row(self, i, str_add_group_ID):
+        str_group_IDs = self.df_project.loc[i, 'group_IDs']
+        list_group_IDs = str_group_IDs.split(",")
+        list_group_IDs.remove(str_add_group_ID)
+        self.df_project.loc[i, 'group_IDs'] = ",".join(sorted(list_group_IDs)) if list_group_IDs else " "
+        # Update 'groups' column
+        if list_group_IDs:
+            group_names = [uistate.df_groups.loc[uistate.df_groups['group_ID'] == group_id, 'group_name'].values[0] for group_id in list_group_IDs]
+            self.df_project.loc[i, 'groups'] = ", ".join(sorted(group_names))
+        else:
+            self.df_project.loc[i, 'groups'] = " "
+
+    def group_add_to_row(self, i, str_add_group_ID, groupname):
+        if self.df_project.loc[i, 'group_IDs'] == " ":
+            self.df_project.loc[i, 'group_IDs'] = str_add_group_ID
+            self.df_project.loc[i, 'groups'] = groupname
+        else:
+            str_group_IDs = str(self.df_project.loc[i, 'group_IDs'])
+            list_group_IDs = str_group_IDs.split(",")
+            if str_add_group_ID not in list_group_IDs:
+                list_group_IDs.append(str_add_group_ID)
+                self.df_project.loc[i, 'group_IDs'] = ",".join(sorted(list_group_IDs))
+                # Update 'groups' column
+                group_names = [uistate.df_groups.loc[uistate.df_groups['group_ID'] == group_id, 'group_name'].values[0] for group_id in list_group_IDs]
+                self.df_project.loc[i, 'groups'] = ", ".join(sorted(group_names))
+
     def addToGroup(self, add_group_ID):
         self.usage("addToGroup")
         str_add_group_ID = str(add_group_ID)
         print(f"addToGroup: {add_group_ID}")
-        # Assign all selected recordings to group "add_group" unless they already belong to that group
-        if uistate.selected:
-            #if all selected are in the group, remove them from the group
-            if all(self.df_project.loc[uistate.selected, 'group_IDs'].str.contains(str_add_group_ID)):
-                for i in uistate.selected:
-                    str_group_IDs = self.df_project.loc[i, 'group_IDs']
-                    list_groups = list(str_group_IDs.split(","))
-                    list_groups.remove(str_add_group_ID)
-                    self.df_project.loc[i, 'group_IDs'] = ",".join(map(str, sorted(list_groups)))
-            else:
-                for i in uistate.selected:
-                    if self.df_project.loc[i, 'group_IDs'] == " ":
-                        self.df_project.loc[i, 'group_IDs'] = str_add_group_ID
-                        print(f"{self.df_project.loc[i, 'recording_name']} set to {str_add_group_ID}")
-                    else:
-                        str_group_IDs = str(self.df_project.loc[i, 'group_IDs'])
-                        list_groups = list(str_group_IDs.split(","))
-                        if str_add_group_ID not in list_groups:
-                            list_groups.append(str_add_group_ID)
-                            self.df_project.loc[i, 'group_IDs'] = ",".join(map(str, sorted(list_groups)))  # Corrected column name
-                            print(f"{self.df_project.loc[i, 'recording_name']} added to {str_add_group_ID}")
-                        else:
-                            print(f"{self.df_project.loc[i, 'recording_name']} is already in {str_add_group_ID}")
-            self.save_df_project()
-            self.purgeGroupCache(add_group_ID)
-            self.tableUpdate()
-            uiplot.unPlot(add_group_ID) # TODO: This is a temporary fix. It should be handled by graphUpdate; set data rather than unPlot.
-            self.graphUpdate()
-            #self.updateMouseover()
-        else:
+        if not uistate.selected:
             print("No files selected.")
+            return
+
+        groupname = uistate.df_groups.loc[uistate.df_groups['group_ID'] == str_add_group_ID, 'group_name'].values[0]
+        if all(self.df_project.loc[uistate.selected, 'group_IDs'].str.contains(str_add_group_ID)):
+            for i in uistate.selected:
+                self.group_remove_from_row(i, str_add_group_ID)
+        else:
+            for i in uistate.selected:
+                self.group_add_to_row(i, str_add_group_ID, groupname)
+        self.save_df_project()
+        self.purgeGroupCache(add_group_ID)
+        self.tableFormat()
+        uiplot.unPlot(add_group_ID)
+        self.graphGroups()
+        self.updateMouseover()
+
     
     def removeFromGroup(self, remove_group_ID, indices=uistate.selected):
         self.usage("removeFromGroup")
@@ -1474,6 +1493,7 @@ class UIsub(Ui_MainWindow):
                     print("...and was successfully unlinked.")
                 except FileNotFoundError:
                     print("...but NOT when attempting to unlink.")
+            uiplot.unPlot(group)
 
     def clearGroupsByRow(self, rows):
         list_affected_groups = ' '.join(self.df_project.iloc[rows]['group_IDs'])
@@ -1592,10 +1612,9 @@ class UIsub(Ui_MainWindow):
         # hide all columns except these:
         list_show = [   
                         df_p.columns.get_loc('recording_name'),
-                        df_p.columns.get_loc('groups'),
-                        df_p.columns.get_loc('group_IDs'),
                         df_p.columns.get_loc('sweeps'),
-
+                        df_p.columns.get_loc('groups'),
+#                        df_p.columns.get_loc('group_IDs'),
 #                        df_p.columns.get_loc('t_EPSP_amp'),
 #                        df_p.columns.get_loc('t_EPSP_amp_method'),
 #                        df_p.columns.get_loc('t_EPSP_slope_start'),
@@ -1955,6 +1974,7 @@ class UIsub(Ui_MainWindow):
         if uistate.zoom['output_xlim'][1] is None:
             uistate.zoom['output_xlim'] = [0, df['sweeps'].max()]
             uistate.save_cfg(projectfolder=self.dict_folders['project'])
+        print("graphUpdate calls uiplot.graphRefresh()")
         uiplot.graphRefresh()
 
 
@@ -1995,6 +2015,7 @@ class UIsub(Ui_MainWindow):
                     connect = True
             if connect: # set new mouseover event connection
                 self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: uiplot.graphMouseover(event=event, axm=uistate.axm))
+        print("updateMouseover calls uiplot.graphRefresh()")
         uiplot.graphRefresh()
 
 
