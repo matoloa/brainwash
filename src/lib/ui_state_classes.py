@@ -54,6 +54,7 @@ class UIstate:
         self.df_recs2plot = None # df_project copy of selected PARSED recordings (or all parsed, if none are selected)
         self.dict_rec_label_ID_line = {} # dict of all plotted recording lines: key=label, value=(rec_ID, 2Dline object)
         self.dict_group_label_ID_line = {} # dict of all plotted group lines: key=label, value=(group_ID, 2Dline object)
+        self.new_indices = [] # list of indices in uisub.df_project of newly parsed recordings; used by uisub.graphMainPreload()
 
     # Mouseover variables
         self.mouseover_action = None # name of action to take if clicked at current mouseover: EPSP amp move, EPSP slope move/resize, volley amp move, volley slope move/resize

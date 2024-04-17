@@ -229,17 +229,24 @@ class ProgressBarManager:
     def __init__(self, progressBar, total):
         self.progressBar = progressBar
         self.total = total
+        print(f"*** Progressbar start: {self.progressBar.value()}")
+        print(f"*** Progressbar total: {total}")
 
     def __enter__(self):
+        self.progressBar.setValue(0)
+        self.progressBar.setFormat("")
         self.progressBar.setVisible(True)
         return self
 
     def __exit__(self, type, value, traceback):
+        self.total = 0
+        self.progressBar.setFormat("")
         self.progressBar.setVisible(False)
 
-    def update(self, i):
-        percentage = int((i+1) * 100 / self.total)
+    def update(self, i, task_description):
+        percentage = int((i) * 100 / self.total)
         self.progressBar.setValue(percentage)
+        self.progressBar.setFormat(f"{task_description} {i + 1} / {self.total}:   %p% complete")
 
 
 class ParseDataThread(QtCore.QThread):
@@ -276,19 +283,23 @@ class ParseDataThread(QtCore.QThread):
 
 class GraphMainPreloadThread(QtCore.QThread):
     finished = QtCore.pyqtSignal()
+    progress = QtCore.pyqtSignal(int)
 
-    def __init__(self, df_p, uistate, uiplot, uisub):
+    def __init__(self, uistate, uiplot, uisub):
         super().__init__()
-        self.df_p = df_p
         self.uistate = uistate
         self.uiplot = uiplot
         self.uisub = uisub
+        self.df_p = self.uisub.get_df_project()
+        self.i = 0
 
     def run(self):
-        df = self.df_p.loc[self.df_p['sweeps'] != "..."]
+        df = self.df_p.loc[self.uistate.new_indices]
+        self.uistate.new_indices = []
+        self.i = 0
         for i, row in df.iterrows():
             dfmean = self.uisub.get_dfmean(row=row)
-            _ = self.uisub.get_dffilter(row=row) # cache for mouseover
+            _ = self.uisub.get_dffilter(row=row)
             if self.uistate.checkBox['paired_stims']:
                 dfoutput = self.uisub.get_dfdiff(row=row)
             else:
@@ -297,6 +308,8 @@ class GraphMainPreloadThread(QtCore.QThread):
                 return
             row = self.df_p.loc[i] # get_dfoutput updates df_project - update row!
             self.uiplot.addRow(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
+            self.progress.emit(i)
+            self.i += 1
             print(f"Preloaded {row['recording_name']}")
         self.finished.emit()
 
@@ -498,6 +511,7 @@ class Ui_MainWindow(QtCore.QObject):
 ################################################################
         self.pushButtonParse.setVisible(False) # explicit hide command required for Windows, but not Linux (?)
         self.progressBar.setVisible(False)
+        self.progressBar.setValue(0)
         if hide_experimental:
             self.label_paired_data.setVisible(False)
             self.pushButton_paired_data_flip.setVisible(False)
@@ -1075,6 +1089,7 @@ class UIsub(Ui_MainWindow):
 
     def triggerParse(self): # parse non-parsed files and folders in self.df_project
         self.usage("triggerParse")
+        self.mouseoverDisconnect()
         self.parseData()
         self.setButtonParse()
 
@@ -1369,7 +1384,7 @@ class UIsub(Ui_MainWindow):
 
 
     def updateProgressBar(self, i):
-        self.progressBarManager.update(i)
+        self.thread.progress.connect(lambda i: self.progressBarManager.update(i, "Parsing file "))
 
 
     def onParseDataFinished(self):
@@ -1379,9 +1394,11 @@ class UIsub(Ui_MainWindow):
             df_p = self.get_df_project()
             df_p = pd.concat([df_p[df_p['sweeps'] != "..."], rows2add]).reset_index(drop=True)
             self.set_df_project(df_p)
+            # Get the indices of the new rows, as they are in df_p
+            uistate.new_indices = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
         self.tableUpdate()
-        self.graphUpdate()
-
+        self.progressBarManager.__exit__(None, None, None)
+        self.graphMainPreload()
 
     def flipCI(self):
         if uistate.selected:
@@ -2000,23 +2017,39 @@ class UIsub(Ui_MainWindow):
             self.main_canvas_output.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.main_canvas_output, ax1=uistate.ax1, ax2=uistate.ax1))
             self.scroll_event_connected = True
         self.darkmode() # set darkmode if set in cfg
+        df_p = self.get_df_project()
+        if df_p.empty:
+            return
         self.graphMainPreload()
 
 
-    def graphMainPreload(self): # plot and hide all imported rows in df_project
+    def graphMainPreload(self): # plot and hide imported recordings
         self.usage("graphMainPreload")
         t0 = time.time()
-        df_p = self.get_df_project()
-
-        self.thread = GraphMainPreloadThread(df_p, uistate, uiplot, self)
+        self.mouseoverDisconnect()
+        if not uistate.new_indices:
+            df_p = self.get_df_project()
+            uistate.new_indices = df_p[~df_p['sweeps'].eq("...")].index.tolist()
+        if not uistate.new_indices:
+            return
+        print(f"Preloading {len(uistate.new_indices)} recordings.")
+        self.progressBar.setValue(0)
+        self.thread = GraphMainPreloadThread(uistate, uiplot, self)
         self.thread.finished.connect(lambda: self.onGraphMainPreloadFinished(t0))
+
+        # Create ProgressBarManager and connect progress signal
+        self.progressBarManager = ProgressBarManager(self.progressBar, len(uistate.new_indices))
+        self.thread.progress.connect(lambda i: self.progressBarManager.update(i, "Preloading recording"))
+
         self.thread.start()
+        self.progressBarManager.__enter__()  # Show progress bar
 
     def onGraphMainPreloadFinished(self, t0):
         self.graphGroups()
         print(f"Preloaded recordings and groups in {time.time()-t0:.2f} seconds.")
         uiplot.graphRefresh()
-
+        self.progressBarManager.__exit__(None, None, None)  # Hide progress bar
+        self.tableProjSelectionChanged()
 
     def graphGroups(self):
         group_ids = set(uistate.df_groups['group_ID'])
@@ -2064,18 +2097,7 @@ class UIsub(Ui_MainWindow):
 
 
     def updateMouseover(self):
-        # drop any prior mouseover event connections and plots
-        if hasattr(self, 'mouseover'):
-            self.main_canvas_mean.mpl_disconnect(self.mouseover)
-        if uistate.mouseover_plot is not None:
-            uistate.mouseover_plot[0].remove()
-            uistate.mouseover_plot = None
-        if uistate.mouseover_blob is not None:
-            uistate.mouseover_blob.remove()
-            uistate.mouseover_blob = None
-        if uistate.mouseover_out is not None:
-            uistate.mouseover_out[0].remove()
-            uistate.mouseover_out = None
+        self.mouseoverDisconnect()
         # if only one item is selected, make a new mouseover event connection
         if len(uistate.selected) == 1:
             df_p = self.get_df_project()
@@ -2103,6 +2125,19 @@ class UIsub(Ui_MainWindow):
         print("updateMouseover calls uiplot.graphRefresh()")
         uiplot.graphRefresh()
 
+    def mouseoverDisconnect(self):
+        # drop any prior mouseover event connections and plots
+        if hasattr(self, 'mouseover'):
+            self.main_canvas_mean.mpl_disconnect(self.mouseover)
+        if uistate.mouseover_plot is not None:
+            uistate.mouseover_plot[0].remove()
+            uistate.mouseover_plot = None
+        if uistate.mouseover_blob is not None:
+            uistate.mouseover_blob.remove()
+            uistate.mouseover_blob = None
+        if uistate.mouseover_out is not None:
+            uistate.mouseover_out[0].remove()
+            uistate.mouseover_out = None
 
     def mainClicked(self, event, canvas, out=False): # maingraph click event
         x = event.xdata
