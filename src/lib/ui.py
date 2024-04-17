@@ -242,6 +242,39 @@ class ProgressBarManager:
         self.progressBar.setValue(percentage)
 
 
+class ParseDataThread(QtCore.QThread):
+    progress = QtCore.pyqtSignal(int)
+
+    def __init__(self, df_p_to_update, dict_folders):
+        super().__init__()
+        self.df_p_to_update = df_p_to_update
+        self.dict_folders = dict_folders
+        self.rows = []
+        self.total = len(df_p_to_update)
+
+    def create_new_row(self, df_proj_row, new_name, dict_sub):
+        df_proj_new_row = df_proj_row.copy()
+        df_proj_new_row['ID'] = uuid.uuid4()
+        df_proj_new_row['recording_name'] = new_name
+        df_proj_new_row['sweeps'] = dict_sub.get('nsweeps', None)
+        df_proj_new_row['channel'] = dict_sub.get('channel', None)
+        df_proj_new_row['stim'] = dict_sub.get('stim', None)
+        return df_proj_new_row
+
+    def run(self):
+        for i, (_, df_proj_row) in enumerate(self.df_p_to_update.iterrows()):
+            self.progress.emit(i)
+            recording_name = df_proj_row['recording_name']
+            source_path = df_proj_row['path']
+            dict_data = parse.parseProjFiles(dict_folders = self.dict_folders, recording_name=recording_name, source_path=source_path)
+            for new_name, dict_sub in dict_data.items():
+                nsweeps = dict_sub.get('nsweeps', None) 
+                if nsweeps is not None:
+                    df_proj_new_row = self.create_new_row(df_proj_row, new_name, dict_sub)
+                    self.rows.append(df_proj_new_row)
+
+
+
 ################################################################
 # section directly copied from output from pyuic, do not alter #
 # trying to make all the rest work with it                     #
@@ -1296,31 +1329,29 @@ class UIsub(Ui_MainWindow):
 
 
     def parseData(self): 
-        def create_new_row(df_proj_row, new_name, dict_sub):
-            df_proj_new_row = df_proj_row.copy()
-            df_proj_new_row['ID'] = uuid.uuid4()
-            df_proj_new_row['recording_name'] = new_name
-            df_proj_new_row['sweeps'] = dict_sub.get('nsweeps', None)
-            df_proj_new_row['channel'] = dict_sub.get('channel', None)
-            df_proj_new_row['stim'] = dict_sub.get('stim', None)
-            return df_proj_new_row
         df_p = self.get_df_project()
         df_p_to_update = df_p[df_p['sweeps'] == "..."].copy()
-        rows = []
-        with ProgressBarManager(self.progressBar, df_p_to_update.shape[0]) as pbm:
-            for i, (_, df_proj_row) in enumerate(df_p_to_update.iterrows()):
-                pbm.update(i)
-                recording_name = df_proj_row['recording_name']
-                source_path = df_proj_row['path']
-                dict_data = parse.parseProjFiles(dict_folders = self.dict_folders, recording_name=recording_name, source_path=source_path)
-                for new_name, dict_sub in dict_data.items():
-                    nsweeps = dict_sub.get('nsweeps', None) 
-                    if nsweeps is not None:
-                        df_proj_new_row = create_new_row(df_proj_row, new_name, dict_sub)
-                        rows.append(df_proj_new_row)
-        rows2add = pd.concat(rows, axis=1).transpose()
-        df_p = pd.concat([df_p[df_p['sweeps'] != "..."], rows2add]).reset_index(drop=True)
-        self.set_df_project(df_p)
+
+        self.thread = ParseDataThread(df_p_to_update, self.dict_folders)
+        self.thread.progress.connect(self.updateProgressBar)
+        self.thread.finished.connect(self.onParseDataFinished)
+        self.thread.start()
+
+        self.progressBarManager = ProgressBarManager(self.progressBar, len(df_p_to_update))
+        self.progressBarManager.__enter__()
+
+
+    def updateProgressBar(self, i):
+        self.progressBarManager.update(i)
+
+
+    def onParseDataFinished(self):
+        self.progressBarManager.__exit__(None, None, None)
+        if self.thread.rows:
+            rows2add = pd.concat(self.thread.rows, axis=1).transpose()
+            df_p = self.get_df_project()
+            df_p = pd.concat([df_p[df_p['sweeps'] != "..."], rows2add]).reset_index(drop=True)
+            self.set_df_project(df_p)
         self.tableUpdate()
         self.graphUpdate()
 
