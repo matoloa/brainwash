@@ -91,8 +91,22 @@ def addFilterSavgol(df, window_length=9, poly_order=3):
 
 # %%
 def find_i_stim_prim_max(dfmean):
-    # TODO: return an index of sufficiently separated over-threshold x:es instead
     return dfmean['prim'].idxmax()
+
+
+# %%
+def find_i_stims(dfmean, threshold=0.75, min_time_difference=0.005, verbose=False):
+    prim_max = find_i_stim_prim_max(dfmean)
+    prim_max_y = dfmean.prim.max()
+    threshold *= prim_max_y
+    above_threshold_indices = np.where(dfmean['prim'] > threshold)[0]
+    # Filter the indices to ensure they are more than min_time_difference apart
+    filtered_indices = [above_threshold_indices[0]]
+    for i in range(1, len(above_threshold_indices)):
+        if dfmean['time'][above_threshold_indices[i]] - dfmean['time'][above_threshold_indices[i - 1]] > min_time_difference:
+            filtered_indices.append(above_threshold_indices[i])
+    print(f"find_i_stims: {filtered_indices}, type: {type(filtered_indices)}")
+    return filtered_indices
 
 
 # %%
@@ -164,6 +178,7 @@ def find_i_VEB_prim_peak_max(
     defined as largest positive peak in first order derivative between i_stim and i_EPSP
 
     """
+    i_stim = i_stim[0] # TODO: for now, operate only on the first stim
     if verbose:
         print("find_i_VEB_prim_peak_max:")
     # calculate sampling frequency
@@ -275,18 +290,18 @@ def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
     Returns a dict of all indices, with np.nan representing detection failure.
     """
     dict_i = { #set default np.nan
-        "i_stim": np.nan,
+        "i_stim": [],
         "i_VEB": np.nan,
         "i_EPSP_amp": np.nan,
         "i_EPSP_slope": np.nan,
         "i_volley_amp": np.nan,
         "i_volley_slope": np.nan,
         }
-    dict_i['i_stim'] = find_i_stim_prim_max(dfmean=dfmean,)
-    if dict_i['i_stim'] is np.nan: # TODO: will not happen in current configuration
+    dict_i['i_stim'] = find_i_stims(dfmean=dfmean)
+    if not dict_i['i_stim']:
         return dict_i
     dict_i['i_EPSP_amp'] = find_i_EPSP_peak_max(dfmean=dfmean, verbose=True)
-    if dict_i['i_EPSP_amp'] is np.nan: # TODO: will not happen in current configuration
+    if dict_i['i_EPSP_amp'] is np.nan:
         return dict_i
     dict_i['i_VEB'] = find_i_VEB_prim_peak_max(dfmean=dfmean, i_stim=dict_i['i_stim'], i_EPSP=dict_i['i_EPSP_amp'])
     if dict_i['i_VEB'] is np.nan:
@@ -307,7 +322,10 @@ def i2t(dfmean, dict_i, verbose=False):
     dict_t = {}
     for k, v in dict_i.items():
         k_new = "t" + k[1:]
-        dict_t[k_new] = np.nan if v is np.nan else dfmean.loc[v].time
+        if isinstance(v, list):
+            dict_t[k_new] = [np.nan if i is np.nan else dfmean.loc[i].time for i in v]
+        else:
+            dict_t[k_new] = np.nan if v is np.nan else dfmean.loc[v].time
     return dict_t
 
 
@@ -359,14 +377,7 @@ if __name__ == "__main__":
     print("Running as main: standalone test")
     #path_filterfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_filter.csv")
     #dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_Ch0_a_mean.csv")
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_Ch0_b_mean.csv")
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_24_P0630-D4_Ch0_a_mean.csv")
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_24_P0630-D4_Ch0_b_mean.csv")
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_22_P0701-D3_Ch0_a_mean.csv")
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_22_P0701-D3_Ch0_b_mean.csv")
-    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_23_P0630-D3_Ch0_a_mean.csv")
-    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/B_23_P0630-D3_Ch0_b_mean.csv")
+    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/2.8MB - PT_Ch0_a_mean.csv")
     
     dfmean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
     dfmean['tris'] = dfmean.bis.rolling(3, center=True).mean().diff()

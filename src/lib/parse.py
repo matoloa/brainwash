@@ -151,7 +151,7 @@ def build_dfmean(dfdata, rollingwidth=3):
     dfmean.reset_index(inplace=True)
     i_stim = dfmean.prim.idxmax()
     y_stim = dfmean.prim.max()
-    threshold = y_stim*0.9
+    threshold = y_stim*0.75
     min_time_difference = 0.005  # Minimum time difference 5ms TODO: hardcoded
     # Find the indices where 'prim' is above the threshold
     above_threshold_indices = np.where(dfmean['prim'] > threshold)[0]
@@ -162,14 +162,12 @@ def build_dfmean(dfdata, rollingwidth=3):
             filtered_indices.append(above_threshold_indices[i])
     n_stim = len(filtered_indices)
     print(f"build_dfmean found {len(above_threshold_indices)} above_threshold_indices in {n_stim} unique stims.")
-    if n_stim == 1:
-        # subtract median of 20-5 samples before stimulus artifact
-        median = dfmean['voltage'].iloc[i_stim-20:i_stim-5].median() # TODO: hardcoded 20 and 5
-        #print(f"dfmean BEFORE subtract: {dfmean}")
-        dfmean['voltage'] = dfmean['voltage'] - median
-        #print(f"dfmean AFTER subtract: {dfmean}")
-    else:
+    if False:#n_stim > 1:
         raise ValueError(f"build_dfmean found {n_stim} stimulus artifacts. Expected 1.")
+    else:
+        i_stim = filtered_indices[0]
+    median = dfmean['voltage'].iloc[i_stim-20:i_stim-5].median() # TODO: hardcoded 20 and 5
+    dfmean['voltage'] = dfmean['voltage'] - median
     return dfmean
 
 def zeroSweeps(dfdata, dfmean):
@@ -337,14 +335,15 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     dict_folders['data'] = dict_folders['project'] / "data"
     dict_folders['cache'] = dict_folders['project'] / "cache"
     dict_folders['project'].mkdir(exist_ok=True)
-    list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"),
-                    str(source_folder / "abf 1 channel/A_24_P0630-D4"),
-                    str(source_folder / "abf 1 channel/B_22_P0701-D3"),
-                    str(source_folder / "abf 1 channel/B_23_P0630-D3"),                    
-                   ]
+    # list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"),
+    #                 str(source_folder / "abf 1 channel/A_24_P0630-D4"),
+    #                 str(source_folder / "abf 1 channel/B_22_P0701-D3"),
+    #                 str(source_folder / "abf 1 channel/B_23_P0630-D3"),                    
+    #                ]
     #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"), str(source_folder / "abf 2 channel/KO_02/2022_01_24_0020.abf")]
     #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"), str(source_folder / "abf 2 channel/KO_02/2022_01_24_0020.abf")]
     #list_sources = [str(source_folder / "abf 1 channel/A_24_P0630-D4")]
+    list_sources = [str(source_folder / "abf Ca trains/03 PT 10nM TTX varied Stim/2.8MB - PT/2023_07_18_0006.abf")]
     for _ in range(3):
         print()
     print("", "*** parse.py standalone test: ***")

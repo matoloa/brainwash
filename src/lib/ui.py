@@ -5,7 +5,7 @@ import yaml
 
 import numpy as np  # numeric calculations module
 import pandas as pd
-import seaborn as sns
+#import seaborn as sns
 #import scipy.stats as stats
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -855,6 +855,15 @@ class UIsub(Ui_MainWindow):
                 self.dict_usage = {'WARNING': "Do NOT set your alias to anything that can be used to identify you!", 'alias': "", 'ID': str(uuid.uuid4()), 'os': os_name, 'ID_created': now, f"last_used_{version}": now}
             self.write_usage()
 
+        # TODO: WIP metadata table
+        # Create a model
+        model = QtGui.QStandardItemModel()
+        # Add "Hello" to the model
+        item = QtGui.QStandardItem("Placeholder metadata")
+        model.appendRow(item)
+        # Set the model for the table
+        self.tableMetadata.setModel(model)
+
         # debug mode; prints widget focus every 1000ms
         if track_widget_focus:
             self.timer = QtCore.QTimer(self)
@@ -1096,16 +1105,16 @@ class UIsub(Ui_MainWindow):
         self.setButtonParse()
 
 
-# Non-button event functions
     def talkback(self):
         row = uistate.row_copy
         dfmean = self.dfmean
 
-        t_start = row['t_stim'] - 0.002
-        t_end = row['t_stim'] + 0.018
+        t_stim = row['t_stim']
+        t_start = t_stim - 0.002
+        t_end = t_stim + 0.018
         dfevent = dfmean[(dfmean['time'] >= t_start) & (dfmean['time'] < t_end)]
         dfevent = dfevent[['time', 'voltage']]
-        path_talkback_df = Path(f"{self.projects_folder}/talkback/talkback_slice_{row['ID']}.csv")
+        path_talkback_df = Path(f"{self.projects_folder}/talkback/talkback_slice_{row['ID']}_stim.csv")
         if not path_talkback_df.parent.exists():
             path_talkback_df.parent.mkdir(parents=True, exist_ok=True)
         dfevent.to_csv(path_talkback_df, index=False)
@@ -1119,7 +1128,7 @@ class UIsub(Ui_MainWindow):
         dict_event = {key: row[key] for key in keys}
         print(f"talkback dict_event: {dict_event}")
         # store dict_event as .csv named after recording_name
-        path_talkback = Path(f"{self.projects_folder}/talkback/talkback_meta_{row['ID']}.csv")
+        path_talkback = Path(f"{self.projects_folder}/talkback/talkback_meta_{row['ID']}_stim.csv")
         with open(path_talkback, 'w') as f:
             json.dump(dict_event, f)
 
@@ -1157,11 +1166,23 @@ class UIsub(Ui_MainWindow):
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         # build the list uistate.selected with indices
         uistate.selected = [index.row() for index in selected_indexes]
+        self.zoomAuto()
         self.update_recs2plot()
         self.updateMouseover()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
         report()
 
+
+    def zoomAuto(self):
+        # find the lowest t_stim and highest t_stim in selected rows
+        if uistate.selected:
+            df_p = self.get_df_project()
+            t_stim_series = df_p.loc[uistate.selected, 't_stim']
+            if not t_stim_series.empty:
+                t_stim_min = t_stim_series.min() - 0.0005
+                t_stim_max = t_stim_series.max() + 0.010
+                uistate.zoom['mean_xlim'] = (t_stim_min, t_stim_max)
+                uistate.axm.set_xlim(uistate.zoom['mean_xlim'])
 
     def update_recs2plot(self):
         if uistate.selected:
@@ -1722,6 +1743,7 @@ class UIsub(Ui_MainWindow):
                         df_p.columns.get_loc('recording_name'),
                         df_p.columns.get_loc('sweeps'),
                         df_p.columns.get_loc('groups'),
+                        df_p.columns.get_loc('n_stims'),
 #                        df_p.columns.get_loc('group_IDs'),
 #                        df_p.columns.get_loc('t_EPSP_amp'),
 #                        df_p.columns.get_loc('t_EPSP_amp_method'),
@@ -1977,15 +1999,17 @@ class UIsub(Ui_MainWindow):
                                           volley_slope_halfwidth=dict_t['t_volley_slope_halfwidth'], 
                                           EPSP_slope_halfwidth=dict_t['t_EPSP_slope_halfwidth'], 
                                           verbose=False))
+        row_id = row['ID'] # Get the row ID
         for key, value in dict_t.items():
-            # Get the row ID
-            row_id = row['ID']
             old_aspect_value = df_p.loc[df_p['ID'] == row_id, key].values[0]
             if pd.notna(old_aspect_value):
-                # if old_aspect IS a valid float, use it: replace in dict_t
+                # if old_aspect is a valid float, use it: replace in dict_t
                 print(f"{key} was {old_aspect_value} in df_p, a valid float. Updated dict_t from {value}")
                 dict_t[key] = old_aspect_value
             else: # if old_aspect is NOT a valid float, replace df_p with dict_t
+                if isinstance(value, list):
+                    df_p.loc[df_p['ID'] == row_id, 'n_stims'] = len(value)
+                    value = value[0]
                 print(f"{key} was {old_aspect_value} in df_p, NOT a valid float. Updating df_p with {value}.")
                 df_p.loc[df_p['ID'] == row_id, key] = value
         dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
@@ -2468,6 +2492,7 @@ def df_projectTemplate():
             "Tx",
             "filter",
             "filter_params",
+            "n_stims",
             "t_stim",
             "t_stim_method",
             "t_stim_params",
