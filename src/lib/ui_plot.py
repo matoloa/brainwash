@@ -68,11 +68,23 @@ class UIplot():
             ax2_legend = self.set_visible_get_legend(axis=ax2, show=uistate.to_ax2(uistate.df_recs2plot))
             ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
 
-        for _, ID_line in uistate.dict_group_label_ID_line.items():
-            group_ID = ID_line[0]
+        for label, ID_line_fill in uistate.dict_group_label_ID_line.items():
+            group_ID = ID_line_fill[0]
             str_show = uistate.df_groups.loc[uistate.df_groups['group_ID'] == group_ID, 'show'].values[0]
-            show = bool(str_show == 'True')
-            ID_line[1].set_visible(show)
+            print(f"Group {group_ID}: {label} - {str_show}")
+            if uistate.df_recs2plot is not None and not getattr(uistate.df_recs2plot, 'empty', True):
+                if 'group_IDs' in uistate.df_recs2plot.columns and any(uistate.df_recs2plot['group_IDs'].str.contains(group_ID)):
+                    ID_line_fill[1].set_visible(bool(str_show == 'True'))
+                    ID_line_fill[2].set_visible(bool(str_show == 'True'))
+                    print(" - - set to show by selection")
+                else:
+                    ID_line_fill[1].set_visible(False)
+                    ID_line_fill[2].set_visible(False)
+                    print(" - - set to hide by selection")
+            else:
+                print(f" - - set to {bool(str_show == 'True')} by checkBox, no df_recs2plot")
+                ID_line_fill[1].set_visible(bool(str_show == 'True'))
+                ID_line_fill[2].set_visible(bool(str_show == 'True')) # show all groups if no recordings are selected
 
         # arrange axes and labels
         axm.set_xlabel("Time (s)")
@@ -199,18 +211,20 @@ class UIplot():
         group_ID = df_group_row['group_ID']
         group_name = df_group_row['group_name']
         color = df_group_row['color']
-        print(f"addGroup - df_group_row: {df_group_row}")
         label = f"{group_name} EPSP slope"
-        _ = sns.lineplot(ax=ax2, data=df_groupmean, y='EPSP_slope_mean', x="sweep", color=color, alpha=0.5, label=label)
-        self.uistate.dict_group_label_ID_line[label] = group_ID, ax2.lines[-1]
-        label = f"{group_name} EPSP amp"
-        _ = sns.lineplot(ax=ax1, data=df_groupmean, y='EPSP_amp_mean', x="sweep", color=color, alpha=0.5, linestyle='--', label=label)
-        self.uistate.dict_group_label_ID_line[label] = group_ID, ax1.lines[-1]
-
+        if df_groupmean['EPSP_amp_mean'].notna().any() & self.uistate.checkBox['EPSP_amp']:
+            label = f"{group_name} EPSP amp"
+            line, = ax1.plot(df_groupmean.sweep, df_groupmean.EPSP_amp_mean, color=color, alpha=0.5, linestyle='--', label=label)
+            fill = ax1.fill_between(df_groupmean.sweep, df_groupmean.EPSP_amp_mean + df_groupmean.EPSP_amp_SEM, df_groupmean.EPSP_amp_mean - df_groupmean.EPSP_amp_SEM, alpha=0.3, color=color)
+            self.uistate.dict_group_label_ID_line[label] = [group_ID, line, fill]
+        if df_groupmean['EPSP_slope_mean'].notna().any() & self.uistate.checkBox['EPSP_slope']:
+            label = f"{group_name} EPSP slope"
+            line, = ax2.plot(df_groupmean.sweep, df_groupmean.EPSP_slope_mean, color=color, alpha=0.5, linestyle='--', label=label)
+            fill = ax2.fill_between(df_groupmean.sweep, df_groupmean.EPSP_slope_mean + df_groupmean.EPSP_slope_SEM, df_groupmean.EPSP_slope_mean - df_groupmean.EPSP_slope_SEM, alpha=0.3, color=color)
+            self.uistate.dict_group_label_ID_line[label] = [group_ID, line, fill]
 
     def plotUpdate(self, row, aspect, dfmean):
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
-        mouseover_out = self.uistate.mouseover_out
         norm = self.uistate.checkBox['norm_EPSP']
         rec_filter = row['filter']  # the filter currently used for this recording
         plot_to_update = f"{row['recording_name']} {aspect} marker"
@@ -243,32 +257,23 @@ class UIplot():
 
     def updateLine(self, plot_to_update, x_data, y_data):
         axm = self.uistate.axm
-        for line in axm.get_lines():
-            if line.get_label() == plot_to_update:
-                line.set_xdata(x_data)
-                line.set_ydata(y_data)
-                axm.figure.canvas.draw()
-                break
+        line = self.uistate.dict_rec_label_ID_line[plot_to_update]
+        line[1].set_xdata(x_data)
+        line[1].set_ydata(y_data)
+        axm.figure.canvas.draw()
 
     def updateOutLine(self, ax_out, row, aspect):
         mouseover_out = self.uistate.mouseover_out
-        print(f"Updating {row['recording_name']} {aspect}")
-        for line in ax_out.get_lines():
-            if line.get_label() == f"{row['recording_name']} {aspect}":
-                line.set_ydata(mouseover_out[0].get_ydata())
-                ax_out.figure.canvas.draw()
-                break
+        line = self.uistate.dict_rec_label_ID_line[f"{row['recording_name']} {aspect}"]
+        line[1].set_ydata(mouseover_out[0].get_ydata())
 
     def updateOutMean(self, ax_out, aspect, row):
         rec_name = row['recording_name']
         mean = row[f'{aspect.replace(" ", "_")}_mean']
-        for line in ax_out.get_lines():
-            if line.get_label() == f"{rec_name} {aspect} mean":
-                line.set_ydata(mean)
-                ax_out.figure.canvas.draw()
-                break
+        line = self.uistate.dict_rec_label_ID_line[f"{rec_name} {aspect} mean"]
+        line[1].set_ydata(mean)
 
-    def updateEPSPout(self, rec_name, out):
+    def updateEPSPout(self, rec_name, out): # TODO: update this last remaining ax-cycle to use the dict
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
         for line in ax1.get_lines():
             if line.get_label() == f"{rec_name} EPSP amp":
@@ -283,7 +288,7 @@ class UIplot():
                 line.set_ydata(out['EPSP_slope_norm'])
                 ax2.figure.canvas.draw()
 
-    def graphMouseover(self, event, axm): # determine which maingraph event is being mouseovered
+    def graphMouseover(self, event): # determine which maingraph event is being mouseovered
         axm = self.uistate.axm
         uistate = self.uistate
         def plotMouseover(action, axm):

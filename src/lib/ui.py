@@ -1275,7 +1275,7 @@ class UIsub(Ui_MainWindow):
         df_p = pd.concat([df_p, dfAdd])
         df_p.reset_index(drop=True, inplace=True)
         df_p['groups'] = df_p['groups'].fillna(" ")
-        df_p['group_IDs'] = df_p['groups'].fillna(" ")
+        df_p['group_IDs'] = df_p['group_IDs'].fillna(" ")
         df_p['sweeps'] = df_p['sweeps'].fillna("...")
         self.set_df_project(df_p)
         self.tableFormat()
@@ -1461,7 +1461,7 @@ class UIsub(Ui_MainWindow):
         self.new_group_menu_item.setShortcut(f"{str_ID}")
         self.menuGroups.addAction(self.new_group_menu_item)                    
         self.new_checkbox = CustomCheckBox(str_ID)
-        self.new_checkbox.rightClicked.connect(self.triggerGroupRename)
+        self.new_checkbox.rightClicked.connect(self.triggerGroupRename) # str_ID is passed by CustomCheckBox
         self.new_checkbox.setObjectName(group_ID)
         self.new_checkbox.setText(f"{str_ID}. {group_name}")
         self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the background color
@@ -1687,7 +1687,7 @@ class UIsub(Ui_MainWindow):
         self.resetCacheDicts() # clear internal caches
         self.projectname = self.dict_folders['project'].stem
         self.dict_folders = self.build_dict_folders()
-        self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"))
+        self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"), dtype={'group_IDs': str})
         uistate.load_cfg(self.dict_folders['project'], version)
         self.tableFormat()
         self.write_bw_cfg()
@@ -2053,6 +2053,8 @@ class UIsub(Ui_MainWindow):
 
     def graphGroups(self):
         group_ids = set(uistate.df_groups['group_ID'])
+        print (f"group_ids: {group_ids}, {type(group_ids)}")
+        print (f"df_project: {self.df_project['group_IDs'], type(self.df_project['group_IDs'])}")
         groups_with_recs = set(group_id for group_ids in self.df_project['group_IDs'] for group_id in group_ids.split(','))
         already_plotted = set(uistate.get_groupSet())
         print(f"groups already plotted: {already_plotted}")
@@ -2121,7 +2123,7 @@ class UIsub(Ui_MainWindow):
                     uistate.updatePointDragZone(aspect="volley amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
                     connect = True
             if connect: # set new mouseover event connection
-                self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: uiplot.graphMouseover(event=event, axm=uistate.axm))
+                self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', uiplot.graphMouseover)
         print("updateMouseover calls uiplot.graphRefresh()")
         uiplot.graphRefresh()
 
@@ -2452,8 +2454,8 @@ def df_projectTemplate():
             "host",
             "path",
             "recording_name",
-            "groups",
             "group_IDs",
+            "groups",
             "parsetimestamp",
             "sweeps",
             "channel",
