@@ -53,7 +53,7 @@ class UIstate:
         self.row_copy = None # copy of single-selected row from df_project, for storing measure points until either saved or rejected
         self.df_recs2plot = None # df_project copy of selected PARSED recordings (or all parsed, if none are selected)
         self.dict_rec_label_ID_line = {} # dict of all plotted recording lines: key=label, value=(rec_ID, 2Dline object)
-        self.dict_group_label_ID_line = {} # dict of all plotted group lines: key=label, value=(group_ID, 2Dline object)
+        self.dict_group_label_ID_line_SEM = {} # dict of all plotted groups: key=label, value=[group_ID, 2Dline object, fill]
         self.new_indices = [] # list of indices in uisub.df_project of newly parsed recordings; used by uisub.graphMainPreload()
 
     # Mouseover variables
@@ -148,7 +148,7 @@ class UIstate:
         return set([value[0] for value in self.dict_rec_label_ID_line.values()])
 
     def get_groupSet(self): # returns a set of all groups that are currently plotted
-        return set([value[0] for value in self.dict_group_label_ID_line.values()])
+        return set([value[0] for value in self.dict_group_label_ID_line_SEM.values()])
 
     #def get_recs_in_group(self):
 
