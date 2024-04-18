@@ -43,13 +43,20 @@ class UIplot():
 
 
     def unPlot(self, rec_ID):
-        def remove_lines_and_keys(dict_label_ID_line):
-            keys_to_remove = [key for key, value in dict_label_ID_line.items() if rec_ID == value[0]]
-            for key in keys_to_remove:
-                dict_label_ID_line[key][1].remove()
-                del dict_label_ID_line[key]
-        remove_lines_and_keys(self.uistate.dict_rec_label_ID_line)
-        remove_lines_and_keys(self.uistate.dict_group_label_ID_line_SEM)
+        dict_rec = self.uistate.dict_rec_label_ID_line
+        keys_to_remove = [key for key, value in dict_rec.items() if rec_ID == value[0]]
+        for key in keys_to_remove:
+            dict_rec[key][1].remove()
+            del dict_rec[key]
+
+
+    def unPlotGroup(self, group_ID):
+        dict_group = self.uistate.dict_group_label_ID_line_SEM
+        keys_to_remove = [key for key, value in dict_group.items() if group_ID == value[0]]
+        for key in keys_to_remove:
+            dict_group[key][1].remove()
+            dict_group[key][2].remove()
+            del dict_group[key]
 
 
     def graphRefresh(self):

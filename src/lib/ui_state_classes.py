@@ -246,7 +246,6 @@ class UIstate:
                     print("Patch version mismatch: Minor changes may not load correctly")
         else:
             self.save_cfg(projectfolder, bw_version)
-        print(f" *** loaded df_groups: {self.df_groups}")
 
     def save_cfg(self, projectfolder, bw_version=None): # save state to project config file
         path_pkl = projectfolder / "cfg.pkl"

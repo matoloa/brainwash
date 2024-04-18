@@ -829,7 +829,7 @@ class UIsub(Ui_MainWindow):
         # connect paired stim checkbox and flip button to local functions
         #self.checkBox_paired_stims.setChecked(uistate.checkBox['paired_stims'])
         #self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
-        self.pushButton_paired_data_flip.pressed.connect(self.pushButton_paired_data_flip_pressed)
+        #self.pushButton_paired_data_flip.pressed.connect(self.pushButton_paired_data_flip_pressed)
 
         # connect Relative checkbox and lineedits to local functions
         norm = uistate.checkBox['norm_EPSP']
@@ -908,6 +908,8 @@ class UIsub(Ui_MainWindow):
                     rec_name = row['recording_name']
                     out = self.dict_outputs[rec_name]
                     uiplot.updateEPSPout(rec_name, out)
+                self.purgeGroupCache()
+                self.graphGroups()
         self.updateMouseover()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
@@ -1560,7 +1562,7 @@ class UIsub(Ui_MainWindow):
         self.save_df_project()
         self.purgeGroupCache(add_group_ID)
         self.tableFormat()
-        uiplot.unPlot(add_group_ID)
+        uiplot.unPlotGroup(add_group_ID)
         self.graphGroups()
         self.updateMouseover()
 
@@ -1584,6 +1586,8 @@ class UIsub(Ui_MainWindow):
             self.updateMouseover()
 
     def purgeGroupCache(self, *groups): # clear cache so that a new group mean is calculated
+        if not groups:  # if no groups are passed
+            groups = list(self.dict_group_means.keys())  # purge all groups
         if verbose:
             print(f"purgeGroupCache: {groups}, len(group): {len(groups)}")
         for group in groups:
@@ -1597,7 +1601,7 @@ class UIsub(Ui_MainWindow):
                     print("...and was successfully unlinked.")
                 except FileNotFoundError:
                     print("...but NOT when attempting to unlink.")
-            uiplot.unPlot(group)
+            uiplot.unPlotGroup(group)
 
     def clearGroupsByRow(self, rows):
         list_affected_groups = ' '.join(self.df_project.iloc[rows]['group_IDs'])
