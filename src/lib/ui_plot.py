@@ -19,7 +19,7 @@ class UIplot():
                 ax.xaxis.label.set_color('white')
                 ax.yaxis.label.set_color('white')
                 ax.tick_params(colors='white')
-            print("Dark mode activated")
+            #print("Dark mode activated")
         else:
             style.use('default')
             for ax in [axm, ax1, ax2]:
@@ -28,7 +28,7 @@ class UIplot():
                 ax.xaxis.label.set_color('black')
                 ax.yaxis.label.set_color('black')
                 ax.tick_params(colors='black')
-            print("Default mode activated")
+            #print("Default mode activated")
 
 
     def hideAll(self):

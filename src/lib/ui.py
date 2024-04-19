@@ -24,28 +24,30 @@ import analysis
 import ui_state_classes
 import ui_plot
 
-print("\n" * 3, f"launch at {time.strftime('%H:%M:%S')}")
+matplotlib_use("Qt5Agg")
+
+
+class Config:
+    def __init__(self):
+        print("\n"*3)
+        print(f"Config set {time.strftime('%H:%M:%S')}")
+        self.dev_mode = True # set to False for deployment
+        self.verbose = self.dev_mode
+        self.talkback = not self.dev_mode
+        self.hide_experimental = not self.dev_mode
+        self.track_widget_focus = False
+        self.terminal_space = 372 if self.dev_mode else 0
+        # get project_name and version number from pyproject.toml
+        pathtoml = [i + "/pyproject.toml" for i in ["..", ".", "lib"] if Path(i + "/pyproject.toml").is_file()][0]
+        pyproject = toml.load(pathtoml)
+        self.program_name = pyproject['project']['name']
+        self.version = pyproject['project']['version']
+
+config = Config() 
 uistate = ui_state_classes.UIstate() # global variable for storing state of UI
 importlib.reload(ui_plot)
 uiplot = ui_plot.UIplot(uistate)
 
-matplotlib_use("Qt5Agg")
-
-class Config:
-    def __init__(self, dev_mode):
-        self.dev_mode = dev_mode
-        self.verbose = dev_mode
-        self.talkback = not dev_mode
-        self.hide_experimental = not dev_mode
-        self.track_widget_focus = False
-        self.terminal_space = 372 if dev_mode else 0
-
-config = Config(dev_mode=True) # set to False for deployment
-
-# get project name and version number from pyproject.toml
-pathtoml = [i + "/pyproject.toml" for i in ["..", ".", "lib"] if Path(i + "/pyproject.toml").is_file()][0]
-pyproject = toml.load(pathtoml)
-version = pyproject['project']['version']
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
@@ -684,7 +686,7 @@ class UIsub(Ui_MainWindow):
 
 
         # set window title to projectname
-        self.mainwindow.setWindowTitle(f"Brainwash {version} - {self.projectname}")
+        self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
 
 #       File menu
         self.actionNew = QtWidgets.QAction("New project", self)
@@ -705,7 +707,7 @@ class UIsub(Ui_MainWindow):
         #self.actionUndo.triggered.connect(self.triggerUndo)
         self.actionUndo.setShortcut("Ctrl+Z")
         self.menuEdit.addAction(self.actionUndo)
-        self.actionDarkmode = QtWidgets.QAction("Toggle Darkmoode", self)
+        self.actionDarkmode = QtWidgets.QAction("Toggle Darkmode", self)
         self.actionDarkmode.triggered.connect(self.triggerDarkmode)
         self.actionDarkmode.setShortcut("Ctrl+D")
         self.menuEdit.addAction(self.actionDarkmode)
@@ -783,7 +785,7 @@ class UIsub(Ui_MainWindow):
             self.write_bw_cfg()
 
         # If local project.cfg exists, load it, otherwise create it
-        uistate.load_cfg(projectfolder=self.dict_folders['project'], bw_version=version)
+        uistate.load_cfg(projectfolder=self.dict_folders['project'], bw_version=config.version)
 
         # make the graphs scaleable
         self.graphMean.setLayout(QtWidgets.QVBoxLayout())
@@ -829,10 +831,10 @@ class UIsub(Ui_MainWindow):
             if path_usage.exists():
                 with path_usage.open("r") as file:
                     self.dict_usage = yaml.safe_load(file)
-                self.dict_usage[f"last_used_{version}"] = now
+                self.dict_usage[f"last_used_{config.version}"] = now
             else:
                 os_name = sys.platform
-                self.dict_usage = {'WARNING': "Do NOT set your alias to anything that can be used to identify you!", 'alias': "", 'ID': str(uuid.uuid4()), 'os': os_name, 'ID_created': now, f"last_used_{version}": now}
+                self.dict_usage = {'WARNING': "Do NOT set your alias to anything that can be used to identify you!", 'alias': "", 'ID': str(uuid.uuid4()), 'os': os_name, 'ID_created': now, f"last_used_{config.version}": now}
             self.write_usage()
 
         # TODO: WIP metadata table
@@ -1007,7 +1009,7 @@ class UIsub(Ui_MainWindow):
         dict_folders = {
                     'project': self.projects_folder / self.projectname,
                     'data': self.projects_folder / self.projectname / 'data',
-                    'cache': self.projects_folder / f'cache {version}' / self.projectname,
+                    'cache': self.projects_folder / f'cache {config.version}' / self.projectname,
         }
         return dict_folders
 
@@ -1046,8 +1048,8 @@ class UIsub(Ui_MainWindow):
 # trigger functions TODO: break out the big ones to separate functions!
 
     def triggerDarkmode(self):
-        self.usage("triggerDarkmode")
         uistate.darkmode = not uistate.darkmode
+        self.usage(f"triggerDarkmode set to {uistate.darkmode}")
         self.write_bw_cfg()
         self.darkmode()
 
@@ -1164,7 +1166,7 @@ class UIsub(Ui_MainWindow):
             self.load_df_project()
             self.connectUIstate()
             self.groupControlsRefresh()
-            self.mainwindow.setWindowTitle(f"Brainwash {version} - {self.projectname}")
+            self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
 
     def triggerAddData(self): # creates file tree for file selection
         self.usage("triggerAddData")
@@ -1669,7 +1671,7 @@ class UIsub(Ui_MainWindow):
         else:
             new_projectfolder.mkdir()
             self.projectname = new_project_name
-            self.mainwindow.setWindowTitle(f"Brainwash {version} - {self.projectname}")
+            self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
             self.dict_folders = self.build_dict_folders()
             self.resetCacheDicts()
             self.set_df_project(df_projectTemplate())
@@ -1696,7 +1698,7 @@ class UIsub(Ui_MainWindow):
                 dict_old['cache'].rename(self.dict_folders['cache'])
             # self.project_cfg_yaml = self.dict_folders['project'] / "project_cfg.yaml"
             # self.write_bw_cfg() # update boot-up-path in bw_cfg.yaml to new project folder
-            self.mainwindow.setWindowTitle(f"Brainwash {version} - {self.projectname}")
+            self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
         else:
             print(f"Project name {new_project_name} is not a valid path.")
 
@@ -1718,7 +1720,7 @@ class UIsub(Ui_MainWindow):
         self.projectname = self.dict_folders['project'].stem
         self.dict_folders = self.build_dict_folders()
         self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"), dtype={'group_IDs': str})
-        uistate.load_cfg(self.dict_folders['project'], version)
+        uistate.load_cfg(self.dict_folders['project'], config.version)
         self.tableFormat()
         self.write_bw_cfg()
 
@@ -2497,7 +2499,7 @@ def df_projectTemplate():
             "filter",
             "filter_params",
             "n_stims",
-            # deprecate timepoints
+            # TODO: deprecate timepoints
             "t_stim",
             "t_stim_method",
             "t_stim_params",
@@ -2524,6 +2526,7 @@ def df_projectTemplate():
             "t_EPSP_slope_end",
             "t_EPSP_slope_method",
             "t_EPSP_slope_params",
+
             "exclude",
             "comment",
         ]
@@ -2570,7 +2573,7 @@ def report(): # debug function to report custom aspects of the current state of 
 
 
 if __name__ == "__main__":
-    print(f"\n\n{pyproject['project']['name']} {version}\n")
+    print(f"\n\n{config.program_name} {config.version}\n")
     app = QtWidgets.QApplication(sys.argv) # "QtWidgets.QApplication(sys.argv) appears to cause Qt: Session management error: None of the authentication protocols specified are supported"
     main_window = QtWidgets.QMainWindow()
     uisub = UIsub(main_window)
