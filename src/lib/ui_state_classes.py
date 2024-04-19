@@ -6,10 +6,9 @@ class UIstate:
         self.reset()
 
     def reset(self): # (re)set all persisted states
-        print(" - - - resetting UIstate")
+        print("UIstate: reset")
         self.version = "0.0.0"
         self.colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000']
-        self.darkmode = True
         self.df_groups = pd.DataFrame(columns=['group_ID', 'group_name', 'color', 'show'])
         self.checkBox = {
             'EPSP_amp': False,
@@ -55,6 +54,7 @@ class UIstate:
         self.dict_rec_label_ID_line = {} # dict of all plotted recording lines: key=label, value=(rec_ID, 2Dline object)
         self.dict_group_label_ID_line_SEM = {} # dict of all plotted groups: key=label, value=[group_ID, 2Dline object, fill]
         self.new_indices = [] # list of indices in uisub.df_project of newly parsed recordings; used by uisub.graphMainPreload()
+        self.darkmode = False # set by global bw cfg
 
     # Mouseover variables
         self.mouseover_action = None # name of action to take if clicked at current mouseover: EPSP amp move, EPSP slope move/resize, volley amp move, volley slope move/resize
@@ -206,7 +206,6 @@ class UIstate:
         try:
             return {
                 'version': self.version,
-                'darkmode': self.darkmode,
                 'selected': self.selected,
                 'df_groups': self.df_groups,
                 'checkBox': self.checkBox,
@@ -219,7 +218,6 @@ class UIstate:
     
     def set_state(self, state):
         self.version = state.get('version')
-        self.darkmode = state.get('darkmode')
         self.df_groups = state.get('df_groups')
         self.checkBox = state.get('checkBox')
         self.lineEdit = state.get('lineEdit')

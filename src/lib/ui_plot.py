@@ -7,7 +7,7 @@ from matplotlib.lines import Line2D
 class UIplot():
     def __init__(self, uistate):
         self.uistate = uistate
-        print(f"UIplot instantiated {self.uistate.anyView()}")
+        print(f"UIplot instantiated: {self.uistate.anyView()}")
     
     def styleUpdate(self):
         axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2

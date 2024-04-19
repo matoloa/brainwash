@@ -2,24 +2,18 @@ import os  # TODO: replace use by pathlib?
 import sys
 from pathlib import Path
 import yaml
-
-import numpy as np  # numeric calculations module
+from PyQt5 import QtCore, QtWidgets, QtGui
+import numpy as np
 import pandas as pd
-#import seaborn as sns
-#import scipy.stats as stats
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib import use as matplotlib_use
 from matplotlib.figure import Figure
-#from matplotlib.lines import Line2D
-#from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
-from PyQt5 import QtCore, QtWidgets, QtGui
 from datetime import datetime # used in project name defaults
+import json # for saving and loading dicts as strings
 import re # regular expressions
 import time # counting time for functions
-import json # for saving and loading dicts as strings
-
 import uuid # generating unique talkback ID
 import socket # getting computer name and localdomain for df_project['host'] (not reported in talkback)
 import toml # for reading pyproject.toml
@@ -30,24 +24,28 @@ import analysis
 import ui_state_classes
 import ui_plot
 
+print("\n" * 3, f"launch at {time.strftime('%H:%M:%S')}")
 uistate = ui_state_classes.UIstate() # global variable for storing state of UI
 importlib.reload(ui_plot)
 uiplot = ui_plot.UIplot(uistate)
 
 matplotlib_use("Qt5Agg")
 
-# TODO: import from pyproject.toml
-#pathtoml = "pyproject.toml" if getattr(sys, "frozen", False) else "../pyproject.toml"
+class Config:
+    def __init__(self, dev_mode):
+        self.dev_mode = dev_mode
+        self.verbose = dev_mode
+        self.talkback = not dev_mode
+        self.hide_experimental = not dev_mode
+        self.track_widget_focus = False
+        self.terminal_space = 372 if dev_mode else 0
+
+config = Config(dev_mode=True) # set to False for deployment
+
+# get project name and version number from pyproject.toml
 pathtoml = [i + "/pyproject.toml" for i in ["..", ".", "lib"] if Path(i + "/pyproject.toml").is_file()][0]
 pyproject = toml.load(pathtoml)
 version = pyproject['project']['version']
-
-verbose = True
-talkback = True
-hide_experimental = False # Hide experimental features
-track_widget_focus = False
-terminal_space = 372 # for development, leave e.g. 300 pixels below program to view terminal messages, or 72 for win-mode (resolution-specific?)
-
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
@@ -98,7 +96,6 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel):  # Should be paired wit
     def __init__(self, parent=None, root_path="."):
         QtWidgets.QFileSystemModel.__init__(self, None)
         self.root_path = root_path
-        self.verbose = verbose
         self.checks = {}
         self.nodestack = []
         self.parent_index = self.setRootPath(self.root_path)
@@ -109,7 +106,7 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel):  # Should be paired wit
         self.directoryLoaded.connect(self._loaded)
 
     def _loaded(self, path):
-        if self.verbose:
+        if config.verbose:
             print("_loaded", self.root_path, self.rowCount(self.parent_index))
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
@@ -138,13 +135,13 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel):  # Should be paired wit
     def setData(self, index, value, role):
         if role == QtCore.Qt.CheckStateRole and index.column() == 0:
             self.checks[index] = value
-            if verbose:
+            if config.verbose:
                 print("setData(): {}".format(value))
             return True
         return QtWidgets.QFileSystemModel.setData(self, index, value, role)
 
     def traverseDirectory(self, parentindex, callback=None):
-        if verbose:
+        if self.verbose:
             print("traverseDirectory():")
         callback(parentindex)
         if self.hasChildren(parentindex):
@@ -505,14 +502,14 @@ class Ui_MainWindow(QtCore.QObject):
         self.menuEdit.setTitle(_translate("mainWindow", "Edit"))
 
 
-
 ################################################################
-#        Hiding experimental features for deploy
+#        Hide elements that appear only on request             #
 ################################################################
         self.pushButtonParse.setVisible(False) # explicit hide command required for Windows, but not Linux (?)
         self.progressBar.setVisible(False)
         self.progressBar.setValue(0)
-        if hide_experimental:
+#       also hide experimental features (for deploy)
+        if config.hide_experimental:
             self.label_paired_data.setVisible(False)
             self.pushButton_paired_data_flip.setVisible(False)
             self.checkBox_paired_stims.setVisible(False)
@@ -613,7 +610,7 @@ class Filetreesub(Ui_Dialog):
         super(Filetreesub, self).__init__()
         self.setupUi(dialog)
         self.parent = parent
-        if verbose:
+        if config.verbose:
             print(" - Filetreesub init")
 
         self.ftree = self.widget
@@ -645,8 +642,6 @@ class Filetreesub(Ui_Dialog):
 
     def pathsSelectedUpdateTable(self, paths):
         # TODO: Extract host and group
-        if verbose:
-            print("pathsSelectedUpdateTable")
         dfAdd = df_projectTemplate()
         dfAdd['path'] = paths
         dfAdd['host'] = str(self.parent.fqdn)
@@ -669,43 +664,28 @@ class Filetreesub(Ui_Dialog):
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # group
         self.tableView.update()
 
-#######################################################################
-
-
-
-
+###########################
+#       Main class        #
+###########################
 
 # subclassing Ui_MainWindow to be able to use the unaltered output file from pyuic and QT designer
 class UIsub(Ui_MainWindow):
     def __init__(self, mainwindow):
         super(UIsub, self).__init__()
         self.setupUi(mainwindow)
-        if verbose:
+        if config.verbose:
             print(" - UIsub init, verbose mode")  # rename for clarity
         # move mainwindow to default position (TODO: later to be stored in cfg)
         self.mainwindow = mainwindow
         screen = QtWidgets.QDesktopWidget().screenGeometry()
-        self.mainwindow.setGeometry(0, 0, int(screen.width()*0.96), int(screen.height())-terminal_space)
-        # load program bw_cfg if present
-        paths = [Path.cwd()] + list(Path.cwd().parents)
-        self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
-        self.bw_cfg_yaml = self.repo_root / "cfg.yaml"  # Path to cfg.yaml
-        # Set default values for bw_cfg.yaml
-        self.user_documents = Path.home() / "Documents"  # Where to look for raw data
-        self.projects_folder = self.user_documents / "Brainwash Projects"  # Where to store projects
-        self.projectname = "My Project"
-        # Override default if cfg.yaml exists
-        if self.bw_cfg_yaml.exists():
-            with self.bw_cfg_yaml.open("r") as file:
-                cfg = yaml.safe_load(file)
-                projectfolder = Path(cfg['projects_folder']) / cfg['projectname']
-                if projectfolder.exists():  # if the folder stored in cfg.yaml exists, use it
-                    self.user_documents = Path(cfg['user_documents'])  # Where to look for raw data
-                    self.projects_folder = Path(cfg['projects_folder'])  # Where to save and read parsed data
-                    self.projectname = cfg['projectname']
-# set window title to projectname
+        self.mainwindow.setGeometry(0, 0, int(screen.width()*0.96), int(screen.height())-config.terminal_space)
+
+        self.read_bw_cfg() # load bw global config file (not project specific)
+
+
+        # set window title to projectname
         self.mainwindow.setWindowTitle(f"Brainwash {version} - {self.projectname}")
-        
+
 #       File menu
         self.actionNew = QtWidgets.QAction("New project", self)
         self.actionNew.triggered.connect(self.triggerNewProject)
@@ -843,7 +823,7 @@ class UIsub(Ui_MainWindow):
         self.lineEdit_norm_EPSP_end.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_EPSP_end))
 
         self.fqdn = socket.getfqdn() # get computer name and local domain, for project file
-        if talkback:
+        if config.talkback:
             path_usage = Path(f"{self.projects_folder}/talkback/usage.yaml")
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             if path_usage.exists():
@@ -864,8 +844,12 @@ class UIsub(Ui_MainWindow):
         # Set the model for the table
         self.tableMetadata.setModel(model)
 
+        # Set up axes for the graphs
+        self.graphMainAxes()
+        self.darkmode() # set darkmode if set in bw_cfg
+
         # debug mode; prints widget focus every 1000ms
-        if track_widget_focus:
+        if config.track_widget_focus:
             self.timer = QtCore.QTimer(self)
             self.timer.timeout.connect(self.checkFocus)
             self.timer.start(1000)
@@ -891,10 +875,100 @@ class UIsub(Ui_MainWindow):
 
 # WIP: TODO: move these to appropriate header in this file
 
+
+    def talkback(self):
+        row = uistate.row_copy
+        dfmean = self.dfmean
+
+        t_stim = row['t_stim']
+        t_start = t_stim - 0.002
+        t_end = t_stim + 0.018
+        dfevent = dfmean[(dfmean['time'] >= t_start) & (dfmean['time'] < t_end)]
+        dfevent = dfevent[['time', 'voltage']]
+        path_talkback_df = Path(f"{self.projects_folder}/talkback/talkback_slice_{row['ID']}_stim.csv")
+        if not path_talkback_df.parent.exists():
+            path_talkback_df.parent.mkdir(parents=True, exist_ok=True)
+        dfevent.to_csv(path_talkback_df, index=False)
+        # save the event data as a dict
+        keys = [
+            't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params',
+            't_EPSP_slope_start', 't_EPSP_slope_end', 't_EPSP_slope_method', 't_EPSP_slope_params',
+            't_volley_amp', 't_volley_amp_method', 't_volley_amp_params',
+            't_volley_slope_start', 't_volley_slope_end', 't_volley_slope_method', 't_volley_slope_params'
+        ]
+        dict_event = {key: row[key] for key in keys}
+        print(f"talkback dict_event: {dict_event}")
+        # store dict_event as .csv named after recording_name
+        path_talkback = Path(f"{self.projects_folder}/talkback/talkback_meta_{row['ID']}_stim.csv")
+        with open(path_talkback, 'w') as f:
+            json.dump(dict_event, f)
+
+
+    def darkmode(self):
+        if uistate.darkmode:
+            self.mainwindow.setStyleSheet("background-color: #333; color: #fff;")
+            self.tableProj.setStyleSheet("""
+                QTableView::item:selected {
+                    background-color: #555;
+                    color: #FFF;
+                }
+                QHeaderView::section {
+                    background-color: #333;
+                    color: #FFF;
+                }
+                QTableCornerButton::section {
+                    background-color: #333;
+                    color: #FFF;
+                }
+            """)
+        else:
+            self.mainwindow.setStyleSheet("")
+            self.tableProj.setStyleSheet("")
+        uiplot.styleUpdate()
+        uiplot.graphRefresh()
+
+
+    def tableProjSelectionChanged(self):
+        self.usage("tableProjSelectionChanged")
+        t0 = time.time()
+        if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
+            self.tableProj.clearSelection()
+            print("Right click")
+        selected_indexes = self.tableProj.selectionModel().selectedRows()
+        # build the list uistate.selected with indices
+        uistate.selected = [index.row() for index in selected_indexes]
+        self.zoomAuto()
+        self.update_recs2plot()
+        self.updateMouseover()
+        print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
+        report()
+
+
+    def zoomAuto(self):
+        # find the lowest t_stim and highest t_stim in selected rows
+        if uistate.selected:
+            df_p = self.get_df_project()
+            t_stim_series = df_p.loc[uistate.selected, 't_stim']
+            if not t_stim_series.empty:
+                t_stim_min = t_stim_series.min() - 0.0005
+                t_stim_max = t_stim_series.max() + 0.010
+                uistate.zoom['mean_xlim'] = (t_stim_min, t_stim_max)
+                uistate.axm.set_xlim(uistate.zoom['mean_xlim'])
+
+    def update_recs2plot(self):
+        if uistate.selected:
+            df_project_selected = self.get_df_project().iloc[uistate.selected]
+            uistate.df_recs2plot = df_project_selected[df_project_selected['sweeps'] != "..."]
+            if uistate.df_recs2plot.empty:
+                uistate.df_recs2plot = None
+        else:
+            uistate.df_recs2plot = None
+
+
     def connectUIstate(self): # Connect UI elements to uistate
         # checkBoxes 
         for key, value in uistate.checkBox.items():
-            print(f" - connecting checkbox {key} to {value}")
+            #print(f" - connecting checkbox {key} to {value}")
             checkBox = getattr(self, f"checkBox_{key}")
             checkBox.setChecked(value)
             checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
@@ -924,9 +998,9 @@ class UIsub(Ui_MainWindow):
 
     def groupControlsRefresh(self):
         self.removeGroupControls()
-        print (f"groupControlsRefresh: uistate.df_groups: {uistate.df_groups}")
+        #print (f"groupControlsRefresh: uistate.df_groups: {uistate.df_groups}")
         for str_ID in uistate.df_groups['group_ID'].tolist():
-            print(f" - adding group {str_ID}")
+            #print(f" - adding group {str_ID}")
             self.addGroupControls(str_ID)
 
     def build_dict_folders(self):
@@ -946,9 +1020,9 @@ class UIsub(Ui_MainWindow):
         self.dict_diffs = {} # all diffs (for paired stim)
 
     def usage(self, ui_component): # Talkback function
-        if verbose:
+        if config.verbose:
             print(f"usage: {ui_component}")
-        if not talkback:
+        if not config.talkback:
             return
         if ui_component not in self.dict_usage.keys():
             self.dict_usage[ui_component] = 0
@@ -974,7 +1048,7 @@ class UIsub(Ui_MainWindow):
     def triggerDarkmode(self):
         self.usage("triggerDarkmode")
         uistate.darkmode = not uistate.darkmode
-        uistate.save_cfg(projectfolder=self.dict_folders['project'])
+        self.write_bw_cfg()
         self.darkmode()
 
     def pushButton_paired_data_flip_pressed(self):
@@ -1068,7 +1142,7 @@ class UIsub(Ui_MainWindow):
             if 0 < i:
                 new_project_name = new_project_name + "(" + str(i) + ")"
             if (self.projects_folder / new_project_name).exists():
-                if verbose:
+                if config.verbose:
                     print(new_project_name, " already exists")
                 i += 1
             else:
@@ -1081,10 +1155,10 @@ class UIsub(Ui_MainWindow):
         print(f"triggerOpenProject: self.projects_folder: {self.projects_folder}")
         projectfolder = QtWidgets.QFileDialog.getExistingDirectory(
             self.dialog, "Open Directory", str(self.projects_folder), QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks)
-        if verbose:
+        if config.verbose:
             print(f"Received projectfolder: {str(projectfolder)}")
         if (Path(projectfolder) / "project.brainwash").exists():
-            if verbose:
+            if config.verbose:
                 print(f"Projectfolder exists, loading project")
             self.dict_folders['project'] = Path(projectfolder)
             self.load_df_project()
@@ -1104,96 +1178,6 @@ class UIsub(Ui_MainWindow):
         self.parseData()
         self.setButtonParse()
 
-
-    def talkback(self):
-        row = uistate.row_copy
-        dfmean = self.dfmean
-
-        t_stim = row['t_stim']
-        t_start = t_stim - 0.002
-        t_end = t_stim + 0.018
-        dfevent = dfmean[(dfmean['time'] >= t_start) & (dfmean['time'] < t_end)]
-        dfevent = dfevent[['time', 'voltage']]
-        path_talkback_df = Path(f"{self.projects_folder}/talkback/talkback_slice_{row['ID']}_stim.csv")
-        if not path_talkback_df.parent.exists():
-            path_talkback_df.parent.mkdir(parents=True, exist_ok=True)
-        dfevent.to_csv(path_talkback_df, index=False)
-        # save the event data as a dict
-        keys = [
-            't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params',
-            't_EPSP_slope_start', 't_EPSP_slope_end', 't_EPSP_slope_method', 't_EPSP_slope_params',
-            't_volley_amp', 't_volley_amp_method', 't_volley_amp_params',
-            't_volley_slope_start', 't_volley_slope_end', 't_volley_slope_method', 't_volley_slope_params'
-        ]
-        dict_event = {key: row[key] for key in keys}
-        print(f"talkback dict_event: {dict_event}")
-        # store dict_event as .csv named after recording_name
-        path_talkback = Path(f"{self.projects_folder}/talkback/talkback_meta_{row['ID']}_stim.csv")
-        with open(path_talkback, 'w') as f:
-            json.dump(dict_event, f)
-
-
-    def darkmode(self):
-        if uistate.darkmode:
-            self.mainwindow.setStyleSheet("background-color: #333; color: #fff;")
-            self.tableProj.setStyleSheet("""
-                QTableView::item:selected {
-                    background-color: #555;
-                    color: #FFF;
-                }
-                QHeaderView::section {
-                    background-color: #333;
-                    color: #FFF;
-                }
-                QTableCornerButton::section {
-                    background-color: #333;
-                    color: #FFF;
-                }
-            """)
-        else:
-            self.mainwindow.setStyleSheet("")
-            self.tableProj.setStyleSheet("")
-        uiplot.styleUpdate()
-        uiplot.graphRefresh()
-
-
-    def tableProjSelectionChanged(self):
-        self.usage("tableProjSelectionChanged")
-        t0 = time.time()
-        if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
-            self.tableProj.clearSelection()
-            print("Right click")
-        selected_indexes = self.tableProj.selectionModel().selectedRows()
-        # build the list uistate.selected with indices
-        uistate.selected = [index.row() for index in selected_indexes]
-        self.zoomAuto()
-        self.update_recs2plot()
-        self.updateMouseover()
-        print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
-        report()
-
-
-    def zoomAuto(self):
-        # find the lowest t_stim and highest t_stim in selected rows
-        if uistate.selected:
-            df_p = self.get_df_project()
-            t_stim_series = df_p.loc[uistate.selected, 't_stim']
-            if not t_stim_series.empty:
-                t_stim_min = t_stim_series.min() - 0.0005
-                t_stim_max = t_stim_series.max() + 0.010
-                uistate.zoom['mean_xlim'] = (t_stim_min, t_stim_max)
-                uistate.axm.set_xlim(uistate.zoom['mean_xlim'])
-
-    def update_recs2plot(self):
-        if uistate.selected:
-            df_project_selected = self.get_df_project().iloc[uistate.selected]
-            uistate.df_recs2plot = df_project_selected[df_project_selected['sweeps'] != "..."]
-            if uistate.df_recs2plot.empty:
-                uistate.df_recs2plot = None
-        else:
-            uistate.df_recs2plot = None
-
-
     def checkBox_paired_stims_changed(self, state):
         self.usage("checkBox_paired_stims_changed")
         uistate.checkBox['paired_stims'] = bool(state)
@@ -1203,7 +1187,6 @@ class UIsub(Ui_MainWindow):
         uistate.save_cfg()
         self.tableFormat()
         self.updateMouseover()
-
 
     def editNormRange(self, lineEdit):
         self.usage("editNormRange")
@@ -1302,7 +1285,7 @@ class UIsub(Ui_MainWindow):
         df_p['sweeps'] = df_p['sweeps'].fillna("...")
         self.set_df_project(df_p)
         self.tableFormat()
-        if verbose:
+        if config.verbose:
             print("addData:", self.get_df_project())
 
 
@@ -1419,9 +1402,10 @@ class UIsub(Ui_MainWindow):
             self.set_df_project(df_p)
             # Get the indices of the new rows, as they are in df_p
             uistate.new_indices = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
-        self.tableUpdate()
+        self.tableFormat()
         self.progressBarManager.__exit__(None, None, None)
         self.graphMainPreload()
+        
 
     def flipCI(self):
         if uistate.selected:
@@ -1533,7 +1517,7 @@ class UIsub(Ui_MainWindow):
                 delattr(self, f"actionAddTo_{group}")
 
     def groupCheckboxChanged(self, state, str_ID):
-        if verbose:
+        if config.verbose:
             print(f"groupCheckboxChanged: {str_ID} = {state}")
         uistate.df_groups.loc[uistate.df_groups['group_ID'] == str_ID, 'show'] = str(state == 2)
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
@@ -1609,7 +1593,7 @@ class UIsub(Ui_MainWindow):
     def purgeGroupCache(self, *groups): # clear cache so that a new group mean is calculated
         if not groups:  # if no groups are passed
             groups = list(self.dict_group_means.keys())  # purge all groups
-        if verbose:
+        if config.verbose:
             print(f"purgeGroupCache: {groups}, len(group): {len(groups)}")
         for group in groups:
             if group in self.dict_group_means:
@@ -1638,10 +1622,31 @@ class UIsub(Ui_MainWindow):
 # Writer functions
     
     def write_bw_cfg(self):  # config file for program, global settings
-        cfg = {"user_documents": str(self.user_documents), "projects_folder": str(self.projects_folder), "projectname": self.projectname}
+        cfg = {"user_documents": str(self.user_documents), "projects_folder": str(self.projects_folder), "projectname": self.projectname, "darkmode": uistate.darkmode}
         with self.bw_cfg_yaml.open("w+") as file:
             yaml.safe_dump(cfg, file)
-    
+
+    def read_bw_cfg(self):
+        # load program bw_cfg if present
+        paths = [Path.cwd()] + list(Path.cwd().parents)
+        self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
+        self.bw_cfg_yaml = self.repo_root / "cfg.yaml"  # Path to cfg.yaml
+        # Set default values for bw_cfg.yaml
+        self.user_documents = Path.home() / "Documents"  # Where to look for raw data
+        self.projects_folder = self.user_documents / "Brainwash Projects"  # Where to store projects
+        self.projectname = "My Project"
+        uistate.darkmode = False
+        # Override default if cfg.yaml exists
+        if self.bw_cfg_yaml.exists():
+            with self.bw_cfg_yaml.open("r") as file:
+                cfg = yaml.safe_load(file)
+                projectfolder = Path(cfg['projects_folder']) / cfg['projectname']
+                if projectfolder.exists():  # if the folder stored in cfg.yaml exists, use it
+                    self.user_documents = Path(cfg['user_documents'])  # Where to look for raw data
+                    self.projects_folder = Path(cfg['projects_folder'])  # Where to save and read parsed data
+                    self.projectname = cfg['projectname']
+                uistate.darkmode = cfg['darkmode']
+
     def df2csv(self, df, rec, key=None): # "writes dict[rec] to rec_{dict}.csv" TODO: Update, better description; replace "rec"
         self.dict_folders['cache'].mkdir(exist_ok=True)
         if key is None:
@@ -1659,7 +1664,7 @@ class UIsub(Ui_MainWindow):
         new_projectfolder = self.projects_folder / new_project_name
         # check if ok
         if (self.projects_folder / new_project_name).exists():
-            if verbose:
+            if config.verbose:
                 print("The target project name already exists")
         else:
             new_projectfolder.mkdir()
@@ -1680,7 +1685,7 @@ class UIsub(Ui_MainWindow):
         new_project_name = RenameDialog.showInputDialog(title='Rename project', query='')
         # check if ok
         if (self.projects_folder / new_project_name).exists():
-            if verbose:
+            if config.verbose:
                 print(f"Project name {new_project_name} already exists")
         elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_project_name)) is not None: # True if valid filename
             dict_old = self.dict_folders
@@ -1731,7 +1736,7 @@ class UIsub(Ui_MainWindow):
             self.pushButtonParse.setVisible(False)
 
     def tableFormat(self):
-        if verbose:
+        if config.verbose:
             print("tableFormat")
         selected_rows = self.tableProj.selectionModel().selectedRows()
         self.tableProj.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
@@ -1944,11 +1949,11 @@ class UIsub(Ui_MainWindow):
             return self.dict_group_means[str_ID]
         group_path = Path(f"{self.dict_folders['cache']}/group_{str_ID}.csv")
         if group_path.exists(): #2: Read from file
-            if verbose:
+            if config.verbose:
                 print("Loading stored", str(group_path))
             group_mean = pd.read_csv(str(group_path))
         else: #3: Create file
-            if verbose:
+            if config.verbose:
                 print("Building new", str(group_path))
             df_p = self.df_project
             # create dfgroup_IDs. containing ONLY lines that have key group in their group_IDs
@@ -2044,7 +2049,6 @@ class UIsub(Ui_MainWindow):
             self.main_canvas_mean.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphMean, canvas=self.main_canvas_mean, ax1=self.main_canvas_mean.axes))
             self.main_canvas_output.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.main_canvas_output, ax1=uistate.ax1, ax2=uistate.ax1))
             self.scroll_event_connected = True
-        self.darkmode() # set darkmode if set in cfg
         df_p = self.get_df_project()
         if df_p.empty:
             return
@@ -2379,7 +2383,7 @@ class UIsub(Ui_MainWindow):
         if uistate.mouseover_action.startswith("EPSP"): # add normalized EPSP columns
             self.normOutput(row=row, dfoutput=dfoutput)
         self.updateMouseover()
-        if talkback:
+        if config.talkback:
             self.talkback()
 
 
@@ -2493,6 +2497,7 @@ def df_projectTemplate():
             "filter",
             "filter_params",
             "n_stims",
+            # deprecate timepoints
             "t_stim",
             "t_stim_method",
             "t_stim_params",
@@ -2524,6 +2529,39 @@ def df_projectTemplate():
         ]
     )
 
+def df_timepointsTemplate():
+    return pd.DataFrame(
+        columns=[
+            "t_stim",
+            "t_stim_method",
+            "t_stim_params",
+            "t_volley_amp",
+            "t_volley_amp_method",
+            "t_volley_amp_params",
+            "t_volley_slope_width",
+            "t_volley_slope_halfwidth",
+            "t_volley_slope_start",
+            "t_volley_slope_end",
+            "t_volley_slope_method",
+            "t_volley_slope_params",
+            "volley_amp_mean",
+            "volley_slope_mean",
+            "t_VEB",
+            "t_VEB_method",
+            "t_VEB_params",
+            "t_EPSP_amp",
+            "t_EPSP_amp_method",
+            "t_EPSP_amp_params",
+            "t_EPSP_slope_width",
+            "t_EPSP_slope_halfwidth",
+            "t_EPSP_slope_start",
+            "t_EPSP_slope_end",
+            "t_EPSP_slope_method",
+            "t_EPSP_slope_params",
+        ]
+    )
+
+
 def report(): # debug function to report custom aspects of the current state of the program
     if False:
         print ("\n REPORT:")
@@ -2532,11 +2570,9 @@ def report(): # debug function to report custom aspects of the current state of 
 
 
 if __name__ == "__main__":
-    print("\n" * 3)
-    print(f"brainwash version {version}")
+    print(f"\n\n{pyproject['project']['name']} {version}\n")
     app = QtWidgets.QApplication(sys.argv) # "QtWidgets.QApplication(sys.argv) appears to cause Qt: Session management error: None of the authentication protocols specified are supported"
     main_window = QtWidgets.QMainWindow()
     uisub = UIsub(main_window)
     main_window.show()
-    uisub.graphMainAxes() # set up axes for the graphs
     sys.exit(app.exec_())
