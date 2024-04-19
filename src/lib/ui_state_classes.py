@@ -272,6 +272,7 @@ class UIstate:
         return any(show.values())
     
 
+
 if __name__ == "__main__":
     # test instantiation
     uistate = UIstate()
@@ -279,4 +280,3 @@ if __name__ == "__main__":
     uistate.checkBox['EPSP_slope'] = False
     assert uistate.anyView() == False
     print("test passed")
-    

@@ -29,9 +29,11 @@ matplotlib_use("Qt5Agg")
 
 class Config:
     def __init__(self):
+        self.dev_mode = True # Development mode
+        #self.dev_mode = False # Deploy mode
         print("\n"*3)
-        print(f"Config set {time.strftime('%H:%M:%S')}")
-        self.dev_mode = True # set to False for deployment
+        if self.dev_mode:
+            print(f"Config set for development mode - {time.strftime('%H:%M:%S')}")
         self.verbose = self.dev_mode
         self.talkback = not self.dev_mode
         self.hide_experimental = not self.dev_mode
@@ -756,9 +758,8 @@ class UIsub(Ui_MainWindow):
         if not os.path.exists(self.dict_folders['cache']):
             os.makedirs(self.dict_folders['cache'])
 
-        # replacing table proj with custom to allow changing of keypress event handling TODO: F2 deprecate - not needed with hotkeys
+        # replacing table proj with custom to allow custom drag and drop TODO: better way?
         originalTableView = self.centralwidget.findChild(QtWidgets.QTableView, "tableProj")  # Find and replace the original QTableView in the layout
-        #tableProj = TableProjSub(self.centralwidget)  # Create an instance of your custom table view
         tableProj = TableProjSub(parent=self)  # Create an instance of your custom table view
         
         # Replace the original QTableView with TableProjSub in the layout
@@ -837,14 +838,11 @@ class UIsub(Ui_MainWindow):
                 self.dict_usage = {'WARNING': "Do NOT set your alias to anything that can be used to identify you!", 'alias': "", 'ID': str(uuid.uuid4()), 'os': os_name, 'ID_created': now, f"last_used_{config.version}": now}
             self.write_usage()
 
-        # TODO: WIP metadata table
-        # Create a model
-        model = QtGui.QStandardItemModel()
-        # Add "Hello" to the model
-        item = QtGui.QStandardItem("Placeholder metadata")
-        model.appendRow(item)
-        # Set the model for the table
-        self.tableMetadata.setModel(model)
+        # Set up the timepoints table, on metadata table for now
+        # TODO: WIP timepoint table
+        self.df_times = df_timepointsTemplate()
+        self.timesmodel = TableModel(self.df_times)
+        self.tableMetadata.setModel(self.timesmodel)
 
         # Set up axes for the graphs
         self.graphMainAxes()
@@ -2007,6 +2005,9 @@ class UIsub(Ui_MainWindow):
                                           EPSP_slope_halfwidth=dict_t['t_EPSP_slope_halfwidth'], 
                                           verbose=False))
         row_id = row['ID'] # Get the row ID
+
+        # TODO: WIP, timepoints to df_t, deprecate df_p t-values
+
         for key, value in dict_t.items():
             old_aspect_value = df_p.loc[df_p['ID'] == row_id, key].values[0]
             if pd.notna(old_aspect_value):
@@ -2016,9 +2017,11 @@ class UIsub(Ui_MainWindow):
             else: # if old_aspect is NOT a valid float, replace df_p with dict_t
                 if isinstance(value, list):
                     df_p.loc[df_p['ID'] == row_id, 'n_stims'] = len(value)
+
                     value = value[0]
                 print(f"{key} was {old_aspect_value} in df_p, NOT a valid float. Updating df_p with {value}.")
                 df_p.loc[df_p['ID'] == row_id, key] = value
+
         dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
         df_p.loc[df_p['ID'] == row_id, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
         df_p.loc[df_p['ID'] == row_id, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
@@ -2535,6 +2538,7 @@ def df_projectTemplate():
 def df_timepointsTemplate():
     return pd.DataFrame(
         columns=[
+            "stim", # stim number in sequence
             "t_stim",
             "t_stim_method",
             "t_stim_params",
