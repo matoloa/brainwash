@@ -757,6 +757,8 @@ class UIsub(Ui_MainWindow):
             os.makedirs(self.projects_folder)
         if not os.path.exists(self.dict_folders['cache']):
             os.makedirs(self.dict_folders['cache'])
+        if not os.path.exists(self.dict_folders['timepoints']):
+            os.makedirs(self.dict_folders['timepoints'])
 
         # replacing table proj with custom to allow custom drag and drop TODO: better way?
         originalTableView = self.centralwidget.findChild(QtWidgets.QTableView, "tableProj")  # Find and replace the original QTableView in the layout
@@ -840,8 +842,8 @@ class UIsub(Ui_MainWindow):
 
         # Set up the timepoints table, on metadata table for now
         # TODO: WIP timepoint table
-        self.df_times = df_timepointsTemplate()
-        self.timesmodel = TableModel(self.df_times)
+        #self.df_times = df_timepointsTemplate()
+        self.timesmodel = TableModel(df_timepointsTemplate())
         self.tableMetadata.setModel(self.timesmodel)
 
         # Set up axes for the graphs
@@ -939,6 +941,12 @@ class UIsub(Ui_MainWindow):
         uistate.selected = [index.row() for index in selected_indexes]
         self.zoomAuto()
         self.update_recs2plot()
+        if len(uistate.selected) == 1:
+            df_p = self.get_df_project()
+            self.timesmodel.setData(self.get_dft(row=df_p.loc[uistate.selected[0]]))
+        else:
+            print("No single row selected, not updating timepoints")
+            self.timesmodel.setData(None)
         self.updateMouseover()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
         report()
@@ -952,8 +960,9 @@ class UIsub(Ui_MainWindow):
             if not t_stim_series.empty:
                 t_stim_min = t_stim_series.min() - 0.0005
                 t_stim_max = t_stim_series.max() + 0.010
-                uistate.zoom['mean_xlim'] = (t_stim_min, t_stim_max)
-                uistate.axm.set_xlim(uistate.zoom['mean_xlim'])
+                if t_stim_min > 0:
+                    uistate.zoom['mean_xlim'] = (t_stim_min, t_stim_max)
+                    uistate.axm.set_xlim(uistate.zoom['mean_xlim'])
 
     def update_recs2plot(self):
         if uistate.selected:
@@ -1007,6 +1016,7 @@ class UIsub(Ui_MainWindow):
         dict_folders = {
                     'project': self.projects_folder / self.projectname,
                     'data': self.projects_folder / self.projectname / 'data',
+                    'timepoints': self.projects_folder / self.projectname / 'timepoints',
                     'cache': self.projects_folder / f'cache {config.version}' / self.projectname,
         }
         return dict_folders
@@ -1015,6 +1025,7 @@ class UIsub(Ui_MainWindow):
         self.dict_datas = {} # all raw data
         self.dict_filters = {} # all processed data
         self.dict_means = {} # all means
+        self.dict_ts = {} # all timepoints
         self.dict_outputs = {} # all outputs
         self.dict_group_means = {} # means of all group outputs
         self.dict_diffs = {} # all diffs (for paired stim)
@@ -1369,9 +1380,9 @@ class UIsub(Ui_MainWindow):
             file_path = Path(self.dict_folders[folder_name] / (recording_name + file_suffix))
             if file_path.exists():
                 file_path.unlink()
-        for cache_name in ['dict_datas', 'dict_means', 'dict_filters', 'dict_outputs']:
+        for cache_name in ['dict_datas', 'dict_means', 'dict_filters', 'dict_ts', 'dict_outputs']:
             removeFromCache(cache_name)
-        for folder_name, file_suffix in [('data', '.csv'), ('cache', '_mean.csv'), ('cache', '_filter.csv'), ('cache', '_output.csv')]:
+        for folder_name, file_suffix in [('data', '.csv'), ('timepoints', '.csv'), ('cache', '_mean.csv'), ('cache', '_filter.csv'), ('cache', '_output.csv')]:
             removeFromDisk(folder_name, file_suffix)
         uiplot.unPlot(recording_name)
 
@@ -1651,6 +1662,8 @@ class UIsub(Ui_MainWindow):
         self.dict_folders['cache'].mkdir(exist_ok=True)
         if key is None:
             filepath = f"{self.dict_folders['cache']}/{rec}.csv"
+        elif key == "timepoints":
+            filepath = f"{self.dict_folders['timepoints']}/t_{rec}.csv"
         else:
             filepath = f"{self.dict_folders['cache']}/{rec}_{key}.csv"
         print(f"saved cache filepath: {filepath}")
@@ -1823,6 +1836,25 @@ class UIsub(Ui_MainWindow):
         self.dict_means[recording_name] = dfmean
         return self.dict_means[recording_name]
 
+    def get_dft(self, row):
+        # returns an internal df t for the selected file. If it does not exist, read it from file first.
+        recording_name = row['recording_name']
+        if recording_name in self.dict_ts.keys():
+            print("returning cached t")
+            return self.dict_ts[recording_name]
+        str_t_path = f"{self.dict_folders['timepoints']}/t_{recording_name}.csv"
+        if Path(str_t_path).exists():
+            print("reading t from file")
+            dft = pd.read_csv(str_t_path)
+            self.dict_ts[recording_name] = dft
+            return dft
+        else:
+            print("creating t")
+            _ = self.defaultOutput(row=row) # also creates dft
+            dft = self.dict_ts[recording_name]
+            self.df2csv(df=dft, rec=recording_name, key="timepoints")
+            return dft
+
     def get_dfoutput(self, row):
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
         recording_name = row['recording_name']
@@ -1991,44 +2023,52 @@ class UIsub(Ui_MainWindow):
     def defaultOutput(self, row):
         '''
         Generates default results for row (in self.df_project)
-        Stores timepoints, methods and params in their designated columns in self.df_project
-        Returns a df of the results: amplitudes and slopes
+        Stores n_stims in self.df_project
+        Stores timepoints, methods and params in dict_ts{<rec_ID>:<df_t>}
+        Returns a dict{stim:output}, that is amplitudes and slopes for each stim
         '''
         print("defaultOutput")
         dffilter = self.get_dffilter(row=row)
         dfmean = self.get_dfmean(row=row)
         df_p = self.get_df_project()
-        dict_t = uistate.default.copy() # Default sizes
-        #print(f"dict_t: {dict_t}")
-        dict_t.update(analysis.find_all_t(dfmean=dfmean, 
-                                          volley_slope_halfwidth=dict_t['t_volley_slope_halfwidth'], 
-                                          EPSP_slope_halfwidth=dict_t['t_EPSP_slope_halfwidth'], 
-                                          verbose=False))
-        row_id = row['ID'] # Get the row ID
 
-        # TODO: WIP, timepoints to df_t, deprecate df_p t-values
+        default_dict_t = uistate.default.copy()  # Default sizes
+        dft = analysis.find_all_t(dfmean=dfmean, 
+                                              volley_slope_halfwidth=default_dict_t['t_volley_slope_halfwidth'], 
+                                              EPSP_slope_halfwidth=default_dict_t['t_EPSP_slope_halfwidth'], 
+                                              verbose=False)
+        dict_outputs = {}
+        df_p['n_stims'] = len(dft)
 
-        for key, value in dict_t.items():
-            old_aspect_value = df_p.loc[df_p['ID'] == row_id, key].values[0]
-            if pd.notna(old_aspect_value):
-                # if old_aspect is a valid float, use it: replace in dict_t
-                print(f"{key} was {old_aspect_value} in df_p, a valid float. Updated dict_t from {value}")
-                dict_t[key] = old_aspect_value
-            else: # if old_aspect is NOT a valid float, replace df_p with dict_t
-                if isinstance(value, list):
-                    df_p.loc[df_p['ID'] == row_id, 'n_stims'] = len(value)
+        # Update each row in dft with the default values
+        for i, row_t in dft.iterrows():
+            updated_dict_t = default_dict_t.copy()  # Start with a copy of the default values
+            updated_dict_t.update(row_t.to_dict())  # Update with the values from row_t
 
-                    value = value[0]
-                print(f"{key} was {old_aspect_value} in df_p, NOT a valid float. Updating df_p with {value}.")
-                df_p.loc[df_p['ID'] == row_id, key] = value
+            # Update the original row in dft with the combined values
+            print(f"dft.loc[i]: {dft.loc[i]}")
+            dft.loc[i] = updated_dict_t
+            print(f"updated_dict_t: {updated_dict_t}")
 
-        dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
-        df_p.loc[df_p['ID'] == row_id, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
-        df_p.loc[df_p['ID'] == row_id, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
+            row_id = row['ID']  # Get the row ID
+            rec_name = row['recording_name']
+            dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dft.loc[i].to_dict())
+            dft.at[i, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
+            dft.at[i, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
+            # Add a new column "stim" to the left of dft
+            dft.insert(0, 'stim', [i+1 for i in range(len(dft))])
+            if i == 0: # TODO: for now, set the deprecated df_p values
+                for key, value in dft.loc[i].items():
+                    row_index = df_p[df_p['ID'] == row_id].index[0]
+                    df_p.at[row_index, key] = value
+            self.normOutput(row=row, dfoutput=dfoutput)
+            if i == 0:
+                dict_outputs[rec_name] = dfoutput
+
         self.set_df_project(df_p)
-        self.normOutput(row=row, dfoutput=dfoutput)
-        return dfoutput
-
+        print(f"df_p.loc[df_p['ID'] == row_id]: {df_p.loc[df_p['ID'] == row_id]}")
+        self.dict_ts[rec_name] = dft
+        return dict_outputs[rec_name]
 
 
 # Graph interface

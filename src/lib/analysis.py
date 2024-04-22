@@ -178,7 +178,6 @@ def find_i_VEB_prim_peak_max(
     defined as largest positive peak in first order derivative between i_stim and i_EPSP
 
     """
-    i_stim = i_stim[0] # TODO: for now, operate only on the first stim
     if verbose:
         print("find_i_VEB_prim_peak_max:")
     # calculate sampling frequency
@@ -284,72 +283,79 @@ def find_i_volley_slope(dfmean, i_stim, i_VEB, happy=False):
 # %%
 def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
     """
-    runs all index-detections in the appropriate sequence,
+    Runs all index-detections in the appropriate sequence,
     The function finds VEB, but does not currently report it
     TODO: also report volley amp and slope
-    Returns a dict of all indices, with np.nan representing detection failure.
+    Returns a DataFrame of all indices, with np.nan representing detection failure.
     """
-    dict_i = { #set default np.nan
-        "i_stim": [],
-        "i_VEB": np.nan,
-        "i_EPSP_amp": np.nan,
-        "i_EPSP_slope": np.nan,
-        "i_volley_amp": np.nan,
-        "i_volley_slope": np.nan,
+    i_stim = find_i_stims(dfmean=dfmean)
+    if not i_stim:
+        return pd.DataFrame()
+
+    data = []
+    for i in i_stim:
+        dict_i = { #set default np.nan
+            "i_stim": i,
+            "i_VEB": np.nan,
+            "i_EPSP_amp": np.nan,
+            "i_EPSP_slope": np.nan,
+            "i_volley_amp": np.nan,
+            "i_volley_slope": np.nan,
         }
-    dict_i['i_stim'] = find_i_stims(dfmean=dfmean)
-    if not dict_i['i_stim']:
-        return dict_i
-    dict_i['i_EPSP_amp'] = find_i_EPSP_peak_max(dfmean=dfmean, verbose=True)
-    if dict_i['i_EPSP_amp'] is np.nan:
-        return dict_i
-    dict_i['i_VEB'] = find_i_VEB_prim_peak_max(dfmean=dfmean, i_stim=dict_i['i_stim'], i_EPSP=dict_i['i_EPSP_amp'])
-    if dict_i['i_VEB'] is np.nan:
-        return dict_i
-    dict_i['i_EPSP_slope'] = find_i_EPSP_slope_bis0(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
-    if dict_i['i_EPSP_slope'] is np.nan:
-        return dict_i
-    dict_i['i_volley_slope'] = find_i_volley_slope(dfmean=dfmean, i_stim=dict_i['i_stim'], i_VEB=dict_i['i_VEB'], happy=True)
-    if dict_i['i_volley_slope'] is np.nan:
-        return dict_i
-    dict_i['i_volley_amp']= dfmean.loc[dict_i['i_volley_slope']:dict_i['i_VEB'], 'voltage'].idxmin() # TODO: make proper function
-    return dict_i
+        dict_i['i_EPSP_amp'] = find_i_EPSP_peak_max(dfmean=dfmean, verbose=True)
+        if dict_i['i_EPSP_amp'] is np.nan:
+            continue
+        dict_i['i_VEB'] = find_i_VEB_prim_peak_max(dfmean=dfmean, i_stim=i, i_EPSP=dict_i['i_EPSP_amp'])
+        if dict_i['i_VEB'] is np.nan:
+            continue
+        dict_i['i_EPSP_slope'] = find_i_EPSP_slope_bis0(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
+        if dict_i['i_EPSP_slope'] is np.nan:
+            continue
+        dict_i['i_volley_slope'] = find_i_volley_slope(dfmean=dfmean, i_stim=i, i_VEB=dict_i['i_VEB'], happy=True)
+        if dict_i['i_volley_slope'] is np.nan:
+            continue
+        dict_i['i_volley_amp']= dfmean.loc[dict_i['i_volley_slope']:dict_i['i_VEB'], 'voltage'].idxmin() # TODO: make proper function
+        data.append(dict_i)
 
-
-# %%
-def i2t(dfmean, dict_i, verbose=False):
-    # Converts dict_i (index) to dict_t (time from start of sweep in dfmean)
-    dict_t = {}
-    for k, v in dict_i.items():
-        k_new = "t" + k[1:]
-        if isinstance(v, list):
-            dict_t[k_new] = [np.nan if i is np.nan else dfmean.loc[i].time for i in v]
-        else:
-            dict_t[k_new] = np.nan if v is np.nan else dfmean.loc[v].time
-    return dict_t
+    df_i = pd.DataFrame(data)
+    return df_i
 
 
 # %%
 def find_all_t(dfmean, volley_slope_halfwidth, EPSP_slope_halfwidth, param_min_time_from_i_stim=0.0005, verbose=False):
     """
-    Acquires indices via find_all_t() for the provided dfmean and converts them to time values
-    Returns a dict of all t-values provided by find_all_t()
+    Acquires indices via find_all_i() for the provided dfmean and converts them to time values
+    Returns a DataFrame of the t-values for each stim, as provided by find_all_i()
     """
-    dict_i = find_all_i(dfmean, param_min_time_from_i_stim=0.0005)
-    print (f"dict_i: {dict_i}")
-    dict_t = i2t(dfmean, dict_i)
-    dict_t['t_volley_slope_start'] = dict_t['t_volley_slope'] - volley_slope_halfwidth
-    dict_t['t_volley_slope_end'] = dict_t['t_volley_slope'] + volley_slope_halfwidth
-    dict_t['t_EPSP_slope_start'] = dict_t['t_EPSP_slope'] - EPSP_slope_halfwidth
-    dict_t['t_EPSP_slope_end'] = dict_t['t_EPSP_slope'] + EPSP_slope_halfwidth
-    # remove slope centers
-    dict_t.pop('t_EPSP_slope', None)
-    dict_t.pop('t_volley_slope', None)
-    
-    if verbose:
-        print(f"dict_t: {dict_t}")
-    return dict_t
+    def i2t(dfmean, row):
+        # Converts i (index) to t (time from start of sweep in dfmean)
+        t = dfmean.loc[row.name].time
+        t_EPSP_slope = dfmean.loc[row['i_EPSP_slope']].time if 'i_EPSP_slope' in row and row['i_EPSP_slope'] in dfmean.index else None
+        t_volley_slope = dfmean.loc[row['i_volley_slope']].time if 'i_volley_slope' in row and row['i_volley_slope'] in dfmean.index else None
+        t_EPSP_amp = dfmean.loc[row['i_EPSP_amp']].time if 'i_EPSP_amp' in row and row['i_EPSP_amp'] in dfmean.index else None
+        t_volley_amp = dfmean.loc[row['i_volley_amp']].time if 'i_volley_amp' in row and row['i_volley_amp'] in dfmean.index else None
+        return {
+            't_volley_slope_start': t_volley_slope - volley_slope_halfwidth,
+            't_volley_slope_end': t_volley_slope + volley_slope_halfwidth,
+            't_EPSP_slope_start': t_EPSP_slope - EPSP_slope_halfwidth,
+            't_EPSP_slope_end': t_EPSP_slope + EPSP_slope_halfwidth,
+            't_EPSP_amp': t_EPSP_amp,
+            't_volley_amp': t_volley_amp,
+        }
 
+    df_indices = find_all_i(dfmean, param_min_time_from_i_stim=0.0005)
+    print(f"df_indices: {df_indices}")
+
+    # Convert each index to a dictionary of t-values and add it to a list
+    list_of_dict_t = [i2t(dfmean, row) for index, row in df_indices.iterrows()]
+
+    # Convert the list of dictionaries to a DataFrame
+    df_t = pd.DataFrame(list_of_dict_t)
+
+    if verbose:
+        print(f"df_t: {df_t}")
+
+    return df_t
 
 # %%
 def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
@@ -381,21 +387,5 @@ if __name__ == "__main__":
     
     dfmean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
     dfmean['tris'] = dfmean.bis.rolling(3, center=True).mean().diff()
-    dict_t = find_all_t(dfmean, volley_slope_halfwidth=0.0001, EPSP_slope_halfwidth=0.0003) # use the average all sweeps to determine where all events are located (noise reduction)
-    t_EPSP_slope_start = dict_t['t_EPSP_slope_start']
-    fig, ax = plt.subplots(figsize=(20,10))
-    plt.plot(dfmean['time'], dfmean['prim']*10, color='red')
-    plt.plot(dfmean['time'], dfmean['bis']*25, color='green')
-    plt.plot(dfmean['time'], dfmean['tris']*25, color='blue')
-    dfmean['bis_roll'] = dfmean['bis'].rolling(9, center=True, win_type='blackman').mean()
-    #plt.plot(dfmean['time'], dfmean['bis_roll']*25, color='blue')
-    plt.axhline(y=0, linestyle='dashed', color='gray')
-    #t_EPSP_slope = 0.0103
-    plt.axvline(x=t_EPSP_slope_start, linestyle='dashed', color='gray')
-    plt.axvline(x=t_EPSP_slope_start, linestyle='dashed', color='gray')
-    plt.plot(dfmean['time'], dfmean['voltage'], color='black')
-    mean_ylim = (-0.0006, 0.0005)
-    mean_xlim = (0.006, 0.020)
-    plt.xlim(mean_xlim)
-    plt.ylim(mean_ylim)
-    print(dict_t)
+    list_dict_t = find_all_t(dfmean, volley_slope_halfwidth=0.0001, EPSP_slope_halfwidth=0.0003) # use the average all sweeps to determine where all events are located (noise reduction)
+    print(list_dict_t)
