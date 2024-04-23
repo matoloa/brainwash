@@ -845,6 +845,7 @@ class UIsub(Ui_MainWindow):
         #self.df_times = df_timepointsTemplate()
         self.timesmodel = TableModel(df_timepointsTemplate())
         self.tableMetadata.setModel(self.timesmodel)
+        self.tableMetadata.verticalHeader().hide()
 
         # Set up axes for the graphs
         self.graphMainAxes()
@@ -1755,6 +1756,7 @@ class UIsub(Ui_MainWindow):
         self.tableProj.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.tablemodel.setData(self.get_df_project())
         header = self.tableProj.horizontalHeader()
+        self.tableProj.verticalHeader().hide()
         df_p = self.df_project
         # hide all columns except these:
         list_show = [   
@@ -1838,6 +1840,7 @@ class UIsub(Ui_MainWindow):
 
     def get_dft(self, row):
         # returns an internal df t for the selected file. If it does not exist, read it from file first.
+        print("*** get_dft")
         recording_name = row['recording_name']
         if recording_name in self.dict_ts.keys():
             print("returning cached t")
@@ -1850,7 +1853,7 @@ class UIsub(Ui_MainWindow):
             return dft
         else:
             print("creating t")
-            _ = self.defaultOutput(row=row) # also creates dft
+            _ = self.defaultOutput(row=row) # also creates self.dict_ts[recording_name]
             dft = self.dict_ts[recording_name]
             self.df2csv(df=dft, rec=recording_name, key="timepoints")
             return dft
@@ -2039,24 +2042,21 @@ class UIsub(Ui_MainWindow):
                                               verbose=False)
         dict_outputs = {}
         df_p['n_stims'] = len(dft)
+        dft['stim'] = 0
 
         # Update each row in dft with the default values
         for i, row_t in dft.iterrows():
             updated_dict_t = default_dict_t.copy()  # Start with a copy of the default values
             updated_dict_t.update(row_t.to_dict())  # Update with the values from row_t
-
-            # Update the original row in dft with the combined values
-            print(f"dft.loc[i]: {dft.loc[i]}")
             dft.loc[i] = updated_dict_t
-            print(f"updated_dict_t: {updated_dict_t}")
-
+        
+            # Update the original row in dft with the combined values
             row_id = row['ID']  # Get the row ID
             rec_name = row['recording_name']
             dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dft.loc[i].to_dict())
             dft.at[i, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
             dft.at[i, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
-            # Add a new column "stim" to the left of dft
-            dft.insert(0, 'stim', [i+1 for i in range(len(dft))])
+            dft.at[i, 'stim'] = i+1 # stims numbered from 1
             if i == 0: # TODO: for now, set the deprecated df_p values
                 for key, value in dft.loc[i].items():
                     row_index = df_p[df_p['ID'] == row_id].index[0]
@@ -2066,8 +2066,32 @@ class UIsub(Ui_MainWindow):
                 dict_outputs[rec_name] = dfoutput
 
         self.set_df_project(df_p)
-        print(f"df_p.loc[df_p['ID'] == row_id]: {df_p.loc[df_p['ID'] == row_id]}")
+        column_order = ['stim',
+                        't_EPSP_slope_start',
+                        't_EPSP_slope_end',
+                        't_EPSP_slope_width',
+                        't_EPSP_slope_halfwidth',
+                        't_EPSP_slope_method',
+                        't_EPSP_slope_params',
+                        't_EPSP_amp',
+                        't_EPSP_amp_method',
+                        't_EPSP_amp_params',
+                        't_volley_slope_start',
+                        't_volley_slope_end',
+                        't_volley_slope_width',
+                        't_volley_slope_halfwidth',
+                        't_volley_slope_method',
+                        't_volley_slope_params',
+                        'volley_slope_mean',
+                        't_volley_amp',
+                        't_volley_amp_method',
+                        't_volley_amp_params',
+                        'volley_amp_mean',
+        ]
+                        
+        dft = dft.reindex(columns=column_order)
         self.dict_ts[rec_name] = dft
+        self.df2csv(df=dft, rec=rec_name, key="timepoints")
         return dict_outputs[rec_name]
 
 
