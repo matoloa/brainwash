@@ -86,12 +86,15 @@ class TableModel(QtCore.QAbstractTableModel):
                 return str(self._data.index[section])
 
     def setData(self, data: pd.DataFrame = None):
-        if not data is None and type(data) is pd.DataFrame:
-            self.beginResetModel()
+        self.beginResetModel()
+        if data is None:
+            self._data = pd.DataFrame()
+        elif isinstance(data, pd.DataFrame):
             self._data = data
-            self.endResetModel()
-            return True
-        return False
+        else:
+            return False
+        self.endResetModel()
+        return True
 
 
 class FileTreeSelectorModel(QtWidgets.QFileSystemModel):  # Should be paired with a FileTreeSelectorView
@@ -805,8 +808,8 @@ class UIsub(Ui_MainWindow):
         # tableProj
         self.pushButtonParse.pressed.connect(self.triggerParse)
         self.tableProj.setSelectionBehavior(TableProjSub.SelectRows)
-        selection_model = self.tableProj.selectionModel()
-        selection_model.selectionChanged.connect(self.tableProjSelectionChanged)
+        tableProj_selectionModel = self.tableProj.selectionModel()
+        tableProj_selectionModel.selectionChanged.connect(self.tableProjSelectionChanged)
 
         self.groupControlsRefresh() # add group controls to UI
         self.connectUIstate() # connect UI elements to uistate
@@ -845,7 +848,10 @@ class UIsub(Ui_MainWindow):
         #self.df_times = df_timepointsTemplate()
         self.timesmodel = TableModel(df_timepointsTemplate())
         self.tableMetadata.setModel(self.timesmodel)
+        self.tableMetadata.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.tableMetadata.verticalHeader().hide()
+        tableMetadata_selectionModel = self.tableMetadata.selectionModel()
+        tableMetadata_selectionModel.selectionChanged.connect(self.metaDataSelectionChanged)
 
         # Set up axes for the graphs
         self.graphMainAxes()
@@ -938,37 +944,68 @@ class UIsub(Ui_MainWindow):
             self.tableProj.clearSelection()
             print("Right click")
         selected_indexes = self.tableProj.selectionModel().selectedRows()
-        # build the list uistate.selected with indices
-        uistate.selected = [index.row() for index in selected_indexes]
+        # build the list uistate.rec_select with indices
+        uistate.rec_select = [index.row() for index in selected_indexes]
         self.zoomAuto()
         self.update_recs2plot()
-        if len(uistate.selected) == 1:
+        if len(uistate.rec_select) == 1:
             df_p = self.get_df_project()
-            self.timesmodel.setData(self.get_dft(row=df_p.loc[uistate.selected[0]]))
+            dft = self.get_dft(row=df_p.loc[uistate.rec_select[0]])
+            selected_stims = self.tableMetadata.selectionModel().selectedRows() # save selection
+            self.timesmodel.setData(dft)
+            model = self.tableMetadata.model()
+            selection = QtCore.QItemSelection()
+
+            for index in selected_stims:
+                row = index.row()
+                index_start = model.index(row, 0)  # Start of the row (first column)
+                index_end = model.index(row, model.columnCount(QtCore.QModelIndex()) - 1)  # End of the row (last column)
+                selection.select(index_start, index_end)
+
+            self.tableMetadata.selectionModel().select(selection, QtCore.QItemSelectionModel.Select)
         else:
             print("No single row selected, not updating timepoints")
+            self.tableMetadata.selectionModel().clear()
             self.timesmodel.setData(None)
+            # empty tableMetadata
+            self.timesmodel.layoutChanged.emit()
+
+        
+
         self.updateMouseover()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
         report()
 
 
+    def metaDataSelectionChanged(self):
+        self.usage("metaDataSelectionChanged")
+        selected_indexes = self.tableMetadata.selectionModel().selectedRows()
+        uistate.stim_select = [index.row() for index in selected_indexes]
+        self.zoomAuto()
+        self.updateMouseover()
+
+
     def zoomAuto(self):
         # find the lowest t_stim and highest t_stim in selected rows
-        if uistate.selected:
+        if uistate.rec_select:
             df_p = self.get_df_project()
-            t_stim_series = df_p.loc[uistate.selected, 't_stim']
-            print(f"t_stim_series: {t_stim_series}")
-            if not t_stim_series.empty:
-                t_stim_min = t_stim_series.min() - 0.0005
-                t_stim_max = t_stim_series.max() + 0.010
+            df_selected = df_p.loc[uistate.rec_select]
+            list_stims = []
+            for index, row in df_selected.iterrows():
+                dft = self.get_dft(row=row)
+                t_stim_values = dft.loc[uistate.stim_select, 't_stim'] if uistate.stim_select else dft['t_stim']
+                list_stims.append(t_stim_values.tolist())
+            if list_stims:
+                t_stim_min = min([min(l) for l in list_stims]) - 0.0005
+                t_stim_max = max([max(l) for l in list_stims]) + 0.010
                 if t_stim_min > 0:
                     uistate.zoom['mean_xlim'] = (t_stim_min, t_stim_max)
                     uistate.axm.set_xlim(uistate.zoom['mean_xlim'])
 
+
     def update_recs2plot(self):
-        if uistate.selected:
-            df_project_selected = self.get_df_project().iloc[uistate.selected]
+        if uistate.rec_select:
+            df_project_selected = self.get_df_project().iloc[uistate.rec_select]
             uistate.df_recs2plot = df_project_selected[df_project_selected['sweeps'] != "..."]
             if uistate.df_recs2plot.empty:
                 uistate.df_recs2plot = None
@@ -997,7 +1034,7 @@ class UIsub(Ui_MainWindow):
                 self.label_relative_to.setVisible(state == 2)
                 self.lineEdit_norm_EPSP_start.setVisible(state == 2)
                 self.lineEdit_norm_EPSP_end.setVisible(state == 2)
-                for idx in uistate.selected:
+                for idx in uistate.rec_select:
                     row = self.get_df_project().loc[idx]
                     rec_name = row['recording_name']
                     out = self.dict_outputs[rec_name]
@@ -1074,8 +1111,8 @@ class UIsub(Ui_MainWindow):
 
     def triggerClearGroups(self):
         self.usage("triggerClearGroups")
-        if uistate.selected:
-            self.clearGroupsByRow(uistate.selected)
+        if uistate.rec_select:
+            self.clearGroupsByRow(uistate.rec_select)
             self.tableUpdate()
             self.updateMouseover()
         else:
@@ -1227,7 +1264,7 @@ class UIsub(Ui_MainWindow):
         self.purgeGroupCache(*uistate.df_groups['group_ID'].tolist())
         self.tableFormat()
         # cycle through all selected recordings and update norm outputs
-        for idx in uistate.selected:
+        for idx in uistate.rec_select:
             row = self.df_project.iloc[idx]
             rec_name = row['recording_name']
             out = self.get_dfoutput(row=row)
@@ -1304,9 +1341,9 @@ class UIsub(Ui_MainWindow):
 
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
-        if len(uistate.selected) == 1:
+        if len(uistate.rec_select) == 1:
             df_p = self.get_df_project()
-            old_recording_name = df_p.at[uistate.selected[0], 'recording_name']
+            old_recording_name = df_p.at[uistate.rec_select[0], 'recording_name']
             old_data = self.dict_folders['data'] / (old_recording_name + ".csv")
             old_mean = self.dict_folders['cache'] / (old_recording_name + "_mean.csv")
             old_filter = self.dict_folders['cache'] / (old_recording_name + "_filter.csv")
@@ -1331,13 +1368,13 @@ class UIsub(Ui_MainWindow):
                         os.rename(old_filter, new_filter)
                     if old_output.exists():
                         os.rename(old_output, new_output)
-                    df_p.at[uistate.selected[0], 'recording_name'] = new_recording_name
+                    df_p.at[uistate.rec_select[0], 'recording_name'] = new_recording_name
                     # For paired recordings: also rename any references to old_recording_name in df_p['paired_recording']
                     df_p.loc[df_p['paired_recording'] == old_recording_name, 'paired_recording'] = new_recording_name
                     self.set_df_project(df_p)
                     self.tableUpdate()
                     uiplot.unPlot(old_recording_name)
-                    self.graphUpdate(row = df_p.loc[uistate.selected[0]])
+                    self.graphUpdate(row = df_p.loc[uistate.rec_select[0]])
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
             else:
@@ -1347,29 +1384,29 @@ class UIsub(Ui_MainWindow):
 
 
     def deleteSelectedRows(self):
-        if not uistate.selected:
+        if not uistate.rec_select:
             print("No files selected.")
             return
         df_p = self.get_df_project()
-        for index in uistate.selected:
+        for index in uistate.rec_select:
             recording_name = df_p.at[index, 'recording_name']
             sweeps = df_p.at[index, 'sweeps']
             if sweeps != "...": # if the file is parsed:
                 print(f"Deleting {recording_name}...")
                 self.purgeRecordingData(recording_name)
         # Regardless of whether or not there was a file, purge the row from df_project
-        self.clearGroupsByRow(uistate.selected) # clear cache so that a new group mean is calculated
+        self.clearGroupsByRow(uistate.rec_select) # clear cache so that a new group mean is calculated
         # store the ID of the line below the last selected row
         reselect_ID = None
-        if uistate.selected[-1] < len(df_p) - 1:
-            reselect_ID = df_p.at[uistate.selected[-1] + 1, 'ID']
-        df_p.drop(uistate.selected, inplace=True)
+        if uistate.rec_select[-1] < len(df_p) - 1:
+            reselect_ID = df_p.at[uistate.rec_select[-1] + 1, 'ID']
+        df_p.drop(uistate.rec_select, inplace=True)
         df_p.reset_index(inplace=True, drop=True)
         self.set_df_project(df_p)
         self.tableUpdate()
         # reselect the line below the last selected row
         if reselect_ID:
-            uistate.selected = df_p[df_p['ID'] == reselect_ID].index[0]
+            uistate.rec_select = df_p[df_p['ID'] == reselect_ID].index[0]
         self.tableProjSelectionChanged()
 
 
@@ -1421,10 +1458,10 @@ class UIsub(Ui_MainWindow):
         
 
     def flipCI(self):
-        if uistate.selected:
+        if uistate.rec_select:
             df_p = self.get_df_project()
             already_flipped = []
-            for index in uistate.selected:
+            for index in uistate.rec_select:
                 row = df_p.loc[index]
                 name_rec = row['recording_name'] 
                 name_pair = row['paired_recording']
@@ -1566,16 +1603,16 @@ class UIsub(Ui_MainWindow):
         self.usage("addToGroup")
         str_add_group_ID = str(add_group_ID)
         print(f"addToGroup: {add_group_ID}")
-        if not uistate.selected:
+        if not uistate.rec_select:
             print("No files selected.")
             return
 
         groupname = uistate.df_groups.loc[uistate.df_groups['group_ID'] == str_add_group_ID, 'group_name'].values[0]
-        if all(self.df_project.loc[uistate.selected, 'group_IDs'].str.contains(str_add_group_ID)):
-            for i in uistate.selected:
+        if all(self.df_project.loc[uistate.rec_select, 'group_IDs'].str.contains(str_add_group_ID)):
+            for i in uistate.rec_select:
                 self.group_remove_from_row(i, str_add_group_ID)
         else:
-            for i in uistate.selected:
+            for i in uistate.rec_select:
                 self.group_add_to_row(i, str_add_group_ID, groupname)
         self.save_df_project()
         self.purgeGroupCache(add_group_ID)
@@ -1585,7 +1622,7 @@ class UIsub(Ui_MainWindow):
         self.updateMouseover()
 
     
-    def removeFromGroup(self, remove_group_ID, indices=uistate.selected):
+    def removeFromGroup(self, remove_group_ID, indices=uistate.rec_select):
         self.usage("removeFromGroup")
         str_remove_group_ID = str(remove_group_ID)
         print(f"removeFromGroup: {remove_group_ID}, indices: {indices}")
@@ -1765,23 +1802,6 @@ class UIsub(Ui_MainWindow):
                         df_p.columns.get_loc('sweeps'),
                         df_p.columns.get_loc('groups'),
                         df_p.columns.get_loc('n_stims'),
-#                        df_p.columns.get_loc('group_IDs'),
-#                        df_p.columns.get_loc('t_EPSP_amp'),
-#                        df_p.columns.get_loc('t_EPSP_amp_method'),
-#                        df_p.columns.get_loc('t_EPSP_slope_start'),
-#                        df_p.columns.get_loc('t_EPSP_slope_end'),
-#                        df_p.columns.get_loc('t_EPSP_slope_width'),
-#                        df_p.columns.get_loc('t_EPSP_slope_halfwidth'),
-#                        df_p.columns.get_loc('t_EPSP_slope_method'),
-#                        df_p.columns.get_loc('t_volley_amp'),
-#                        df_p.columns.get_loc('volley_amp_mean'),
-#                        df_p.columns.get_loc('t_volley_amp_method'),
-#                        df_p.columns.get_loc('t_volley_slope_start'),
-#                        df_p.columns.get_loc('t_volley_slope_end'),
-#                        df_p.columns.get_loc('volley_slope_mean'),
-#                        df_p.columns.get_loc('t_volley_slope_width'),
-#                        df_p.columns.get_loc('t_volley_slope_halfwidth'),
-#                        df_p.columns.get_loc('t_volley_slope_method'),
                     ]
         if uistate.checkBox['paired_stims']:
             list_show.append(df_p.columns.get_loc('Tx'))
@@ -1795,17 +1815,22 @@ class UIsub(Ui_MainWindow):
         self.tableProj.resizeColumnsToContents()
         total_width = 13 + sum([self.tableProj.columnWidth(i) for i in range(self.tableProj.model().columnCount(QtCore.QModelIndex())) if not self.tableProj.isColumnHidden(i)])
         self.tableProj.setMinimumWidth(total_width)
+
+        selection = QtCore.QItemSelection()
         for index in selected_rows:
-            self.tableProj.selectionModel().select(index, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
+            selection.select(index, index)
+        self.tableProj.selectionModel().select(selection, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
         self.setButtonParse()
     
+
     def tableUpdate(self):
         selected_rows = self.tableProj.selectionModel().selectedRows() # Save selection
         self.tablemodel.setData(self.get_df_project())
         self.tableProj.resizeColumnsToContents()
+        selection = QtCore.QItemSelection()
         for index in selected_rows: # Restore selection
-            self.tableProj.selectionModel().select(index, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
-
+            selection.select(index, index)
+        self.tableProj.selectionModel().select(selection, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
 
 
 # Internal dataframe handling
@@ -2206,9 +2231,9 @@ class UIsub(Ui_MainWindow):
     def updateMouseover(self):
         self.mouseoverDisconnect()
         # if only one item is selected, make a new mouseover event connection
-        if len(uistate.selected) == 1:
+        if len(uistate.rec_select) == 1:
             df_p = self.get_df_project()
-            uistate.row_copy = df_p.loc[uistate.selected[0]].copy()
+            uistate.row_copy = df_p.loc[uistate.rec_select[0]].copy()
             self.dfmean = self.get_dfmean(row=uistate.row_copy) # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
             uistate.setMargins(axm=uistate.axm)
             connect = False

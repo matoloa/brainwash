@@ -48,7 +48,8 @@ class UIstate:
         self.axm = None # axis of mean graph
         self.ax1 = None # axis of output graph for amplitudes
         self.ax2 = None # axis of output graph for slopes
-        self.selected = [] # list of selected indices
+        self.rec_select = [] # list of selected indices in uisub.tableProj
+        self.stim_select = [] # list of selected indices in uisub.tableStim
         self.row_copy = None # copy of single-selected row from df_project, for storing measure points until either saved or rejected
         self.df_recs2plot = None # df_project copy of selected PARSED recordings (or all parsed, if none are selected)
         self.dict_rec_label_ID_line = {} # dict of all plotted recording lines: key=label, value=(rec_ID, 2Dline object)
