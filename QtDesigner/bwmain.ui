@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1215</width>
-    <height>717</height>
+    <width>1171</width>
+    <height>887</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,94 +16,79 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayoutCentralwidget">
     <item>
-     <layout class="QVBoxLayout" name="verticalMasterLayout">
+     <layout class="QVBoxLayout" name="verticalMasterLayout" stretch="1,0,0">
       <item>
-       <layout class="QHBoxLayout" name="horizontalMasterLayout" stretch="0,0,1,0">
+       <layout class="QHBoxLayout" name="horizontalMasterLayout" stretch="0">
         <item>
-         <layout class="QVBoxLayout" name="verticalLayoutProj" stretch="0,0">
-          <property name="sizeConstraint">
-           <enum>QLayout::SetMinimumSize</enum>
+         <widget class="QSplitter" name="h_masterSplitter">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
           </property>
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayoutProj">
+          <widget class="QSplitter" name="h_tableSplitter">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <widget class="QWidget" name="layoutWidget">
+            <layout class="QVBoxLayout" name="verticalLayoutProj" stretch="0">
+             <property name="sizeConstraint">
+              <enum>QLayout::SetMinimumSize</enum>
+             </property>
+             <item>
+              <layout class="QHBoxLayout" name="horizontalLayoutProj">
+               <item>
+                <widget class="QPushButton" name="pushButtonParse">
+                 <property name="text">
+                  <string>Import</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
+           <widget class="QWidget" name="verticalLayoutWidget">
+            <layout class="QVBoxLayout" name="verticalLayoutStim">
+             <item>
+              <widget class="QTableView" name="tableStim">
+               <property name="minimumSize">
+                <size>
+                 <width>200</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </widget>
+          <widget class="QWidget" name="layoutWidget_2">
+           <layout class="QVBoxLayout" name="verticalLayoutGraph" stretch="5,0,5">
             <item>
-             <widget class="QPushButton" name="pushButtonParse">
-              <property name="text">
-               <string>Import</string>
+             <widget class="QWidget" name="graphMean" native="true">
+              <property name="minimumSize">
+               <size>
+                <width>100</width>
+                <height>100</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayoutGroups"/>
+            </item>
+            <item>
+             <widget class="QWidget" name="graphOutput" native="true">
+              <property name="minimumSize">
+               <size>
+                <width>100</width>
+                <height>100</height>
+               </size>
               </property>
              </widget>
             </item>
            </layout>
-          </item>
-          <item>
-           <widget class="QTableView" name="tableProj">
-            <property name="minimumSize">
-             <size>
-              <width>420</width>
-              <height>0</height>
-             </size>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>16777215</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="acceptDrops">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <spacer name="horizontalSpacer">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeType">
-           <enum>QSizePolicy::Fixed</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>10</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-        <item>
-         <layout class="QVBoxLayout" name="verticalLayoutGraph" stretch="5,0,0,5">
-          <item>
-           <widget class="QWidget" name="graphMean" native="true">
-            <property name="minimumSize">
-             <size>
-              <width>100</width>
-              <height>100</height>
-             </size>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayoutControls"/>
-          </item>
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayoutGroups"/>
-          </item>
-          <item>
-           <widget class="QWidget" name="graphOutput" native="true">
-            <property name="minimumSize">
-             <size>
-              <width>100</width>
-              <height>100</height>
-             </size>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <widget class="QTableView" name="tableMetadata"/>
+          </widget>
+         </widget>
         </item>
        </layout>
       </item>
@@ -375,8 +360,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1215</width>
-     <height>21</height>
+     <width>1171</width>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

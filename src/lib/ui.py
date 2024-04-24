@@ -329,7 +329,7 @@ class GraphMainPreloadThread(QtCore.QThread):
 class Ui_MainWindow(QtCore.QObject):
     def setupUi(self, mainWindow):
         mainWindow.setObjectName("mainWindow")
-        mainWindow.resize(1215, 717)
+        mainWindow.resize(1171, 887)
         self.centralwidget = QtWidgets.QWidget(mainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayoutCentralwidget = QtWidgets.QHBoxLayout(self.centralwidget)
@@ -338,47 +338,52 @@ class Ui_MainWindow(QtCore.QObject):
         self.verticalMasterLayout.setObjectName("verticalMasterLayout")
         self.horizontalMasterLayout = QtWidgets.QHBoxLayout()
         self.horizontalMasterLayout.setObjectName("horizontalMasterLayout")
-        self.verticalLayoutProj = QtWidgets.QVBoxLayout()
+        self.h_masterSplitter = QtWidgets.QSplitter(self.centralwidget)
+        self.h_masterSplitter.setOrientation(QtCore.Qt.Horizontal)
+        self.h_masterSplitter.setObjectName("h_masterSplitter")
+        self.h_tableSplitter = QtWidgets.QSplitter(self.h_masterSplitter)
+        self.h_tableSplitter.setOrientation(QtCore.Qt.Horizontal)
+        self.h_tableSplitter.setObjectName("h_tableSplitter")
+        self.layoutWidget = QtWidgets.QWidget(self.h_tableSplitter)
+        self.layoutWidget.setObjectName("layoutWidget")
+        self.verticalLayoutProj = QtWidgets.QVBoxLayout(self.layoutWidget)
         self.verticalLayoutProj.setSizeConstraint(QtWidgets.QLayout.SetMinimumSize)
+        self.verticalLayoutProj.setContentsMargins(0, 0, 0, 0)
         self.verticalLayoutProj.setObjectName("verticalLayoutProj")
         self.horizontalLayoutProj = QtWidgets.QHBoxLayout()
         self.horizontalLayoutProj.setObjectName("horizontalLayoutProj")
-        self.pushButtonParse = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButtonParse = QtWidgets.QPushButton(self.layoutWidget)
         self.pushButtonParse.setObjectName("pushButtonParse")
         self.horizontalLayoutProj.addWidget(self.pushButtonParse)
         self.verticalLayoutProj.addLayout(self.horizontalLayoutProj)
-        self.tableProj = QtWidgets.QTableView(self.centralwidget)
-        self.tableProj.setMinimumSize(QtCore.QSize(420, 0))
-        self.tableProj.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        self.tableProj.setAcceptDrops(True)
-        self.tableProj.setObjectName("tableProj")
-        self.verticalLayoutProj.addWidget(self.tableProj)
-        self.horizontalMasterLayout.addLayout(self.verticalLayoutProj)
-        spacerItem = QtWidgets.QSpacerItem(10, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalMasterLayout.addItem(spacerItem)
-        self.verticalLayoutGraph = QtWidgets.QVBoxLayout()
+        self.verticalLayoutWidget = QtWidgets.QWidget(self.h_tableSplitter)
+        self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
+        self.verticalLayoutStim = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
+        self.verticalLayoutStim.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayoutStim.setObjectName("verticalLayoutStim")
+        self.tableStim = QtWidgets.QTableView(self.verticalLayoutWidget)
+        self.tableStim.setMinimumSize(QtCore.QSize(200, 0))
+        self.tableStim.setObjectName("tableStim")
+        self.verticalLayoutStim.addWidget(self.tableStim)
+        self.layoutWidget_2 = QtWidgets.QWidget(self.h_masterSplitter)
+        self.layoutWidget_2.setObjectName("layoutWidget_2")
+        self.verticalLayoutGraph = QtWidgets.QVBoxLayout(self.layoutWidget_2)
+        self.verticalLayoutGraph.setContentsMargins(0, 0, 0, 0)
         self.verticalLayoutGraph.setObjectName("verticalLayoutGraph")
-        self.graphMean = QtWidgets.QWidget(self.centralwidget)
+        self.graphMean = QtWidgets.QWidget(self.layoutWidget_2)
         self.graphMean.setMinimumSize(QtCore.QSize(100, 100))
         self.graphMean.setObjectName("graphMean")
         self.verticalLayoutGraph.addWidget(self.graphMean)
-        self.horizontalLayoutControls = QtWidgets.QHBoxLayout()
-        self.horizontalLayoutControls.setObjectName("horizontalLayoutControls")
-        self.verticalLayoutGraph.addLayout(self.horizontalLayoutControls)
         self.horizontalLayoutGroups = QtWidgets.QHBoxLayout()
         self.horizontalLayoutGroups.setObjectName("horizontalLayoutGroups")
         self.verticalLayoutGraph.addLayout(self.horizontalLayoutGroups)
-        self.graphOutput = QtWidgets.QWidget(self.centralwidget)
+        self.graphOutput = QtWidgets.QWidget(self.layoutWidget_2)
         self.graphOutput.setMinimumSize(QtCore.QSize(100, 100))
         self.graphOutput.setObjectName("graphOutput")
         self.verticalLayoutGraph.addWidget(self.graphOutput)
         self.verticalLayoutGraph.setStretch(0, 5)
-        self.verticalLayoutGraph.setStretch(3, 5)
-        self.horizontalMasterLayout.addLayout(self.verticalLayoutGraph)
-        self.tableMetadata = QtWidgets.QTableView(self.centralwidget)
-        self.tableMetadata.setObjectName("tableMetadata")
-        self.horizontalMasterLayout.addWidget(self.tableMetadata)
-        self.horizontalMasterLayout.setStretch(2, 1)
+        self.verticalLayoutGraph.setStretch(2, 5)
+        self.horizontalMasterLayout.addWidget(self.h_masterSplitter)
         self.verticalMasterLayout.addLayout(self.horizontalMasterLayout)
         self.addonFrame = QtWidgets.QFrame(self.centralwidget)
         self.addonFrame.setMinimumSize(QtCore.QSize(0, 120))
@@ -460,10 +465,11 @@ class Ui_MainWindow(QtCore.QObject):
         self.progressBar.setProperty("value", 24)
         self.progressBar.setObjectName("progressBar")
         self.verticalMasterLayout.addWidget(self.progressBar)
+        self.verticalMasterLayout.setStretch(0, 1)
         self.horizontalLayoutCentralwidget.addLayout(self.verticalMasterLayout)
         mainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(mainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1215, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1171, 22))
         self.menubar.setObjectName("menubar")
         self.menuFile = QtWidgets.QMenu(self.menubar)
         self.menuFile.setObjectName("menuFile")
@@ -507,6 +513,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.menuData.setTitle(_translate("mainWindow", "Data"))
         self.menuGroups.setTitle(_translate("mainWindow", "Groups"))
         self.menuEdit.setTitle(_translate("mainWindow", "Edit"))
+
 
 
 ################################################################
@@ -763,24 +770,19 @@ class UIsub(Ui_MainWindow):
         if not os.path.exists(self.dict_folders['timepoints']):
             os.makedirs(self.dict_folders['timepoints'])
 
-        # replacing table proj with custom to allow custom drag and drop TODO: better way?
-        originalTableView = self.centralwidget.findChild(QtWidgets.QTableView, "tableProj")  # Find and replace the original QTableView in the layout
-        tableProj = TableProjSub(parent=self)  # Create an instance of your custom table view
-        
-        # Replace the original QTableView with TableProjSub in the layout
-        layout = self.centralwidget.layout()
-        layout.replaceWidget(originalTableView, tableProj)
-        layout.removeWidget(originalTableView)
+        # Create an instance of custom table view to allow drag&drop
+        tableProj = TableProjSub(parent=self)
+        # Add TableProjSub to the splitter
+        self.verticalLayoutProj.addWidget(tableProj)
 
-        # Update the layout
-        layout.update()
+        # Update the reference to tableProj
         self.tableProj = tableProj
         tableProj.setObjectName("tableProj")
 
+        # populate tableProj
         self.df_project = df_projectTemplate()
         self.tablemodel = TableModel(self.df_project)
         self.tableProj.setModel(self.tablemodel)
-
         self.resetCacheDicts() # Clear internal storage dicts
        
         # If local project.brainwash exists, load it, otherwise create it
@@ -847,11 +849,11 @@ class UIsub(Ui_MainWindow):
         # TODO: WIP timepoint table
         #self.df_times = df_timepointsTemplate()
         self.timesmodel = TableModel(df_timepointsTemplate())
-        self.tableMetadata.setModel(self.timesmodel)
-        self.tableMetadata.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self.tableMetadata.verticalHeader().hide()
-        tableMetadata_selectionModel = self.tableMetadata.selectionModel()
-        tableMetadata_selectionModel.selectionChanged.connect(self.metaDataSelectionChanged)
+        self.tableStim.setModel(self.timesmodel)
+        self.tableStim.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.tableStim.verticalHeader().hide()
+        tableStim_selectionModel = self.tableStim.selectionModel()
+        tableStim_selectionModel.selectionChanged.connect(self.metaDataSelectionChanged)
 
         # Set up axes for the graphs
         self.graphMainAxes()
@@ -865,7 +867,39 @@ class UIsub(Ui_MainWindow):
 
 
     # Debugging tools
-            # self.find_widgets_with_top_left_coordinates(self.centralwidget)
+        #self.find_widgets_with_top_left_coordinates(self.centralwidget)
+        #self.print_splitter_contents()
+
+
+
+    def print_splitter_contents(self):
+        def print_splitter_contents(self, splitter):
+            print(f"Splitter: {splitter.objectName()}, Number of widgets: {splitter.count()}")
+            for i in range(splitter.count()):
+                widget = splitter.widget(i)
+                print(f" - Widget {i}: {widget.objectName()}, type: {type(widget).__name__}")
+        print()
+        print_splitter_contents(self, self.splitterTables)
+        #print_splitter_contents(self, self.splitter)
+        print()
+        print()
+
+
+    def print_widget_layout(self, widget):
+        layout = widget.layout()
+        if layout is not None:
+            print(f"{widget.objectName()} has a {type(layout).__name__}")
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                if item.widget() is not None:
+                    print(f" - Widget {i}: {item.widget().objectName()}, type: {type(item.widget()).__name__}")
+        else:
+            print(f"{widget.objectName()} has no layout")
+
+
+
+
+
 
     def find_widgets_with_top_left_coordinates(self, widget):
         print(f"trying child geometry")
@@ -951,9 +985,9 @@ class UIsub(Ui_MainWindow):
         if len(uistate.rec_select) == 1:
             df_p = self.get_df_project()
             dft = self.get_dft(row=df_p.loc[uistate.rec_select[0]])
-            selected_stims = self.tableMetadata.selectionModel().selectedRows() # save selection
+            selected_stims = self.tableStim.selectionModel().selectedRows() # save selection
             self.timesmodel.setData(dft)
-            model = self.tableMetadata.model()
+            model = self.tableStim.model()
             selection = QtCore.QItemSelection()
 
             for index in selected_stims:
@@ -962,12 +996,12 @@ class UIsub(Ui_MainWindow):
                 index_end = model.index(row, model.columnCount(QtCore.QModelIndex()) - 1)  # End of the row (last column)
                 selection.select(index_start, index_end)
 
-            self.tableMetadata.selectionModel().select(selection, QtCore.QItemSelectionModel.Select)
+            self.tableStim.selectionModel().select(selection, QtCore.QItemSelectionModel.Select)
         else:
             print("No single row selected, not updating timepoints")
-            self.tableMetadata.selectionModel().clear()
+            self.tableStim.selectionModel().clear()
             self.timesmodel.setData(None)
-            # empty tableMetadata
+            # empty tableStim
             self.timesmodel.layoutChanged.emit()
 
         
@@ -979,7 +1013,7 @@ class UIsub(Ui_MainWindow):
 
     def metaDataSelectionChanged(self):
         self.usage("metaDataSelectionChanged")
-        selected_indexes = self.tableMetadata.selectionModel().selectedRows()
+        selected_indexes = self.tableStim.selectionModel().selectedRows()
         uistate.stim_select = [index.row() for index in selected_indexes]
         self.zoomAuto()
         self.updateMouseover()
