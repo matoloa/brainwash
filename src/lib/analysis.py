@@ -95,7 +95,7 @@ def find_i_stim_prim_max(dfmean):
 
 
 # %%
-def find_i_stims(dfmean, threshold=0.75, min_time_difference=0.005, verbose=False):
+def find_i_stims(dfmean, threshold=0.1, min_time_difference=0.005, verbose=False):
     prim_max = find_i_stim_prim_max(dfmean)
     prim_max_y = dfmean.prim.max()
     threshold *= prim_max_y
@@ -105,17 +105,19 @@ def find_i_stims(dfmean, threshold=0.75, min_time_difference=0.005, verbose=Fals
     for i in range(1, len(above_threshold_indices)):
         if dfmean['time'][above_threshold_indices[i]] - dfmean['time'][above_threshold_indices[i - 1]] > min_time_difference:
             filtered_indices.append(above_threshold_indices[i])
-    print(f"find_i_stims: {filtered_indices}, type: {type(filtered_indices)}")
+    if verbose:
+        print(f"find_i_stims: {filtered_indices}, type: {type(filtered_indices)}")
     return filtered_indices
 
 
 # %%
 def find_i_EPSP_peak_max(
     dfmean,
-    limitleft=0,
-    limitright=-1,
+    sampling_Hz=10000,
+    limitleft=0, # index - not time
+    limitright=-1, # index - not time
     param_EPSP_minimum_width_ms=5,  # width in ms
-    param_EPSP_minimum_prominence_mV=0.001,  # what unit? TODO: find out!
+    param_EPSP_minimum_prominence_mV=0.0001,  # what unit? TODO: find out!
     verbose=False
 ):
     """
@@ -125,25 +127,26 @@ def find_i_EPSP_peak_max(
     if verbose:
         print("find_i_EPSP_peak_max:")
 
-    # calculate sampling frequency
-    time_delta = dfmean.time[1] - dfmean.time[0]
-    sampling_Hz = 1 / time_delta
-    if verbose:
-        print(f" . . . sampling_Hz: {sampling_Hz}")
-
     # convert EPSP width from ms to index
     EPSP_minimum_width_i = int(
         param_EPSP_minimum_width_ms * 0.001 * sampling_Hz
     )  # 0.001 for ms to seconds, *sampling_Hz for seconds to recorded points
     if verbose:
-        print(" . . . EPSP is at least", EPSP_minimum_width_i, "points wide")
+        print(" . . . EPSP must be at least", EPSP_minimum_width_i, "points wide")
+
+    # Slice dfmean according to limitleft and limitright
+    if limitright != -1:
+        dfmean_sliced = dfmean[(limitleft <= dfmean.index) & (dfmean.index <= limitright)]
+    else:
+        dfmean_sliced = dfmean[limitleft <= dfmean.index]
 
     # scipy.signal.find_peaks returns a tuple
     i_peaks, properties = scipy.signal.find_peaks(
-        -dfmean['voltage'],
+        -dfmean_sliced['voltage'],
         width=EPSP_minimum_width_i,
-        prominence=param_EPSP_minimum_prominence_mV / 1000,
+    prominence=param_EPSP_minimum_prominence_mV / 1000,
     )
+
     if verbose:
         print(f" . . . i_peaks:{i_peaks}")
     if len(i_peaks) == 0:
@@ -153,13 +156,7 @@ def find_i_EPSP_peak_max(
     if verbose:
         print(f" . . . properties:{properties}")
 
-    dfpeaks = dfmean.iloc[i_peaks]
-    # dfpeaks = pd.DataFrame(peaks[0]) # Convert to dataframe in order to select only > limitleft
-    dfpeaks = dfpeaks[limitleft < dfpeaks.index]
-    if verbose:
-        print(f" . . . dfpeaks:{dfpeaks}")
-
-    i_EPSP = i_peaks[properties['prominences'].argmax()]
+    i_EPSP = i_peaks[properties['prominences'].argmax()] + limitleft
     return i_EPSP
 
 
@@ -292,8 +289,15 @@ def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
     if not i_stim:
         return pd.DataFrame()
 
-    data = []
+    # calculate sampling frequency
+    time_delta = dfmean.time[1] - dfmean.time[0]
+    sampling_Hz = 1 / time_delta
+    print(f"find_i_stims: {len(i_stim)}: sampling_Hz: {sampling_Hz}")
+    print(i_stim)
+    
+    list_dict_i = []
     for i in i_stim:
+        print(f"processing i_stim: {i}")
         dict_i = { #set default np.nan
             "i_stim": i,
             "i_VEB": np.nan,
@@ -301,23 +305,50 @@ def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
             "i_EPSP_slope": np.nan,
             "i_volley_amp": np.nan,
             "i_volley_slope": np.nan,
+            "t_volley_amp_method": "Auto",
+            "t_volley_slope_method": "Auto",
+            "t_EPSP_amp_method": "Auto",
+            "t_EPSP_slope_method": "Auto",
+            "t_volley_amp_params": "-",
+            "t_volley_slope_params": "-",
+            "t_EPSP_amp_params": "-",
+            "t_EPSP_slope_params": "-",
         }
-        dict_i['i_EPSP_amp'] = find_i_EPSP_peak_max(dfmean=dfmean, verbose=True)
-        if dict_i['i_EPSP_amp'] is np.nan:
-            continue
-        dict_i['i_VEB'] = find_i_VEB_prim_peak_max(dfmean=dfmean, i_stim=i, i_EPSP=dict_i['i_EPSP_amp'])
-        if dict_i['i_VEB'] is np.nan:
-            continue
-        dict_i['i_EPSP_slope'] = find_i_EPSP_slope_bis0(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
-        if dict_i['i_EPSP_slope'] is np.nan:
-            continue
-        dict_i['i_volley_slope'] = find_i_volley_slope(dfmean=dfmean, i_stim=i, i_VEB=dict_i['i_VEB'], happy=True)
-        if dict_i['i_volley_slope'] is np.nan:
-            continue
-        dict_i['i_volley_amp']= dfmean.loc[dict_i['i_volley_slope']:dict_i['i_VEB'], 'voltage'].idxmin() # TODO: make proper function
-        data.append(dict_i)
-
-    df_i = pd.DataFrame(data)
+        dict_i['i_EPSP_amp'] = find_i_EPSP_peak_max(dfmean=dfmean, sampling_Hz=sampling_Hz, limitleft=i, limitright=i+200, verbose=True)
+        if dict_i['i_EPSP_amp'] is not np.nan:
+            dict_i['i_VEB'] = find_i_VEB_prim_peak_max(dfmean=dfmean, i_stim=i, i_EPSP=dict_i['i_EPSP_amp'])
+            if dict_i['i_VEB'] is not np.nan:
+                dict_i['i_EPSP_slope'] = find_i_EPSP_slope_bis0(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
+                if dict_i['i_EPSP_slope'] is not np.nan:
+                    dict_i['i_volley_slope'] = find_i_volley_slope(dfmean=dfmean, i_stim=i, i_VEB=dict_i['i_VEB'], happy=True)
+                    if dict_i['i_volley_slope'] is not np.nan:
+                        dict_i['i_volley_amp']= dfmean.loc[dict_i['i_volley_slope']:dict_i['i_VEB'], 'voltage'].idxmin() # TODO: make proper function
+        list_dict_i.append(dict_i)
+    df_i = pd.DataFrame(list_dict_i)
+    df_i_numeric = df_i.select_dtypes(include=[np.number])
+    list_nan = [i for i in range(len(df_i_numeric)) if df_i_numeric.iloc[i].isnull().any()]
+    if list_nan:
+        # find a stim-row that has values in all columns, and use it as a template
+        for i in range(len(df_i_numeric)):
+            print(f"checking stim: {i}")
+            if not df_i_numeric.iloc[i].isnull().any():
+                # create a template for i_values based difference from i_stim
+                i_values = df_i_numeric.iloc[i]
+                i_template = {key: i_values[key] - i_stim[i] for key in i_values.keys()}
+                # update methods and params
+                methods = ['t_volley_amp_method', 't_volley_slope_method', 't_EPSP_amp_method', 't_EPSP_slope_method']
+                params = ['t_volley_amp_params', 't_volley_slope_params', 't_EPSP_amp_params', 't_EPSP_slope_params']
+                # apply the template to all rows with np.nan
+                for j in list_nan:
+                    for key in df_i_numeric.columns:
+                        df_i.loc[j, key] = i_stim[j] + i_template[key]
+                    for key in methods:
+                        df_i.loc[j, key] = "Extrapolated"
+                    for key in params:
+                        df_i.loc[j, key] = f"stim {i}"
+                break
+        else:
+            raise ValueError("Analysis failed for all detected events - cannot extrapolate missing values.") # TODO: replace with default values based on i_stim
     return df_i
 
 
@@ -329,33 +360,40 @@ def find_all_t(dfmean, volley_slope_halfwidth, EPSP_slope_halfwidth, param_min_t
     """
     def i2t(dfmean, row):
         # Converts i (index) to t (time from start of sweep in dfmean)
-        t = dfmean.loc[row.name].time
+        time_values = dfmean['time'].values
+        precision = len(str(time_values[1] - time_values[0]).split('.')[1])
         t_EPSP_slope = dfmean.loc[row['i_EPSP_slope']].time if 'i_EPSP_slope' in row and row['i_EPSP_slope'] in dfmean.index else None
         t_volley_slope = dfmean.loc[row['i_volley_slope']].time if 'i_volley_slope' in row and row['i_volley_slope'] in dfmean.index else None
         t_EPSP_amp = dfmean.loc[row['i_EPSP_amp']].time if 'i_EPSP_amp' in row and row['i_EPSP_amp'] in dfmean.index else None
         t_volley_amp = dfmean.loc[row['i_volley_amp']].time if 'i_volley_amp' in row and row['i_volley_amp'] in dfmean.index else None
         return {
-            't_volley_slope_start': t_volley_slope - volley_slope_halfwidth,
-            't_volley_slope_end': t_volley_slope + volley_slope_halfwidth,
-            't_EPSP_slope_start': t_EPSP_slope - EPSP_slope_halfwidth,
-            't_EPSP_slope_end': t_EPSP_slope + EPSP_slope_halfwidth,
-            't_EPSP_amp': t_EPSP_amp,
-            't_volley_amp': t_volley_amp,
+            't_stim': round(dfmean.loc[row['i_stim']].time, precision),
+            't_volley_slope_start': round(t_volley_slope - volley_slope_halfwidth, precision) if t_volley_slope is not None else None,
+            't_volley_slope_end': round(t_volley_slope + volley_slope_halfwidth, precision) if t_volley_slope is not None else None,
+            't_EPSP_slope_start': round(t_EPSP_slope - EPSP_slope_halfwidth, precision) if t_EPSP_slope is not None else None,
+            't_EPSP_slope_end': round(t_EPSP_slope + EPSP_slope_halfwidth, precision) if t_EPSP_slope is not None else None,
+            't_EPSP_amp': round(t_EPSP_amp, precision) if t_EPSP_amp is not None else None,
+            't_volley_amp': round(t_volley_amp, precision) if t_volley_amp is not None else None,
         }
 
     df_indices = find_all_i(dfmean, param_min_time_from_i_stim=0.0005)
-    print(f"df_indices: {df_indices}")
+    # print(f"df_indices: {df_indices}")
 
     # Convert each index to a dictionary of t-values and add it to a list
     list_of_dict_t = [i2t(dfmean, row) for index, row in df_indices.iterrows()]
-
     # Convert the list of dictionaries to a DataFrame
     df_t = pd.DataFrame(list_of_dict_t)
+
+    # conserve all columns that already start with "t_"
+    list_t_columns_in_df_indices = [col for col in df_indices.columns if col.startswith('t_')]
+    for col in list_t_columns_in_df_indices:
+        df_t[col] = df_indices[col]
 
     if verbose:
         print(f"df_t: {df_t}")
 
     return df_t
+
 
 # %%
 def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
@@ -377,15 +415,11 @@ def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
 ''' Standalone test:'''
 if __name__ == "__main__":
     from pathlib import Path
-    import matplotlib.pyplot as plt
-    print()
-    print()
-    print("Running as main: standalone test")
     #path_filterfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_filter.csv")
     #dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file
-    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/2.8MB - PT_Ch0_a_mean.csv")
-    
+    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/PT_Ch0_a_mean.csv")
+    print(f"\n\n\nRunning as main: standalone test of {str(path_meanfile)}")
     dfmean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
-    dfmean['tris'] = dfmean.bis.rolling(3, center=True).mean().diff()
-    list_dict_t = find_all_t(dfmean, volley_slope_halfwidth=0.0001, EPSP_slope_halfwidth=0.0003) # use the average all sweeps to determine where all events are located (noise reduction)
+    #dfmean['tris'] = dfmean.bis.rolling(3, center=True).mean().diff()
+    list_dict_t = find_all_t(dfmean, volley_slope_halfwidth=0.0001, EPSP_slope_halfwidth=0.0003)
     print(list_dict_t)

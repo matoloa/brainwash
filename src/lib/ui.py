@@ -958,6 +958,7 @@ class UIsub(Ui_MainWindow):
         if uistate.selected:
             df_p = self.get_df_project()
             t_stim_series = df_p.loc[uistate.selected, 't_stim']
+            print(f"t_stim_series: {t_stim_series}")
             if not t_stim_series.empty:
                 t_stim_min = t_stim_series.min() - 0.0005
                 t_stim_max = t_stim_series.max() + 0.010
@@ -2040,33 +2041,37 @@ class UIsub(Ui_MainWindow):
                                               volley_slope_halfwidth=default_dict_t['t_volley_slope_halfwidth'], 
                                               EPSP_slope_halfwidth=default_dict_t['t_EPSP_slope_halfwidth'], 
                                               verbose=False)
-        dict_outputs = {}
+        if dft.empty:
+            print("No stims found.")
+            return
+        output = None
         df_p['n_stims'] = len(dft)
         dft['stim'] = 0
 
-        # Update each row in dft with the default values
+        # Update the original row in dft with combined default and measured values
         for i, row_t in dft.iterrows():
             updated_dict_t = default_dict_t.copy()  # Start with a copy of the default values
             updated_dict_t.update(row_t.to_dict())  # Update with the values from row_t
             dft.loc[i] = updated_dict_t
-        
-            # Update the original row in dft with the combined values
             row_id = row['ID']  # Get the row ID
             rec_name = row['recording_name']
-            dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dft.loc[i].to_dict())
-            dft.at[i, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
-            dft.at[i, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
             dft.at[i, 'stim'] = i+1 # stims numbered from 1
             if i == 0: # TODO: for now, set the deprecated df_p values
                 for key, value in dft.loc[i].items():
                     row_index = df_p[df_p['ID'] == row_id].index[0]
                     df_p.at[row_index, key] = value
-            self.normOutput(row=row, dfoutput=dfoutput)
-            if i == 0:
-                dict_outputs[rec_name] = dfoutput
+            if i == 0: # TODO: for now, only use the output from the first stim
+                dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dft.loc[i].to_dict())
+                self.normOutput(row=row, dfoutput=dfoutput)
+                output = dfoutput
+                if 'volley_amp' in dfoutput.columns:
+                    dft.at[i, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
+                if 'volley_slope' in dfoutput.columns:
+                    dft.at[i, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
 
         self.set_df_project(df_p)
         column_order = ['stim',
+                        't_stim',
                         't_EPSP_slope_start',
                         't_EPSP_slope_end',
                         't_EPSP_slope_width',
@@ -2088,11 +2093,10 @@ class UIsub(Ui_MainWindow):
                         't_volley_amp_params',
                         'volley_amp_mean',
         ]
-                        
         dft = dft.reindex(columns=column_order)
         self.dict_ts[rec_name] = dft
         self.df2csv(df=dft, rec=rec_name, key="timepoints")
-        return dict_outputs[rec_name]
+        return output
 
 
 # Graph interface

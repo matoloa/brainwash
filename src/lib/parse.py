@@ -242,7 +242,7 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
                 persistdf(file_base=file_base, dict_folders=dict_folders, dfdata=df)
                 dict_sub = {
                     'nsweeps': df['sweep'].nunique(),
-                    # channel is comes after the last Ch in the filename, and ends before the first _
+                    # channel is what comes after the last Ch in the filename, and ends before the first _
                     'channel': source_path.split("Ch")[-1].split("_")[0],
                     # stim is the last letter in the filename, before the .csv
                     'stim': source_path.split("_")[-1].split(".")[0],
@@ -356,7 +356,7 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
             recording_name = os.path.basename(os.path.dirname(item))
         print(" - processing", item, "as recording_name", recording_name)
         df_files = pd.DataFrame({"path": [item], "recording_name": [recording_name]})
-        dict_data_nsweeps = parseProjFiles(dict_folders=dict_folders, df=df_files)
+        dict_data_nsweeps = parseProjFiles(dict_folders=dict_folders, df=df_files, single_stim=True)
         print(f" - dict_data_nsweeps: {dict_data_nsweeps}") # what the parsed file turned into
     t1 = time.time()
     print(f'time elapsed: {t1-t0} seconds')
