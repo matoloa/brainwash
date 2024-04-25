@@ -21,6 +21,12 @@
        <layout class="QHBoxLayout" name="horizontalMasterLayout" stretch="0">
         <item>
          <widget class="QSplitter" name="h_masterSplitter">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
           <property name="orientation">
            <enum>Qt::Horizontal</enum>
           </property>
@@ -50,6 +56,9 @@
             <layout class="QVBoxLayout" name="verticalLayoutStim">
              <item>
               <widget class="QTableView" name="tableStim">
+               <property name="enabled">
+                <bool>true</bool>
+               </property>
                <property name="minimumSize">
                 <size>
                  <width>200</width>
@@ -62,28 +71,62 @@
            </widget>
           </widget>
           <widget class="QWidget" name="layoutWidget_2">
-           <layout class="QVBoxLayout" name="verticalLayoutGraph" stretch="5,0,5">
+           <layout class="QVBoxLayout" name="verticalLayoutGraphs" stretch="0">
             <item>
-             <widget class="QWidget" name="graphMean" native="true">
-              <property name="minimumSize">
-               <size>
-                <width>100</width>
-                <height>100</height>
-               </size>
+             <widget class="QSplitter" name="v_graphSplitter">
+              <property name="orientation">
+               <enum>Qt::Vertical</enum>
               </property>
-             </widget>
-            </item>
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayoutGroups"/>
-            </item>
-            <item>
-             <widget class="QWidget" name="graphOutput" native="true">
-              <property name="minimumSize">
-               <size>
-                <width>100</width>
-                <height>100</height>
-               </size>
-              </property>
+              <widget class="QWidget" name="verticalLayoutWidget_2">
+               <layout class="QVBoxLayout" name="verticalLayoutMean">
+                <item>
+                 <widget class="QTabWidget" name="tabMean">
+                  <property name="currentIndex">
+                   <number>0</number>
+                  </property>
+                  <widget class="QWidget" name="tab_continuous">
+                   <attribute name="title">
+                    <string>Continuous</string>
+                   </attribute>
+                   <layout class="QHBoxLayout" name="horizontalLayout">
+                    <item>
+                     <widget class="QWidget" name="graphMean" native="true">
+                      <property name="minimumSize">
+                       <size>
+                        <width>100</width>
+                        <height>100</height>
+                       </size>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                  <widget class="QWidget" name="tab_event">
+                   <attribute name="title">
+                    <string>Events</string>
+                   </attribute>
+                  </widget>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+              <widget class="QWidget" name="verticalLayoutWidget_3">
+               <layout class="QVBoxLayout" name="verticalLayoutOutput">
+                <item>
+                 <widget class="QWidget" name="graphOutput" native="true">
+                  <property name="minimumSize">
+                   <size>
+                    <width>100</width>
+                    <height>100</height>
+                   </size>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayoutGroups"/>
+                </item>
+               </layout>
+              </widget>
              </widget>
             </item>
            </layout>
