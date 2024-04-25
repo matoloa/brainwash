@@ -10,7 +10,15 @@ class UIstate:
         self.version = "0.0.0"
         self.colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000']
         self.df_groups = pd.DataFrame(columns=['group_ID', 'group_name', 'color', 'show'])
-        self.checkBox = {
+        self.splitters = {
+            'h_tableSplitter_width': 200,
+            'verticalLayoutProj_width': 200,
+            'verticalLayoutStim_width': 200,
+            'v_graphSplitter_width': 200,
+            'verticalLayoutMean_height': 200,
+            'verticalLayoutOutput_height': 200,
+        }
+        self.checkBox = { # these are cycled by uisub.connectUIstate; maintain format!
             'EPSP_amp': False,
             'EPSP_slope': True,
             'volley_amp': False,
