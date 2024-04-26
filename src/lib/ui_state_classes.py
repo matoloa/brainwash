@@ -11,7 +11,7 @@ class UIstate:
         self.colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000']
         self.df_groups = pd.DataFrame(columns=['group_ID', 'group_name', 'color', 'show'])
         self.splitter = {
-            'h_splitterMaster': [0.15, 0.15, 0.58, 0.12],
+            'h_splitterMaster': [0.105, 0.04, 0.795, 0.06],
             'v_splitterGraphs': [0.2, 0.5, 0.3],
         }
 
@@ -213,7 +213,7 @@ class UIstate:
         try:
             return {
                 'version': self.version,
-                'color': self.color,
+                'colors': self.colors,
                 'df_groups': self.df_groups,
                 'splitter': self.splitter,
                 'checkBox': self.checkBox,
@@ -226,7 +226,7 @@ class UIstate:
     
     def set_state(self, state):
         self.version = state.get('version')
-        self.color = state.get('color')
+        self.colors = state.get('colors')
         self.df_groups = state.get('df_groups')
         self.splitter = state.get('splitter')
         self.checkBox = state.get('checkBox')

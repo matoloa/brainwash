@@ -763,6 +763,9 @@ class UIsub(Ui_MainWindow):
         # If local project.cfg exists, load it, otherwise create it
         uistate.load_cfg(projectfolder=self.dict_folders['project'], bw_version=config.version)
 
+        # apply splitter proportions
+        self.setSplitterSizes('h_splitterMaster', 'v_splitterGraphs')
+
         # connect paired stim checkbox and flip button to local functions
         #self.checkBox_paired_stims.setChecked(uistate.checkBox['paired_stims'])
         #self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
@@ -880,7 +883,28 @@ class UIsub(Ui_MainWindow):
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
         report()
 
+
+
 # WIP: TODO: move these to appropriate header in this file
+
+
+    def setSplitterSizes(self, *splitter_names):
+        for splitter_name in splitter_names:
+            splitter = getattr(self, splitter_name)
+            proportions = uistate.splitter[splitter_name]
+            widgets = [splitter.widget(i) for i in range(splitter.count())]
+            # Store the original size policies of the widgets, and set their size policy to QtWidgets.QSizePolicy.Ignored
+            # Set width/height depending on splitter orientation
+            sizes = []
+            for widget in widgets:
+                #original_size_policy = widget.sizePolicy()
+                widget.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
+                if splitter.orientation() == QtCore.Qt.Horizontal:
+                    sizes.append(int(proportions[widgets.index(widget)] * splitter.sizeHint().width()))
+                else:
+                    sizes.append(int(proportions[widgets.index(widget)] * splitter.sizeHint().height()))
+                #widget.setSizePolicy(original_size_policy)
+            splitter.setSizes(sizes)
 
 
     def setupTableStim(self):
@@ -893,6 +917,7 @@ class UIsub(Ui_MainWindow):
         self.show_tableStim(False)
 
     def show_tableStim(self, state):
+        self.tableStim.resizeColumnsToContents()
         self.tableStimModel.layoutChanged.emit()
 
     def onSplitterMoved(self, pos, index):
@@ -901,7 +926,8 @@ class UIsub(Ui_MainWindow):
         total_size = sum(splitter.sizes())
         proportions = [size / total_size for size in splitter.sizes()]
         print(f"{splitter_name}, total_size: {total_size}, Proportions: {proportions}")
-        uistate.splitters[splitter_name] = proportions
+        uistate.splitter[splitter_name] = proportions
+        uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
 
     def setupCanvases(self):
@@ -1876,7 +1902,7 @@ class UIsub(Ui_MainWindow):
         if config.verbose:
             print("tableFormat")
         selected_rows = self.tableProj.selectionModel().selectedRows()
-        self.tableProj.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.tableProj.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         self.tablemodel.setData(self.get_df_project())
         header = self.tableProj.horizontalHeader()
         self.tableProj.verticalHeader().hide()
@@ -1898,8 +1924,6 @@ class UIsub(Ui_MainWindow):
             else:
                 self.tableProj.setColumnHidden(col, True)
         self.tableProj.resizeColumnsToContents()
-        total_width = 13 + sum([self.tableProj.columnWidth(i) for i in range(self.tableProj.model().columnCount(QtCore.QModelIndex())) if not self.tableProj.isColumnHidden(i)])
-        self.tableProj.setMinimumWidth(total_width)
 
         selection = QtCore.QItemSelection()
         for index in selected_rows:
@@ -2385,7 +2409,7 @@ class UIsub(Ui_MainWindow):
                 self.zoomReset(canvas=canvas, out=out)
 
 
-    def graphDragSlope(self, event, time_values, action, prior_slope_start, prior_slope_end): # maingraph dragging event
+    def graphDragSlope(self, event, time_values, action, prior_slope_start, prior_slope_end): # graph dragging event
         self.canvasEvent.mpl_disconnect(self.mouseover)
         if event.xdata is None:
             return
@@ -2519,7 +2543,7 @@ class UIsub(Ui_MainWindow):
         self.canvasOutput.draw()
 
 
-    def graphDragReleased(self, event): # maingraph release event
+    def graphDragReleased(self, event): # graph release event
         self.usage("graphDragReleased")
         print(f" - uistate.mouseover_action: {uistate.mouseover_action}")
         self.canvasEvent.mpl_disconnect(self.mouse_drag)
