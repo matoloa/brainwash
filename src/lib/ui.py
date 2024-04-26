@@ -895,9 +895,36 @@ class UIsub(Ui_MainWindow):
         self.tableStimModel.layoutChanged.emit()
 
     def onSplitterMoved(self, pos, index):
+        # TODO: QtDesigner splitter creates intermediate objects that are NOT accessible from QtDesigner.
+        # For whatever reason, the names of the intermediates - not the end widget - appear when dragging
+        # Hence, the translator workaround:        
+        dict_widget = { #key <internal intermediary name>: value <related width in uistate>
+            # 'h_splitterMaster'
+                'layoutWidget': 'proj_width',
+                'verticalLayoutWidget': 'stim_width',
+                'verticalLayoutWidget_2': 'graphs_width',
+                    # 'v_splitterGraphs'
+                        'horizontalLayoutWidget': 'mean_height',
+                        'horizontalLayoutWidget_2': 'event_height',
+                        'horizontalLayoutWidget_3': 'output_height',
+                'verticalLayoutWidget_3': 'tools_width',
+        }
         splitter = self.sender()
-        for item in range(splitter.count()):
-            print(item.objectName())
+        widgets = [splitter.widget(i) for i in range(splitter.count())]
+        if splitter.objectName() == "v_splitterGraphs":
+            for widget in widgets:
+                uistate.splitters[dict_widget.get(widget.objectName(), 'Key not found')] = widget.height()
+        else:
+            for widget in widgets:
+                uistate.splitters[dict_widget.get(widget.objectName(), 'Key not found')] = widget.width()
+
+        return # printout for debugging purposes
+        for i, widget in enumerate(widgets):
+            if splitter.objectName() == "v_splitterGraphs":
+                print(f"{i} - {splitter.objectName()}: {widget.objectName()} = {dict_widget.get(widget.objectName(), 'Key not found')}, {widget.height()}")
+            else:
+                print(f"{i} - {splitter.objectName()}: {widget.objectName()} = {dict_widget.get(widget.objectName(), 'Key not found')}, {widget.width()}")
+
 
     def setupCanvases(self):
         self.graphMean.setLayout(QtWidgets.QVBoxLayout())
