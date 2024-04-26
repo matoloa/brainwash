@@ -290,7 +290,7 @@ class ParseDataThread(QtCore.QThread):
                     self.rows.append(df_proj_new_row)
 
 
-class GraphMainPreloadThread(QtCore.QThread):
+class graphPreloadThread(QtCore.QThread):
     finished = QtCore.pyqtSignal()
     progress = QtCore.pyqtSignal(int)
 
@@ -554,6 +554,7 @@ class Ui_MainWindow(QtCore.QObject):
 
 
 
+
 ################################################################
 #       non-QtDesigner-generated instructions                  #
 ################################################################
@@ -792,10 +793,10 @@ class UIsub(Ui_MainWindow):
             self.write_usage()
 
         # Set up canvases and graphs
-        self.setupCanvases() # for graphs, and connect mainClicked(event, <canvas>)
+        self.setupCanvases() # for graphs, and connect graphClicked(event, <canvas>)
         self.groupControlsRefresh() # add group controls to UI
         self.connectUIstate() # connect UI elements to uistate
-        self.graphMainAxes()
+        self.graphAxes()
 
         self.darkmode() # set darkmode if set in bw_cfg. Requires tables and canvases be loaded!
 
@@ -895,48 +896,31 @@ class UIsub(Ui_MainWindow):
         self.tableStimModel.layoutChanged.emit()
 
     def onSplitterMoved(self, pos, index):
-        # TODO: QtDesigner splitter creates intermediate objects that are NOT accessible from QtDesigner.
-        # For whatever reason, the names of the intermediates - not the end widget - appear when dragging
-        # Hence, the translator workaround:        
-        dict_widget = { #key <internal intermediary name>: value <related width in uistate>
-            # 'h_splitterMaster'
-                'layoutWidget': 'proj_width',
-                'verticalLayoutWidget': 'stim_width',
-                'verticalLayoutWidget_2': 'graphs_width',
-                    # 'v_splitterGraphs'
-                        'horizontalLayoutWidget': 'mean_height',
-                        'horizontalLayoutWidget_2': 'event_height',
-                        'horizontalLayoutWidget_3': 'output_height',
-                'verticalLayoutWidget_3': 'tools_width',
-        }
         splitter = self.sender()
-        widgets = [splitter.widget(i) for i in range(splitter.count())]
-        if splitter.objectName() == "v_splitterGraphs":
-            for widget in widgets:
-                uistate.splitters[dict_widget.get(widget.objectName(), 'Key not found')] = widget.height()
-        else:
-            for widget in widgets:
-                uistate.splitters[dict_widget.get(widget.objectName(), 'Key not found')] = widget.width()
-
-        return # printout for debugging purposes
-        for i, widget in enumerate(widgets):
-            if splitter.objectName() == "v_splitterGraphs":
-                print(f"{i} - {splitter.objectName()}: {widget.objectName()} = {dict_widget.get(widget.objectName(), 'Key not found')}, {widget.height()}")
-            else:
-                print(f"{i} - {splitter.objectName()}: {widget.objectName()} = {dict_widget.get(widget.objectName(), 'Key not found')}, {widget.width()}")
+        splitter_name = splitter.objectName()
+        total_size = sum(splitter.sizes())
+        proportions = [size / total_size for size in splitter.sizes()]
+        print(f"{splitter_name}, total_size: {total_size}, Proportions: {proportions}")
+        uistate.splitters[splitter_name] = proportions
 
 
     def setupCanvases(self):
         self.graphMean.setLayout(QtWidgets.QVBoxLayout())
-        self.main_canvas_mean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
-        self.graphMean.layout().addWidget(self.main_canvas_mean)
-        self.graphOutput.setLayout(QtWidgets.QVBoxLayout())
-        self.main_canvas_output = MplCanvas(parent=self.graphOutput)  # instantiate canvas for Output
-        self.graphOutput.layout().addWidget(self.main_canvas_output)
-        self.main_canvas_mean.mpl_connect('button_press_event', lambda event: self.mainClicked(event, self.main_canvas_mean))
-        self.main_canvas_output.mpl_connect('button_press_event', lambda event: self.mainClicked(event, self.main_canvas_output, out=True))
-        self.main_canvas_mean.show()
-        self.main_canvas_output.show()
+        self.canvasMean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
+        self.graphMean.layout().addWidget(self.canvasMean)
+
+        self.graphEvent.setLayout(QtWidgets.QVBoxLayout())
+        self.canvasEvent = MplCanvas(parent=self.graphEvent)  # instantiate canvas for Mean
+        self.graphEvent.layout().addWidget(self.canvasEvent)
+
+        self.graphOutput.setLayout(QtWidgets.QVBoxLayout())        
+        self.canvasOutput = MplCanvas(parent=self.graphOutput)  # instantiate canvas for Output
+        self.graphOutput.layout().addWidget(self.canvasOutput)
+
+        self.canvasEvent.mpl_connect('button_press_event', lambda event: self.graphClicked(event, self.canvasEvent))
+        self.canvasOutput.mpl_connect('button_press_event', lambda event: self.graphClicked(event, self.canvasOutput, out=True))
+        self.canvasEvent.show()
+        self.canvasOutput.show()
 
     def setupMenus(self):
         # File menu
@@ -1096,7 +1080,7 @@ class UIsub(Ui_MainWindow):
                 t_stim_max = max([max(l) for l in list_stims]) + 0.010
                 if t_stim_min > 0:
                     uistate.zoom['mean_xlim'] = (t_stim_min, t_stim_max)
-                    uistate.axm.set_xlim(uistate.zoom['mean_xlim'])
+                    uistate.axe.set_xlim(uistate.zoom['mean_xlim'])
 
 
     def update_recs2plot(self):
@@ -1555,7 +1539,7 @@ class UIsub(Ui_MainWindow):
             uistate.new_indices = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
         self.tableFormat()
         self.progressBarManager.__exit__(None, None, None)
-        self.graphMainPreload()
+        self.graphPreload()
         
 
     def flipCI(self):
@@ -1866,7 +1850,7 @@ class UIsub(Ui_MainWindow):
         self.save_df_project()
 
     def load_df_project(self): # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
-        self.graphMainWipe()
+        self.graphWipe()
         self.resetCacheDicts() # clear internal caches
         self.projectname = self.dict_folders['project'].stem
         self.dict_folders = self.build_dict_folders()
@@ -2227,35 +2211,39 @@ class UIsub(Ui_MainWindow):
 
 # Graph interface
 
-    def graphMainWipe(self): # removes all plots from main_canvas_mean and main_canvas_output
-        if hasattr(self, "main_canvas_mean"):
-            self.main_canvas_mean.axes.cla()
-            self.main_canvas_mean.draw()
-        if hasattr(self, "main_canvas_output"):
-            self.main_canvas_output.axes.cla()
-            self.main_canvas_output.draw()
+    def graphWipe(self): # removes all plots from canvasEvent and canvasOutput
+        if hasattr(self, "canvasMean"):
+            self.canvasMean.axes.cla()
+            self.canvasMean.draw()
+        if hasattr(self, "canvasEvent"):
+            self.canvasEvent.axes.cla()
+            self.canvasEvent.draw()
+        if hasattr(self, "canvasOutput"):
+            self.canvasOutput.axes.cla()
+            self.canvasOutput.draw()
 
-    def graphMainAxes(self): # plot selected row(s), or clear graph if empty
-        uistate.axm = self.main_canvas_mean.axes
-        ax1 = self.main_canvas_output.axes
+    def graphAxes(self): # plot selected row(s), or clear graph if empty
+        uistate.axm = self.canvasMean.axes
+        uistate.axe = self.canvasEvent.axes
+        ax1 = self.canvasOutput.axes
         if uistate.ax2 is not None and hasattr(uistate, "ax2"):  # remove ax2 if it exists
             uistate.ax2.remove()
         ax2 = ax1.twinx()
         uistate.ax2 = ax2  # Store the ax2 instance
         uistate.ax1 = ax1
-        # connect scroll event if not already connected #TODO: when graphMainAxes is called only once, the check should be redundant
+        # connect scroll event if not already connected #TODO: when graphAxes is called only once, the check should be redundant
         if not hasattr(self, 'scroll_event_connected') or not self.scroll_event_connected:
-            self.main_canvas_mean.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphMean, canvas=self.main_canvas_mean, ax1=self.main_canvas_mean.axes))
-            self.main_canvas_output.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.main_canvas_output, ax1=uistate.ax1, ax2=uistate.ax1))
+            self.canvasEvent.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphEvent, canvas=self.canvasEvent, ax1=self.canvasEvent.axes))
+            self.canvasOutput.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.canvasOutput, ax1=uistate.ax1, ax2=uistate.ax1))
             self.scroll_event_connected = True
         df_p = self.get_df_project()
         if df_p.empty:
             return
-        self.graphMainPreload()
+        self.graphPreload()
 
 
-    def graphMainPreload(self): # plot and hide imported recordings
-        self.usage("graphMainPreload")
+    def graphPreload(self): # plot and hide imported recordings
+        self.usage("graphPreload")
         t0 = time.time()
         self.mouseoverDisconnect()
         if not uistate.new_indices:
@@ -2265,8 +2253,8 @@ class UIsub(Ui_MainWindow):
             return
         print(f"Preloading {len(uistate.new_indices)} recordings.")
         self.progressBar.setValue(0)
-        self.thread = GraphMainPreloadThread(uistate, uiplot, self)
-        self.thread.finished.connect(lambda: self.onGraphMainPreloadFinished(t0))
+        self.thread = graphPreloadThread(uistate, uiplot, self)
+        self.thread.finished.connect(lambda: self.ongraphPreloadFinished(t0))
 
         # Create ProgressBarManager and connect progress signal
         self.progressBarManager = ProgressBarManager(self.progressBar, len(uistate.new_indices))
@@ -2275,7 +2263,7 @@ class UIsub(Ui_MainWindow):
         self.thread.start()
         self.progressBarManager.__enter__()  # Show progress bar
 
-    def onGraphMainPreloadFinished(self, t0):
+    def ongraphPreloadFinished(self, t0):
         self.graphGroups()
         print(f"Preloaded recordings and groups in {time.time()-t0:.2f} seconds.")
         uiplot.graphRefresh()
@@ -2336,9 +2324,9 @@ class UIsub(Ui_MainWindow):
             df_p = self.get_df_project()
             uistate.row_copy = df_p.loc[uistate.rec_select[0]].copy()
             self.dfmean = self.get_dfmean(row=uistate.row_copy) # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
-            uistate.setMargins(axm=uistate.axm)
+            uistate.setMargins(axe=uistate.axe)
             connect = False
-            for line in uistate.axm.lines: # connects plotted lines
+            for line in uistate.axe.lines: # connects plotted lines
                 label = line.get_label()
                 rec_name = uistate.row_copy['recording_name']
                 if label == f"{rec_name} EPSP slope marker":
@@ -2354,14 +2342,14 @@ class UIsub(Ui_MainWindow):
                     uistate.updatePointDragZone(aspect="volley amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
                     connect = True
             if connect: # set new mouseover event connection
-                self.mouseover = self.main_canvas_mean.mpl_connect('motion_notify_event', uiplot.graphMouseover)
+                self.mouseover = self.canvasEvent.mpl_connect('motion_notify_event', uiplot.graphMouseover)
         print("updateMouseover calls uiplot.graphRefresh()")
         uiplot.graphRefresh()
 
     def mouseoverDisconnect(self):
         # drop any prior mouseover event connections and plots
         if hasattr(self, 'mouseover'):
-            self.main_canvas_mean.mpl_disconnect(self.mouseover)
+            self.canvasEvent.mpl_disconnect(self.mouseover)
         if uistate.mouseover_plot is not None:
             uistate.mouseover_plot[0].remove()
             uistate.mouseover_plot = None
@@ -2373,7 +2361,7 @@ class UIsub(Ui_MainWindow):
             uistate.mouseover_out = None
         uistate.mouseover_action = None
 
-    def mainClicked(self, event, canvas, out=False): # maingraph click event
+    def graphClicked(self, event, canvas, out=False): # graph click event
         x = event.xdata
         time_values = self.dfmean['time'].values
         uistate.prior_x_idx = np.abs(time_values - x).argmin() # nearest x-index to click
@@ -2384,21 +2372,21 @@ class UIsub(Ui_MainWindow):
                 print(f"action: {action}")
                 if action.startswith("EPSP slope"):
                     start, end = uistate.row_copy['t_EPSP_slope_start'], uistate.row_copy['t_EPSP_slope_end']
-                    self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragSlope(event, time_values, action, start, end))
+                    self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.graphDragSlope(event, time_values, action, start, end))
                 elif action == 'EPSP amp move':
-                    self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragPoint(event, time_values))
+                    self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.graphDragPoint(event, time_values))
                 elif action.startswith("volley slope"):
                     start, end = uistate.row_copy['t_volley_slope_start'], uistate.row_copy['t_volley_slope_end']
-                    self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragSlope(event, time_values, action, start, end))
+                    self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.graphDragSlope(event, time_values, action, start, end))
                 elif action == 'volley amp move':
-                    self.mouse_drag = self.main_canvas_mean.mpl_connect('motion_notify_event', lambda event: self.mainDragPoint(event, time_values))
-                self.mouse_release = self.main_canvas_mean.mpl_connect('button_release_event', self.mainReleased)
+                    self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.graphDragPoint(event, time_values))
+                self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', self.graphDragReleased)
             elif event.button == 2:
                 self.zoomReset(canvas=canvas, out=out)
 
 
-    def mainDragSlope(self, event, time_values, action, prior_slope_start, prior_slope_end): # maingraph dragging event
-        self.main_canvas_mean.mpl_disconnect(self.mouseover)
+    def graphDragSlope(self, event, time_values, action, prior_slope_start, prior_slope_end): # maingraph dragging event
+        self.canvasEvent.mpl_disconnect(self.mouseover)
         if event.xdata is None:
             return
         uistate.x_idx = np.abs(time_values - event.xdata).argmin()  # update x to the nearest x-value on the plot
@@ -2433,12 +2421,12 @@ class UIsub(Ui_MainWindow):
 
         if blob:
             uistate.mouseover_blob.set_offsets([x_end, y_end])
-        self.main_canvas_mean.draw()
-        self.mainDragUpdate(x_start, x_end, precision)
+        self.canvasEvent.draw()
+        self.graphDragUpdate(x_start, x_end, precision)
 
 
-    def mainDragPoint(self, event, time_values): # maingraph dragging event
-        self.main_canvas_mean.mpl_disconnect(self.mouseover)
+    def graphDragPoint(self, event, time_values): # maingraph dragging event
+        self.canvasEvent.mpl_disconnect(self.mouseover)
         if event.xdata is None:
             return
         uistate.x_idx = np.abs(time_values - event.xdata).argmin()  # update x to the nearest x-value on the plot
@@ -2458,11 +2446,11 @@ class UIsub(Ui_MainWindow):
         # update the mouseover plot
         uistate.mouseover_blob.set_offsets([x_point, y_point])
 
-        self.main_canvas_mean.draw()
-        self.mainDragUpdate(x_point, x_point, precision)
+        self.canvasEvent.draw()
+        self.graphDragUpdate(x_point, x_point, precision)
   
 
-    def mainDragUpdate(self, x_start, x_end, precision): # update output; this is a separate function to allow the user to make it happen live (current) or on release (for low compute per data)
+    def graphDragUpdate(self, x_start, x_end, precision): # update output; this is a separate function to allow the user to make it happen live (current) or on release (for low compute per data)
         dffilter = self.get_dffilter(row=uistate.row_copy)
         action = uistate.mouseover_action
         
@@ -2528,14 +2516,14 @@ class UIsub(Ui_MainWindow):
 
         if dict_t:
             uistate.row_copy.update(dict_t)
-        self.main_canvas_output.draw()
+        self.canvasOutput.draw()
 
 
-    def mainReleased(self, event): # maingraph release event
-        self.usage("mainReleased")
+    def graphDragReleased(self, event): # maingraph release event
+        self.usage("graphDragReleased")
         print(f" - uistate.mouseover_action: {uistate.mouseover_action}")
-        self.main_canvas_mean.mpl_disconnect(self.mouse_drag)
-        self.main_canvas_mean.mpl_disconnect(self.mouse_release)
+        self.canvasEvent.mpl_disconnect(self.mouse_drag)
+        self.canvasEvent.mpl_disconnect(self.mouse_release)
         uistate.last_x_idx = None
         if uistate.x_idx == uistate.prior_x_idx: # nothing to update
             print("x_idx == prior_x_idx")

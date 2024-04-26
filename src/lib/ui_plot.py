@@ -10,10 +10,10 @@ class UIplot():
         print(f"UIplot instantiated: {self.uistate.anyView()}")
     
     def styleUpdate(self):
-        axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
+        axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
         if self.uistate.darkmode:
             style.use('dark_background')
-            for ax in [axm, ax1, ax2]:
+            for ax in [axm, axe, ax1, ax2]:
                 ax.figure.patch.set_facecolor('#333333')
                 ax.set_facecolor('#333333')
                 ax.xaxis.label.set_color('white')
@@ -22,7 +22,7 @@ class UIplot():
             #print("Dark mode activated")
         else:
             style.use('default')
-            for ax in [axm, ax1, ax2]:
+            for ax in [axm, axe, ax1, ax2]:
                 ax.figure.patch.set_facecolor('white')
                 ax.set_facecolor('white')
                 ax.xaxis.label.set_color('black')
@@ -32,8 +32,8 @@ class UIplot():
 
 
     def hideAll(self):
-        axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
-        for ax in [axm, ax1, ax2]:
+        axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
+        for ax in [axm, axe, ax1, ax2]:
             for line in ax.get_lines():
                 line.set_visible(False)
             legend = ax.get_legend()
@@ -60,16 +60,16 @@ class UIplot():
 
 
     def graphRefresh(self):
-        # toggle show/hide of lines on axm, ax1 and ax2: show only selected and imported lines, only appropriate aspects
-        axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
+        # toggle show/hide of lines on axe, ax1 and ax2: show only selected and imported lines, only appropriate aspects
+        axe, ax1, ax2 = self.uistate.axe, self.uistate.ax1, self.uistate.ax2
         print("graphRefresh")
         uistate = self.uistate
         if uistate.df_recs2plot is None or not uistate.anyView():
             self.hideAll()
         else:
             # set visibility of recording lines and build legend
-            axm_legend = self.set_visible_get_legend(axis=axm, show=uistate.to_axm(uistate.df_recs2plot))
-            axm.legend(axm_legend.values(), axm_legend.keys(), loc='upper right')
+            axe_legend = self.set_visible_get_legend(axis=axe, show=uistate.to_axe(uistate.df_recs2plot))
+            axe.legend(axe_legend.values(), axe_legend.keys(), loc='upper right')
             ax1_legend = self.set_visible_get_legend(axis=ax1, show=uistate.to_ax1(uistate.df_recs2plot))
             ax1.legend(ax1_legend.values(), ax1_legend.keys(), loc='upper right')
             ax2_legend = self.set_visible_get_legend(axis=ax2, show=uistate.to_ax2(uistate.df_recs2plot))
@@ -90,11 +90,11 @@ class UIplot():
                 ID_line_fill[2].set_visible(bool(str_show == 'True'))
 
         # arrange axes and labels
-        axm.set_xlabel("Time (s)")
-        axm.set_ylabel("Voltage (V)")
+        axe.set_xlabel("Time (s)")
+        axe.set_ylabel("Voltage (V)")
         # x and y limits
-        axm.set_xlim(uistate.zoom['mean_xlim'])
-        axm.set_ylim(uistate.zoom['mean_ylim'])
+        axe.set_xlim(uistate.zoom['mean_xlim'])
+        axe.set_ylim(uistate.zoom['mean_ylim'])
 
         if uistate.checkBox['norm_EPSP']:
             ax1.set_ylabel("Amplitude %")
@@ -108,7 +108,7 @@ class UIplot():
             ax2.set_ylim(uistate.zoom['output_ax2_ylim'])
         self.oneAxisLeft()
         # redraw
-        axm.figure.canvas.draw()
+        axe.figure.canvas.draw()
         ax1.figure.canvas.draw() # ax2 should be on the same canvas
 
 
@@ -139,7 +139,7 @@ class UIplot():
             ax2.yaxis.set_ticks_position("right")
 
     def addRow(self, dict_row, dfmean, dfoutput):
-        axm, ax1, ax2 = self.uistate.axm, self.uistate.ax1, self.uistate.ax2
+        axe, ax1, ax2 = self.uistate.axe, self.uistate.ax1, self.uistate.ax2
         rec_ID = dict_row['ID']
         rec_name = dict_row['recording_name']
         print(f"Graphing {rec_name}...")
@@ -152,13 +152,13 @@ class UIplot():
         t_volley_slope_start = dict_row['t_volley_slope_start']
         t_volley_slope_end = dict_row['t_volley_slope_end']
         volley_slope_mean = dict_row['volley_slope_mean']
-        # plot relevant filter of dfmean on main_canvas_mean
+        # plot relevant filter of dfmean on canvasEvent
         if rec_filter != 'voltage':
             label = f"{rec_name} ({rec_filter})"
         else:
             label = rec_name
 
-        line, = axm.plot(dfmean["time"], dfmean[rec_filter], color="black", label=label)
+        line, = axe.plot(dfmean["time"], dfmean[rec_filter], color="black", label=label)
         self.uistate.dict_rec_label_ID_line[label] = rec_ID, line
    
         # plot them all, don't bother with show/hide
@@ -166,7 +166,7 @@ class UIplot():
 
         if not np.isnan(t_EPSP_amp):
             y_position = dfmean.loc[dfmean.time == t_EPSP_amp, rec_filter]
-            marker, = axm.plot(t_EPSP_amp, y_position, marker='o', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha=0.3, label=f"{label} EPSP amp marker")
+            marker, = axe.plot(t_EPSP_amp, y_position, marker='o', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha=0.3, label=f"{label} EPSP amp marker")
             subplot = f"{label} EPSP amp"
             line, = ax1.plot(out["sweep"], out['EPSP_amp'], color="green", linestyle='--', alpha=0.5, label=subplot)
             self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, line
@@ -180,7 +180,7 @@ class UIplot():
             y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
             subplot = f"{label} EPSP slope marker"
-            line, = axm.plot([x_start, x_end], [y_start, y_end], color='green', linewidth=10, alpha=0.3, label=subplot)
+            line, = axe.plot([x_start, x_end], [y_start, y_end], color='green', linewidth=10, alpha=0.3, label=subplot)
             self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, line
             subplot = f"{label} EPSP slope"
             line, = ax2.plot(out["sweep"], out['EPSP_slope'], color="green", alpha = 0.3, label=subplot)
@@ -192,7 +192,7 @@ class UIplot():
         if not np.isnan(t_volley_amp):
             y_position = dfmean.loc[dfmean.time == t_volley_amp, rec_filter]
             subplot = f"{label} volley amp marker"
-            marker, = axm.plot(t_volley_amp, y_position, marker='o', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3, label=subplot)
+            marker, = axe.plot(t_volley_amp, y_position, marker='o', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3, label=subplot)
             self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, marker
             subplot = f"{label} volley amp mean"
             line = ax1.axhline(y=volley_amp_mean, color='blue', alpha = 0.3, linestyle='--', label=subplot)
@@ -203,7 +203,7 @@ class UIplot():
             y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
             subplot = f"{label} volley slope marker"
-            line, = axm.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3, label=subplot)
+            line, = axe.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3, label=subplot)
             self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, line
             subplot = f"{label} volley slope mean"
             line = ax2.axhline(y=volley_slope_mean, color='blue', alpha = 0.3, label=subplot)
@@ -259,11 +259,11 @@ class UIplot():
 
 
     def updateLine(self, plot_to_update, x_data, y_data):
-        axm = self.uistate.axm
+        axe = self.uistate.axe
         line = self.uistate.dict_rec_label_ID_line[plot_to_update]
         line[1].set_xdata(x_data)
         line[1].set_ydata(y_data)
-        axm.figure.canvas.draw()
+        axe.figure.canvas.draw()
 
     def updateOutLine(self, ax_out, row, aspect):
         mouseover_out = self.uistate.mouseover_out
@@ -292,9 +292,9 @@ class UIplot():
                 ax2.figure.canvas.draw()
 
     def graphMouseover(self, event): # determine which maingraph event is being mouseovered
-        axm = self.uistate.axm
+        axe = self.uistate.axe
         uistate = self.uistate
-        def plotMouseover(action, axm):
+        def plotMouseover(action, axe):
             alpha = 0.8
             linewidth = 3 if 'resize' in action else 10
             if 'slope' in action:
@@ -308,14 +308,14 @@ class UIplot():
                     color = 'blue'
 
                 if uistate.mouseover_blob is None:
-                    uistate.mouseover_blob = axm.scatter(x_range[1], y_range[1], color=color, s=100, alpha=alpha)
+                    uistate.mouseover_blob = axe.scatter(x_range[1], y_range[1], color=color, s=100, alpha=alpha)
                 else:
                     uistate.mouseover_blob.set_offsets([x_range[1], y_range[1]])
                     uistate.mouseover_blob.set_sizes([100])
                     uistate.mouseover_blob.set_color(color)
 
                 if uistate.mouseover_plot is None:
-                    uistate.mouseover_plot = axm.plot(x_range, y_range, color=color, linewidth=linewidth, alpha=alpha, label="mouseover")
+                    uistate.mouseover_plot = axe.plot(x_range, y_range, color=color, linewidth=linewidth, alpha=alpha, label="mouseover")
                 else:
                     uistate.mouseover_plot[0].set_data(x_range, y_range)
                     uistate.mouseover_plot[0].set_linewidth(linewidth)
@@ -331,7 +331,7 @@ class UIplot():
                     color = 'blue'
 
                 if uistate.mouseover_blob is None:
-                    uistate.mouseover_blob = axm.scatter(x, y, color=color, s=100, alpha=alpha)
+                    uistate.mouseover_blob = axe.scatter(x, y, color=color, s=100, alpha=alpha)
                 else:
                     uistate.mouseover_blob.set_offsets([x, y])
                     uistate.mouseover_blob.set_sizes([100])
@@ -340,7 +340,7 @@ class UIplot():
         y = event.ydata
         if x is None or y is None:
             return
-        if event.inaxes == axm:
+        if event.inaxes == axe:
             zones = {
                 'EPSP slope resize': uistate.EPSP_slope_resize_zone,
                 'EPSP slope move': uistate.EPSP_slope_move_zone,
@@ -354,7 +354,7 @@ class UIplot():
                 checkbox_key = '_'.join(action.split(' ')[:2])  # Split the action string and use the first two parts as the checkbox key
                 if uistate.checkBox.get(checkbox_key, False) and zone['x'][0] <= x <= zone['x'][1] and zone['y'][0] <= y <= zone['y'][1]:
                     uistate.mouseover_action = action
-                    plotMouseover(action, axm)
+                    plotMouseover(action, axe)
                     break
 
             if uistate.mouseover_action is None:
@@ -363,4 +363,4 @@ class UIplot():
                 if uistate.mouseover_plot is not None:
                     uistate.mouseover_plot[0].set_linewidth(0)
 
-            axm.figure.canvas.draw()
+            axe.figure.canvas.draw()

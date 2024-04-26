@@ -10,14 +10,11 @@ class UIstate:
         self.version = "0.0.0"
         self.colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000']
         self.df_groups = pd.DataFrame(columns=['group_ID', 'group_name', 'color', 'show'])
-        self.splitters = {
-            'h_tableSplitter_width': 200,
-            'verticalLayoutProj_width': 200,
-            'verticalLayoutStim_width': 200,
-            'v_graphSplitter_width': 200,
-            'verticalLayoutMean_height': 200,
-            'verticalLayoutOutput_height': 200,
+        self.splitter = {
+            'h_splitterMaster': [0.15, 0.15, 0.58, 0.12],
+            'v_splitterGraphs': [0.2, 0.5, 0.3],
         }
+
         self.checkBox = { # these are cycled by uisub.connectUIstate; maintain format!
             'EPSP_amp': False,
             'EPSP_slope': True,
@@ -54,15 +51,16 @@ class UIstate:
 
     # Do NOT persist these
         self.axm = None # axis of mean graph
-        self.ax1 = None # axis of output graph for amplitudes
-        self.ax2 = None # axis of output graph for slopes
+        self.axe = None # axis of event graph
+        self.ax1 = None # axis of output for amplitudes
+        self.ax2 = None # axis of output for slopes
         self.rec_select = [] # list of selected indices in uisub.tableProj
         self.stim_select = [] # list of selected indices in uisub.tableStim
         self.row_copy = None # copy of single-selected row from df_project, for storing measure points until either saved or rejected
         self.df_recs2plot = None # df_project copy of selected PARSED recordings (or all parsed, if none are selected)
         self.dict_rec_label_ID_line = {} # dict of all plotted recording lines: key=label, value=(rec_ID, 2Dline object)
         self.dict_group_label_ID_line_SEM = {} # dict of all plotted groups: key=label, value=[group_ID, 2Dline object, fill]
-        self.new_indices = [] # list of indices in uisub.df_project of newly parsed recordings; used by uisub.graphMainPreload()
+        self.new_indices = [] # list of indices in uisub.df_project of newly parsed recordings; used by uisub.graphPreload()
         self.darkmode = False # set by global bw cfg
 
     # Mouseover variables
@@ -92,9 +90,9 @@ class UIstate:
         self.volley_slope_move_zone = {} # dict: key=x,y, value=start,end.
         self.volley_slope_resize_zone = {} # dict: key=x,y, value=start,end.
 
-    def setMargins(self, axm, pixels=10): # set margins for mouseover detection
-        self.x_margin = axm.transData.inverted().transform((pixels, 0))[0] - axm.transData.inverted().transform((0, 0))[0]
-        self.y_margin = axm.transData.inverted().transform((0, pixels))[1] - axm.transData.inverted().transform((0, 0))[1]
+    def setMargins(self, axe, pixels=10): # set margins for mouseover detection
+        self.x_margin = axe.transData.inverted().transform((pixels, 0))[0] - axe.transData.inverted().transform((0, 0))[0]
+        self.y_margin = axe.transData.inverted().transform((0, pixels))[1] - axe.transData.inverted().transform((0, 0))[1]
 
     def updateDragZones(self, aspect=None, x=None, y=None):
         if aspect is None:
@@ -162,8 +160,8 @@ class UIstate:
     #def get_recs_in_group(self):
 
 
-    def to_axm(self, df): # dict of lines that are supposed to be on axm - label: index
-        axm = {}
+    def to_axe(self, df): # dict of lines that are supposed to be on axe - label: index
+        axe = {}
         for index, row in df.iterrows():
             rec_filter = row['filter']
             if rec_filter != 'voltage':
@@ -171,15 +169,15 @@ class UIstate:
             else:
                 key = row['recording_name']
             if self.checkBox['EPSP_amp']:
-                axm[f"{key} EPSP amp marker"] = index
+                axe[f"{key} EPSP amp marker"] = index
             if self.checkBox['EPSP_slope']:
-                axm[f"{key} EPSP slope marker"] = index
+                axe[f"{key} EPSP slope marker"] = index
             if self.checkBox['volley_amp']:
-                axm[f"{key} volley amp marker"] = index
+                axe[f"{key} volley amp marker"] = index
             if self.checkBox['volley_slope']:
-                axm[f"{key} volley slope marker"] = index
-            axm[key] = index
-        return axm
+                axe[f"{key} volley slope marker"] = index
+            axe[key] = index
+        return axe
 
     def to_ax1(self, df): # dict of lines that are supposed to be on ax1 - label: index
         ax1 = {}
@@ -215,8 +213,9 @@ class UIstate:
         try:
             return {
                 'version': self.version,
-                'selected': self.selected,
+                'color': self.color,
                 'df_groups': self.df_groups,
+                'splitter': self.splitter,
                 'checkBox': self.checkBox,
                 'lineEdit': self.lineEdit,
                 'zoom': self.zoom,
@@ -227,7 +226,9 @@ class UIstate:
     
     def set_state(self, state):
         self.version = state.get('version')
+        self.color = state.get('color')
         self.df_groups = state.get('df_groups')
+        self.splitter = state.get('splitter')
         self.checkBox = state.get('checkBox')
         self.lineEdit = state.get('lineEdit')
         self.zoom = state.get('zoom')
