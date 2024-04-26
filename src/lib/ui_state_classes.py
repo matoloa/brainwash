@@ -159,6 +159,16 @@ class UIstate:
 
     #def get_recs_in_group(self):
 
+    def to_axm(self, df): # dict of lines that are supposed to be on axe - label: index
+        axm = {}
+        for index, row in df.iterrows():
+            rec_filter = row['filter']
+            if rec_filter != 'voltage':
+                key = f"mean_{row['recording_name']} ({rec_filter})"
+            else:
+                key = f"mean_{row['recording_name']}"
+            axm[key] = index
+        return axm
 
     def to_axe(self, df): # dict of lines that are supposed to be on axe - label: index
         axe = {}

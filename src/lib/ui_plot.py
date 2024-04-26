@@ -61,19 +61,25 @@ class UIplot():
 
     def graphRefresh(self):
         # toggle show/hide of lines on axe, ax1 and ax2: show only selected and imported lines, only appropriate aspects
-        axe, ax1, ax2 = self.uistate.axe, self.uistate.ax1, self.uistate.ax2
+        axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
         print("graphRefresh")
         uistate = self.uistate
         if uistate.df_recs2plot is None or not uistate.anyView():
             self.hideAll()
         else:
             # set visibility of recording lines and build legend
+            axm_legend = self.set_visible_get_legend(axis=axm, show=uistate.to_axm(uistate.df_recs2plot))
+            axm.legend(axm_legend.values(), axm_legend.keys(), loc='upper right')
             axe_legend = self.set_visible_get_legend(axis=axe, show=uistate.to_axe(uistate.df_recs2plot))
             axe.legend(axe_legend.values(), axe_legend.keys(), loc='upper right')
             ax1_legend = self.set_visible_get_legend(axis=ax1, show=uistate.to_ax1(uistate.df_recs2plot))
             ax1.legend(ax1_legend.values(), ax1_legend.keys(), loc='upper right')
             ax2_legend = self.set_visible_get_legend(axis=ax2, show=uistate.to_ax2(uistate.df_recs2plot))
             ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
+
+        # make all lines on axm visible
+#        for line in axm.get_lines():
+#            line.set_visible(True)
 
         for label, ID_line_fill in uistate.dict_group_label_ID_line_SEM.items():
             group_ID = ID_line_fill[0]
@@ -108,6 +114,7 @@ class UIplot():
             ax2.set_ylim(uistate.zoom['output_ax2_ylim'])
         self.oneAxisLeft()
         # redraw
+        axm.figure.canvas.draw()
         axe.figure.canvas.draw()
         ax1.figure.canvas.draw() # ax2 should be on the same canvas
 
@@ -139,7 +146,7 @@ class UIplot():
             ax2.yaxis.set_ticks_position("right")
 
     def addRow(self, dict_row, dfmean, dfoutput):
-        axe, ax1, ax2 = self.uistate.axe, self.uistate.ax1, self.uistate.ax2
+        axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
         rec_ID = dict_row['ID']
         rec_name = dict_row['recording_name']
         print(f"Graphing {rec_name}...")
@@ -158,6 +165,12 @@ class UIplot():
         else:
             label = rec_name
 
+        # add to Mean
+        mean_label = f"mean_{rec_name}"
+        line, = axm.plot(dfmean["time"], dfmean[rec_filter], color="black", label=mean_label)
+        self.uistate.dict_rec_label_ID_line[mean_label] = rec_ID, line
+
+        # add to Events
         line, = axe.plot(dfmean["time"], dfmean[rec_filter], color="black", label=label)
         self.uistate.dict_rec_label_ID_line[label] = rec_ID, line
    

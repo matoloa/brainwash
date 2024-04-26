@@ -2257,7 +2257,8 @@ class UIsub(Ui_MainWindow):
         uistate.ax1 = ax1
         # connect scroll event if not already connected #TODO: when graphAxes is called only once, the check should be redundant
         if not hasattr(self, 'scroll_event_connected') or not self.scroll_event_connected:
-            self.canvasEvent.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphEvent, canvas=self.canvasEvent, ax1=self.canvasEvent.axes))
+            self.canvasMean.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphMean, canvas=self.canvasMean))
+            self.canvasEvent.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphEvent, canvas=self.canvasEvent))
             self.canvasOutput.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.canvasOutput, ax1=uistate.ax1, ax2=uistate.ax1))
             self.scroll_event_connected = True
         df_p = self.get_df_project()
