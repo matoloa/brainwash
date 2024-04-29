@@ -985,12 +985,11 @@ class UIsub(Ui_MainWindow):
                 self.tableStim.selectionModel().select(selection, QtCore.QItemSelectionModel.Select)
                 self.setTableStimVisibility(True)
             else:
-                print(f"** hiding because dft.shape[0] = {dft.shape[0]}")
+                print(f"* hiding tableStim as dft.shape[0] = {dft.shape[0]}")
                 self.setTableStimVisibility(False)
         else: # none or many selected
             self.tableStim.selectionModel().clear()
             self.tableStimModel.setData(None)
-            print(f"** hiding because selection = {len(uistate.rec_select)}")
             self.setTableStimVisibility(False)
 
         self.updateMouseover()
