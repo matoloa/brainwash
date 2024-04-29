@@ -11,8 +11,16 @@ class UIstate:
         self.colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000']
         self.df_groups = pd.DataFrame(columns=['group_ID', 'group_name', 'color', 'show'])
         self.splitter = {
-            'h_splitterMaster': [0.105, 0.04, 0.795, 0.06],
+            'h_splitterMaster': [0.105, 0.04, 0.795, 0.09],
             'v_splitterGraphs': [0.2, 0.5, 0.3],
+        }
+        self.viewTools = {
+            'frameToolCrop': ["Data cropping", True],
+            'frameToolStim': ["Stim detection", True],
+            'frameToolAspect': ["Aspect toggles", True],
+            'frameToolScaling': ["Output Scaling", True],
+            'frameToolPairedStim': ["Paired stims", False],
+            'frameToolExport': ["Image Export", False],
         }
 
         self.checkBox = { # these are cycled by uisub.connectUIstate; maintain format!
@@ -226,6 +234,7 @@ class UIstate:
                 'colors': self.colors,
                 'df_groups': self.df_groups,
                 'splitter': self.splitter,
+                'viewTools': self.viewTools,
                 'checkBox': self.checkBox,
                 'lineEdit': self.lineEdit,
                 'zoom': self.zoom,
@@ -239,6 +248,7 @@ class UIstate:
         self.colors = state.get('colors')
         self.df_groups = state.get('df_groups')
         self.splitter = state.get('splitter')
+        self.viewTools = state.get('viewTools')
         self.checkBox = state.get('checkBox')
         self.lineEdit = state.get('lineEdit')
         self.zoom = state.get('zoom')

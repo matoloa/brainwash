@@ -405,6 +405,106 @@ class Ui_MainWindow(QtCore.QObject):
         self.verticalLayoutTools = QtWidgets.QVBoxLayout(self.verticalLayoutWidget_3)
         self.verticalLayoutTools.setContentsMargins(0, 0, 0, 0)
         self.verticalLayoutTools.setObjectName("verticalLayoutTools")
+        self.frameToolCrop = QtWidgets.QFrame(self.verticalLayoutWidget_3)
+        self.frameToolCrop.setMinimumSize(QtCore.QSize(211, 191))
+        self.frameToolCrop.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frameToolCrop.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frameToolCrop.setObjectName("frameToolCrop")
+        self.label_cropped_data = QtWidgets.QLabel(self.frameToolCrop)
+        self.label_cropped_data.setGeometry(QtCore.QRect(10, 10, 111, 17))
+        font = QtGui.QFont()
+        font.setFamily("DejaVu Sans")
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_cropped_data.setFont(font)
+        self.label_cropped_data.setObjectName("label_cropped_data")
+        self.pushButton_crop_apply = QtWidgets.QPushButton(self.frameToolCrop)
+        self.pushButton_crop_apply.setGeometry(QtCore.QRect(20, 30, 181, 25))
+        self.pushButton_crop_apply.setObjectName("pushButton_crop_apply")
+        self.label_mean_to = QtWidgets.QLabel(self.frameToolCrop)
+        self.label_mean_to.setGeometry(QtCore.QRect(70, 90, 21, 20))
+        self.label_mean_to.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
+        self.label_mean_to.setObjectName("label_mean_to")
+        self.lineEdit_mean_selection_end = QtWidgets.QLineEdit(self.frameToolCrop)
+        self.lineEdit_mean_selection_end.setGeometry(QtCore.QRect(80, 90, 41, 25))
+        self.lineEdit_mean_selection_end.setObjectName("lineEdit_mean_selection_end")
+        self.label_mean_selected_range_2 = QtWidgets.QLabel(self.frameToolCrop)
+        self.label_mean_selected_range_2.setGeometry(QtCore.QRect(10, 130, 131, 17))
+        font = QtGui.QFont()
+        font.setFamily("DejaVu Sans")
+        font.setBold(False)
+        font.setWeight(50)
+        self.label_mean_selected_range_2.setFont(font)
+        self.label_mean_selected_range_2.setObjectName("label_mean_selected_range_2")
+        self.label_mean_selected_range = QtWidgets.QLabel(self.frameToolCrop)
+        self.label_mean_selected_range.setGeometry(QtCore.QRect(10, 70, 131, 17))
+        font = QtGui.QFont()
+        font.setFamily("DejaVu Sans")
+        font.setBold(False)
+        font.setWeight(50)
+        self.label_mean_selected_range.setFont(font)
+        self.label_mean_selected_range.setObjectName("label_mean_selected_range")
+        self.pushButton_crop_range = QtWidgets.QPushButton(self.frameToolCrop)
+        self.pushButton_crop_range.setGeometry(QtCore.QRect(140, 90, 61, 25))
+        self.pushButton_crop_range.setObjectName("pushButton_crop_range")
+        self.pushButton_crop_reinsert = QtWidgets.QPushButton(self.frameToolCrop)
+        self.pushButton_crop_reinsert.setGeometry(QtCore.QRect(140, 150, 61, 25))
+        self.pushButton_crop_reinsert.setObjectName("pushButton_crop_reinsert")
+        self.lineEdit_mean_selection_start = QtWidgets.QLineEdit(self.frameToolCrop)
+        self.lineEdit_mean_selection_start.setGeometry(QtCore.QRect(20, 90, 41, 25))
+        self.lineEdit_mean_selection_start.setObjectName("lineEdit_mean_selection_start")
+        self.comboBoxCropped = QtWidgets.QComboBox(self.frameToolCrop)
+        self.comboBoxCropped.setGeometry(QtCore.QRect(20, 150, 101, 25))
+        self.comboBoxCropped.setObjectName("comboBoxCropped")
+        self.verticalLayoutTools.addWidget(self.frameToolCrop)
+        self.frameToolStim = QtWidgets.QFrame(self.verticalLayoutWidget_3)
+        self.frameToolStim.setMinimumSize(QtCore.QSize(211, 211))
+        self.frameToolStim.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frameToolStim.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frameToolStim.setObjectName("frameToolStim")
+        self.checkBox_show_all_events = QtWidgets.QCheckBox(self.frameToolStim)
+        self.checkBox_show_all_events.setGeometry(QtCore.QRect(10, 30, 151, 23))
+        self.checkBox_show_all_events.setObjectName("checkBox_show_all_events")
+        self.checkBox_global_timepoints = QtWidgets.QCheckBox(self.frameToolStim)
+        self.checkBox_global_timepoints.setGeometry(QtCore.QRect(10, 50, 151, 23))
+        self.checkBox_global_timepoints.setObjectName("checkBox_global_timepoints")
+        self.label_stims = QtWidgets.QLabel(self.frameToolStim)
+        self.label_stims.setGeometry(QtCore.QRect(10, 10, 62, 17))
+        font = QtGui.QFont()
+        font.setFamily("DejaVu Sans")
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_stims.setFont(font)
+        self.label_stims.setObjectName("label_stims")
+        self.lineEdit_mean_selected_stim = QtWidgets.QLineEdit(self.frameToolStim)
+        self.lineEdit_mean_selected_stim.setGeometry(QtCore.QRect(20, 110, 41, 25))
+        self.lineEdit_mean_selected_stim.setObjectName("lineEdit_mean_selected_stim")
+        self.label_mean_selected_stim = QtWidgets.QLabel(self.frameToolStim)
+        self.label_mean_selected_stim.setGeometry(QtCore.QRect(10, 90, 151, 17))
+        font = QtGui.QFont()
+        font.setFamily("DejaVu Sans")
+        font.setBold(False)
+        font.setWeight(50)
+        self.label_mean_selected_stim.setFont(font)
+        self.label_mean_selected_stim.setObjectName("label_mean_selected_stim")
+        self.pushButton_stim_toggle = QtWidgets.QPushButton(self.frameToolStim)
+        self.pushButton_stim_toggle.setGeometry(QtCore.QRect(70, 110, 81, 25))
+        self.pushButton_stim_toggle.setObjectName("pushButton_stim_toggle")
+        self.pushButton_stim_set_threshold = QtWidgets.QPushButton(self.frameToolStim)
+        self.pushButton_stim_set_threshold.setGeometry(QtCore.QRect(20, 170, 51, 25))
+        self.pushButton_stim_set_threshold.setObjectName("pushButton_stim_set_threshold")
+        self.pushButton_stim_clear = QtWidgets.QPushButton(self.frameToolStim)
+        self.pushButton_stim_clear.setGeometry(QtCore.QRect(80, 170, 71, 25))
+        self.pushButton_stim_clear.setObjectName("pushButton_stim_clear")
+        self.label_mean_selected_stim_2 = QtWidgets.QLabel(self.frameToolStim)
+        self.label_mean_selected_stim_2.setGeometry(QtCore.QRect(10, 150, 191, 17))
+        font = QtGui.QFont()
+        font.setFamily("DejaVu Sans")
+        font.setBold(False)
+        font.setWeight(50)
+        self.label_mean_selected_stim_2.setFont(font)
+        self.label_mean_selected_stim_2.setObjectName("label_mean_selected_stim_2")
+        self.verticalLayoutTools.addWidget(self.frameToolStim)
         self.frameToolAspect = QtWidgets.QFrame(self.verticalLayoutWidget_3)
         self.frameToolAspect.setMinimumSize(QtCore.QSize(131, 121))
         self.frameToolAspect.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -437,7 +537,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.frameToolScaling.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frameToolScaling.setObjectName("frameToolScaling")
         self.lineEdit_norm_EPSP_end = QtWidgets.QLineEdit(self.frameToolScaling)
-        self.lineEdit_norm_EPSP_end.setGeometry(QtCore.QRect(70, 70, 41, 25))
+        self.lineEdit_norm_EPSP_end.setGeometry(QtCore.QRect(80, 70, 41, 25))
         self.lineEdit_norm_EPSP_end.setObjectName("lineEdit_norm_EPSP_end")
         self.label_norm_on_sweep = QtWidgets.QLabel(self.frameToolScaling)
         self.label_norm_on_sweep.setGeometry(QtCore.QRect(10, 50, 131, 20))
@@ -447,7 +547,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBox_norm_EPSP.setGeometry(QtCore.QRect(10, 30, 111, 23))
         self.checkBox_norm_EPSP.setObjectName("checkBox_norm_EPSP")
         self.label_relative_to = QtWidgets.QLabel(self.frameToolScaling)
-        self.label_relative_to.setGeometry(QtCore.QRect(60, 70, 21, 20))
+        self.label_relative_to.setGeometry(QtCore.QRect(70, 70, 21, 20))
         self.label_relative_to.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
         self.label_relative_to.setObjectName("label_relative_to")
         self.label_scaling = QtWidgets.QLabel(self.frameToolScaling)
@@ -459,7 +559,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.label_scaling.setFont(font)
         self.label_scaling.setObjectName("label_scaling")
         self.lineEdit_norm_EPSP_start = QtWidgets.QLineEdit(self.frameToolScaling)
-        self.lineEdit_norm_EPSP_start.setGeometry(QtCore.QRect(10, 70, 41, 25))
+        self.lineEdit_norm_EPSP_start.setGeometry(QtCore.QRect(20, 70, 41, 25))
         self.lineEdit_norm_EPSP_start.setObjectName("lineEdit_norm_EPSP_start")
         self.verticalLayoutTools.addWidget(self.frameToolScaling)
         self.frameToolPairedStim = QtWidgets.QFrame(self.verticalLayoutWidget_3)
@@ -517,12 +617,15 @@ class Ui_MainWindow(QtCore.QObject):
         self.menuGroups.setObjectName("menuGroups")
         self.menuEdit = QtWidgets.QMenu(self.menubar)
         self.menuEdit.setObjectName("menuEdit")
+        self.menuView = QtWidgets.QMenu(self.menubar)
+        self.menuView.setObjectName("menuView")
         mainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(mainWindow)
         self.statusbar.setObjectName("statusbar")
         mainWindow.setStatusBar(self.statusbar)
         self.menubar.addAction(self.menuFile.menuAction())
         self.menubar.addAction(self.menuEdit.menuAction())
+        self.menubar.addAction(self.menuView.menuAction())
         self.menubar.addAction(self.menuData.menuAction())
         self.menubar.addAction(self.menuGroups.menuAction())
 
@@ -533,6 +636,21 @@ class Ui_MainWindow(QtCore.QObject):
         _translate = QtCore.QCoreApplication.translate
         mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash"))
         self.pushButtonParse.setText(_translate("mainWindow", "Import"))
+        self.label_cropped_data.setText(_translate("mainWindow", "Crop Data"))
+        self.pushButton_crop_apply.setText(_translate("mainWindow", "Apply to Selected Recs"))
+        self.label_mean_to.setText(_translate("mainWindow", "-"))
+        self.label_mean_selected_range_2.setText(_translate("mainWindow", "Removed ranges"))
+        self.label_mean_selected_range.setText(_translate("mainWindow", "Selected range"))
+        self.pushButton_crop_range.setText(_translate("mainWindow", "Remove"))
+        self.pushButton_crop_reinsert.setText(_translate("mainWindow", "Reinsert"))
+        self.checkBox_show_all_events.setText(_translate("mainWindow", "Show all events"))
+        self.checkBox_global_timepoints.setText(_translate("mainWindow", "Uniform timepoints"))
+        self.label_stims.setText(_translate("mainWindow", "Stims"))
+        self.label_mean_selected_stim.setText(_translate("mainWindow", "Stim point selected"))
+        self.pushButton_stim_toggle.setText(_translate("mainWindow", "(toggle)"))
+        self.pushButton_stim_set_threshold.setText(_translate("mainWindow", "Set"))
+        self.pushButton_stim_clear.setText(_translate("mainWindow", "Clear all"))
+        self.label_mean_selected_stim_2.setText(_translate("mainWindow", "Stim Detection Threshold"))
         self.checkBox_EPSP_slope.setText(_translate("mainWindow", "EPSP slope"))
         self.checkBox_volley_slope.setText(_translate("mainWindow", "volley slope"))
         self.checkBox_EPSP_amp.setText(_translate("mainWindow", "EPSP amp."))
@@ -551,7 +669,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.menuData.setTitle(_translate("mainWindow", "Data"))
         self.menuGroups.setTitle(_translate("mainWindow", "Groups"))
         self.menuEdit.setTitle(_translate("mainWindow", "Edit"))
-
+        self.menuView.setTitle(_translate("mainWindow", "View"))
 
 
 
@@ -562,13 +680,6 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButtonParse.setVisible(False) # explicit hide command required for Windows, but not Linux (?)
         self.progressBar.setVisible(False)
         self.progressBar.setValue(0)
-#       also hide experimental features (for deploy)
-        if config.hide_experimental:
-            self.label_paired_data.setVisible(False)
-            self.pushButton_paired_data_flip.setVisible(False)
-            self.checkBox_paired_stims.setVisible(False)
-
-
 
 ################################################################
 #        Dialog and table classes                              #
@@ -802,6 +913,7 @@ class UIsub(Ui_MainWindow):
         self.graphAxes()
 
         self.darkmode() # set darkmode if set in bw_cfg. Requires tables and canvases be loaded!
+        self.setupToolBar()
 
         # debug mode; prints widget focus every 1000ms
         if config.track_widget_focus:
@@ -871,13 +983,15 @@ class UIsub(Ui_MainWindow):
                     index_end = model.index(row, model.columnCount(QtCore.QModelIndex()) - 1)  # End of the row (last column)
                     selection.select(index_start, index_end)
                 self.tableStim.selectionModel().select(selection, QtCore.QItemSelectionModel.Select)
-                self.show_tableStim(True)
+                self.setTableStimVisibility(True)
             else:
-                self.show_tableStim(False)
+                print(f"** hiding because dft.shape[0] = {dft.shape[0]}")
+                self.setTableStimVisibility(False)
         else: # none or many selected
             self.tableStim.selectionModel().clear()
             self.tableStimModel.setData(None)
-            self.show_tableStim(False)
+            print(f"** hiding because selection = {len(uistate.rec_select)}")
+            self.setTableStimVisibility(False)
 
         self.updateMouseover()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
@@ -885,151 +999,31 @@ class UIsub(Ui_MainWindow):
 
 
 
-# WIP: TODO: move these to appropriate header in this file
+##################################################################
+#    WIP: TODO: move these to appropriate header in this file    #
+##################################################################
 
+    def setTableStimVisibility(self, state):
+        widget = self.h_splitterMaster.widget(1)  # Get the second widget in the splitter
+        widget.setVisible(state)
 
-    def setSplitterSizes(self, *splitter_names):
-        for splitter_name in splitter_names:
-            splitter = getattr(self, splitter_name)
-            proportions = uistate.splitter[splitter_name]
-            widgets = [splitter.widget(i) for i in range(splitter.count())]
-            # Store the original size policies of the widgets, and set their size policy to QtWidgets.QSizePolicy.Ignored
-            # Set width/height depending on splitter orientation
-            sizes = []
-            for widget in widgets:
-                #original_size_policy = widget.sizePolicy()
-                widget.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
-                if splitter.orientation() == QtCore.Qt.Horizontal:
-                    sizes.append(int(proportions[widgets.index(widget)] * splitter.sizeHint().width()))
-                else:
-                    sizes.append(int(proportions[widgets.index(widget)] * splitter.sizeHint().height()))
-                #widget.setSizePolicy(original_size_policy)
-            splitter.setSizes(sizes)
-
-
-    def setupTableStim(self):
-        self.tableStimModel = TableModel(df_timepointsTemplate())
-        self.tableStim.setModel(self.tableStimModel)
-        self.tableStim.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self.tableStim.verticalHeader().hide()
-        tableStim_selectionModel = self.tableStim.selectionModel()
-        tableStim_selectionModel.selectionChanged.connect(self.stimSelectionChanged)
-        self.show_tableStim(False)
-
-    def show_tableStim(self, state):
-        self.tableStim.resizeColumnsToContents()
-        self.tableStimModel.layoutChanged.emit()
 
     def onSplitterMoved(self, pos, index):
         splitter = self.sender()
         splitter_name = splitter.objectName()
         total_size = sum(splitter.sizes())
         proportions = [size / total_size for size in splitter.sizes()]
-        print(f"{splitter_name}, total_size: {total_size}, Proportions: {proportions}")
+        #print(f"{splitter_name}, total_size: {total_size}, Proportions: {proportions}")
         uistate.splitter[splitter_name] = proportions
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
+ 
+    def toggleViewTool(self, frame):
+        self.usage(f"toggleViewTool {frame}")
+        uistate.viewTools[frame][1] = not uistate.viewTools[frame][1]
+        getattr(self, frame).setVisible(uistate.viewTools[frame][1])
+        uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
-    def setupCanvases(self):
-        self.graphMean.setLayout(QtWidgets.QVBoxLayout())
-        self.canvasMean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
-        self.graphMean.layout().addWidget(self.canvasMean)
-
-        self.graphEvent.setLayout(QtWidgets.QVBoxLayout())
-        self.canvasEvent = MplCanvas(parent=self.graphEvent)  # instantiate canvas for Mean
-        self.graphEvent.layout().addWidget(self.canvasEvent)
-
-        self.graphOutput.setLayout(QtWidgets.QVBoxLayout())        
-        self.canvasOutput = MplCanvas(parent=self.graphOutput)  # instantiate canvas for Output
-        self.graphOutput.layout().addWidget(self.canvasOutput)
-
-        self.canvasEvent.mpl_connect('button_press_event', lambda event: self.graphClicked(event, self.canvasEvent))
-        self.canvasOutput.mpl_connect('button_press_event', lambda event: self.graphClicked(event, self.canvasOutput, out=True))
-        self.canvasEvent.show()
-        self.canvasOutput.show()
-
-    def setupMenus(self):
-        # File menu
-        self.actionNew = QtWidgets.QAction("New project", self)
-        self.actionNew.triggered.connect(self.triggerNewProject)
-        self.actionNew.setShortcut("Ctrl+N")
-        self.menuFile.addAction(self.actionNew)
-        self.actionOpen = QtWidgets.QAction("Open project", self)
-        self.actionOpen.triggered.connect(self.triggerOpenProject)
-        self.actionOpen.setShortcut("Ctrl+O")
-        self.menuFile.addAction(self.actionOpen)
-        self.actionRenameProject = QtWidgets.QAction("Rename project", self)
-        self.actionRenameProject.triggered.connect(self.renameProject)
-        self.actionRenameProject.setShortcut("Ctrl+R")
-        self.menuFile.addAction(self.actionRenameProject)
-
-        # Edit menu
-        self.actionUndo = QtWidgets.QAction("Undo (coming soon)", self)
-        #self.actionUndo.triggered.connect(self.triggerUndo)
-        self.actionUndo.setShortcut("Ctrl+Z")
-        self.menuEdit.addAction(self.actionUndo)
-        self.actionDarkmode = QtWidgets.QAction("Toggle Darkmode", self)
-        self.actionDarkmode.triggered.connect(self.triggerDarkmode)
-        self.actionDarkmode.setShortcut("Ctrl+D")
-        self.menuEdit.addAction(self.actionDarkmode)
-
-        # Data menu
-        self.actionAddData = QtWidgets.QAction("Add data files", self)
-        self.actionAddData.triggered.connect(self.triggerAddData)
-        self.menuData.addAction(self.actionAddData)
-        self.actionParse = QtWidgets.QAction("Import all added datafiles", self)
-        self.actionParse.triggered.connect(self.triggerParse)
-        self.actionParse.setShortcut("Ctrl+I")
-        self.menuData.addAction(self.actionParse)
-        self.actionDelete = QtWidgets.QAction("Delete selected data", self)
-        self.actionDelete.triggered.connect(self.triggerDelete)
-        self.actionDelete.setShortcut("DEL")
-        self.menuData.addAction(self.actionDelete)
-        self.actionRenameRecording = QtWidgets.QAction("Rename recording", self)
-        self.actionRenameRecording.triggered.connect(self.triggerRenameRecording)
-        self.actionRenameRecording.setShortcut("F2")
-        self.menuData.addAction(self.actionRenameRecording)
-
-        # Group menu
-        self.actionNewGroup = QtWidgets.QAction("Add a group", self)
-        self.actionNewGroup.triggered.connect(self.triggerNewGroup)
-        self.actionNewGroup.setShortcut("+")
-        self.menuGroups.addAction(self.actionNewGroup)
-        self.actionRemoveEmptyGroup = QtWidgets.QAction("Remove last empty group", self)
-        self.actionRemoveEmptyGroup.triggered.connect(self.triggerRemoveLastEmptyGroup)
-        self.actionRemoveEmptyGroup.setShortcut("-")
-        self.menuGroups.addAction(self.actionRemoveEmptyGroup)
-        self.actionRemoveGroup = QtWidgets.QAction("Force remove last group", self)
-        self.actionRemoveGroup.triggered.connect(self.triggerRemoveLastGroup)
-        self.actionRemoveGroup.setShortcut("Ctrl+-")
-        self.menuGroups.addAction(self.actionRemoveGroup)
-        self.actionClearGroups = QtWidgets.QAction("Clear group(s) in selection", self)
-        self.actionClearGroups.triggered.connect(self.triggerClearGroups)
-        self.menuGroups.addAction(self.actionClearGroups)
-        self.actionResetGroups = QtWidgets.QAction("Remove all groups", self)
-        self.actionResetGroups.triggered.connect(self.triggerEditGroups)
-        self.menuGroups.addAction(self.actionResetGroups)
-
-
-    def setupTableProj(self):
-        # Creates an instance of custom QTableView to allow drag&drop
-        try:
-            self.tableProj = TableProjSub(parent=self)
-            self.verticalLayoutProj.addWidget(self.tableProj)
-            self.tableProj.setObjectName("tableProj")
-
-            # Set up the table view
-            self.df_project = df_projectTemplate()
-            self.tablemodel = TableModel(self.df_project)
-            self.tableProj.setModel(self.tablemodel)
-
-            # Connect events
-            self.pushButtonParse.pressed.connect(self.triggerParse)
-            self.tableProj.setSelectionBehavior(TableProjSub.SelectRows)
-            tableProj_selectionModel = self.tableProj.selectionModel()
-            tableProj_selectionModel.selectionChanged.connect(self.tableProjSelectionChanged)
-        except Exception as e:
-            print(f"Error setting up tableProj: {e}")
 
     def talkback(self):
         row = uistate.row_copy
@@ -1119,23 +1113,6 @@ class UIsub(Ui_MainWindow):
             uistate.df_recs2plot = None
 
 
-    def connectUIstate(self): # Connect UI elements to uistate
-        # checkBoxes 
-        for key, value in uistate.checkBox.items():
-            #print(f" - connecting checkbox {key} to {value}")
-            checkBox = getattr(self, f"checkBox_{key}")
-            checkBox.setChecked(value)
-            checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
-        # lineEdits
-        # pushButtons
-        # comboBoxes
-        # mods?...
-        for splitter_name in ['h_splitterMaster', 'v_splitterGraphs']:
-            splitter = getattr(self, splitter_name)
-            print(f" - connecting splitter {splitter_name}: objectName={splitter.objectName()}")
-            splitter.splitterMoved.connect(self.onSplitterMoved)
-
-   
     def viewSettingsChanged(self, key, state):
         self.usage(f"viewSettingsChanged_{key}, {state == 2}")
         if key in uistate.checkBox.keys():
@@ -1155,6 +1132,7 @@ class UIsub(Ui_MainWindow):
         self.updateMouseover()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
+
     def groupControlsRefresh(self):
         self.removeGroupControls()
         #print (f"groupControlsRefresh: uistate.df_groups: {uistate.df_groups}")
@@ -1162,23 +1140,6 @@ class UIsub(Ui_MainWindow):
             #print(f" - adding group {str_ID}")
             self.addGroupControls(str_ID)
 
-    def build_dict_folders(self):
-        dict_folders = {
-                    'project': self.projects_folder / self.projectname,
-                    'data': self.projects_folder / self.projectname / 'data',
-                    'timepoints': self.projects_folder / self.projectname / 'timepoints',
-                    'cache': self.projects_folder / f'cache {config.version}' / self.projectname,
-        }
-        return dict_folders
-
-    def resetCacheDicts(self):
-        self.dict_datas = {} # all raw data
-        self.dict_filters = {} # all processed data
-        self.dict_means = {} # all means
-        self.dict_ts = {} # all timepoints
-        self.dict_outputs = {} # all outputs
-        self.dict_group_means = {} # means of all group outputs
-        self.dict_diffs = {} # all diffs (for paired stim)
 
     def usage(self, ui_component): # Talkback function
         if config.verbose:
@@ -1202,6 +1163,190 @@ class UIsub(Ui_MainWindow):
             yaml.safe_dump(top_data, file, default_flow_style=False)
             yaml.safe_dump(dict_bottom, file, default_flow_style=False)
 
+
+    def resetCacheDicts(self):
+        self.dict_datas = {} # all raw data
+        self.dict_filters = {} # all processed data
+        self.dict_means = {} # all means
+        self.dict_ts = {} # all timepoints
+        self.dict_outputs = {} # all outputs
+        self.dict_group_means = {} # means of all group outputs
+        self.dict_diffs = {} # all diffs (for paired stim)
+
+
+
+# uisub init refactoring
+    def setSplitterSizes(self, *splitter_names):
+        for splitter_name in splitter_names:
+            splitter = getattr(self, splitter_name)
+            proportions = uistate.splitter[splitter_name]
+            widgets = [splitter.widget(i) for i in range(splitter.count())]
+            # Store the original size policies of the widgets, and set their size policy to QtWidgets.QSizePolicy.Ignored
+            # Set width/height depending on splitter orientation
+            sizes = []
+            for widget in widgets:
+                #original_size_policy = widget.sizePolicy()
+                widget.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
+                if splitter.orientation() == QtCore.Qt.Horizontal:
+                    sizes.append(int(proportions[widgets.index(widget)] * splitter.sizeHint().width()))
+                else:
+                    sizes.append(int(proportions[widgets.index(widget)] * splitter.sizeHint().height()))
+                #widget.setSizePolicy(original_size_policy)
+            splitter.setSizes(sizes)
+
+
+    def setupCanvases(self):
+        self.graphMean.setLayout(QtWidgets.QVBoxLayout())
+        self.canvasMean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
+        self.graphMean.layout().addWidget(self.canvasMean)
+
+        self.graphEvent.setLayout(QtWidgets.QVBoxLayout())
+        self.canvasEvent = MplCanvas(parent=self.graphEvent)  # instantiate canvas for Mean
+        self.graphEvent.layout().addWidget(self.canvasEvent)
+
+        self.graphOutput.setLayout(QtWidgets.QVBoxLayout())        
+        self.canvasOutput = MplCanvas(parent=self.graphOutput)  # instantiate canvas for Output
+        self.graphOutput.layout().addWidget(self.canvasOutput)
+
+        self.canvasEvent.mpl_connect('button_press_event', lambda event: self.graphClicked(event, self.canvasEvent))
+        self.canvasOutput.mpl_connect('button_press_event', lambda event: self.graphClicked(event, self.canvasOutput, out=True))
+        self.canvasEvent.show()
+        self.canvasOutput.show()
+
+
+    def setupMenus(self):
+        # File menu
+        self.actionNew = QtWidgets.QAction("New project", self)
+        self.actionNew.triggered.connect(self.triggerNewProject)
+        self.actionNew.setShortcut("Ctrl+N")
+        self.menuFile.addAction(self.actionNew)
+        self.actionOpen = QtWidgets.QAction("Open project", self)
+        self.actionOpen.triggered.connect(self.triggerOpenProject)
+        self.actionOpen.setShortcut("Ctrl+O")
+        self.menuFile.addAction(self.actionOpen)
+        self.actionRenameProject = QtWidgets.QAction("Rename project", self)
+        self.actionRenameProject.triggered.connect(self.renameProject)
+        self.actionRenameProject.setShortcut("Ctrl+R")
+        self.menuFile.addAction(self.actionRenameProject)
+
+        # Edit menu
+        self.actionUndo = QtWidgets.QAction("Undo (coming soon)", self)
+        #self.actionUndo.triggered.connect(self.triggerUndo)
+        self.actionUndo.setShortcut("Ctrl+Z")
+        self.menuEdit.addAction(self.actionUndo)
+        self.actionDarkmode = QtWidgets.QAction("Toggle Darkmode", self)
+        self.actionDarkmode.triggered.connect(self.triggerDarkmode)
+        self.actionDarkmode.setShortcut("Ctrl+D")
+        self.menuEdit.addAction(self.actionDarkmode)
+
+        # View menu
+        for frame, (text, initial_state) in uistate.viewTools.items():
+            action = QtWidgets.QAction(f"Toggle {text}", self)
+            action.setCheckable(True)  # Make the action checkable
+            action.setChecked(initial_state)  # Set the initial checked state
+            action.triggered.connect(lambda state, frame=frame: self.toggleViewTool(frame))
+            self.menuView.addAction(action)
+
+        # Data menu
+        self.actionAddData = QtWidgets.QAction("Add data files", self)
+        self.actionAddData.triggered.connect(self.triggerAddData)
+        self.menuData.addAction(self.actionAddData)
+        self.actionParse = QtWidgets.QAction("Import all added datafiles", self)
+        self.actionParse.triggered.connect(self.triggerParse)
+        self.actionParse.setShortcut("Ctrl+I")
+        self.menuData.addAction(self.actionParse)
+        self.actionDelete = QtWidgets.QAction("Delete selected data", self)
+        self.actionDelete.triggered.connect(self.triggerDelete)
+        self.actionDelete.setShortcut("DEL")
+        self.menuData.addAction(self.actionDelete)
+        self.actionRenameRecording = QtWidgets.QAction("Rename recording", self)
+        self.actionRenameRecording.triggered.connect(self.triggerRenameRecording)
+        self.actionRenameRecording.setShortcut("F2")
+        self.menuData.addAction(self.actionRenameRecording)
+
+        # Group menu
+        self.actionNewGroup = QtWidgets.QAction("Add a group", self)
+        self.actionNewGroup.triggered.connect(self.triggerNewGroup)
+        self.actionNewGroup.setShortcut("+")
+        self.menuGroups.addAction(self.actionNewGroup)
+        self.actionRemoveEmptyGroup = QtWidgets.QAction("Remove last empty group", self)
+        self.actionRemoveEmptyGroup.triggered.connect(self.triggerRemoveLastEmptyGroup)
+        self.actionRemoveEmptyGroup.setShortcut("-")
+        self.menuGroups.addAction(self.actionRemoveEmptyGroup)
+        self.actionRemoveGroup = QtWidgets.QAction("Force remove last group", self)
+        self.actionRemoveGroup.triggered.connect(self.triggerRemoveLastGroup)
+        self.actionRemoveGroup.setShortcut("Ctrl+-")
+        self.menuGroups.addAction(self.actionRemoveGroup)
+        self.actionClearGroups = QtWidgets.QAction("Clear group(s) in selection", self)
+        self.actionClearGroups.triggered.connect(self.triggerClearGroups)
+        self.menuGroups.addAction(self.actionClearGroups)
+        self.actionResetGroups = QtWidgets.QAction("Remove all groups", self)
+        self.actionResetGroups.triggered.connect(self.triggerEditGroups)
+        self.menuGroups.addAction(self.actionResetGroups)
+
+
+    def setupTableProj(self):
+        # Creates an instance of custom QTableView to allow drag&drop
+        try:
+            self.tableProj = TableProjSub(parent=self)
+            self.verticalLayoutProj.addWidget(self.tableProj)
+            self.tableProj.setObjectName("tableProj")
+
+            # Set up the table view
+            self.df_project = df_projectTemplate()
+            self.tablemodel = TableModel(self.df_project)
+            self.tableProj.setModel(self.tablemodel)
+
+            # Connect events
+            self.pushButtonParse.pressed.connect(self.triggerParse)
+            self.tableProj.setSelectionBehavior(TableProjSub.SelectRows)
+            tableProj_selectionModel = self.tableProj.selectionModel()
+            tableProj_selectionModel.selectionChanged.connect(self.tableProjSelectionChanged)
+        except Exception as e:
+            print(f"Error setting up tableProj: {e}")
+
+
+    def setupTableStim(self):
+        self.tableStimModel = TableModel(df_timepointsTemplate())
+        self.tableStim.setModel(self.tableStimModel)
+        self.tableStim.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.tableStim.verticalHeader().hide()
+        tableStim_selectionModel = self.tableStim.selectionModel()
+        tableStim_selectionModel.selectionChanged.connect(self.stimSelectionChanged)
+        self.setTableStimVisibility(False)
+
+
+    def setupToolBar(self):  # apply viewstates for tool frames in the toolbar
+        for frame, (text, state) in uistate.viewTools.items():
+            getattr(self, frame).setVisible(state)
+
+
+    def connectUIstate(self): # Connect UI elements to uistate
+        # checkBoxes 
+        for key, value in uistate.checkBox.items():
+            #print(f" - connecting checkbox {key} to {value}")
+            checkBox = getattr(self, f"checkBox_{key}")
+            checkBox.setChecked(value)
+            checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
+        # lineEdits
+        # pushButtons
+        # comboBoxes
+        # mods?...
+        for splitter_name in ['h_splitterMaster', 'v_splitterGraphs']:
+            splitter = getattr(self, splitter_name)
+            print(f" - connecting splitter {splitter_name}: objectName={splitter.objectName()}")
+            splitter.splitterMoved.connect(self.onSplitterMoved)
+
+
+    def build_dict_folders(self):
+        dict_folders = {
+                    'project': self.projects_folder / self.projectname,
+                    'data': self.projects_folder / self.projectname / 'data',
+                    'timepoints': self.projects_folder / self.projectname / 'timepoints',
+                    'cache': self.projects_folder / f'cache {config.version}' / self.projectname,
+        }
+        return dict_folders
+    
 
 
 # trigger functions TODO: break out the big ones to separate functions!

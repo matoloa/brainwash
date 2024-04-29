@@ -77,10 +77,6 @@ class UIplot():
             ax2_legend = self.set_visible_get_legend(axis=ax2, show=uistate.to_ax2(uistate.df_recs2plot))
             ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
 
-        # make all lines on axm visible
-#        for line in axm.get_lines():
-#            line.set_visible(True)
-
         for label, ID_line_fill in uistate.dict_group_label_ID_line_SEM.items():
             group_ID = ID_line_fill[0]
             str_show = uistate.df_groups.loc[uistate.df_groups['group_ID'] == group_ID, 'show'].values[0]
