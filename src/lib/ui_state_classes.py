@@ -64,7 +64,8 @@ class UIstate:
         self.ax2 = None # axis of output for slopes
         self.rec_select = [] # list of selected indices in uisub.tableProj
         self.stim_select = [] # list of selected indices in uisub.tableStim
-        self.row_copy = None # copy of single-selected row from df_project, for storing measure points until either saved or rejected
+        self.dfp_row_copy = None # copy of selected row in uisub.tableProj
+        self.dft_row_copy = None # copy of dft for storing measure points until either saved or rejected
         self.df_recs2plot = None # df_project copy of selected PARSED recordings (or all parsed, if none are selected)
         self.dict_rec_label_ID_line = {} # dict of all plotted recording lines: key=label, value=(rec_ID, 2Dline object)
         self.dict_group_label_ID_line_SEM = {} # dict of all plotted groups: key=label, value=[group_ID, 2Dline object, fill]
@@ -254,9 +255,9 @@ class UIstate:
         self.zoom = state.get('zoom')
         self.default = state.get('default')
 
-    def load_cfg(self, projectfolder, bw_version): # load state from project config file
+    def load_cfg(self, projectfolder, bw_version, force_reset=False): # load state from project config file
         path_pkl = projectfolder / "cfg.pkl"
-        if path_pkl.exists():
+        if path_pkl.exists() and not force_reset:
             with open(path_pkl, 'rb') as f:
                 data = pickle.load(f)
             if data is not None:

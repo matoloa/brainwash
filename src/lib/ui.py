@@ -37,6 +37,7 @@ class Config:
         self.verbose = self.dev_mode
         self.talkback = not self.dev_mode
         self.hide_experimental = not self.dev_mode
+        self.force_cfg_reset = self.dev_mode
         self.track_widget_focus = False
         self.terminal_space = 372 if self.dev_mode else 0
         # get project_name and version number from pyproject.toml
@@ -307,6 +308,7 @@ class graphPreloadThread(QtCore.QThread):
         self.uistate.new_indices = []
         self.i = 0
         for i, row in df.iterrows():
+            dft = self.uisub.get_dft(row=row)
             dfmean = self.uisub.get_dfmean(row=row)
             _ = self.uisub.get_dffilter(row=row)
             if self.uistate.checkBox['paired_stims']:
@@ -315,8 +317,7 @@ class graphPreloadThread(QtCore.QThread):
                 dfoutput = self.uisub.get_dfoutput(row=row)
             if dfoutput is None:
                 return
-            row = self.df_p.loc[i] # get_dfoutput updates df_project - update row!
-            self.uiplot.addRow(dict_row=row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
+            self.uiplot.addRow(dict_row=row.to_dict(), dft=dft, dfmean=dfmean, dfoutput=dfoutput)
             self.progress.emit(i)
             self.i += 1
             print(f"Preloaded {row['recording_name']}")
@@ -847,7 +848,6 @@ class UIsub(Ui_MainWindow):
         self.mainwindow.setGeometry(0, 0, int(screen.width()*0.96), int(screen.height())-config.terminal_space)
 
         self.read_bw_cfg() # load bw global config file (not project specific)
-
         # set window title to projectname
         self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
         self.setupMenus()
@@ -872,7 +872,7 @@ class UIsub(Ui_MainWindow):
             self.write_bw_cfg()
 
         # If local project.cfg exists, load it, otherwise create it
-        uistate.load_cfg(projectfolder=self.dict_folders['project'], bw_version=config.version)
+        uistate.load_cfg(projectfolder=self.dict_folders['project'], bw_version=config.version, force_reset=config.force_cfg_reset)
 
         # apply splitter proportions
         self.setSplitterSizes('h_splitterMaster', 'v_splitterGraphs')
@@ -971,16 +971,17 @@ class UIsub(Ui_MainWindow):
         self.zoomAuto()
         if len(uistate.rec_select) == 1: # if just one item is selected...
             df_p = self.get_df_project()
-            dft = self.get_dft(row=df_p.loc[uistate.rec_select[0]])
+            row = df_p.loc[uistate.rec_select[0]]
+            dft = self.get_dft(row=row)
             if dft.shape[0] > 1:
                 selected_stims = self.tableStim.selectionModel().selectedRows() # save selection
                 self.tableStimModel.setData(dft)
                 model = self.tableStim.model()
                 selection = QtCore.QItemSelection()
                 for index in selected_stims:
-                    row = index.row()
-                    index_start = model.index(row, 0)  # Start of the row (first column)
-                    index_end = model.index(row, model.columnCount(QtCore.QModelIndex()) - 1)  # End of the row (last column)
+                    row_idx = index.row()
+                    index_start = model.index(row_idx, 0)  # Start of the row (first column)
+                    index_end = model.index(row_idx, model.columnCount(QtCore.QModelIndex()) - 1)  # End of the row (last column)
                     selection.select(index_start, index_end)
                 self.tableStim.selectionModel().select(selection, QtCore.QItemSelectionModel.Select)
                 self.setTableStimVisibility(True)
@@ -1025,7 +1026,7 @@ class UIsub(Ui_MainWindow):
 
 
     def talkback(self):
-        row = uistate.row_copy
+        row = uistate.dfp_row_copy
         dfmean = self.dfmean
 
         t_stim = row['t_stim']
@@ -2033,6 +2034,28 @@ class UIsub(Ui_MainWindow):
         self.df_project.to_csv(str(self.dict_folders['project'] / "project.brainwash"), index=False)
 
 
+# Timepoints dataframe handling
+
+    def set_dft(self, rec_name, df): # persists df and saves it to .csv
+        print(f"set_dft, t_EPSP_slope_start = {df['t_EPSP_slope_start']}")
+        self.dict_ts[rec_name] = df
+        self.df2csv(df=df, rec=rec_name, key="timepoints")
+
+    def load_df_project(self): # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
+        self.graphWipe()
+        self.resetCacheDicts() # clear internal caches
+        self.projectname = self.dict_folders['project'].stem
+        self.dict_folders = self.build_dict_folders()
+        self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"), dtype={'group_IDs': str})
+        uistate.load_cfg(self.dict_folders['project'], config.version)
+        self.tableFormat()
+        self.write_bw_cfg()
+
+    def save_df_project(self): # writes df_project to .csv
+        self.df_project.to_csv(str(self.dict_folders['project'] / "project.brainwash"), index=False)
+
+
+
 
 # Table handling
 
@@ -2119,7 +2142,6 @@ class UIsub(Ui_MainWindow):
 
     def get_dft(self, row):
         # returns an internal df t for the selected file. If it does not exist, read it from file first.
-        print("*** get_dft")
         recording_name = row['recording_name']
         if recording_name in self.dict_ts.keys():
             print("returning cached t")
@@ -2323,7 +2345,8 @@ class UIsub(Ui_MainWindow):
             print("No stims found.")
             return
         output = None
-        df_p['n_stims'] = len(dft)
+        df_p.loc[df_p['ID'] == row['ID'], 'n_stims'] = len(dft)
+        self.set_df_project(df_p)
         dft['stim'] = 0
 
         # Update the original row in dft with combined default and measured values
@@ -2331,14 +2354,9 @@ class UIsub(Ui_MainWindow):
             updated_dict_t = default_dict_t.copy()  # Start with a copy of the default values
             updated_dict_t.update(row_t.to_dict())  # Update with the values from row_t
             dft.loc[i] = updated_dict_t
-            row_id = row['ID']  # Get the row ID
             rec_name = row['recording_name']
             dft.at[i, 'stim'] = i+1 # stims numbered from 1
-            if i == 0: # TODO: for now, set the deprecated df_p values
-                for key, value in dft.loc[i].items():
-                    row_index = df_p[df_p['ID'] == row_id].index[0]
-                    df_p.at[row_index, key] = value
-            if i == 0: # TODO: for now, only use the output from the first stim
+            if i == 0: # TODO: for now, only calculate the output from the first stim
                 dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dft.loc[i].to_dict())
                 self.normOutput(row=row, dfoutput=dfoutput)
                 output = dfoutput
@@ -2346,8 +2364,6 @@ class UIsub(Ui_MainWindow):
                     dft.at[i, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
                 if 'volley_slope' in dfoutput.columns:
                     dft.at[i, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
-
-        self.set_df_project(df_p)
         column_order = ['stim',
                         't_stim',
                         't_EPSP_slope_start',
@@ -2391,6 +2407,7 @@ class UIsub(Ui_MainWindow):
             self.canvasOutput.draw()
 
     def graphAxes(self): # plot selected row(s), or clear graph if empty
+        print("graphAxes")
         uistate.axm = self.canvasMean.axes
         uistate.axe = self.canvasEvent.axes
         ax1 = self.canvasOutput.axes
@@ -2489,29 +2506,47 @@ class UIsub(Ui_MainWindow):
     def updateMouseover(self):
         self.mouseoverDisconnect()
         # if only one item is selected, make a new mouseover event connection
-        if len(uistate.rec_select) == 1:
-            df_p = self.get_df_project()
-            uistate.row_copy = df_p.loc[uistate.rec_select[0]].copy()
-            self.dfmean = self.get_dfmean(row=uistate.row_copy) # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
-            uistate.setMargins(axe=uistate.axe)
-            connect = False
-            for line in uistate.axe.lines: # connects plotted lines
-                label = line.get_label()
-                rec_name = uistate.row_copy['recording_name']
-                if label == f"{rec_name} EPSP slope marker":
-                    uistate.updateDragZones(aspect="EPSP slope", x=line.get_xdata(), y=line.get_ydata())
-                    connect = True
-                elif label == f"{rec_name} EPSP amp marker":
-                    uistate.updatePointDragZone(aspect="EPSP amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
-                    connect = True
-                elif label == f"{rec_name} volley slope marker":
-                    uistate.updateDragZones(aspect="volley slope", x=line.get_xdata(), y=line.get_ydata())
-                    connect = True
-                elif label == f"{rec_name} volley amp marker":
-                    uistate.updatePointDragZone(aspect="volley amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
-                    connect = True
-            if connect: # set new mouseover event connection
-                self.mouseover = self.canvasEvent.mpl_connect('motion_notify_event', uiplot.graphMouseover)
+        if len(uistate.rec_select) != 1:
+            return
+    
+        print(f"updateMouseover: {uistate.rec_select[0]}, {type(uistate.rec_select[0])}")
+        df_p = self.get_df_project()
+        row = df_p.loc[uistate.rec_select[0]].copy()
+        dft = self.get_dft(row=row).copy()
+        dft_row = dft.iloc[[0]]
+        uistate.dfp_row_copy = row
+        uistate.dft_row_copy = dft_row
+        rec_name = row['recording_name']
+        rec_ID = row['ID']
+        print(f"rec_name: {rec_name}, rec_ID: {rec_ID}")
+        print(f"dft_row: {dft_row}")
+
+        zones = {
+            'EPSP slope resize': uistate.EPSP_slope_resize_zone,
+            'EPSP slope move': uistate.EPSP_slope_move_zone,
+            'EPSP amp move': uistate.EPSP_amp_move_zone,
+            'volley slope resize': uistate.volley_slope_resize_zone,
+            'volley slope move': uistate.volley_slope_move_zone,
+            'volley amp move': uistate.volley_amp_move_zone,
+        }
+        print(zones)
+
+        self.dfmean = self.get_dfmean(row=row) # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
+        uistate.setMargins(axe=uistate.axe)
+        dict_labels = {key: value for key, value in uistate.dict_rec_label_ID_line.items() if key.endswith(" marker") and value[0] == rec_ID}
+        if not dict_labels:
+            return
+        for label, value in dict_labels.items():
+            line = value[1]
+            if "amp" in label:
+                aspect = label.replace(f"{rec_name} ", "").replace(" marker", "")
+                uistate.updatePointDragZone(aspect=aspect, x=line.get_xdata()[0], y=line.get_ydata()[0])
+            else:
+                aspect = label.replace(f"{rec_name} ", "").replace(" marker", "")
+                uistate.updateDragZones(aspect=aspect, x=line.get_xdata(), y=line.get_ydata())
+
+        # Always set new mouseover event connection
+        self.mouseover = self.canvasEvent.mpl_connect('motion_notify_event', uiplot.graphMouseover)
         print("updateMouseover calls uiplot.graphRefresh()")
         uiplot.graphRefresh()
 
@@ -2540,12 +2575,12 @@ class UIsub(Ui_MainWindow):
                 action = uistate.mouseover_action
                 print(f"action: {action}")
                 if action.startswith("EPSP slope"):
-                    start, end = uistate.row_copy['t_EPSP_slope_start'], uistate.row_copy['t_EPSP_slope_end']
+                    start, end = uistate.dft_row_copy['t_EPSP_slope_start'], uistate.dft_row_copy['t_EPSP_slope_end']
                     self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.graphDragSlope(event, time_values, action, start, end))
                 elif action == 'EPSP amp move':
                     self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.graphDragPoint(event, time_values))
                 elif action.startswith("volley slope"):
-                    start, end = uistate.row_copy['t_volley_slope_start'], uistate.row_copy['t_volley_slope_end']
+                    start, end = uistate.dft_row_copy['t_volley_slope_start'], uistate.dft_row_copy['t_volley_slope_end']
                     self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.graphDragSlope(event, time_values, action, start, end))
                 elif action == 'volley amp move':
                     self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.graphDragPoint(event, time_values))
@@ -2579,7 +2614,7 @@ class UIsub(Ui_MainWindow):
         x_indices = self.dfmean['time'].searchsorted([x_start, x_end])
 
         # get y values from the appropriate filter of persisted dfmean
-        rec_filter = uistate.row_copy['filter']
+        rec_filter = uistate.dfp_row_copy['filter']
         y_start, y_end = self.dfmean[rec_filter].iloc[x_indices]
 
         # remember the last x index
@@ -2607,7 +2642,7 @@ class UIsub(Ui_MainWindow):
         x_idx = self.dfmean['time'].searchsorted(x_point)
 
         # get y values from the appropriate filter of persisted dfmean
-        rec_filter = uistate.row_copy['filter']
+        rec_filter = uistate.dfp_row_copy['filter']
         y_point = self.dfmean[rec_filter].iloc[x_idx]
 
         # remember the last x index
@@ -2620,7 +2655,7 @@ class UIsub(Ui_MainWindow):
   
 
     def graphDragUpdate(self, x_start, x_end, precision): # update output; this is a separate function to allow the user to make it happen live (current) or on release (for low compute per data)
-        dffilter = self.get_dffilter(row=uistate.row_copy)
+        dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
         action = uistate.mouseover_action
         
         if action.startswith("EPSP slope"):
@@ -2633,13 +2668,13 @@ class UIsub(Ui_MainWindow):
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
                 if uistate.checkBox['norm_EPSP']:
-                    out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_slope')
+                    out = self.normOutput(row=uistate.dfp_row_copy, dfoutput=out, aspect='EPSP_slope')
                     uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['EPSP_slope_norm'], color=color)
                 else:
                     uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['EPSP_slope'], color=color)
             else:
                 if uistate.checkBox['norm_EPSP']:
-                    out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_slope')
+                    out = self.normOutput(row=uistate.dfp_row_copy, dfoutput=out, aspect='EPSP_slope')
                     uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope_norm'])
                 else:
                     uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope'])
@@ -2649,13 +2684,13 @@ class UIsub(Ui_MainWindow):
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
                 if uistate.checkBox['norm_EPSP']:
-                    out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_amp')
+                    out = self.normOutput(row=uistate.dfp_row_copy, dfoutput=out, aspect='EPSP_amp')
                     uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_amp_norm'], color=color)
                 else:
                     uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_amp'], color=color)
             else:
                 if uistate.checkBox['norm_EPSP']:
-                    out = self.normOutput(row=uistate.row_copy, dfoutput=out, aspect='EPSP_amp')
+                    out = self.normOutput(row=uistate.dfp_row_copy, dfoutput=out, aspect='EPSP_amp')
                     uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_amp_norm'])
                 else:
                     uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_amp'])
@@ -2684,7 +2719,10 @@ class UIsub(Ui_MainWindow):
             dict_t['volley_amp_mean'] = out['volley_amp'].mean()
 
         if dict_t:
-            uistate.row_copy.update(dict_t)
+            dft = self.get_dft(row=uistate.dfp_row_copy).copy()
+            dft.iloc[0].update(dict_t) # TODO: only on row 0 for now
+            uistate.dft_row_copy = dft
+            print(f"update - dict_t: {dict_t}")
         self.canvasOutput.draw()
 
 
@@ -2698,47 +2736,48 @@ class UIsub(Ui_MainWindow):
             print("x_idx == prior_x_idx")
             self.updateMouseover()
             return
-        
-        if uistate.mouseover_action.startswith("EPSP slope"):
-            uistate.row_copy['t_EPSP_slope_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP slope', dfmean=self.dfmean)
-            uistate.updateDragZones()
-            dict_t = {'t_EPSP_slope_start': uistate.row_copy['t_EPSP_slope_start'], 't_EPSP_slope_end': uistate.row_copy['t_EPSP_slope_end']}
-        elif uistate.mouseover_action == 'EPSP amp move':
-            uistate.row_copy['t_EPSP_amp_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='EPSP amp', dfmean=self.dfmean)
-            uistate.updatePointDragZone()
-            dict_t = {'t_EPSP_amp': uistate.row_copy['t_EPSP_amp']}
-        elif uistate.mouseover_action.startswith("volley slope"):
-            uistate.row_copy['t_volley_slope_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='volley slope', dfmean=self.dfmean)
-            uistate.updateDragZones()
-            dict_t = {'t_volley_slope_start': uistate.row_copy['t_volley_slope_start'], 't_volley_slope_end': uistate.row_copy['t_volley_slope_end']}
-        elif uistate.mouseover_action == 'volley amp move':
-            uistate.row_copy['t_volley_amp_method'] = "manual"
-            uiplot.plotUpdate(row=uistate.row_copy, aspect='volley amp', dfmean=self.dfmean)
-            uistate.updatePointDragZone()
-            dict_t = {'t_volley_amp': uistate.row_copy['t_volley_amp']}
 
-        # update df_p with uistate.row_copy, allocated by unique ID
-        df_p = self.get_df_project()
-        df_update = pd.DataFrame(uistate.row_copy).T.set_index('ID')
-        df_p.set_index('ID', inplace=True)
-        df_p.update(df_update)
-        df_p.reset_index(inplace=True)
-        self.set_df_project(df_p)
+        dfp_row = uistate.dfp_row_copy
+
+        dict_t = {} # update the dict_t with the new values, for use by build_dfoutput
+        if uistate.mouseover_action.startswith("EPSP slope"):
+            uistate.dft_row_copy['t_EPSP_slope_method'] = "manual"
+            uiplot.plotUpdate(dfp_row=dfp_row, dft_row=uistate.dft_row_copy, aspect='EPSP slope', dfmean=self.dfmean)
+            uistate.updateDragZones()
+            dict_t = {'t_EPSP_slope_start': uistate.dft_row_copy['t_EPSP_slope_start'], 't_EPSP_slope_end': uistate.dft_row_copy['t_EPSP_slope_end']}
+        elif uistate.mouseover_action == 'EPSP amp move':
+            uistate.dft_row_copy['t_EPSP_amp_method'] = "manual"
+            uiplot.plotUpdate(dfp_row=dfp_row, dft_row=uistate.dft_row_copy, aspect='EPSP amp', dfmean=self.dfmean)
+            uistate.updatePointDragZone()
+            dict_t = {'t_EPSP_amp': uistate.dft_row_copy['t_EPSP_amp']}
+        elif uistate.mouseover_action.startswith("volley slope"):
+            uistate.dft_row_copy['t_volley_slope_method'] = "manual"
+            uiplot.plotUpdate(dfp_row=dfp_row, dft_row=uistate.dft_row_copy, aspect='volley slope', dfmean=self.dfmean)
+            uistate.updateDragZones()
+            dict_t = {'t_volley_slope_start': uistate.dft_row_copy['t_volley_slope_start'], 't_volley_slope_end': uistate.dft_row_copy['t_volley_slope_end']}
+        elif uistate.mouseover_action == 'volley amp move':
+            uistate.dft_row_copy['t_volley_amp_method'] = "manual"
+            uiplot.plotUpdate(dfp_row=dfp_row, dft_row=uistate.dft_row_copy, aspect='volley amp', dfmean=self.dfmean)
+            uistate.updatePointDragZone()
+            dict_t = {'t_volley_amp': uistate.dft_row_copy['t_volley_amp']}
+
+        print(f"release - dict_t: {dict_t}")
+
+        dft = self.get_dft(row=uistate.dfp_row_copy).copy()
+        dft = dft.iloc[[0]]
+        uistate.dft_row_copy = dft
+        self.set_dft(uistate.dfp_row_copy['recording_name'], dft)
 
         # update dfoutput; dict and file, with normalized columns if applicable
-        row = uistate.row_copy
-        dfoutput = self.get_dfoutput(row=row)
-        dffilter = self.get_dffilter(row=uistate.row_copy)
+        dfoutput = self.get_dfoutput(row=dfp_row)
+        dffilter = self.get_dffilter(row=dfp_row)
         new_dfoutput_columns = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
         for col in new_dfoutput_columns.columns:
             dfoutput[col] = new_dfoutput_columns[col]
         self.tableUpdate()
         if uistate.mouseover_action.startswith("EPSP"): # add normalized EPSP columns
-            self.normOutput(row=row, dfoutput=dfoutput)
-        self.updateMouseover()
+            self.normOutput(row=dfp_row, dfoutput=dfoutput)
+        #self.updateMouseover()
         if config.talkback:
             self.talkback()
 
@@ -2838,84 +2877,56 @@ def get_signals(source):
 def df_projectTemplate():
     return pd.DataFrame(
         columns=[
-            "ID",
-            "host",
-            "path",
-            "recording_name",
-            "group_IDs",
-            "groups",
-            "parsetimestamp",
-            "sweeps",
-            "channel",
-            "stim",
-            "paired_recording",
-            "Tx",
-            "filter",
-            "filter_params",
-            "n_stims",
-            # TODO: deprecate timepoints
-            "t_stim",
-            "t_stim_method",
-            "t_stim_params",
-            "t_volley_amp",
-            "t_volley_amp_method",
-            "t_volley_amp_params",
-            "t_volley_slope_width",
-            "t_volley_slope_halfwidth",
-            "t_volley_slope_start",
-            "t_volley_slope_end",
-            "t_volley_slope_method",
-            "t_volley_slope_params",
-            "volley_amp_mean",
-            "volley_slope_mean",
-            "t_VEB",
-            "t_VEB_method",
-            "t_VEB_params",
-            "t_EPSP_amp",
-            "t_EPSP_amp_method",
-            "t_EPSP_amp_params",
-            "t_EPSP_slope_width",
-            "t_EPSP_slope_halfwidth",
-            "t_EPSP_slope_start",
-            "t_EPSP_slope_end",
-            "t_EPSP_slope_method",
-            "t_EPSP_slope_params",
-
-            "exclude",
-            "comment",
+            'ID',
+            'host',
+            'path',
+            'recording_name',
+            'group_IDs',
+            'groups',
+            'parsetimestamp',
+            'sweeps',
+            'channel',
+            'stim',
+            'paired_recording',
+            'Tx',
+            'filter',
+            'filter_params',
+            'n_stims',
+            'exclude',
+            'comment',
         ]
     )
 
 def df_timepointsTemplate():
     return pd.DataFrame(
         columns=[
-            "stim", # stim number in sequence
-            "t_stim",
-            "t_stim_method",
-            "t_stim_params",
-            "t_volley_amp",
-            "t_volley_amp_method",
-            "t_volley_amp_params",
-            "t_volley_slope_width",
-            "t_volley_slope_halfwidth",
-            "t_volley_slope_start",
-            "t_volley_slope_end",
-            "t_volley_slope_method",
-            "t_volley_slope_params",
-            "volley_amp_mean",
-            "volley_slope_mean",
-            "t_VEB",
-            "t_VEB_method",
-            "t_VEB_params",
-            "t_EPSP_amp",
-            "t_EPSP_amp_method",
-            "t_EPSP_amp_params",
-            "t_EPSP_slope_width",
-            "t_EPSP_slope_halfwidth",
-            "t_EPSP_slope_start",
-            "t_EPSP_slope_end",
-            "t_EPSP_slope_method",
-            "t_EPSP_slope_params",
+            'stim', # stim number in sequence
+            't_stim',
+            't_stim_method',
+            't_stim_params',
+            't_volley_amp',
+            't_volley_amp_method',
+            't_volley_amp_params',
+            't_volley_slope_width',
+            't_volley_slope_halfwidth',
+            't_volley_slope_start',
+            't_volley_slope_end',
+            't_volley_slope_method',
+            't_volley_slope_params',
+            'volley_amp_mean',
+            'volley_slope_mean',
+            't_VEB',
+            't_VEB_method',
+            't_VEB_params',
+            't_EPSP_amp',
+            't_EPSP_amp_method',
+            't_EPSP_amp_params',
+            't_EPSP_slope_width',
+            't_EPSP_slope_halfwidth',
+            't_EPSP_slope_start',
+            't_EPSP_slope_end',
+            't_EPSP_slope_method',
+            't_EPSP_slope_params',
         ]
     )
 
