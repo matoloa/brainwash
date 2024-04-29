@@ -141,20 +141,20 @@ class UIplot():
             ax2.yaxis.set_label_position("right")
             ax2.yaxis.set_ticks_position("right")
 
-    def addRow(self, dict_row, dft, dfmean, dfoutput):
+    def addRow(self, p_row, t_row, dfmean, dfoutput):
         axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
-        rec_ID = dict_row['ID']
-        rec_name = dict_row['recording_name']
+        rec_ID = p_row['ID']
+        rec_name = p_row['recording_name']
         print(f"Graphing {rec_name}...")
-        rec_filter = dict_row['filter'] # the filter currently used for this recording
-        t_EPSP_amp = dft['t_EPSP_amp'].iloc[0]
-        t_EPSP_slope_start = dft['t_EPSP_slope_start'].iloc[0]
-        t_EPSP_slope_end = dft['t_EPSP_slope_end'].iloc[0]
-        t_volley_amp = dft['t_volley_amp'].iloc[0]
-        volley_amp_mean = dft['volley_amp_mean'].iloc[0]
-        t_volley_slope_start = dft['t_volley_slope_start'].iloc[0]
-        t_volley_slope_end = dft['t_volley_slope_end'].iloc[0]
-        volley_slope_mean = dft['volley_slope_mean'].iloc[0]
+        rec_filter = p_row['filter'] # the filter currently used for this recording
+        t_EPSP_amp = t_row['t_EPSP_amp']
+        t_EPSP_slope_start = t_row['t_EPSP_slope_start']
+        t_EPSP_slope_end = t_row['t_EPSP_slope_end']
+        t_volley_amp = t_row['t_volley_amp']
+        volley_amp_mean = t_row['volley_amp_mean']
+        t_volley_slope_start = t_row['t_volley_slope_start']
+        t_volley_slope_end = t_row['t_volley_slope_end']
+        volley_slope_mean = t_row['volley_slope_mean']
         # plot relevant filter of dfmean on canvasEvent
         if rec_filter != 'voltage':
             label = f"{rec_name} ({rec_filter})"
@@ -236,6 +236,7 @@ class UIplot():
             self.uistate.dict_group_label_ID_line_SEM[label] = [group_ID, line, fill]
 
     def plotUpdate(self, dfp_row, dft_row, aspect, dfmean):
+        print(f"dfp_row: {dfp_row}, dft_row: {dft_row}")
         norm = self.uistate.checkBox['norm_EPSP']
         rec_filter = dfp_row['filter']  # the filter currently used for this recording
         plot_to_update = f"{dfp_row['recording_name']} {aspect} marker"
