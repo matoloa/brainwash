@@ -31,7 +31,6 @@ class UIplot():
 
     def xSelect(self, canvas, slopeAx=None):
         # draws a selected range of x values on <canvas>
- 
         if slopeAx is not None:
             if slopeAx:
                 ax = self.uistate.ax2
@@ -44,8 +43,10 @@ class UIplot():
         # draw new axvlines and axvspans
         start, end = self.uistate.x_on_click, self.uistate.x_drag
         if end is None:
+            print(f"Selected x: {start}")
             ax.axvline(x=start, color='blue', label='xSelect')
         else:
+            print(f"Selected x_range: {start} - {end}")
             if start is None:
                 return
             elif start > end:
@@ -54,7 +55,6 @@ class UIplot():
             ax.axvline(x=end, color='blue', label='xSelect')
             ax.axvspan(start, end, color='blue', alpha=0.1, label='xSelect')
         canvas.draw()
-        #print(f"Selected range: {start} - {end}")
 
 
     def styleUpdate(self):

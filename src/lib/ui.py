@@ -2559,8 +2559,7 @@ class UIsub(Ui_MainWindow):
                     max_x = last_x
                     max_x_line = line
             x_data = max_x_line.get_xdata()
-            uistate.x_on_click = x_range[np.abs(x_range - x).argmin()]
-            self.mouse_drag = canvas.mpl_connect('motion_notify_event', lambda event: self.xDrag(event, canvas=canvas, x_data=x_data, slopeAx=slopeAx))
+            self.mouse_drag = canvas.mpl_connect('motion_notify_event', lambda event: self.xDrag(event, canvas=canvas, x_data=x_data, x_range=x_range, slopeAx=slopeAx))
             self.mouse_release = canvas.mpl_connect('button_release_event', lambda event: self.dragReleased(event, canvas=canvas, slopeAx=slopeAx))
 
         # left click
@@ -2569,6 +2568,7 @@ class UIsub(Ui_MainWindow):
             print(f"canvasEvent clicked at {x}")
             time_values = self.dfmean['time'].values
             uistate.x_on_click = np.abs(time_values - x).argmin() # nearest x-index to click
+            print(f"uistate.x_on_click: {uistate.x_on_click}")
             dft_row = uistate.dft_row_copy
             #print(f"dft_row: {dft_row}, type: {type(dft_row)}")
             if event.inaxes is not None:
@@ -2589,33 +2589,31 @@ class UIsub(Ui_MainWindow):
                     self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', self.eventDragReleased)
         elif canvas == self.canvasMean:
             time_values = self.dfmean['time'].values
+            uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
             handle_canvas(self,  self.canvasMean, x_range=time_values)
         elif canvas == self.canvasOutput:
             df_p = self.get_df_project()
             p_row = df_p.loc[uistate.rec_select[0]]
             sweep_numbers = list(range(1, int(p_row['sweeps']) + 1))
+            uistate.x_on_click = sweep_numbers[np.abs(sweep_numbers - x).argmin()]
             handle_canvas(self, self.canvasOutput, x_range=sweep_numbers, slopeAx=uistate.checkBox['EPSP_slope'])
 
 
-    def xDrag(self, event, canvas, x_data, slopeAx=None):
+    def xDrag(self, event, canvas, x_data, x_range, slopeAx=None):
         if not uistate.dragging:
             return
         if event.xdata is None:
             return
         x = event.xdata # mouse x position
-        x_idx = np.abs(x_data - x).argmin() # index closest to x
-#        if isinstance(x_data, pd.DataFrame):  # Check if x_data is a DataFrame
-#            x_drag = x_data['time'] if 'time' in x_data.columns else x_data['sweep'] # convert to time/sweep
-#        else:  # If x_data is not a DataFrame, use x_idx as x_drag
-        x_drag = x_idx
+        x_drag = np.abs(x_data - x).argmin() # index closest to x
+        if x_drag == uistate.x_drag_last: # return if the pointer hasn't moved a full idx since last update
+            return
         if x_drag < 0:
             x_drag = 0
         elif x_drag >= len(x_data):
             x_drag = len(x_data) - 1
-        if x_drag == uistate.x_drag_last: # return if the pointer hasn't moved a full idx since last update
-            return
-        uistate.x_drag = x_drag
-        uistate.x_drag_last = x_drag
+        uistate.x_drag = x_range[np.abs(x_range - x).argmin()]
+        uistate.x_drag_last = uistate.x_drag
         uiplot.xSelect(canvas=canvas, slopeAx=slopeAx)
 
 
