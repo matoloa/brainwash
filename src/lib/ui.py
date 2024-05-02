@@ -971,7 +971,6 @@ class UIsub(Ui_MainWindow):
         # build the list uistate.rec_select with indices
         uistate.rec_select = [index.row() for index in selected_indexes]
         self.update_recs2plot()
-        self.zoomAuto()
         if len(uistate.rec_select) == 1: # if just one item is selected...
             df_p = self.get_df_project()
             p_row = df_p.loc[uistate.rec_select[0]]
@@ -1000,6 +999,7 @@ class UIsub(Ui_MainWindow):
             self.tableStimModel.setData(None)
             self.setTableStimVisibility(False)
 
+        self.zoomAuto()
         self.updateMouseover()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
 
@@ -1092,6 +1092,7 @@ class UIsub(Ui_MainWindow):
 
 
     def zoomAuto(self):
+        print(f"zoomAuto, uistate.selected: {uistate.rec_select}, uistate.stim_select: {uistate.stim_select}")
         if uistate.rec_select:
         # axm
             df_p = self.get_df_project()
@@ -1100,7 +1101,6 @@ class UIsub(Ui_MainWindow):
             uistate.zoom['mean_xlim'] = (0, max_sweep_duration)
             uistate.axm.set_xlim(uistate.zoom['mean_xlim'])
         # axe
-
             list_stims = []
             for index, p_row in df_selected.iterrows():
                 dft = self.get_dft(row=p_row)
@@ -2525,6 +2525,8 @@ class UIsub(Ui_MainWindow):
         self.mouseoverDisconnect()
         # if only one item is selected, make a new mouseover event connection
         if len(uistate.rec_select) != 1:
+            print("no lables - updateMouseover calls uiplot.graphRefresh()")
+            uiplot.graphRefresh()
             return
     
         print(f"updateMouseover: {uistate.rec_select[0]}, {type(uistate.rec_select[0])}")
