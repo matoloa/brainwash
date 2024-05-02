@@ -15,7 +15,6 @@ class UIstate:
             'v_splitterGraphs': [0.2, 0.5, 0.3],
         }
         self.viewTools = {
-            'frameToolCrop': ["Data cropping", True],
             'frameToolStim': ["Stim detection", True],
             'frameToolAspect': ["Aspect toggles", True],
             'frameToolScaling': ["Output Scaling", True],
