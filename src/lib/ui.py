@@ -276,6 +276,8 @@ class ParseDataThread(QtCore.QThread):
         df_proj_new_row['sweeps'] = dict_sub.get('nsweeps', None)
         df_proj_new_row['channel'] = dict_sub.get('channel', None)
         df_proj_new_row['stim'] = dict_sub.get('stim', None)
+        df_proj_new_row['sweep_duration'] = dict_sub.get('sweep_duration', None)
+        df_proj_new_row['resets'] = dict_sub.get('resets', None)
         return df_proj_new_row
 
     def run(self):
@@ -977,6 +979,7 @@ class UIsub(Ui_MainWindow):
             t_row = df_t.iloc[0] # get the first row of the table, for now
             uistate.dfp_row_copy = p_row.copy()
             uistate.dft_row_copy = t_row.copy()
+
             if df_t.shape[0] > 1:
                 selected_stims = self.tableStim.selectionModel().selectedRows() # save selection
                 self.tableStimModel.setData(df_t)
@@ -999,7 +1002,6 @@ class UIsub(Ui_MainWindow):
 
         self.updateMouseover()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
-        report()
 
 
 
@@ -1090,21 +1092,23 @@ class UIsub(Ui_MainWindow):
 
 
     def zoomAuto(self):
-        # find the lowest t_stim and highest t_stim in selected rows
         if uistate.rec_select:
+        # axm
             df_p = self.get_df_project()
             df_selected = df_p.loc[uistate.rec_select]
+            max_sweep_duration = df_selected['sweep_duration'].max()
+            uistate.zoom['mean_xlim'] = (0, max_sweep_duration)
+            uistate.axm.set_xlim(uistate.zoom['mean_xlim'])
+        # axe
+
             list_stims = []
             for index, p_row in df_selected.iterrows():
                 dft = self.get_dft(row=p_row)
-
                 if uistate.stim_select is not None and set(uistate.stim_select).issubset(dft.index):
                     t_stim_values = dft.loc[uistate.stim_select, 't_stim'].values.tolist()
                 else:
                     t_stim_values = [dft['t_stim'].iloc[0]]  # Make sure t_stim_values is always a list
-
                 list_stims.extend(t_stim_values)  # Use extend instead of append to flatten the list
-
             if list_stims:
                 t_stim_min = min(list_stims) - 0.0005
                 t_stim_max = max(list_stims) + 0.010
@@ -2089,7 +2093,9 @@ class UIsub(Ui_MainWindow):
                         df_p.columns.get_loc('recording_name'),
                         df_p.columns.get_loc('sweeps'),
                         df_p.columns.get_loc('groups'),
-                        df_p.columns.get_loc('n_stims'),
+                        df_p.columns.get_loc('stims'),
+                        df_p.columns.get_loc('sweep_duration'),
+                        df_p.columns.get_loc('resets'),
                     ]
         if uistate.checkBox['paired_stims']:
             list_show.append(df_p.columns.get_loc('Tx'))
@@ -2337,7 +2343,7 @@ class UIsub(Ui_MainWindow):
     def defaultOutput(self, row):
         '''
         Generates default results for row (in self.df_project)
-        Stores n_stims in self.df_project
+        Stores stims in self.df_project
         Stores timepoints, methods and params in dict_ts{<rec_ID>:<df_t>}
         Returns a dict{stim:output}, that is amplitudes and slopes for each stim
         '''
@@ -2355,7 +2361,7 @@ class UIsub(Ui_MainWindow):
             print("No stims found.")
             return
         output = None
-        df_p.loc[df_p['ID'] == row['ID'], 'n_stims'] = len(dft)
+        df_p.loc[df_p['ID'] == row['ID'], 'stims'] = len(dft)
         self.set_df_project(df_p)
         dft['stim'] = 0
 
@@ -2530,15 +2536,15 @@ class UIsub(Ui_MainWindow):
         uistate.dft_row_copy = dft_row
         rec_name = dfp_row['recording_name']
         rec_ID = dfp_row['ID']
-        print(f"rec_name: {rec_name}, rec_ID: {rec_ID}")
-        print(f"dft_row: {dft_row}")
+        #print(f"rec_name: {rec_name}, rec_ID: {rec_ID}")
+        #print(f"dft_row: {dft_row}")
 
         self.dfmean = self.get_dfmean(row=dfp_row) # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
         uistate.setMargins(axe=uistate.axe)
 
         dict_labels = {key: value for key, value in uistate.dict_rec_label_ID_line.items() if key.endswith(" marker") and value[0] == rec_ID}
         if not dict_labels:
-            print("updateMouseover calls uiplot.graphRefresh()")
+            print("no lables - updateMouseover calls uiplot.graphRefresh()")
             uiplot.graphRefresh()
             return
         for label, value in dict_labels.items():
@@ -2547,7 +2553,7 @@ class UIsub(Ui_MainWindow):
                 aspect = label.replace(f"{rec_name} ", "").replace(" marker", "")
                 uistate.updatePointDragZone(aspect=aspect, x=line.get_xdata()[0], y=line.get_ydata()[0])
             else:
-                print(f"updated label: {label}, value: {value}, uistate.mouseover_plot: {uistate.mouseover_plot}")
+                #print(f"updated label: {label}, value: {value}, uistate.mouseover_plot: {uistate.mouseover_plot}")
                 aspect = label.replace(f"{rec_name} ", "").replace(" marker", "")
                 uistate.updateDragZones(aspect=aspect, x=line.get_xdata(), y=line.get_ydata())
         self.mouseover = self.canvasEvent.mpl_connect('motion_notify_event', uiplot.graphMouseover)
@@ -2886,64 +2892,60 @@ def get_signals(source):
 def df_projectTemplate():
     return pd.DataFrame(
         columns=[
-            'ID',
-            'host',
-            'path',
-            'recording_name',
-            'group_IDs',
-            'groups',
-            'parsetimestamp',
-            'sweeps',
-            'channel',
-            'stim',
-            'paired_recording',
-            'Tx',
-            'filter',
-            'filter_params',
-            'n_stims',
-            'exclude',
-            'comment',
+            'ID',               # str: unique identifier for recording
+            'host',             # str: computer name
+            'path',             # str: path of original source file
+            'recording_name',   # str: name of recording
+            'stims',            # int: number of stims in recording
+            'sweeps',           # int: number of sweeps in recording
+            'sweep_duration',   # float: duration of each sweep in seconds
+            'resets',           # str: list of number of first sweep in source file, for breaking up tables of non-continuous recordings
+            'filter',           # str: filter used for analysis
+            'filter_params',    # str: filter parameters
+            'group_IDs',        # str: unique group identifier(s); 1-9
+            'groups',           # str: group name(s)
+            'parsetimestamp',   # str: timestamp of parsing of original source file
+            'channel',          # str: this recording is only from this channel
+            'stim',             # str: this recording is only from this stim (a/b)
+            'paired_recording', # str: unique ID of paired recording
+            'Tx',               # Boolean: Treatment / Control, for paired recordings
+            'exclude',          # Boolean: If True, exclude this recording from analysis
+            'comment',          # str: user comment
         ]
     )
 
 def df_timepointsTemplate():
     return pd.DataFrame(
-        columns=[
+        columns=[ #chronological order
             'stim', # stim number in sequence
             't_stim',
             't_stim_method',
             't_stim_params',
-            't_volley_amp',
-            't_volley_amp_method',
-            't_volley_amp_params',
             't_volley_slope_width',
             't_volley_slope_halfwidth',
             't_volley_slope_start',
             't_volley_slope_end',
             't_volley_slope_method',
             't_volley_slope_params',
-            'volley_amp_mean',
             'volley_slope_mean',
+            't_volley_amp',
+            't_volley_amp_method',
+            't_volley_amp_params',
+            'volley_amp_mean',
             't_VEB',
             't_VEB_method',
             't_VEB_params',
-            't_EPSP_amp',
-            't_EPSP_amp_method',
-            't_EPSP_amp_params',
             't_EPSP_slope_width',
             't_EPSP_slope_halfwidth',
             't_EPSP_slope_start',
             't_EPSP_slope_end',
             't_EPSP_slope_method',
             't_EPSP_slope_params',
+            't_EPSP_amp',
+            't_EPSP_amp_method',
+            't_EPSP_amp_params',
         ]
     )
-
-
-def report(): # debug function to report custom aspects of the current state of the program
-    if False:
-        print ("\n REPORT:")
-    
 
 
 

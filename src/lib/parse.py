@@ -160,12 +160,9 @@ def build_dfmean(dfdata, rollingwidth=3):
     for i in range(1, len(above_threshold_indices)):
         if dfmean['time'][above_threshold_indices[i]] - dfmean['time'][above_threshold_indices[i - 1]] > min_time_difference:
             filtered_indices.append(above_threshold_indices[i])
-    n_stim = len(filtered_indices)
-    print(f"build_dfmean found {len(above_threshold_indices)} above_threshold_indices in {n_stim} unique stims.")
-    if False:#n_stim > 1:
-        raise ValueError(f"build_dfmean found {n_stim} stimulus artifacts. Expected 1.")
-    else:
-        i_stim = filtered_indices[0]
+    n_stims = len(filtered_indices)
+    print(f"build_dfmean found {len(above_threshold_indices)} above_threshold_indices in {n_stims} unique stims.")
+    i_stim = filtered_indices[0]
     median = dfmean['voltage'].iloc[i_stim-20:i_stim-5].median() # TODO: hardcoded 20 and 5
     dfmean['voltage'] = dfmean['voltage'] - median
     return dfmean
@@ -246,8 +243,10 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
                     'channel': source_path.split("Ch")[-1].split("_")[0],
                     # stim is the last letter in the filename, before the .csv
                     'stim': source_path.split("_")[-1].split(".")[0],
+                    # sweep_duration is the difference between the highest and the lowest time in the file
+                    'sweep_duration': df['time'].max() - df['time'].min(),
                     # reset is the first sweep number after every sweep_raw reset: finds recording breaks for display purposes
-                    # TODO: this is not implemented for .csv files
+                    'resets': df[(df['sweep_raw'] == df['sweep_raw'].min()) & (df['time'] == 0)]['sweep'].tolist()[1:]
                     }
                 # TODO: Add checks for csv files; must be brainwash formatted!
                 dict_data[file_base] = dict_sub
@@ -269,12 +268,12 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
                 list_stims=["a", "b"]
         nstims = len(list_stims)
         nchannels = df.channel.nunique()
-        sweeplength = df.time.nunique()
+        sweep_duration = df.time.nunique()
 
         # TODO: Why is this copied?
         dfcopy = df.copy()
         dfcopy = dfcopy.sort_values(by=['datetime', 'channel']).reset_index(drop=True)
-        dfcopy['sweep_raw'] = dfcopy.index.to_numpy() // (sweeplength * nchannels)
+        dfcopy['sweep_raw'] = dfcopy.index.to_numpy() // (sweep_duration * nchannels)
 
         for channel in dfcopy.channel.unique():
             df_ch = dfcopy[dfcopy.channel==channel]
@@ -300,7 +299,8 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
                     'nsweeps': df_ch_st['sweep'].nunique(),
                     'channel': channel,
                     'stim': stim,
-                    'reset': df_ch_st[(df_ch_st['sweep_raw'] == df_ch_st['sweep_raw'].min()) & (df_ch_st['time'] == 0)]['sweep'].tolist()[1:]
+                    'sweep_duration': df_ch_st['time'].max() - df_ch_st['time'].min(),
+                    'resets': df_ch_st[(df_ch_st['sweep_raw'] == df_ch_st['sweep_raw'].min()) & (df_ch_st['time'] == 0)]['sweep'].tolist()[1:]
                 }
                 dict_data[f"{recording_name}_Ch{channel}_{stim}"] = dict_sub
         return dict_data
