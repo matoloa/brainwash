@@ -2531,24 +2531,19 @@ class UIsub(Ui_MainWindow):
             self.zoomReset(canvas=canvas)
             return
         if event.button == 3: # right click
+            if uistate.dragging:
+                return
             print("right click")
             self.mouse_drag = None
             self.mouse_release = None
-            uistate.dragging = False
             uistate.x_drag = None
-            self.canvasMean.mpl_disconnect(self.mouse_drag)
-            self.canvasEvent.mpl_disconnect(self.mouse_drag)
-            self.canvasOutput.mpl_disconnect(self.mouse_drag)
-            self.canvasMean.mpl_disconnect(self.mouse_release)
-            self.canvasEvent.mpl_disconnect(self.mouse_release)
-            self.canvasOutput.mpl_disconnect(self.mouse_release)
             if canvas == self.canvasMean:
                 uiplot.xDeselect(ax = uistate.axm)
             else:
                 uiplot.xDeselect(ax = uistate.ax1)
             return
         
-        def handle_canvas(self, canvas, x_range, slopeAx=None):
+        def connect_canvas(self, canvas, x_range, slopeAx=None):
             max_x = 0
             max_x_line = None
             #find the line with the highest x value, use for indexing
@@ -2590,13 +2585,13 @@ class UIsub(Ui_MainWindow):
         elif canvas == self.canvasMean:
             time_values = self.dfmean['time'].values
             uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
-            handle_canvas(self,  self.canvasMean, x_range=time_values)
+            connect_canvas(self,  self.canvasMean, x_range=time_values)
         elif canvas == self.canvasOutput:
             df_p = self.get_df_project()
             p_row = df_p.loc[uistate.rec_select[0]]
-            sweep_numbers = list(range(1, int(p_row['sweeps']) + 1))
+            sweep_numbers = list(range(0, int(p_row['sweeps'])))
             uistate.x_on_click = sweep_numbers[np.abs(sweep_numbers - x).argmin()]
-            handle_canvas(self, self.canvasOutput, x_range=sweep_numbers, slopeAx=uistate.checkBox['EPSP_slope'])
+            connect_canvas(self, self.canvasOutput, x_range=sweep_numbers, slopeAx=uistate.checkBox['EPSP_slope'])
 
 
     def xDrag(self, event, canvas, x_data, x_range, slopeAx=None):
