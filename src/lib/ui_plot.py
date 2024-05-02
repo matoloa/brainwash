@@ -8,7 +8,55 @@ class UIplot():
     def __init__(self, uistate):
         self.uistate = uistate
         print(f"UIplot instantiated: {self.uistate.anyView()}")
-    
+
+
+    def xDeselect(self, ax):
+        # clear previous axvlines and axvspans
+        ax1, ax2 = self.uistate.ax1, self.uistate.ax2
+        if ax == ax1 or ax == ax2:
+            axlines = ax1.get_lines() + ax2.get_lines()
+            axpatches = ax1.patches + ax2.patches
+        else:
+            axlines = ax.get_lines()
+            axpatches = ax.patches
+
+        for line in axlines:
+            if line.get_label() == 'xSelect':
+                line.remove()
+        for patch in axpatches:
+            if patch.get_label() == 'xSelect':
+                patch.remove()
+        ax.figure.canvas.draw()
+
+
+    def xSelect(self, canvas, slopeAx=None):
+        # draws a selected range of x values on <canvas>
+ 
+        if slopeAx is not None:
+            if slopeAx:
+                ax = self.uistate.ax2
+            else:
+                ax = self.uistate.ax1
+        else:
+            ax = canvas.axes
+        self.xDeselect(ax)
+
+        # draw new axvlines and axvspans
+        start, end = self.uistate.x_on_click, self.uistate.x_drag
+        if end is None:
+            ax.axvline(x=start, color='blue', label='xSelect')
+        else:
+            if start is None:
+                return
+            elif start > end:
+                start, end = end, start
+            ax.axvline(x=start, color='blue', label='xSelect')
+            ax.axvline(x=end, color='blue', label='xSelect')
+            ax.axvspan(start, end, color='blue', alpha=0.1, label='xSelect')
+        canvas.draw()
+        #print(f"Selected range: {start} - {end}")
+
+
     def styleUpdate(self):
         axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
         if self.uistate.darkmode:
@@ -92,9 +140,10 @@ class UIplot():
                 ID_line_fill[2].set_visible(bool(str_show == 'True'))
 
         # arrange axes and labels
+        axm.axis('off')
+
         axe.set_xlabel("Time (s)")
         axe.set_ylabel("Voltage (V)")
-        # x and y limits
         axe.set_xlim(uistate.zoom['mean_xlim'])
         axe.set_ylim(uistate.zoom['mean_ylim'])
 
@@ -109,6 +158,7 @@ class UIplot():
             ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
             ax2.set_ylim(uistate.zoom['output_ax2_ylim'])
         self.oneAxisLeft()
+
         # redraw
         axm.figure.canvas.draw()
         axe.figure.canvas.draw()

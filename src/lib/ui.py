@@ -336,7 +336,7 @@ class graphPreloadThread(QtCore.QThread):
 class Ui_MainWindow(QtCore.QObject):
     def setupUi(self, mainWindow):
         mainWindow.setObjectName("mainWindow")
-        mainWindow.resize(1171, 887)
+        mainWindow.resize(1171, 923)
         self.centralwidget = QtWidgets.QWidget(mainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayoutCentralwidget = QtWidgets.QHBoxLayout(self.centralwidget)
@@ -566,6 +566,9 @@ class Ui_MainWindow(QtCore.QObject):
         self.lineEdit_norm_EPSP_start.setGeometry(QtCore.QRect(20, 70, 41, 25))
         self.lineEdit_norm_EPSP_start.setObjectName("lineEdit_norm_EPSP_start")
         self.verticalLayoutTools.addWidget(self.frameToolScaling)
+        self.verticalLayoutGroups = QtWidgets.QVBoxLayout()
+        self.verticalLayoutGroups.setObjectName("verticalLayoutGroups")
+        self.verticalLayoutTools.addLayout(self.verticalLayoutGroups)
         self.frameToolPairedStim = QtWidgets.QFrame(self.verticalLayoutWidget_3)
         self.frameToolPairedStim.setMinimumSize(QtCore.QSize(131, 91))
         self.frameToolPairedStim.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -674,6 +677,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.menuGroups.setTitle(_translate("mainWindow", "Groups"))
         self.menuEdit.setTitle(_translate("mainWindow", "Edit"))
         self.menuView.setTitle(_translate("mainWindow", "View"))
+
 
 
 
@@ -1000,7 +1004,7 @@ class UIsub(Ui_MainWindow):
             self.setTableStimVisibility(False)
 
         self.zoomAuto()
-        self.updateMouseover()
+        self.mouseoverUpdate()
         print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
 
 
@@ -1088,7 +1092,7 @@ class UIsub(Ui_MainWindow):
         selected_indexes = self.tableStim.selectionModel().selectedRows()
         uistate.stim_select = [index.row() for index in selected_indexes]
         self.zoomAuto()
-        self.updateMouseover()
+        self.mouseoverUpdate()
 
 
     def zoomAuto(self):
@@ -1142,7 +1146,7 @@ class UIsub(Ui_MainWindow):
                     uiplot.updateEPSPout(rec_name, out)
                 self.purgeGroupCache()
                 self.graphGroups()
-        self.updateMouseover()
+        self.mouseoverUpdate()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
 
@@ -1209,22 +1213,16 @@ class UIsub(Ui_MainWindow):
 
 
     def setupCanvases(self):
-        self.graphMean.setLayout(QtWidgets.QVBoxLayout())
-        self.canvasMean = MplCanvas(parent=self.graphMean)  # instantiate canvas for Mean
-        self.graphMean.layout().addWidget(self.canvasMean)
-
-        self.graphEvent.setLayout(QtWidgets.QVBoxLayout())
-        self.canvasEvent = MplCanvas(parent=self.graphEvent)  # instantiate canvas for Mean
-        self.graphEvent.layout().addWidget(self.canvasEvent)
-
-        self.graphOutput.setLayout(QtWidgets.QVBoxLayout())        
-        self.canvasOutput = MplCanvas(parent=self.graphOutput)  # instantiate canvas for Output
-        self.graphOutput.layout().addWidget(self.canvasOutput)
-
-        self.canvasEvent.mpl_connect('button_press_event', lambda event: self.graphClicked(event, self.canvasEvent))
-        self.canvasOutput.mpl_connect('button_press_event', lambda event: self.graphClicked(event, self.canvasOutput, out=True))
-        self.canvasEvent.show()
-        self.canvasOutput.show()
+        def setup_graph(graph):
+            graph.setLayout(QtWidgets.QVBoxLayout())
+            canvas = MplCanvas(parent=graph)
+            graph.layout().addWidget(canvas)
+            canvas.mpl_connect('button_press_event', lambda event: self.graphClicked(event, canvas))
+            canvas.show()
+            return canvas
+        self.canvasMean = setup_graph(self.graphMean)
+        self.canvasEvent = setup_graph(self.graphEvent)
+        self.canvasOutput = setup_graph(self.graphOutput)
 
 
     def setupMenus(self):
@@ -1383,7 +1381,7 @@ class UIsub(Ui_MainWindow):
         if uistate.rec_select:
             self.clearGroupsByRow(uistate.rec_select)
             self.tableUpdate()
-            self.updateMouseover()
+            self.mouseoverUpdate()
         else:
             print("No files selected.")
 
@@ -1394,7 +1392,7 @@ class UIsub(Ui_MainWindow):
         self.removeGroupControls()
         self.groupsClear()
         self.tableUpdate()
-        self.updateMouseover()
+        self.mouseoverUpdate()
 
     def triggerNewGroup(self):
         self.usage("triggerNewGroup")
@@ -1505,7 +1503,7 @@ class UIsub(Ui_MainWindow):
         self.purgeGroupCache(*uistate.df_groups['group_ID'].tolist())
         uistate.save_cfg()
         self.tableFormat()
-        self.updateMouseover()
+        self.mouseoverUpdate()
 
     def editNormRange(self, lineEdit):
         self.usage("editNormRange")
@@ -1755,7 +1753,7 @@ class UIsub(Ui_MainWindow):
                 already_flipped.append(index_pair)
                 self.set_df_project(df_p)
                 self.tableUpdate()
-            self.updateMouseover()
+            self.mouseoverUpdate()
         else:
             print("No files selected.")
 
@@ -1794,7 +1792,7 @@ class UIsub(Ui_MainWindow):
         self.new_checkbox.setMaximumWidth(100)  # Set the maximum width
         self.new_checkbox.setChecked(bool(dict_row['show']))
         self.new_checkbox.stateChanged.connect(lambda state, str_ID=str_ID: self.groupCheckboxChanged(state, str_ID))
-        self.horizontalLayoutGroups.addWidget(self.new_checkbox)
+        self.verticalLayoutGroups.addWidget(self.new_checkbox)
 
 
     def triggerGroupRename(self, str_ID):
@@ -1840,7 +1838,7 @@ class UIsub(Ui_MainWindow):
             print(f"groupCheckboxChanged: {str_ID} = {state}")
         uistate.df_groups.loc[uistate.df_groups['group_ID'] == str_ID, 'show'] = str(state == 2)
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
-        self.updateMouseover()
+        self.mouseoverUpdate()
 
     def group_remove_from_row(self, i, str_add_group_ID):
         str_group_IDs = self.df_project.loc[i, 'group_IDs']
@@ -1888,7 +1886,7 @@ class UIsub(Ui_MainWindow):
         self.tableFormat()
         uiplot.unPlotGroup(add_group_ID)
         self.graphGroups()
-        self.updateMouseover()
+        self.mouseoverUpdate()
 
     
     def removeFromGroup(self, remove_group_ID, indices=uistate.rec_select):
@@ -1907,7 +1905,7 @@ class UIsub(Ui_MainWindow):
             self.save_df_project()
             self.purgeGroupCache(remove_group_ID)
             self.tableUpdate()
-            self.updateMouseover()
+            self.mouseoverUpdate()
 
     def purgeGroupCache(self, *groups): # clear cache so that a new group mean is calculated
         if not groups:  # if no groups are passed
@@ -2521,15 +2519,126 @@ class UIsub(Ui_MainWindow):
         uiplot.graphRefresh()
 
 
-    def updateMouseover(self):
+
+#####################################################
+#          Mouseover, click and drag events         #
+#####################################################
+
+
+    def graphClicked(self, event, canvas): # graph click event
+        x = event.xdata
+        if event.button == 2: # middle click
+            self.zoomReset(canvas=canvas)
+            return
+        if event.button == 3: # right click
+            print("right click")
+            self.mouse_drag = None
+            self.mouse_release = None
+            uistate.dragging = False
+            uistate.x_drag = None
+            self.canvasMean.mpl_disconnect(self.mouse_drag)
+            self.canvasEvent.mpl_disconnect(self.mouse_drag)
+            self.canvasOutput.mpl_disconnect(self.mouse_drag)
+            self.canvasMean.mpl_disconnect(self.mouse_release)
+            self.canvasEvent.mpl_disconnect(self.mouse_release)
+            self.canvasOutput.mpl_disconnect(self.mouse_release)
+            if canvas == self.canvasMean:
+                uiplot.xDeselect(ax = uistate.axm)
+            else:
+                uiplot.xDeselect(ax = uistate.ax1)
+            return
+        
+        def handle_canvas(self, canvas, x_range, slopeAx=None):
+            max_x = 0
+            max_x_line = None
+            #find the line with the highest x value, use for indexing
+            lines = uistate.axm.lines if canvas == self.canvasMean else uistate.ax1.lines + uistate.ax2.lines
+            for line in lines:
+                last_x = line.get_xdata()[-1]
+                if last_x > max_x:
+                    max_x = last_x
+                    max_x_line = line
+            x_data = max_x_line.get_xdata()
+            uistate.x_on_click = x_range[np.abs(x_range - x).argmin()]
+            self.mouse_drag = canvas.mpl_connect('motion_notify_event', lambda event: self.xDrag(event, canvas=canvas, x_data=x_data, slopeAx=slopeAx))
+            self.mouse_release = canvas.mpl_connect('button_release_event', lambda event: self.dragReleased(event, canvas=canvas, slopeAx=slopeAx))
+
+        # left click
+        uistate.dragging = True
+        if canvas == self.canvasEvent:
+            print(f"canvasEvent clicked at {x}")
+            time_values = self.dfmean['time'].values
+            uistate.x_on_click = np.abs(time_values - x).argmin() # nearest x-index to click
+            dft_row = uistate.dft_row_copy
+            #print(f"dft_row: {dft_row}, type: {type(dft_row)}")
+            if event.inaxes is not None:
+                if (event.button == 1 or event.button == 3) and (uistate.mouseover_action is not None):
+                    # mouseover what?
+                    action = uistate.mouseover_action
+                    print(f"action: {action}")
+                    if action.startswith("EPSP slope"):
+                        start, end = dft_row['t_EPSP_slope_start'], dft_row['t_EPSP_slope_end']
+                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, time_values, action, start, end))
+                    elif action == 'EPSP amp move':
+                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, time_values))
+                    elif action.startswith("volley slope"):
+                        start, end = dft_row['t_volley_slope_start'], dft_row['t_volley_slope_end']
+                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, time_values, action, start, end))
+                    elif action == 'volley amp move':
+                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, time_values))
+                    self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', self.eventDragReleased)
+        elif canvas == self.canvasMean:
+            time_values = self.dfmean['time'].values
+            handle_canvas(self,  self.canvasMean, x_range=time_values)
+        elif canvas == self.canvasOutput:
+            df_p = self.get_df_project()
+            p_row = df_p.loc[uistate.rec_select[0]]
+            sweep_numbers = list(range(1, int(p_row['sweeps']) + 1))
+            handle_canvas(self, self.canvasOutput, x_range=sweep_numbers, slopeAx=uistate.checkBox['EPSP_slope'])
+
+
+    def xDrag(self, event, canvas, x_data, slopeAx=None):
+        if not uistate.dragging:
+            return
+        if event.xdata is None:
+            return
+        x = event.xdata # mouse x position
+        x_idx = np.abs(x_data - x).argmin() # index closest to x
+#        if isinstance(x_data, pd.DataFrame):  # Check if x_data is a DataFrame
+#            x_drag = x_data['time'] if 'time' in x_data.columns else x_data['sweep'] # convert to time/sweep
+#        else:  # If x_data is not a DataFrame, use x_idx as x_drag
+        x_drag = x_idx
+        if x_drag < 0:
+            x_drag = 0
+        elif x_drag >= len(x_data):
+            x_drag = len(x_data) - 1
+        if x_drag == uistate.x_drag_last: # return if the pointer hasn't moved a full idx since last update
+            return
+        uistate.x_drag = x_drag
+        uistate.x_drag_last = x_drag
+        uiplot.xSelect(canvas=canvas, slopeAx=slopeAx)
+
+
+    def dragReleased(self, event, canvas, slopeAx=None):
+        if uistate.x_drag is None:
+            uiplot.xSelect(canvas=canvas, slopeAx=slopeAx)
+        canvas.mpl_disconnect(self.mouse_drag)
+        canvas.mpl_disconnect(self.mouse_release)
+        self.mouse_drag = None
+        self.mouse_release = None
+        uistate.x_drag = None
+        uistate.dragging = False
+
+
+    def mouseoverUpdate(self):
         self.mouseoverDisconnect()
         # if only one item is selected, make a new mouseover event connection
         if len(uistate.rec_select) != 1:
-            print("no lables - updateMouseover calls uiplot.graphRefresh()")
+            print("no lables - mouseoverUpdate calls uiplot.graphRefresh()")
             uiplot.graphRefresh()
             return
     
-        print(f"updateMouseover: {uistate.rec_select[0]}, {type(uistate.rec_select[0])}")
+        print(f"mouseoverUpdate: {uistate.rec_select[0]}, {type(uistate.rec_select[0])}")
         df_p = self.get_df_project()
         dfp_row = df_p.loc[uistate.rec_select[0]].copy()
         dft = self.get_dft(row=dfp_row).copy()
@@ -2546,7 +2655,7 @@ class UIsub(Ui_MainWindow):
 
         dict_labels = {key: value for key, value in uistate.dict_rec_label_ID_line.items() if key.endswith(" marker") and value[0] == rec_ID}
         if not dict_labels:
-            print("no lables - updateMouseover calls uiplot.graphRefresh()")
+            print("no lables - mouseoverUpdate calls uiplot.graphRefresh()")
             uiplot.graphRefresh()
             return
         for label, value in dict_labels.items():
@@ -2559,8 +2668,9 @@ class UIsub(Ui_MainWindow):
                 aspect = label.replace(f"{rec_name} ", "").replace(" marker", "")
                 uistate.updateDragZones(aspect=aspect, x=line.get_xdata(), y=line.get_ydata())
         self.mouseover = self.canvasEvent.mpl_connect('motion_notify_event', uiplot.graphMouseover)
-        print("updateMouseover calls uiplot.graphRefresh()")
+        print("mouseoverUpdate calls uiplot.graphRefresh()")
         uiplot.graphRefresh()
+
 
     def mouseoverDisconnect(self):
         # drop any prior mouseover event connections and plots
@@ -2577,41 +2687,16 @@ class UIsub(Ui_MainWindow):
             uistate.mouseover_out = None
         uistate.mouseover_action = None
 
-    def graphClicked(self, event, canvas, out=False): # graph click event
-        x = event.xdata
-        time_values = self.dfmean['time'].values
-        uistate.prior_x_idx = np.abs(time_values - x).argmin() # nearest x-index to click
-        dft_row = uistate.dft_row_copy
-        print(f"dft_row: {dft_row}, type: {type(dft_row)}")
-        if event.inaxes is not None:
-            if (event.button == 1 or event.button == 3) and (uistate.mouseover_action is not None):
-                # mouseover what?
-                action = uistate.mouseover_action
-                print(f"action: {action}")
-                if action.startswith("EPSP slope"):
-                    start, end = dft_row['t_EPSP_slope_start'], dft_row['t_EPSP_slope_end']
-                    self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.graphDragSlope(event, time_values, action, start, end))
-                elif action == 'EPSP amp move':
-                    self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.graphDragPoint(event, time_values))
-                elif action.startswith("volley slope"):
-                    start, end = dft_row['t_volley_slope_start'], dft_row['t_volley_slope_end']
-                    self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.graphDragSlope(event, time_values, action, start, end))
-                elif action == 'volley amp move':
-                    self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.graphDragPoint(event, time_values))
-                self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', self.graphDragReleased)
-            elif event.button == 2:
-                self.zoomReset(canvas=canvas, out=out)
 
-
-    def graphDragSlope(self, event, time_values, action, prior_slope_start, prior_slope_end): # graph dragging event
+    def eventDragSlope(self, event, time_values, action, prior_slope_start, prior_slope_end): # graph dragging event
         self.canvasEvent.mpl_disconnect(self.mouseover)
         if event.xdata is None:
             return
-        uistate.x_idx = np.abs(time_values - event.xdata).argmin()  # update x to the nearest x-value on the plot
-        if uistate.x_idx == uistate.last_x_idx: # if the dragged event hasn't moved an index point, change nothing
+        uistate.x_drag = np.abs(time_values - event.xdata).argmin()  # update x to the nearest x-value on the plot
+        if uistate.x_drag == uistate.x_drag_last: # if the dragged event hasn't moved an index point, change nothing
             return
         precision = len(str(time_values[1] - time_values[0]).split('.')[1])
-        time_diff = time_values[uistate.x_idx] - time_values[uistate.prior_x_idx]
+        time_diff = time_values[uistate.x_drag] - time_values[uistate.x_on_click]
         print(f"prior_slope_start: {prior_slope_start}, prior_slope_end: {prior_slope_end}")
         # get the x values of the slope
         blob = True # only moving amplitudes and resizing slopes have a blob
@@ -2633,7 +2718,7 @@ class UIsub(Ui_MainWindow):
         y_start, y_end = self.dfmean[rec_filter].iloc[x_indices]
 
         # remember the last x index
-        uistate.last_x_idx = uistate.x_idx
+        uistate.x_drag_last = uistate.x_drag
 
         # update the mouseover plot
         uistate.mouseover_plot[0].set_data([x_start, x_end], [y_start, y_end])
@@ -2641,35 +2726,35 @@ class UIsub(Ui_MainWindow):
         if blob:
             uistate.mouseover_blob.set_offsets([x_end, y_end])
         self.canvasEvent.draw()
-        self.graphDragUpdate(x_start, x_end, precision)
+        self.eventDragUpdate(x_start, x_end, precision)
 
 
-    def graphDragPoint(self, event, time_values): # maingraph dragging event
+    def eventDragPoint(self, event, time_values): # maingraph dragging event
         self.canvasEvent.mpl_disconnect(self.mouseover)
         if event.xdata is None:
             return
-        uistate.x_idx = np.abs(time_values - event.xdata).argmin()  # update x to the nearest x-value on the plot
-        if uistate.x_idx == uistate.last_x_idx: # if the dragged event hasn't moved an index point, change nothing
+        uistate.x_drag = np.abs(time_values - event.xdata).argmin()  # update x to the nearest x-value on the plot
+        if uistate.x_drag == uistate.x_drag_last: # if the dragged event hasn't moved an index point, change nothing
             return
         precision = len(str(time_values[1] - time_values[0]).split('.')[1])
         
-        x_point = time_values[uistate.x_idx]
-        x_idx = self.dfmean['time'].searchsorted(x_point)
+        x_point = time_values[uistate.x_drag]
+        x_drag = self.dfmean['time'].searchsorted(x_point)
 
         # get y values from the appropriate filter of persisted dfmean
         rec_filter = uistate.dfp_row_copy['filter']
-        y_point = self.dfmean[rec_filter].iloc[x_idx]
+        y_point = self.dfmean[rec_filter].iloc[x_drag]
 
         # remember the last x index
-        uistate.last_x_idx = uistate.x_idx
+        uistate.x_drag_last = uistate.x_drag
         # update the mouseover plot
         uistate.mouseover_blob.set_offsets([x_point, y_point])
 
         self.canvasEvent.draw()
-        self.graphDragUpdate(x_point, x_point, precision)
+        self.eventDragUpdate(x_point, x_point, precision)
   
 
-    def graphDragUpdate(self, x_start, x_end, precision): # update output; this is a separate function to allow the user to make it happen live (current) or on release (for low compute per data)
+    def eventDragUpdate(self, x_start, x_end, precision): # update output; this is a separate function to allow the user to make it happen live (current) or on release (for low compute per data)
         dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
         action = uistate.mouseover_action
         
@@ -2741,15 +2826,15 @@ class UIsub(Ui_MainWindow):
         self.canvasOutput.draw()
 
 
-    def graphDragReleased(self, event): # graph release event
-        self.usage("graphDragReleased")
+    def eventDragReleased(self, event): # graph release event
+        self.usage("eventDragReleased")
         print(f" - uistate.mouseover_action: {uistate.mouseover_action}")
         self.canvasEvent.mpl_disconnect(self.mouse_drag)
         self.canvasEvent.mpl_disconnect(self.mouse_release)
-        uistate.last_x_idx = None
-        if uistate.x_idx == uistate.prior_x_idx: # nothing to update
-            print("x_idx == prior_x_idx")
-            self.updateMouseover()
+        uistate.x_drag_last = None
+        if uistate.x_drag == uistate.x_on_click: # nothing to update
+            print("x_drag == x_on_click")
+            self.mouseoverUpdate()
             return
 
         p_row = uistate.dfp_row_copy.to_dict()
@@ -2794,7 +2879,7 @@ class UIsub(Ui_MainWindow):
         self.tableUpdate()
         if uistate.mouseover_action.startswith("EPSP"): # add normalized EPSP columns
             self.normOutput(row=p_row, dfoutput=dfoutput)
-        #self.updateMouseover()
+        #self.mouseoverUpdate()
         if config.talkback:
             self.talkback()
 
@@ -2854,8 +2939,8 @@ class UIsub(Ui_MainWindow):
         canvas.draw()
 
 
-    def zoomReset(self, canvas, out=False):
-        if out:
+    def zoomReset(self, canvas):
+        if canvas == uistate.axe:
             axes_in_figure = canvas.figure.get_axes()
             for ax in axes_in_figure:
                 if ax.get_ylabel() == "Amplitude (mV)":

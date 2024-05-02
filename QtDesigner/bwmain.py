@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_mainWindow(object):
     def setupUi(self, mainWindow):
         mainWindow.setObjectName("mainWindow")
-        mainWindow.resize(1171, 887)
+        mainWindow.resize(1171, 923)
         self.centralwidget = QtWidgets.QWidget(mainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayoutCentralwidget = QtWidgets.QHBoxLayout(self.centralwidget)
@@ -244,6 +244,9 @@ class Ui_mainWindow(object):
         self.lineEdit_norm_EPSP_start.setGeometry(QtCore.QRect(20, 70, 41, 25))
         self.lineEdit_norm_EPSP_start.setObjectName("lineEdit_norm_EPSP_start")
         self.verticalLayoutTools.addWidget(self.frameToolScaling)
+        self.verticalLayoutGroups = QtWidgets.QVBoxLayout()
+        self.verticalLayoutGroups.setObjectName("verticalLayoutGroups")
+        self.verticalLayoutTools.addLayout(self.verticalLayoutGroups)
         self.frameToolPairedStim = QtWidgets.QFrame(self.verticalLayoutWidget_3)
         self.frameToolPairedStim.setMinimumSize(QtCore.QSize(131, 91))
         self.frameToolPairedStim.setFrameShape(QtWidgets.QFrame.StyledPanel)

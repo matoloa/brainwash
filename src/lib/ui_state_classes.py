@@ -78,9 +78,10 @@ class UIstate:
         self.mouseover_blob = None # scatterplot indicating mouseover of dragable point; move point or resize slope
         self.x_margin = None # for mouseover detection boundaries
         self.y_margin = None # for mouseover detection boundaries
-        self.x_idx = None # current x value of dragging
-        self.last_x_idx = None # last x value within the same dragging event; prevents needless update when holding drag still
-        self.prior_x_idx = None # x value of the last stored slope
+        self.x_on_click = None # x-value nearest mousebutton down
+        self.x_drag_last = None # last x-value within the same dragging event; prevents needless update when holding drag still
+        self.x_drag = None # x-value of current dragging
+        self.dragging = False # True if dragging; allows right-click to cancel drag
         self.mouseover_out = None # output of dragged aspect
 
         # Mouseover coordinates, for plotting. Set on row selection.
