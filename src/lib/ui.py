@@ -930,6 +930,8 @@ class UIsub(Ui_MainWindow):
             t_row = df_t.iloc[0] # get the first row of the table, for now
             uistate.dfp_row_copy = p_row.copy()
             uistate.dft_row_copy = t_row.copy()
+            # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
+            self.dfmean = self.get_dfmean(row=p_row) # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
 
             if df_t.shape[0] > 1:
                 selected_stims = self.tableStim.selectionModel().selectedRows() # save selection
@@ -1051,7 +1053,6 @@ class UIsub(Ui_MainWindow):
             df_selected = df_p.loc[uistate.rec_select]
             max_sweep_duration = df_selected['sweep_duration'].max()
             uistate.zoom['mean_xlim'] = (0, max_sweep_duration)
-            uistate.axm.set_xlim(uistate.zoom['mean_xlim'])
         # axe
             list_stims = []
             for index, p_row in df_selected.iterrows():
@@ -1065,8 +1066,21 @@ class UIsub(Ui_MainWindow):
                 t_stim_min = min(list_stims) - 0.0005
                 t_stim_max = max(list_stims) + 0.010
                 if t_stim_min > 0:
-                    uistate.zoom['mean_xlim'] = (t_stim_min, t_stim_max)
-                    uistate.axe.set_xlim(uistate.zoom['mean_xlim'])
+                    uistate.zoom['event_xlim'] = (t_stim_min, t_stim_max)
+
+        # ax1 and ax2
+
+            #TODO: WIP - This isn't working
+            # make a list of values in column df_selected['recording_names']
+            rec_IDs = df_selected['ID'].tolist()
+            rec_lines = [value[1] for value in uistate.dict_rec_label_ID_line.values() if value[0] in rec_IDs]
+            x_min, x_max = 0, 0
+            for line in rec_lines:
+                x_min = min(x_min, min(line.get_xdata()))
+                x_max = max(x_max, max(line.get_xdata()))
+            uistate.zoom['output_xlim'] = (x_min, x_max)
+            print(f"uistate.zoom['output_xlim']: {uistate.zoom['output_xlim']}")
+
 
     def update_recs2plot(self):
         if uistate.rec_select:
@@ -2585,28 +2599,17 @@ class UIsub(Ui_MainWindow):
         self.mouseoverDisconnect()
         # if only one item is selected, make a new mouseover event connection
         if len(uistate.rec_select) != 1:
-            print("no lables - mouseoverUpdate calls uiplot.graphRefresh()")
+            print("(multi-selection) mouseoverUpdate calls uiplot.graphRefresh()")
             uiplot.graphRefresh()
             return
-    
         print(f"mouseoverUpdate: {uistate.rec_select[0]}, {type(uistate.rec_select[0])}")
-        df_p = self.get_df_project()
-        dfp_row = df_p.loc[uistate.rec_select[0]].copy()
-        dft = self.get_dft(row=dfp_row).copy()
-        dft_row = dft.iloc[0]
-        uistate.dfp_row_copy = dfp_row
-        uistate.dft_row_copy = dft_row
+        dfp_row = uistate.dfp_row_copy
         rec_name = dfp_row['recording_name']
         rec_ID = dfp_row['ID']
-        #print(f"rec_name: {rec_name}, rec_ID: {rec_ID}")
-        #print(f"dft_row: {dft_row}")
-
-        self.dfmean = self.get_dfmean(row=dfp_row) # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
         uistate.setMargins(axe=uistate.axe)
-
         dict_labels = {key: value for key, value in uistate.dict_rec_label_ID_line.items() if key.endswith(" marker") and value[0] == rec_ID}
         if not dict_labels:
-            print("no lables - mouseoverUpdate calls uiplot.graphRefresh()")
+            print("(no labels) mouseoverUpdate calls uiplot.graphRefresh()")
             uiplot.graphRefresh()
             return
         for label, value in dict_labels.items():
@@ -2662,7 +2665,7 @@ class UIsub(Ui_MainWindow):
         if x_end <= x_start:
             x_start_index = np.where(time_values == x_start)[0][0]
             x_end = time_values[x_start_index + 1] 
-        x_indices = self.dfmean['time'].searchsorted([x_start, x_end])
+        x_indices = np.searchsorted(time_values, [x_start, x_end])
 
         # get y values from the appropriate filter of persisted dfmean
         rec_filter = uistate.dfp_row_copy['filter']
@@ -2890,7 +2893,7 @@ class UIsub(Ui_MainWindow):
         canvas.draw()
 
 
-    def zoomReset(self, canvas):
+    def zoomReset(self, canvas): # TODO: Update with axm
         if canvas == uistate.axe:
             axes_in_figure = canvas.figure.get_axes()
             for ax in axes_in_figure:
@@ -2902,8 +2905,8 @@ class UIsub(Ui_MainWindow):
                 uistate.zoom['output_xlim'] = [0, df_p['sweeps'].max()]
                 ax.set_xlim(uistate.zoom['output_xlim'])
         else:
-            canvas.axes.set_xlim(uistate.zoom['mean_xlim'])
-            canvas.axes.set_ylim(uistate.zoom['mean_ylim'])
+            canvas.axes.set_xlim(uistate.zoom['event_xlim'])
+            canvas.axes.set_ylim(uistate.zoom['event_ylim'])
         canvas.draw()
 
 

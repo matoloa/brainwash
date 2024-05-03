@@ -35,8 +35,10 @@ class UIstate:
             'norm_EPSP_on': [0, 0],
         }
         self.zoom = {
-            'mean_xlim': (0.006, 0.020),
-            'mean_ylim': (-0.001, 0.0002),
+            'mean_xlim': (0, 1),
+            'mean_ylim': (-1, 1),
+            'event_xlim': (0.006, 0.020),
+            'event_ylim': (-0.001, 0.0002),
             'output_xlim': (0, None),
             'output_ax1_ylim': (0, 1.2),
             'output_ax2_ylim': (0, 1.2),

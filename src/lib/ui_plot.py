@@ -84,6 +84,8 @@ class UIplot():
         for ax in [axm, axe, ax1, ax2]:
             for line in ax.get_lines():
                 line.set_visible(False)
+            for patch in ax.patches:
+                patch.remove()
             legend = ax.get_legend()
             if legend is not None:
                 legend.remove()
@@ -141,11 +143,12 @@ class UIplot():
 
         # arrange axes and labels
         axm.axis('off')
+        axm.set_xlim(uistate.zoom['mean_xlim'])
 
         axe.set_xlabel("Time (s)")
         axe.set_ylabel("Voltage (V)")
-        axe.set_xlim(uistate.zoom['mean_xlim'])
-        axe.set_ylim(uistate.zoom['mean_ylim'])
+        axe.set_xlim(uistate.zoom['event_xlim'])
+        axe.set_ylim(uistate.zoom['event_ylim'])
 
         if uistate.checkBox['norm_EPSP']:
             ax1.set_ylabel("Amplitude %")
@@ -157,6 +160,10 @@ class UIplot():
             ax2.set_ylabel("Slope (mV/ms)")
             ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
             ax2.set_ylim(uistate.zoom['output_ax2_ylim'])
+        ax1.set_xlim(uistate.zoom['output_xlim'])
+        ax2.set_xlim(uistate.zoom['output_xlim'])
+        ax1.figure.subplots_adjust(bottom=0.2)
+        print(f"ax1-2_xlim: {uistate.zoom['output_xlim']} enforced")
         self.oneAxisLeft()
 
         # redraw
