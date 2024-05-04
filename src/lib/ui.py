@@ -930,8 +930,7 @@ class UIsub(Ui_MainWindow):
             t_row = df_t.iloc[0] # get the first row of the table, for now
             uistate.dfp_row_copy = p_row.copy()
             uistate.dft_row_copy = t_row.copy()
-            # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
-            self.dfmean = self.get_dfmean(row=p_row) # TODO: potential ISSUE: persisted dfmean overwritten only on selecting new single line
+            self.dfmean = self.get_dfmean(row=p_row) # Required for event dragging, x and y
 
             if df_t.shape[0] > 1:
                 selected_stims = self.tableStim.selectionModel().selectedRows() # save selection
@@ -949,6 +948,7 @@ class UIsub(Ui_MainWindow):
                 print(f"* hiding tableStim as df_t.shape[0] = {df_t.shape[0]}")
                 self.setTableStimVisibility(False)
         else: # none or many selected
+            self.dfmean = None
             self.tableStim.selectionModel().clear()
             self.tableStimModel.setData(None)
             self.setTableStimVisibility(False)
@@ -1067,19 +1067,15 @@ class UIsub(Ui_MainWindow):
                 t_stim_max = max(list_stims) + 0.010
                 if t_stim_min > 0:
                     uistate.zoom['event_xlim'] = (t_stim_min, t_stim_max)
-
-        # ax1 and ax2
-
-            #TODO: WIP - This isn't working
-            # make a list of values in column df_selected['recording_names']
-            rec_IDs = df_selected['ID'].tolist()
-            rec_lines = [value[1] for value in uistate.dict_rec_label_ID_line.values() if value[0] in rec_IDs]
-            x_min, x_max = 0, 0
-            for line in rec_lines:
-                x_min = min(x_min, min(line.get_xdata()))
-                x_max = max(x_max, max(line.get_xdata()))
-            uistate.zoom['output_xlim'] = (x_min, x_max)
-            print(f"uistate.zoom['output_xlim']: {uistate.zoom['output_xlim']}")
+         # ax1 and ax2
+            rec_IDs = set(df_selected['ID'].tolist())
+            rec_lines = (value[1] for value in uistate.dict_rec_label_ID_line.values() if value[0] in rec_IDs)
+            lines_on_canvas = (line for line in rec_lines if line in uistate.ax1.lines or line in uistate.ax2.lines)
+            x_data_on_canvas = list(line.get_xdata() for line in lines_on_canvas)
+            if x_data_on_canvas:
+                uistate.zoom['output_xlim'] = min(min(x_data, default=0) for x_data in x_data_on_canvas), max(max(x_data, default=0) for x_data in x_data_on_canvas)
+            else:
+                uistate.zoom['output_xlim'] = (0, 0)
 
 
     def update_recs2plot(self):
