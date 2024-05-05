@@ -34,6 +34,12 @@ class UIstate:
         self.lineEdit = {
             'norm_EPSP_on': [0, 0],
         }
+        self.x_select = { # selected ranges on mean- and output graphs
+            'mean_start': None,
+            'mean_end': None,
+            'output_start': None,
+            'output_end': None,
+        }
         self.zoom = {
             'mean_xlim': (0, 1),
             'mean_ylim': (-1, 1),
@@ -59,18 +65,18 @@ class UIstate:
         }
 
     # Do NOT persist these
-        self.axm = None # axis of mean graph
-        self.axe = None # axis of event graph
-        self.ax1 = None # axis of output for amplitudes
-        self.ax2 = None # axis of output for slopes
+        self.axm = None # axis of mean graph (top)
+        self.axe = None # axis of event graph (middle)
+        self.ax1 = None # axis of output for amplitudes (bottom graph)
+        self.ax2 = None # axis of output for slopes (bottom graph)
         self.rec_select = [] # list of selected indices in uisub.tableProj
         self.stim_select = [] # list of selected indices in uisub.tableStim
         self.dfp_row_copy = None # copy of selected row in uisub.tableProj
         self.dft_row_copy = None # copy of dft for storing measure points until either saved or rejected
-        self.df_recs2plot = None # df_project copy of selected PARSED recordings (or all parsed, if none are selected)
+        self.df_recs2plot = None # df_project copy, filtered  to selected AND parsed recordings (or all parsed, if none are selected)
         self.dict_rec_label_ID_line = {} # dict of all plotted recording lines: key=label, value=(rec_ID, 2Dline object)
         self.dict_group_label_ID_line_SEM = {} # dict of all plotted groups: key=label, value=[group_ID, 2Dline object, fill]
-        self.new_indices = [] # list of indices in uisub.df_project of newly parsed recordings; used by uisub.graphPreload()
+        self.new_indices = [] # list of indices in uisub.df_project for freshly parsed recordings; used by uisub.graphPreload()
         self.darkmode = False # set by global bw cfg
 
     # Mouseover variables
@@ -79,7 +85,7 @@ class UIstate:
         self.mouseover_blob = None # scatterplot indicating mouseover of dragable point; move point or resize slope
         self.x_margin = None # for mouseover detection boundaries
         self.y_margin = None # for mouseover detection boundaries
-        self.x_on_click = None # x-value nearest mousebutton down
+        self.x_on_click = None # x-value closest to mousebutton down
         self.x_drag_last = None # last x-value within the same dragging event; prevents needless update when holding drag still
         self.x_drag = None # x-value of current dragging
         self.dragging = False # True if dragging; allows right-click to cancel drag

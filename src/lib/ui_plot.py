@@ -21,39 +21,36 @@ class UIplot():
             axpatches = ax.patches
 
         for line in axlines:
-            if line.get_label() == 'xSelect':
+            if line.get_label().startswith('xSelect'):
                 line.remove()
         for patch in axpatches:
-            if patch.get_label() == 'xSelect':
+            if patch.get_label().startswith('xSelect'):
                 patch.remove()
         ax.figure.canvas.draw()
 
 
-    def xSelect(self, canvas, slopeAx=None):
+    def xSelect(self, canvas):
         # draws a selected range of x values on <canvas>
-        if slopeAx is not None:
-            if slopeAx:
+        if canvas == self.uistate.axm.figure.canvas:
+            ax = canvas.axes
+        else:
+            if self.uistate.checkBox['EPSP_slope']:
                 ax = self.uistate.ax2
             else:
                 ax = self.uistate.ax1
-        else:
-            ax = canvas.axes
-        self.xDeselect(ax)
-
+        self.xDeselect(ax) # will clear both ax1 and ax2, if fed either one
+        if self.uistate.x_on_click is None:
+            return
         # draw new axvlines and axvspans
-        start, end = self.uistate.x_on_click, self.uistate.x_drag
-        if end is None:
-            print(f"Selected x: {start}")
-            ax.axvline(x=start, color='blue', label='xSelect')
+        if self.uistate.x_drag is None:
+            print(f"Selected x: {self.uistate.x_on_click}")
+            ax.axvline(x=self.uistate.x_on_click, color='blue', label='xSelect_x')
         else:
+            start, end = min(self.uistate.x_on_click, self.uistate.x_drag), max(self.uistate.x_on_click, self.uistate.x_drag)
             print(f"Selected x_range: {start} - {end}")
-            if start is None:
-                return
-            elif start > end:
-                start, end = end, start
-            ax.axvline(x=start, color='blue', label='xSelect')
-            ax.axvline(x=end, color='blue', label='xSelect')
-            ax.axvspan(start, end, color='blue', alpha=0.1, label='xSelect')
+            ax.axvline(x=start, color='blue', label='xSelect_start')
+            ax.axvline(x=end, color='blue', label='xSelect_end')
+            ax.axvspan(start, end, color='blue', alpha=0.1, label='xSelect_span')
         canvas.draw()
 
 
@@ -165,6 +162,9 @@ class UIplot():
         ax1.figure.subplots_adjust(bottom=0.2)
         print(f"ax1-2_xlim: {uistate.zoom['output_xlim']} enforced")
         self.oneAxisLeft()
+
+        # maintain selections
+        self.xSelect(canvas = axm.figure.canvas)
 
         # redraw
         axm.figure.canvas.draw()

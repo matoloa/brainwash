@@ -2483,14 +2483,17 @@ class UIsub(Ui_MainWindow):
 #####################################################
 
     def graphClicked(self, event, canvas): # graph click event
+        if not uistate.rec_select: # no recording selected; do nothing
+            return
         x = event.xdata
-        if event.button == 2: # middle click
+        if x is None: # clicked outside graph; do nothing
+            return
+        if event.button == 2: # middle click, reset zoom
             self.zoomReset(canvas=canvas)
             return
-        if event.button == 3: # right click
+        if event.button == 3: # right click, deselect
             if uistate.dragging:
                 return
-            print("right click")
             self.mouse_drag = None
             self.mouse_release = None
             uistate.x_drag = None
@@ -2502,7 +2505,8 @@ class UIsub(Ui_MainWindow):
                 uiplot.xDeselect(ax = uistate.ax1)
             return
         
-        def connect_canvas(self, canvas, x_range, slopeAx=None):
+        def connect_canvas(self, canvas, x_range):
+            # sets up x scales for clicking and dragging on mean- and output canvases
             max_x = 0
             max_x_line = None
             #find the line with the highest x value, use for indexing
@@ -2513,23 +2517,19 @@ class UIsub(Ui_MainWindow):
                     max_x = last_x
                     max_x_line = line
             x_data = max_x_line.get_xdata()
-            self.mouse_drag = canvas.mpl_connect('motion_notify_event', lambda event: self.xDrag(event, canvas=canvas, x_data=x_data, x_range=x_range, slopeAx=slopeAx))
-            self.mouse_release = canvas.mpl_connect('button_release_event', lambda event: self.dragReleased(event, canvas=canvas, slopeAx=slopeAx))
+            self.mouse_drag = canvas.mpl_connect('motion_notify_event', lambda event: self.xDrag(event, canvas=canvas, x_data=x_data, x_range=x_range))
+            self.mouse_release = canvas.mpl_connect('button_release_event', lambda event: self.dragReleased(event, canvas=canvas))
 
-        # left click
+    # left clicked on a graph
         uistate.dragging = True
-        if canvas == self.canvasEvent:
-            print(f"canvasEvent clicked at {x}")
+        if canvas == self.canvasEvent: # Event canvas left-clicked, middle graph: editing detected events
             time_values = self.dfmean['time'].values
             uistate.x_on_click = np.abs(time_values - x).argmin() # nearest x-index to click
-            print(f"uistate.x_on_click: {uistate.x_on_click}")
             dft_row = uistate.dft_row_copy
-            #print(f"dft_row: {dft_row}, type: {type(dft_row)}")
             if event.inaxes is not None:
                 if (event.button == 1 or event.button == 3) and (uistate.mouseover_action is not None):
-                    # mouseover what?
                     action = uistate.mouseover_action
-                    print(f"action: {action}")
+                    print(f"mouseover action: {action}")
                     if action.startswith("EPSP slope"):
                         start, end = dft_row['t_EPSP_slope_start'], dft_row['t_EPSP_slope_end']
                         self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, time_values, action, start, end))
@@ -2541,20 +2541,22 @@ class UIsub(Ui_MainWindow):
                     elif action == 'volley amp move':
                         self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, time_values))
                     self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', self.eventDragReleased)
-        elif canvas == self.canvasMean:
+
+        elif canvas == self.canvasMean: # Mean canvas (top graph) left-clicked: overview and selecting ranges for finding relevant stims
             time_values = self.dfmean['time'].values
             uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
             self.lineEdit_mean_selection_start.setText(str(uistate.x_on_click))
             connect_canvas(self,  self.canvasMean, x_range=time_values)
-        elif canvas == self.canvasOutput:
+
+        elif canvas == self.canvasOutput: # Output canvas (bottom graph) left-clicked: click and drag to select specific sweeps
             df_p = self.get_df_project()
             p_row = df_p.loc[uistate.rec_select[0]]
             sweep_numbers = list(range(0, int(p_row['sweeps'])))
             uistate.x_on_click = sweep_numbers[np.abs(sweep_numbers - x).argmin()]
-            connect_canvas(self, self.canvasOutput, x_range=sweep_numbers, slopeAx=uistate.checkBox['EPSP_slope'])
+            connect_canvas(self, self.canvasOutput, x_range=sweep_numbers)
 
 
-    def xDrag(self, event, canvas, x_data, x_range, slopeAx=None):
+    def xDrag(self, event, canvas, x_data, x_range):
         if not uistate.dragging:
             return
         if event.xdata is None:
@@ -2571,18 +2573,32 @@ class UIsub(Ui_MainWindow):
         uistate.x_drag_last = uistate.x_drag
         if canvas == self.canvasMean:
             self.lineEdit_mean_selection_end.setText(str(uistate.x_drag))
-        uiplot.xSelect(canvas=canvas, slopeAx=slopeAx)
+        uiplot.xSelect(canvas=canvas)
 
 
-    def dragReleased(self, event, canvas, slopeAx=None):
-        if uistate.x_drag is None:
-            uiplot.xSelect(canvas=canvas, slopeAx=slopeAx)
-            self.lineEdit_mean_selection_end.setText("")
+    def dragReleased(self, event, canvas):
+        if uistate.x_drag is None: # no drag; just click - set only start
+            if canvas == self.canvasMean:
+                self.lineEdit_mean_selection_end.setText("")
+                uistate.x_select['mean_start'] = uistate.x_on_click
+
+                uistate.x_select['mean_end'] = None
+            elif canvas == self.canvasOutput:
+                uistate.x_select['output_start'] = uistate.x_on_click
+                uistate.x_select['output_end'] = None
+            uiplot.xSelect(canvas=canvas)
         else:
-            if uistate.x_drag < uistate.x_on_click:
-                uistate.x_drag, uistate.x_on_click = uistate.x_on_click, uistate.x_drag
-                self.lineEdit_mean_selection_start.setText(str(uistate.x_on_click))
-                self.lineEdit_mean_selection_end.setText(str(uistate.x_drag))
+            start = str(min(uistate.x_on_click, uistate.x_drag))
+            end = str(max(uistate.x_on_click, uistate.x_drag))
+            if canvas == self.canvasMean:
+                uistate.x_select['mean_start'] = start
+                uistate.x_select['mean_end'] = end
+                self.lineEdit_mean_selection_start.setText(start) # reset, as it may have been resorted
+                self.lineEdit_mean_selection_end.setText(end)
+            elif canvas == self.canvasOutput:
+                uistate.x_select['output_start'] = start
+                uistate.x_select['output_end'] = end
+                print(f"output selection: {start, end}")
         canvas.mpl_disconnect(self.mouse_drag)
         canvas.mpl_disconnect(self.mouse_release)
         self.mouse_drag = None
