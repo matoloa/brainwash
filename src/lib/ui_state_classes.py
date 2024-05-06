@@ -74,7 +74,7 @@ class UIstate:
         self.dfp_row_copy = None # copy of selected row in uisub.tableProj
         self.dft_row_copy = None # copy of dft for storing measure points until either saved or rejected
         self.df_recs2plot = None # df_project copy, filtered  to selected AND parsed recordings (or all parsed, if none are selected)
-        self.dict_rec_label_ID_line = {} # dict of all plotted recording lines: key=label, value=(rec_ID, 2Dline object)
+        self.dict_rec_label_ID_line_canvas = {} # dict of all plotted recording lines: key=label, value=(rec_ID, 2Dline object, canvas)
         self.dict_group_label_ID_line_SEM = {} # dict of all plotted groups: key=label, value=[group_ID, 2Dline object, fill]
         self.new_indices = [] # list of indices in uisub.df_project for freshly parsed recordings; used by uisub.graphPreload()
         self.darkmode = False # set by global bw cfg
@@ -168,10 +168,10 @@ class UIstate:
         elif aspect == "volley amp move":
             self.updateAmpZone('volley', x, y)
 
-    def get_recSet(self): # returns a set of all recs that are currently plotted
-        return set([value[0] for value in self.dict_rec_label_ID_line.values()])
+    def get_recSet(self): # returns a set of all rec IDs that are currently plotted
+        return set([value[0] for value in self.dict_rec_label_ID_line_canvas.values()])
 
-    def get_groupSet(self): # returns a set of all groups that are currently plotted
+    def get_groupSet(self): # returns a set of all group IDs that are currently plotted
         return set([value[0] for value in self.dict_group_label_ID_line_SEM.values()])
 
     #def get_recs_in_group(self):

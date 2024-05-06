@@ -10,15 +10,21 @@ class UIplot():
         print(f"UIplot instantiated: {self.uistate.anyView()}")
 
 
-    def xDeselect(self, ax):
+    def xDeselect(self, ax, reset=False):
         # clear previous axvlines and axvspans
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
         if ax == ax1 or ax == ax2:
             axlines = ax1.get_lines() + ax2.get_lines()
             axpatches = ax1.patches + ax2.patches
-        else:
+            if reset:
+                self.uistate.x_select['output_start'] = None
+                self.uistate.x_select['output_end'] = None
+        else: # axm
             axlines = ax.get_lines()
             axpatches = ax.patches
+            if reset:
+                self.uistate.x_select['mean_start'] = None
+                self.uistate.x_select['mean_end'] = None
 
         for line in axlines:
             if line.get_label().startswith('xSelect'):
@@ -32,25 +38,32 @@ class UIplot():
     def xSelect(self, canvas):
         # draws a selected range of x values on <canvas>
         if canvas == self.uistate.axm.figure.canvas:
-            ax = canvas.axes
-        else:
+            ax = self.uistate.axm
+            self.xDeselect(ax)
+            if self.uistate.x_select['mean_end'] is None:
+                print(f"Selected x: {self.uistate.x_select['mean_start']}")
+                ax.axvline(x=self.uistate.x_select['mean_start'], color='blue', label='xSelect_x')
+            else:
+                start, end = self.uistate.x_select['mean_start'], self.uistate.x_select['mean_end']
+                print(f"Selected x_range: {start} - {end}")
+                ax.axvline(x=start, color='blue', label='xSelect_start')
+                ax.axvline(x=end, color='blue', label='xSelect_end')
+                ax.axvspan(start, end, color='blue', alpha=0.1, label='xSelect_span')
+        else: # canvasOutput
             if self.uistate.checkBox['EPSP_slope']:
                 ax = self.uistate.ax2
             else:
                 ax = self.uistate.ax1
-        self.xDeselect(ax) # will clear both ax1 and ax2, if fed either one
-        if self.uistate.x_on_click is None:
-            return
-        # draw new axvlines and axvspans
-        if self.uistate.x_drag is None:
-            print(f"Selected x: {self.uistate.x_on_click}")
-            ax.axvline(x=self.uistate.x_on_click, color='blue', label='xSelect_x')
-        else:
-            start, end = min(self.uistate.x_on_click, self.uistate.x_drag), max(self.uistate.x_on_click, self.uistate.x_drag)
-            print(f"Selected x_range: {start} - {end}")
-            ax.axvline(x=start, color='blue', label='xSelect_start')
-            ax.axvline(x=end, color='blue', label='xSelect_end')
-            ax.axvspan(start, end, color='blue', alpha=0.1, label='xSelect_span')
+            self.xDeselect(ax) # will clear both ax1 and ax2, if fed either one
+            if self.uistate.x_select['output_end'] is None:
+                print(f"Selected x: {self.uistate.x_select['output_start']}")
+                ax.axvline(x=self.uistate.x_select['output_start'], color='blue', label='xSelect_x')
+            else:
+                start, end = self.uistate.x_select['output_start'], self.uistate.x_select['output_end']
+                print(f"Selected x_range: {start} - {end}")
+                ax.axvline(x=start, color='blue', label='xSelect_start')
+                ax.axvline(x=end, color='blue', label='xSelect_end')
+                ax.axvspan(start, end, color='blue', alpha=0.1, label='xSelect_span')
         canvas.draw()
 
 
@@ -90,7 +103,7 @@ class UIplot():
 
 
     def unPlot(self, rec_ID):
-        dict_rec = self.uistate.dict_rec_label_ID_line
+        dict_rec = self.uistate.dict_rec_label_ID_line_canvas
         keys_to_remove = [key for key, value in dict_rec.items() if rec_ID == value[0]]
         for key in keys_to_remove:
             dict_rec[key][1].remove()
@@ -164,7 +177,13 @@ class UIplot():
         self.oneAxisLeft()
 
         # maintain selections
-        self.xSelect(canvas = axm.figure.canvas)
+        if uistate.x_select['mean_start'] is not None:
+            self.xSelect(canvas = axm.figure.canvas)
+        if uistate.x_select['output_start'] is not None:
+            if uistate.checkBox['EPSP_slope']:
+                self.xSelect(canvas = ax2.figure.canvas)
+            else:
+                self.xSelect(canvas = ax1.figure.canvas)
 
         # redraw
         axm.figure.canvas.draw()
@@ -221,11 +240,11 @@ class UIplot():
         # add to Mean
         mean_label = f"mean_{rec_name}"
         line, = axm.plot(dfmean["time"], dfmean[rec_filter], color="black", label=mean_label)
-        self.uistate.dict_rec_label_ID_line[mean_label] = rec_ID, line
+        self.uistate.dict_rec_label_ID_line_canvas[mean_label] = rec_ID, line, axm
 
         # add to Events
         line, = axe.plot(dfmean["time"], dfmean[rec_filter], color="black", label=label)
-        self.uistate.dict_rec_label_ID_line[label] = rec_ID, line
+        self.uistate.dict_rec_label_ID_line_canvas[label] = rec_ID, line, axe
    
         # plot them all, don't bother with show/hide
         out = dfoutput # TODO: enable switch to dfdiff?
@@ -235,11 +254,11 @@ class UIplot():
             marker, = axe.plot(t_EPSP_amp, y_position, marker='o', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha=0.3, label=f"{label} EPSP amp marker")
             subplot = f"{label} EPSP amp"
             line, = ax1.plot(out["sweep"], out['EPSP_amp'], color="green", linestyle='--', alpha=0.5, label=subplot)
-            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, line
+            self.uistate.dict_rec_label_ID_line_canvas[subplot] = rec_ID, line, ax1
             if 'EPSP_amp_norm' in out.columns:
                 subplot = f"{label} EPSP amp norm"
                 line, = ax1.plot(out["sweep"], out['EPSP_amp_norm'], color="green", linestyle='--', alpha=0.5, label=subplot)
-                self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, line
+                self.uistate.dict_rec_label_ID_line_canvas[subplot] = rec_ID, line, ax1
         if not np.isnan(t_EPSP_slope_start):
             x_start = t_EPSP_slope_start
             x_end = t_EPSP_slope_end
@@ -247,22 +266,22 @@ class UIplot():
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
             subplot = f"{label} EPSP slope marker"
             line, = axe.plot([x_start, x_end], [y_start, y_end], color='green', linewidth=10, alpha=0.3, label=subplot)
-            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, line
+            self.uistate.dict_rec_label_ID_line_canvas[subplot] = rec_ID, line, axe
             subplot = f"{label} EPSP slope"
             line, = ax2.plot(out["sweep"], out['EPSP_slope'], color="green", alpha = 0.3, label=subplot)
-            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, line
+            self.uistate.dict_rec_label_ID_line_canvas[subplot] = rec_ID, line, ax2
             if 'EPSP_slope_norm' in out.columns:
                 subplot = f"{label} EPSP slope norm"
                 line, = ax2.plot(out["sweep"], out['EPSP_slope_norm'], color="green", alpha = 0.3, label=subplot)
-                self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, line
+                self.uistate.dict_rec_label_ID_line_canvas[subplot] = rec_ID, line, ax2
         if not np.isnan(t_volley_amp):
             y_position = dfmean.loc[dfmean.time == t_volley_amp, rec_filter]
             subplot = f"{label} volley amp marker"
             marker, = axe.plot(t_volley_amp, y_position, marker='o', markerfacecolor='blue', markeredgecolor='blue', markersize=10, alpha = 0.3, label=subplot)
-            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, marker
+            self.uistate.dict_rec_label_ID_line_canvas[subplot] = rec_ID, marker, axe
             subplot = f"{label} volley amp mean"
             line = ax1.axhline(y=volley_amp_mean, color='blue', alpha = 0.3, linestyle='--', label=subplot)
-            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, line
+            self.uistate.dict_rec_label_ID_line_canvas[subplot] = rec_ID, line, ax1
         if not np.isnan(t_volley_slope_start):
             x_start = t_volley_slope_start
             x_end = t_volley_slope_end
@@ -270,10 +289,10 @@ class UIplot():
             y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
             subplot = f"{label} volley slope marker"
             line, = axe.plot([x_start, x_end], [y_start, y_end], color='blue', linewidth=10, alpha=0.3, label=subplot)
-            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, line
+            self.uistate.dict_rec_label_ID_line_canvas[subplot] = rec_ID, line, axe
             subplot = f"{label} volley slope mean"
             line = ax2.axhline(y=volley_slope_mean, color='blue', alpha = 0.3, label=subplot)
-            self.uistate.dict_rec_label_ID_line[subplot] = rec_ID, line
+            self.uistate.dict_rec_label_ID_line_canvas[subplot] = rec_ID, line, ax2
 
     def addGroup(self, df_group_row, df_groupmean):
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
@@ -326,20 +345,20 @@ class UIplot():
 
     def updateLine(self, plot_to_update, x_data, y_data):
         axe = self.uistate.axe
-        line = self.uistate.dict_rec_label_ID_line[plot_to_update]
+        line = self.uistate.dict_rec_label_ID_line_canvas[plot_to_update]
         line[1].set_xdata(x_data)
         line[1].set_ydata(y_data)
         axe.figure.canvas.draw()
 
     def updateOutLine(self, row, aspect):
         mouseover_out = self.uistate.mouseover_out
-        line = self.uistate.dict_rec_label_ID_line[f"{row['recording_name']} {aspect}"]
+        line = self.uistate.dict_rec_label_ID_line_canvas[f"{row['recording_name']} {aspect}"]
         line[1].set_ydata(mouseover_out[0].get_ydata())
 
     def updateOutMean(self, aspect, row):
         rec_name = row['recording_name']
         mean = row[f'{aspect.replace(" ", "_")}_mean']
-        line = self.uistate.dict_rec_label_ID_line[f"{rec_name} {aspect} mean"]
+        line = self.uistate.dict_rec_label_ID_line_canvas[f"{rec_name} {aspect} mean"]
         line[1].set_ydata(mean)
 
     def updateEPSPout(self, rec_name, out): # TODO: update this last remaining ax-cycle to use the dict

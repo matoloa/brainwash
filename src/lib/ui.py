@@ -955,7 +955,7 @@ class UIsub(Ui_MainWindow):
 
         self.zoomAuto()
         self.mouseoverUpdate()
-        print(f" - - {round((time.time() - t0) * 1000, 2)}ms")
+        print(f" - - {round((time.time() - t0) * 1000)} ms")
 
 
 
@@ -1067,15 +1067,8 @@ class UIsub(Ui_MainWindow):
                 t_stim_max = max(list_stims) + 0.010
                 if t_stim_min > 0:
                     uistate.zoom['event_xlim'] = (t_stim_min, t_stim_max)
-         # ax1 and ax2
-            rec_IDs = set(df_selected['ID'].tolist())
-            rec_lines = (value[1] for value in uistate.dict_rec_label_ID_line.values() if value[0] in rec_IDs)
-            lines_on_canvas = (line for line in rec_lines if line in uistate.ax1.lines or line in uistate.ax2.lines)
-            x_data_on_canvas = list(line.get_xdata() for line in lines_on_canvas)
-            if x_data_on_canvas:
-                uistate.zoom['output_xlim'] = min(min(x_data, default=0) for x_data in x_data_on_canvas), max(max(x_data, default=0) for x_data in x_data_on_canvas)
-            else:
-                uistate.zoom['output_xlim'] = (0, 0)
+        # ax1 and ax2, simplified (iterative version is pre 2024-05-06)
+            uistate.zoom['output_xlim'] = 0, df_selected['sweeps'].max()
 
 
     def update_recs2plot(self):
@@ -2003,6 +1996,7 @@ class UIsub(Ui_MainWindow):
         self.df_project.to_csv(str(self.dict_folders['project'] / "project.brainwash"), index=False)
 
 
+
 # Timepoints dataframe handling
 
     def set_dft(self, rec_name, df): # persists df and saves it to .csv
@@ -2023,7 +2017,6 @@ class UIsub(Ui_MainWindow):
 
     def save_df_project(self): # writes df_project to .csv
         self.df_project.to_csv(str(self.dict_folders['project'] / "project.brainwash"), index=False)
-
 
 
 
@@ -2482,6 +2475,7 @@ class UIsub(Ui_MainWindow):
 #          Mouseover, click and drag events         #
 #####################################################
 
+
     def graphClicked(self, event, canvas): # graph click event
         if not uistate.rec_select: # no recording selected; do nothing
             return
@@ -2498,30 +2492,34 @@ class UIsub(Ui_MainWindow):
             self.mouse_release = None
             uistate.x_drag = None
             if canvas == self.canvasMean:
-                uiplot.xDeselect(ax = uistate.axm)
+                uiplot.xDeselect(ax = uistate.axm, reset=True)
                 self.lineEdit_mean_selection_start.setText("")
                 self.lineEdit_mean_selection_end.setText("")
             else:
-                uiplot.xDeselect(ax = uistate.ax1)
+                uiplot.xDeselect(ax = uistate.ax1, reset=True)
             return
-        
-        def connect_canvas(self, canvas, x_range):
-            # sets up x scales for clicking and dragging on mean- and output canvases
+        if len(uistate.rec_select) != 1: # only connect when exactly one recording is selected
+            return
+
+        def connectDragRelease(self, list_ax, x_range, rec_ID):
+            # subfunction to set up x scales for dragging and releasing on mean- and output canvases
+            lines = [value[1] for value in uistate.dict_rec_label_ID_line_canvas.values() if value[0] == rec_ID and value[2] in list_ax]
             max_x = 0
-            max_x_line = None
-            #find the line with the highest x value, use for indexing
-            lines = uistate.axm.lines if canvas == self.canvasMean else uistate.ax1.lines + uistate.ax2.lines
-            for line in lines:
+            for line in lines: # find the line with the highest x value and use its x_data for dragging
                 last_x = line.get_xdata()[-1]
                 if last_x > max_x:
                     max_x = last_x
                     max_x_line = line
             x_data = max_x_line.get_xdata()
+            canvas = list_ax[0].figure.canvas
             self.mouse_drag = canvas.mpl_connect('motion_notify_event', lambda event: self.xDrag(event, canvas=canvas, x_data=x_data, x_range=x_range))
             self.mouse_release = canvas.mpl_connect('button_release_event', lambda event: self.dragReleased(event, canvas=canvas))
 
     # left clicked on a graph
         uistate.dragging = True
+        df_p = self.get_df_project()
+        p_row = df_p.loc[uistate.rec_select[0]]
+
         if canvas == self.canvasEvent: # Event canvas left-clicked, middle graph: editing detected events
             time_values = self.dfmean['time'].values
             uistate.x_on_click = np.abs(time_values - x).argmin() # nearest x-index to click
@@ -2545,15 +2543,15 @@ class UIsub(Ui_MainWindow):
         elif canvas == self.canvasMean: # Mean canvas (top graph) left-clicked: overview and selecting ranges for finding relevant stims
             time_values = self.dfmean['time'].values
             uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
-            self.lineEdit_mean_selection_start.setText(str(uistate.x_on_click))
-            connect_canvas(self,  self.canvasMean, x_range=time_values)
+            uistate.x_select['mean_start'] = uistate.x_on_click
+            self.lineEdit_mean_selection_start.setText(str(uistate.x_select['mean_start']))
+            connectDragRelease(self, [uistate.axm], x_range=time_values, rec_ID=p_row['ID'])
 
         elif canvas == self.canvasOutput: # Output canvas (bottom graph) left-clicked: click and drag to select specific sweeps
-            df_p = self.get_df_project()
-            p_row = df_p.loc[uistate.rec_select[0]]
             sweep_numbers = list(range(0, int(p_row['sweeps'])))
             uistate.x_on_click = sweep_numbers[np.abs(sweep_numbers - x).argmin()]
-            connect_canvas(self, self.canvasOutput, x_range=sweep_numbers)
+            uistate.x_select['output_start'] = uistate.x_on_click
+            connectDragRelease(self, [uistate.ax1, uistate.ax2], x_range=sweep_numbers, rec_ID=p_row['ID'])
 
 
     def xDrag(self, event, canvas, x_data, x_range):
@@ -2572,7 +2570,11 @@ class UIsub(Ui_MainWindow):
         uistate.x_drag = x_range[np.abs(x_range - x).argmin()]
         uistate.x_drag_last = uistate.x_drag
         if canvas == self.canvasMean:
+            uistate.x_select['mean_end'] = uistate.x_drag
             self.lineEdit_mean_selection_end.setText(str(uistate.x_drag))
+        else:
+            uistate.x_select['output_end'] = uistate.x_drag
+            print(f"uistate.x_select['output_end']: {uistate.x_select['output_end']}")
         uiplot.xSelect(canvas=canvas)
 
 
@@ -2580,25 +2582,21 @@ class UIsub(Ui_MainWindow):
         if uistate.x_drag is None: # no drag; just click - set only start
             if canvas == self.canvasMean:
                 self.lineEdit_mean_selection_end.setText("")
-                uistate.x_select['mean_start'] = uistate.x_on_click
-
                 uistate.x_select['mean_end'] = None
             elif canvas == self.canvasOutput:
-                uistate.x_select['output_start'] = uistate.x_on_click
                 uistate.x_select['output_end'] = None
-            uiplot.xSelect(canvas=canvas)
         else:
-            start = str(min(uistate.x_on_click, uistate.x_drag))
-            end = str(max(uistate.x_on_click, uistate.x_drag))
+            start = min(uistate.x_on_click, uistate.x_drag)
+            end = max(uistate.x_on_click, uistate.x_drag)
             if canvas == self.canvasMean:
                 uistate.x_select['mean_start'] = start
                 uistate.x_select['mean_end'] = end
-                self.lineEdit_mean_selection_start.setText(start) # reset, as it may have been resorted
-                self.lineEdit_mean_selection_end.setText(end)
+                self.lineEdit_mean_selection_start.setText(str(start)) # update, as it may have been resorted
+                self.lineEdit_mean_selection_end.setText(str(end))
             elif canvas == self.canvasOutput:
                 uistate.x_select['output_start'] = start
                 uistate.x_select['output_end'] = end
-                print(f"output selection: {start, end}")
+        uiplot.xSelect(canvas=canvas)
         canvas.mpl_disconnect(self.mouse_drag)
         canvas.mpl_disconnect(self.mouse_release)
         self.mouse_drag = None
@@ -2619,7 +2617,7 @@ class UIsub(Ui_MainWindow):
         rec_name = dfp_row['recording_name']
         rec_ID = dfp_row['ID']
         uistate.setMargins(axe=uistate.axe)
-        dict_labels = {key: value for key, value in uistate.dict_rec_label_ID_line.items() if key.endswith(" marker") and value[0] == rec_ID}
+        dict_labels = {key: value for key, value in uistate.dict_rec_label_ID_line_canvas.items() if key.endswith(" marker") and value[0] == rec_ID}
         if not dict_labels:
             print("(no labels) mouseoverUpdate calls uiplot.graphRefresh()")
             uiplot.graphRefresh()
