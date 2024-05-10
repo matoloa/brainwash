@@ -119,6 +119,22 @@ class UIplot():
             del dict_group[key]
 
 
+    def set_visible_get_legend(self, axis, show): # toggles visibility per selection, sets Legend of axis and returns dict_legends{label: line object}
+        dict_rec = self.uistate.dict_rec_label_ID_line_axis
+        dict_on_axis = {key: value for key, value in dict_rec.items() if value[2] == axis}
+        dict_legend = {}
+        print(f"axis {axis}: show {show}")
+        for key, value in dict_on_axis.items():
+            if key in show:
+                value[1].set_visible(True)
+                if not key.endswith(" marker"):
+                    dict_legend[key] = value[1]
+            else:
+                value[1].set_visible(False)
+        print(f"dict_legend: {dict_legend.keys()}")
+        return dict_legend
+
+
     def graphRefresh(self):
         # toggle show/hide of lines on axe, ax1 and ax2: show only selected and imported lines, only appropriate aspects
         axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
@@ -128,15 +144,16 @@ class UIplot():
             self.hideAll()
         else:
             # set visibility of recording lines and build legend
-            axm_legend = self.set_visible_get_legend(axis=axm, show=uistate.to_axm(uistate.df_recs2plot))
+            axm_legend = self.set_visible_get_legend(axis='axm', show=uistate.to_axm())
             axm.legend(axm_legend.values(), axm_legend.keys(), loc='upper right')
-            axe_legend = self.set_visible_get_legend(axis=axe, show=uistate.to_axe(uistate.df_recs2plot))
+            axe_legend = self.set_visible_get_legend(axis='axe', show=uistate.to_axe())
             axe.legend(axe_legend.values(), axe_legend.keys(), loc='upper right')
-            ax1_legend = self.set_visible_get_legend(axis=ax1, show=uistate.to_ax1(uistate.df_recs2plot))
+            ax1_legend = self.set_visible_get_legend(axis='ax1', show=uistate.to_ax1())
             ax1.legend(ax1_legend.values(), ax1_legend.keys(), loc='upper right')
-            ax2_legend = self.set_visible_get_legend(axis=ax2, show=uistate.to_ax2(uistate.df_recs2plot))
+            ax2_legend = self.set_visible_get_legend(axis='ax2', show=uistate.to_ax2())
             ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
 
+        # Groups
         for label, ID_line_fill in uistate.dict_group_label_ID_line_SEM.items():
             group_ID = ID_line_fill[0]
             str_show = uistate.df_groups.loc[uistate.df_groups['group_ID'] == group_ID, 'show'].values[0]
@@ -191,18 +208,6 @@ class UIplot():
         ax1.figure.canvas.draw() # ax2 should be on the same canvas
 
 
-    def set_visible_get_legend(self, axis, show): # toggles visibility per selection, sets Legend of axis and returns dict_legends{label: line object}
-        dict_lines = {item.get_label(): item for item in axis.get_children() if isinstance(item, Line2D)}
-        #print(f"dict_lines: {dict_lines.keys()}")
-        dict_legend = {}
-        for label, line in dict_lines.items():
-            visible = label in show if show else False
-            line.set_visible(visible)
-            if visible and not label.endswith(" marker"):
-                dict_legend[label] = line
-        return dict_legend
-
-
     def oneAxisLeft(self):
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
         uistate = self.uistate
@@ -230,6 +235,14 @@ class UIplot():
         else:
             label = rec_name
 
+        # add to Mean
+        mean_label = f"mean {rec_name}"
+        line, = axm.plot(dfmean["time"], dfmean[rec_filter], color="black", label=mean_label)
+        print(f" - Placing line {mean_label} on axm")
+        self.uistate.dict_rec_label_ID_line_axis[mean_label] = rec_ID, line, 'axm'
+
+        # process selected stims
+
         # TODO: only process the first row for now:
         dft_first = dft.iloc[0:1]
 
@@ -245,16 +258,13 @@ class UIplot():
             t_volley_slope_end = t_row['t_volley_slope_end']
             volley_slope_mean = t_row['volley_slope_mean']
 
-            # add to Mean
-            mean_label = f"mean_{rec_name}"
-            line, = axm.plot(dfmean["time"], dfmean[rec_filter], color="black", label=mean_label)
-            self.uistate.dict_rec_label_ID_line_axis[label] = rec_ID, line, 'axm'
             y_position = dfmean.loc[dfmean.time == t_stim, rec_filter].values[0] # returns index, y_value
             if dft is not None:
-                subplot = f"{label}, stim {stim}"
+                subplot = f"{label}, stim {stim} marker"
                 marker, = axm.plot(t_stim, y_position, marker='o', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha=0.3, label=f"{subplot}")
-                self.uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, line, 'axm'
-                print(f" - Placing marker {stim} @ x:{t_stim}, y:{y_position}")
+                self.uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, marker, 'axm'
+                print(f" - - Placing marker {subplot}, stim {stim}/{n_stims} @ x:{t_stim}, y:{y_position}")
+                # TODO: this is PRINTED, but no marker is visible. Hidden?
 
             # add to Events
             line, = axe.plot(dfmean["time"], dfmean[rec_filter], color="black", label=label)
@@ -307,7 +317,7 @@ class UIplot():
                 subplot = f"{label} volley slope mean"
                 line = ax2.axhline(y=volley_slope_mean, color='blue', alpha = 0.3, label=subplot)
                 self.uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, line, 'ax2'
-                
+
 
     def addGroup(self, df_group_row, df_groupmean):
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2

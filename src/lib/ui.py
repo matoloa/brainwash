@@ -955,6 +955,31 @@ class UIsub(Ui_MainWindow):
         self.zoomAuto()
         self.mouseoverUpdate()
         print(f" - - {round((time.time() - t0) * 1000)} ms")
+        self.report("tPSC")
+
+
+    def report(self, caller=None):
+        print()
+        if caller is not None:
+            print(f"REPORT from {caller}:")
+        else:
+            print("REPORT:")
+        if len(uistate.rec_select) != 1:
+            return
+        df_p = self.get_df_project()
+        p_row = df_p.loc[uistate.rec_select[0]]
+        rec_name = p_row['recording_name']
+        rec_ID = p_row['ID']
+        print(f"{rec_name} - Selected recording: {uistate.rec_select}, Selected stims: {uistate.stim_select}")
+        filtered_dict = {key: value for key, value in uistate.dict_rec_label_ID_line_axis.items() if value[0] == rec_ID and value[2] == 'axm'}
+#        axm_filtered_dict = {key: value for key, value in uistate.dict_rec_label_ID_line_axis.items() if value[2] == 'axm'}
+#        ID_filtered_dict = {key: value for key, value in uistate.dict_rec_label_ID_line_axis.items() if value[0] == rec_ID}
+#        print(f"axm_filtered_dict: {axm_filtered_dict.keys()}")
+#        print(f"ID_filtered_dict: {ID_filtered_dict.keys()}")
+        print(f"filtered_dict: {filtered_dict.keys()}")
+        for key, value in filtered_dict.items():
+            print(f"Key: {key}, visible: {value[1].get_visible()}")
+        print()
 
 
 

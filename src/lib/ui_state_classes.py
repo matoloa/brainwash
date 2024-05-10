@@ -73,7 +73,7 @@ class UIstate:
         self.stim_select = [0] # list of selected indices in uisub.tableStim; default to first
         self.dfp_row_copy = None # copy of selected row in uisub.tableProj
         self.dft_row_copy = None # copy of dft for storing measure points until either saved or rejected
-        self.df_recs2plot = None # df_project copy, filtered  to selected AND parsed recordings (or all parsed, if none are selected)
+        self.df_recs2plot = None # df_project copy, filtered to selected AND parsed recordings (or all parsed, if none are selected)
         self.dict_rec_label_ID_line_axis = {} # dict of all plotted recording lines: key=label(str), value=[rec_ID(str), 2Dline(object), axes(str)]
         self.dict_group_label_ID_line_SEM = {} # dict of all plotted groups: key=label, value=[group_ID, 2Dline object, fill]
         self.new_indices = [] # list of indices in uisub.df_project for freshly parsed recordings; used by uisub.graphPreload()
@@ -174,20 +174,22 @@ class UIstate:
     def get_groupSet(self): # returns a set of all group IDs that are currently plotted
         return set([value[0] for value in self.dict_group_label_ID_line_SEM.values()])
 
-    #def get_recs_in_group(self):
-
-    def to_axm(self, df): # dict of lines that are supposed to be on axe - label: index
+    def to_axm(self): # dict of lines that are supposed to be on axm - label: index
+        df = self.df_recs2plot
         axm = {}
         for index, row in df.iterrows():
             rec_filter = row['filter']
             if rec_filter != 'voltage':
-                key = f"mean_{row['recording_name']} ({rec_filter})"
+                key = f"mean {row['recording_name']} ({rec_filter})"
             else:
-                key = f"mean_{row['recording_name']}"
+                key = f"mean {row['recording_name']}"
             axm[key] = index
+            for stim in range(1, row['stims'] + 1):
+                axm[f"mean {key}, stim {stim} marker"] = index
         return axm
 
-    def to_axe(self, df): # dict of lines that are supposed to be on axe - label: index
+    def to_axe(self): # dict of lines that are supposed to be on axe - label: index
+        df = self.df_recs2plot
         axe = {}
         for index, row in df.iterrows():
             rec_filter = row['filter']
@@ -206,7 +208,8 @@ class UIstate:
             axe[key] = index
         return axe
 
-    def to_ax1(self, df): # dict of lines that are supposed to be on ax1 - label: index
+    def to_ax1(self): # dict of lines that are supposed to be on ax1 - label: index
+        df = self.df_recs2plot
         ax1 = {}
         for index, row in df.iterrows():
             key = row['recording_name']
@@ -221,7 +224,8 @@ class UIstate:
             ax1[key] = index
         return ax1
 
-    def to_ax2(self, df): # dict of lines that are supposed to be on ax2 - label: index
+    def to_ax2(self): # dict of lines that are supposed to be on ax2 - label: index
+        df = self.df_recs2plot
         ax2 = {}
         for index, row in df.iterrows():
             key = row['recording_name']
@@ -235,6 +239,7 @@ class UIstate:
                 ax2[f"{key} volley slope mean"] = index
             ax2[key] = index
         return ax2
+
 
     def get_state(self):
         try:
