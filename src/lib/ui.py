@@ -311,7 +311,6 @@ class graphPreloadThread(QtCore.QThread):
         self.i = 0
         for i, p_row in df_p.iterrows():
             dft = self.uisub.get_dft(row=p_row)
-            t_row = dft.iloc[0] # for now
             dfmean = self.uisub.get_dfmean(row=p_row)
             _ = self.uisub.get_dffilter(row=p_row)
             if self.uistate.checkBox['paired_stims']:
@@ -320,7 +319,7 @@ class graphPreloadThread(QtCore.QThread):
                 dfoutput = self.uisub.get_dfoutput(row=p_row)
             if dfoutput is None:
                 return
-            self.uiplot.addRow(p_row=p_row.to_dict(), t_row=t_row.to_dict(), dfmean=dfmean, dfoutput=dfoutput)
+            self.uiplot.addRow(p_row=p_row.to_dict(), dft=dft, dfmean=dfmean, dfoutput=dfoutput)
             self.progress.emit(i)
             self.i += 1
             print(f"Preloaded {p_row['recording_name']}")
@@ -910,7 +909,7 @@ class UIsub(Ui_MainWindow):
 
 
 ##################################################################
-#   This is where the almighty tableProjSelectionChanged lives   #
+#    This is where the mighty tableProjSelectionChanged lives    #
 ##################################################################
 
     def tableProjSelectionChanged(self): # Keep this on top - it gets changed A LOT
@@ -2040,6 +2039,7 @@ class UIsub(Ui_MainWindow):
         # hide all columns except these:
         list_show = [   
                         df_p.columns.get_loc('recording_name'),
+                        df_p.columns.get_loc('ID'),
                         df_p.columns.get_loc('sweeps'),
                         df_p.columns.get_loc('groups'),
                         df_p.columns.get_loc('stims'),
@@ -2501,20 +2501,6 @@ class UIsub(Ui_MainWindow):
         if len(uistate.rec_select) != 1: # only connect when exactly one recording is selected
             return
 
-        def connectDragRelease(self, list_ax, x_range, rec_ID):
-            # subfunction to set up x scales for dragging and releasing on mean- and output canvases
-            lines = [value[1] for value in uistate.dict_rec_label_ID_line_canvas.values() if value[0] == rec_ID and value[2] in list_ax]
-            max_x = 0
-            for line in lines: # find the line with the highest x value and use its x_data for dragging
-                last_x = line.get_xdata()[-1]
-                if last_x > max_x:
-                    max_x = last_x
-                    max_x_line = line
-            x_data = max_x_line.get_xdata()
-            canvas = list_ax[0].figure.canvas
-            self.mouse_drag = canvas.mpl_connect('motion_notify_event', lambda event: self.xDrag(event, canvas=canvas, x_data=x_data, x_range=x_range))
-            self.mouse_release = canvas.mpl_connect('button_release_event', lambda event: self.dragReleased(event, canvas=canvas))
-
     # left clicked on a graph
         uistate.dragging = True
         df_p = self.get_df_project()
@@ -2545,13 +2531,35 @@ class UIsub(Ui_MainWindow):
             uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
             uistate.x_select['mean_start'] = uistate.x_on_click
             self.lineEdit_mean_selection_start.setText(str(uistate.x_select['mean_start']))
-            connectDragRelease(self, [uistate.axm], x_range=time_values, rec_ID=p_row['ID'])
-
+            print(f"uistate.axm {uistate.axm}")
+            self.connectDragRelease(x_range=time_values, rec_ID=p_row['ID'], graph="mean")
         elif canvas == self.canvasOutput: # Output canvas (bottom graph) left-clicked: click and drag to select specific sweeps
             sweep_numbers = list(range(0, int(p_row['sweeps'])))
             uistate.x_on_click = sweep_numbers[np.abs(sweep_numbers - x).argmin()]
             uistate.x_select['output_start'] = uistate.x_on_click
-            connectDragRelease(self, [uistate.ax1, uistate.ax2], x_range=sweep_numbers, rec_ID=p_row['ID'])
+            self.connectDragRelease(x_range=sweep_numbers, rec_ID=p_row['ID'], graph="output")
+
+
+    def connectDragRelease(self, x_range, rec_ID, graph):
+        # function to set up x scales for dragging and releasing on mean- and output canvases
+        if graph == "mean": # uistate.axm
+            canvas = self.canvasMean
+            filtered_values = [value[1] for value in uistate.dict_rec_label_ID_line_axis.values() if value[0] == rec_ID and value[2] == 'axm']
+        elif graph == 'output': #uistate.ax1+ax2
+            canvas = self.canvasOutput
+            filtered_values = [value[1] for value in uistate.dict_rec_label_ID_line_axis.values() if value[0] == rec_ID and (value[2] == 'ax1' or value[2] == 'ax2')]
+        else:
+            print("connectDragRelease: Incorrect graph reference.")
+            return
+        
+        max_x_line = max(filtered_values, key=lambda line: line.get_xdata()[-1], default=None)
+        if max_x_line is None:
+            print("No lines found. Cannot set up drag and release.")
+            return
+        x_data = max_x_line.get_xdata()
+        self.mouse_drag = canvas.mpl_connect('motion_notify_event', lambda event: self.xDrag(event, canvas=canvas, x_data=x_data, x_range=x_range))
+        self.mouse_release = canvas.mpl_connect('button_release_event', lambda event: self.dragReleased(event, canvas=canvas))
+
 
 
     def xDrag(self, event, canvas, x_data, x_range):
@@ -2617,7 +2625,7 @@ class UIsub(Ui_MainWindow):
         rec_name = dfp_row['recording_name']
         rec_ID = dfp_row['ID']
         uistate.setMargins(axe=uistate.axe)
-        dict_labels = {key: value for key, value in uistate.dict_rec_label_ID_line_canvas.items() if key.endswith(" marker") and value[0] == rec_ID}
+        dict_labels = {key: value for key, value in uistate.dict_rec_label_ID_line_axis.items() if key.endswith(" marker") and value[0] == rec_ID}
         if not dict_labels:
             print("(no labels) mouseoverUpdate calls uiplot.graphRefresh()")
             uiplot.graphRefresh()
