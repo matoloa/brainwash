@@ -72,7 +72,7 @@ class UIstate:
         self.rec_select = [] # list of selected indices in uisub.tableProj
         self.stim_select = [0] # list of selected indices in uisub.tableStim; default to first
         self.dfp_row_copy = None # copy of selected row in uisub.tableProj
-        self.dft_row_copy = None # copy of dft for storing measure points until either saved or rejected
+        self.dft_copy = None # copy of dft for storing measure points until either saved or rejected
         self.df_recs2plot = None # df_project copy, filtered to selected AND parsed recordings (or all parsed, if none are selected)
         self.dict_rec_label_ID_line_axis = {} # dict of all plotted recording lines: key=label(str), value=[rec_ID(str), 2Dline(object), axes(str)]
         self.dict_group_label_ID_line_SEM = {} # dict of all plotted groups: key=label, value=[group_ID, 2Dline object, fill]

@@ -908,11 +908,11 @@ class UIsub(Ui_MainWindow):
 
 
 
-##################################################################
-#    This is where the mighty tableProjSelectionChanged lives    #
-##################################################################
+######################################################################
+#          tableProjSelectionChanged controls everything             #
+######################################################################
 
-    def tableProjSelectionChanged(self): # Keep this on top - it gets changed A LOT
+    def tableProjSelectionChanged(self):
         self.usage("tableProjSelectionChanged")
         t0 = time.time()
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
@@ -925,10 +925,9 @@ class UIsub(Ui_MainWindow):
         if len(uistate.rec_select) == 1: # if just one item is selected...
             df_p = self.get_df_project()
             p_row = df_p.loc[uistate.rec_select[0]]
-            df_t = self.get_dft(row=p_row)
-            t_row = df_t.iloc[0] # get the first row of the table, for now
             uistate.dfp_row_copy = p_row.copy()
-            uistate.dft_row_copy = t_row.copy()
+            df_t = self.get_dft(row=p_row)
+            uistate.dft_copy = df_t.copy()
             self.dfmean = self.get_dfmean(row=p_row) # Required for event dragging, x and y
 
             if df_t.shape[0] > 1:
@@ -2528,7 +2527,7 @@ class UIsub(Ui_MainWindow):
         if canvas == self.canvasEvent: # Event canvas left-clicked, middle graph: editing detected events
             time_values = self.dfmean['time'].values
             uistate.x_on_click = np.abs(time_values - x).argmin() # nearest x-index to click
-            dft_row = uistate.dft_row_copy
+            dft_row = uistate.dft_copy.iloc[0] # TOOD: first row for now
             if event.inaxes is not None:
                 if (event.button == 1 or event.button == 3) and (uistate.mouseover_action is not None):
                     action = uistate.mouseover_action
@@ -2688,7 +2687,7 @@ class UIsub(Ui_MainWindow):
             return
         precision = len(str(time_values[1] - time_values[0]).split('.')[1])
         time_diff = time_values[uistate.x_drag] - time_values[uistate.x_on_click]
-        print(f"prior_slope_start: {prior_slope_start}, prior_slope_end: {prior_slope_end}")
+        #print(f"prior_slope_start: {prior_slope_start}, prior_slope_end: {prior_slope_end}")
         # get the x values of the slope
         blob = True # only moving amplitudes and resizing slopes have a blob
         if action.endswith('resize'):
@@ -2697,7 +2696,6 @@ class UIsub(Ui_MainWindow):
             x_start = round(prior_slope_start + time_diff, precision)
             blob = False
         x_end = round(prior_slope_end + time_diff, precision)
-        print(f"**** x_start: {x_start}, x_end: {x_end}, precision: {precision}")
         # prevent resizing below 1 index - TODO: make it flip instead
         if x_end <= x_start:
             x_start_index = np.where(time_values == x_start)[0][0]
@@ -2810,9 +2808,7 @@ class UIsub(Ui_MainWindow):
             dict_t['volley_amp_mean'] = out['volley_amp'].mean()
 
         if dict_t:
-            dft_row = uistate.dft_row_copy
-            dft_row.update(pd.Series(dict_t)) # Update the DataFrame in-place
-            uistate.dft_row_copy = dft_row
+            uistate.dft_copy.update(pd.Series(dict_t), errors='ignore')
             print(f"update - dict_t: {dict_t}")
         self.canvasOutput.draw()
 
@@ -2829,36 +2825,30 @@ class UIsub(Ui_MainWindow):
             return
 
         p_row = uistate.dfp_row_copy.to_dict()
-        t_row = uistate.dft_row_copy.to_dict()
+        t_row = uistate.dft_copy.iloc[0].to_dict() # TODO: first row for now
         print(f"t_row: {t_row}")
 
         dict_t = {} # update the dict_t with the new values, for use by build_dfoutput
-        if uistate.mouseover_action.startswith("EPSP slope"):
-            uistate.dft_row_copy['t_EPSP_slope_method'] = "manual"
-            uiplot.plotUpdate(dfp_row=p_row, dft_row=t_row, aspect='EPSP slope', dfmean=self.dfmean)
-            uistate.updateDragZones()
-            dict_t = {'t_EPSP_slope_start': t_row['t_EPSP_slope_start'], 't_EPSP_slope_end': t_row['t_EPSP_slope_end']}
-        elif uistate.mouseover_action == 'EPSP amp move':
-            uistate.dft_row_copy['t_EPSP_amp_method'] = "manual"
-            uiplot.plotUpdate(dfp_row=p_row, dft_row=t_row, aspect='EPSP amp', dfmean=self.dfmean)
-            uistate.updatePointDragZone()
-            dict_t = {'t_EPSP_amp': t_row['t_EPSP_amp']}
-        elif uistate.mouseover_action.startswith("volley slope"):
-            uistate.dft_row_copy['t_volley_slope_method'] = "manual"
-            uiplot.plotUpdate(dfp_row=p_row, dft_row=t_row, aspect='volley slope', dfmean=self.dfmean)
-            uistate.updateDragZones()
-            dict_t = {'t_volley_slope_start': t_row['t_volley_slope_start'], 't_volley_slope_end': t_row['t_volley_slope_end']}
-        elif uistate.mouseover_action == 'volley amp move':
-            uistate.dft_row_copy['t_volley_amp_method'] = "manual"
-            uiplot.plotUpdate(dfp_row=p_row, dft_row=t_row, aspect='volley amp', dfmean=self.dfmean)
-            uistate.updatePointDragZone()
-            dict_t = {'t_volley_amp': t_row['t_volley_amp']}
+        action_mapping = {
+            "EPSP slope": ("t_EPSP_slope_method", "manual", 'EPSP slope', {'t_EPSP_slope_start': t_row['t_EPSP_slope_start'], 't_EPSP_slope_end': t_row['t_EPSP_slope_end']}, uistate.updateDragZones),
+            "EPSP amp move": ("t_EPSP_amp_method", "manual", 'EPSP amp', {'t_EPSP_amp': t_row['t_EPSP_amp']}, uistate.updatePointDragZone),
+            "volley slope": ("t_volley_slope_method", "manual", 'volley slope', {'t_volley_slope_start': t_row['t_volley_slope_start'], 't_volley_slope_end': t_row['t_volley_slope_end']}, uistate.updateDragZones),
+            "volley amp move": ("t_volley_amp_method", "manual", 'volley amp', {'t_volley_amp': t_row['t_volley_amp']}, uistate.updatePointDragZone),
+        }
+
+        for action, values in action_mapping.items():
+            if uistate.mouseover_action.startswith(action):
+                t_row[values[0]] = values[1]
+                uiplot.plotUpdate(dfp_row=p_row, dft_row=t_row, aspect=values[2], dfmean=self.dfmean)
+                values[4]()
+                dict_t = values[3]
+                break
 
         print(f"release - dict_t: {dict_t}")
 
-        dft = self.get_dft(row=p_row).copy()
         #update dft row 0 with the values from uistate.dft_row_copy
-        dft.loc[0] = uistate.dft_row_copy
+        dft = self.get_dft(row=p_row).copy()
+        dft.loc[0] = t_row
         self.set_dft(p_row['recording_name'], dft)
 
         # update dfoutput; dict and file, with normalized columns if applicable
