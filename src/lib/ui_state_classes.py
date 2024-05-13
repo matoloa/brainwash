@@ -107,6 +107,45 @@ class UIstate:
         self.volley_slope_move_zone = {} # dict: key=x,y, value=start,end.
         self.volley_slope_resize_zone = {} # dict: key=x,y, value=start,end.
 
+
+    def to_axis(self, axis_type): 
+        df = self.df_recs2plot
+        axis_list = []
+        for index, row in df.iterrows():
+            rec_filter = row['filter']
+            key = f"{row['recording_name']} ({rec_filter})" if rec_filter != 'voltage' else row['recording_name']
+            if axis_type == 'axm':
+                if rec_filter != 'voltage':
+                    key = f"mean {row['recording_name']} ({rec_filter})"
+                else:
+                    key = f"mean {row['recording_name']}"
+                axis_list.append(key)
+                for stim in range(1, row['stims'] + 1):
+                    axis_list.append(f"{key} - stim {stim} marker")
+            elif axis_type == 'axe':
+                if self.checkBox['EPSP_amp']:
+                    axis_list.append(f"{key} EPSP amp marker")
+                if self.checkBox['EPSP_slope']:
+                    axis_list.append(f"{key} EPSP slope marker")
+                if self.checkBox['volley_amp']:
+                    axis_list.append(f"{key} volley amp marker")
+                if self.checkBox['volley_slope']:
+                    axis_list.append(f"{key} volley slope marker")
+                axis_list.append(key)
+            elif axis_type in ['ax1', 'ax2']:
+                norm = " norm" if self.checkBox['norm_EPSP'] else ""
+                if self.checkBox['EPSP_amp'] and axis_type == 'ax1':
+                    axis_list.append(f"{key} EPSP amp{norm}")
+                if self.checkBox['volley_amp'] and axis_type == 'ax1':
+                    axis_list.append(f"{key} volley amp mean")
+                if self.checkBox['EPSP_slope'] and axis_type == 'ax2':
+                    axis_list.append(f"{key} EPSP slope{norm}")
+                if self.checkBox['volley_slope'] and axis_type == 'ax2':
+                    axis_list.append(f"{key} volley slope mean")
+                axis_list.append(key)
+        return axis_list
+
+
     def setMargins(self, axe, pixels=10): # set margins for mouseover detection
         self.x_margin = axe.transData.inverted().transform((pixels, 0))[0] - axe.transData.inverted().transform((0, 0))[0]
         self.y_margin = axe.transData.inverted().transform((0, pixels))[1] - axe.transData.inverted().transform((0, 0))[1]
@@ -173,73 +212,6 @@ class UIstate:
 
     def get_groupSet(self): # returns a set of all group IDs that are currently plotted
         return set([value[0] for value in self.dict_group_label_ID_line_SEM.values()])
-
-    def to_axm(self): # dict of lines that are supposed to be on axm - label: index
-        df = self.df_recs2plot
-        axm = {}
-        for index, row in df.iterrows():
-            rec_filter = row['filter']
-            if rec_filter != 'voltage':
-                key = f"mean {row['recording_name']} ({rec_filter})"
-            else:
-                key = f"mean {row['recording_name']}"
-            axm[key] = index
-            for stim in range(1, row['stims'] + 1):
-                axm[f"{key} - stim {stim} marker"] = index
-        return axm
-
-    def to_axe(self): # dict of lines that are supposed to be on axe - label: index
-        df = self.df_recs2plot
-        axe = {}
-        for index, row in df.iterrows():
-            rec_filter = row['filter']
-            if rec_filter != 'voltage':
-                key = f"{row['recording_name']} ({rec_filter})"
-            else:
-                key = row['recording_name']
-            if self.checkBox['EPSP_amp']:
-                axe[f"{key} EPSP amp marker"] = index
-            if self.checkBox['EPSP_slope']:
-                axe[f"{key} EPSP slope marker"] = index
-            if self.checkBox['volley_amp']:
-                axe[f"{key} volley amp marker"] = index
-            if self.checkBox['volley_slope']:
-                axe[f"{key} volley slope marker"] = index
-            axe[key] = index
-        return axe
-
-    def to_ax1(self): # dict of lines that are supposed to be on ax1 - label: index
-        df = self.df_recs2plot
-        ax1 = {}
-        for index, row in df.iterrows():
-            key = row['recording_name']
-            if self.checkBox['norm_EPSP']:
-                norm = " norm"
-            else:
-                norm = ""
-            if self.checkBox['EPSP_amp']:
-                ax1[f"{key} EPSP amp{norm}"] = index
-            if self.checkBox['volley_amp']:
-                ax1[f"{key} volley amp mean"] = index
-            ax1[key] = index
-        return ax1
-
-    def to_ax2(self): # dict of lines that are supposed to be on ax2 - label: index
-        df = self.df_recs2plot
-        ax2 = {}
-        for index, row in df.iterrows():
-            key = row['recording_name']
-            if self.checkBox['norm_EPSP']:
-                norm = " norm"
-            else:
-                norm = ""
-            if self.checkBox['EPSP_slope']:
-                ax2[f"{key} EPSP slope{norm}"] = index
-            if self.checkBox['volley_slope']:
-                ax2[f"{key} volley slope mean"] = index
-            ax2[key] = index
-        return ax2
-
 
     def get_state(self):
         try:

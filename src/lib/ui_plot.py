@@ -119,43 +119,24 @@ class UIplot():
             del dict_group[key]
 
 
-    def set_visible_get_legend(self, axis, show): # toggles visibility per selection, sets Legend of axis and returns dict_legends{label: line object}
-        dict_rec = self.uistate.dict_rec_label_ID_line_axis
-        dict_on_axis = {key: value for key, value in dict_rec.items() if value[2] == axis}
-        dict_legend = {}
-        if axis == 'axm':
-            print(f"axis {axis}: show {show}")
-        for key, value in dict_on_axis.items():
-            if key in show:
-                value[1].set_visible(True)
-                if not key.endswith(" marker"):
-                    dict_legend[key] = value[1]
-            else:
-                value[1].set_visible(False)
-            if axis == 'axm':
-                print(f"set visible: {key} to {value[1].get_visible()}")
-        if axis == 'axm':
-            print(f"dict_legend: {dict_legend.keys()}")
-        return dict_legend
-
-
     def graphRefresh(self):
         # toggle show/hide of lines on axe, ax1 and ax2: show only selected and imported lines, only appropriate aspects
-        axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
         print("graphRefresh")
         uistate = self.uistate
         if uistate.df_recs2plot is None or not uistate.anyView():
             self.hideAll()
         else:
-            # set visibility of recording lines and build legend
-            axm_legend = self.set_visible_get_legend(axis='axm', show=uistate.to_axm())
-            axm.legend(axm_legend.values(), axm_legend.keys(), loc='upper right')
-            axe_legend = self.set_visible_get_legend(axis='axe', show=uistate.to_axe())
-            axe.legend(axe_legend.values(), axe_legend.keys(), loc='upper right')
-            ax1_legend = self.set_visible_get_legend(axis='ax1', show=uistate.to_ax1())
-            ax1.legend(ax1_legend.values(), ax1_legend.keys(), loc='upper right')
-            ax2_legend = self.set_visible_get_legend(axis='ax2', show=uistate.to_ax2())
-            ax2.legend(ax2_legend.values(), ax2_legend.keys(), loc='lower right')
+            dict_rec = uistate.dict_rec_label_ID_line_axis
+            axis_names = ['axm', 'axe', 'ax1', 'ax2']
+            loc_values = ['upper right', 'upper right', 'upper right', 'lower right']
+            for axis_name, loc in zip(axis_names, loc_values):
+                dict_on_axis = {key: value for key, value in dict_rec.items() if value[2] == axis_name}
+                axis_list = uistate.to_axis(axis_name)
+                axis_legend = {key: value[1] for key, value in dict_on_axis.items() if key in axis_list and not key.endswith(" marker")}
+                for key, value in dict_on_axis.items():
+                    value[1].set_visible(key in axis_list)
+                axis = getattr(uistate, axis_name)
+                axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)              
 
         # Groups
         for label, ID_line_fill in uistate.dict_group_label_ID_line_SEM.items():
@@ -173,6 +154,7 @@ class UIplot():
                 ID_line_fill[2].set_visible(bool(str_show == 'True'))
 
         # arrange axes and labels
+        axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
         axm.axis('off')
         axm.set_xlim(uistate.zoom['mean_xlim'])
 
