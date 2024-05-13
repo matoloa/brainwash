@@ -245,12 +245,8 @@ class UIplot():
         print(f" - Placing line {mean_label} on axm")
         self.uistate.dict_rec_label_ID_line_axis[mean_label] = rec_ID, line, 'axm'
 
-        # process selected stims
-
-        # TODO: only process the first row for now:
-        dft_first = dft.iloc[0:1]
-
-        for i_stim, t_row in dft_first.iterrows():
+        # process detected stims
+        for i_stim, t_row in dft.iterrows():
             stim = i_stim+1 # first one is 1 for the user; not 0
             t_stim = t_row['t_stim']
             t_EPSP_amp = t_row['t_EPSP_amp']
