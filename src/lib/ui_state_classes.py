@@ -109,6 +109,7 @@ class UIstate:
 
 
     def to_axis(self, axis_type): 
+        # returns a list of labels that, per uistate settings, should be plotted on axis_type(str)
         df = self.df_recs2plot
         axis_list = []
         for index, row in df.iterrows():

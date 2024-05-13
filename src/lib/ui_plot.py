@@ -120,9 +120,11 @@ class UIplot():
 
 
     def graphRefresh(self):
-        # toggle show/hide of lines on axe, ax1 and ax2: show only selected and imported lines, only appropriate aspects
+        # show only selected and imported lines, only appropriate aspects
         print("graphRefresh")
         uistate = self.uistate
+
+        # Recordings
         if uistate.df_recs2plot is None or not uistate.anyView():
             self.hideAll()
         else:
@@ -179,7 +181,7 @@ class UIplot():
         print(f"ax1-2_xlim: {uistate.zoom['output_xlim']} enforced")
         self.oneAxisLeft()
 
-        # maintain selections
+        # maintain drag selections through reselection
         if uistate.x_select['mean_start'] is not None:
             self.xSelect(canvas = axm.figure.canvas)
         if uistate.x_select['output_start'] is not None:
