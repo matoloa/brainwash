@@ -2,6 +2,7 @@ import seaborn as sns
 import numpy as np
 from matplotlib import style
 from matplotlib.lines import Line2D
+from matplotlib.colors import LinearSegmentedColormap
 
 
 class UIplot():
@@ -229,8 +230,13 @@ class UIplot():
         print(f" - Placing line {mean_label} on axm")
         self.uistate.dict_rec_label_ID_line_axis[mean_label] = rec_ID, line, 'axm'
 
+        colors = ["green", "blue"]
+        cmap = LinearSegmentedColormap.from_list("", colors)
+        list_gradient = {i: cmap(i/n_stims) for i in range(n_stims)}
+
         # process detected stims
         for i_stim, t_row in dft.iterrows():
+            color = list_gradient[i_stim]
             stim = i_stim+1 # first one is 1 for the user; not 0
             t_stim = t_row['t_stim']
             t_EPSP_amp = t_row['t_EPSP_amp']
@@ -243,11 +249,10 @@ class UIplot():
             volley_slope_mean = t_row['volley_slope_mean']
 
             y_position = dfmean.loc[dfmean.time == t_stim, rec_filter].values[0] # returns index, y_value
-            if dft is not None:
-                subplot = f"{mean_label} - stim {stim} marker"
-                marker, = axm.plot(t_stim, y_position, marker='o', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha=0.3, label=f"{subplot}")
-                self.uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, marker, 'axm'
-                print(f" - - Placing marker {subplot}, stim {stim}/{n_stims} @ x:{t_stim}, y:{y_position}")
+            subplot = f"{mean_label} - stim {stim} marker"
+            marker, = axm.plot(t_stim, y_position, marker='o', markerfacecolor=color, markeredgecolor=color, markersize=10, alpha=0.3, label=f"{subplot}")
+            self.uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, marker, 'axm'
+            print(f" - - Placing marker {subplot}, stim {stim}/{n_stims} @ x:{t_stim}, y:{y_position}")
 
             # add to Events
             line, = axe.plot(dfmean["time"], dfmean[rec_filter], color="black", label=label)
