@@ -230,7 +230,8 @@ class UIplot():
         print(f" - Placing line {mean_label} on axm")
         self.uistate.dict_rec_label_ID_line_axis[mean_label] = rec_ID, line, 'axm'
 
-        colors = ["green", "blue"]
+        #colors = ["green", "blue"]
+        colors = ["orange", "green", "blue"]
         cmap = LinearSegmentedColormap.from_list("", colors)
         list_gradient = {i: cmap(i/n_stims) for i in range(n_stims)}
 

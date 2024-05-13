@@ -177,25 +177,12 @@
               <rect>
                <x>20</x>
                <y>160</y>
-               <width>41</width>
+               <width>61</width>
                <height>25</height>
               </rect>
              </property>
              <property name="text">
               <string>Set</string>
-             </property>
-            </widget>
-            <widget class="QPushButton" name="pushButton_stim_clear">
-             <property name="geometry">
-              <rect>
-               <x>70</x>
-               <y>160</y>
-               <width>41</width>
-               <height>25</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string>Clear</string>
              </property>
             </widget>
             <widget class="QLabel" name="label_stim_detection_threshold">
@@ -274,17 +261,17 @@
               </rect>
              </property>
             </widget>
-            <widget class="QPushButton" name="pushButton_stim_add">
+            <widget class="QPushButton" name="pushButton_stim_detect">
              <property name="geometry">
               <rect>
-               <x>120</x>
+               <x>100</x>
                <y>160</y>
-               <width>41</width>
+               <width>61</width>
                <height>25</height>
               </rect>
              </property>
              <property name="text">
-              <string>Add</string>
+              <string>Detect</string>
              </property>
             </widget>
            </widget>
