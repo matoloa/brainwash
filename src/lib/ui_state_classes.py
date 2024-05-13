@@ -185,7 +185,7 @@ class UIstate:
                 key = f"mean {row['recording_name']}"
             axm[key] = index
             for stim in range(1, row['stims'] + 1):
-                axm[f"mean {key}, stim {stim} marker"] = index
+                axm[f"{key} - stim {stim} marker"] = index
         return axm
 
     def to_axe(self): # dict of lines that are supposed to be on axe - label: index

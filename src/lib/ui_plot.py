@@ -123,7 +123,8 @@ class UIplot():
         dict_rec = self.uistate.dict_rec_label_ID_line_axis
         dict_on_axis = {key: value for key, value in dict_rec.items() if value[2] == axis}
         dict_legend = {}
-        print(f"axis {axis}: show {show}")
+        if axis == 'axm':
+            print(f"axis {axis}: show {show}")
         for key, value in dict_on_axis.items():
             if key in show:
                 value[1].set_visible(True)
@@ -131,7 +132,10 @@ class UIplot():
                     dict_legend[key] = value[1]
             else:
                 value[1].set_visible(False)
-        print(f"dict_legend: {dict_legend.keys()}")
+            if axis == 'axm':
+                print(f"set visible: {key} to {value[1].get_visible()}")
+        if axis == 'axm':
+            print(f"dict_legend: {dict_legend.keys()}")
         return dict_legend
 
 
@@ -260,11 +264,10 @@ class UIplot():
 
             y_position = dfmean.loc[dfmean.time == t_stim, rec_filter].values[0] # returns index, y_value
             if dft is not None:
-                subplot = f"{label}, stim {stim} marker"
+                subplot = f"{mean_label} - stim {stim} marker"
                 marker, = axm.plot(t_stim, y_position, marker='o', markerfacecolor='green', markeredgecolor='green', markersize=10, alpha=0.3, label=f"{subplot}")
                 self.uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, marker, 'axm'
                 print(f" - - Placing marker {subplot}, stim {stim}/{n_stims} @ x:{t_stim}, y:{y_position}")
-                # TODO: this is PRINTED, but no marker is visible. Hidden?
 
             # add to Events
             line, = axe.plot(dfmean["time"], dfmean[rec_filter], color="black", label=label)
