@@ -984,19 +984,20 @@ class UIsub(Ui_MainWindow):
         selected_ids = set(uistate.df_recs2plot['ID'])
         uistate.dict_rec_show = {k: v for k, v in uistate.dict_rec_label_ID_line_axis.items() if v[0] in selected_ids}
         # Apply checkboxes
-        filters = []
-        if not uistate.checkBox['EPSP_amp']:
-            filters.extend([" EPSP amp marker", " EPSP amp"])
-        if not uistate.checkBox['EPSP_slope']:
-            filters.extend([" EPSP slope marker", " EPSP slope"])
-        if not uistate.checkBox['volley_amp']:
-            filters.extend([" volley amp marker", " volley amp"])
-        if not uistate.checkBox['volley_slope']:
-            filters.extend([" volley slope marker", " volley slope"])
-        if not uistate.checkBox['norm_EPSP']:
-            filters.extend([" norm"])
-        uistate.dict_rec_show = {k: v for k, v in uistate.dict_rec_show.items() 
-                                if not any(k.endswith(f) for f in filters)}
+        if False:
+            filters = []
+            if not uistate.checkBox['EPSP_amp']:
+                filters.extend([" EPSP amp marker", " EPSP amp"])
+            if not uistate.checkBox['EPSP_slope']:
+                filters.extend([" EPSP slope marker", " EPSP slope"])
+            if not uistate.checkBox['volley_amp']:
+                filters.extend([" volley amp marker", " volley amp mean"])
+            if not uistate.checkBox['volley_slope']:
+                filters.extend([" volley slope marker", " volley slope mean"])
+            if not uistate.checkBox['norm_EPSP']:
+                filters.extend([" norm"])
+            uistate.dict_rec_show = {k: v for k, v in uistate.dict_rec_show.items() 
+                                    if not any(k.endswith(f) for f in filters)}
         print(f"uistate.dict_rec_show: {uistate.dict_rec_show}")
 
     def setTableStimVisibility(self, state):
@@ -1090,19 +1091,6 @@ class UIsub(Ui_MainWindow):
             max_sweep_duration = df_selected['sweep_duration'].max()
             uistate.zoom['mean_xlim'] = (0, max_sweep_duration)
         # axe
-            list_stims = []
-            for index, p_row in df_selected.iterrows():
-                dft = self.get_dft(row=p_row)
-                if uistate.stim_select is not None and set(uistate.stim_select).issubset(dft.index):
-                    t_stim_values = dft.loc[uistate.stim_select, 't_stim'].values.tolist()
-                else:
-                    t_stim_values = [dft['t_stim'].iloc[0]]  # Make sure t_stim_values is always a list
-                list_stims.extend(t_stim_values)  # Use extend instead of append to flatten the list
-            if list_stims:
-                t_stim_min = min(list_stims) - 0.0005
-                t_stim_max = max(list_stims) + 0.010
-                if t_stim_min > 0:
-                    uistate.zoom['event_xlim'] = (t_stim_min, t_stim_max)
         # ax1 and ax2, simplified (iterative version is pre 2024-05-06)
             uistate.zoom['output_xlim'] = 0, df_selected['sweeps'].max()
 

@@ -1,6 +1,33 @@
 # Functions that are not in use anymore, but might be useful again in the future
 '''
 
+    def zoomAuto(self):
+    # Obsolete extending axe to include all stims in the selected recordings
+        print(f"zoomAuto, uistate.selected: {uistate.rec_select}, uistate.stim_select: {uistate.stim_select}")
+        if uistate.rec_select:
+        # axm
+            df_p = self.get_df_project()
+            df_selected = df_p.loc[uistate.rec_select]
+            max_sweep_duration = df_selected['sweep_duration'].max()
+            uistate.zoom['mean_xlim'] = (0, max_sweep_duration)
+        # axe
+            list_stims = []
+            for index, p_row in df_selected.iterrows():
+                dft = self.get_dft(row=p_row)
+                if uistate.stim_select is not None and set(uistate.stim_select).issubset(dft.index):
+                    t_stim_values = dft.loc[uistate.stim_select, 't_stim'].values.tolist()
+                else:
+                    t_stim_values = [dft['t_stim'].iloc[0]]  # Make sure t_stim_values is always a list
+                list_stims.extend(t_stim_values)  # Use extend instead of append to flatten the list
+            if list_stims:
+                t_stim_min = min(list_stims) - 0.0005
+                t_stim_max = max(list_stims) + 0.010
+                if t_stim_min > 0:
+                    uistate.zoom['event_xlim'] = (t_stim_min, t_stim_max)
+        # ax1 and ax2, simplified (iterative version is pre 2024-05-06)
+            uistate.zoom['output_xlim'] = 0, df_selected['sweeps'].max()
+
+
     def to_axis(self, axis_type): 
         # returns a list of labels that, per uistate settings, should be plotted on axis_type(str)
         df = self.df_recs2plot
