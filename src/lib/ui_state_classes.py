@@ -75,7 +75,9 @@ class UIstate:
         self.dft_copy = None # copy of dft for storing measure points until either saved or rejected
         self.df_recs2plot = None # df_project copy, filtered to selected AND parsed recordings (or all parsed, if none are selected)
         self.dict_rec_label_ID_line_axis = {} # dict of all plotted recording lines: key=label(str), value=[rec_ID(str), 2Dline(object), axes(str)]
+        self.dict_rec_show = {} # copy containing only visible recs
         self.dict_group_label_ID_line_SEM = {} # dict of all plotted groups: key=label, value=[group_ID, 2Dline object, fill]
+        self.dict_group_show = {} # copy containing only visible groups
         self.new_indices = [] # list of indices in uisub.df_project for freshly parsed recordings; used by uisub.graphPreload()
         self.darkmode = False # set by global bw cfg
 
@@ -106,46 +108,6 @@ class UIstate:
         self.volley_amp_move_zone = {} # dict: key=x,y, value=start,end. 
         self.volley_slope_move_zone = {} # dict: key=x,y, value=start,end.
         self.volley_slope_resize_zone = {} # dict: key=x,y, value=start,end.
-
-
-    def to_axis(self, axis_type): 
-        # returns a list of labels that, per uistate settings, should be plotted on axis_type(str)
-        df = self.df_recs2plot
-        axis_list = []
-        for index, row in df.iterrows():
-            rec_filter = row['filter']
-            key = f"{row['recording_name']} ({rec_filter})" if rec_filter != 'voltage' else row['recording_name']
-            if axis_type == 'axm':
-                if rec_filter != 'voltage':
-                    key = f"mean {row['recording_name']} ({rec_filter})"
-                else:
-                    key = f"mean {row['recording_name']}"
-                axis_list.append(key)
-                for stim in range(1, row['stims'] + 1):
-                    axis_list.append(f"{key} - stim {stim} marker")
-            elif axis_type == 'axe':
-                if self.checkBox['EPSP_amp']:
-                    axis_list.append(f"{key} EPSP amp marker")
-                if self.checkBox['EPSP_slope']:
-                    axis_list.append(f"{key} EPSP slope marker")
-                if self.checkBox['volley_amp']:
-                    axis_list.append(f"{key} volley amp marker")
-                if self.checkBox['volley_slope']:
-                    axis_list.append(f"{key} volley slope marker")
-                axis_list.append(key)
-            elif axis_type in ['ax1', 'ax2']:
-                norm = " norm" if self.checkBox['norm_EPSP'] else ""
-                if self.checkBox['EPSP_amp'] and axis_type == 'ax1':
-                    axis_list.append(f"{key} EPSP amp{norm}")
-                if self.checkBox['volley_amp'] and axis_type == 'ax1':
-                    axis_list.append(f"{key} volley amp mean")
-                if self.checkBox['EPSP_slope'] and axis_type == 'ax2':
-                    axis_list.append(f"{key} EPSP slope{norm}")
-                if self.checkBox['volley_slope'] and axis_type == 'ax2':
-                    axis_list.append(f"{key} volley slope mean")
-                axis_list.append(key)
-        return axis_list
-
 
     def setMargins(self, axe, pixels=10): # set margins for mouseover detection
         self.x_margin = axe.transData.inverted().transform((pixels, 0))[0] - axe.transData.inverted().transform((0, 0))[0]

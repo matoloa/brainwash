@@ -909,14 +909,14 @@ class UIsub(Ui_MainWindow):
 
     def tableProjSelectionChanged(self):
         self.usage("tableProjSelectionChanged")
-        t0 = time.time()
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableProj.clearSelection()
-            print("Right click")
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         # build the list uistate.rec_select with indices
         uistate.rec_select = [index.row() for index in selected_indexes]
         self.update_recs2plot()
+        self.update_rec_show()
+            
         if len(uistate.rec_select) == 1: # if just one item is selected...
             df_p = self.get_df_project()
             p_row = df_p.loc[uistate.rec_select[0]]
@@ -947,8 +947,9 @@ class UIsub(Ui_MainWindow):
             self.setTableStimVisibility(False)
 
         self.zoomAuto()
+        #t0 = time.time()
         self.mouseoverUpdate()
-        print(f" - - {round((time.time() - t0) * 1000)} ms")
+        #print(f" - - {round((time.time() - t0) * 1000)} ms")
         #self.report("tPSC")
 
 
@@ -974,6 +975,29 @@ class UIsub(Ui_MainWindow):
 ##################################################################
 #    WIP: TODO: move these to appropriate header in this file    #
 ##################################################################
+
+    def update_rec_show(self):
+        for _, line, _ in uistate.dict_rec_show.values():
+            line.set_visible(False) # Hide last selection
+        if uistate.df_recs2plot is None:
+            return
+        selected_ids = set(uistate.df_recs2plot['ID'])
+        uistate.dict_rec_show = {k: v for k, v in uistate.dict_rec_label_ID_line_axis.items() if v[0] in selected_ids}
+        # Apply checkboxes
+        filters = []
+        if not uistate.checkBox['EPSP_amp']:
+            filters.extend([" EPSP amp marker", " EPSP amp"])
+        if not uistate.checkBox['EPSP_slope']:
+            filters.extend([" EPSP slope marker", " EPSP slope"])
+        if not uistate.checkBox['volley_amp']:
+            filters.extend([" volley amp marker", " volley amp"])
+        if not uistate.checkBox['volley_slope']:
+            filters.extend([" volley slope marker", " volley slope"])
+        if not uistate.checkBox['norm_EPSP']:
+            filters.extend([" norm"])
+        uistate.dict_rec_show = {k: v for k, v in uistate.dict_rec_show.items() 
+                                if not any(k.endswith(f) for f in filters)}
+        print(f"uistate.dict_rec_show: {uistate.dict_rec_show}")
 
     def setTableStimVisibility(self, state):
         widget = self.h_splitterMaster.widget(1)  # Get the second widget in the splitter
@@ -2396,9 +2420,9 @@ class UIsub(Ui_MainWindow):
         uistate.ax1 = ax1
         # connect scroll event if not already connected #TODO: when graphAxes is called only once, the check should be redundant
         if not hasattr(self, 'scroll_event_connected') or not self.scroll_event_connected:
-            self.canvasMean.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphMean, canvas=self.canvasMean))
-            self.canvasEvent.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphEvent, canvas=self.canvasEvent))
-            self.canvasOutput.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, parent=self.graphOutput, canvas=self.canvasOutput, ax1=uistate.ax1, ax2=uistate.ax1))
+            self.canvasMean.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, graph="mean"))
+            self.canvasEvent.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, graph="event"))
+            self.canvasOutput.mpl_connect('scroll_event', lambda event: self.zoomOnScroll(event=event, graph="output"))
             self.scroll_event_connected = True
         df_p = self.get_df_project()
         if df_p.empty:
@@ -2860,58 +2884,48 @@ class UIsub(Ui_MainWindow):
             self.talkback()
 
 
-    def zoomOnScroll(self, event, parent, canvas, ax1=None, ax2=None):
-        x = event.xdata
-        y = event.ydata
-        y2 = event.ydata
-        if x is None or y is None: # if the click was outside the canvas, extrapolate x and y
-            x_display, y_display = ax1.transAxes.inverted().transform((event.x, event.y))
-            x = x_display * (ax1.get_xlim()[1] - ax1.get_xlim()[0]) + ax1.get_xlim()[0]
-            y = y_display * (ax1.get_ylim()[1] - ax1.get_ylim()[0]) + ax1.get_ylim()[0]
-            if ax2 is not None:
-                y2 = y_display * (ax2.get_ylim()[1] - ax2.get_ylim()[0]) + ax2.get_ylim()[0]
-        if event.button == 'up':
-            zoom = 1.05
-        elif event.button == 'down':
-            zoom = 1 / 1.05
-        else:
-            return
-        # Define the boundaries of the invisible rectangles
-        left = 0.12 * parent.width()
-        right = 0.88 * parent.width()
-        bottom = 0.12 * parent.height() # NB: counts from bottom up!
-        x_rect = [0, 0, parent.width(), bottom]
-        slope_left = uistate.slopeOnly()
-        if slope_left:
-            ax2_rect = [0, 0, left, parent.height()]
-        else:
-            ax1_rect = [0, 0, left, parent.height()]
-            ax2_rect = [right, 0, parent.width()-right, parent.height()]
+    def zoomOnScroll(self, event, graph):
+        if graph == "mean":
+            canvas = self.canvasMean
+            ax = uistate.axm
+        elif graph == "event":
+            canvas = self.canvasEvent
+            ax = uistate.axe
+        elif graph == "output":
+            canvas = self.canvasOutput
+            ax = uistate.ax2
 
-        # Check if the event is within each rectangle
-        in_x = x_rect[0] <= event.x <= x_rect[0] + x_rect[2] and x_rect[1] <= event.y <= x_rect[1] + x_rect[3]
-        if slope_left:
-            in_ax1 = False
+        if event.button == 'up':
+            zoom = 1.1
         else:
-            in_ax1 = ax1_rect[0] <= event.x <= ax1_rect[0] + ax1_rect[2] and ax1_rect[1] <= event.y <= ax1_rect[1] + ax1_rect[3]
-        if ax2 is not None:
-            in_ax2 = ax2_rect[0] <= event.x <= ax2_rect[0] + ax2_rect[2] and ax2_rect[1] <= event.y <= ax2_rect[1] + ax2_rect[3]
+            zoom = 1 / 1.1
+
+        if event.xdata is None or event.ydata is None: # if the scroll event was outside the axes, extrapolate x and y
+            x_display, y_display = ax.transAxes.inverted().transform((event.x, event.y))
+            x = x_display * (ax.get_xlim()[1] - ax.get_xlim()[0]) + ax.get_xlim()[0]
+            y = y_display * (ax.get_ylim()[1] - ax.get_ylim()[0]) + ax.get_ylim()[0]
         else:
-            in_ax2 = False
-        
-        if in_x:
-            ax1.set_xlim(x - (x - ax1.get_xlim()[0]) / zoom, x + (ax1.get_xlim()[1] - x) / zoom)
-        if in_ax1:
-            ax1.set_ylim(y - (y - ax1.get_ylim()[0]) / zoom, y + (ax1.get_ylim()[1] - y) / zoom)
-        if ax2 is not None:
-            if in_ax2:
-                ax2.set_ylim(y2 - (y2 - ax2.get_ylim()[0]) / zoom, y2 + (ax2.get_ylim()[1] - y2) / zoom)
-        # if all in_s are false, zoom all axes
-        if not in_x and not in_ax1 and not in_ax2:
-            ax1.set_xlim(x - (x - ax1.get_xlim()[0]) / zoom, x + (ax1.get_xlim()[1] - x) / zoom)
-            ax1.set_ylim(y - (y - ax1.get_ylim()[0]) / zoom, y + (ax1.get_ylim()[1] - y) / zoom)
-            if ax2 is not None:
-                ax2.set_ylim(y2 - (y2 - ax2.get_ylim()[0]) / zoom, y2 + (ax2.get_ylim()[1] - y2) / zoom)
+            x = event.xdata
+            y = event.ydata
+
+        left = 0.12 * (ax.get_xlim()[1] - ax.get_xlim()[0]) + ax.get_xlim()[0]
+        right = 0.88 * (ax.get_xlim()[1] - ax.get_xlim()[0]) + ax.get_xlim()[0]
+        bottom = 0.08 * (ax.get_ylim()[1] - ax.get_ylim()[0]) + ax.get_ylim()[0]
+        on_x = y <= bottom
+
+        # Apply the zoom
+        if on_x:
+            ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
+        else:
+            ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
+            ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
+
+        # TODO: this block is dev visualization for debugging
+        if hasattr(ax, 'hline'): # If the line exists, update it
+            ax.hline.set_ydata(bottom)
+        else: # Otherwise, create a new line
+            ax.hline = ax.axhline(y=bottom, color='r', linestyle='--')
+
         canvas.draw()
 
 

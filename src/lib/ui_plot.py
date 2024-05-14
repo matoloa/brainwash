@@ -4,6 +4,7 @@ from matplotlib import style
 from matplotlib.lines import Line2D
 from matplotlib.colors import LinearSegmentedColormap
 
+import time # counting time for functions
 
 class UIplot():
     def __init__(self, uistate):
@@ -129,18 +130,16 @@ class UIplot():
         if uistate.df_recs2plot is None or not uistate.anyView():
             self.hideAll()
         else:
-            dict_rec = uistate.dict_rec_label_ID_line_axis
+            dict_rec = uistate.dict_rec_show
             axis_names = ['axm', 'axe', 'ax1', 'ax2']
             loc_values = ['upper right', 'upper right', 'upper right', 'lower right']
             for axis_name, loc in zip(axis_names, loc_values):
                 dict_on_axis = {key: value for key, value in dict_rec.items() if value[2] == axis_name}
-                axis_list = uistate.to_axis(axis_name)
-                axis_legend = {key: value[1] for key, value in dict_on_axis.items() if key in axis_list and not key.endswith(" marker")}
+                axis_legend = {key: value[1] for key, value in dict_on_axis.items() if not key.endswith(" marker")}
                 for key, value in dict_on_axis.items():
-                    value[1].set_visible(key in axis_list)
+                    value[1].set_visible(True)
                 axis = getattr(uistate, axis_name)
                 axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)              
-
         # Groups
         for label, ID_line_fill in uistate.dict_group_label_ID_line_SEM.items():
             group_ID = ID_line_fill[0]
@@ -193,7 +192,9 @@ class UIplot():
 
         # redraw
         axm.figure.canvas.draw()
+        t0 = time.time()
         axe.figure.canvas.draw()
+        print(f" - - {round((time.time() - t0) * 1000)} ms")
         ax1.figure.canvas.draw() # ax2 should be on the same canvas
 
 
@@ -256,9 +257,14 @@ class UIplot():
             print(f" - - Placing marker {subplot}, stim {stim}/{n_stims} @ x:{t_stim}, y:{y_position}")
 
             # add to Events
-            line, = axe.plot(dfmean["time"], dfmean[rec_filter], color="black", label=label)
-            self.uistate.dict_rec_label_ID_line_axis[label] = rec_ID, line, 'axe'
-    
+            stim_label = f"{label} - stim {stim}"
+            window_start = t_row['t_stim'] - 0.005  # 5ms before t_stim
+            window_end = t_row['t_stim'] + 0.05  # 50ms after t_stim
+            df_event = dfmean[(dfmean['time'] >= window_start) & (dfmean['time'] <= window_end)]
+            df_event['time'] = df_event['time'] - t_row['t_stim']  # shift event so that t_stim is at time 0
+            line, = axe.plot(df_event['time'], df_event[rec_filter], color=color, label=stim_label)
+            self.uistate.dict_rec_label_ID_line_axis[stim_label] = rec_ID, line, 'axe'
+
             # plot them all, don't bother with show/hide
             out = dfoutput # TODO: enable switch to dfdiff?
 
@@ -448,9 +454,14 @@ class UIplot():
                 'volley slope move': uistate.volley_slope_move_zone,
                 'volley amp move': uistate.volley_amp_move_zone,
             }
+            #print(f"zones: {zones}")
             uistate.mouseover_action = None
             for action, zone in zones.items():
                 checkbox_key = '_'.join(action.split(' ')[:2])  # Split the action string and use the last two words as the checkbox key
+                #print (f"action: {action}, uistate.checkBox.get({checkbox_key}): {uistate.checkBox[checkbox_key]}")
+                if zone is None or 'x' not in zone:
+                    print(f" - - {action} zone not defined")
+                    break
                 if uistate.checkBox.get(checkbox_key, False) and zone['x'][0] <= x <= zone['x'][1] and zone['y'][0] <= y <= zone['y'][1]:
                     uistate.mouseover_action = action
                     plotMouseover(action, axe)
