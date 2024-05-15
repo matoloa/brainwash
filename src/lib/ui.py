@@ -979,13 +979,14 @@ class UIsub(Ui_MainWindow):
     def update_rec_show(self):
         if uistate.df_recs2plot is None:
             return
+        t0 = time.time()
         old_selection = uistate.dict_rec_show 
         selected_ids = set(uistate.df_recs2plot['ID'])
-        print(f"selected_ids: {selected_ids}")
+        #print(f"selected_ids: {selected_ids}")
         new_selection = {k: v for k, v in uistate.dict_rec_label_ID_line_axis.items() if v[0] in selected_ids}
-        print(f"old_selection: {old_selection.keys()}")
-        # Apply checkboxes to new selection
+        #print(f"old_selection: {old_selection.keys()}")
         filters = []
+        # Setup filters for checkboxes
         if not uistate.checkBox['EPSP_amp']:
             filters.extend([" EPSP amp marker", " EPSP amp"])
         if not uistate.checkBox['EPSP_slope']:
@@ -996,9 +997,20 @@ class UIsub(Ui_MainWindow):
             filters.extend([" volley slope marker", " volley slope mean"])
         if not uistate.checkBox['norm_EPSP']:
             filters.extend([" norm"])
+        # Setup filters for selected stims
+        if len(uistate.df_recs2plot) == 1:
+            p_row = uistate.df_recs2plot.iloc[0]
+            dft = self.get_dft(p_row)
+            if dft.shape[0] > 1:
+                endings = ["", " EPSP amp", " EPSP slope", " volley amp", " volley slope", 
+                           " EPSP amp marker", " EPSP slope marker", " volley amp marker", " volley slope marker",
+                           " volley amp mean", " volley slope mean"]
+                filters.extend([f" - stim {i+1}{ending}" for i in range(dft.shape[0]) 
+                                if i not in uistate.stim_select for ending in endings])
+        # Apply filters
         new_selection = {k: v for k, v in new_selection.items() 
                             if not any(k.endswith(f) for f in filters)}
-        print(f"new_selection: {new_selection.keys()}")
+        #print(f"new_selection: {new_selection.keys()}")
         # Hide what ceased to be selected
         obsolete_lines = {k: v for k, v in old_selection.items() if k not in new_selection}
         for _, line, _ in obsolete_lines.values():
@@ -1008,7 +1020,8 @@ class UIsub(Ui_MainWindow):
         for _, line, _ in added_lines.values():
             line.set_visible(True)
         uistate.dict_rec_show = new_selection
-        print(f"uistate.dict_rec_show: {uistate.dict_rec_show}")
+        print(f"uistate.dict_rec_show: {uistate.dict_rec_show.keys()}")
+        print(f"update_rec_show took {round((time.time() - t0) * 1000)} ms")
 
     def setTableStimVisibility(self, state):
         widget = self.h_splitterMaster.widget(1)  # Get the second widget in the splitter
@@ -1088,6 +1101,7 @@ class UIsub(Ui_MainWindow):
         self.usage("stimSelectionChanged")
         selected_indexes = self.tableStim.selectionModel().selectedRows()
         uistate.stim_select = [index.row() for index in selected_indexes]
+        self.update_rec_show()
         self.zoomAuto()
         self.mouseoverUpdate()
 
