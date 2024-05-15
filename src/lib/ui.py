@@ -2881,7 +2881,9 @@ class UIsub(Ui_MainWindow):
             ax = uistate.axe
         elif graph == "output":
             canvas = self.canvasOutput
+            slope_left = uistate.slopeOnly()
             ax = uistate.ax2
+            ax1 = uistate.ax1
 
         if event.button == 'up':
             zoom = 1.1
@@ -2900,13 +2902,30 @@ class UIsub(Ui_MainWindow):
         right = 0.88 * (ax.get_xlim()[1] - ax.get_xlim()[0]) + ax.get_xlim()[0]
         bottom = 0.08 * (ax.get_ylim()[1] - ax.get_ylim()[0]) + ax.get_ylim()[0]
         on_x = y <= bottom
+        on_left = x <= left
+        on_right = x >= right
 
         # Apply the zoom
-        if on_x:
+        if on_x: # check this first; x takes precedence
             ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
-        else:
-            ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
-            ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
+        elif 'slope_left' in locals(): # on output
+            if on_left:
+                if slope_left: # scroll left y zoom output slope y
+                    ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
+                else: # scroll left y to zoom output amp y
+                    ax1.set_xlim(x - (x - ax1.get_xlim()[0]) / zoom, x + (ax1.get_xlim()[1] - x) / zoom)
+            elif on_right and not slope_left: # scroll right y to zoom output slope y
+                ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
+            else: # default, scroll graph to zoom all
+                ax1.set_xlim(x - (x - ax1.get_xlim()[0]) / zoom, x + (ax1.get_xlim()[1] - x) / zoom)
+                ax1.set_ylim(y - (y - ax1.get_ylim()[0]) / zoom, y + (ax1.get_ylim()[1] - y) / zoom)
+                ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
+        else: # mean or event
+            if on_left: # scroll left x to zoom mean or event x
+                ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
+            else:
+                ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
+                ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
 
         # TODO: this block is dev visualization for debugging
         if hasattr(ax, 'hline'): # If the line exists, update it
