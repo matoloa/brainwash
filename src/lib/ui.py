@@ -977,27 +977,37 @@ class UIsub(Ui_MainWindow):
 ##################################################################
 
     def update_rec_show(self):
-        for _, line, _ in uistate.dict_rec_show.values():
-            line.set_visible(False) # Hide last selection
         if uistate.df_recs2plot is None:
             return
+        old_selection = uistate.dict_rec_show 
         selected_ids = set(uistate.df_recs2plot['ID'])
-        uistate.dict_rec_show = {k: v for k, v in uistate.dict_rec_label_ID_line_axis.items() if v[0] in selected_ids}
-        # Apply checkboxes
-        if False:
-            filters = []
-            if not uistate.checkBox['EPSP_amp']:
-                filters.extend([" EPSP amp marker", " EPSP amp"])
-            if not uistate.checkBox['EPSP_slope']:
-                filters.extend([" EPSP slope marker", " EPSP slope"])
-            if not uistate.checkBox['volley_amp']:
-                filters.extend([" volley amp marker", " volley amp mean"])
-            if not uistate.checkBox['volley_slope']:
-                filters.extend([" volley slope marker", " volley slope mean"])
-            if not uistate.checkBox['norm_EPSP']:
-                filters.extend([" norm"])
-            uistate.dict_rec_show = {k: v for k, v in uistate.dict_rec_show.items() 
-                                    if not any(k.endswith(f) for f in filters)}
+        print(f"selected_ids: {selected_ids}")
+        new_selection = {k: v for k, v in uistate.dict_rec_label_ID_line_axis.items() if v[0] in selected_ids}
+        print(f"old_selection: {old_selection.keys()}")
+        # Apply checkboxes to new selection
+        filters = []
+        if not uistate.checkBox['EPSP_amp']:
+            filters.extend([" EPSP amp marker", " EPSP amp"])
+        if not uistate.checkBox['EPSP_slope']:
+            filters.extend([" EPSP slope marker", " EPSP slope"])
+        if not uistate.checkBox['volley_amp']:
+            filters.extend([" volley amp marker", " volley amp mean"])
+        if not uistate.checkBox['volley_slope']:
+            filters.extend([" volley slope marker", " volley slope mean"])
+        if not uistate.checkBox['norm_EPSP']:
+            filters.extend([" norm"])
+        new_selection = {k: v for k, v in new_selection.items() 
+                            if not any(k.endswith(f) for f in filters)}
+        print(f"new_selection: {new_selection.keys()}")
+        # Hide what ceased to be selected
+        obsolete_lines = {k: v for k, v in old_selection.items() if k not in new_selection}
+        for _, line, _ in obsolete_lines.values():
+            line.set_visible(False)
+        # Show what's now selected
+        added_lines = {k: v for k, v in new_selection.items() if k not in old_selection}
+        for _, line, _ in added_lines.values():
+            line.set_visible(True)
+        uistate.dict_rec_show = new_selection
         print(f"uistate.dict_rec_show: {uistate.dict_rec_show}")
 
     def setTableStimVisibility(self, state):
@@ -1121,6 +1131,7 @@ class UIsub(Ui_MainWindow):
                     uiplot.updateEPSPout(rec_name, out)
                 self.purgeGroupCache()
                 self.graphGroups()
+        self.update_rec_show()
         self.mouseoverUpdate()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
@@ -2911,11 +2922,11 @@ class UIsub(Ui_MainWindow):
         elif 'slope_left' in locals(): # on output
             if on_left:
                 if slope_left: # scroll left y zoom output slope y
-                    ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
+                    ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
                 else: # scroll left y to zoom output amp y
-                    ax1.set_xlim(x - (x - ax1.get_xlim()[0]) / zoom, x + (ax1.get_xlim()[1] - x) / zoom)
+                    ax1.set_ylim(y - (y - ax1.get_ylim()[0]) / zoom, y + (ax1.get_ylim()[1] - y) / zoom)
             elif on_right and not slope_left: # scroll right y to zoom output slope y
-                ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
+                ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
             else: # default, scroll graph to zoom all
                 ax1.set_xlim(x - (x - ax1.get_xlim()[0]) / zoom, x + (ax1.get_xlim()[1] - x) / zoom)
                 ax1.set_ylim(y - (y - ax1.get_ylim()[0]) / zoom, y + (ax1.get_ylim()[1] - y) / zoom)
