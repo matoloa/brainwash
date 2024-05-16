@@ -234,8 +234,7 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
             filetype = source_path[-3:]
             if filetype == "csv":
                 df = pd.read_csv(source_path)
-                #file_base for .csv is the filename without the filetype
-                file_base = source_path.split("/")[-1].split(".")[0]
+                file_base = os.path.splitext(os.path.basename(source_path))[0].replace('.', '_')
                 persistdf(file_base=file_base, dict_folders=dict_folders, dfdata=df)
                 dict_sub = {
                     'nsweeps': df['sweep'].nunique(),

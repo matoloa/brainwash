@@ -106,10 +106,13 @@ class UIplot():
 
     def unPlot(self, rec_ID):
         dict_rec = self.uistate.dict_rec_label_ID_line_axis
+        dict_show = self.uistate.dict_rec_show
         keys_to_remove = [key for key, value in dict_rec.items() if rec_ID == value[0]]
         for key in keys_to_remove:
             dict_rec[key][1].remove()
             del dict_rec[key]
+            if key in dict_show:
+                del dict_show[key]
 
 
     def unPlotGroup(self, group_ID):
@@ -124,6 +127,7 @@ class UIplot():
     def graphRefresh(self):
         # show only selected and imported lines, only appropriate aspects
         print("graphRefresh")
+        t0 = time.time()
         uistate = self.uistate
 
         # Recordings
@@ -192,10 +196,9 @@ class UIplot():
 
         # redraw
         axm.figure.canvas.draw()
-        t0 = time.time()
         axe.figure.canvas.draw()
-        print(f" - - {round((time.time() - t0) * 1000)} ms")
         ax1.figure.canvas.draw() # ax2 should be on the same canvas
+        print(f" - - {round((time.time() - t0) * 1000)} ms")
 
 
     def oneAxisLeft(self):

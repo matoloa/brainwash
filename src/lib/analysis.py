@@ -99,11 +99,12 @@ def find_i_stims(dfmean, threshold=0.1, min_time_difference=0.005, verbose=False
     prim_max = find_i_stim_prim_max(dfmean)
     prim_max_y = dfmean.prim.max()
     threshold *= prim_max_y
+
     above_threshold_indices = np.where(dfmean['prim'] > threshold)[0]
     # Filter the indices to ensure they are more than min_time_difference apart
     filtered_indices = [above_threshold_indices[0]]
     for i in range(1, len(above_threshold_indices)):
-        if dfmean['time'][above_threshold_indices[i]] - dfmean['time'][above_threshold_indices[i - 1]] > min_time_difference:
+        if dfmean['time'].iloc[above_threshold_indices[i]] - dfmean['time'].iloc[above_threshold_indices[i - 1]] > min_time_difference:
             filtered_indices.append(above_threshold_indices[i])
     if verbose:
         print(f"find_i_stims: {filtered_indices}, type: {type(filtered_indices)}")
@@ -116,7 +117,7 @@ def find_i_EPSP_peak_max(
     sampling_Hz=10000,
     limitleft=0, # index - not time
     limitright=-1, # index - not time
-    param_EPSP_minimum_width_ms=5,  # width in ms
+    param_EPSP_minimum_width_ms=4,  # width in ms
     param_EPSP_minimum_prominence_mV=0.0001,  # what unit? TODO: find out!
     verbose=False
 ):
@@ -278,25 +279,26 @@ def find_i_volley_slope(dfmean, i_stim, i_VEB, happy=False):
 
 
 # %%
-def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
+def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=False):
     """
     Runs all index-detections in the appropriate sequence,
     The function finds VEB, but does not currently report it
     TODO: also report volley amp and slope
     Returns a DataFrame of all indices, with np.nan representing detection failure.
     """
-    i_stim = find_i_stims(dfmean=dfmean)
-    if not i_stim:
+    if i_stims is None:
+        i_stims = find_i_stims(dfmean=dfmean)
+    if not i_stims:
         return pd.DataFrame()
 
     # calculate sampling frequency
     time_delta = dfmean.time[1] - dfmean.time[0]
     sampling_Hz = 1 / time_delta
-    print(f"find_i_stims: {len(i_stim)}: sampling_Hz: {sampling_Hz}")
-    print(i_stim)
+    print(f"find_i_stims: {len(i_stims)}: sampling_Hz: {sampling_Hz}")
+    print(i_stims)
     
     list_dict_i = []
-    for i in i_stim:
+    for i in i_stims:
         print(f"processing i_stim: {i}")
         dict_i = { #set default np.nan
             "i_stim": i,
@@ -327,6 +329,7 @@ def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
     df_i = pd.DataFrame(list_dict_i)
     df_i_numeric = df_i.select_dtypes(include=[np.number])
     list_nan = [i for i in range(len(df_i_numeric)) if df_i_numeric.iloc[i].isnull().any()]
+    print (f"***** list_nan: {list_nan}")
     if list_nan:
         # find a stim-row that has values in all columns, and use it as a template
         for i in range(len(df_i_numeric)):
@@ -334,21 +337,21 @@ def find_all_i(dfmean, param_min_time_from_i_stim=0.0005, verbose=False):
             if not df_i_numeric.iloc[i].isnull().any():
                 # create a template for i_values based difference from i_stim
                 i_values = df_i_numeric.iloc[i]
-                i_template = {key: i_values[key] - i_stim[i] for key in i_values.keys()}
+                i_template = {key: i_values[key] - i_stims[i] for key in i_values.keys()}
                 # update methods and params
                 methods = ['t_volley_amp_method', 't_volley_slope_method', 't_EPSP_amp_method', 't_EPSP_slope_method']
                 params = ['t_volley_amp_params', 't_volley_slope_params', 't_EPSP_amp_params', 't_EPSP_slope_params']
                 # apply the template to all rows with np.nan
                 for j in list_nan:
                     for key in df_i_numeric.columns:
-                        df_i.loc[j, key] = i_stim[j] + i_template[key]
+                        df_i.loc[j, key] = i_stims[j] + i_template[key]
                     for key in methods:
                         df_i.loc[j, key] = "Extrapolated"
                     for key in params:
-                        df_i.loc[j, key] = f"stim {i}"
+                        df_i.loc[j, key] = f"stim {i+1}" # user readable references are 1-indexed
                 break
-        else:
-            raise ValueError("Analysis failed for all detected events - cannot extrapolate missing values.") # TODO: replace with default values based on i_stim
+        else: # no stim-row with all values. TODO: replace with default values based on i_stim
+            raise ValueError("Analysis failed for all detected events - cannot extrapolate missing values.")
     return df_i
 
 
@@ -377,7 +380,7 @@ def find_all_t(dfmean, volley_slope_halfwidth, EPSP_slope_halfwidth, param_min_t
         }
 
     df_indices = find_all_i(dfmean, param_min_time_from_i_stim=0.0005)
-    # print(f"df_indices: {df_indices}")
+    print(f"df_indices: {df_indices}")
 
     # Convert each index to a dictionary of t-values and add it to a list
     list_of_dict_t = [i2t(dfmean, row) for index, row in df_indices.iterrows()]

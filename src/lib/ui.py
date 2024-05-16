@@ -281,6 +281,7 @@ class ParseDataThread(QtCore.QThread):
         return df_proj_new_row
 
     def run(self):
+        recording_names = {}
         for i, (_, df_proj_row) in enumerate(self.df_p_to_update.iterrows()):
             self.progress.emit(i)
             recording_name = df_proj_row['recording_name']
@@ -289,9 +290,14 @@ class ParseDataThread(QtCore.QThread):
             for new_name, dict_sub in dict_data.items():
                 nsweeps = dict_sub.get('nsweeps', None) 
                 if nsweeps is not None:
+                    # Check for duplicates
+                    if new_name in recording_names:
+                        recording_names[new_name] += 1
+                        new_name = f"{new_name}({recording_names[new_name]})"
+                    else:
+                        recording_names[new_name] = 1
                     df_proj_new_row = self.create_new_row(df_proj_row, new_name, dict_sub)
                     self.rows.append(df_proj_new_row)
-
 
 class graphPreloadThread(QtCore.QThread):
     finished = QtCore.pyqtSignal()
@@ -826,11 +832,6 @@ class UIsub(Ui_MainWindow):
         # apply splitter proportions
         self.setSplitterSizes('h_splitterMaster', 'v_splitterGraphs')
 
-        # connect paired stim checkbox and flip button to local functions
-        #self.checkBox_paired_stims.setChecked(uistate.checkBox['paired_stims'])
-        #self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
-        #self.pushButton_paired_data_flip.pressed.connect(self.pushButton_paired_data_flip_pressed)
-
         # connect Relative checkbox and lineedits to local functions
         norm = uistate.checkBox['norm_EPSP']
         self.label_norm_on_sweep.setVisible(norm)
@@ -879,22 +880,6 @@ class UIsub(Ui_MainWindow):
         else:
             print("No widget has focus.")
 
-    def print_splitter_contents(self):
-        def print_splitter_contents(self, splitter):
-            print(f"Splitter: {splitter.objectName()}, Number of widgets: {splitter.count()}")
-            for i in range(splitter.count()):
-                widget = splitter.widget(i)
-                print(f" - Widget {i}: {widget.objectName()}, type: {type(widget).__name__}")
-    def print_widget_layout(self, widget):
-        layout = widget.layout()
-        if layout is not None:
-            print(f"{widget.objectName()} has a {type(layout).__name__}")
-            for i in range(layout.count()):
-                item = layout.itemAt(i)
-                if item.widget() is not None:
-                    print(f" - Widget {i}: {item.widget().objectName()}, type: {type(item.widget()).__name__}")
-        else:
-            print(f"{widget.objectName()} has no layout")
     def find_widgets_with_top_left_coordinates(self, widget):
         print(f"trying child geometry")
         for child in widget.findChildren(QtWidgets.QWidget):
@@ -976,7 +961,7 @@ class UIsub(Ui_MainWindow):
 #    WIP: TODO: move these to appropriate header in this file    #
 ##################################################################
 
-    def update_rec_show(self):
+    def update_rec_show(self, reset=False):
         if uistate.df_recs2plot is None:
             return
         t0 = time.time()
@@ -1010,9 +995,11 @@ class UIsub(Ui_MainWindow):
         # Apply filters
         new_selection = {k: v for k, v in new_selection.items() 
                             if not any(k.endswith(f) for f in filters)}
-        #print(f"new_selection: {new_selection.keys()}")
         # Hide what ceased to be selected
-        obsolete_lines = {k: v for k, v in old_selection.items() if k not in new_selection}
+        if reset: # Hide all lines
+            obsolete_lines = {k: v for k, v in uistate.dict_rec_label_ID_line_axis.items()}
+        else:
+            obsolete_lines = {k: v for k, v in old_selection.items() if k not in new_selection}
         for _, line, _ in obsolete_lines.values():
             line.set_visible(False)
         # Show what's now selected
@@ -1022,6 +1009,7 @@ class UIsub(Ui_MainWindow):
         uistate.dict_rec_show = new_selection
         print(f"uistate.dict_rec_show: {uistate.dict_rec_show.keys()}")
         print(f"update_rec_show took {round((time.time() - t0) * 1000)} ms")
+
 
     def setTableStimVisibility(self, state):
         widget = self.h_splitterMaster.widget(1)  # Get the second widget in the splitter
@@ -1327,9 +1315,17 @@ class UIsub(Ui_MainWindow):
         self.setTableStimVisibility(False)
 
 
-    def setupToolBar(self):  # apply viewstates for tool frames in the toolbar
+    def setupToolBar(self):
+        # apply viewstates for tool frames in the toolbar
         for frame, (text, state) in uistate.viewTools.items():
             getattr(self, frame).setVisible(state)
+        # connect toolbar buttons to local functions
+        self.pushButton_stim_detect.pressed.connect(self.triggerStimDetect)
+        # TODO:
+        # connect paired stim checkbox and flip button to local functions
+        #self.checkBox_paired_stims.setChecked(uistate.checkBox['paired_stims'])
+        #self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
+        #self.pushButton_paired_data_flip.pressed.connect(self.pushButton_paired_data_flip_pressed)
 
 
     def connectUIstate(self): # Connect UI elements to uistate
@@ -1361,6 +1357,10 @@ class UIsub(Ui_MainWindow):
 
 
 # trigger functions TODO: break out the big ones to separate functions!
+
+    def triggerStimDetect(self):
+        self.usage("triggerStimDetect")
+        self.stimDetect()
 
     def triggerDarkmode(self):
         uistate.darkmode = not uistate.darkmode
@@ -1571,6 +1571,50 @@ class UIsub(Ui_MainWindow):
 
 
 # Data Editing functions
+
+    def stimDetect(self):
+        if not uistate.rec_select:
+            print("No files selected.")
+            return
+        for index in uistate.rec_select:
+            df_p = self.get_df_project()
+            p_row = df_p.loc[index]
+            rec_name = p_row['recording_name']
+            rec_ID = p_row['ID']
+            if p_row['sweeps'] == "...":
+                print(f"{rec_name} not parsed yet.")
+                continue
+            print(f"Detecting stims for {rec_name}")
+            if uistate.x_select['mean_start'] is not None:
+                print (f" - range: {uistate.x_select['mean_start']} to {uistate.x_select['mean_end']}")
+            dfmean = self.get_dfmean(p_row)
+            if uistate.x_select['mean_start'] is not None and uistate.x_select['mean_end'] is not None:
+                dfmean_range = dfmean[(dfmean['time'] >= uistate.x_select['mean_start']) & (dfmean['time'] <= uistate.x_select['mean_end'])].reset_index(drop=True)
+            else:
+                dfmean_range = dfmean
+            default_dict_t = uistate.default.copy()  # Default sizes
+            df_t = analysis.find_all_t(dfmean=dfmean_range, 
+                                              volley_slope_halfwidth=default_dict_t['t_volley_slope_halfwidth'], 
+                                              EPSP_slope_halfwidth=default_dict_t['t_EPSP_slope_halfwidth'], 
+                                              verbose=False)
+            if df_t.empty:
+                print(f"No stims found for {rec_name}.")
+                continue
+            df_p.loc[p_row['ID'] == df_p['ID'], 'stims'] = len(df_t)
+            self.set_df_project(df_p)
+            _ = self.default_dft(df_t, p_row)
+            uiplot.unPlot(rec_ID)
+            print(f"***** df_t: {df_t}")
+            uiplot.addRow(p_row, df_t, dfmean, self.dict_outputs[rec_name])
+        uistate.stim_select = [0]
+        if len(uistate.rec_select) == 1:
+            self.tableStimModel.setData(df_t)
+            self.tableStim.selectRow(0)
+            self.stimSelectionChanged()
+        # unplot and replot all affected recordings
+        self.update_rec_show(reset=True)
+        self.mouseoverUpdate()
+
 
     def addData(self, dfAdd):  # concatenate dataframes of old and new data
         # Check for unique names in dfAdd, vs df_p and dfAdd
@@ -2089,7 +2133,7 @@ class UIsub(Ui_MainWindow):
         # hide all columns except these:
         list_show = [   
                         df_p.columns.get_loc('recording_name'),
-                        df_p.columns.get_loc('ID'),
+#                        df_p.columns.get_loc('ID'),
                         df_p.columns.get_loc('sweeps'),
                         df_p.columns.get_loc('groups'),
                         df_p.columns.get_loc('stims'),
@@ -2347,24 +2391,28 @@ class UIsub(Ui_MainWindow):
         Returns a dict{stim:output}, that is amplitudes and slopes for each stim
         '''
         print("defaultOutput")
-        dffilter = self.get_dffilter(row=row)
         dfmean = self.get_dfmean(row=row)
         df_p = self.get_df_project()
 
         default_dict_t = uistate.default.copy()  # Default sizes
-        dft = analysis.find_all_t(dfmean=dfmean, 
+        df_t = analysis.find_all_t(dfmean=dfmean, 
                                               volley_slope_halfwidth=default_dict_t['t_volley_slope_halfwidth'], 
                                               EPSP_slope_halfwidth=default_dict_t['t_EPSP_slope_halfwidth'], 
                                               verbose=False)
-        if dft.empty:
+        if df_t.empty:
             print("No stims found.")
             return
         output = None
-        df_p.loc[df_p['ID'] == row['ID'], 'stims'] = len(dft)
+        df_p.loc[df_p['ID'] == row['ID'], 'stims'] = len(df_t)
         self.set_df_project(df_p)
-        dft['stim'] = 0
+        output = self.default_dft(df_t, row) # TODO: restructure, rename!
+        return output
 
+    def default_dft(self, dft, row):
         # Update the original row in dft with combined default and measured values
+        default_dict_t = uistate.default.copy()  # Default sizes
+        dffilter = self.get_dffilter(row=row)
+        dft['stim'] = 0
         for i, row_t in dft.iterrows():
             updated_dict_t = default_dict_t.copy()  # Start with a copy of the default values
             updated_dict_t.update(row_t.to_dict())  # Update with the values from row_t
@@ -2403,10 +2451,8 @@ class UIsub(Ui_MainWindow):
                         'volley_amp_mean',
         ]
         dft = dft.reindex(columns=column_order)
-        self.dict_ts[rec_name] = dft
-        self.df2csv(df=dft, rec=rec_name, key="timepoints")
+        self.set_dft(rec_name, dft)
         return output
-
 
 # Graph interface
 
