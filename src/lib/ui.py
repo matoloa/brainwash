@@ -785,6 +785,8 @@ class Filetreesub(Ui_Dialog):
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # group
         self.tableView.update()
 
+
+
 ###########################
 #       Main class        #
 ###########################
@@ -2594,15 +2596,13 @@ class UIsub(Ui_MainWindow):
             else:
                 uiplot.xDeselect(ax = uistate.ax1, reset=True)
             return
-        if len(uistate.rec_select) != 1: # only connect when exactly one recording is selected
-            return
 
     # left clicked on a graph
         uistate.dragging = True
         df_p = self.get_df_project()
         p_row = df_p.loc[uistate.rec_select[0]]
 
-        if canvas == self.canvasEvent: # Event canvas left-clicked, middle graph: editing detected events
+        if (canvas == self.canvasEvent) and (len(uistate.rec_select) == 1): # Event canvas left-clicked with just one selected, middle graph: editing detected events
             time_values = self.dfmean['time'].values
             uistate.x_on_click = np.abs(time_values - x).argmin() # nearest x-index to click
             dft_row = uistate.dft_copy.iloc[0] # TOOD: first row for now
