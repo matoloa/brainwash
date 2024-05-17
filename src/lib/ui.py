@@ -982,7 +982,9 @@ class UIsub(Ui_MainWindow):
             if dft.shape[0] > 1:
                 endings = ["", " EPSP amp", " EPSP slope", " volley amp", " volley slope", 
                            " EPSP amp marker", " EPSP slope marker", " volley amp marker", " volley slope marker",
-                           " volley amp mean", " volley slope mean"]
+                           " volley amp mean", " volley slope mean",
+                           " selection marker"
+                           ]
                 filters.extend([f" - stim {i+1}{ending}" for i in range(dft.shape[0]) 
                                 if i not in uistate.stim_select for ending in endings])
         # Apply filters
@@ -1000,7 +1002,7 @@ class UIsub(Ui_MainWindow):
         for _, line, _ in added_lines.values():
             line.set_visible(True)
         uistate.dict_rec_show = new_selection
-        print(f"uistate.dict_rec_show: {uistate.dict_rec_show.keys()}")
+        #print(f"uistate.dict_rec_show: {uistate.dict_rec_show.keys()}")
         print(f"update_rec_show took {round((time.time() - t0) * 1000)} ms")
 
 
@@ -1565,8 +1567,6 @@ class UIsub(Ui_MainWindow):
 
     def persistOutput(self, rec_name, dfoutput): 
         # Clean up column order, save to dict and file.
-        print(f"persistOutput: {rec_name}")
-        print(f"dfoutput: {dfoutput}")
         output_columns = ['stim',
                 'sweep',
                 'EPSP_slope',
@@ -2470,7 +2470,6 @@ class UIsub(Ui_MainWindow):
         dft = dft.reindex(columns=dft_columns)
         rec_name = row['recording_name']
         self.set_dft(rec_name, dft)
-        print(f"about to persist {rec_name}...")
         self.persistOutput(rec_name, output)
 
 

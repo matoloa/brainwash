@@ -250,7 +250,9 @@ class UIplot():
             subplot = f"{mean_label}{stim_str} marker"
             marker, = axm.plot(t_stim, y_position, marker='o', markerfacecolor=color, markeredgecolor=color, markersize=10, alpha=1, zorder=0, label=f"{subplot}")
             uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, marker, 'axm'
-            print(f" - - Placing marker {subplot}/{n_stims} @ x:{t_stim}, y:{y_position}")
+            subplot = f"{mean_label}{stim_str} selection marker"
+            marker = axm.axvline(x=t_stim, color=color, linewidth=1, alpha=0.8, label=f"{subplot}")
+            uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, marker, 'axm'
             # convert all variables except t_stim to stim-specific time
             variables = ['t_EPSP_amp', 't_EPSP_slope_start', 't_EPSP_slope_end', 't_volley_amp', 't_volley_slope_start', 't_volley_slope_end']
             for var in variables:
