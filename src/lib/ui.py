@@ -1555,14 +1555,36 @@ class UIsub(Ui_MainWindow):
                 selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_slope']
                 norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
                 dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
-            self.dict_outputs[rec_name] = dfoutput
-            self.df2csv(df=dfoutput, rec=rec_name, key="output")
+            self.persistOutput(rec_name, dfoutput)
         else: # norm specific column and DO NOT SAVE file (dragged on-the-fly-graphs are saved only on mouse release)
             selected_values = dfoutput.loc[normFrom:normTo, aspect]
             norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
             dfoutput[f'{aspect}_norm'] = dfoutput[aspect] / norm_mean
             return dfoutput
 
+
+    def persistOutput(self, rec_name, dfoutput): 
+        # Clean up column order, save to dict and file.
+        print(f"persistOutput: {rec_name}")
+        print(f"dfoutput: {dfoutput}")
+        output_columns = ['stim',
+                'sweep',
+                'EPSP_slope',
+                'EPSP_slope_norm',
+                'EPSP_amp',
+                'EPSP_amp_norm',
+                'volley_slope',
+                'volley_amp',
+        ]
+        missing_columns = set(output_columns) - set(dfoutput.columns)
+        extra_columns = set(dfoutput.columns) - set(output_columns)
+        if missing_columns:
+            print(f"Warning: The following columns in output_columns don't exist in dfoutput: {missing_columns}")
+        if extra_columns:
+            print(f"Warning: The following columns exist in dfoutput but not in output_columns: {extra_columns}")
+        dfoutput = dfoutput.reindex(columns=output_columns)
+        self.dict_outputs[rec_name] = dfoutput
+        self.df2csv(df=dfoutput, rec=rec_name, key="output")
 
 
 # Data Editing functions
@@ -2209,7 +2231,7 @@ class UIsub(Ui_MainWindow):
             return dft
         else:
             print("creating t")
-            _ = self.defaultOutput(row=row) # also creates self.dict_ts[recording_name]
+            self.defaultOutput(row=row) # also creates self.dict_ts[recording_name]
             dft = self.dict_ts[recording_name]
             self.df2csv(df=dft, rec=recording_name, key="timepoints")
             return dft
@@ -2222,10 +2244,9 @@ class UIsub(Ui_MainWindow):
         str_output_path = f"{self.dict_folders['cache']}/{recording_name}_output.csv"
         if Path(str_output_path).exists(): #2: Read from file
             dfoutput = pd.read_csv(str_output_path)
-        else: #3: Create file
-            dfoutput = self.defaultOutput(row=row)
-            self.df2csv(df=dfoutput, rec=recording_name, key="output")
-        self.dict_outputs[recording_name] = dfoutput
+            self.dict_outputs[recording_name] = dfoutput
+        else: #3: Create file and cache
+            self.defaultOutput(row=row)
         return self.dict_outputs[recording_name]
         
     def get_dfdata(self, row):
@@ -2381,10 +2402,10 @@ class UIsub(Ui_MainWindow):
 
     def defaultOutput(self, row):
         '''
-        Generates default results for row (in self.df_project)
+        Generates default results for dft and dfoutput
         Stores stims in self.df_project
         Stores timepoints, methods and params in dict_ts{<rec_ID>:<df_t>}
-        Returns a dict{stim:output}, that is amplitudes and slopes for each stim
+        returns a single output DataFrame, stims numbered from 1
         '''
         print("defaultOutput")
         dfmean = self.get_dfmean(row=row)
@@ -2401,8 +2422,8 @@ class UIsub(Ui_MainWindow):
         output = None
         df_p.loc[df_p['ID'] == row['ID'], 'stims'] = len(df_t)
         self.set_df_project(df_p)
-        output = self.dft2output(df_t, row)
-        return output
+        self.dft2output(df_t, row)
+
 
     def dft2output(self, dft, row):
         # Update the original row in dft with combined default and measured values
@@ -2447,20 +2468,10 @@ class UIsub(Ui_MainWindow):
                         'volley_amp_mean',
         ]
         dft = dft.reindex(columns=dft_columns)
-        output_columns = ['stim',
-                        'sweep',
-                        'EPSP_slope',
-                        'EPSP_slope_norm',
-                        'EPSP_amp',
-                        'EPSP_amp_norm',
-                        'volley_slope',
-                        'volley_amp',
-        ]
-        output = output.reindex(columns=output_columns)
-        print(f"df2output: output: {output}")
         rec_name = row['recording_name']
         self.set_dft(rec_name, dft)
-        return output
+        print(f"about to persist {rec_name}...")
+        self.persistOutput(rec_name, output)
 
 
 # Graph interface
