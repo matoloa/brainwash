@@ -245,9 +245,7 @@ class UIplot():
             stim_num = i_stim + 1 # 1-numbering (visible to user)
             t_stim = t_row['t_stim']
             stim_str = f" - stim {stim_num}"
-            # Rest of your code...
             out = dfoutput[dfoutput['stim'] == stim_num]# TODO: enable switch to dfdiff?
-            # Rest of your code...
             y_position = dfmean.loc[dfmean.time == t_stim, rec_filter].values[0] # returns index, y_value
             subplot = f"{mean_label}{stim_str} marker"
             marker, = axm.plot(t_stim, y_position, marker='o', markerfacecolor=color, markeredgecolor=color, markersize=10, alpha=1, zorder=0, label=f"{subplot}")

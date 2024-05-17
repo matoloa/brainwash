@@ -325,6 +325,7 @@ class graphPreloadThread(QtCore.QThread):
                 dfoutput = self.uisub.get_dfoutput(row=p_row)
             if dfoutput is None:
                 return
+            print (f"graphPreloadThread, {p_row['recording_name']} calls uiplot.addRow() dfoutput columns: {dfoutput.columns}")
             self.uiplot.addRow(p_row=p_row.to_dict(), dft=dft, dfmean=dfmean, dfoutput=dfoutput)
             self.progress.emit(i)
             self.i += 1
@@ -903,34 +904,30 @@ class UIsub(Ui_MainWindow):
         uistate.rec_select = [index.row() for index in selected_indexes]
         self.update_recs2plot()
         self.update_rec_show()
-            
-        if len(uistate.rec_select) == 1: # if just one item is selected...
-            df_p = self.get_df_project()
-            p_row = df_p.loc[uistate.rec_select[0]]
-            uistate.dfp_row_copy = p_row.copy()
-            df_t = self.get_dft(row=p_row)
-            uistate.dft_copy = df_t.copy()
-            self.dfmean = self.get_dfmean(row=p_row) # Required for event dragging, x and y
+        if not uistate.rec_select:
+            print("*** Nothing seleceted - returning")
+            return
+        # use the selected df_p row with the highest sweep duration
+        p_row = uistate.df_recs2plot.loc[uistate.df_recs2plot['sweep_duration'].idxmax()]
+        uistate.dfp_row_copy = p_row.copy()
+        df_t = self.get_dft(row=p_row)
+        uistate.dft_copy = df_t.copy()
+        self.dfmean = self.get_dfmean(row=p_row) # Required for event dragging, x and y
 
-            if df_t.shape[0] > 1:
-                selected_stims = self.tableStim.selectionModel().selectedRows() # save selection
-                self.tableStimModel.setData(df_t)
-                model = self.tableStim.model()
-                selection = QtCore.QItemSelection()
-                for index in selected_stims:
-                    row_idx = index.row()
-                    index_start = model.index(row_idx, 0)  # Start of the row (first column)
-                    index_end = model.index(row_idx, model.columnCount(QtCore.QModelIndex()) - 1)  # End of the row (last column)
-                    selection.select(index_start, index_end)
-                self.tableStim.selectionModel().select(selection, QtCore.QItemSelectionModel.Select)
-                self.setTableStimVisibility(True)
-            else:
-                print(f"* hiding tableStim as df_t.shape[0] = {df_t.shape[0]}")
-                self.setTableStimVisibility(False)
-        else: # none or many selected
-            self.dfmean = None
-            self.tableStim.selectionModel().clear()
-            self.tableStimModel.setData(None)
+        if df_t.shape[0] > 1:
+            selected_stims = self.tableStim.selectionModel().selectedRows() # save selection
+            self.tableStimModel.setData(df_t)
+            model = self.tableStim.model()
+            selection = QtCore.QItemSelection()
+            for index in selected_stims:
+                row_idx = index.row()
+                index_start = model.index(row_idx, 0)  # Start of the row (first column)
+                index_end = model.index(row_idx, model.columnCount(QtCore.QModelIndex()) - 1)  # End of the row (last column)
+                selection.select(index_start, index_end)
+            self.tableStim.selectionModel().select(selection, QtCore.QItemSelectionModel.Select)
+            self.setTableStimVisibility(True)
+        else:
+            print(f"* Hiding tableStim as df_t.shape[0] = {df_t.shape[0]}")
             self.setTableStimVisibility(False)
         self.zoomAuto()
 
@@ -2419,8 +2416,8 @@ class UIsub(Ui_MainWindow):
             dft.loc[i] = updated_dict_t
             dft.at[i, 'stim'] = i+1 # stims numbered from 1
             dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dft.loc[i].to_dict())
-            self.normOutput(row=row, dfoutput=dfoutput)
             dfoutput['stim'] = i+1  # Add stim column to dfoutput
+            self.normOutput(row=row, dfoutput=dfoutput)
             output = pd.concat([output, dfoutput], ignore_index=True)  # Concatenate dfoutput to output
             if 'volley_amp' in dfoutput.columns:
                 dft.at[i, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
@@ -2460,6 +2457,7 @@ class UIsub(Ui_MainWindow):
                         'volley_amp',
         ]
         output = output.reindex(columns=output_columns)
+        print(f"df2output: output: {output}")
         rec_name = row['recording_name']
         self.set_dft(rec_name, dft)
         return output
