@@ -932,30 +932,11 @@ class UIsub(Ui_MainWindow):
             self.tableStim.selectionModel().clear()
             self.tableStimModel.setData(None)
             self.setTableStimVisibility(False)
-
         self.zoomAuto()
-        #t0 = time.time()
+
+        t0 = time.time()
         self.mouseoverUpdate()
-        #print(f" - - {round((time.time() - t0) * 1000)} ms")
-        #self.report("tPSC")
-
-
-    def report(self, caller=None):
-        print()
-        if caller is not None:
-            print(f"REPORT from {caller}:")
-        else:
-            print("REPORT:")
-        if len(uistate.rec_select) != 1:
-            return
-        df_p = self.get_df_project()
-        p_row = df_p.loc[uistate.rec_select[0]]
-        rec_name = p_row['recording_name']
-        rec_ID = p_row['ID']
-        print(f"{rec_name} - Selected recording: {uistate.rec_select}, Selected stims: {uistate.stim_select}")
-        filtered_dict = {key: value for key, value in uistate.dict_rec_label_ID_line_axis.items() if value[0] == rec_ID and value[2] == 'axm'}
-        print(f"filtered_dict: {filtered_dict.keys()}")
-        print()
+        print(f" - - mouseoverUpdate: {round((time.time() - t0) * 1000)} ms")
 
 
 
@@ -963,13 +944,27 @@ class UIsub(Ui_MainWindow):
 #    WIP: TODO: move these to appropriate header in this file    #
 ##################################################################
 
+    def uiFreeze(self): # Disable selection changes and checkboxes
+        self.tableProj.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
+        self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
+        for key, _ in uistate.checkBox.items():
+            checkBox = getattr(self, f"checkBox_{key}")
+            checkBox.setEnabled(False)
+       
+    def uiThaw(self): # Enable selection changes and checkboxes
+        self.tableProj.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        for key, _ in uistate.checkBox.items():
+            checkBox = getattr(self, f"checkBox_{key}")
+            checkBox.setEnabled(True)
+
     def update_rec_show(self, reset=False):
         if uistate.df_recs2plot is None:
             return
         t0 = time.time()
         old_selection = uistate.dict_rec_show 
         selected_ids = set(uistate.df_recs2plot['ID'])
-        #print(f"selected_ids: {selected_ids}")
+        print(f"selected_ids: {selected_ids}")
         new_selection = {k: v for k, v in uistate.dict_rec_label_ID_line_axis.items() if v[0] in selected_ids}
         #print(f"old_selection: {old_selection.keys()}")
         filters = []
@@ -984,9 +979,8 @@ class UIsub(Ui_MainWindow):
             filters.extend([" volley slope marker", " volley slope mean"])
         if not uistate.checkBox['norm_EPSP']:
             filters.extend([" norm"])
-        # Setup filters for selected stims
-        if len(uistate.df_recs2plot) == 1:
-            p_row = uistate.df_recs2plot.iloc[0]
+        # Setup filters for selected rows
+        for _, p_row in uistate.df_recs2plot.iterrows():
             dft = self.get_dft(p_row)
             if dft.shape[0] > 1:
                 endings = ["", " EPSP amp", " EPSP slope", " volley amp", " volley slope", 
@@ -1089,6 +1083,8 @@ class UIsub(Ui_MainWindow):
 
     def stimSelectionChanged(self):
         self.usage("stimSelectionChanged")
+        if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
+            self.tableStim.clearSelection()
         selected_indexes = self.tableStim.selectionModel().selectedRows()
         uistate.stim_select = [index.row() for index in selected_indexes]
         self.update_rec_show()
@@ -1604,7 +1600,7 @@ class UIsub(Ui_MainWindow):
                 continue
             df_p.loc[p_row['ID'] == df_p['ID'], 'stims'] = len(df_t)
             self.set_df_project(df_p)
-            _ = self.default_dft(df_t, p_row)
+            _ = self.dft2output(df_t, p_row)
             uiplot.unPlot(rec_ID)
             print(f"***** df_t: {df_t}")
             uiplot.addRow(p_row, df_t, dfmean, self.dict_outputs[rec_name])
@@ -1740,6 +1736,7 @@ class UIsub(Ui_MainWindow):
 
 
     def parseData(self): 
+        self.uiFreeze() # Thawed at the end of graphPreload()
         df_p = self.get_df_project()
         df_p_to_update = df_p[df_p['sweeps'] == "..."].copy()
 
@@ -2407,29 +2404,29 @@ class UIsub(Ui_MainWindow):
         output = None
         df_p.loc[df_p['ID'] == row['ID'], 'stims'] = len(df_t)
         self.set_df_project(df_p)
-        output = self.default_dft(df_t, row) # TODO: restructure, rename!
+        output = self.dft2output(df_t, row)
         return output
 
-    def default_dft(self, dft, row):
+    def dft2output(self, dft, row):
         # Update the original row in dft with combined default and measured values
-        default_dict_t = uistate.default.copy()  # Default sizes
+        dft['stim'] = 1
+        output = pd.DataFrame()  # Initialize output as an empty DataFrame
         dffilter = self.get_dffilter(row=row)
-        dft['stim'] = 0
+        default_dict_t = uistate.default.copy()  # Default sizes
         for i, row_t in dft.iterrows():
             updated_dict_t = default_dict_t.copy()  # Start with a copy of the default values
             updated_dict_t.update(row_t.to_dict())  # Update with the values from row_t
             dft.loc[i] = updated_dict_t
-            rec_name = row['recording_name']
             dft.at[i, 'stim'] = i+1 # stims numbered from 1
-            if i == 0: # TODO: for now, only calculate the output from the first stim
-                dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dft.loc[i].to_dict())
-                self.normOutput(row=row, dfoutput=dfoutput)
-                output = dfoutput
-                if 'volley_amp' in dfoutput.columns:
-                    dft.at[i, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
-                if 'volley_slope' in dfoutput.columns:
-                    dft.at[i, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
-        column_order = ['stim',
+            dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dft.loc[i].to_dict())
+            self.normOutput(row=row, dfoutput=dfoutput)
+            dfoutput['stim'] = i+1  # Add stim column to dfoutput
+            output = pd.concat([output, dfoutput], ignore_index=True)  # Concatenate dfoutput to output
+            if 'volley_amp' in dfoutput.columns:
+                dft.at[i, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
+            if 'volley_slope' in dfoutput.columns:
+                dft.at[i, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
+        dft_columns = ['stim',
                         't_stim',
                         't_EPSP_slope_start',
                         't_EPSP_slope_end',
@@ -2452,9 +2449,21 @@ class UIsub(Ui_MainWindow):
                         't_volley_amp_params',
                         'volley_amp_mean',
         ]
-        dft = dft.reindex(columns=column_order)
+        dft = dft.reindex(columns=dft_columns)
+        output_columns = ['stim',
+                        'sweep',
+                        'EPSP_slope',
+                        'EPSP_slope_norm',
+                        'EPSP_amp',
+                        'EPSP_amp_norm',
+                        'volley_slope',
+                        'volley_amp',
+        ]
+        output = output.reindex(columns=output_columns)
+        rec_name = row['recording_name']
         self.set_dft(rec_name, dft)
         return output
+
 
 # Graph interface
 
@@ -2495,6 +2504,7 @@ class UIsub(Ui_MainWindow):
         self.usage("graphPreload")
         t0 = time.time()
         self.mouseoverDisconnect()
+        self.uiFreeze()
         if not uistate.new_indices:
             df_p = self.get_df_project()
             uistate.new_indices = df_p[~df_p['sweeps'].eq("...")].index.tolist()
@@ -2517,6 +2527,7 @@ class UIsub(Ui_MainWindow):
         print(f"Preloaded recordings and groups in {time.time()-t0:.2f} seconds.")
         uiplot.graphRefresh()
         self.progressBarManager.__exit__(None, None, None)  # Hide progress bar
+        self.uiThaw()
         self.tableProjSelectionChanged()
 
     def graphGroups(self):
@@ -2605,22 +2616,23 @@ class UIsub(Ui_MainWindow):
         if (canvas == self.canvasEvent) and (len(uistate.rec_select) == 1): # Event canvas left-clicked with just one selected, middle graph: editing detected events
             time_values = self.dfmean['time'].values
             uistate.x_on_click = np.abs(time_values - x).argmin() # nearest x-index to click
-            dft_row = uistate.dft_copy.iloc[0] # TOOD: first row for now
-            if event.inaxes is not None:
-                if (event.button == 1 or event.button == 3) and (uistate.mouseover_action is not None):
-                    action = uistate.mouseover_action
-                    print(f"mouseover action: {action}")
-                    if action.startswith("EPSP slope"):
-                        start, end = dft_row['t_EPSP_slope_start'], dft_row['t_EPSP_slope_end']
-                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, time_values, action, start, end))
-                    elif action == 'EPSP amp move':
-                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, time_values))
-                    elif action.startswith("volley slope"):
-                        start, end = dft_row['t_volley_slope_start'], dft_row['t_volley_slope_end']
-                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, time_values, action, start, end))
-                    elif action == 'volley amp move':
-                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, time_values))
-                    self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', self.eventDragReleased)
+            if len(uistate.stim_select) == 1: # connect mouseover IF one stim selected
+                dft_row = uistate.dft_copy.iloc[uistate.stim_select[0]]
+                if event.inaxes is not None:
+                    if (event.button == 1 or event.button == 3) and (uistate.mouseover_action is not None):
+                        action = uistate.mouseover_action
+                        print(f"mouseover action: {action}")
+                        if action.startswith("EPSP slope"):
+                            start, end = dft_row['t_EPSP_slope_start'], dft_row['t_EPSP_slope_end']
+                            self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, time_values, action, start, end))
+                        elif action == 'EPSP amp move':
+                            self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, time_values))
+                        elif action.startswith("volley slope"):
+                            start, end = dft_row['t_volley_slope_start'], dft_row['t_volley_slope_end']
+                            self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, time_values, action, start, end))
+                        elif action == 'volley amp move':
+                            self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, time_values))
+                        self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', self.eventDragReleased)
 
         elif canvas == self.canvasMean: # Mean canvas (top graph) left-clicked: overview and selecting ranges for finding relevant stims
             time_values = self.dfmean['time'].values
@@ -2903,7 +2915,7 @@ class UIsub(Ui_MainWindow):
             return
 
         p_row = uistate.dfp_row_copy.to_dict()
-        t_row = uistate.dft_copy.iloc[0].to_dict() # TODO: first row for now
+        t_row = uistate.dft_copy.iloc[self.stim_select[0]].to_dict()
         print(f"t_row: {t_row}")
 
         dict_t = {} # update the dict_t with the new values, for use by build_dfoutput
