@@ -27,10 +27,13 @@ class UIstate:
             'EPSP_slope': True,
             'volley_amp': False,
             'volley_slope': False,
-            'force1stim': False,
+            'force1stim': False, # prevent splitting of channels when multiple stims are detected
+            'show_all_events': False, # show ghosts of non-selected events in eventgraph output graph
+            'timepoints_per_stim': False, # allow setting (non-uniform) timepoints per stim
+            'output_per_stim': False, # output per stim (for binned trains) instead of per sweep (for consecutive sweeps)
             # break these out to separate mod-class?
-            'norm_EPSP': False,
-            'paired_stims': False,
+            'norm_EPSP': False, # show normalized EPSPs (they're always calculated)
+            'paired_stims': False, # Recs are paired: output per pair is Intervention / Control
         }
         self.lineEdit = {
             'norm_EPSP_on': [0, 0],
