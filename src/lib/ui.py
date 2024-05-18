@@ -286,7 +286,7 @@ class ParseDataThread(QtCore.QThread):
             self.progress.emit(i)
             recording_name = df_proj_row['recording_name']
             source_path = df_proj_row['path']
-            dict_data = parse.parseProjFiles(dict_folders=self.dict_folders, recording_name=recording_name, source_path=source_path, single_stim=True)
+            dict_data = parse.parseProjFiles(dict_folders=self.dict_folders, recording_name=recording_name, source_path=source_path, single_stim=uistate.checkBox['force1stim'])
             for new_name, dict_sub in dict_data.items():
                 nsweeps = dict_sub.get('nsweeps', None) 
                 if nsweeps is not None:
@@ -358,12 +358,18 @@ class Ui_MainWindow(QtCore.QObject):
         self.verticalLayoutProj.setSizeConstraint(QtWidgets.QLayout.SetMinimumSize)
         self.verticalLayoutProj.setContentsMargins(0, 0, 0, 0)
         self.verticalLayoutProj.setObjectName("verticalLayoutProj")
-        self.horizontalLayoutProj = QtWidgets.QHBoxLayout()
-        self.horizontalLayoutProj.setObjectName("horizontalLayoutProj")
+        self.horizontalLayoutProjParse = QtWidgets.QHBoxLayout()
+        self.horizontalLayoutProjParse.setObjectName("horizontalLayoutProjParse")
         self.pushButtonParse = QtWidgets.QPushButton(self.layoutWidget)
         self.pushButtonParse.setObjectName("pushButtonParse")
-        self.horizontalLayoutProj.addWidget(self.pushButtonParse)
-        self.verticalLayoutProj.addLayout(self.horizontalLayoutProj)
+        self.horizontalLayoutProjParse.addWidget(self.pushButtonParse)
+        self.verticalLayoutProj.addLayout(self.horizontalLayoutProjParse)
+        self.horizontalLayoutProjStim = QtWidgets.QHBoxLayout()
+        self.horizontalLayoutProjStim.setObjectName("horizontalLayoutProjStim")
+        self.checkBox_force1stim = QtWidgets.QCheckBox(self.layoutWidget)
+        self.checkBox_force1stim.setObjectName("checkBox_force1stim")
+        self.horizontalLayoutProjStim.addWidget(self.checkBox_force1stim)
+        self.verticalLayoutProj.addLayout(self.horizontalLayoutProjStim)
         self.verticalLayoutWidget = QtWidgets.QWidget(self.h_splitterMaster)
         self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
         self.verticalLayoutStim = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
@@ -424,7 +430,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBox_show_all_events.setGeometry(QtCore.QRect(10, 30, 151, 23))
         self.checkBox_show_all_events.setObjectName("checkBox_show_all_events")
         self.checkBox_global_timepoints = QtWidgets.QCheckBox(self.frameToolStim)
-        self.checkBox_global_timepoints.setGeometry(QtCore.QRect(10, 50, 151, 23))
+        self.checkBox_global_timepoints.setGeometry(QtCore.QRect(10, 50, 161, 23))
         self.checkBox_global_timepoints.setObjectName("checkBox_global_timepoints")
         self.label_stims = QtWidgets.QLabel(self.frameToolStim)
         self.label_stims.setGeometry(QtCore.QRect(10, 10, 62, 17))
@@ -446,14 +452,14 @@ class Ui_MainWindow(QtCore.QObject):
         self.label_stim_detection_threshold.setFont(font)
         self.label_stim_detection_threshold.setObjectName("label_stim_detection_threshold")
         self.label_mean_to = QtWidgets.QLabel(self.frameToolStim)
-        self.label_mean_to.setGeometry(QtCore.QRect(90, 100, 21, 20))
+        self.label_mean_to.setGeometry(QtCore.QRect(90, 110, 21, 20))
         self.label_mean_to.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
         self.label_mean_to.setObjectName("label_mean_to")
         self.lineEdit_mean_selection_end = QtWidgets.QLineEdit(self.frameToolStim)
-        self.lineEdit_mean_selection_end.setGeometry(QtCore.QRect(100, 100, 61, 25))
+        self.lineEdit_mean_selection_end.setGeometry(QtCore.QRect(100, 110, 61, 25))
         self.lineEdit_mean_selection_end.setObjectName("lineEdit_mean_selection_end")
         self.label_mean_selected_range = QtWidgets.QLabel(self.frameToolStim)
-        self.label_mean_selected_range.setGeometry(QtCore.QRect(10, 80, 131, 17))
+        self.label_mean_selected_range.setGeometry(QtCore.QRect(10, 90, 71, 17))
         font = QtGui.QFont()
         font.setFamily("DejaVu Sans")
         font.setBold(False)
@@ -461,10 +467,10 @@ class Ui_MainWindow(QtCore.QObject):
         self.label_mean_selected_range.setFont(font)
         self.label_mean_selected_range.setObjectName("label_mean_selected_range")
         self.lineEdit_mean_selection_start = QtWidgets.QLineEdit(self.frameToolStim)
-        self.lineEdit_mean_selection_start.setGeometry(QtCore.QRect(20, 100, 61, 25))
+        self.lineEdit_mean_selection_start.setGeometry(QtCore.QRect(20, 110, 61, 25))
         self.lineEdit_mean_selection_start.setObjectName("lineEdit_mean_selection_start")
         self.pushButton_stim_detect = QtWidgets.QPushButton(self.frameToolStim)
-        self.pushButton_stim_detect.setGeometry(QtCore.QRect(100, 160, 61, 25))
+        self.pushButton_stim_detect.setGeometry(QtCore.QRect(100, 80, 61, 25))
         self.pushButton_stim_detect.setObjectName("pushButton_stim_detect")
         self.verticalLayoutTools.addWidget(self.frameToolStim)
         self.frameToolAspect = QtWidgets.QFrame(self.verticalLayoutWidget_3)
@@ -601,13 +607,14 @@ class Ui_MainWindow(QtCore.QObject):
         _translate = QtCore.QCoreApplication.translate
         mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash"))
         self.pushButtonParse.setText(_translate("mainWindow", "Import"))
+        self.checkBox_force1stim.setText(_translate("mainWindow", "Single stim"))
         self.checkBox_show_all_events.setText(_translate("mainWindow", "Show all events"))
-        self.checkBox_global_timepoints.setText(_translate("mainWindow", "Uniform timepoints"))
+        self.checkBox_global_timepoints.setText(_translate("mainWindow", "Individual timepoints"))
         self.label_stims.setText(_translate("mainWindow", "Stims"))
         self.pushButton_stim_set_threshold.setText(_translate("mainWindow", "Set"))
         self.label_stim_detection_threshold.setText(_translate("mainWindow", "Stim Detection Threshold"))
         self.label_mean_to.setText(_translate("mainWindow", "-"))
-        self.label_mean_selected_range.setText(_translate("mainWindow", "Selected range"))
+        self.label_mean_selected_range.setText(_translate("mainWindow", "Selection"))
         self.pushButton_stim_detect.setText(_translate("mainWindow", "Detect"))
         self.checkBox_EPSP_slope.setText(_translate("mainWindow", "EPSP slope"))
         self.checkBox_volley_slope.setText(_translate("mainWindow", "volley slope"))
@@ -630,11 +637,14 @@ class Ui_MainWindow(QtCore.QObject):
         self.menuView.setTitle(_translate("mainWindow", "View"))
 
 
+
+
 ################################################################
 #       non-QtDesigner-generated instructions                  #
 ################################################################
 
         self.pushButtonParse.setVisible(False) # explicit hide command required for Windows, but not Linux (?)
+        self.checkBox_force1stim.setVisible(False) # explicit hide command required for Windows, but not Linux (?)
         self.progressBar.setVisible(False)
         self.progressBar.setValue(0)
 
@@ -1130,6 +1140,8 @@ class UIsub(Ui_MainWindow):
                     uiplot.updateEPSPout(rec_name, out)
                 self.purgeGroupCache()
                 self.graphGroups()
+            elif key == 'force1stim':
+                self.checkBox_force1stim_changed(state)
         self.update_rec_show()
         self.mouseoverUpdate()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
@@ -1718,10 +1730,12 @@ class UIsub(Ui_MainWindow):
         df_p = self.get_df_project()
         for index in uistate.rec_select:
             recording_name = df_p.at[index, 'recording_name']
+            rec_ID = df_p.at[index, 'ID']
             sweeps = df_p.at[index, 'sweeps']
             if sweeps != "...": # if the file is parsed:
                 print(f"Deleting {recording_name}...")
                 self.purgeRecordingData(recording_name)
+                uiplot.unPlot(rec_ID) # remove plotted lines
         # Regardless of whether or not there was a file, purge the row from df_project
         self.clearGroupsByRow(uistate.rec_select) # clear cache so that a new group mean is calculated
         # store the ID of the line below the last selected row
@@ -1751,7 +1765,6 @@ class UIsub(Ui_MainWindow):
             removeFromCache(cache_name)
         for folder_name, file_suffix in [('data', '.csv'), ('timepoints', '.csv'), ('cache', '_mean.csv'), ('cache', '_filter.csv'), ('cache', '_output.csv')]:
             removeFromDisk(folder_name, file_suffix)
-        uiplot.unPlot(recording_name)
 
 
     def parseData(self): 
@@ -2134,10 +2147,14 @@ class UIsub(Ui_MainWindow):
 # Table handling
 
     def setButtonParse(self):
-        if self.df_project['sweeps'].eq("...").any():
-            self.pushButtonParse.setVisible(True)
-        else:
-            self.pushButtonParse.setVisible(False)
+        unparsed = self.df_project['sweeps'].eq("...").any()
+        self.pushButtonParse.setVisible(unparsed)
+        self.checkBox_force1stim.setVisible(unparsed)
+
+    def checkBox_force1stim_changed(self, state):
+        uistate.checkBox['force1stim'] = state == 2
+        if config.verbose:
+            print(f"checkBox_force1stim_changed: {state}")
 
     def tableFormat(self):
         if config.verbose:

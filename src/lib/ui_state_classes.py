@@ -27,6 +27,7 @@ class UIstate:
             'EPSP_slope': True,
             'volley_amp': False,
             'volley_slope': False,
+            'force1stim': False,
             # break these out to separate mod-class?
             'norm_EPSP': False,
             'paired_stims': False,
