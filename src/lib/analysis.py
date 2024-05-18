@@ -329,8 +329,9 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
     df_i = pd.DataFrame(list_dict_i)
     df_i_numeric = df_i.select_dtypes(include=[np.number])
     list_nan = [i for i in range(len(df_i_numeric)) if df_i_numeric.iloc[i].isnull().any()]
-    print (f"***** list_nan: {list_nan}")
     if list_nan:
+        methods = ['t_volley_amp_method', 't_volley_slope_method', 't_EPSP_amp_method', 't_EPSP_slope_method']
+        params = ['t_volley_amp_params', 't_volley_slope_params', 't_EPSP_amp_params', 't_EPSP_slope_params']
         # find a stim-row that has values in all columns, and use it as a template
         for i in range(len(df_i_numeric)):
             print(f"checking stim: {i}")
@@ -338,9 +339,6 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
                 # create a template for i_values based difference from i_stim
                 i_values = df_i_numeric.iloc[i]
                 i_template = {key: i_values[key] - i_stims[i] for key in i_values.keys()}
-                # update methods and params
-                methods = ['t_volley_amp_method', 't_volley_slope_method', 't_EPSP_amp_method', 't_EPSP_slope_method']
-                params = ['t_volley_amp_params', 't_volley_slope_params', 't_EPSP_amp_params', 't_EPSP_slope_params']
                 # apply the template to all rows with np.nan
                 for j in list_nan:
                     for key in df_i_numeric.columns:
@@ -350,8 +348,28 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
                     for key in params:
                         df_i.loc[j, key] = f"stim {i+1}" # user readable references are 1-indexed
                 break
-        else: # no stim-row with all values. TODO: replace with default values based on i_stim
-            raise ValueError("Analysis failed for all detected events - cannot extrapolate missing values.")
+        else: # no stim-row with all values. Apply dodgy default values based on i_stim
+            for index, row in df_i.iterrows():
+                if row.isnull().any():  # if the row has any NaN value
+                    stim = row['i_stim']
+                    dict_default = { #set default 
+                        "i_stim": stim,
+                        "i_VEB": stim+20,
+                        "i_EPSP_amp": stim+50,
+                        "i_EPSP_slope": stim+20,
+                        "i_volley_amp": stim+15,
+                        "i_volley_slope": stim+10,
+                        "t_volley_amp_method": "Default",
+                        "t_volley_slope_method": "Default",
+                        "t_EPSP_amp_method": "Default",
+                        "t_EPSP_slope_method": "Default",
+                        "t_volley_amp_params": "-",
+                        "t_volley_slope_params": "-",
+                        "t_EPSP_amp_params": "-",
+                        "t_EPSP_slope_params": "-",
+                    }
+                    df_i.loc[index] = dict_default
+                
     return df_i
 
 

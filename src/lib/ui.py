@@ -286,7 +286,7 @@ class ParseDataThread(QtCore.QThread):
             self.progress.emit(i)
             recording_name = df_proj_row['recording_name']
             source_path = df_proj_row['path']
-            dict_data = parse.parseProjFiles(dict_folders = self.dict_folders, recording_name=recording_name, source_path=source_path)
+            dict_data = parse.parseProjFiles(dict_folders=self.dict_folders, recording_name=recording_name, source_path=source_path, single_stim=True)
             for new_name, dict_sub in dict_data.items():
                 nsweeps = dict_sub.get('nsweeps', None) 
                 if nsweeps is not None:
