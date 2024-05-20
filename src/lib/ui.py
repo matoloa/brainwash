@@ -2764,30 +2764,27 @@ class UIsub(Ui_MainWindow):
             uiplot.graphRefresh()
             return
         print(f"mouseoverUpdate: {uistate.rec_select[0]}, {type(uistate.rec_select[0])}")
-        p_row = uistate.dfp_row_copy
-        rec_name = p_row['recording_name']
-        rec_ID = p_row['ID']
+        rec_ID = uistate.dfp_row_copy['ID']
         t_row = uistate.dft_copy.iloc[uistate.stim_select[0]]
         stim_num = t_row['stim']
-        stim_str = f" - stim {stim_num}"
         uistate.setMargins(axe=uistate.axe)
-        dict_labels = {key: value for key, value in uistate.dict_rec_labels.items() if key.endswith(" marker") and value['rec_ID'] == rec_ID}
+        dict_labels = {key: value for key, value in uistate.dict_rec_labels.items()
+                       if key.endswith(" marker") and value['rec_ID'] == rec_ID and value['axis'] == 'axe' and value['stim'] == stim_num}
         if not dict_labels:
             print("(no labels) mouseoverUpdate calls uiplot.graphRefresh()")
             uiplot.graphRefresh()
             return
         for label, value in dict_labels.items():
             line = value['line']
-            if "amp" in label:
-                aspect = label.replace(f"{rec_name} ", "").replace(f"{stim_str} ", "").replace(" marker", "")
-                print (f"aspect: {aspect}")
-                uistate.updatePointDragZone(aspect=aspect, x=line.get_xdata()[0], y=line.get_ydata()[0])
-                #print(f"updated AMP label: {label}, value: {value}, uistate.mouseover_plot: {uistate.mouseover_plot}")
-            else:
-                aspect = label.replace(f"{rec_name} ", "").replace(f"{stim_str} ", "").replace(" marker", "")
-                print (f"aspect: {aspect}")
-                uistate.updateDragZones(aspect=aspect, x=line.get_xdata(), y=line.get_ydata())
-                #print(f"updated SLOPE label: {label}, value: {value}, uistate.mouseover_plot: {uistate.mouseover_plot}")
+            if label.endswith("EPSP amp marker"):
+                uistate.updatePointDragZone(aspect="EPSP amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
+            elif label.endswith("volley amp marker"):
+                uistate.updatePointDragZone(aspect="volley amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
+            elif label.endswith("EPSP slope marker"):
+                uistate.updateDragZones(aspect="EPSP slope", x=line.get_xdata(), y=line.get_ydata())
+            elif label.endswith("volley slope marker"):
+                uistate.updateDragZones(aspect="volley slope", x=line.get_xdata(), y=line.get_ydata())
+
         self.mouseover = self.canvasEvent.mpl_connect('motion_notify_event', uiplot.graphMouseover)
         print("mouseoverUpdate calls uiplot.graphRefresh()")
         uiplot.graphRefresh()

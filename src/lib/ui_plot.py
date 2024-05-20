@@ -433,7 +433,6 @@ class UIplot():
                     uistate.mouseover_blob.set_color(color)
 
                 if uistate.mouseover_plot is None:
-                    print("plotted mouseover")
                     uistate.mouseover_plot = axe.plot(x_range, y_range, color=color, linewidth=linewidth, alpha=alpha, label="mouseover")
                 else:
                     uistate.mouseover_plot[0].set_data(x_range, y_range)
@@ -460,23 +459,20 @@ class UIplot():
         if x is None or y is None:
             return
         if event.inaxes == axe:
-            zones = {
-                'EPSP slope resize': uistate.EPSP_slope_resize_zone,
-                'EPSP slope move': uistate.EPSP_slope_move_zone,
-                'EPSP amp move': uistate.EPSP_amp_move_zone,
-                'volley slope resize': uistate.volley_slope_resize_zone,
-                'volley slope move': uistate.volley_slope_move_zone,
-                'volley amp move': uistate.volley_amp_move_zone,
-            }
-            #print(f"zones: {zones}")
+            zones = {}
+            if uistate.checkBox['EPSP_amp']:
+                zones['EPSP amp move'] = uistate.EPSP_amp_move_zone
+            if uistate.checkBox['EPSP_slope']:
+                zones['EPSP slope resize'] = uistate.EPSP_slope_resize_zone
+                zones['EPSP slope move'] = uistate.EPSP_slope_move_zone
+            if uistate.checkBox['volley_amp']:
+                zones['volley amp move'] = uistate.volley_amp_move_zone
+            if uistate.checkBox['volley_slope']:
+                zones['volley slope resize'] = uistate.volley_slope_resize_zone
+                zones['volley slope move'] = uistate.volley_slope_move_zone
             uistate.mouseover_action = None
             for action, zone in zones.items():
-                checkbox_key = '_'.join(action.split(' ')[:2])  # Split the action string and use the last two words as the checkbox key
-                #print (f"action: {action}, uistate.checkBox.get({checkbox_key}): {uistate.checkBox[checkbox_key]}")
-                if zone is None or 'x' not in zone:
-                    print(f" - - {action} zone: {zone}")
-                    break
-                if uistate.checkBox.get(checkbox_key, False) and zone['x'][0] <= x <= zone['x'][1] and zone['y'][0] <= y <= zone['y'][1]:
+                if zone['x'][0] <= x <= zone['x'][1] and zone['y'][0] <= y <= zone['y'][1]:
                     uistate.mouseover_action = action
                     plotMouseover(action, axe)
                     break

@@ -123,6 +123,7 @@ class UIstate:
         self.y_margin = axe.transData.inverted().transform((0, pixels))[1] - axe.transData.inverted().transform((0, 0))[1]
 
     def updateDragZones(self, aspect=None, x=None, y=None):
+        #print(f"*** updateDragZones: {aspect} {x} {y}")
         if aspect is None:
             aspect = self.mouseover_action
             x = self.mouseover_plot[0].get_xdata()
@@ -146,29 +147,8 @@ class UIstate:
         elif aspect == "volley amp move":
             self.updateAmpZone('volley', x, y)
 
-    def updateSlopeZone(self, type, x, y):
-        slope_start = x[0], y[0]
-        slope_end = x[-1], y[-1]
-        x_window = min(x), max(x)
-        y_window = min(y), max(y)
-
-        print(f"*** updateSlopeZone: {type} {slope_start} {slope_end} {x_window} {y_window}")
-        setattr(self, f'{type}_slope_start_xy', slope_start)
-        setattr(self, f'{type}_slope_end_xy', slope_end)
-        getattr(self, f'{type}_slope_move_zone')['x'] = x_window[0]-self.x_margin, x_window[-1]+self.x_margin
-        getattr(self, f'{type}_slope_move_zone')['y'] = y_window[0]-self.y_margin, y_window[-1]+self.y_margin
-        getattr(self, f'{type}_slope_resize_zone')['x'] = x[-1]-self.x_margin, x[-1]+self.x_margin
-        getattr(self, f'{type}_slope_resize_zone')['y'] = y[-1]-self.y_margin, y[-1]+self.y_margin
-
-    def updateAmpZone(self, type, x, y):
-        amp_xy = x, y
-        amp_move_zone = x-self.x_margin, x+self.x_margin, y-self.y_margin, y+self.y_margin
-
-        setattr(self, f'{type}_amp_xy', amp_xy)
-        getattr(self, f'{type}_amp_move_zone')['x'] = amp_move_zone[0], amp_move_zone[1]
-        getattr(self, f'{type}_amp_move_zone')['y'] = amp_move_zone[2], amp_move_zone[3]
-
     def updatePointDragZone(self, aspect=None, x=None, y=None):
+        #print(f"*** updatePointDragZone: {aspect} {x} {y}")
         if aspect is None:
             aspect = self.mouseoverAction
             x, y = self.mouseover_blob.get_offsets()[0].tolist()
@@ -179,6 +159,29 @@ class UIstate:
             self.updateAmpZone('EPSP', x, y)
         elif aspect == "volley amp move":
             self.updateAmpZone('volley', x, y)
+
+    def updateSlopeZone(self, type, x, y):
+        #print(f"*** - updateSlopeZone: {type} {x} {y}")
+        slope_start = x[0], y[0]
+        slope_end = x[-1], y[-1]
+        x_window = min(x), max(x)
+        y_window = min(y), max(y)
+
+        setattr(self, f'{type}_slope_start_xy', slope_start)
+        setattr(self, f'{type}_slope_end_xy', slope_end)
+        getattr(self, f'{type}_slope_move_zone')['x'] = x_window[0]-self.x_margin, x_window[-1]+self.x_margin
+        getattr(self, f'{type}_slope_move_zone')['y'] = y_window[0]-self.y_margin, y_window[-1]+self.y_margin
+        getattr(self, f'{type}_slope_resize_zone')['x'] = x[-1]-self.x_margin, x[-1]+self.x_margin
+        getattr(self, f'{type}_slope_resize_zone')['y'] = y[-1]-self.y_margin, y[-1]+self.y_margin
+
+    def updateAmpZone(self, type, x, y):
+        #print(f"*** - updateAmpZone: {type} {x} {y}")
+        amp_xy = x, y
+        amp_move_zone = x-self.x_margin, x+self.x_margin, y-self.y_margin, y+self.y_margin
+
+        setattr(self, f'{type}_amp_xy', amp_xy)
+        getattr(self, f'{type}_amp_move_zone')['x'] = amp_move_zone[0], amp_move_zone[1]
+        getattr(self, f'{type}_amp_move_zone')['y'] = amp_move_zone[2], amp_move_zone[3]
 
     def get_recSet(self): # returns a set of all rec IDs that are currently plotted
         return set([value['rec_ID'] for value in self.dict_rec_labels.values()])
