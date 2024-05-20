@@ -976,8 +976,7 @@ class UIsub(Ui_MainWindow):
         old_selection = uistate.dict_rec_show 
         selected_ids = set(uistate.df_recs2plot['ID'])
         print(f"selected_ids: {selected_ids}")
-        new_selection = {k: v for k, v in uistate.dict_rec_label_ID_line_axis.items() if v[0] in selected_ids}
-        #print(f"old_selection: {old_selection.keys()}")
+        new_selection = {k: v for k, v in uistate.dict_rec_labels.items() if v['rec_ID'] in selected_ids}
         filters = []
         # Setup filters for checkboxes
         if not uistate.checkBox['EPSP_amp']:
@@ -1006,17 +1005,21 @@ class UIsub(Ui_MainWindow):
                             if not any(k.endswith(f) for f in filters)}
         # Hide what ceased to be selected
         if reset: # Hide all lines
-            obsolete_lines = {k: v for k, v in uistate.dict_rec_label_ID_line_axis.items()}
+            obsolete_lines = {k: v for k, v in uistate.dict_rec_labels.items()}
         else:
             obsolete_lines = {k: v for k, v in old_selection.items() if k not in new_selection}
-        for _, line, _ in obsolete_lines.values():
-            line.set_visible(False)
+        for line_dict in obsolete_lines.values():
+            line_dict['line'].set_visible(False)
         # Show what's now selected
         added_lines = {k: v for k, v in new_selection.items() if k not in old_selection}
-        for _, line, _ in added_lines.values():
-            line.set_visible(True)
+        for line_dict in added_lines.values():
+            line_dict['line'].set_visible(True)
         uistate.dict_rec_show = new_selection
-        #print(f"uistate.dict_rec_show: {uistate.dict_rec_show.keys()}")
+        # print new selection; key (linebreak) values
+        print("new_selection:")
+        for k, v in new_selection.items():
+            print(f"{k}:\n{v}")
+        
         print(f"update_rec_show took {round((time.time() - t0) * 1000)} ms")
 
 
@@ -2681,10 +2684,10 @@ class UIsub(Ui_MainWindow):
         # function to set up x scales for dragging and releasing on mean- and output canvases
         if graph == "mean": # uistate.axm
             canvas = self.canvasMean
-            filtered_values = [value[1] for value in uistate.dict_rec_label_ID_line_axis.values() if value[0] == rec_ID and value[2] == 'axm']
+            filtered_values = [value['line'] for value in uistate.dict_rec_labels.values() if value['rec_ID'] == rec_ID and value['axis'] == 'axm']
         elif graph == 'output': #uistate.ax1+ax2
             canvas = self.canvasOutput
-            filtered_values = [value[1] for value in uistate.dict_rec_label_ID_line_axis.values() if value[0] == rec_ID and (value[2] == 'ax1' or value[2] == 'ax2')]
+            filtered_values = [value['line'] for value in uistate.dict_rec_labels.values() if value['rec_ID'] == rec_ID and (value['axis'] == 'ax1' or value['axis'] == 'ax2')]
         else:
             print("connectDragRelease: Incorrect graph reference.")
             return
@@ -2696,7 +2699,6 @@ class UIsub(Ui_MainWindow):
         x_data = max_x_line.get_xdata()
         self.mouse_drag = canvas.mpl_connect('motion_notify_event', lambda event: self.xDrag(event, canvas=canvas, x_data=x_data, x_range=x_range))
         self.mouse_release = canvas.mpl_connect('button_release_event', lambda event: self.dragReleased(event, canvas=canvas))
-
 
 
     def xDrag(self, event, canvas, x_data, x_range):
@@ -2754,28 +2756,38 @@ class UIsub(Ui_MainWindow):
         self.mouseoverDisconnect()
         # if only one item is selected, make a new mouseover event connection
         if len(uistate.rec_select) != 1:
-            print("(multi-selection) mouseoverUpdate calls uiplot.graphRefresh()")
+            print("(multi-rec-selection) mouseoverUpdate calls uiplot.graphRefresh()")
+            uiplot.graphRefresh()
+            return
+        if len(uistate.stim_select) != 1:
+            print("(multi-stim-selection) mouseoverUpdate calls uiplot.graphRefresh()")
             uiplot.graphRefresh()
             return
         print(f"mouseoverUpdate: {uistate.rec_select[0]}, {type(uistate.rec_select[0])}")
-        dfp_row = uistate.dfp_row_copy
-        rec_name = dfp_row['recording_name']
-        rec_ID = dfp_row['ID']
+        p_row = uistate.dfp_row_copy
+        rec_name = p_row['recording_name']
+        rec_ID = p_row['ID']
+        t_row = uistate.dft_copy.iloc[uistate.stim_select[0]]
+        stim_num = t_row['stim']
+        stim_str = f" - stim {stim_num}"
         uistate.setMargins(axe=uistate.axe)
-        dict_labels = {key: value for key, value in uistate.dict_rec_label_ID_line_axis.items() if key.endswith(" marker") and value[0] == rec_ID}
+        dict_labels = {key: value for key, value in uistate.dict_rec_labels.items() if key.endswith(" marker") and value['rec_ID'] == rec_ID}
         if not dict_labels:
             print("(no labels) mouseoverUpdate calls uiplot.graphRefresh()")
             uiplot.graphRefresh()
             return
         for label, value in dict_labels.items():
-            line = value[1]
+            line = value['line']
             if "amp" in label:
-                aspect = label.replace(f"{rec_name} ", "").replace(" marker", "")
+                aspect = label.replace(f"{rec_name} ", "").replace(f"{stim_str} ", "").replace(" marker", "")
+                print (f"aspect: {aspect}")
                 uistate.updatePointDragZone(aspect=aspect, x=line.get_xdata()[0], y=line.get_ydata()[0])
+                #print(f"updated AMP label: {label}, value: {value}, uistate.mouseover_plot: {uistate.mouseover_plot}")
             else:
-                #print(f"updated label: {label}, value: {value}, uistate.mouseover_plot: {uistate.mouseover_plot}")
-                aspect = label.replace(f"{rec_name} ", "").replace(" marker", "")
+                aspect = label.replace(f"{rec_name} ", "").replace(f"{stim_str} ", "").replace(" marker", "")
+                print (f"aspect: {aspect}")
                 uistate.updateDragZones(aspect=aspect, x=line.get_xdata(), y=line.get_ydata())
+                #print(f"updated SLOPE label: {label}, value: {value}, uistate.mouseover_plot: {uistate.mouseover_plot}")
         self.mouseover = self.canvasEvent.mpl_connect('motion_notify_event', uiplot.graphMouseover)
         print("mouseoverUpdate calls uiplot.graphRefresh()")
         uiplot.graphRefresh()

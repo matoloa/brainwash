@@ -105,13 +105,15 @@ class UIplot():
 
 
     def unPlot(self, rec_ID):
-        dict_rec = self.uistate.dict_rec_label_ID_line_axis
+        dict_rec = self.uistate.dict_rec_labels
         dict_show = self.uistate.dict_rec_show
-        keys_to_remove = [key for key, value in dict_rec.items() if rec_ID == value[0]]
+        keys_to_remove = [key for key, value in dict_rec.items() if rec_ID == value['rec_ID']]
         for key in keys_to_remove:
-            dict_rec[key][1].remove()
+            dict_rec[key]['line'].remove()
+            print(f"unPlot: {key} removed from dict_rec")
             del dict_rec[key]
             if key in dict_show:
+                print(f"unPlot: {key} removed from dict_show")
                 del dict_show[key]
 
 
@@ -138,10 +140,10 @@ class UIplot():
             axis_names = ['axm', 'axe', 'ax1', 'ax2']
             loc_values = ['upper right', 'upper right', 'upper right', 'lower right']
             for axis_name, loc in zip(axis_names, loc_values):
-                dict_on_axis = {key: value for key, value in dict_rec.items() if value[2] == axis_name}
-                axis_legend = {key: value[1] for key, value in dict_on_axis.items() if not key.endswith(" marker")}
+                dict_on_axis = {key: value for key, value in dict_rec.items() if value['axis'] == axis_name}
+                axis_legend = {key: value['line'] for key, value in dict_on_axis.items() if not key.endswith(" marker")}
                 for key, value in dict_on_axis.items():
-                    value[1].set_visible(True)
+                    value['line'].set_visible(True)
                 axis = getattr(uistate, axis_name)
                 axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)              
         # Groups
@@ -220,7 +222,7 @@ class UIplot():
         axm, axe, ax1, ax2 = uistate.axm, uistate.axe, uistate.ax1, uistate.ax2
         rec_ID = p_row['ID']
         rec_name = p_row['recording_name']
-        print(f"addRow {rec_name}: {rec_ID}")
+        #print(f"addRow {rec_name}: {rec_ID}")
         rec_filter = p_row['filter'] # the filter currently used for this recording
         n_stims = len(dft)
         # plot relevant filter of dfmean on canvasEvent
@@ -232,8 +234,7 @@ class UIplot():
         # add to Mean
         mean_label = f"mean {rec_name}"
         line, = axm.plot(dfmean["time"], dfmean[rec_filter], label=mean_label, color="black")
-        uistate.dict_rec_label_ID_line_axis[mean_label] = rec_ID, line, 'axm'
-        print(f" - Placed line {mean_label} on axm")
+        uistate.dict_rec_labels[mean_label] = {'rec_ID':rec_ID, 'stim': None, 'line':line, 'axis':'axm'}
 
         colors = [(1, 0.5, 0), "green", "teal"]  # RGB for a redder orange
         cmap = LinearSegmentedColormap.from_list("", colors)
@@ -248,11 +249,11 @@ class UIplot():
             out = dfoutput[dfoutput['stim'] == stim_num]# TODO: enable switch to dfdiff?
             y_position = dfmean.loc[dfmean.time == t_stim, rec_filter].values[0] # returns index, y_value
             subplot = f"{mean_label}{stim_str} marker"
-            marker, = axm.plot(t_stim, y_position, marker='o', markerfacecolor=color, markeredgecolor=color, markersize=10, alpha=1, zorder=0, label=f"{subplot}")
-            uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, marker, 'axm'
+            line, = axm.plot(t_stim, y_position, marker='o', markerfacecolor=color, markeredgecolor=color, markersize=10, alpha=1, zorder=0, label=f"{subplot}")
+            uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'axm'}
             subplot = f"{mean_label}{stim_str} selection marker"
-            marker = axm.axvline(x=t_stim, color=color, linewidth=1, alpha=0.8, label=f"{subplot}")
-            uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, marker, 'axm'
+            line = axm.axvline(x=t_stim, color=color, linewidth=1, alpha=0.8, label=f"{subplot}")
+            uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'axm'}
             # convert all variables except t_stim to stim-specific time
             variables = ['t_EPSP_amp', 't_EPSP_slope_start', 't_EPSP_slope_end', 't_volley_amp', 't_volley_slope_start', 't_volley_slope_end']
             for var in variables:
@@ -265,7 +266,7 @@ class UIplot():
             df_event = dfmean[(dfmean['time'] >= window_start) & (dfmean['time'] <= window_end)].copy()
             df_event['time'] = df_event['time'] - t_stim  # shift event so that t_stim is at time 0
             line, = axe.plot(df_event['time'], df_event[rec_filter], color=color, label=stim_label)
-            uistate.dict_rec_label_ID_line_axis[stim_label] = rec_ID, line, 'axe'
+            uistate.dict_rec_labels[stim_label] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'axe'}
             
             # plot markers on axe, output lines on ax1 and ax2
             out = dfoutput[dfoutput['stim'] == stim_num] # TODO: enable switch to dfdiff?
@@ -277,15 +278,15 @@ class UIplot():
             if not np.isnan(t_row['t_EPSP_amp']):
                 subplot = f"{label}{stim_str} EPSP amp marker"
                 y_position = df_event.loc[df_event.time == t_row['t_EPSP_amp'], rec_filter]
-                marker, = axe.plot(t_row['t_EPSP_amp'], y_position, marker='o', markerfacecolor='none', markeredgecolor=rgb_EPSP_amp, markersize=10, markeredgewidth=3, alpha=a_dot, zorder=0, label=subplot)
-                uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, marker, 'axe'
+                line, = axe.plot(t_row['t_EPSP_amp'], y_position, marker='o', markerfacecolor='none', markeredgecolor=rgb_EPSP_amp, markersize=10, markeredgewidth=3, alpha=a_dot, zorder=0, label=subplot)
+                uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'axe'}
                 subplot = f"{label}{stim_str} EPSP amp"
                 line, = ax1.plot(out['sweep'], out['EPSP_amp'], color=rgb_EPSP_amp, alpha=a_line, zorder=3, label=subplot)
-                uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, line, 'ax1'
+                uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'ax1'}
                 if 'EPSP_amp_norm' in out.columns:
                     subplot = f"{label}{stim_str} EPSP amp norm"
                     line, = ax1.plot(out["sweep"], out['EPSP_amp_norm'], color=rgb_EPSP_amp, zorder=3, alpha=a_line, label=subplot)
-                    uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, line, 'ax1'
+                    uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'ax1'}
             if not np.isnan(t_row['t_EPSP_slope_start']):
                 x_start = t_row['t_EPSP_slope_start']
                 x_end = t_row['t_EPSP_slope_end']
@@ -295,22 +296,22 @@ class UIplot():
                 y_end = df_event.loc[index, rec_filter] if index in df_event.index else None
                 subplot = f"{label}{stim_str} EPSP slope marker"
                 line, = axe.plot([x_start, x_end], [y_start, y_end], color=rgb_EPSP_slope, linewidth=10, alpha=a_mark, zorder=0, label=subplot)
-                uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, line, 'axe'
+                uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'axe'}
                 subplot = f"{label}{stim_str} EPSP slope"
                 line, = ax2.plot(out["sweep"], out['EPSP_slope'], color=rgb_EPSP_slope, zorder=3, alpha=a_line, label=subplot)
-                uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, line, 'ax2'
+                uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'ax2'}
                 if 'EPSP_slope_norm' in out.columns:
                     subplot = f"{label}{stim_str} EPSP slope norm"
                     line, = ax2.plot(out["sweep"], out['EPSP_slope_norm'], color=rgb_EPSP_slope, zorder=3, alpha=a_line, label=subplot)
-                    uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, line, 'ax2'
+                    uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'ax2'}
             if not np.isnan(t_row['t_volley_amp']):
                 y_position = df_event.loc[df_event.time == t_row['t_volley_amp'], rec_filter]
                 subplot = f"{label}{stim_str} volley amp marker"
-                marker, = axe.plot(t_row['t_volley_amp'], y_position, marker='o', markerfacecolor='none', markeredgecolor=rgb_volley_amp, markersize=10, markeredgewidth=3, alpha=a_dot, zorder=0, label=subplot)
-                uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, marker, 'axe'
+                line, = axe.plot(t_row['t_volley_amp'], y_position, marker='o', markerfacecolor='none', markeredgecolor=rgb_volley_amp, markersize=10, markeredgewidth=3, alpha=a_dot, zorder=0, label=subplot)
+                uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'axe'}
                 subplot = f"{label}{stim_str} volley amp mean"
                 line = ax1.axhline(y=t_row['volley_amp_mean'], color=rgb_volley_amp, linestyle=':', zorder=0, label=subplot)
-                uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, line, 'ax1'
+                uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'ax1'}
             if not np.isnan(t_row['t_volley_slope_start']):
                 x_start = t_row['t_volley_slope_start']
                 x_end = t_row['t_volley_slope_end']
@@ -320,11 +321,11 @@ class UIplot():
                 y_end = df_event.loc[index, rec_filter] if index in df_event.index else None
                 subplot = f"{label}{stim_str} volley slope marker"
                 line, = axe.plot([x_start, x_end], [y_start, y_end], color=rgb_volley_slope, linewidth=10, alpha=a_mark, zorder=0, label=subplot)
-                uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, line, 'axe'
+                uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'axe'}
                 subplot = f"{label}{stim_str} volley slope mean"
                 line = ax2.axhline(y=t_row['volley_slope_mean'], color=rgb_volley_slope, linestyle='--', zorder=0, label=subplot)
-                uistate.dict_rec_label_ID_line_axis[subplot] = rec_ID, line, 'ax2'
-        #print(f"uistate.dict_rec_label_ID_line_axis.keys(): {uistate.dict_rec_label_ID_line_axis.keys()}")
+                uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'ax2'}
+        # print(f"uistate.dict_rec_labels.keys(): {uistate.dict_rec_labels.keys()}")
 
     def addGroup(self, df_group_row, df_groupmean):
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
@@ -377,21 +378,21 @@ class UIplot():
 
     def updateLine(self, plot_to_update, x_data, y_data):
         axe = self.uistate.axe
-        line = self.uistate.dict_rec_label_ID_line_axis[plot_to_update]
-        line[1].set_xdata(x_data)
-        line[1].set_ydata(y_data)
+        line = self.uistate.dict_rec_labels[plot_to_update]
+        line['line'].set_xdata(x_data)
+        line['line'].set_ydata(y_data)
         axe.figure.canvas.draw()
 
     def updateOutLine(self, row, aspect):
         mouseover_out = self.uistate.mouseover_out
-        line = self.uistate.dict_rec_label_ID_line_axis[f"{row['recording_name']} {aspect}"]
-        line[1].set_ydata(mouseover_out[0].get_ydata())
+        line = self.uistate.dict_rec_labels[f"{row['recording_name']} {aspect}"]
+        line['line'].set_ydata(mouseover_out[0].get_ydata())
 
     def updateOutMean(self, aspect, row):
         rec_name = row['recording_name']
         mean = row[f'{aspect.replace(" ", "_")}_mean']
-        line = self.uistate.dict_rec_label_ID_line_axis[f"{rec_name} {aspect} mean"]
-        line[1].set_ydata(mean)
+        line = self.uistate.dict_rec_labels[f"{rec_name} {aspect} mean"]
+        line['line'].set_ydata(mean)
 
     def updateEPSPout(self, rec_name, out): # TODO: update this last remaining ax-cycle to use the dict
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
@@ -409,8 +410,8 @@ class UIplot():
                 ax2.figure.canvas.draw()
 
     def graphMouseover(self, event): # determine which maingraph event is being mouseovered
-        axe = self.uistate.axe
         uistate = self.uistate
+        axe = uistate.axe
         def plotMouseover(action, axe):
             alpha = 0.8
             linewidth = 3 if 'resize' in action else 10
@@ -432,6 +433,7 @@ class UIplot():
                     uistate.mouseover_blob.set_color(color)
 
                 if uistate.mouseover_plot is None:
+                    print("plotted mouseover")
                     uistate.mouseover_plot = axe.plot(x_range, y_range, color=color, linewidth=linewidth, alpha=alpha, label="mouseover")
                 else:
                     uistate.mouseover_plot[0].set_data(x_range, y_range)
@@ -472,7 +474,7 @@ class UIplot():
                 checkbox_key = '_'.join(action.split(' ')[:2])  # Split the action string and use the last two words as the checkbox key
                 #print (f"action: {action}, uistate.checkBox.get({checkbox_key}): {uistate.checkBox[checkbox_key]}")
                 if zone is None or 'x' not in zone:
-                    print(f" - - {action} zone not defined")
+                    print(f" - - {action} zone: {zone}")
                     break
                 if uistate.checkBox.get(checkbox_key, False) and zone['x'][0] <= x <= zone['x'][1] and zone['y'][0] <= y <= zone['y'][1]:
                     uistate.mouseover_action = action
