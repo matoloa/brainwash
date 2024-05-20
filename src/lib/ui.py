@@ -1016,10 +1016,9 @@ class UIsub(Ui_MainWindow):
             line_dict['line'].set_visible(True)
         uistate.dict_rec_show = new_selection
         # print new selection; key (linebreak) values
-        print("new_selection:")
-        for k, v in new_selection.items():
-            print(f"{k}:\n{v}")
-        
+#        print("new_selection:")
+#        for k, v in new_selection.items():
+#            print(f"{k}:\n{v}")
         print(f"update_rec_show took {round((time.time() - t0) * 1000)} ms")
 
 
@@ -2642,29 +2641,33 @@ class UIsub(Ui_MainWindow):
 
     # left clicked on a graph
         uistate.dragging = True
-        df_p = self.get_df_project()
-        p_row = df_p.loc[uistate.rec_select[0]]
+        p_row = uistate.dfp_row_copy
+        stim_num = uistate.dft_copy.iloc[uistate.stim_select[0]]['stim']
 
-        if (canvas == self.canvasEvent) and (len(uistate.rec_select) == 1): # Event canvas left-clicked with just one selected, middle graph: editing detected events
-            time_values = self.dfmean['time'].values
-            uistate.x_on_click = np.abs(time_values - x).argmin() # nearest x-index to click
-            if len(uistate.stim_select) == 1: # connect mouseover IF one stim selected
-                dft_row = uistate.dft_copy.iloc[uistate.stim_select[0]]
-                if event.inaxes is not None:
-                    if (event.button == 1 or event.button == 3) and (uistate.mouseover_action is not None):
-                        action = uistate.mouseover_action
-                        print(f"mouseover action: {action}")
-                        if action.startswith("EPSP slope"):
-                            start, end = dft_row['t_EPSP_slope_start'], dft_row['t_EPSP_slope_end']
-                            self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, time_values, action, start, end))
-                        elif action == 'EPSP amp move':
-                            self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, time_values))
-                        elif action.startswith("volley slope"):
-                            start, end = dft_row['t_volley_slope_start'], dft_row['t_volley_slope_end']
-                            self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, time_values, action, start, end))
-                        elif action == 'volley amp move':
-                            self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, time_values))
-                        self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', self.eventDragReleased)
+        if (canvas == self.canvasEvent) and (len(uistate.rec_select) == 1) and ((len(uistate.stim_select) == 1)): # Event canvas left-clicked with just one rec and stim selected, middle graph: editing detected events
+            label = f"{p_row['recording_name']} - stim {stim_num}"
+            dict_event = uistate.dict_rec_labels[label]
+            data = dict_event['line']
+            data_x = data.get_xdata()
+            data_y = data.get_ydata()
+            uistate.x_on_click = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
+            print(f"uistate.x_on_click: {uistate.x_on_click}")
+            t_row = uistate.dft_copy.iloc[uistate.stim_select[0]]
+            if event.inaxes is not None:
+                if (event.button == 1 or event.button == 3) and (uistate.mouseover_action is not None):
+                    action = uistate.mouseover_action
+                    print(f"mouseover action: {action}")
+                    if action.startswith("EPSP slope"):
+                        start, end = t_row['t_EPSP_slope_start']-t_row['t_stim'], t_row['t_EPSP_slope_end']-t_row['t_stim']
+                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, action, data_x, data_y, start, end))
+                    elif action == 'EPSP amp move':
+                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, data_x, data_y))
+                    elif action.startswith("volley slope"):
+                        start, end = t_row['t_volley_slope_start']-t_row['t_stim'], t_row['t_volley_slope_end']-t_row['t_stim']
+                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, action, data_x, data_y, start, end))
+                    elif action == 'volley amp move':
+                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, data_x, data_y))
+                    self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', lambda event: self.eventDragReleased(event, data_x, data_y))
 
         elif canvas == self.canvasMean: # Mean canvas (top graph) left-clicked: overview and selecting ranges for finding relevant stims
             time_values = self.dfmean['time'].values
@@ -2806,16 +2809,19 @@ class UIsub(Ui_MainWindow):
         uistate.mouseover_action = None
 
 
-    def eventDragSlope(self, event, time_values, action, prior_slope_start, prior_slope_end): # graph dragging event
+    def eventDragSlope(self, event, action, data_x, data_y, prior_slope_start, prior_slope_end): # graph dragging event
         self.canvasEvent.mpl_disconnect(self.mouseover)
         if event.xdata is None:
             return
-        uistate.x_drag = np.abs(time_values - event.xdata).argmin()  # update x to the nearest x-value on the plot
+        x = event.xdata
+        uistate.x_drag = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
         if uistate.x_drag == uistate.x_drag_last: # if the dragged event hasn't moved an index point, change nothing
             return
-        precision = len(str(time_values[1] - time_values[0]).split('.')[1])
-        time_diff = time_values[uistate.x_drag] - time_values[uistate.x_on_click]
-        #print(f"prior_slope_start: {prior_slope_start}, prior_slope_end: {prior_slope_end}")
+
+        x_offset = uistate.dft_copy.iloc[uistate.stim_select[0]]['t_stim']
+        precision = len(str(data_x[1] - data_x[0]).split('.')[1])
+        time_diff = uistate.x_drag - uistate.x_on_click
+        print(f"time_diff: {time_diff}, x_offset: {x_offset}")
         # get the x values of the slope
         blob = True # only moving amplitudes and resizing slopes have a blob
         if action.endswith('resize'):
@@ -2824,15 +2830,15 @@ class UIsub(Ui_MainWindow):
             x_start = round(prior_slope_start + time_diff, precision)
             blob = False
         x_end = round(prior_slope_end + time_diff, precision)
+        
         # prevent resizing below 1 index - TODO: make it flip instead
         if x_end <= x_start:
-            x_start_index = np.where(time_values == x_start)[0][0]
-            x_end = time_values[x_start_index + 1] 
-        x_indices = np.searchsorted(time_values, [x_start, x_end])
+            x_start_index = np.where(data_x == x_start)[0][0]
+            x_end = data_x[x_start_index + 1] 
+        x_indices = np.searchsorted(data_x, [x_start, x_end])
 
-        # get y values from the appropriate filter of persisted dfmean
-        rec_filter = uistate.dfp_row_copy['filter']
-        y_start, y_end = self.dfmean[rec_filter].iloc[x_indices]
+        # get y values
+        y_start, y_end = data_y[x_indices]
 
         # remember the last x index
         uistate.x_drag_last = uistate.x_drag
@@ -2845,23 +2851,27 @@ class UIsub(Ui_MainWindow):
         self.canvasEvent.draw()
         self.eventDragUpdate(x_start, x_end, precision)
 
-
-    def eventDragPoint(self, event, time_values): # maingraph dragging event
+    def eventDragPoint(self, event): # maingraph dragging event
         self.canvasEvent.mpl_disconnect(self.mouseover)
         if event.xdata is None:
             return
-        uistate.x_drag = np.abs(time_values - event.xdata).argmin()  # update x to the nearest x-value on the plot
+        
+        rec_name = uistate.dfp_row_copy['recording_name']
+        stim_num = uistate.dft_copy.iloc[uistate.stim_select[0]]['stim']
+        label = f"{rec_name} - stim {stim_num}"
+        event_dict = uistate.dict_rec_labels[label]
+        event_line = event_dict['line']
+        x_data = event_line.get_xdata()
+        y_data = event_line.get_ydata()
+
+        uistate.x_drag = np.abs(x_data - event.xdata).argmin()  # update x to the nearest x-value on the plot
         if uistate.x_drag == uistate.x_drag_last: # if the dragged event hasn't moved an index point, change nothing
             return
-        precision = len(str(time_values[1] - time_values[0]).split('.')[1])
+        precision = len(str(x_data[1] - x_data[0]).split('.')[1])
         
-        x_point = time_values[uistate.x_drag]
-        x_drag = self.dfmean['time'].searchsorted(x_point)
-
-        # get y values from the appropriate filter of persisted dfmean
-        rec_filter = uistate.dfp_row_copy['filter']
-        y_point = self.dfmean[rec_filter].iloc[x_drag]
-
+        x_point = x_data[uistate.x_drag]
+        y_point = y_data[uistate.x_drag]
+        print (f"x_point: {x_point}, y_point: {y_point}")
         # remember the last x index
         uistate.x_drag_last = uistate.x_drag
         # update the mouseover plot
@@ -2874,11 +2884,13 @@ class UIsub(Ui_MainWindow):
     def eventDragUpdate(self, x_start, x_end, precision): # update output; this is a separate function to allow the user to make it happen live (current) or on release (for low compute per data)
         dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
         action = uistate.mouseover_action
-        
+        stim_offset = uistate.dft_copy.iloc[uistate.stim_select[0]]['t_stim']
+        dict_t = {}
+
         if action.startswith("EPSP slope"):
             dict_t = { # only pass these values to build_dfoutput, so it won't rebuild unchanged values
-                't_EPSP_slope_start': x_start,
-                't_EPSP_slope_end': x_end,
+                't_EPSP_slope_start': x_start + stim_offset,
+                't_EPSP_slope_end': x_end + stim_offset,
                 't_EPSP_slope_width': round(x_end - x_start, precision),
             }
             color = 'green'
@@ -2936,12 +2948,12 @@ class UIsub(Ui_MainWindow):
             dict_t['volley_amp_mean'] = out['volley_amp'].mean()
 
         if dict_t:
-            uistate.dft_copy.update(pd.Series(dict_t), errors='ignore')
-            print(f"update - dict_t: {dict_t}")
+            for key, value in dict_t.items():
+                uistate.dft_copy.loc[uistate.stim_select[0], key] = value
         self.canvasOutput.draw()
 
 
-    def eventDragReleased(self, event): # graph release event
+    def eventDragReleased(self, event, data_x, data_y): # graph release event
         self.usage("eventDragReleased")
         print(f" - uistate.mouseover_action: {uistate.mouseover_action}")
         self.canvasEvent.mpl_disconnect(self.mouse_drag)
@@ -2953,8 +2965,7 @@ class UIsub(Ui_MainWindow):
             return
 
         p_row = uistate.dfp_row_copy.to_dict()
-        t_row = uistate.dft_copy.iloc[self.stim_select[0]].to_dict()
-        print(f"t_row: {t_row}")
+        t_row = uistate.dft_copy.iloc[uistate.stim_select[0]].to_dict()
 
         dict_t = {} # update the dict_t with the new values, for use by build_dfoutput
         action_mapping = {
@@ -2964,19 +2975,27 @@ class UIsub(Ui_MainWindow):
             "volley amp move": ("t_volley_amp_method", "manual", 'volley amp', {'t_volley_amp': t_row['t_volley_amp']}, uistate.updatePointDragZone),
         }
 
+        # The action_mapping dictionary maps actions to a tuple of values.
+        # Each tuple contains the method name, method type, aspect, a dictionary of parameters, and a function to update the UI.
+        # Loop over each action and its associated values in the action_mapping dictionary
         for action, values in action_mapping.items():
+            # Check if the current mouseover action starts with the current action
             if uistate.mouseover_action.startswith(action):
+                # If it does, update the method in t_row with the method type from values
                 t_row[values[0]] = values[1]
-                uiplot.plotUpdate(dfp_row=p_row, dft_row=t_row, aspect=values[2], dfmean=self.dfmean)
+                # Call plotUpdate to update the plot with the new method
+                uiplot.plotUpdate(p_row=p_row, t_row=t_row, aspect=values[2], data_x=data_x, data_y=data_y)
+                # Call the function in values to update the UI
                 values[4]()
+                # Set dict_t to the dictionary of parameters from values
                 dict_t = values[3]
+                # Break the loop as we've found a match for the mouseover action
                 break
-
-        print(f"release - dict_t: {dict_t}")
 
         #update dft row 0 with the values from uistate.dft_row_copy
         dft = self.get_dft(row=p_row).copy()
-        dft.loc[0] = t_row
+        for key, value in dict_t.items():
+            uistate.dft_copy.loc[uistate.stim_select[0], key] = value
         self.set_dft(p_row['recording_name'], dft)
 
         # update dfoutput; dict and file, with normalized columns if applicable

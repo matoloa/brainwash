@@ -344,49 +344,49 @@ class UIplot():
             fill = ax2.fill_between(df_groupmean.sweep, df_groupmean.EPSP_slope_mean + df_groupmean.EPSP_slope_SEM, df_groupmean.EPSP_slope_mean - df_groupmean.EPSP_slope_SEM, alpha=0.3, color=color)
             self.uistate.dict_group_label_ID_line_SEM[label] = [group_ID, line, fill]
 
-    def plotUpdate(self, dfp_row, dft_row, aspect, dfmean):
-        print(f"dfp_row: {dfp_row}, dft_row: {dft_row}")
+    def plotUpdate(self, p_row, t_row, aspect, data_x, data_y):
         norm = self.uistate.checkBox['norm_EPSP']
-        rec_filter = dfp_row['filter']  # the filter currently used for this recording
-        plot_to_update = f"{dfp_row['recording_name']} {aspect} marker"
+        stim_offset = t_row['t_stim']
+        stim_str = f" - stim {t_row['stim']}"
+        plot_to_update = f"{p_row['recording_name']}{stim_str} {aspect} marker"
 
         if aspect in ['EPSP slope', 'volley slope']:
-            x_start = dft_row[f't_{aspect.replace(" ", "_")}_start']
-            x_end = dft_row[f't_{aspect.replace(" ", "_")}_end']
-            y_start = dfmean[rec_filter].iloc[(dfmean['time'] - x_start).abs().idxmin()]
-            y_end = dfmean[rec_filter].iloc[(dfmean['time'] - x_end).abs().idxmin()]
+            x_start = t_row[f't_{aspect.replace(" ", "_")}_start']-stim_offset
+            x_end = t_row[f't_{aspect.replace(" ", "_")}_end']-stim_offset
+            y_start = data_y[np.abs(data_x - x_start).argmin()]
+            y_end = data_y[np.abs(data_x - x_end).argmin()]
             self.updateLine(plot_to_update, [x_start, x_end], [y_start, y_end])
             if aspect == 'volley slope':
-                self.updateOutMean(aspect, dft_row)
+                self.updateOutMean(aspect, t_row)
             else:
+                label = f"{p_row['recording_name']}{stim_str} {aspect}"
                 if norm:
-                    self.updateOutLine(dfp_row, f"{aspect} norm")
-                else:
-                    self.updateOutLine(dfp_row, f"{aspect}")
+                    label += " norm"
+                self.updateOutLine(label)
         elif aspect in ['EPSP amp', 'volley amp']:
-            t_amp = dft_row[f't_{aspect.replace(" ", "_")}']
-            y_position = dfmean.loc[dfmean.time == t_amp, rec_filter].item()
+            t_amp = t_row[f't_{aspect.replace(" ", "_")}']
+            y_position = data_y[data_x == t_amp].item()
             self.updateLine(plot_to_update, t_amp, y_position)
             if aspect == 'volley amp':
-                self.updateOutMean(aspect, dft_row)
+                self.updateOutMean(aspect, t_row)
             else:
+                label = f"{p_row['recording_name']}{stim_str} {aspect}"
                 if norm:
-                    self.updateOutLine(dfp_row, f"{aspect} norm")
-                else:
-                    self.updateOutLine(dfp_row, f"{aspect}")
+                    label += " norm"
+                self.updateOutLine(label)
 
 
     def updateLine(self, plot_to_update, x_data, y_data):
         axe = self.uistate.axe
-        line = self.uistate.dict_rec_labels[plot_to_update]
-        line['line'].set_xdata(x_data)
-        line['line'].set_ydata(y_data)
+        linedict = self.uistate.dict_rec_labels[plot_to_update]
+        linedict['line'].set_xdata(x_data)
+        linedict['line'].set_ydata(y_data)
         axe.figure.canvas.draw()
 
-    def updateOutLine(self, row, aspect):
+    def updateOutLine(self, label):
         mouseover_out = self.uistate.mouseover_out
-        line = self.uistate.dict_rec_labels[f"{row['recording_name']} {aspect}"]
-        line['line'].set_ydata(mouseover_out[0].get_ydata())
+        linedict = self.uistate.dict_rec_labels[label]
+        linedict['line'].set_ydata(mouseover_out[0].get_ydata())
 
     def updateOutMean(self, aspect, row):
         rec_name = row['recording_name']
