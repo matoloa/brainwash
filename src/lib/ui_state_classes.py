@@ -47,6 +47,14 @@ class UIstate:
         self.settings = {
             'event_start': -0.005, # in relation to current t_stim
             'event_end': 0.05,
+            # colors and alpha
+            'rgb_EPSP_amp': (0.2, 0.2, 1),
+            'rgb_EPSP_slope': (0.5, 0.5, 1),
+            'rgb_volley_amp': (1, 0.2, 1),
+            'rgb_volley_slope': (1, 0.5, 1),
+            'alpha_mark': 0.5,
+            'alpha_line': 1,
+            'alpha_dot': 0.8,
         }
         self.zoom = {
             'mean_xlim': (0, 1),

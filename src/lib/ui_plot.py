@@ -270,11 +270,12 @@ class UIplot():
             
             # plot markers on axe, output lines on ax1 and ax2
             out = dfoutput[dfoutput['stim'] == stim_num] # TODO: enable switch to dfdiff?
-            rgb_EPSP_amp = (0.2, 0.2, 1)
-            rgb_EPSP_slope = (0.5, 0.5, 1)
-            rgb_volley_amp = (1, 0.2, 1)
-            rgb_volley_slope = (1, 0.5, 1)
-            a_mark, a_line, a_dot = 0.5, 1, 0.8 # alpha settings
+            rgb_EPSP_amp = uistate.settings['rgb_EPSP_amp']
+            rgb_EPSP_slope = uistate.settings['rgb_EPSP_slope']
+            rgb_volley_amp = uistate.settings['rgb_volley_amp']
+            rgb_volley_slope = uistate.settings['rgb_volley_slope']
+            a_mark, a_line, a_dot = uistate.settings['alpha_mark'], uistate.settings['alpha_line'], uistate.settings['alpha_dot']
+
             if not np.isnan(t_row['t_EPSP_amp']):
                 subplot = f"{label}{stim_str} EPSP amp marker"
                 y_position = df_event.loc[df_event.time == t_row['t_EPSP_amp'], rec_filter]
@@ -346,9 +347,11 @@ class UIplot():
 
     def plotUpdate(self, p_row, t_row, aspect, data_x, data_y):
         norm = self.uistate.checkBox['norm_EPSP']
+        rec_name = p_row['recording_name']
         stim_offset = t_row['t_stim']
         stim_str = f" - stim {t_row['stim']}"
         plot_to_update = f"{p_row['recording_name']}{stim_str} {aspect} marker"
+        print(f"plotUpdate: {plot_to_update}")
 
         if aspect in ['EPSP slope', 'volley slope']:
             x_start = t_row[f't_{aspect.replace(" ", "_")}_start']-stim_offset
@@ -357,20 +360,24 @@ class UIplot():
             y_end = data_y[np.abs(data_x - x_end).argmin()]
             self.updateLine(plot_to_update, [x_start, x_end], [y_start, y_end])
             if aspect == 'volley slope':
-                self.updateOutMean(aspect, t_row)
+                label = f"{rec_name}{stim_str} {aspect} mean"
+                mean = t_row[f'{aspect.replace(" ", "_")}_mean']
+                self.updateOutMean(label, mean)
             else:
-                label = f"{p_row['recording_name']}{stim_str} {aspect}"
+                label = f"{rec_name}{stim_str} {aspect}"
                 if norm:
                     label += " norm"
                 self.updateOutLine(label)
         elif aspect in ['EPSP amp', 'volley amp']:
-            t_amp = t_row[f't_{aspect.replace(" ", "_")}']
-            y_position = data_y[data_x == t_amp].item()
+            t_amp = t_row[f't_{aspect.replace(" ", "_")}'] - stim_offset
+            y_position = data_y[np.abs(data_x - t_amp).argmin()]
             self.updateLine(plot_to_update, t_amp, y_position)
             if aspect == 'volley amp':
-                self.updateOutMean(aspect, t_row)
+                label = f"{rec_name}{stim_str} {aspect} mean"
+                mean = t_row[f'{aspect.replace(" ", "_")}_mean']
+                self.updateOutMean(label, mean)
             else:
-                label = f"{p_row['recording_name']}{stim_str} {aspect}"
+                label = f"{rec_name}{stim_str} {aspect}"
                 if norm:
                     label += " norm"
                 self.updateOutLine(label)
@@ -379,6 +386,7 @@ class UIplot():
     def updateLine(self, plot_to_update, x_data, y_data):
         axe = self.uistate.axe
         linedict = self.uistate.dict_rec_labels[plot_to_update]
+        print(f"updateLine: {plot_to_update}, linedict: {linedict}")
         linedict['line'].set_xdata(x_data)
         linedict['line'].set_ydata(y_data)
         axe.figure.canvas.draw()
@@ -388,11 +396,9 @@ class UIplot():
         linedict = self.uistate.dict_rec_labels[label]
         linedict['line'].set_ydata(mouseover_out[0].get_ydata())
 
-    def updateOutMean(self, aspect, row):
-        rec_name = row['recording_name']
-        mean = row[f'{aspect.replace(" ", "_")}_mean']
-        line = self.uistate.dict_rec_labels[f"{rec_name} {aspect} mean"]
-        line['line'].set_ydata(mean)
+    def updateOutMean(self, label, mean):
+        linedict = self.uistate.dict_rec_labels[label]
+        linedict['line'].set_ydata(mean)
 
     def updateEPSPout(self, rec_name, out): # TODO: update this last remaining ax-cycle to use the dict
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
@@ -419,11 +425,11 @@ class UIplot():
                 if 'EPSP' in action:
                     x_range = uistate.EPSP_slope_start_xy[0], uistate.EPSP_slope_end_xy[0]
                     y_range = uistate.EPSP_slope_start_xy[1], uistate.EPSP_slope_end_xy[1]
-                    color = 'green'
+                    color = uistate.settings['rgb_EPSP_slope']
                 elif 'volley' in action:
                     x_range = uistate.volley_slope_start_xy[0], uistate.volley_slope_end_xy[0]
                     y_range = uistate.volley_slope_start_xy[1], uistate.volley_slope_end_xy[1]
-                    color = 'blue'
+                    color = uistate.settings['rgb_volley_slope']
 
                 if uistate.mouseover_blob is None:
                     uistate.mouseover_blob = axe.scatter(x_range[1], y_range[1], color=color, s=100, alpha=alpha)
@@ -443,10 +449,10 @@ class UIplot():
             elif 'amp' in action:
                 if 'EPSP' in action:
                     x, y = uistate.EPSP_amp_xy
-                    color = 'green'
+                    color = uistate.settings['rgb_EPSP_amp']
                 elif 'volley' in action:
                     x, y = uistate.volley_amp_xy
-                    color = 'blue'
+                    color = uistate.settings['rgb_volley_amp']
 
                 if uistate.mouseover_blob is None:
                     uistate.mouseover_blob = axe.scatter(x, y, color=color, s=100, alpha=alpha)

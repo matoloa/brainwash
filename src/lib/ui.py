@@ -2661,12 +2661,14 @@ class UIsub(Ui_MainWindow):
                         start, end = t_row['t_EPSP_slope_start']-t_row['t_stim'], t_row['t_EPSP_slope_end']-t_row['t_stim']
                         self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, action, data_x, data_y, start, end))
                     elif action == 'EPSP amp move':
-                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, data_x, data_y))
+                        start = t_row['t_EPSP_amp']-t_row['t_stim']
+                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, data_x, data_y, start))
                     elif action.startswith("volley slope"):
                         start, end = t_row['t_volley_slope_start']-t_row['t_stim'], t_row['t_volley_slope_end']-t_row['t_stim']
                         self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, action, data_x, data_y, start, end))
                     elif action == 'volley amp move':
-                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, data_x, data_y))
+                        start = t_row['t_volley_amp']-t_row['t_stim']
+                        self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragPoint(event, data_x, data_y, start))
                     self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', lambda event: self.eventDragReleased(event, data_x, data_y))
 
         elif canvas == self.canvasMean: # Mean canvas (top graph) left-clicked: overview and selecting ranges for finding relevant stims
@@ -2818,7 +2820,6 @@ class UIsub(Ui_MainWindow):
         if uistate.x_drag == uistate.x_drag_last: # if the dragged event hasn't moved an index point, change nothing
             return
 
-        x_offset = uistate.dft_copy.iloc[uistate.stim_select[0]]['t_stim']
         precision = len(str(data_x[1] - data_x[0]).split('.')[1])
         time_diff = uistate.x_drag - uistate.x_on_click
         # get the x values of the slope
@@ -2850,26 +2851,21 @@ class UIsub(Ui_MainWindow):
         self.canvasEvent.draw()
         self.eventDragUpdate(x_start, x_end, precision)
 
-    def eventDragPoint(self, event): # maingraph dragging event
+    def eventDragPoint(self, event, data_x, data_y, prior_amp): # maingraph dragging event
         self.canvasEvent.mpl_disconnect(self.mouseover)
         if event.xdata is None:
             return
-        
-        rec_name = uistate.dfp_row_copy['recording_name']
-        stim_num = uistate.dft_copy.iloc[uistate.stim_select[0]]['stim']
-        label = f"{rec_name} - stim {stim_num}"
-        event_dict = uistate.dict_rec_labels[label]
-        event_line = event_dict['line']
-        x_data = event_line.get_xdata()
-        y_data = event_line.get_ydata()
-
-        uistate.x_drag = np.abs(x_data - event.xdata).argmin()  # update x to the nearest x-value on the plot
+        x = event.xdata
+        uistate.x_drag = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
         if uistate.x_drag == uistate.x_drag_last: # if the dragged event hasn't moved an index point, change nothing
             return
-        precision = len(str(x_data[1] - x_data[0]).split('.')[1])
         
-        x_point = x_data[uistate.x_drag]
-        y_point = y_data[uistate.x_drag]
+        precision = len(str(data_x[1] - data_x[0]).split('.')[1])
+        time_diff = uistate.x_drag - uistate.x_on_click
+        
+        x_point = round(prior_amp + time_diff, precision)
+        x_index = (np.abs(data_x - x_point)).argmin()
+        y_point = data_y[x_index]
         print (f"x_point: {x_point}, y_point: {y_point}")
         # remember the last x index
         uistate.x_drag_last = uistate.x_drag
@@ -2892,14 +2888,13 @@ class UIsub(Ui_MainWindow):
                 't_EPSP_slope_end': x_end + stim_offset,
                 't_EPSP_slope_width': round(x_end - x_start, precision),
             }
-            color = 'green'
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.dfp_row_copy, dfoutput=out, aspect='EPSP_slope')
-                    uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['EPSP_slope_norm'], color=color)
+                    uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['EPSP_slope_norm'], color=uistate.settings['rgb_EPSP_slope'])
                 else:
-                    uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['EPSP_slope'], color=color)
+                    uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['EPSP_slope'], color=uistate.settings['rgb_EPSP_slope'])
             else:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.dfp_row_copy, dfoutput=out, aspect='EPSP_slope')
@@ -2907,15 +2902,15 @@ class UIsub(Ui_MainWindow):
                 else:
                     uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope'])
         elif action == "EPSP amp move":
-            dict_t = {'t_EPSP_amp': x_start}
-            color = 'green'
+            dict_t = {'t_EPSP_amp': x_start + stim_offset}
+            print(f"t_EPSP_amp: {dict_t['t_EPSP_amp']}")
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.dfp_row_copy, dfoutput=out, aspect='EPSP_amp')
-                    uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_amp_norm'], color=color)
+                    uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_amp_norm'], color=uistate.settings['rgb_EPSP_amp'])
                 else:
-                    uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_amp'], color=color)
+                    uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_amp'], color=uistate.settings['rgb_EPSP_amp'])
             else:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.dfp_row_copy, dfoutput=out, aspect='EPSP_amp')
@@ -2924,24 +2919,23 @@ class UIsub(Ui_MainWindow):
                     uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_amp'])
         elif action.startswith("volley slope"):
             dict_t = {
-                't_volley_slope_start': x_start,
-                't_volley_slope_end': x_end,
+                't_volley_slope_start': x_start + stim_offset,
+                't_volley_slope_end': x_end + stim_offset,
                 't_volley_slope_width': round(x_end - x_start, precision),
             }
-            color = 'blue'
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
-                uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['volley_slope'], color=color)
+                uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['volley_slope'], color=uistate.settings['rgb_volley_slope'], linestyle='--')
             else:
                 uistate.mouseover_out[0].set_data(out['sweep'], out['volley_slope'])
             dict_t['volley_slope_mean'] = out['volley_slope'].mean()
 
         elif action == "volley amp move":
-            dict_t = {'t_volley_amp': x_start}
-            color = 'blue'
+            dict_t = {'t_volley_amp': x_start + stim_offset}
+            print(f"t_volley_amp: {dict_t['t_volley_amp']}")
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
-                uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['volley_amp'], color=color,  linestyle='--')
+                uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['volley_amp'], color=uistate.settings['rgb_volley_amp'], linestyle=':')
             else:
                 uistate.mouseover_out[0].set_data(out['sweep'], out['volley_amp'])
             dict_t['volley_amp_mean'] = out['volley_amp'].mean()
