@@ -2899,7 +2899,7 @@ class UIsub(Ui_MainWindow):
                 else:
                     uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope'])
         elif action == "EPSP amp move":
-            dict_t = {'t_EPSP_amp': x_start + stim_offset}
+            dict_t = {'t_EPSP_amp': round(x_start + stim_offset, precision)}
             print(f"t_EPSP_amp: {dict_t['t_EPSP_amp']}")
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:

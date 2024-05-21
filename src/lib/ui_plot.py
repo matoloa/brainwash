@@ -282,14 +282,16 @@ class UIplot():
                 x_position = t_row['t_EPSP_amp']
                 #print(f"x_position: {x_position}, type: {type(x_position)}")
                 y_position = df_event.loc[df_event.time == x_position, rec_filter]
+                color = rgb_EPSP_amp
                 if isinstance(y_position, pd.Series):
                     if not y_position.empty and isinstance(y_position.values[0], float):
                         y_position = y_position.values[0]
                         print(f"Salvaged bad y_position by values[0]: {y_position} from {subplot}")
                     else:
                         print(f"*** Failed to salvage bad y_position: {y_position} from {subplot}")
-                        y_position = np.nan
-                line, = axe.plot(x_position, y_position, marker='o', markerfacecolor='none', markeredgecolor=rgb_EPSP_amp, markersize=10, markeredgewidth=3, alpha=a_dot, zorder=0, label=subplot)
+                        color = 'red'
+                        y_position = 0
+                line, = axe.plot(x_position, y_position, marker='o', markerfacecolor='none', markeredgecolor=color, markersize=10, markeredgewidth=3, alpha=a_dot, zorder=0, label=subplot)
                 uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'axe'}
                 subplot = f"{label}{stim_str} EPSP amp"
                 line, = ax1.plot(out['sweep'], out['EPSP_amp'], color=rgb_EPSP_amp, alpha=a_line, zorder=3, label=subplot)
