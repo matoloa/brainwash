@@ -1,5 +1,6 @@
 import seaborn as sns
 import numpy as np
+import pandas as pd
 from matplotlib import style
 from matplotlib.lines import Line2D
 from matplotlib.colors import LinearSegmentedColormap
@@ -246,7 +247,7 @@ class UIplot():
             stim_num = i_stim + 1 # 1-numbering (visible to user)
             t_stim = t_row['t_stim']
             stim_str = f" - stim {stim_num}"
-            out = dfoutput[dfoutput['stim'] == stim_num]# TODO: enable switch to dfdiff?
+            out = dfoutput[dfoutput['stim'] == stim_num]# TODO: enable switch to dfdiff?            
             y_position = dfmean.loc[dfmean.time == t_stim, rec_filter].values[0] # returns index, y_value
             subplot = f"{mean_label}{stim_str} marker"
             line, = axm.plot(t_stim, y_position, marker='o', markerfacecolor=color, markeredgecolor=color, markersize=10, alpha=1, zorder=0, label=f"{subplot}")
@@ -278,8 +279,17 @@ class UIplot():
 
             if not np.isnan(t_row['t_EPSP_amp']):
                 subplot = f"{label}{stim_str} EPSP amp marker"
-                y_position = df_event.loc[df_event.time == t_row['t_EPSP_amp'], rec_filter]
-                line, = axe.plot(t_row['t_EPSP_amp'], y_position, marker='o', markerfacecolor='none', markeredgecolor=rgb_EPSP_amp, markersize=10, markeredgewidth=3, alpha=a_dot, zorder=0, label=subplot)
+                x_position = t_row['t_EPSP_amp']
+                #print(f"x_position: {x_position}, type: {type(x_position)}")
+                y_position = df_event.loc[df_event.time == x_position, rec_filter]
+                if isinstance(y_position, pd.Series):
+                    if not y_position.empty and isinstance(y_position.values[0], float):
+                        y_position = y_position.values[0]
+                        print(f"Salvaged bad y_position by values[0]: {y_position} from {subplot}")
+                    else:
+                        print(f"*** Failed to salvage bad y_position: {y_position} from {subplot}")
+                        y_position = np.nan
+                line, = axe.plot(x_position, y_position, marker='o', markerfacecolor='none', markeredgecolor=rgb_EPSP_amp, markersize=10, markeredgewidth=3, alpha=a_dot, zorder=0, label=subplot)
                 uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'axe'}
                 subplot = f"{label}{stim_str} EPSP amp"
                 line, = ax1.plot(out['sweep'], out['EPSP_amp'], color=rgb_EPSP_amp, alpha=a_line, zorder=3, label=subplot)
@@ -307,6 +317,9 @@ class UIplot():
                     uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'ax2'}
             if not np.isnan(t_row['t_volley_amp']):
                 y_position = df_event.loc[df_event.time == t_row['t_volley_amp'], rec_filter]
+                if isinstance(y_position, (tuple, list, np.ndarray)) and len(y_position) > 0: # TODO: Find out whence tuples come!
+                    y_position = y_position[0]
+
                 subplot = f"{label}{stim_str} volley amp marker"
                 line, = axe.plot(t_row['t_volley_amp'], y_position, marker='o', markerfacecolor='none', markeredgecolor=rgb_volley_amp, markersize=10, markeredgewidth=3, alpha=a_dot, zorder=0, label=subplot)
                 uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'axe'}
