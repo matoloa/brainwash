@@ -2130,8 +2130,8 @@ class UIsub(Ui_MainWindow):
 # Timepoints dataframe handling
 
     def set_dft(self, rec_name, df): # persists df and saves it to .csv
-        print(f"type: {type(df)}")
-        print(f"set_dft, {df}")
+        #print(f"type: {type(df)}")
+        #print(f"set_dft, {df}")
         self.dict_ts[rec_name] = df
         self.df2csv(df=df, rec=rec_name, key="timepoints")
 
@@ -2821,7 +2821,6 @@ class UIsub(Ui_MainWindow):
         x_offset = uistate.dft_copy.iloc[uistate.stim_select[0]]['t_stim']
         precision = len(str(data_x[1] - data_x[0]).split('.')[1])
         time_diff = uistate.x_drag - uistate.x_on_click
-        print(f"time_diff: {time_diff}, x_offset: {x_offset}")
         # get the x values of the slope
         blob = True # only moving amplitudes and resizing slopes have a blob
         if action.endswith('resize'):
@@ -2835,9 +2834,9 @@ class UIsub(Ui_MainWindow):
         if x_end <= x_start:
             x_start_index = np.where(data_x == x_start)[0][0]
             x_end = data_x[x_start_index + 1] 
-        x_indices = np.searchsorted(data_x, [x_start, x_end])
 
         # get y values
+        x_indices = np.searchsorted(data_x, [x_start, x_end])
         y_start, y_end = data_y[x_indices]
 
         # remember the last x index
@@ -2992,11 +2991,10 @@ class UIsub(Ui_MainWindow):
                 # Break the loop as we've found a match for the mouseover action
                 break
 
-        #update dft row 0 with the values from uistate.dft_row_copy
-        dft = self.get_dft(row=p_row).copy()
+        #update selected dft row with the values from dict_t
         for key, value in dict_t.items():
             uistate.dft_copy.loc[uistate.stim_select[0], key] = value
-        self.set_dft(p_row['recording_name'], dft)
+        self.set_dft(p_row['recording_name'], uistate.dft_copy)
 
         # update dfoutput; dict and file, with normalized columns if applicable
         dfoutput = self.get_dfoutput(row=p_row)
