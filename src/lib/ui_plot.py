@@ -129,7 +129,7 @@ class UIplot():
     def graphRefresh(self):
         # show only selected and imported lines, only appropriate aspects
         print("graphRefresh")
-        t0 = time.time()
+        #t0 = time.time()
         uistate = self.uistate
 
         # Recordings
@@ -200,7 +200,7 @@ class UIplot():
         axm.figure.canvas.draw()
         axe.figure.canvas.draw()
         ax1.figure.canvas.draw() # ax2 should be on the same canvas
-        print(f" - - {round((time.time() - t0) * 1000)} ms")
+        #print(f" - - {round((time.time() - t0) * 1000)} ms")
 
 
     def oneAxisLeft(self):
@@ -351,7 +351,7 @@ class UIplot():
         stim_offset = t_row['t_stim']
         stim_str = f" - stim {t_row['stim']}"
         plot_to_update = f"{p_row['recording_name']}{stim_str} {aspect} marker"
-        print(f"plotUpdate: {plot_to_update}")
+        #print(f"plotUpdate: {plot_to_update}")
 
         if aspect in ['EPSP slope', 'volley slope']:
             x_start = t_row[f't_{aspect.replace(" ", "_")}_start']-stim_offset
@@ -401,6 +401,7 @@ class UIplot():
         linedict['line'].set_ydata(mean)
 
     def updateEPSPout(self, rec_name, out): # TODO: update this last remaining ax-cycle to use the dict
+        # OBSOLETE - called by norm, does not operate on stim-specific data!
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
         for line in ax1.get_lines():
             if line.get_label() == f"{rec_name} EPSP amp":
@@ -481,6 +482,21 @@ class UIplot():
                 if zone['x'][0] <= x <= zone['x'][1] and zone['y'][0] <= y <= zone['y'][1]:
                     uistate.mouseover_action = action
                     plotMouseover(action, axe)
+                    
+                    # Debugging block
+                    if False:
+                        p_row = uistate.dfp_row_copy
+                        rec_name = p_row['recording_name']
+                        rec_ID = p_row['ID']
+                        t_row = uistate.dft_copy.loc[uistate.stim_select[0]]
+                        stim_num = t_row['stim']
+                        #new_dict = {key: value for key, value in uistate.dict_rec_labels.items() if value.get('stim') == stim_num and value.get('rec_ID') == rec_ID and value.get('axis') == 'ax2'}
+                        #EPSP_slope = new_dict.get(f"{rec_name} - stim {stim_num} EPSP slope")
+                        EPSP_slope = uistate.dict_rec_labels.get(f"{rec_name} - stim {stim_num} EPSP slope")
+                        line = EPSP_slope.get('line')
+                        line.set_linewidth(10)
+                        print(f"{EPSP_slope} - {action}")
+                        
                     break
 
             if uistate.mouseover_action is None:

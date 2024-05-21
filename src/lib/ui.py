@@ -1143,7 +1143,7 @@ class UIsub(Ui_MainWindow):
                     row = self.get_df_project().loc[idx]
                     rec_name = row['recording_name']
                     out = self.dict_outputs[rec_name]
-                    uiplot.updateEPSPout(rec_name, out)
+                    uiplot.updateEPSPout(rec_name, out) # TODO: deprecated
                 self.purgeGroupCache()
                 self.graphGroups()
             elif key == 'force1stim':
@@ -1550,7 +1550,7 @@ class UIsub(Ui_MainWindow):
             row = self.df_project.iloc[idx]
             rec_name = row['recording_name']
             out = self.get_dfoutput(row=row)
-            uiplot.updateEPSPout(rec_name, out)
+            uiplot.updateEPSPout(rec_name, out) # TODO: deprecated
         print(f"editNormRange: {uistate.lineEdit['norm_EPSP_on']}")
     
 
@@ -1565,7 +1565,6 @@ class UIsub(Ui_MainWindow):
     def normOutput(self, row, dfoutput, aspect=None):
         normFrom = uistate.lineEdit['norm_EPSP_on'][0] # start
         normTo = uistate.lineEdit['norm_EPSP_on'][1] # end
-        rec_name = row['recording_name']
         if aspect is None: # norm all existing columns and save file
             if 'EPSP_amp' in dfoutput.columns:
                 selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_amp']
@@ -1575,7 +1574,6 @@ class UIsub(Ui_MainWindow):
                 selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_slope']
                 norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
                 dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
-            self.persistOutput(rec_name, dfoutput)
         else: # norm specific column and DO NOT SAVE file (dragged on-the-fly-graphs are saved only on mouse release)
             selected_values = dfoutput.loc[normFrom:normTo, aspect]
             norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
@@ -2651,12 +2649,12 @@ class UIsub(Ui_MainWindow):
             data_x = data.get_xdata()
             data_y = data.get_ydata()
             uistate.x_on_click = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
-            print(f"uistate.x_on_click: {uistate.x_on_click}")
+            #print(f"uistate.x_on_click: {uistate.x_on_click}")
             t_row = uistate.dft_copy.iloc[uistate.stim_select[0]]
             if event.inaxes is not None:
                 if (event.button == 1 or event.button == 3) and (uistate.mouseover_action is not None):
                     action = uistate.mouseover_action
-                    print(f"mouseover action: {action}")
+                    # print(f"mouseover action: {action}")
                     if action.startswith("EPSP slope"):
                         start, end = t_row['t_EPSP_slope_start']-t_row['t_stim'], t_row['t_EPSP_slope_end']-t_row['t_stim']
                         self.mouse_drag = self.canvasEvent.mpl_connect('motion_notify_event', lambda event: self.eventDragSlope(event, action, data_x, data_y, start, end))
@@ -2676,7 +2674,6 @@ class UIsub(Ui_MainWindow):
             uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
             uistate.x_select['mean_start'] = uistate.x_on_click
             self.lineEdit_mean_selection_start.setText(str(uistate.x_select['mean_start']))
-            print(f"uistate.axm {uistate.axm}")
             self.connectDragRelease(x_range=time_values, rec_ID=p_row['ID'], graph="mean")
         elif canvas == self.canvasOutput: # Output canvas (bottom graph) left-clicked: click and drag to select specific sweeps
             sweep_numbers = list(range(0, int(p_row['sweeps'])))
@@ -2768,7 +2765,7 @@ class UIsub(Ui_MainWindow):
             print("(multi-stim-selection) mouseoverUpdate calls uiplot.graphRefresh()")
             uiplot.graphRefresh()
             return
-        print(f"mouseoverUpdate: {uistate.rec_select[0]}, {type(uistate.rec_select[0])}")
+        #print(f"mouseoverUpdate: {uistate.rec_select[0]}, {type(uistate.rec_select[0])}")
         rec_ID = uistate.dfp_row_copy['ID']
         t_row = uistate.dft_copy.iloc[uistate.stim_select[0]]
         stim_num = t_row['stim']
@@ -2791,7 +2788,7 @@ class UIsub(Ui_MainWindow):
                 uistate.updateDragZones(aspect="volley slope", x=line.get_xdata(), y=line.get_ydata())
 
         self.mouseover = self.canvasEvent.mpl_connect('motion_notify_event', uiplot.graphMouseover)
-        print("mouseoverUpdate calls uiplot.graphRefresh()")
+        #print("mouseoverUpdate calls uiplot.graphRefresh()")
         uiplot.graphRefresh()
 
 
@@ -2866,7 +2863,7 @@ class UIsub(Ui_MainWindow):
         x_point = round(prior_amp + time_diff, precision)
         x_index = (np.abs(data_x - x_point)).argmin()
         y_point = data_y[x_index]
-        print (f"x_point: {x_point}, y_point: {y_point}")
+        # print (f"x_point: {x_point}, y_point: {y_point}")
         # remember the last x index
         uistate.x_drag_last = uistate.x_drag
         # update the mouseover plot
@@ -2993,9 +2990,13 @@ class UIsub(Ui_MainWindow):
         # update dfoutput; dict and file, with normalized columns if applicable
         dfoutput = self.get_dfoutput(row=p_row)
         dffilter = self.get_dffilter(row=p_row)
+        stim_num = t_row['stim']
         new_dfoutput_columns = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+        new_dfoutput_columns['stim'] = int(stim_num)
+        print(f"new_dfoutput_columns: {new_dfoutput_columns}")
         for col in new_dfoutput_columns.columns:
-            dfoutput[col] = new_dfoutput_columns[col]
+            dfoutput.loc[dfoutput['stim'] == stim_num, col] = new_dfoutput_columns.loc[new_dfoutput_columns['stim'] == stim_num, col]
+        self.persistOutput(rec_name=p_row['recording_name'], dfoutput=dfoutput)
         self.tableUpdate()
         if uistate.mouseover_action.startswith("EPSP"): # add normalized EPSP columns
             self.normOutput(row=p_row, dfoutput=dfoutput)
