@@ -218,7 +218,11 @@ class UIplot():
             ax2.yaxis.set_label_position("right")
             ax2.yaxis.set_ticks_position("right")
 
-    def addRow(self, p_row, dft, dfmean, dfoutput):
+    def plot_line(self, axis, axisname, x, y, color, label, stim=None):
+        line, = axis.plot(x, y, color=color, label=label)
+        self.uistate.dict_rec_labels[label] = {'rec_ID':None, 'stim': stim, 'line':line, 'axis':axisname}
+
+    def addRow(self, p_row, dft, dfmean, dfoutput): # TODO: unspaghetti this
         uistate = self.uistate
         axm, axe, ax1, ax2 = uistate.axm, uistate.axe, uistate.ax1, uistate.ax2
         rec_ID = p_row['ID']
@@ -341,7 +345,6 @@ class UIplot():
                 subplot = f"{label}{stim_str} volley slope mean"
                 line = ax2.axhline(y=t_row['volley_slope_mean'], color=rgb_volley_slope, linestyle='--', zorder=0, label=subplot)
                 uistate.dict_rec_labels[subplot] = {'rec_ID':rec_ID, 'stim': stim_num, 'line':line, 'axis':'ax2'}
-        # print(f"uistate.dict_rec_labels.keys(): {uistate.dict_rec_labels.keys()}")
 
     def addGroup(self, df_group_row, df_groupmean):
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
