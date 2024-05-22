@@ -79,8 +79,43 @@ def build_dfoutput(df, dict_t, filter='voltage'):
             dfoutput['volley_slope'] = np.nan
         list_col.append('volley_slope')
     t1 = time.time()
-    # print(f'build_dfoutput: {t1-t0} seconds, list_col: {list_col}')
+    print(f'build_df_output: {round((t1-t0)*1000)} ms, list_col: {list_col}')
     return dfoutput[list_col]
+
+
+def build_dfstimoutput(dfmean, df_t, filter='voltage'):
+    t0 = time.time()
+    list_col = ['stim', 'bin', 'EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
+    df_stimoutput = pd.DataFrame(columns=list_col)
+
+    for i, row in df_t.iterrows():
+        df_stimoutput.loc[i, 'stim'] = row['stim']
+
+        # EPSP_amp
+        if valid(row['t_EPSP_amp']):
+            df_EPSP_amp = dfmean[dfmean['time']==row['t_EPSP_amp']].copy()
+            df_EPSP_amp.reset_index(inplace=True, drop=True)
+            df_stimoutput.loc[i, 'EPSP_amp'] = -1000 * df_EPSP_amp[filter].values[0] if not df_EPSP_amp.empty else np.nan
+
+        # EPSP_slope
+        if valid(row['t_EPSP_slope_start']) and valid(row['t_EPSP_slope_end']):
+            slope_EPSP = measureslope(df=dfmean, filter=filter, t_start=row['t_EPSP_slope_start'], t_end=row['t_EPSP_slope_end'])
+            df_stimoutput.loc[i, 'EPSP_slope'] = -slope_EPSP if slope_EPSP else np.nan
+
+        # volley_amp
+        if valid(row['t_volley_amp']):
+            df_volley_amp = dfmean[dfmean['time']==row['t_volley_amp']].copy()
+            df_volley_amp.reset_index(inplace=True, drop=True)
+            df_stimoutput.loc[i, 'volley_amp'] = -1000 * df_volley_amp[filter].values[0] if not df_volley_amp.empty else np.nan
+
+        # volley_slope
+        if valid(row['t_volley_slope_start']) and valid(row['t_volley_slope_end']):
+            slope_volley = measureslope(df=dfmean, filter=filter, t_start=row['t_volley_slope_start'], t_end=row['t_volley_slope_end'])
+            df_stimoutput.loc[i, 'volley_slope'] = -slope_volley if slope_volley else np.nan
+
+    t1 = time.time()
+    print(f'build_df_stimoutput: {round((t1-t0)*1000)} ms, list_col: {list_col}')
+    return df_stimoutput[list_col]
 
 
 def addFilterSavgol(df, window_length=9, poly_order=3):
@@ -414,6 +449,18 @@ def find_all_t(dfmean, volley_slope_halfwidth, EPSP_slope_halfwidth, param_min_t
         print(f"df_t: {df_t}")
 
     return df_t
+
+
+def measureslope(df, t_start, t_end, filter='voltage'):
+    reg = linear_model.LinearRegression()
+    # Select the data between start and end time points
+    dftemp = df[(t_start <= df.time) & (df.time <= t_end)]
+    x = dftemp.time.values.reshape(-1, 1)
+    y = dftemp[filter].values.reshape(-1, 1)  # use the filter instead of 'voltage'
+    # Fit the linear regression model and calculate the slope
+    reg.fit(x, y)
+    slope = reg.coef_[0][0]
+    return slope
 
 
 # %%

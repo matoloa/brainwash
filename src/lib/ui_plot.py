@@ -288,7 +288,7 @@ class UIplot():
                         y_position = y_position.values[0]
                         print(f"Salvaged bad y_position by values[0]: {y_position} from {subplot}")
                     else:
-                        print(f"*** Failed to salvage bad y_position: {y_position} from {subplot}")
+                        print(f"*** Failed to salvage bad y_position: {y_position} from {subplot}; setting to 0")
                         color = 'red'
                         y_position = 0
                 line, = axe.plot(x_position, y_position, marker='o', markerfacecolor='none', markeredgecolor=color, markersize=10, markeredgewidth=3, alpha=a_dot, zorder=0, label=subplot)

@@ -906,7 +906,7 @@ class UIsub(Ui_MainWindow):
 
 
 ######################################################################
-#          tableProjSelectionChanged controls everything             #
+#               very frequently edited functions                     #
 ######################################################################
 
     def tableProjSelectionChanged(self):
@@ -919,7 +919,7 @@ class UIsub(Ui_MainWindow):
         self.update_recs2plot()
         self.update_rec_show()
         if not uistate.rec_select:
-            print("*** Nothing seleceted - returning")
+            print("Nothing seleceted - returning")
             return
         # use the selected df_p row with the highest sweep duration
         p_row = uistate.df_recs2plot.loc[uistate.df_recs2plot['sweep_duration'].idxmax()]
@@ -949,25 +949,6 @@ class UIsub(Ui_MainWindow):
         self.mouseoverUpdate()
         print(f" - - mouseoverUpdate: {round((time.time() - t0) * 1000)} ms")
 
-
-
-##################################################################
-#    WIP: TODO: move these to appropriate header in this file    #
-##################################################################
-
-    def uiFreeze(self): # Disable selection changes and checkboxes
-        self.tableProj.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
-        self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
-        for key, _ in uistate.checkBox.items():
-            checkBox = getattr(self, f"checkBox_{key}")
-            checkBox.setEnabled(False)
-       
-    def uiThaw(self): # Enable selection changes and checkboxes
-        self.tableProj.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        for key, _ in uistate.checkBox.items():
-            checkBox = getattr(self, f"checkBox_{key}")
-            checkBox.setEnabled(True)
 
     def update_rec_show(self, reset=False):
         if uistate.df_recs2plot is None:
@@ -1020,6 +1001,94 @@ class UIsub(Ui_MainWindow):
 #        for k, v in new_selection.items():
 #            print(f"{k}:\n{v}")
         print(f"update_rec_show took {round((time.time() - t0) * 1000)} ms")
+
+
+##################################################################
+#    WIP: TODO: move these to appropriate header in this file    #
+##################################################################
+
+    def normOutputs(self): # TODO: also norm diffs (paired stim) when applicable
+        df_p = self.get_df_project()
+        for index, row in df_p.iterrows():
+            dfoutput = self.get_dfoutput(row=row)
+            print(f"editNormRange: rebuilding norm columns for {row['recording_name']}")
+            self.normOutput(row, dfoutput)
+
+
+    def normOutput(self, row, dfoutput, aspect=None): # TODO: reduntant? merge with normOutputs?
+        normFrom = uistate.lineEdit['norm_EPSP_on'][0] # start
+        normTo = uistate.lineEdit['norm_EPSP_on'][1] # end
+        if aspect is None: # norm all existing columns and save file
+            if 'EPSP_amp' in dfoutput.columns:
+                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_amp']
+                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
+                dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
+            if 'EPSP_slope' in dfoutput.columns:
+                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_slope']
+                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
+                dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
+        else: # norm specific column and DO NOT SAVE file (dragged on-the-fly-graphs are saved only on mouse release)
+            selected_values = dfoutput.loc[normFrom:normTo, aspect]
+            norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
+            dfoutput[f'{aspect}_norm'] = dfoutput[aspect] / norm_mean
+            return dfoutput
+
+    def persistOutput(self, rec_name, dfoutput): 
+        # Clean up column order, save to dict and file.
+        output_columns = ['stim',
+                'sweep',
+                'EPSP_slope',
+                'EPSP_slope_norm',
+                'EPSP_amp',
+                'EPSP_amp_norm',
+                'volley_slope',
+                'volley_amp',
+        ]
+        missing_columns = set(output_columns) - set(dfoutput.columns)
+        extra_columns = set(dfoutput.columns) - set(output_columns)
+        if missing_columns:
+            print(f"Warning: The following columns in output_columns don't exist in dfoutput: {missing_columns}")
+        if extra_columns:
+            print(f"Warning: The following columns exist in dfoutput but not in output_columns: {extra_columns}")
+        dfoutput = dfoutput.reindex(columns=output_columns)
+        self.dict_outputs[rec_name] = dfoutput
+        self.df2csv(df=dfoutput, rec=rec_name, key="output")
+
+    def persistStimOutput(self, rec_name, dfstimoutput): 
+        # Clean up column order, save to dict and file.
+        stimoutput_columns = ['stim',
+                'bin', # tuple; first and last sweep in bin
+                'EPSP_slope',
+                'EPSP_slope_norm',
+                'EPSP_amp',
+                'EPSP_amp_norm',
+                'volley_slope',
+                'volley_amp',
+        ]
+        missing_columns = set(stimoutput_columns) - set(dfstimoutput.columns)
+        extra_columns = set(dfstimoutput.columns) - set(stimoutput_columns)
+        if missing_columns:
+            print(f"Warning: The following columns in stimoutput_columns don't exist in dfstimoutput: {missing_columns}")
+        if extra_columns:
+            print(f"Warning: The following columns exist in dfstimoutput but not in stimoutput_columns: {extra_columns}")
+        dfstimoutput = dfstimoutput.reindex(columns=stimoutput_columns)
+        self.dict_stimoutputs[rec_name] = dfstimoutput
+        self.df2csv(df=dfstimoutput, rec=rec_name, key="stimoutput")
+
+
+    def uiFreeze(self): # Disable selection changes and checkboxes
+        self.tableProj.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
+        self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
+        for key, _ in uistate.checkBox.items():
+            checkBox = getattr(self, f"checkBox_{key}")
+            checkBox.setEnabled(False)
+       
+    def uiThaw(self): # Enable selection changes and checkboxes
+        self.tableProj.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        for key, _ in uistate.checkBox.items():
+            checkBox = getattr(self, f"checkBox_{key}")
+            checkBox.setEnabled(True)
 
 
     def setTableStimVisibility(self, state):
@@ -1555,55 +1624,7 @@ class UIsub(Ui_MainWindow):
             out = self.get_dfoutput(row=row)
             uiplot.updateEPSPout(rec_name, out) # TODO: deprecated
         print(f"editNormRange: {uistate.lineEdit['norm_EPSP_on']}")
-    
 
-    def normOutputs(self): # TODO: also norm diffs (paired stim) when applicable
-        df_p = self.get_df_project()
-        for index, row in df_p.iterrows():
-            dfoutput = self.get_dfoutput(row=row)
-            print(f"editNormRange: rebuilding norm columns for {row['recording_name']}")
-            self.normOutput(row, dfoutput)
-
-
-    def normOutput(self, row, dfoutput, aspect=None):
-        normFrom = uistate.lineEdit['norm_EPSP_on'][0] # start
-        normTo = uistate.lineEdit['norm_EPSP_on'][1] # end
-        if aspect is None: # norm all existing columns and save file
-            if 'EPSP_amp' in dfoutput.columns:
-                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_amp']
-                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
-                dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
-            if 'EPSP_slope' in dfoutput.columns:
-                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_slope']
-                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
-                dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
-        else: # norm specific column and DO NOT SAVE file (dragged on-the-fly-graphs are saved only on mouse release)
-            selected_values = dfoutput.loc[normFrom:normTo, aspect]
-            norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
-            dfoutput[f'{aspect}_norm'] = dfoutput[aspect] / norm_mean
-            return dfoutput
-
-
-    def persistOutput(self, rec_name, dfoutput): 
-        # Clean up column order, save to dict and file.
-        output_columns = ['stim',
-                'sweep',
-                'EPSP_slope',
-                'EPSP_slope_norm',
-                'EPSP_amp',
-                'EPSP_amp_norm',
-                'volley_slope',
-                'volley_amp',
-        ]
-        missing_columns = set(output_columns) - set(dfoutput.columns)
-        extra_columns = set(dfoutput.columns) - set(output_columns)
-        if missing_columns:
-            print(f"Warning: The following columns in output_columns don't exist in dfoutput: {missing_columns}")
-        if extra_columns:
-            print(f"Warning: The following columns exist in dfoutput but not in output_columns: {extra_columns}")
-        dfoutput = dfoutput.reindex(columns=output_columns)
-        self.dict_outputs[rec_name] = dfoutput
-        self.df2csv(df=dfoutput, rec=rec_name, key="output")
 
 
 # Data Editing functions
@@ -1640,7 +1661,6 @@ class UIsub(Ui_MainWindow):
             self.set_df_project(df_p)
             _ = self.dft2output(df_t, p_row)
             uiplot.unPlot(rec_ID)
-            print(f"***** df_t: {df_t}")
             uiplot.addRow(p_row, df_t, dfmean, self.dict_outputs[rec_name])
         uistate.stim_select = [0]
         if len(uistate.rec_select) == 1:
@@ -2166,6 +2186,8 @@ class UIsub(Ui_MainWindow):
     def checkBox_output_per_stim_changed(self, state):
         uistate.checkBox['output_per_stim'] = state == 2
         print(f"checkBox_output_per_stim_changed: {state}")
+        if state == 2:
+            self.stimOutputs()
 
     def tableFormat(self):
         if config.verbose:
@@ -2265,7 +2287,7 @@ class UIsub(Ui_MainWindow):
             return dft
 
     def get_dfoutput(self, row):
-        if uistate.checkBox['output_per_stim']:
+        if False:#uistate.checkBox['output_per_stim']:
             # returns an internal df STIMoutput for the selected file. If it does not exist, read it from file first.
             recording_name = row['recording_name']
             if recording_name in self.dict_stimoutputs: #1: Return cached
@@ -2275,7 +2297,7 @@ class UIsub(Ui_MainWindow):
                 dfstimoutput = pd.read_csv(str_output_path)
                 self.dict_stimoutputs[recording_name] = dfstimoutput
             else: #3: Create file and cache
-                self.stimOutput(row=row)
+                self.stimOutputs()
             return self.dict_stimoutputs[recording_name]
         else:
             # returns an internal df output for the selected file. If it does not exist, read it from file first.
@@ -2465,16 +2487,18 @@ class UIsub(Ui_MainWindow):
         self.dft2output(df_t, row)
 
 
-    def stimOutput(self, row):
+    def stimOutputs(self):
         '''
         Generates dfstimoutput: stims (not sweeps) on x-axis
         '''
         print("stimOutput")
-        dfmean = self.get_dfmean(row=row)
         df_recs = uistate.df_recs2plot
-        # placeholder for output
-        self.defaultOutput(row=row)
-        return self.dict_outputs[row['recording_name']]
+        for _, p_row in df_recs.iterrows():
+            rec_name = p_row['recording_name']
+            dfmean = self.get_dfmean(row=p_row)
+            df_t = self.get_dft(row=p_row)
+            dfstimoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
+            self.persistStimOutput(rec_name=rec_name, dfstimoutput=dfstimoutput)
 
 
     def dft2output(self, dft, row):
