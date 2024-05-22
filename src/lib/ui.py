@@ -1131,7 +1131,7 @@ class UIsub(Ui_MainWindow):
 
 
     def viewSettingsChanged(self, key, state):
-        self.usage(f"viewSettingsChanged_{key}, {state == 2}")
+        self.usage(f"viewSettingsChanged {key}, {state == 2}")
         if key in uistate.checkBox.keys():
             uistate.checkBox[key] = (state == 2)
             if key == 'norm_EPSP':
@@ -1148,6 +1148,8 @@ class UIsub(Ui_MainWindow):
                 self.graphGroups()
             elif key == 'force1stim':
                 self.checkBox_force1stim_changed(state)
+            elif key == 'output_per_stim':
+                self.checkBox_output_per_stim_changed(state)
         self.update_rec_show()
         self.mouseoverUpdate()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
@@ -1189,7 +1191,8 @@ class UIsub(Ui_MainWindow):
         self.dict_filters = {} # all processed data
         self.dict_means = {} # all means
         self.dict_ts = {} # all timepoints
-        self.dict_outputs = {} # all outputs
+        self.dict_outputs = {} # all outputs, x per sweep
+        self.dict_stimoutputs = {} # all outputs, x per stim
         self.dict_group_means = {} # means of all group outputs
         self.dict_diffs = {} # all diffs (for paired stim)
 
@@ -2160,6 +2163,10 @@ class UIsub(Ui_MainWindow):
         if config.verbose:
             print(f"checkBox_force1stim_changed: {state}")
 
+    def checkBox_output_per_stim_changed(self, state):
+        uistate.checkBox['output_per_stim'] = state == 2
+        print(f"checkBox_output_per_stim_changed: {state}")
+
     def tableFormat(self):
         if config.verbose:
             print("tableFormat")
@@ -2258,17 +2265,30 @@ class UIsub(Ui_MainWindow):
             return dft
 
     def get_dfoutput(self, row):
-        # returns an internal df output for the selected file. If it does not exist, read it from file first.
-        recording_name = row['recording_name']
-        if recording_name in self.dict_outputs: #1: Return cached
+        if False:# uistate.checkBox['output_per_stim']:
+            # returns an internal df STIMoutput for the selected file. If it does not exist, read it from file first.
+            recording_name = row['recording_name']
+            if recording_name in self.dict_stimoutputs: #1: Return cached
+                return self.dict_stimoutputs[recording_name]
+            str_output_path = f"{self.dict_folders['cache']}/{recording_name}_stimoutput.csv"
+            if Path(str_output_path).exists(): #2: Read from file
+                dfstimoutput = pd.read_csv(str_output_path)
+                self.dict_stimoutputs[recording_name] = dfstimoutput
+            else: #3: Create file and cache
+                self.stimOutput(row=row)
+            return self.dict_stimoutputs[recording_name]
+        else:
+            # returns an internal df output for the selected file. If it does not exist, read it from file first.
+            recording_name = row['recording_name']
+            if recording_name in self.dict_outputs: #1: Return cached
+                return self.dict_outputs[recording_name]
+            str_output_path = f"{self.dict_folders['cache']}/{recording_name}_output.csv"
+            if Path(str_output_path).exists(): #2: Read from file
+                dfoutput = pd.read_csv(str_output_path)
+                self.dict_outputs[recording_name] = dfoutput
+            else: #3: Create file and cache
+                self.defaultOutput(row=row)
             return self.dict_outputs[recording_name]
-        str_output_path = f"{self.dict_folders['cache']}/{recording_name}_output.csv"
-        if Path(str_output_path).exists(): #2: Read from file
-            dfoutput = pd.read_csv(str_output_path)
-            self.dict_outputs[recording_name] = dfoutput
-        else: #3: Create file and cache
-            self.defaultOutput(row=row)
-        return self.dict_outputs[recording_name]
         
     def get_dfdata(self, row):
         # returns an internal df for the selected recording_name. If it does not exist, read it from file first.
@@ -2440,10 +2460,19 @@ class UIsub(Ui_MainWindow):
         if df_t.empty:
             print("No stims found.")
             return
-        output = None
         df_p.loc[df_p['ID'] == row['ID'], 'stims'] = len(df_t)
         self.set_df_project(df_p)
         self.dft2output(df_t, row)
+
+
+    def stimOutput(self, row):
+        '''
+        Generates dfoutput with stims (not sweeps) on x-axis
+        '''
+        print("stimOutput")
+        dfmean = self.get_dfmean(row=row)
+        df_recs = uistate.df_recs2plot
+        
 
 
     def dft2output(self, dft, row):
