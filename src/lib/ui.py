@@ -2265,7 +2265,7 @@ class UIsub(Ui_MainWindow):
             return dft
 
     def get_dfoutput(self, row):
-        if False:# uistate.checkBox['output_per_stim']:
+        if uistate.checkBox['output_per_stim']:
             # returns an internal df STIMoutput for the selected file. If it does not exist, read it from file first.
             recording_name = row['recording_name']
             if recording_name in self.dict_stimoutputs: #1: Return cached
@@ -2467,12 +2467,14 @@ class UIsub(Ui_MainWindow):
 
     def stimOutput(self, row):
         '''
-        Generates dfoutput with stims (not sweeps) on x-axis
+        Generates dfstimoutput: stims (not sweeps) on x-axis
         '''
         print("stimOutput")
         dfmean = self.get_dfmean(row=row)
         df_recs = uistate.df_recs2plot
-        
+        # placeholder for output
+        self.defaultOutput(row=row)
+        return self.dict_outputs[row['recording_name']]
 
 
     def dft2output(self, dft, row):
