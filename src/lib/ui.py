@@ -2427,8 +2427,6 @@ class UIsub(Ui_MainWindow):
         '''
         Generates default results for dft and dfoutput
         Stores stims in self.df_project
-        Stores timepoints, methods and params in dict_ts{<rec_ID>:<df_t>}
-        returns a single output DataFrame, stims numbered from 1
         '''
         print("defaultOutput")
         dfmean = self.get_dfmean(row=row)
@@ -2444,7 +2442,36 @@ class UIsub(Ui_MainWindow):
             return
         df_p.loc[df_p['ID'] == row['ID'], 'stims'] = len(df_t)
         self.set_df_project(df_p)
-        self.dft2output(df_t, row)
+        self.sweepOutputs()
+        if not uistate.checkBox['timepoints_per_stim']:
+            variables = ['t_volley_amp', 't_volley_slope_start', 't_volley_slope_end', 't_EPSP_amp', 't_EPSP_slope_start', 't_EPSP_slope_end']
+            methods = ['t_volley_amp_method', 't_volley_slope_method', 't_EPSP_amp_method', 't_EPSP_slope_method']
+            params = ['t_volley_amp_params', 't_volley_slope_params', 't_EPSP_amp_params', 't_EPSP_slope_params']
+            # find highest EPSP_slope in df_output
+            dfoutput = self.get_dfoutput(row)
+            if 'EPSP_slope' in dfoutput.columns:
+                idx_max = dfoutput['EPSP_slope'].idxmax()
+                stim_max = dfoutput.loc[idx_max, 'stim']
+                t_template_row = df_t.loc[[idx_max]]
+                t_stim = t_template_row['t_stim'].values[0]
+                for var in variables:
+                    t_template_row[var] -= t_stim
+                if 'stim' not in df_t.columns:
+                    df_t['stim'] = None
+                for i, row_t in df_t.iterrows():
+                    df_t.at[i, 'stim'] = i+1 # stims numbered from 1
+                    for var in variables:
+                        df_t.at[i, var] = t_template_row[var].values[0] + row_t['t_stim']
+                    for method in methods:
+                        df_t.at[i, method] = f"=stim_{stim_max}"
+                    for param in params:
+                        df_t.at[i, param] = f"=stim_{stim_max}"
+            self.set_dft(row['recording_name'], df_t)
+        if uistate.checkBox['output_per_stim']:
+            self.stimOutputs()
+        else:
+            self.sweepOutputs()
+        
 
     def sweepOutputs(self):
         # rebuild all outputs for all recordings based on output x = sweep number TODO: add option to show time instead
@@ -2452,9 +2479,9 @@ class UIsub(Ui_MainWindow):
         df_p = self.get_df_project()
         for _, p_row in df_p.iterrows():
             uiplot.unPlot(p_row['ID'])
+            dfmean = self.get_dfmean(p_row)
             df_t = self.get_dft(p_row)
             self.dft2output(df_t, p_row)
-            dfmean = self.get_dfmean(p_row)
             uiplot.addRow(p_row, df_t, dfmean, self.get_dfoutput(p_row))
         self.update_rec_show(reset=True)
         self.mouseoverUpdate()
@@ -2899,26 +2926,34 @@ class UIsub(Ui_MainWindow):
         stim_offset = t_row['t_stim']
         if uistate.checkBox['output_per_stim']:
             x_axis = 'stim'
+            p_row = uistate.dfp_row_copy
+            rec_name = p_row['recording_name']
+            df_t = uistate.dft_copy
+            dfmean = self.get_dfmean(row=uistate.dfp_row_copy)
         else:
             x_axis = 'sweep'
-        
-        # filtered_recs = {k: v for k, v in uistate.dict_rec_show.items() if v['axis'] == 'axe'}
-        # print (f"filtered_recs.keys(): {filtered_recs.keys()}")
+            dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
 
         if action.startswith("EPSP slope"):
+            slope_width = round(x_end - x_start, precision)
             dict_t = { # only pass these values to build_dfoutput, so it won't rebuild unchanged values
-                't_EPSP_slope_start': x_start + stim_offset,
-                't_EPSP_slope_end': x_end + stim_offset,
-                't_EPSP_slope_width': round(x_end - x_start, precision),
+                't_EPSP_slope_start': round(x_start + stim_offset, precision),
+                't_EPSP_slope_end': round(x_end + stim_offset, precision),
+                't_EPSP_slope_width': slope_width,
             }
             if x_axis == 'stim':
-                dfmean = self.get_dfmean(row=uistate.dfp_row_copy)
-                df_t = self.get_dft(row=uistate.dfp_row_copy)
                 for key, value in dict_t.items():
                     df_t.at[stim_idx, key] = value
+                if not uistate.checkBox['timepoints_per_stim']:
+                    for i, t_row in df_t.iterrows():
+                        stim_diff = t_row['t_stim'] - stim_offset
+                        df_t.at[i, 't_EPSP_slope_start'] = x_start + stim_diff
+                        df_t.at[i, 't_EPSP_slope_end']   = x_end + stim_diff
+                        df_t.at[i, 't_EPSP_slope_width'] = slope_width
+                        print(f"{i}, start: {t_row['t_EPSP_slope_start']}")
+                    self.set_dft(rec_name, df_t)
                 out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
             elif x_axis == 'sweep':
-                dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
                 out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
                 if uistate.checkBox['norm_EPSP']:
@@ -2995,10 +3030,11 @@ class UIsub(Ui_MainWindow):
                 uistate.mouseover_out[0].set_data(out[x_axis], out['volley_amp'])
             dict_t['volley_amp_mean'] = out['volley_amp'].mean()
 
-        if dict_t:
-            for key, value in dict_t.items():
-                uistate.dft_copy.loc[uistate.stim_select[0], key] = value
-                print(f"uistate.dft_copy: key, value {key}: {value}")
+        if uistate.checkBox['timepoints_per_stim']:
+            if dict_t:
+                for key, value in dict_t.items():
+                    uistate.dft_copy.loc[uistate.stim_select[0], key] = value
+                    print(f"uistate.dft_copy: key, value {key}: {value}")
         self.canvasOutput.draw()
 
 

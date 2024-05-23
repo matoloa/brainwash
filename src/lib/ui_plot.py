@@ -343,7 +343,6 @@ class UIplot():
                 if isinstance(y_position, pd.Series):
                     if not y_position.empty and isinstance(y_position.values[0], float):
                         y_position = y_position.values[0]
-                        print(f"* Salvaged bad y_position by values[0]: {y_position} from {label} {stim_str} volley amp marker")
                     else:
                         print(f"*** Failed to salvage bad y_position: {y_position} from {label} {stim_str} volley amp marker, setting to 0")
                         y_position, color = 0, 'red'

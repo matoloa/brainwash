@@ -97,7 +97,7 @@ def build_dfstimoutput(dfmean, df_t, filter='voltage'):
             df_EPSP_amp = dfmean[dfmean['time']==row['t_EPSP_amp']].copy()
             df_EPSP_amp.reset_index(inplace=True, drop=True)
             df_stimoutput.loc[i, 'EPSP_amp'] = -1000 * df_EPSP_amp[filter].values[0] if not df_EPSP_amp.empty else np.nan
-            print(f"*** {i} row['t_EPSP_amp']: {row['t_EPSP_amp']}, df_stimoutput: {df_stimoutput.loc[i, 'EPSP_amp']}")
+            # print(f"*** {i} row['t_EPSP_amp']: {row['t_EPSP_amp']}, df_stimoutput: {df_stimoutput.loc[i, 'EPSP_amp']}")
 
         # EPSP_slope
         if valid(row['t_EPSP_slope_start']) and valid(row['t_EPSP_slope_end']):
