@@ -956,10 +956,13 @@ class UIsub(Ui_MainWindow):
         t0 = time.time()
         old_selection = uistate.dict_rec_show 
         selected_ids = set(uistate.df_recs2plot['ID'])
-        print(f"selected_ids: {selected_ids}")
-        new_selection = {k: v for k, v in uistate.dict_rec_labels.items() if v['rec_ID'] in selected_ids}
+        selected_stims = [stim + 1 for stim in uistate.stim_select] # stim_select is 0-based (indices) - convert to stims
+        print(f"*** update_rec_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}")
+        # remove non-selected recs and stims
+        new_selection = {k: v for k, v in uistate.dict_rec_labels.items() if v['rec_ID'] in selected_ids and (v['stim'] in selected_stims or v['stim'] is None)}
+
+        # Setup filters for checkboxes, operating on labels
         filters = []
-        # Setup filters for checkboxes
         if not uistate.checkBox['EPSP_amp']:
             filters.extend([" EPSP amp marker", " EPSP amp"])
         if not uistate.checkBox['EPSP_slope']:
@@ -970,27 +973,10 @@ class UIsub(Ui_MainWindow):
             filters.extend([" volley slope marker", " volley slope mean"])
         if not uistate.checkBox['norm_EPSP']:
             filters.extend([" norm"])
-        # Setup filters for selected rows
-        for _, p_row in uistate.df_recs2plot.iterrows():
-            dft = self.get_dft(p_row)
-            if dft.shape[0] > 1:
-                endings = ["", " EPSP amp", " EPSP slope", " volley amp", " volley slope", 
-                           " EPSP amp marker", " EPSP slope marker", " volley amp marker", " volley slope marker",
-                           " volley amp mean", " volley slope mean",
-                           " selection marker"
-                           ]
-                filters.extend([f" - stim {i+1}{ending}" for i in range(dft.shape[0]) 
-                                if i not in uistate.stim_select for ending in endings])
-        # Apply filters
         new_selection = {k: v for k, v in new_selection.items() 
                             if not any(k.endswith(f) for f in filters)}
-        #if uistate.checkBox['output_per_stim']:
-        #    new_selection = {k: v for k, v in new_selection.items() if v['axis']=='ax1' and v['stim'] is None}
-        #else:
-        #    new_selection = {k: v for k, v in new_selection.items() if v['axis']=='ax1' and v['stim'] is not None}
-        # Hide what ceased to be selected
         if reset: # Hide all lines
-            obsolete_lines = {k: v for k, v in uistate.dict_rec_labels.items()}
+            obsolete_lines = uistate.dict_rec_labels
         else:
             obsolete_lines = {k: v for k, v in old_selection.items() if k not in new_selection}
         for line_dict in obsolete_lines.values():
@@ -1005,6 +991,7 @@ class UIsub(Ui_MainWindow):
 #        for k, v in new_selection.items():
 #            print(f"{k}:\n{v}")
         print(f"update_rec_show took {round((time.time() - t0) * 1000)} ms")
+
 
 
 ##################################################################
@@ -1162,12 +1149,9 @@ class UIsub(Ui_MainWindow):
             uistate.zoom['mean_xlim'] = (0, max_sweep_duration)
         # axe
         # ax1 and ax2, simplified (iterative version is pre 2024-05-06)
-        x_axis = 'sweeps'
-        first, last = 0, df_selected[x_axis].max()-1
+        first, last = 0, df_selected['sweeps'].max()-1
         if uistate.checkBox['output_per_stim']:
-            x_axis = 'stim'
-            first += 1
-            last += 1
+            first, last = 1, df_selected['stims'].max()
         uistate.zoom['output_xlim'] = first, last
         print(f"zoomAuto: output_xlim: {uistate.zoom['output_xlim']}")
 
@@ -2172,6 +2156,7 @@ class UIsub(Ui_MainWindow):
             self.stimOutputs()
         else:
             self.sweepOutputs()
+        self.zoomAuto()
 
     def tableFormat(self):
         if config.verbose:
@@ -2462,6 +2447,7 @@ class UIsub(Ui_MainWindow):
         self.uiFreeze()
         df_p = self.get_df_project()
         for _, p_row in df_p.iterrows():
+            uiplot.unPlot(p_row['ID'])
             df_t = self.get_dft(p_row)
             self.dft2output(df_t, p_row)
             dfmean = self.get_dfmean(p_row)
@@ -2631,22 +2617,15 @@ class UIsub(Ui_MainWindow):
             for rec in list_to_plot:
                 row = df[df['recording_name'] == rec].iloc[0]
                 processRow(row)
-        def updateZoom(df):
-            if uistate.zoom['output_xlim'][1] is None:
-                x_axis = 'stim' if uistate.checkBox['output_per_stim'] else 'sweep'
-                uistate.zoom['output_xlim'] = [0, df[x_axis].max()]
-                print(f"graphUpdate: output_xlim: {uistate.zoom['output_xlim']}")
-                uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
         self.graphGroups()
         if row is not None:
             processRow(row)
-            updateZoom(df)
         else:
             df = df or uistate.df_recs2plot
             if df is not None and not df.empty:
                 processDataFrame(df)
-                updateZoom(df)
+        self.zoomAuto()
         print("graphUpdate calls uiplot.graphRefresh()")
         uiplot.graphRefresh()
 

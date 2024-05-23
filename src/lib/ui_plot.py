@@ -166,7 +166,7 @@ class UIplot():
 
         # arrange axes and labels
         axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
-        axm.axis('off')
+        #axm.axis('off')
         axm.set_xlim(uistate.zoom['mean_xlim'])
 
         axe.set_xlabel("Time (s)")
@@ -190,8 +190,8 @@ class UIplot():
             x_axis = 'stim'
             if uistate.rec_select:
                 x_max = uistate.df_recs2plot['stims'].max()
-                ax1.xaxis.set_major_locator(FixedLocator(range(1, x_max)))
-                ax2.xaxis.set_major_locator(FixedLocator(range(1, x_max)))
+                ax1.xaxis.set_major_locator(FixedLocator(range(1, x_max+1)))
+                ax2.xaxis.set_major_locator(FixedLocator(range(1, x_max+1)))
         else:
             x_axis = 'sweep'
         ax1.set_xlabel(x_axis)
@@ -355,15 +355,15 @@ class UIplot():
                 if x_axis == 'sweep':
                     self.plot_line(f"{label}{stim_str} volley slope mean", 'ax2', out[x_axis], out['volley_slope'], settings['rgb_volley_slope'], rec_ID, stim=stim_num)
 
-            # add stim-lines to output
-            if x_axis == 'stim':
-                out = dfoutput
-                print(f"***** Adding stim-lines to output: {label}")
-                print(f" - - - {out.columns}")  # DEBUG
-                print(f" - - - {out}")  # DEBUG
-                self.plot_line(f"{label} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID)
-                if 'EPSP_amp_norm' in out.columns:
-                    self.plot_line(f"{label} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID)
+        # add stim-lines to output
+        if x_axis == 'stim':
+            out = dfoutput
+            print(f"***** Adding stim-lines to output: {label}")
+            print(f" - - - {out.columns}")  # DEBUG
+            print(f" - - - {out}")  # DEBUG
+            self.plot_line(f"{label} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID)
+            if 'EPSP_amp_norm' in out.columns:
+                self.plot_line(f"{label} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID)
 
 
     def addGroup(self, df_group_row, df_groupmean):
