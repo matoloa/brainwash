@@ -4,6 +4,8 @@ import pandas as pd
 from matplotlib import style
 from matplotlib.lines import Line2D
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.ticker import FixedLocator
+
 
 import time # counting time for functions
 
@@ -184,8 +186,18 @@ class UIplot():
             ax2.set_ylim(uistate.zoom['output_ax2_ylim'])
         ax1.set_xlim(uistate.zoom['output_xlim'])
         ax2.set_xlim(uistate.zoom['output_xlim'])
+        if uistate.checkBox['output_per_stim']:
+            x_axis = 'stim'
+            if uistate.rec_select:
+                x_max = uistate.df_recs2plot['stims'].max()
+                ax1.xaxis.set_major_locator(FixedLocator(range(1, x_max)))
+                ax2.xaxis.set_major_locator(FixedLocator(range(1, x_max)))
+        else:
+            x_axis = 'sweep'
+        ax1.set_xlabel(x_axis)
+        ax2.set_xlabel(x_axis)
+        print(f"output_xlim: {uistate.zoom['output_xlim']}")
         ax1.figure.subplots_adjust(bottom=0.2)
-        print(f"ax1-2_xlim: {uistate.zoom['output_xlim']} enforced")
         self.oneAxisLeft()
 
         # maintain drag selections through reselection
@@ -258,6 +270,7 @@ class UIplot():
         # Add meanline to Mean
         self.plot_line(f"mean {label}", 'axm', dfmean["time"], dfmean[rec_filter], "black", rec_ID=rec_ID)
 
+        x_axis = 'stim' if self.uistate.checkBox['output_per_stim'] else 'sweep'
         dict_gradient = self.get_dict_gradient(n_stims)
         # Process detected stims
         for i_stim, t_row in dft.iterrows():
@@ -301,20 +314,23 @@ class UIplot():
                         print(f"*** Failed to salvage bad y_position: {y_position} from {label}{stim_str} EPSP amp marker; setting to 0")
                         y_position, color = 0, 'red'
                 self.plot_marker(f"{label}{stim_str} EPSP amp marker", 'axe', x_position, y_position, color, rec_ID, stim=stim_num)
-                self.plot_line(f"{label}{stim_str} EPSP amp", 'ax1', out['sweep'], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, stim=stim_num)
-                if 'EPSP_amp_norm' in out.columns:
-                    self.plot_line(f"{label}{stim_str} EPSP amp norm", 'ax1', out['sweep'], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, stim=stim_num)
+                if x_axis == 'sweep':
+                    self.plot_line(f"{label}{stim_str} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, stim=stim_num)
+                    if 'EPSP_amp_norm' in out.columns:
+                        self.plot_line(f"{label}{stim_str} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, stim=stim_num)
+            
             if not np.isnan(t_row['t_EPSP_slope_start']):
                 x_start, x_end = t_row['t_EPSP_slope_start'], t_row['t_EPSP_slope_end']
                 index = (df_event['time'] - x_start).abs().idxmin()
                 y_start = df_event.loc[index, rec_filter] if index in df_event.index else None
                 index = (df_event['time'] - x_end).abs().idxmin()
                 y_end = df_event.loc[index, rec_filter] if index in df_event.index else None
-
                 self.plot_line(f"{label}{stim_str} EPSP slope marker", 'axe', [x_start, x_end], [y_start, y_end], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num, width=5)
-                self.plot_line(f"{label}{stim_str} EPSP slope", 'ax2', out["sweep"], out['EPSP_slope'], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num)
-                if 'EPSP_slope_norm' in out.columns:
-                    self.plot_line(f"{label}{stim_str} EPSP slope norm", 'ax2', out["sweep"], out['EPSP_slope_norm'], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num)
+                if x_axis == 'sweep':
+                    self.plot_line(f"{label}{stim_str} EPSP slope", 'ax2', out[x_axis], out['EPSP_slope'], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num)
+                    if 'EPSP_slope_norm' in out.columns:
+                        self.plot_line(f"{label}{stim_str} EPSP slope norm", 'ax2', out[x_axis], out['EPSP_slope_norm'], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num)
+
             if not np.isnan(t_row['t_volley_amp']):
                 y_position = df_event.loc[df_event.time == t_row['t_volley_amp'], rec_filter]
                 # TODO: temporary hotfix - salvage bad y_positions (prevent this from happening!)
@@ -326,7 +342,9 @@ class UIplot():
                         print(f"*** Failed to salvage bad y_position: {y_position} from {label}{stim_str} volley amp marker, setting to 0")
                         y_position, color = 0, 'red'
                 self.plot_marker(f"{label}{stim_str} volley amp marker", 'axe', t_row['t_volley_amp'], y_position, settings['rgb_volley_amp'], rec_ID, stim=stim_num)
-                self.plot_line(f"{label}{stim_str} volley amp mean", 'ax1', out["sweep"], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, stim=stim_num)
+                if x_axis == 'sweep':
+                    self.plot_line(f"{label}{stim_str} volley amp mean", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, stim=stim_num)
+            
             if not np.isnan(t_row['t_volley_slope_start']):
                 x_start, x_end = t_row['t_volley_slope_start'], t_row['t_volley_slope_end']
                 index = (df_event['time'] - x_start).abs().idxmin()
@@ -334,7 +352,19 @@ class UIplot():
                 index = (df_event['time'] - x_end).abs().idxmin()
                 y_end = df_event.loc[index, rec_filter] if index in df_event.index else None
                 self.plot_line(f"{label}{stim_str} volley slope marker", 'axe', [x_start, x_end], [y_start, y_end], settings['rgb_volley_slope'], rec_ID, stim=stim_num, width=5)
-                self.plot_line(f"{label}{stim_str} volley slope mean", 'ax2', out["sweep"], out['volley_slope'], settings['rgb_volley_slope'], rec_ID, stim=stim_num)
+                if x_axis == 'sweep':
+                    self.plot_line(f"{label}{stim_str} volley slope mean", 'ax2', out[x_axis], out['volley_slope'], settings['rgb_volley_slope'], rec_ID, stim=stim_num)
+
+            # add stim-lines to output
+            if x_axis == 'stim':
+                out = dfoutput
+                print(f"***** Adding stim-lines to output: {label}")
+                print(f" - - - {out.columns}")  # DEBUG
+                print(f" - - - {out}")  # DEBUG
+                self.plot_line(f"{label} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID)
+                if 'EPSP_amp_norm' in out.columns:
+                    self.plot_line(f"{label} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID)
+
 
     def addGroup(self, df_group_row, df_groupmean):
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2

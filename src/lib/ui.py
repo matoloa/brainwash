@@ -984,6 +984,10 @@ class UIsub(Ui_MainWindow):
         # Apply filters
         new_selection = {k: v for k, v in new_selection.items() 
                             if not any(k.endswith(f) for f in filters)}
+        #if uistate.checkBox['output_per_stim']:
+        #    new_selection = {k: v for k, v in new_selection.items() if v['axis']=='ax1' and v['stim'] is None}
+        #else:
+        #    new_selection = {k: v for k, v in new_selection.items() if v['axis']=='ax1' and v['stim'] is not None}
         # Hide what ceased to be selected
         if reset: # Hide all lines
             obsolete_lines = {k: v for k, v in uistate.dict_rec_labels.items()}
@@ -1034,46 +1038,18 @@ class UIsub(Ui_MainWindow):
             return dfoutput
 
     def persistOutput(self, rec_name, dfoutput): 
+        # Determine column order based on the state of uistate.checkBox['output_per_stim']
+        column_order = ['stim', 'bin', 'EPSP_slope', 'EPSP_amp', 'volley_amp', 'volley_slope'] if uistate.checkBox['output_per_stim'] else ['stim', 'sweep', 'time', 'EPSP_slope', 'EPSP_amp', 'volley_amp', 'volley_slope']
         # Clean up column order, save to dict and file.
-        output_columns = ['stim',
-                'sweep',
-                'EPSP_slope',
-                'EPSP_slope_norm',
-                'EPSP_amp',
-                'EPSP_amp_norm',
-                'volley_slope',
-                'volley_amp',
-        ]
-        missing_columns = set(output_columns) - set(dfoutput.columns)
-        extra_columns = set(dfoutput.columns) - set(output_columns)
+        missing_columns = set(column_order) - set(dfoutput.columns)
+        extra_columns = set(dfoutput.columns) - set(column_order)
         if missing_columns:
-            print(f"Warning: The following columns in output_columns don't exist in dfoutput: {missing_columns}")
+            print(f"Warning: The following columns in column_order don't exist in dfoutput: {missing_columns}")
         if extra_columns:
-            print(f"Warning: The following columns exist in dfoutput but not in output_columns: {extra_columns}")
-        dfoutput = dfoutput.reindex(columns=output_columns)
+            print(f"Warning: The following columns exist in dfoutput but not in column_order: {extra_columns}")
+        dfoutput = dfoutput.reindex(columns=column_order)
         self.dict_outputs[rec_name] = dfoutput
         self.df2csv(df=dfoutput, rec=rec_name, key="output")
-
-    def persistStimOutput(self, rec_name, dfstimoutput): 
-        # Clean up column order, save to dict and file.
-        stimoutput_columns = ['stim',
-                'bin', # tuple; first and last sweep in bin
-                'EPSP_slope',
-                'EPSP_slope_norm',
-                'EPSP_amp',
-                'EPSP_amp_norm',
-                'volley_slope',
-                'volley_amp',
-        ]
-        missing_columns = set(stimoutput_columns) - set(dfstimoutput.columns)
-        extra_columns = set(dfstimoutput.columns) - set(stimoutput_columns)
-        if missing_columns:
-            print(f"Warning: The following columns in stimoutput_columns don't exist in dfstimoutput: {missing_columns}")
-        if extra_columns:
-            print(f"Warning: The following columns exist in dfstimoutput but not in stimoutput_columns: {extra_columns}")
-        dfstimoutput = dfstimoutput.reindex(columns=stimoutput_columns)
-        self.dict_stimoutputs[rec_name] = dfstimoutput
-        self.df2csv(df=dfstimoutput, rec=rec_name, key="stimoutput")
 
 
     def uiFreeze(self): # Disable selection changes and checkboxes
@@ -1186,7 +1162,14 @@ class UIsub(Ui_MainWindow):
             uistate.zoom['mean_xlim'] = (0, max_sweep_duration)
         # axe
         # ax1 and ax2, simplified (iterative version is pre 2024-05-06)
-            uistate.zoom['output_xlim'] = 0, df_selected['sweeps'].max()
+        x_axis = 'sweeps'
+        first, last = 0, df_selected[x_axis].max()-1
+        if uistate.checkBox['output_per_stim']:
+            x_axis = 'stim'
+            first += 1
+            last += 1
+        uistate.zoom['output_xlim'] = first, last
+        print(f"zoomAuto: output_xlim: {uistate.zoom['output_xlim']}")
 
 
     def update_recs2plot(self):
@@ -1261,7 +1244,6 @@ class UIsub(Ui_MainWindow):
         self.dict_means = {} # all means
         self.dict_ts = {} # all timepoints
         self.dict_outputs = {} # all outputs, x per sweep
-        self.dict_stimoutputs = {} # all outputs, x per stim
         self.dict_group_means = {} # means of all group outputs
         self.dict_diffs = {} # all diffs (for paired stim)
 
@@ -2188,6 +2170,8 @@ class UIsub(Ui_MainWindow):
         print(f"checkBox_output_per_stim_changed: {state}")
         if state == 2:
             self.stimOutputs()
+        else:
+            self.sweepOutputs()
 
     def tableFormat(self):
         if config.verbose:
@@ -2287,30 +2271,17 @@ class UIsub(Ui_MainWindow):
             return dft
 
     def get_dfoutput(self, row):
-        if False:#uistate.checkBox['output_per_stim']:
-            # returns an internal df STIMoutput for the selected file. If it does not exist, read it from file first.
-            recording_name = row['recording_name']
-            if recording_name in self.dict_stimoutputs: #1: Return cached
-                return self.dict_stimoutputs[recording_name]
-            str_output_path = f"{self.dict_folders['cache']}/{recording_name}_stimoutput.csv"
-            if Path(str_output_path).exists(): #2: Read from file
-                dfstimoutput = pd.read_csv(str_output_path)
-                self.dict_stimoutputs[recording_name] = dfstimoutput
-            else: #3: Create file and cache
-                self.stimOutputs()
-            return self.dict_stimoutputs[recording_name]
-        else:
-            # returns an internal df output for the selected file. If it does not exist, read it from file first.
-            recording_name = row['recording_name']
-            if recording_name in self.dict_outputs: #1: Return cached
-                return self.dict_outputs[recording_name]
-            str_output_path = f"{self.dict_folders['cache']}/{recording_name}_output.csv"
-            if Path(str_output_path).exists(): #2: Read from file
-                dfoutput = pd.read_csv(str_output_path)
-                self.dict_outputs[recording_name] = dfoutput
-            else: #3: Create file and cache
-                self.defaultOutput(row=row)
+        # returns an internal df output for the selected file. If it does not exist, read it from file first.
+        recording_name = row['recording_name']
+        if recording_name in self.dict_outputs: #1: Return cached
             return self.dict_outputs[recording_name]
+        str_output_path = f"{self.dict_folders['cache']}/{recording_name}_output.csv"
+        if Path(str_output_path).exists(): #2: Read from file
+            dfoutput = pd.read_csv(str_output_path)
+            self.dict_outputs[recording_name] = dfoutput
+        else: #3: Create file and cache
+            self.defaultOutput(row=row)
+        return self.dict_outputs[recording_name]
         
     def get_dfdata(self, row):
         # returns an internal df for the selected recording_name. If it does not exist, read it from file first.
@@ -2486,19 +2457,34 @@ class UIsub(Ui_MainWindow):
         self.set_df_project(df_p)
         self.dft2output(df_t, row)
 
+    def sweepOutputs(self):
+        # rebuild all outputs for all recordings based on output x = sweep number TODO: add option to show time instead
+        self.uiFreeze()
+        df_p = self.get_df_project()
+        for _, p_row in df_p.iterrows():
+            df_t = self.get_dft(p_row)
+            self.dft2output(df_t, p_row)
+            dfmean = self.get_dfmean(p_row)
+            uiplot.addRow(p_row, df_t, dfmean, self.get_dfoutput(p_row))
+        self.update_rec_show(reset=True)
+        self.mouseoverUpdate()
+        self.uiThaw()
 
     def stimOutputs(self):
-        '''
-        Generates dfstimoutput: stims (not sweeps) on x-axis
-        '''
-        print("stimOutput")
-        df_recs = uistate.df_recs2plot
-        for _, p_row in df_recs.iterrows():
-            rec_name = p_row['recording_name']
+        # rebuild all outputs for all recordings based on output x = stim number
+        self.uiFreeze()
+        df_p = self.get_df_project()
+        df_parsed = df_p[df_p['sweeps'] != "..."]
+        for _, p_row in df_parsed.iterrows():
+            uiplot.unPlot(p_row['ID'])
             dfmean = self.get_dfmean(row=p_row)
             df_t = self.get_dft(row=p_row)
-            dfstimoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
-            self.persistStimOutput(rec_name=rec_name, dfstimoutput=dfstimoutput)
+            dfoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
+            self.persistOutput(rec_name=p_row['recording_name'], dfoutput=dfoutput)
+            uiplot.addRow(p_row, df_t, dfmean, dfoutput)
+        self.update_rec_show(reset=True)
+        self.mouseoverUpdate()
+        self.uiThaw()
 
 
     def dft2output(self, dft, row):
@@ -2647,7 +2633,9 @@ class UIsub(Ui_MainWindow):
                 processRow(row)
         def updateZoom(df):
             if uistate.zoom['output_xlim'][1] is None:
-                uistate.zoom['output_xlim'] = [0, df['sweeps'].max()]
+                x_axis = 'stim' if uistate.checkBox['output_per_stim'] else 'sweep'
+                uistate.zoom['output_xlim'] = [0, df[x_axis].max()]
+                print(f"graphUpdate: output_xlim: {uistate.zoom['output_xlim']}")
                 uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
         self.graphGroups()
@@ -3133,7 +3121,9 @@ class UIsub(Ui_MainWindow):
                 elif ax.get_ylabel() == "Slope (mV/ms)":
                     ax.set_ylim(uistate.zoom['output_ax2_ylim'])
                 df_p = self.get_df_project()
-                uistate.zoom['output_xlim'] = [0, df_p['sweeps'].max()]
+                x_axis = 'stim' if uistate.checkBox['output_per_stim'] else 'sweep'
+                uistate.zoom['output_xlim'] = [0, df_p[x_axis].max()]
+                print(f"zoomReset: output_xlim: {uistate.zoom['output_xlim']}")
                 ax.set_xlim(uistate.zoom['output_xlim'])
         else:
             canvas.axes.set_xlim(uistate.zoom['event_xlim'])
