@@ -290,6 +290,11 @@ class UIplot():
             # add markers to Mean
             self.plot_marker(f"mean {label}{stim_str} marker", 'axm', t_stim, y_position, color, rec_ID, stim=stim_num)
             self.plot_vline(f"mean {label}{stim_str} selection marker", 'axm', t_stim, color, rec_ID, stim=stim_num)
+            if x_axis == 'stim': # also add to output
+                self.plot_marker(f"ax1 mean {label}{stim_str} marker", 'ax1', stim_num, y_position, color, rec_ID, stim=stim_num)
+                self.plot_marker(f"ax2 mean {label}{stim_str} marker", 'ax2', stim_num, y_position, color, rec_ID, stim=stim_num)
+                self.plot_vline(f"ax1 mean {label}{stim_str} selection marker", 'ax1', stim_num, color, rec_ID, stim=stim_num)
+                self.plot_vline(f"ax2 mean {label}{stim_str} selection marker", 'ax2', stim_num, color, rec_ID, stim=stim_num)
 
             # add to Events
             window_start = t_stim + settings['event_start']
@@ -358,12 +363,14 @@ class UIplot():
         # add stim-lines to output
         if x_axis == 'stim':
             out = dfoutput
-            print(f"***** Adding stim-lines to output: {label}")
-            print(f" - - - {out.columns}")  # DEBUG
-            print(f" - - - {out}")  # DEBUG
             self.plot_line(f"{label} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID)
             if 'EPSP_amp_norm' in out.columns:
                 self.plot_line(f"{label} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID)
+            self.plot_line(f"{label} EPSP slope", 'ax2', out[x_axis], out['EPSP_slope'], settings['rgb_EPSP_slope'], rec_ID)
+            if 'EPSP_slope_norm' in out.columns:
+                self.plot_line(f"{label} EPSP slope norm", 'ax2', out[x_axis], out['EPSP_slope_norm'], settings['rgb_EPSP_slope'], rec_ID)
+            self.plot_line(f"{label} volley amp", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID)
+            self.plot_line(f"{label} volley slope", 'ax2', out[x_axis], out['volley_slope'], settings['rgb_volley_slope'], rec_ID)
 
 
     def addGroup(self, df_group_row, df_groupmean):

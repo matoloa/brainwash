@@ -960,7 +960,6 @@ class UIsub(Ui_MainWindow):
         print(f"*** update_rec_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}")
         # remove non-selected recs and stims
         new_selection = {k: v for k, v in uistate.dict_rec_labels.items() if v['rec_ID'] in selected_ids and (v['stim'] in selected_stims or v['stim'] is None)}
-
         # Setup filters for checkboxes, operating on labels
         filters = []
         if not uistate.checkBox['EPSP_amp']:
@@ -968,9 +967,11 @@ class UIsub(Ui_MainWindow):
         if not uistate.checkBox['EPSP_slope']:
             filters.extend([" EPSP slope marker", " EPSP slope"])
         if not uistate.checkBox['volley_amp']:
-            filters.extend([" volley amp marker", " volley amp mean"])
+            filters.extend([" volley amp marker"])
+            filters.extend([" volley amp"] if uistate.checkBox['output_per_stim'] else [" volley amp mean"])
         if not uistate.checkBox['volley_slope']:
-            filters.extend([" volley slope marker", " volley slope mean"])
+            filters.extend([" volley slope marker"])
+            filters.extend([" volley slope"] if uistate.checkBox['output_per_stim'] else [" volley slope mean"])
         if not uistate.checkBox['norm_EPSP']:
             filters.extend([" norm"])
         new_selection = {k: v for k, v in new_selection.items() 
