@@ -957,9 +957,12 @@ class UIsub(Ui_MainWindow):
         old_selection = uistate.dict_rec_show 
         selected_ids = set(uistate.df_recs2plot['ID'])
         selected_stims = [stim + 1 for stim in uistate.stim_select] # stim_select is 0-based (indices) - convert to stims
-        print(f"*** update_rec_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}")
+        # print(f"update_rec_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}")
         # remove non-selected recs and stims
         new_selection = {k: v for k, v in uistate.dict_rec_labels.items() if v['rec_ID'] in selected_ids and (v['stim'] in selected_stims or v['stim'] is None)}
+        # for k, v in new_selection.items():
+        #    print(f"new_selection: {k}: {v}")
+
         # Setup filters for checkboxes, operating on labels
         filters = []
         if not uistate.checkBox['EPSP_amp']:
@@ -1150,10 +1153,10 @@ class UIsub(Ui_MainWindow):
             uistate.zoom['mean_xlim'] = (0, max_sweep_duration)
         # axe
         # ax1 and ax2, simplified (iterative version is pre 2024-05-06)
-        first, last = 0, df_selected['sweeps'].max()-1
-        if uistate.checkBox['output_per_stim']:
-            first, last = 1, df_selected['stims'].max()
-        uistate.zoom['output_xlim'] = first, last
+            first, last = 0, df_selected['sweeps'].max()-1
+            if uistate.checkBox['output_per_stim']:
+                first, last = 1, df_selected['stims'].max()
+            uistate.zoom['output_xlim'] = first, last
         print(f"zoomAuto: output_xlim: {uistate.zoom['output_xlim']}")
 
 
@@ -2839,8 +2842,7 @@ class UIsub(Ui_MainWindow):
         uistate.x_drag = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
         if uistate.x_drag == uistate.x_drag_last: # if the dragged event hasn't moved an index point, change nothing
             return
-
-        precision = len(str(data_x[1] - data_x[0]).split('.')[1])
+        precision = uistate.settings['precision']
         time_diff = uistate.x_drag - uistate.x_on_click
         # get the x values of the slope
         blob = True # only moving amplitudes and resizing slopes have a blob
@@ -2850,26 +2852,22 @@ class UIsub(Ui_MainWindow):
             x_start = round(prior_slope_start + time_diff, precision)
             blob = False
         x_end = round(prior_slope_end + time_diff, precision)
-        
         # prevent resizing below 1 index - TODO: make it flip instead
         if x_end <= x_start:
             x_start_index = np.where(data_x == x_start)[0][0]
             x_end = data_x[x_start_index + 1] 
-
         # get y values
         x_indices = np.searchsorted(data_x, [x_start, x_end])
         y_start, y_end = data_y[x_indices]
-
         # remember the last x index
         uistate.x_drag_last = uistate.x_drag
-
         # update the mouseover plot
         uistate.mouseover_plot[0].set_data([x_start, x_end], [y_start, y_end])
-
         if blob:
             uistate.mouseover_blob.set_offsets([x_end, y_end])
         self.canvasEvent.draw()
         self.eventDragUpdate(x_start, x_end, precision)
+
 
     def eventDragPoint(self, event, data_x, data_y, prior_amp): # maingraph dragging event
         self.canvasEvent.mpl_disconnect(self.mouseover)
@@ -2879,28 +2877,33 @@ class UIsub(Ui_MainWindow):
         uistate.x_drag = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
         if uistate.x_drag == uistate.x_drag_last: # if the dragged event hasn't moved an index point, change nothing
             return
-        
-        precision = len(str(data_x[1] - data_x[0]).split('.')[1])
+        precision = uistate.settings['precision']
         time_diff = uistate.x_drag - uistate.x_on_click
-        
         x_point = round(prior_amp + time_diff, precision)
         x_index = (np.abs(data_x - x_point)).argmin()
         y_point = data_y[x_index]
-        # print (f"x_point: {x_point}, y_point: {y_point}")
+        print (f"x_point: {x_point}, y_point: {y_point}")
         # remember the last x index
         uistate.x_drag_last = uistate.x_drag
         # update the mouseover plot
         uistate.mouseover_blob.set_offsets([x_point, y_point])
-
         self.canvasEvent.draw()
         self.eventDragUpdate(x_point, x_point, precision)
   
 
     def eventDragUpdate(self, x_start, x_end, precision): # update output; this is a separate function to allow the user to make it happen live (current) or on release (for low compute per data)
-        dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
+        # TODO: unspaghetti this
         action = uistate.mouseover_action
-        stim_offset = uistate.dft_copy.iloc[uistate.stim_select[0]]['t_stim']
-        dict_t = {}
+        stim_idx = uistate.stim_select[0]
+        t_row = uistate.dft_copy.iloc[stim_idx]
+        stim_offset = t_row['t_stim']
+        if uistate.checkBox['output_per_stim']:
+            x_axis = 'stim'
+        else:
+            x_axis = 'sweep'
+        
+        # filtered_recs = {k: v for k, v in uistate.dict_rec_show.items() if v['axis'] == 'axe'}
+        # print (f"filtered_recs.keys(): {filtered_recs.keys()}")
 
         if action.startswith("EPSP slope"):
             dict_t = { # only pass these values to build_dfoutput, so it won't rebuild unchanged values
@@ -2908,61 +2911,94 @@ class UIsub(Ui_MainWindow):
                 't_EPSP_slope_end': x_end + stim_offset,
                 't_EPSP_slope_width': round(x_end - x_start, precision),
             }
-            out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+            if x_axis == 'stim':
+                dfmean = self.get_dfmean(row=uistate.dfp_row_copy)
+                df_t = self.get_dft(row=uistate.dfp_row_copy)
+                for key, value in dict_t.items():
+                    df_t.at[stim_idx, key] = value
+                out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
+            elif x_axis == 'sweep':
+                dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
+                out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.dfp_row_copy, dfoutput=out, aspect='EPSP_slope')
-                    uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['EPSP_slope_norm'], color=uistate.settings['rgb_EPSP_slope'])
+                    uistate.mouseover_out = uistate.ax2.plot(out[x_axis], out['EPSP_slope_norm'], color=uistate.settings['rgb_EPSP_slope'], linewidth=3)
                 else:
-                    uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['EPSP_slope'], color=uistate.settings['rgb_EPSP_slope'])
+                    uistate.mouseover_out = uistate.ax2.plot(out[x_axis], out['EPSP_slope'], color=uistate.settings['rgb_EPSP_slope'], linewidth=3)
             else:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.dfp_row_copy, dfoutput=out, aspect='EPSP_slope')
-                    uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope_norm'])
+                    uistate.mouseover_out[0].set_data(out[x_axis], out['EPSP_slope_norm'])
                 else:
-                    uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_slope'])
+                    uistate.mouseover_out[0].set_data(out[x_axis], out['EPSP_slope'])
         elif action == "EPSP amp move":
             dict_t = {'t_EPSP_amp': round(x_start + stim_offset, precision)}
-            print(f"t_EPSP_amp: {dict_t['t_EPSP_amp']}")
-            out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+            print(f"dict_t['t_EPSP_amp']: {dict_t['t_EPSP_amp']}")
+            if x_axis == 'stim':
+                dfmean = self.get_dfmean(row=uistate.dfp_row_copy)
+                df_t = self.get_dft(row=uistate.dfp_row_copy)
+                for key, value in dict_t.items():
+                    df_t.at[stim_idx, key] = value
+                    print(f"df_t.at[stim_idx, key]: {df_t.at[stim_idx, key]}")
+                out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
+            elif x_axis == 'sweep':
+                dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
+                out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.dfp_row_copy, dfoutput=out, aspect='EPSP_amp')
-                    uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_amp_norm'], color=uistate.settings['rgb_EPSP_amp'])
+                    uistate.mouseover_out = uistate.ax1.plot(out[x_axis], out['EPSP_amp_norm'], color=uistate.settings['rgb_EPSP_amp'], linewidth=3)
                 else:
-                    uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['EPSP_amp'], color=uistate.settings['rgb_EPSP_amp'])
+                    uistate.mouseover_out = uistate.ax1.plot(out[x_axis], out['EPSP_amp'], color=uistate.settings['rgb_EPSP_amp'], linewidth=3)
             else:
                 if uistate.checkBox['norm_EPSP']:
                     out = self.normOutput(row=uistate.dfp_row_copy, dfoutput=out, aspect='EPSP_amp')
-                    uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_amp_norm'])
+                    uistate.mouseover_out[0].set_data(out[x_axis], out['EPSP_amp_norm'])
                 else:
-                    uistate.mouseover_out[0].set_data(out['sweep'], out['EPSP_amp'])
+                    uistate.mouseover_out[0].set_data(out[x_axis], out['EPSP_amp'])
         elif action.startswith("volley slope"):
             dict_t = {
                 't_volley_slope_start': x_start + stim_offset,
                 't_volley_slope_end': x_end + stim_offset,
                 't_volley_slope_width': round(x_end - x_start, precision),
             }
-            out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+            if x_axis == 'stim':
+                dfmean = self.get_dfmean(row=uistate.dfp_row_copy)
+                df_t = self.get_dft(row=uistate.dfp_row_copy)
+                for key, value in dict_t.items():
+                    df_t.at[stim_idx, key] = value
+                out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
+            elif x_axis == 'sweep':
+                dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
+                out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
-                uistate.mouseover_out = uistate.ax2.plot(out['sweep'], out['volley_slope'], color=uistate.settings['rgb_volley_slope'], linestyle='--')
+                uistate.mouseover_out = uistate.ax2.plot(out[x_axis], out['volley_slope'], color=uistate.settings['rgb_volley_slope'], linestyle='--', linewidth=3)
             else:
-                uistate.mouseover_out[0].set_data(out['sweep'], out['volley_slope'])
+                uistate.mouseover_out[0].set_data(out[x_axis], out['volley_slope'])
             dict_t['volley_slope_mean'] = out['volley_slope'].mean()
 
         elif action == "volley amp move":
             dict_t = {'t_volley_amp': x_start + stim_offset}
-            print(f"t_volley_amp: {dict_t['t_volley_amp']}")
-            out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+            if x_axis == 'stim':
+                dfmean = self.get_dfmean(row=uistate.dfp_row_copy)
+                df_t = self.get_dft(row=uistate.dfp_row_copy)
+                for key, value in dict_t.items():
+                    df_t.at[stim_idx, key] = value
+                out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
+            elif x_axis == 'sweep':
+                dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
+                out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             if uistate.mouseover_out is None:
-                uistate.mouseover_out = uistate.ax1.plot(out['sweep'], out['volley_amp'], color=uistate.settings['rgb_volley_amp'], linestyle=':')
+                uistate.mouseover_out = uistate.ax1.plot(out[x_axis], out['volley_amp'], color=uistate.settings['rgb_volley_amp'], linestyle=':', linewidth=3)
             else:
-                uistate.mouseover_out[0].set_data(out['sweep'], out['volley_amp'])
+                uistate.mouseover_out[0].set_data(out[x_axis], out['volley_amp'])
             dict_t['volley_amp_mean'] = out['volley_amp'].mean()
 
         if dict_t:
             for key, value in dict_t.items():
                 uistate.dft_copy.loc[uistate.stim_select[0], key] = value
+                print(f"uistate.dft_copy: key, value {key}: {value}")
         self.canvasOutput.draw()
 
 
@@ -3009,16 +3045,22 @@ class UIsub(Ui_MainWindow):
         for key, value in dict_t.items():
             uistate.dft_copy.loc[uistate.stim_select[0], key] = value
         self.set_dft(p_row['recording_name'], uistate.dft_copy)
+        print(f"t_EPSP_amp: {uistate.dft_copy.loc[uistate.stim_select[0], 't_EPSP_amp']}")
 
         # update dfoutput; dict and file, with normalized columns if applicable
-        dfoutput = self.get_dfoutput(row=p_row)
-        dffilter = self.get_dffilter(row=p_row)
-        stim_num = t_row['stim']
-        new_dfoutput_columns = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
-        new_dfoutput_columns['stim'] = int(stim_num)
-        print(f"new_dfoutput_columns: {new_dfoutput_columns}")
-        for col in new_dfoutput_columns.columns:
-            dfoutput.loc[dfoutput['stim'] == stim_num, col] = new_dfoutput_columns.loc[new_dfoutput_columns['stim'] == stim_num, col]
+        if uistate.checkBox['output_per_stim']:
+            df_t = self.get_dft(row=p_row)
+            dfmean = self.get_dfmean(row=p_row)
+            dfoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
+        else:
+            dfoutput = self.get_dfoutput(row=p_row)
+            dffilter = self.get_dffilter(row=p_row)
+            stim_num = t_row['stim']
+            new_dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+            new_dfoutput['stim'] = int(stim_num)
+            for col in new_dfoutput.columns:
+                dfoutput.loc[dfoutput['stim'] == stim_num, col] = new_dfoutput.loc[new_dfoutput['stim'] == stim_num, col]
+        print(f"dfoutput.columns: {dfoutput.columns}")
         self.persistOutput(rec_name=p_row['recording_name'], dfoutput=dfoutput)
         self.tableUpdate()
         if uistate.mouseover_action.startswith("EPSP"): # add normalized EPSP columns

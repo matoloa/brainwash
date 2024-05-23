@@ -132,6 +132,7 @@ class UIplot():
     def graphRefresh(self):
         # show only selected and imported lines, only appropriate aspects
         print("graphRefresh")
+
         #t0 = time.time()
         uistate = self.uistate
 
@@ -142,6 +143,7 @@ class UIplot():
             dict_rec = uistate.dict_rec_show
             axis_names = ['axm', 'axe', 'ax1', 'ax2']
             loc_values = ['upper right', 'upper right', 'upper right', 'lower right']
+
             for axis_name, loc in zip(axis_names, loc_values):
                 dict_on_axis = {key: value for key, value in dict_rec.items() if value['axis'] == axis_name}
                 axis_legend = {key: value['line'] for key, value in dict_on_axis.items() if not key.endswith(" marker")}
@@ -276,7 +278,7 @@ class UIplot():
         for i_stim, t_row in dft.iterrows():
             color = dict_gradient[i_stim]
             stim_num = i_stim + 1 # 1-numbering (visible to user)
-            stim_str = f" - stim {stim_num}"
+            stim_str = f"- stim {stim_num}"
             t_stim = t_row['t_stim']
             out = dfoutput[dfoutput['stim'] == stim_num]# TODO: enable switch to dfdiff?
             y_position = dfmean.loc[dfmean.time == t_stim, rec_filter].values[0] # returns index, y_value
@@ -288,20 +290,20 @@ class UIplot():
                t_row[var] -= t_stim
 
             # add markers to Mean
-            self.plot_marker(f"mean {label}{stim_str} marker", 'axm', t_stim, y_position, color, rec_ID, stim=stim_num)
-            self.plot_vline(f"mean {label}{stim_str} selection marker", 'axm', t_stim, color, rec_ID, stim=stim_num)
+            self.plot_marker(f"mean {label} {stim_str} marker", 'axm', t_stim, y_position, color, rec_ID)
+            self.plot_vline(f"mean {label} {stim_str} selection marker", 'axm', t_stim, color, rec_ID, stim=stim_num)
             if x_axis == 'stim': # also add to output
-                self.plot_marker(f"ax1 mean {label}{stim_str} marker", 'ax1', stim_num, y_position, color, rec_ID, stim=stim_num)
-                self.plot_marker(f"ax2 mean {label}{stim_str} marker", 'ax2', stim_num, y_position, color, rec_ID, stim=stim_num)
-                self.plot_vline(f"ax1 mean {label}{stim_str} selection marker", 'ax1', stim_num, color, rec_ID, stim=stim_num)
-                self.plot_vline(f"ax2 mean {label}{stim_str} selection marker", 'ax2', stim_num, color, rec_ID, stim=stim_num)
+                self.plot_marker(f"ax1 mean {label} {stim_str} marker", 'ax1', stim_num, y_position, color, rec_ID, stim=stim_num)
+                self.plot_marker(f"ax2 mean {label} {stim_str} marker", 'ax2', stim_num, y_position, color, rec_ID, stim=stim_num)
+                self.plot_vline(f"ax1 mean {label} {stim_str} selection marker", 'ax1', stim_num, color, rec_ID, stim=stim_num)
+                self.plot_vline(f"ax2 mean {label} {stim_str} selection marker", 'ax2', stim_num, color, rec_ID, stim=stim_num)
 
             # add to Events
             window_start = t_stim + settings['event_start']
             window_end = t_stim + settings['event_end']
             df_event = dfmean[(dfmean['time'] >= window_start) & (dfmean['time'] <= window_end)].copy()
             df_event['time'] = df_event['time'] - t_stim  # shift event so that t_stim is at time 0
-            self.plot_line(f"{label}{stim_str}", 'axe', df_event['time'], df_event[rec_filter], color, rec_ID, stim=stim_num)
+            self.plot_line(f"{label} {stim_str}", 'axe', df_event['time'], df_event[rec_filter], color, rec_ID, stim=stim_num)
             
             # plot markers on axe, output lines on ax1 and ax2
             out = dfoutput[dfoutput['stim'] == stim_num] # TODO: enable switch to dfdiff?
@@ -314,15 +316,14 @@ class UIplot():
                 if isinstance(y_position, pd.Series):
                     if not y_position.empty and isinstance(y_position.values[0], float):
                         y_position = y_position.values[0]
-                        print(f"* Salvaged bad y_position by values[0]: {y_position} from {label}{stim_str} EPSP amp marker")
                     else:
-                        print(f"*** Failed to salvage bad y_position: {y_position} from {label}{stim_str} EPSP amp marker; setting to 0")
+                        print(f"*** Failed to salvage bad y_position: {y_position} from {label} {stim_str} EPSP amp marker; setting to 0")
                         y_position, color = 0, 'red'
-                self.plot_marker(f"{label}{stim_str} EPSP amp marker", 'axe', x_position, y_position, color, rec_ID, stim=stim_num)
+                self.plot_marker(f"{label} {stim_str} EPSP amp marker", 'axe', x_position, y_position, color, rec_ID, stim=stim_num)
                 if x_axis == 'sweep':
-                    self.plot_line(f"{label}{stim_str} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, stim=stim_num)
+                    self.plot_line(f"{label} {stim_str} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, stim=stim_num)
                     if 'EPSP_amp_norm' in out.columns:
-                        self.plot_line(f"{label}{stim_str} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, stim=stim_num)
+                        self.plot_line(f"{label} {stim_str} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, stim=stim_num)
             
             if not np.isnan(t_row['t_EPSP_slope_start']):
                 x_start, x_end = t_row['t_EPSP_slope_start'], t_row['t_EPSP_slope_end']
@@ -330,11 +331,11 @@ class UIplot():
                 y_start = df_event.loc[index, rec_filter] if index in df_event.index else None
                 index = (df_event['time'] - x_end).abs().idxmin()
                 y_end = df_event.loc[index, rec_filter] if index in df_event.index else None
-                self.plot_line(f"{label}{stim_str} EPSP slope marker", 'axe', [x_start, x_end], [y_start, y_end], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num, width=5)
+                self.plot_line(f"{label} {stim_str} EPSP slope marker", 'axe', [x_start, x_end], [y_start, y_end], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num, width=5)
                 if x_axis == 'sweep':
-                    self.plot_line(f"{label}{stim_str} EPSP slope", 'ax2', out[x_axis], out['EPSP_slope'], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num)
+                    self.plot_line(f"{label} {stim_str} EPSP slope", 'ax2', out[x_axis], out['EPSP_slope'], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num)
                     if 'EPSP_slope_norm' in out.columns:
-                        self.plot_line(f"{label}{stim_str} EPSP slope norm", 'ax2', out[x_axis], out['EPSP_slope_norm'], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num)
+                        self.plot_line(f"{label} {stim_str} EPSP slope norm", 'ax2', out[x_axis], out['EPSP_slope_norm'], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num)
 
             if not np.isnan(t_row['t_volley_amp']):
                 y_position = df_event.loc[df_event.time == t_row['t_volley_amp'], rec_filter]
@@ -342,13 +343,13 @@ class UIplot():
                 if isinstance(y_position, pd.Series):
                     if not y_position.empty and isinstance(y_position.values[0], float):
                         y_position = y_position.values[0]
-                        print(f"* Salvaged bad y_position by values[0]: {y_position} from {label}{stim_str} volley amp marker")
+                        print(f"* Salvaged bad y_position by values[0]: {y_position} from {label} {stim_str} volley amp marker")
                     else:
-                        print(f"*** Failed to salvage bad y_position: {y_position} from {label}{stim_str} volley amp marker, setting to 0")
+                        print(f"*** Failed to salvage bad y_position: {y_position} from {label} {stim_str} volley amp marker, setting to 0")
                         y_position, color = 0, 'red'
-                self.plot_marker(f"{label}{stim_str} volley amp marker", 'axe', t_row['t_volley_amp'], y_position, settings['rgb_volley_amp'], rec_ID, stim=stim_num)
+                self.plot_marker(f"{label} {stim_str} volley amp marker", 'axe', t_row['t_volley_amp'], y_position, settings['rgb_volley_amp'], rec_ID, stim=stim_num)
                 if x_axis == 'sweep':
-                    self.plot_line(f"{label}{stim_str} volley amp mean", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, stim=stim_num)
+                    self.plot_line(f"{label} {stim_str} volley amp mean", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, stim=stim_num)
             
             if not np.isnan(t_row['t_volley_slope_start']):
                 x_start, x_end = t_row['t_volley_slope_start'], t_row['t_volley_slope_end']
@@ -356,9 +357,9 @@ class UIplot():
                 y_start = df_event.loc[index, rec_filter] if index in df_event.index else None
                 index = (df_event['time'] - x_end).abs().idxmin()
                 y_end = df_event.loc[index, rec_filter] if index in df_event.index else None
-                self.plot_line(f"{label}{stim_str} volley slope marker", 'axe', [x_start, x_end], [y_start, y_end], settings['rgb_volley_slope'], rec_ID, stim=stim_num, width=5)
+                self.plot_line(f"{label} {stim_str} volley slope marker", 'axe', [x_start, x_end], [y_start, y_end], settings['rgb_volley_slope'], rec_ID, stim=stim_num, width=5)
                 if x_axis == 'sweep':
-                    self.plot_line(f"{label}{stim_str} volley slope mean", 'ax2', out[x_axis], out['volley_slope'], settings['rgb_volley_slope'], rec_ID, stim=stim_num)
+                    self.plot_line(f"{label} {stim_str} volley slope mean", 'ax2', out[x_axis], out['volley_slope'], settings['rgb_volley_slope'], rec_ID, stim=stim_num)
 
         # add stim-lines to output
         if x_axis == 'stim':
@@ -392,40 +393,40 @@ class UIplot():
 
     def plotUpdate(self, p_row, t_row, aspect, data_x, data_y):
         norm = self.uistate.checkBox['norm_EPSP']
-        rec_name = p_row['recording_name']
         stim_offset = t_row['t_stim']
-        stim_str = f" - stim {t_row['stim']}"
-        plot_to_update = f"{p_row['recording_name']}{stim_str} {aspect} marker"
-        #print(f"plotUpdate: {plot_to_update}")
+        label_base = f"{p_row['recording_name']} - stim {t_row['stim']} {aspect}"
 
         if aspect in ['EPSP slope', 'volley slope']:
             x_start = t_row[f't_{aspect.replace(" ", "_")}_start']-stim_offset
             x_end = t_row[f't_{aspect.replace(" ", "_")}_end']-stim_offset
             y_start = data_y[np.abs(data_x - x_start).argmin()]
             y_end = data_y[np.abs(data_x - x_end).argmin()]
-            self.updateLine(plot_to_update, [x_start, x_end], [y_start, y_end])
+            self.updateLine(f"{label_base} marker", [x_start, x_end], [y_start, y_end])
+            if self.uistate.checkBox['output_per_stim']:
+                label_base = f"{p_row['recording_name']} {aspect}"
             if aspect == 'volley slope':
-                label = f"{rec_name}{stim_str} {aspect} mean"
                 mean = t_row[f'{aspect.replace(" ", "_")}_mean']
-                self.updateOutMean(label, mean)
-            else:
-                label = f"{rec_name}{stim_str} {aspect}"
+                self.updateOutMean(f"{label_base} mean", mean)
+            else: # EPSP slope
                 if norm:
-                    label += " norm"
-                self.updateOutLine(label)
+                    label_base += " norm"
+                self.updateOutLine(label_base)
         elif aspect in ['EPSP amp', 'volley amp']:
             t_amp = t_row[f't_{aspect.replace(" ", "_")}'] - stim_offset
             y_position = data_y[np.abs(data_x - t_amp).argmin()]
-            self.updateLine(plot_to_update, t_amp, y_position)
+            self.updateLine(f"{label_base} marker", t_amp, y_position)
+            if self.uistate.checkBox['output_per_stim']:
+                label_base = f"{p_row['recording_name']} {aspect}"
             if aspect == 'volley amp':
-                label = f"{rec_name}{stim_str} {aspect} mean"
-                mean = t_row[f'{aspect.replace(" ", "_")}_mean']
-                self.updateOutMean(label, mean)
-            else:
-                label = f"{rec_name}{stim_str} {aspect}"
+                if self.uistate.checkBox['output_per_stim']:
+                    self.updateOutLine(f"{label_base}", t_amp, y_position)
+                else:
+                    mean = t_row[f'{aspect.replace(" ", "_")}_mean']
+                    self.updateOutMean(f"{label_base} mean", mean)
+            else: # EPSP amp
                 if norm:
-                    label += " norm"
-                self.updateOutLine(label)
+                    label_base += " norm"
+                self.updateOutLine(label_base)
 
 
     def updateLine(self, plot_to_update, x_data, y_data):
@@ -437,6 +438,7 @@ class UIplot():
         axe.figure.canvas.draw()
 
     def updateOutLine(self, label):
+        print(f"updateOutLine: {label}")
         mouseover_out = self.uistate.mouseover_out
         linedict = self.uistate.dict_rec_labels[label]
         linedict['line'].set_ydata(mouseover_out[0].get_ydata())

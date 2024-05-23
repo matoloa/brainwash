@@ -79,11 +79,12 @@ def build_dfoutput(df, dict_t, filter='voltage'):
             dfoutput['volley_slope'] = np.nan
         list_col.append('volley_slope')
     t1 = time.time()
-    print(f'build_df_output: {round((t1-t0)*1000)} ms, list_col: {list_col}')
+    # print(f'build_df_output: {round((t1-t0)*1000)} ms, list_col: {list_col}')
     return dfoutput[list_col]
 
 
 def build_dfstimoutput(dfmean, df_t, filter='voltage'):
+    # TODO: make sure it accepts a df_t with fewer columns
     t0 = time.time()
     list_col = ['stim', 'bin', 'EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
     df_stimoutput = pd.DataFrame(columns=list_col)
@@ -96,6 +97,7 @@ def build_dfstimoutput(dfmean, df_t, filter='voltage'):
             df_EPSP_amp = dfmean[dfmean['time']==row['t_EPSP_amp']].copy()
             df_EPSP_amp.reset_index(inplace=True, drop=True)
             df_stimoutput.loc[i, 'EPSP_amp'] = -1000 * df_EPSP_amp[filter].values[0] if not df_EPSP_amp.empty else np.nan
+            print(f"*** {i} row['t_EPSP_amp']: {row['t_EPSP_amp']}, df_stimoutput: {df_stimoutput.loc[i, 'EPSP_amp']}")
 
         # EPSP_slope
         if valid(row['t_EPSP_slope_start']) and valid(row['t_EPSP_slope_end']):
@@ -114,7 +116,7 @@ def build_dfstimoutput(dfmean, df_t, filter='voltage'):
             df_stimoutput.loc[i, 'volley_slope'] = -slope_volley if slope_volley else np.nan
 
     t1 = time.time()
-    print(f'build_df_stimoutput: {round((t1-t0)*1000)} ms, list_col: {list_col}')
+    # print(f'build_df_stimoutput: {round((t1-t0)*1000)} ms, list_col: {list_col}')
     return df_stimoutput[list_col]
 
 
