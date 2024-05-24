@@ -2523,9 +2523,9 @@ class UIsub(Ui_MainWindow):
         ]
         df_t = df_t.reindex(columns=dft_columns)
         self.set_dft(rec_name, df_t)
-        print(f"output_pre: {output}")
+        #print(f"output_pre: {output}")
         output = self.normOutput(dfoutput=output)
-        print(f"output_post: {output}")
+        #print(f"output_post: {output}")
         if uistate.checkBox['output_per_stim']:
             self.stimOutputs()
         self.persistOutput(rec_name=rec_name, dfoutput=output)
