@@ -106,12 +106,6 @@ def build_dfstimoutput(dfmean, df_t, filter='voltage'):
     list_col = ['stim', 'bin', 'EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
     df_stimoutput = pd.DataFrame(columns=list_col)
     if 't_stim' in df_t.columns and ('t_EPSP_amp' in df_t.columns or 't_volley_amp' in df_t.columns):
-        # Find the index of the closest time point to t_stim
-        closest_index = np.argmin(np.abs(dfmean['time'] - row['t_stim']))
-        start_index = max(0, closest_index - 5)
-        end_index = min(len(dfmean['time']), closest_index + 20)
-        indices = np.arange(start_index, end_index)  # Step is 1 to go forward
-        amp_zero = dfmean[filter].iloc[indices].mean()
         # TODO: Hook up to uistate (args?)
         #EPSP_hw = uistate.lineEdit['EPSP_amp_halfwidth']
         #volley_hw = uistate.lineEdit['volley_amp_halfwidth']
@@ -120,6 +114,12 @@ def build_dfstimoutput(dfmean, df_t, filter='voltage'):
 
     for i, row in df_t.iterrows():
         df_stimoutput.loc[i, 'stim'] = row['stim']
+        # Find the index of the closest time point to t_stim
+        closest_index = np.argmin(np.abs(dfmean['time'] - row['t_stim']))
+        start_index = max(0, closest_index - 5)
+        end_index = min(len(dfmean['time']), closest_index + 20)
+        indices = np.arange(start_index, end_index)  # Step is 1 to go forward
+        amp_zero = dfmean[filter].iloc[indices].mean()
 
         # EPSP_amp
         if valid(row['t_EPSP_amp']):

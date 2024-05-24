@@ -256,7 +256,6 @@ class UIplot():
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'stim': stim, 'line':marker, 'axis':axid}
 
     def plot_plume(self, label, axid, x, y, color, rec_ID, stim=None):
-        print(f" ***** plot_plume x: {x}, y: {y}")
         plume, = self.get_axis(axid).plot(x, y, color=color, label=label, alpha=self.uistate.settings['alpha_line'])
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'stim': stim, 'line':plume, 'axis':axid}
 
