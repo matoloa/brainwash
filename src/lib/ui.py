@@ -1190,6 +1190,8 @@ class UIsub(Ui_MainWindow):
                 self.checkBox_force1stim_changed(state)
             elif key == 'output_per_stim':
                 self.checkBox_output_per_stim_changed(state)
+            elif key == 'timepoints_per_stim':
+                self.checkBox_timepoints_per_stim_changed(state)
         self.update_rec_show()
         self.mouseoverUpdate()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
@@ -2162,6 +2164,12 @@ class UIsub(Ui_MainWindow):
             self.sweepOutputs()
         self.zoomAuto()
 
+    def checkBox_timepoints_per_stim_changed(self, state):
+        uistate.checkBox['timepoints_per_stim'] = state == 2
+        print(f"checkBox_timepoints_per_stim_changed: {state}")
+        if state == 2:
+            self.set_uniformTimepoints()
+
     def tableFormat(self):
         if config.verbose:
             print("tableFormat")
@@ -2254,7 +2262,7 @@ class UIsub(Ui_MainWindow):
             return dft
         else:
             print("creating t")
-            self.defaultOutput(row=row) # also creates self.dict_ts[recording_name]
+            self.defaultOutput(row=row)
             dft = self.dict_ts[recording_name]
             self.df2csv(df=dft, rec=recording_name, key="timepoints")
             return dft
@@ -2442,36 +2450,8 @@ class UIsub(Ui_MainWindow):
             return
         df_p.loc[df_p['ID'] == row['ID'], 'stims'] = len(df_t)
         self.set_df_project(df_p)
-        self.sweepOutputs()
-        if not uistate.checkBox['timepoints_per_stim']:
-            variables = ['t_volley_amp', 't_volley_slope_start', 't_volley_slope_end', 't_EPSP_amp', 't_EPSP_slope_start', 't_EPSP_slope_end']
-            methods = ['t_volley_amp_method', 't_volley_slope_method', 't_EPSP_amp_method', 't_EPSP_slope_method']
-            params = ['t_volley_amp_params', 't_volley_slope_params', 't_EPSP_amp_params', 't_EPSP_slope_params']
-            # find highest EPSP_slope in df_output
-            dfoutput = self.get_dfoutput(row)
-            if 'EPSP_slope' in dfoutput.columns:
-                idx_max = dfoutput['EPSP_slope'].idxmax()
-                stim_max = dfoutput.loc[idx_max, 'stim']
-                t_template_row = df_t.loc[[idx_max]]
-                t_stim = t_template_row['t_stim'].values[0]
-                for var in variables:
-                    t_template_row[var] -= t_stim
-                if 'stim' not in df_t.columns:
-                    df_t['stim'] = None
-                for i, row_t in df_t.iterrows():
-                    df_t.at[i, 'stim'] = i+1 # stims numbered from 1
-                    for var in variables:
-                        df_t.at[i, var] = t_template_row[var].values[0] + row_t['t_stim']
-                    for method in methods:
-                        df_t.at[i, method] = f"=stim_{stim_max}"
-                    for param in params:
-                        df_t.at[i, param] = f"=stim_{stim_max}"
-            self.set_dft(row['recording_name'], df_t)
-        if uistate.checkBox['output_per_stim']:
-            self.stimOutputs()
-        else:
-            self.sweepOutputs()
-        
+        self.dft2output(df_t, row)
+
 
     def sweepOutputs(self):
         # rebuild all outputs for all recordings based on output x = sweep number TODO: add option to show time instead
@@ -2502,6 +2482,41 @@ class UIsub(Ui_MainWindow):
         self.update_rec_show(reset=True)
         self.mouseoverUpdate()
         self.uiThaw()
+
+
+    def set_uniformTimepoints(self):
+        for _, p_row in self.get_df_project().iterrows():
+            dfoutput = self.get_dfoutput(p_row)
+            if 'stim' not in dfoutput.columns:
+                self.stimOutputs()
+                dfoutput = self.get_dfoutput(p_row)
+                print(dfoutput)
+            df_t = self.get_dft(p_row)
+            print(df_t)
+            print()
+            variables = ['t_volley_amp', 't_volley_slope_start', 't_volley_slope_end', 't_EPSP_amp', 't_EPSP_slope_start', 't_EPSP_slope_end']
+            methods = ['t_volley_amp_method', 't_volley_slope_method', 't_EPSP_amp_method', 't_EPSP_slope_method']
+            params = ['t_volley_amp_params', 't_volley_slope_params', 't_EPSP_amp_params', 't_EPSP_slope_params']
+            # find highest EPSP_slope in df_output
+            if 'EPSP_slope' in dfoutput.columns:
+                print(dfoutput['EPSP_slope'])
+                idx_max = dfoutput['EPSP_slope'].idxmax()
+                stim_max = dfoutput.loc[idx_max, 'stim']
+                t_template_row = df_t.loc[[idx_max]]
+                t_stim = t_template_row['t_stim'].values[0]
+                for var in variables:
+                    t_template_row[var] -= t_stim
+                if 'stim' not in df_t.columns:
+                    df_t['stim'] = None
+                for i, row_t in df_t.iterrows():
+                    df_t.at[i, 'stim'] = i+1 # stims numbered from 1
+                    for var in variables:
+                        df_t.at[i, var] = t_template_row[var].values[0] + row_t['t_stim']
+                    for method in methods:
+                        df_t.at[i, method] = f"=stim_{stim_max}"
+                    for param in params:
+                        df_t.at[i, param] = f"=stim_{stim_max}"
+                self.set_dft(p_row['recording_name'], df_t)
 
 
     def dft2output(self, dft, row):
