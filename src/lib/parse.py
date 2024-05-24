@@ -125,10 +125,42 @@ def parse_ibwFolder(folder, dev=False): # igor2, para
     measurement_start = min(timestamp_array)
     timestamp_array -= measurement_start
     voltage_raw = np.vstack(arrays)
-
     df = pd.DataFrame(data=voltage_raw, index=timestamp_array)
     timestep = timesteps[0][0]
-    df.columns = np.round(np.arange(7500) * timestep, int(-np.log(timestep))).tolist()
+    num_columns = voltage_raw.shape[1]
+    df.columns = np.round(np.arange(num_columns) * timestep, int(-np.log(timestep))).tolist()
+    df = df.stack().reset_index()
+    df.columns = ['t0', 'time', 'voltage_raw']
+    df.t0 = df.t0.astype("float64")
+    df.time = df.time.astype("float64")
+    df['datetime'] = pd.to_datetime((measurement_start + df.t0 + df.time), unit="s").round("us")
+    df['channel'] = 0
+
+    return df
+
+def parse_ibw(filepath, dev=False): # igor2, para
+    files = [Path(filepath)] # TODO: EVERY attempt to read just one filepath, without what should be superfluous lists, have failed in unresolvable mismatch errors
+    for file in files:
+        if not file.exists():
+            raise FileNotFoundError(f"No such file: '{file}'")
+    results = Parallel(n_jobs=-1)(delayed(ibw_read)(file) for file in tqdm(files))
+    keys = results[0].keys()
+    res = {}
+    for key in keys:
+        res[key] = [i[key] for i in results]
+    timesteps = res['meta_sfA']
+    arrays = np.vstack(res['array'])
+    timestamps = res['timestamp']       
+
+    seconds = (pd.to_datetime("1970-01-01") - pd.to_datetime("1900-01-01")).total_seconds()
+    timestamp_array = (np.array(timestamps)-seconds)
+    measurement_start = min(timestamp_array)
+    timestamp_array -= measurement_start
+    voltage_raw = np.vstack(arrays)
+    df = pd.DataFrame(data=voltage_raw, index=timestamp_array)
+    timestep = timesteps[0][0]
+    num_columns = voltage_raw.shape[1]
+    df.columns = np.round(np.arange(num_columns) * timestep, int(-np.log(timestep))).tolist()
     df = df.stack().reset_index()
     df.columns = ['t0', 'time', 'voltage_raw']
     df.t0 = df.t0.astype("float64")
@@ -252,7 +284,8 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
                 return dict_data
             elif filetype == "abf":
                 df = parse_abf(filepath=Path(source_path))
-            # TODO: add function to parse single .ibw files
+            elif filetype == "ibw":
+                df = parse_ibw(filepath=Path(source_path))
         if df is None:
             raise ValueError(f" - - no supported files found in {source_path}")
         df = df.sort_values(by='datetime').reset_index(drop=True)
