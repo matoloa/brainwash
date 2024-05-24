@@ -325,13 +325,14 @@ class UIplot():
                         print(f"*** Failed to salvage bad y_position: {y_position} from {label} {stim_str} EPSP amp marker; setting to 0")
                         y_position, color = 0, 'red'
                 self.plot_marker(f"{label} {stim_str} EPSP amp marker", 'axe', x_position, y_position, color, rec_ID, stim=stim_num)
-                amp = y_position + out['EPSP_amp'].iloc[0] / 1000
-                self.plot_plume(f"{label} {stim_str} EPSP amp plume marker", 'axe', [x_position, x_position], [y_position, amp], color, rec_ID, stim=stim_num)
-
                 if x_axis == 'sweep':
                     self.plot_line(f"{label} {stim_str} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, stim=stim_num)
                     if 'EPSP_amp_norm' in out.columns:
                         self.plot_line(f"{label} {stim_str} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, stim=stim_num)
+                else:
+                    amp = y_position + out['EPSP_amp'].iloc[0] / 1000
+                    self.plot_plume(f"{label} {stim_str} EPSP amp plume marker", 'axe', [x_position, x_position], [y_position, amp], color, rec_ID, stim=stim_num)
+
 
             if not np.isnan(t_row['t_EPSP_slope_start']):
                 x_start, x_end = t_row['t_EPSP_slope_start'], t_row['t_EPSP_slope_end']
