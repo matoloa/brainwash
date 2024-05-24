@@ -103,7 +103,7 @@ class TableModel(QtCore.QAbstractTableModel):
         return True
 
 
-class FileTreeSelectorModel(QtWidgets.QFileSystemModel):  # Should be paired with a FileTreeSelectorView
+class FileTreeSelectorModel(QtWidgets.QFileSystemModel):  # Paired with a FileTreeSelectorView
     paths_selected = QtCore.pyqtSignal(list)
 
     def __init__(self, parent=None, root_path="."):
@@ -1028,6 +1028,7 @@ class UIsub(Ui_MainWindow):
             dfoutput[f'{aspect}_norm'] = dfoutput[aspect] / norm_mean
             return dfoutput
 
+
     def persistOutput(self, rec_name, dfoutput): 
         # Determine column order based on the state of uistate.checkBox['output_per_stim']
         column_order = ['stim', 'bin', 'EPSP_slope', 'EPSP_amp', 'volley_amp', 'volley_slope'] if uistate.checkBox['output_per_stim'] else ['stim', 'sweep', 'time', 'EPSP_slope', 'EPSP_amp', 'volley_amp', 'volley_slope']
@@ -1629,9 +1630,10 @@ class UIsub(Ui_MainWindow):
             if df_t.empty:
                 print(f"No stims found for {rec_name}.")
                 continue
+            self.set_dft(rec_name, df_t)
             df_p.loc[p_row['ID'] == df_p['ID'], 'stims'] = len(df_t)
             self.set_df_project(df_p)
-            _ = self.dft2output(df_t, p_row)
+            self.default_dft_output(p_row)
             uiplot.unPlot(rec_ID)
             uiplot.addRow(p_row, df_t, dfmean, self.dict_outputs[rec_name])
         uistate.stim_select = [0]
@@ -2262,7 +2264,7 @@ class UIsub(Ui_MainWindow):
             return dft
         else:
             print("creating t")
-            self.defaultOutput(row=row)
+            self.default_dft_output(row=row)
             dft = self.dict_ts[recording_name]
             self.df2csv(df=dft, rec=recording_name, key="timepoints")
             return dft
@@ -2277,7 +2279,7 @@ class UIsub(Ui_MainWindow):
             dfoutput = pd.read_csv(str_output_path)
             self.dict_outputs[recording_name] = dfoutput
         else: #3: Create file and cache
-            self.defaultOutput(row=row)
+            self.default_dft_output(row=row)
         return self.dict_outputs[recording_name]
         
     def get_dfdata(self, row):
@@ -2431,27 +2433,76 @@ class UIsub(Ui_MainWindow):
         self.dict_group_means[str_ID] = group_mean
         return self.dict_group_means[str_ID]
 
-    def defaultOutput(self, row):
+
+    def default_dft_output(self, row, reset = False):
         '''
         Generates default results for dft and dfoutput
-        Stores stims in self.df_project
+        Stores (number of) stims in self.df_project
         '''
-        print("defaultOutput")
+        print("default_dft_output")
         dfmean = self.get_dfmean(row=row)
         df_p = self.get_df_project()
+        rec_name = row['recording_name']
+        if rec_name in self.dict_ts and not reset:
+            df_t = self.dict_ts[rec_name]
+        else:
+            default_dict_t = uistate.default.copy()  # Default sizes
+            df_t = analysis.find_all_t(dfmean=dfmean, 
+                                                volley_slope_halfwidth=default_dict_t['t_volley_slope_halfwidth'], 
+                                                EPSP_slope_halfwidth=default_dict_t['t_EPSP_slope_halfwidth'], 
+                                                verbose=False)
+            if df_t.empty:
+                print("No stims found.")
+                return
+            df_p.loc[df_p['ID'] == row['ID'], 'stims'] = len(df_t)
+            self.set_df_project(df_p)
 
+        # Update the original row in dft with combined default and measured values
+        df_t['stim'] = 1
+        output = pd.DataFrame()  # Initialize output as an empty DataFrame
+        dffilter = self.get_dffilter(row=row)
         default_dict_t = uistate.default.copy()  # Default sizes
-        df_t = analysis.find_all_t(dfmean=dfmean, 
-                                              volley_slope_halfwidth=default_dict_t['t_volley_slope_halfwidth'], 
-                                              EPSP_slope_halfwidth=default_dict_t['t_EPSP_slope_halfwidth'], 
-                                              verbose=False)
-        if df_t.empty:
-            print("No stims found.")
-            return
-        df_p.loc[df_p['ID'] == row['ID'], 'stims'] = len(df_t)
-        self.set_df_project(df_p)
-        self.dft2output(df_t, row)
-
+        for i, row_t in df_t.iterrows():
+            updated_dict_t = default_dict_t.copy()  # Start with a copy of the default values
+            updated_dict_t.update(row_t.to_dict())  # Update with the values from row_t
+            df_t.loc[i] = updated_dict_t
+            df_t.at[i, 'stim'] = i+1 # stims numbered from 1
+            dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=df_t.loc[i].to_dict())
+            dfoutput['stim'] = i+1  # Add stim column to dfoutput
+            self.normOutput(row=row, dfoutput=dfoutput)
+            output = pd.concat([output, dfoutput], ignore_index=True)  # Concatenate dfoutput to output
+            if 'volley_amp' in dfoutput.columns:
+                df_t.at[i, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
+            if 'volley_slope' in dfoutput.columns:
+                df_t.at[i, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
+        dft_columns = ['stim',
+                        't_stim',
+                        't_EPSP_slope_start',
+                        't_EPSP_slope_end',
+                        't_EPSP_slope_width',
+                        't_EPSP_slope_halfwidth',
+                        't_EPSP_slope_method',
+                        't_EPSP_slope_params',
+                        't_EPSP_amp',
+                        't_EPSP_amp_method',
+                        't_EPSP_amp_params',
+                        't_volley_slope_start',
+                        't_volley_slope_end',
+                        't_volley_slope_width',
+                        't_volley_slope_halfwidth',
+                        't_volley_slope_method',
+                        't_volley_slope_params',
+                        'volley_slope_mean',
+                        't_volley_amp',
+                        't_volley_amp_method',
+                        't_volley_amp_params',
+                        'volley_amp_mean',
+        ]
+        df_t = df_t.reindex(columns=dft_columns)
+        self.set_dft(rec_name, df_t)
+        if uistate.checkBox['output_per_stim']:
+            self.stimOutputs()
+        self.persistOutput(rec_name=rec_name, dfoutput=output)
 
     def sweepOutputs(self):
         # rebuild all outputs for all recordings based on output x = sweep number TODO: add option to show time instead
@@ -2460,8 +2511,10 @@ class UIsub(Ui_MainWindow):
         for _, p_row in df_p.iterrows():
             uiplot.unPlot(p_row['ID'])
             dfmean = self.get_dfmean(p_row)
+            self.default_dft_output(p_row)
             df_t = self.get_dft(p_row)
-            self.dft2output(df_t, p_row)
+            # dfoutput = self.get_dfoutput(p_row)
+            # self.persistOutput(rec_name=p_row['recording_name'], dfoutput=dfoutput)
             uiplot.addRow(p_row, df_t, dfmean, self.get_dfoutput(p_row))
         self.update_rec_show(reset=True)
         self.mouseoverUpdate()
@@ -2490,7 +2543,6 @@ class UIsub(Ui_MainWindow):
             if 'stim' not in dfoutput.columns:
                 self.stimOutputs()
                 dfoutput = self.get_dfoutput(p_row)
-                print(dfoutput)
             df_t = self.get_dft(p_row)
             print(df_t)
             print()
@@ -2517,54 +2569,6 @@ class UIsub(Ui_MainWindow):
                     for param in params:
                         df_t.at[i, param] = f"=stim_{stim_max}"
                 self.set_dft(p_row['recording_name'], df_t)
-
-
-    def dft2output(self, dft, row):
-        # Update the original row in dft with combined default and measured values
-        dft['stim'] = 1
-        output = pd.DataFrame()  # Initialize output as an empty DataFrame
-        dffilter = self.get_dffilter(row=row)
-        default_dict_t = uistate.default.copy()  # Default sizes
-        for i, row_t in dft.iterrows():
-            updated_dict_t = default_dict_t.copy()  # Start with a copy of the default values
-            updated_dict_t.update(row_t.to_dict())  # Update with the values from row_t
-            dft.loc[i] = updated_dict_t
-            dft.at[i, 'stim'] = i+1 # stims numbered from 1
-            dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dft.loc[i].to_dict())
-            dfoutput['stim'] = i+1  # Add stim column to dfoutput
-            self.normOutput(row=row, dfoutput=dfoutput)
-            output = pd.concat([output, dfoutput], ignore_index=True)  # Concatenate dfoutput to output
-            if 'volley_amp' in dfoutput.columns:
-                dft.at[i, 'volley_amp_mean'] = dfoutput['volley_amp'].mean()
-            if 'volley_slope' in dfoutput.columns:
-                dft.at[i, 'volley_slope_mean'] = dfoutput['volley_slope'].mean()
-        dft_columns = ['stim',
-                        't_stim',
-                        't_EPSP_slope_start',
-                        't_EPSP_slope_end',
-                        't_EPSP_slope_width',
-                        't_EPSP_slope_halfwidth',
-                        't_EPSP_slope_method',
-                        't_EPSP_slope_params',
-                        't_EPSP_amp',
-                        't_EPSP_amp_method',
-                        't_EPSP_amp_params',
-                        't_volley_slope_start',
-                        't_volley_slope_end',
-                        't_volley_slope_width',
-                        't_volley_slope_halfwidth',
-                        't_volley_slope_method',
-                        't_volley_slope_params',
-                        'volley_slope_mean',
-                        't_volley_amp',
-                        't_volley_amp_method',
-                        't_volley_amp_params',
-                        'volley_amp_mean',
-        ]
-        dft = dft.reindex(columns=dft_columns)
-        rec_name = row['recording_name']
-        self.set_dft(rec_name, dft)
-        self.persistOutput(rec_name, output)
 
 
 # Graph interface
