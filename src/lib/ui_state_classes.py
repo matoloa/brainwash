@@ -37,6 +37,8 @@ class UIstate:
         }
         self.lineEdit = {
             'norm_EPSP_on': [0, 0],
+            'EPSP_amp_halfwidth': 0.0002,
+            'volley_amp_halfwidth': 0.0001,
         }
         self.x_select = { # selected ranges on mean- and output graphs
             'mean_start': None,

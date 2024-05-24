@@ -1303,6 +1303,10 @@ class UIsub(Ui_MainWindow):
         self.actionDarkmode.triggered.connect(self.triggerDarkmode)
         self.actionDarkmode.setShortcut("Ctrl+D")
         self.menuEdit.addAction(self.actionDarkmode)
+        self.actionCopy = QtWidgets.QAction("Copy timepoints", self)
+        self.actionCopy.triggered.connect(self.triggerCopy)
+        self.actionCopy.setShortcut("Ctrl+C")
+        self.menuEdit.addAction(self.actionCopy)
 
         # View menu
         for frame, (text, initial_state) in uistate.viewTools.items():
@@ -1433,6 +1437,10 @@ class UIsub(Ui_MainWindow):
         self.usage(f"triggerDarkmode set to {uistate.darkmode}")
         self.write_bw_cfg()
         self.darkmode()
+
+    def triggerCopy(self):
+        self.usage("triggerCopy")
+        self.copy_dft()
 
     def pushButton_paired_data_flip_pressed(self):
         self.usage("pushButton_paired_data_flip_pressed")
@@ -1607,6 +1615,16 @@ class UIsub(Ui_MainWindow):
 
 
 # Data Editing functions
+
+    def copy_dft(self):
+        if uistate.dft_copy is None:
+            print("Nothing to copy.")
+            return
+        if uistate.dft_copy.empty:
+            print("Nothing to copy.")
+            return
+        uistate.dft_copy.to_clipboard(index=False)
+
 
     def stimDetect(self):
         if not uistate.rec_select:

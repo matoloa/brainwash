@@ -38,13 +38,29 @@ def build_dfoutput(df, dict_t, filter='voltage'):
     dfoutput = pd.DataFrame()
     dfoutput['sweep'] = df.sweep.unique() # one row per unique sweep in data file
 
+    if 't_stim' in dict_t.keys() and ('t_EPSP_amp' or 't_volley_amp') in dict_t.keys():
+        import numpy as np
+        # Find the index of the closest time point to t_stim
+        closest_index = np.argmin(np.abs(df['time'] - dict_t['t_stim']))
+        start_index = max(0, closest_index - 5)
+        end_index = max(0, closest_index - 20)
+        indices = np.arange(start_index, end_index, -1)  # Step is -1 to go backwards
+        amp_zero = df[filter].iloc[indices].mean()
+        # TODO: Hook up to uistate (args?)
+        #EPSP_hw = uistate.lineEdit['EPSP_amp_halfwidth']
+        #volley_hw = uistate.lineEdit['volley_amp_halfwidth']
+        EPSP_hw = 0.0002
+        volley_hw = 0.0001
+
     # EPSP_amp
     if 't_EPSP_amp' in dict_t.keys():
         t_EPSP_amp = dict_t['t_EPSP_amp']
         if valid(t_EPSP_amp):
-            df_EPSP_amp = df[df['time']==t_EPSP_amp].copy() # filter out all time (from sweep start) that do not match t_EPSP_amp
+            start_time = t_EPSP_amp - EPSP_hw
+            end_time = t_EPSP_amp + EPSP_hw
+            df_EPSP_amp = df[(df['time'] >= start_time) & (df['time'] <= end_time)].copy()
             df_EPSP_amp.reset_index(inplace=True, drop=True)
-            dfoutput['EPSP_amp'] = -1000 * df_EPSP_amp[filter] # invert and convert to mV
+            dfoutput['EPSP_amp'] = -1000 * (df_EPSP_amp[filter].mean() - amp_zero)
         else:
             dfoutput['EPSP_amp'] = np.nan
         list_col.append('EPSP_amp')
@@ -62,9 +78,11 @@ def build_dfoutput(df, dict_t, filter='voltage'):
     if 't_volley_amp' in dict_t.keys():
         t_volley_amp = dict_t['t_volley_amp']
         if valid(t_volley_amp):
-            df_volley_amp = df[df['time']==t_volley_amp].copy() # filter out all time (from sweep start) that do not match t_volley_amp
+            start_time = t_volley_amp - volley_hw
+            end_time = t_volley_amp + volley_hw
+            df_volley_amp = df[(df['time'] >= start_time) & (df['time'] <= end_time)].copy()
             df_volley_amp.reset_index(inplace=True, drop=True)
-            dfoutput['volley_amp'] = -1000 * df_volley_amp[filter] # invert and convert to mV
+            dfoutput['volley_amp'] = -1000 * (df_volley_amp[filter].mean() - amp_zero) # invert and convert to mV
         else:
             dfoutput['volley_amp'] = np.nan
         list_col.append('volley_amp')
