@@ -186,8 +186,8 @@ class UIplot():
             ax2.set_ylabel("Slope (mV/ms)")
             ax1.set_ylim(uistate.zoom['output_ax1_ylim'])
             ax2.set_ylim(uistate.zoom['output_ax2_ylim'])
-#        ax1.set_xlim(uistate.zoom['output_xlim'])
-#        ax2.set_xlim(uistate.zoom['output_xlim'])
+        ax1.set_xlim(uistate.zoom['output_xlim'])
+        ax2.set_xlim(uistate.zoom['output_xlim'])
         if uistate.checkBox['output_per_stim']:
             x_axis = 'stim'
             if uistate.rec_select:
