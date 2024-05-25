@@ -979,11 +979,11 @@ class UIsub(Ui_MainWindow):
         # Setup filters for checkboxes, operating on labels
         filters = []
         if not uistate.checkBox['EPSP_amp']:
-            filters.extend([" EPSP amp marker", "EPSP amp plume marker", " EPSP amp"])
+            filters.extend([" EPSP amp marker", "EPSP amp x marker", "EPSP amp y marker", " EPSP amp"])
         if not uistate.checkBox['EPSP_slope']:
             filters.extend([" EPSP slope marker", " EPSP slope"])
         if not uistate.checkBox['volley_amp']:
-            filters.extend([" volley amp marker"])
+            filters.extend([" volley amp marker", "volley amp x marker", "volley amp y marker"])
             filters.extend([" volley amp"] if uistate.checkBox['output_per_stim'] else [" volley amp mean"])
         if not uistate.checkBox['volley_slope']:
             filters.extend([" volley slope marker"])
