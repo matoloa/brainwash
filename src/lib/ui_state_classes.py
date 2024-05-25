@@ -55,7 +55,7 @@ class UIstate:
             'rgb_EPSP_slope': (0.5, 0.5, 1),
             'rgb_volley_amp': (1, 0.2, 1),
             'rgb_volley_slope': (1, 0.5, 1),
-            'alpha_mark': 0.5,
+            'alpha_mark': 0.4,
             'alpha_line': 1,
             'alpha_dot': 0.8,
         }

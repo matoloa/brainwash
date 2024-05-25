@@ -252,7 +252,7 @@ class UIplot():
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'stim': stim, 'line':line, 'axis':axid}
 
     def plot_marker(self, label, axid, x, y, color, rec_ID, stim=None):
-        marker, = self.get_axis(axid).plot(x, y, marker='o', markerfacecolor=color, markeredgecolor=color, markersize=10, alpha=self.uistate.settings['alpha_mark'], zorder=0, label=label)
+        marker, = self.get_axis(axid).plot(x, y, marker='o', markerfacecolor=color, markeredgecolor=color, markersize=10, alpha=0.4, zorder=0, label=label)
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'stim': stim, 'line':marker, 'axis':axid}
 
     def plot_cross(self, label, axid, x, y, amp_x, amp_y, color, rec_ID, stim=None):
