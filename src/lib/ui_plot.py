@@ -303,6 +303,7 @@ class UIplot():
             stim_num = i_stim + 1 # 1-numbering (visible to user)
             stim_str = f"- stim {stim_num}"
             t_stim = t_row['t_stim']
+            print(stim_num, dfoutput)
             out = dfoutput[dfoutput['stim'] == stim_num]# TODO: enable switch to dfdiff?
             y_position = dfmean.loc[dfmean.time == t_stim, rec_filter].values[0] # returns index, y_value
             # Event window, color, and alpha settings
@@ -329,6 +330,7 @@ class UIplot():
             self.plot_line(f"{label} {stim_str}", 'axe', df_event['time'], df_event[rec_filter], color, rec_ID, stim=stim_num)
             
             # plot markers on axe, output lines on ax1 and ax2
+            print(stim_num, dfoutput)
             out = dfoutput[dfoutput['stim'] == stim_num] # TODO: enable switch to dfdiff?
 
             if not np.isnan(t_row['t_EPSP_amp']):
