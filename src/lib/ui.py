@@ -970,28 +970,17 @@ class UIsub(Ui_MainWindow):
         selected_stims = [stim + 1 for stim in uistate.stim_select] # stim_select is 0-based (indices) - convert to stims
         # print(f"update_rec_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}")
         # remove non-selected recs and stims
-        new_selection = {k: v for k, v in uistate.dict_rec_labels.items() if v['rec_ID'] in selected_ids and (v['stim'] in selected_stims or v['stim'] is None)}
-        # for k, v in new_selection.items():
-        #    print(f"new_selection: {k}: {v}")
-
-        # Setup filters for checkboxes, operating on labels
-        filters = []
-        if not uistate.checkBox['EPSP_amp']:
-            filters.extend([" EPSP amp marker", "EPSP amp x marker", "EPSP amp y marker", " EPSP amp"])
-        if not uistate.checkBox['EPSP_slope']:
-            filters.extend([" EPSP slope marker", " EPSP slope"])
-        if not uistate.checkBox['volley_amp']:
-            filters.extend([" volley amp marker", "volley amp x marker", "volley amp y marker"])
-            filters.extend([" volley amp"] if uistate.checkBox['output_per_stim'] else [" volley amp mean"])
-        if not uistate.checkBox['volley_slope']:
-            filters.extend([" volley slope marker"])
-            filters.extend([" volley slope"] if uistate.checkBox['output_per_stim'] else [" volley slope mean"])
+        aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
+        new_selection = {k: v for k, v in uistate.dict_rec_labels.items() 
+                         if v['rec_ID'] in selected_ids 
+                         and (v['stim'] in selected_stims or v['stim'] is None)
+                         and all(uistate.checkBox[aspect] or v.get('aspect', '') != aspect for aspect in aspects)}
         if not uistate.checkBox['norm_EPSP']:
-            filters.extend([" norm"])
+             filters = [" norm"]
         else:
-            filters.extend([" EPSP amp", " EPSP slope"])
-        new_selection = {k: v for k, v in new_selection.items() 
-                            if not any(k.endswith(f) for f in filters)}
+             filters = [" EPSP amp", " EPSP slope"]
+        new_selection = {k: v for k, v in new_selection.items() if not any(k.endswith(f) for f in filters)}
+
         if reset: # Hide all lines
             obsolete_lines = uistate.dict_rec_labels
         else:
@@ -1003,7 +992,7 @@ class UIsub(Ui_MainWindow):
         for line_dict in added_lines.values():
             line_dict['line'].set_visible(True)
         uistate.dict_rec_show = new_selection
-        print(f"update_rec_show took {round((time.time() - t0) * 1000)} ms")
+        #print(f"update_rec_show took {round((time.time() - t0) * 1000)} ms")
 
 
 

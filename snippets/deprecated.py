@@ -1,6 +1,44 @@
 # Functions that are not in use anymore, but might be useful again in the future
 '''
 
+
+    def sweepOutputs(self):
+        # rebuild all outputs for all recordings based on output x = sweep number TODO: add option to show time instead
+        self.uiFreeze()
+        df_p = self.get_df_project()
+        for _, p_row in df_p.iterrows():
+            uiplot.unPlot(p_row['ID'])
+            df_t = self.get_dft(p_row)
+            dict_t = df_t.iloc[0].to_dict()
+            dfmean = self.get_dfmean(row=p_row)
+            dffilter = self.get_dffilter(p_row)
+            dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
+            self.persistOutput(p_row['recording_name'], dfoutput)
+            print(f"sweepOutputs: {p_row['recording_name']} {dfoutput.columns}")
+            uiplot.addRow(p_row, df_t, dfmean, dfoutput)
+        self.update_rec_show(reset=True)
+        self.mouseoverUpdate()
+        self.uiThaw()
+        return dfoutput
+
+    def stimOutputs(self):
+        # rebuild all outputs for all recordings based on output x = stim number
+        self.uiFreeze()
+        df_p = self.get_df_project()
+        df_parsed = df_p[df_p['sweeps'] != "..."]
+        for _, p_row in df_parsed.iterrows():
+            uiplot.unPlot(p_row['ID'])
+            dfmean = self.get_dfmean(row=p_row)
+            df_t = self.get_dft(row=p_row)
+            dfoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
+            print(f"stimOutputs: {p_row['recording_name']} {dfoutput.columns}")
+            self.persistOutput(rec_name=p_row['recording_name'], dfoutput=dfoutput)
+            uiplot.addRow(p_row, df_t, dfmean, dfoutput)
+        self.update_rec_show(reset=True)
+        self.mouseoverUpdate()
+        self.uiThaw()
+        return dfoutput
+
     def normOutputs(self): # TODO: also norm diffs (paired stim) when applicable
         df_p = self.get_df_project()
         for index, row in df_p.iterrows():

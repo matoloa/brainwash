@@ -263,24 +263,24 @@ class UIplot():
         cmap = LinearSegmentedColormap.from_list("", colors)
         return {i: cmap(i/n_stims) for i in range(n_stims)}
 
-    def plot_line(self, label, axid, x, y, color, rec_ID, stim=None, width=1):
+    def plot_line(self, label, axid, x, y, color, rec_ID, aspect=None, stim=None, width=1):
         zorder = 0 if width > 1 else 1
         line, = self.get_axis(axid).plot(x, y, color=color, label=label, alpha=self.uistate.settings['alpha_line'], linewidth=width, zorder=zorder)
-        self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'stim': stim, 'line':line, 'axis':axid}
+        self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':line, 'axis':axid}
 
-    def plot_marker(self, label, axid, x, y, color, rec_ID, stim=None):
+    def plot_marker(self, label, axid, x, y, color, rec_ID, aspect=None, stim=None):
         marker, = self.get_axis(axid).plot(x, y, marker='o', markerfacecolor=color, markeredgecolor=color, markersize=10, alpha=0.4, zorder=0, label=label)
-        self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'stim': stim, 'line':marker, 'axis':axid}
+        self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':marker, 'axis':axid}
 
-    def plot_cross(self, label, axid, x, y, amp_x, amp_y, color, rec_ID, stim=None):
+    def plot_cross(self, label, axid, x, y, amp_x, amp_y, color, rec_ID, aspect=None, stim=None):
         xline, = self.get_axis(axid).plot(amp_x, [y,y], color=color, label=f"{label} x", alpha=self.uistate.settings['alpha_line'])
         yline, = self.get_axis(axid).plot([x,x], amp_y, color=color, label=f"{label} y", alpha=self.uistate.settings['alpha_line'])
-        self.uistate.dict_rec_labels[f"{label} x marker"] = {'rec_ID':rec_ID, 'stim': stim, 'line':xline, 'axis':axid}
-        self.uistate.dict_rec_labels[f"{label} y marker"] = {'rec_ID':rec_ID, 'stim': stim, 'line':yline, 'axis':axid}
+        self.uistate.dict_rec_labels[f"{label} x marker"] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':xline, 'axis':axid}
+        self.uistate.dict_rec_labels[f"{label} y marker"] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':yline, 'axis':axid}
 
-    def plot_vline(self, label, axid, x, color, rec_ID, stim=None):
+    def plot_vline(self, label, axid, x, color, rec_ID, aspect=None, stim=None):
         vline = self.get_axis(axid).axvline(x=x, color=color, linewidth=1, alpha=self.uistate.settings['alpha_dot'], label=label)
-        self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'stim': stim, 'line':vline, 'axis':axid}
+        self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':vline, 'axis':axid}
 
     def addRow(self, p_row, dft, dfmean, dfoutput): # TODO: unspaghetti this
         rec_ID = p_row['ID']
@@ -337,21 +337,14 @@ class UIplot():
                 x_position = t_row['t_EPSP_amp']
                 y_position = df_event.loc[df_event.time == x_position, rec_filter]
                 color = settings['rgb_EPSP_amp']
-                # TODO: temporary hotfix - salvage bad y_positions (prevent this from happening!)
-                if isinstance(y_position, pd.Series):
-                    if not y_position.empty and isinstance(y_position.values[0], float):
-                        y_position = y_position.values[0]
-                    else:
-                        print(f"*** Failed to salvage bad y_position: {y_position} from {label} {stim_str} EPSP amp marker; setting to 0")
-                        y_position, color = 0, 'red'
-                self.plot_marker(f"{label} {stim_str} EPSP amp marker", 'axe', x_position, y_position, color, rec_ID, stim=stim_num)
+                self.plot_marker(f"{label} {stim_str} EPSP amp marker", 'axe', x_position, y_position, color, rec_ID, aspect='EPSP_amp', stim=stim_num)
                 if x_axis == 'sweep':
-                    self.plot_line(f"{label} {stim_str} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, stim=stim_num)
+                    self.plot_line(f"{label} {stim_str} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                     if 'EPSP_amp_norm' in out.columns:
-                        self.plot_line(f"{label} {stim_str} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, stim=stim_num)
+                        self.plot_line(f"{label} {stim_str} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                 amp_x = x_position - self.uistate.lineEdit['EPSP_amp_halfwidth'], x_position + self.uistate.lineEdit['EPSP_amp_halfwidth']
                 amp_y = y_position, y_position + out['EPSP_amp'].iloc[0] / 1000 # .iloc[0] since filtered by stim, /1000 to convert from mV to V
-                self.plot_cross(f"{label} {stim_str} EPSP amp", 'axe', x_position, y_position, amp_x, amp_y, color, rec_ID, stim=stim_num)
+                self.plot_cross(f"{label} {stim_str} EPSP amp", 'axe', x_position, y_position, amp_x, amp_y, color, rec_ID, aspect='EPSP_amp', stim=stim_num)
 
             if not np.isnan(t_row['t_EPSP_slope_start']):
                 x_start, x_end = t_row['t_EPSP_slope_start'], t_row['t_EPSP_slope_end']
@@ -359,29 +352,22 @@ class UIplot():
                 y_start = df_event.loc[index, rec_filter] if index in df_event.index else None
                 index = (df_event['time'] - x_end).abs().idxmin()
                 y_end = df_event.loc[index, rec_filter] if index in df_event.index else None
-                self.plot_line(f"{label} {stim_str} EPSP slope marker", 'axe', [x_start, x_end], [y_start, y_end], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num, width=5)
+                self.plot_line(f"{label} {stim_str} EPSP slope marker", 'axe', [x_start, x_end], [y_start, y_end], settings['rgb_EPSP_slope'], rec_ID, aspect='EPSP_slope', stim=stim_num, width=5)
                 if x_axis == 'sweep':
-                    self.plot_line(f"{label} {stim_str} EPSP slope", 'ax2', out[x_axis], out['EPSP_slope'], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num)
+                    self.plot_line(f"{label} {stim_str} EPSP slope", 'ax2', out[x_axis], out['EPSP_slope'], settings['rgb_EPSP_slope'], rec_ID, aspect='EPSP_slope', stim=stim_num)
                     if 'EPSP_slope_norm' in out.columns:
-                        self.plot_line(f"{label} {stim_str} EPSP slope norm", 'ax2', out[x_axis], out['EPSP_slope_norm'], settings['rgb_EPSP_slope'], rec_ID, stim=stim_num)
+                        self.plot_line(f"{label} {stim_str} EPSP slope norm", 'ax2', out[x_axis], out['EPSP_slope_norm'], settings['rgb_EPSP_slope'], rec_ID, aspect='EPSP_slope', stim=stim_num)
 
             if not np.isnan(t_row['t_volley_amp']):
                 x_position = t_row['t_volley_amp']
                 y_position = df_event.loc[df_event.time == t_row['t_volley_amp'], rec_filter]
                 color = settings['rgb_volley_amp']
-                # TODO: temporary hotfix - salvage bad y_positions (prevent this from happening!)
-                if isinstance(y_position, pd.Series):
-                    if not y_position.empty and isinstance(y_position.values[0], float):
-                        y_position = y_position.values[0]
-                    else:
-                        print(f"*** Failed to salvage bad y_position: {y_position} from {label} {stim_str} volley amp marker, setting to 0")
-                        y_position, color = 0, 'red'
-                self.plot_marker(f"{label} {stim_str} volley amp marker", 'axe', t_row['t_volley_amp'], y_position, settings['rgb_volley_amp'], rec_ID, stim=stim_num)
+                self.plot_marker(f"{label} {stim_str} volley amp marker", 'axe', t_row['t_volley_amp'], y_position, settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
                 if x_axis == 'sweep':
-                    self.plot_line(f"{label} {stim_str} volley amp mean", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, stim=stim_num)
+                    self.plot_line(f"{label} {stim_str} volley amp mean", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
                 amp_x = x_position - self.uistate.lineEdit['volley_amp_halfwidth'], x_position + self.uistate.lineEdit['volley_amp_halfwidth']
                 amp_y = y_position, y_position + out['volley_amp'].iloc[0] / 1000 # .iloc[0] since filtered by stim, /1000 to convert from mV to V
-                self.plot_cross(f"{label} {stim_str} volley amp", 'axe', x_position, y_position, amp_x, amp_y, color, rec_ID, stim=stim_num)
+                self.plot_cross(f"{label} {stim_str} volley amp", 'axe', x_position, y_position, amp_x, amp_y, color, rec_ID, aspect='volley amp', stim=stim_num)
 
             if not np.isnan(t_row['t_volley_slope_start']):
                 x_start, x_end = t_row['t_volley_slope_start'], t_row['t_volley_slope_end']
@@ -389,21 +375,21 @@ class UIplot():
                 y_start = df_event.loc[index, rec_filter] if index in df_event.index else None
                 index = (df_event['time'] - x_end).abs().idxmin()
                 y_end = df_event.loc[index, rec_filter] if index in df_event.index else None
-                self.plot_line(f"{label} {stim_str} volley slope marker", 'axe', [x_start, x_end], [y_start, y_end], settings['rgb_volley_slope'], rec_ID, stim=stim_num, width=5)
+                self.plot_line(f"{label} {stim_str} volley slope marker", 'axe', [x_start, x_end], [y_start, y_end], settings['rgb_volley_slope'], rec_ID, aspect='volley_slope', stim=stim_num, width=5)
                 if x_axis == 'sweep':
-                    self.plot_line(f"{label} {stim_str} volley slope mean", 'ax2', out[x_axis], out['volley_slope'], settings['rgb_volley_slope'], rec_ID, stim=stim_num)
+                    self.plot_line(f"{label} {stim_str} volley slope mean", 'ax2', out[x_axis], out['volley_slope'], settings['rgb_volley_slope'], rec_ID, aspect='volley_slope', stim=stim_num)
 
         # add stim-lines to output
         if x_axis == 'stim':
             out = dfoutput
-            self.plot_line(f"{label} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID)
+            self.plot_line(f"{label} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp')
             if 'EPSP_amp_norm' in out.columns:
-                self.plot_line(f"{label} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID)
-            self.plot_line(f"{label} EPSP slope", 'ax2', out[x_axis], out['EPSP_slope'], settings['rgb_EPSP_slope'], rec_ID)
+                self.plot_line(f"{label} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp')
+            self.plot_line(f"{label} EPSP slope", 'ax2', out[x_axis], out['EPSP_slope'], settings['rgb_EPSP_slope'], rec_ID, aspect='EPSP_slope')
             if 'EPSP_slope_norm' in out.columns:
-                self.plot_line(f"{label} EPSP slope norm", 'ax2', out[x_axis], out['EPSP_slope_norm'], settings['rgb_EPSP_slope'], rec_ID)
-            self.plot_line(f"{label} volley amp", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID)
-            self.plot_line(f"{label} volley slope", 'ax2', out[x_axis], out['volley_slope'], settings['rgb_volley_slope'], rec_ID)
+                self.plot_line(f"{label} EPSP slope norm", 'ax2', out[x_axis], out['EPSP_slope_norm'], settings['rgb_EPSP_slope'], rec_ID, aspect='EPSP_slope')
+            self.plot_line(f"{label} volley amp", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, aspect='volley_amp')
+            self.plot_line(f"{label} volley slope", 'ax2', out[x_axis], out['volley_slope'], settings['rgb_volley_slope'], rec_ID, aspect='volley_slope')
 
 
     def addGroup(self, df_group_row, df_groupmean):
