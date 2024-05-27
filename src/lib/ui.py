@@ -2512,7 +2512,7 @@ class UIsub(Ui_MainWindow):
             uiplot.unPlot(p_row['ID'])
             dfmean = self.get_dfmean(row=p_row)
             df_t = self.get_dft(row=p_row)
-            dfoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
+            dfoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
             self.persistOutput(rec_name=p_row['recording_name'], dfoutput=dfoutput)
             uiplot.addRow(p_row, df_t, dfmean, dfoutput)
         self.update_rec_show(reset=True)
@@ -3028,7 +3028,7 @@ class UIsub(Ui_MainWindow):
                         df_t.at[i, 't_EPSP_slope_end']   = round(t_row['t_stim'] - offset_end, precision)
                         df_t.at[i, 't_EPSP_slope_width'] = slope_width
                 self.set_dft(rec_name, df_t)
-                out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
+                out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
             elif x_axis == 'sweep':
                 out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
             if uistate.mouseover_out is None:
@@ -3050,7 +3050,7 @@ class UIsub(Ui_MainWindow):
                     for i, t_row in df_t.iterrows():
                         df_t.at[i, 't_EPSP_amp'] = round(t_row['t_stim'] - offset_x, precision)
                 self.set_dft(rec_name, df_t)
-                out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
+                out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
             elif x_axis == 'sweep':
                 dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
                 out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
@@ -3083,7 +3083,7 @@ class UIsub(Ui_MainWindow):
                         df_t.at[i, 't_volley_slope_start'] = round(t_row['t_stim'] - offset_start, precision)
                         df_t.at[i, 't_volley_slope_end']   = round(t_row['t_stim'] - offset_end, precision)
                         df_t.at[i, 't_volley_slope_width'] = dict_t['t_volley_slope_width']
-                out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
+                out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
             elif x_axis == 'sweep':
                 dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
                 out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
@@ -3104,7 +3104,7 @@ class UIsub(Ui_MainWindow):
                     offset_x = df_t.at[stim_idx, 't_stim'] - df_t.at[stim_idx, 't_volley_amp']
                     for i, t_row in df_t.iterrows():
                         df_t.at[i, 't_volley_amp'] = round(t_row['t_stim'] - offset_x, precision)
-                out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
+                out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
             elif x_axis == 'sweep':
                 dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
                 out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
@@ -3170,7 +3170,7 @@ class UIsub(Ui_MainWindow):
         if uistate.checkBox['output_per_stim']:
             df_t = self.get_dft(row=p_row)
             dfmean = self.get_dfmean(row=p_row)
-            dfoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
+            dfoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
         else:
             dfoutput = self.get_dfoutput(row=p_row)
             dffilter = self.get_dffilter(row=p_row)
