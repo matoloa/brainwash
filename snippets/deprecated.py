@@ -1,6 +1,34 @@
 # Functions that are not in use anymore, but might be useful again in the future
 '''
 
+    def normOutputs(self): # TODO: also norm diffs (paired stim) when applicable
+        df_p = self.get_df_project()
+        for index, row in df_p.iterrows():
+            dfoutput = self.get_dfoutput(row=row)
+            print(f"editNormRange: rebuilding norm columns for {row['recording_name']}")
+            self.normOutput(dfoutput)
+            self.persistOutput(row['recording_name'], dfoutput)
+
+
+    def normOutput(self, dfoutput, aspect=None): # TODO: reduntant? merge with normOutputs?
+        normFrom = uistate.lineEdit['norm_EPSP_on'][0] # start
+        normTo = uistate.lineEdit['norm_EPSP_on'][1] # end
+        if aspect is None: # norm all existing columns and save file
+            if 'EPSP_amp' in dfoutput.columns:
+                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_amp']
+                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
+                dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
+            if 'EPSP_slope' in dfoutput.columns:
+                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_slope']
+                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
+                dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
+            return dfoutput
+        else: # norm specific column and DO NOT SAVE file (dragged on-the-fly-graphs are saved only on mouse release)
+            selected_values = dfoutput.loc[normFrom:normTo, aspect]
+            norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
+            dfoutput[f'{aspect}_norm'] = dfoutput[aspect] / norm_mean
+            return dfoutput
+
     def zoomAuto(self):
     # Obsolete extending axe to include all stims in the selected recordings
         print(f"zoomAuto, uistate.selected: {uistate.rec_select}, uistate.stim_select: {uistate.stim_select}")

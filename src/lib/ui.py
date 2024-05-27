@@ -947,8 +947,6 @@ class UIsub(Ui_MainWindow):
 
         t0 = time.time()
         self.mouseoverUpdate()
-        self.normOutputs()
-        print(self.get_dfoutput(row=p_row))
         print(f" - - mouseoverUpdate: {round((time.time() - t0) * 1000)} ms")
 
 
@@ -1012,35 +1010,6 @@ class UIsub(Ui_MainWindow):
 ##################################################################
 #    WIP: TODO: move these to appropriate header in this file    #
 ##################################################################
-
-    def normOutputs(self): # TODO: also norm diffs (paired stim) when applicable
-        df_p = self.get_df_project()
-        for index, row in df_p.iterrows():
-            dfoutput = self.get_dfoutput(row=row)
-            print(f"editNormRange: rebuilding norm columns for {row['recording_name']}")
-            self.normOutput(dfoutput)
-            self.persistOutput(row['recording_name'], dfoutput)
-
-
-    def normOutput(self, dfoutput, aspect=None): # TODO: reduntant? merge with normOutputs?
-        normFrom = uistate.lineEdit['norm_EPSP_on'][0] # start
-        normTo = uistate.lineEdit['norm_EPSP_on'][1] # end
-        if aspect is None: # norm all existing columns and save file
-            if 'EPSP_amp' in dfoutput.columns:
-                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_amp']
-                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
-                dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
-            if 'EPSP_slope' in dfoutput.columns:
-                selected_values = dfoutput.loc[normFrom:normTo, 'EPSP_slope']
-                norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
-                dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
-            return dfoutput
-        else: # norm specific column and DO NOT SAVE file (dragged on-the-fly-graphs are saved only on mouse release)
-            selected_values = dfoutput.loc[normFrom:normTo, aspect]
-            norm_mean = selected_values.mean() / 100 # divide by 100 to get percentage
-            dfoutput[f'{aspect}_norm'] = dfoutput[aspect] / norm_mean
-            return dfoutput
-
 
     def persistOutput(self, rec_name, dfoutput): 
         # Determine column order based on the state of uistate.checkBox['output_per_stim']
@@ -1597,7 +1566,6 @@ class UIsub(Ui_MainWindow):
             uistate.lineEdit['norm_EPSP_on'][1] = num
         lineEdit.setText(str(num))
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
-        self.normOutputs() # ...of all recordings in df_p
         self.purgeGroupCache(*uistate.df_groups['group_ID'].tolist())
         self.tableFormat()
         # cycle through all selected recordings and update norm outputs
@@ -2436,8 +2404,6 @@ class UIsub(Ui_MainWindow):
                     list_pairs.append(name_pair)                    
                 else:
                     df = self.get_dfoutput(row=row)
-                    if uistate.checkBox['norm_EPSP']:
-                        self.normOutput(df)
                 dfs.append(df)
             if dfs:
                 dfs = pd.concat(dfs)
@@ -2487,7 +2453,7 @@ class UIsub(Ui_MainWindow):
             updated_dict_t.update(row_t.to_dict())  # Update with the values from row_t
             df_t.loc[i] = updated_dict_t
             df_t.at[i, 'stim'] = i+1 # stims numbered from 1
-            dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=df_t.loc[i].to_dict())
+            dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=df_t.loc[i].to_dict(), lineEdit=uistate.lineEdit)
             dfoutput['stim'] = i+1  # Add stim column to dfoutput
             output = pd.concat([output, dfoutput], ignore_index=True)  # Concatenate dfoutput to output
             if 'volley_amp' in dfoutput.columns:
@@ -2519,9 +2485,6 @@ class UIsub(Ui_MainWindow):
         ]
         df_t = df_t.reindex(columns=dft_columns)
         self.set_dft(rec_name, df_t)
-        #print(f"output_pre: {output}")
-        output = self.normOutput(dfoutput=output)
-        #print(f"output_post: {output}")
         if uistate.checkBox['output_per_stim']:
             self.stimOutputs()
         self.persistOutput(rec_name=rec_name, dfoutput=output)
@@ -2550,7 +2513,6 @@ class UIsub(Ui_MainWindow):
             dfmean = self.get_dfmean(row=p_row)
             df_t = self.get_dft(row=p_row)
             dfoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
-            dfoutput = self.normOutput(dfoutput=dfoutput)
             self.persistOutput(rec_name=p_row['recording_name'], dfoutput=dfoutput)
             uiplot.addRow(p_row, df_t, dfmean, dfoutput)
         self.update_rec_show(reset=True)
@@ -3068,16 +3030,14 @@ class UIsub(Ui_MainWindow):
                 self.set_dft(rec_name, df_t)
                 out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
             elif x_axis == 'sweep':
-                out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+                out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
             if uistate.mouseover_out is None:
                 if uistate.checkBox['norm_EPSP']:
-                    out = self.normOutput(dfoutput=out, aspect='EPSP_slope')
                     uistate.mouseover_out = uistate.ax2.plot(out[x_axis], out['EPSP_slope_norm'], color=uistate.settings['rgb_EPSP_slope'], linewidth=3)
                 else:
                     uistate.mouseover_out = uistate.ax2.plot(out[x_axis], out['EPSP_slope'], color=uistate.settings['rgb_EPSP_slope'], linewidth=3)
             else:
                 if uistate.checkBox['norm_EPSP']:
-                    out = self.normOutput(rdfoutput=out, aspect='EPSP_slope')
                     uistate.mouseover_out[0].set_data(out[x_axis], out['EPSP_slope_norm'])
                 else:
                     uistate.mouseover_out[0].set_data(out[x_axis], out['EPSP_slope'])
@@ -3093,16 +3053,14 @@ class UIsub(Ui_MainWindow):
                 out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
             elif x_axis == 'sweep':
                 dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
-                out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+                out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
             if uistate.mouseover_out is None:
                 if uistate.checkBox['norm_EPSP']:
-                    out = self.normOutput(dfoutput=out, aspect='EPSP_amp')
                     uistate.mouseover_out = uistate.ax1.plot(out[x_axis], out['EPSP_amp_norm'], color=uistate.settings['rgb_EPSP_amp'], linewidth=3)
                 else:
                     uistate.mouseover_out = uistate.ax1.plot(out[x_axis], out['EPSP_amp'], color=uistate.settings['rgb_EPSP_amp'], linewidth=3)
             else:
                 if uistate.checkBox['norm_EPSP']:
-                    out = self.normOutput(dfoutput=out, aspect='EPSP_amp')
                     uistate.mouseover_out[0].set_data(out[x_axis], out['EPSP_amp_norm'])
                 else:
                     uistate.mouseover_out[0].set_data(out[x_axis], out['EPSP_amp'])
@@ -3128,7 +3086,7 @@ class UIsub(Ui_MainWindow):
                 out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
             elif x_axis == 'sweep':
                 dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
-                out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+                out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
             if uistate.mouseover_out is None:
                 uistate.mouseover_out = uistate.ax2.plot(out[x_axis], out['volley_slope'], color=uistate.settings['rgb_volley_slope'], linestyle='--', linewidth=3)
             else:
@@ -3149,7 +3107,7 @@ class UIsub(Ui_MainWindow):
                 out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t)
             elif x_axis == 'sweep':
                 dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
-                out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+                out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
             if uistate.mouseover_out is None:
                 uistate.mouseover_out = uistate.ax1.plot(out[x_axis], out['volley_amp'], color=uistate.settings['rgb_volley_amp'], linestyle=':', linewidth=3)
             else:
@@ -3217,13 +3175,11 @@ class UIsub(Ui_MainWindow):
             dfoutput = self.get_dfoutput(row=p_row)
             dffilter = self.get_dffilter(row=p_row)
             stim_num = t_row['stim']
-            new_dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+            new_dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
             new_dfoutput['stim'] = int(stim_num)
             for col in new_dfoutput.columns:
                 dfoutput.loc[dfoutput['stim'] == stim_num, col] = new_dfoutput.loc[new_dfoutput['stim'] == stim_num, col]
         print(f"dfoutput.columns: {dfoutput.columns}")
-        if uistate.mouseover_action.startswith("EPSP"): # add normalized EPSP columns
-            dfoutput = self.normOutput(dfoutput=dfoutput)
         self.persistOutput(rec_name=p_row['recording_name'], dfoutput=dfoutput)
         self.tableUpdate()
         #self.mouseoverUpdate()

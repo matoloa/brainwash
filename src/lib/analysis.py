@@ -20,7 +20,7 @@ def valid(num):
     return num is not None and not np.isnan(num)
 
 # %%
-def build_dfoutput(df, dict_t, filter='voltage'):
+def build_dfoutput(df, dict_t, lineEdit, filter='voltage'):
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
     Args:
         df: a dataframe containing numbered sweeps, timestamps and voltage
@@ -50,7 +50,6 @@ def build_dfoutput(df, dict_t, filter='voltage'):
         #volley_hw = uistate.lineEdit['volley_amp_halfwidth']
         EPSP_hw = 0.0002
         volley_hw = 0.0001
-
     # EPSP_amp
     if 't_EPSP_amp' in dict_t.keys():
         t_EPSP_amp = dict_t['t_EPSP_amp']
@@ -62,7 +61,13 @@ def build_dfoutput(df, dict_t, filter='voltage'):
             dfoutput['EPSP_amp'] = df_EPSP_amp.groupby('sweep')[filter].mean() * -1000 - amp_zero
         else:
             dfoutput['EPSP_amp'] = np.nan
-        list_col.append('EPSP_amp')
+        # Normalize EPSP_amp
+        normFrom = lineEdit['norm_EPSP_on'][0]  # start
+        normTo = lineEdit['norm_EPSP_on'][1]  # end
+        selected_values = dfoutput[(dfoutput.index >= normFrom) & (dfoutput.index <= normTo)]['EPSP_amp']
+        norm_mean = selected_values.mean() / 100  # divide by 100 to get percentage
+        dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
+        list_col.extend(['EPSP_amp', 'EPSP_amp_norm'])
     # EPSP_slope
     if 't_EPSP_slope_start' in dict_t.keys():
         t_EPSP_slope_start = dict_t['t_EPSP_slope_start']
@@ -72,7 +77,13 @@ def build_dfoutput(df, dict_t, filter='voltage'):
             dfoutput['EPSP_slope'] = -df_EPSP_slope['value'] # invert 
         else:
             dfoutput['EPSP_slope'] = np.nan
-        list_col.append('EPSP_slope')
+        # Normalize EPSP_slope
+        normFrom = lineEdit['norm_EPSP_on'][0]  # start
+        normTo = lineEdit['norm_EPSP_on'][1]  # end
+        selected_values = dfoutput[(dfoutput.index >= normFrom) & (dfoutput.index <= normTo)]['EPSP_slope']
+        norm_mean = selected_values.mean() / 100  # divide by 100 to get percentage
+        dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
+        list_col.extend(['EPSP_slope', 'EPSP_slope_norm'])
     # volley_amp
     if 't_volley_amp' in dict_t.keys():
         t_volley_amp = dict_t['t_volley_amp']
