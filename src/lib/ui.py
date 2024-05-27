@@ -1005,10 +1005,6 @@ class UIsub(Ui_MainWindow):
         for line_dict in added_lines.values():
             line_dict['line'].set_visible(True)
         uistate.dict_rec_show = new_selection
-        # print new selection; key (linebreak) values
-#        print("new_selection:")
-#        for k, v in new_selection.items():
-#            print(f"{k}:\n{v}")
         print(f"update_rec_show took {round((time.time() - t0) * 1000)} ms")
 
 
@@ -3274,16 +3270,21 @@ class UIsub(Ui_MainWindow):
         elif 'slope_left' in locals(): # on output
             if on_left:
                 if slope_left: # scroll left y zoom output slope y
-                    ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
+                    ymin = 0 if True else y - (y - ax.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
+                    ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
                 else: # scroll left y to zoom output amp y
-                    ax1.set_ylim(y - (y - ax1.get_ylim()[0]) / zoom, y + (ax1.get_ylim()[1] - y) / zoom)
+                    ymin = 0 if True else y - (y - ax1.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
+                    ax1.set_ylim(ymin, y + (ax1.get_ylim()[1] - y) / zoom)
             elif on_right and not slope_left: # scroll right y to zoom output slope y
-                ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
+                ymin = 0 if True else y - (y - ax.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
+                ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
             else: # default, scroll graph to zoom all
                 ax1.set_xlim(x - (x - ax1.get_xlim()[0]) / zoom, x + (ax1.get_xlim()[1] - x) / zoom)
-                ax1.set_ylim(y - (y - ax1.get_ylim()[0]) / zoom, y + (ax1.get_ylim()[1] - y) / zoom)
-                ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
-        else: # mean or event
+                ymin = 0 if True else y - (y - ax1.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
+                ax1.set_ylim(ymin, y + (ax1.get_ylim()[1] - y) / zoom)
+                ymin = 0 if True else y - (y - ax.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
+                ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
+        else: # on mean or event graphs
             if on_left: # scroll left x to zoom mean or event x
                 ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
             else:

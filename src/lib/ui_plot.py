@@ -211,6 +211,23 @@ class UIplot():
             else:
                 self.xSelect(canvas = ax1.figure.canvas)
 
+
+        # 0-hline for Events
+        if not 'Events y zero marker' in self.uistate.dict_rec_labels:
+            hline0 = self.uistate.axe.axhline(0, linestyle='dotted', alpha=0.3)
+            self.uistate.dict_rec_labels['Events y zero marker'] = {'rec_ID':None, 'stim': None, 'line':hline0, 'axis':'axe'}
+        uistate.dict_rec_labels['Events y zero marker']['line'].set_visible(True)
+
+        # 1000-hline for relative Output
+        if uistate.checkBox['norm_EPSP']:
+            if not 'Output y 100% marker' in self.uistate.dict_rec_labels:
+                hline100ax1 = self.uistate.ax1.axhline(100, linestyle='dotted', alpha=0.3, color = uistate.settings['rgb_EPSP_amp'])
+                hline100ax2 = self.uistate.ax2.axhline(100, linestyle='dotted', alpha=0.3, color = uistate.settings['rgb_EPSP_slope'])
+                self.uistate.dict_rec_labels['output amp 100% marker'] = {'rec_ID':None, 'stim': None, 'line':hline100ax1, 'axis':'ax1'}
+                self.uistate.dict_rec_labels['output slope 100% marker'] = {'rec_ID':None, 'stim': None, 'line':hline100ax2, 'axis':'ax2'}
+            uistate.dict_rec_labels['output amp 100% marker']['line'].set_visible(uistate.ampView())
+            uistate.dict_rec_labels['output slope 100% marker']['line'].set_visible(uistate.slopeView())
+
         # redraw
         axm.figure.canvas.draw()
         axe.figure.canvas.draw()
@@ -296,7 +313,7 @@ class UIplot():
                t_row[var] -= t_stim
 
             # add markers to Mean
-            self.plot_marker(f"mean {label} {stim_str} marker", 'axm', t_stim, y_position, color, rec_ID)
+            self.plot_marker(f"mean {label} {stim_str} marker", 'axm', t_stim, 0, color, rec_ID)
             self.plot_vline(f"mean {label} {stim_str} selection marker", 'axm', t_stim, color, rec_ID, stim=stim_num)
             if x_axis == 'stim': # also add to output
                 self.plot_marker(f"ax1 mean {label} {stim_str} marker", 'ax1', stim_num, y_position, color, rec_ID, stim=stim_num)
