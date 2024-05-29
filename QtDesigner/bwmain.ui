@@ -305,7 +305,7 @@
             <property name="minimumSize">
              <size>
               <width>131</width>
-              <height>121</height>
+              <height>181</height>
              </size>
             </property>
             <property name="frameShape">
@@ -386,6 +386,78 @@
               <string>volley amp.</string>
              </property>
             </widget>
+            <widget class="QLineEdit" name="lineEdit_EPSP_amp_halfwidth">
+             <property name="geometry">
+              <rect>
+               <x>60</x>
+               <y>140</y>
+               <width>31</width>
+               <height>25</height>
+              </rect>
+             </property>
+            </widget>
+            <widget class="QLineEdit" name="lineEdit_volley_amp_halfwidth">
+             <property name="geometry">
+              <rect>
+               <x>150</x>
+               <y>140</y>
+               <width>31</width>
+               <height>25</height>
+              </rect>
+             </property>
+            </widget>
+            <widget class="QLabel" name="label_header_amp_halfwidth">
+             <property name="geometry">
+              <rect>
+               <x>10</x>
+               <y>120</y>
+               <width>141</width>
+               <height>17</height>
+              </rect>
+             </property>
+             <property name="font">
+              <font>
+               <family>DejaVu Sans</family>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>Amplitude ± (ms)</string>
+             </property>
+            </widget>
+            <widget class="QLabel" name="label_EPSP_amp_halfwidth">
+             <property name="geometry">
+              <rect>
+               <x>20</x>
+               <y>140</y>
+               <width>51</width>
+               <height>20</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>EPSP</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+             </property>
+            </widget>
+            <widget class="QLabel" name="label_volley_amp_halfwidth">
+             <property name="geometry">
+              <rect>
+               <x>100</x>
+               <y>140</y>
+               <width>51</width>
+               <height>20</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>volley</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+             </property>
+            </widget>
            </widget>
           </item>
           <item>
@@ -393,7 +465,7 @@
             <property name="minimumSize">
              <size>
               <width>131</width>
-              <height>111</height>
+              <height>131</height>
              </size>
             </property>
             <property name="frameShape">
@@ -485,6 +557,19 @@
                <width>41</width>
                <height>25</height>
               </rect>
+             </property>
+            </widget>
+            <widget class="QCheckBox" name="checkBox_output_ymin0">
+             <property name="geometry">
+              <rect>
+               <x>10</x>
+               <y>100</y>
+               <width>111</width>
+               <height>23</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>output Ymin 0</string>
              </property>
             </widget>
            </widget>

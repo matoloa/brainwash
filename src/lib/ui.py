@@ -40,7 +40,7 @@ class Config:
         self.force_cfg_reset = clear
         self.verbose = self.dev_mode
         self.talkback = not self.dev_mode
-        self.hide_experimental = not self.dev_mode
+        self.hide_experimental = True #not self.dev_mode
         self.track_widget_focus = False
         self.terminal_space = 372 if self.dev_mode else 0
         # get project_name and version number from pyproject.toml
@@ -480,7 +480,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBox_output_per_stim.setObjectName("checkBox_output_per_stim")
         self.verticalLayoutTools.addWidget(self.frameToolStim)
         self.frameToolAspect = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        self.frameToolAspect.setMinimumSize(QtCore.QSize(131, 121))
+        self.frameToolAspect.setMinimumSize(QtCore.QSize(131, 181))
         self.frameToolAspect.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frameToolAspect.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frameToolAspect.setObjectName("frameToolAspect")
@@ -504,9 +504,31 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBox_volley_amp = QtWidgets.QCheckBox(self.frameToolAspect)
         self.checkBox_volley_amp.setGeometry(QtCore.QRect(10, 90, 101, 23))
         self.checkBox_volley_amp.setObjectName("checkBox_volley_amp")
+        self.lineEdit_EPSP_amp_halfwidth = QtWidgets.QLineEdit(self.frameToolAspect)
+        self.lineEdit_EPSP_amp_halfwidth.setGeometry(QtCore.QRect(60, 140, 31, 25))
+        self.lineEdit_EPSP_amp_halfwidth.setObjectName("lineEdit_EPSP_amp_halfwidth")
+        self.lineEdit_volley_amp_halfwidth = QtWidgets.QLineEdit(self.frameToolAspect)
+        self.lineEdit_volley_amp_halfwidth.setGeometry(QtCore.QRect(150, 140, 31, 25))
+        self.lineEdit_volley_amp_halfwidth.setObjectName("lineEdit_volley_amp_halfwidth")
+        self.label_header_amp_halfwidth = QtWidgets.QLabel(self.frameToolAspect)
+        self.label_header_amp_halfwidth.setGeometry(QtCore.QRect(10, 120, 141, 17))
+        font = QtGui.QFont()
+        font.setFamily("DejaVu Sans")
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_header_amp_halfwidth.setFont(font)
+        self.label_header_amp_halfwidth.setObjectName("label_header_amp_halfwidth")
+        self.label_EPSP_amp_halfwidth = QtWidgets.QLabel(self.frameToolAspect)
+        self.label_EPSP_amp_halfwidth.setGeometry(QtCore.QRect(20, 140, 51, 20))
+        self.label_EPSP_amp_halfwidth.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
+        self.label_EPSP_amp_halfwidth.setObjectName("label_EPSP_amp_halfwidth")
+        self.label_volley_amp_halfwidth = QtWidgets.QLabel(self.frameToolAspect)
+        self.label_volley_amp_halfwidth.setGeometry(QtCore.QRect(100, 140, 51, 20))
+        self.label_volley_amp_halfwidth.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
+        self.label_volley_amp_halfwidth.setObjectName("label_volley_amp_halfwidth")
         self.verticalLayoutTools.addWidget(self.frameToolAspect)
         self.frameToolScaling = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        self.frameToolScaling.setMinimumSize(QtCore.QSize(131, 111))
+        self.frameToolScaling.setMinimumSize(QtCore.QSize(131, 131))
         self.frameToolScaling.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frameToolScaling.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frameToolScaling.setObjectName("frameToolScaling")
@@ -535,6 +557,9 @@ class Ui_MainWindow(QtCore.QObject):
         self.lineEdit_norm_EPSP_start = QtWidgets.QLineEdit(self.frameToolScaling)
         self.lineEdit_norm_EPSP_start.setGeometry(QtCore.QRect(20, 70, 41, 25))
         self.lineEdit_norm_EPSP_start.setObjectName("lineEdit_norm_EPSP_start")
+        self.checkBox_output_ymin0 = QtWidgets.QCheckBox(self.frameToolScaling)
+        self.checkBox_output_ymin0.setGeometry(QtCore.QRect(10, 100, 111, 23))
+        self.checkBox_output_ymin0.setObjectName("checkBox_output_ymin0")
         self.verticalLayoutTools.addWidget(self.frameToolScaling)
         self.verticalLayoutGroups = QtWidgets.QVBoxLayout()
         self.verticalLayoutGroups.setObjectName("verticalLayoutGroups")
@@ -628,10 +653,14 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBox_EPSP_amp.setText(_translate("mainWindow", "EPSP amp."))
         self.label_aspect.setText(_translate("mainWindow", "Aspect"))
         self.checkBox_volley_amp.setText(_translate("mainWindow", "volley amp."))
+        self.label_header_amp_halfwidth.setText(_translate("mainWindow", "Amplitude ± (ms)"))
+        self.label_EPSP_amp_halfwidth.setText(_translate("mainWindow", "EPSP"))
+        self.label_volley_amp_halfwidth.setText(_translate("mainWindow", "volley"))
         self.label_norm_on_sweep.setText(_translate("mainWindow", "Norm on sweep(s)"))
         self.checkBox_norm_EPSP.setText(_translate("mainWindow", "Relative"))
         self.label_relative_to.setText(_translate("mainWindow", "-"))
         self.label_scaling.setText(_translate("mainWindow", "Scaling"))
+        self.checkBox_output_ymin0.setText(_translate("mainWindow", "output Ymin 0"))
         self.pushButton_paired_data_flip.setText(_translate("mainWindow", "Flip C-I"))
         self.label_paired_data.setText(_translate("mainWindow", "Paired data"))
         self.checkBox_paired_stims.setText(_translate("mainWindow", "stim / stim"))
@@ -645,15 +674,20 @@ class Ui_MainWindow(QtCore.QObject):
 
 
 
-
 ################################################################
 #       non-QtDesigner-generated instructions                  #
 ################################################################
 
-        self.pushButtonParse.setVisible(False) # explicit hide command required for Windows, but not Linux (?)
-        self.checkBox_force1stim.setVisible(False) # explicit hide command required for Windows, but not Linux (?)
+        self.pushButtonParse.setVisible(False)
         self.progressBar.setVisible(False)
         self.progressBar.setValue(0)
+
+        if config.hide_experimental:
+            # explicit hide command required for Windows, but not Linux (?)
+            self.checkBox_show_all_events.setVisible(False)
+            self.checkBox_force1stim.setVisible(False)
+            self.pushButton_stim_assign_threshold.setVisible(False)
+            self.label_stim_detection_threshold.setVisible(False)
 
 ################################################################
 #        Dialog and table classes                              #
@@ -1285,11 +1319,14 @@ class UIsub(Ui_MainWindow):
         self.actionDarkmode.triggered.connect(self.triggerDarkmode)
         self.actionDarkmode.setShortcut("Ctrl+D")
         self.menuEdit.addAction(self.actionDarkmode)
-        self.actionCopy = QtWidgets.QAction("Copy timepoints", self)
-        self.actionCopy.triggered.connect(self.triggerCopy)
-        self.actionCopy.setShortcut("Ctrl+C")
-        self.menuEdit.addAction(self.actionCopy)
-
+        self.actionCopyTimepoints = QtWidgets.QAction("Copy timepoints", self)
+        self.actionCopyTimepoints.triggered.connect(self.triggerCopyTimepoints)
+        self.actionCopyTimepoints.setShortcut("Ctrl+T")
+        self.menuEdit.addAction(self.actionCopyTimepoints)
+        self.actionCopyOutput = QtWidgets.QAction("Copy output", self)
+        self.actionCopyOutput.triggered.connect(self.triggerCopyOutput)
+        self.actionCopyOutput.setShortcut("Ctrl+C")
+        self.menuEdit.addAction(self.actionCopyOutput)
         # View menu
         for frame, (text, initial_state) in uistate.viewTools.items():
             action = QtWidgets.QAction(f"Toggle {text}", self)
@@ -1420,9 +1457,13 @@ class UIsub(Ui_MainWindow):
         self.write_bw_cfg()
         self.darkmode()
 
-    def triggerCopy(self):
-        self.usage("triggerCopy")
+    def triggerCopyTimepoints(self):
+        self.usage("triggerCopyTimepoints")
         self.copy_dft()
+
+    def triggerCopyOutput(self):
+        self.usage("triggerCopyOutput")
+        self.copy_output()
 
     def pushButton_paired_data_flip_pressed(self):
         self.usage("pushButton_paired_data_flip_pressed")
@@ -1607,6 +1648,13 @@ class UIsub(Ui_MainWindow):
             return
         uistate.dft_copy.to_clipboard(index=False)
 
+    def copy_output(self):
+        if len(uistate.rec_select) != 1:
+            print("Select one recording.")
+            return
+        p_row = self.get_df_project().loc[uistate.rec_select[0]]
+        output = self.get_dfoutput(p_row)
+        output.to_clipboard(index=False)
 
     def stimDetect(self):
         if not uistate.rec_select:
