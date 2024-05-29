@@ -31,12 +31,13 @@ class Config:
     def __init__(self):
         self.dev_mode = True # Development mode
         #self.dev_mode = False # Deploy mode
+        clear = True
         print("\n"*3)
         if self.dev_mode:
             print(f"Config set for development mode - {time.strftime('%H:%M:%S')}")
-        self.clear_cache = self.dev_mode
-        self.clear_timepoints = self.dev_mode
-        self.force_cfg_reset = self.dev_mode
+        self.clear_cache = clear
+        self.clear_timepoints = clear
+        self.force_cfg_reset = clear
         self.verbose = self.dev_mode
         self.talkback = not self.dev_mode
         self.hide_experimental = not self.dev_mode
@@ -978,7 +979,7 @@ class UIsub(Ui_MainWindow):
         # remove non-selected recs and stims
         aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
         new_selection = {k: v for k, v in uistate.dict_rec_labels.items() 
-                         if v['rec_ID'] in selected_ids 
+                         if v['rec_ID'] in selected_ids
                          and (v['stim'] in selected_stims or v['stim'] is None)
                          and all(uistate.checkBox[aspect] or v.get('aspect', '') != aspect for aspect in aspects)}
         if not uistate.checkBox['norm_EPSP']:
@@ -997,6 +998,12 @@ class UIsub(Ui_MainWindow):
         added_lines = {k: v for k, v in new_selection.items() if k not in old_selection}
         for line_dict in added_lines.values():
             line_dict['line'].set_visible(True)
+        print(f"update_rec_show: {len(new_selection)} lines shown, {len(obsolete_lines)} lines hidden")
+        print(f" - new_selection: {new_selection.keys()}")
+        # find all keys that end in "EPSP slope", and print x,y of their ['line'] lineobject
+        EPSP_slopes = {k: v for k, v in new_selection.items() if k.endswith('EPSP slope')}
+        print(f" - EPSP slope lines: {[v['line'].get_ydata() for v in EPSP_slopes.values()]}")
+
         uistate.dict_rec_show = new_selection
         #print(f"update_rec_show took {round((time.time() - t0) * 1000)} ms")
 
@@ -1132,10 +1139,10 @@ class UIsub(Ui_MainWindow):
             max_sweep_duration = df_selected['sweep_duration'].max()
             uistate.zoom['mean_xlim'] = (0, max_sweep_duration)
         # axe
-        # ax1 and ax2, simplified (iterative version is pre 2024-05-06)
-            first, last = 0, df_selected['sweeps'].max()-1
+        # ax1 and ax2
+            first, last = 0, max(df_selected['sweeps'].max()-1, 1)
             if uistate.checkBox['output_per_stim']:
-                first, last = 1, df_selected['stims'].max()
+                first, last = 1, max(df_selected['stims'].max(), 2)
             uistate.zoom['output_xlim'] = first, last
         print(f"zoomAuto: output_xlim: {uistate.zoom['output_xlim']}")
 
@@ -2167,6 +2174,11 @@ class UIsub(Ui_MainWindow):
         for i, p_row in df_p.iterrows():
             dfoutput = self.get_dfoutput(p_row, reset=True)
             self.persistOutput(p_row['recording_name'], dfoutput)
+            uiplot.unPlot(p_row['ID'])
+            df_t = self.get_dft(p_row)
+            dfmean = self.get_dfmean(p_row)
+            uiplot.addRow(p_row=p_row, dft=df_t, dfmean=dfmean, dfoutput=dfoutput)
+            self.update_rec_show(reset=True)
         self.uiThaw()
         self.zoomAuto()
 

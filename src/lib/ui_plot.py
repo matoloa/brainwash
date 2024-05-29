@@ -279,10 +279,12 @@ class UIplot():
         self.uistate.dict_rec_labels[f"{label} y marker"] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':yline, 'axis':axid}
 
     def plot_vline(self, label, axid, x, color, rec_ID, aspect=None, stim=None):
-        vline = self.get_axis(axid).axvline(x=x, color=color, linewidth=1, alpha=self.uistate.settings['alpha_dot'], label=label)
+        vline = self.get_axis(axid).axvline(x=x, color=color, alpha=self.uistate.settings['alpha_mark'], label=label, linewidth=8, zorder=0)
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':vline, 'axis':axid}
 
     def addRow(self, p_row, dft, dfmean, dfoutput): # TODO: unspaghetti this
+        print(f"******* addRow: {p_row['recording_name']}")
+        print(dfoutput)
         rec_ID = p_row['ID']
         rec_name = p_row['recording_name']
         rec_filter = p_row['filter'] # the filter currently used for this recording
@@ -334,15 +336,13 @@ class UIplot():
             if not np.isnan(t_row['t_EPSP_amp']):
                 x_position = t_row['t_EPSP_amp']
                 y_position = df_event.loc[df_event.time == x_position, rec_filter]
-                color = settings['rgb_EPSP_amp']
-                self.plot_marker(f"{label} {stim_str} EPSP amp marker", 'axe', x_position, y_position, color, rec_ID, aspect='EPSP_amp', stim=stim_num)
-                if x_axis == 'sweep':
-                    self.plot_line(f"{label} {stim_str} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
-                    if 'EPSP_amp_norm' in out.columns:
-                        self.plot_line(f"{label} {stim_str} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
+                self.plot_marker(f"{label} {stim_str} EPSP amp marker", 'axe', x_position, y_position, settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                 amp_x = x_position - self.uistate.lineEdit['EPSP_amp_halfwidth'], x_position + self.uistate.lineEdit['EPSP_amp_halfwidth']
                 amp_y = y_position, y_position + out['EPSP_amp'].iloc[0] / 1000 # .iloc[0] since filtered by stim, /1000 to convert from mV to V
-                self.plot_cross(f"{label} {stim_str} EPSP amp", 'axe', x_position, y_position, amp_x, amp_y, color, rec_ID, aspect='EPSP_amp', stim=stim_num)
+                self.plot_cross(f"{label} {stim_str} EPSP amp", 'axe', x_position, y_position, amp_x, amp_y, settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
+                if x_axis == 'sweep':
+                    self.plot_line(f"{label} {stim_str} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
+                    self.plot_line(f"{label} {stim_str} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
 
             if not np.isnan(t_row['t_EPSP_slope_start']):
                 x_start, x_end = t_row['t_EPSP_slope_start'], t_row['t_EPSP_slope_end']
@@ -353,19 +353,18 @@ class UIplot():
                 self.plot_line(f"{label} {stim_str} EPSP slope marker", 'axe', [x_start, x_end], [y_start, y_end], settings['rgb_EPSP_slope'], rec_ID, aspect='EPSP_slope', stim=stim_num, width=5)
                 if x_axis == 'sweep':
                     self.plot_line(f"{label} {stim_str} EPSP slope", 'ax2', out[x_axis], out['EPSP_slope'], settings['rgb_EPSP_slope'], rec_ID, aspect='EPSP_slope', stim=stim_num)
-                    if 'EPSP_slope_norm' in out.columns:
-                        self.plot_line(f"{label} {stim_str} EPSP slope norm", 'ax2', out[x_axis], out['EPSP_slope_norm'], settings['rgb_EPSP_slope'], rec_ID, aspect='EPSP_slope', stim=stim_num)
+                    self.plot_line(f"{label} {stim_str} EPSP slope norm", 'ax2', out[x_axis], out['EPSP_slope_norm'], settings['rgb_EPSP_slope'], rec_ID, aspect='EPSP_slope', stim=stim_num)
 
             if not np.isnan(t_row['t_volley_amp']):
                 x_position = t_row['t_volley_amp']
                 y_position = df_event.loc[df_event.time == t_row['t_volley_amp'], rec_filter]
                 color = settings['rgb_volley_amp']
                 self.plot_marker(f"{label} {stim_str} volley amp marker", 'axe', t_row['t_volley_amp'], y_position, settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
-                if x_axis == 'sweep':
-                    self.plot_line(f"{label} {stim_str} volley amp mean", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
                 amp_x = x_position - self.uistate.lineEdit['volley_amp_halfwidth'], x_position + self.uistate.lineEdit['volley_amp_halfwidth']
                 amp_y = y_position, y_position + out['volley_amp'].iloc[0] / 1000 # .iloc[0] since filtered by stim, /1000 to convert from mV to V
                 self.plot_cross(f"{label} {stim_str} volley amp", 'axe', x_position, y_position, amp_x, amp_y, color, rec_ID, aspect='volley_amp', stim=stim_num)
+                if x_axis == 'sweep':
+                    self.plot_line(f"{label} {stim_str} volley amp mean", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
 
             if not np.isnan(t_row['t_volley_slope_start']):
                 x_start, x_end = t_row['t_volley_slope_start'], t_row['t_volley_slope_end']
@@ -381,11 +380,9 @@ class UIplot():
         if x_axis == 'stim':
             out = dfoutput
             self.plot_line(f"{label} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp')
-            if 'EPSP_amp_norm' in out.columns:
-                self.plot_line(f"{label} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp')
+            self.plot_line(f"{label} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp')
             self.plot_line(f"{label} EPSP slope", 'ax2', out[x_axis], out['EPSP_slope'], settings['rgb_EPSP_slope'], rec_ID, aspect='EPSP_slope')
-            if 'EPSP_slope_norm' in out.columns:
-                self.plot_line(f"{label} EPSP slope norm", 'ax2', out[x_axis], out['EPSP_slope_norm'], settings['rgb_EPSP_slope'], rec_ID, aspect='EPSP_slope')
+            self.plot_line(f"{label} EPSP slope norm", 'ax2', out[x_axis], out['EPSP_slope_norm'], settings['rgb_EPSP_slope'], rec_ID, aspect='EPSP_slope')
             self.plot_line(f"{label} volley amp", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, aspect='volley_amp')
             self.plot_line(f"{label} volley slope", 'ax2', out[x_axis], out['volley_slope'], settings['rgb_volley_slope'], rec_ID, aspect='volley_slope')
 
