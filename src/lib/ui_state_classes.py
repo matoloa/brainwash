@@ -246,6 +246,7 @@ class UIstate:
                 elif cfg_v[2] != bw_v[2]:
                     print("Patch version mismatch: Minor changes may not load correctly")
         else:
+            self.reset()
             self.save_cfg(projectfolder, bw_version)
 
     def save_cfg(self, projectfolder, bw_version=None): # save state to project config file

@@ -365,7 +365,7 @@ class UIplot():
                     self.plot_line(f"{label} {stim_str} volley amp mean", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
                 amp_x = x_position - self.uistate.lineEdit['volley_amp_halfwidth'], x_position + self.uistate.lineEdit['volley_amp_halfwidth']
                 amp_y = y_position, y_position + out['volley_amp'].iloc[0] / 1000 # .iloc[0] since filtered by stim, /1000 to convert from mV to V
-                self.plot_cross(f"{label} {stim_str} volley amp", 'axe', x_position, y_position, amp_x, amp_y, color, rec_ID, aspect='volley amp', stim=stim_num)
+                self.plot_cross(f"{label} {stim_str} volley amp", 'axe', x_position, y_position, amp_x, amp_y, color, rec_ID, aspect='volley_amp', stim=stim_num)
 
             if not np.isnan(t_row['t_volley_slope_start']):
                 x_start, x_end = t_row['t_volley_slope_start'], t_row['t_volley_slope_end']

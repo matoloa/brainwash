@@ -34,10 +34,12 @@ class Config:
         print("\n"*3)
         if self.dev_mode:
             print(f"Config set for development mode - {time.strftime('%H:%M:%S')}")
+        self.clear_cache = self.dev_mode
+        self.clear_timepoints = self.dev_mode
+        self.force_cfg_reset = self.dev_mode
         self.verbose = self.dev_mode
         self.talkback = not self.dev_mode
         self.hide_experimental = not self.dev_mode
-        self.force_cfg_reset = self.dev_mode
         self.track_widget_focus = False
         self.terminal_space = 372 if self.dev_mode else 0
         # get project_name and version number from pyproject.toml
@@ -827,8 +829,13 @@ class UIsub(Ui_MainWindow):
         self.setupTableStim()
         self.resetCacheDicts() # initiate/clear internal storage dicts
         
-        # Make sure the necessary folders exist
         self.dict_folders = self.build_dict_folders()
+        # DEBUG: clear cache and timepoints folders
+        if config.clear_cache:
+            self.deleteFolder(self.dict_folders['cache'])
+        if config.clear_timepoints:
+            self.deleteFolder(self.dict_folders['timepoints'])
+        # Make sure the necessary folders exist
         if not os.path.exists(self.projects_folder):
             os.makedirs(self.projects_folder)
         if not os.path.exists(self.dict_folders['cache']):
@@ -999,9 +1006,19 @@ class UIsub(Ui_MainWindow):
 #    WIP: TODO: move these to appropriate header in this file    #
 ##################################################################
 
+    def deleteFolder(self, dir_path):
+        for filename in os.listdir(dir_path):
+            file_path = os.path.join(dir_path, filename)
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)  # remove file or symlink
+            elif os.path.isdir(file_path):
+                self.deleteFolder(file_path)  # recursively remove a subdirectory
+        os.rmdir(dir_path)  # remove the directory itself
+
+
     def persistOutput(self, rec_name, dfoutput): 
         # Determine column order based on the state of uistate.checkBox['output_per_stim']
-        column_order = ['stim', 'bin', 'EPSP_slope', 'EPSP_slope_norm', 'EPSP_amp', 'EPSP_amp_norm', 'volley_amp', 'volley_slope'] if uistate.checkBox['output_per_stim'] else ['stim', 'sweep', 'time', 'EPSP_slope', 'EPSP_amp', 'volley_amp', 'volley_slope']
+        column_order = ['stim', 'bin', 'EPSP_slope', 'EPSP_slope_norm', 'EPSP_amp', 'EPSP_amp_norm', 'volley_amp', 'volley_slope'] if uistate.checkBox['output_per_stim'] else ['stim', 'sweep', 'EPSP_slope', 'EPSP_slope_norm', 'EPSP_amp', 'EPSP_amp_norm', 'volley_amp', 'volley_slope']
         # Clean up column order, save to dict and file.
         missing_columns = set(column_order) - set(dfoutput.columns)
         extra_columns = set(dfoutput.columns) - set(column_order)
@@ -1010,6 +1027,8 @@ class UIsub(Ui_MainWindow):
         if extra_columns:
             print(f"Warning: The following columns exist in dfoutput but not in column_order: {extra_columns}")
         dfoutput = dfoutput.reindex(columns=column_order)
+        print(f"persistOutput: rec_name: {rec_name}")
+        print(f"{dfoutput}")
         self.dict_outputs[rec_name] = dfoutput
         self.df2csv(df=dfoutput, rec=rec_name, key="output")
 
@@ -1608,10 +1627,10 @@ class UIsub(Ui_MainWindow):
             if df_t.empty:
                 print(f"No stims found for {rec_name}.")
                 continue
-            if not uistate.checkBox['timepoints_per_stim']:
-                self.set_uniformTimepoints(p_row=p_row)
-            else:
+            if uistate.checkBox['timepoints_per_stim']:
                 self.set_dft(rec_name, df_t)
+            else:
+                self.set_uniformTimepoints(p_row=p_row)
             df_p.loc[p_row['ID'] == df_p['ID'], 'stims'] = len(df_t)
             self.set_df_project(df_p)
             print(f"stimDetect: {rec_name}")
@@ -2452,23 +2471,27 @@ class UIsub(Ui_MainWindow):
 
         def update_row(p_row, df_t, dfoutput):
             # find highest EPSP_slope in df_output and apply uniform timepoints to all stims
+            precision = uistate.settings['precision']
             if 'EPSP_slope' in dfoutput.columns:
                 idx_max_EPSP = dfoutput['EPSP_slope'].idxmax()
                 stim_max = dfoutput.loc[idx_max_EPSP, 'stim']
                 t_template_row = df_t.loc[[idx_max_EPSP]]
-                t_stim = t_template_row['t_stim'].values[0]
+                t_stim = round(t_template_row['t_stim'].values[0], precision)
                 for var in variables:
-                    t_template_row[var] = round(t_template_row[var].values[0] - t_stim, uistate.settings['precision'])
+                    t_template_row[var] = round(t_template_row[var].values[0] - t_stim, precision)
                 if 'stim' not in df_t.columns:
                     df_t['stim'] = None
                 for i, row_t in df_t.iterrows():
-                    df_t.at[i, 'stim'] = i+1 # stims numbered from 1
-                    for var in variables:
-                        df_t.at[i, var] = t_template_row[var].values[0] + row_t['t_stim']
-                    for method in methods:
-                        df_t.at[i, method] = f"=stim_{stim_max}"
-                    for param in params:
-                        df_t.at[i, param] = f"=stim_{stim_max}"
+                    if i != idx_max_EPSP:
+                        df_t.at[i, 'stim'] = i+1 # stims numbered from 1
+                        for var in variables:
+                            df_t.at[i, var] = round(t_template_row[var].values[0] + row_t['t_stim'], precision)
+                        for method in methods:
+                            df_t.at[i, method] = f"=stim_{stim_max}"
+                        for param in params:
+                            df_t.at[i, param] = f"=stim_{stim_max}"
+                print(f"Uniform timepoints applied to {p_row['recording_name']}.")
+                print(df_t)
                 self.set_dft(p_row['recording_name'], df_t)
                 dfoutput = self.get_dfoutput(p_row, reset=True)
                 self.persistOutput(p_row['recording_name'], dfoutput)
