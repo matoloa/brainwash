@@ -97,8 +97,8 @@ def build_dfoutput(df, dict_t, lineEdit, filter='voltage'):
         else:
             dfoutput['volley_slope'] = np.nan
         list_col.append('volley_slope')
-    t1 = time.time()
-    print(f'build_df_output: {round((t1-t0)*1000)} ms, list_col: {list_col}')
+
+    # print(f'build_df_output: {round((time.time()-t0)*1000)} ms, list_col: {list_col}')
     return dfoutput[list_col]
 
 
@@ -153,8 +153,7 @@ def build_dfstimoutput(dfmean, df_t, lineEdit, filter='voltage'):
             volley_EPSP = measureslope(df=dfmean, filter=filter, t_start=row['t_volley_slope_start'], t_end=row['t_volley_slope_end'])
             df_stimoutput.at[i, 'volley_slope'] = -volley_EPSP if volley_EPSP else np.nan
 
-    t1 = time.time()
-    print(f'build_df_stimoutput: {round((t1-t0)*1000)} ms, columns: {df_stimoutput.columns}')
+    # print(f'build_df_stimoutput: {round((time.time()-t0)*1000)} ms, columns: {df_stimoutput.columns}')
     return df_stimoutput
 
 

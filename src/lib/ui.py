@@ -2907,7 +2907,7 @@ class UIsub(Ui_MainWindow):
 
     def eventDragSlope(self, event, action, data_x, data_y, prior_slope_start, prior_slope_end): # graph dragging event
         self.canvasEvent.mpl_disconnect(self.mouseover)
-        if event.xdata is None:
+        if event.xdata is None or action is None:
             return
         x = event.xdata
         uistate.x_drag = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
@@ -3011,7 +3011,7 @@ class UIsub(Ui_MainWindow):
                         df_t.at[i, key] = round(t_row['t_stim'] - offset, precision)
 
         if x_axis == 'stim':
-            self.set_dft(rec_name, df_t)
+            uistate.dft_copy = df_t
             out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
         elif x_axis == 'sweep':
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)

@@ -273,8 +273,8 @@ class UIplot():
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':marker, 'axis':axid}
 
     def plot_cross(self, label, axid, x, y, amp_x, amp_y, color, rec_ID, aspect=None, stim=None):
-        xline, = self.get_axis(axid).plot(amp_x, [y,y], color=color, label=f"{label} x", alpha=self.uistate.settings['alpha_line'])
-        yline, = self.get_axis(axid).plot([x,x], amp_y, color=color, label=f"{label} y", alpha=self.uistate.settings['alpha_line'])
+        xline, = self.get_axis(axid).plot(amp_x, [y,y], color=color, label=f"{label} x", alpha=self.uistate.settings['alpha_line'], zorder=0)
+        yline, = self.get_axis(axid).plot([x,x], amp_y, color=color, label=f"{label} y", alpha=self.uistate.settings['alpha_line'], zorder=0)
         self.uistate.dict_rec_labels[f"{label} x marker"] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':xline, 'axis':axid}
         self.uistate.dict_rec_labels[f"{label} y marker"] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':yline, 'axis':axid}
 
@@ -416,8 +416,11 @@ class UIplot():
             if self.uistate.checkBox['output_per_stim']:
                 label_base = f"{p_row['recording_name']} {aspect}"
             if aspect == 'volley slope':
-                mean = t_row[f'{aspect.replace(" ", "_")}_mean']
-                self.updateOutMean(f"{label_base} mean", mean)
+                if self.uistate.checkBox['output_per_stim']:
+                    self.updateOutLine(label_base)
+                else:
+                    mean = t_row['volley_slope_mean']
+                    self.updateOutMean(f"{label_base} mean", mean)
             else: # EPSP slope
                 if norm:
                     label_base += " norm"
@@ -432,7 +435,7 @@ class UIplot():
                 if self.uistate.checkBox['output_per_stim']:
                     self.updateOutLine(label_base)
                 else:
-                    mean = t_row[f'{aspect.replace(" ", "_")}_mean']
+                    mean = t_row['volley_amp_mean']
                     self.updateOutMean(f"{label_base} mean", mean)
             else: # EPSP amp
                 if norm:
