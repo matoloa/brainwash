@@ -402,7 +402,7 @@ class UIplot():
             fill = ax2.fill_between(df_groupmean.sweep, df_groupmean.EPSP_slope_mean + df_groupmean.EPSP_slope_SEM, df_groupmean.EPSP_slope_mean - df_groupmean.EPSP_slope_SEM, alpha=0.3, color=color)
             self.uistate.dict_group_label_ID_line_SEM[label] = [group_ID, line, fill]
 
-    def plotUpdate(self, p_row, t_row, aspect, data_x, data_y):
+    def plotUpdate(self, p_row, t_row, aspect, data_x, data_y, amp=None): # TODO: unspaghetti this
         norm = self.uistate.checkBox['norm_EPSP']
         stim_offset = t_row['t_stim']
         label_base = f"{p_row['recording_name']} - stim {t_row['stim']} {aspect}"
@@ -425,12 +425,12 @@ class UIplot():
         elif aspect in ['EPSP amp', 'volley amp']:
             t_amp = t_row[f't_{aspect.replace(" ", "_")}'] - stim_offset
             y_position = data_y[np.abs(data_x - t_amp).argmin()]
-            self.updateLine(f"{label_base} marker", t_amp, y_position)
+            self.updateAmpMarker(label_base, t_amp, y_position, amp=amp)
             if self.uistate.checkBox['output_per_stim']:
                 label_base = f"{p_row['recording_name']} {aspect}"
             if aspect == 'volley amp':
                 if self.uistate.checkBox['output_per_stim']:
-                    self.updateOutLine(f"{label_base}", t_amp, y_position)
+                    self.updateOutLine(label_base)
                 else:
                     mean = t_row[f'{aspect.replace(" ", "_")}_mean']
                     self.updateOutMean(f"{label_base} mean", mean)
@@ -439,13 +439,20 @@ class UIplot():
                     label_base += " norm"
                 self.updateOutLine(label_base)
 
+    def updateAmpMarker(self, labelbase, x, y, amp=None):
+        axe = self.uistate.axe
+        self.uistate.dict_rec_labels[f"{labelbase} marker"]['line'].set_data(x, y)
+        if amp is not None:
+            amp_x = x - self.uistate.lineEdit['volley_amp_halfwidth'], x + self.uistate.lineEdit['volley_amp_halfwidth']
+            amp_y = y, y + amp
+            self.uistate.dict_rec_labels[f"{labelbase} x marker"]['line'].set_data(amp_x, [y,y])
+            self.uistate.dict_rec_labels[f"{labelbase} y marker"]['line'].set_data([x,x], amp_y)
+        axe.figure.canvas.draw()
 
     def updateLine(self, plot_to_update, x_data, y_data):
         axe = self.uistate.axe
-        linedict = self.uistate.dict_rec_labels[plot_to_update]
-        print(f"updateLine: {plot_to_update}, linedict: {linedict}")
-        linedict['line'].set_xdata(x_data)
-        linedict['line'].set_ydata(y_data)
+        dict_line = self.uistate.dict_rec_labels[plot_to_update]
+        dict_line['line'].set_data(x_data, y_data)
         axe.figure.canvas.draw()
 
     def updateOutLine(self, label):
