@@ -926,7 +926,6 @@ class UIsub(Ui_MainWindow):
         uistate.dfp_row_copy = p_row.copy()
         df_t = self.get_dft(row=p_row)
         uistate.dft_copy = df_t.copy()
-        self.dfmean = self.get_dfmean(row=p_row) # Required for event dragging, x and y
 
         if df_t.shape[0] > 1:
             selected_stims = self.tableStim.selectionModel().selectedRows() # save selection
@@ -1053,15 +1052,16 @@ class UIsub(Ui_MainWindow):
 
 
     def talkback(self):
-        row = uistate.dfp_row_copy
-        dfmean = self.dfmean
+        p_row = uistate.dfp_row_copy
+        t_row = uistate.dft_copy[uistate.stim_select]
+        dfmean = self.get_dfmean(p_row)
 
-        t_stim = row['t_stim']
+        t_stim = t_row['t_stim']
         t_start = t_stim - 0.002
         t_end = t_stim + 0.018
         dfevent = dfmean[(dfmean['time'] >= t_start) & (dfmean['time'] < t_end)]
         dfevent = dfevent[['time', 'voltage']]
-        path_talkback_df = Path(f"{self.projects_folder}/talkback/talkback_slice_{row['ID']}_stim.csv")
+        path_talkback_df = Path(f"{self.projects_folder}/talkback/talkback_slice_{p_row['ID']}_stim.csv")
         if not path_talkback_df.parent.exists():
             path_talkback_df.parent.mkdir(parents=True, exist_ok=True)
         dfevent.to_csv(path_talkback_df, index=False)
@@ -1072,10 +1072,10 @@ class UIsub(Ui_MainWindow):
             't_volley_amp', 't_volley_amp_method', 't_volley_amp_params',
             't_volley_slope_start', 't_volley_slope_end', 't_volley_slope_method', 't_volley_slope_params'
         ]
-        dict_event = {key: row[key] for key in keys}
+        dict_event = {key: t_row[key] for key in keys}
         print(f"talkback dict_event: {dict_event}")
         # store dict_event as .csv named after recording_name
-        path_talkback = Path(f"{self.projects_folder}/talkback/talkback_meta_{row['ID']}_stim.csv")
+        path_talkback = Path(f"{self.projects_folder}/talkback/talkback_meta_{p_row['ID']}_stim.csv")
         with open(path_talkback, 'w') as f:
             json.dump(dict_event, f)
 
@@ -1560,9 +1560,10 @@ class UIsub(Ui_MainWindow):
         # cycle through all selected recordings and update norm outputs
         for idx in uistate.rec_select:
             row = self.df_project.iloc[idx]
-            rec_name = row['recording_name']
-            out = self.get_dfoutput(row=row)
-            uiplot.updateEPSPout(rec_name, out) # TODO: deprecated
+            rec = row['recording_name']
+            dfoutput = self.get_dfoutput(row=row)
+            self.persistOutput(rec, dfoutput)
+            uiplot.updateEPSPout(rec, dfoutput) # TODO: deprecated
         print(f"editNormRange: {uistate.lineEdit['norm_EPSP_on']}")
 
 
@@ -1607,12 +1608,16 @@ class UIsub(Ui_MainWindow):
             if df_t.empty:
                 print(f"No stims found for {rec_name}.")
                 continue
-            self.set_dft(rec_name, df_t)
+            if not uistate.checkBox['timepoints_per_stim']:
+                self.set_uniformTimepoints(p_row=p_row)
+            else:
+                self.set_dft(rec_name, df_t)
             df_p.loc[p_row['ID'] == df_p['ID'], 'stims'] = len(df_t)
             self.set_df_project(df_p)
             print(f"stimDetect: {rec_name}")
             uiplot.unPlot(rec_ID)
             dfoutput = self.get_dfoutput(p_row)
+            self.persistOutput(p_row['recording_name'], dfoutput)
             uiplot.addRow(p_row, df_t, dfmean, dfoutput)
         uistate.stim_select = [0]
         if len(uistate.rec_select) == 1:
@@ -2141,14 +2146,15 @@ class UIsub(Ui_MainWindow):
         self.uiFreeze()
         df_p = self.get_df_project()
         for i, p_row in df_p.iterrows():
-            _ = self.get_dfoutput(p_row, reset=True)
+            dfoutput = self.get_dfoutput(p_row, reset=True)
+            self.persistOutput(p_row['recording_name'], dfoutput)
         self.uiThaw()
         self.zoomAuto()
 
     def checkBox_timepoints_per_stim_changed(self, state):
         uistate.checkBox['timepoints_per_stim'] = state == 2
         print(f"checkBox_timepoints_per_stim_changed: {state}")
-        if state == 2:
+        if state == 0:
             self.set_uniformTimepoints()
 
     def tableFormat(self):
@@ -2214,7 +2220,7 @@ class UIsub(Ui_MainWindow):
             dfmean = parse.build_dfmean(self.get_dfdata(row=row))
             persist = True
 
-        #if the filter is not a column in self.dfmean, create it
+        #if the filter is not a column in dfmean, create it
         if row['filter'] == 'savgol':
             # TODO: extract parameters from df_p, use default for now
             if 'savgol' not in dfmean.columns:
@@ -2252,15 +2258,19 @@ class UIsub(Ui_MainWindow):
             if df_t.empty:
                 print("No stims found.")
                 return None
-            
             df_p = self.get_df_project() # update (number of) 'stims'
             df_p.loc[df_p['ID'] == row['ID'], 'stims'] = len(df_t)
             self.set_df_project(df_p)
-            self.dict_ts[rec] = df_t # update cache
+            if uistate.checkBox['timepoints_per_stim']:
+                self.dict_ts[rec] = df_t # update cache
+            else: # homogenize timepoints
+                dfoutput = self.get_dfoutput(row=row, df_t=df_t)
+                self.set_uniformTimepoints(p_row=row, df_t=df_t, dfoutput=dfoutput)
+                df_t = self.dict_ts[rec]
             self.df2csv(df=df_t, rec=rec, key="timepoints") # persist csv
             return df_t
 
-    def get_dfoutput(self, row, reset=False):
+    def get_dfoutput(self, row, reset=False, df_t=None): # Requires df_t
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
         rec = row['recording_name']
         if rec in self.dict_outputs and not reset: #1: Return cached
@@ -2271,7 +2281,8 @@ class UIsub(Ui_MainWindow):
         else: #3: Create file and cache
             print(f"creating output for {row['recording_name']}")
             dfmean = self.get_dfmean(row=row)
-            df_t = self.get_dft(row=row)
+            if df_t is None:
+                df_t = self.get_dft(row=row)
             if uistate.checkBox['output_per_stim']:
                 dfoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
             else:
@@ -2282,10 +2293,7 @@ class UIsub(Ui_MainWindow):
                     dfoutput_stim = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
                     dfoutput = pd.concat([dfoutput, dfoutput_stim])
         dfoutput.reset_index(inplace=True)
-        print(dfoutput)
-        self.persistOutput(rec, dfoutput)
-        self.dict_outputs[rec] = dfoutput
-        return self.dict_outputs[rec]
+        return dfoutput
 
     def get_dfdata(self, row):
         # returns an internal df for the selected recording_name. If it does not exist, read it from file first.
@@ -2436,60 +2444,21 @@ class UIsub(Ui_MainWindow):
         self.dict_group_means[str_ID] = group_mean
         return self.dict_group_means[str_ID]
 
-    def sweepOutputs(self):
-        # rebuild all outputs for all recordings based on output x = sweep number TODO: add option to show time instead
-        self.uiFreeze()
-        df_p = self.get_df_project()
-        for _, p_row in df_p.iterrows():
-            uiplot.unPlot(p_row['ID'])
-            df_t = self.get_dft(p_row)
-            dict_t = df_t.iloc[0].to_dict()
-            dfmean = self.get_dfmean(row=p_row)
-            dffilter = self.get_dffilter(p_row)
-            dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
-            self.persistOutput(p_row['recording_name'], dfoutput)
-            print(f"sweepOutputs: {p_row['recording_name']} {dfoutput.columns}")
-            uiplot.addRow(p_row, df_t, dfmean, dfoutput)
-        self.update_rec_show(reset=True)
-        self.mouseoverUpdate()
-        self.uiThaw()
-        return dfoutput
 
-    def stimOutputs(self):
-        # rebuild all outputs for all recordings based on output x = stim number
-        self.uiFreeze()
-        df_p = self.get_df_project()
-        df_parsed = df_p[df_p['sweeps'] != "..."]
-        for _, p_row in df_parsed.iterrows():
-            uiplot.unPlot(p_row['ID'])
-            dfmean = self.get_dfmean(row=p_row)
-            df_t = self.get_dft(row=p_row)
-            dfoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
-            print(f"stimOutputs: {p_row['recording_name']} {dfoutput.columns}")
-            self.persistOutput(rec_name=p_row['recording_name'], dfoutput=dfoutput)
-            uiplot.addRow(p_row, df_t, dfmean, dfoutput)
-        self.update_rec_show(reset=True)
-        self.mouseoverUpdate()
-        self.uiThaw()
-        return dfoutput
+    def set_uniformTimepoints(self, p_row=None, df_t=None, dfoutput=None): # NB: requires both dfoutput and df_t to be present!
+        variables = ['t_volley_amp', 't_volley_slope_start', 't_volley_slope_end', 't_EPSP_amp', 't_EPSP_slope_start', 't_EPSP_slope_end']
+        methods = ['t_volley_amp_method', 't_volley_slope_method', 't_EPSP_amp_method', 't_EPSP_slope_method']
+        params = ['t_volley_amp_params', 't_volley_slope_params', 't_EPSP_amp_params', 't_EPSP_slope_params']
 
-
-    def set_uniformTimepoints(self):
-        for _, p_row in self.get_df_project().iterrows():
-            dfoutput = self.get_dfoutput(p_row)
-            df_t = self.get_dft(p_row)
-            variables = ['t_volley_amp', 't_volley_slope_start', 't_volley_slope_end', 't_EPSP_amp', 't_EPSP_slope_start', 't_EPSP_slope_end']
-            methods = ['t_volley_amp_method', 't_volley_slope_method', 't_EPSP_amp_method', 't_EPSP_slope_method']
-            params = ['t_volley_amp_params', 't_volley_slope_params', 't_EPSP_amp_params', 't_EPSP_slope_params']
-            # find highest EPSP_slope in df_output
+        def update_row(p_row, df_t, dfoutput):
+            # find highest EPSP_slope in df_output and apply uniform timepoints to all stims
             if 'EPSP_slope' in dfoutput.columns:
-                print(dfoutput['EPSP_slope'])
-                idx_max = dfoutput['EPSP_slope'].idxmax()
-                stim_max = dfoutput.loc[idx_max, 'stim']
-                t_template_row = df_t.loc[[idx_max]]
+                idx_max_EPSP = dfoutput['EPSP_slope'].idxmax()
+                stim_max = dfoutput.loc[idx_max_EPSP, 'stim']
+                t_template_row = df_t.loc[[idx_max_EPSP]]
                 t_stim = t_template_row['t_stim'].values[0]
                 for var in variables:
-                    t_template_row[var] -= t_stim
+                    t_template_row[var] = round(t_template_row[var].values[0] - t_stim, uistate.settings['precision'])
                 if 'stim' not in df_t.columns:
                     df_t['stim'] = None
                 for i, row_t in df_t.iterrows():
@@ -2502,6 +2471,18 @@ class UIsub(Ui_MainWindow):
                         df_t.at[i, param] = f"=stim_{stim_max}"
                 self.set_dft(p_row['recording_name'], df_t)
                 dfoutput = self.get_dfoutput(p_row, reset=True)
+                self.persistOutput(p_row['recording_name'], dfoutput)
+        if p_row is None:
+            for _, p_row in self.get_df_project().iterrows():
+                df_t = self.get_dft(p_row)
+                dfoutput = self.get_dfoutput(p_row)
+                update_row(p_row, df_t, dfoutput)
+        else:
+            if df_t is None or dfoutput is None:
+                df_t = self.get_dft(p_row)
+                dfoutput = self.get_dfoutput(p_row)
+            update_row(p_row, df_t, dfoutput)
+
 
 
 # Graph interface
@@ -2541,9 +2522,9 @@ class UIsub(Ui_MainWindow):
 
     def graphPreload(self): # plot and hide imported recordings
         self.usage("graphPreload")
+        self.uiFreeze()
         t0 = time.time()
         self.mouseoverDisconnect()
-        self.uiFreeze()
         if not uistate.new_indices:
             df_p = self.get_df_project()
             uistate.new_indices = df_p[~df_p['sweeps'].eq("...")].index.tolist()
@@ -2560,7 +2541,6 @@ class UIsub(Ui_MainWindow):
 
         self.thread.start()
         self.progressBarManager.__enter__()  # Show progress bar
-
     def ongraphPreloadFinished(self, t0):
         self.graphGroups()
         print(f"Preloaded recordings and groups in {time.time()-t0:.2f} seconds.")
@@ -2568,6 +2548,7 @@ class UIsub(Ui_MainWindow):
         self.progressBarManager.__exit__(None, None, None)  # Hide progress bar
         self.uiThaw()
         self.tableProjSelectionChanged()
+
 
     def graphGroups(self):
         group_ids = set(uistate.df_groups['group_ID'])
@@ -2675,7 +2656,8 @@ class UIsub(Ui_MainWindow):
                     self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', lambda event: self.eventDragReleased(event, data_x, data_y))
 
         elif canvas == self.canvasMean: # Mean canvas (top graph) left-clicked: overview and selecting ranges for finding relevant stims
-            time_values = self.dfmean['time'].values
+            dfmean = self.get_dfmean(p_row) # Required for event dragging, x and y
+            time_values = dfmean['time'].values
             uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
             uistate.x_select['mean_start'] = uistate.x_on_click
             self.lineEdit_mean_selection_start.setText(str(uistate.x_select['mean_start']))

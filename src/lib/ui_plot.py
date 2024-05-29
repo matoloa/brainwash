@@ -133,7 +133,7 @@ class UIplot():
         # show only selected and imported lines, only appropriate aspects
         print("graphRefresh")
 
-        #t0 = time.time()
+        t0 = time.time()
         uistate = self.uistate
 
         # Recordings
@@ -218,7 +218,7 @@ class UIplot():
             self.uistate.dict_rec_labels['Events y zero marker'] = {'rec_ID':None, 'stim': None, 'line':hline0, 'axis':'axe'}
         uistate.dict_rec_labels['Events y zero marker']['line'].set_visible(True)
 
-        # 1000-hline for relative Output
+        # 100-hline for relative Output
         if uistate.checkBox['norm_EPSP']:
             if not 'Output y 100% marker' in self.uistate.dict_rec_labels:
                 hline100ax1 = self.uistate.ax1.axhline(100, linestyle='dotted', alpha=0.3, color = uistate.settings['rgb_EPSP_amp'])
@@ -232,7 +232,7 @@ class UIplot():
         axm.figure.canvas.draw()
         axe.figure.canvas.draw()
         ax1.figure.canvas.draw() # ax2 should be on the same canvas
-        #print(f" - - {round((time.time() - t0) * 1000)} ms")
+        print(f" - - {round((time.time() - t0) * 1000)} ms")
 
 
     def oneAxisLeft(self):
@@ -303,7 +303,6 @@ class UIplot():
             stim_num = i_stim + 1 # 1-numbering (visible to user)
             stim_str = f"- stim {stim_num}"
             t_stim = t_row['t_stim']
-            print(stim_num, dfoutput)
             out = dfoutput[dfoutput['stim'] == stim_num]# TODO: enable switch to dfdiff?
             y_position = dfmean.loc[dfmean.time == t_stim, rec_filter].values[0] # returns index, y_value
             # Event window, color, and alpha settings
@@ -330,7 +329,6 @@ class UIplot():
             self.plot_line(f"{label} {stim_str}", 'axe', df_event['time'], df_event[rec_filter], color, rec_ID, stim=stim_num)
             
             # plot markers on axe, output lines on ax1 and ax2
-            print(stim_num, dfoutput)
             out = dfoutput[dfoutput['stim'] == stim_num] # TODO: enable switch to dfdiff?
 
             if not np.isnan(t_row['t_EPSP_amp']):
