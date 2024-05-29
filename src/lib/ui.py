@@ -31,7 +31,7 @@ class Config:
     def __init__(self):
         self.dev_mode = True # Development mode
         #self.dev_mode = False # Deploy mode
-        clear = True
+        clear = False
         print("\n"*3)
         if self.dev_mode:
             print(f"Config set for development mode - {time.strftime('%H:%M:%S')}")
@@ -998,13 +998,15 @@ class UIsub(Ui_MainWindow):
         added_lines = {k: v for k, v in new_selection.items() if k not in old_selection}
         for line_dict in added_lines.values():
             line_dict['line'].set_visible(True)
-        print(f"update_rec_show: {len(new_selection)} lines shown, {len(obsolete_lines)} lines hidden")
-        print(f" - new_selection: {new_selection.keys()}")
-        # find all keys that end in "EPSP slope", and print x,y of their ['line'] lineobject
-        EPSP_slopes = {k: v for k, v in new_selection.items() if k.endswith('EPSP slope')}
-        print(f" - EPSP slope lines: {[v['line'].get_ydata() for v in EPSP_slopes.values()]}")
-
         uistate.dict_rec_show = new_selection
+
+        # DEBUG block
+        # print(f"update_rec_show: {len(new_selection)} lines shown, {len(obsolete_lines)} lines hidden")
+        # print(f" - new_selection: {new_selection.keys()}")
+        # find all keys that end in "EPSP slope", and print x,y of their ['line'] lineobject
+        # EPSP_slopes = {k: v for k, v in new_selection.items() if k.endswith('EPSP slope')}
+        # print(f" - EPSP slope lines: {[v['line'].get_ydata() for v in EPSP_slopes.values()]}")
+
         #print(f"update_rec_show took {round((time.time() - t0) * 1000)} ms")
 
 
@@ -1131,7 +1133,7 @@ class UIsub(Ui_MainWindow):
 
 
     def zoomAuto(self):
-        print(f"zoomAuto, uistate.selected: {uistate.rec_select}, uistate.stim_select: {uistate.stim_select}")
+        # print(f"zoomAuto, uistate.selected: {uistate.rec_select}, uistate.stim_select: {uistate.stim_select}")
         if uistate.rec_select:
         # axm
             df_p = self.get_df_project()
@@ -1144,7 +1146,7 @@ class UIsub(Ui_MainWindow):
             if uistate.checkBox['output_per_stim']:
                 first, last = 1, max(df_selected['stims'].max(), 2)
             uistate.zoom['output_xlim'] = first, last
-        print(f"zoomAuto: output_xlim: {uistate.zoom['output_xlim']}")
+        # print(f"zoomAuto: output_xlim: {uistate.zoom['output_xlim']}")
 
 
     def update_recs2plot(self):

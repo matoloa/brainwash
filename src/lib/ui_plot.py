@@ -283,8 +283,6 @@ class UIplot():
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':vline, 'axis':axid}
 
     def addRow(self, p_row, dft, dfmean, dfoutput): # TODO: unspaghetti this
-        print(f"******* addRow: {p_row['recording_name']}")
-        print(dfoutput)
         rec_ID = p_row['ID']
         rec_name = p_row['recording_name']
         rec_filter = p_row['filter'] # the filter currently used for this recording
