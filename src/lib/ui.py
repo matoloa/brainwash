@@ -31,7 +31,7 @@ class Config:
     def __init__(self):
         self.dev_mode = True # Development mode
         #self.dev_mode = False # Deploy mode
-        clear = False
+        clear = True
         print("\n"*3)
         if self.dev_mode:
             print(f"Config set for development mode - {time.strftime('%H:%M:%S')}")
@@ -679,13 +679,13 @@ class Ui_MainWindow(QtCore.QObject):
 ################################################################
 
         self.pushButtonParse.setVisible(False)
+        self.checkBox_force1stim.setVisible(False)
         self.progressBar.setVisible(False)
         self.progressBar.setValue(0)
 
         if config.hide_experimental:
             # explicit hide command required for Windows, but not Linux (?)
             self.checkBox_show_all_events.setVisible(False)
-            self.checkBox_force1stim.setVisible(False)
             self.pushButton_stim_assign_threshold.setVisible(False)
             self.label_stim_detection_threshold.setVisible(False)
 
@@ -897,11 +897,18 @@ class UIsub(Ui_MainWindow):
         self.label_relative_to.setVisible(norm)
         self.lineEdit_norm_EPSP_start.setVisible(norm)
         self.lineEdit_norm_EPSP_end.setVisible(norm)
-        self.lineEdit_norm_EPSP_start.setText(f"{uistate.lineEdit['norm_EPSP_on'][0]}")
-        self.lineEdit_norm_EPSP_end.setText(f"{uistate.lineEdit['norm_EPSP_on'][1]}")
+        self.lineEdit_norm_EPSP_start.setText(f"{uistate.lineEdit['norm_EPSP_from']}")
+        self.lineEdit_norm_EPSP_end.setText(f"{uistate.lineEdit['norm_EPSP_to']}")
         self.lineEdit_norm_EPSP_start.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_EPSP_start))
         self.lineEdit_norm_EPSP_end.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_EPSP_end))
 
+        # connect amp halfwidth lineedits to local functions
+        self.lineEdit_EPSP_amp_halfwidth.setText(f"{uistate.lineEdit['EPSP_amp_halfwidth_ms']}")
+        self.lineEdit_volley_amp_halfwidth.setText(f"{uistate.lineEdit['volley_amp_halfwidth_ms']}")
+        self.lineEdit_EPSP_amp_halfwidth.editingFinished.connect(lambda: self.editAmpHalfwidth(self.lineEdit_EPSP_amp_halfwidth))
+        self.lineEdit_volley_amp_halfwidth.editingFinished.connect(lambda: self.editAmpHalfwidth(self.lineEdit_volley_amp_halfwidth))
+
+        
         self.fqdn = socket.getfqdn() # get computer name and local domain, for project file
         if config.talkback:
             path_usage = Path(f"{self.projects_folder}/talkback/usage.yaml")
@@ -1048,15 +1055,15 @@ class UIsub(Ui_MainWindow):
 ##################################################################
 #    WIP: TODO: move these to appropriate header in this file    #
 ##################################################################
-
     def deleteFolder(self, dir_path):
-        for filename in os.listdir(dir_path):
-            file_path = os.path.join(dir_path, filename)
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)  # remove file or symlink
-            elif os.path.isdir(file_path):
-                self.deleteFolder(file_path)  # recursively remove a subdirectory
-        os.rmdir(dir_path)  # remove the directory itself
+        if os.path.exists(dir_path):
+            for filename in os.listdir(dir_path):
+                file_path = os.path.join(dir_path, filename)
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)  # remove file or symlink
+                elif os.path.isdir(file_path):
+                    self.deleteFolder(file_path)  # recursively remove a subdirectory
+            os.rmdir(dir_path)  # remove the directory itself
 
 
     def persistOutput(self, rec_name, dfoutput): 
@@ -1180,6 +1187,7 @@ class UIsub(Ui_MainWindow):
             if uistate.checkBox['output_per_stim']:
                 first, last = 1, max(df_selected['stims'].max(), 2)
             uistate.zoom['output_xlim'] = first, last
+            
         # print(f"zoomAuto: output_xlim: {uistate.zoom['output_xlim']}")
 
 
@@ -1215,6 +1223,12 @@ class UIsub(Ui_MainWindow):
                 self.checkBox_output_per_stim_changed(state)
             elif key == 'timepoints_per_stim':
                 self.checkBox_timepoints_per_stim_changed(state)
+            elif key == 'output_ymin0':
+                if state == 2:
+                    current_ylim = uistate.zoom['output_ax1_ylim']
+                    uistate.zoom['output_ax1_ylim'] = (0, current_ylim[1])
+                    current_ylim = uistate.zoom['output_ax2_ylim']
+                    uistate.zoom['output_ax2_ylim'] = (0, current_ylim[1])
         self.update_rec_show()
         self.mouseoverUpdate()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
@@ -1602,6 +1616,21 @@ class UIsub(Ui_MainWindow):
         self.tableFormat()
         self.mouseoverUpdate()
 
+    def editAmpHalfwidth(self, lineEdit):
+        lineEditName = lineEdit.objectName()
+        self.usage(f"editAmpHalfwidth {lineEditName}")
+        try:
+            num = max(0, float(lineEdit.text()))
+        except ValueError:
+            num = 0
+        if lineEditName == "lineEdit_EPSP_amp_halfwidth":
+            uistate.default['EPSP_amp_halfwidth_ms'] = num
+        elif lineEditName == "lineEdit_volley_amp_halfwidth":
+            uistate.default['EPSP_amp_halfwidth_ms'] = num
+        lineEdit.setText(str(num))
+        uistate.save_cfg(projectfolder=self.dict_folders['project'])
+        # TODO: cycle through all selected recordings and update df_t and dfoutput
+
     def editNormRange(self, lineEdit):
         self.usage("editNormRange")
         try:
@@ -1609,19 +1638,19 @@ class UIsub(Ui_MainWindow):
         except ValueError:
             num = 0
         if lineEdit.objectName() == "lineEdit_norm_EPSP_start": # start, cannot be higher than end
-            if num == uistate.lineEdit['norm_EPSP_on'][0]:
+            if num == uistate.lineEdit['norm_EPSP_from']:
                 self.lineEdit_norm_EPSP_start.setText(str(num))
                 return # no change
-            uistate.lineEdit['norm_EPSP_on'][1] = max(num, int(self.lineEdit_norm_EPSP_end.text()))
-            self.lineEdit_norm_EPSP_end.setText(str(uistate.lineEdit['norm_EPSP_on'][1]))
-            uistate.lineEdit['norm_EPSP_on'][0] = num
+            uistate.lineEdit['norm_EPSP_to'] = max(num, int(self.lineEdit_norm_EPSP_end.text()))
+            self.lineEdit_norm_EPSP_end.setText(str(uistate.lineEdit['norm_EPSP_to']))
+            uistate.lineEdit['norm_EPSP_from'] = num
         else: # end, cannot be lower than start
-            if num == uistate.lineEdit['norm_EPSP_on'][1]:
+            if num == uistate.lineEdit['norm_EPSP_to']:
                 self.lineEdit_norm_EPSP_end.setText(str(num))
                 return # no change
-            uistate.lineEdit['norm_EPSP_on'][0] = min(num, int(self.lineEdit_norm_EPSP_start.text()))
-            self.lineEdit_norm_EPSP_start.setText(str(uistate.lineEdit['norm_EPSP_on'][0]))
-            uistate.lineEdit['norm_EPSP_on'][1] = num
+            uistate.lineEdit['norm_EPSP_to'] = min(num, int(self.lineEdit_norm_EPSP_start.text()))
+            self.lineEdit_norm_EPSP_start.setText(str(uistate.lineEdit['norm_EPSP_from']))
+            uistate.lineEdit['norm_EPSP_to'] = num
         lineEdit.setText(str(num))
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
         self.purgeGroupCache(*uistate.df_groups['group_ID'].tolist())
@@ -1633,7 +1662,7 @@ class UIsub(Ui_MainWindow):
             dfoutput = self.get_dfoutput(row=row)
             self.persistOutput(rec, dfoutput)
             uiplot.updateEPSPout(rec, dfoutput) # TODO: deprecated
-        print(f"editNormRange: {uistate.lineEdit['norm_EPSP_on']}")
+        print(f"editNormRange: {uistate.lineEdit['norm_EPSP_from']}-{uistate.lineEdit['norm_EPSP_to']}")
 
 
 
@@ -2339,6 +2368,9 @@ class UIsub(Ui_MainWindow):
             if df_t.empty:
                 print("No stims found.")
                 return None
+            df_t['norm_EPSP_from'], df_t['norm_EPSP_to'] = uistate.lineEdit['norm_EPSP_from'], uistate.lineEdit['norm_EPSP_to']
+            df_t['EPSP_amp_halfwidth'] = uistate.lineEdit['EPSP_amp_halfwidth_ms']/1000
+            df_t['volley_amp_halfwidth'] = uistate.lineEdit['volley_amp_halfwidth_ms']/1000
             df_p = self.get_df_project() # update (number of) 'stims'
             df_p.loc[df_p['ID'] == row['ID'], 'stims'] = len(df_t)
             self.set_df_project(df_p)
@@ -3023,7 +3055,6 @@ class UIsub(Ui_MainWindow):
         if uistate.checkBox['output_per_stim']:
             x_axis = 'stim'
             p_row = uistate.dfp_row_copy
-            rec_name = p_row['recording_name']
             dfmean = self.get_dfmean(row=uistate.dfp_row_copy)
         else:
             x_axis = 'sweep'
@@ -3042,7 +3073,7 @@ class UIsub(Ui_MainWindow):
 
         def handle_amp(aspect, x_start, stim_offset, precision):
             amp_key = f't_{aspect}'
-            return {amp_key: round(x_start + stim_offset, precision)}
+            return {'t_stim': stim_offset, amp_key: round(x_start + stim_offset, precision)}
 
         dict_t = None
         if aspect in ["EPSP_slope", "volley_slope"]:
@@ -3053,7 +3084,7 @@ class UIsub(Ui_MainWindow):
         if dict_t:
             for key, value in dict_t.items():
                 df_t.at[stim_idx, key] = value
-                if not uistate.checkBox['timepoints_per_stim']:
+                if not uistate.checkBox['timepoints_per_stim']: # update all timepoints in df_t
                     offset = df_t.at[stim_idx, 't_stim'] - df_t.at[stim_idx, key]
                     for i, t_row in df_t.iterrows():
                         df_t.at[i, key] = round(t_row['t_stim'] - offset, precision)
@@ -3121,7 +3152,7 @@ class UIsub(Ui_MainWindow):
         print(f" - {dfoutput.columns}")
         self.persistOutput(rec_name=p_row['recording_name'], dfoutput=dfoutput)
         
-        def update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot, uistate):
+        def update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot):
             labelbase = f"{p_row['recording_name']} - stim {t_row['stim']}"
             labelamp = f"{labelbase} {aspect}"
             t_aspect = aspect.replace(" ", "_")
@@ -3129,15 +3160,15 @@ class UIsub(Ui_MainWindow):
             x = t_row[f't_{t_aspect}'] - stim_offset
             y = dfmean.loc[dfmean['time'] == t_row[f't_{t_aspect}'], p_row['filter']].values[0]
             amp = dfoutput.loc[dfoutput['stim'] == t_row['stim']][t_aspect].mean()/1000 # conversion: mV to V
-            uiplot.updateAmpMarker(labelamp, x, y, amp)
+            uiplot.updateAmpMarker(labelamp, x, y, t_row, amp=amp)
 
         if aspect in ["EPSP amp", "volley amp"]:
             print(f" - {aspect} updated")
             if uistate.checkBox['timepoints_per_stim']:
-                update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot, uistate)
+                update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot)
             else:
                 for i, t_row in uistate.dft_copy.iterrows():
-                    update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot, uistate)
+                    update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot)
         self.tableUpdate()
         if config.talkback:
             self.talkback()
@@ -3177,24 +3208,25 @@ class UIsub(Ui_MainWindow):
         on_right = x >= right
 
         # Apply the zoom
+        ymin0 = uistate.checkBox['output_ymin0']
         if on_x: # check this first; x takes precedence
             ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
         elif 'slope_left' in locals(): # on output
             if on_left:
                 if slope_left: # scroll left y zoom output slope y
-                    ymin = 0 if True else y - (y - ax.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
+                    ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
                     ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
                 else: # scroll left y to zoom output amp y
-                    ymin = 0 if True else y - (y - ax1.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
+                    ymin = 0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
                     ax1.set_ylim(ymin, y + (ax1.get_ylim()[1] - y) / zoom)
             elif on_right and not slope_left: # scroll right y to zoom output slope y
-                ymin = 0 if True else y - (y - ax.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
+                ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
                 ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
             else: # default, scroll graph to zoom all
                 ax1.set_xlim(x - (x - ax1.get_xlim()[0]) / zoom, x + (ax1.get_xlim()[1] - x) / zoom)
-                ymin = 0 if True else y - (y - ax1.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
+                ymin = 0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
                 ax1.set_ylim(ymin, y + (ax1.get_ylim()[1] - y) / zoom)
-                ymin = 0 if True else y - (y - ax.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
+                ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom # TODO: uistate.checkBox...
                 ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
         else: # on mean or event graphs
             if on_left: # scroll left x to zoom mean or event x

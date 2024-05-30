@@ -23,7 +23,7 @@ class UIstate:
         }
 
         self.checkBox = { # these are cycled by uisub.connectUIstate; maintain format!
-            'EPSP_amp': False,
+            'EPSP_amp': True,
             'EPSP_slope': True,
             'volley_amp': False,
             'volley_slope': False,
@@ -31,14 +31,16 @@ class UIstate:
             'show_all_events': False, # show ghosts of non-selected events in eventgraph output graph
             'timepoints_per_stim': False, # allow setting (non-uniform) timepoints per stim
             'output_per_stim': False, # output per stim (for binned trains) instead of per sweep (for consecutive sweeps)
+            'output_ymin0': True, # set output y-axis minimum to 0
             # break these out to separate mod-class?
             'norm_EPSP': False, # show normalized EPSPs (they're always calculated)
             'paired_stims': False, # Recs are paired: output per pair is Intervention / Control
         }
-        self.lineEdit = {
-            'norm_EPSP_on': [0, 0],
-            'EPSP_amp_halfwidth': 0.0002,
-            'volley_amp_halfwidth': 0.0001,
+        self.lineEdit = { # storage of user input; used to update df_t
+            'norm_EPSP_from': 0,
+            'norm_EPSP_to': 0,
+            'EPSP_amp_halfwidth_ms':   2,   # in ms here (visible to user). NB: in s in df_t!
+            'volley_amp_halfwidth_ms': 0.1, # in ms here (visible to user). NB: in s in df_t!
         }
         self.x_select = { # selected ranges on mean- and output graphs
             'mean_start': None,
