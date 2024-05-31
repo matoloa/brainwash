@@ -1776,6 +1776,7 @@ class UIsub(Ui_MainWindow):
             df_p = self.get_df_project()
             old_recording_name = df_p.at[uistate.rec_select[0], 'recording_name']
             old_data = self.dict_folders['data'] / (old_recording_name + ".csv")
+            old_timepoints = self.dict_folders['timepoints'] / (old_recording_name + ".csv")
             old_mean = self.dict_folders['cache'] / (old_recording_name + "_mean.csv")
             old_filter = self.dict_folders['cache'] / (old_recording_name + "_filter.csv")
             old_output = self.dict_folders['cache'] / (old_recording_name + "_output.csv")
@@ -1786,6 +1787,7 @@ class UIsub(Ui_MainWindow):
                 list_recording_names = set(df_p['recording_name'])
                 if not new_recording_name in list_recording_names: # prevent duplicates
                     new_data = self.dict_folders['data'] / (new_recording_name + ".csv")
+                    new_timepoints = self.dict_folders['timepoints'] / (new_recording_name + ".csv")
                     new_mean = self.dict_folders['cache'] / (new_recording_name + "_mean.csv")
                     new_filter = self.dict_folders['cache'] / (new_recording_name + "_filter.csv")
                     new_output = self.dict_folders['cache'] / (new_recording_name + "_output.csv")
@@ -1793,6 +1795,8 @@ class UIsub(Ui_MainWindow):
                         os.rename(old_data, new_data)
                     else: # data SHOULD exist
                         raise FileNotFoundError
+                    if old_timepoints.exists():
+                        os.rename(old_timepoints, new_timepoints)
                     if old_mean.exists():
                         os.rename(old_mean, new_mean)
                     if old_filter.exists():
@@ -1804,8 +1808,11 @@ class UIsub(Ui_MainWindow):
                     df_p.loc[df_p['paired_recording'] == old_recording_name, 'paired_recording'] = new_recording_name
                     self.set_df_project(df_p)
                     self.tableUpdate()
-                    uiplot.unPlot(old_recording_name)
+                    self.update_recs2plot()
+                    old_recording_ID = df_p.at[uistate.rec_select[0], 'ID']
+                    uiplot.unPlot(old_recording_ID)
                     self.graphUpdate(row = df_p.loc[uistate.rec_select[0]])
+                    self.update_rec_show(reset=True)
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
             else:
@@ -1852,6 +1859,8 @@ class UIsub(Ui_MainWindow):
             file_path = Path(self.dict_folders[folder_name] / (recording_name + file_suffix))
             if file_path.exists():
                 file_path.unlink()
+            else:
+                print(f"purgeRecordingData: file not found: {file_path}")
         for cache_name in ['dict_datas', 'dict_means', 'dict_filters', 'dict_ts', 'dict_outputs']:
             removeFromCache(cache_name)
         for folder_name, file_suffix in [('data', '.csv'), ('timepoints', '.csv'), ('cache', '_mean.csv'), ('cache', '_filter.csv'), ('cache', '_output.csv')]:
@@ -2139,7 +2148,7 @@ class UIsub(Ui_MainWindow):
         if key is None:
             filepath = f"{self.dict_folders['cache']}/{rec}.csv"
         elif key == "timepoints":
-            filepath = f"{self.dict_folders['timepoints']}/t_{rec}.csv"
+            filepath = f"{self.dict_folders['timepoints']}/{rec}.csv"
         else:
             filepath = f"{self.dict_folders['cache']}/{rec}_{key}.csv"
         print(f"saved cache filepath: {filepath}")
@@ -2701,7 +2710,7 @@ class UIsub(Ui_MainWindow):
             print(f"graphUpdate dft: {dft}")
             dfoutput = self.get_dfdiff(row=row) if uistate.checkBox['paired_stims'] else self.get_dfoutput(row=row)
             if dfoutput is not None:
-                uiplot.addRow(dict_row=row.to_dict(), dft=dft, dfmean=dfmean, dfoutput=dfoutput)
+                uiplot.addRow(p_row=row, dft=dft, dfmean=dfmean, dfoutput=dfoutput)
         def processDataFrame(df):
             list_to_plot = [rec for rec in df['recording_name'].tolist() if rec not in uistate.get_recSet()]
             for rec in list_to_plot:
