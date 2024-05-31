@@ -447,7 +447,7 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
 
 
 # %%
-def find_all_t(dfmean, volley_slope_halfwidth, EPSP_slope_halfwidth, precision=None, param_min_time_from_i_stim=0.0005, verbose=False):
+def find_all_t(dfmean, default_dict_t, precision=None, param_min_time_from_i_stim=0.0005, verbose=False):
     """
     Acquires indices via find_all_i() for the provided dfmean and converts them to time values
     Returns a DataFrame of the t-values for each stim, as provided by find_all_i()
@@ -457,6 +457,8 @@ def find_all_t(dfmean, volley_slope_halfwidth, EPSP_slope_halfwidth, precision=N
         time_values = dfmean['time'].values
         if precision is None:
             precision = len(str(time_values[1] - time_values[0]).split('.')[1])
+        EPSP_slope_halfwidth = row['t_EPSP_amp_halfwidth']
+        volley_slope_halfwidth = row['t_volley_amp_halfwidth']
         t_EPSP_slope = dfmean.loc[row['i_EPSP_slope']].time if 'i_EPSP_slope' in row and row['i_EPSP_slope'] in dfmean.index else None
         t_volley_slope = dfmean.loc[row['i_volley_slope']].time if 'i_volley_slope' in row and row['i_volley_slope'] in dfmean.index else None
         t_EPSP_amp = dfmean.loc[row['i_EPSP_amp']].time if 'i_EPSP_amp' in row and row['i_EPSP_amp'] in dfmean.index else None
@@ -479,8 +481,13 @@ def find_all_t(dfmean, volley_slope_halfwidth, EPSP_slope_halfwidth, precision=N
     df_indices = find_all_i(dfmean, param_min_time_from_i_stim=0.0005)
     print(f"df_indices: {df_indices}")
 
+    # TODO: WIP use default_dict_t
+
     # Convert each index to a dictionary of t-values and add it to a list
-    list_of_dict_t = [i2t(index, dfmean, row, precision) for index, row in df_indices.iterrows()]
+    list_of_dict_t = []
+    for index, row in df_indices.iterrows():
+        result = i2t(index, dfmean, row, precision)
+        list_of_dict_t.append(result)
 
     # Convert the list of dictionaries to a DataFrame
     df_t = pd.DataFrame(list_of_dict_t)

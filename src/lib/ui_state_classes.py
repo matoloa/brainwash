@@ -70,17 +70,34 @@ class UIstate:
             'output_ax1_ylim': (0, 1.2),
             'output_ax2_ylim': (0, 1.2),
         }
-        self.default = { # default values for df_project
+        self.default_dict_t = { # default values for df_t(imepoints)
+            'stim': 0,
+            't_stim': 0,
+            't_stim_method': 0,
+            't_stim_params': 0,
             't_volley_slope_width': 0.0003,
             't_volley_slope_halfwidth': 0.0001,
+            't_volley_slope_start': 0,
+            't_volley_slope_end': 0,
             't_volley_slope_method': 'auto detect',
             't_volley_slope_params': 'NA',
+            'volley_slope_mean': 0,
+            't_volley_amp': 0,
+            't_volley_amp_halfwidth': 0,
             't_volley_amp_method': 'auto detect',
             't_volley_amp_params': 'NA',
+            'volley_amp_mean': 0,
+            't_VEB': 0,
+            't_VEB_method': 0,
+            't_VEB_params': 0,
             't_EPSP_slope_width': 0.0007,
             't_EPSP_slope_halfwidth': 0.0003,
+            't_EPSP_slope_start': 0,
+            't_EPSP_slope_end': 0,
             't_EPSP_slope_method': 'auto detect',
             't_EPSP_slope_params': 'NA',
+            't_EPSP_amp': 0,
+            't_EPSP_amp_halfwidth': 0,
             't_EPSP_amp_method': 'auto detect',
             't_EPSP_amp_params': 'NA',
         }
@@ -90,6 +107,7 @@ class UIstate:
         self.axe = None # axis of event graph (middle)
         self.ax1 = None # axis of output for amplitudes (bottom graph)
         self.ax2 = None # axis of output for slopes (bottom graph)
+        self.frozen = False # True if ui is frozen
         self.rec_select = [] # list of selected indices in uisub.tableProj
         self.stim_select = [0] # list of selected indices in uisub.tableStim; default to first
         self.dfp_row_copy = None # copy of selected row in uisub.tableProj

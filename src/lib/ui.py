@@ -34,7 +34,7 @@ class Config:
         print("\n"*3)
         if self.dev_mode:
             print(f"Config set for development mode - {time.strftime('%H:%M:%S')}")
-        clear = False
+        clear = True
 
         self.clear_cache = clear
         self.transient = False # Block persisting of files
@@ -1053,8 +1053,10 @@ class UIsub(Ui_MainWindow):
 
 
     def uiFreeze(self): # Disable selection changes and checkboxes
+        uistate.frozen = True
         self.tableProj.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
+        self.connectUIstate(disconnect=True)
         for key, _ in uistate.checkBox.items():
             checkBox = getattr(self, f"checkBox_{key}")
             checkBox.setEnabled(False)
@@ -1062,9 +1064,11 @@ class UIsub(Ui_MainWindow):
     def uiThaw(self): # Enable selection changes and checkboxes
         self.tableProj.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.connectUIstate()
         for key, _ in uistate.checkBox.items():
             checkBox = getattr(self, f"checkBox_{key}")
             checkBox.setEnabled(True)
+        uistate.frozen = False
 
 
     def setTableStimVisibility(self, state):
@@ -1384,7 +1388,7 @@ class UIsub(Ui_MainWindow):
 
 
     def setupTableStim(self):
-        self.tableStimModel = TableModel(df_timepointsTemplate())
+        self.tableStimModel = TableModel(pd.DataFrame([uistate.default_dict_t]))
         self.tableStim.setModel(self.tableStimModel)
         self.tableStim.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.tableStim.verticalHeader().hide()
@@ -1441,20 +1445,19 @@ class UIsub(Ui_MainWindow):
             else:
                 checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
         # lineEdits
-        lineEdits = [
-            self.lineEdit_norm_EPSP_start,
-            self.lineEdit_norm_EPSP_end,
-            self.lineEdit_EPSP_amp_halfwidth,
-            self.lineEdit_volley_amp_halfwidth
-        ]
-        for lineEdit in lineEdits:
+        lineEditNorm = [self.lineEdit_norm_EPSP_start, self.lineEdit_norm_EPSP_end,]
+        for lineEdit in lineEditNorm:
             if disconnect:
                 lineEdit.editingFinished.disconnect()
             else:
                 lineEdit.editingFinished.connect(lambda le=lineEdit: self.editNormRange(le))
-        # pushButtons
-        # comboBoxes
-        # mods?...
+        lineEditAmpHalfwidth = [self.lineEdit_EPSP_amp_halfwidth, self.lineEdit_volley_amp_halfwidth,]
+        for lineEdit in lineEditAmpHalfwidth:
+            if disconnect:
+                lineEdit.editingFinished.disconnect()
+            else:
+                lineEdit.editingFinished.connect(lambda le=lineEdit: self.editAmpHalfwidth(le))
+        # SplitterMoved
         for splitter_name in ['h_splitterMaster', 'v_splitterGraphs']:
             splitter = getattr(self, splitter_name)
             if disconnect:
@@ -1639,43 +1642,13 @@ class UIsub(Ui_MainWindow):
         self.tableFormat()
         self.mouseoverUpdate()
 
-    def editAmpHalfwidth(self, lineEdit):
-        lineEditName = lineEdit.objectName()
-        self.usage(f"editAmpHalfwidth {lineEditName}")
-        try:
-            num = max(0, float(lineEdit.text()))
-        except ValueError:
-            num = 0
-        if lineEditName == "lineEdit_EPSP_amp_halfwidth":
-            uistate.default['EPSP_amp_halfwidth_ms'] = num
-        elif lineEditName == "lineEdit_volley_amp_halfwidth":
-            uistate.default['EPSP_amp_halfwidth_ms'] = num
-        lineEdit.setText(str(num))
-        uistate.save_cfg(projectfolder=self.dict_folders['project'])
-        # TODO: cycle through all selected recordings and update df_t and dfoutput
 
-    def editNormRange(self, lineEdit):
-        self.usage("editNormRange")
-        try:
-            num = max(0, int(lineEdit.text()))
-        except ValueError:
-            num = 0
-        if lineEdit.objectName() == "lineEdit_norm_EPSP_start": # start, cannot be higher than end
-            if num == uistate.lineEdit['norm_EPSP_from']:
-                self.lineEdit_norm_EPSP_start.setText(str(num))
-                return # no change
-            uistate.lineEdit['norm_EPSP_to'] = max(num, int(self.lineEdit_norm_EPSP_end.text()))
-            self.lineEdit_norm_EPSP_end.setText(str(uistate.lineEdit['norm_EPSP_to']))
-            uistate.lineEdit['norm_EPSP_from'] = num
-        else: # end, cannot be lower than start
-            if num == uistate.lineEdit['norm_EPSP_to']:
-                self.lineEdit_norm_EPSP_end.setText(str(num))
-                return # no change
-            uistate.lineEdit['norm_EPSP_to'] = min(num, int(self.lineEdit_norm_EPSP_start.text()))
-            self.lineEdit_norm_EPSP_start.setText(str(uistate.lineEdit['norm_EPSP_from']))
-            uistate.lineEdit['norm_EPSP_to'] = num
-        lineEdit.setText(str(num))
-        uistate.save_cfg(projectfolder=self.dict_folders['project'])
+
+# Data Editing functions
+    def recalculate(self):
+        # Placeholder function called when settings are changed
+        # TODO: cycle through all selected recordings and update df_t and dfoutput
+        return
         self.purgeGroupCache(*uistate.df_groups['group_ID'].tolist())
         self.tableFormat()
         # cycle through all selected recordings and update norm outputs
@@ -1688,8 +1661,39 @@ class UIsub(Ui_MainWindow):
         print(f"editNormRange: {uistate.lineEdit['norm_EPSP_from']}-{uistate.lineEdit['norm_EPSP_to']}")
 
 
+    def editAmpHalfwidth(self, lineEdit):
+        lineEditName = lineEdit.objectName()
+        self.usage(f"editAmpHalfwidth {lineEditName}")
+        try:
+            num = max(0, float(lineEdit.text()))
+        except ValueError:
+            num = 0
+        lineEdit.setText(str(num))
+        self.recalculate()
 
-# Data Editing functions
+    def editNormRange(self, lineEdit):
+        self.usage("editNormRange")
+        try:
+            num = max(0, int(lineEdit.text()))
+        except ValueError:
+            num = 0
+        if False:
+            if lineEdit.objectName() == "lineEdit_norm_EPSP_start": # start, cannot be higher than end
+                if num == uistate.lineEdit['norm_EPSP_from']:
+                    self.lineEdit_norm_EPSP_start.setText(str(num))
+                    return # no change
+                uistate.lineEdit['norm_EPSP_to'] = max(num, int(self.lineEdit_norm_EPSP_end.text()))
+                self.lineEdit_norm_EPSP_end.setText(str(uistate.lineEdit['norm_EPSP_to']))
+                uistate.lineEdit['norm_EPSP_from'] = num
+            else: # end, cannot be lower than start
+                if num == uistate.lineEdit['norm_EPSP_to']:
+                    self.lineEdit_norm_EPSP_end.setText(str(num))
+                    return # no change
+                uistate.lineEdit['norm_EPSP_to'] = min(num, int(self.lineEdit_norm_EPSP_start.text()))
+                self.lineEdit_norm_EPSP_start.setText(str(uistate.lineEdit['norm_EPSP_from']))
+                uistate.lineEdit['norm_EPSP_to'] = num
+        lineEdit.setText(str(num))
+        self.recalculate()
 
     def copy_dft(self):
         if uistate.dft_copy is None:
@@ -1729,12 +1733,9 @@ class UIsub(Ui_MainWindow):
                 dfmean_range = dfmean[(dfmean['time'] >= uistate.x_select['mean_start']) & (dfmean['time'] <= uistate.x_select['mean_end'])].reset_index(drop=True)
             else:
                 dfmean_range = dfmean
-            default_dict_t = uistate.default.copy()  # Default sizes
-            df_t = analysis.find_all_t(dfmean=dfmean_range, 
-                                              volley_slope_halfwidth=default_dict_t['t_volley_slope_halfwidth'], 
-                                              EPSP_slope_halfwidth=default_dict_t['t_EPSP_slope_halfwidth'], 
-                                              precision = uistate.settings['precision'], verbose=False)
-            if df_t.empty:
+            default_dict_t = uistate.default_dict_t.copy()  # Default sizes
+            df_t = analysis.find_all_t(dfmean=dfmean_range, default_dict_t=default_dict_t, precision = uistate.settings['precision'], verbose=False)
+            if df_t is None:
                 print(f"No stims found for {rec_name}.")
                 continue
             if uistate.checkBox['timepoints_per_stim'] or stims == 1:
@@ -2209,7 +2210,6 @@ class UIsub(Ui_MainWindow):
 
 
     def openProject(self, str_projectfolder):
-            self.uiFreeze()
             uiplot.unPlot() # all plots
             self.graphWipe()
             self.resetCacheDicts()
@@ -2227,7 +2227,6 @@ class UIsub(Ui_MainWindow):
             self.groupControlsRefresh()
             self.write_bw_cfg() # update project to open at boot
             self.graphAxes()
-            self.uiThaw()
 
 
     def renameProject(self): # changes name of project folder and updates .cfg
@@ -2402,26 +2401,23 @@ class UIsub(Ui_MainWindow):
         self.dict_means[recording_name] = dfmean
         return self.dict_means[recording_name]
 
-    def get_dft(self, row):
+    def get_dft(self, row, reset=False):
         # returns an internal df t for the selected file. If it does not exist, read it from file first.
         rec = row['recording_name']
-        if rec in self.dict_ts.keys():
+        if rec in self.dict_ts.keys() and not reset:
             #print("returning cached dft")
             return self.dict_ts[rec]
         str_t_path = f"{self.dict_folders['timepoints']}/t_{rec}.csv"
-        if Path(str_t_path).exists():
+        if Path(str_t_path).exists() and not reset:
             #print("reading dft from file")
             df_t = pd.read_csv(str_t_path)
             self.dict_ts[rec] = df_t
             return df_t
         else:
             print("creating dft")
-            default_dict_t = uistate.default.copy()  # Default sizes
+            default_dict_t = uistate.default_dict_t.copy()  # Default sizes
             dfmean = self.get_dfmean(row)
-            df_t = analysis.find_all_t(dfmean=dfmean, 
-                                    volley_slope_halfwidth=default_dict_t['t_volley_slope_halfwidth'], 
-                                    EPSP_slope_halfwidth=default_dict_t['t_EPSP_slope_halfwidth'], 
-                                    verbose=False)
+            df_t = analysis.find_all_t(dfmean=dfmean, default_dict_t=default_dict_t, precision = uistate.settings['precision'], verbose=False)
             if df_t.empty:
                 print("No stims found.")
                 return None
@@ -3378,41 +3374,6 @@ def df_projectTemplate():
             'Tx',               # Boolean: Treatment / Control, for paired recordings
             'exclude',          # Boolean: If True, exclude this recording from analysis
             'comment',          # str: user comment
-        ]
-    )
-
-def df_timepointsTemplate():
-    return pd.DataFrame(
-        columns=[ #chronological order
-            'stim', # stim number in sequence
-            't_stim',
-            't_stim_method',
-            't_stim_params',
-            't_volley_slope_width',
-            't_volley_slope_halfwidth',
-            't_volley_slope_start',
-            't_volley_slope_end',
-            't_volley_slope_method',
-            't_volley_slope_params',
-            'volley_slope_mean',
-            't_volley_amp',
-            't_volley_amp_halfwidth',
-            't_volley_amp_method',
-            't_volley_amp_params',
-            'volley_amp_mean',
-            't_VEB',
-            't_VEB_method',
-            't_VEB_params',
-            't_EPSP_slope_width',
-            't_EPSP_slope_halfwidth',
-            't_EPSP_slope_start',
-            't_EPSP_slope_end',
-            't_EPSP_slope_method',
-            't_EPSP_slope_params',
-            't_EPSP_amp',
-            't_EPSP_amp_halfwidth',
-            't_EPSP_amp_method',
-            't_EPSP_amp_params',
         ]
     )
 
