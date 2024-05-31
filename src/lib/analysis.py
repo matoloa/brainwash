@@ -122,7 +122,6 @@ def build_dfstimoutput(df, df_t, lineEdit, filter='voltage'):
             end_index = np.abs(df['time'] - end_time).idxmin()
             df_EPSP_amp = df.iloc[start_index:end_index+1].copy()
             df_EPSP_amp.reset_index(drop=True, inplace=True)
-            print(f"df_EPSP_amp: {df_EPSP_amp}")
 #            df_EPSP_amp = df[(df['time'] >= start_time) & (df['time'] <= end_time)].copy()
 #            df_EPSP_amp.reset_index(inplace=True, drop=True)
             df_stimoutput.at[i, 'EPSP_amp'] = (df_EPSP_amp[filter].mean() - amp_zero) * -1000 if not df_EPSP_amp.empty else np.nan

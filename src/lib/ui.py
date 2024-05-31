@@ -34,10 +34,10 @@ class Config:
         print("\n"*3)
         if self.dev_mode:
             print(f"Config set for development mode - {time.strftime('%H:%M:%S')}")
-        clear = False
+        clear = True
 
         self.clear_cache = clear
-        self.transient = clear # Block persisting of files
+        self.transient = False # Block persisting of files
         self.clear_timepoints = clear
         self.force_cfg_reset = clear
         self.verbose = self.dev_mode
@@ -936,8 +936,8 @@ class UIsub(Ui_MainWindow):
         uistate.rec_select = [index.row() for index in selected_indexes]
         self.update_recs2plot()
         self.update_rec_show()
-        if not uistate.rec_select:
-            print("Nothing seleceted - returning")
+        if uistate.df_recs2plot is None:
+            print("No parsed recordings selected.")
             return
         # use the selected df_p row with the highest sweep duration
         p_row = uistate.df_recs2plot.loc[uistate.df_recs2plot['sweep_duration'].idxmax()]
@@ -1737,7 +1737,7 @@ class UIsub(Ui_MainWindow):
             if df_t.empty:
                 print(f"No stims found for {rec_name}.")
                 continue
-            if uistate.checkBox['timepoints_per_stim'] or stims <= 1:
+            if uistate.checkBox['timepoints_per_stim'] or stims == 1:
                 self.set_dft(rec_name, df_t)
             else:
                 self.set_uniformTimepoints(p_row=p_row)
@@ -2428,11 +2428,12 @@ class UIsub(Ui_MainWindow):
             df_t['EPSP_amp_halfwidth'] = uistate.lineEdit['EPSP_amp_halfwidth_ms']/1000
             df_t['volley_amp_halfwidth'] = uistate.lineEdit['volley_amp_halfwidth_ms']/1000
             df_p = self.get_df_project() # update (number of) 'stims'
-            df_p.loc[df_p['ID'] == row['ID'], 'stims'] = len(df_t)
+            stims = len(df_t)
+            df_p.loc[df_p['ID'] == row['ID'], 'stims'] = stims
             self.set_df_project(df_p)
-            if uistate.checkBox['timepoints_per_stim']:
+            if uistate.checkBox['timepoints_per_stim'] or stims == 1:
                 self.dict_ts[rec] = df_t # update cache
-            else: # homogenize timepoints
+            else:
                 dfoutput = self.get_dfoutput(row=row, df_t=df_t)
                 self.set_uniformTimepoints(p_row=row, df_t=df_t, dfoutput=dfoutput)
                 df_t = self.dict_ts[rec]
