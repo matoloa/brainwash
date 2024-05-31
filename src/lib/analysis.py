@@ -27,29 +27,24 @@ def build_dfoutput(df, dict_t, lineEdit, filter='voltage'):
         a dataframe. Per sweep (row): EPSP_amp, EPSP_slope, volley_amp, volley_EPSP
     """
     t0 = time.time()
-    print (f"build_df_output: {dict_t}")
+    # print (f"build_dfoutput: {dict_t}")
     list_col = ['stim', 'sweep']
     dfoutput = pd.DataFrame()
     dfoutput['sweep'] = df.sweep.unique() # one row per unique sweep in data file
+    dfoutput['stim'] = dict_t['stim']
 
-    if 't_stim' in dict_t.keys() and ('t_EPSP_amp' in dict_t.keys() or 't_volley_amp' in dict_t.keys()):
-        dfoutput['stim'] = dict_t['stim']
-        amp_zero = dict_t['amp_zero']
-        EPSP_hw = dict_t['EPSP_amp_halfwidth']
-        volley_hw = dict_t['volley_amp_halfwidth']
-    else:
-        raise ValueError("Missing t_stim or t_EPSP_amp/t_volley_amp in dict_t")
     # EPSP_amp
     if 't_EPSP_amp' in dict_t.keys():
         t_EPSP_amp = dict_t['t_EPSP_amp']
         if valid(t_EPSP_amp):
+            amp_zero = dict_t['amp_zero']
+            EPSP_hw = dict_t['t_EPSP_amp_halfwidth']
             start_time = dict_t['t_EPSP_amp'] - EPSP_hw
             end_time = dict_t['t_EPSP_amp'] + EPSP_hw
             start_index = np.abs(df['time'] - start_time).idxmin()
             end_index = np.abs(df['time'] - end_time).idxmin()
             df_EPSP_amp = df.iloc[start_index:end_index+1].copy()
             df_EPSP_amp.reset_index(drop=True, inplace=True)
-            print(f"df_EPSP_amp: {df_EPSP_amp}")
             dfoutput['EPSP_amp'] = (df_EPSP_amp.groupby('sweep')[filter].mean() - amp_zero) * -1000 # convert to mV for output
         else:
             dfoutput['EPSP_amp'] = np.nan
@@ -78,12 +73,16 @@ def build_dfoutput(df, dict_t, lineEdit, filter='voltage'):
         list_col.extend(['EPSP_slope', 'EPSP_slope_norm'])
     # volley_amp
     if 't_volley_amp' in dict_t.keys():
+        amp_zero = dict_t['amp_zero']
+        volley_hw = dict_t['t_volley_amp_halfwidth']
         t_volley_amp = dict_t['t_volley_amp']
         if valid(t_volley_amp):
             start_time = t_volley_amp - volley_hw
             end_time = t_volley_amp + volley_hw
-            df_volley_amp = df[(df['time'] >= start_time) & (df['time'] <= end_time)].copy()
-            df_volley_amp.reset_index(inplace=True, drop=True)
+            start_index = np.abs(df['time'] - start_time).idxmin()
+            end_index = np.abs(df['time'] - end_time).idxmin()
+            df_volley_amp = df.iloc[start_index:end_index+1].copy()
+            df_volley_amp.reset_index(drop=True, inplace=True)
             dfoutput['volley_amp'] = (df_volley_amp.groupby('sweep')[filter].mean() - amp_zero) * -1000 
         else:
             dfoutput['volley_amp'] = np.nan
@@ -106,12 +105,12 @@ def build_dfoutput(df, dict_t, lineEdit, filter='voltage'):
 def build_dfstimoutput(df, df_t, lineEdit, filter='voltage'):
     t0 = time.time()
     df_stimoutput = pd.DataFrame(index=df_t.index, columns=['stim', 'bin', 'EPSP_amp', 'EPSP_amp_norm', 'EPSP_slope', 'EPSP_slope_norm', 'volley_amp', 'volley_slope'])
-
+    # print (f"build_dfstimoutput: {df_t}")
 
     for i, t_row in df_t.iterrows():
         amp_zero = t_row['amp_zero']
-        EPSP_hw = t_row['EPSP_amp_halfwidth']
-        volley_hw = t_row['volley_amp_halfwidth']
+        EPSP_hw = t_row['t_EPSP_amp_halfwidth']
+        volley_hw = t_row['t_volley_amp_halfwidth']
         df_stimoutput.at[i, 'stim'] = t_row['stim']
 
         # EPSP_amp
@@ -122,8 +121,6 @@ def build_dfstimoutput(df, df_t, lineEdit, filter='voltage'):
             end_index = np.abs(df['time'] - end_time).idxmin()
             df_EPSP_amp = df.iloc[start_index:end_index+1].copy()
             df_EPSP_amp.reset_index(drop=True, inplace=True)
-#            df_EPSP_amp = df[(df['time'] >= start_time) & (df['time'] <= end_time)].copy()
-#            df_EPSP_amp.reset_index(inplace=True, drop=True)
             df_stimoutput.at[i, 'EPSP_amp'] = (df_EPSP_amp[filter].mean() - amp_zero) * -1000 if not df_EPSP_amp.empty else np.nan
             # Normalize EPSP_amp
             normFrom = lineEdit['norm_EPSP_from'] # start
@@ -145,8 +142,10 @@ def build_dfstimoutput(df, df_t, lineEdit, filter='voltage'):
         if valid(t_row['t_volley_amp']):
             start_time = t_row['t_volley_amp'] - volley_hw
             end_time = t_row['t_volley_amp'] + volley_hw
-            df_volley_amp = df[(df['time'] >= start_time) & (df['time'] <= end_time)].copy()
-            df_volley_amp.reset_index(inplace=True, drop=True)
+            start_index = np.abs(df['time'] - start_time).idxmin()
+            end_index = np.abs(df['time'] - end_time).idxmin()
+            df_volley_amp = df.iloc[start_index:end_index+1].copy()
+            df_volley_amp.reset_index(drop=True, inplace=True)
             df_stimoutput.at[i, 'volley_amp'] = (df_volley_amp[filter].mean() - amp_zero) * -1000 if not df_volley_amp.empty else np.nan
         # volley_slope
         if valid(t_row['t_volley_slope_start']) and valid(t_row['t_volley_slope_end']):

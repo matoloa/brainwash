@@ -34,7 +34,7 @@ class Config:
         print("\n"*3)
         if self.dev_mode:
             print(f"Config set for development mode - {time.strftime('%H:%M:%S')}")
-        clear = True
+        clear = False
 
         self.clear_cache = clear
         self.transient = False # Block persisting of files
@@ -1046,8 +1046,8 @@ class UIsub(Ui_MainWindow):
         if extra_columns:
             print(f"Warning: The following columns exist in dfoutput but not in column_order: {extra_columns}")
         dfoutput = dfoutput.reindex(columns=column_order)
-        print(f"persistOutput: rec_name: {rec_name}")
-        print(f"{dfoutput}")
+        #print(f"persistOutput: rec_name: {rec_name}")
+        #print(f"{dfoutput}")
         self.dict_outputs[rec_name] = dfoutput
         self.df2csv(df=dfoutput, rec=rec_name, key="output")
 
@@ -2216,6 +2216,7 @@ class UIsub(Ui_MainWindow):
             self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
             self.load_df_project(str_projectfolder)
             self.setupFolders()
+            uistate.reset()
             uistate.load_cfg(self.dict_folders['project'], config.version)
             self.applyConfigStates()
 
@@ -2425,8 +2426,8 @@ class UIsub(Ui_MainWindow):
                 print("No stims found.")
                 return None
             df_t['norm_EPSP_from'], df_t['norm_EPSP_to'] = uistate.lineEdit['norm_EPSP_from'], uistate.lineEdit['norm_EPSP_to']
-            df_t['EPSP_amp_halfwidth'] = uistate.lineEdit['EPSP_amp_halfwidth_ms']/1000
-            df_t['volley_amp_halfwidth'] = uistate.lineEdit['volley_amp_halfwidth_ms']/1000
+            df_t['t_EPSP_amp_halfwidth'] = uistate.lineEdit['EPSP_amp_halfwidth_ms']/1000
+            df_t['t_volley_amp_halfwidth'] = uistate.lineEdit['volley_amp_halfwidth_ms']/1000
             df_p = self.get_df_project() # update (number of) 'stims'
             stims = len(df_t)
             df_p.loc[df_p['ID'] == row['ID'], 'stims'] = stims
@@ -3094,7 +3095,7 @@ class UIsub(Ui_MainWindow):
         x_point = round(prior_amp + time_diff, precision)
         idx = (np.abs(data_x - x_point)).argmin()
         y_point = data_y[idx]
-        print (f"x_point: {x_point}, y_point: {y_point}")
+        # print (f"x_point: {x_point}, y_point: {y_point}")
         # remember the last x index
         uistate.x_drag_last = uistate.x_drag
         # update the mouseover plot
@@ -3104,23 +3105,6 @@ class UIsub(Ui_MainWindow):
   
 
     def eventDragUpdate(self, x_start, x_end, precision): 
-        action = uistate.mouseover_action
-        aspect = "_".join(action.split()[:2])
-        stim_idx = uistate.stim_select[0]
-        t_row = uistate.dft_copy.iloc[stim_idx]
-        stim_offset = t_row['t_stim'] 
-        df_t = uistate.dft_copy
-        dfmean = None
-        dffilter = None
-
-        if uistate.checkBox['output_per_stim']:
-            x_axis = 'stim'
-            p_row = uistate.dfp_row_copy
-            dfmean = self.get_dfmean(row=uistate.dfp_row_copy)
-        else:
-            x_axis = 'sweep'
-            dffilter = self.get_dffilter(row=uistate.dfp_row_copy)
-
         def handle_slope(aspect, x_start, x_end, precision, stim_offset):
             slope_width = round(x_end - x_start, precision)
             slope_start_key = f't_{aspect}_start'
@@ -3135,27 +3119,48 @@ class UIsub(Ui_MainWindow):
         def handle_amp(aspect, x_start, stim_offset, precision):
             amp_key = f't_{aspect}'
             return {'t_stim': stim_offset, amp_key: round(x_start + stim_offset, precision)}
-
+        
+        action = uistate.mouseover_action
+        aspect = "_".join(action.split()[:2])
+        stim_idx = uistate.stim_select[0]
+        p_row = uistate.dfp_row_copy # TODO: deprecate uistate df copies
+        n_stims = p_row['stims']
+        df_t = uistate.dft_copy
+        t_row = df_t.loc[stim_idx]
+        stim_offset = t_row['t_stim'] 
+        dfmean = None
+        dffilter = None
         dict_t = None
+
+        if uistate.checkBox['output_per_stim']:
+            x_axis = 'stim'
+            dfmean = self.get_dfmean(row=p_row)
+        else:
+            x_axis = 'sweep'
+            dffilter = self.get_dffilter(row=p_row)
+
         if aspect in ["EPSP_slope", "volley_slope"]:
             dict_t = handle_slope(aspect, x_start, x_end, precision, stim_offset)
         elif aspect in ["EPSP_amp", "volley_amp"]:
             dict_t = handle_amp(aspect, x_start, stim_offset, precision)
+            dict_t['t_EPSP_amp_halfwidth'] = t_row['t_EPSP_amp_halfwidth']
+            dict_t['t_volley_amp_halfwidth'] = t_row['t_volley_amp_halfwidth']
 
-        if dict_t:
+        if dict_t: # update df_t with new values
             for key, value in dict_t.items():
                 df_t.at[stim_idx, key] = value
-                if not uistate.checkBox['timepoints_per_stim']: # update all timepoints in df_t
+                if not uistate.checkBox['timepoints_per_stim'] and n_stims>1: # update all timepoints in df_t
                     offset = df_t.at[stim_idx, 't_stim'] - df_t.at[stim_idx, key]
                     for i, t_row in df_t.iterrows():
                         df_t.at[i, key] = round(t_row['t_stim'] - offset, precision)
 
+        uistate.dft_copy = df_t
         if x_axis == 'stim':
-            uistate.dft_copy = df_t
             out = analysis.build_dfstimoutput(df=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
         elif x_axis == 'sweep':
+            dict_t['stim'] = t_row['stim']
+            dict_t['amp_zero'] = t_row['amp_zero']
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
-
         if uistate.mouseover_out is None:
             uistate.mouseover_out = uistate.ax1.plot(out[x_axis], out[aspect], color=uistate.settings[f'rgb_{aspect}'], linewidth=3)
         else:
@@ -3174,14 +3179,15 @@ class UIsub(Ui_MainWindow):
             print("x_drag == x_on_click")
             self.mouseoverUpdate()
             return
-
         p_row = uistate.dfp_row_copy.to_dict()
+        df_t = uistate.dft_copy # updated while dragging
         t_row = uistate.dft_copy.iloc[uistate.stim_select[0]].to_dict()
+
         action_mapping = {
             "EPSP slope": ("t_EPSP_slope_method", "manual", 'EPSP slope', {'t_EPSP_slope_start': t_row['t_EPSP_slope_start'], 't_EPSP_slope_end': t_row['t_EPSP_slope_end']}, uistate.updateDragZones),
-            "EPSP amp move": ("t_EPSP_amp_method", "manual", 'EPSP amp', {'t_EPSP_amp': t_row['t_EPSP_amp']}, uistate.updatePointDragZone),
+            "EPSP amp move": ("t_EPSP_amp_method", "manual", 'EPSP amp', {'t_EPSP_amp': t_row['t_EPSP_amp'], 't_EPSP_amp_halfwidth': t_row['t_EPSP_amp_halfwidth'], 'amp_zero': t_row['amp_zero']}, uistate.updatePointDragZone),
             "volley slope": ("t_volley_slope_method", "manual", 'volley slope', {'t_volley_slope_start': t_row['t_volley_slope_start'], 't_volley_slope_end': t_row['t_volley_slope_end']}, uistate.updateDragZones),
-            "volley amp move": ("t_volley_amp_method", "manual", 'volley amp', {'t_volley_amp': t_row['t_volley_amp']}, uistate.updatePointDragZone),
+            "volley amp move": ("t_volley_amp_method", "manual", 'volley amp', {'t_volley_amp': t_row['t_volley_amp'], 't_volley_amp_halfwidth': t_row['t_volley_amp_halfwidth'], 'amp_zero': t_row['amp_zero']}, uistate.updatePointDragZone),
         }
         for action, values in action_mapping.items():
             if uistate.mouseover_action.startswith(action):
@@ -3190,6 +3196,8 @@ class UIsub(Ui_MainWindow):
                 uiplot.plotUpdate(p_row=p_row, t_row=t_row, aspect=aspect, data_x=data_x, data_y=data_y)
                 values[4]()
                 dict_t = values[3]
+                dict_t['stim'] = t_row['stim']
+                dict_t['t_stim'] = t_row['t_stim']
                 break
 
         #update selected dft row with the values from dict_t
@@ -3197,10 +3205,10 @@ class UIsub(Ui_MainWindow):
             uistate.dft_copy.loc[uistate.stim_select[0], key] = value
         self.set_dft(p_row['recording_name'], uistate.dft_copy)
 
+        dfmean = self.get_dfmean(row=p_row)
+
         # update dfoutput; dict and file, with normalized columns if applicable
         if uistate.checkBox['output_per_stim']:
-            df_t = self.get_dft(row=p_row)
-            dfmean = self.get_dfmean(row=p_row)
             dfoutput = analysis.build_dfstimoutput(df=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
         else:
             dfoutput = self.get_dfoutput(row=p_row)
@@ -3216,12 +3224,13 @@ class UIsub(Ui_MainWindow):
         def update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot):
             labelbase = f"{p_row['recording_name']} - stim {t_row['stim']}"
             labelamp = f"{labelbase} {aspect}"
-            t_aspect = aspect.replace(" ", "_")
+            aspect = aspect.replace(" ", "_")
+            t_aspect = f"t_{aspect}"
             stim_offset = t_row['t_stim']
-            x = t_row[f't_{t_aspect}'] - stim_offset
-            y = dfmean.loc[dfmean['time'] == t_row[f't_{t_aspect}'], p_row['filter']].values[0]
-            amp = dfoutput.loc[dfoutput['stim'] == t_row['stim']][t_aspect].mean()/1000 # conversion: mV to V
-            t_amp = t_row[f't_{t_aspect}'] - stim_offset
+            x = t_row[t_aspect] - stim_offset
+            y = dfmean.loc[dfmean['time'] == t_row[t_aspect], p_row['filter']].values[0]
+            amp = dfoutput.loc[dfoutput['stim'] == t_row['stim']][aspect].mean()/1000 # conversion: mV to V
+            t_amp = t_row[t_aspect] - stim_offset
             amp_x = t_amp - t_row[f'{t_aspect}_halfwidth'], t_amp + t_row[f'{t_aspect}_halfwidth']
             uiplot.updateAmpMarker(labelamp, x, y, amp_x, t_row['amp_zero'], amp=amp)
 
@@ -3387,6 +3396,7 @@ def df_timepointsTemplate():
             't_volley_slope_params',
             'volley_slope_mean',
             't_volley_amp',
+            't_volley_amp_halfwidth',
             't_volley_amp_method',
             't_volley_amp_params',
             'volley_amp_mean',
@@ -3400,6 +3410,7 @@ def df_timepointsTemplate():
             't_EPSP_slope_method',
             't_EPSP_slope_params',
             't_EPSP_amp',
+            't_EPSP_amp_halfwidth',
             't_EPSP_amp_method',
             't_EPSP_amp_params',
         ]

@@ -350,12 +350,13 @@ class UIplot():
                 x_position = t_row['t_EPSP_amp']
                 y_position = df_event.loc[df_event.time == x_position, rec_filter]
                 self.plot_marker(f"{label} {stim_str} EPSP amp marker", 'axe', x_position, y_position, settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
-                amp_x = x_position - t_row['EPSP_amp_halfwidth'], x_position + t_row['EPSP_amp_halfwidth']
+                amp_x = x_position - t_row['t_EPSP_amp_halfwidth'], x_position + t_row['t_EPSP_amp_halfwidth']
                 amp_y = amp_zero, 0 - (out['EPSP_amp'].iloc[0] / 1000) + amp_zero # .iloc[0] since filtered by stim, /1000 to convert from mV to V
                 self.plot_cross(f"{label} {stim_str} EPSP amp", 'axe', x_position, amp_x, amp_y, settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                 if x_axis == 'sweep':
                     self.plot_line(f"{label} {stim_str} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                     self.plot_line(f"{label} {stim_str} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
+                self.plot_line(f"{label} {stim_str} amp_zero", 'axe', [-0.002, -0.001], [amp_zero, amp_zero], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num) # TODO: hardcoded x
 
             if not np.isnan(t_row['t_EPSP_slope_start']):
                 x_start, x_end = t_row['t_EPSP_slope_start'], t_row['t_EPSP_slope_end']
@@ -373,7 +374,7 @@ class UIplot():
                 y_position = df_event.loc[df_event.time == t_row['t_volley_amp'], rec_filter]
                 color = settings['rgb_volley_amp']
                 self.plot_marker(f"{label} {stim_str} volley amp marker", 'axe', t_row['t_volley_amp'], y_position, settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
-                amp_x = x_position - t_row['volley_amp_halfwidth'], x_position + t_row['volley_amp_halfwidth']
+                amp_x = x_position - t_row['t_volley_amp_halfwidth'], x_position + t_row['t_volley_amp_halfwidth']
                 amp_y = amp_zero, 0 - (out['volley_amp'].iloc[0] / 1000) + amp_zero # .iloc[0] since filtered by stim, /1000 to convert from mV to V
                 self.plot_cross(f"{label} {stim_str} volley amp", 'axe', x_position, amp_x, amp_y, color, rec_ID, aspect='volley_amp', stim=stim_num)
                 if x_axis == 'sweep':
@@ -439,8 +440,10 @@ class UIplot():
                 if self.uistate.checkBox['output_per_stim']:
                     self.updateOutLine(label_base)
                 else:
-                    mean = t_row['volley_slope_mean']
-                    self.updateOutMean(f"{label_base} mean", mean)
+                    volley_slope_mean = t_row.get('volley_slope_mean')
+                    if volley_slope_mean is None:
+                        volley_slope_mean = self.uistate.mouseover_out[0].get_ydata().mean()
+                    self.updateOutMean(f"{label_base} mean", volley_slope_mean)
             else: # EPSP slope
                 if norm:
                     label_base += " norm"
@@ -449,7 +452,7 @@ class UIplot():
             key = aspect.replace(" ", "_")
             t_amp = t_row[f't_{key}'] - stim_offset
             y_position = data_y[np.abs(data_x - t_amp).argmin()]
-            amp_x = t_amp - t_row[f'{key}_halfwidth'], t_amp + t_row[f'{key}_halfwidth']
+            amp_x = t_amp - t_row[f't_{key}_halfwidth'], t_amp + t_row[f't_{key}_halfwidth']
             self.updateAmpMarker(label_base, t_amp, y_position, amp_x, t_row['amp_zero'], amp=amp)
             if self.uistate.checkBox['output_per_stim']:
                 label_base = f"{p_row['recording_name']} {aspect}"
@@ -457,8 +460,10 @@ class UIplot():
                 if self.uistate.checkBox['output_per_stim']:
                     self.updateOutLine(label_base)
                 else:
-                    mean = t_row['volley_amp_mean']
-                    self.updateOutMean(f"{label_base} mean", mean)
+                    volley_amp_mean = t_row.get('volley_amp_mean')
+                    if volley_amp_mean is None:
+                        volley_amp_mean = self.uistate.mouseover_out[0].get_ydata().mean()
+                    self.updateOutMean(f"{label_base} mean", volley_amp_mean)
             else: # EPSP amp
                 if norm:
                     label_base += " norm"
