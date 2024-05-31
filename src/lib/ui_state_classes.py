@@ -101,7 +101,7 @@ class UIstate:
         # TODO: add stim to dict_group_label_ID_stim_line_SEM
         self.dict_group_show = {} # copy containing only visible groups
         self.new_indices = [] # list of indices in uisub.df_project for freshly parsed recordings; used by uisub.graphPreload()
-        self.darkmode = False # set by global bw cfg
+        #self.darkmode = False # set by global bw cfg
 
     # Mouseover variables
         self.mouseover_action = None # name of action to take if clicked at current mouseover: EPSP amp move, EPSP slope move/resize, volley amp move, volley slope move/resize

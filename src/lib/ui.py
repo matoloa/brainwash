@@ -2,7 +2,7 @@ import os  # TODO: replace use by pathlib?
 import sys
 from pathlib import Path
 import yaml
-from PyQt5 import QtCore, QtWidgets, QtGui
+from PyQt5 import QtCore, QtWidgets, QtGui, sip
 import numpy as np
 import pandas as pd
 
@@ -865,51 +865,18 @@ class UIsub(Ui_MainWindow):
         self.setupTableProj()
         self.setupTableStim()
         self.resetCacheDicts() # initiate/clear internal storage dicts
-        
-        self.dict_folders = self.build_dict_folders()
-        # DEBUG: clear cache and timepoints folders
-        if config.clear_cache:
-            self.deleteFolder(self.dict_folders['cache'])
-        if config.clear_timepoints:
-            self.deleteFolder(self.dict_folders['timepoints'])
-        # Make sure the necessary folders exist
-        if not os.path.exists(self.projects_folder):
-            os.makedirs(self.projects_folder)
-        if not os.path.exists(self.dict_folders['cache']):
-            os.makedirs(self.dict_folders['cache'])
-        if not os.path.exists(self.dict_folders['timepoints']):
-            os.makedirs(self.dict_folders['timepoints'])
+        self.setupFolders()
 
         # If local project.brainwash exists, load it, otherwise create it
-        if Path(self.dict_folders['project'] / "project.brainwash").exists():
-            self.load_df_project()
+        projectpath = Path(self.dict_folders['project'] / "project.brainwash")
+        if projectpath.exists():
+            self.load_df_project(self.dict_folders['project'])
         else:
             print(f"Project file {self.dict_folders['project'] / 'project.brainwash'} not found, creating new project file")
             self.write_bw_cfg()
 
         # If local project.cfg exists, load it, otherwise create it
         uistate.load_cfg(projectfolder=self.dict_folders['project'], bw_version=config.version, force_reset=config.force_cfg_reset)
-
-        # apply splitter proportions
-        self.setSplitterSizes('h_splitterMaster', 'v_splitterGraphs')
-
-        # connect Relative checkbox and lineedits to local functions
-        norm = uistate.checkBox['norm_EPSP']
-        self.label_norm_on_sweep.setVisible(norm)
-        self.label_relative_to.setVisible(norm)
-        self.lineEdit_norm_EPSP_start.setVisible(norm)
-        self.lineEdit_norm_EPSP_end.setVisible(norm)
-        self.lineEdit_norm_EPSP_start.setText(f"{uistate.lineEdit['norm_EPSP_from']}")
-        self.lineEdit_norm_EPSP_end.setText(f"{uistate.lineEdit['norm_EPSP_to']}")
-        self.lineEdit_norm_EPSP_start.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_EPSP_start))
-        self.lineEdit_norm_EPSP_end.editingFinished.connect(lambda: self.editNormRange(self.lineEdit_norm_EPSP_end))
-
-        # connect amp halfwidth lineedits to local functions
-        self.lineEdit_EPSP_amp_halfwidth.setText(f"{uistate.lineEdit['EPSP_amp_halfwidth_ms']}")
-        self.lineEdit_volley_amp_halfwidth.setText(f"{uistate.lineEdit['volley_amp_halfwidth_ms']}")
-        self.lineEdit_EPSP_amp_halfwidth.editingFinished.connect(lambda: self.editAmpHalfwidth(self.lineEdit_EPSP_amp_halfwidth))
-        self.lineEdit_volley_amp_halfwidth.editingFinished.connect(lambda: self.editAmpHalfwidth(self.lineEdit_volley_amp_halfwidth))
-
         
         self.fqdn = socket.getfqdn() # get computer name and local domain, for project file
         if config.talkback:
@@ -928,8 +895,8 @@ class UIsub(Ui_MainWindow):
         self.setupCanvases() # for graphs, and connect graphClicked(event, <canvas>)
         self.groupControlsRefresh() # add group controls to UI
         self.connectUIstate() # connect UI elements to uistate
+        self.applyConfigStates() # apply config states to UI elements
         self.graphAxes()
-
         self.darkmode() # set darkmode if set in bw_cfg. Requires tables and canvases be loaded!
         self.setupToolBar()
 
@@ -1390,14 +1357,20 @@ class UIsub(Ui_MainWindow):
 
 
     def setupTableProj(self):
-        # Creates an instance of custom QTableView to allow drag&drop
         try:
+            # If tableProj already exists, remove it from the layout
+            if hasattr(self, 'tableProj'):
+                self.verticalLayoutProj.removeWidget(self.tableProj)
+                sip.delete(self.tableProj)
+
+            # Creates an instance of custom QTableView to allow drag&drop
             self.tableProj = TableProjSub(parent=self)
             self.verticalLayoutProj.addWidget(self.tableProj)
             self.tableProj.setObjectName("tableProj")
 
             # Set up the table view
-            self.df_project = df_projectTemplate()
+            if not hasattr(self, 'df_project'):
+                self.df_project = df_projectTemplate()
             self.tablemodel = TableModel(self.df_project)
             self.tableProj.setModel(self.tablemodel)
 
@@ -1420,6 +1393,22 @@ class UIsub(Ui_MainWindow):
         self.setTableStimVisibility(False)
 
 
+    def setupFolders(self):
+        self.dict_folders = self.build_dict_folders()
+        # DEBUG: clear cache and timepoints folders
+        if config.clear_cache:
+            self.deleteFolder(self.dict_folders['cache'])
+        if config.clear_timepoints:
+            self.deleteFolder(self.dict_folders['timepoints'])
+        # Make sure the necessary folders exist
+        if not os.path.exists(self.projects_folder):
+            os.makedirs(self.projects_folder)
+        if not os.path.exists(self.dict_folders['cache']):
+            os.makedirs(self.dict_folders['cache'])
+        if not os.path.exists(self.dict_folders['timepoints']):
+            os.makedirs(self.dict_folders['timepoints'])
+
+
     def setupToolBar(self):
         # apply viewstates for tool frames in the toolbar
         for frame, (text, state) in uistate.viewTools.items():
@@ -1433,23 +1422,6 @@ class UIsub(Ui_MainWindow):
         #self.pushButton_paired_data_flip.pressed.connect(self.pushButton_paired_data_flip_pressed)
 
 
-    def connectUIstate(self): # Connect UI elements to uistate
-        # checkBoxes 
-        for key, value in uistate.checkBox.items():
-            #print(f" - connecting checkbox {key} to {value}")
-            checkBox = getattr(self, f"checkBox_{key}")
-            checkBox.setChecked(value)
-            checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
-        # lineEdits
-        # pushButtons
-        # comboBoxes
-        # mods?...
-        for splitter_name in ['h_splitterMaster', 'v_splitterGraphs']:
-            splitter = getattr(self, splitter_name)
-            print(f" - connecting splitter {splitter_name}: objectName={splitter.objectName()}")
-            splitter.splitterMoved.connect(self.onSplitterMoved)
-
-
     def build_dict_folders(self):
         dict_folders = {
                     'project': self.projects_folder / self.projectname,
@@ -1459,6 +1431,58 @@ class UIsub(Ui_MainWindow):
         }
         return dict_folders
     
+
+    def connectUIstate(self, disconnect=False): # Connect or disconnect UI elements to/from uistate
+        # checkBoxes 
+        for key, value in uistate.checkBox.items():
+            checkBox = getattr(self, f"checkBox_{key}")
+            if disconnect:
+                checkBox.stateChanged.disconnect()
+            else:
+                checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
+        # lineEdits
+        lineEdits = [
+            self.lineEdit_norm_EPSP_start,
+            self.lineEdit_norm_EPSP_end,
+            self.lineEdit_EPSP_amp_halfwidth,
+            self.lineEdit_volley_amp_halfwidth
+        ]
+        for lineEdit in lineEdits:
+            if disconnect:
+                lineEdit.editingFinished.disconnect()
+            else:
+                lineEdit.editingFinished.connect(lambda le=lineEdit: self.editNormRange(le))
+        # pushButtons
+        # comboBoxes
+        # mods?...
+        for splitter_name in ['h_splitterMaster', 'v_splitterGraphs']:
+            splitter = getattr(self, splitter_name)
+            if disconnect:
+                splitter.splitterMoved.disconnect()
+            else:
+                splitter.splitterMoved.connect(self.onSplitterMoved)
+   
+    def applyConfigStates(self):
+        # Disconnect signals to prevent editingFinished from triggering from .setText
+        self.connectUIstate(disconnect=True)
+
+        for key, value in uistate.checkBox.items():
+            checkBox = getattr(self, f"checkBox_{key}")
+            checkBox.setChecked(value)
+        norm = uistate.checkBox['norm_EPSP']
+        self.label_norm_on_sweep.setVisible(norm)
+        self.label_relative_to.setVisible(norm)
+        self.lineEdit_norm_EPSP_start.setVisible(norm)
+        self.lineEdit_norm_EPSP_end.setVisible(norm)
+        self.lineEdit_norm_EPSP_start.setText(f"{uistate.lineEdit['norm_EPSP_from']}")
+        self.lineEdit_norm_EPSP_end.setText(f"{uistate.lineEdit['norm_EPSP_to']}")
+        self.lineEdit_EPSP_amp_halfwidth.setText(f"{uistate.lineEdit['EPSP_amp_halfwidth_ms']}")
+        self.lineEdit_volley_amp_halfwidth.setText(f"{uistate.lineEdit['volley_amp_halfwidth_ms']}")
+
+        # apply splitter proportions from project config
+        self.setSplitterSizes('h_splitterMaster', 'v_splitterGraphs')
+        self.connectUIstate()
+
 
 
 # trigger functions TODO: break out the big ones to separate functions!
@@ -1582,19 +1606,16 @@ class UIsub(Ui_MainWindow):
     def triggerOpenProject(self): # open folder selector dialog
         self.usage("triggerOpenProject")
         self.dialog = QtWidgets.QDialog()
-        print(f"triggerOpenProject: self.projects_folder: {self.projects_folder}")
-        projectfolder = QtWidgets.QFileDialog.getExistingDirectory(
-            self.dialog, "Open Directory", str(self.projects_folder), QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks)
+        print(f"self.projects_folder: {self.projects_folder}")
+        str_projectfolder = str(QtWidgets.QFileDialog.getExistingDirectory(
+            self.dialog, "Open Directory", str(self.projects_folder), QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks | QtWidgets.QFileDialog.DontUseNativeDialog))
         if config.verbose:
-            print(f"Received projectfolder: {str(projectfolder)}")
-        if (Path(projectfolder) / "project.brainwash").exists():
+            print(f"Received projectfolder: {str_projectfolder}")
+        projectpath = Path(str_projectfolder) / "project.brainwash"
+        if projectpath.exists():
             if config.verbose:
-                print(f"Projectfolder exists, loading project")
-            self.dict_folders['project'] = Path(projectfolder)
-            self.load_df_project()
-            self.connectUIstate()
-            self.groupControlsRefresh()
-            self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
+                print(f"Found project {str_projectfolder}, loading...")
+            self.openProject(str_projectfolder)
 
     def triggerAddData(self): # creates file tree for file selection
         self.usage("triggerAddData")
@@ -1696,6 +1717,7 @@ class UIsub(Ui_MainWindow):
             p_row = df_p.loc[index]
             rec_name = p_row['recording_name']
             rec_ID = p_row['ID']
+            stims = p_row['stims']
             if p_row['sweeps'] == "...":
                 print(f"{rec_name} not parsed yet.")
                 continue
@@ -1715,7 +1737,7 @@ class UIsub(Ui_MainWindow):
             if df_t.empty:
                 print(f"No stims found for {rec_name}.")
                 continue
-            if uistate.checkBox['timepoints_per_stim']:
+            if uistate.checkBox['timepoints_per_stim'] or stims <= 1:
                 self.set_dft(rec_name, df_t)
             else:
                 self.set_uniformTimepoints(p_row=p_row)
@@ -2165,17 +2187,47 @@ class UIsub(Ui_MainWindow):
             if config.verbose:
                 print("The target project name already exists")
         else:
+            print("\n" * 30)
             new_projectfolder.mkdir()
             self.projectname = new_project_name
             self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
-            self.dict_folders = self.build_dict_folders()
+            self.graphWipe()
             self.resetCacheDicts()
-            self.set_df_project(df_projectTemplate())
-            self.write_bw_cfg() # update project to open at boot
+            self.setupFolders()
             uistate.reset()
             uistate.save_cfg(projectfolder=self.dict_folders['project'])
+            self.applyConfigStates()
+
+            self.df_project = df_projectTemplate()
+            self.setupTableProj()
+            self.setupTableStim()
             self.tableFormat()
-            uiplot.graphRefresh()
+
+            self.groupControlsRefresh()
+            self.write_bw_cfg() # update project to open at boot
+            self.graphAxes()
+
+
+    def openProject(self, str_projectfolder):
+            self.uiFreeze()
+            uiplot.unPlot() # all plots
+            self.graphWipe()
+            self.resetCacheDicts()
+            self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
+            self.load_df_project(str_projectfolder)
+            self.setupFolders()
+            uistate.load_cfg(self.dict_folders['project'], config.version)
+            self.applyConfigStates()
+
+            self.setupTableProj()
+            self.setupTableStim()
+            self.tableFormat()
+
+            self.groupControlsRefresh()
+            self.write_bw_cfg() # update project to open at boot
+            self.graphAxes()
+            self.uiThaw()
+
 
     def renameProject(self): # changes name of project folder and updates .cfg
         #self.dict_folders['project'].mkdir(exist_ok=True)
@@ -2210,12 +2262,14 @@ class UIsub(Ui_MainWindow):
         self.df_project = df
         self.save_df_project()
 
-    def load_df_project(self): # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
+    def load_df_project(self, str_projectfolder): # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
         self.graphWipe()
         self.resetCacheDicts() # clear internal caches
-        self.projectname = self.dict_folders['project'].stem
+        path_projectfolder = Path(str_projectfolder)
+        self.projectname = str(path_projectfolder.stem)
+        print(f"load_df_project: {self.projectname}")
         self.dict_folders = self.build_dict_folders()
-        self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"), dtype={'group_IDs': str})
+        self.df_project = pd.read_csv(str(path_projectfolder/'project.brainwash'), dtype={'group_IDs': str})
         uistate.load_cfg(self.dict_folders['project'], config.version)
         self.tableFormat()
         self.write_bw_cfg()
@@ -2233,27 +2287,14 @@ class UIsub(Ui_MainWindow):
         self.dict_ts[rec_name] = df
         self.df2csv(df=df, rec=rec_name, key="timepoints")
 
-    def load_df_project(self): # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
-        self.graphWipe()
-        self.resetCacheDicts() # clear internal caches
-        self.projectname = self.dict_folders['project'].stem
-        self.dict_folders = self.build_dict_folders()
-        self.df_project = pd.read_csv(str(self.dict_folders['project'] / "project.brainwash"), dtype={'group_IDs': str})
-        uistate.load_cfg(self.dict_folders['project'], config.version)
-        self.tableFormat()
-        self.write_bw_cfg()
-
-    def save_df_project(self): # writes df_project to .csv
-        self.df_project.to_csv(str(self.dict_folders['project'] / "project.brainwash"), index=False)
-
 
 
 # Table handling
 
     def setButtonParse(self):
         unparsed = self.df_project['sweeps'].eq("...").any()
-        self.pushButtonParse.setVisible(unparsed)
-        self.checkBox_force1stim.setVisible(unparsed)
+        self.pushButtonParse.setVisible(bool(unparsed))
+        self.checkBox_force1stim.setVisible(bool(unparsed))
 
     def checkBox_force1stim_changed(self, state):
         uistate.checkBox['force1stim'] = state == 2
@@ -2676,6 +2717,7 @@ class UIsub(Ui_MainWindow):
 
         self.thread.start()
         self.progressBarManager.__enter__()  # Show progress bar
+
     def ongraphPreloadFinished(self, t0):
         self.graphGroups()
         print(f"Preloaded recordings and groups in {time.time()-t0:.2f} seconds.")
@@ -2889,7 +2931,7 @@ class UIsub(Ui_MainWindow):
             print("(multi-stim-selection) mouseoverUpdate calls uiplot.graphRefresh()")
             uiplot.graphRefresh()
             return
-        #print(f"mouseoverUpdate: {uistate.rec_select[0]}, {type(uistate.rec_select[0])}")
+        # print(f"mouseoverUpdate: {uistate.rec_select[0]}, {type(uistate.rec_select[0])}")
         rec_ID = uistate.dfp_row_copy['ID']
         t_row = uistate.dft_copy.iloc[uistate.stim_select[0]]
         stim_num = t_row['stim']
@@ -3362,7 +3404,8 @@ def df_timepointsTemplate():
         ]
     )
 
-
+def hold():
+    input("Press Enter to continue...")
 
 if __name__ == "__main__":
     print(f"\n\n{config.program_name} {config.version}\n")

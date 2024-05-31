@@ -1,5 +1,31 @@
 # Functions that are not in use anymore, but might be useful again in the future
 '''
+    above_threshold_indices = np.where(dfmean['prim'] > threshold)[0]
+    # Filter the indices to ensure they are more than min_time_difference apart
+    filtered_indices = []
+    max_index = above_threshold_indices[0]
+    max_value = dfmean['prim'][max_index]
+    for i in range(1, len(above_threshold_indices)):
+        current_index = above_threshold_indices[i]
+        current_value = dfmean['prim'][current_index]
+        previous_index = above_threshold_indices[i - 1]
+        # If the time difference between the current and previous index is more than min_time_difference
+        if dfmean['time'][current_index] - dfmean['time'][previous_index] > min_time_difference:
+            # Add the index of the maximum value in the previous cluster to filtered_indices
+            filtered_indices.append(max_index)
+            # Reset max_index and max_value for the new cluster
+            max_index = current_index
+            max_value = current_value
+        elif current_value > max_value:
+            # Update max_index and max_value if the current value is greater than max_value
+            max_index = current_index
+            max_value = current_value
+    # Add the index of the maximum value in the last cluster to filtered_indices
+    filtered_indices.append(max_index)
+    
+    n_stims = len(filtered_indices)  # Count the number of unique stimuli
+    print(f"zeroSweeps found {len(above_threshold_indices)} above_threshold_indices in {n_stims} unique stims.")  # Print the number of above-threshold indices and unique stimuli
+    i_stim = filtered_indices[0]  # Get the first filtered index
 
 
     def sweepOutputs(self):

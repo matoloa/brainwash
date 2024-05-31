@@ -97,26 +97,32 @@ class UIplot():
     def hideAll(self):
         axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
         for ax in [axm, axe, ax1, ax2]:
-            for line in ax.get_lines():
-                line.set_visible(False)
-            for patch in ax.patches:
-                patch.remove()
-            legend = ax.get_legend()
-            if legend is not None:
-                legend.remove()
+            if ax is not None:
+                lines = ax.get_lines()
+                if len(lines) > 0:
+                    for line in lines:
+                        line.set_visible(False)
+                patches = ax.patches
+                if len(patches) > 0:
+                    for patch in patches:
+                        patch.remove()
+                legend = ax.get_legend()
+                if legend is not None:
+                    legend.remove()
         print("All lines hidden")
 
 
-    def unPlot(self, rec_ID):
+    def unPlot(self, rec_ID=None):
         dict_rec = self.uistate.dict_rec_labels
         dict_show = self.uistate.dict_rec_show
-        keys_to_remove = [key for key, value in dict_rec.items() if rec_ID == value['rec_ID']]
+        if rec_ID is None:
+            keys_to_remove = list(dict_rec.keys())
+        else:
+            keys_to_remove = [key for key, value in dict_rec.items() if rec_ID == value['rec_ID']]
         for key in keys_to_remove:
             dict_rec[key]['line'].remove()
-            # print(f"unPlot: {key} removed from dict_rec")
             del dict_rec[key]
             if key in dict_show:
-                # print(f"unPlot: {key} removed from dict_show")
                 del dict_show[key]
 
 
@@ -132,9 +138,11 @@ class UIplot():
     def graphRefresh(self):
         # show only selected and imported lines, only appropriate aspects
         print("graphRefresh")
-
-        t0 = time.time()
         uistate = self.uistate
+        if uistate.axm is None:
+            print("No axes to refresh")
+            return
+        t0 = time.time()
 
         # Recordings
         if uistate.df_recs2plot is None or not uistate.anyView():
@@ -509,6 +517,9 @@ class UIplot():
 
     def graphMouseover(self, event): # determine which maingraph event is being mouseovered
         uistate = self.uistate
+        if uistate.df_recs2plot is None or uistate.df_recs2plot.empty:
+            print("No recordings to mouseover")
+            return
         axe = uistate.axe
         def plotMouseover(action, axe):
             alpha = 0.8
