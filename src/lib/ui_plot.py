@@ -113,10 +113,10 @@ class UIplot():
         keys_to_remove = [key for key, value in dict_rec.items() if rec_ID == value['rec_ID']]
         for key in keys_to_remove:
             dict_rec[key]['line'].remove()
-            print(f"unPlot: {key} removed from dict_rec")
+            # print(f"unPlot: {key} removed from dict_rec")
             del dict_rec[key]
             if key in dict_show:
-                print(f"unPlot: {key} removed from dict_show")
+                # print(f"unPlot: {key} removed from dict_show")
                 del dict_show[key]
 
 
@@ -338,16 +338,16 @@ class UIplot():
                 y_position = df_event.loc[df_event.time == x_position, rec_filter]
                 self.plot_marker(f"{label} {stim_str} EPSP amp marker", 'axe', x_position, y_position, settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                 amp_x = x_position - t_row['EPSP_amp_halfwidth'], x_position + t_row['EPSP_amp_halfwidth']
-                amp_y = amp_zero, 0 - out['EPSP_amp'].iloc[0] / 1000 # .iloc[0] since filtered by stim, /1000 to convert from mV to V
+                amp_y = amp_zero, 0 - (out['EPSP_amp'].iloc[0] / 1000) + amp_zero # .iloc[0] since filtered by stim, /1000 to convert from mV to V
                 self.plot_cross(f"{label} {stim_str} EPSP amp", 'axe', x_position, amp_x, amp_y, settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                 if x_axis == 'sweep':
                     self.plot_line(f"{label} {stim_str} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                     self.plot_line(f"{label} {stim_str} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
-                
-                # TODO: DEBUG, draw event x/y lines and means
-                self.plot_line(f"{label} {stim_str} amp_zero", 'axe', [-0.002, 1], [amp_zero, amp_zero], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
-                x, y = self.uistate.dict_rec_labels[f"{label} {stim_str}"]['line'].get_data()
 
+                '''
+                # DEBUG Block, draw event x/y lines and means
+                self.plot_line(f"{label} {stim_str} amp_zero", 'axe', [-0.002, -0.001], [amp_zero, amp_zero], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
+                x, y = self.uistate.dict_rec_labels[f"{label} {stim_str}"]['line'].get_data()
                 # filter x and y by amp_x
                 start_time = t_row['t_EPSP_amp'] - t_row['EPSP_amp_halfwidth']
                 end_time = t_row['t_EPSP_amp'] + t_row['EPSP_amp_halfwidth']
@@ -357,11 +357,12 @@ class UIplot():
                 x = x[start_index:end_index+1]
                 y = y[start_index:end_index+1]
                 mean = y.mean()
-
                 # plot the mean line
-                out_amp = out['EPSP_amp'].iloc[0] / -1000
+                out_amp = out['EPSP_amp'].iloc[0] / -1000 # convert from mV to V, undo inversion
+                out_amp = out_amp + amp_zero # undo amp-zero compensation
                 self.plot_line(f"{label} {stim_str} amp_event: {str(round(mean, 6))}, {str(len(x))}", 'axe', amp_x, [mean, mean], 'green', rec_ID, aspect='EPSP_amp', stim=stim_num)
                 self.plot_line(f"{label} {stim_str} amp_output: {str(round(out_amp, 6))}, {str(len(x))}", 'axe', amp_x, [out_amp, out_amp], 'red', rec_ID, aspect='EPSP_amp', stim=stim_num)
+                '''
 
             if not np.isnan(t_row['t_EPSP_slope_start']):
                 x_start, x_end = t_row['t_EPSP_slope_start'], t_row['t_EPSP_slope_end']
@@ -380,7 +381,7 @@ class UIplot():
                 color = settings['rgb_volley_amp']
                 self.plot_marker(f"{label} {stim_str} volley amp marker", 'axe', t_row['t_volley_amp'], y_position, settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
                 amp_x = x_position - t_row['volley_amp_halfwidth'], x_position + t_row['volley_amp_halfwidth']
-                amp_y = 0, 0 - out['volley_amp'].iloc[0] / 1000 # .iloc[0] since filtered by stim, /1000 to convert from mV to V
+                amp_y = amp_zero, 0 - (out['volley_amp'].iloc[0] / 1000) + amp_zero # .iloc[0] since filtered by stim, /1000 to convert from mV to V
                 self.plot_cross(f"{label} {stim_str} volley amp", 'axe', x_position, amp_x, amp_y, color, rec_ID, aspect='volley_amp', stim=stim_num)
                 if x_axis == 'sweep':
                     self.plot_line(f"{label} {stim_str} volley amp mean", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
@@ -447,9 +448,11 @@ class UIplot():
                     label_base += " norm"
                 self.updateOutLine(label_base)
         elif aspect in ['EPSP amp', 'volley amp']:
-            t_amp = t_row[f't_{aspect.replace(" ", "_")}'] - stim_offset
+            key = aspect.replace(" ", "_")
+            t_amp = t_row[f't_{key}'] - stim_offset
             y_position = data_y[np.abs(data_x - t_amp).argmin()]
-            self.updateAmpMarker(label_base, t_amp, y_position, t_row, amp=amp)
+            amp_x = t_amp - t_row[f'{key}_halfwidth'], t_amp + t_row[f'{key}_halfwidth']
+            self.updateAmpMarker(label_base, t_amp, y_position, amp_x, t_row['amp_zero'], amp=amp)
             if self.uistate.checkBox['output_per_stim']:
                 label_base = f"{p_row['recording_name']} {aspect}"
             if aspect == 'volley amp':
@@ -463,13 +466,11 @@ class UIplot():
                     label_base += " norm"
                 self.updateOutLine(label_base)
 
-    def updateAmpMarker(self, labelbase, x, y, t_row, amp=None):
+    def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None):
         axe = self.uistate.axe
         self.uistate.dict_rec_labels[f"{labelbase} marker"]['line'].set_data(x, y)
         if amp is not None:
-            amp_zero = t_row['amp_zero']
-            amp_x = x - t_row['volley_amp_halfwidth'], x + t_row['volley_amp_halfwidth']
-            amp_y = amp_zero, 0 - amp
+            amp_y = amp_zero, (0 - amp) + amp_zero
             self.uistate.dict_rec_labels[f"{labelbase} x marker"]['line'].set_data(amp_x, [amp_y[1],amp_y[1]])
             self.uistate.dict_rec_labels[f"{labelbase} y marker"]['line'].set_data([x,x], amp_y)
         axe.figure.canvas.draw()

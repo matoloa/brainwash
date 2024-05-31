@@ -31,11 +31,13 @@ class Config:
     def __init__(self):
         self.dev_mode = True # Development mode
         #self.dev_mode = False # Deploy mode
-        clear = True
         print("\n"*3)
         if self.dev_mode:
             print(f"Config set for development mode - {time.strftime('%H:%M:%S')}")
+        clear = False
+
         self.clear_cache = clear
+        self.transient = clear # Block persisting of files
         self.clear_timepoints = clear
         self.force_cfg_reset = clear
         self.verbose = self.dev_mode
@@ -2103,6 +2105,8 @@ class UIsub(Ui_MainWindow):
 # Writer functions
     
     def write_bw_cfg(self):  # config file for program, global settings
+        if config.transient:
+            return
         cfg = {"user_documents": str(self.user_documents), "projects_folder": str(self.projects_folder), "projectname": self.projectname, "darkmode": uistate.darkmode}
         with self.bw_cfg_yaml.open("w+") as file:
             yaml.safe_dump(cfg, file)
@@ -2129,6 +2133,8 @@ class UIsub(Ui_MainWindow):
                 uistate.darkmode = cfg['darkmode']
 
     def df2csv(self, df, rec, key=None): # "writes dict[rec] to rec_{dict}.csv" TODO: Update, better description; replace "rec"
+        if config.transient:
+            return
         self.dict_folders['cache'].mkdir(exist_ok=True)
         if key is None:
             filepath = f"{self.dict_folders['cache']}/{rec}.csv"
@@ -2327,7 +2333,7 @@ class UIsub(Ui_MainWindow):
         if Path(str_mean_path).exists(): #2: Read from file
             dfmean = pd.read_csv(str_mean_path)
         else: #3: Create file
-            dfmean = parse.build_dfmean(self.get_dfdata(row=row))
+            dfmean, _ = parse.build_dfmean(self.get_dfdata(row=row))
             persist = True
 
         #if the filter is not a column in dfmean, create it
@@ -2396,8 +2402,9 @@ class UIsub(Ui_MainWindow):
             dfmean = self.get_dfmean(row=row)
             if df_t is None:
                 df_t = self.get_dft(row=row)
+            print(f"df_t: {df_t}")
             if uistate.checkBox['output_per_stim']:
-                dfoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
+                dfoutput = analysis.build_dfstimoutput(df=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
             else:
                 dfoutput = pd.DataFrame()
                 for i, t_row in df_t.iterrows():
@@ -2405,7 +2412,9 @@ class UIsub(Ui_MainWindow):
                     dffilter = self.get_dffilter(row)
                     dfoutput_stim = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
                     dfoutput = pd.concat([dfoutput, dfoutput_stim])
+                    print(f"dfoutput_stim: {dfoutput_stim}")
         dfoutput.reset_index(inplace=True)
+        print(f"dfoutput: {dfoutput}")
         return dfoutput
 
     def get_dfdata(self, row):
@@ -2430,7 +2439,7 @@ class UIsub(Ui_MainWindow):
         if Path(path_filter).exists(): #2: Read from file
             dffilter = pd.read_csv(path_filter)
         else: #3: Create file
-            dffilter = parse.zeroSweeps(self.get_dfdata(row=row), self.get_dfmean(row=row))
+            dffilter = parse.zeroSweeps(dfdata=self.get_dfdata(row=row), dfmean=self.get_dfmean(row=row))
             self.df2csv(df=dffilter, rec=recording_name, key="filter")
             if row['filter'] == 'savgol':
                 dict_filter_params = json.loads(row['filter_params'])
@@ -3091,7 +3100,7 @@ class UIsub(Ui_MainWindow):
 
         if x_axis == 'stim':
             uistate.dft_copy = df_t
-            out = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
+            out = analysis.build_dfstimoutput(df=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
         elif x_axis == 'sweep':
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
 
@@ -3140,7 +3149,7 @@ class UIsub(Ui_MainWindow):
         if uistate.checkBox['output_per_stim']:
             df_t = self.get_dft(row=p_row)
             dfmean = self.get_dfmean(row=p_row)
-            dfoutput = analysis.build_dfstimoutput(dfmean=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
+            dfoutput = analysis.build_dfstimoutput(df=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
         else:
             dfoutput = self.get_dfoutput(row=p_row)
             dffilter = self.get_dffilter(row=p_row)
@@ -3160,7 +3169,9 @@ class UIsub(Ui_MainWindow):
             x = t_row[f't_{t_aspect}'] - stim_offset
             y = dfmean.loc[dfmean['time'] == t_row[f't_{t_aspect}'], p_row['filter']].values[0]
             amp = dfoutput.loc[dfoutput['stim'] == t_row['stim']][t_aspect].mean()/1000 # conversion: mV to V
-            uiplot.updateAmpMarker(labelamp, x, y, t_row, amp=amp)
+            t_amp = t_row[f't_{t_aspect}'] - stim_offset
+            amp_x = t_amp - t_row[f'{t_aspect}_halfwidth'], t_amp + t_row[f'{t_aspect}_halfwidth']
+            uiplot.updateAmpMarker(labelamp, x, y, amp_x, t_row['amp_zero'], amp=amp)
 
         if aspect in ["EPSP amp", "volley amp"]:
             print(f" - {aspect} updated")

@@ -173,42 +173,51 @@ def parse_ibw(filepath, dev=False): # igor2, para
 
 # %%
 def build_dfmean(dfdata, rollingwidth=3):
-    # TODO: is rollingwidth "radius" or "diameter"?
+    # returns zeroed mean of dfdata and the index of the first peak in the prim column
     dfmean = pd.DataFrame(dfdata.pivot(columns='time', index='sweep', values='voltage_raw').mean())
     dfmean.columns = ['voltage']
     # generate diffs
     dfmean['prim'] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
     dfmean['bis'] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()
-    # find index of stimulus artifact (this requires and index)
     dfmean.reset_index(inplace=True)
-    i_stim = dfmean.prim.idxmax()
-    y_stim = dfmean.prim.max()
-    threshold = y_stim*0.75
-    min_time_difference = 0.005  # Minimum time difference 5ms TODO: hardcoded
-    # Find the indices where 'prim' is above the threshold
-    above_threshold_indices = np.where(dfmean['prim'] > threshold)[0]
-    # Filter the indices to ensure they are more than min_time_difference apart
-    filtered_indices = [above_threshold_indices[0]]
-    for i in range(1, len(above_threshold_indices)):
-        if dfmean['time'][above_threshold_indices[i]] - dfmean['time'][above_threshold_indices[i - 1]] > min_time_difference:
-            filtered_indices.append(above_threshold_indices[i])
-    n_stims = len(filtered_indices)
-    print(f"build_dfmean found {len(above_threshold_indices)} above_threshold_indices in {n_stims} unique stims.")
-    i_stim = filtered_indices[0]
-    median = dfmean['voltage'].iloc[i_stim-20:i_stim-5].median() # TODO: hardcoded 20 and 5
-    dfmean['voltage'] = dfmean['voltage'] - median
-    return dfmean
+    i_stim = first_stim_index(dfmean)
+    baseline_mean = dfmean.iloc[i_stim-20:i_stim-10]['voltage'].mean() # TODO: hardcoded
+    dfmean['voltage'] = dfmean['voltage'] - baseline_mean
+    return dfmean, i_stim
 
-def zeroSweeps(dfdata, dfmean):
-    #print(f"dfdata BEFORE subtract: {dfdata}")
-    i_stim = dfmean.prim.idxmax()
-    df_zeroed = dfdata.copy()
-    dfpivot = df_zeroed.pivot(index='sweep', columns='time', values='voltage_raw')
-    sermedians = dfpivot.iloc[:, i_stim-20:i_stim-5].median(axis=1) # TODO: hardcoded 20 and 5
-    dfpivot = dfpivot.subtract(sermedians, axis='rows')
-    df_zeroed['voltage'] = dfpivot.stack().reset_index().sort_values(by=['sweep', 'time'])[0].values
+def zeroSweeps(dfdata, i_stim=None, dfmean=None):
+    # returns dfdata with sweeps zeroed to the mean of the 20th to 10th column before i_stim
+    if i_stim is None:
+        if dfmean is None:
+            _, i_stim = build_dfmean(dfdata)
+        else:
+            i_stim = first_stim_index(dfmean)
+    print(f"i_stim: {i_stim}, df_data: {dfdata}")
+    df_zeroed = dfdata.copy()  # Copy dfdata to avoid modifying the original DataFrame
+    dfpivot = df_zeroed.pivot(index='sweep', columns='time', values='voltage_raw')  # Reshape df_zeroed to have one row per 'sweep' and one column per 'time'
+    ser_mean = dfpivot.iloc[:, i_stim-20:i_stim-10].mean(axis=1)  # Calculate the mean of 'voltage_raw' values from the 20th to the 10th column before i_stim for each 'sweep' TODO: hardcoded
+    dfpivot = dfpivot.subtract(ser_mean, axis='rows')  # Subtract the calculated means from dfpivot
+    df_zeroed['voltage'] = dfpivot.stack().reset_index().sort_values(by=['sweep', 'time'])[0].values  # Stack dfpivot, reset the index, sort by 'sweep' and 'time', select the 0th column, convert to a NumPy array, and assign to the 'voltage' column of df_zeroed
     df_zeroed.drop(columns=['voltage_raw', 'sweep_raw', 't0', 'datetime'], inplace=True)
     return df_zeroed
+
+def first_stim_index(dfmean, threshold_factor=0.75, min_time_difference=0.005):
+    # returns the index of the first peak in the prim column of dfmean
+    y_max_stim = dfmean.prim.max()
+    threshold = y_max_stim * threshold_factor
+    above_threshold_indices = np.where(dfmean['prim'] > threshold)[0]
+    if above_threshold_indices.size == 0:
+        return None
+    max_index = above_threshold_indices[0]
+    for i in range(1, len(above_threshold_indices)):
+        current_index = above_threshold_indices[i]
+        previous_index = above_threshold_indices[i - 1]
+        if dfmean['time'][current_index] - dfmean['time'][previous_index] > min_time_difference:
+            break
+        if dfmean['prim'][current_index] > dfmean['prim'][max_index]:
+            max_index = current_index
+    return max_index
+
 
 def persistdf(file_base, dict_folders, dfdata=None, dfmean=None, dffilter=None):
     if dfdata is not None:
@@ -323,8 +332,8 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
                     df_ch_st['sweep'] = df_ch_st.sweep_raw
                 df_ch_st.drop(columns=['channel'], inplace=True)
                 print(f"nunique: {df_ch_st['sweep'].nunique()}")
-                dfmean = build_dfmean(df_ch_st)
-                dffilter = zeroSweeps(dfdata=df_ch_st, dfmean=dfmean)
+                dfmean, i_stim = build_dfmean(df_ch_st)
+                dffilter = zeroSweeps(dfdata=df_ch_st, i_stim=i_stim)
                 persistdf(file_base=file_base, dict_folders=dict_folders, dfdata=df_ch_st, dfmean=dfmean, dffilter=dffilter)
                 # Build dict: keys are datafile names, values are a dict of nsweeps, channels, stim, and reset (the first sweep number after every sweep_raw reset: finds recording breaks for display purposes)
                 dict_sub = {
