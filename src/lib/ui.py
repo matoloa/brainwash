@@ -34,7 +34,7 @@ class Config:
         print("\n"*3)
         if self.dev_mode:
             print(f"Config set for development mode - {time.strftime('%H:%M:%S')}")
-        clear = True
+        clear = False
 
         self.clear_cache = clear
         self.transient = False # Block persisting of files
@@ -3371,13 +3371,15 @@ class UIsub(Ui_MainWindow):
             dict_t['t_EPSP_amp_halfwidth'] = t_row['t_EPSP_amp_halfwidth']
             dict_t['t_volley_amp_halfwidth'] = t_row['t_volley_amp_halfwidth']
 
-        if dict_t: # update df_t with new values
-            for key, value in dict_t.items():
-                df_t.at[stim_idx, key] = value
-                if not uistate.checkBox['timepoints_per_stim'] and n_stims>1: # update all timepoints in df_t
-                    offset = df_t.at[stim_idx, 't_stim'] - df_t.at[stim_idx, key]
-                    for i, t_row in df_t.iterrows():
-                        df_t.at[i, key] = round(t_row['t_stim'] - offset, precision)
+        for key, value in dict_t.items():
+            df_t.at[stim_idx, key] = value
+            if not uistate.checkBox['timepoints_per_stim'] and n_stims>1: # update all timepoints in df_t
+                offset = df_t.at[stim_idx, 't_stim'] - df_t.at[stim_idx, key]
+                for i, t_row in df_t.iterrows():
+                    df_t.at[i, key] = round(t_row['t_stim'] - offset, precision)
+
+        dict_t['norm_output_from'] = t_row['norm_output_from']
+        dict_t['norm_output_to'] = t_row['norm_output_to']
 
         uistate.dft_copy = df_t
         if x_axis == 'stim':
@@ -3386,10 +3388,13 @@ class UIsub(Ui_MainWindow):
             dict_t['stim'] = t_row['stim']
             dict_t['amp_zero'] = t_row['amp_zero']
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+
+        outkey = f"{aspect}_norm" if uistate.checkBox['norm_EPSP'] and aspect in ["EPSP_amp", "EPSP_slope"] else aspect
+
         if uistate.mouseover_out is None:
-            uistate.mouseover_out = uistate.ax1.plot(out[x_axis], out[aspect], color=uistate.settings[f'rgb_{aspect}'], linewidth=3)
+            uistate.mouseover_out = uistate.ax1.plot(out[x_axis], out[outkey], color=uistate.settings[f'rgb_{aspect}'], linewidth=3)
         else:
-            uistate.mouseover_out[0].set_data(out[x_axis], out[aspect])
+            uistate.mouseover_out[0].set_data(out[x_axis], out[outkey])
 
         self.canvasOutput.draw()
 
@@ -3423,6 +3428,8 @@ class UIsub(Ui_MainWindow):
                 dict_t = values[3]
                 dict_t['stim'] = t_row['stim']
                 dict_t['t_stim'] = t_row['t_stim']
+                dict_t['norm_output_from'] = t_row['norm_output_from']
+                dict_t['norm_output_to'] = t_row['norm_output_to']
                 break
 
         #update selected dft row with the values from dict_t
@@ -3439,7 +3446,7 @@ class UIsub(Ui_MainWindow):
             dfoutput = self.get_dfoutput(row=p_row)
             dffilter = self.get_dffilter(row=p_row)
             stim_num = t_row['stim']
-            new_dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
+            new_dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             new_dfoutput['stim'] = int(stim_num)
             for col in new_dfoutput.columns:
                 dfoutput.loc[dfoutput['stim'] == stim_num, col] = new_dfoutput.loc[new_dfoutput['stim'] == stim_num, col]
