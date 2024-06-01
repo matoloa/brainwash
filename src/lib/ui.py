@@ -3383,7 +3383,7 @@ class UIsub(Ui_MainWindow):
 
         uistate.dft_copy = df_t
         if x_axis == 'stim':
-            out = analysis.build_dfstimoutput(df=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
+            out = analysis.build_dfstimoutput(df=dfmean, df_t=df_t)
         elif x_axis == 'sweep':
             dict_t['stim'] = t_row['stim']
             dict_t['amp_zero'] = t_row['amp_zero']
@@ -3441,7 +3441,7 @@ class UIsub(Ui_MainWindow):
 
         # update dfoutput; dict and file, with normalized columns if applicable
         if uistate.checkBox['output_per_stim']:
-            dfoutput = analysis.build_dfstimoutput(df=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
+            dfoutput = analysis.build_dfstimoutput(df=dfmean, df_t=df_t)
         else:
             dfoutput = self.get_dfoutput(row=p_row)
             dffilter = self.get_dffilter(row=p_row)

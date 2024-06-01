@@ -99,12 +99,14 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
     return dfoutput[list_col]
 
 
-def build_dfstimoutput(df, df_t, lineEdit, filter='voltage'):
+def build_dfstimoutput(df, df_t, filter='voltage'):
     t0 = time.time()
     df_stimoutput = pd.DataFrame(index=df_t.index, columns=['stim', 'bin', 'EPSP_amp', 'EPSP_amp_norm', 'EPSP_slope', 'EPSP_slope_norm', 'volley_amp', 'volley_slope'])
     # print (f"build_dfstimoutput: {df_t}")
 
     for i, t_row in df_t.iterrows():
+        normFrom = t_row['norm_output_from'] # start
+        normTo = t_row['norm_output_to'] # end
         amp_zero = t_row['amp_zero']
         EPSP_hw = t_row['t_EPSP_amp_halfwidth']
         volley_hw = t_row['t_volley_amp_halfwidth']
@@ -120,8 +122,6 @@ def build_dfstimoutput(df, df_t, lineEdit, filter='voltage'):
             df_EPSP_amp.reset_index(drop=True, inplace=True)
             df_stimoutput.at[i, 'EPSP_amp'] = (df_EPSP_amp[filter].mean() - amp_zero) * -1000 if not df_EPSP_amp.empty else np.nan
             # Normalize EPSP_amp
-            normFrom = lineEdit['norm_EPSP_from'] # start
-            normTo = lineEdit['norm_EPSP_to'] # end
             selected_values = df_stimoutput['EPSP_amp'][normFrom:normTo+1]
             norm_mean = np.mean(selected_values) / 100  # divide by 100 to get percentage
             df_stimoutput.at[i, 'EPSP_amp_norm'] = df_stimoutput.at[i, 'EPSP_amp'] / norm_mean if norm_mean else np.nan
@@ -130,8 +130,6 @@ def build_dfstimoutput(df, df_t, lineEdit, filter='voltage'):
             slope_EPSP = measureslope(df=df, filter=filter, t_start=t_row['t_EPSP_slope_start'], t_end=t_row['t_EPSP_slope_end'])
             df_stimoutput.at[i, 'EPSP_slope'] = -slope_EPSP if slope_EPSP else np.nan
             # Normalize EPSP_slope
-            normFrom = lineEdit['norm_EPSP_from'] # start
-            normTo = lineEdit['norm_EPSP_to'] # end
             selected_values = df_stimoutput['EPSP_slope'][normFrom:normTo+1]
             norm_mean = np.mean(selected_values) / 100  # divide by 100 to get percentage
             df_stimoutput.at[i, 'EPSP_slope_norm'] = df_stimoutput.at[i, 'EPSP_slope'] / norm_mean if norm_mean else np.nan
