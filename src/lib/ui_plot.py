@@ -494,6 +494,12 @@ class UIplot():
         linedict = self.uistate.dict_rec_labels[label]
         linedict['line'].set_ydata(mean)
 
+
+
+#####################################################################
+#     #DEPRECATED FUNCTIONS - TO BE REMOVED IN FUTURE RELEASES      #
+#####################################################################
+
     def updateEPSPout(self, rec_name, out): # TODO: update this last remaining ax-cycle to use the dict
         # OBSOLETE - called by norm, does not operate on stim-specific data!
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
@@ -509,97 +515,3 @@ class UIplot():
             if line.get_label() == f"{rec_name} EPSP slope norm":
                 line.set_ydata(out['EPSP_slope_norm'])
                 ax2.figure.canvas.draw()
-
-    def graphMouseover(self, event): # determine which maingraph event is being mouseovered
-        uistate = self.uistate
-        if uistate.df_recs2plot is None or uistate.df_recs2plot.empty:
-            print("No recordings to mouseover")
-            return
-        axe = uistate.axe
-        def plotMouseover(action, axe):
-            alpha = 0.8
-            linewidth = 3 if 'resize' in action else 10
-            if 'slope' in action:
-                if 'EPSP' in action:
-                    x_range = uistate.EPSP_slope_start_xy[0], uistate.EPSP_slope_end_xy[0]
-                    y_range = uistate.EPSP_slope_start_xy[1], uistate.EPSP_slope_end_xy[1]
-                    color = uistate.settings['rgb_EPSP_slope']
-                elif 'volley' in action:
-                    x_range = uistate.volley_slope_start_xy[0], uistate.volley_slope_end_xy[0]
-                    y_range = uistate.volley_slope_start_xy[1], uistate.volley_slope_end_xy[1]
-                    color = uistate.settings['rgb_volley_slope']
-
-                if uistate.mouseover_blob is None:
-                    uistate.mouseover_blob = axe.scatter(x_range[1], y_range[1], color=color, s=100, alpha=alpha)
-                else:
-                    uistate.mouseover_blob.set_offsets([x_range[1], y_range[1]])
-                    uistate.mouseover_blob.set_sizes([100])
-                    uistate.mouseover_blob.set_color(color)
-
-                if uistate.mouseover_plot is None:
-                    uistate.mouseover_plot = axe.plot(x_range, y_range, color=color, linewidth=linewidth, alpha=alpha, label="mouseover")
-                else:
-                    uistate.mouseover_plot[0].set_data(x_range, y_range)
-                    uistate.mouseover_plot[0].set_linewidth(linewidth)
-                    uistate.mouseover_plot[0].set_alpha(alpha)
-                    uistate.mouseover_plot[0].set_color(color)
-
-            elif 'amp' in action:
-                if 'EPSP' in action:
-                    x, y = uistate.EPSP_amp_xy
-                    color = uistate.settings['rgb_EPSP_amp']
-                elif 'volley' in action:
-                    x, y = uistate.volley_amp_xy
-                    color = uistate.settings['rgb_volley_amp']
-
-                if uistate.mouseover_blob is None:
-                    uistate.mouseover_blob = axe.scatter(x, y, color=color, s=100, alpha=alpha)
-                else:
-                    uistate.mouseover_blob.set_offsets([x, y])
-                    uistate.mouseover_blob.set_sizes([100])
-                    uistate.mouseover_blob.set_color(color)
-        x = event.xdata
-        y = event.ydata
-        if x is None or y is None:
-            return
-        if event.inaxes == axe:
-            zones = {}
-            if uistate.checkBox['EPSP_amp']:
-                zones['EPSP amp move'] = uistate.EPSP_amp_move_zone
-            if uistate.checkBox['EPSP_slope']:
-                zones['EPSP slope resize'] = uistate.EPSP_slope_resize_zone
-                zones['EPSP slope move'] = uistate.EPSP_slope_move_zone
-            if uistate.checkBox['volley_amp']:
-                zones['volley amp move'] = uistate.volley_amp_move_zone
-            if uistate.checkBox['volley_slope']:
-                zones['volley slope resize'] = uistate.volley_slope_resize_zone
-                zones['volley slope move'] = uistate.volley_slope_move_zone
-            uistate.mouseover_action = None
-            for action, zone in zones.items():
-                if zone['x'][0] <= x <= zone['x'][1] and zone['y'][0] <= y <= zone['y'][1]:
-                    uistate.mouseover_action = action
-                    plotMouseover(action, axe)
-                    
-                    # Debugging block
-                    if False:
-                        p_row = uistate.dfp_row_copy
-                        rec_name = p_row['recording_name']
-                        rec_ID = p_row['ID']
-                        t_row = uistate.dft_copy.loc[uistate.stim_select[0]]
-                        stim_num = t_row['stim']
-                        #new_dict = {key: value for key, value in uistate.dict_rec_labels.items() if value.get('stim') == stim_num and value.get('rec_ID') == rec_ID and value.get('axis') == 'ax2'}
-                        #EPSP_slope = new_dict.get(f"{rec_name} - stim {stim_num} EPSP slope")
-                        EPSP_slope = uistate.dict_rec_labels.get(f"{rec_name} - stim {stim_num} EPSP slope")
-                        line = EPSP_slope.get('line')
-                        line.set_linewidth(10)
-                        print(f"{EPSP_slope} - {action}")
-                        
-                    break
-
-            if uistate.mouseover_action is None:
-                if uistate.mouseover_blob is not None:
-                    uistate.mouseover_blob.set_sizes([0])
-                if uistate.mouseover_plot is not None:
-                    uistate.mouseover_plot[0].set_linewidth(0)
-
-            axe.figure.canvas.draw()

@@ -131,6 +131,7 @@ class UIstate:
         #self.darkmode = False # set by global bw cfg
 
     # Mouseover variables
+        # Eventgraph Mouseover variables
         self.mouseover_action = None # name of action to take if clicked at current mouseover: EPSP amp move, EPSP slope move/resize, volley amp move, volley slope move/resize
         self.mouseover_plot = None # plot of tentative EPSP slope
         self.mouseover_blob = None # scatterplot indicating mouseover of dragable point; move point or resize slope
@@ -142,7 +143,7 @@ class UIstate:
         self.dragging = False # True if dragging; allows right-click to cancel drag
         self.mouseover_out = None # output of dragged aspect
 
-        # Mouseover coordinates, for plotting. Set on row selection.
+        # Eventgraph Mouseover coordinates, for plotting. Set on row selection.
         self.EPSP_amp_xy = None # x,y
         self.EPSP_slope_start_xy = None # x,y
         self.EPSP_slope_end_xy = None # x,y
@@ -150,13 +151,18 @@ class UIstate:
         self.volley_slope_start_xy = None # x,y
         self.volley_slope_end_xy = None # x,y
 
-        # Mouseover clickzones: coordinates including margins. Set on row selection.
+        # Eventgraph Mouseover clickzones: coordinates including margins. Set on row selection.
         self.EPSP_amp_move_zone = {} # dict: key=x,y, value=start,end. 
         self.EPSP_slope_move_zone = {} # dict: key=x,y, value=start,end.
         self.EPSP_slope_resize_zone = {} # dict: key=x,y, value=start,end.
         self.volley_amp_move_zone = {} # dict: key=x,y, value=start,end. 
         self.volley_slope_move_zone = {} # dict: key=x,y, value=start,end.
         self.volley_slope_resize_zone = {} # dict: key=x,y, value=start,end.
+
+        # OutputGraph Mouseover variables
+        self.last_out_x_idx = None
+        self.ghost_sweep = None
+        self.ghost_label = None
 
     def setMargins(self, axe, pixels=10): # set margins for mouseover detection
         self.x_margin = axe.transData.inverted().transform((pixels, 0))[0] - axe.transData.inverted().transform((0, 0))[0]

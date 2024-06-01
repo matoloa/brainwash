@@ -2912,6 +2912,165 @@ class UIsub(Ui_MainWindow):
             self.connectDragRelease(x_range=sweep_numbers, rec_ID=p_row['ID'], graph="output")
 
 
+    def eventMouseover(self, event): # determine which event is being mouseovered
+        if uistate.df_recs2plot is None or uistate.df_recs2plot.empty:
+            print("No recordings to mouseover")
+            return
+        axe = uistate.axe
+        def plotMouseover(action, axe):
+            alpha = 0.8
+            linewidth = 3 if 'resize' in action else 10
+            if 'slope' in action:
+                if 'EPSP' in action:
+                    x_range = uistate.EPSP_slope_start_xy[0], uistate.EPSP_slope_end_xy[0]
+                    y_range = uistate.EPSP_slope_start_xy[1], uistate.EPSP_slope_end_xy[1]
+                    color = uistate.settings['rgb_EPSP_slope']
+                elif 'volley' in action:
+                    x_range = uistate.volley_slope_start_xy[0], uistate.volley_slope_end_xy[0]
+                    y_range = uistate.volley_slope_start_xy[1], uistate.volley_slope_end_xy[1]
+                    color = uistate.settings['rgb_volley_slope']
+
+                if uistate.mouseover_blob is None:
+                    uistate.mouseover_blob = axe.scatter(x_range[1], y_range[1], color=color, s=100, alpha=alpha)
+                else:
+                    uistate.mouseover_blob.set_offsets([x_range[1], y_range[1]])
+                    uistate.mouseover_blob.set_sizes([100])
+                    uistate.mouseover_blob.set_color(color)
+
+                if uistate.mouseover_plot is None:
+                    uistate.mouseover_plot = axe.plot(x_range, y_range, color=color, linewidth=linewidth, alpha=alpha, label="mouseover")
+                else:
+                    uistate.mouseover_plot[0].set_data(x_range, y_range)
+                    uistate.mouseover_plot[0].set_linewidth(linewidth)
+                    uistate.mouseover_plot[0].set_alpha(alpha)
+                    uistate.mouseover_plot[0].set_color(color)
+
+            elif 'amp' in action:
+                if 'EPSP' in action:
+                    x, y = uistate.EPSP_amp_xy
+                    color = uistate.settings['rgb_EPSP_amp']
+                elif 'volley' in action:
+                    x, y = uistate.volley_amp_xy
+                    color = uistate.settings['rgb_volley_amp']
+
+                if uistate.mouseover_blob is None:
+                    uistate.mouseover_blob = axe.scatter(x, y, color=color, s=100, alpha=alpha)
+                else:
+                    uistate.mouseover_blob.set_offsets([x, y])
+                    uistate.mouseover_blob.set_sizes([100])
+                    uistate.mouseover_blob.set_color(color)
+        x = event.xdata
+        y = event.ydata
+        if x is None or y is None:
+            return
+        if event.inaxes == axe:
+            zones = {}
+            if uistate.checkBox['EPSP_amp']:
+                zones['EPSP amp move'] = uistate.EPSP_amp_move_zone
+            if uistate.checkBox['EPSP_slope']:
+                zones['EPSP slope resize'] = uistate.EPSP_slope_resize_zone
+                zones['EPSP slope move'] = uistate.EPSP_slope_move_zone
+            if uistate.checkBox['volley_amp']:
+                zones['volley amp move'] = uistate.volley_amp_move_zone
+            if uistate.checkBox['volley_slope']:
+                zones['volley slope resize'] = uistate.volley_slope_resize_zone
+                zones['volley slope move'] = uistate.volley_slope_move_zone
+            uistate.mouseover_action = None
+            for action, zone in zones.items():
+                if zone['x'][0] <= x <= zone['x'][1] and zone['y'][0] <= y <= zone['y'][1]:
+                    uistate.mouseover_action = action
+                    plotMouseover(action, axe)
+                    
+                    # Debugging block
+                    if False:
+                        p_row = uistate.dfp_row_copy
+                        rec_name = p_row['recording_name']
+                        rec_ID = p_row['ID']
+                        t_row = uistate.dft_copy.loc[uistate.stim_select[0]]
+                        stim_num = t_row['stim']
+                        #new_dict = {key: value for key, value in uistate.dict_rec_labels.items() if value.get('stim') == stim_num and value.get('rec_ID') == rec_ID and value.get('axis') == 'ax2'}
+                        #EPSP_slope = new_dict.get(f"{rec_name} - stim {stim_num} EPSP slope")
+                        EPSP_slope = uistate.dict_rec_labels.get(f"{rec_name} - stim {stim_num} EPSP slope")
+                        line = EPSP_slope.get('line')
+                        line.set_linewidth(10)
+                        print(f"{EPSP_slope} - {action}")
+                        
+                    break
+
+            if uistate.mouseover_action is None:
+                if uistate.mouseover_blob is not None:
+                    uistate.mouseover_blob.set_sizes([0])
+                if uistate.mouseover_plot is not None:
+                    uistate.mouseover_plot[0].set_linewidth(0)
+
+            axe.figure.canvas.draw()
+
+
+    def outputMouseover(self, event): # determine which event is being mouseovered
+        x, y = event.xdata, event.ydata
+        str_ax = 'ax2' if uistate.slopeView() else 'ax1' if uistate.ampView() else None
+        ax = getattr(uistate, str_ax)
+        if str_ax is None or x is None or y is None or not event.inaxes == ax or not (uistate.slopeView() or uistate.ampView()):
+            if uistate.ghost_sweep is not None: # remove ghost sweep if outside output graph
+                uistate.ghost_sweep.remove()
+                uistate.ghost_sweep = None
+                uistate.ghost_label.remove()
+                uistate.ghost_label = None
+                uistate.axe.figure.canvas.draw()
+            return
+        x_axis = 'stim' if uistate.checkBox['output_per_stim'] else 'sweep'
+        # find a visible line
+        dict_out = {key: value for key, value in uistate.dict_rec_show.items() if value['axis'] == str_ax and (value['aspect'] in ['EPSP_amp', 'EPSP_slope'])}
+        if not dict_out:
+            return
+        dict_pop = dict_out.popitem()[1] # TODO: ugly random; pick top in df_p?
+        x_data = dict_pop['line'].get_xdata()
+        # find closest x_index
+        out_x_idx = (np.abs(x_data - x)).argmin()
+        if out_x_idx == uistate.last_out_x_idx: # prevent update if same x
+            return
+
+        if x_axis == 'stim': # Not connected yet
+            return
+        else: # sweep
+            rec_ID = dict_pop['rec_ID']
+            df_p = self.get_df_project()
+            p_row = df_p[df_p['ID'] == rec_ID].iloc[0]
+            df_t = self.get_dft(p_row)
+            stim = dict_pop['stim']
+            t_row = df_t[df_t['stim'] == stim].iloc[0]
+            offset = t_row['t_stim']
+
+            dffilter = self.get_dffilter(p_row)
+            dfsweep = dffilter[dffilter['sweep'] == out_x_idx] # select only rows where sweep == out_x_idx
+            sweep_x = dfsweep['time']-offset
+            sweep_y = dfsweep[p_row['filter']] # get the value of the filter at the selected sweep
+
+            if uistate.ghost_sweep is None:
+                ghost_color = 'white' if uistate.darkmode else 'black'
+                uistate.ghost_sweep, = uistate.axe.plot(sweep_x, sweep_y, color=ghost_color, alpha=0.5, zorder=0)
+                if uistate.ghost_label is None:
+                    uistate.ghost_label = uistate.axe.text(1, 1, f"sweep {out_x_idx}", transform=uistate.axe.transAxes, ha='left', va='bottom')
+                else:
+                    uistate.ghost_label.set_text(f"sweep {out_x_idx}")
+            else:
+                uistate.ghost_sweep.set_data(sweep_x, sweep_y)
+                uistate.ghost_label.set_text(f"sweep {out_x_idx}")
+            uistate.axe.figure.canvas.draw()
+            uistate.axe.figure.canvas.draw()
+        uistate.last_out_x_idx = out_x_idx
+        ax.figure.canvas.draw()
+
+    def on_leave_output(self, event):
+        if uistate.ghost_sweep is not None:
+            uistate.ghost_sweep.remove()
+            uistate.ghost_sweep = None
+        if uistate.ghost_label is not None:
+            uistate.ghost_label.remove()
+            uistate.ghost_label = None
+        uistate.axe.figure.canvas.draw()
+
+
     def connectDragRelease(self, x_range, rec_ID, graph):
         # function to set up x scales for dragging and releasing on mean- and output canvases
         if graph == "mean": # uistate.axm
@@ -3021,7 +3180,9 @@ class UIsub(Ui_MainWindow):
             elif label.endswith("volley slope marker"):
                 uistate.updateDragZones(aspect="volley slope", x=line.get_xdata(), y=line.get_ydata())
 
-        self.mouseover = self.canvasEvent.mpl_connect('motion_notify_event', uiplot.graphMouseover)
+        self.mouseoverEvent = self.canvasEvent.mpl_connect('motion_notify_event', self.eventMouseover)
+        self.mouseoverOutput = self.canvasOutput.mpl_connect('motion_notify_event', self.outputMouseover)
+        self.mouseLeaveOutput = self.canvasOutput.mpl_connect('axes_leave_event', self.on_leave_output)
         #print("mouseoverUpdate calls uiplot.graphRefresh()")
         uiplot.graphRefresh()
 
@@ -3099,7 +3260,8 @@ class UIsub(Ui_MainWindow):
     def mouseoverDisconnect(self):
         # drop any prior mouseover event connections and plots
         if hasattr(self, 'mouseover'):
-            self.canvasEvent.mpl_disconnect(self.mouseover)
+            self.canvasEvent.mpl_disconnect(self.mouseoverEvent)
+            self.canvasOutput.mpl_disconnect(self.mouseoverOutput)
         if uistate.mouseover_plot is not None:
             uistate.mouseover_plot[0].remove()
             uistate.mouseover_plot = None
@@ -3113,7 +3275,7 @@ class UIsub(Ui_MainWindow):
 
 
     def eventDragSlope(self, event, action, data_x, data_y, prior_slope_start, prior_slope_end): # graph dragging event
-        self.canvasEvent.mpl_disconnect(self.mouseover)
+        self.canvasEvent.mpl_disconnect(self.mouseoverEvent)
         if event.xdata is None or action is None:
             return
         x = event.xdata
@@ -3148,7 +3310,7 @@ class UIsub(Ui_MainWindow):
 
 
     def eventDragPoint(self, event, data_x, data_y, prior_amp): # maingraph dragging event
-        self.canvasEvent.mpl_disconnect(self.mouseover)
+        self.canvasEvent.mpl_disconnect(self.mouseoverEvent)
         if event.xdata is None:
             return
         x = event.xdata
