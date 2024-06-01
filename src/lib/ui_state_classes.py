@@ -14,12 +14,19 @@ class UIstate:
             'h_splitterMaster': [0.105, 0.04, 0.795, 0.09],
             'v_splitterGraphs': [0.2, 0.5, 0.3],
         }
-        self.viewTools = {
+        self.viewTools = { # these are cycled by uisub.connectUIstate; framename: [title, visible]
             'frameToolStim': ["Stim detection", True],
             'frameToolAspect': ["Aspect toggles", True],
             'frameToolScaling': ["Output Scaling", True],
             'frameToolPairedStim': ["Paired stims", False],
             'frameToolExport': ["Image Export", False],
+        }
+
+        self.pushButtons = { # these are cycled by uisub.connectUIstate; buttonname: methodname
+            'pushButton_stim_detect': 'triggerStimDetect',
+            'pushButton_EPSP_amp_width_set_all': 'trigger_set_EPSP_amp_width_all',
+            'pushButton_volley_amp_width_set_all': 'trigger_set_volley_amp_width_all',
+            'pushButton_norm_range_set_all': 'trigger_set_norm_range_all',
         }
 
         self.checkBox = { # these are cycled by uisub.connectUIstate; maintain format!
@@ -100,6 +107,8 @@ class UIstate:
             't_EPSP_amp_halfwidth': 0.002,
             't_EPSP_amp_method': 'auto detect',
             't_EPSP_amp_params': 'NA',
+            'norm_output_from': 0,
+            'norm_output_to': 0,
         }
 
     # Do NOT persist these

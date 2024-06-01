@@ -34,7 +34,7 @@ class Config:
         print("\n"*3)
         if self.dev_mode:
             print(f"Config set for development mode - {time.strftime('%H:%M:%S')}")
-        clear = True
+        clear = False
 
         self.clear_cache = clear
         self.transient = False # Block persisting of files
@@ -480,9 +480,20 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBox_output_per_stim = QtWidgets.QCheckBox(self.frameToolStim)
         self.checkBox_output_per_stim.setGeometry(QtCore.QRect(10, 70, 161, 23))
         self.checkBox_output_per_stim.setObjectName("checkBox_output_per_stim")
+        self.checkBox_show_all_events.raise_()
+        self.checkBox_timepoints_per_stim.raise_()
+        self.label_stims.raise_()
+        self.pushButton_stim_assign_threshold.raise_()
+        self.label_stim_detection_threshold.raise_()
+        self.label_mean_to.raise_()
+        self.label_mean_selected_range.raise_()
+        self.pushButton_stim_detect.raise_()
+        self.checkBox_output_per_stim.raise_()
+        self.lineEdit_mean_selection_start.raise_()
+        self.lineEdit_mean_selection_end.raise_()
         self.verticalLayoutTools.addWidget(self.frameToolStim)
         self.frameToolAspect = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        self.frameToolAspect.setMinimumSize(QtCore.QSize(131, 181))
+        self.frameToolAspect.setMinimumSize(QtCore.QSize(131, 211))
         self.frameToolAspect.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frameToolAspect.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frameToolAspect.setObjectName("frameToolAspect")
@@ -528,6 +539,24 @@ class Ui_MainWindow(QtCore.QObject):
         self.label_volley_amp_halfwidth.setGeometry(QtCore.QRect(100, 140, 51, 20))
         self.label_volley_amp_halfwidth.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
         self.label_volley_amp_halfwidth.setObjectName("label_volley_amp_halfwidth")
+        self.pushButton_EPSP_amp_width_set_all = QtWidgets.QPushButton(self.frameToolAspect)
+        self.pushButton_EPSP_amp_width_set_all.setGeometry(QtCore.QRect(40, 170, 51, 25))
+        self.pushButton_EPSP_amp_width_set_all.setObjectName("pushButton_EPSP_amp_width_set_all")
+        self.pushButton_volley_amp_width_set_all = QtWidgets.QPushButton(self.frameToolAspect)
+        self.pushButton_volley_amp_width_set_all.setGeometry(QtCore.QRect(130, 170, 51, 25))
+        self.pushButton_volley_amp_width_set_all.setObjectName("pushButton_volley_amp_width_set_all")
+        self.checkBox_EPSP_slope.raise_()
+        self.checkBox_volley_slope.raise_()
+        self.checkBox_EPSP_amp.raise_()
+        self.label_aspect.raise_()
+        self.checkBox_volley_amp.raise_()
+        self.label_header_amp_halfwidth.raise_()
+        self.label_EPSP_amp_halfwidth.raise_()
+        self.label_volley_amp_halfwidth.raise_()
+        self.lineEdit_EPSP_amp_halfwidth.raise_()
+        self.lineEdit_volley_amp_halfwidth.raise_()
+        self.pushButton_EPSP_amp_width_set_all.raise_()
+        self.pushButton_volley_amp_width_set_all.raise_()
         self.verticalLayoutTools.addWidget(self.frameToolAspect)
         self.frameToolScaling = QtWidgets.QFrame(self.verticalLayoutWidget_3)
         self.frameToolScaling.setMinimumSize(QtCore.QSize(131, 131))
@@ -562,6 +591,17 @@ class Ui_MainWindow(QtCore.QObject):
         self.checkBox_output_ymin0 = QtWidgets.QCheckBox(self.frameToolScaling)
         self.checkBox_output_ymin0.setGeometry(QtCore.QRect(10, 100, 111, 23))
         self.checkBox_output_ymin0.setObjectName("checkBox_output_ymin0")
+        self.pushButton_norm_range_set_all = QtWidgets.QPushButton(self.frameToolScaling)
+        self.pushButton_norm_range_set_all.setGeometry(QtCore.QRect(130, 70, 51, 25))
+        self.pushButton_norm_range_set_all.setObjectName("pushButton_norm_range_set_all")
+        self.label_norm_on_sweep.raise_()
+        self.checkBox_norm_EPSP.raise_()
+        self.label_relative_to.raise_()
+        self.label_scaling.raise_()
+        self.checkBox_output_ymin0.raise_()
+        self.lineEdit_norm_EPSP_end.raise_()
+        self.lineEdit_norm_EPSP_start.raise_()
+        self.pushButton_norm_range_set_all.raise_()
         self.verticalLayoutTools.addWidget(self.frameToolScaling)
         self.verticalLayoutGroups = QtWidgets.QVBoxLayout()
         self.verticalLayoutGroups.setObjectName("verticalLayoutGroups")
@@ -658,11 +698,14 @@ class Ui_MainWindow(QtCore.QObject):
         self.label_header_amp_halfwidth.setText(_translate("mainWindow", "Amplitude ± (ms)"))
         self.label_EPSP_amp_halfwidth.setText(_translate("mainWindow", "EPSP"))
         self.label_volley_amp_halfwidth.setText(_translate("mainWindow", "volley"))
+        self.pushButton_EPSP_amp_width_set_all.setText(_translate("mainWindow", "Set All"))
+        self.pushButton_volley_amp_width_set_all.setText(_translate("mainWindow", "Set All"))
         self.label_norm_on_sweep.setText(_translate("mainWindow", "Norm on sweep(s)"))
         self.checkBox_norm_EPSP.setText(_translate("mainWindow", "Relative"))
         self.label_relative_to.setText(_translate("mainWindow", "-"))
         self.label_scaling.setText(_translate("mainWindow", "Scaling"))
         self.checkBox_output_ymin0.setText(_translate("mainWindow", "output Ymin 0"))
+        self.pushButton_norm_range_set_all.setText(_translate("mainWindow", "Set All"))
         self.pushButton_paired_data_flip.setText(_translate("mainWindow", "Flip C-I"))
         self.label_paired_data.setText(_translate("mainWindow", "Paired data"))
         self.checkBox_paired_stims.setText(_translate("mainWindow", "stim / stim"))
@@ -1053,6 +1096,8 @@ class UIsub(Ui_MainWindow):
 
 
     def uiFreeze(self): # Disable selection changes and checkboxes
+        if uistate.frozen:
+            return
         uistate.frozen = True
         self.tableProj.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
@@ -1060,8 +1105,11 @@ class UIsub(Ui_MainWindow):
         for key, _ in uistate.checkBox.items():
             checkBox = getattr(self, f"checkBox_{key}")
             checkBox.setEnabled(False)
-       
+
+
     def uiThaw(self): # Enable selection changes and checkboxes
+        if not uistate.frozen:
+            return
         self.tableProj.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.connectUIstate()
@@ -1183,13 +1231,6 @@ class UIsub(Ui_MainWindow):
                 self.label_relative_to.setVisible(state == 2)
                 self.lineEdit_norm_EPSP_start.setVisible(state == 2)
                 self.lineEdit_norm_EPSP_end.setVisible(state == 2)
-                for idx in uistate.rec_select:
-                    row = self.get_df_project().loc[idx]
-                    rec_name = row['recording_name']
-                    out = self.dict_outputs[rec_name]
-                    uiplot.updateEPSPout(rec_name, out) # TODO: deprecated
-                self.purgeGroupCache()
-                self.graphGroups()
             elif key == 'force1stim':
                 self.checkBox_force1stim_changed(state)
             elif key == 'output_per_stim':
@@ -1417,8 +1458,6 @@ class UIsub(Ui_MainWindow):
         # apply viewstates for tool frames in the toolbar
         for frame, (text, state) in uistate.viewTools.items():
             getattr(self, frame).setVisible(state)
-        # connect toolbar buttons to local functions
-        self.pushButton_stim_detect.pressed.connect(self.triggerStimDetect)
         # TODO:
         # connect paired stim checkbox and flip button to local functions
         #self.checkBox_paired_stims.setChecked(uistate.checkBox['paired_stims'])
@@ -1436,34 +1475,25 @@ class UIsub(Ui_MainWindow):
         return dict_folders
     
 
-    def connectUIstate(self, disconnect=False): # Connect or disconnect UI elements to/from uistate
-        # checkBoxes 
+    def connectUIstate(self, disconnect=False): # ternary (dis)connect of UI elements
+        # checkBoxes
         for key, value in uistate.checkBox.items():
             checkBox = getattr(self, f"checkBox_{key}")
-            if disconnect:
-                checkBox.stateChanged.disconnect()
-            else:
-                checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
+            checkBox.stateChanged.disconnect() if disconnect else checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
         # lineEdits
-        lineEditNorm = [self.lineEdit_norm_EPSP_start, self.lineEdit_norm_EPSP_end,]
-        for lineEdit in lineEditNorm:
-            if disconnect:
-                lineEdit.editingFinished.disconnect()
-            else:
-                lineEdit.editingFinished.connect(lambda le=lineEdit: self.editNormRange(le))
-        lineEditAmpHalfwidth = [self.lineEdit_EPSP_amp_halfwidth, self.lineEdit_volley_amp_halfwidth,]
-        for lineEdit in lineEditAmpHalfwidth:
-            if disconnect:
-                lineEdit.editingFinished.disconnect()
-            else:
-                lineEdit.editingFinished.connect(lambda le=lineEdit: self.editAmpHalfwidth(le))
+        for lineEdit in [self.lineEdit_norm_EPSP_start, self.lineEdit_norm_EPSP_end,]:
+            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editNormRange(le))
+        for lineEdit in [self.lineEdit_EPSP_amp_halfwidth, self.lineEdit_volley_amp_halfwidth,]:
+            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editAmpHalfwidth(le))
+        # pushButtons
+        for str_button, str_function in uistate.pushButtons.items():
+            button, func = getattr(self, str_button), getattr(self, str_function)
+            button.pressed.disconnect() if disconnect else button.pressed.connect(func)
         # SplitterMoved
         for splitter_name in ['h_splitterMaster', 'v_splitterGraphs']:
             splitter = getattr(self, splitter_name)
-            if disconnect:
-                splitter.splitterMoved.disconnect()
-            else:
-                splitter.splitterMoved.connect(self.onSplitterMoved)
+            splitter.splitterMoved.disconnect() if disconnect else splitter.splitterMoved.connect(self.onSplitterMoved)
+
    
     def applyConfigStates(self):
         # Disconnect signals to prevent editingFinished from triggering from .setText
@@ -1493,6 +1523,18 @@ class UIsub(Ui_MainWindow):
     def triggerStimDetect(self):
         self.usage("triggerStimDetect")
         self.stimDetect()
+
+    def trigger_set_EPSP_amp_width_all(self):
+        self.usage(f"trigger_set_EPSP_amp_width_all")
+        self.recalculate()
+
+    def trigger_set_volley_amp_width_all(self):
+        self.usage(f"trigger_set_volley_amp_width_all")
+        self.recalculate()
+
+    def trigger_set_norm_range_all(self):
+        self.usage(f"trigger_set_norm_range_all")
+        self.recalculate()
 
     def triggerDarkmode(self):
         uistate.darkmode = not uistate.darkmode
@@ -1646,19 +1688,46 @@ class UIsub(Ui_MainWindow):
 
 # Data Editing functions
     def recalculate(self):
-        # Placeholder function called when settings are changed
-        # TODO: cycle through all selected recordings and update df_t and dfoutput
-        return
-        self.purgeGroupCache(*uistate.df_groups['group_ID'].tolist())
-        self.tableFormat()
-        # cycle through all selected recordings and update norm outputs
-        for idx in uistate.rec_select:
-            row = self.df_project.iloc[idx]
-            rec = row['recording_name']
-            dfoutput = self.get_dfoutput(row=row)
+        # Placeholder function called when output must be recalculated
+        # For now, it recalculates ALL outputs, triggered by any "set All" button
+        # TODO: make a (default) version that only affects selected recordings
+        print(f" - recalculate")
+        self.uiFreeze()
+
+        norm_from = uistate.lineEdit['norm_EPSP_from']
+        norm_to = uistate.lineEdit['norm_EPSP_to']
+        EPSP_amp_halfwidth_ms = uistate.lineEdit['EPSP_amp_halfwidth_ms']
+        volley_amp_halfwidth_ms = uistate.lineEdit['volley_amp_halfwidth_ms']
+        dt = uistate.default_dict_t
+        dt['t_EPSP_amp_halfwidth'] = EPSP_amp_halfwidth_ms / 1000  # convert to seconds
+        dt['t_volley_amp_halfwidth'] = volley_amp_halfwidth_ms / 1000  # convert to seconds
+        dt['norm_output_from'] = norm_from
+        dt['norm_output_to'] = norm_to
+        uistate.save_cfg(projectfolder=self.dict_folders['project'])
+
+        uiplot.unPlot()
+        df_p = self.get_df_project()
+        for i, p_row in df_p.iterrows():
+            rec = p_row['recording_name']
+            df_t = self.get_dft(p_row)
+            df_t['t_EPSP_amp_halfwidth'] = dt['t_EPSP_amp_halfwidth']
+            df_t['t_volley_amp_halfwidth'] = dt['t_volley_amp_halfwidth']
+            df_t['norm_output_from'] = dt['norm_output_from'] 
+            df_t['norm_output_to'] = dt['norm_output_to']
+            self.set_dft(rec, df_t)
+            dfoutput = self.get_dfoutput(p_row, reset=True)
             self.persistOutput(rec, dfoutput)
-            uiplot.updateEPSPout(rec, dfoutput) # TODO: deprecated
-        print(f"editNormRange: {uistate.lineEdit['norm_EPSP_from']}-{uistate.lineEdit['norm_EPSP_to']}")
+            uiplot.addRow(p_row, df_t, self.get_dfmean(p_row), dfoutput)
+        self.tableFormat()
+
+        # group handling
+        self.purgeGroupCache(*uistate.df_groups['group_ID'].tolist())
+        # TODO: rest of group handling
+
+        uiplot.hideAll()
+        self.update_rec_show(reset=True)
+        self.mouseoverUpdate()
+        self.uiThaw()
 
 
     def editAmpHalfwidth(self, lineEdit):
@@ -1669,7 +1738,10 @@ class UIsub(Ui_MainWindow):
         except ValueError:
             num = 0
         lineEdit.setText(str(num))
-        self.recalculate()
+        if lineEditName == "lineEdit_EPSP_amp_halfwidth":
+            uistate.lineEdit['EPSP_amp_halfwidth_ms'] = num
+        elif lineEditName == "lineEdit_volley_amp_halfwidth":
+            uistate.lineEdit['volley_amp_halfwidth_ms'] = num
 
     def editNormRange(self, lineEdit):
         self.usage("editNormRange")
@@ -1677,23 +1749,21 @@ class UIsub(Ui_MainWindow):
             num = max(0, int(lineEdit.text()))
         except ValueError:
             num = 0
-        if False:
-            if lineEdit.objectName() == "lineEdit_norm_EPSP_start": # start, cannot be higher than end
-                if num == uistate.lineEdit['norm_EPSP_from']:
-                    self.lineEdit_norm_EPSP_start.setText(str(num))
-                    return # no change
-                uistate.lineEdit['norm_EPSP_to'] = max(num, int(self.lineEdit_norm_EPSP_end.text()))
-                self.lineEdit_norm_EPSP_end.setText(str(uistate.lineEdit['norm_EPSP_to']))
-                uistate.lineEdit['norm_EPSP_from'] = num
-            else: # end, cannot be lower than start
-                if num == uistate.lineEdit['norm_EPSP_to']:
-                    self.lineEdit_norm_EPSP_end.setText(str(num))
-                    return # no change
-                uistate.lineEdit['norm_EPSP_to'] = min(num, int(self.lineEdit_norm_EPSP_start.text()))
-                self.lineEdit_norm_EPSP_start.setText(str(uistate.lineEdit['norm_EPSP_from']))
-                uistate.lineEdit['norm_EPSP_to'] = num
+        if lineEdit.objectName() == "lineEdit_norm_EPSP_start": # start, cannot be higher than end
+            if num == uistate.lineEdit['norm_EPSP_from']:
+                self.lineEdit_norm_EPSP_start.setText(str(num))
+                return # no change
+            uistate.lineEdit['norm_EPSP_to'] = max(num, int(self.lineEdit_norm_EPSP_end.text()))
+            self.lineEdit_norm_EPSP_end.setText(str(uistate.lineEdit['norm_EPSP_to']))
+            uistate.lineEdit['norm_EPSP_from'] = num
+        else: # end, cannot be lower than start
+            if num == uistate.lineEdit['norm_EPSP_to']:
+                self.lineEdit_norm_EPSP_end.setText(str(num))
+                return # no change
+            uistate.lineEdit['norm_EPSP_to'] = min(num, int(self.lineEdit_norm_EPSP_start.text()))
+            self.lineEdit_norm_EPSP_start.setText(str(uistate.lineEdit['norm_EPSP_from']))
+            uistate.lineEdit['norm_EPSP_to'] = num
         lineEdit.setText(str(num))
-        self.recalculate()
 
     def copy_dft(self):
         if uistate.dft_copy is None:
@@ -2105,15 +2175,15 @@ class UIsub(Ui_MainWindow):
             self.tableUpdate()
             self.mouseoverUpdate()
 
-    def purgeGroupCache(self, *groups): # clear cache so that a new group mean is calculated
-        if not groups:  # if no groups are passed
-            groups = list(self.dict_group_means.keys())  # purge all groups
+    def purgeGroupCache(self, *group_IDs): # clear cache so that a new group mean is calculated
+        if not group_IDs:  # if no group IDs are passed
+            group_IDs = list(self.dict_group_means.keys())  # purge all groups
         if config.verbose:
-            print(f"purgeGroupCache: {groups}, len(group): {len(groups)}")
-        for group in groups:
-            if group in self.dict_group_means:
-                del self.dict_group_means[group]
-            path_group_cache = Path(f"{self.dict_folders['cache']}/{group}.csv")
+            print(f"purgeGroupCache: {group_IDs}, len(group): {len(group_IDs)}")
+        for group_ID in group_IDs:
+            if group_ID in self.dict_group_means:
+                del self.dict_group_means[group_ID]
+            path_group_cache = Path(f"{self.dict_folders['cache']}/{group_ID}.csv")
             if path_group_cache.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
                 print(f"{path_group_cache} found when checking for existence...")
                 try:
@@ -2121,7 +2191,7 @@ class UIsub(Ui_MainWindow):
                     print("...and was successfully unlinked.")
                 except FileNotFoundError:
                     print("...but NOT when attempting to unlink.")
-            uiplot.unPlotGroup(group)
+            uiplot.unPlotGroup(group_ID)
 
     def clearGroupsByRow(self, rows):
         list_affected_groups = ' '.join(self.df_project.iloc[rows]['group_IDs'])
@@ -2395,7 +2465,6 @@ class UIsub(Ui_MainWindow):
                 poly_order = int(dict_filter_params['poly_order'])
                 dfmean['savgol'] = analysis.addFilterSavgol(df = dfmean, window_length=window_length, poly_order=poly_order)
                 persist = True
-
         if persist:
             self.df2csv(df=dfmean, rec=recording_name, key="mean")
         self.dict_means[recording_name] = dfmean

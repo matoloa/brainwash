@@ -298,6 +298,17 @@
               <string>Output per stim</string>
              </property>
             </widget>
+            <zorder>checkBox_show_all_events</zorder>
+            <zorder>checkBox_timepoints_per_stim</zorder>
+            <zorder>label_stims</zorder>
+            <zorder>pushButton_stim_assign_threshold</zorder>
+            <zorder>label_stim_detection_threshold</zorder>
+            <zorder>label_mean_to</zorder>
+            <zorder>label_mean_selected_range</zorder>
+            <zorder>pushButton_stim_detect</zorder>
+            <zorder>checkBox_output_per_stim</zorder>
+            <zorder>lineEdit_mean_selection_start</zorder>
+            <zorder>lineEdit_mean_selection_end</zorder>
            </widget>
           </item>
           <item>
@@ -305,7 +316,7 @@
             <property name="minimumSize">
              <size>
               <width>131</width>
-              <height>181</height>
+              <height>211</height>
              </size>
             </property>
             <property name="frameShape">
@@ -458,6 +469,44 @@
               <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
              </property>
             </widget>
+            <widget class="QPushButton" name="pushButton_EPSP_amp_width_set_all">
+             <property name="geometry">
+              <rect>
+               <x>40</x>
+               <y>170</y>
+               <width>51</width>
+               <height>25</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>Set All</string>
+             </property>
+            </widget>
+            <widget class="QPushButton" name="pushButton_volley_amp_width_set_all">
+             <property name="geometry">
+              <rect>
+               <x>130</x>
+               <y>170</y>
+               <width>51</width>
+               <height>25</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>Set All</string>
+             </property>
+            </widget>
+            <zorder>checkBox_EPSP_slope</zorder>
+            <zorder>checkBox_volley_slope</zorder>
+            <zorder>checkBox_EPSP_amp</zorder>
+            <zorder>label_aspect</zorder>
+            <zorder>checkBox_volley_amp</zorder>
+            <zorder>label_header_amp_halfwidth</zorder>
+            <zorder>label_EPSP_amp_halfwidth</zorder>
+            <zorder>label_volley_amp_halfwidth</zorder>
+            <zorder>lineEdit_EPSP_amp_halfwidth</zorder>
+            <zorder>lineEdit_volley_amp_halfwidth</zorder>
+            <zorder>pushButton_EPSP_amp_width_set_all</zorder>
+            <zorder>pushButton_volley_amp_width_set_all</zorder>
            </widget>
           </item>
           <item>
@@ -572,6 +621,27 @@
               <string>output Ymin 0</string>
              </property>
             </widget>
+            <widget class="QPushButton" name="pushButton_norm_range_set_all">
+             <property name="geometry">
+              <rect>
+               <x>130</x>
+               <y>70</y>
+               <width>51</width>
+               <height>25</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>Set All</string>
+             </property>
+            </widget>
+            <zorder>label_norm_on_sweep</zorder>
+            <zorder>checkBox_norm_EPSP</zorder>
+            <zorder>label_relative_to</zorder>
+            <zorder>label_scaling</zorder>
+            <zorder>checkBox_output_ymin0</zorder>
+            <zorder>lineEdit_norm_EPSP_end</zorder>
+            <zorder>lineEdit_norm_EPSP_start</zorder>
+            <zorder>pushButton_norm_range_set_all</zorder>
            </widget>
           </item>
           <item>
