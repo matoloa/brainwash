@@ -83,7 +83,7 @@ class UIstate:
             't_volley_slope_params': 'NA',
             'volley_slope_mean': 0,
             't_volley_amp': 0,
-            't_volley_amp_halfwidth': 0,
+            't_volley_amp_halfwidth': 0.0002,
             't_volley_amp_method': 'auto detect',
             't_volley_amp_params': 'NA',
             'volley_amp_mean': 0,
@@ -97,7 +97,7 @@ class UIstate:
             't_EPSP_slope_method': 'auto detect',
             't_EPSP_slope_params': 'NA',
             't_EPSP_amp': 0,
-            't_EPSP_amp_halfwidth': 0,
+            't_EPSP_amp_halfwidth': 0.002,
             't_EPSP_amp_method': 'auto detect',
             't_EPSP_amp_params': 'NA',
         }
@@ -231,7 +231,7 @@ class UIstate:
                 'checkBox': self.checkBox,
                 'lineEdit': self.lineEdit,
                 'zoom': self.zoom,
-                'default': self.default,
+                'default_dict_t': self.default_dict_t,
             }
         except KeyError:
             self.reset()
@@ -245,7 +245,7 @@ class UIstate:
         self.checkBox = state.get('checkBox')
         self.lineEdit = state.get('lineEdit')
         self.zoom = state.get('zoom')
-        self.default = state.get('default')
+        self.default_dict_t = state.get('default_dict_t')
 
     def load_cfg(self, projectfolder, bw_version, force_reset=False): # load state from project config file
         path_pkl = projectfolder / "cfg.pkl"

@@ -175,14 +175,20 @@ def find_i_stims(dfmean, threshold=0.1, min_time_difference=0.005, verbose=False
 
     above_threshold_indices = np.where(dfmean['prim'] > threshold)[0]
     # Filter the indices to ensure they are more than min_time_difference apart
-    filtered_indices = [above_threshold_indices[0]]
+    filtered_indices = []
+    max_index = above_threshold_indices[0]
     for i in range(1, len(above_threshold_indices)):
-        if dfmean['time'].iloc[above_threshold_indices[i]] - dfmean['time'].iloc[above_threshold_indices[i - 1]] > min_time_difference:
-            filtered_indices.append(above_threshold_indices[i])
+        current_index = above_threshold_indices[i]
+        previous_index = above_threshold_indices[i - 1]
+        if dfmean['time'][current_index] - dfmean['time'][previous_index] > min_time_difference:
+            filtered_indices.append(max_index)
+            max_index = current_index
+        elif dfmean['prim'][current_index] > dfmean['prim'][max_index]:
+            max_index = current_index
+    filtered_indices.append(max_index)
     if verbose:
         print(f"find_i_stims: {filtered_indices}, type: {type(filtered_indices)}")
     return filtered_indices
-
 
 # %%
 def find_i_EPSP_peak_max(
@@ -452,13 +458,14 @@ def find_all_t(dfmean, default_dict_t, precision=None, param_min_time_from_i_sti
     Acquires indices via find_all_i() for the provided dfmean and converts them to time values
     Returns a DataFrame of the t-values for each stim, as provided by find_all_i()
     """
-    def i2t(index, dfmean, row, precision):
+
+    def i2t(index, dfmean, row, precision, default_dict_t):
         # Converts i (index) to t (time from start of sweep in dfmean)
         time_values = dfmean['time'].values
         if precision is None:
             precision = len(str(time_values[1] - time_values[0]).split('.')[1])
-        EPSP_slope_halfwidth = row['t_EPSP_amp_halfwidth']
-        volley_slope_halfwidth = row['t_volley_amp_halfwidth']
+        volley_slope_halfwidth = default_dict_t['t_volley_slope_halfwidth']
+        EPSP_slope_halfwidth = default_dict_t['t_EPSP_slope_halfwidth']
         t_EPSP_slope = dfmean.loc[row['i_EPSP_slope']].time if 'i_EPSP_slope' in row and row['i_EPSP_slope'] in dfmean.index else None
         t_volley_slope = dfmean.loc[row['i_volley_slope']].time if 'i_volley_slope' in row and row['i_volley_slope'] in dfmean.index else None
         t_EPSP_amp = dfmean.loc[row['i_EPSP_amp']].time if 'i_EPSP_amp' in row and row['i_EPSP_amp'] in dfmean.index else None
@@ -486,8 +493,10 @@ def find_all_t(dfmean, default_dict_t, precision=None, param_min_time_from_i_sti
     # Convert each index to a dictionary of t-values and add it to a list
     list_of_dict_t = []
     for index, row in df_indices.iterrows():
-        result = i2t(index, dfmean, row, precision)
-        list_of_dict_t.append(result)
+        result = i2t(index, dfmean, row, precision, default_dict_t)
+        dict_t = default_dict_t.copy()
+        dict_t.update(result)
+        list_of_dict_t.append(dict_t)
 
     # Convert the list of dictionaries to a DataFrame
     df_t = pd.DataFrame(list_of_dict_t)
