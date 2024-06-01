@@ -351,7 +351,7 @@ class UIplot():
                 y_position = df_event.loc[df_event.time == x_position, rec_filter]
                 self.plot_marker(f"{label} {stim_str} EPSP amp marker", 'axe', x_position, y_position, settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                 amp_x = x_position - t_row['t_EPSP_amp_halfwidth'], x_position + t_row['t_EPSP_amp_halfwidth']
-                amp_y = amp_zero, 0 - (out['EPSP_amp'].iloc[0] / 1000) + amp_zero # .iloc[0] since filtered by stim, /1000 to convert from mV to V
+                amp_y = amp_zero, amp_zero - (out['EPSP_amp'].mean() / 1000) # mV to V
                 self.plot_cross(f"{label} {stim_str} EPSP amp", 'axe', x_position, amp_x, amp_y, settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                 if x_axis == 'sweep':
                     self.plot_line(f"{label} {stim_str} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
@@ -374,13 +374,13 @@ class UIplot():
                 y_position = df_event.loc[df_event.time == t_row['t_volley_amp'], rec_filter]
                 color = settings['rgb_volley_amp']
                 self.plot_marker(f"{label} {stim_str} volley amp marker", 'axe', t_row['t_volley_amp'], y_position, settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
+                volley_amp_mean = t_row.get('volley_amp_mean')
+                if volley_amp_mean is None:
+                    volley_amp_mean = out['volley_amp'].mean()
                 amp_x = x_position - t_row['t_volley_amp_halfwidth'], x_position + t_row['t_volley_amp_halfwidth']
-                amp_y = amp_zero, 0 - (out['volley_amp'].iloc[0] / 1000) + amp_zero # .iloc[0] since filtered by stim, /1000 to convert from mV to V
+                amp_y = amp_zero, amp_zero - volley_amp_mean / 1000 # mV to V
                 self.plot_cross(f"{label} {stim_str} volley amp", 'axe', x_position, amp_x, amp_y, color, rec_ID, aspect='volley_amp', stim=stim_num)
                 if x_axis == 'sweep':
-                    volley_amp_mean = t_row.get('volley_amp_mean')
-                    if volley_amp_mean is None:
-                        volley_amp_mean = out['volley_amp'].mean()
                     self.plot_hline(f"{label} {stim_str} volley amp mean", 'ax2', volley_amp_mean, settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
 
             if not np.isnan(t_row['t_volley_slope_start']):

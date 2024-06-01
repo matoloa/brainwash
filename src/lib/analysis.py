@@ -13,21 +13,20 @@ def valid(num):
     return num is not None and not np.isnan(num)
 
 # %%
-def build_dfoutput(df, dict_t, lineEdit, filter='voltage'):
+def build_dfoutput(df, dict_t, filter='voltage', quick=False):
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
     Args:
         df: a dataframe containing numbered sweeps, timestamps and voltage
-        dict_t: a dictionary containing the following
-            t_volley_amp: time of lowest point of volley
-            t_EPSP_amp: time of lowest point of EPSP
-            t_volley_slope_start/end: first and last point of volley slope measurement
-            t_EPSP_slope_start/end: first and last point of ESPS slope measurement
-        filter: the filter (column name) to use for output. Default: 'voltage'
+        dict_t: a dictionary of measuring points
+        lineEdit: a dictionary of user settings
+
     Returns:
         a dataframe. Per sweep (row): EPSP_amp, EPSP_slope, volley_amp, volley_EPSP
     """
     t0 = time.time()
     # print (f"build_dfoutput: {dict_t}")
+    normFrom = dict_t['norm_output_from'] # start
+    normTo = dict_t['norm_output_to'] # end
     list_col = ['stim', 'sweep']
     dfoutput = pd.DataFrame()
     dfoutput['sweep'] = df.sweep.unique() # one row per unique sweep in data file
@@ -39,18 +38,17 @@ def build_dfoutput(df, dict_t, lineEdit, filter='voltage'):
         if valid(t_EPSP_amp):
             amp_zero = dict_t['amp_zero']
             EPSP_hw = dict_t['t_EPSP_amp_halfwidth']
-            start_time = dict_t['t_EPSP_amp'] - EPSP_hw
-            end_time = dict_t['t_EPSP_amp'] + EPSP_hw
-            start_index = np.abs(df['time'] - start_time).idxmin()
-            end_index = np.abs(df['time'] - end_time).idxmin()
-            df_EPSP_amp = df.iloc[start_index:end_index+1].copy()
-            df_EPSP_amp.reset_index(drop=True, inplace=True)
-            dfoutput['EPSP_amp'] = (df_EPSP_amp.groupby('sweep')[filter].mean() - amp_zero) * -1000 # convert to mV for output
+            if EPSP_hw == 0 or quick: #single point
+                df_EPSP_amp = df[df['time']==t_EPSP_amp].copy() # filter out all time (from sweep start) that do not match t_EPSP_amp
+                df_EPSP_amp.reset_index(inplace=True, drop=True)
+                dfoutput['EPSP_amp'] = -1000 * df_EPSP_amp[filter] # invert and convert to mV
+            else: # mean (SLOW)
+                start_time = t_EPSP_amp - EPSP_hw
+                end_time = t_EPSP_amp + EPSP_hw
+                dfoutput['EPSP_amp'] = df.groupby('sweep').apply(lambda sweep_df: ((sweep_df.loc[(sweep_df['time'] >= start_time) & (sweep_df['time'] <= end_time), filter].mean() - amp_zero) * -1000)) # convert to mV for output
         else:
             dfoutput['EPSP_amp'] = np.nan
         # Normalize EPSP_amp
-        normFrom = lineEdit['norm_EPSP_from'] # start
-        normTo = lineEdit['norm_EPSP_to'] # end
         selected_values = dfoutput[(dfoutput.index >= normFrom) & (dfoutput.index <= normTo)]['EPSP_amp']
         norm_mean = selected_values.mean() / 100  # divide by 100 to get percentage
         dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
@@ -65,25 +63,24 @@ def build_dfoutput(df, dict_t, lineEdit, filter='voltage'):
         else:
             dfoutput['EPSP_slope'] = np.nan
         # Normalize EPSP_slope
-        normFrom = lineEdit['norm_EPSP_from'] # start
-        normTo = lineEdit['norm_EPSP_to'] # end
         selected_values = dfoutput[(dfoutput.index >= normFrom) & (dfoutput.index <= normTo)]['EPSP_slope']
         norm_mean = selected_values.mean() / 100  # divide by 100 to get percentage
         dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
         list_col.extend(['EPSP_slope', 'EPSP_slope_norm'])
     # volley_amp
     if 't_volley_amp' in dict_t.keys():
-        amp_zero = dict_t['amp_zero']
-        volley_hw = dict_t['t_volley_amp_halfwidth']
         t_volley_amp = dict_t['t_volley_amp']
         if valid(t_volley_amp):
-            start_time = t_volley_amp - volley_hw
-            end_time = t_volley_amp + volley_hw
-            start_index = np.abs(df['time'] - start_time).idxmin()
-            end_index = np.abs(df['time'] - end_time).idxmin()
-            df_volley_amp = df.iloc[start_index:end_index+1].copy()
-            df_volley_amp.reset_index(drop=True, inplace=True)
-            dfoutput['volley_amp'] = (df_volley_amp.groupby('sweep')[filter].mean() - amp_zero) * -1000 
+            amp_zero = dict_t['amp_zero']
+            volley_hw = dict_t['t_volley_amp_halfwidth']
+            if volley_hw == 0 or quick: # single point
+                df_volley_amp = df[df['time']==t_volley_amp].copy() # filter out all time (from sweep start) that do not match t_volley_amp
+                df_volley_amp.reset_index(inplace=True, drop=True)
+                dfoutput['volley_amp'] = -1000 * df_volley_amp[filter] # invert and convert to mV
+            else: # mean (SLOW)
+                start_time = t_volley_amp - volley_hw
+                end_time = t_volley_amp + volley_hw
+                dfoutput['volley_amp'] = df.groupby('sweep').apply(lambda sweep_df: ((sweep_df.loc[(sweep_df['time'] >= start_time) & (sweep_df['time'] <= end_time), filter].mean() - amp_zero) * -1000)) # convert to mV for output
         else:
             dfoutput['volley_amp'] = np.nan
         list_col.append('volley_amp')

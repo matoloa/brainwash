@@ -34,7 +34,7 @@ class Config:
         print("\n"*3)
         if self.dev_mode:
             print(f"Config set for development mode - {time.strftime('%H:%M:%S')}")
-        clear = False
+        clear = True
 
         self.clear_cache = clear
         self.transient = False # Block persisting of files
@@ -2521,13 +2521,13 @@ class UIsub(Ui_MainWindow):
                 df_t = self.get_dft(row=row)
             print(f"df_t: {df_t}")
             if uistate.checkBox['output_per_stim']:
-                dfoutput = analysis.build_dfstimoutput(df=dfmean, df_t=df_t, lineEdit=uistate.lineEdit)
+                dfoutput = analysis.build_dfstimoutput(df=dfmean, df_t=df_t)
             else:
                 dfoutput = pd.DataFrame()
                 for i, t_row in df_t.iterrows():
                     dict_t = t_row.to_dict()
                     dffilter = self.get_dffilter(row)
-                    dfoutput_stim = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
+                    dfoutput_stim = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
                     dfoutput = pd.concat([dfoutput, dfoutput_stim])
                     print(f"dfoutput_stim: {dfoutput_stim}")
         dfoutput.reset_index(inplace=True)
@@ -3012,11 +3012,7 @@ class UIsub(Ui_MainWindow):
         ax = getattr(uistate, str_ax)
         if str_ax is None or x is None or y is None or not event.inaxes == ax or not (uistate.slopeView() or uistate.ampView()):
             if uistate.ghost_sweep is not None: # remove ghost sweep if outside output graph
-                uistate.ghost_sweep.remove()
-                uistate.ghost_sweep = None
-                uistate.ghost_label.remove()
-                uistate.ghost_label = None
-                uistate.axe.figure.canvas.draw()
+                self.exorcise()
             return
         x_axis = 'stim' if uistate.checkBox['output_per_stim'] else 'sweep'
         # find a visible line
@@ -3060,8 +3056,10 @@ class UIsub(Ui_MainWindow):
             uistate.axe.figure.canvas.draw()
         uistate.last_out_x_idx = out_x_idx
         ax.figure.canvas.draw()
-
     def on_leave_output(self, event):
+        self.exorcise()
+
+    def exorcise(self):
         if uistate.ghost_sweep is not None:
             uistate.ghost_sweep.remove()
             uistate.ghost_sweep = None
@@ -3387,7 +3385,7 @@ class UIsub(Ui_MainWindow):
         elif x_axis == 'sweep':
             dict_t['stim'] = t_row['stim']
             dict_t['amp_zero'] = t_row['amp_zero']
-            out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, lineEdit=uistate.lineEdit)
+            out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
         if uistate.mouseover_out is None:
             uistate.mouseover_out = uistate.ax1.plot(out[x_axis], out[aspect], color=uistate.settings[f'rgb_{aspect}'], linewidth=3)
         else:
