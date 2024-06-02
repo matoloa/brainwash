@@ -9,7 +9,6 @@ class UIstate:
         print("UIstate: reset")
         self.version = "0.0.0"
         self.colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000']
-        self.df_groups = pd.DataFrame(columns=['group_ID', 'group_name', 'color', 'show'])
         self.splitter = {
             'h_splitterMaster': [0.105, 0.04, 0.795, 0.09],
             'v_splitterGraphs': [0.2, 0.5, 0.3],
@@ -163,9 +162,6 @@ class UIstate:
         self.ghost_sweep = None
         self.ghost_label = None
 
-    def group_ID2name(self, group_ID):
-        return self.df_groups.loc[self.df_groups['group_ID'] == group_ID, 'group_name'].values[0]
-
     def setMargins(self, axe, pixels=10): # set margins for mouseover detection
         self.x_margin = axe.transData.inverted().transform((pixels, 0))[0] - axe.transData.inverted().transform((0, 0))[0]
         self.y_margin = axe.transData.inverted().transform((0, pixels))[1] - axe.transData.inverted().transform((0, 0))[1]
@@ -242,7 +238,6 @@ class UIstate:
             return {
                 'version': self.version,
                 'colors': self.colors,
-                'df_groups': self.df_groups,
                 'splitter': self.splitter,
                 'viewTools': self.viewTools,
                 'checkBox': self.checkBox,
@@ -256,7 +251,6 @@ class UIstate:
     def set_state(self, state):
         self.version = state.get('version')
         self.colors = state.get('colors')
-        self.df_groups = state.get('df_groups')
         self.splitter = state.get('splitter')
         self.viewTools = state.get('viewTools')
         self.checkBox = state.get('checkBox')

@@ -135,7 +135,7 @@ class UIplot():
             del dict_group[key]
 
 
-    def graphRefresh(self):
+    def graphRefresh(self, dfgroups):
         # show only selected and imported lines, only appropriate aspects
         print("graphRefresh")
         uistate = self.uistate
@@ -162,7 +162,7 @@ class UIplot():
         # Groups
         for label, dict_group in uistate.dict_group_labels.items():
             group_ID = dict_group['group_ID']
-            str_show = uistate.df_groups.loc[uistate.df_groups['group_ID'] == group_ID, 'show'].values[0]
+            str_show = dfgroups.loc[dfgroups['group_ID'] == group_ID, 'show'].values[0]
             if uistate.df_recs2plot is not None and not getattr(uistate.df_recs2plot, 'empty', True):
                 if 'group_IDs' in uistate.df_recs2plot.columns and any(uistate.df_recs2plot['group_IDs'].str.contains(group_ID)):
                     dict_group['line'].set_visible(bool(str_show == 'True'))
