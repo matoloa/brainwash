@@ -1028,7 +1028,7 @@ class UIsub(Ui_MainWindow):
         old_selection = uistate.dict_rec_show 
         selected_ids = set(uistate.df_recs2plot['ID'])
         selected_stims = [stim + 1 for stim in uistate.stim_select] # stim_select is 0-based (indices) - convert to stims
-        # print(f"update_rec_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}")
+        print(f"update_rec_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}")
         # remove non-selected recs and stims
         aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
         new_selection = {k: v for k, v in uistate.dict_rec_labels.items() 
@@ -1595,11 +1595,11 @@ class UIsub(Ui_MainWindow):
     def triggerRemoveLastGroup(self):
         self.usage("triggerRemoveLastGroup")
         if not uistate.df_groups.empty:  # Check if the DataFrame is not empty
-            group__ID_to_remove = uistate.df_groups.iloc[-1]['group_ID']
-            self.removeGroupControls(group__ID_to_remove)
+            group_ID_to_remove = uistate.df_groups.iloc[-1]['group_ID']
+            self.removeGroupControls(group_ID_to_remove)
             uistate.df_groups.drop(uistate.df_groups.index[-1], inplace=True)
             uistate.save_cfg(projectfolder=self.dict_folders['project'])
-            self.removeFromGroup(group__ID_to_remove, self.get_df_project().index)
+            self.removeFromGroup(group_ID_to_remove, self.get_df_project().index)
 
     def triggerRemoveLastEmptyGroup(self):
         self.usage("triggerRemoveLastEmptyGroup")
@@ -2036,6 +2036,7 @@ class UIsub(Ui_MainWindow):
         self.clearGroupsByRow(df_p.index) # clear all groups from all rows in df_project
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
+
     def addGroupControls(self, str_ID): # Create menu for adding to group and checkbox for showing group
         group_ID = f"group_{str_ID}" # backend group name for object naming
         group_name = uistate.df_groups.loc[uistate.df_groups['group_ID'] == str_ID, 'group_name'].values[0]
@@ -2156,7 +2157,6 @@ class UIsub(Ui_MainWindow):
         self.graphGroups()
         self.mouseoverUpdate()
 
-    
     def removeFromGroup(self, remove_group_ID, indices=uistate.rec_select):
         self.usage("removeFromGroup")
         str_remove_group_ID = str(remove_group_ID)
@@ -2166,10 +2166,17 @@ class UIsub(Ui_MainWindow):
             for i in indices:
                 if self.df_project.loc[i, 'group_IDs'] != " ":
                     str_group_IDs = self.df_project.loc[i, 'group_IDs']
-                    list_groups = list(str_group_IDs.split(","))
-                    if str_remove_group_ID in list_groups:
-                        list_groups.remove(str_remove_group_ID)
-                        self.df_project.loc[i, 'group_IDs'] = ",".join(map(str, sorted(list_groups)))
+                    list_group_IDs = list(str_group_IDs.split(","))
+                    list_group_names = list(self.df_project.loc[i, 'groups'].split(","))
+                    if str_remove_group_ID in list_group_IDs:
+                        list_group_IDs.remove(list_group_IDs)
+                        list_group_names.remove(uistate.group_ID2name(str_remove_group_ID))
+                        if list_group_IDs:
+                            self.df_project.loc[i, 'group_IDs'] = ",".join(map(str, sorted(list_group_IDs)))
+                            self.df_project.loc[i, 'groups'] = ",".join(map(str, sorted(list_group_names)))
+                        else:
+                            self.df_project.loc[i, 'group_IDs'] = " "
+                            self.df_project.loc[i, 'groups'] = " "
             self.save_df_project()
             self.purgeGroupCache(remove_group_ID)
             self.tableUpdate()
@@ -2184,13 +2191,15 @@ class UIsub(Ui_MainWindow):
             if group_ID in self.dict_group_means:
                 del self.dict_group_means[group_ID]
             path_group_cache = Path(f"{self.dict_folders['cache']}/{group_ID}.csv")
-            if path_group_cache.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
-                print(f"{path_group_cache} found when checking for existence...")
-                try:
-                    path_group_cache.unlink()
-                    print("...and was successfully unlinked.")
-                except FileNotFoundError:
-                    print("...but NOT when attempting to unlink.")
+            path_group_mean_cache = Path(f"{self.dict_folders['cache']}/{group_ID}_mean.csv")
+            for groupfile_path in [path_group_cache, path_group_mean_cache,]:
+                if groupfile_path.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
+                    print(f"{groupfile_path} found when checking for existence...")
+                    try:
+                        groupfile_path.unlink()
+                        print("...and was successfully unlinked.")
+                    except FileNotFoundError:
+                        print("...but NOT when attempting to unlink.")
             uiplot.unPlotGroup(group_ID)
 
     def clearGroupsByRow(self, rows):
@@ -2796,6 +2805,8 @@ class UIsub(Ui_MainWindow):
 
     def graphGroups(self):
         group_ids = set(uistate.df_groups['group_ID'])
+        if not group_ids:
+            return
         print (f"group_ids: {group_ids}, {type(group_ids)}")
         print (f"df_project: {self.df_project['group_IDs'], type(self.df_project['group_IDs'])}")
         groups_with_recs = set(group_id for group_ids in self.df_project['group_IDs'] for group_id in group_ids.split(','))

@@ -127,11 +127,11 @@ class UIplot():
 
 
     def unPlotGroup(self, group_ID):
-        dict_group = self.uistate.dict_group_label_ID_line_SEM
-        keys_to_remove = [key for key, value in dict_group.items() if group_ID == value[0]]
+        dict_group = self.uistate.dict_group_labels
+        keys_to_remove = [key for key, value in dict_group.items() if group_ID == value['group_ID']]
         for key in keys_to_remove:
-            dict_group[key][1].remove()
-            dict_group[key][2].remove()
+            dict_group[key]['fill'].remove()
+            dict_group[key]['line'].remove()
             del dict_group[key]
 
 
@@ -160,19 +160,19 @@ class UIplot():
                 axis = getattr(uistate, axis_name)
                 axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)              
         # Groups
-        for label, ID_line_fill in uistate.dict_group_label_ID_line_SEM.items():
-            group_ID = ID_line_fill[0]
+        for label, dict_group in uistate.dict_group_labels.items():
+            group_ID = dict_group['group_ID']
             str_show = uistate.df_groups.loc[uistate.df_groups['group_ID'] == group_ID, 'show'].values[0]
             if uistate.df_recs2plot is not None and not getattr(uistate.df_recs2plot, 'empty', True):
                 if 'group_IDs' in uistate.df_recs2plot.columns and any(uistate.df_recs2plot['group_IDs'].str.contains(group_ID)):
-                    ID_line_fill[1].set_visible(bool(str_show == 'True'))
-                    ID_line_fill[2].set_visible(bool(str_show == 'True'))
+                    dict_group['line'].set_visible(bool(str_show == 'True'))
+                    dict_group['fill'].set_visible(bool(str_show == 'True'))
                 else: # always hidden, as none of its recordings are selected
-                    ID_line_fill[1].set_visible(False)
-                    ID_line_fill[2].set_visible(False)
+                    dict_group['line'].set_visible(False)
+                    dict_group['fill'].set_visible(False)
             else: # show all checked groups, as no recordings are selected
-                ID_line_fill[1].set_visible(bool(str_show == 'True'))
-                ID_line_fill[2].set_visible(bool(str_show == 'True'))
+                dict_group['line'].set_visible(bool(str_show == 'True'))
+                dict_group['fill'].set_visible(bool(str_show == 'True'))
 
         # arrange axes and labels
         axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
@@ -295,7 +295,7 @@ class UIplot():
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':hline, 'axis':axid}
 
 
-    def addRow(self, p_row, dft, dfmean, dfoutput): # TODO: unspaghetti this
+    def addRow(self, p_row, dft, dfmean, dfoutput):
         rec_ID = p_row['ID']
         rec_name = p_row['recording_name']
         rec_filter = p_row['filter'] # the filter currently used for this recording
@@ -407,6 +407,7 @@ class UIplot():
 
 
     def addGroup(self, df_group_row, df_groupmean):
+        # plot group meanlines and SEMs
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
         group_ID = df_group_row['group_ID']
         group_name = df_group_row['group_name']
@@ -416,12 +417,13 @@ class UIplot():
             label = f"{group_name} EPSP amp"
             line, = ax1.plot(df_groupmean.sweep, df_groupmean.EPSP_amp_mean, color=color, alpha=0.5, linestyle='--', label=label)
             fill = ax1.fill_between(df_groupmean.sweep, df_groupmean.EPSP_amp_mean + df_groupmean.EPSP_amp_SEM, df_groupmean.EPSP_amp_mean - df_groupmean.EPSP_amp_SEM, alpha=0.3, color=color)
-            self.uistate.dict_group_label_ID_line_SEM[label] = [group_ID, line, fill]
+            self.uistate.dict_group_labels[label] = {'group_ID':group_ID, 'aspect':'EPSP_amp', 'axis':'ax1', 'line':line, 'fill':fill}
         if df_groupmean['EPSP_slope_mean'].notna().any() & self.uistate.checkBox['EPSP_slope']:
             label = f"{group_name} EPSP slope"
             line, = ax2.plot(df_groupmean.sweep, df_groupmean.EPSP_slope_mean, color=color, alpha=0.5, linestyle='--', label=label)
             fill = ax2.fill_between(df_groupmean.sweep, df_groupmean.EPSP_slope_mean + df_groupmean.EPSP_slope_SEM, df_groupmean.EPSP_slope_mean - df_groupmean.EPSP_slope_SEM, alpha=0.3, color=color)
-            self.uistate.dict_group_label_ID_line_SEM[label] = [group_ID, line, fill]
+            self.uistate.dict_group_labels[label] = {'group_ID':group_ID, 'aspect':'EPSP_slope', 'axis':'ax2', 'line':line, 'fill':fill}
+
 
     def plotUpdate(self, p_row, t_row, aspect, data_x, data_y, amp=None): # TODO: unspaghetti this
         norm = self.uistate.checkBox['norm_EPSP']

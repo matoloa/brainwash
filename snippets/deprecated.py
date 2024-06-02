@@ -1,5 +1,27 @@
 # Functions that are not in use anymore, but might be useful again in the future
 '''
+                # addRow DEBUG Block, draw event x/y lines and means
+                self.plot_line(f"{label} {stim_str} amp_zero", 'axe', [-0.002, -0.001], [amp_zero, amp_zero], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
+                x, y = self.uistate.dict_rec_labels[f"{label} {stim_str}"]['line'].get_data()
+                # filter x and y by amp_x
+                start_time = t_row['t_EPSP_amp'] - t_row['EPSP_amp_halfwidth']
+                end_time = t_row['t_EPSP_amp'] + t_row['EPSP_amp_halfwidth']
+                # Find the index of the closest value to start_time and end_time in x
+                start_index = (np.abs(x - start_time)).argmin()
+                end_index = (np.abs(x - end_time)).argmin()
+                x = x[start_index:end_index+1]
+                y = y[start_index:end_index+1]
+                mean = y.mean()
+                # plot the mean line
+                out_amp = out['EPSP_amp'].iloc[0] / -1000 # convert from mV to V, undo inversion
+                out_amp = out_amp + amp_zero # undo amp-zero compensation
+                self.plot_line(f"{label} {stim_str} amp_event: {str(round(mean, 6))}, {str(len(x))}", 'axe', amp_x, [mean, mean], 'green', rec_ID, aspect='EPSP_amp', stim=stim_num)
+                self.plot_line(f"{label} {stim_str} amp_output: {str(round(out_amp, 6))}, {str(len(x))}", 'axe', amp_x, [out_amp, out_amp], 'red', rec_ID, aspect='EPSP_amp', stim=stim_num)
+
+
+
+
+
     above_threshold_indices = np.where(dfmean['prim'] > threshold)[0]
     # Filter the indices to ensure they are more than min_time_difference apart
     filtered_indices = []
