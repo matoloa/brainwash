@@ -27,6 +27,41 @@ import ui_plot
 matplotlib_use("Qt5Agg")
 
 
+
+'''
+####################################################################
+#                    Table of Contents                             #
+####################################################################
+
+    Globals
+    Custom sub-classes
+    Main class (UIsub)
+        Selection changers
+        WIP section TODO: move to appopriate sections
+        uisub inits
+        triggers
+        Data editing
+        Data groups
+        Writers (files, dicts)
+        TODO: consolidate these sections
+            Project functions
+            df_p handling
+            df_t handling
+            table handling (df_p, df_t)
+            internal dataframe handling
+        Graph interface
+        Mouseover + click and drag functions, zooms
+        pyqtSlot decorators
+    get_signals
+    df_projectTemplate TODO: move to uistate?
+    Mainguard
+'''
+
+
+####################################################################
+#                             Globals                              #
+####################################################################
+
 class Config:
     def __init__(self):
         self.dev_mode = True # Development mode
@@ -56,10 +91,8 @@ uistate = ui_state_classes.UIstate() # global variable for storing state of UI
 importlib.reload(ui_plot)
 uiplot = ui_plot.UIplot(uistate)
 
-
-
 ####################################################################
-#                    Custom sub-classes                            #
+#                       Custom sub-classes                         #
 ####################################################################
 
 class TableModel(QtCore.QAbstractTableModel):
@@ -734,6 +767,8 @@ class Ui_MainWindow(QtCore.QObject):
             self.pushButton_stim_assign_threshold.setVisible(False)
             self.label_stim_detection_threshold.setVisible(False)
 
+
+
 ################################################################
 #        Dialog and table classes                              #
 ################################################################
@@ -967,7 +1002,7 @@ class UIsub(Ui_MainWindow):
 
 
 ######################################################################
-#               very frequently edited functions                     #
+#                     Selection changers                             #
 ######################################################################
 
     def tableProjSelectionChanged(self):
@@ -1065,7 +1100,7 @@ class UIsub(Ui_MainWindow):
 
 
 ##################################################################
-#    WIP: TODO: move these to appropriate header in this file    #
+#    WIP section: TODO: move to appropriate header               #
 ##################################################################
     def deleteFolder(self, dir_path):
         if os.path.exists(dir_path):
@@ -3624,9 +3659,9 @@ def df_projectTemplate():
         ]
     )
 
-def hold():
-    input("Press Enter to continue...")
 
+
+# Mainguard
 if __name__ == "__main__":
     print(f"\n\n{config.program_name} {config.version}\n")
     app = QtWidgets.QApplication(sys.argv) # "QtWidgets.QApplication(sys.argv) appears to cause Qt: Session management error: None of the authentication protocols specified are supported"
