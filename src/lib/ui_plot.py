@@ -162,19 +162,8 @@ class UIplot():
         # Groups
         for label, dict_group in uistate.dict_group_labels.items():
             print(f" - - {label}")
-            '''
-            visible_dd_groups = {k: v for k, v in self.dd_groups.items() if v['show']}
-            if uistate.df_recs2plot is not None and not getattr(uistate.df_recs2plot, 'empty', True):
-                if 'group_IDs' in uistate.df_recs2plot.columns and any(uistate.df_recs2plot['group_IDs'].str.contains(group_ID)):
-                    dict_group['line'].set_visible(bool(str_show == 'True'))
-                    dict_group['fill'].set_visible(bool(str_show == 'True'))
-                else: # always hidden, as none of its recordings are selected
-                    dict_group['line'].set_visible(False)
-                    dict_group['fill'].set_visible(False)
-            else: # show all checked groups, as no recordings are selected
-                dict_group['line'].set_visible(bool(str_show == 'True'))
-                dict_group['fill'].set_visible(bool(str_show == 'True'))
-            '''
+            dict_group['line'].set_visible(True)
+            dict_group['fill'].set_visible(True)
 
         # arrange axes and labels
         axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2

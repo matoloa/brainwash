@@ -263,7 +263,7 @@ class MplCanvas(FigureCanvasQTAgg):
 
 class CustomCheckBox(QtWidgets.QCheckBox):
 # Custom checkbox to allow right-click to rename group
-    rightClicked = QtCore.pyqtSignal(str)  # Define a new signal that carries a string
+    rightClicked = QtCore.pyqtSignal(int)  # Define a new signal that carries an integer
     def __init__(self, group_ID, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.group_ID = group_ID # int 1-9
@@ -1743,7 +1743,7 @@ class UIsub(Ui_MainWindow):
         self.tableFormat()
 
         # group handling
-        self.group_purge_cache()
+        self.group_cache_purge()
         # TODO: rest of group handling
 
         uiplot.hideAll()
@@ -1877,7 +1877,6 @@ class UIsub(Ui_MainWindow):
         df_p = pd.concat([df_p, dfAdd])
         df_p.reset_index(drop=True, inplace=True)
         df_p['groups'] = df_p['groups'].fillna(" ")
-        df_p['group_IDs'] = df_p['group_IDs'].fillna(" ")
         df_p['sweeps'] = df_p['sweeps'].fillna("...")
         self.set_df_project(df_p)
         self.tableFormat()
@@ -1949,8 +1948,6 @@ class UIsub(Ui_MainWindow):
                 print(f"Deleting {recording_name}...")
                 self.purgeRecordingData(recording_name)
                 uiplot.unPlot(rec_ID) # remove plotted lines
-        # Regardless of whether or not there was a file, purge the row from df_project
-        self.clearGroupsByRow(uistate.rec_select) # clear cache so that a new group mean is calculated
         # store the ID of the line below the last selected row
         reselect_ID = None
         if uistate.rec_select[-1] < len(df_p) - 1:
@@ -1965,13 +1962,13 @@ class UIsub(Ui_MainWindow):
         self.tableProjSelectionChanged()
 
 
-    def purgeRecordingData(self, recording_name):
+    def purgeRecordingData(self, rec_name):
         def removeFromCache(cache_name):
             cache = getattr(self, cache_name)
-            if recording_name in cache.keys():
-                cache.pop(recording_name, None)
+            if rec_name in cache.keys():
+                cache.pop(rec_name, None)
         def removeFromDisk(folder_name, file_suffix):
-            file_path = Path(self.dict_folders[folder_name] / (recording_name + file_suffix))
+            file_path = Path(self.dict_folders[folder_name] / (rec_name + file_suffix))
             if file_path.exists():
                 file_path.unlink()
             else:
@@ -1980,6 +1977,10 @@ class UIsub(Ui_MainWindow):
             removeFromCache(cache_name)
         for folder_name, file_suffix in [('data', '.csv'), ('timepoints', '.csv'), ('cache', '_mean.csv'), ('cache', '_filter.csv'), ('cache', '_output.csv')]:
             removeFromDisk(folder_name, file_suffix)
+        groups2purge = self.get_groupsOfRec(rec_name)
+        self.group_cache_purge(groups2purge)
+
+
 
 
     def parseData(self): 
@@ -2067,6 +2068,9 @@ class UIsub(Ui_MainWindow):
         with open(path_dd_groups, 'wb') as f:
             pickle.dump(dd_groups, f)
 
+    def get_groupsOfRec(self, rec_ID): # returns a set of all 'group ID' that have rec_ID in their 'rec_IDs' list
+        return set([value['group_ID'] for key, value in self.dd_groups.items() if rec_ID in value['rec_IDs']])
+
     def group_new(self):
         print(f"Adding new group to dd_groups: {self.dd_groups}")
         if len(self.dd_groups) > 8: # TODO: hardcoded max nr of groups: move to bw cfg
@@ -2098,11 +2102,11 @@ class UIsub(Ui_MainWindow):
     def group_remove(self, group_ID=None):
         if group_ID is None:
             self.dd_groups = {}
-            self.group_purge_cache()
+            self.group_cache_purge()
             self.group_controls_remove()
         else:
             del self.dd_groups[group_ID]
-            self.group_purge_cache(group_ID)
+            self.group_cache_purge(group_ID)
             self.group_controls_remove(group_ID)
         self.group_save_dd()
 
@@ -2118,11 +2122,18 @@ class UIsub(Ui_MainWindow):
 
     def group_rec_assign(self, rec_ID, group_ID):
         if rec_ID not in self.dd_groups[group_ID]['rec_IDs']:
-            self.dd_groups[group_ID]['rec_IDs'].append(rec_ID)
+            dict_group = self.dd_groups[group_ID]
+            dict_group['rec_IDs'].append(rec_ID)
+            self.group_cache_purge(group_ID)
+            df_groupmean = self.get_dfgroupmean(group_ID)
+            uiplot.addGroup(group_ID, dict_group, df_groupmean)
 
     def group_rec_ungroup(self, rec_ID, group_ID):
         if rec_ID in self.dd_groups[group_ID]['rec_IDs']:
             self.dd_groups[group_ID]['rec_IDs'].remove(rec_ID)
+            self.group_cache_purge(group_ID)
+            if self.dd_groups[group_ID]['rec_IDs']:
+                uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.get_dfgroupmean(group_ID))
 
     def group_selection(self, group_ID):
         dfp = self.get_df_project()
@@ -2140,12 +2151,14 @@ class UIsub(Ui_MainWindow):
                 self.group_rec_assign(rec_ID, group_ID)
         self.group_save_dd()
         self.set_df_project(dfp)
+        self.tableUpdate()
+        self.graphRefresh()
 
-    def group_purge_cache(self, *group_IDs): # clear cache so that a new group mean is calculated
+    def group_cache_purge(self, *group_IDs): # clear cache so that a new group mean is calculated
         if not group_IDs:  # if no group IDs are passed purge all groups
             group_IDs = list(self.dict_group_means.keys())
         if config.verbose:
-            print(f"group_purge_cache: {group_IDs}, len(group): {len(group_IDs)}")
+            print(f"group_cache_purge: {group_IDs}, len(group): {len(group_IDs)}")
         for group_ID in group_IDs:
             if group_ID in self.dict_group_means:
                 del self.dict_group_means[group_ID]
@@ -2430,7 +2443,7 @@ class UIsub(Ui_MainWindow):
                         df_p.columns.get_loc('groups'),
                         df_p.columns.get_loc('stims'),
                         df_p.columns.get_loc('sweep_duration'),
-                        df_p.columns.get_loc('resets'),
+                        #df_p.columns.get_loc('resets'),
                     ]
         if uistate.checkBox['paired_stims']:
             list_show.append(df_p.columns.get_loc('Tx'))
@@ -2676,21 +2689,22 @@ class UIsub(Ui_MainWindow):
             recs_in_group = self.dd_groups[group_ID]['rec_IDs']
             dfs = []
             for rec in recs_in_group:
-                row = self.get_df_project().loc[self.get_df_project()['ID'] == rec].iloc[0]
-                df = self.get_dfoutput(row=row)
-                dfs.append(df)
-            if dfs:
-                dfs = pd.concat(dfs)
-            else:
-                print(f"No recordings in group_ID {str_ID}.")
-                return
+                df_project = self.get_df_project().loc[self.get_df_project()['ID'] == rec]
+                if not df_project.empty:
+                    row = df_project.iloc[0]
+                    df = self.get_dfoutput(row=row)
+                    dfs.append(df)
+                else:
+                    print(f"No data found for rec: {rec}")
+                    return
             group_mean = dfs.groupby('sweep').agg({
                 'EPSP_amp_norm': ['mean', 'sem'],
                 'EPSP_slope_norm': ['mean', 'sem'],
                 'EPSP_amp': ['mean', 'sem'],
                 'EPSP_slope': ['mean', 'sem']
             }).reset_index()
-            group_mean.columns = ['sweep', 'EPSP_amp_mean', 'EPSP_amp_SEM', 'EPSP_slope_mean', 'EPSP_slope_SEM']
+            group_mean.columns = [col[0] if col[0] == 'sweep' else '_'.join(col).strip().replace('sem', 'SEM') for col in group_mean.columns.values]
+            print(f"Group mean columns: {group_mean.columns}")
             self.df2csv(df=group_mean, rec=f"group_{str_ID}", key="mean")
         self.dict_group_means[group_ID] = group_mean
         return group_mean
@@ -2819,6 +2833,7 @@ class UIsub(Ui_MainWindow):
             for group_ID in groups_to_plot:
                 dict_group = self.dd_groups[group_ID]
                 group_mean_data = self.get_dfgroupmean(group_ID)
+                print(f"Adding group {group_ID} to plot: {group_mean_data}")
                 uiplot.addGroup(group_ID, dict_group, group_mean_data)
 
 

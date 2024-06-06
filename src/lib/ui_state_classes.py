@@ -8,7 +8,7 @@ class UIstate:
     def reset(self): # (re)set all persisted states
         print("UIstate: reset")
         self.version = "0.0.0"
-        self.colors = ['#8080FF', '#FF8080', '#CCCC00', '#FF80FF', '#80FFFF', '#FFA500', '#800080', '#0080FF', '#800000']
+        self.colors = ['#808080', '#00BFFF', '#008000', '#FF8080', '#006666', '#9ACD32', '#D2691E', '#FFD700', '#0000FF']
         self.splitter = {
             'h_splitterMaster': [0.105, 0.04, 0.795, 0.09],
             'v_splitterGraphs': [0.2, 0.5, 0.3],
@@ -20,14 +20,6 @@ class UIstate:
             'frameToolPairedStim': ["Paired stims", False],
             'frameToolExport': ["Image Export", False],
         }
-
-        self.pushButtons = { # these are cycled by uisub.connectUIstate; buttonname: methodname
-            'pushButton_stim_detect': 'triggerStimDetect',
-            'pushButton_EPSP_amp_width_set_all': 'trigger_set_EPSP_amp_width_all',
-            'pushButton_volley_amp_width_set_all': 'trigger_set_volley_amp_width_all',
-            'pushButton_norm_range_set_all': 'trigger_set_norm_range_all',
-        }
-
         self.checkBox = { # these are cycled by uisub.connectUIstate; maintain format!
             'EPSP_amp': True,
             'EPSP_slope': True,
@@ -45,14 +37,8 @@ class UIstate:
         self.lineEdit = { # storage of user input; used to update df_t
             'norm_EPSP_from': 0,
             'norm_EPSP_to': 0,
-            'EPSP_amp_halfwidth_ms':   2,   # in ms here (visible to user). NB: in s in df_t!
-            'volley_amp_halfwidth_ms': 0.1, # in ms here (visible to user). NB: in s in df_t!
-        }
-        self.x_select = { # selected ranges on mean- and output graphs
-            'mean_start': None,
-            'mean_end': None,
-            'output_start': None,
-            'output_end': None,
+            'EPSP_amp_halfwidth_ms':   0,   # in ms here (visible to user). NB: in s in df_t!
+            'volley_amp_halfwidth_ms': 0, # in ms here (visible to user). NB: in s in df_t!
         }
         self.settings = {
             'event_start': -0.005, # in relation to current t_stim
@@ -65,7 +51,6 @@ class UIstate:
             'rgb_volley_slope': (1, 0.5, 1),
             'alpha_mark': 0.4,
             'alpha_line': 1,
-            'alpha_dot': 0.8,
         }
         self.zoom = {
             'mean_xlim': (0, 1),
@@ -97,13 +82,13 @@ class UIstate:
             't_VEB_method': 0,
             't_VEB_params': 0,
             't_EPSP_slope_width': 0.0007,
-            't_EPSP_slope_halfwidth': 0.0003,
+            't_EPSP_slope_halfwidth': 0,
             't_EPSP_slope_start': 0,
             't_EPSP_slope_end': 0,
             't_EPSP_slope_method': 'auto detect',
             't_EPSP_slope_params': 'NA',
             't_EPSP_amp': 0,
-            't_EPSP_amp_halfwidth': 0.0002,
+            't_EPSP_amp_halfwidth': 0,
             't_EPSP_amp_method': 'auto detect',
             't_EPSP_amp_params': 'NA',
             'norm_output_from': 0,
@@ -111,6 +96,19 @@ class UIstate:
         }
 
     # Do NOT persist these
+        self.pushButtons = { # these are cycled by uisub.connectUIstate; buttonname: methodname
+            'pushButton_stim_detect': 'triggerStimDetect',
+            'pushButton_EPSP_amp_width_set_all': 'trigger_set_EPSP_amp_width_all',
+            'pushButton_volley_amp_width_set_all': 'trigger_set_volley_amp_width_all',
+            'pushButton_norm_range_set_all': 'trigger_set_norm_range_all',
+        }
+        self.x_select = { # selected ranges on mean- and output graphs
+            'mean_start': None,
+            'mean_end': None,
+            'output_start': None,
+            'output_end': None,
+        }
+
         #self.darkmode = False # set by global bw cfg
         self.axm = None # axis of mean graph (top)
         self.axe = None # axis of event graph (middle)
@@ -242,6 +240,7 @@ class UIstate:
                 'viewTools': self.viewTools,
                 'checkBox': self.checkBox,
                 'lineEdit': self.lineEdit,
+                'settings': self.settings,
                 'zoom': self.zoom,
                 'default_dict_t': self.default_dict_t,
             }
@@ -255,6 +254,7 @@ class UIstate:
         self.viewTools = state.get('viewTools')
         self.checkBox = state.get('checkBox')
         self.lineEdit = state.get('lineEdit')
+        self.settings = state.get('settings')
         self.zoom = state.get('zoom')
         self.default_dict_t = state.get('default_dict_t')
 
