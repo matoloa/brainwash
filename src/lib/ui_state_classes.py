@@ -122,7 +122,7 @@ class UIstate:
         self.df_recs2plot = None # df_project copy, filtered to selected AND parsed recordings (or all parsed, if none are selected)
         self.dict_rec_labels = {} # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, axis: str, line: 2DlineObject}}
         self.dict_rec_show = {} # copy containing only visible recs
-        self.dict_group_labels = {} # dict of dicts of all plotted groups: {key:label(str): {group_ID: str, stim: int, axis: str, line: 2DlineObject}, fill: 2DfillObject}
+        self.dict_group_labels = {} # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, axis: str, line: 2DlineObject}, fill: 2DfillObject}
         self.new_indices = [] # list of indices in uisub.df_project for freshly parsed recordings; used by uisub.graphPreload()
         # TODO: deprecate these
         self.dfp_row_copy = None # copy of selected row in uisub.tableProj
