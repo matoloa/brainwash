@@ -1560,6 +1560,19 @@ class UIsub(Ui_MainWindow):
 
 # trigger functions TODO: break out the big ones to separate functions!
 
+    def groupCheckboxChanged(self, state, str_ID):
+        if config.verbose:
+            print(f"groupCheckboxChanged: {str_ID} = {state}")
+        self.dfgroups.loc[self.dfgroups['group_ID'] == str_ID, 'show'] = str(state == 2)
+        uistate.save_cfg(projectfolder=self.dict_folders['project'])
+        self.mouseoverUpdate()
+
+    def triggerGroupRename(self, group_ID):
+        self.usage("triggerGroupRename")
+        RenameDialog = InputDialogPopup()
+        new_group_name = RenameDialog.showInputDialog(title='Rename group', query='')
+        self.group_rename(group_ID, new_group_name)
+
     def triggerStimDetect(self):
         self.usage("triggerStimDetect")
         self.stimDetect()
@@ -2071,77 +2084,81 @@ class UIsub(Ui_MainWindow):
 # replacing dfgroups with dd_groups (dict of dict)
 # only dd_groups knows about groups; df_p only has a string listing groupnames
 
-    def load_dd_groups(self):               # dd_groups is a dict of dicts: {group_ID: {group_name: str, color: str, show: bool, rec_IDs: [str]}}
+    def group_get_dd(self):               # dd_groups is a dict of dicts: {group_ID: {group_name: str, color: str, show: bool, rec_IDs: [str]}}
         path_dd_groups = Path(self.dict_folders['project'] / "groups.pkl")
         if path_dd_groups.exists():
             with open(path_dd_groups, 'rb') as f:
                 dict_groups = pickle.load(f)
+                self.group_update_dfp()
             return dict_groups
+        self.group_update_dfp(reset=True)
         return {}
 
-    def save_dd_groups(self, dd_groups):    # dd_groups is a dict of dicts: {group_ID: {group_name: str, color: str, show: bool, rec_IDs: [str]}}
+    def group_save_dd(self, dd_groups=None):    # dd_groups is a dict of dicts: {group_ID: {group_name: str, color: str, show: bool, rec_IDs: [str]}}
+        self.group_update_dfp()
+        if dd_groups is None:
+            dd_groups = self.dd_groups
         path_dd_groups = Path(self.dict_folders['project'] / "groups.pkl")        
         with open(path_dd_groups, 'wb') as f:
             pickle.dump(dd_groups, f)
 
-    def groupname2dfp(self):
-        #update dfp['groups'] by making list of groupnames based on dd_groups
-        print("groupname2dfp")
+    def group_new(self):
+        # TODO: add a new group - FIND THE CORRESPONDING TRIGGER!
+        print("group_new")
 
+    def group_remove_last_empty(self):
+        print("group_remove_last_empty")
+        # TODO: check self.triggerRemoveLastEmptyGroup()
 
+    def group_remove_last(self):
+        print("group_remove_last")
+        # TODO: check self.triggerRemoveLastGroup()
 
-
-    def group_add_to_row(self, i, str_add_group_ID, groupname):
-        # TODO: NOT UPDATED TO 2024-06-02 OVERHAUL
-        
-
-        str_group_IDs = str(self.df_project.loc[i, 'group_IDs'])
-        list_group_IDs = str_group_IDs.split(",")
-        if str_add_group_ID not in list_group_IDs:
-            list_group_IDs.append(str_add_group_ID)
-            self.df_project.loc[i, 'group_IDs'] = ",".join(sorted(list_group_IDs))
-            # Update 'groups' column
-            group_names = [self.dfgroups.loc[self.dfgroups['group_ID'] == group_id, 'group_name'].values[0] for group_id in list_group_IDs]
-            self.df_project.loc[i, 'groups'] = ", ".join(sorted(group_names))
-
-
-    def group_remove_from_row(self, i, str_add_group_ID):
-        # TODO: NOT UPDATED TO 2024-06-02 OVERHAUL
-        str_group_IDs = self.df_project.loc[i, 'group_IDs']
-        list_group_IDs = str_group_IDs.split(",")
-        list_group_IDs.remove(str_add_group_ID)
-        self.df_project.loc[i, 'group_IDs'] = ",".join(sorted(list_group_IDs)) if list_group_IDs else " "
-        # Update 'groups' column
-        if list_group_IDs:
-            group_names = [self.dfgroups.loc[self.dfgroups['group_ID'] == group_id, 'group_name'].values[0] for group_id in list_group_IDs]
-            self.df_project.loc[i, 'groups'] = ", ".join(sorted(group_names))
+    def group_remove(self, group_ID=None):
+        if group_ID is None:
+            self.dd_groups = {}
         else:
-            self.df_project.loc[i, 'groups'] = " "
+            del self.dd_groups[group_ID]
 
+    def group_rename(self, group_ID, new_group_name):
+        if new_group_name in [group['group_name'] for group in self.dd_groups.values()]:
+            print(f"Group name {new_group_name} already exists.")
+        elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_group_name)) is not None: # True if valid filename
+            self.dd_groups[group_ID]['group_name'] = new_group_name
+            self.group_save_dd()
+            self.groupControlsRefresh()
+        else:
+            print(f"Group name {new_group_name} is not a valid name.")
 
-    def groupsClear(self): # clear all groups
-        df_p = self.get_df_project()
-        df_p['groups'] = " "
-        self.set_df_project(df_p)
-        self.clearGroupsByRow(df_p.index) # clear all groups from all rows in df_project
+    def group_rec_assign(self, rec_ID, group_ID):
+        if rec_ID not in self.dd_groups[group_ID]['rec_IDs']:
+            self.dd_groups[group_ID]['rec_IDs'].append(rec_ID)
 
-    def clearGroupsByRow(self, dfp_indices):
-        # for selected rows in df_project, remove their rec_IDs from all dfgroup['rec_IDs']
+    def group_rec_ungroup(self, rec_ID, group_ID):
+        if rec_ID in self.dd_groups[group_ID]['rec_IDs']:
+            self.dd_groups[group_ID]['rec_IDs'].remove(rec_ID)
+
+    def group_selection(self, group_ID):
         dfp = self.get_df_project()
-        selected_rec_IDs = dfp.loc[dfp_indices, 'ID'].tolist() # selected rec_IDs
-        for group_ID, group_v in self.dd_groups.items():
-            self.purgeGroupCache(group_ID)
-            # in dd_groups, remove all selected_rec_IDs from values['rec_IDs']
-            group_v['rec_IDs'] = [rec_ID for rec_ID in group_v['rec_IDs'] if rec_ID not in selected_rec_IDs]
-        self.save_dd_groups(self.dd_groups)
-        self.set_df_project(self.df_project)
+        if uistate.rec_select is None:
+            print("No files selected.")
+            return
+        selected_rec_IDs = dfp.loc[uistate.rec_select, 'ID'].tolist()  # selected rec_IDs
+        all_in_group = all(rec_ID in self.dd_groups[group_ID]['rec_IDs'] for rec_ID in selected_rec_IDs)
+        if all_in_group: # If all selected_rec_IDs are in the group_ID, ungroup them
+            for rec_ID in selected_rec_IDs:
+                self.group_rec_ungroup(rec_ID, group_ID)
+        else:            # Otherwise, add all selected_rec_IDs to the group_ID
+            for rec_ID in selected_rec_IDs:
+                self.group_rec_assign(rec_ID, group_ID)
+        self.group_save_dd()
+        self.set_df_project(dfp)
 
-    def purgeGroupCache(self, *group_IDs): # clear cache so that a new group mean is calculated
-        # TODO: NOT UPDATED TO 2024-06-02 OVERHAUL
-        if not group_IDs:  # if no group IDs are passed
-            group_IDs = list(self.dict_group_means.keys())  # purge all groups
+    def group_purge_cache(self, *group_IDs): # clear cache so that a new group mean is calculated
+        if not group_IDs:  # if no group IDs are passed purge all groups
+            group_IDs = list(self.dict_group_means.keys())
         if config.verbose:
-            print(f"purgeGroupCache: {group_IDs}, len(group): {len(group_IDs)}")
+            print(f"group_purge_cache: {group_IDs}, len(group): {len(group_IDs)}")
         for group_ID in group_IDs:
             if group_ID in self.dict_group_means:
                 del self.dict_group_means[group_ID]
@@ -2155,137 +2172,68 @@ class UIsub(Ui_MainWindow):
                     print("...but NOT when attempting to unlink.")
             uiplot.unPlotGroup(group_ID)
 
-
-
-    def addGroupControls(self, str_ID): # Create menu for adding to group and checkbox for showing group
-        # TODO: NOT UPDATED TO 2024-06-02 OVERHAUL
-        group_ID = f"group_{str_ID}" # backend group name for object naming
-
-        group_name = self.dfgroups.loc[self.dfgroups['group_ID'] == str_ID, 'group_name'].values[0]
-        print(f"addGroupControls, str_ID: {str_ID}, type: {type(str_ID)} group_name: {group_name}")
-        dict_row = self.dfgroups.loc[self.dfgroups['group_ID'] == str_ID].to_dict(orient='records')[0]
-        if not dict_row:
-            print(f"addGroupControls: {str_ID} not found in self.dfgroups:")
-            print(self.dfgroups)
+    def group_controls_add(self, str_ID): # Create menu for adding to group and checkbox for showing group
+        group_name = self.dd_groups[str_ID]['group_name']
+        print(f"group_controls_add, str_ID: {str_ID}, type: {type(str_ID)} group_name: {group_name}")
+        dict_group = self.dd_groups.get(str_ID)
+        if not dict_group:
+            print(f" - {str_ID} not found in self.dd_groups:")
+            print(self.dd_groups)
             return
-        color = dict_row['color']
-        # print(f"addGroupControls: {group_name}, {color}, type: {type(color)}")
-        setattr(self, f"actionAddTo_{group_ID}", QtWidgets.QAction(f"Add selection to {group_name}", self))
-        self.new_group_menu_item = getattr(self, f"actionAddTo_{group_ID}")
+        color = dict_group['color']
+        setattr(self, f"actionAddTo_{str_ID}", QtWidgets.QAction(f"Add selection to {group_name}", self))
+        self.new_group_menu_item = getattr(self, f"actionAddTo_{str_ID}")
         self.new_group_menu_item.triggered.connect(lambda checked, add_group_ID=str_ID: self.addToGroup(add_group_ID))
         self.new_group_menu_item.setShortcut(f"{str_ID}")
         self.menuGroups.addAction(self.new_group_menu_item)                    
         self.new_checkbox = CustomCheckBox(str_ID)
         self.new_checkbox.rightClicked.connect(self.triggerGroupRename) # str_ID is passed by CustomCheckBox
-        self.new_checkbox.setObjectName(group_ID)
+        self.new_checkbox.setObjectName(str_ID)
         self.new_checkbox.setText(f"{str_ID}. {group_name}")
         self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the background color
         self.new_checkbox.setMaximumWidth(100)  # Set the maximum width
-        self.new_checkbox.setChecked(bool(dict_row['show']))
+        self.new_checkbox.setChecked(bool(dict_group['show']))
         self.new_checkbox.stateChanged.connect(lambda state, str_ID=str_ID: self.groupCheckboxChanged(state, str_ID))
         self.verticalLayoutGroups.addWidget(self.new_checkbox)
 
-
-    def triggerGroupRename(self, str_ID):
-        print(f"triggerGroupRename: {str_ID}")
-        RenameDialog = InputDialogPopup()
-        new_group_name = RenameDialog.showInputDialog(title='Rename group', query='')
-        # check if ok
-        if new_group_name in self.dfgroups['group_name'].values:
-            print(f"Group name {new_group_name} already exists.")
-        elif re.match(r'^[a-zA-Z0-9_ -]+$', str(new_group_name)) is not None: # True if valid filename
-            self.dfgroups.loc[self.dfgroups['group_ID'] == str_ID, 'group_name'] = new_group_name
-            uistate.save_cfg(projectfolder=self.dict_folders['project'])
-            df_p = self.get_df_project()
-            indexes_with_str_ID = [i for i in df_p.index if str_ID in df_p.loc[i, 'group_IDs'].split(",")]
-            for i in indexes_with_str_ID:
-                self.group_remove_from_row(i, str_ID)
-                self.group_add_to_row(i, str_ID, new_group_name)
-            self.save_df_project()
-            self.groupControlsRefresh()
-            self.tableFormat()
-        else:
-            print(f"Group name {new_group_name} is not a valid name.")
-
-
-    def removeGroupControls(self, i=None):
-        # TODO: NOT UPDATED TO 2024-06-02 OVERHAUL
+    def group_controls_remove(self, i=None):
         if i is None:  # if i is not provided, remove all group controls
             for i in range(1, 10):  # clear group controls 1-9
-                self.removeGroupControls(i)
+                self.group_controls_add(i)
         else:
-            group = f"group_{str(i)}"
+            group_ID = f"group_{str(i)}"
             # get the widget named group and remove it
-            widget = self.centralwidget.findChild(QtWidgets.QWidget, group)
+            widget = self.centralwidget.findChild(QtWidgets.QWidget, group_ID)
             if widget:
                 widget.deleteLater()
             # get the action named actionAddTo_{group} and remove it
-            action = getattr(self, f"actionAddTo_{group}", None)
+            action = getattr(self, f"actionAddTo_{group_ID}", None)
             if action:
                 self.menuGroups.removeAction(action)
-                delattr(self, f"actionAddTo_{group}")
+                delattr(self, f"actionAddTo_{group_ID}")
 
-    def groupCheckboxChanged(self, state, str_ID):
-        # TODO: NOT UPDATED TO 2024-06-02 OVERHAUL
-        if config.verbose:
-            print(f"groupCheckboxChanged: {str_ID} = {state}")
-        self.dfgroups.loc[self.dfgroups['group_ID'] == str_ID, 'show'] = str(state == 2)
-        uistate.save_cfg(projectfolder=self.dict_folders['project'])
-        self.mouseoverUpdate()
-
-
-    def addToGroup(self, add_group_ID):
-        # TODO: NOT UPDATED TO 2024-06-02 OVERHAUL
-        self.usage("addToGroup")
-        str_add_group_ID = str(add_group_ID)
-        print(f"addToGroup: {add_group_ID}")
-        if not uistate.rec_select:
-            print("No files selected.")
-            return
-
-        groupname = self.dfgroups.loc[self.dfgroups['group_ID'] == str_add_group_ID, 'group_name'].values[0]
-        if all(self.df_project.loc[uistate.rec_select, 'group_IDs'].str.contains(str_add_group_ID)):
-            for i in uistate.rec_select:
-                self.group_remove_from_row(i, str_add_group_ID)
+    def group_update_dfp(self, rec_ID=None, reset=False):
+        #update dfp['groups'] based on dd_groups
+        def group_list(rec_ID):
+            list_rec_in_groups = []
+            for group_ID, group_v in self.dd_groups.items():
+                if rec_ID in group_v['rec_IDs']:
+                    list_rec_in_groups.append(group_v['group_name'])
+            return list_rec_in_groups
+        df_p = self.get_df_project()
+        if reset:
+            df_p['groups'] = " "
         else:
-            for i in uistate.rec_select:
-                self.group_add_to_row(i, str_add_group_ID, groupname)
-        self.save_df_project()
-        self.purgeGroupCache(add_group_ID)
+            if rec_ID is not None:
+                list_rec_in_groups = group_list(rec_ID)
+                df_p.loc[df_p['ID'] == rec_ID, 'groups'] = ", ".join(sorted(list_rec_in_groups)) if list_rec_in_groups else " "
+            else:
+                for i, row in df_p.iterrows():
+                    rec_ID = row['ID']
+                    list_rec_in_groups = group_list(rec_ID)
+                    df_p.at[i, 'groups'] = ", ".join(sorted(list_rec_in_groups)) if list_rec_in_groups else " "
+        self.set_df_project(df_p)
         self.tableFormat()
-        uiplot.unPlotGroup(add_group_ID)
-        self.graphGroups()
-        self.mouseoverUpdate()
-
-    def removeFromGroup(self, remove_group_ID, indices=uistate.rec_select):
-        # TODO: NOT UPDATED TO 2024-06-02 OVERHAUL
-        self.usage("removeFromGroup")
-        str_remove_group_ID = str(remove_group_ID)
-        print(f"removeFromGroup: {remove_group_ID}, indices: {indices}")
-        # Remove all selected recordings from group "remove_group"
-        if len(indices) > 0:
-            for i in indices:
-                if self.df_project.loc[i, 'group_IDs'] != " ":
-                    str_group_IDs = self.df_project.loc[i, 'group_IDs']
-                    list_group_IDs = list(str_group_IDs.split(","))
-                    list_group_names = list(self.df_project.loc[i, 'groups'].split(","))
-                    if str_remove_group_ID in list_group_IDs:
-                        list_group_IDs.remove(list_group_IDs)
-                        list_group_names.remove(uistate.group_ID2name(str_remove_group_ID))
-                        if list_group_IDs:
-                            self.df_project.loc[i, 'group_IDs'] = ",".join(map(str, sorted(list_group_IDs)))
-                            self.df_project.loc[i, 'groups'] = ",".join(map(str, sorted(list_group_names)))
-                        else:
-                            self.df_project.loc[i, 'group_IDs'] = " "
-                            self.df_project.loc[i, 'groups'] = " "
-            self.save_df_project()
-            self.purgeGroupCache(remove_group_ID)
-            self.tableUpdate()
-            self.mouseoverUpdate()
-
-
-
-
 
 
 # Writer functions
