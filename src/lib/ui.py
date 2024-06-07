@@ -1063,6 +1063,7 @@ class UIsub(Ui_MainWindow):
 
 
     def update_show(self, reset=False):
+        aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
         old_selection = uistate.dict_rec_show 
         if uistate.df_recs2plot is None:
             reset=True
@@ -1072,7 +1073,6 @@ class UIsub(Ui_MainWindow):
             selected_stims = [stim + 1 for stim in uistate.stim_select] # stim_select is 0-based (indices) - convert to stims
             print(f"update_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}")
             # remove non-selected recs and stims
-            aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
             new_selection = {k: v for k, v in uistate.dict_rec_labels.items() 
                             if v['rec_ID'] in selected_ids
                             and (v['stim'] in selected_stims or v['stim'] is None)
@@ -1096,6 +1096,9 @@ class UIsub(Ui_MainWindow):
 
         # group view
         if self.dd_groups is not None:
+            reset_groups = False
+            if uistate.dict_group_show == {}:
+                reset_groups = True
             old_group_selection = uistate.dict_group_show.copy()
             # if any recs are selected, show only groups that contain selected recs
             if uistate.df_recs2plot is not None:
@@ -1103,15 +1106,21 @@ class UIsub(Ui_MainWindow):
                 new_group_selection = {k: v for k, v in uistate.dict_group_labels.items() if v['group_ID'] in selected_groups}
             else:
                 new_group_selection = uistate.dict_group_labels.copy()
-            aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
             new_group_selection = {k: v for k, v in new_group_selection.items()
                                     if all(uistate.checkBox[aspect] or v.get('aspect', '') != aspect for aspect in aspects)}
             if uistate.checkBox['norm_EPSP']:
                 filters = [" norm"]
             else:
                 filters = [" mean"]
-            new_group_selection = {k: v for k, v in new_group_selection.items() if any(k.endswith(f) for f in filters)}
-            obsolete_group_lines = {k: v for k, v in old_group_selection.items() if k not in new_group_selection}
+            new_group_selection = {
+                k: v 
+                for k, v in new_group_selection.items() 
+                if any(k.endswith(f) for f in filters) and self.dd_groups[v['group_ID']]['show']
+            }
+            if reset_groups: # Hide all lines
+                obsolete_group_lines = uistate.dict_group_labels
+            else:
+                obsolete_group_lines = {k: v for k, v in old_group_selection.items() if k not in new_group_selection}
             print(f"obsolete_group_lines: {obsolete_group_lines.keys()}")
             for k, line_dict in obsolete_group_lines.items():
                 print(f"Obsolete group line key: {k}")
@@ -1126,15 +1135,24 @@ class UIsub(Ui_MainWindow):
                 line_dict['fill'].set_visible(True)
             uistate.dict_group_show = new_group_selection
 
+        #return
+        # DEBUG block - for inquiring visiblity of specific lines
+        for key, value in self.dd_groups.items():
+            print(f"update_show: {key}, show:{value['show']}")
+
+
+
+
+
+##################################################################
+#    WIP section: TODO: move to appropriate header               #
+##################################################################
 
     def graphRefresh(self):
         self.usage("graphRefresh")
         uiplot.graphRefresh(self.dd_groups)
 
 
-##################################################################
-#    WIP section: TODO: move to appropriate header               #
-##################################################################
     def deleteFolder(self, dir_path):
         if os.path.exists(dir_path):
             for filename in os.listdir(dir_path):
@@ -1591,6 +1609,7 @@ class UIsub(Ui_MainWindow):
             print(f"groupCheckboxChanged: {str(group_ID)} = {state}")
         self.dd_groups[group_ID]['show'] = state == 2
         self.group_save_dd()
+        self.update_show()
         self.mouseoverUpdate()
 
     def triggerGroupRename(self, group_ID):
@@ -2198,7 +2217,7 @@ class UIsub(Ui_MainWindow):
 
     def group_controls_add(self, group_ID): # Create menu for adding to group and checkbox for showing group
         group_name = self.dd_groups[group_ID]['group_name']
-        print(f"group_controls_add, group_ID: {group_ID}, type: {type(group_ID)} group_name: {group_name}")
+        #print(f"group_controls_add, group_ID: {group_ID}, type: {type(group_ID)} group_name: {group_name}")
         dict_group = self.dd_groups.get(group_ID)
         if not dict_group:
             print(f" - {group_ID} not found in self.dd_groups:")
@@ -2213,7 +2232,7 @@ class UIsub(Ui_MainWindow):
         self.menuGroups.addAction(self.new_group_menu_item)                    
         self.new_checkbox = CustomCheckBox(group_ID)
         self.new_checkbox.rightClicked.connect(self.triggerGroupRename) # str_ID is passed by CustomCheckBox
-        self.new_checkbox.setObjectName(str_ID)
+        self.new_checkbox.setObjectName(f"checkBox_group_{str_ID}")
         self.new_checkbox.setText(f"{str_ID}. {group_name}")
         self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the background color
         self.new_checkbox.setMaximumWidth(100)  # Set the maximum width
@@ -2576,7 +2595,7 @@ class UIsub(Ui_MainWindow):
             dfmean = self.get_dfmean(row=row)
             if df_t is None:
                 df_t = self.get_dft(row=row)
-            print(f"df_t: {df_t}")
+            # print(f"df_t: {df_t}")
             if uistate.checkBox['output_per_stim']:
                 dfoutput = analysis.build_dfstimoutput(df=dfmean, df_t=df_t)
             else:
@@ -2585,10 +2604,13 @@ class UIsub(Ui_MainWindow):
                     dict_t = t_row.to_dict()
                     dffilter = self.get_dffilter(row)
                     dfoutput_stim = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+                    df_t.at[i, 'volley_amp_mean'] = dfoutput_stim['volley_amp'].mean()
+                    df_t.at[i, 'volley_slope_mean'] = dfoutput_stim['volley_slope'].mean()
                     dfoutput = pd.concat([dfoutput, dfoutput_stim])
-                    print(f"dfoutput_stim: {dfoutput_stim}")
+                    # print(f"dfoutput_stim: {dfoutput_stim}")
+                self.set_dft(rec, df_t)
         dfoutput.reset_index(inplace=True)
-        print(f"dfoutput: {dfoutput}")
+        # print(f"dfoutput: {dfoutput}")
         return dfoutput
 
     def get_dfdata(self, row):
@@ -2853,7 +2875,7 @@ class UIsub(Ui_MainWindow):
             for group_ID in groups_to_plot:
                 dict_group = self.dd_groups[group_ID]
                 group_mean_data = self.get_dfgroupmean(group_ID)
-                print(f"Adding group {group_ID} to plot: {group_mean_data}")
+                # print(f"graphGroups: Adding group {group_ID} to plot: {group_mean_data}")
                 uiplot.addGroup(group_ID, dict_group, group_mean_data)
 
 
@@ -3477,6 +3499,7 @@ class UIsub(Ui_MainWindow):
                 dict_t['norm_output_to'] = t_row['norm_output_to']
                 break
 
+
         #update selected dft row with the values from dict_t
         for key, value in dict_t.items():
             uistate.dft_copy.loc[uistate.stim_select[0], key] = value
@@ -3520,6 +3543,7 @@ class UIsub(Ui_MainWindow):
                     update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot)
         self.tableUpdate()
 
+ 
         # update groups
         affected_groups = self.get_groupsOfRec(p_row['ID'])
         self.group_cache_purge(*affected_groups)

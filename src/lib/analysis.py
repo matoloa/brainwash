@@ -14,6 +14,7 @@ def valid(num):
 
 # %%
 def build_dfoutput(df, dict_t, filter='voltage', quick=False):
+    # TODO: implement quick, to operate without amp_hws
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
     Args:
         df: a dataframe containing numbered sweeps, timestamps and voltage
