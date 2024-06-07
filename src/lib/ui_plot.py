@@ -285,6 +285,30 @@ class UIplot():
         hline = self.get_axis(axid).axhline(y=y, color=color, alpha=self.uistate.settings['alpha_mark'], label=label, linewidth=linewidth, zorder=0)
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':hline, 'axis':axid}
 
+    def plot_group_lines(self, axid, group_ID, dict_group, df_groupmean):
+        group_name = dict_group['group_name']
+        color = dict_group['color']
+        axis = self.get_axis(axid)
+        if axid == 'ax1':
+            aspect = 'EPSP_amp'
+            str_aspect = 'EPSP amp'
+        else:
+            aspect = 'EPSP_slope'
+            str_aspect = 'EPSP slope'
+        x = df_groupmean.sweep
+        label_mean = f"{group_name} {str_aspect} mean"
+        label_norm = f"{group_name} {str_aspect} norm"
+        y_mean = df_groupmean[f"{aspect}_mean"]
+        y_mean_SEM = df_groupmean[f"{aspect}_SEM"]
+        y_norm = df_groupmean[f"{aspect}_norm_mean"]
+        y_norm_SEM = df_groupmean[f"{aspect}_norm_SEM"]
+        meanline, = axis.plot(x, y_mean, color=color, label=label_mean, alpha=self.uistate.settings['alpha_line'], zorder=0)
+        normline, = axis.plot(x, y_norm, color=color, label=label_norm, alpha=self.uistate.settings['alpha_line'], zorder=0)
+        meanfill  = axis.fill_between(x, y_mean - y_mean_SEM, y_mean + y_mean_SEM, alpha=0.3, color=color)
+        normfill  = axis.fill_between(x, y_norm - y_norm_SEM, y_norm + y_norm_SEM, alpha=0.3, color=color)
+        self.uistate.dict_group_labels[label_mean] = {'group_ID':group_ID, 'stim':None, 'aspect':aspect, 'axis':axid, 'line':meanline, 'fill':meanfill}
+        self.uistate.dict_group_labels[label_norm] = {'group_ID':group_ID, 'stim':None, 'aspect':aspect, 'axis':axid, 'line':normline, 'fill':normfill}
+
 
     def addRow(self, p_row, dft, dfmean, dfoutput):
         rec_ID = p_row['ID']
@@ -347,7 +371,7 @@ class UIplot():
                 if x_axis == 'sweep':
                     self.plot_line(f"{label} {stim_str} EPSP amp", 'ax1', out[x_axis], out['EPSP_amp'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                     self.plot_line(f"{label} {stim_str} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
-                self.plot_line(f"{label} {stim_str} amp_zero", 'axe', [-0.002, -0.001], [amp_zero, amp_zero], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num) # TODO: hardcoded x
+                self.plot_line(f"{label} {stim_str} amp_zero marker", 'axe', [-0.002, -0.001], [amp_zero, amp_zero], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num) # TODO: hardcoded x
 
             if not np.isnan(t_row['t_EPSP_slope_start']):
                 x_start, x_end = t_row['t_EPSP_slope_start'], t_row['t_EPSP_slope_end']
@@ -399,19 +423,10 @@ class UIplot():
 
     def addGroup(self, group_ID, dict_group, df_groupmean):
         # plot group meanlines and SEMs
-        ax1, ax2 = self.uistate.ax1, self.uistate.ax2
-        group_name = dict_group['group_name']
-        color = dict_group['color']
-        if df_groupmean['EPSP_amp_mean'].notna().any() & self.uistate.checkBox['EPSP_amp']:
-            label = f"{group_name} EPSP amp"
-            line, = ax1.plot(df_groupmean.sweep, df_groupmean.EPSP_amp_mean, color=color, alpha=0.5, linestyle='--', label=label)
-            fill = ax1.fill_between(df_groupmean.sweep, df_groupmean.EPSP_amp_mean + df_groupmean.EPSP_amp_SEM, df_groupmean.EPSP_amp_mean - df_groupmean.EPSP_amp_SEM, alpha=0.3, color=color)
-            self.uistate.dict_group_labels[label] = {'group_ID':group_ID, 'stim':None, 'aspect':'EPSP_amp', 'axis':'ax1', 'line':line, 'fill':fill}
-        if df_groupmean['EPSP_slope_mean'].notna().any() & self.uistate.checkBox['EPSP_slope']:
-            label = f"{group_name} EPSP slope"
-            line, = ax2.plot(df_groupmean.sweep, df_groupmean.EPSP_slope_mean, color=color, alpha=0.5, linestyle='--', label=label)
-            fill = ax2.fill_between(df_groupmean.sweep, df_groupmean.EPSP_slope_mean + df_groupmean.EPSP_slope_SEM, df_groupmean.EPSP_slope_mean - df_groupmean.EPSP_slope_SEM, alpha=0.3, color=color)
-            self.uistate.dict_group_labels[label] = {'group_ID':group_ID, 'stim':None, 'aspect':'EPSP_slope', 'axis':'ax2', 'line':line, 'fill':fill}
+        if df_groupmean['EPSP_amp_mean'].notna().any():
+            self.plot_group_lines('ax1', group_ID, dict_group, df_groupmean)
+        if df_groupmean['EPSP_slope_mean'].notna().any():
+            self.plot_group_lines('ax2', group_ID, dict_group, df_groupmean)
 
 
     def plotUpdate(self, p_row, t_row, aspect, data_x, data_y, amp=None): # TODO: unspaghetti this

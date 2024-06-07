@@ -1018,7 +1018,7 @@ class UIsub(Ui_MainWindow):
         # build the list uistate.rec_select with indices
         uistate.rec_select = [index.row() for index in selected_indexes]
         self.update_recs2plot()
-        self.update_rec_show()
+        self.update_show()
         if uistate.df_recs2plot is None:
             print("No parsed recordings selected.")
             self.graphRefresh()
@@ -1057,12 +1057,12 @@ class UIsub(Ui_MainWindow):
             self.tableStim.clearSelection()
         selected_indexes = self.tableStim.selectionModel().selectedRows()
         uistate.stim_select = [index.row() for index in selected_indexes]
-        self.update_rec_show()
+        self.update_show()
         self.zoomAuto()
         self.mouseoverUpdate()
 
 
-    def update_rec_show(self, reset=False):
+    def update_show(self, reset=False):
         # t0 = time.time()
         old_selection = uistate.dict_rec_show 
         if uistate.df_recs2plot is None:
@@ -1071,7 +1071,7 @@ class UIsub(Ui_MainWindow):
         else:
             selected_ids = set(uistate.df_recs2plot['ID'])
             selected_stims = [stim + 1 for stim in uistate.stim_select] # stim_select is 0-based (indices) - convert to stims
-            print(f"update_rec_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}")
+            print(f"update_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}")
             # remove non-selected recs and stims
             aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
             new_selection = {k: v for k, v in uistate.dict_rec_labels.items() 
@@ -1095,14 +1095,13 @@ class UIsub(Ui_MainWindow):
             line_dict['line'].set_visible(True)
         uistate.dict_rec_show = new_selection
 
-        # DEBUG block
-        # print(f"update_rec_show: {len(new_selection)} lines shown, {len(obsolete_lines)} lines hidden")
-        # print(f" - new_selection: {new_selection.keys()}")
-        # find all keys that end in "EPSP slope", and print x,y of their ['line'] lineobject
-        # EPSP_slopes = {k: v for k, v in new_selection.items() if k.endswith('EPSP slope')}
-        # print(f" - EPSP slope lines: {[v['line'].get_ydata() for v in EPSP_slopes.values()]}")
+        # print labels and visibility of keys that end with "EPSP slope marker"
+        for k, v in uistate.dict_rec_labels.items():
+            if k.endswith("EPSP slope marker"):
+                print(f"{k}: {v['line'].get_visible()}")
 
-        #print(f"update_rec_show took {round((time.time() - t0) * 1000)} ms")
+
+        #print(f"update_show took {round((time.time() - t0) * 1000)} ms")
 
 
     def graphRefresh(self):
@@ -1289,7 +1288,7 @@ class UIsub(Ui_MainWindow):
                     uistate.zoom['output_ax1_ylim'] = (0, current_ylim[1])
                     current_ylim = uistate.zoom['output_ax2_ylim']
                     uistate.zoom['output_ax2_ylim'] = (0, current_ylim[1])
-        self.update_rec_show()
+        self.update_show()
         self.mouseoverUpdate()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
@@ -1749,7 +1748,7 @@ class UIsub(Ui_MainWindow):
         # TODO: rest of group handling
 
         uiplot.hideAll()
-        self.update_rec_show(reset=True)
+        self.update_show(reset=True)
         self.mouseoverUpdate()
         self.uiThaw()
 
@@ -1849,7 +1848,7 @@ class UIsub(Ui_MainWindow):
             self.tableStim.selectRow(0)
             self.stimSelectionChanged()
         # unplot and replot all affected recordings
-        self.update_rec_show(reset=True)
+        self.update_show(reset=True)
         self.mouseoverUpdate()
 
 
@@ -1928,7 +1927,7 @@ class UIsub(Ui_MainWindow):
                     old_recording_ID = df_p.at[uistate.rec_select[0], 'ID']
                     uiplot.unPlot(old_recording_ID)
                     self.graphUpdate(row = df_p.loc[uistate.rec_select[0]])
-                    self.update_rec_show(reset=True)
+                    self.update_show(reset=True)
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
             else:
@@ -2054,7 +2053,7 @@ class UIsub(Ui_MainWindow):
 
 # Data Group functionshandling
 
-    def group_get_dd(self):               # dd_groups is a dict of dicts: {group_ID (int): {group_name: str, color: str, show: bool, rec_IDs: [str]}}
+    def group_get_dd(self):                   # dd_groups is a dict of dicts: {group_ID (int): {group_name: str, color: str, show: bool, rec_IDs: [str]}}
         path_dd_groups = Path(self.dict_folders['project'] / "groups.pkl")
         if path_dd_groups.exists():
             with open(path_dd_groups, 'rb') as f:
@@ -2062,7 +2061,7 @@ class UIsub(Ui_MainWindow):
             return dict_groups
         return {}
 
-    def group_save_dd(self, dd_groups=None):    # dd_groups is a dict of dicts: {group_ID (int): {group_name: str, color: str, show: bool, rec_IDs: [str]}}
+    def group_save_dd(self, dd_groups=None):  # dd_groups is a dict of dicts: {group_ID (int): {group_name: str, color: str, show: bool, rec_IDs: [str]}}
         self.group_update_dfp()
         if dd_groups is None:
             dd_groups = self.dd_groups
@@ -2196,7 +2195,7 @@ class UIsub(Ui_MainWindow):
         self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the background color
         self.new_checkbox.setMaximumWidth(100)  # Set the maximum width
         self.new_checkbox.setChecked(bool(dict_group['show']))
-        self.new_checkbox.stateChanged.connect(lambda state, str_ID=str_ID: self.groupCheckboxChanged(state, str_ID))
+        self.new_checkbox.stateChanged.connect(lambda state, group_ID=group_ID: self.groupCheckboxChanged(state, group_ID))
         self.verticalLayoutGroups.addWidget(self.new_checkbox)
 
     def group_controls_remove(self, group_ID=None):
@@ -2418,7 +2417,7 @@ class UIsub(Ui_MainWindow):
             df_t = self.get_dft(p_row)
             dfmean = self.get_dfmean(p_row)
             uiplot.addRow(p_row=p_row, dft=df_t, dfmean=dfmean, dfoutput=dfoutput)
-            self.update_rec_show(reset=True)
+            self.update_show(reset=True)
         self.uiThaw()
         self.zoomAuto()
 
