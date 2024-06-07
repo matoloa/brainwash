@@ -2769,14 +2769,24 @@ class UIsub(Ui_MainWindow):
                     p_row = matching_rows.iloc[0]
                 df = self.get_dfoutput(row=p_row)
                 dfs.append(df)
-            group_mean = pd.concat(dfs).groupby('sweep').agg({
-                'EPSP_amp_norm': ['mean', 'sem'],
-                'EPSP_slope_norm': ['mean', 'sem'],
-                'EPSP_amp': ['mean', 'sem'],
-                'EPSP_slope': ['mean', 'sem']
-            }).reset_index()
-            group_mean.columns = [col[0] if col[0] == 'sweep' else '_'.join(col).strip().replace('sem', 'SEM') for col in group_mean.columns.values]
+            if uistate.checkBox['output_per_stim']:
+                group_mean = pd.concat(dfs).groupby('stim').agg({
+                    'EPSP_amp_norm': ['mean', 'sem'],
+                    'EPSP_slope_norm': ['mean', 'sem'],
+                    'EPSP_amp': ['mean', 'sem'],
+                    'EPSP_slope': ['mean', 'sem']
+                }).reset_index()
+                group_mean.columns = [col[0] if col[0] == 'stim' else '_'.join(col).strip().replace('sem', 'SEM') for col in group_mean.columns.values]
+            else:
+                group_mean = pd.concat(dfs).groupby('sweep').agg({
+                    'EPSP_amp_norm': ['mean', 'sem'],
+                    'EPSP_slope_norm': ['mean', 'sem'],
+                    'EPSP_amp': ['mean', 'sem'],
+                    'EPSP_slope': ['mean', 'sem']
+                }).reset_index()
+                group_mean.columns = [col[0] if col[0] == 'sweep' else '_'.join(col).strip().replace('sem', 'SEM') for col in group_mean.columns.values]
             print(f"Group mean columns: {group_mean.columns}")
+            print(f"Group mean: {group_mean}")
             self.df2csv(df=group_mean, rec=f"group_{group_ID}", key="mean")
         self.dict_group_means[group_ID] = group_mean
         return group_mean

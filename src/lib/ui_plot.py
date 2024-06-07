@@ -294,13 +294,22 @@ class UIplot():
         else:
             aspect = 'EPSP_slope'
             str_aspect = 'EPSP slope'
-        x = df_groupmean.sweep
+        if self.uistate.checkBox['output_per_stim']:
+            x = df_groupmean.stim
+        else:
+            x = df_groupmean.sweep
         label_mean = f"{group_name} {str_aspect} mean"
         label_norm = f"{group_name} {str_aspect} norm"
-        y_mean = df_groupmean[f"{aspect}_mean"]
-        y_mean_SEM = df_groupmean[f"{aspect}_SEM"]
-        y_norm = df_groupmean[f"{aspect}_norm_mean"]
-        y_norm_SEM = df_groupmean[f"{aspect}_norm_SEM"]
+        y_mean = df_groupmean[f"{aspect}_mean"].fillna(0)
+        y_mean_SEM = df_groupmean[f"{aspect}_SEM"].fillna(0)
+        y_norm = df_groupmean[f"{aspect}_norm_mean"].fillna(0)
+        y_norm_SEM = df_groupmean[f"{aspect}_norm_SEM"].fillna(0)
+
+        print(f"y_mean: {y_mean}")
+        print(f"y_mean_SEM: {y_mean_SEM}")
+        print(f"y_mean - y_mean_SEM: {y_mean - y_mean_SEM}")
+        print(f"y_mean + y_mean_SEM: {y_mean + y_mean_SEM}")
+
         meanline, = axis.plot(x, y_mean, color=color, label=label_mean, alpha=self.uistate.settings['alpha_line'], zorder=0)
         normline, = axis.plot(x, y_norm, color=color, label=label_norm, alpha=self.uistate.settings['alpha_line'], zorder=0)
         meanfill  = axis.fill_between(x, y_mean - y_mean_SEM, y_mean + y_mean_SEM, alpha=0.3, color=color)
