@@ -3465,8 +3465,6 @@ class UIsub(Ui_MainWindow):
             dict_t = handle_slope(aspect, x_start, x_end, precision, stim_offset)
         elif aspect in ["EPSP_amp", "volley_amp"]:
             dict_t = handle_amp(aspect, x_start, stim_offset, precision)
-            dict_t['t_EPSP_amp_halfwidth'] = t_row['t_EPSP_amp_halfwidth']
-            dict_t['t_volley_amp_halfwidth'] = t_row['t_volley_amp_halfwidth']
 
         for key, value in dict_t.items():
             df_t.at[stim_idx, key] = value
@@ -3475,6 +3473,8 @@ class UIsub(Ui_MainWindow):
                 for i, t_row in df_t.iterrows():
                     df_t.at[i, key] = round(t_row['t_stim'] - offset, precision)
 
+        dict_t['t_EPSP_amp_halfwidth'] = t_row['t_EPSP_amp_halfwidth']
+        dict_t['t_volley_amp_halfwidth'] = t_row['t_volley_amp_halfwidth']
         dict_t['norm_output_from'] = t_row['norm_output_from']
         dict_t['norm_output_to'] = t_row['norm_output_to']
 
