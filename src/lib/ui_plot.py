@@ -258,24 +258,30 @@ class UIplot():
     def plot_line(self, label, axid, x, y, color, rec_ID, aspect=None, stim=None, width=1):
         zorder = 0 if width > 1 else 1
         line, = self.get_axis(axid).plot(x, y, color=color, label=label, alpha=self.uistate.settings['alpha_line'], linewidth=width, zorder=zorder)
+        line.set_visible(False)
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':line, 'axis':axid}
 
     def plot_marker(self, label, axid, x, y, color, rec_ID, aspect=None, stim=None):
         marker, = self.get_axis(axid).plot(x, y, marker='o', markerfacecolor=color, markeredgecolor=color, markersize=10, alpha=0.4, zorder=0, label=label)
+        marker.set_visible(False)
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':marker, 'axis':axid}
 
     def plot_cross(self, label, axid, x, amp_x, amp_y, color, rec_ID, aspect=None, stim=None):
         xline, = self.get_axis(axid).plot(amp_x, [amp_y[1], amp_y[1]], color=color, label=f"{label} x", alpha=self.uistate.settings['alpha_line'], zorder=0)
         yline, = self.get_axis(axid).plot([x,x], amp_y, color=color, label=f"{label} y", alpha=self.uistate.settings['alpha_line'], zorder=0)
+        xline.set_visible(False)
+        yline.set_visible(False)
         self.uistate.dict_rec_labels[f"{label} x marker"] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':xline, 'axis':axid}
         self.uistate.dict_rec_labels[f"{label} y marker"] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':yline, 'axis':axid}
 
     def plot_vline(self, label, axid, x, color, rec_ID, aspect=None, stim=None, linewidth=8):
         vline = self.get_axis(axid).axvline(x=x, color=color, alpha=self.uistate.settings['alpha_mark'], label=label, linewidth=linewidth, zorder=0)
+        vline.set_visible(False)
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':vline, 'axis':axid}
 
     def plot_hline(self, label, axid, y, color, rec_ID, aspect=None, stim=None, linewidth=1):
         hline = self.get_axis(axid).axhline(y=y, color=color, alpha=self.uistate.settings['alpha_mark'], label=label, linewidth=linewidth, zorder=0)
+        hline.set_visible(False)
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':hline, 'axis':axid}
 
     def plot_group_lines(self, axid, group_ID, dict_group, df_groupmean):
@@ -299,6 +305,10 @@ class UIplot():
         normline, = axis.plot(x, y_norm, color=color, label=label_norm, alpha=self.uistate.settings['alpha_line'], zorder=0)
         meanfill  = axis.fill_between(x, y_mean - y_mean_SEM, y_mean + y_mean_SEM, alpha=0.3, color=color)
         normfill  = axis.fill_between(x, y_norm - y_norm_SEM, y_norm + y_norm_SEM, alpha=0.3, color=color)
+        meanline.set_visible(False)
+        normline.set_visible(False)
+        meanfill.set_visible(False)
+        normfill.set_visible(False)
         self.uistate.dict_group_labels[label_mean] = {'group_ID':group_ID, 'stim':None, 'aspect':aspect, 'axis':axid, 'line':meanline, 'fill':meanfill}
         self.uistate.dict_group_labels[label_norm] = {'group_ID':group_ID, 'stim':None, 'aspect':aspect, 'axis':axid, 'line':normline, 'fill':normfill}
 
@@ -440,8 +450,9 @@ class UIplot():
                     self.updateOutLine(label_base)
                 else:
                     volley_slope_mean = t_row.get('volley_slope_mean')
-                    if volley_slope_mean is None:
-                        volley_slope_mean = self.uistate.mouseover_out[0].get_ydata().mean()
+                    print(f" - - - volley_slope_mean: {volley_slope_mean}")
+                    #if volley_slope_mean is None:
+                    #    volley_slope_mean = self.uistate.mouseover_out[0].get_ydata().mean()
                     self.updateOutMean(f"{label_base} mean", volley_slope_mean)
             else: # EPSP slope
                 if norm:
@@ -460,8 +471,9 @@ class UIplot():
                     self.updateOutLine(label_base)
                 else:
                     volley_amp_mean = t_row.get('volley_amp_mean')
-                    if volley_amp_mean is None:
-                        volley_amp_mean = self.uistate.mouseover_out[0].get_ydata().mean()
+                    print(f" - - - volley_amp_mean: {volley_amp_mean}")
+                    #if volley_amp_mean is None:
+                    #    volley_amp_mean = self.uistate.mouseover_out[0].get_ydata().mean()
                     self.updateOutMean(f"{label_base} mean", volley_amp_mean)
             else: # EPSP amp
                 if norm:
@@ -490,6 +502,7 @@ class UIplot():
         linedict['line'].set_ydata(mouseover_out[0].get_ydata())
 
     def updateOutMean(self, label, mean):
+        print(f"updateOutMean: {label}, {mean}")
         linedict = self.uistate.dict_rec_labels[label]
         linedict['line'].set_ydata(mean)
 

@@ -1137,9 +1137,13 @@ class UIsub(Ui_MainWindow):
 
         #return
         # DEBUG block - for inquiring visiblity of specific lines
-        for key, value in self.dd_groups.items():
-            print(f"update_show: {key}, show:{value['show']}")
-
+        #for key, value in self.dd_groups.items():
+        #    print(f"update_show: {key}, show:{value['show']}")
+        print (f"update_show: {len(uistate.dict_rec_show)}")
+        for key, value in uistate.dict_rec_show.items():
+            if key.endswith(" volley amp mean") or key.endswith(" volley slope mean"):
+                print(f"update_show: {key}, show:{value['line'].get_visible()}")
+                print(f" - ydata: {value['line'].get_ydata()}")
 
 
 
@@ -1984,12 +1988,13 @@ class UIsub(Ui_MainWindow):
             return
         df_p = self.get_df_project()
         for index in uistate.rec_select:
-            recording_name = df_p.at[index, 'recording_name']
+            rec_name = df_p.at[index, 'recording_name']
             rec_ID = df_p.at[index, 'ID']
             sweeps = df_p.at[index, 'sweeps']
             if sweeps != "...": # if the file is parsed:
-                print(f"Deleting {recording_name}...")
-                self.purgeRecordingData(recording_name)
+                print(f"Deleting {rec_name}...")
+                self.purgeRecordingData(rec_ID, rec_name)
+                    # this also purges group cache and unplots the group
                 uiplot.unPlot(rec_ID) # remove plotted lines
         # store the ID of the line below the last selected row
         reselect_ID = None
@@ -2005,7 +2010,7 @@ class UIsub(Ui_MainWindow):
         self.tableProjSelectionChanged()
 
 
-    def purgeRecordingData(self, rec_name):
+    def purgeRecordingData(self, rec_ID, rec_name):
         def removeFromCache(cache_name):
             cache = getattr(self, cache_name)
             if rec_name in cache.keys():
@@ -2016,14 +2021,20 @@ class UIsub(Ui_MainWindow):
                 file_path.unlink()
             else:
                 print(f"purgeRecordingData: file not found: {file_path}")
+        groups2purge = self.get_groupsOfRec(rec_ID)
+        if groups2purge: # if rec_ID is in groups, purge those group caches and update dd_groups
+            #print(f"purgeRecordingData: {rec_name} in groups: {groups2purge}")
+            for group_ID in groups2purge: # remove rec_ID from rec_IDs of all affected groups
+                print(f"purgeRecordingData: pre  {self.dd_groups[group_ID]['rec_IDs']}")
+                self.dd_groups[group_ID]['rec_IDs'].remove(rec_ID)
+                print(f"purgeRecordingData: post {self.dd_groups[group_ID]['rec_IDs']}")
+            self.group_save_dd()
+            self.group_cache_purge(groups2purge)
+        # clear recording caches
         for cache_name in ['dict_datas', 'dict_means', 'dict_filters', 'dict_ts', 'dict_outputs']:
             removeFromCache(cache_name)
         for folder_name, file_suffix in [('data', '.csv'), ('timepoints', '.csv'), ('cache', '_mean.csv'), ('cache', '_filter.csv'), ('cache', '_output.csv')]:
             removeFromDisk(folder_name, file_suffix)
-        groups2purge = self.get_groupsOfRec(rec_name)
-        self.group_cache_purge(groups2purge)
-
-
 
 
     def parseData(self): 
@@ -2112,7 +2123,7 @@ class UIsub(Ui_MainWindow):
             pickle.dump(dd_groups, f)
 
     def get_groupsOfRec(self, rec_ID): # returns a set of all 'group ID' that have rec_ID in their 'rec_IDs' list
-        return set([key for key, value in self.dd_groups.items() if rec_ID in value['rec_IDs']])
+        return list([key for key, value in self.dd_groups.items() if rec_ID in value['rec_IDs']])
 
     def group_new(self):
         print(f"Adding new group to dd_groups: {self.dd_groups}")
@@ -2149,7 +2160,7 @@ class UIsub(Ui_MainWindow):
             self.group_controls_remove()
         else:
             del self.dd_groups[group_ID]
-            self.group_cache_purge(group_ID)
+            self.group_cache_purge([group_ID])
             self.group_controls_remove(group_ID)
         self.group_save_dd()
 
@@ -2167,21 +2178,21 @@ class UIsub(Ui_MainWindow):
         if rec_ID not in self.dd_groups[group_ID]['rec_IDs']:
             dict_group = self.dd_groups[group_ID]
             dict_group['rec_IDs'].append(rec_ID)
-            self.group_cache_purge(group_ID)
+            self.group_cache_purge([group_ID])
             df_groupmean = self.get_dfgroupmean(group_ID)
             uiplot.addGroup(group_ID, dict_group, df_groupmean)
 
     def group_rec_ungroup(self, rec_ID, group_ID):
         if rec_ID in self.dd_groups[group_ID]['rec_IDs']:
             self.dd_groups[group_ID]['rec_IDs'].remove(rec_ID)
-            self.group_cache_purge(group_ID)
+            self.group_cache_purge([group_ID])
             if self.dd_groups[group_ID]['rec_IDs']:
                 uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.get_dfgroupmean(group_ID))
 
     def group_selection(self, group_ID):
         dfp = self.get_df_project()
-        if uistate.rec_select is None:
-            print("No files selected.")
+        if uistate.df_recs2plot is None:
+            print("No parsed files selected.")
             # TODO: set selection to clicked group
             return
         selected_rec_IDs = dfp.loc[uistate.rec_select, 'ID'].tolist()  # selected rec_IDs
@@ -2197,11 +2208,10 @@ class UIsub(Ui_MainWindow):
         self.tableUpdate()
         self.graphRefresh()
 
-    def group_cache_purge(self, *group_IDs): # clear cache so that a new group mean is calculated
+    def group_cache_purge(self, group_IDs): # clear cache so that a new group mean is calculated
         if not group_IDs:  # if no group IDs are passed purge all groups
             group_IDs = list(self.dict_group_means.keys())
-        if config.verbose:
-            print(f"group_cache_purge: {group_IDs}, len(group): {len(group_IDs)}")
+        print(f"group_cache_purge: {group_IDs}, len(group): {len(group_IDs)}")
         for group_ID in group_IDs:
             if group_ID in self.dict_group_means:
                 del self.dict_group_means[group_ID]
@@ -2214,6 +2224,8 @@ class UIsub(Ui_MainWindow):
                 except FileNotFoundError:
                     print("...but NOT when attempting to unlink.")
             uiplot.unPlotGroup(group_ID)
+            if self.dd_groups[group_ID]['rec_IDs']:
+                uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.get_dfgroupmean(group_ID))
 
     def group_controls_add(self, group_ID): # Create menu for adding to group and checkbox for showing group
         group_name = self.dd_groups[group_ID]['group_name']
@@ -2507,14 +2519,31 @@ class UIsub(Ui_MainWindow):
     
 
     def tableUpdate(self):
-        selected_rows = self.tableProj.selectionModel().selectedRows() # Save selection
-        self.tablemodel.setData(self.get_df_project())
-        self.tableProj.resizeColumnsToContents()
-        selection = QtCore.QItemSelection()
-        for index in selected_rows: # Restore selection
-            selection.select(index, index)
-        self.tableProj.selectionModel().select(selection, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
+        # Save selection
+        selected_rows = self.tableProj.selectionModel().selectedRows()
+        df_p = self.get_df_project()
+        selected_IDs = [df_p.at[row.row(), 'ID'] for row in selected_rows]
+        print(f"tableUpdate: {selected_IDs}")
 
+        # Update data
+        df_project = self.get_df_project()
+        self.tablemodel.setData(df_project)
+        self.tableProj.resizeColumnsToContents()
+
+        # Clear selection
+        self.tableProj.clearSelection()
+
+        # Restore selection
+        for selected_ID in selected_IDs:
+            # Find the index of the row that matches the selected ID in the updated DataFrame
+            row_idx = df_project[df_project['ID'] == selected_ID].index[0]
+            self.tableProj.selectRow(row_idx)
+
+        # Set focus to the first selected row
+        if selected_IDs:
+            first_selected_ID = selected_IDs[0]
+            first_row_idx = df_project[df_project['ID'] == first_selected_ID].index[0]
+            self.tableProj.selectRow(first_row_idx)
 
 # Internal dataframe handling
   
@@ -2721,7 +2750,8 @@ class UIsub(Ui_MainWindow):
     def get_dfgroupmean(self, group_ID):
         # returns an internal df output average of <group>. If it does not exist, create it
         if group_ID in self.dict_group_means: # 1: Return cached
-            print(f"Returning cached group mean for group {group_ID}")
+            if config.verbose:
+                print(f"Returning cached group mean for group {group_ID}")
             return self.dict_group_means[group_ID]
         group_path = Path(f"{self.dict_folders['cache']}/group_{group_ID}.csv")
         if group_path.exists(): #2: Read from file
@@ -2732,11 +2762,19 @@ class UIsub(Ui_MainWindow):
             if config.verbose:
                 print(f"Building new group mean for group {group_ID}")
             recs_in_group = self.dd_groups[group_ID]['rec_IDs']
+            print(f"recs_in_group: {recs_in_group}")
             dfs = []
-            for rec_ID in recs_in_group:
-                p_row = self.get_df_project().loc[self.get_df_project()['ID'] == rec_ID].iloc[0]
-                if p_row.empty:
+            df_p = self.get_df_project()
+            print(df_p['ID'].dtypes)
+            for UUID_rec_ID in recs_in_group:
+                rec_ID = str(UUID_rec_ID)
+                print(type(rec_ID))
+                print(f"df_p.loc[df_p['ID']: {df_p['ID']}")
+                matching_rows = df_p.loc[df_p['ID'] == rec_ID]
+                if matching_rows.empty:
                     raise ValueError(f"rec_ID {rec_ID} not found in df_project.")
+                else:
+                    p_row = matching_rows.iloc[0]
                 df = self.get_dfoutput(row=p_row)
                 dfs.append(df)
             group_mean = pd.concat(dfs).groupby('sweep').agg({
@@ -2865,7 +2903,7 @@ class UIsub(Ui_MainWindow):
 
     def graphGroups(self):
         # Get all group IDs
-        all_group_ids = set(self.dd_groups.keys())
+        all_group_ids = self.dd_groups.keys()
         if not all_group_ids:
             return
         groups_with_records = {group_id: group_info for group_id, group_info in self.dd_groups.items() if group_info['rec_IDs']}
@@ -3478,7 +3516,8 @@ class UIsub(Ui_MainWindow):
             return
         p_row = uistate.dfp_row_copy.to_dict()
         df_t = uistate.dft_copy # updated while dragging
-        t_row = uistate.dft_copy.iloc[uistate.stim_select[0]].to_dict()
+        stim_idx = uistate.stim_select[0]
+        t_row = df_t.iloc[stim_idx].to_dict()
 
         action_mapping = {
             "EPSP slope": ("t_EPSP_slope_method", "manual", 'EPSP slope', {'t_EPSP_slope_start': t_row['t_EPSP_slope_start'], 't_EPSP_slope_end': t_row['t_EPSP_slope_end']}, uistate.updateDragZones),
@@ -3490,7 +3529,6 @@ class UIsub(Ui_MainWindow):
             if uistate.mouseover_action.startswith(action):
                 t_row[values[0]] = values[1]
                 aspect = values[2]
-                uiplot.plotUpdate(p_row=p_row, t_row=t_row, aspect=aspect, data_x=data_x, data_y=data_y)
                 values[4]()
                 dict_t = values[3]
                 dict_t['stim'] = t_row['stim']
@@ -3502,8 +3540,7 @@ class UIsub(Ui_MainWindow):
 
         #update selected dft row with the values from dict_t
         for key, value in dict_t.items():
-            uistate.dft_copy.loc[uistate.stim_select[0], key] = value
-        self.set_dft(p_row['recording_name'], uistate.dft_copy)
+            df_t.loc[df_t.index[stim_idx], key] = value
 
         dfmean = self.get_dfmean(row=p_row)
 
@@ -3515,12 +3552,22 @@ class UIsub(Ui_MainWindow):
             dffilter = self.get_dffilter(row=p_row)
             stim_num = t_row['stim']
             new_dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+            if aspect == "volley amp":
+                df_t.loc[df_t.index[stim_idx], 'volley_amp_mean'] = new_dfoutput['volley_amp'].mean()
+            elif aspect == "volley slope":
+                df_t.loc[df_t.index[stim_idx], 'volley_slope_mean'] = new_dfoutput['volley_slope'].mean()
             new_dfoutput['stim'] = int(stim_num)
             for col in new_dfoutput.columns:
                 dfoutput.loc[dfoutput['stim'] == stim_num, col] = new_dfoutput.loc[new_dfoutput['stim'] == stim_num, col]
         print(f" - {dfoutput.columns}")
         self.persistOutput(rec_name=p_row['recording_name'], dfoutput=dfoutput)
-        
+
+        self.set_dft(p_row['recording_name'], df_t)
+        uistate.dft_copy = df_t
+        t_row = df_t.iloc[stim_idx].to_dict()
+
+        uiplot.plotUpdate(p_row=p_row, t_row=t_row, aspect=aspect, data_x=data_x, data_y=data_y)
+
         def update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot):
             labelbase = f"{p_row['recording_name']} - stim {t_row['stim']}"
             labelamp = f"{labelbase} {aspect}"
@@ -3535,7 +3582,7 @@ class UIsub(Ui_MainWindow):
             uiplot.updateAmpMarker(labelamp, x, y, amp_x, t_row['amp_zero'], amp=amp)
 
         if aspect in ["EPSP amp", "volley amp"]:
-            print(f" - {aspect} updated")
+            # print(f" - {aspect} updated")
             if uistate.checkBox['timepoints_per_stim']:
                 update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot)
             else:
@@ -3543,10 +3590,9 @@ class UIsub(Ui_MainWindow):
                     update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot)
         self.tableUpdate()
 
- 
-        # update groups
+         # update groups
         affected_groups = self.get_groupsOfRec(p_row['ID'])
-        self.group_cache_purge(*affected_groups)
+        self.group_cache_purge(affected_groups)
         for group_ID in affected_groups:
             df_groupmean = self.get_dfgroupmean(group_ID)
             uiplot.addGroup(group_ID, self.dd_groups[group_ID], df_groupmean)
