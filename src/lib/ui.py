@@ -310,7 +310,7 @@ class ParseDataThread(QtCore.QThread):
 
     def create_new_row(self, df_proj_row, new_name, dict_sub):
         df_proj_new_row = df_proj_row.copy()
-        df_proj_new_row['ID'] = uuid.uuid4()
+        df_proj_new_row['ID'] = str(uuid.uuid4())
         df_proj_new_row['recording_name'] = new_name
         df_proj_new_row['sweeps'] = dict_sub.get('nsweeps', None)
         df_proj_new_row['channel'] = dict_sub.get('channel', None)
@@ -983,6 +983,10 @@ class UIsub(Ui_MainWindow):
         self.darkmode() # set darkmode if set in bw_cfg. Requires tables and canvases be loaded!
         self.setupToolBar()
 
+        # set focus to TableProj, so that arrows work immediately
+        self.tableProj.setFocus()
+        self.updating_tableProj = False
+
         # debug mode; prints widget focus every 1000ms
         if config.track_widget_focus:
             self.timer = QtCore.QTimer(self)
@@ -1011,12 +1015,15 @@ class UIsub(Ui_MainWindow):
 ######################################################################
 
     def tableProjSelectionChanged(self):
+        if self.updating_tableProj:
+            return
         self.usage("tableProjSelectionChanged")
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableProj.clearSelection()
         selected_indexes = self.tableProj.selectionModel().selectedRows()
         # build the list uistate.rec_select with indices
         uistate.rec_select = [index.row() for index in selected_indexes]
+        #print(f" - rec_select: {uistate.rec_select}")
         self.update_recs2plot()
         self.update_show()
         if uistate.df_recs2plot is None:
@@ -2184,10 +2191,12 @@ class UIsub(Ui_MainWindow):
 
     def group_rec_ungroup(self, rec_ID, group_ID):
         if rec_ID in self.dd_groups[group_ID]['rec_IDs']:
-            self.dd_groups[group_ID]['rec_IDs'].remove(rec_ID)
+            dict_group = self.dd_groups[group_ID]
+            dict_group['rec_IDs'].remove(rec_ID)
             self.group_cache_purge([group_ID])
-            if self.dd_groups[group_ID]['rec_IDs']:
-                uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.get_dfgroupmean(group_ID))
+            df_groupmean = self.get_dfgroupmean(group_ID)
+            if self.dd_groups[group_ID]['rec_IDs']:                
+                uiplot.addGroup(group_ID, dict_group, df_groupmean)
 
     def group_selection(self, group_ID):
         dfp = self.get_df_project()
@@ -2519,31 +2528,18 @@ class UIsub(Ui_MainWindow):
     
 
     def tableUpdate(self):
-        # Save selection
-        selected_rows = self.tableProj.selectionModel().selectedRows()
-        df_p = self.get_df_project()
-        selected_IDs = [df_p.at[row.row(), 'ID'] for row in selected_rows]
-        print(f"tableUpdate: {selected_IDs}")
-
+        self.updating_tableProj = True # prevent tableProjSelectionChanged from firing
         # Update data
         df_project = self.get_df_project()
         self.tablemodel.setData(df_project)
         self.tableProj.resizeColumnsToContents()
-
-        # Clear selection
-        self.tableProj.clearSelection()
-
         # Restore selection
-        for selected_ID in selected_IDs:
-            # Find the index of the row that matches the selected ID in the updated DataFrame
-            row_idx = df_project[df_project['ID'] == selected_ID].index[0]
-            self.tableProj.selectRow(row_idx)
-
-        # Set focus to the first selected row
-        if selected_IDs:
-            first_selected_ID = selected_IDs[0]
-            first_row_idx = df_project[df_project['ID'] == first_selected_ID].index[0]
-            self.tableProj.selectRow(first_row_idx)
+        selection_model = self.tableProj.selectionModel()
+        for idx in uistate.rec_select:
+            index = self.tablemodel.index(idx, 0)  # get the QModelIndex for the row
+            selection_model.select(index, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
+            #print(f"tableUpdate: reselecting {len(uistate.rec_select)}: {idx}")
+        self.updating_tableProj = False
 
 # Internal dataframe handling
   
@@ -2762,14 +2758,10 @@ class UIsub(Ui_MainWindow):
             if config.verbose:
                 print(f"Building new group mean for group {group_ID}")
             recs_in_group = self.dd_groups[group_ID]['rec_IDs']
-            print(f"recs_in_group: {recs_in_group}")
+            #print(f"recs_in_group: {recs_in_group}")
             dfs = []
             df_p = self.get_df_project()
-            print(df_p['ID'].dtypes)
-            for UUID_rec_ID in recs_in_group:
-                rec_ID = str(UUID_rec_ID)
-                print(type(rec_ID))
-                print(f"df_p.loc[df_p['ID']: {df_p['ID']}")
+            for rec_ID in recs_in_group:
                 matching_rows = df_p.loc[df_p['ID'] == rec_ID]
                 if matching_rows.empty:
                     raise ValueError(f"rec_ID {rec_ID} not found in df_project.")
