@@ -1021,6 +1021,7 @@ class UIsub(Ui_MainWindow):
         self.update_rec_show()
         if uistate.df_recs2plot is None:
             print("No parsed recordings selected.")
+            self.graphRefresh()
             return
         # use the selected df_p row with the highest sweep duration
         p_row = uistate.df_recs2plot.loc[uistate.df_recs2plot['sweep_duration'].idxmax()]
@@ -1062,25 +1063,26 @@ class UIsub(Ui_MainWindow):
 
 
     def update_rec_show(self, reset=False):
-        if uistate.df_recs2plot is None:
-            return
-        t0 = time.time()
+        # t0 = time.time()
         old_selection = uistate.dict_rec_show 
-        selected_ids = set(uistate.df_recs2plot['ID'])
-        selected_stims = [stim + 1 for stim in uistate.stim_select] # stim_select is 0-based (indices) - convert to stims
-        print(f"update_rec_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}")
-        # remove non-selected recs and stims
-        aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
-        new_selection = {k: v for k, v in uistate.dict_rec_labels.items() 
-                         if v['rec_ID'] in selected_ids
-                         and (v['stim'] in selected_stims or v['stim'] is None)
-                         and all(uistate.checkBox[aspect] or v.get('aspect', '') != aspect for aspect in aspects)}
-        if not uistate.checkBox['norm_EPSP']:
-             filters = [" norm"]
+        if uistate.df_recs2plot is None:
+            reset=True
+            new_selection = {}
         else:
-             filters = [" EPSP amp", " EPSP slope"]
-        new_selection = {k: v for k, v in new_selection.items() if not any(k.endswith(f) for f in filters)}
-
+            selected_ids = set(uistate.df_recs2plot['ID'])
+            selected_stims = [stim + 1 for stim in uistate.stim_select] # stim_select is 0-based (indices) - convert to stims
+            print(f"update_rec_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}")
+            # remove non-selected recs and stims
+            aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
+            new_selection = {k: v for k, v in uistate.dict_rec_labels.items() 
+                            if v['rec_ID'] in selected_ids
+                            and (v['stim'] in selected_stims or v['stim'] is None)
+                            and all(uistate.checkBox[aspect] or v.get('aspect', '') != aspect for aspect in aspects)}
+            if not uistate.checkBox['norm_EPSP']:
+                filters = [" norm"]
+            else:
+                filters = [" EPSP amp", " EPSP slope"]
+            new_selection = {k: v for k, v in new_selection.items() if not any(k.endswith(f) for f in filters)}
         if reset: # Hide all lines
             obsolete_lines = uistate.dict_rec_labels
         else:
@@ -2674,30 +2676,26 @@ class UIsub(Ui_MainWindow):
         
     def get_dfgroupmean(self, group_ID):
         # returns an internal df output average of <group>. If it does not exist, create it
-        str_ID = str(group_ID)
         if group_ID in self.dict_group_means: # 1: Return cached
-            print(f"Returning cached group mean for {str_ID}")
+            print(f"Returning cached group mean for group {group_ID}")
             return self.dict_group_means[group_ID]
-        group_path = Path(f"{self.dict_folders['cache']}/group_{str_ID}.csv")
+        group_path = Path(f"{self.dict_folders['cache']}/group_{group_ID}.csv")
         if group_path.exists(): #2: Read from file
             if config.verbose:
-                print("Loading stored", str(group_path))
+                print(f"Loading stored group mean for group {group_ID}")
             group_mean = pd.read_csv(str(group_path))
         else: #3: Create file
             if config.verbose:
-                print("Building new", str(group_path))
+                print(f"Building new group mean for group {group_ID}")
             recs_in_group = self.dd_groups[group_ID]['rec_IDs']
             dfs = []
-            for rec in recs_in_group:
-                df_project = self.get_df_project().loc[self.get_df_project()['ID'] == rec]
-                if not df_project.empty:
-                    row = df_project.iloc[0]
-                    df = self.get_dfoutput(row=row)
-                    dfs.append(df)
-                else:
-                    print(f"No data found for rec: {rec}")
-                    return
-            group_mean = dfs.groupby('sweep').agg({
+            for rec_ID in recs_in_group:
+                p_row = self.get_df_project().loc[self.get_df_project()['ID'] == rec_ID].iloc[0]
+                if p_row.empty:
+                    raise ValueError(f"rec_ID {rec_ID} not found in df_project.")
+                df = self.get_dfoutput(row=p_row)
+                dfs.append(df)
+            group_mean = pd.concat(dfs).groupby('sweep').agg({
                 'EPSP_amp_norm': ['mean', 'sem'],
                 'EPSP_slope_norm': ['mean', 'sem'],
                 'EPSP_amp': ['mean', 'sem'],
@@ -2705,7 +2703,7 @@ class UIsub(Ui_MainWindow):
             }).reset_index()
             group_mean.columns = [col[0] if col[0] == 'sweep' else '_'.join(col).strip().replace('sem', 'SEM') for col in group_mean.columns.values]
             print(f"Group mean columns: {group_mean.columns}")
-            self.df2csv(df=group_mean, rec=f"group_{str_ID}", key="mean")
+            self.df2csv(df=group_mean, rec=f"group_{group_ID}", key="mean")
         self.dict_group_means[group_ID] = group_mean
         return group_mean
 
