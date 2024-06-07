@@ -144,26 +144,19 @@ class UIplot():
             return
         t0 = time.time()
 
-        # Recordings
-        if uistate.df_recs2plot is None or not uistate.anyView():
-            self.hideAll()
-        else:
-            dict_rec = uistate.dict_rec_show
-            axis_names = ['axm', 'axe', 'ax1', 'ax2']
-            loc_values = ['upper right', 'upper right', 'upper right', 'lower right']
-
-            for axis_name, loc in zip(axis_names, loc_values):
-                dict_on_axis = {key: value for key, value in dict_rec.items() if value['axis'] == axis_name}
-                axis_legend = {key: value['line'] for key, value in dict_on_axis.items() if not key.endswith(" marker")}
-                for key, value in dict_on_axis.items():
-                    value['line'].set_visible(True)
-                axis = getattr(uistate, axis_name)
-                axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)              
-        # Groups
-        for label, dict_group in uistate.dict_group_labels.items():
-            print(f" - - {label}")
-            dict_group['line'].set_visible(True)
-            dict_group['fill'].set_visible(True)
+        # Set recordings and group legends
+        dd_recs = uistate.dict_rec_show
+        dd_groups = uistate.dict_group_show
+        axids = ['axm', 'axe', 'ax1', 'ax2']
+        legend_loc = ['upper right', 'upper right', 'upper right', 'lower right']
+        for axid, loc in zip(axids, legend_loc):
+            recs_on_axis = {key: value for key, value in dd_recs.items() if value['axis'] == axid and not key.endswith(" marker")}
+            axis_legend = {key: value['line'] for key, value in recs_on_axis.items()}
+            if axid in ['ax1', 'ax2']:
+                groups_on_axis = {key: value for key, value in dd_groups.items() if value['axis'] == axid}
+                axis_legend.update({key: value['line'] for key, value in groups_on_axis.items()})
+            axis = getattr(uistate, axid)
+            axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)              
 
         # arrange axes and labels
         axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2

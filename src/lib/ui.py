@@ -1063,7 +1063,6 @@ class UIsub(Ui_MainWindow):
 
 
     def update_show(self, reset=False):
-        # t0 = time.time()
         old_selection = uistate.dict_rec_show 
         if uistate.df_recs2plot is None:
             reset=True
@@ -1095,13 +1094,37 @@ class UIsub(Ui_MainWindow):
             line_dict['line'].set_visible(True)
         uistate.dict_rec_show = new_selection
 
-        # print labels and visibility of keys that end with "EPSP slope marker"
-        for k, v in uistate.dict_rec_labels.items():
-            if k.endswith("EPSP slope marker"):
-                print(f"{k}: {v['line'].get_visible()}")
-
-
-        #print(f"update_show took {round((time.time() - t0) * 1000)} ms")
+        # group view
+        if self.dd_groups is not None:
+            old_group_selection = uistate.dict_group_show.copy()
+            # if any recs are selected, show only groups that contain selected recs
+            if uistate.df_recs2plot is not None:
+                selected_groups = {group for rec_ID in selected_ids for group in self.get_groupsOfRec(rec_ID)}
+                new_group_selection = {k: v for k, v in uistate.dict_group_labels.items() if v['group_ID'] in selected_groups}
+            else:
+                new_group_selection = uistate.dict_group_labels.copy()
+            aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
+            new_group_selection = {k: v for k, v in new_group_selection.items()
+                                    if all(uistate.checkBox[aspect] or v.get('aspect', '') != aspect for aspect in aspects)}
+            if uistate.checkBox['norm_EPSP']:
+                filters = [" norm"]
+            else:
+                filters = [" mean"]
+            new_group_selection = {k: v for k, v in new_group_selection.items() if any(k.endswith(f) for f in filters)}
+            obsolete_group_lines = {k: v for k, v in old_group_selection.items() if k not in new_group_selection}
+            print(f"obsolete_group_lines: {obsolete_group_lines.keys()}")
+            for k, line_dict in obsolete_group_lines.items():
+                print(f"Obsolete group line key: {k}")
+                line_dict['line'].set_visible(False)
+                line_dict['fill'].set_visible(False)
+            # Show what's now selected
+            added_group_lines = {k: v for k, v in new_group_selection.items() if k not in old_group_selection}
+            print(f"added_group_lines: {added_group_lines.keys()}")
+            for k, line_dict in added_group_lines.items():
+                print(f"Added group line key: {k}")
+                line_dict['line'].set_visible(True)
+                line_dict['fill'].set_visible(True)
+            uistate.dict_group_show = new_group_selection
 
 
     def graphRefresh(self):
@@ -2070,7 +2093,7 @@ class UIsub(Ui_MainWindow):
             pickle.dump(dd_groups, f)
 
     def get_groupsOfRec(self, rec_ID): # returns a set of all 'group ID' that have rec_ID in their 'rec_IDs' list
-        return set([value['group_ID'] for key, value in self.dd_groups.items() if rec_ID in value['rec_IDs']])
+        return set([key for key, value in self.dd_groups.items() if rec_ID in value['rec_IDs']])
 
     def group_new(self):
         print(f"Adding new group to dd_groups: {self.dd_groups}")
@@ -2163,7 +2186,7 @@ class UIsub(Ui_MainWindow):
         for group_ID in group_IDs:
             if group_ID in self.dict_group_means:
                 del self.dict_group_means[group_ID]
-            path_group_mean_cache = Path(f"{self.dict_folders['cache']}/{group_ID}_mean.csv")
+            path_group_mean_cache = Path(f"{self.dict_folders['cache']}/group_{group_ID}_mean.csv")
             if path_group_mean_cache.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
                 print(f"{path_group_mean_cache} found when checking for existence...")
                 try:
@@ -2936,7 +2959,7 @@ class UIsub(Ui_MainWindow):
 
     def eventMouseover(self, event): # determine which event is being mouseovered
         if uistate.df_recs2plot is None or uistate.df_recs2plot.empty:
-            print("No recordings to mouseover")
+            # print("No recordings to mouseover")
             return
         axe = uistate.axe
         def plotMouseover(action, axe):
@@ -3496,6 +3519,16 @@ class UIsub(Ui_MainWindow):
                 for i, t_row in uistate.dft_copy.iterrows():
                     update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot)
         self.tableUpdate()
+
+        # update groups
+        affected_groups = self.get_groupsOfRec(p_row['ID'])
+        self.group_cache_purge(*affected_groups)
+        for group_ID in affected_groups:
+            df_groupmean = self.get_dfgroupmean(group_ID)
+            uiplot.addGroup(group_ID, self.dd_groups[group_ID], df_groupmean)
+        self.mouseoverUpdate()
+
+
         if config.talkback:
             self.talkback()
 
