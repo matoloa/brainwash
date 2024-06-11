@@ -82,7 +82,7 @@ class Config:
         self.track_widget_focus = False
         self.terminal_space = 372 if self.dev_mode else 0
         # get project_name and version number from pyproject.toml
-        pathtoml = [i + "/pyproject.toml" for i in ["..", ".", "lib"] if Path(i + "/pyproject.toml").is_file()][0]
+        pathtoml = [i + "/pyproject.toml" for i in ["../..", "..", ".", "lib"] if Path(i + "/pyproject.toml").is_file()][0]
         pyproject = toml.load(pathtoml)
         self.program_name = pyproject['project']['name']
         self.version = pyproject['project']['version']
