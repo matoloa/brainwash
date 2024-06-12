@@ -183,7 +183,7 @@ class UIplot():
         if uistate.checkBox['output_per_stim']:
             x_axis = 'stim'
             if uistate.rec_select:
-                x_max = uistate.df_recs2plot['stims'].max()
+                x_max = int(uistate.df_recs2plot['stims'].max())
                 ax1.xaxis.set_major_locator(FixedLocator(range(1, x_max+1)))
                 ax2.xaxis.set_major_locator(FixedLocator(range(1, x_max+1)))
         else:

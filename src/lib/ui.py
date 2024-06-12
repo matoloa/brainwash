@@ -2797,13 +2797,13 @@ class UIsub(Ui_MainWindow):
         methods = ['t_volley_amp_method', 't_volley_slope_method', 't_EPSP_amp_method', 't_EPSP_slope_method']
         params = ['t_volley_amp_params', 't_volley_slope_params', 't_EPSP_amp_params', 't_EPSP_slope_params']
 
-        def update_row(p_row, df_t, dfoutput):
+        def use_t_from_stim_with_max(p_row, df_t, dfoutput, column):
             # find highest EPSP_slope in df_output and apply uniform timepoints to all stims
             precision = uistate.settings['precision']
-            if 'EPSP_slope' in dfoutput.columns:
-                idx_max_EPSP = dfoutput['EPSP_slope'].idxmax()
+            if column in dfoutput.columns:
+                idx_max_EPSP = dfoutput[column].idxmax()
                 stim_max = dfoutput.loc[idx_max_EPSP, 'stim']
-                t_template_row = df_t.loc[[idx_max_EPSP]]
+                t_template_row = df_t[df_t['stim'] == stim_max]
                 t_stim = round(t_template_row['t_stim'].values[0], precision)
                 for var in variables:
                     t_template_row[var] = round(t_template_row[var].values[0] - t_stim, precision)
@@ -2827,12 +2827,12 @@ class UIsub(Ui_MainWindow):
             for _, p_row in self.get_df_project().iterrows():
                 df_t = self.get_dft(p_row)
                 dfoutput = self.get_dfoutput(p_row)
-                update_row(p_row, df_t, dfoutput)
+                use_t_from_stim_with_max(p_row, df_t, dfoutput, 'EPSP_slope')
         else:
             if df_t is None or dfoutput is None:
                 df_t = self.get_dft(p_row)
                 dfoutput = self.get_dfoutput(p_row)
-            update_row(p_row, df_t, dfoutput)
+            use_t_from_stim_with_max(p_row, df_t, dfoutput, 'EPSP_slope')
 
 
 
