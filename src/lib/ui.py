@@ -1866,9 +1866,10 @@ class UIsub(Ui_MainWindow):
         if not uistate.rec_select:
             print("No files selected.")
             return
+        df_p = self.get_df_project()
         for index in uistate.rec_select:
-            df_p = self.get_df_project()
             p_row = df_p.loc[index]
+            old_df_t = self.get_dft(p_row)
             rec_name = p_row['recording_name']
             rec_ID = p_row['ID']
             stims = p_row['stims']
@@ -1884,27 +1885,37 @@ class UIsub(Ui_MainWindow):
             else:
                 dfmean_range = dfmean
             default_dict_t = uistate.default_dict_t.copy()  # Default sizes
-            df_t = analysis.find_all_t(dfmean=dfmean_range, default_dict_t=default_dict_t, precision = uistate.settings['precision'], verbose=False)
-            if df_t is None:
+            print(f"stimDetect: {rec_name} calling find_all_t within range:\n{uistate.x_select}")
+            new_df_t = analysis.find_all_t(dfmean=dfmean_range, default_dict_t=default_dict_t, precision = uistate.settings['precision'], verbose=False)
+            if new_df_t is None:
                 print(f"No stims found for {rec_name}.")
                 continue
             if uistate.checkBox['timepoints_per_stim'] or stims == 1:
-                self.set_dft(rec_name, df_t)
+                self.set_dft(rec_name, new_df_t)
             else:
                 dfoutput = self.get_dfoutput(p_row)
-                self.set_uniformTimepoints(p_row=p_row, df_t=df_t, dfoutput=dfoutput)
-            df_p.loc[p_row['ID'] == df_p['ID'], 'stims'] = len(df_t)
+                print(f"stimDetect: {rec_name} calling set_uniformTimepoints with df_t:\n{new_df_t}")
+                # list_obsolete_stim_idx: a list of idx of old_df_t rows, that have a t_stim that isn't in new_df_t
+                list_obsolete_stim_idx = [i for i, row in old_df_t.iterrows() if row['t_stim'] not in new_df_t['t_stim'].values]
+                if list_obsolete_stim_idx:
+                    print(f"Obsolete stims: {list_obsolete_stim_idx}")
+                    for idx in list_obsolete_stim_idx:
+                        dfoutput = dfoutput.drop(idx)
+                        print(f" - removed idx {idx} from dfoutput")
+                    dfoutput = dfoutput.reset_index(drop=True)
+                    dfoutput['stim'] = new_df_t['stim']
+                self.set_uniformTimepoints(p_row=p_row, df_t=new_df_t, dfoutput=dfoutput)
+            df_p.loc[p_row['ID'] == df_p['ID'], 'stims'] = len(new_df_t)
             self.set_df_project(df_p)
-            print(f"stimDetect: {rec_name}")
             uiplot.unPlot(rec_ID)
             dfoutput = self.get_dfoutput(p_row)
             self.persistOutput(p_row['recording_name'], dfoutput)
-            uiplot.addRow(p_row, df_t, dfmean, dfoutput)
-        print(f"************df_t after stimDetect: {df_t}")
+            uiplot.addRow(p_row, new_df_t, dfmean, dfoutput)
         uistate.stim_select = [0]
+        p_row = df_p.loc[uistate.rec_select[0]]
+        df_t = self.get_dft(p_row)
         self.tableStimModel.setData(df_t)
         self.tableStim.selectRow(0)
-        self.stimSelectionChanged()
         # unplot and replot all affected recordings
         self.update_show(reset=True)
         self.mouseoverUpdate()
@@ -2804,11 +2815,16 @@ class UIsub(Ui_MainWindow):
 
         def use_t_from_stim_with_max(p_row, df_t, dfoutput, column):
             # find highest EPSP_slope in df_output and apply uniform timepoints to all stims
+            print(f" - use_t_from_stim_with_max called with df_t:\n{df_t}")
             precision = uistate.settings['precision']
             if column in dfoutput.columns:
+                print(f"dfoutput:\n{dfoutput}")
                 idx_max_EPSP = dfoutput[column].idxmax()
+                print(f"idx_max_EPSP: {idx_max_EPSP}")
                 stim_max = dfoutput.loc[idx_max_EPSP, 'stim']
+                print(f"stim_max: {stim_max}")
                 t_template_row = df_t[df_t['stim'] == stim_max].copy()
+                print(f"t_template_row: {t_template_row}")
                 t_stim = round(t_template_row['t_stim'].values[0], precision)
                 for var in variables:
                     t_template_row[var] = round(t_template_row[var].values[0] - t_stim, precision)
