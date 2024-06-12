@@ -1851,12 +1851,16 @@ class UIsub(Ui_MainWindow):
         uistate.dft_copy.to_clipboard(index=False)
 
     def copy_output(self):
-        if len(uistate.rec_select) != 1:
-            print("Select one recording.")
-            return
-        p_row = self.get_df_project().loc[uistate.rec_select[0]]
-        output = self.get_dfoutput(p_row)
-        output.to_clipboard(index=False)
+        if len(uistate.rec_select) < 1:
+            print("copy_output: nothing selected.")
+            return    
+        selected_outputs = pd.DataFrame()
+        for rec in uistate.rec_select:
+            p_row = self.get_df_project().loc[rec]
+            output = self.get_dfoutput(p_row)
+            output.insert(0, 'recording_name', p_row['recording_name'])
+            selected_outputs = pd.concat([selected_outputs, output], ignore_index=True)
+        selected_outputs.to_clipboard(index=False)
 
     def stimDetect(self):
         if not uistate.rec_select:
