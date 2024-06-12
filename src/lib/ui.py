@@ -1891,7 +1891,8 @@ class UIsub(Ui_MainWindow):
             if uistate.checkBox['timepoints_per_stim'] or stims == 1:
                 self.set_dft(rec_name, df_t)
             else:
-                self.set_uniformTimepoints(p_row=p_row)
+                dfoutput = self.get_dfoutput(p_row)
+                self.set_uniformTimepoints(p_row=p_row, df_t=df_t, dfoutput=dfoutput)
             df_p.loc[p_row['ID'] == df_p['ID'], 'stims'] = len(df_t)
             self.set_df_project(df_p)
             print(f"stimDetect: {rec_name}")
@@ -1899,11 +1900,11 @@ class UIsub(Ui_MainWindow):
             dfoutput = self.get_dfoutput(p_row)
             self.persistOutput(p_row['recording_name'], dfoutput)
             uiplot.addRow(p_row, df_t, dfmean, dfoutput)
+        print(f"************df_t after stimDetect: {df_t}")
         uistate.stim_select = [0]
-        if len(uistate.rec_select) == 1:
-            self.tableStimModel.setData(df_t)
-            self.tableStim.selectRow(0)
-            self.stimSelectionChanged()
+        self.tableStimModel.setData(df_t)
+        self.tableStim.selectRow(0)
+        self.stimSelectionChanged()
         # unplot and replot all affected recordings
         self.update_show(reset=True)
         self.mouseoverUpdate()
@@ -2454,7 +2455,7 @@ class UIsub(Ui_MainWindow):
 
     def set_dft(self, rec_name, df): # persists df and saves it to .csv
         #print(f"type: {type(df)}")
-        #print(f"set_dft, {df}")
+        print(f"set_dft of {rec_name}: {df}")
         self.dict_ts[rec_name] = df
         self.df2csv(df=df, rec=rec_name, key="timepoints")
 
@@ -2581,7 +2582,7 @@ class UIsub(Ui_MainWindow):
         if rec in self.dict_ts.keys() and not reset:
             #print("returning cached dft")
             return self.dict_ts[rec]
-        str_t_path = f"{self.dict_folders['timepoints']}/t_{rec}.csv"
+        str_t_path = f"{self.dict_folders['timepoints']}/{rec}.csv"
         if Path(str_t_path).exists() and not reset:
             #print("reading dft from file")
             df_t = pd.read_csv(str_t_path)
@@ -2807,27 +2808,25 @@ class UIsub(Ui_MainWindow):
             if column in dfoutput.columns:
                 idx_max_EPSP = dfoutput[column].idxmax()
                 stim_max = dfoutput.loc[idx_max_EPSP, 'stim']
-                t_template_row = df_t[df_t['stim'] == stim_max]
+                t_template_row = df_t[df_t['stim'] == stim_max].copy()
                 t_stim = round(t_template_row['t_stim'].values[0], precision)
                 for var in variables:
                     t_template_row[var] = round(t_template_row[var].values[0] - t_stim, precision)
                 if 'stim' not in df_t.columns:
                     df_t['stim'] = None
                 for i, row_t in df_t.iterrows():
-                    if i != idx_max_EPSP:
-                        df_t.at[i, 'stim'] = i+1 # stims numbered from 1
-                        for var in variables:
-                            df_t.at[i, var] = round(t_template_row[var].values[0] + row_t['t_stim'], precision)
-                        for method in methods:
-                            df_t.at[i, method] = f"=stim_{stim_max}"
-                        for param in params:
-                            df_t.at[i, param] = f"=stim_{stim_max}"
+                    df_t.at[i, 'stim'] = i+1 # stims numbered from 1
+                    for var in variables:
+                        df_t.at[i, var] = round(t_template_row[var].values[0] + row_t['t_stim'], precision)
+                    for method in methods:
+                        df_t.at[i, method] = f"=stim_{stim_max}"
+                    for param in params:
+                        df_t.at[i, param] = f"=stim_{stim_max}"
                 print(f"Uniform timepoints applied to {p_row['recording_name']}.")
-                print(df_t)
                 self.set_dft(p_row['recording_name'], df_t)
                 dfoutput = self.get_dfoutput(p_row, reset=True)
                 self.persistOutput(p_row['recording_name'], dfoutput)
-        if p_row is None:
+        if p_row is None: # apply to all recordings
             for _, p_row in self.get_df_project().iterrows():
                 df_t = self.get_dft(p_row)
                 dfoutput = self.get_dfoutput(p_row)
@@ -2837,6 +2836,7 @@ class UIsub(Ui_MainWindow):
                 df_t = self.get_dft(p_row)
                 dfoutput = self.get_dfoutput(p_row)
             use_t_from_stim_with_max(p_row, df_t, dfoutput, 'EPSP_slope')
+
 
 
 
