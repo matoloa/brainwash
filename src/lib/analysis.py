@@ -1,10 +1,8 @@
 # %%
 import numpy as np  # numeric calculations module
 import pandas as pd  # dataframe module, think excel, but good
-import scipy  # peakfinder and other useful analysis tools
-from scipy.signal import savgol_filter
+from scipy.signal import savgol_filter, find_peaks
 from sklearn import linear_model
-from tqdm import tqdm
 import time
 
 
@@ -217,7 +215,7 @@ def find_i_EPSP_peak_max(
         dfmean_sliced = dfmean[limitleft <= dfmean.index]
 
     # scipy.signal.find_peaks returns a tuple
-    i_peaks, properties = scipy.signal.find_peaks(
+    i_peaks, properties = find_peaks(
         -dfmean_sliced['voltage'],
         width=EPSP_minimum_width_i,
     prominence=param_EPSP_minimum_prominence_mV / 1000,
@@ -271,7 +269,7 @@ def find_i_VEB_prim_peak_max(
     prim_sample = dfmean['prim'].values[minimum_acceptable_i_for_VEB:max_acceptable_i_for_VEB]
 
     # find the sufficiently wide and promintent peaks within this range
-    i_peaks, properties = scipy.signal.find_peaks(
+    i_peaks, properties = find_peaks(
         prim_sample,
         width=param_minimum_width_of_VEB * 1000 / sampling_Hz,  # *1000 for ms to seconds, / sampling_Hz for seconds to recorded points
         prominence=param_prim_prominence / 1000,  # TODO: unit?
