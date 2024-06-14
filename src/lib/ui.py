@@ -2392,6 +2392,7 @@ class UIsub(Ui_MainWindow):
             self.groupControlsRefresh()
             self.write_bw_cfg() # update project to open at boot
             self.graphAxes()
+            self.darkmode()
 
 
     def openProject(self, str_projectfolder):
@@ -2411,8 +2412,8 @@ class UIsub(Ui_MainWindow):
 
             self.groupControlsRefresh()
             self.write_bw_cfg() # update project to open at boot
-            #self.darkmode()
             self.graphAxes()
+            self.darkmode()
 
 
     def renameProject(self): # changes name of project folder and updates .cfg
@@ -2855,7 +2856,6 @@ class UIsub(Ui_MainWindow):
                 df_t = self.get_dft(p_row)
                 dfoutput = self.get_dfoutput(p_row)
             use_t_from_stim_with_max(p_row, df_t, dfoutput, 'EPSP_slope')
-
 
 
 
