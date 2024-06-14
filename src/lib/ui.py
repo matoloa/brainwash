@@ -1742,6 +1742,8 @@ class UIsub(Ui_MainWindow):
             if config.verbose:
                 print(f"Found project {str_projectfolder}, loading...")
             self.openProject(str_projectfolder)
+        else:
+            print(f"No project found in {str_projectfolder}")
 
     def triggerAddData(self): # creates file tree for file selection
         self.usage("triggerAddData")
@@ -2396,8 +2398,8 @@ class UIsub(Ui_MainWindow):
             uiplot.unPlot() # all plots
             self.graphWipe()
             self.resetCacheDicts()
-            self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
             self.load_df_project(str_projectfolder)
+            self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
             self.setupFolders()
             uistate.reset()
             uistate.load_cfg(self.dict_folders['project'], config.version)
@@ -2409,6 +2411,7 @@ class UIsub(Ui_MainWindow):
 
             self.groupControlsRefresh()
             self.write_bw_cfg() # update project to open at boot
+            #self.darkmode()
             self.graphAxes()
 
 
@@ -2859,6 +2862,10 @@ class UIsub(Ui_MainWindow):
 # Graph interface
 
     def graphWipe(self): # removes all plots from canvasEvent and canvasOutput
+        uistate.dict_rec_labels = {}
+        uistate.dict_rec_show = {}
+        uistate.dict_group_labels = {}
+        uistate.dict_group_show = {}
         if hasattr(self, "canvasMean"):
             self.canvasMean.axes.cla()
             self.canvasMean.draw()
