@@ -2376,9 +2376,9 @@ class UIsub(Ui_MainWindow):
             print("\n" * 30)
             new_projectfolder.mkdir()
             self.projectname = new_project_name
-            self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
             self.graphWipe()
             self.resetCacheDicts()
+            self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
             self.setupFolders()
             uistate.reset()
             uistate.save_cfg(projectfolder=self.dict_folders['project'])
