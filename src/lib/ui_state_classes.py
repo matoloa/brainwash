@@ -38,7 +38,7 @@ class UIstate:
         self.lineEdit = { # storage of user input; used to update df_t
             'norm_EPSP_from': 0,
             'norm_EPSP_to': 0,
-            'bin_size': 0,
+            'bin_size': 10,
             'EPSP_amp_halfwidth_ms':   0, # in ms here (visible to user). NB: in s in df_t!
             'volley_amp_halfwidth_ms': 0, # in ms here (visible to user). NB: in s in df_t!
         }

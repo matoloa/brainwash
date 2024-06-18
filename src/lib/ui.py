@@ -75,7 +75,7 @@ class Config:
         self.clear_cache = clear
         self.transient = False # Block persisting of files
         self.clear_timepoints = clear
-        self.force_cfg_reset = True
+        self.force_cfg_reset = clear
         self.verbose = self.dev_mode
         self.talkback = not self.dev_mode
         self.hide_experimental = True #not self.dev_mode
@@ -1340,7 +1340,10 @@ class UIsub(Ui_MainWindow):
             uistate.zoom['mean_xlim'] = (0, max_sweep_duration)
         # axe
         # ax1 and ax2
-            first, last = 0, max(df_selected['sweeps'].max()-1, 1)
+            if uistate.checkBox['bin']:
+                first, last = 0, max((df_selected['sweeps'].max()-1)/uistate.lineEdit['bin_size']-1, 1)
+            else:
+                first, last = 0, max(df_selected['sweeps'].max()-1, 1)
             if uistate.checkBox['output_per_stim']:
                 first, last = 1, max(df_selected['stims'].max(), 2)
             uistate.zoom['output_xlim'] = first, last
@@ -1417,7 +1420,8 @@ class UIsub(Ui_MainWindow):
 
     def resetCacheDicts(self):
         self.dict_datas = {} # all raw data
-        self.dict_filters = {} # all processed data
+        self.dict_filters = {} # all processed data, based on raw data
+        self.dict_bins = {} # all binned data, based on filters
         self.dict_means = {} # all means
         self.dict_ts = {} # all timepoints
         self.dict_outputs = {} # all outputs, x per sweep
@@ -1475,10 +1479,10 @@ class UIsub(Ui_MainWindow):
         self.menuFile.addAction(self.actionRenameProject)
 
         # Edit menu
-        self.actionUndo = QtWidgets.QAction("Undo (coming soon)", self)
+        #self.actionUndo = QtWidgets.QAction("Undo", self) # TODO: Implement undo
         #self.actionUndo.triggered.connect(self.triggerUndo)
-        self.actionUndo.setShortcut("Ctrl+Z")
-        self.menuEdit.addAction(self.actionUndo)
+        #self.actionUndo.setShortcut("Ctrl+Z")
+        #self.menuEdit.addAction(self.actionUndo)
         self.actionDarkmode = QtWidgets.QAction("Toggle Darkmode", self)
         self.actionDarkmode.triggered.connect(self.triggerDarkmode)
         self.actionDarkmode.setShortcut("Ctrl+D")
@@ -1835,10 +1839,9 @@ class UIsub(Ui_MainWindow):
         bin_size = uistate.lineEdit['bin_size']
         if binSweeps:
             print(f"binSweeps: {binSweeps}, bin_size: {bin_size}")
-
         uiplot.unPlot()
         df_p = self.get_df_project()
-        for i, p_row in df_p.iterrows():
+        for _, p_row in df_p.iterrows():
             rec = p_row['recording_name']
             df_t = self.get_dft(p_row)
             df_t['t_EPSP_amp_halfwidth'] = dt['t_EPSP_amp_halfwidth']
@@ -1846,17 +1849,9 @@ class UIsub(Ui_MainWindow):
             df_t['norm_output_from'] = dt['norm_output_from'] 
             df_t['norm_output_to'] = dt['norm_output_to']
             self.set_dft(rec, df_t)
-            if binSweeps and bin_size > 0:
-                # bin the sweeps
-                df_filter = self.get_dffilter(p_row)
-                # Create df_bins by copying df_filter and then transforming it
-                df_bins = df_filter.copy()
-                # Calculate bin groups without altering df_filter
-                df_bins['bin_group'] = df_bins['sweep'] // bin_size
-                # Group by 'bin_group' and calculate the mean for all other columns
-                df_bins = df_bins.groupby('bin_group').mean().reset_index(drop=True)
-                df_bins = df_bins.drop(columns=['bin_group'], errors='ignore')
-                print(f"recalculate: {rec} binned {df_filter['sweep'].nunique()} sweeps into {len(df_bins)} bins")
+            if binSweeps:
+                dfbin = self.get_dfbin(p_row)
+                print(dfbin)
             dfoutput = self.get_dfoutput(p_row, reset=True)
             self.persistOutput(rec, dfoutput)
             uiplot.addRow(p_row, df_t, self.get_dfmean(p_row), dfoutput)
@@ -1910,12 +1905,13 @@ class UIsub(Ui_MainWindow):
     def editBinSize(self, lineEdit):
         self.usage("editBinSize")
         try:
-            num = max(0, int(lineEdit.text()))
+            num = max(2, int(lineEdit.text()))
         except ValueError:
-            num = 0
+            num = 10
         lineEdit.setText(str(num))
         uistate.lineEdit['bin_size'] = num
         print(f"editBinSize: {num}")
+        uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
     def copy_dft(self):
         if uistate.dft_copy is None:
@@ -2730,8 +2726,11 @@ class UIsub(Ui_MainWindow):
                 dfoutput = pd.DataFrame()
                 for i, t_row in df_t.iterrows():
                     dict_t = t_row.to_dict()
-                    dffilter = self.get_dffilter(row)
-                    dfoutput_stim = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+                    if uistate.checkBox['bin']:
+                        dfinput = self.get_dfbin(row)
+                    else:
+                        dfinput = self.get_dffilter(row)
+                    dfoutput_stim = analysis.build_dfoutput(df=dfinput, dict_t=dict_t)
                     df_t.at[i, 'volley_amp_mean'] = dfoutput_stim['volley_amp'].mean()
                     df_t.at[i, 'volley_slope_mean'] = dfoutput_stim['volley_slope'].mean()
                     dfoutput = pd.concat([dfoutput, dfoutput_stim])
@@ -2773,6 +2772,39 @@ class UIsub(Ui_MainWindow):
         # Cache and return
         self.dict_filters[recording_name] = dffilter
         return self.dict_filters[recording_name]
+
+    def get_dfbin(self, p_row):
+        # returns an internal df_bin for the selected recording_name. If it does not exist, read it from file first.
+        rec = p_row['recording_name']
+        if rec in self.dict_bins:
+            return self.dict_bins[rec]
+        path_bin = Path(f"{self.dict_folders['cache']}/{rec}_bin.csv")
+        if path_bin.exists():
+            df_bins = pd.read_csv(path_bin)
+        else:
+            bin_size = int(uistate.lineEdit['bin_size'])
+            df_filter = self.get_dffilter(p_row)
+            max_sweep = df_filter['sweep'].max()
+            num_bins = (max_sweep // bin_size) + 1
+            binned_data = []
+            for bin_num in range(num_bins):
+                sweep_start = bin_num * bin_size
+                sweep_end = sweep_start + bin_size
+                df_bin = df_filter[(df_filter['sweep'] >= sweep_start) & (df_filter['sweep'] < sweep_end)]
+                if df_bin.empty:
+                    continue
+                agg_funcs = {col: 'mean' for col in df_bin.columns if col not in ['sweep', 'time']}
+                agg_funcs['time'] = 'first'  # Keep the first time value as representative
+                df_bin_grouped = df_bin.groupby('time', as_index=False).agg(agg_funcs)
+                # Assign the bin number as the new sweep value
+                df_bin_grouped['sweep'] = bin_num
+                binned_data.append(df_bin_grouped)
+            df_bins = pd.concat(binned_data, ignore_index=True)
+            self.dict_bins[rec] = df_bins
+            print(f"recalculate: {rec}, binned {df_filter['sweep'].nunique()} sweeps into {len(df_bins['sweep'].unique())} bins")
+            self.df2csv(df=df_bins, rec=rec, key="bin")
+        self.dict_bins[rec] = df_bins
+        return df_bins
 
     def get_dfdiff(self, row):
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
@@ -3254,8 +3286,13 @@ class UIsub(Ui_MainWindow):
             t_row = df_t[df_t['stim'] == stim].iloc[0]
             offset = t_row['t_stim']
 
-            dffilter = self.get_dffilter(p_row)
-            dfsweep = dffilter[dffilter['sweep'] == out_x_idx] # select only rows where sweep == out_x_idx
+            if uistate.checkBox['bin']:
+                dfsource = self.get_dfbin(p_row)
+            else:
+                dfsource = self.get_dffilter(p_row)
+
+
+            dfsweep = dfsource[dfsource['sweep'] == out_x_idx] # select only rows where sweep == out_x_idx
             sweep_x = dfsweep['time']-offset
             sweep_y = dfsweep[p_row['filter']] # get the value of the filter at the selected sweep
 
