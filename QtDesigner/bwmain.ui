@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1171</width>
-    <height>923</height>
+    <width>1270</width>
+    <height>1050</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -309,6 +309,98 @@
             <zorder>checkBox_output_per_stim</zorder>
             <zorder>lineEdit_mean_selection_start</zorder>
             <zorder>lineEdit_mean_selection_end</zorder>
+           </widget>
+          </item>
+          <item>
+           <widget class="QFrame" name="frameToolBin">
+            <property name="minimumSize">
+             <size>
+              <width>211</width>
+              <height>111</height>
+             </size>
+            </property>
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Raised</enum>
+            </property>
+            <widget class="QCheckBox" name="checkBox_bin">
+             <property name="geometry">
+              <rect>
+               <x>10</x>
+               <y>30</y>
+               <width>151</width>
+               <height>23</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>Bin sweeps</string>
+             </property>
+            </widget>
+            <widget class="QLabel" name="label_bins">
+             <property name="geometry">
+              <rect>
+               <x>10</x>
+               <y>10</y>
+               <width>62</width>
+               <height>17</height>
+              </rect>
+             </property>
+             <property name="font">
+              <font>
+               <family>DejaVu Sans</family>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>Bins</string>
+             </property>
+            </widget>
+            <widget class="QPushButton" name="pushButton_bin_size_set_all">
+             <property name="geometry">
+              <rect>
+               <x>90</x>
+               <y>80</y>
+               <width>61</width>
+               <height>25</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>Set All</string>
+             </property>
+            </widget>
+            <widget class="QLabel" name="label_bin_size">
+             <property name="geometry">
+              <rect>
+               <x>10</x>
+               <y>60</y>
+               <width>71</width>
+               <height>17</height>
+              </rect>
+             </property>
+             <property name="font">
+              <font>
+               <family>DejaVu Sans</family>
+               <weight>50</weight>
+               <bold>false</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>Bin size</string>
+             </property>
+            </widget>
+            <widget class="QLineEdit" name="lineEdit_bin_size">
+             <property name="geometry">
+              <rect>
+               <x>20</x>
+               <y>80</y>
+               <width>61</width>
+               <height>25</height>
+              </rect>
+             </property>
+            </widget>
            </widget>
           </item>
           <item>
@@ -778,8 +870,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1171</width>
-     <height>22</height>
+     <width>1270</width>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

@@ -75,7 +75,7 @@ class Config:
         self.clear_cache = clear
         self.transient = False # Block persisting of files
         self.clear_timepoints = clear
-        self.force_cfg_reset = clear
+        self.force_cfg_reset = True
         self.verbose = self.dev_mode
         self.talkback = not self.dev_mode
         self.hide_experimental = True #not self.dev_mode
@@ -381,7 +381,7 @@ class graphPreloadThread(QtCore.QThread):
 class Ui_MainWindow(QtCore.QObject):
     def setupUi(self, mainWindow):
         mainWindow.setObjectName("mainWindow")
-        mainWindow.resize(1171, 923)
+        mainWindow.resize(1270, 1050)
         self.centralwidget = QtWidgets.QWidget(mainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayoutCentralwidget = QtWidgets.QHBoxLayout(self.centralwidget)
@@ -526,6 +526,37 @@ class Ui_MainWindow(QtCore.QObject):
         self.lineEdit_mean_selection_start.raise_()
         self.lineEdit_mean_selection_end.raise_()
         self.verticalLayoutTools.addWidget(self.frameToolStim)
+        self.frameToolBin = QtWidgets.QFrame(self.verticalLayoutWidget_3)
+        self.frameToolBin.setMinimumSize(QtCore.QSize(211, 111))
+        self.frameToolBin.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frameToolBin.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frameToolBin.setObjectName("frameToolBin")
+        self.checkBox_bin = QtWidgets.QCheckBox(self.frameToolBin)
+        self.checkBox_bin.setGeometry(QtCore.QRect(10, 30, 151, 23))
+        self.checkBox_bin.setObjectName("checkBox_bin")
+        self.label_bins = QtWidgets.QLabel(self.frameToolBin)
+        self.label_bins.setGeometry(QtCore.QRect(10, 10, 62, 17))
+        font = QtGui.QFont()
+        font.setFamily("DejaVu Sans")
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_bins.setFont(font)
+        self.label_bins.setObjectName("label_bins")
+        self.pushButton_bin_size_set_all = QtWidgets.QPushButton(self.frameToolBin)
+        self.pushButton_bin_size_set_all.setGeometry(QtCore.QRect(90, 80, 61, 25))
+        self.pushButton_bin_size_set_all.setObjectName("pushButton_bin_size_set_all")
+        self.label_bin_size = QtWidgets.QLabel(self.frameToolBin)
+        self.label_bin_size.setGeometry(QtCore.QRect(10, 60, 71, 17))
+        font = QtGui.QFont()
+        font.setFamily("DejaVu Sans")
+        font.setBold(False)
+        font.setWeight(50)
+        self.label_bin_size.setFont(font)
+        self.label_bin_size.setObjectName("label_bin_size")
+        self.lineEdit_bin_size = QtWidgets.QLineEdit(self.frameToolBin)
+        self.lineEdit_bin_size.setGeometry(QtCore.QRect(20, 80, 61, 25))
+        self.lineEdit_bin_size.setObjectName("lineEdit_bin_size")
+        self.verticalLayoutTools.addWidget(self.frameToolBin)
         self.frameToolAspect = QtWidgets.QFrame(self.verticalLayoutWidget_3)
         self.frameToolAspect.setMinimumSize(QtCore.QSize(131, 211))
         self.frameToolAspect.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -685,7 +716,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.horizontalLayoutCentralwidget.addLayout(self.verticalMasterLayout)
         mainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(mainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1171, 22))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1270, 21))
         self.menubar.setObjectName("menubar")
         self.menuFile = QtWidgets.QMenu(self.menubar)
         self.menuFile.setObjectName("menuFile")
@@ -724,6 +755,10 @@ class Ui_MainWindow(QtCore.QObject):
         self.label_mean_selected_range.setText(_translate("mainWindow", "Selection"))
         self.pushButton_stim_detect.setText(_translate("mainWindow", "Detect"))
         self.checkBox_output_per_stim.setText(_translate("mainWindow", "Output per stim"))
+        self.checkBox_bin.setText(_translate("mainWindow", "Bin sweeps"))
+        self.label_bins.setText(_translate("mainWindow", "Bins"))
+        self.pushButton_bin_size_set_all.setText(_translate("mainWindow", "Set All"))
+        self.label_bin_size.setText(_translate("mainWindow", "Bin size"))
         self.checkBox_EPSP_slope.setText(_translate("mainWindow", "EPSP slope"))
         self.checkBox_volley_slope.setText(_translate("mainWindow", "volley slope"))
         self.checkBox_EPSP_amp.setText(_translate("mainWindow", "EPSP amp."))
@@ -1159,6 +1194,10 @@ class UIsub(Ui_MainWindow):
 #    WIP section: TODO: move to appropriate header               #
 ##################################################################
 
+
+    def binSweeps(self):
+        print("binSweeps")
+
     def graphRefresh(self):
         self.usage("graphRefresh")
         uiplot.graphRefresh(self.dd_groups)
@@ -1340,6 +1379,8 @@ class UIsub(Ui_MainWindow):
                     uistate.zoom['output_ax1_ylim'] = (0, current_ylim[1])
                     current_ylim = uistate.zoom['output_ax2_ylim']
                     uistate.zoom['output_ax2_ylim'] = (0, current_ylim[1])
+            elif key == 'bin':
+                self.checkBox_bin_changed(state)
         self.update_show()
         self.mouseoverUpdate()
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
@@ -1580,6 +1621,9 @@ class UIsub(Ui_MainWindow):
             lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editNormRange(le))
         for lineEdit in [self.lineEdit_EPSP_amp_halfwidth, self.lineEdit_volley_amp_halfwidth,]:
             lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editAmpHalfwidth(le))
+        for lineEdit in [self.lineEdit_bin_size,]:
+            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editBinSize(le))
+
         # pushButtons
         for str_button, str_function in uistate.pushButtons.items():
             button, func = getattr(self, str_button), getattr(self, str_function)
@@ -1643,6 +1687,10 @@ class UIsub(Ui_MainWindow):
 
     def trigger_set_norm_range_all(self):
         self.usage(f"trigger_set_norm_range_all")
+        self.recalculate()
+    
+    def trigger_set_bin_size_all(self):
+        self.usage(f"trigger_set_bin_size_all")
         self.recalculate()
 
     def triggerDarkmode(self):
@@ -1783,6 +1831,11 @@ class UIsub(Ui_MainWindow):
         dt['norm_output_to'] = norm_to
         uistate.save_cfg(projectfolder=self.dict_folders['project'])
 
+        binSweeps = uistate.checkBox['bin']
+        bin_size = uistate.lineEdit['bin_size']
+        if binSweeps:
+            print(f"binSweeps: {binSweeps}, bin_size: {bin_size}")
+
         uiplot.unPlot()
         df_p = self.get_df_project()
         for i, p_row in df_p.iterrows():
@@ -1793,6 +1846,17 @@ class UIsub(Ui_MainWindow):
             df_t['norm_output_from'] = dt['norm_output_from'] 
             df_t['norm_output_to'] = dt['norm_output_to']
             self.set_dft(rec, df_t)
+            if binSweeps and bin_size > 0:
+                # bin the sweeps
+                df_filter = self.get_dffilter(p_row)
+                # Create df_bins by copying df_filter and then transforming it
+                df_bins = df_filter.copy()
+                # Calculate bin groups without altering df_filter
+                df_bins['bin_group'] = df_bins['sweep'] // bin_size
+                # Group by 'bin_group' and calculate the mean for all other columns
+                df_bins = df_bins.groupby('bin_group').mean().reset_index(drop=True)
+                df_bins = df_bins.drop(columns=['bin_group'], errors='ignore')
+                print(f"recalculate: {rec} binned {df_filter['sweep'].nunique()} sweeps into {len(df_bins)} bins")
             dfoutput = self.get_dfoutput(p_row, reset=True)
             self.persistOutput(rec, dfoutput)
             uiplot.addRow(p_row, df_t, self.get_dfmean(p_row), dfoutput)
@@ -1842,6 +1906,16 @@ class UIsub(Ui_MainWindow):
             self.lineEdit_norm_EPSP_start.setText(str(uistate.lineEdit['norm_EPSP_from']))
             uistate.lineEdit['norm_EPSP_to'] = num
         lineEdit.setText(str(num))
+
+    def editBinSize(self, lineEdit):
+        self.usage("editBinSize")
+        try:
+            num = max(0, int(lineEdit.text()))
+        except ValueError:
+            num = 0
+        lineEdit.setText(str(num))
+        uistate.lineEdit['bin_size'] = num
+        print(f"editBinSize: {num}")
 
     def copy_dft(self):
         if uistate.dft_copy is None:
@@ -2235,7 +2309,10 @@ class UIsub(Ui_MainWindow):
         self.tableUpdate()
         self.graphRefresh()
 
-    def group_cache_purge(self, group_IDs): # clear cache so that a new group mean is calculated
+    def group_cache_purge(self, group_IDs=None): # clear cache so that a new group mean is calculated
+        if not self.dict_group_means:
+            print("No groups to purge.")
+            return
         if not group_IDs:  # if no group IDs are passed purge all groups
             group_IDs = list(self.dict_group_means.keys())
         print(f"group_cache_purge: {group_IDs}, len(group): {len(group_IDs)}")
@@ -2509,6 +2586,12 @@ class UIsub(Ui_MainWindow):
         print(f"checkBox_timepoints_per_stim_changed: {state}")
         if state == 0:
             self.set_uniformTimepoints()
+
+    def checkBox_bin_changed(self, state):
+        uistate.checkBox['bin'] = state == 2
+        print(f"checkBox_bin_changed: {state}")
+        if state == 2:
+            self.binSweeps()
 
     def tableFormat(self):
         if config.verbose:

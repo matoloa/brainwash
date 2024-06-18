@@ -32,11 +32,13 @@ class UIstate:
             'output_ymin0': True, # set output y-axis minimum to 0
             # break these out to separate mod-class?
             'norm_EPSP': False, # show normalized EPSPs (they're always calculated)
+            'bin': False, # binning of output
             'paired_stims': False, # Recs are paired: output per pair is Intervention / Control
         }
         self.lineEdit = { # storage of user input; used to update df_t
             'norm_EPSP_from': 0,
             'norm_EPSP_to': 0,
+            'bin_size': 0,
             'EPSP_amp_halfwidth_ms':   0, # in ms here (visible to user). NB: in s in df_t!
             'volley_amp_halfwidth_ms': 0, # in ms here (visible to user). NB: in s in df_t!
         }
@@ -101,6 +103,7 @@ class UIstate:
             'pushButton_EPSP_amp_width_set_all': 'trigger_set_EPSP_amp_width_all',
             'pushButton_volley_amp_width_set_all': 'trigger_set_volley_amp_width_all',
             'pushButton_norm_range_set_all': 'trigger_set_norm_range_all',
+            'pushButton_bin_size_set_all': 'trigger_set_bin_size_all',
         }
         self.x_select = { # selected ranges on mean- and output graphs
             'mean_start': None,
