@@ -2131,9 +2131,9 @@ class UIsub(Ui_MainWindow):
             self.group_save_dd()
             self.group_cache_purge(groups2purge)
         # clear recording caches
-        for cache_name in ['dict_datas', 'dict_means', 'dict_filters', 'dict_ts', 'dict_outputs']:
+        for cache_name in ['dict_datas', 'dict_means', 'dict_filters', 'dict_ts', 'dict_bins', 'dict_outputs']:
             removeFromCache(cache_name)
-        for folder_name, file_suffix in [('data', '.csv'), ('timepoints', '.csv'), ('cache', '_mean.csv'), ('cache', '_filter.csv'), ('cache', '_output.csv')]:
+        for folder_name, file_suffix in [('data', '.csv'), ('timepoints', '.csv'), ('cache', '_mean.csv'), ('cache', '_filter.csv'), ('cache', '_bin.csv'), ('cache', '_output.csv')]:
             removeFromDisk(folder_name, file_suffix)
 
 
