@@ -2035,7 +2035,9 @@ class UIsub(Ui_MainWindow):
             old_timepoints = self.dict_folders['timepoints'] / (old_recording_name + ".csv")
             old_mean = self.dict_folders['cache'] / (old_recording_name + "_mean.csv")
             old_filter = self.dict_folders['cache'] / (old_recording_name + "_filter.csv")
+            old_bin = self.dict_folders['cache'] / (old_recording_name + "_bin.csv")
             old_output = self.dict_folders['cache'] / (old_recording_name + "_output.csv")
+            
             RenameDialog = InputDialogPopup()
             new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query=old_recording_name)
             # check if the new name is a valid filename
@@ -2046,6 +2048,7 @@ class UIsub(Ui_MainWindow):
                     new_timepoints = self.dict_folders['timepoints'] / (new_recording_name + ".csv")
                     new_mean = self.dict_folders['cache'] / (new_recording_name + "_mean.csv")
                     new_filter = self.dict_folders['cache'] / (new_recording_name + "_filter.csv")
+                    new_bin = self.dict_folders['cache'] / (new_recording_name + "_bin.csv")
                     new_output = self.dict_folders['cache'] / (new_recording_name + "_output.csv")
                     if old_data.exists():
                         os.rename(old_data, new_data)
@@ -2059,6 +2062,8 @@ class UIsub(Ui_MainWindow):
                         os.rename(old_filter, new_filter)
                     if old_output.exists():
                         os.rename(old_output, new_output)
+                    if old_bin.exists():
+                        os.rename(old_bin, new_bin)
                     df_p.at[uistate.rec_select[0], 'recording_name'] = new_recording_name
                     # For paired recordings: also rename any references to old_recording_name in df_p['paired_recording']
                     df_p.loc[df_p['paired_recording'] == old_recording_name, 'paired_recording'] = new_recording_name
