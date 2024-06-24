@@ -69,7 +69,9 @@ class Config:
         #self.dev_mode = False # Deploy mode
         print("\n"*3)
         if self.dev_mode:
-            print(f"Config set for development mode - {time.strftime('%H:%M:%S')}")
+            print(f"Development mode - {time.strftime('%H:%M:%S')}")
+        else:
+            print(f"Deploy mode - {time.strftime('%H:%M:%S')}")
         clear = False
 
         self.clear_cache = clear
@@ -1401,7 +1403,7 @@ class UIsub(Ui_MainWindow):
             self.load_df_project(self.dict_folders['project'])
         else:
             print(f"Project file {self.dict_folders['project'] / 'project.brainwash'} not found, creating new project file")
-            self.triggerNewProject() # TODO: breakout
+            self.df_project = df_projectTemplate()
         # If local cfg.pkl exists, load it, otherwise create it
         uistate.reset()
         uistate.load_cfg(projectfolder=self.dict_folders['project'], bw_version=config.version, force_reset=config.force_cfg_reset)
@@ -1770,20 +1772,7 @@ class UIsub(Ui_MainWindow):
 
     def triggerNewProject(self):
         self.usage("triggerNewProject")
-        self.dict_folders['project'].mkdir(exist_ok=True)
-        date = datetime.now().strftime("%Y-%m-%d")
-        i = 0
-        while True:
-            new_project_name = "Project " + date
-            if 0 < i:
-                new_project_name = new_project_name + "(" + str(i) + ")"
-            if (self.projects_folder / new_project_name).exists():
-                if config.verbose:
-                    print(new_project_name, " already exists")
-                i += 1
-            else:
-                self.newProject(new_project_name)
-                break
+        self.newProject()
 
     def triggerOpenProject(self): # open folder selector dialog
         self.usage("triggerOpenProject")
@@ -2448,34 +2437,30 @@ class UIsub(Ui_MainWindow):
 
 # Project functions
 
-    def newProject(self, new_project_name):
-        new_projectfolder = self.projects_folder / new_project_name
-        # check if ok
-        if (self.projects_folder / new_project_name).exists():
+    def newProject(self):
+        self.dict_folders['project'].mkdir(exist_ok=True)  # make sure the project folder exists
+        # Find lowest integer to append to new_project_name to make it unique
+        date = datetime.now().strftime("%Y-%m-%d")
+        i = 0
+        unique_project_name = "Project " + date  # Initialize with a base name
+        while True:
+            if i > 0:
+                unique_project_name = "Project " + date + "(" + str(i) + ")"
+            if not (self.projects_folder / unique_project_name).exists():
+                break  # Found a unique name, exit loop
             if config.verbose:
-                print("The target project name already exists")
-        else:
-            print("\n" * 5)
-            new_projectfolder.mkdir()
-            self.projectname = new_project_name
-            self.graphWipe()
-            self.resetCacheDicts()
-            self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
-            self.setupFolders()
-            uistate.reset()
-            uistate.save_cfg(projectfolder=self.dict_folders['project'])
-            self.applyConfigStates()
+                print(f"*** {unique_project_name} already exists")
+            i += 1
 
-            self.df_project = df_projectTemplate()
-            self.setupTableProj()
-            self.setupTableStim()
-            self.tableFormat()
-
-            self.groupControlsRefresh()
-            self.write_bw_cfg() # update project to open at boot
-            self.graphAxes()
-            self.darkmode()
-
+        # Proceed with project creation using unique_project_name
+        self.clearProject()
+        print("\n" * 5)
+        self.projectname = unique_project_name
+        new_projectfolder = self.projects_folder / unique_project_name
+        new_projectfolder.mkdir()
+        self.loadProject()
+        self.set_df_project()
+        self.write_bw_cfg()
 
     def openProject(self, str_projectfolder):
             self.clearProject()
@@ -2486,8 +2471,6 @@ class UIsub(Ui_MainWindow):
     def clearProject(self):
         uiplot.unPlot() # all plots
         self.graphWipe()
-
-
 
     def renameProject(self): # changes name of project folder and updates .cfg
         #self.dict_folders['project'].mkdir(exist_ok=True)
@@ -2516,9 +2499,12 @@ class UIsub(Ui_MainWindow):
     def get_df_project(self): # returns a copy of the persistent df_project TODO: make these functions the only way to get to it.
         return self.df_project
 
-    def set_df_project(self, df): # persists df and saves it to .csv
+    def set_df_project(self, df=None): # persists df and saves it to .csv
         print("set_df_project")
-        self.df_project = df
+        if df is None:
+            self.df_project = df_projectTemplate()
+        else:
+            self.df_project = df
         self.save_df_project()
 
     def load_df_project(self, str_projectfolder): # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg

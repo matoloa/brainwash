@@ -18,7 +18,7 @@ class UIstate:
             'frameToolAspect': ["Aspect toggles", True],
             'frameToolScaling': ["Output Scaling", True],
             'frameToolPairedStim': ["Paired stims", False],
-            'frameToolExport': ["Image Export", False],
+            'frameToolExport': ["Image Export", True],
         }
         self.checkBox = { # these are cycled by uisub.connectUIstate; maintain format!
             'EPSP_amp': True,
