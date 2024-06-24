@@ -24,7 +24,9 @@ class UIstate:
             'EPSP_amp': True,
             'EPSP_slope': True,
             'volley_amp': False,
+            'volley_amp_mean': True,
             'volley_slope': False,
+            'volley_slope_mean': True,
             'force1stim': False, # prevent splitting of channels when multiple stims are detected
             'show_all_events': False, # show ghosts of non-selected events in eventgraph output graph
             'timepoints_per_stim': False, # allow setting (non-uniform) timepoints per stim
@@ -104,6 +106,7 @@ class UIstate:
             'pushButton_volley_amp_width_set_all': 'trigger_set_volley_amp_width_all',
             'pushButton_norm_range_set_all': 'trigger_set_norm_range_all',
             'pushButton_bin_size_set_all': 'trigger_set_bin_size_all',
+            'pushButton_export_image': 'trigger_export_image',
         }
         self.x_select = { # selected ranges on mean- and output graphs
             'mean_start': None,

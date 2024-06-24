@@ -612,6 +612,12 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButton_volley_amp_width_set_all = QtWidgets.QPushButton(self.frameToolAspect)
         self.pushButton_volley_amp_width_set_all.setGeometry(QtCore.QRect(130, 170, 51, 25))
         self.pushButton_volley_amp_width_set_all.setObjectName("pushButton_volley_amp_width_set_all")
+        self.checkBox_volley_slope_mean = QtWidgets.QCheckBox(self.frameToolAspect)
+        self.checkBox_volley_slope_mean.setGeometry(QtCore.QRect(120, 70, 101, 23))
+        self.checkBox_volley_slope_mean.setObjectName("checkBox_volley_slope_mean")
+        self.checkBox_volley_amp_mean = QtWidgets.QCheckBox(self.frameToolAspect)
+        self.checkBox_volley_amp_mean.setGeometry(QtCore.QRect(120, 90, 61, 23))
+        self.checkBox_volley_amp_mean.setObjectName("checkBox_volley_amp_mean")
         self.checkBox_EPSP_slope.raise_()
         self.checkBox_volley_slope.raise_()
         self.checkBox_EPSP_amp.raise_()
@@ -624,6 +630,8 @@ class Ui_MainWindow(QtCore.QObject):
         self.lineEdit_volley_amp_halfwidth.raise_()
         self.pushButton_EPSP_amp_width_set_all.raise_()
         self.pushButton_volley_amp_width_set_all.raise_()
+        self.checkBox_volley_slope_mean.raise_()
+        self.checkBox_volley_amp_mean.raise_()
         self.verticalLayoutTools.addWidget(self.frameToolAspect)
         self.frameToolScaling = QtWidgets.QFrame(self.verticalLayoutWidget_3)
         self.frameToolScaling.setMinimumSize(QtCore.QSize(131, 131))
@@ -698,9 +706,9 @@ class Ui_MainWindow(QtCore.QObject):
         self.frameToolExport.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frameToolExport.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frameToolExport.setObjectName("frameToolExport")
-        self.pushButton_export_jpeg = QtWidgets.QPushButton(self.frameToolExport)
-        self.pushButton_export_jpeg.setGeometry(QtCore.QRect(10, 30, 41, 25))
-        self.pushButton_export_jpeg.setObjectName("pushButton_export_jpeg")
+        self.pushButton_export_image = QtWidgets.QPushButton(self.frameToolExport)
+        self.pushButton_export_image.setGeometry(QtCore.QRect(10, 30, 61, 25))
+        self.pushButton_export_image.setObjectName("pushButton_export_image")
         self.label_export = QtWidgets.QLabel(self.frameToolExport)
         self.label_export.setGeometry(QtCore.QRect(10, 10, 81, 17))
         font = QtGui.QFont()
@@ -718,7 +726,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.horizontalLayoutCentralwidget.addLayout(self.verticalMasterLayout)
         mainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(mainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1270, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1270, 22))
         self.menubar.setObjectName("menubar")
         self.menuFile = QtWidgets.QMenu(self.menubar)
         self.menuFile.setObjectName("menuFile")
@@ -771,6 +779,8 @@ class Ui_MainWindow(QtCore.QObject):
         self.label_volley_amp_halfwidth.setText(_translate("mainWindow", "volley"))
         self.pushButton_EPSP_amp_width_set_all.setText(_translate("mainWindow", "Set All"))
         self.pushButton_volley_amp_width_set_all.setText(_translate("mainWindow", "Set All"))
+        self.checkBox_volley_slope_mean.setText(_translate("mainWindow", "mean"))
+        self.checkBox_volley_amp_mean.setText(_translate("mainWindow", "mean"))
         self.label_norm_on_sweep.setText(_translate("mainWindow", "Norm on sweep(s)"))
         self.checkBox_norm_EPSP.setText(_translate("mainWindow", "Relative"))
         self.label_relative_to.setText(_translate("mainWindow", "-"))
@@ -780,7 +790,7 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButton_paired_data_flip.setText(_translate("mainWindow", "Flip C-I"))
         self.label_paired_data.setText(_translate("mainWindow", "Paired data"))
         self.checkBox_paired_stims.setText(_translate("mainWindow", "stim / stim"))
-        self.pushButton_export_jpeg.setText(_translate("mainWindow", "jpeg"))
+        self.pushButton_export_image.setText(_translate("mainWindow", "image"))
         self.label_export.setText(_translate("mainWindow", "Export"))
         self.menuFile.setTitle(_translate("mainWindow", "File"))
         self.menuData.setTitle(_translate("mainWindow", "Data"))
@@ -804,6 +814,8 @@ class Ui_MainWindow(QtCore.QObject):
             self.checkBox_show_all_events.setVisible(False)
             self.pushButton_stim_assign_threshold.setVisible(False)
             self.label_stim_detection_threshold.setVisible(False)
+            # hide binning for separate recordings
+            self.checkBox_bin.setVisible(False)
 
 
 
@@ -1137,8 +1149,17 @@ class UIsub(Ui_MainWindow):
 #    WIP section: TODO: move to appropriate header               #
 ##################################################################
 
+    def export_image(self):
+        print("export_image")
+        figure = self.canvasOutput.figure
+        # Construct the full path with the specified folder and project name
+        filename = os.path.join(self.projects_folder, f"{self.projectname}.png")
+        # Save the figure
+        figure.savefig(filename, dpi=300)  # Adjust dpi for desired resolution
+        print(f"Canvas output saved to {filename}")
+
     def binSweeps(self):
-        print("binSweeps")
+        print("binSweeps - later on, this is to bin only the selected recording: now it does nothing and should be hidden")
 
     def graphRefresh(self):
         self.usage("graphRefresh")
@@ -1677,6 +1698,16 @@ class UIsub(Ui_MainWindow):
         self.update_show()
         self.mouseoverUpdate()
 
+    def checkBox_paired_stims_changed(self, state):
+        self.usage("checkBox_paired_stims_changed")
+        uistate.checkBox['paired_stims'] = bool(state)
+        print(f"checkBox_paired_stims_changed: {uistate.checkBox['paired_stims']}")
+        # TODO: reconnect this
+
+    def trigger_export_image(self):
+        self.usage("trigger_export_image")
+        self.export_image()
+
     def triggerGroupRename(self, group_ID):
         self.usage("triggerGroupRename")
         RenameDialog = InputDialogPopup()
@@ -1701,6 +1732,7 @@ class UIsub(Ui_MainWindow):
     
     def trigger_set_bin_size_all(self):
         self.usage(f"trigger_set_bin_size_all")
+        uistate.checkBox['bin'] = True
         self.recalculate()
 
     def triggerDarkmode(self):
@@ -1802,11 +1834,6 @@ class UIsub(Ui_MainWindow):
         self.parseData()
         self.setButtonParse()
 
-    def checkBox_paired_stims_changed(self, state):
-        self.usage("checkBox_paired_stims_changed")
-        uistate.checkBox['paired_stims'] = bool(state)
-        print(f"checkBox_paired_stims_changed: {uistate.checkBox['paired_stims']}")
-        # TODO: reconnect this
 
 
 # Data Editing functions
