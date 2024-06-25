@@ -1060,7 +1060,7 @@ class UIsub(Ui_MainWindow):
 
 
     def update_show(self, reset=False):
-        aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope']
+        aspects = ['EPSP_amp', 'EPSP_slope', 'volley_amp', 'volley_slope', 'volley_amp_mean', 'volley_slope_mean']
         old_selection = uistate.dict_rec_show 
         if uistate.df_recs2plot is None:
             reset=True
@@ -1077,7 +1077,11 @@ class UIsub(Ui_MainWindow):
             if not uistate.checkBox['norm_EPSP']:
                 filters = [" norm"]
             else:
-                filters = [" EPSP amp", " EPSP slope"]
+                filters = [" EPSP amp", " EPSP slope",]
+            # if not uistate.checkBox['volley_amp_mean']:
+            #     filters.append("volley amp mean")
+            # if not uistate.checkBox['volley_slope_mean']:
+            #     filters.append("volley slope mean")
             new_selection = {k: v for k, v in new_selection.items() if not any(k.endswith(f) for f in filters)}
         if reset: # Hide all lines
             obsolete_lines = uistate.dict_rec_labels
@@ -1144,7 +1148,6 @@ class UIsub(Ui_MainWindow):
 
 
 
-
 ##################################################################
 #    WIP section: TODO: move to appropriate header               #
 ##################################################################
@@ -1152,7 +1155,9 @@ class UIsub(Ui_MainWindow):
     def export_image(self):
         print("export_image")
         if True:
-            output_file = f"{self.projects_folder}/{self.projectname}.png"
+            #x_aspect, y_aspect = "volley_amp", "EPSP_amp"
+            x_aspect, y_aspect = "volley_slope", "EPSP_slope"
+            output_path = Path(f"{self.projects_folder}/{self.projectname}.png")
             df_p = self.get_df_project()
             dict_dfs = {}
             dd_r_lines = {}
@@ -1160,10 +1165,10 @@ class UIsub(Ui_MainWindow):
                 rec = p_row['recording_name']
                 df = self.get_dfoutput(p_row)
                 dict_dfs[rec] = df
-                dd_r_lines[rec] = analysis.regression_line(df['volley_slope'], df['EPSP_slope'])
+                dd_r_lines[rec] = analysis.regression_line(df[x_aspect], df[y_aspect])
 
             print(f"Calling create_scatterplot for {len(dict_dfs)} dataframes")
-            uiplot.create_scatterplot(dict_dfs, dd_r_lines, output_file)
+            uiplot.create_scatterplot(dict_dfs, x_aspect, y_aspect, dd_r_lines, output_path)
         else:
             figure = self.canvasOutput.figure
             # Construct the full path with the specified folder and project name

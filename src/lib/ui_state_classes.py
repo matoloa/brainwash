@@ -24,9 +24,9 @@ class UIstate:
             'EPSP_amp': True,
             'EPSP_slope': True,
             'volley_amp': False,
-            'volley_amp_mean': True,
+            'volley_amp_mean': True, # display mean of volley_amp in output
             'volley_slope': False,
-            'volley_slope_mean': True,
+            'volley_slope_mean': True, # display mean of volley_slope in output
             'force1stim': False, # prevent splitting of channels when multiple stims are detected
             'show_all_events': False, # show ghosts of non-selected events in eventgraph output graph
             'timepoints_per_stim': False, # allow setting (non-uniform) timepoints per stim

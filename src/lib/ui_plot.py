@@ -1,6 +1,7 @@
 import seaborn as sns
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt # for the scatterplot
 from matplotlib import style
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import FixedLocator
@@ -9,9 +10,7 @@ from matplotlib.lines import Line2D # for custom legend; TODO: still used?
 
 import time # counting time for functions
 
-# for the scatterplot
-import matplotlib.pyplot as plt
-from pathlib import Path # TODO: move the save function to ui.py
+
 
 
 class UIplot():
@@ -20,22 +19,18 @@ class UIplot():
         print(f"UIplot instantiated: {self.uistate.anyView()}")
 
 
-    def create_scatterplot(self, dict_dfs, dd_r_lines, output_file):
+    def create_scatterplot(self, dict_dfs, x_aspect, y_aspect, dd_r_lines, output_path):
         print(f"Creating scatter plot for {len(dict_dfs)} dataframes")
         plt.figure(figsize=(8, 6))
         for label, df in dict_dfs.items():
-            # Scatter plot
-            plt.scatter(df['volley_slope'], df['EPSP_slope'], label=label)
+            plt.scatter(df[x_aspect], df[y_aspect], label=label)
             x, y = dd_r_lines[label]['x'], dd_r_lines[label]['y']
-            # Calculate and plot regression line
-            plt.plot(x, y, linestyle='--', linewidth=2, label=f'{label} regression')
-            
-        plt.xlabel('volley_slope')
-        plt.ylabel('EPSP_slope')
-        plt.title('Scatter plot of volley_slope vs EPSP_slope with Regression Lines')
+            plt.plot(x, y, linestyle='--', linewidth=2)#, label=f'{label} regression')
+        plt.title(f"Scatter plot of {x_aspect} vs {y_aspect} with Regression Lines")
+        plt.xlabel(x_aspect)
+        plt.ylabel(y_aspect)
         plt.legend()
         plt.grid(True)
-        output_path = Path(output_file)
         plt.savefig(output_path)
         plt.close()
         print(f'Saved scatter plot to {output_path}')
@@ -433,8 +428,11 @@ class UIplot():
                 amp_x = x_position - t_row['t_volley_amp_halfwidth'], x_position + t_row['t_volley_amp_halfwidth']
                 amp_y = amp_zero, amp_zero - volley_amp_mean / 1000 # mV to V
                 self.plot_cross(f"{label} {stim_str} volley amp", 'axe', x_position, amp_x, amp_y, color, rec_ID, aspect='volley_amp', stim=stim_num)
-                if x_axis == 'sweep':
-                    self.plot_hline(f"{label} {stim_str} volley amp mean", 'ax2', volley_amp_mean, settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
+                volley_amp_mean = t_row.get('volley_amp_mean')
+                if volley_amp_mean is None:
+                    volley_amp_mean = out['volley_amp'].mean()
+                self.plot_hline(f"{label} {stim_str} volley amp mean", 'ax1', volley_amp_mean, settings['rgb_volley_amp'], rec_ID, aspect='volley_amp_mean', stim=stim_num)
+                self.plot_line(f"{label} {stim_str} volley amp", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
 
             if not np.isnan(t_row['t_volley_slope_start']):
                 x_start, x_end = t_row['t_volley_slope_start'], t_row['t_volley_slope_end']
@@ -443,11 +441,11 @@ class UIplot():
                 index = (df_event['time'] - x_end).abs().idxmin()
                 y_end = df_event.loc[index, rec_filter] if index in df_event.index else None
                 self.plot_line(f"{label} {stim_str} volley slope marker", 'axe', [x_start, x_end], [y_start, y_end], settings['rgb_volley_slope'], rec_ID, aspect='volley_slope', stim=stim_num, width=5)
-                if x_axis == 'sweep':
-                    volley_slope_mean = t_row.get('volley_slope_mean')
-                    if volley_slope_mean is None:
-                        volley_slope_mean = out['volley_slope'].mean()
-                    self.plot_hline(f"{label} {stim_str} volley slope mean", 'ax2', volley_slope_mean, settings['rgb_volley_slope'], rec_ID, aspect='volley_slope', stim=stim_num)
+                volley_slope_mean = t_row.get('volley_slope_mean')
+                if volley_slope_mean is None:
+                    volley_slope_mean = out['volley_slope'].mean()
+                self.plot_hline(f"{label} {stim_str} volley slope mean", 'ax2', volley_slope_mean, settings['rgb_volley_slope'], rec_ID, aspect='volley_slope_mean', stim=stim_num)
+                self.plot_line(f"{label} {stim_str} volley slope", 'ax2', out[x_axis], out['volley_slope'], settings['rgb_volley_slope'], rec_ID, aspect='volley_slope', stim=stim_num)
 
         if x_axis == 'stim': # add stim-lines to output
             out = dfoutput
