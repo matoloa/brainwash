@@ -1151,12 +1151,26 @@ class UIsub(Ui_MainWindow):
 
     def export_image(self):
         print("export_image")
-        figure = self.canvasOutput.figure
-        # Construct the full path with the specified folder and project name
-        filename = os.path.join(self.projects_folder, f"{self.projectname}.png")
-        # Save the figure
-        figure.savefig(filename, dpi=300)  # Adjust dpi for desired resolution
-        print(f"Canvas output saved to {filename}")
+        if True:
+            output_file = f"{self.projects_folder}/{self.projectname}.png"
+            df_p = self.get_df_project()
+            dict_dfs = {}
+            dd_r_lines = {}
+            for _, p_row in df_p.iterrows():
+                rec = p_row['recording_name']
+                df = self.get_dfoutput(p_row)
+                dict_dfs[rec] = df
+                dd_r_lines[rec] = analysis.regression_line(df['volley_slope'], df['EPSP_slope'])
+
+            print(f"Calling create_scatterplot for {len(dict_dfs)} dataframes")
+            uiplot.create_scatterplot(dict_dfs, dd_r_lines, output_file)
+        else:
+            figure = self.canvasOutput.figure
+            # Construct the full path with the specified folder and project name
+            filename = os.path.join(self.projects_folder, f"{self.projectname}.png")
+            # Save the figure
+            figure.savefig(filename, dpi=300)  # Adjust dpi for desired resolution
+            print(f"Canvas output saved to {filename}")
 
     def binSweeps(self):
         print("binSweeps - later on, this is to bin only the selected recording: now it does nothing and should be hidden")

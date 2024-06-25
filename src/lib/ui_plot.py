@@ -2,17 +2,43 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 from matplotlib import style
-from matplotlib.lines import Line2D
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import FixedLocator
 
+from matplotlib.lines import Line2D # for custom legend; TODO: still used?
 
 import time # counting time for functions
+
+# for the scatterplot
+import matplotlib.pyplot as plt
+from pathlib import Path # TODO: move the save function to ui.py
+
 
 class UIplot():
     def __init__(self, uistate):
         self.uistate = uistate
         print(f"UIplot instantiated: {self.uistate.anyView()}")
+
+
+    def create_scatterplot(self, dict_dfs, dd_r_lines, output_file):
+        print(f"Creating scatter plot for {len(dict_dfs)} dataframes")
+        plt.figure(figsize=(8, 6))
+        for label, df in dict_dfs.items():
+            # Scatter plot
+            plt.scatter(df['volley_slope'], df['EPSP_slope'], label=label)
+            x, y = dd_r_lines[label]['x'], dd_r_lines[label]['y']
+            # Calculate and plot regression line
+            plt.plot(x, y, linestyle='--', linewidth=2, label=f'{label} regression')
+            
+        plt.xlabel('volley_slope')
+        plt.ylabel('EPSP_slope')
+        plt.title('Scatter plot of volley_slope vs EPSP_slope with Regression Lines')
+        plt.legend()
+        plt.grid(True)
+        output_path = Path(output_file)
+        plt.savefig(output_path)
+        plt.close()
+        print(f'Saved scatter plot to {output_path}')
 
 
     def xDeselect(self, ax, reset=False):

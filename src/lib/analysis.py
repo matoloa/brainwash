@@ -2,13 +2,33 @@
 import numpy as np  # numeric calculations module
 import pandas as pd  # dataframe module, think excel, but good
 from scipy.signal import savgol_filter, find_peaks
+from scipy import stats # for regression_line
 from sklearn import linear_model
 import time
+
 
 
 def valid(num):
     #print(f"num: {num}, type: {type(num)}")
     return num is not None and not np.isnan(num)
+
+
+def regression_line(x_data, y_data):
+    # Calculate linear regression
+    slope, intercept, r_value, p_value, std_err = stats.linregress(x_data, y_data)
+
+    # Generate x values from the min to max range of x data for plotting the regression line
+    x = np.linspace(x_data.min(), x_data.max(), 100)
+    y = slope * x + intercept
+    
+    return {
+        'x': x,
+        'y': y,
+        'r_value': r_value,
+        'p_value': p_value,
+        'std_err': std_err
+    }
+
 
 # %%
 def build_dfoutput(df, dict_t, filter='voltage', quick=False):
