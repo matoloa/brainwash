@@ -706,9 +706,9 @@ class Ui_MainWindow(QtCore.QObject):
         self.frameToolExport.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frameToolExport.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frameToolExport.setObjectName("frameToolExport")
-        self.pushButton_export_image = QtWidgets.QPushButton(self.frameToolExport)
-        self.pushButton_export_image.setGeometry(QtCore.QRect(10, 30, 61, 25))
-        self.pushButton_export_image.setObjectName("pushButton_export_image")
+        self.pushButton_export_selection = QtWidgets.QPushButton(self.frameToolExport)
+        self.pushButton_export_selection.setGeometry(QtCore.QRect(10, 30, 81, 25))
+        self.pushButton_export_selection.setObjectName("pushButton_export_selection")
         self.label_export = QtWidgets.QLabel(self.frameToolExport)
         self.label_export.setGeometry(QtCore.QRect(10, 10, 81, 17))
         font = QtGui.QFont()
@@ -717,6 +717,9 @@ class Ui_MainWindow(QtCore.QObject):
         font.setWeight(75)
         self.label_export.setFont(font)
         self.label_export.setObjectName("label_export")
+        self.pushButton_export_groups = QtWidgets.QPushButton(self.frameToolExport)
+        self.pushButton_export_groups.setGeometry(QtCore.QRect(100, 30, 81, 25))
+        self.pushButton_export_groups.setObjectName("pushButton_export_groups")
         self.verticalLayoutTools.addWidget(self.frameToolExport)
         self.verticalMasterLayout.addWidget(self.h_splitterMaster)
         self.progressBar = QtWidgets.QProgressBar(self.centralwidget)
@@ -790,8 +793,9 @@ class Ui_MainWindow(QtCore.QObject):
         self.pushButton_paired_data_flip.setText(_translate("mainWindow", "Flip C-I"))
         self.label_paired_data.setText(_translate("mainWindow", "Paired data"))
         self.checkBox_paired_stims.setText(_translate("mainWindow", "stim / stim"))
-        self.pushButton_export_image.setText(_translate("mainWindow", "image"))
+        self.pushButton_export_selection.setText(_translate("mainWindow", "selection"))
         self.label_export.setText(_translate("mainWindow", "Export"))
+        self.pushButton_export_groups.setText(_translate("mainWindow", "groups"))
         self.menuFile.setTitle(_translate("mainWindow", "File"))
         self.menuData.setTitle(_translate("mainWindow", "Data"))
         self.menuGroups.setTitle(_translate("mainWindow", "Groups"))
@@ -815,7 +819,7 @@ class Ui_MainWindow(QtCore.QObject):
             self.pushButton_stim_assign_threshold.setVisible(False)
             self.label_stim_detection_threshold.setVisible(False)
             # hide binning for separate recordings
-            self.checkBox_bin.setVisible(False)
+            #self.checkBox_bin.setVisible(False)
 
 
 
@@ -1078,10 +1082,6 @@ class UIsub(Ui_MainWindow):
                 filters = [" norm"]
             else:
                 filters = [" EPSP amp", " EPSP slope",]
-            # if not uistate.checkBox['volley_amp_mean']:
-            #     filters.append("volley amp mean")
-            # if not uistate.checkBox['volley_slope_mean']:
-            #     filters.append("volley slope mean")
             new_selection = {k: v for k, v in new_selection.items() if not any(k.endswith(f) for f in filters)}
         if reset: # Hide all lines
             obsolete_lines = uistate.dict_rec_labels
@@ -1152,23 +1152,35 @@ class UIsub(Ui_MainWindow):
 #    WIP section: TODO: move to appropriate header               #
 ##################################################################
 
-    def export_image(self):
-        print("export_image")
+    def export_selection(self):
+        print("export_selection")
         if True:
-            #x_aspect, y_aspect = "volley_amp", "EPSP_amp"
-            x_aspect, y_aspect = "volley_slope", "EPSP_slope"
-            output_path = Path(f"{self.projects_folder}/{self.projectname}.png")
-            df_p = self.get_df_project()
-            dict_dfs = {}
-            dd_r_lines = {}
-            for _, p_row in df_p.iterrows():
-                rec = p_row['recording_name']
-                df = self.get_dfoutput(p_row)
-                dict_dfs[rec] = df
-                dd_r_lines[rec] = analysis.regression_line(df[x_aspect], df[y_aspect])
+            aspect_pairs = []
+            if uistate.checkBox['EPSP_amp']:
+                aspect_pairs.append(("volley_amp", "EPSP_amp"))
+            if uistate.checkBox['EPSP_slope']:
+                aspect_pairs.append(("volley_slope", "EPSP_slope"))
+            print(aspect_pairs)
+            if not aspect_pairs:
+                print("No aspects selected for export.")
+                return
+            df_selected = self.get_df_project()
+            if uistate.rec_select:  # if something is selected, export only that
+                df_selected = df_selected.iloc[uistate.rec_select]
 
-            print(f"Calling create_scatterplot for {len(dict_dfs)} dataframes")
-            uiplot.create_scatterplot(dict_dfs, x_aspect, y_aspect, dd_r_lines, output_path)
+            for x_aspect, y_aspect in aspect_pairs:
+                output_path = Path(f"{self.projects_folder}/{self.projectname}_{x_aspect.split('_')[-1]}.png")
+                print(f"Exporting {x_aspect} vs {y_aspect} to {output_path}")
+                dict_dfs = {}
+                dd_r_lines = {}
+                for _, p_row in df_selected.iterrows():
+                    rec = p_row['recording_name']
+                    df = self.get_dfoutput(p_row)
+                    dict_dfs[rec] = df
+                    dd_r_lines[rec] = analysis.regression_line(df[x_aspect], df[y_aspect])
+
+                print(f"Calling create_scatterplot for {len(dict_dfs)} dataframes with aspects {x_aspect} and {y_aspect}")
+                uiplot.create_scatterplot(dict_dfs, x_aspect, y_aspect, dd_r_lines, output_path)
         else:
             figure = self.canvasOutput.figure
             # Construct the full path with the specified folder and project name
@@ -1177,8 +1189,14 @@ class UIsub(Ui_MainWindow):
             figure.savefig(filename, dpi=300)  # Adjust dpi for desired resolution
             print(f"Canvas output saved to {filename}")
 
+
+    def export_groups(self):
+        print("export_groups")
+
+
     def binSweeps(self):
         print("binSweeps - later on, this is to bin only the selected recording: now it does nothing and should be hidden")
+
 
     def graphRefresh(self):
         self.usage("graphRefresh")
@@ -1723,9 +1741,13 @@ class UIsub(Ui_MainWindow):
         print(f"checkBox_paired_stims_changed: {uistate.checkBox['paired_stims']}")
         # TODO: reconnect this
 
-    def trigger_export_image(self):
-        self.usage("trigger_export_image")
-        self.export_image()
+    def trigger_export_selection(self):
+        self.usage("trigger_export_selection")
+        self.export_selection()
+
+    def trigger_export_groups(self):
+        self.usage("trigger_export_groups")
+        self.export_groups()
 
     def triggerGroupRename(self, group_ID):
         self.usage("triggerGroupRename")

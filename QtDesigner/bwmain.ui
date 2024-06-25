@@ -843,17 +843,17 @@
             <property name="frameShadow">
              <enum>QFrame::Raised</enum>
             </property>
-            <widget class="QPushButton" name="pushButton_export_image">
+            <widget class="QPushButton" name="pushButton_export_selection">
              <property name="geometry">
               <rect>
                <x>10</x>
                <y>30</y>
-               <width>61</width>
+               <width>81</width>
                <height>25</height>
               </rect>
              </property>
              <property name="text">
-              <string>image</string>
+              <string>selection</string>
              </property>
             </widget>
             <widget class="QLabel" name="label_export">
@@ -874,6 +874,19 @@
              </property>
              <property name="text">
               <string>Export</string>
+             </property>
+            </widget>
+            <widget class="QPushButton" name="pushButton_export_groups">
+             <property name="geometry">
+              <rect>
+               <x>100</x>
+               <y>30</y>
+               <width>81</width>
+               <height>25</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>groups</string>
              </property>
             </widget>
            </widget>

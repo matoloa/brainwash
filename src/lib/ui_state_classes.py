@@ -106,7 +106,8 @@ class UIstate:
             'pushButton_volley_amp_width_set_all': 'trigger_set_volley_amp_width_all',
             'pushButton_norm_range_set_all': 'trigger_set_norm_range_all',
             'pushButton_bin_size_set_all': 'trigger_set_bin_size_all',
-            'pushButton_export_image': 'trigger_export_image',
+            'pushButton_export_selection': 'trigger_export_selection',
+            'pushButton_export_groups': 'trigger_export_groups',
         }
         self.x_select = { # selected ranges on mean- and output graphs
             'mean_start': None,
