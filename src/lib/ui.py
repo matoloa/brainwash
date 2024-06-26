@@ -1154,7 +1154,7 @@ class UIsub(Ui_MainWindow):
 
     def export_selection(self):
         print("export_selection")
-        if True:
+        if uistate.checkBox['bin']:
             aspect_pairs = []
             if uistate.checkBox['EPSP_amp']:
                 aspect_pairs.append(("volley_amp", "EPSP_amp"))
@@ -2541,10 +2541,9 @@ class UIsub(Ui_MainWindow):
             return
     
     def clearProject(self):
-        uiplot.unPlot() # all plots
-        self.graphWipe()
-        self.group_controls_remove() # purge group buttons
-
+        uiplot.unPlot() # all rec plots
+        uiplot.unPlotGroup() # all group plots
+        self.graphWipe() # for good measure
 
     def renameProject(self): # changes name of project folder and updates .cfg
         #self.dict_folders['project'].mkdir(exist_ok=True)
@@ -3035,19 +3034,23 @@ class UIsub(Ui_MainWindow):
 
 # Graph interface
 
-    def graphWipe(self): # removes all plots from canvasEvent and canvasOutput
+    def graphWipe(self):  # removes all plots from canvasEvent and canvasOutput
         uistate.dict_rec_labels = {}
         uistate.dict_rec_show = {}
         uistate.dict_group_labels = {}
         uistate.dict_group_show = {}
         if hasattr(self, "canvasMean"):
+            self.canvasMean.figure.legends.clear()
             self.canvasMean.axes.cla()
             self.canvasMean.draw()
         if hasattr(self, "canvasEvent"):
+            self.canvasEvent.figure.legends.clear()
             self.canvasEvent.axes.cla()
             self.canvasEvent.draw()
         if hasattr(self, "canvasOutput"):
-            self.canvasOutput.axes.cla()
+            for ax in self.canvasOutput.figure.axes:
+                ax.cla()
+                ax.legend_ = None
             self.canvasOutput.draw()
 
 

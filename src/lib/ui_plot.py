@@ -147,9 +147,12 @@ class UIplot():
                 del dict_show[key]
 
 
-    def unPlotGroup(self, group_ID):
+    def unPlotGroup(self, group_ID=None):
         dict_group = self.uistate.dict_group_labels
-        keys_to_remove = [key for key, value in dict_group.items() if group_ID == value['group_ID']]
+        if group_ID is None:
+            keys_to_remove = list(dict_group.keys())  # Remove all if group_ID is None
+        else:
+            keys_to_remove = [key for key, value in dict_group.items() if group_ID == value['group_ID']]
         for key in keys_to_remove:
             dict_group[key]['fill'].remove()
             dict_group[key]['line'].remove()
