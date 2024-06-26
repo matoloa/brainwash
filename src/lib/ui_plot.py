@@ -19,13 +19,17 @@ class UIplot():
         print(f"UIplot instantiated: {self.uistate.anyView()}")
 
 
-    def create_scatterplot(self, dict_dfs, x_aspect, y_aspect, dd_r_lines, output_path):
-        print(f"Creating scatter plot for {len(dict_dfs)} dataframes")
+    def create_scatterplot(self, dict_rec_legend_color_df, x_aspect, y_aspect, dd_r_lines, output_path):
+        print(f"Creating scatter plot for {len(dict_rec_legend_color_df)} records")
         plt.figure(figsize=(8, 6))
-        for label, df in dict_dfs.items():
-            plt.scatter(df[x_aspect], df[y_aspect], label=label)
-            x, y = dd_r_lines[label]['x'], dd_r_lines[label]['y']
-            plt.plot(x, y, linestyle='--', linewidth=2)#, label=f'{label} regression')
+        
+        # Iterate over each record in dict_rec_legend_color_df
+        for label, (legend, color, df) in dict_rec_legend_color_df.items():
+            plt.scatter(df[x_aspect], df[y_aspect], label=legend, color=color)
+            if label in dd_r_lines:
+                x, y = dd_r_lines[label]['x'], dd_r_lines[label]['y']
+                plt.plot(x, y, linestyle='--', linewidth=2, color=color)  # Use the same color for regression line
+        
         plt.title(f"Scatter plot of {x_aspect} vs {y_aspect} with Regression Lines")
         plt.xlabel(x_aspect)
         plt.ylabel(y_aspect)
