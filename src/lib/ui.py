@@ -2390,7 +2390,7 @@ class UIsub(Ui_MainWindow):
                 except FileNotFoundError:
                     print("...but NOT when attempting to unlink.")
             uiplot.unPlotGroup(group_ID)
-            if self.dd_groups[group_ID]['rec_IDs']:
+            if group_ID in self.dd_groups and self.dd_groups[group_ID]['rec_IDs']:
                 uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.get_dfgroupmean(group_ID))
 
     def group_controls_add(self, group_ID): # Create menu for adding to group and checkbox for showing group
@@ -2424,10 +2424,14 @@ class UIsub(Ui_MainWindow):
                 self.group_controls_remove(i)
         else:
             str_ID = str(group_ID)
-            # get the widget named group and remove it
-            widget = self.centralwidget.findChild(QtWidgets.QWidget, str_ID)
+            # Correctly identify the widget by its full object name used during creation
+            widget_name = f"checkBox_group_{str_ID}"
+            widget = self.centralwidget.findChild(QtWidgets.QWidget, widget_name)
             if widget:
+                print(f"Removing widget {widget_name}")
                 widget.deleteLater()
+            else:
+                print(f"Widget {widget_name} not found.")
             # get the action named actionAddTo_{group} and remove it
             action = getattr(self, f"actionAddTo_{str_ID}", None)
             if action:
@@ -2539,6 +2543,8 @@ class UIsub(Ui_MainWindow):
     def clearProject(self):
         uiplot.unPlot() # all plots
         self.graphWipe()
+        self.group_controls_remove() # purge group buttons
+
 
     def renameProject(self): # changes name of project folder and updates .cfg
         #self.dict_folders['project'].mkdir(exist_ok=True)
