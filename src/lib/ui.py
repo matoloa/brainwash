@@ -1193,48 +1193,65 @@ class UIsub(Ui_MainWindow):
 
     def export_groups(self):
         print("export_groups")
-        aspect_pairs = []
-        if uistate.checkBox['EPSP_amp']:
-            aspect_pairs.append(("volley_amp", "EPSP_amp"))
-        if uistate.checkBox['EPSP_slope']:
-            aspect_pairs.append(("volley_slope", "EPSP_slope"))
-        print(aspect_pairs)
-        if not aspect_pairs:
-            print("No aspects selected for export.")
-            return
-        df_selected = self.get_df_project()
-        if uistate.rec_select:  # if something is selected, export only that
-            df_selected = df_selected.iloc[uistate.rec_select]
+        if True: # PP export
+            dict_group_color_ratio = {}
+            for group_ID, dict_group in self.dd_groups.items():
+                if dict_group['show']:
+                    df_group = self.get_dfgroupmean(group_ID)
+                    if uistate.checkBox['EPSP_amp']:
+                        ratio = df_group.loc[df_group['stim'] == 2, 'EPSP_amp_norm_mean'].values[0]
+                        output_path = Path(f"{self.projects_folder}/{self.projectname}_amp.png")
+                        str_aspect = "EPSP amplitude"
+                    else:
+                        ratio = df_group.loc[df_group['stim'] == 2, 'EPSP_slope_norm_mean'].values[0]
+                        output_path = Path(f"{self.projects_folder}/{self.projectname}_slope.png")
+                        str_aspect = "EPSP slope"
+                    dict_group_color_ratio[dict_group['group_name']] = [dict_group['color'], ratio]
+            print(f"Calling create_barplot for {len(dict_group_color_ratio)} groups")
+            uiplot.create_barplot(dict_group_color_ratio, str_aspect, output_path)
+        else:
+            aspect_pairs = []
+            if uistate.checkBox['EPSP_amp']:
+                aspect_pairs.append(("volley_amp", "EPSP_amp"))
+            if uistate.checkBox['EPSP_slope']:
+                aspect_pairs.append(("volley_slope", "EPSP_slope"))
+            print(aspect_pairs)
+            if not aspect_pairs:
+                print("No aspects selected for export.")
+                return
+            df_selected = self.get_df_project()
+            if uistate.rec_select:  # if something is selected, export only that
+                df_selected = df_selected.iloc[uistate.rec_select]
 
-        for x_aspect, y_aspect in aspect_pairs:
-            output_path = Path(f"{self.projects_folder}/{self.projectname}_grouped_{x_aspect.split('_')[-1]}.png")
-            print(f"Exporting group {x_aspect} vs {y_aspect} to {output_path}")
-            dict_rec_legend_color_df = {} # legend (group)name; color, df
-            dd_r_lines = {}
-            dd_r_report = {}
-            for _, p_row in df_selected.iterrows():
-                rec = p_row['recording_name']
-                rec_in_groups = self.get_groupsOfRec(p_row['ID'])
-                if rec_in_groups:
-                    dict_prime_group = self.dd_groups[rec_in_groups[0]]
-                    prime_group_name = dict_prime_group['group_name']
-                    legend = f"{prime_group_name}"# {rec}"
-                    color = dict_prime_group['color']
-                else:
-                    legend = rec
-                    color = 'black'
-                df = self.get_dfoutput(p_row)
-                dict_rec_legend_color_df[rec] = [legend, color, df]
-                dd_r_lines[rec] = analysis.regression_line(df[x_aspect], df[y_aspect])
-                # Assuming dd_r_lines[rec] is a dictionary
-                dd_r_report[rec] = dd_r_lines[rec]
-                dd_r_report[rec]['group'] = prime_group_name
-            #TODO Temporary; make a df of dd_r_lines and save it to clipboard
-            df_r_report = pd.DataFrame(dd_r_report)
-            df_r_report.to_clipboard()
+            for x_aspect, y_aspect in aspect_pairs:
+                output_path = Path(f"{self.projects_folder}/{self.projectname}_grouped_{x_aspect.split('_')[-1]}.png")
+                print(f"Exporting group {x_aspect} vs {y_aspect} to {output_path}")
+                dict_rec_legend_color_df = {} # legend (group)name; color, df
+                dd_r_lines = {}
+                dd_r_report = {}
+                for _, p_row in df_selected.iterrows():
+                    rec = p_row['recording_name']
+                    rec_in_groups = self.get_groupsOfRec(p_row['ID'])
+                    if rec_in_groups:
+                        dict_prime_group = self.dd_groups[rec_in_groups[0]]
+                        prime_group_name = dict_prime_group['group_name']
+                        legend = f"{prime_group_name}"# {rec}"
+                        color = dict_prime_group['color']
+                    else:
+                        legend = rec
+                        color = 'black'
+                    df = self.get_dfoutput(p_row)
+                    dict_rec_legend_color_df[rec] = [legend, color, df]
+                    dd_r_lines[rec] = analysis.regression_line(df[x_aspect], df[y_aspect])
+                    # Assuming dd_r_lines[rec] is a dictionary
+                    dd_r_report[rec] = dd_r_lines[rec]
+                    dd_r_report[rec]['group'] = prime_group_name
+                #TODO Temporary; make a df of dd_r_lines and save it to clipboard
+                df_r_report = pd.DataFrame(dd_r_report)
+                df_r_report.to_clipboard()
 
-            print(f"Calling create_scatterplot for {len(dict_rec_legend_color_df)} dataframes with aspects {x_aspect} and {y_aspect}")
-            uiplot.create_scatterplot(dict_rec_legend_color_df, x_aspect, y_aspect, dd_r_lines, output_path)
+                print(f"Calling create_scatterplot for {len(dict_rec_legend_color_df)} dataframes with aspects {x_aspect} and {y_aspect}")
+                uiplot.create_scatterplot(dict_rec_legend_color_df, x_aspect, y_aspect, dd_r_lines, output_path)
 
     def binSweeps(self):
         print("binSweeps - later on, this is to bin only the selected recording: now it does nothing and should be hidden")

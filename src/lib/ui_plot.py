@@ -19,6 +19,41 @@ class UIplot():
         print(f"UIplot instantiated: {self.uistate.anyView()}")
 
 
+    def create_barplot(self, dict_group_color_ratio, str_aspect, output_path):
+        plt.figure(figsize=(6, 6))
+        group_names = []
+        ratios = []
+        colors = []
+        
+        # Extract information from the dictionary
+        for group, (color, ratio) in dict_group_color_ratio.items():
+            group_names.append(group)
+            ratios.append(ratio)
+            colors.append(color)
+        
+        # Increase the font size for all text in the plot
+        plt.rcParams.update({'font.size': 14})  # Adjust the size as needed
+        
+        # Create the bar plot with narrower bars
+        plt.bar(group_names, ratios, color=colors, width=0.4)  # Adjust the width for narrower bars
+        
+        # Add a dashed line at 1
+        plt.axhline(y=100, color='black', linestyle='--')
+        
+        # Set labels and title with increased font size
+        plt.xlabel('Group', fontsize=16)
+        plt.ylabel(f"{str_aspect}, % of stim 1", fontsize=16)
+        plt.title('Paired Pulse Ratio (50ms)', fontsize=18)
+        
+        # Increase tick labels size
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+        
+        plt.savefig(output_path)
+        plt.close()
+        print(f'Saved barplot to {output_path}')
+
+
     def create_scatterplot(self, dict_rec_legend_color_df, x_aspect, y_aspect, dd_r_lines, output_path):
         print(f"Creating scatter plot for {len(dict_rec_legend_color_df)} records")
         plt.figure(figsize=(8, 6))
