@@ -1218,7 +1218,7 @@ class UIsub(Ui_MainWindow):
                 if rec_in_groups:
                     dict_prime_group = self.dd_groups[rec_in_groups[0]]
                     prime_group_name = dict_prime_group['group_name']
-                    legend = f"{prime_group_name} {rec}"
+                    legend = f"{prime_group_name}"# {rec}"
                     color = dict_prime_group['color']
                 else:
                     legend = rec

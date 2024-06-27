@@ -33,7 +33,12 @@ class UIplot():
         plt.title(f"Scatter plot of {x_aspect} vs {y_aspect} with Regression Lines")
         plt.xlabel(x_aspect)
         plt.ylabel(y_aspect)
-        plt.legend()
+        
+        # Remove duplicate legends
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys())
+        
         plt.grid(True)
         plt.savefig(output_path)
         plt.close()
