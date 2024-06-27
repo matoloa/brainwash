@@ -1194,21 +1194,23 @@ class UIsub(Ui_MainWindow):
     def export_groups(self):
         print("export_groups")
         if True: # PP export
-            dict_group_color_ratio = {}
+            dict_group_color_ratio_SEM = {}
             for group_ID, dict_group in self.dd_groups.items():
                 if dict_group['show']:
                     df_group = self.get_dfgroupmean(group_ID)
                     if uistate.checkBox['EPSP_amp']:
-                        ratio = df_group.loc[df_group['stim'] == 2, 'EPSP_amp_norm_mean'].values[0]
+                        group_ratio = df_group.loc[df_group['stim'] == 2, 'EPSP_amp_norm_mean'].values[0]
+                        group_SEM = df_group.loc[df_group['stim'] == 2, 'EPSP_amp_norm_SEM'].values[0]
                         output_path = Path(f"{self.projects_folder}/{self.projectname}_amp.png")
                         str_aspect = "EPSP amplitude"
                     else:
-                        ratio = df_group.loc[df_group['stim'] == 2, 'EPSP_slope_norm_mean'].values[0]
+                        group_ratio = df_group.loc[df_group['stim'] == 2, 'EPSP_slope_norm_mean'].values[0]
+                        group_SEM = df_group.loc[df_group['stim'] == 2, 'EPSP_slope_norm_SEM'].values[0]
                         output_path = Path(f"{self.projects_folder}/{self.projectname}_slope.png")
                         str_aspect = "EPSP slope"
-                    dict_group_color_ratio[dict_group['group_name']] = [dict_group['color'], ratio]
-            print(f"Calling create_barplot for {len(dict_group_color_ratio)} groups")
-            uiplot.create_barplot(dict_group_color_ratio, str_aspect, output_path)
+                    dict_group_color_ratio_SEM[dict_group['group_name']] = [dict_group['color'], group_ratio, group_SEM]
+            print(f"Calling create_barplot for {len(dict_group_color_ratio_SEM)} groups")
+            uiplot.create_barplot(dict_group_color_ratio_SEM, str_aspect, output_path)
         else:
             aspect_pairs = []
             if uistate.checkBox['EPSP_amp']:

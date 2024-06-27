@@ -19,23 +19,29 @@ class UIplot():
         print(f"UIplot instantiated: {self.uistate.anyView()}")
 
 
-    def create_barplot(self, dict_group_color_ratio, str_aspect, output_path):
+    def create_barplot(self, dict_group_color_ratio_SEM, str_aspect, output_path):
         plt.figure(figsize=(6, 6))
         group_names = []
         ratios = []
+        SEMs = []
         colors = []
         
         # Extract information from the dictionary
-        for group, (color, ratio) in dict_group_color_ratio.items():
+        for group, (color, ratio, group_SEM) in dict_group_color_ratio_SEM.items():
             group_names.append(group)
             ratios.append(ratio)
+            SEMs.append(group_SEM)
             colors.append(color)
         
         # Increase the font size for all text in the plot
         plt.rcParams.update({'font.size': 14})  # Adjust the size as needed
         
         # Create the bar plot with narrower bars
-        plt.bar(group_names, ratios, color=colors, width=0.4)  # Adjust the width for narrower bars
+        bars = plt.bar(group_names, ratios, color=colors, width=0.4)  # Adjust the width for narrower bars
+        
+        # Add error bars (SEM) to each bar
+        x_positions = np.arange(len(group_names))  # Get the x positions of the bars
+        plt.errorbar(x_positions, ratios, yerr=SEMs, fmt='none', capsize=5, color='black')
         
         # Add a dashed line at 1
         plt.axhline(y=100, color='black', linestyle='--')
