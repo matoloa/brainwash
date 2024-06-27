@@ -1152,9 +1152,9 @@ class UIsub(Ui_MainWindow):
 #    WIP section: TODO: move to appropriate header               #
 ##################################################################
 
-    def export_selection(self):
-        print("export_selection")
+    def export_selection(self): # WARNING! Experimental feature for very specific use-cases. TODO: generalize!
         if uistate.checkBox['bin']:
+            print("export_selection of binned data, treated as IO - WARNING! Experimental feature for very specific use-cases.")
             aspect_pairs = []
             if uistate.checkBox['EPSP_amp']:
                 aspect_pairs.append(("volley_amp", "EPSP_amp"))
@@ -1183,6 +1183,7 @@ class UIsub(Ui_MainWindow):
                 print(f"Calling create_scatterplot for {len(dict_rec_legend_color_df)} dataframes with aspects {x_aspect} and {y_aspect}")
                 uiplot.create_scatterplot(dict_rec_legend_color_df, x_aspect, y_aspect, dd_r_lines, output_path)
         else: # For now, just export the output window as it is TODO: actually export selection!
+            print("export_selection of non-binned data, snapshot of output window - WARNING! Experimental feature for very specific use-cases.")
             figure = self.canvasOutput.figure
             # Construct the full path with the specified folder and project name
             filename = os.path.join(self.projects_folder, f"{self.projectname}.png")
@@ -1191,9 +1192,9 @@ class UIsub(Ui_MainWindow):
             print(f"Canvas output saved to {filename}")
 
 
-    def export_groups(self):
-        print("export_groups")
-        if True: # PP export
+    def export_groups(self): # WARNING! Experimental feature for very specific use-cases. TODO: generalize!
+        if uistate.checkBox['output_per_stim']: # TODO: now interpreted as PP export
+            print("export_groups: PP barplot export - WARNING! Experimental feature for very specific use-cases!")
             dict_group_color_ratio_SEM = {}
             for group_ID, dict_group in self.dd_groups.items():
                 if dict_group['show']:
@@ -1212,6 +1213,7 @@ class UIsub(Ui_MainWindow):
             print(f"Calling create_barplot for {len(dict_group_color_ratio_SEM)} groups")
             uiplot.create_barplot(dict_group_color_ratio_SEM, str_aspect, output_path)
         else:
+            print("export_groups: scatterplot export - WARNING! Experimental feature for very specific use-cases!")
             aspect_pairs = []
             if uistate.checkBox['EPSP_amp']:
                 aspect_pairs.append(("volley_amp", "EPSP_amp"))

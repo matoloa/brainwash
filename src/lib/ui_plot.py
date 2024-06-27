@@ -47,7 +47,7 @@ class UIplot():
         plt.axhline(y=100, color='black', linestyle='--')
         
         # Set labels and title with increased font size
-        plt.xlabel('Group', fontsize=16)
+        #plt.xlabel('Group', fontsize=16)
         plt.ylabel(f"{str_aspect}, % of stim 1", fontsize=16)
         plt.title('Paired Pulse Ratio (50ms)', fontsize=18)
         
