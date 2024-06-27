@@ -143,6 +143,14 @@ class TableModel(QtCore.QAbstractTableModel):
         self.endResetModel()
         return True
 
+    def sort(self, column, order):
+        try:
+            self.layoutAboutToBeChanged.emit()
+            self._data = self._data.sort_values(self._data.columns[column], ascending=order == QtCore.Qt.AscendingOrder)
+            self.layoutChanged.emit()
+        except Exception as e:
+            print(f"Error sorting table: {e}")
+
 
 class FileTreeSelectorModel(QtWidgets.QFileSystemModel):  # Paired with a FileTreeSelectorView
     paths_selected = QtCore.pyqtSignal(list)
@@ -1686,6 +1694,9 @@ class UIsub(Ui_MainWindow):
             self.tablemodel = TableModel(self.df_project)
             self.tableProj.setModel(self.tablemodel)
 
+            # Enable sorting on the QTableView
+            self.tableProj.setSortingEnabled(True)
+
             # Connect events
             self.pushButtonParse.pressed.connect(self.triggerParse)
             self.tableProj.setSelectionBehavior(TableProjSub.SelectRows)
@@ -2720,9 +2731,9 @@ class UIsub(Ui_MainWindow):
         self.tableProj.verticalHeader().hide()
         df_p = self.df_project
         # hide all columns except these:
-        list_show = [   
+        list_show = [
                         df_p.columns.get_loc('recording_name'),
-#                        df_p.columns.get_loc('ID'),
+                        #df_p.columns.get_loc('ID'),
                         df_p.columns.get_loc('sweeps'),
                         df_p.columns.get_loc('groups'),
                         df_p.columns.get_loc('stims'),
@@ -2739,7 +2750,14 @@ class UIsub(Ui_MainWindow):
             else:
                 self.tableProj.setColumnHidden(col, True)
         self.tableProj.resizeColumnsToContents()
-
+    
+        # Rearrange column order
+        column_order = [df_p.columns.get_loc('recording_name'), df_p.columns.get_loc('groups'), df_p.columns.get_loc('stims'), df_p.columns.get_loc('sweeps'), df_p.columns.get_loc('sweep_duration')]
+        if uistate.checkBox['paired_stims']:
+            column_order.append(df_p.columns.get_loc('Tx'))
+        for i, col_index in enumerate(column_order):
+            header.moveSection(header.visualIndex(col_index), i)
+    
         selection = QtCore.QItemSelection()
         for index in selected_rows:
             selection.select(index, index)
