@@ -1419,7 +1419,7 @@ class UIsub(Ui_MainWindow):
                 first, last = 1, max(df_selected['stims'].max(), 2)
             uistate.zoom['output_xlim'] = first, last
             
-        # print(f"zoomAuto: output_xlim: {uistate.zoom['output_xlim']}")
+        print(f"zoomAuto: output_xlim: {uistate.zoom['output_xlim']}")
 
 
     def update_recs2plot(self):
@@ -3976,7 +3976,8 @@ class UIsub(Ui_MainWindow):
                     ax.set_ylim(uistate.zoom['output_ax2_ylim'])
                 df_p = self.get_df_project()
                 x_axis = 'stim' if uistate.checkBox['output_per_stim'] else 'sweep'
-                uistate.zoom['output_xlim'] = [0, df_p[x_axis].max()]
+                max_value = round(df_p[x_axis].max())  # Round to the nearest integer
+                uistate.zoom['output_xlim'] = [0, max_value]
                 print(f"zoomReset: output_xlim: {uistate.zoom['output_xlim']}")
                 ax.set_xlim(uistate.zoom['output_xlim'])
         else:
