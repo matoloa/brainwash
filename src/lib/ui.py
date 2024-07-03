@@ -1160,6 +1160,37 @@ class UIsub(Ui_MainWindow):
 #    WIP section: TODO: move to appropriate header               #
 ##################################################################
 
+    import pandas as pd
+    
+    def export_means(self):
+        print("export_means")
+        means_list = []
+        df_p = self.get_df_project()
+        for _, p_row in df_p.iterrows():
+            df = self.get_dfoutput(p_row)
+            rec_name = p_row['recording_name']
+            rec_ID = p_row['ID']
+            group_ID = self.get_groupsOfRec(rec_ID)
+            group_name = self.dd_groups[group_ID[0]]['group_name']
+            EPSP_amp_mean = df['EPSP_amp'].mean()
+            EPSP_slope_mean = df['EPSP_slope'].mean()
+            volley_amp_mean = df['volley_amp'].mean()
+            volley_slope_mean = df['volley_slope'].mean()
+            row_dict = {
+                'rec_name': rec_name,
+                'group_name': group_name,
+                'EPSP_amp_mean': EPSP_amp_mean,
+                'EPSP_slope_mean': EPSP_slope_mean,
+                'volley_amp_mean': volley_amp_mean,
+                'volley_slope_mean': volley_slope_mean
+            }
+            means_list.append(row_dict)
+        df_means_by_group = pd.DataFrame(means_list)
+        # Sort by 'group_name' in reverse alphabetical order
+        df_means_by_group = df_means_by_group.sort_values(by='group_name', ascending=False)
+        df_means_by_group.to_clipboard(index=False)
+
+        
     def export_selection(self): # WARNING! Experimental feature for very specific use-cases. TODO: generalize!
         if uistate.checkBox['bin']:
             print("export_selection of binned data, treated as IO - WARNING! Experimental feature for very specific use-cases.")
@@ -1630,6 +1661,13 @@ class UIsub(Ui_MainWindow):
         self.actionCopyOutput.triggered.connect(self.triggerCopyOutput)
         self.actionCopyOutput.setShortcut("Ctrl+C")
         self.menuEdit.addAction(self.actionCopyOutput)
+        
+        # TODO: Temporary for David's master; deprecate
+        self.actionCopyMeans = QtWidgets.QAction("Copy means", self)
+        self.actionCopyMeans.triggered.connect(self.export_means)
+        self.actionCopyMeans.setShortcut("Ctrl+M")
+        self.menuEdit.addAction(self.actionCopyMeans)
+
         # View menu
         for frame, (text, initial_state) in uistate.viewTools.items():
             action = QtWidgets.QAction(f"Toggle {text}", self)
@@ -2339,7 +2377,7 @@ class UIsub(Ui_MainWindow):
 
 
 
-# Data Group functionshandling
+# Data Group handling functions
 
     def group_get_dd(self):                   # dd_groups is a dict of dicts: {group_ID (int): {group_name: str, color: str, show: bool, rec_IDs: [str]}}
         path_dd_groups = Path(self.dict_folders['project'] / "groups.pkl")
