@@ -173,15 +173,24 @@ def parse_ibw(filepath, dev=False): # igor2, para
 
 # %%
 def build_dfmean(dfdata, rollingwidth=3):
-    # returns zeroed mean of dfdata and the index of the first peak in the prim column
-    dfmean = pd.DataFrame(dfdata.pivot(columns='time', index='sweep', values='voltage_raw').mean())
-    dfmean.columns = ['voltage']
-    # generate diffs
+    print("build_dfmean")
+    # Ensure aggregation over 'sweep' and 'time' removes all duplicates
+    dfdata = dfdata.groupby(['sweep', 'time'], as_index=False)['voltage_raw'].mean()
+    print("aggregation finished.")
+
+    # Check for duplicates after aggregation (for debugging purposes)
+    if dfdata.duplicated(['sweep', 'time']).any():
+        print("Warning: Still duplicates present after aggregation.")
+
+    # Use pivot_table instead of pivot to handle any remaining duplicates
+    dfmean = pd.pivot_table(dfdata, values='voltage_raw', index='sweep', columns='time', aggfunc='mean').mean().to_frame(name='voltage')
+
+    # Continue with the rest of the function...
     dfmean['prim'] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
     dfmean['bis'] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()
     dfmean.reset_index(inplace=True)
     i_stim = first_stim_index(dfmean)
-    baseline_mean = dfmean.iloc[i_stim-20:i_stim-10]['voltage'].mean() # TODO: hardcoded
+    baseline_mean = dfmean.iloc[i_stim-20:i_stim-10]['voltage'].mean()  # Adjusted for potential NaNs
     dfmean['voltage'] = dfmean['voltage'] - baseline_mean
     return dfmean, i_stim
 
@@ -384,7 +393,9 @@ if __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Sour
     #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"), str(source_folder / "abf 2 channel/KO_02/2022_01_24_0020.abf")]
     #list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2/2022_07_01_0012.abf"), str(source_folder / "abf 2 channel/KO_02/2022_01_24_0020.abf")]
     #list_sources = [str(source_folder / "abf 1 channel/A_24_P0630-D4")]
-    list_sources = [str(source_folder / "abf Ca trains/03 PT 10nM TTX varied Stim/2.8MB - PT/2023_07_18_0006.abf")]
+    #list_sources = [str(source_folder / "abf Ca trains/03 PT 10nM TTX varied Stim/2.8MB - PT/2023_07_18_0006.abf")]
+    list_sources = [r"K:\Brainwash Data Source\Rong Samples\Good recording"]
+    
     for _ in range(3):
         print()
     print("", "*** parse.py standalone test: ***")

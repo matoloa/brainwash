@@ -6,9 +6,11 @@ from PyQt5 import QtCore, QtWidgets, QtGui, sip
 import numpy as np
 import pandas as pd
 
+# TODO: kick these out to ui_plot.py
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib import use as matplotlib_use
 from matplotlib.figure import Figure
+matplotlib_use("Qt5Agg")
 
 from datetime import datetime # used in project name defaults
 import json # for saving and loading dicts as strings
@@ -24,8 +26,6 @@ import parse
 import analysis
 import ui_state_classes
 import ui_plot
-
-matplotlib_use("Qt5Agg")
 
 
 
@@ -59,6 +59,7 @@ matplotlib_use("Qt5Agg")
 '''
 
 
+
 ####################################################################
 #                             Globals                              #
 ####################################################################
@@ -79,8 +80,8 @@ class Config:
         self.clear_timepoints = clear
         self.force_cfg_reset = clear
         self.verbose = self.dev_mode
-        self.talkback = not self.dev_mode
-        self.hide_experimental = True #not self.dev_mode
+        self.talkback = True # not self.dev_mode
+        self.hide_experimental = not self.dev_mode
         self.track_widget_focus = False
         self.terminal_space = 372 if self.dev_mode else 0
         # get project_name and version number from pyproject.toml
@@ -93,6 +94,8 @@ config = Config()
 uistate = ui_state_classes.UIstate() # global variable for storing state of UI
 importlib.reload(ui_plot)
 uiplot = ui_plot.UIplot(uistate)
+
+
 
 ####################################################################
 #                       Custom sub-classes                         #
@@ -354,6 +357,7 @@ class graphPreloadThread(QtCore.QThread):
 
     def __init__(self, uistate, uiplot, uisub):
         super().__init__()
+        self.rows = []
         self.uistate = uistate
         self.uiplot = uiplot
         self.uisub = uisub
@@ -1394,7 +1398,7 @@ class UIsub(Ui_MainWindow):
 
     def talkback(self):
         p_row = uistate.dfp_row_copy
-        t_row = uistate.dft_copy[uistate.stim_select]
+        t_row = uistate.dft_copy.iloc[uistate.stim_select[0]]
         dfmean = self.get_dfmean(p_row)
 
         t_stim = t_row['t_stim']
@@ -1408,10 +1412,10 @@ class UIsub(Ui_MainWindow):
         dfevent.to_csv(path_talkback_df, index=False)
         # save the event data as a dict
         keys = [
-            't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params',
-            't_EPSP_slope_start', 't_EPSP_slope_end', 't_EPSP_slope_method', 't_EPSP_slope_params',
-            't_volley_amp', 't_volley_amp_method', 't_volley_amp_params',
-            't_volley_slope_start', 't_volley_slope_end', 't_volley_slope_method', 't_volley_slope_params'
+#            't_EPSP_amp', 't_EPSP_amp_method', 't_EPSP_amp_params',
+            't_EPSP_slope_start', 't_EPSP_slope_end', #'t_EPSP_slope_method', 't_EPSP_slope_params',
+            #'t_volley_amp', 't_volley_amp_method', 't_volley_amp_params',
+            't_volley_slope_start', 't_volley_slope_end', # 't_volley_slope_method', 't_volley_slope_params'
         ]
         dict_event = {key: t_row[key] for key in keys}
         print(f"talkback dict_event: {dict_event}")
