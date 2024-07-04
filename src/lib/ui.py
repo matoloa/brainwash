@@ -1159,8 +1159,6 @@ class UIsub(Ui_MainWindow):
 ##################################################################
 #    WIP section: TODO: move to appropriate header               #
 ##################################################################
-
-    import pandas as pd
     
     def export_means(self):
         print("export_means")
@@ -1172,25 +1170,40 @@ class UIsub(Ui_MainWindow):
             rec_ID = p_row['ID']
             group_ID = self.get_groupsOfRec(rec_ID)
             group_name = self.dd_groups[group_ID[0]]['group_name']
-            EPSP_amp_mean = df['EPSP_amp'].mean()
-            EPSP_slope_mean = df['EPSP_slope'].mean()
-            volley_amp_mean = df['volley_amp'].mean()
-            volley_slope_mean = df['volley_slope'].mean()
+        
+            # Define sweep ranges for averaging
+            sweep_ranges = {
+                '0': (0, 9),
+                '110': (110, 119),
+                '120': (120, 129),
+                '590': (590, 599),
+            }
+            
+            # Initialize dictionary to store means
+            means_dict = {}
+            
+            # Calculate mean for each sweep range for EPSP_amp, EPSP_slope, volley_amp, and volley_slope
+            for prefix, (start, end) in sweep_ranges.items():
+                filtered_df = df[df['sweep'].between(start, end)]
+                means_dict[f'EPSP_amp_mean_{prefix}'] = filtered_df['EPSP_amp'].mean()
+                means_dict[f'EPSP_slope_mean_{prefix}'] = filtered_df['EPSP_slope'].mean()
+                means_dict[f'volley_amp_mean_{prefix}'] = filtered_df['volley_amp'].mean()
+                means_dict[f'volley_slope_mean_{prefix}'] = filtered_df['volley_slope'].mean()  # Assuming 'volley_slope' is a column in your DataFrame
+            # Combine with other data
             row_dict = {
                 'rec_name': rec_name,
                 'group_name': group_name,
-                'EPSP_amp_mean': EPSP_amp_mean,
-                'EPSP_slope_mean': EPSP_slope_mean,
-                'volley_amp_mean': volley_amp_mean,
-                'volley_slope_mean': volley_slope_mean
+                **means_dict  # Merge the means_dict into row_dict
             }
+        
             means_list.append(row_dict)
+    
         df_means_by_group = pd.DataFrame(means_list)
         # Sort by 'group_name' in reverse alphabetical order
         df_means_by_group = df_means_by_group.sort_values(by='group_name', ascending=False)
         df_means_by_group.to_clipboard(index=False)
-
         
+
     def export_selection(self): # WARNING! Experimental feature for very specific use-cases. TODO: generalize!
         if uistate.checkBox['bin']:
             print("export_selection of binned data, treated as IO - WARNING! Experimental feature for very specific use-cases.")
