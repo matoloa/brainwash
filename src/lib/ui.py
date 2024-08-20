@@ -1668,6 +1668,10 @@ class UIsub(Ui_MainWindow):
         self.actionRenameProject.triggered.connect(self.renameProject)
         self.actionRenameProject.setShortcut("Ctrl+R")
         self.menuFile.addAction(self.actionRenameProject)
+        self.actionExit = QtWidgets.QAction("Exit", self)
+        self.actionExit.triggered.connect(QtWidgets.qApp.quit)
+        # self.actionExit.setShortcut("Ctrl+Q")  # Set shortcut for Exit
+        self.menuFile.addAction(self.actionExit)
 
         # Edit menu
         #self.actionUndo = QtWidgets.QAction("Undo", self) # TODO: Implement undo
