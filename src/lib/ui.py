@@ -1161,7 +1161,7 @@ class UIsub(Ui_MainWindow):
 
 
 ##################################################################
-#    WIP section: TODO: move to appropriate header               #
+#    Temporary functions for David's project - TODO: Purge       #
 ##################################################################
     
     def export_means(self):
@@ -1313,6 +1313,13 @@ class UIsub(Ui_MainWindow):
                 print(f"Calling create_scatterplot for {len(dict_rec_legend_color_df)} dataframes with aspects {x_aspect} and {y_aspect}")
                 uiplot.create_scatterplot(dict_rec_legend_color_df, x_aspect, y_aspect, dd_r_lines, output_path)
 
+
+
+##################################################################
+#    WIP section: TODO: move to appropriate header               #
+##################################################################
+
+
     def binSweeps(self):
         print("binSweeps - later on, this is to bin only the selected recording: now it does nothing and should be hidden")
 
@@ -1427,7 +1434,7 @@ class UIsub(Ui_MainWindow):
 
     def darkmode(self):
         if uistate.darkmode:
-            self.mainwindow.setStyleSheet("background-color: #333; color: #fff;")
+            self.mainwindow.setStyleSheet("background-color: #2A2A2A; color: #fff;")
             self.tableProj.setStyleSheet("""
                 QTableView::item:selected {
                     background-color: #555;
@@ -1442,6 +1449,7 @@ class UIsub(Ui_MainWindow):
                     color: #FFF;
                 }
             """)
+       
         else:
             self.mainwindow.setStyleSheet("")
             self.tableProj.setStyleSheet("")
@@ -3156,11 +3164,13 @@ class UIsub(Ui_MainWindow):
                 dfoutput = self.get_dfoutput(p_row, reset=True)
                 self.persistOutput(p_row['recording_name'], dfoutput)
         if p_row is None: # apply to all recordings
+            print (f"set_uniformTimepoints for all recordings")
             for _, p_row in self.get_df_project().iterrows():
                 df_t = self.get_dft(p_row)
                 dfoutput = self.get_dfoutput(p_row)
                 use_t_from_stim_with_max(p_row, df_t, dfoutput, 'EPSP_slope')
         else:
+            print (f"set_uniformTimepoints for {p_row['recording_name']}")
             if df_t is None or dfoutput is None:
                 df_t = self.get_dft(p_row)
                 dfoutput = self.get_dfoutput(p_row)

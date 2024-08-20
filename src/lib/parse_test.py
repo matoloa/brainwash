@@ -268,6 +268,7 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
     """
     * receives a df of project data file paths built in ui
         files that are already parsed are to be overwritten (ui.py passes filitered list of unparsed files)
+    * checks for or creates project parsed files folder
     * creates a datafile by unique source file/channel/stim combination
     * Stim defaults to a and b
     * saves two files:
@@ -340,13 +341,11 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
         nchannels = df.channel.nunique()
         sweep_duration = df.time.nunique()
 
-        print(f" - - nchannels: {nchannels}, nstims: {nstims}, sweep_duration: {sweep_duration}")
-
         # TODO: Why is this copied?
         dfcopy = df.copy()
         dfcopy = dfcopy.sort_values(by=['datetime', 'channel']).reset_index(drop=True)
         dfcopy['sweep_raw'] = dfcopy.index.to_numpy() // (sweep_duration * nchannels)
-        print (f" - - dfcopy: {dfcopy}")
+
         for channel in dfcopy.channel.unique():
             df_ch = dfcopy[dfcopy.channel==channel]
             for i, stim in enumerate(list_stims):
@@ -355,15 +354,11 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
                 if filetype == "abf": # split df by % nstims
                     df_ch_st = df_ch.loc[df_ch.sweep_raw % nstims == i].copy()
                     df_ch_st['sweep'] = (df_ch_st.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
-                elif filetype == "ibw":
-                    if False: # split df; time < 0.5 is stim a, time >= 0.5 is stim b
-                        # TODO: This is a stupid approach; don't split the data before the stims are placed!
-                        if stim == "a":
-                            df_ch_st = dfcopy.loc[dfcopy.time < 0.25].copy()
-                        if stim == "b":
-                            df_ch_st = dfcopy.loc[dfcopy.time >= 0.5].copy()  
-                    else:
-                        df_ch_st = dfcopy.copy()
+                elif filetype == "ibw": # split df; time < 0.5 is stim a, time >= 0.5 is stim b
+                    if stim == "a":
+                        df_ch_st = dfcopy.loc[dfcopy.time < 0.25].copy()
+                    if stim == "b":
+                        df_ch_st = dfcopy.loc[dfcopy.time >= 0.5].copy()  
                     df_ch_st['sweep'] = df_ch_st.sweep_raw
                 df_ch_st.drop(columns=['channel'], inplace=True)
                 print(f"nunique: {df_ch_st['sweep'].nunique()}")
@@ -404,7 +399,7 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
 
 
 # %%
-if __name__ == "__main__":
+if False: # __name__ == "__main__":  # hardcoded testbed to work with Brainwash Data Source 2023-05-12 on Linux
     source_folder = Path.home() / "Documents/Brainwash Data Source/"
     dict_folders = {'project': Path.home() / "Documents/Brainwash Projects/standalone_test"}
     dict_folders['data'] = dict_folders['project'] / "data"
@@ -420,31 +415,66 @@ if __name__ == "__main__":
     #list_sources = [str(source_folder / "abf 1 channel/A_24_P0630-D4")]
     #list_sources = [str(source_folder / "abf Ca trains/03 PT 10nM TTX varied Stim/2.8MB - PT/2023_07_18_0006.abf")]
     #list_sources = [r"K:\Brainwash Data Source\Rong Samples\SameTime"]
-    list_sources = [r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_1.ibw",
-    #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_2.ibw",
-    #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_25.ibw",
-                    ]
-
-        
+    list_sources = [r"K:\Brainwash Data Source\Rong Samples\Good uniform"]
+    
     for _ in range(3):
         print()
     print("", "*** parse.py standalone test: ***")
     t0 = time.time()
     
     for item in tqdm(list_sources):
-        df = parse_ibw(item)
-        print(df)
         if Path(item).is_dir():
             recording_name = os.path.basename(item)
         else:
             recording_name = os.path.basename(os.path.dirname(item))
         print(" - processing", item, "as recording_name", recording_name)
         df_files = pd.DataFrame({"path": [item], "recording_name": [recording_name]})
-        dict_data_nsweeps = parseProjFiles(dict_folders=dict_folders, df=df_files, single_stim=True)
+        dict_data_nsweeps = parseProjFiles(dict_folders=dict_folders, df=df_files, single_stim=False)
         print(f" - dict_data_nsweeps: {dict_data_nsweeps}") # what the parsed file turned into
-        data_file_path = dict_folders['data'] / f"{recording_name}_Ch0_a.csv"
-        parsed_df = pd.read_csv(data_file_path)
     t1 = time.time()
     print(f'time elapsed: {t1-t0} seconds')
     print()
+
+# %%
+source_folder = Path.home() / "Documents/Brainwash Data Source/"
+dict_folders = {'project': Path.home() / "Documents/Brainwash Projects/standalone_test"}
+dict_folders['data'] = dict_folders['project'] / "data"
+dict_folders['cache'] = dict_folders['project'] / "cache"
+dict_folders['project'].mkdir(exist_ok=True)
+list_sources = [r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_1.ibw",
+#                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_2.ibw",
+#                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_25.ibw",
+               ]
+
+for _ in range(3):
+    print()
+print("", "*** parse.py standalone test: ***")
+t0 = time.time()
+
+for item in tqdm(list_sources):
+    df = parse_ibw(item)
+    print(df)
+    if Path(item).is_dir():
+        recording_name = os.path.basename(item)
+    else:
+        recording_name = os.path.basename(os.path.dirname(item))
+    print(" - processing", item, "as recording_name", recording_name)
+    df_files = pd.DataFrame({"path": [item], "recording_name": [recording_name]})
+    dict_data_nsweeps = parseProjFiles(dict_folders=dict_folders, df=df_files)
+
+    data_file_path = dict_folders['data'] / f"{recording_name}.csv"
+    parsed_df = pd.read_csv(data_file_path)
+    print(parsed_df)
+
+# %%
+# Group by 'time' and 'sweep', then count the occurrences
+#duplicates = df.groupby(['time', 'sweep']).size()
+duplicates = df.groupby(['channel']).size()
+
+# Filter counts greater than 1 to find duplicates
+duplicates = duplicates[duplicates > 1]
+
+# Print the number of duplicate rows
+print(f'Number of duplicate rows: {duplicates.sum()}')
+
 # %%
