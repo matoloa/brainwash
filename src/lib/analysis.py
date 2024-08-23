@@ -556,13 +556,46 @@ def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
 
 # %%
 ''' Standalone test:'''
+default_dict_t = { # default values for df_t(imepoints)
+    'stim': 0,
+    't_stim': 0,
+    't_stim_method': 0,
+    't_stim_params': 0,
+    't_volley_slope_width': 0.0003,
+    't_volley_slope_halfwidth': 0.0001,
+    't_volley_slope_start': 0,
+    't_volley_slope_end': 0,
+    't_volley_slope_method': 'auto detect',
+    't_volley_slope_params': 'NA',
+    'volley_slope_mean': 0,
+    't_volley_amp': 0,
+    't_volley_amp_halfwidth': 0,
+    't_volley_amp_method': 'auto detect',
+    't_volley_amp_params': 'NA',
+    'volley_amp_mean': 0,
+    't_VEB': 0,
+    't_VEB_method': 0,
+    't_VEB_params': 0,
+    't_EPSP_slope_width': 0.0007,
+    't_EPSP_slope_halfwidth': 0.0003,
+    't_EPSP_slope_start': 0,
+    't_EPSP_slope_end': 0,
+    't_EPSP_slope_method': 'auto detect',
+    't_EPSP_slope_params': 'NA',
+    't_EPSP_amp': 0,
+    't_EPSP_amp_halfwidth': 0,
+    't_EPSP_amp_method': 'auto detect',
+    't_EPSP_amp_params': 'NA',
+    'norm_output_from': 0,
+    'norm_output_to': 0,
+}
 if __name__ == "__main__":
     from pathlib import Path
     #path_filterfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_filter.csv")
     #dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file
-    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/PT_Ch0_a_mean.csv")
+    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/Good recording_Ch0_a_mean.csv")
     print(f"\n\n\nRunning as main: standalone test of {str(path_meanfile)}")
     dfmean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
     #dfmean['tris'] = dfmean.bis.rolling(3, center=True).mean().diff()
-    list_dict_t = find_all_t(dfmean, volley_slope_halfwidth=0.0001, EPSP_slope_halfwidth=0.0003)
+    list_dict_t = find_all_t(dfmean, default_dict_t=default_dict_t)
     print(list_dict_t)
