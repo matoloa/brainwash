@@ -974,7 +974,7 @@ class Filetreesub(Ui_Dialog):
         dfAdd['recording_name'] = names
         self.dfAdd = dfAdd
         # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
-        # TODO: names that have been set manually are stored a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)
+        # TODO: names that have been set manually are stored as a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)
         # format tableView
         header = self.tableView.horizontalHeader()
         self.tableView.setColumnHidden(0, True)  # host
