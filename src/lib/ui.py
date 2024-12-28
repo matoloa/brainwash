@@ -1812,10 +1812,10 @@ class UIsub(Ui_MainWindow):
 
     def build_dict_folders(self):
         dict_folders = {
-                    'project': self.projects_folder / self.projectname,
-                    'data': self.projects_folder / self.projectname / 'data',
-                    'timepoints': self.projects_folder / self.projectname / 'timepoints',
-                    'cache': self.projects_folder / f'cache {config.version}' / self.projectname,
+                    'project': self.projects_folder / self.projectname,                             # path to project folder
+                    'data': self.projects_folder / self.projectname / 'data',                       # path to project data subfolder
+                    'timepoints': self.projects_folder / self.projectname / 'timepoints',           # path to project timepoints subfolder
+                    'cache': self.projects_folder / f'cache {config.version}' / self.projectname,   # path to project cache subfolder
         }
         return dict_folders
     
@@ -2571,8 +2571,8 @@ class UIsub(Ui_MainWindow):
             if widget:
                 print(f"Removing widget {widget_name}")
                 widget.deleteLater()
-            else:
-                print(f"Widget {widget_name} not found.")
+            # else:
+            #     print(f"Widget {widget_name} not found.")
             # get the action named actionAddTo_{group} and remove it
             action = getattr(self, f"actionAddTo_{str_ID}", None)
             if action:

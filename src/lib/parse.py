@@ -264,6 +264,94 @@ def persistdf(file_base, dict_folders, dfdata=None, dfmean=None, dffilter=None):
         dffilter.to_csv(str_mean_path, index=False)
 
 
+def sampleFiles(source_path, sweep=0, force_sample=False):
+    """
+    WIP
+
+    * Returns a dict of statistics from metadata if available, otherwise as measured from a sweep in the source
+        source_path: Path to source file or folder
+        sweep: use this sweep to create metadata, if available
+        force_sample: analyze the first sweep in the source, regardless of metadata
+    """
+
+    def sampler(source_path):
+        df = None
+        dict_data = {}
+        if verbose:
+            print(f" - parser, source_path: {source_path}")
+        if False: #Path(source_path).is_dir(): # TODO: 
+            # check contents of folder: .ibw or .abf
+            list_files = [i for i in os.listdir(source_path) if -1 < i.find(".ibw") or -1 < i.find(".abf")]
+            filetype = None
+            if -1 < list_files[0].find(".abf"):
+                filetype = "abf"
+            elif -1 < list_files[0].find(".ibw"):
+                filetype = "ibw"
+            if filetype is None:
+                raise ValueError(f" - - no supported files found in {source_path}")
+
+            if filetype == "abf":
+                df = parse_abfFolder(folderpath=Path(source_path))
+            elif filetype == "ibw":
+                df = parse_ibwFolder(folder=Path(source_path))#, dev=True)
+        else:
+            # set filetype to last 3 letters of filename
+            filetype = source_path[-3:]
+            if filetype == "csv":
+                df = pd.read_csv(source_path)
+                dict_metadata = {
+                    'nsweeps': df['sweep'].nunique(),
+                    # channel is what comes after the last Ch in the filename, and ends before the first _
+                    'channel': source_path.split("Ch")[-1].split("_")[0],
+                    # stim is the last letter in the filename, before the .csv
+                    'stim': source_path.split("_")[-1].split(".")[0],
+                    # sweep_duration is the difference between the highest and the lowest time in the file
+                    'sweep_duration': df['time'].max() - df['time'].min(),
+                    # resets is a list of sweep numbers with sweep_raw == 0, indicating recording breaks
+                    'resets': df[(df['sweep_raw'] == df['sweep_raw'].min()) & (df['time'] == 0)]['sweep'].tolist()[1:]
+                    }
+                # TODO: Add checks for csv files; must be brainwash formatted!
+                return dict_metadata
+            elif filetype == "abf":
+                df = parse_abf(filepath=Path(source_path))
+            elif filetype == "ibw":
+                df = parse_ibw(filepath=Path(source_path))
+            if df is None:
+                raise ValueError(f" - - no supported files found in {source_path}")
+            # make a df first, then sample it
+            dict_metadata = {"nsweeps": None,
+                            "channels": None,
+                            "stims": None, 
+                            "sweep_duration": None,}
+            return dict_metadata
+
+    dict_metadata = sampler(source_path=source_path)
+    return dict_metadata
+
+
+
+def projectFiles(source_path, keep_non_stim_data=False):
+    """
+    WIP
+
+    * Returns a dict of {"<recording_name>_Ch<Ch>_<Stim>": df} for updating df_project recording names
+        source_path: Path to source file or folder
+        keep_non_stim_data: override default behavior of discarding data from the non-stimmed channel
+
+
+    NTH: checks if file is already parsed by checksums
+    """
+    # Name of the recording, either the name of the folder or the name of the file
+    if Path(source_path).is_dir():
+        recording_name = os.path.basename(source_path)
+    else:
+        recording_name = os.path.basename(os.path.dirname(source_path))
+    # later, update with separate channels and stims if required
+
+    dict_rec_data = {recording_name: "df"}
+    return dict_rec_data
+
+
 def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None, single_stim=False):
     """
     * receives a df of project data file paths built in ui
@@ -420,7 +508,9 @@ if __name__ == "__main__":
     #list_sources = [str(source_folder / "abf 1 channel/A_24_P0630-D4")]
     #list_sources = [str(source_folder / "abf Ca trains/03 PT 10nM TTX varied Stim/2.8MB - PT/2023_07_18_0006.abf")]
     #list_sources = [r"K:\Brainwash Data Source\Rong Samples\SameTime"]
-    list_sources = [r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_1.ibw",
+    list_sources = [
+                     r"K:\Brainwash Data Source\csv\A_21_P0701-S2_Ch0_a.csv",
+    #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_1.ibw",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_2.ibw",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_25.ibw",
                     ]
@@ -432,18 +522,22 @@ if __name__ == "__main__":
     t0 = time.time()
     
     for item in tqdm(list_sources):
-        df = parse_ibw(item)
-        print(df)
         if Path(item).is_dir():
             recording_name = os.path.basename(item)
         else:
             recording_name = os.path.basename(os.path.dirname(item))
         print(" - processing", item, "as recording_name", recording_name)
-        df_files = pd.DataFrame({"path": [item], "recording_name": [recording_name]})
-        dict_data_nsweeps = parseProjFiles(dict_folders=dict_folders, df=df_files, single_stim=True)
-        print(f" - dict_data_nsweeps: {dict_data_nsweeps}") # what the parsed file turned into
-        data_file_path = dict_folders['data'] / f"{recording_name}_Ch0_a.csv"
-        parsed_df = pd.read_csv(data_file_path)
+        dict_metadata = sampleFiles(item)
+        print(f" - dict_metadata: {dict_metadata}")
+
+        if False:
+            df = parse_ibw(item)
+            print(df)
+            df_files = pd.DataFrame({"path": [item], "recording_name": [recording_name]})
+            dict_data_nsweeps = parseProjFiles(dict_folders=dict_folders, df=df_files, single_stim=True)
+            print(f" - dict_data_nsweeps: {dict_data_nsweeps}") # what the parsed file turned into
+            data_file_path = dict_folders['data'] / f"{recording_name}_Ch0_a.csv"
+            parsed_df = pd.read_csv(data_file_path)
     t1 = time.time()
     print(f'time elapsed: {t1-t0} seconds')
     print()
