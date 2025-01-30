@@ -40,137 +40,6 @@ def build_experimentcsv(dir_gen_data):
     return dfmetadata
 
 
-def parse_abf(filepath):
-    """
-    read .abf and return dataframe with proper SI units
-    """
-    # parse abf
-    abf = pyabf.ABF(filepath)
-    #with open(filepath, "r+b") as f:
-    #    mmap_file=mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-    #    abf = pyabf.ABF(mmap_file)
-    channels = range(abf.channelCount)
-    sweeps = range(abf.sweepCount)
-    sampling_Hz = abf.sampleRate
-    n_rows_in_channel = len(abf.getAllXs()) # defaults to 0
-    if verbose:
-        print(f"abf.channelCount: {channels}")
-        print(f"abf.sweepCount): {sweeps}")
-        print(f"abf.sampleRate): {sampling_Hz}")
-        print (f"n_rows_in_channel {n_rows_in_channel}")
-
-    # build df
-    dfs = []
-    for j in channels:
-        sweepX = np.tile(abf.getAllXs(j)[:abf.sweepPointCount], abf.sweepCount)
-        t0 = np.repeat(abf.sweepTimesSec, len(sweepX) // abf.sweepCount)
-        sweepY = abf.getAllYs(j)
-        df = pd.DataFrame({"sweepX": sweepX, "sweepY": sweepY, "t0": t0})
-        df['channel'] = j
-        dfs.append(df)
-    df = pd.concat(dfs)
-    # Convert to SI
-    df['time'] = df.sweepX  # time in seconds from start of sweep recording
-    df['voltage_raw'] = df.sweepY / 1000  # mv to V
-    # Absolute date and time
-    df['timens'] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
-    df['datetime'] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
-    df.drop(columns=['sweepX', 'sweepY', 'timens'], inplace=True)
-    df.reset_index(drop=True, inplace=True)
-    return df
-
-
-# %%
-def parse_abfFolder(folderpath):
-    """
-    Read, sort (by filename) and concatenate all .abf files in folderpath to a single df
-    """
-    list_files = sorted([i for i in os.listdir(folderpath) if -1 < i.find(".abf")])  # [:2] # stop before item 2 [begin:end]
-    if verbose:
-        print(f"list_files: {list_files}")
-    listdf = []
-    for filename in list_files:
-        df = parse_abf(folderpath / filename)
-        listdf.append(df)
-    df = pd.concat(listdf)
-    df.reset_index(drop=True, inplace=True)
-    # Check first timestamp in each df, verify correct sequence, raise error
-    df['datetime'] = pd.to_datetime(df.datetime)
-    return df
-
-
-def ibw_read(file):
-    ibw = igor.binarywave.load(file)
-    timestamp = ibw['wave']['wave_header']['creationDate']
-    meta_sfA = ibw['wave']['wave_header']['sfA']
-    array = ibw['wave']['wData']
-    return {'timestamp': timestamp, 'meta_sfA': meta_sfA, 'array': array}
-
-
-def parse_ibwFolder(folder, dev=False): # igor2, para
-    files = sorted(list(folder.glob('*.ibw')))
-    if dev:
-        files = files[:100]
-    results = Parallel(n_jobs=-1)(delayed(ibw_read)(file) for file in tqdm(files))
-    keys = results[0].keys()
-    res = {}
-    for key in keys:
-        res[key] = [i[key] for i in results]
-    timesteps = res['meta_sfA']
-    arrays = np.vstack(res['array'])
-    timestamps = res['timestamp']       
-
-    seconds = (pd.to_datetime("1970-01-01") - pd.to_datetime("1900-01-01")).total_seconds()
-    timestamp_array = (np.array(timestamps)-seconds)
-    measurement_start = min(timestamp_array)
-    timestamp_array -= measurement_start
-    voltage_raw = np.vstack(arrays)
-    df = pd.DataFrame(data=voltage_raw, index=timestamp_array)
-    timestep = timesteps[0][0]
-    num_columns = voltage_raw.shape[1]
-    df.columns = np.round(np.arange(num_columns) * timestep, int(-np.log(timestep))).tolist()
-    df = df.stack().reset_index()
-    df.columns = ['t0', 'time', 'voltage_raw']
-    df.t0 = df.t0.astype("float64")
-    df.time = df.time.astype("float64")
-    df['datetime'] = pd.to_datetime((measurement_start + df.t0 + df.time), unit="s").round("us")
-    df['channel'] = 0
-
-    return df
-
-def parse_ibw(filepath, dev=False): # igor2, para
-    files = [Path(filepath)] # TODO: EVERY attempt to read just one filepath, without what should be superfluous lists, have failed in unresolvable mismatch errors
-    for file in files:
-        if not file.exists():
-            raise FileNotFoundError(f"No such file: '{file}'")
-    results = Parallel(n_jobs=-1)(delayed(ibw_read)(file) for file in tqdm(files))
-    keys = results[0].keys()
-    res = {}
-    for key in keys:
-        res[key] = [i[key] for i in results]
-    timesteps = res['meta_sfA']
-    arrays = np.vstack(res['array'])
-    timestamps = res['timestamp']       
-
-    seconds = (pd.to_datetime("1970-01-01") - pd.to_datetime("1900-01-01")).total_seconds()
-    timestamp_array = (np.array(timestamps)-seconds)
-    measurement_start = min(timestamp_array)
-    timestamp_array -= measurement_start
-    voltage_raw = np.vstack(arrays)
-    df = pd.DataFrame(data=voltage_raw, index=timestamp_array)
-    timestep = timesteps[0][0]
-    num_columns = voltage_raw.shape[1]
-    df.columns = np.round(np.arange(num_columns) * timestep, int(-np.log(timestep))).tolist()
-    df = df.stack().reset_index()
-    df.columns = ['t0', 'time', 'voltage_raw']
-    df.t0 = df.t0.astype("float64")
-    df.time = df.time.astype("float64")
-    df['datetime'] = pd.to_datetime((measurement_start + df.t0 + df.time), unit="s").round("us")
-    df['channel'] = 0
-
-    return df
-
-
 # %%
 def build_dfmean(dfdata, rollingwidth=3):
     print("build_dfmean")
@@ -264,10 +133,10 @@ def persistdf(file_base, dict_folders, dfdata=None, dfmean=None, dffilter=None):
         dffilter.to_csv(str_mean_path, index=False)
 
 
-def sampleFiles(source_path, sweep=0, force_sample=False):
+def metaData(source_path, sweep=0, force_sample=False):
     """
     WIP
-
+    Usage: called by parse.metaData from ui.py
     * Returns a dict of statistics from metadata if available, otherwise as measured from a sweep in the source
         source_path: Path to source file or folder
         sweep: use this sweep to create metadata, if available
@@ -276,7 +145,6 @@ def sampleFiles(source_path, sweep=0, force_sample=False):
 
     def sampler(source_path):
         df = None
-        dict_data = {}
         if verbose:
             print(f" - parser, source_path: {source_path}")
         if False: #Path(source_path).is_dir(): # TODO: 
@@ -306,14 +174,12 @@ def sampleFiles(source_path, sweep=0, force_sample=False):
                     # stim is the last letter in the filename, before the .csv
                     'stim': source_path.split("_")[-1].split(".")[0],
                     # sweep_duration is the difference between the highest and the lowest time in the file
-                    'sweep_duration': df['time'].max() - df['time'].min(),
-                    # resets is a list of sweep numbers with sweep_raw == 0, indicating recording breaks
-                    'resets': df[(df['sweep_raw'] == df['sweep_raw'].min()) & (df['time'] == 0)]['sweep'].tolist()[1:]
-                    }
+                    'sweep_duration': df['time'].max() - df['time'].min(),}
                 # TODO: Add checks for csv files; must be brainwash formatted!
                 return dict_metadata
             elif filetype == "abf":
-                df = parse_abf(filepath=Path(source_path))
+                dict_metadata = sample_abf(source_path)
+                return dict_metadata
             elif filetype == "ibw":
                 df = parse_ibw(filepath=Path(source_path))
             if df is None:
@@ -329,31 +195,221 @@ def sampleFiles(source_path, sweep=0, force_sample=False):
     return dict_metadata
 
 
+def ibw_read(file):
+    ibw = igor.binarywave.load(file)
+    timestamp = ibw['wave']['wave_header']['creationDate']
+    meta_sfA = ibw['wave']['wave_header']['sfA']
+    array = ibw['wave']['wData']
+    return {'timestamp': timestamp, 'meta_sfA': meta_sfA, 'array': array}
 
-def projectFiles(source_path, keep_non_stim_data=False):
+
+def parse_ibwFolder(folder, dev=False): # igor2, para
+    files = sorted(list(folder.glob('*.ibw')))
+    if dev:
+        files = files[:100]
+    results = Parallel(n_jobs=-1)(delayed(ibw_read)(file) for file in tqdm(files))
+    keys = results[0].keys()
+    res = {}
+    for key in keys:
+        res[key] = [i[key] for i in results]
+    timesteps = res['meta_sfA']
+    arrays = np.vstack(res['array'])
+    timestamps = res['timestamp']       
+
+    seconds = (pd.to_datetime("1970-01-01") - pd.to_datetime("1900-01-01")).total_seconds()
+    timestamp_array = (np.array(timestamps)-seconds)
+    measurement_start = min(timestamp_array)
+    timestamp_array -= measurement_start
+    voltage_raw = np.vstack(arrays)
+    df = pd.DataFrame(data=voltage_raw, index=timestamp_array)
+    timestep = timesteps[0][0]
+    num_columns = voltage_raw.shape[1]
+    df.columns = np.round(np.arange(num_columns) * timestep, int(-np.log(timestep))).tolist()
+    df = df.stack().reset_index()
+    df.columns = ['t0', 'time', 'voltage_raw']
+    df.t0 = df.t0.astype("float64")
+    df.time = df.time.astype("float64")
+    df['datetime'] = pd.to_datetime((measurement_start + df.t0 + df.time), unit="s").round("us")
+    df['channel'] = 0
+
+    return df
+
+def parse_ibw(filepath, dev=False): # igor2, para
+    files = [Path(filepath)] # TODO: EVERY attempt to read just one filepath, without what should be superfluous lists, have failed in unresolvable mismatch errors
+    for file in files:
+        if not file.exists():
+            raise FileNotFoundError(f"No such file: '{file}'")
+    results = Parallel(n_jobs=-1)(delayed(ibw_read)(file) for file in tqdm(files))
+    keys = results[0].keys()
+    res = {}
+    for key in keys:
+        res[key] = [i[key] for i in results]
+    timesteps = res['meta_sfA']
+    arrays = np.vstack(res['array'])
+    timestamps = res['timestamp']       
+
+    seconds = (pd.to_datetime("1970-01-01") - pd.to_datetime("1900-01-01")).total_seconds()
+    timestamp_array = (np.array(timestamps)-seconds)
+    measurement_start = min(timestamp_array)
+    timestamp_array -= measurement_start
+    voltage_raw = np.vstack(arrays)
+    df = pd.DataFrame(data=voltage_raw, index=timestamp_array)
+    timestep = timesteps[0][0]
+    num_columns = voltage_raw.shape[1]
+    df.columns = np.round(np.arange(num_columns) * timestep, int(-np.log(timestep))).tolist()
+    df = df.stack().reset_index()
+    df.columns = ['t0', 'time', 'voltage_raw']
+    df.t0 = df.t0.astype("float64")
+    df.time = df.time.astype("float64")
+    df['datetime'] = pd.to_datetime((measurement_start + df.t0 + df.time), unit="s").round("us")
+    df['channel'] = 0
+
+    return df
+
+def parse_csv(source_path, recording_name=None):
     """
-    WIP
-
-    * Returns a dict of {"<recording_name>_Ch<Ch>_<Stim>": df} for updating df_project recording names
-        source_path: Path to source file or folder
-        keep_non_stim_data: override default behavior of discarding data from the non-stimmed channel
-
-
-    NTH: checks if file is already parsed by checksums
+        WIP: called by dataFile, assumes a Brainwash formatted csv file for now
+        It is therefore currently the only parser that does not return a raw dataframe
     """
-    # Name of the recording, either the name of the folder or the name of the file
-    if Path(source_path).is_dir():
-        recording_name = os.path.basename(source_path)
-    else:
+    if recording_name is None:
         recording_name = os.path.basename(os.path.dirname(source_path))
-    # later, update with separate channels and stims if required
 
-    dict_rec_data = {recording_name: "df"}
-    return dict_rec_data
+    df = pd.read_csv(source_path)
+    dict_meta = {
+        'recording_name': recording_name,
+        'nsweeps': df['sweep'].nunique(),
+        # channel is what comes after the last Ch in the filename, and ends before the first _
+        'channel': source_path.split("Ch")[-1].split("_")[0],
+        # stim is the last letter in the filename, before the .csv
+        'stim': source_path.split("_")[-1].split(".")[0],
+        # sweep_duration is the difference between the highest and the lowest time in the file
+        'sweep_duration': df['time'].max() - df['time'].min(),
+        # recorded y:s per second
+        'sampling_rate': (df['time'].nunique() - 1) / (df['time'].max() - df['time'].min()),
+        # reset is the first sweep number after every sweep_raw reset: finds recording breaks for display purposes
+        'resets': df[(df['sweep_raw'] == df['sweep_raw'].min()) & (df['time'] == 0)]['sweep'].tolist()[1:],
+    }
+    return [(dict_meta, df)]
+
+def parse_abf(filepath):
+    """
+    read .abf and return dataframe with proper SI units
+    """
+    # parse abf
+    abf = pyabf.ABF(filepath)
+    #with open(filepath, "r+b") as f:
+    #    mmap_file=mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+    #    abf = pyabf.ABF(mmap_file)
+    channels = range(abf.channelCount)
+    sweeps = range(abf.sweepCount)
+    sampling_Hz = abf.sampleRate
+    n_rows_in_channel = len(abf.getAllXs()) # defaults to 0
+    if verbose:
+        print(f"abf.channelCount: {channels}")
+        print(f"abf.sweepCount): {sweeps}")
+        print(f"abf.sampleRate): {sampling_Hz}")
+        print (f"n_rows_in_channel {n_rows_in_channel}")
+
+    # build df
+    dfs = []
+    for j in channels:
+        sweepX = np.tile(abf.getAllXs(j)[:abf.sweepPointCount], abf.sweepCount)
+        t0 = np.repeat(abf.sweepTimesSec, len(sweepX) // abf.sweepCount)
+        sweepY = abf.getAllYs(j)
+        df = pd.DataFrame({"sweepX": sweepX, "sweepY": sweepY, "t0": t0})
+        df['channel'] = j
+        dfs.append(df)
+    df = pd.concat(dfs)
+    # Convert to SI
+    df['time'] = df.sweepX  # time in seconds from start of sweep recording
+    df['voltage_raw'] = df.sweepY / 1000  # mv to V
+    # Absolute date and time
+    df['timens'] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
+    df['datetime'] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
+    df.drop(columns=['sweepX', 'sweepY', 'timens'], inplace=True)
+    df.reset_index(drop=True, inplace=True)
+    return df
+
+
+def sample_abf(filepath):
+    """
+    Extracts channelCount, sweepCount and sweep duration from an .abf file
+    """
+    filepath = Path(filepath)
+    abf = pyabf.ABF(filepath)
+    channel_count = abf.channelCount
+    sweep_count = abf.sweepCount
+    sample_rate = abf.sampleRate
+    sweep_duration = len(abf.getAllXs()) / sample_rate  # duration in seconds
+    dict_metadata = {
+        "channel_count": channel_count,
+        "sweep_count": sweep_count,
+        "sample_rate": sample_rate, # TODO: implement sample_rate, for listing in df_project
+        "sweep_duration": sweep_duration
+    }
+    return dict_metadata
+
+
+# %%
+def parse_abfFolder(folderpath):
+    """
+    Read, sort (by filename) and concatenate all .abf files in folderpath to a single df
+    """
+    list_files = sorted([i for i in os.listdir(folderpath) if -1 < i.find(".abf")])  # [:2] # stop before item 2 [begin:end]
+    if verbose:
+        print(f"list_files: {list_files}")
+    listdf = []
+    for filename in list_files:
+        df = parse_abf(folderpath / filename)
+        listdf.append(df)
+    df = pd.concat(listdf)
+    df.reset_index(drop=True, inplace=True)
+    # Check first timestamp in each df, verify correct sequence, raise error
+    df['datetime'] = pd.to_datetime(df.datetime)
+    return df
+
+
+
+def dataFile(source_path, recording_name=None, keep_non_stim_data=False):
+    """
+    Usage: called by parse.dataFile from ui.py
+    Identifies type of file, and calls the appropriate parser
+    source_path: Path to source file or folder
+    recording_name: use to force a recording name
+    keep_non_stim_data: override default behavior of discarding data from the non-stimmed channel
+
+    Returns a list of tuples: [(dict_meta, df_raw), (dict_meta, df_raw), ...]
+        Must be a list, as there may be multiple channels and stims in a single file or folder
+        dict_meta: {
+            "recording_name": "<recording_name>_Ch<Ch>_<Stim>"
+            "nsweeps": number of sweeps in the recording
+            "channel": channel number
+            "stim": stim letter (A or B, for now) # TODO: expand to generic stim names
+            "sweep_duration": duration of a sweep in seconds
+            "sampling_rate": sampling rate in Hz
+            "resets": list of sweep numbers where the recording was reset}
+        df is the data from the source file(s)
+        NTH: checks if file is already parsed by checksum in dict_meta
+    """
+    
+    # Determine file type and dispatch to the correct parser.
+    # TODO: Check how this handles folders
+    filetype = Path(source_path).suffix.lstrip(".").lower()
+    PARSERS = { # all parsers must return a LIST of tuples: [(dict_meta, df_raw), (dict_meta, df_raw), ...]
+        "csv": parse_csv,
+        "abf": parse_abf,
+        "ibw": parse_ibw,
+    }
+    if filetype not in PARSERS:
+        raise ValueError(f"Unsupported file type: {filetype}")
+
+    return PARSERS[filetype](source_path, recording_name=recording_name)
+
 
 
 def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None, single_stim=False):
     """
+    WIP: Still operation, called from ui.py - to be replaced by dataFile.
     * receives a df of project data file paths built in ui
         files that are already parsed are to be overwritten (ui.py passes filitered list of unparsed files)
     * creates a datafile by unique source file/channel/stim combination
@@ -363,8 +419,6 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
         dict_folders['cache']<recording_name>_Ch<Ch>_<Stim>_dfmean.csv
     
     returns a list of <recording_name>_Ch<Ch>_<Stim> for updating df_project recording names
-
-    NTH: checks if file is already parsed by checksums
     calls build_dfmean() to create an average, prim and bis file, per channel-stim combo
     """
     def parser(dict_folders, recording_name, source_path):
@@ -509,10 +563,11 @@ if __name__ == "__main__":
     #list_sources = [str(source_folder / "abf Ca trains/03 PT 10nM TTX varied Stim/2.8MB - PT/2023_07_18_0006.abf")]
     #list_sources = [r"K:\Brainwash Data Source\Rong Samples\SameTime"]
     list_sources = [
-                     r"K:\Brainwash Data Source\csv\A_21_P0701-S2_Ch0_a.csv",
+                    r"K:\Brainwash Data Source\csv\A_21_P0701-S2_Ch0_a.csv",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_1.ibw",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_2.ibw",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_25.ibw",
+    #                r"K:\Brainwash Data Source\abf 1 channel\A_21_P0701-S2\2022_07_01_0012.abf",
                     ]
 
         
@@ -527,9 +582,11 @@ if __name__ == "__main__":
         else:
             recording_name = os.path.basename(os.path.dirname(item))
         print(" - processing", item, "as recording_name", recording_name)
-        dict_metadata = sampleFiles(item)
-        print(f" - dict_metadata: {dict_metadata}")
-
+        list_tuple_data = dataFile(item)
+        for rec in list_tuple_data:
+            print(f" - rec: {rec[0]}")
+            print(rec[1])
+            print()
         if False:
             df = parse_ibw(item)
             print(df)

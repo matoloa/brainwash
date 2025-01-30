@@ -333,11 +333,13 @@ class ParseDataThread(QtCore.QThread):
         return df_proj_new_row
 
     def run(self):
+        '''Parse data from files, persist them as bw csv:s, and update df_p'''
         recording_names = {}
         for i, (_, df_proj_row) in enumerate(self.df_p_to_update.iterrows()):
             self.progress.emit(i)
             recording_name = df_proj_row['recording_name']
             source_path = df_proj_row['path']
+            # TODO OLD METHOD (DEPRECATE)
             dict_data = parse.parseProjFiles(dict_folders=self.dict_folders, recording_name=recording_name, source_path=source_path, single_stim=uistate.checkBox['force1stim'])
             for new_name, dict_sub in dict_data.items():
                 nsweeps = dict_sub.get('nsweeps', None) 
@@ -350,6 +352,12 @@ class ParseDataThread(QtCore.QThread):
                         recording_names[new_name] = 1
                     df_proj_new_row = self.create_new_row(df_proj_row, new_name, dict_sub)
                     self.rows.append(df_proj_new_row)
+            # TODO NEW METHOD (IMPLEMENT)
+            # iterate through a list of tuples (dict_meta, df_raw)
+            #list_tuple_data = parse.dataFile(source_path)
+            #for dict_meta, df_raw in list_tuple_data:
+                # Persist df_raw to disk
+                # Use returned metadata to update df_p
 
 class graphPreloadThread(QtCore.QThread):
     finished = QtCore.pyqtSignal()
