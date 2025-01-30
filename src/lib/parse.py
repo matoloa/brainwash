@@ -266,7 +266,7 @@ def parse_ibw(filepath, dev=False): # igor2, para
 
     return df
 
-def parse_csv(source_path, recording_name=None):
+def parse_csv(source_path, recording_name=None, keep_non_stim_data=False):
     """
         WIP: called by dataFile, assumes a Brainwash formatted csv file for now
         It is therefore currently the only parser that does not return a raw dataframe
@@ -291,44 +291,7 @@ def parse_csv(source_path, recording_name=None):
     }
     return [(dict_meta, df)]
 
-def parse_abf(filepath):
-    """
-    read .abf and return dataframe with proper SI units
-    """
-    # parse abf
-    abf = pyabf.ABF(filepath)
-    #with open(filepath, "r+b") as f:
-    #    mmap_file=mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-    #    abf = pyabf.ABF(mmap_file)
-    channels = range(abf.channelCount)
-    sweeps = range(abf.sweepCount)
-    sampling_Hz = abf.sampleRate
-    n_rows_in_channel = len(abf.getAllXs()) # defaults to 0
-    if verbose:
-        print(f"abf.channelCount: {channels}")
-        print(f"abf.sweepCount): {sweeps}")
-        print(f"abf.sampleRate): {sampling_Hz}")
-        print (f"n_rows_in_channel {n_rows_in_channel}")
 
-    # build df
-    dfs = []
-    for j in channels:
-        sweepX = np.tile(abf.getAllXs(j)[:abf.sweepPointCount], abf.sweepCount)
-        t0 = np.repeat(abf.sweepTimesSec, len(sweepX) // abf.sweepCount)
-        sweepY = abf.getAllYs(j)
-        df = pd.DataFrame({"sweepX": sweepX, "sweepY": sweepY, "t0": t0})
-        df['channel'] = j
-        dfs.append(df)
-    df = pd.concat(dfs)
-    # Convert to SI
-    df['time'] = df.sweepX  # time in seconds from start of sweep recording
-    df['voltage_raw'] = df.sweepY / 1000  # mv to V
-    # Absolute date and time
-    df['timens'] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
-    df['datetime'] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
-    df.drop(columns=['sweepX', 'sweepY', 'timens'], inplace=True)
-    df.reset_index(drop=True, inplace=True)
-    return df
 
 
 def sample_abf(filepath):
@@ -369,15 +332,81 @@ def parse_abfFolder(folderpath):
     return df
 
 
+def parse_abf(filepath, recording_name=None, keep_non_stim_data=False):
+    """
+    reads a .abf 
+    returns a list of tuples: [(dict_meta, df_raw), ...]
+    WIP: There is considerable postprocessing in the original code - channels and stims - which is not yet implemented here
+        df_ch_st = df_ch.loc[df_ch.sweep_raw % nstims == i].copy()
+        df_ch_st['sweep'] = (df_ch_st.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
+    """
+    if recording_name is None:
+        recording_name = os.path.basename(os.path.dirname(filepath))
+    abf = pyabf.ABF(filepath)
+    #with open(filepath, "r+b") as f:
+    #    mmap_file=mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+    #    abf = pyabf.ABF(mmap_file)
+    sweeps = range(abf.sweepCount)
+    # n_rows_in_channel = len(abf.getAllXs()) # defaults to 0
+    channels = range(abf.channelCount)
+
+    # 1) build one big concatenated dataframe
+    dfs = []
+    for j in channels:
+        sweepX = np.tile(abf.getAllXs(j)[:abf.sweepPointCount], abf.sweepCount)
+        t0 = np.repeat(abf.sweepTimesSec, len(sweepX) // abf.sweepCount)
+        sweepY = abf.getAllYs(j)
+        df = pd.DataFrame({"sweepX": sweepX, "sweepY": sweepY, "t0": t0})
+        df['channel'] = j
+        dfs.append(df)
+    df = pd.concat(dfs)
+    # 2) Convert to SI, absolute date and time
+    df['time'] = df.sweepX  # time in seconds from start of sweep recording
+    df['voltage_raw'] = df.sweepY / 1000  # mv to V
+    df['timens'] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
+    df['datetime'] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
+    df.drop(columns=['sweepX', 'sweepY', 'timens'], inplace=True)
+    # 3) Assumptions: 2 stims, for now
+    list_stims = ["a", "b"]
+    nstims = len(list_stims)
+    nchannels = df.channel.nunique()
+    sweep_duration = df.time.nunique()
+    df.sort_values(by=['datetime', 'channel'], inplace=True, ignore_index=True)
+    df['sweep_raw'] = df.index // (sweep_duration * nchannels)
+    # 4) split by channel and stim
+    list_tuple_data = []
+    for channel in df.channel.unique():
+        print(f" - channel: {channel}, nchannels: {nchannels}, nstims: {nstims}, sweep_duration: {sweep_duration}")
+        if keep_non_stim_data:
+            df_ch = df # TODO NOT TESTED!
+        else:
+            df_ch = df[df.channel==channel]
+        for i, stim in enumerate(list_stims):
+            full_recording_name = f"{recording_name}_Ch{channel}_{stim}"
+            df_ch_st = df_ch.loc[df_ch.sweep_raw % nstims == i].copy()
+            df_ch_st['sweep'] = (df_ch_st.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
+        df_raw = df
+        dict_meta = {
+            "recording_name": full_recording_name,
+            "channels": channels,
+            "nsweeps": sweeps,
+            "sweep_duration": len(abf.getAllXs()) / abf.sampleRate,
+            "sampling_rate": abf.sampleRate,
+            "resets": [],
+        }
+        # 4a) add tuple to list
+        list_tuple_data.append((dict_meta, df_raw))
+    return list_tuple_data
+
+
 
 def dataFile(source_path, recording_name=None, keep_non_stim_data=False):
     """
     Usage: called by parse.dataFile from ui.py
     Identifies type of file, and calls the appropriate parser
-    source_path: Path to source file or folder
-    recording_name: use to force a recording name
-    keep_non_stim_data: override default behavior of discarding data from the non-stimmed channel
-
+    * source_path: Path to source file or folder
+    * recording_name: use to force a recording name
+    * keep_non_stim_data: override default behavior of discarding data from the non-stimmed channel
     Returns a list of tuples: [(dict_meta, df_raw), (dict_meta, df_raw), ...]
         Must be a list, as there may be multiple channels and stims in a single file or folder
         dict_meta: {
@@ -388,22 +417,30 @@ def dataFile(source_path, recording_name=None, keep_non_stim_data=False):
             "sweep_duration": duration of a sweep in seconds
             "sampling_rate": sampling rate in Hz
             "resets": list of sweep numbers where the recording was reset}
-        df is the data from the source file(s)
-        NTH: checks if file is already parsed by checksum in dict_meta
+        df_raw is the data from the source file(s)
+    NTH: checks if file is already parsed by checksum in dict_meta
     """
-    
-    # Determine file type and dispatch to the correct parser.
-    # TODO: Check how this handles folders
-    filetype = Path(source_path).suffix.lstrip(".").lower()
-    PARSERS = { # all parsers must return a LIST of tuples: [(dict_meta, df_raw), (dict_meta, df_raw), ...]
+    path = Path(source_path)
+    # Check if source_path is a folder
+    if path.is_dir(): # TODO: currently, presence of a single .abf overrides .ibw
+        files = [f for f in path.iterdir() if f.is_file()]
+        abf_files = [f for f in files if f.suffix.lstrip(".").lower() == "abf"]
+        if abf_files:
+            return parse_abfFolder(path, recording_name=recording_name)
+        ibw_files = [f for f in files if f.suffix.lstrip(".").lower() == "ibw"]
+        if ibw_files:
+            return parse_ibwFolder(path, recording_name=recording_name)
+        raise ValueError(f"No valid .abf or .ibw files found in {source_path}")
+    # source_path is not a folder - parse as a single file
+    PARSERS = {
         "csv": parse_csv,
         "abf": parse_abf,
         "ibw": parse_ibw,
     }
+    filetype = path.suffix.lstrip(".").lower()
     if filetype not in PARSERS:
         raise ValueError(f"Unsupported file type: {filetype}")
-
-    return PARSERS[filetype](source_path, recording_name=recording_name)
+    return PARSERS[filetype](source_path, recording_name=recording_name, keep_non_stim_data=keep_non_stim_data)
 
 
 
@@ -563,11 +600,11 @@ if __name__ == "__main__":
     #list_sources = [str(source_folder / "abf Ca trains/03 PT 10nM TTX varied Stim/2.8MB - PT/2023_07_18_0006.abf")]
     #list_sources = [r"K:\Brainwash Data Source\Rong Samples\SameTime"]
     list_sources = [
-                    r"K:\Brainwash Data Source\csv\A_21_P0701-S2_Ch0_a.csv",
+    #                r"K:\Brainwash Data Source\csv\A_21_P0701-S2_Ch0_a.csv",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_1.ibw",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_2.ibw",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_25.ibw",
-    #                r"K:\Brainwash Data Source\abf 1 channel\A_21_P0701-S2\2022_07_01_0012.abf",
+                    r"K:\Brainwash Data Source\abf 1 channel\A_21_P0701-S2\2022_07_01_0012.abf",
                     ]
 
         
@@ -585,7 +622,6 @@ if __name__ == "__main__":
         list_tuple_data = dataFile(item)
         for rec in list_tuple_data:
             print(f" - rec: {rec[0]}")
-            print(rec[1])
             print()
         if False:
             df = parse_ibw(item)
