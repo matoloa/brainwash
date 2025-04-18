@@ -234,8 +234,9 @@ def parse_ibwFolder(folder, dev=False): # igor2, para
 
     return df
 
+
 def parse_ibw(filepath, dev=False): # igor2, para
-    files = [Path(filepath)] # TODO: EVERY attempt to read just one filepath, without what should be superfluous lists, have failed in unresolvable mismatch errors
+    files = [Path(filepath)] # TODO: EVERY attempt to read just one filepath, without what should be superfluous lists, has failed due to unresolvable mismatch errors
     for file in files:
         if not file.exists():
             raise FileNotFoundError(f"No such file: '{file}'")
@@ -266,6 +267,7 @@ def parse_ibw(filepath, dev=False): # igor2, para
 
     return df
 
+
 def parse_csv(source_path, recording_name=None, keep_non_stim_data=False):
     """
         WIP: called by dataFile, assumes a Brainwash formatted csv file for now
@@ -290,8 +292,6 @@ def parse_csv(source_path, recording_name=None, keep_non_stim_data=False):
         'resets': df[(df['sweep_raw'] == df['sweep_raw'].min()) & (df['time'] == 0)]['sweep'].tolist()[1:],
     }
     return [(dict_meta, df)]
-
-
 
 
 def sample_abf(filepath):
@@ -343,12 +343,12 @@ def parse_abf(filepath, recording_name=None, keep_non_stim_data=False):
     if recording_name is None:
         recording_name = os.path.basename(os.path.dirname(filepath))
     abf = pyabf.ABF(filepath)
-    #with open(filepath, "r+b") as f:
-    #    mmap_file=mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-    #    abf = pyabf.ABF(mmap_file)
-    sweeps = range(abf.sweepCount)
-    # n_rows_in_channel = len(abf.getAllXs()) # defaults to 0
-    channels = range(abf.channelCount)
+    if False: # DEBUG
+        print(f"abf: {abf}")
+        for key, value in vars(abf).items():
+            print(f"{key}: {value}")
+    sweeps = abf.sweepCount
+    channels = abf.channelList
 
     # 1) build one big concatenated dataframe
     dfs = []
@@ -376,7 +376,7 @@ def parse_abf(filepath, recording_name=None, keep_non_stim_data=False):
     # 4) split by channel and stim
     list_tuple_data = []
     for channel in df.channel.unique():
-        print(f" - channel: {channel}, nchannels: {nchannels}, nstims: {nstims}, sweep_duration: {sweep_duration}")
+        print(f" - channel: {channel} (nchannels: {nchannels}), nstims: {nstims}, sweep_duration: {sweep_duration}")
         if keep_non_stim_data:
             df_ch = df # TODO NOT TESTED!
         else:
@@ -422,15 +422,21 @@ def dataFile(source_path, recording_name=None, keep_non_stim_data=False):
     """
     path = Path(source_path)
     # Check if source_path is a folder
-    if path.is_dir(): # TODO: currently, presence of a single .abf overrides .ibw
+    if path.is_dir(): # TODO: currently reads only one type of file:
         files = [f for f in path.iterdir() if f.is_file()]
+        # if there are .abf files, parse and return those.
         abf_files = [f for f in files if f.suffix.lstrip(".").lower() == "abf"]
         if abf_files:
             return parse_abfFolder(path, recording_name=recording_name)
+        # elif there are .ibw files, parse and return those.
         ibw_files = [f for f in files if f.suffix.lstrip(".").lower() == "ibw"]
         if ibw_files:
             return parse_ibwFolder(path, recording_name=recording_name)
-        raise ValueError(f"No valid .abf or .ibw files found in {source_path}")
+        # TODO elif there are .csv files, parse and return those.
+        #csv_files = [f for f in files if f.suffix.lstrip(".").lower() == "csv"]
+        #if csv_files:
+        #    return parse_csvFolder(path, recording_name=recording_name)
+        raise ValueError(f"No valid files found in {source_path}")
     # source_path is not a folder - parse as a single file
     PARSERS = {
         "csv": parse_csv,
@@ -446,7 +452,7 @@ def dataFile(source_path, recording_name=None, keep_non_stim_data=False):
 
 def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None, single_stim=False):
     """
-    WIP: Still operation, called from ui.py - to be replaced by dataFile.
+    WIP: Still operational, called from ui.py - TO BE REPLACED BY dataFile.
     * receives a df of project data file paths built in ui
         files that are already parsed are to be overwritten (ui.py passes filitered list of unparsed files)
     * creates a datafile by unique source file/channel/stim combination
