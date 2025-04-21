@@ -1,12 +1,7 @@
 name: Build with cx_Freeze
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   build:
