@@ -48,6 +48,13 @@ jobs:
         working-directory: ./src  # Adjust to your subdirectory
         run: python setup.py build_exe
 
+      - name: List files for debugging
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          ls -R src/dist/ || echo "src/dist/ not found"
+          ls -R build/ || echo "build/ not found"
+        shell: bash
+
       # Upload artifacts
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
