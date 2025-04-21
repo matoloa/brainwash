@@ -12,6 +12,7 @@ seaborn
 tqdm
 jupytext
 pyyaml
+toml
 requests
 flake8
 flake8-black
