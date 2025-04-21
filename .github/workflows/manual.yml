@@ -46,7 +46,8 @@ jobs:
       # Build the executable
       - name: Build with cx_Freeze
         working-directory: ./src  # Adjust to your subdirectory
-        run: python setup.py build_exe
+        run: python setup.py bdist_appimage
+        # run: python setup.py build_exe
 
       - name: List files for debugging
         if: matrix.os == 'ubuntu-latest'
