@@ -45,6 +45,7 @@ jobs:
 
       # Build the executable
       - name: Build with cx_Freeze
+        working-directory: ./src  # Adjust to your subdirectory
         run: python setup.py build_exe
 
       # Upload artifacts
