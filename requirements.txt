@@ -1,6 +1,6 @@
 #python==3.12
 pyqt5
-openblas
+scipy-openblas64
 pandas
 joblib
 matplotlib
