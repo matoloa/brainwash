@@ -1,4 +1,4 @@
-python==3.12
+#python==3.12
 pyqt5
 openblas
 pandas
