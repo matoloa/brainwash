@@ -38,7 +38,8 @@ options = {
         "excludes": [],
         "packages": ["pyabf", "igor2", "tqdm", "sklearn", "scipy", "seaborn"],
         "include_files": include_files
-    }
+    },
+    "bdist_appimage": {"compression": "gzip"}
 }
 
 
