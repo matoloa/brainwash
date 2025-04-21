@@ -53,4 +53,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: executable-${{ matrix.os }}
-          path: build/
+          path: src/dist/
