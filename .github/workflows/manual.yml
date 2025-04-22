@@ -1,4 +1,4 @@
-name: Build with cx_Freeze
+name: Build linux appimage with cx_Freeze
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-22.04] # build on old for compatibility
         #, windows-latest]
         python-version: ["3.12"]
 
@@ -35,7 +35,6 @@ jobs:
 
       # Install patchelf on Linux (required for cx_Freeze)
       - name: Install patchelf (Linux)
-        if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y patchelf
 
       # Build the executable
@@ -47,7 +46,6 @@ jobs:
         # run: python setup.py build_exe
 
       - name: List files for debugging
-        if: matrix.os == 'ubuntu-latest'
         run: |
           ls -R src/dist/ || echo "src/dist/ not found"
           ls -R build/ || echo "build/ not found"
