@@ -46,7 +46,7 @@ exe = Executable(
 options = {
     "build_exe": {
         "includes": [],
-        "excludes": ["tkinter", "unittest", "email", "http", "pytest"],
+        "excludes": ["tkinter", "email", "pytest"],
         "packages": ["pyabf", "igor2", "tqdm", "sklearn", "numpy", "scipy", "seaborn"],
         "include_files": include_files
     }
