@@ -25,7 +25,10 @@ Provided files in "release"
 - Build Dev Container: `./build-devcontainer.sh`.
 
 ### vscode
-The chosen container has some shell commands. Therefore, podman has to build the image with format=docker. The only way I got vscode to respect that was to export the env variable BUILDAH_FORMAT=docker. It could be aither in .bashrc, or as I didn't want it global, but only in this project, there is now a podman_build_docker.sh in .devcontainer that wraps the podman command. Project settings to use that wrapper:
+The chosen container has some shell commands. Therefore, podman has to build the image with format=docker. The only way I got vscode to respect that was to export the env variable BUILDAH_FORMAT=docker. It could be aither in .bashrc, or as I didn't want it global, but only in this project. There is now a .env file setting this in repo.
+
+#### obsolete
+There is now a podman_build_docker.sh in .devcontainer that wraps the podman command. Project settings to use that wrapper:
 .vscode/settings.json:
 {
   "dev.containers.dockerPath": "${workspaceFolder}/.devcontainer/podman_build_docker.sh",
