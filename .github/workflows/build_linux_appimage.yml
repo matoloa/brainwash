@@ -8,7 +8,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-22.04] # build on old for compatibility
+        os: [ubuntu-22.04] # build on old for compatibility, devcontainer was python3.12 bullseye, but this is probably close enough
         #, windows-latest]
         python-version: ["3.12"]
 
@@ -40,7 +40,7 @@ jobs:
       # Build the executable
       - name: Build with cx_Freeze
         working-directory: ./src  # Adjust to your subdirectory
-        run: python setup.py bdist_appimage --silent
+        run: python build_with_cxfreeze_multiarch_setup.py bdist_appimage --silent
         # run: python setup.py build_exe
 
       - name: List files for debugging
