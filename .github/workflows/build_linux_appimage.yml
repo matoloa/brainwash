@@ -40,7 +40,7 @@ jobs:
       # Build the executable
       - name: Build with cx_Freeze
         working-directory: ./src  # Adjust to your subdirectory
-        run: python build_with_cxfreeze_multiarch_setup.py bdist_appimage --silent
+        run: python build_with_cxfreeze_multiarch_setup.py bdist_appimage > cxbuild_appimage.log
         # run: python setup.py build_exe
 
       - name: List files for debugging
