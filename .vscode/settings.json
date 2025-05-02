@@ -1,0 +1,4 @@
+{
+  "dev.containers.dockerPath": "${workspaceFolder}/.devcontainer/podman_build_docker.sh",
+  "dev.containers.dockerComposePath": "podman-compose"
+}

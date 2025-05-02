@@ -22,12 +22,12 @@ script_path = "main.py"
 # Additional files/directories that should be included in the distribution.
 # You may need to add other dependencies or data files here.
 include_files = []
-#include_files = [f"{vcomp140_dll_path}", "lib/", ("../pyproject.toml", "lib/pyproject.toml")]
+include_files = ["lib/", ("../pyproject.toml", "lib/pyproject.toml")]
 		 #("/home/jonathan/mambaforge/envs/brainwash/lib/libcblas.so", "lib/libcblas.so"), ("/home/jonathan/mambaforge/envs/brainwash/lib/libcblas.so.3", "lib/libcblas.so.3")]
 # Create an executable.
 exe = Executable(
     script=script_path,
-    #base=base,
+    base=base,
     #targetName="hello.exe"  # The name of the output executable.
 )
 
@@ -36,7 +36,7 @@ options = {
     "build_exe": {
         "includes": [],
         "excludes": [],
-        "packages": ["pyabf", "igor2", "tqdm", "sklearn", "scipy", "seaborn"],
+        "packages": ["pyabf", "igor2", "tqdm", "sklearn", "numpy", "scipy", "seaborn"],
         "include_files": include_files
     }
 }
@@ -52,6 +52,5 @@ setup(
     #include_package_data=True,
     options=options,
     executables=[exe],
-    base=base
 )
 

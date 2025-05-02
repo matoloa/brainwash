@@ -4,21 +4,14 @@ scipy-openblas64
 pandas
 joblib
 matplotlib
-jupyterlab
 numpy
 scikit-learn
 scipy
 seaborn
 tqdm
-jupytext
 pyyaml
 toml
 requests
-flake8
-flake8-black
-black
-isort
-nose2
 pyabf
 igor2
-cx-Freeze
+cx-Freeze==8.2 # for building the executable, allowing this here to, is not that big

@@ -7,18 +7,40 @@ Output is stored as .csv-files for compatibility.
 ## Contact
 Mats Andersson (mats.olof.andersson@gu.se). We're happy to receive feedback and suggestions, or to discuss collaborations.
 
+# Installation
+Provided files in "release"
+* Linux - Appimage
+* Windoes - installer
+
+## Dev environment
+### Requirements (suggested)
+- Podman 4.6.2 (use --format=docker)
+- Python 3.12
+- VS Code with Dev Containers extension
+
+## Setup
+- Unmask Podman socket: `systemctl --user unmask podman.socket`.
+- Enable socket: `systemctl --user enable --now podman.socket`.
+- Set `dev.containers.dockerPath` to `podman`.
+- Build Dev Container: `./build-devcontainer.sh`.
+
+### vscode
+The chosen container has some shell commands. Therefore, podman has to build the image with format=docker. The only way I got vscode to respect that was to export the env variable BUILDAH_FORMAT=docker. It could be aither in .bashrc, or as I didn't want it global, but only in this project, there is now a podman_build_docker.sh in .devcontainer that wraps the podman command. Project settings to use that wrapper:
+.vscode/settings.json:
+{
+  "dev.containers.dockerPath": "${workspaceFolder}/.devcontainer/podman_build_docker.sh",
+  "dev.containers.dockerComposePath": "podman-compose"
+}
+
 
 
 ## Distribution builds
 se also specific build document in docs.
-This requires a development version of cx_freeze (v6.16):
-pip install --upgrade --pre --extra-index-url https://marcelotduarte.github.io/packages/ cx_Freeze
 Build from src folder [SIC], this is needed as cxfreeze does not handle our repo structure gracefully. When it does, it should be from repo root.
+
+### Linux AppImage
+./build-appimage.sh
 
 ### Windows
 > python setup.py build_exe --silent-level 2
 Then zip the folder and distribute.
-
-### Linux
-$ python setup.py bdist_appimage
-Results in an appimage, ready for distribution.

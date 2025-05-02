@@ -1,0 +1,7 @@
+jupyterlab
+jupytext
+flake8
+flake8-black
+black
+isort
+

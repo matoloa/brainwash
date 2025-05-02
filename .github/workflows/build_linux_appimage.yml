@@ -40,8 +40,6 @@ jobs:
       # Build the executable
       - name: Build with cx_Freeze
         working-directory: ./src  # Adjust to your subdirectory
-        env:
-          APPI_COMPRESSION: gzip  # Force gzip to avoid zstd
         run: python setup.py bdist_appimage --silent
         # run: python setup.py build_exe
 
