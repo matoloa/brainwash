@@ -10,16 +10,21 @@
   // Mount the project directory into /app
   "mounts": [
         "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
-        // Optional: For Linux hosts, mount X11 socket
+        // Mount /tmp/.X11-unix for Ubuntu; ignored on Windows (no socket exists)
         "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
+        // Mount /dev/dri for GPU on Ubuntu; ignored on Windows if unavailable
         "source=/dev/dri,target=/dev/dri,type=bind,consistency=cached"
-    ],
+      ],
 
   // Forward display for GUI (adjust based on host)
   "runArgs": [
-      "--env", "DISPLAY=:0",
-      "--userns=keep-id",
-      "--gpus", "all"
+    // Use host's DISPLAY if set (Ubuntu: :0); fallback to Windows default
+    "--env", "DISPLAY=${localEnv:DISPLAY:host.docker.internal:0}",
+    // GPU for Docker Desktop (Windows/Ubuntu); ignored by Podman if unsupported
+    "--gpus", "all",
+    // GPU device for Podman/Ubuntu; ignored on Windows if unavailable
+    "--device=/dev/dri",
+    "--userns=keep-id"
     ],
     // Install VS Code extensions for Python development
 
