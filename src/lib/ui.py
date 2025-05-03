@@ -85,7 +85,7 @@ class Config:
         self.track_widget_focus = False
         self.terminal_space = 372 if self.dev_mode else 0
         # get project_name and version number from pyproject.toml
-        pathtoml = [i + "/pyproject.toml" for i in ["../..", "..", ".", "lib"] if Path(i + "/pyproject.toml").is_file()][0]
+        pathtoml = [i + "/pyproject.toml" for i in ["../..", "..", ".", "lib", "/lib"] if Path(i + "/pyproject.toml").is_file()][0]
         pyproject = toml.load(pathtoml)
         self.program_name = pyproject['project']['name']
         self.version = pyproject['project']['version']
@@ -2623,7 +2623,7 @@ class UIsub(Ui_MainWindow):
     def get_bw_cfg(self):
         # load program bw_cfg if present
         paths = [Path.cwd()] + list(Path.cwd().parents)
-        self.repo_root = [i for i in paths if (-1 < str(i).find("brainwash")) & (str(i).find("src") == -1)][0]  # path to brainwash directory
+        self.repo_root = [i for i in paths if ((-1 < str(i).find("brainwash")) or (-1 < str(i).find("app")) and (str(i).find("src") == -1))][0]  # path to brainwash directory
         self.bw_cfg_yaml = self.repo_root / "cfg.yaml"  # Path to cfg.yaml
         # Set default values for bw_cfg.yaml
         self.user_documents = Path.home() / "Documents"  # Where to look for raw data

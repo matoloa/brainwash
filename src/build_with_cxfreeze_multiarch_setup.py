@@ -24,7 +24,7 @@ base = "Win32GUI" if sys.platform == "win32" else None
 script_path = "main.py"
 
 # include paths files
-include_files = ["lib/", ("../pyproject.toml", "lib/pyproject.toml")]
+include_files = [("../pyproject.toml", "lib/pyproject.toml"), "lib/"]
 
 # windows build
 # Find the vcomp140.dll file in the system

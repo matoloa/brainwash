@@ -49,9 +49,17 @@ jobs:
           ls -R build/ || echo "build/ not found"
         shell: bash
 
+        # Extract version from pyproject.toml
+      - name: Extract version from pyproject.toml
+        run: |
+          VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+        shell: bash
+
       # Upload artifacts
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: executable-${{ matrix.os }}
-          path: src/dist/*
+          name: brainwash-${{ env.VERSION }}-x86_64.AppImage
+          path: src/dist/
+          compression-level: 0  # Disable compression
