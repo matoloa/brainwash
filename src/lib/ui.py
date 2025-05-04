@@ -95,8 +95,15 @@ class Config:
         self.track_widget_focus = False
         self.terminal_space = 372 if self.dev_mode else 0
         # get project_name and version number from pyproject.toml
-        pathtoml = [i + "/pyproject.toml" for i in ["../..", "..", ".", "lib", "/lib"] if Path(i + "/pyproject.toml").is_file()][0]
-        pyproject = toml.load(pathtoml)
+        pathtoml = [i + "/pyproject.toml" for i in ["../..", "..", ".", "lib", "/lib"] if Path(i + "/pyproject.toml").is_file()]
+        # you will want this eventually so I fix it now
+        pathbwcfgyaml = [i + "/bw_cfg.yaml" for i in ["../..", "..", ".", "lib", "/lib"] if Path(i + "/bw_cfg.yaml").is_file()]
+        if len(pathtoml) == 0:
+            # not found, we may be in an appimage
+            pathtoml = [i + "/pyproject.toml" for i in sys.path if Path(i + "/pyproject.toml").is_file()]
+            pathbwcfgyaml = [i + "/bw_cfg.yaml" for i in sys.path if Path(i + "/bw_cfg.yaml").is_file()]
+        pyproject = toml.load(pathtoml[0])
+        self.bw_cfg_yaml = pathbwcfgyaml[0] if len(pathbwcfgyaml) ==1 else None
         self.program_name = pyproject['project']['name']
         self.version = pyproject['project']['version']
 
@@ -2627,22 +2634,20 @@ class UIsub(Ui_MainWindow):
         if config.transient:
             return
         cfg = {"user_documents": str(self.user_documents), "projects_folder": str(self.projects_folder), "projectname": self.projectname, "darkmode": uistate.darkmode}
-        with self.bw_cfg_yaml.open("w+") as file:
-            yaml.safe_dump(cfg, file)
+        #TODO: maybe this should start going in the Brainwash user folder? not in repo or packaged app 
+        #with self.bw_cfg_yaml.open("w+") as file:
+        #    yaml.safe_dump(cfg, file)
 
     def get_bw_cfg(self):
         # load program bw_cfg if present
-        paths = [Path.cwd()] + list(Path.cwd().parents)
-        self.repo_root = [i for i in paths if ((-1 < str(i).find("brainwash")) or (-1 < str(i).find("app")) and (str(i).find("src") == -1))][0]  # path to brainwash directory
-        self.bw_cfg_yaml = self.repo_root / "cfg.yaml"  # Path to cfg.yaml
         # Set default values for bw_cfg.yaml
         self.user_documents = Path.home() / "Documents"  # Where to look for raw data
         self.projects_folder = self.user_documents / "Brainwash Projects"  # Where to store projects
         self.projectname = "My Project"
         uistate.darkmode = False
         # Override default if cfg.yaml exists
-        if self.bw_cfg_yaml.exists():
-            with self.bw_cfg_yaml.open("r") as file:
+        if config.bw_cfg_yaml is not None:
+            with Path(config.bw_cfg_yaml).open("r") as file:
                 cfg = yaml.safe_load(file)
                 projectfolder = Path(cfg['projects_folder']) / cfg['projectname']
                 if projectfolder.exists():  # if the folder stored in cfg.yaml exists, use it
