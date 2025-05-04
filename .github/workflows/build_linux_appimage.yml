@@ -8,7 +8,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-22.04] # build on old for compatibility, devcontainer was python3.12 bullseye, but this is probably close enough
+        os: [ubuntu-22.04] # build on old for compatibility, devcontainer was set up to be ubuntu 22.04 with py 3.12 to be similar
         #, windows-latest]
         python-version: ["3.12"]
 

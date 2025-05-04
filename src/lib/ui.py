@@ -58,7 +58,17 @@ import ui_plot
     Mainguard
 '''
 
-
+# debug, tell me where you think you are now
+debug_mode = os.getenv("BRAINWASH_DEBUG", "0") == "1"
+if debug_mode:
+    print(f"ui.py: os.getcwd(): {os.getcwd()}")
+    print(f"ui.py: sys.path: {sys.path}")
+    try:
+        script_path = os.path.abspath(__file__)
+        script_dir = os.path.dirname(script_path)
+        print(f"ui.py: script_path: {script_path}")
+    except:
+        pass
 
 ####################################################################
 #                             Globals                              #
