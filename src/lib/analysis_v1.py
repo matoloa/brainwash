@@ -1,4 +1,61 @@
 # %%
+'''
+analysis modeule to characterize and calculate features from diagrams
+
+
+typical explanation of what happend in a diagram in time order
+0: relaxed background
+1: stim pulse created by external voltage stim shaped as sharp huge negative quickly swinging up to a sharp huge positive and then subsiding quickly
+2: some noisy chatter
+3: axon depolarisation response to stim is m shaped volley
+4: postsynaptisk depolarisation: around the middle of the m is initiated a strong pull down in voltage signal that reaches a minima after the m and later relaxes back towards background
+   this superposition effect tilts the second half of the m
+
+
+function: find_all_i 
+purpose: find indexes of all intereting features in a graph
+search order
+how do we get i stim from the start? 
+
+i_EPSP_amp: find_i_EPSP_peak_max(dfmean=dfmean, sampling_Hz=sampling_Hz, limitleft=i, limitright=i+200, verbose=False)
+    params: i stim
+
+i_VEB: find_i_VEB_prim_peak_max(dfmean=dfmean, i_stim=i, i_EPSP=dict_i['i_EPSP_amp'])
+    params: i epsp, i stim
+
+i_EPSP_slope: find_i_EPSP_slope_bis0(dfmean=dfmean, i_VEB=dict_i['i_VEB'] , i_EPSP=dict_i['i_EPSP_amp'], happy=True)
+    params: i veb, i epsp
+
+i_volley_slope: find_i_volley_slope(dfmean=dfmean, i_stim=i, i_VEB=dict_i['i_VEB'], happy=True)
+    params: i stim, i veb
+
+i_volley_amp: dfmean.loc[dict_i['i_volley_slope']:dict_i['i_VEB'], 'voltage'].idxmin() # TODO: make proper function
+    params: 
+    
+seems to sequentially search for all features
+can it still work if one is missing?
+0: hittar stim
+    alltid
+
+1: epsp amp: found most to the right of features
+    finns den alltid?
+
+2: veb: largest prim (meaning local minima) found between epsp max and stim.
+    mats virtuell feature
+
+3: epsp slope: looks for bis zero crossings between veb and epsp
+SKALL HELST LETAS UPP D'R VOLLEY 'R SLUT
+
+4: volley slope: looks for a prim min, why different from epsp slope? to the left of veb
+    
+
+5: volley amp: fmin found between i volley slope and veb
+    kan f;rsvinna
+
+
+'''
+
+# %%
 import numpy as np  # numeric calculations module
 import pandas as pd  # dataframe module, think excel, but good
 from scipy.signal import savgol_filter, find_peaks
@@ -316,20 +373,20 @@ def find_i_VEB_prim_peak_max(
 
 
 # %%
-def find_i_EPSP_slope_bis0(dfmean, i_VEB, i_EPSP, happy=False):
+def find_i_EPSP_slope_bis0(dfmean, i_VEB, i_EPSP, happy=False, verbose=False):
     """ """
 
     dftemp = dfmean.bis[i_VEB:i_EPSP]
     i_EPSP_slope = dftemp[0 < dftemp.apply(np.sign).diff()].index.values
 
     if len(i_EPSP_slope) == 0:
-        print(" . . No positive zero-crossings in dfmean.bis[i_VEB: i_EPSP].")
+        if verbose: print(" . . No positive zero-crossings in dfmean.bis[i_VEB: i_EPSP].")
         return np.nan
     if 1 < len(i_EPSP_slope):
         if not happy:
             raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[i_VEB: i_EPSP]:{i_EPSP_slope}")
         else:
-            print("More EPSPs than we wanted but I'm happy, so I pick the first one and move on.")
+            if verbose: print("More EPSPs than we wanted but I'm happy, so I pick the first one and move on.")
     return i_EPSP_slope[0]
 
 
@@ -377,7 +434,8 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
     Runs all index-detections in the appropriate sequence,
     The function finds VEB, but does not currently report it
     TODO: also report volley amp and slope
-    Returns a DataFrame of all indices, with np.nan representing detection failure.
+    Returns a DataFrame of all indices, with np.na
+    n representing detection failure.
     """
     if i_stims is None:
         i_stims = find_i_stims(dfmean=dfmean)
@@ -387,12 +445,13 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
     # calculate sampling frequency
     time_delta = dfmean.time[1] - dfmean.time[0]
     sampling_Hz = 1 / time_delta
-    print(f"find_i_stims: {len(i_stims)}: sampling_Hz: {sampling_Hz}")
-    print(i_stims)
+    if verbose:
+        print(f"find_i_stims: {len(i_stims)}: sampling_Hz: {sampling_Hz}")
+        print(i_stims)
     
     list_dict_i = []
     for i in i_stims:
-        print(f"processing i_stim: {i}")
+        if verbose: print(f"processing i_stim: {i}")
         dict_i = { #set default np.nan
             "i_stim": i,
             "i_VEB": np.nan,
@@ -409,7 +468,7 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
             "t_EPSP_amp_params": "-",
             "t_EPSP_slope_params": "-",
         }
-        dict_i['i_EPSP_amp'] = find_i_EPSP_peak_max(dfmean=dfmean, sampling_Hz=sampling_Hz, limitleft=i, limitright=i+200, verbose=True)
+        dict_i['i_EPSP_amp'] = find_i_EPSP_peak_max(dfmean=dfmean, sampling_Hz=sampling_Hz, limitleft=i, limitright=i+200, verbose=False)
         if dict_i['i_EPSP_amp'] is not np.nan:
             dict_i['i_VEB'] = find_i_VEB_prim_peak_max(dfmean=dfmean, i_stim=i, i_EPSP=dict_i['i_EPSP_amp'])
             if dict_i['i_VEB'] is not np.nan:
@@ -427,7 +486,7 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
         params = ['t_volley_amp_params', 't_volley_slope_params', 't_EPSP_amp_params', 't_EPSP_slope_params']
         # find a stim-row that has values in all columns, and use it as a template
         for i in range(len(df_i_numeric)):
-            print(f"checking stim: {i}")
+            if verbose: print(f"checking stim: {i}")
             if not df_i_numeric.iloc[i].isnull().any():
                 # create a template for i_values based difference from i_stim
                 i_values = df_i_numeric.iloc[i]
@@ -500,7 +559,7 @@ def find_all_t(dfmean, default_dict_t, precision=None, param_min_time_from_i_sti
         }
 
     df_indices = find_all_i(dfmean, param_min_time_from_i_stim=0.0005)
-    print(f"df_indices: {df_indices}")
+    if verbose: print(f"df_indices: {df_indices}")
 
     # TODO: WIP use default_dict_t
 
@@ -520,8 +579,7 @@ def find_all_t(dfmean, default_dict_t, precision=None, param_min_time_from_i_sti
     for col in list_t_columns_in_df_indices:
         df_t[col] = df_indices[col]
 
-    if verbose:
-        print(f"df_t: {df_t}")
+    if verbose: print(f"df_t: {df_t}")
 
     return df_t
 
@@ -595,9 +653,10 @@ if __name__ == "__main__":
     from pathlib import Path
     #path_filterfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_filter.csv")
     #dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file
-    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/Good recording_Ch0_a_mean.csv")
+    #path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/Good recording_Ch0_a_mean.csv")
+    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_Ch0_a_mean.csv")
     print(f"\n\n\nRunning as main: standalone test of {str(path_meanfile)}")
     dfmean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
     #dfmean['tris'] = dfmean.bis.rolling(3, center=True).mean().diff()
-    list_dict_t = find_all_t(dfmean, default_dict_t=default_dict_t)
-    print(list_dict_t)
+    dft = find_all_t(dfmean, default_dict_t=default_dict_t)
+    print(dft)
