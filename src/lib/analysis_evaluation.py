@@ -14,7 +14,6 @@
 
 # %%
 '''
-standalone, not importable
 purpose
 pull all Mats (and later user feedback) supplied graphs with manual labels
 push them through analysis modules, collect results and evaluate
@@ -34,6 +33,9 @@ from sklearn.linear_model import LinearRegression
 reporoot = Path(os.getcwd()).parent
 sys.path.append(str(reporoot / 'src/lib/'))
 import analysis_v1
+
+# %% [markdown]
+# # loaders
 
 # %%
 # read slices and meta
@@ -72,8 +74,10 @@ def load_meta(path, sweep=1):
     return df
 
 meta = pd.concat([load_meta(meta_filepath, sweep) for sweep, meta_filepath in enumerate(meta_filepaths)])
-meta
+#meta
 
+# %% [markdown]
+# # evaluators
 
 # %%
 # grok evaluate results
@@ -158,7 +162,7 @@ def evaluate_and_report(dfresults, meta, signals, time_scale_factor=10000, offse
     """
     # Set default offset thresholds if none provided
     if offset_thresholds is None:
-        offset_thresholds = [1, 2, 3]
+        offset_thresholds = [1, 2, 3, 5, 10]
     
     # Define ground truth columns
     true_cols = ["t_EPSP_slope_start", "t_volley_slope_start"]
@@ -359,30 +363,31 @@ def evaluate_and_report(dfresults, meta, signals, time_scale_factor=10000, offse
     print(f"{'='*50}\n")
 
 
-# %%
-default_dict_t = { # default values for df_t(imepoints)
-    't_volley_slope_halfwidth': 0.0001,
-    't_EPSP_slope_halfwidth': 0.0003,
-}
-
-def check_sweep(sweepname):
-    dfsweep = df.loc[df.sweepname == sweepname, ['time', 'voltage', 'prim', 'bis']]
-    result = analysis_v1.find_all_t(dfsweep, default_dict_t)[['t_volley_slope_start', 't_EPSP_slope_start']]
-    result.columns = [f"analytic_v1-{i}" for i in result.columns]
-    result['sweepname'] = sweepname
-    return result
-
-results = []
-signals = []
-for sweepname in df.sweepname.unique():
-    result = check_sweep(sweepname)
-    results.append(result)
-    signal = df[df['sweepname'] == sweepname][['time', 'voltage']].copy()
-    signals.append(signal)
-dfresults = pd.concat(results).reset_index(drop=True)
-dfresults
-
-evaluate_and_report(dfresults, meta, signals)
+# %% [markdown]
+# # estimation
 
 # %%
-dfresults
+if __name__ == "__main__":
+    default_dict_t = { # default values for df_t(imepoints)
+        't_volley_slope_halfwidth': 0.0001,
+        't_EPSP_slope_halfwidth': 0.0003,
+    }
+    
+    def check_sweep(sweepname):
+        dfsweep = df.loc[df.sweepname == sweepname, ['time', 'voltage', 'prim', 'bis']]
+        result = analysis_v1.find_all_t(dfsweep, default_dict_t)[['t_volley_slope_start', 't_EPSP_slope_start']]
+        result.columns = [f"analytic_v1-{i}" for i in result.columns]
+        result['sweepname'] = sweepname
+        return result
+    
+    results = []
+    signals = []
+    for sweepname in df.sweepname.unique():
+        result = check_sweep(sweepname)
+        results.append(result)
+        signal = df[df['sweepname'] == sweepname][['time', 'voltage']].copy()
+        signals.append(signal)
+    dfresults = pd.concat(results).reset_index(drop=True)
+    dfresults
+    
+    evaluate_and_report(dfresults, meta, signals)
