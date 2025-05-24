@@ -33,6 +33,7 @@ from sklearn.linear_model import LinearRegression
 reporoot = Path(os.getcwd()).parent
 sys.path.append(str(reporoot / 'src/lib/'))
 import analysis_v1
+import analysis_v2
 
 # %% [markdown]
 # # loaders
@@ -363,14 +364,18 @@ def evaluate_and_report(dfresults, meta, signals, time_scale_factor=10000, offse
     print(f"{'='*50}\n")
 
 
+# %%
+
 # %% [markdown]
 # # estimation
 
 # %%
+
+# %%
 if __name__ == "__main__":
     default_dict_t = { # default values for df_t(imepoints)
-        't_volley_slope_halfwidth': 0.0001,
-        't_EPSP_slope_halfwidth': 0.0003,
+        't_volley_slope_width': 0.0001,
+        't_EPSP_slope_width': 0.0003,
     }
     
     def check_sweep(sweepname):
@@ -387,7 +392,45 @@ if __name__ == "__main__":
         results.append(result)
         signal = df[df['sweepname'] == sweepname][['time', 'voltage']].copy()
         signals.append(signal)
-    dfresults = pd.concat(results).reset_index(drop=True)
-    dfresults
+    dfresults_av1 = pd.concat(results).reset_index(drop=True)
+
+    def check_sweep(sweepname):
+        dfsweep = df.loc[df.sweepname == sweepname, ['time', 'voltage', 'prim', 'bis']]
+        result = analysis_v2.characterize_graph(dfsweep, stim_amp=0.005, verbose=False, plot=False)
+        result.update({'sweepname': sweepname})
+        return result
+    
+    results = []
+    signals = []
+    for sweepname in df.sweepname.unique():
+        result = check_sweep(sweepname)
+        results.append(result)
+        signal = df[df['sweepname'] == sweepname][['time', 'voltage']].copy()
+        signals.append(signal)
+    dfresults_av2 = pd.DataFrame(results)
+    dfresults_av2 = dfresults_av2[[col for col in dfresults_av2 if col.startswith('t_')] + ["sweepname"]]
+    dfresults_av2.columns = ["analytic_v2-" + col if col.startswith('t_') else col for col in dfresults_av2.columns]
+    dfresults_av2
+
+    dfresults = pd.merge(dfresults_av1, dfresults_av2, right_on='sweepname', left_on='sweepname')
+    
     
     evaluate_and_report(dfresults, meta, signals)
+
+# %%
+if __name__ == "__main__":
+    tcols = ['t_volley_slope_start', 't_EPSP_slope_start']
+    dfdiff = dfresults[['sweepname']].copy()
+    for col in dfresults.columns:
+        try:
+            col_end = col.split('-')[1] if col.endswith('_start') else ''
+        except:
+            col_end = ''
+        if col_end in tcols:
+            dfdiff[col] = round(10000 * (dfresults[col] - meta[col_end]))
+    display(dfdiff)
+
+# %%
+#dfdiff.select_dtypes('number').abs().sum()
+
+# %%

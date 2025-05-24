@@ -29,7 +29,7 @@ sys.path.append(str(reporoot / 'src/lib/'))
 import analysis_v1
 
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# %% [markdown]
 # # func: characterize_graph
 
 # %%
@@ -60,7 +60,7 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
     neg_peaks = []
     pos_peaks = []
     stim_prom = stim_amp
-    while (len(pos_peaks) == 0 or len(neg_peaks) == 0) and stim_prom > 1e-6: # iterative volley search until at least 2 prominent peaks are found
+    while (len(pos_peaks) == 0 or len(neg_peaks) == 0) and stim_prom > 1e-6: # iterative stim search until at least 2 prominent peaks are found
         neg_peaks, neg_props = find_peaks(-voltage, prominence=stim_prom)
         pos_peaks, pos_props = find_peaks(voltage, prominence=stim_prom)
         stim_prom /= 2
@@ -76,10 +76,10 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
         next_pos = next_pos_candidates[0] if next_pos_candidates.size > 0 else None
         if next_pos is not None:
             verboses += f"stim length: {(time[next_pos] - time[first_neg])}\n"
-            if (time[next_pos] - time[first_neg]) < 0.0004:  # Within 0.4 ms
+            if (time[next_pos] - time[first_neg]) < 0.0004:  # Within 0.4 ms               
                 stim_amplitude = -voltage[first_neg]
-                stim_neg_idx = int(first_neg)
-                stim_pos_idx = int(next_pos)
+                stim_neg_idx = int(first_neg) - 1 # yes I hardcoded these 1 step adjustments. Hope it stays that way
+                stim_pos_idx = int(next_pos) + 1 # yes I hardcoded these 1 step adjustments. Hope it stays that way
                 stim_detected = bool(stim_amplitude > stim_amp)
                 verboses += f"{stim_detected=}\n"
     else:
@@ -361,8 +361,7 @@ if __name__ == "__main__":
     
     df = pd.concat([load_slice(slice_filepath, sweep) for sweep, slice_filepath in enumerate(slice_filepaths)])
 
-# %% [markdown]
-#
+# %%
 
 # %% [markdown]
 # # evaluation
@@ -379,7 +378,6 @@ if __name__ == "__main__":
 if __name__ == "__main__":
     from analysis_evaluation import evaluate_and_report
 
-
     def check_sweep(sweepname):
         dfsweep = df.loc[df.sweepname == sweepname, ['time', 'voltage', 'prim', 'bis']]
         result = characterize_graph(dfsweep, stim_amp=0.005, verbose=False, plot=False)
@@ -393,12 +391,13 @@ if __name__ == "__main__":
         results.append(result)
         signal = df[df['sweepname'] == sweepname][['time', 'voltage']].copy()
         signals.append(signal)
-    dfresults = pd.DataFrame(results)
-    dfresults = dfresults[[col for col in dfresults if col.startswith('t_')] + ["sweepname"]]
-    dfresults.columns = ["analytic_v2-" + col if col.startswith('t_') else col for col in dfresults.columns]
-    dfresults
+    dfresults_av2 = pd.DataFrame(results)
+    dfresults_av2 = dfresults_av2[[col for col in dfresults_av2 if col.startswith('t_')] + ["sweepname"]]
+    dfresults_av2.columns = ["analytic_v2-" + col if col.startswith('t_') else col for col in dfresults_av2.columns]
+    dfresults_av2
+  
     
-    evaluate_and_report(dfresults, meta, signals, offset_thresholds=[1, 2, 3, 5, 10])
+    evaluate_and_report(dfresults_av2, meta, signals, offset_thresholds=[1, 2, 3, 5, 10])
 
 # %% [markdown]
 # # find and plot the worst errors

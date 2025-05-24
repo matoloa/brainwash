@@ -62,7 +62,7 @@ from scipy.signal import savgol_filter, find_peaks
 from scipy import stats # for regression_line
 from sklearn import linear_model
 import time
-
+# TODO: use box for modern dict handling
 
 
 def valid(num):
@@ -148,14 +148,14 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
         t_volley_amp = dict_t['t_volley_amp']
         if valid(t_volley_amp):
             amp_zero = dict_t['amp_zero']
-            volley_hw = dict_t['t_volley_amp_halfwidth']
-            if volley_hw == 0 or quick: # single point
+            volley_width = dict_t['t_volley_amp_width']
+            if volley_width == 0 or quick: # single point
                 df_volley_amp = df[df['time']==t_volley_amp].copy() # filter out all time (from sweep start) that do not match t_volley_amp
                 df_volley_amp.reset_index(inplace=True, drop=True)
                 dfoutput['volley_amp'] = -1000 * df_volley_amp[filter] # invert and convert to mV
             else: # mean (SLOW)
-                start_time = t_volley_amp - volley_hw
-                end_time = t_volley_amp + volley_hw
+                start_time = t_volley_amp - (volley_width - 1) // 2
+                end_time = t_volley_amp + (volley_width - 1) // 2
                 dfoutput['volley_amp'] = df.groupby('sweep').apply(lambda sweep_df: ((sweep_df.loc[(sweep_df['time'] >= start_time) & (sweep_df['time'] <= end_time), filter].mean() - amp_zero) * -1000)) # convert to mV for output
         else:
             dfoutput['volley_amp'] = np.nan
@@ -425,7 +425,7 @@ def find_i_volley_slope(dfmean, i_stim, i_VEB, happy=False):
     #         raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[i_stim: i_VEB]:{i_volleyslope}")
     #     else:
     #         print("More volleys than than we wanted but Im happy, so I pick one and move on.")
-    return i_volleyslope#[0]
+    return i_volleyslope
 
 
 # %%
@@ -535,14 +535,17 @@ def find_all_t(dfmean, default_dict_t, precision=None, param_min_time_from_i_sti
     def i2t(index, dfmean, row, precision, default_dict_t):
         # Converts i (index) to t (time from start of sweep in dfmean)
         time_values = dfmean['time'].values
+        deltat = time_values[1] - time_values[0]
         if precision is None:
             precision = len(str(time_values[1] - time_values[0]).split('.')[1])
-        volley_slope_halfwidth = default_dict_t['t_volley_slope_halfwidth']
-        EPSP_slope_halfwidth = default_dict_t['t_EPSP_slope_halfwidth']
-        t_EPSP_slope = dfmean.loc[row['i_EPSP_slope']].time if 'i_EPSP_slope' in row and row['i_EPSP_slope'] in dfmean.index else None
-        t_volley_slope = dfmean.loc[row['i_volley_slope']].time if 'i_volley_slope' in row and row['i_volley_slope'] in dfmean.index else None
-        t_EPSP_amp = dfmean.loc[row['i_EPSP_amp']].time if 'i_EPSP_amp' in row and row['i_EPSP_amp'] in dfmean.index else None
+        i_volley_slope_width = round(default_dict_t['t_volley_slope_width'] / deltat)
+        i_EPSP_slope_width = round(default_dict_t['t_EPSP_slope_width'] / deltat)
+        t_volley_slope_start = dfmean.loc[row['i_volley_slope'] - ((i_volley_slope_width - 1) // 2) - 1].time if 'i_volley_slope' in row and row['i_volley_slope'] in dfmean.index else None
+        t_volley_slope_end = dfmean.loc[row['i_volley_slope'] + ((i_volley_slope_width - 1) // 2) - 1].time if 'i_volley_slope' in row and row['i_volley_slope'] in dfmean.index else None
+        t_EPSP_slope_start = dfmean.loc[row['i_EPSP_slope'] - ((i_EPSP_slope_width -1) // 2) - 2].time if 'i_EPSP_slope' in row and row['i_EPSP_slope'] in dfmean.index else None
+        t_EPSP_slope_end = dfmean.loc[row['i_EPSP_slope'] + ((i_EPSP_slope_width -1) // 2) - 2].time if 'i_EPSP_slope' in row and row['i_EPSP_slope'] in dfmean.index else None
         t_volley_amp = dfmean.loc[row['i_volley_amp']].time if 'i_volley_amp' in row and row['i_volley_amp'] in dfmean.index else None
+        t_EPSP_amp = dfmean.loc[row['i_EPSP_amp']].time if 'i_EPSP_amp' in row and row['i_EPSP_amp'] in dfmean.index else None
         amp_zero_idx_start = row['i_stim'] - 20 # TODO: fix hardcoded value
         amp_zero_idx_end = row['i_stim'] - 10 # TODO: fix hardcoded value
         amp_zero = dfmean.loc[amp_zero_idx_start:amp_zero_idx_end].voltage.mean() # TODO: fix hardcoded filter: "voltage"
@@ -550,12 +553,12 @@ def find_all_t(dfmean, default_dict_t, precision=None, param_min_time_from_i_sti
             'stim': index+1,
             'amp_zero': amp_zero, # mean of dfmean.voltage 20-10 indices before i_stim, in Volts
             't_stim': round(dfmean.loc[row['i_stim']].time, precision),
-            't_volley_slope_start': round(t_volley_slope - volley_slope_halfwidth, precision) if t_volley_slope is not None else None,
-            't_volley_slope_end': round(t_volley_slope + volley_slope_halfwidth, precision) if t_volley_slope is not None else None,
-            't_EPSP_slope_start': round(t_EPSP_slope - EPSP_slope_halfwidth, precision) if t_EPSP_slope is not None else None,
-            't_EPSP_slope_end': round(t_EPSP_slope + EPSP_slope_halfwidth, precision) if t_EPSP_slope is not None else None,
-            't_EPSP_amp': round(t_EPSP_amp, precision) if t_EPSP_amp is not None else None,
+            't_volley_slope_start': round(t_volley_slope_start, precision) if t_volley_slope_start is not None else None,
+            't_volley_slope_end': round(t_volley_slope_end, precision) if t_volley_slope_end is not None else None,
+            't_EPSP_slope_start': round(t_EPSP_slope_start , precision) if t_EPSP_slope_start is not None else None,
+            't_EPSP_slope_end': round(t_EPSP_slope_end , precision) if t_EPSP_slope_end is not None else None,
             't_volley_amp': round(t_volley_amp, precision) if t_volley_amp is not None else None,
+            't_EPSP_amp': round(t_EPSP_amp, precision) if t_EPSP_amp is not None else None,
         }
 
     df_indices = find_all_i(dfmean, param_min_time_from_i_stim=0.0005)
@@ -617,12 +620,15 @@ def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
 if __name__ == "__main__":
     # Temporary default_dict_t for standalone tests
     default_dict_t = { # default values for df_t(imepoints)
+        # TODO: rework and harmonize parameters
+        # sugegsted format: feature-[param, value]
+        # example: dict_param = {volley_slope-width: 3}
+        # example: dict_values = {volley_slope-value: -0.3254}
         'stim': 0,
         't_stim': 0,
         't_stim_method': 0,
         't_stim_params': 0,
-        't_volley_slope_width': 0.0003,
-        't_volley_slope_halfwidth': 0.0001,
+        't_volley_slope_width': 0.0003, # only assign full width as we normally use odd length in discrete index for clairty
         't_volley_slope_start': 0,
         't_volley_slope_end': 0,
         't_volley_slope_method': 'auto detect',
@@ -636,8 +642,7 @@ if __name__ == "__main__":
         't_VEB': 0,
         't_VEB_method': 0,
         't_VEB_params': 0,
-        't_EPSP_slope_width': 0.0007,
-        't_EPSP_slope_halfwidth': 0.0003,
+        't_EPSP_slope_width': 0.0007, # only assign full width as we normally use odd length in discrete index for clarity
         't_EPSP_slope_start': 0,
         't_EPSP_slope_end': 0,
         't_EPSP_slope_method': 'auto detect',
@@ -659,4 +664,8 @@ if __name__ == "__main__":
     dfmean = pd.read_csv(str(path_meanfile)) # a persisted average of all sweeps in that data file
     #dfmean['tris'] = dfmean.bis.rolling(3, center=True).mean().diff()
     dft = find_all_t(dfmean, default_dict_t=default_dict_t)
-    print(dft)
+    display(dft)
+
+# %%
+
+# %%
