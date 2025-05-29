@@ -23,7 +23,7 @@ import importlib # for reloading modules
 import pickle # for saving and loading dicts
 
 import parse
-import analysis
+import analysis_v2 as analysis
 import ui_state_classes
 import ui_plot
 

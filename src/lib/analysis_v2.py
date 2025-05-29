@@ -22,11 +22,192 @@ import sys
 from pathlib import Path
 import seaborn as sns
 from sklearn.linear_model import LinearRegression
+import time
 
 
 reporoot = Path(os.getcwd()).parent
 sys.path.append(str(reporoot / 'src/lib/'))
 import analysis_v1
+
+
+# %% [markdown]
+# # fumc: build_dfoutput
+
+# %%
+def valid(num):
+    #print(f"num: {num}, type: {type(num)}")
+    return num is not None and not np.isnan(num)
+
+def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
+    """
+    vectorized measure slope
+    """
+    df_filtered = df[(t_start <= df.time) & (df.time <= t_end)] # NB: including start and end
+    dfpivot = df_filtered.pivot(index='sweep', columns='time', values=filter)
+    coefs = np.polyfit(dfpivot.columns, dfpivot.T, deg=1).T
+    dfslopes = pd.DataFrame(index=dfpivot.index)
+    dfslopes['type'] = name + "_slope"
+    dfslopes['algorithm'] = 'linear'
+    dfslopes['value'] = coefs[:, 0]
+    # TODO: verify that it was the correct columns, and that values are reasonable
+    return dfslopes
+
+def build_dfoutput(df, dict_t, filter='voltage', quick=False):
+    print(f"{dict_t=}")
+    # TODO: check amps width calculations
+    # TODO: implement quick, to operate without amp_hws
+    """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
+    Args:
+        df: a dataframe containing numbered sweeps, timestamps and voltage
+        dict_t: a dictionary of measuring points
+
+    Returns:
+        a dataframe. Per sweep (row): EPSP_amp, EPSP_slope, volley_amp, volley_EPSP
+    """
+    t0 = time.time()
+    # print (f"build_dfoutput: {dict_t}")
+    normFrom = dict_t['norm_output_from'] # start
+    normTo = dict_t['norm_output_to'] # end
+    list_col = ['stim', 'sweep']
+    dfoutput = pd.DataFrame()
+    dfoutput['sweep'] = df.sweep.unique() # one row per unique sweep in data file
+    dfoutput['stim'] = dict_t['stim']
+
+    # EPSP_amp
+    if 't_EPSP_amp' in dict_t.keys():
+        t_EPSP_amp = dict_t['t_EPSP_amp']
+        if valid(t_EPSP_amp):
+            amp_zero = dict_t['amp_zero']
+            EPSP_w = dict_t['t_EPSP_amp_width'] if 't_EPSP_amp_width' in dict_t.keys() else 2 * dict_t['t_EPSP_amp_halfwidth']
+            if EPSP_w == 0 or quick: #single point
+                df_EPSP_amp = df[df['time']==t_EPSP_amp].copy() # filter out all time (from sweep start) that do not match t_EPSP_amp
+                df_EPSP_amp.reset_index(inplace=True, drop=True)
+                dfoutput['EPSP_amp'] = -1000 * df_EPSP_amp[filter] # invert and convert to mV
+            else: # mean (SLOW)
+                start_time = t_EPSP_amp - EPSP_w
+                end_time = t_EPSP_amp + EPSP_w
+                dfoutput['EPSP_amp'] = df.groupby('sweep').apply(lambda sweep_df: ((sweep_df.loc[(sweep_df['time'] >= start_time) & (sweep_df['time'] <= end_time), filter].mean() - amp_zero) * -1000)) # convert to mV for output
+        else:
+            dfoutput['EPSP_amp'] = np.nan
+        # Normalize EPSP_amp
+        selected_values = dfoutput[(dfoutput.index >= normFrom) & (dfoutput.index <= normTo)]['EPSP_amp']
+        norm_mean = selected_values.mean() / 100  # divide by 100 to get percentage
+        dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
+        list_col.extend(['EPSP_amp', 'EPSP_amp_norm'])
+    # EPSP_slope
+    if 't_EPSP_slope_start' in dict_t.keys():
+        t_EPSP_slope_start = dict_t['t_EPSP_slope_start']
+        t_EPSP_slope_end = dict_t['t_EPSP_slope_end']
+        if valid(t_EPSP_slope_start):
+            df_EPSP_slope = measureslope_vec(df=df, filter=filter, t_start=t_EPSP_slope_start, t_end=t_EPSP_slope_end)
+            dfoutput['EPSP_slope'] = -df_EPSP_slope['value'] # invert 
+        else:
+            dfoutput['EPSP_slope'] = np.nan
+        # Normalize EPSP_slope
+        selected_values = dfoutput[(dfoutput.index >= normFrom) & (dfoutput.index <= normTo)]['EPSP_slope']
+        norm_mean = selected_values.mean() / 100  # divide by 100 to get percentage
+        dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
+        list_col.extend(['EPSP_slope', 'EPSP_slope_norm'])
+    # volley_amp
+    if 't_volley_amp' in dict_t.keys():
+        t_volley_amp = dict_t['t_volley_amp']
+        if valid(t_volley_amp):
+            amp_zero = dict_t['amp_zero']
+            volley_w = dict_t['t_volley_amp_width'] if 't_volley_amp_width' in dict_t.keys() else 2 * dict_t['t_volley_amp_halfwidth']
+            if volley_w == 0 or quick: # single point
+                df_volley_amp = df[df['time']==t_volley_amp].copy() # filter out all time (from sweep start) that do not match t_volley_amp
+                df_volley_amp.reset_index(inplace=True, drop=True)
+                dfoutput['volley_amp'] = -1000 * df_volley_amp[filter] # invert and convert to mV
+            else: # mean (SLOW)
+                start_time = t_volley_amp - volley_w
+                end_time = t_volley_amp + volley_w
+                dfoutput['volley_amp'] = df.groupby('sweep').apply(lambda sweep_df: ((sweep_df.loc[(sweep_df['time'] >= start_time) & (sweep_df['time'] <= end_time), filter].mean() - amp_zero) * -1000)) # convert to mV for output
+        else:
+            dfoutput['volley_amp'] = np.nan
+        list_col.append('volley_amp')
+    # volley_slope
+    if 't_volley_slope_start' in dict_t.keys():
+        t_volley_slope_start = dict_t['t_volley_slope_start']
+        t_volley_slope_end = dict_t['t_volley_slope_end']
+        if valid(t_volley_slope_start):
+            df_volley_slope = measureslope_vec(df=df, filter=filter,  t_start=t_volley_slope_start, t_end=t_volley_slope_end)
+            dfoutput['volley_slope'] = -df_volley_slope['value'] # invert 
+        else:
+            dfoutput['volley_slope'] = np.nan
+        list_col.append('volley_slope')
+
+    # print(f'build_df_output: {round((time.time()-t0)*1000)} ms, list_col: {list_col}')
+    return dfoutput[list_col]
+
+
+
+# %% [markdown]
+# # func: build_dfstimoutput
+
+# %%
+
+def build_dfstimoutput(df, df_t, filter='voltage'):
+    t0 = time.time()
+    df_stimoutput = pd.DataFrame(index=df_t.index, columns=['stim', 'bin', 'EPSP_amp', 'EPSP_amp_norm', 'EPSP_slope', 'EPSP_slope_norm', 'volley_amp', 'volley_slope'])
+    # print (f"build_dfstimoutput: {df_t}")
+
+    for i, t_row in df_t.iterrows():
+        normFrom = t_row['norm_output_from'] # start
+        normTo = t_row['norm_output_to'] # end
+        amp_zero = t_row['amp_zero']
+        EPSP_hw = t_row['t_EPSP_amp_halfwidth']
+        volley_hw = t_row['t_volley_amp_halfwidth']
+        df_stimoutput.at[i, 'stim'] = t_row['stim']
+
+        # EPSP_amp
+        if valid(t_row['t_EPSP_amp']):
+            start_time = t_row['t_EPSP_amp'] - EPSP_hw
+            end_time = t_row['t_EPSP_amp'] + EPSP_hw
+            start_index = np.abs(df['time'] - start_time).idxmin()
+            end_index = np.abs(df['time'] - end_time).idxmin()
+            df_EPSP_amp = df.iloc[start_index:end_index+1].copy()
+            df_EPSP_amp.reset_index(drop=True, inplace=True)
+            df_stimoutput.at[i, 'EPSP_amp'] = (df_EPSP_amp[filter].mean() - amp_zero) * -1000 if not df_EPSP_amp.empty else np.nan
+            # Normalize EPSP_amp
+            selected_values = df_stimoutput['EPSP_amp'][normFrom:normTo+1]
+            norm_mean = np.mean(selected_values) / 100  # divide by 100 to get percentage
+            df_stimoutput.at[i, 'EPSP_amp_norm'] = df_stimoutput.at[i, 'EPSP_amp'] / norm_mean if norm_mean else np.nan
+        # EPSP_slope
+        if valid(t_row['t_EPSP_slope_start']) and valid(t_row['t_EPSP_slope_end']):
+            slope_EPSP = measureslope(df=df, filter=filter, t_start=t_row['t_EPSP_slope_start'], t_end=t_row['t_EPSP_slope_end'])
+            df_stimoutput.at[i, 'EPSP_slope'] = -slope_EPSP if slope_EPSP else np.nan
+            # Normalize EPSP_slope
+            selected_values = df_stimoutput['EPSP_slope'][normFrom:normTo+1]
+            norm_mean = np.mean(selected_values) / 100  # divide by 100 to get percentage
+            df_stimoutput.at[i, 'EPSP_slope_norm'] = df_stimoutput.at[i, 'EPSP_slope'] / norm_mean if norm_mean else np.nan
+        # volley_amp
+        if valid(t_row['t_volley_amp']):
+            start_time = t_row['t_volley_amp'] - volley_hw
+            end_time = t_row['t_volley_amp'] + volley_hw
+            start_index = np.abs(df['time'] - start_time).idxmin()
+            end_index = np.abs(df['time'] - end_time).idxmin()
+            df_volley_amp = df.iloc[start_index:end_index+1].copy()
+            df_volley_amp.reset_index(drop=True, inplace=True)
+            df_stimoutput.at[i, 'volley_amp'] = (df_volley_amp[filter].mean() - amp_zero) * -1000 if not df_volley_amp.empty else np.nan
+        # volley_slope
+        if valid(t_row['t_volley_slope_start']) and valid(t_row['t_volley_slope_end']):
+            volley_EPSP = measureslope(df=df, filter=filter, t_start=t_row['t_volley_slope_start'], t_end=t_row['t_volley_slope_end'])
+            df_stimoutput.at[i, 'volley_slope'] = -volley_EPSP if volley_EPSP else np.nan
+
+    # print(f'build_df_stimoutput: {round((time.time()-t0)*1000)} ms, columns: {df_stimoutput.columns}')
+    return df_stimoutput
+
+
+
+# %% [markdown]
+# # func: addFilterSavgol
+
+# %%
+
+def addFilterSavgol(df, window_length=9, poly_order=3):
+    # returns a column containing a smoothed version of the voltage column in a df; dfmean or dffilter
+    df['savgol'] = savgol_filter(df.voltage, window_length=window_length, polyorder=poly_order)
+    return df['savgol']
 
 
 # %% [markdown]
@@ -53,8 +234,8 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
         dict: Characterization results with feature properties and indices.
     """
     voltage = df['voltage'].values
-    time = df['time'].values
-    dt = time[1] - time[0]  # Assumes uniform sampling
+    times = df['time'].values
+    dt = times[1] - times[0]  # Assumes uniform sampling
     
     # 1. Stimulation Pulse
     neg_peaks = []
@@ -75,8 +256,8 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
         next_pos_candidates = pos_peaks[pos_peaks > first_neg]
         next_pos = next_pos_candidates[0] if next_pos_candidates.size > 0 else None
         if next_pos is not None:
-            verboses += f"stim length: {(time[next_pos] - time[first_neg])}\n"
-            if (time[next_pos] - time[first_neg]) < 0.0004:  # Within 0.4 ms               
+            verboses += f"stim length: {(times[next_pos] - times[first_neg])}\n"
+            if (times[next_pos] - times[first_neg]) < 0.0004:  # Within 0.4 ms               
                 stim_amplitude = -voltage[first_neg]
                 i_stim_neg = int(first_neg) - 1 # yes I hardcoded these 1 step adjustments. Hope it stays that way
                 i_stim_pos = int(next_pos) + 1 # yes I hardcoded these 1 step adjustments. Hope it stays that way
@@ -126,7 +307,7 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
     i_epsp_min = None
     epsp_start = i_veb if volley_detected else i_stim_pos + 2
     epsp_end = min(epsp_start + int(0.02 / dt), len(voltage)-1)  # Clamp to array length
-    verboses += f"epsp region: {epsp_start}:{epsp_end}, time={time[epsp_start]}:{time[epsp_end]}\n"
+    verboses += f"epsp region: {epsp_start}:{epsp_end}, times={times[epsp_start]}:{times[epsp_end]}\n"
     epsp_region = voltage[epsp_start:epsp_end] #TODO: could be useful to savgol this for robustness
     if len(epsp_region) > 0:
         i_epsp_min_rel = np.argmin(epsp_region)
@@ -137,7 +318,7 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
             e_prom /= 2
         if len(e_peaks):
             i_epsp_min = e_peaks[0] + epsp_start # just choosing the leftmost now. with normal curves that should be it, unless noise is very bad
-            verboses += f"epsp min: {i_epsp_min=}, time={time[i_epsp_min]}\n"
+            verboses += f"epsp min: {i_epsp_min=}, times={times[i_epsp_min]}\n"
             if i_epsp_min < len(voltage):
                 epsp_depth = baseline - voltage[i_epsp_min]
                 epsp_detected = bool(epsp_depth > 0.0001)
@@ -162,9 +343,9 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
             win_length = min((trough + 1 - left_peak) // 2, 3) # set savgol window length
             pad = 3
             voltage_slope = savgol_filter(voltage[left_peak: trough + pad], window_length=win_length, polyorder=0)
-            time_slope = time[left_peak: trough + pad]
+            times_slope = times[left_peak: trough + pad]
             for i in range(len(voltage_slope) - pad): # first half
-                x = time_slope[i:i+3]
+                x = times_slope[i:i+3]
                 y = voltage_slope[i:i+3]
                 model = LinearRegression()
                 model.fit(x.reshape(-1, 1), y.reshape(-1, 1))
@@ -175,7 +356,7 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
                 min_slope_i, volley_slope_value = min(slopes, key=lambda x: x[1])
                 i_volley_slope_start = min_slope_i + left_peak
                 i_volley_slope_end = min_slope_i + 2 + left_peak
-                verboses += f"volley slope: start={time[i_volley_slope_start]}, end={time[i_volley_slope_end]}, slope={volley_slope_value}\n"
+                verboses += f"volley slope: start={times[i_volley_slope_start]}, end={times[i_volley_slope_end]}, slope={volley_slope_value}\n"
             else:
                 verboses += "volley slope: not found\n"
         else:
@@ -193,9 +374,9 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
             win_length = min((epsp_min + 1 - right_peak) // 2, 6) # set savgol window length
             pad = 7
             voltage_slope = savgol_filter(voltage[right_peak: epsp_min + pad], window_length=win_length, polyorder=1)
-            time_slope = time[right_peak: epsp_min + pad]
+            times_slope = times[right_peak: epsp_min + pad]
             for i in range((len(voltage_slope) - pad)//4): # first fourth for slope start
-                x = time_slope[i:i+7]
+                x = times_slope[i:i+7]
                 y = voltage_slope[i:i+7]
                 model = LinearRegression()
                 model.fit(x.reshape(-1, 1), y.reshape(-1, 1))
@@ -210,7 +391,7 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
                 max_r2_i, max_r2, epsp_slope_value = max(r2_values, key=lambda x: x[1])
                 i_epsp_slope_start = max_r2_i + right_peak
                 i_epsp_slope_end = max_r2_i + 6 + right_peak
-                verboses += f"epsp slope: start={time[i_epsp_slope_start]}, end={time[i_epsp_slope_end]}, slope={epsp_slope_value}\n"
+                verboses += f"epsp slope: start={times[i_epsp_slope_start]}, end={times[i_epsp_slope_end]}, slope={epsp_slope_value}\n"
             else:
                 verboses += "epsp slope: not found\n"
         else:
@@ -239,11 +420,11 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
         'baseline_region': (0, baseline_end),
         'standard_structure': stim_detected and volley_detected and m_shape and epsp_detected,
         'i_volley_slope_start': i_volley_slope_start,
-        't_volley_slope_start': time[i_volley_slope_start],
+        't_volley_slope_start': times[i_volley_slope_start],
         'i_volley_slope_end': i_volley_slope_end,
         'volley_slope_value': volley_slope_value,
         'i_epsp_slope_start': i_epsp_slope_start,
-        't_EPSP_slope_start': time[i_epsp_slope_start],
+        't_EPSP_slope_start': times[i_epsp_slope_start],
         'i_epsp_slope_end': i_epsp_slope_end,
         'epsp_slope_value': epsp_slope_value
     }
@@ -251,49 +432,49 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
     # Plotting if requested
     if plot:            
         plt.figure(figsize=(12, 9) if not multiplots else (6, 1))
-        plt.plot(time, voltage, label='Voltage', color='black')
+        plt.plot(times, voltage, label='Voltage', color='black')
         
         # Plot baseline
         plt.axhline(y=baseline, color='gray', linestyle='--', label='Baseline')
         
         # Volley region and features
-        if volley_start < len(time) and volley_end <= len(time):
-            volley_start_time = time[volley_start]
-            volley_end_time = time[min(volley_end - 1, len(time) - 1)]
-            plt.axvspan(volley_start_time, volley_end_time, color='yellow', alpha=0.2, label='Volley Region')
+        if volley_start < len(times) and volley_end <= len(times):
+            t_volley_start = times[volley_start]
+            t_volley_end = times[min(volley_end - 1, len(times) - 1)]
+            plt.axvspan(t_volley_start, t_volley_end, color='yellow', alpha=0.2, label='Volley Region')
             for i in i_volley_peaks:
-                if i < len(time):
-                    plt.plot(time[i], voltage[i], 'go', label='Volley Peak' if 'Volley Peak' not in plt.gca().get_legend_handles_labels()[1] else "")
+                if i < len(times):
+                    plt.plot(times[i], voltage[i], 'go', label='Volley Peak' if 'Volley Peak' not in plt.gca().get_legend_handles_labels()[1] else "")
             i = i_volley_trough if 'i_volley_trough' in locals() else None
-            if i is not None and i < len(time):
-                plt.plot(time[i], voltage[i], 'mo', label='Volley Trough' if 'Volley Trough' not in plt.gca().get_legend_handles_labels()[1] else "")
+            if i is not None and i < len(times):
+                plt.plot(times[i], voltage[i], 'mo', label='Volley Trough' if 'Volley Trough' not in plt.gca().get_legend_handles_labels()[1] else "")
         
         # EPSP region and minimum
-        if epsp_start is not None and epsp_end is not None and epsp_start < len(time) and epsp_end <= len(time):
-            epsp_start_time = time[epsp_start]
-            epsp_end_time = time[min(epsp_end - 1, len(time) - 1)]
-            plt.axvspan(epsp_start_time, epsp_end_time, color='cyan', alpha=0.2, label='EPSP Region')
-            if i_epsp_min is not None and i_epsp_min < len(time):
-                plt.plot(time[i_epsp_min], voltage[i_epsp_min], 'ko', label='EPSP Min')
+        if epsp_start is not None and epsp_end is not None and epsp_start < len(times) and epsp_end <= len(times):
+            t_epsp_start = times[epsp_start]
+            t_epsp_end = times[min(epsp_end - 1, len(times) - 1)]
+            plt.axvspan(t_epsp_start, t_epsp_end, color='cyan', alpha=0.2, label='EPSP Region')
+            if i_epsp_min is not None and i_epsp_min < len(times):
+                plt.plot(times[i_epsp_min], voltage[i_epsp_min], 'ko', label='EPSP Min')
         
         # Chatter region
-        if chatter_start < len(time) and chatter_end <= len(time):
-            chatter_start_time = time[chatter_start]
-            chatter_end_time = time[min(chatter_end - 1, len(time) - 1)]
-            plt.axvspan(chatter_start_time, chatter_end_time, color='orange', alpha=0.2, label='Chatter Region')
+        if chatter_start < len(times) and chatter_end <= len(times):
+            t_chatter_start = times[chatter_start]
+            t_chatter_end = times[min(chatter_end - 1, len(times) - 1)]
+            plt.axvspan(t_chatter_start, t_chatter_end, color='orange', alpha=0.2, label='Chatter Region')
         
         # Mark stimulation baseline crossings
         if stim_detected:
-            plt.plot(time[i_stim_neg], baseline, 'ro', label='Stim peaks time')
-            plt.plot(time[i_stim_pos], baseline, 'ro')
+            plt.plot(times[i_stim_neg], baseline, 'ro', label='Stim peaks time')
+            plt.plot(times[i_stim_pos], baseline, 'ro')
         
         # Plot volley slope
         if i_volley_slope_start is not None and i_volley_slope_end is not None:
-            plt.plot(time[i_volley_slope_start:i_volley_slope_end+1], voltage[i_volley_slope_start:i_volley_slope_end+1], 'r-', linewidth=2, label='Volley Slope')
+            plt.plot(times[i_volley_slope_start:i_volley_slope_end+1], voltage[i_volley_slope_start:i_volley_slope_end+1], 'r-', linewidth=2, label='Volley Slope')
         
         # Plot EPSP slope
         if i_epsp_slope_start is not None and i_epsp_slope_end is not None:
-            plt.plot(time[i_epsp_slope_start:i_epsp_slope_end+1], voltage[i_epsp_slope_start:i_epsp_slope_end+1], 'r-', linewidth=2, label='EPSP Slope')
+            plt.plot(times[i_epsp_slope_start:i_epsp_slope_end+1], voltage[i_epsp_slope_start:i_epsp_slope_end+1], 'r-', linewidth=2, label='EPSP Slope')
         
         # Calculate y-axis limits based on features
         if volley_detected:
