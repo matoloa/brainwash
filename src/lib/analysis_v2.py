@@ -66,8 +66,8 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
         stim_prom /= 2
     stim_detected = False
     stim_amplitude = 0
-    stim_neg_idx = None
-    stim_pos_idx = None
+    i_stim_neg = None
+    i_stim_pos = None
     verboses = f"function: characterize_graph_class_a\n"
     if neg_peaks.size > 0 and pos_peaks.size > 0:
         verboses += f"stim: found possible peaks.\n {neg_peaks}, {neg_props}, {pos_peaks}, {pos_props}\n"
@@ -78,8 +78,8 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
             verboses += f"stim length: {(time[next_pos] - time[first_neg])}\n"
             if (time[next_pos] - time[first_neg]) < 0.0004:  # Within 0.4 ms               
                 stim_amplitude = -voltage[first_neg]
-                stim_neg_idx = int(first_neg) - 1 # yes I hardcoded these 1 step adjustments. Hope it stays that way
-                stim_pos_idx = int(next_pos) + 1 # yes I hardcoded these 1 step adjustments. Hope it stays that way
+                i_stim_neg = int(first_neg) - 1 # yes I hardcoded these 1 step adjustments. Hope it stays that way
+                i_stim_pos = int(next_pos) + 1 # yes I hardcoded these 1 step adjustments. Hope it stays that way
                 stim_detected = bool(stim_amplitude > stim_amp)
                 verboses += f"{stim_detected=}\n"
     else:
@@ -87,7 +87,7 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
 
     # Baseline: Mean voltage before stimulation (or first 10% of data)
     if stim_detected:
-        baseline_end = stim_neg_idx - 2
+        baseline_end = i_stim_neg - 2
     else:
         baseline_end = int(0.1 * len(voltage))
     baseline = np.mean(voltage[:baseline_end])
@@ -95,7 +95,7 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
     # 2. Volley (M-Shape)
     volley_detected = False
     m_shape = False
-    volley_start = stim_neg_idx + int(0.0005 / dt) if stim_detected else int(0.001 / dt)
+    volley_start = i_stim_neg + int(0.0005 / dt) if stim_detected else int(0.001 / dt)
     volley_end = min(volley_start + int(0.005 / dt), len(voltage))  # Clamp to array length
     volley_region = voltage[volley_start:volley_end]
     verboses += f"volley: search region {volley_start}, {volley_end}\n"
@@ -105,8 +105,8 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
         v_peaks, v_peak_props = find_peaks(volley_region, prominence=v_prom)
         v_prom /= 2
     v_troughs, _ = find_peaks(-volley_region, prominence=v_prom) # using same v_prom for peak and trough. seems to work but could change
-    volley_peaks_idx = [p + volley_start for p in v_peaks if p + volley_start < len(voltage)]
-    volley_troughs_idx = [t + volley_start for t in v_troughs if t + volley_start < len(voltage)]
+    i_volley_peaks = [p + volley_start for p in v_peaks if p + volley_start < len(voltage)]
+    i_volley_troughs = [t + volley_start for t in v_troughs if t + volley_start < len(voltage)]
     if len(v_peaks) >= 2 and len(v_troughs) >= 1:
         volley_detected = True
         for i in range(len(v_peaks) - 1):
@@ -114,49 +114,49 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
             troughs_between = [t for t in v_troughs if p1 < t < p2]
             if troughs_between and volley_region[p2] <= volley_region[p1]:
                 m_shape = True
-                veb_idx = p2 + volley_start
-                volley_peaks_idx = [p1 + volley_start, p2 + volley_start]
-                volley_trough_idx = troughs_between[0] + volley_start
+                i_veb = p2 + volley_start
+                i_volley_peaks = [p1 + volley_start, p2 + volley_start]
+                i_volley_trough = troughs_between[0] + volley_start
                 #TODO: speak with Mats, maybe select trough in the middle of the peaks here?
                 break
 
     # 3. EPSP
     epsp_detected = False
     epsp_depth = 0
-    epsp_min_idx = None
-    epsp_start = veb_idx if volley_detected else stim_pos_idx + 2
+    i_epsp_min = None
+    epsp_start = i_veb if volley_detected else i_stim_pos + 2
     epsp_end = min(epsp_start + int(0.02 / dt), len(voltage)-1)  # Clamp to array length
     verboses += f"epsp region: {epsp_start}:{epsp_end}, time={time[epsp_start]}:{time[epsp_end]}\n"
     epsp_region = voltage[epsp_start:epsp_end] #TODO: could be useful to savgol this for robustness
     if len(epsp_region) > 0:
-        epsp_min_idx_rel = np.argmin(epsp_region)
+        i_epsp_min_rel = np.argmin(epsp_region)
         e_prom = 0.01
         e_peaks = []
         while len(e_peaks) < 1 and e_prom > 1e-6: # iterative epsp search
             e_peaks, e_peak_props = find_peaks( - epsp_region, prominence=e_prom)
             e_prom /= 2
         if len(e_peaks):
-            epsp_min_idx = e_peaks[0] + epsp_start # just choosing the leftmost now. with normal curves that should be it, unless noise is very bad
-            verboses += f"epsp min: {epsp_min_idx=}, time={time[epsp_min_idx]}\n"
-            if epsp_min_idx < len(voltage):
-                epsp_depth = baseline - voltage[epsp_min_idx]
+            i_epsp_min = e_peaks[0] + epsp_start # just choosing the leftmost now. with normal curves that should be it, unless noise is very bad
+            verboses += f"epsp min: {i_epsp_min=}, time={time[i_epsp_min]}\n"
+            if i_epsp_min < len(voltage):
+                epsp_depth = baseline - voltage[i_epsp_min]
                 epsp_detected = bool(epsp_depth > 0.0001)
         else:
             verboses += f"epsp min: no peak found\n"
 
     # 4. Noise Level
-    chatter_start = stim_pos_idx + 3 if stim_detected else int(0.05 * len(voltage))
+    chatter_start = i_stim_pos + 3 if stim_detected else int(0.05 * len(voltage))
     chatter_end = min(int(0.2 * len(voltage)), len(voltage))
     chatter_region = voltage[chatter_start:chatter_end]
     noise_level = np.std(chatter_region) if len(chatter_region) > 0 else 0
 
     # 5. Volley Slope (steepest 3-point interval between left volley peak and volley trough, limit search to first half and see what happens)
-    volley_slope_start = None
-    volley_slope_end = None
+    i_volley_slope_start = None
+    i_volley_slope_end = None
     volley_slope_value = None
-    if m_shape and 'volley_trough_idx' in locals():
-        left_peak = volley_peaks_idx[0]
-        trough = volley_trough_idx
+    if m_shape and 'i_volley_trough' in locals():
+        left_peak = i_volley_peaks[0]
+        trough = i_volley_trough
         if trough - left_peak >= 2:
             slopes = []
             win_length = min((trough + 1 - left_peak) // 2, 3) # set savgol window length
@@ -173,21 +173,21 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
                 slopes.append((i, coeffs[0]))
             if slopes:
                 min_slope_i, volley_slope_value = min(slopes, key=lambda x: x[1])
-                volley_slope_start = min_slope_i + left_peak
-                volley_slope_end = min_slope_i + 2 + left_peak
-                verboses += f"volley slope: start={time[volley_slope_start]}, end={time[volley_slope_end]}, slope={volley_slope_value}\n"
+                i_volley_slope_start = min_slope_i + left_peak
+                i_volley_slope_end = min_slope_i + 2 + left_peak
+                verboses += f"volley slope: start={time[i_volley_slope_start]}, end={time[i_volley_slope_end]}, slope={volley_slope_value}\n"
             else:
                 verboses += "volley slope: not found\n"
         else:
             verboses += "volley slope: region too small\n"
 
     # 6. EPSP Slope (straightest 7-point interval between right volley peak and EPSP min)
-    epsp_slope_start = None
-    epsp_slope_end = None
+    i_epsp_slope_start = None
+    i_epsp_slope_end = None
     epsp_slope_value = None
-    if epsp_detected and len(volley_peaks_idx) >= 2 and epsp_min_idx is not None:
-        right_peak = volley_peaks_idx[1]
-        epsp_min = epsp_min_idx
+    if epsp_detected and len(i_volley_peaks) >= 2 and i_epsp_min is not None:
+        right_peak = i_volley_peaks[1]
+        epsp_min = i_epsp_min
         if epsp_min - right_peak >= 6:
             r2_values = []
             win_length = min((epsp_min + 1 - right_peak) // 2, 6) # set savgol window length
@@ -208,9 +208,9 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
                 r2_values.append((i, r2, coeffs[0]))
             if r2_values:
                 max_r2_i, max_r2, epsp_slope_value = max(r2_values, key=lambda x: x[1])
-                epsp_slope_start = max_r2_i + right_peak
-                epsp_slope_end = max_r2_i + 6 + right_peak
-                verboses += f"epsp slope: start={time[epsp_slope_start]}, end={time[epsp_slope_end]}, slope={epsp_slope_value}\n"
+                i_epsp_slope_start = max_r2_i + right_peak
+                i_epsp_slope_end = max_r2_i + 6 + right_peak
+                verboses += f"epsp slope: start={time[i_epsp_slope_start]}, end={time[i_epsp_slope_end]}, slope={epsp_slope_value}\n"
             else:
                 verboses += "epsp slope: not found\n"
         else:
@@ -223,28 +223,28 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
     result = {
         'stimulation_detected': stim_detected,
         'stim_amplitude': stim_amplitude,
-        'stim_neg_idx': stim_neg_idx,
-        'stim_pos_idx': stim_pos_idx,
+        'i_stim_neg': i_stim_neg,
+        'i_stim_pos': i_stim_pos,
         'volley_detected': volley_detected,
         'm_shape_confirmed': m_shape,
         'volley_region': (volley_start, volley_end),
-        'volley_peaks_idx': volley_peaks_idx,
-        'volley_trough_idx': volley_trough_idx if 'volley_trough_idx' in locals() else None,
+        'i_volley_peaks': i_volley_peaks,
+        'i_volley_trough': i_volley_trough if 'i_volley_trough' in locals() else None,
         'epsp_detected': epsp_detected,
         'epsp_depth': epsp_depth,
         'epsp_region': (epsp_start, epsp_end),
-        'epsp_min_idx': epsp_min_idx,
+        'i_epsp_min': i_epsp_min,
         'noise_level': noise_level,
         'chatter_region': (chatter_start, chatter_end),
         'baseline_region': (0, baseline_end),
         'standard_structure': stim_detected and volley_detected and m_shape and epsp_detected,
-        'volley_slope_start': volley_slope_start,
-        't_volley_slope_start': time[volley_slope_start],
-        'volley_slope_end': volley_slope_end,
+        'i_volley_slope_start': i_volley_slope_start,
+        't_volley_slope_start': time[i_volley_slope_start],
+        'i_volley_slope_end': i_volley_slope_end,
         'volley_slope_value': volley_slope_value,
-        'epsp_slope_start': epsp_slope_start,
-        't_EPSP_slope_start': time[epsp_slope_start],
-        'epsp_slope_end': epsp_slope_end,
+        'i_epsp_slope_start': i_epsp_slope_start,
+        't_EPSP_slope_start': time[i_epsp_slope_start],
+        'i_epsp_slope_end': i_epsp_slope_end,
         'epsp_slope_value': epsp_slope_value
     }
 
@@ -261,20 +261,20 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
             volley_start_time = time[volley_start]
             volley_end_time = time[min(volley_end - 1, len(time) - 1)]
             plt.axvspan(volley_start_time, volley_end_time, color='yellow', alpha=0.2, label='Volley Region')
-            for idx in volley_peaks_idx:
-                if idx < len(time):
-                    plt.plot(time[idx], voltage[idx], 'go', label='Volley Peak' if 'Volley Peak' not in plt.gca().get_legend_handles_labels()[1] else "")
-            idx = volley_trough_idx if 'volley_trough_idx' in locals() else None
-            if idx is not None and idx < len(time):
-                plt.plot(time[idx], voltage[idx], 'mo', label='Volley Trough' if 'Volley Trough' not in plt.gca().get_legend_handles_labels()[1] else "")
+            for i in i_volley_peaks:
+                if i < len(time):
+                    plt.plot(time[i], voltage[i], 'go', label='Volley Peak' if 'Volley Peak' not in plt.gca().get_legend_handles_labels()[1] else "")
+            i = i_volley_trough if 'i_volley_trough' in locals() else None
+            if i is not None and i < len(time):
+                plt.plot(time[i], voltage[i], 'mo', label='Volley Trough' if 'Volley Trough' not in plt.gca().get_legend_handles_labels()[1] else "")
         
         # EPSP region and minimum
         if epsp_start is not None and epsp_end is not None and epsp_start < len(time) and epsp_end <= len(time):
             epsp_start_time = time[epsp_start]
             epsp_end_time = time[min(epsp_end - 1, len(time) - 1)]
             plt.axvspan(epsp_start_time, epsp_end_time, color='cyan', alpha=0.2, label='EPSP Region')
-            if epsp_min_idx is not None and epsp_min_idx < len(time):
-                plt.plot(time[epsp_min_idx], voltage[epsp_min_idx], 'ko', label='EPSP Min')
+            if i_epsp_min is not None and i_epsp_min < len(time):
+                plt.plot(time[i_epsp_min], voltage[i_epsp_min], 'ko', label='EPSP Min')
         
         # Chatter region
         if chatter_start < len(time) and chatter_end <= len(time):
@@ -284,16 +284,16 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
         
         # Mark stimulation baseline crossings
         if stim_detected:
-            plt.plot(time[stim_neg_idx], baseline, 'ro', label='Stim peaks time')
-            plt.plot(time[stim_pos_idx], baseline, 'ro')
+            plt.plot(time[i_stim_neg], baseline, 'ro', label='Stim peaks time')
+            plt.plot(time[i_stim_pos], baseline, 'ro')
         
         # Plot volley slope
-        if volley_slope_start is not None and volley_slope_end is not None:
-            plt.plot(time[volley_slope_start:volley_slope_end+1], voltage[volley_slope_start:volley_slope_end+1], 'r-', linewidth=2, label='Volley Slope')
+        if i_volley_slope_start is not None and i_volley_slope_end is not None:
+            plt.plot(time[i_volley_slope_start:i_volley_slope_end+1], voltage[i_volley_slope_start:i_volley_slope_end+1], 'r-', linewidth=2, label='Volley Slope')
         
         # Plot EPSP slope
-        if epsp_slope_start is not None and epsp_slope_end is not None:
-            plt.plot(time[epsp_slope_start:epsp_slope_end+1], voltage[epsp_slope_start:epsp_slope_end+1], 'r-', linewidth=2, label='EPSP Slope')
+        if i_epsp_slope_start is not None and i_epsp_slope_end is not None:
+            plt.plot(time[i_epsp_slope_start:i_epsp_slope_end+1], voltage[i_epsp_slope_start:i_epsp_slope_end+1], 'r-', linewidth=2, label='EPSP Slope')
         
         # Calculate y-axis limits based on features
         if volley_detected:

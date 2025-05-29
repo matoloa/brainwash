@@ -16,7 +16,7 @@
 '''
 purpose
 pull all Mats (and later user feedback) supplied graphs with manual labels
-push them through analysis modules, collect results and evaluate
+push them through analysis modules, collect results and evaluate performance of analysis algorithms
 
 '''
 
