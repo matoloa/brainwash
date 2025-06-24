@@ -2187,7 +2187,7 @@ class UIsub(Ui_MainWindow):
             print(f"stimDetect: {rec_name} calling find_events within range:\n{uistate.x_select}")
             new_df_t = analysis.find_events(dfmean=dfmean_range, default_dict_t=default_dict_t, verbose=False)
             if new_df_t is None:
-                print(f"No stims found for {rec_name}.")
+                print(f"StimDetect: No stims found for {rec_name}.")
                 continue
             if uistate.checkBox['timepoints_per_stim'] or stims == 1:
                 self.set_dft(rec_name, new_df_t)
@@ -2917,7 +2917,7 @@ class UIsub(Ui_MainWindow):
             dfmean = self.get_dfmean(row)
             df_t = analysis.find_events(dfmean=dfmean, default_dict_t=default_dict_t, verbose=False)
             if df_t.empty:
-                print("No stims found.")
+                print("get_dft: No stims found.")
                 return None
             df_t['norm_EPSP_from'], df_t['norm_EPSP_to'] = uistate.lineEdit['norm_EPSP_from'], uistate.lineEdit['norm_EPSP_to']
             df_t['t_EPSP_amp_halfwidth'] = uistate.lineEdit['EPSP_amp_halfwidth_ms']/1000

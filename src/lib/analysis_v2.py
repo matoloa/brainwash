@@ -148,31 +148,102 @@ def addFilterSavgol(df, window_length=9, poly_order=3):
     return df['savgol']
 
 
+def find_i_stims(dfmean, threshold=0.1, min_time_difference=0.005, verbose=False):
+    # Finds indices of stimulation events in a DataFrame based on the 'prim' column.
+    prim_max_y = dfmean.prim.max()
+    threshold *= prim_max_y
 
-def find_events(dfmean, default_dict_t, stim_amp=0.005, verbose=False):
+    above_threshold_indices = np.where(dfmean['prim'] > threshold)[0]
+    # Filter the indices to ensure they are more than min_time_difference apart
+    filtered_indices = []
+    max_index = above_threshold_indices[0]
+    for i in range(1, len(above_threshold_indices)):
+        current_index = above_threshold_indices[i]
+        previous_index = above_threshold_indices[i - 1]
+        if dfmean['time'][current_index] - dfmean['time'][previous_index] > min_time_difference:
+            filtered_indices.append(max_index)
+            max_index = current_index
+        elif dfmean['prim'][current_index] > dfmean['prim'][max_index]:
+            max_index = current_index
+    filtered_indices.append(max_index)
+    if verbose:
+        print(f"find_i_stims: {filtered_indices}, type: {type(filtered_indices)}")
+    return filtered_indices
 
-    result = characterize_graph(dfmean, stim_amp=stim_amp, verbose=verbose)
+
+def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=None, verbose=False):
+    """
+    This function replaces the deprecated find_all_i and find_all_t
+    1) Finds stims, if not provided
+    2) Acquires i and t from characterize_graph() for the provided dfmean and converts index to time values
+    3) Returns a DataFrame of the t-values for each stim
+    """
+    # i_stims: list of indices of stimulation artefacts in dfmean. If None, autodetects using find_i_stims.
+    if i_stims is None:
+        i_stims = find_i_stims(dfmean=dfmean)
+    if not i_stims:
+        print("find_events: no stimulation artefacts found. Returning empty DataFrame.")
+        return pd.DataFrame()
+    
+    # calculate time delta and sampling frequency
+    time_values = dfmean['time'].values
+    time_delta = time_values[1] - time_values[0]
+    sampling_Hz = 1 / time_delta
+
+    if precision is None:
+        precision = len(str(time_values[1] - time_values[0]).split('.')[1])
+
+    if verbose:
+        print(f"find_i_stims: {len(i_stims)}: sampling_Hz: {sampling_Hz}")
+        print(i_stims)
+    
+    def i2t(stim_nr, i_stim, df_event_range, time_delta, stim_char, precision, default_dict_t):
+        # Converts i (index) to t (time from start of sweep in dfmean)
+        t_stim = df_event_range.loc[i_stim].time
+#        amp_zero_idx_start = df_event_range.loc[i_stim] - 20 # TODO: fix hardcoded value
+#        amp_zero_idx_end = df_event_range.loc[i_stim] - 10 # TODO: fix hardcoded value
+#        amp_zero = df_event_range.loc[amp_zero_idx_start:amp_zero_idx_end].voltage.mean() # TODO: fix hardcoded filter: "voltage"
+        amp_zero = 0
+        t_volley_slope_start = stim_char['t_volley_slope_start']
+        t_volley_slope_end = t_volley_slope_start + default_dict_t['t_volley_slope_width']
+        t_EPSP_slope_start = stim_char['t_EPSP_slope_start']
+        t_EPSP_slope_end = t_EPSP_slope_start + default_dict_t['t_EPSP_slope_width']
+        t_volley_amp = df_event_range.loc[stim_char['i_volley_trough']].time
+        print(f"find_events: t_volley_amp: {t_volley_amp}, type: {type(t_volley_amp)} from i_volley_trough: {stim_char['i_volley_trough']}")
+        t_EPSP_amp = df_event_range.loc[stim_char['i_epsp_min']].time
+        print(f"find_events: t_EPSP_amp: {t_EPSP_amp}, type: {type(t_EPSP_amp)} from i_epsp_min: {stim_char['i_epsp_min']}")
+
+        return {
+            'stim': stim_nr,
+            'amp_zero': amp_zero, # mean of dfmean.voltage 20-10 indices before i_stim, in Volts
+            't_stim': round(t_stim, precision),
+            't_volley_slope_start': round(t_volley_slope_start, precision) if t_volley_slope_start is not None else None,
+            't_volley_slope_end': round(t_volley_slope_end, precision) if t_volley_slope_end is not None else None,
+            't_EPSP_slope_start': round(t_EPSP_slope_start , precision) if t_EPSP_slope_start is not None else None,
+            't_EPSP_slope_end': round(t_EPSP_slope_end , precision) if t_EPSP_slope_end is not None else None,
+            't_volley_amp': round(t_volley_amp, precision) if t_volley_amp is not None else None,
+            't_EPSP_amp': round(t_EPSP_amp, precision) if t_EPSP_amp is not None else None,
+        }
+
     # Convert each index to a dictionary of t-values and add it to a list
     list_of_dict_t = []
-    '''
-    for index, row in df_indices.iterrows():
-        result = i2t(index, dfmean, row, precision, default_dict_t)
+    for stim_nr, i_stim in enumerate(i_stims, start=1):
+        df_event_range = dfmean.loc[i_stim - 50:i_stim + 500]  # TODO: fix hardcoded value
         dict_t = default_dict_t.copy()
-        dict_t.update(result)
+        stim_characteristics = characterize_graph(df_event_range, verbose=verbose)
+        print(f"stim_characteristics: {stim_characteristics}")
+        if stim_characteristics['standard_structure']:
+            result = i2t(stim_nr=stim_nr, i_stim=i_stim, df_event_range=df_event_range, time_delta=time_delta, stim_char=stim_characteristics, precision=precision, default_dict_t=dict_t)
+            dict_t.update(result)
+        else:
+            print(f"find_events: no standard structure found in stim #{stim_nr}, using default.")
         list_of_dict_t.append(dict_t)
 
     # Convert the list of dictionaries to a DataFrame
     df_t = pd.DataFrame(list_of_dict_t)
 
-    # conserve all columns that start with "t_"
-    list_t_columns_in_df_indices = [col for col in df_indices.columns if col.startswith('t_')]
-    for col in list_t_columns_in_df_indices:
-        df_t[col] = df_indices[col]
-
     if verbose: print(f"df_t: {df_t}")
     return df_t
-    '''
-    print(f"find_events: {result}")
     
 
 # %%
