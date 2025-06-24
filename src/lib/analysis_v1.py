@@ -175,6 +175,8 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
 
 
 def build_dfstimoutput(df, df_t, filter='voltage'):
+    # This is a temporary duplicate of build_dfoutput, modified for handling multiple stimulations in a single sweep
+    # Cannibalize for build_dfoutput - do not use in production
     t0 = time.time()
     df_stimoutput = pd.DataFrame(index=df_t.index, columns=['stim', 'bin', 'EPSP_amp', 'EPSP_amp_norm', 'EPSP_slope', 'EPSP_slope_norm', 'volley_amp', 'volley_slope'])
     # print (f"build_dfstimoutput: {df_t}")

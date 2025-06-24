@@ -27,16 +27,15 @@ import time
 
 reporoot = Path(os.getcwd()).parent
 sys.path.append(str(reporoot / 'src/lib/'))
-import analysis_v1
 
 
-# %% [markdown]
-# # fumc: build_dfoutput
 
 # %%
 def valid(num):
     #print(f"num: {num}, type: {type(num)}")
     return num is not None and not np.isnan(num)
+
+
 
 def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
     """
@@ -51,6 +50,8 @@ def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
     dfslopes['value'] = coefs[:, 0]
     # TODO: verify that it was the correct columns, and that values are reasonable
     return dfslopes
+
+
 
 def build_dfoutput(df, dict_t, filter='voltage', quick=False):
     print(f"{dict_t=}")
@@ -141,77 +142,38 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
 
 
 
-# %% [markdown]
-# # func: build_dfstimoutput
-
-# %%
-
-def build_dfstimoutput(df, df_t, filter='voltage'):
-    t0 = time.time()
-    df_stimoutput = pd.DataFrame(index=df_t.index, columns=['stim', 'bin', 'EPSP_amp', 'EPSP_amp_norm', 'EPSP_slope', 'EPSP_slope_norm', 'volley_amp', 'volley_slope'])
-    # print (f"build_dfstimoutput: {df_t}")
-
-    for i, t_row in df_t.iterrows():
-        normFrom = t_row['norm_output_from'] # start
-        normTo = t_row['norm_output_to'] # end
-        amp_zero = t_row['amp_zero']
-        EPSP_hw = t_row['t_EPSP_amp_halfwidth']
-        volley_hw = t_row['t_volley_amp_halfwidth']
-        df_stimoutput.at[i, 'stim'] = t_row['stim']
-
-        # EPSP_amp
-        if valid(t_row['t_EPSP_amp']):
-            start_time = t_row['t_EPSP_amp'] - EPSP_hw
-            end_time = t_row['t_EPSP_amp'] + EPSP_hw
-            start_index = np.abs(df['time'] - start_time).idxmin()
-            end_index = np.abs(df['time'] - end_time).idxmin()
-            df_EPSP_amp = df.iloc[start_index:end_index+1].copy()
-            df_EPSP_amp.reset_index(drop=True, inplace=True)
-            df_stimoutput.at[i, 'EPSP_amp'] = (df_EPSP_amp[filter].mean() - amp_zero) * -1000 if not df_EPSP_amp.empty else np.nan
-            # Normalize EPSP_amp
-            selected_values = df_stimoutput['EPSP_amp'][normFrom:normTo+1]
-            norm_mean = np.mean(selected_values) / 100  # divide by 100 to get percentage
-            df_stimoutput.at[i, 'EPSP_amp_norm'] = df_stimoutput.at[i, 'EPSP_amp'] / norm_mean if norm_mean else np.nan
-        # EPSP_slope
-        if valid(t_row['t_EPSP_slope_start']) and valid(t_row['t_EPSP_slope_end']):
-            slope_EPSP = measureslope(df=df, filter=filter, t_start=t_row['t_EPSP_slope_start'], t_end=t_row['t_EPSP_slope_end'])
-            df_stimoutput.at[i, 'EPSP_slope'] = -slope_EPSP if slope_EPSP else np.nan
-            # Normalize EPSP_slope
-            selected_values = df_stimoutput['EPSP_slope'][normFrom:normTo+1]
-            norm_mean = np.mean(selected_values) / 100  # divide by 100 to get percentage
-            df_stimoutput.at[i, 'EPSP_slope_norm'] = df_stimoutput.at[i, 'EPSP_slope'] / norm_mean if norm_mean else np.nan
-        # volley_amp
-        if valid(t_row['t_volley_amp']):
-            start_time = t_row['t_volley_amp'] - volley_hw
-            end_time = t_row['t_volley_amp'] + volley_hw
-            start_index = np.abs(df['time'] - start_time).idxmin()
-            end_index = np.abs(df['time'] - end_time).idxmin()
-            df_volley_amp = df.iloc[start_index:end_index+1].copy()
-            df_volley_amp.reset_index(drop=True, inplace=True)
-            df_stimoutput.at[i, 'volley_amp'] = (df_volley_amp[filter].mean() - amp_zero) * -1000 if not df_volley_amp.empty else np.nan
-        # volley_slope
-        if valid(t_row['t_volley_slope_start']) and valid(t_row['t_volley_slope_end']):
-            volley_EPSP = measureslope(df=df, filter=filter, t_start=t_row['t_volley_slope_start'], t_end=t_row['t_volley_slope_end'])
-            df_stimoutput.at[i, 'volley_slope'] = -volley_EPSP if volley_EPSP else np.nan
-
-    # print(f'build_df_stimoutput: {round((time.time()-t0)*1000)} ms, columns: {df_stimoutput.columns}')
-    return df_stimoutput
-
-
-
-# %% [markdown]
-# # func: addFilterSavgol
-
-# %%
-
 def addFilterSavgol(df, window_length=9, poly_order=3):
     # returns a column containing a smoothed version of the voltage column in a df; dfmean or dffilter
     df['savgol'] = savgol_filter(df.voltage, window_length=window_length, polyorder=poly_order)
     return df['savgol']
 
 
-# %% [markdown]
-# # func: characterize_graph
+
+def find_events(dfmean, default_dict_t, stim_amp=0.005, verbose=False):
+
+    result = characterize_graph(dfmean, stim_amp=stim_amp, verbose=verbose)
+    # Convert each index to a dictionary of t-values and add it to a list
+    list_of_dict_t = []
+    '''
+    for index, row in df_indices.iterrows():
+        result = i2t(index, dfmean, row, precision, default_dict_t)
+        dict_t = default_dict_t.copy()
+        dict_t.update(result)
+        list_of_dict_t.append(dict_t)
+
+    # Convert the list of dictionaries to a DataFrame
+    df_t = pd.DataFrame(list_of_dict_t)
+
+    # conserve all columns that start with "t_"
+    list_t_columns_in_df_indices = [col for col in df_indices.columns if col.startswith('t_')]
+    for col in list_t_columns_in_df_indices:
+        df_t[col] = df_indices[col]
+
+    if verbose: print(f"df_t: {df_t}")
+    return df_t
+    '''
+    print(f"find_events: {result}")
+    
 
 # %%
 import numpy as np
@@ -511,9 +473,6 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
     return result
 
 
-# %% [markdown]
-# # inmodule test and development
-
 # %%
 if __name__ == "__main__":
     # read slices and meta
@@ -542,10 +501,6 @@ if __name__ == "__main__":
     
     df = pd.concat([load_slice(slice_filepath, sweep) for sweep, slice_filepath in enumerate(slice_filepaths)])
 
-# %%
-
-# %% [markdown]
-# # evaluation
 
 # %%
 if __name__ == "__main__":
@@ -579,9 +534,6 @@ if __name__ == "__main__":
   
     
     evaluate_and_report(dfresults_av2, meta, signals, offset_thresholds=[1, 2, 3, 5, 10])
-
-# %% [markdown]
-# # find and plot the worst errors
 
 # %%
 # find worst offenders
@@ -617,7 +569,3 @@ if __name__ == "__main__":
         results.append(result)
     dfresults = pd.DataFrame(results)
     #dfresults
-
-# %%
-
-# %%

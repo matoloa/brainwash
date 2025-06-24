@@ -2184,8 +2184,8 @@ class UIsub(Ui_MainWindow):
             else:
                 dfmean_range = dfmean
             default_dict_t = uistate.default_dict_t.copy()  # Default sizes
-            print(f"stimDetect: {rec_name} calling find_all_t within range:\n{uistate.x_select}")
-            new_df_t = analysis.find_all_t(dfmean=dfmean_range, default_dict_t=default_dict_t, precision = uistate.settings['precision'], verbose=False)
+            print(f"stimDetect: {rec_name} calling find_events within range:\n{uistate.x_select}")
+            new_df_t = analysis.find_events(dfmean=dfmean_range, default_dict_t=default_dict_t, verbose=False)
             if new_df_t is None:
                 print(f"No stims found for {rec_name}.")
                 continue
@@ -2915,7 +2915,7 @@ class UIsub(Ui_MainWindow):
             print("creating dft")
             default_dict_t = uistate.default_dict_t.copy()  # Default sizes
             dfmean = self.get_dfmean(row)
-            df_t = analysis.find_all_t(dfmean=dfmean, default_dict_t=default_dict_t, precision = uistate.settings['precision'], verbose=False)
+            df_t = analysis.find_events(dfmean=dfmean, default_dict_t=default_dict_t, verbose=False)
             if df_t.empty:
                 print("No stims found.")
                 return None
