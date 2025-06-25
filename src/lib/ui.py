@@ -83,7 +83,7 @@ class Config:
             print(f"Development mode - {time.strftime('%H:%M:%S')}")
         else:
             print(f"Deploy mode - {time.strftime('%H:%M:%S')}")
-        clear = False
+        clear = True#False
 
         self.clear_cache = clear
         self.transient = False # Block persisting of files
