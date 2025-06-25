@@ -70,6 +70,7 @@ class UIstate:
             't_stim': 0,
             't_stim_method': 0,
             't_stim_params': 0,
+            'amp_zero': 0,
             't_volley_slope_width': 0.0003,
             't_volley_slope_halfwidth': 0.0001,
             't_volley_slope_start': 0,

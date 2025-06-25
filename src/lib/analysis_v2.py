@@ -203,7 +203,7 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
 #        amp_zero_idx_start = df_event_range.loc[i_stim] - 20 # TODO: fix hardcoded value
 #        amp_zero_idx_end = df_event_range.loc[i_stim] - 10 # TODO: fix hardcoded value
 #        amp_zero = df_event_range.loc[amp_zero_idx_start:amp_zero_idx_end].voltage.mean() # TODO: fix hardcoded filter: "voltage"
-        amp_zero = 0
+        amp_zero = 0 # TODO: placeholder for debugging, remove when amp_zero is implemented
         t_volley_slope_start = stim_char['t_volley_slope_start']
         t_volley_slope_end = t_volley_slope_start + default_dict_t['t_volley_slope_width']
         t_EPSP_slope_start = stim_char['t_EPSP_slope_start']
@@ -228,7 +228,7 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
     # Convert each index to a dictionary of t-values and add it to a list
     list_of_dict_t = []
     for stim_nr, i_stim in enumerate(i_stims, start=1):
-        df_event_range = dfmean.loc[i_stim - 50:i_stim + 500]  # TODO: fix hardcoded value
+        df_event_range = dfmean#.loc[i_stim - 50:i_stim + 500]  # TODO: fix hardcoded value
         dict_t = default_dict_t.copy()
         stim_characteristics = characterize_graph(df_event_range, verbose=verbose)
         print(f"stim_characteristics: {stim_characteristics}")
@@ -241,7 +241,7 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
 
     # Convert the list of dictionaries to a DataFrame
     df_t = pd.DataFrame(list_of_dict_t)
-
+    print(f"df_t: {df_t}")
     if verbose: print(f"df_t: {df_t}")
     return df_t
     
