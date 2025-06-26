@@ -543,6 +543,79 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
         
     return result
 
+if __name__ == "__main__":
+    import parse
+    import ui_state_classes as ui
+    # Test find_events:  with a sample DataFrame
+    list_sources = [r"K:\Samples - pilot\cA24.csv",  # Works with ui.py
+                    #r"K:\Samples - pilot\cB22.csv", # Doesn't Work with ui.py
+    ]
+    default_dict_t = { # default values for df_t(imepoints)
+        # TODO: rework and harmonize parameters
+        # suggested format: feature-[param, value]
+        # example: dict_param = {volley_slope-width: 3}
+        # example: dict_values = {volley_slope-value: -0.3254}
+        'stim': 0,
+        't_stim': 0,
+        't_stim_method': 0,
+        't_stim_params': 0,
+        't_volley_slope_width': 0.0003, # only assign full width as we normally use odd length in discrete index for clarity
+        't_volley_slope_start': 0,
+        't_volley_slope_end': 0,
+        't_volley_slope_method': 'auto detect',
+        't_volley_slope_params': 'NA',
+        'volley_slope_mean': 0,
+        't_volley_amp': 0,
+        't_volley_amp_halfwidth': 0,
+        't_volley_amp_method': 'auto detect',
+        't_volley_amp_params': 'NA',
+        'volley_amp_mean': 0,
+        't_VEB': 0,
+        't_VEB_method': 0,
+        't_VEB_params': 0,
+        't_EPSP_slope_width': 0.0007, # only assign full width as we normally use odd length in discrete index for clarity
+        't_EPSP_slope_start': 0,
+        't_EPSP_slope_end': 0,
+        't_EPSP_slope_method': 'auto detect',
+        't_EPSP_slope_params': 'NA',
+        't_EPSP_amp': 0,
+        't_EPSP_amp_halfwidth': 0,
+        't_EPSP_amp_method': 'auto detect',
+        't_EPSP_amp_params': 'NA',
+        'norm_output_from': 0,
+        'norm_output_to': 0,
+    }
+    for _ in range(3):
+        print()
+    print("", "*** parse.py standalone test: ***")
+    for source in list_sources:
+        t0 = time.time()
+        df = pd.read_csv(source)
+        print(f"Loaded {source} with shape {df.shape}")
+        dfmean, i_stim = parse.build_dfmean(df)
+        print(f"DataFrame mean shape: {dfmean.shape}, i_stim: {i_stim}")
+        print(f"Testing find_events on {source}...")
+        dict_events = find_events(dfmean, default_dict_t, verbose=True)
+        print()
+        print(f"*** find_events result: {dict_events}")
+        dict_t = default_dict_t.copy()  # Create a copy of the default dictionary
+        print()
+        print(f"*** dict_t(default): {dict_t}")
+        dict_t.update(dict_events)  # Update default_dict_t with found events
+        print()
+        print(f"*** dict_t(updated): {dict_t}")
+        df_t = pd.DataFrame([dict_t])  # Convert to DataFrame
+        print()
+        print(f"*** df_t: {df_t}")
+        # print time rounded to 3 decimal places
+        print(f"Time taken: {round(time.time() - t0, 3)} seconds")
+        print()
+
+
+
+
+'''
+# Jupyter Notebook testers
 
 # %%
 if __name__ == "__main__":
@@ -640,3 +713,4 @@ if __name__ == "__main__":
         results.append(result)
     dfresults = pd.DataFrame(results)
     #dfresults
+'''

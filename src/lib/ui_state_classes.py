@@ -66,12 +66,16 @@ class UIstate:
             'output_ax2_ylim': (0, 1.2),
         }
         self.default_dict_t = { # default values for df_t(imepoints)
+        # TODO: rework and harmonize parameters
+        # suggested format: feature-[param, value]
+        # example: dict_param = {volley_slope-width: 3}
+        # example: dict_values = {volley_slope-value: -0.3254}
             'stim': 0,
             't_stim': 0,
             't_stim_method': 0,
             't_stim_params': 0,
             'amp_zero': 0,
-            't_volley_slope_width': 0.0003,
+            't_volley_slope_width': 0.0003, # only assign full width as we normally use odd length in discrete index for clarity
             't_volley_slope_halfwidth': 0.0001,
             't_volley_slope_start': 0,
             't_volley_slope_end': 0,
@@ -86,7 +90,7 @@ class UIstate:
             't_VEB': 0,
             't_VEB_method': 0,
             't_VEB_params': 0,
-            't_EPSP_slope_width': 0.0007,
+            't_EPSP_slope_width': 0.0007, # only assign full width as we normally use odd length in discrete index for clarity
             't_EPSP_slope_halfwidth': 0.0003,
             't_EPSP_slope_start': 0,
             't_EPSP_slope_end': 0,

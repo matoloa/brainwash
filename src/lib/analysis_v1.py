@@ -621,15 +621,12 @@ def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
 if __name__ == "__main__":
     # Temporary default_dict_t for standalone tests
     default_dict_t = { # default values for df_t(imepoints)
-        # TODO: rework and harmonize parameters
-        # sugegsted format: feature-[param, value]
-        # example: dict_param = {volley_slope-width: 3}
-        # example: dict_values = {volley_slope-value: -0.3254}
         'stim': 0,
         't_stim': 0,
         't_stim_method': 0,
         't_stim_params': 0,
-        't_volley_slope_width': 0.0003, # only assign full width as we normally use odd length in discrete index for clairty
+        'amp_zero': 0,
+        't_volley_slope_width': 0.0003, # only assign full width as we normally use odd length in discrete index for clarity
         't_volley_slope_start': 0,
         't_volley_slope_end': 0,
         't_volley_slope_method': 'auto detect',
