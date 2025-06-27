@@ -428,7 +428,10 @@ if __name__ == "__main__":
             col_end = ''
         if col_end in tcols:
             dfdiff[col] = round(10000 * (dfresults[col] - meta[col_end]))
-    display(dfdiff)
+    try:
+        display(dfdiff) #jupyter
+    except:
+        print(dfdiff)
 
 # %%
 #dfdiff.select_dtypes('number').abs().sum()

@@ -1,6 +1,6 @@
 # %%
 '''
-analysis modeule to characterize and calculate features from diagrams
+analysis module to characterize and calculate features from diagrams
 
 
 typical explanation of what happend in a diagram in time order
