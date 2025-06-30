@@ -196,7 +196,15 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
     if verbose:
         print(f"find_i_stims: {len(i_stims)}: sampling_Hz: {sampling_Hz}")
         print(i_stims)
-    
+
+    def unwrap(v):
+        if isinstance(v, pd.Series):
+            if len(v) == 1:
+                return v.iloc[0]
+            else:
+                raise ValueError(f"Expected scalar or single-element Series, got Series with {len(v)} elements: {v}")
+        return v
+            
     def i2t(stim_nr, i_stim, df_event_range, time_delta, stim_char, precision, default_dict_t):
         # Converts i (index) to t (time from start of sweep in dfmean)
         t_stim = df_event_range.loc[i_stim].time
@@ -228,22 +236,39 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
     # Convert each index to a dictionary of t-values and add it to a list
     list_of_dict_t = []
     for stim_nr, i_stim in enumerate(i_stims, start=1):
-        df_event_range = dfmean#.loc[i_stim - 50:i_stim + 500]  # TODO: fix hardcoded value
+        df_event_range = dfmean  # TODO: Remove or generalize this hardcoded range if needed
         dict_t = default_dict_t.copy()
+
         stim_characteristics = characterize_graph(df_event_range, verbose=verbose)
         print(f"stim_characteristics: {stim_characteristics}")
+
         if stim_characteristics['standard_structure']:
-            result = i2t(stim_nr=stim_nr, i_stim=i_stim, df_event_range=df_event_range, time_delta=time_delta, stim_char=stim_characteristics, precision=precision, default_dict_t=dict_t)
-            dict_t.update(result)
+            result = i2t(
+                stim_nr=stim_nr,
+                i_stim=i_stim,
+                df_event_range=df_event_range,
+                time_delta=time_delta,
+                stim_char=stim_characteristics,
+                precision=precision,
+                default_dict_t=dict_t
+            )
+
+            # Unwrap any Panda Series to scalars
+            sanitized_result = {k: unwrap(v) for k, v in result.items()}
+            dict_t.update(sanitized_result)
         else:
             print(f"find_events: no standard structure found in stim #{stim_nr}, using default.")
+
         list_of_dict_t.append(dict_t)
 
-    # Convert the list of dictionaries to a DataFrame
+    # Create DataFrame from sanitized list of dictionaries
     df_t = pd.DataFrame(list_of_dict_t)
-    print(f"df_t: {df_t}")
-    if verbose: print(f"df_t: {df_t}")
+
+    if verbose:
+        print(f"df_t: {df_t}")
+
     return df_t
+
     
 
 # %%
@@ -587,8 +612,10 @@ if __name__ == "__main__":
     }
     for _ in range(3):
         print()
-    print("", "*** parse.py standalone test: ***")
+    print("", "*** analysis_v2.py standalone test: ***")
     for source in list_sources:
+        for _ in range(2):
+            print()
         t0 = time.time()
         df = pd.read_csv(source)
         print(f"Loaded {source} with shape {df.shape}")
@@ -601,10 +628,12 @@ if __name__ == "__main__":
         dict_t = default_dict_t.copy()  # Create a copy of the default dictionary
         print()
         print(f"*** dict_t(default): {dict_t}")
+
+        # TODO: CURRENT FUCKUP: df_t ends up with a leading column of all-0s, which is not desired.
+        # terminal suggests this happens during the update of dict_t with dict_events:
         dict_t.update(dict_events)  # Update default_dict_t with found events
-        print()
-        print(f"*** dict_t(updated): {dict_t}")
-        df_t = pd.DataFrame([dict_t])  # Convert to DataFrame
+
+        df_t = pd.DataFrame([dict_t])
         print()
         print(f"*** df_t: {df_t}")
         # print time rounded to 3 decimal places
