@@ -20,7 +20,6 @@ import os
 import json
 import sys
 from pathlib import Path
-import seaborn as sns
 from sklearn.linear_model import LinearRegression
 import time
 
@@ -32,9 +31,7 @@ sys.path.append(str(reporoot / 'src/lib/'))
 
 # %%
 def valid(num):
-    #print(f"num: {num}, type: {type(num)}")
     return num is not None and not np.isnan(num)
-
 
 
 def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
@@ -50,7 +47,6 @@ def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
     dfslopes['value'] = coefs[:, 0]
     # TODO: verify that it was the correct columns, and that values are reasonable
     return dfslopes
-
 
 
 def build_dfoutput(df, dict_t, filter='voltage', quick=False):
