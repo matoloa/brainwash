@@ -609,6 +609,7 @@ if __name__ == "__main__":
     for _ in range(3):
         print()
     print("", "*** analysis_v2.py standalone test: ***")
+    # Assumes single stim for now
     for source in list_sources:
         for _ in range(2):
             print()
@@ -617,18 +618,12 @@ if __name__ == "__main__":
         print(f"Loaded {source} with shape {df.shape}")
         dfmean, i_stim = parse.build_dfmean(df)
         print(f"DataFrame mean shape: {dfmean.shape}, i_stim: {i_stim}")
-        print(f"Testing find_events on {source}...")
         dict_events = find_events(dfmean, default_dict_t, verbose=True)
-        print()
-        print(f"*** find_events result: {dict_events}")
         dict_t = default_dict_t.copy()  # Create a copy of the default dictionary
-        print()
-        print(f"*** dict_t(default): {dict_t}")
-
-        # TODO: CURRENT FUCKUP: df_t ends up with a leading column of all-0s, which is not desired.
-        # terminal suggests this happens during the update of dict_t with dict_events:
-        dict_t.update(dict_events)  # Update default_dict_t with found events
-
+        if dict_events.shape[0] == 1:
+            dict_t.update(dict_events.iloc[0].to_dict()) # find_events returns a DataFrame
+        else:
+            raise ValueError("Expected exactly one event in find_events result.")
         df_t = pd.DataFrame([dict_t])
         print()
         print(f"*** df_t: {df_t}")
