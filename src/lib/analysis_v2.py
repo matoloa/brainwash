@@ -30,8 +30,8 @@ sys.path.append(str(reporoot / 'src/lib/'))
 
 
 # %%
-def valid(num):
-    return num is not None and not np.isnan(num)
+def valid(*args):
+    return all(isinstance(x, (int, float)) and x is not None and not np.isnan(x) for x in args)
 
 
 def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
@@ -72,6 +72,7 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
 
     # EPSP_amp
     if 't_EPSP_amp' in dict_t.keys():
+        list_col.extend(['EPSP_amp', 'EPSP_amp_norm'])
         t_EPSP_amp = dict_t['t_EPSP_amp']
         if valid(t_EPSP_amp):
             amp_zero = dict_t['amp_zero']
@@ -84,29 +85,33 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
                 start_time = t_EPSP_amp - EPSP_w
                 end_time = t_EPSP_amp + EPSP_w
                 dfoutput['EPSP_amp'] = df.groupby('sweep').apply(lambda sweep_df: ((sweep_df.loc[(sweep_df['time'] >= start_time) & (sweep_df['time'] <= end_time), filter].mean() - amp_zero) * -1000)) # convert to mV for output
+            # Normalize EPSP_amp
+            selected_values = dfoutput[(dfoutput.index >= normFrom) & (dfoutput.index <= normTo)]['EPSP_amp']
+            norm_mean = selected_values.mean() / 100  # divide by 100 to get percentage
+            dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
         else:
             dfoutput['EPSP_amp'] = np.nan
-        # Normalize EPSP_amp
-        selected_values = dfoutput[(dfoutput.index >= normFrom) & (dfoutput.index <= normTo)]['EPSP_amp']
-        norm_mean = selected_values.mean() / 100  # divide by 100 to get percentage
-        dfoutput['EPSP_amp_norm'] = dfoutput['EPSP_amp'] / norm_mean
-        list_col.extend(['EPSP_amp', 'EPSP_amp_norm'])
+
     # EPSP_slope
     if 't_EPSP_slope_start' in dict_t.keys():
+        list_col.extend(['EPSP_slope', 'EPSP_slope_norm'])
         t_EPSP_slope_start = dict_t['t_EPSP_slope_start']
         t_EPSP_slope_end = dict_t['t_EPSP_slope_end']
-        if valid(t_EPSP_slope_start):
+        if valid(t_EPSP_slope_start, t_EPSP_slope_end) and t_EPSP_slope_start < t_EPSP_slope_end:
             df_EPSP_slope = measureslope_vec(df=df, filter=filter, t_start=t_EPSP_slope_start, t_end=t_EPSP_slope_end)
             dfoutput['EPSP_slope'] = -df_EPSP_slope['value'] # invert 
+            # Normalize EPSP_slope
+            selected_values = dfoutput[(dfoutput.index >= normFrom) & (dfoutput.index <= normTo)]['EPSP_slope']
+            norm_mean = selected_values.mean() / 100  # divide by 100 to get percentage
+            dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
         else:
             dfoutput['EPSP_slope'] = np.nan
-        # Normalize EPSP_slope
-        selected_values = dfoutput[(dfoutput.index >= normFrom) & (dfoutput.index <= normTo)]['EPSP_slope']
-        norm_mean = selected_values.mean() / 100  # divide by 100 to get percentage
-        dfoutput['EPSP_slope_norm'] = dfoutput['EPSP_slope'] / norm_mean
-        list_col.extend(['EPSP_slope', 'EPSP_slope_norm'])
+            dfoutput['EPSP_slope_norm'] = np.nan
+
+
     # volley_amp
     if 't_volley_amp' in dict_t.keys():
+        list_col.append('volley_amp')
         t_volley_amp = dict_t['t_volley_amp']
         if valid(t_volley_amp):
             amp_zero = dict_t['amp_zero']
@@ -121,19 +126,18 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
                 dfoutput['volley_amp'] = df.groupby('sweep').apply(lambda sweep_df: ((sweep_df.loc[(sweep_df['time'] >= start_time) & (sweep_df['time'] <= end_time), filter].mean() - amp_zero) * -1000)) # convert to mV for output
         else:
             dfoutput['volley_amp'] = np.nan
-        list_col.append('volley_amp')
     # volley_slope
     if 't_volley_slope_start' in dict_t.keys():
+        list_col.append('volley_slope')
         t_volley_slope_start = dict_t['t_volley_slope_start']
         t_volley_slope_end = dict_t['t_volley_slope_end']
-        if valid(t_volley_slope_start):
+        if valid(t_volley_slope_start, t_volley_slope_end) and t_volley_slope_start < t_volley_slope_end:
             df_volley_slope = measureslope_vec(df=df, filter=filter,  t_start=t_volley_slope_start, t_end=t_volley_slope_end)
             dfoutput['volley_slope'] = -df_volley_slope['value'] # invert 
         else:
             dfoutput['volley_slope'] = np.nan
-        list_col.append('volley_slope')
 
-    # print(f'build_df_output: {round((time.time()-t0)*1000)} ms, list_col: {list_col}')
+    print(f'build_df_output: {round((time.time()-t0)*1000)} ms, list_col: {list_col}')
     return dfoutput[list_col]
 
 
@@ -568,7 +572,16 @@ if __name__ == "__main__":
     import parse
     import ui_state_classes as ui
     # Test find_events:  with a sample DataFrame
-    list_sources = [r"K:\Samples - pilot\cA24.csv",  # Works with ui.py
+    list_sources = [r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_a.csv",
+                    r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_b.csv",
+                    r"C:\Users\xandmz\Documents\data\A_24_P0630-D4_Ch0_a.csv",
+                    r"C:\Users\xandmz\Documents\data\A_24_P0630-D4_Ch0_b.csv",
+                    r"C:\Users\xandmz\Documents\data\B_22_P0701-D3_Ch0_a.csv",
+                    r"C:\Users\xandmz\Documents\data\B_22_P0701-D3_Ch0_b.csv",
+                    r"C:\Users\xandmz\Documents\data\B_23_P0630-D3_Ch0_a.csv",
+                    r"C:\Users\xandmz\Documents\data\B_23_P0630-D3_Ch0_b.csv",
+                    
+                    #r"K:\Samples - pilot\cA24.csv",  # Works with ui.py
                     #r"K:\Samples - pilot\cB22.csv", # Doesn't Work with ui.py
     ]
     default_dict_t = { # default values for df_t(imepoints)

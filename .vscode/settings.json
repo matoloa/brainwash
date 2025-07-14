@@ -1,4 +1,8 @@
 {
-  "dev.containers.dockerPath": "podman",
-  "dev.containers.dockerComposePath": "podman-compose"
+  "python.defaultInterpreterPath": ".venv\\Scripts\\python.exe",
+  "terminal.integrated.defaultProfile.windows": "Command Prompt",
+  "terminal.integrated.shellArgs.windows": [
+    "/K",
+    ".venv\\Scripts\\activate.bat"
+  ]
 }
