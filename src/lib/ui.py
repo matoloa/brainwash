@@ -90,7 +90,7 @@ class Config:
         self.clear_timepoints = clear
         self.force_cfg_reset = clear
         self.verbose = self.dev_mode
-        self.talkback = True # not self.dev_mode
+        self.talkback = not self.dev_mode
         self.hide_experimental = not self.dev_mode
         self.track_widget_focus = False
         self.terminal_space = 372 if self.dev_mode else 0
@@ -1549,6 +1549,7 @@ class UIsub(Ui_MainWindow):
 
     def usage(self, ui_component): # Talkback function
         if config.verbose:
+            print()
             print(f"usage: {ui_component}")
         if not config.talkback:
             return
@@ -3329,6 +3330,7 @@ class UIsub(Ui_MainWindow):
 
 
     def graphClicked(self, event, canvas): # graph click event
+        self.usage("graphClicked")
         if not uistate.rec_select: # no recording selected; do nothing
             return
         x = event.xdata
@@ -3397,6 +3399,7 @@ class UIsub(Ui_MainWindow):
 
 
     def eventMouseover(self, event): # determine which event is being mouseovered
+        self.usage("eventMouseover")
         if uistate.df_recs2plot is None or uistate.df_recs2plot.empty:
             # print("No recordings to mouseover")
             return
@@ -3491,6 +3494,7 @@ class UIsub(Ui_MainWindow):
 
 
     def outputMouseover(self, event): # determine which event is being mouseovered
+        self.usage("outputMouseover")
         x, y = event.xdata, event.ydata
         str_ax = 'ax2' if uistate.slopeView() else 'ax1' if uistate.ampView() else None
         ax = getattr(uistate, str_ax)
@@ -3559,6 +3563,7 @@ class UIsub(Ui_MainWindow):
 
 
     def connectDragRelease(self, x_range, rec_ID, graph):
+        self.usage("connectDragRelease")
         # function to set up x scales for dragging and releasing on mean- and output canvases
         if graph == "mean": # uistate.axm
             canvas = self.canvasMean
@@ -3580,6 +3585,7 @@ class UIsub(Ui_MainWindow):
 
 
     def xDrag(self, event, canvas, x_data, x_range):
+        self.usage("xDrag")
         if not uistate.dragging:
             return
         if event.xdata is None:
@@ -3604,6 +3610,7 @@ class UIsub(Ui_MainWindow):
 
 
     def dragReleased(self, event, canvas):
+        self.usage("dragReleased")
         if uistate.x_drag is None: # no drag; just click - set only start
             if canvas == self.canvasMean:
                 self.lineEdit_mean_selection_end.setText("")
@@ -3631,6 +3638,7 @@ class UIsub(Ui_MainWindow):
 
 
     def mouseoverUpdate(self):
+        self.usage("mouseoverUpdate")
         self.mouseoverDisconnect()
         # if only one item is selected, make a new mouseover event connection
         if uistate.rec_select and uistate.stim_select:
@@ -3675,6 +3683,7 @@ class UIsub(Ui_MainWindow):
 
 
     def mouseoverUpdateMarkers(self):
+        self.usage("mouseoverUpdateMarkers")
         # update xy data of shown markers
         df_p = self.get_df_project()
         precision = uistate.settings['precision']
@@ -3763,6 +3772,7 @@ class UIsub(Ui_MainWindow):
 
 
     def mouseoverDisconnect(self):
+        self.usage("mouseoverDisconnect")
         # drop any prior mouseover event connections and plots
         if hasattr(self, 'mouseover'):
             self.canvasEvent.mpl_disconnect(self.mouseoverEvent)
@@ -3780,6 +3790,7 @@ class UIsub(Ui_MainWindow):
 
 
     def eventDragSlope(self, event, action, data_x, data_y, prior_slope_start, prior_slope_end): # graph dragging event
+        self.usage("eventDragSlope")
         self.canvasEvent.mpl_disconnect(self.mouseoverEvent)
         if event.xdata is None or action is None:
             return
@@ -3815,6 +3826,7 @@ class UIsub(Ui_MainWindow):
 
 
     def eventDragPoint(self, event, data_x, data_y, prior_amp): # maingraph dragging event
+        self.usage("eventDragPoint")
         self.canvasEvent.mpl_disconnect(self.mouseoverEvent)
         if event.xdata is None:
             return
@@ -3836,7 +3848,8 @@ class UIsub(Ui_MainWindow):
         self.eventDragUpdate(x_point, x_point, precision)
   
 
-    def eventDragUpdate(self, x_start, x_end, precision): 
+    def eventDragUpdate(self, x_start, x_end, precision):
+        self.usage("eventDragUpdate")
         def handle_slope(aspect, x_start, x_end, precision, stim_offset):
             slope_width = round(x_end - x_start, precision)
             slope_start_key = f't_{aspect}_start'
