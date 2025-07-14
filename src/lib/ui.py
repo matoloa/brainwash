@@ -3692,7 +3692,7 @@ class UIsub(Ui_MainWindow):
             x_start, x_end = round(t_row['t_EPSP_slope_start'], precision), round(t_row['t_EPSP_slope_end'], precision)
             # event_x: location on event graph, for drawing event markers
             if not analysis.valid(x_start, x_end):
-                print("Error: invalid x_start or x_end in mouseoverUpdateMarkers")
+                print("ERROR - EPSP_slope_markers: invalid x_start or x_end in mouseoverUpdateMarkers")
                 print(type(x_start), x_start)
                 print(type(x_end), x_end)
                 return
@@ -3712,6 +3712,10 @@ class UIsub(Ui_MainWindow):
             # x: location on dfmean['time'], for acquiring y-values
             x_start = round(t_row['t_EPSP_amp'], precision)
             # event_x: location on event graph, for drawing event markers
+            if not analysis.valid(x_start):
+                print("ERROR - EPSP_amp_markers: invalid x_start or x_end in mouseoverUpdateMarkers")
+                print(type(x_start), x_start)
+                return
             event_x_start = round(t_row['t_EPSP_amp'] - t_stim, precision)
             y_start = dfmean.loc[dfmean['time'] == x_start, 'voltage'].values[0]
             marker['line'].set_data([event_x_start, event_x_start], [y_start, y_start])
@@ -3728,6 +3732,11 @@ class UIsub(Ui_MainWindow):
             # x: location on dfmean['time'], for acquiring y-values
             x_start, x_end = round(t_row['t_volley_slope_start'], precision), round(t_row['t_volley_slope_end'], precision)
             # event_x: location on event graph, for drawing event markers
+            if not analysis.valid(x_start, x_end):
+                print("ERROR - volley_slope_markers: invalid x_start or x_end in mouseoverUpdateMarkers")
+                print(type(x_start), x_start)
+                print(type(x_end), x_end)
+                return
             event_x_start, event_x_end = round(t_row['t_volley_slope_start'] - t_stim, precision), round(t_row['t_volley_slope_end'] - t_stim, precision)
             y_start, y_end = dfmean.loc[dfmean['time'] == x_start, 'voltage'].values[0], dfmean.loc[dfmean['time'] == x_end, 'voltage'].values[0]
             marker['line'].set_data([event_x_start, event_x_end], [y_start, y_end])
@@ -3744,6 +3753,10 @@ class UIsub(Ui_MainWindow):
             # x: location on dfmean['time'], for acquiring y-values
             x_start = round(t_row['t_volley_amp'], precision)
             # event_x: location on event graph, for drawing event markers
+            if not analysis.valid(x_start):
+                print("ERROR - volley_amp_markers: invalid x_start or x_end in mouseoverUpdateMarkers")
+                print(type(x_start), x_start)
+                return            
             event_x_start = round(t_row['t_volley_amp'] - t_stim, precision)
             y_start = dfmean.loc[dfmean['time'] == x_start, 'voltage'].values[0]
             marker['line'].set_data([event_x_start, event_x_start], [y_start, y_start])
