@@ -1,5 +1,178 @@
 # Functions that are not in use anymore, but might be useful again in the future
+
+
 '''
+
+
+##################################################################
+#    Temporary functions for David's project - TODO: Purge       #
+##################################################################
+            # TODO: Temporary for David's master; deprecate
+        self.actionCopyMeans = QtWidgets.QAction("Copy means", self)
+        self.actionCopyMeans.triggered.connect(self.export_means)
+        self.actionCopyMeans.setShortcut("Ctrl+M")
+        self.menuEdit.addAction(self.actionCopyMeans)
+
+    def trigger_export_selection(self):
+        self.usage("trigger_export_selection")
+        self.export_selection()
+
+    def trigger_export_groups(self):
+        self.usage("trigger_export_groups")
+        self.export_groups()
+
+
+    def export_means(self):
+        print("export_means")
+        means_list = []
+        df_p = self.get_df_project()
+        for _, p_row in df_p.iterrows():
+            df = self.get_dfoutput(p_row)
+            rec_name = p_row['recording_name']
+            rec_ID = p_row['ID']
+            group_ID = self.get_groupsOfRec(rec_ID)
+            group_name = self.dd_groups[group_ID[0]]['group_name']
+        
+            # Define sweep ranges for averaging
+            sweep_ranges = {
+                '0': (0, 9),
+                '110': (110, 119),
+                '120': (120, 129),
+                '590': (590, 599),
+            }
+            
+            # Initialize dictionary to store means
+            means_dict = {}
+            
+            # Calculate mean for each sweep range for EPSP_amp, EPSP_slope, volley_amp, and volley_slope
+            for prefix, (start, end) in sweep_ranges.items():
+                filtered_df = df[df['sweep'].between(start, end)]
+                means_dict[f'EPSP_amp_mean_{prefix}'] = filtered_df['EPSP_amp'].mean()
+                means_dict[f'EPSP_slope_mean_{prefix}'] = filtered_df['EPSP_slope'].mean()
+                means_dict[f'volley_amp_mean_{prefix}'] = filtered_df['volley_amp'].mean()
+                means_dict[f'volley_slope_mean_{prefix}'] = filtered_df['volley_slope'].mean()  # Assuming 'volley_slope' is a column in your DataFrame
+            # Combine with other data
+            row_dict = {
+                'rec_name': rec_name,
+                'group_name': group_name,
+                **means_dict  # Merge the means_dict into row_dict
+            }
+        
+            means_list.append(row_dict)
+    
+        df_means_by_group = pd.DataFrame(means_list)
+        # Sort by 'group_name' in reverse alphabetical order
+        df_means_by_group = df_means_by_group.sort_values(by='group_name', ascending=False)
+        df_means_by_group.to_clipboard(index=False)
+        
+
+    def export_selection(self): # WARNING! Experimental feature for very specific use-cases. TODO: generalize!
+        if uistate.checkBox['bin']:
+            print("export_selection of binned data, treated as IO - WARNING! Experimental feature for very specific use-cases.")
+            aspect_pairs = []
+            if uistate.checkBox['EPSP_amp']:
+                aspect_pairs.append(("volley_amp", "EPSP_amp"))
+            if uistate.checkBox['EPSP_slope']:
+                aspect_pairs.append(("volley_slope", "EPSP_slope"))
+            print(aspect_pairs)
+            if not aspect_pairs:
+                print("No aspects selected for export.")
+                return
+            df_selected = self.get_df_project()
+            if uistate.rec_select:  # if something is selected, export only that
+                df_selected = df_selected.iloc[uistate.rec_select]
+
+            for x_aspect, y_aspect in aspect_pairs:
+                output_path = Path(f"{self.projects_folder}/{self.projectname}_{x_aspect.split('_')[-1]}.png")
+                print(f"Exporting {x_aspect} vs {y_aspect} to {output_path}")
+                dict_rec_legend_color_df = {}
+                dd_r_lines = {}
+                for i, p_row in df_selected.iterrows():
+                    rec = p_row['recording_name']
+                    df = self.get_dfoutput(p_row)
+                    color = uistate.colors[i % len(uistate.colors)]
+                    dict_rec_legend_color_df[rec] = rec, color, df
+                    dd_r_lines[rec] = analysis.regression_line(df[x_aspect], df[y_aspect])
+
+                print(f"Calling create_scatterplot for {len(dict_rec_legend_color_df)} dataframes with aspects {x_aspect} and {y_aspect}")
+                uiplot.create_scatterplot(dict_rec_legend_color_df, x_aspect, y_aspect, dd_r_lines, output_path)
+        else: # For now, just export the output window as it is TODO: actually export selection!
+            print("export_selection of non-binned data, snapshot of output window - WARNING! Experimental feature for very specific use-cases.")
+            figure = self.canvasOutput.figure
+            # Construct the full path with the specified folder and project name
+            filename = os.path.join(self.projects_folder, f"{self.projectname}.png")
+            # Save the figure
+            figure.savefig(filename, dpi=300)  # Adjust dpi for desired resolution
+            print(f"Canvas output saved to {filename}")
+
+
+    def export_groups(self): # WARNING! Experimental feature for very specific use-cases. TODO: generalize!
+        if uistate.checkBox['output_per_stim']: # TODO: now interpreted as PP export
+            print("export_groups: PP barplot export - WARNING! Experimental feature for very specific use-cases!")
+            dict_group_color_ratio_SEM = {}
+            for group_ID, dict_group in self.dd_groups.items():
+                if dict_group['show']:
+                    df_group = self.get_dfgroupmean(group_ID)
+                    if uistate.checkBox['EPSP_amp']:
+                        group_ratio = df_group.loc[df_group['stim'] == 2, 'EPSP_amp_norm_mean'].values[0]
+                        group_SEM = df_group.loc[df_group['stim'] == 2, 'EPSP_amp_norm_SEM'].values[0]
+                        output_path = Path(f"{self.projects_folder}/{self.projectname}_amp.png")
+                        str_aspect = "EPSP amplitude"
+                    else:
+                        group_ratio = df_group.loc[df_group['stim'] == 2, 'EPSP_slope_norm_mean'].values[0]
+                        group_SEM = df_group.loc[df_group['stim'] == 2, 'EPSP_slope_norm_SEM'].values[0]
+                        output_path = Path(f"{self.projects_folder}/{self.projectname}_slope.png")
+                        str_aspect = "EPSP slope"
+                    dict_group_color_ratio_SEM[dict_group['group_name']] = [dict_group['color'], group_ratio, group_SEM]
+            print(f"Calling create_barplot for {len(dict_group_color_ratio_SEM)} groups")
+            uiplot.create_barplot(dict_group_color_ratio_SEM, str_aspect, output_path)
+        else:
+            print("export_groups: scatterplot export - WARNING! Experimental feature for very specific use-cases!")
+            aspect_pairs = []
+            if uistate.checkBox['EPSP_amp']:
+                aspect_pairs.append(("volley_amp", "EPSP_amp"))
+            if uistate.checkBox['EPSP_slope']:
+                aspect_pairs.append(("volley_slope", "EPSP_slope"))
+            print(aspect_pairs)
+            if not aspect_pairs:
+                print("No aspects selected for export.")
+                return
+            df_selected = self.get_df_project()
+            if uistate.rec_select:  # if something is selected, export only that
+                df_selected = df_selected.iloc[uistate.rec_select]
+
+            for x_aspect, y_aspect in aspect_pairs:
+                output_path = Path(f"{self.projects_folder}/{self.projectname}_grouped_{x_aspect.split('_')[-1]}.png")
+                print(f"Exporting group {x_aspect} vs {y_aspect} to {output_path}")
+                dict_rec_legend_color_df = {} # legend (group)name; color, df
+                dd_r_lines = {}
+                dd_r_report = {}
+                for _, p_row in df_selected.iterrows():
+                    rec = p_row['recording_name']
+                    rec_in_groups = self.get_groupsOfRec(p_row['ID'])
+                    if rec_in_groups:
+                        dict_prime_group = self.dd_groups[rec_in_groups[0]]
+                        prime_group_name = dict_prime_group['group_name']
+                        legend = f"{prime_group_name}"# {rec}"
+                        color = dict_prime_group['color']
+                    else:
+                        legend = rec
+                        color = 'black'
+                    df = self.get_dfoutput(p_row)
+                    dict_rec_legend_color_df[rec] = [legend, color, df]
+                    dd_r_lines[rec] = analysis.regression_line(df[x_aspect], df[y_aspect])
+                    # Assuming dd_r_lines[rec] is a dictionary
+                    dd_r_report[rec] = dd_r_lines[rec]
+                    dd_r_report[rec]['group'] = prime_group_name
+                #TODO Temporary; make a df of dd_r_lines and save it to clipboard
+                df_r_report = pd.DataFrame(dd_r_report)
+                df_r_report.to_clipboard()
+
+                print(f"Calling create_scatterplot for {len(dict_rec_legend_color_df)} dataframes with aspects {x_aspect} and {y_aspect}")
+                uiplot.create_scatterplot(dict_rec_legend_color_df, x_aspect, y_aspect, dd_r_lines, output_path)
+
+                
+
                 # addRow DEBUG Block, draw event x/y lines and means
                 self.plot_line(f"{label} {stim_str} amp_zero", 'axe', [-0.002, -0.001], [amp_zero, amp_zero], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                 x, y = self.uistate.dict_rec_labels[f"{label} {stim_str}"]['line'].get_data()
