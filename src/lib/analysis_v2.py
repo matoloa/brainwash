@@ -607,10 +607,6 @@ if __name__ == "__main__":
     t_volley_slope_halfwidth = 0.0001
     t_EPSP_slope_halfwidth = 0.0003
     default_dict_t = { # default values for df_t(imepoints)
-        # TODO: rework and harmonize parameters
-        # suggested format: feature-[param, value]
-        # example: dict_param = {volley_slope-width: 3}
-        # example: dict_values = {volley_slope-value: -0.3254}
             'stim': 0,
             't_stim': 0,
             't_stim_method': 'max prim',
@@ -624,7 +620,6 @@ if __name__ == "__main__":
             't_volley_slope_params': 'NA',
             'volley_slope_mean': 0,
             't_volley_amp': 0,
-            't_volley_amp_halfwidth': 0,
             't_volley_amp_method': 'default',
             't_volley_amp_params': 'NA',
             'volley_amp_mean': 0,
@@ -635,7 +630,6 @@ if __name__ == "__main__":
             't_EPSP_slope_method': 'default',
             't_EPSP_slope_params': 'NA',
             't_EPSP_amp': 0,
-            't_EPSP_amp_halfwidth': 0,
             't_EPSP_amp_method': 'default',
             't_EPSP_amp_params': 'NA',
             'norm_output_from': 0,
@@ -645,6 +639,7 @@ if __name__ == "__main__":
         print()
     print("", "*** analysis_v2.py standalone test: ***")
     # Assumes single stim for now
+    list_event_summary = []
     for source in list_sources:
         for _ in range(2):
             print()
@@ -665,6 +660,24 @@ if __name__ == "__main__":
         # print time rounded to 3 decimal places
         print(f"Time taken: {round(time.time() - t0, 3)} seconds")
         print()
+        list_event_summary.append({
+            'source': source,
+            't_stim': df_t['t_stim'].values[0],
+            't_volley_slope_start': df_t['t_volley_slope_start'].values[0],
+            't_volley_slope_end': df_t['t_volley_slope_end'].values[0],
+            't_volley_slope_method': df_t['t_volley_slope_method'].values[0],
+            't_EPSP_slope_start': df_t['t_EPSP_slope_start'].values[0],
+            't_EPSP_slope_end': df_t['t_EPSP_slope_end'].values[0],
+            't_EPSP_slope_method': df_t['t_EPSP_slope_method'].values[0],
+            't_volley_amp': df_t['t_volley_amp'].values[0],
+            't_EPSP_amp': df_t['t_EPSP_amp'].values[0],
+        })
+    print("Event Summary:")
+    for event in list_event_summary:
+        print(f"t_stim: {event['t_stim']}, vS:{event['t_volley_slope_method']}, ES: {event['t_EPSP_slope_method']}, "
+              f"t_volley_slope: {event['t_volley_slope_start']} - {event['t_volley_slope_end']}, t_volley_amp: {event['t_volley_amp']}, "
+              f"t_EPSP_slope_start: {event['t_EPSP_slope_start']} - {event['t_EPSP_slope_end']}, t_EPSP_amp: {event['t_EPSP_amp']}")
+              
 
 
 

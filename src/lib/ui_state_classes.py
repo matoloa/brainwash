@@ -73,7 +73,7 @@ class UIstate:
         resolution = 0.0001 # resolution in seconds TODO: hardcoded for 10KHz
         t_volley_slope_halfwidth = self.floor_to_resolution(t_volley_slope_width / 2, resolution)
         t_EPSP_slope_halfwidth = self.floor_to_resolution(t_EPSP_slope_width / 2, resolution)
-        print(f"UIstate: t_volley_slope_halfwidth={t_volley_slope_halfwidth}, t_EPSP_slope_halfwidth={t_EPSP_slope_halfwidth}")
+        # print(f"UIstate: t_volley_slope_halfwidth={t_volley_slope_halfwidth}, t_EPSP_slope_halfwidth={t_EPSP_slope_halfwidth}")
         self.default_dict_t = { # default values for df_t(imepoints)
         # TODO: rework and harmonize parameters
         # suggested format: feature-[param, value]
@@ -92,7 +92,7 @@ class UIstate:
             't_volley_slope_params': 'NA',
             'volley_slope_mean': 0,
             't_volley_amp': 0,
-            't_volley_amp_halfwidth': 0,
+            't_volley_amp_halfwidth': 0, # Deprecated
             't_volley_amp_method': 'default',
             't_volley_amp_params': 'NA',
             'volley_amp_mean': 0,
@@ -106,7 +106,7 @@ class UIstate:
             't_EPSP_slope_method': 'default',
             't_EPSP_slope_params': 'NA',
             't_EPSP_amp': 0,
-            't_EPSP_amp_halfwidth': 0,
+            't_EPSP_amp_halfwidth': 0, # Deprecated
             't_EPSP_amp_method': 'default',
             't_EPSP_amp_params': 'NA',
             'norm_output_from': 0,
