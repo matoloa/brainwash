@@ -207,31 +207,51 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
             
     def i2t(stim_nr, i_stim, df_event_range, time_delta, stim_char, precision, default_dict_t):
         # Converts i (index) to t (time from start of sweep in dfmean)
-        t_stim = df_event_range.loc[i_stim].time
-#        amp_zero_idx_start = df_event_range.loc[i_stim] - 20 # TODO: fix hardcoded value
-#        amp_zero_idx_end = df_event_range.loc[i_stim] - 10 # TODO: fix hardcoded value
-#        amp_zero = df_event_range.loc[amp_zero_idx_start:amp_zero_idx_end].voltage.mean() # TODO: fix hardcoded filter: "voltage"
+        t_stim = round(df_event_range.loc[i_stim].time, precision)
+        # amp_zero_idx_start = df_event_range.loc[i_stim] - 20 # TODO: fix hardcoded value
+        # amp_zero_idx_end = df_event_range.loc[i_stim] - 10 # TODO: fix hardcoded value
+        # amp_zero = df_event_range.loc[amp_zero_idx_start:amp_zero_idx_end].voltage.mean() # TODO: fix hardcoded filter: "voltage"
         amp_zero = 0 # TODO: placeholder for debugging, remove when amp_zero is implemented
-        t_volley_slope_start = stim_char['t_volley_slope_start']
-        t_volley_slope_end = t_volley_slope_start + default_dict_t['t_volley_slope_width']
-        t_EPSP_slope_start = stim_char['t_EPSP_slope_start']
-        t_EPSP_slope_end = t_EPSP_slope_start + default_dict_t['t_EPSP_slope_width']
-        t_volley_amp = df_event_range.loc[stim_char['i_volley_trough']].time
-        print(f"find_events: t_volley_amp: {t_volley_amp}, type: {type(t_volley_amp)} from i_volley_trough: {stim_char['i_volley_trough']}")
-        t_EPSP_amp = df_event_range.loc[stim_char['i_epsp_min']].time
-        print(f"find_events: t_EPSP_amp: {t_EPSP_amp}, type: {type(t_EPSP_amp)} from i_epsp_min: {stim_char['i_epsp_min']}")
 
-        return {
+        # Volley
+        if stim_char.get('volley_detected'):
+            t_volley_amp = df_event_range.loc[stim_char['i_volley_trough']].time
+            t_volley_slope_start = stim_char['t_volley_slope_start']
+            t_volley_amp_method = t_volley_slope_method = 'auto detect'
+        else:
+            t_volley_amp = t_stim + 0.0007 # default to 0.7 ms after stim
+            t_volley_slope_start = t_stim + 0.001 # default to 1 ms after stim
+            t_volley_amp_method = t_volley_slope_method = 'default'
+
+        # EPSP
+        if stim_char.get('epsp_detected'):
+            t_EPSP_amp = df_event_range.loc[stim_char['i_epsp_min']].time
+            t_EPSP_slope_start = stim_char['t_EPSP_slope_start']
+            t_EPSP_amp_method = t_EPSP_slope_method = 'auto detect'
+        else:
+            t_EPSP_amp = t_stim + 0.005 # default to 5 ms after stim
+            t_EPSP_slope_start = t_stim + 0.002 # default to 2 ms after stim
+            t_EPSP_amp_method = t_EPSP_slope_method = 'default'
+        # Calculate the end times for volley and EPSP slopes
+        t_volley_slope_end = t_volley_slope_start + default_dict_t['t_volley_slope_width']
+        t_EPSP_slope_end = t_EPSP_slope_start + default_dict_t['t_EPSP_slope_width']
+
+        result = {
             'stim': stim_nr,
             'amp_zero': amp_zero, # mean of dfmean.voltage 20-10 indices before i_stim, in Volts
-            't_stim': round(t_stim, precision),
-            't_volley_slope_start': round(t_volley_slope_start, precision) if t_volley_slope_start is not None else None,
-            't_volley_slope_end': round(t_volley_slope_end, precision) if t_volley_slope_end is not None else None,
-            't_EPSP_slope_start': round(t_EPSP_slope_start , precision) if t_EPSP_slope_start is not None else None,
-            't_EPSP_slope_end': round(t_EPSP_slope_end , precision) if t_EPSP_slope_end is not None else None,
-            't_volley_amp': round(t_volley_amp, precision) if t_volley_amp is not None else None,
-            't_EPSP_amp': round(t_EPSP_amp, precision) if t_EPSP_amp is not None else None,
+            't_stim': t_stim,
+            't_volley_slope_start': t_volley_slope_start,
+            't_volley_slope_end': t_volley_slope_end,
+            't_volley_slope_method': t_volley_slope_method,
+            't_volley_amp': t_volley_amp,
+            't_volley_amp_method': t_volley_amp_method,
+            't_EPSP_slope_start': t_EPSP_slope_start,
+            't_EPSP_slope_end': t_EPSP_slope_end,
+            't_EPSP_slope_method': t_EPSP_slope_method,
+            't_EPSP_amp': t_EPSP_amp,
+            't_EPSP_amp_method': t_EPSP_amp_method,
         }
+        return result
 
     # Convert each index to a dictionary of t-values and add it to a list
     list_of_dict_t = []
@@ -242,22 +262,19 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
         stim_characteristics = characterize_graph(df_event_range, verbose=verbose)
         print(f"stim_characteristics: {stim_characteristics}")
 
-        if stim_characteristics['standard_structure']:
-            result = i2t(
-                stim_nr=stim_nr,
-                i_stim=i_stim,
-                df_event_range=df_event_range,
-                time_delta=time_delta,
-                stim_char=stim_characteristics,
-                precision=precision,
-                default_dict_t=dict_t
-            )
-
-            # Unwrap any Panda Series to scalars
-            sanitized_result = {k: unwrap(v) for k, v in result.items()}
-            dict_t.update(sanitized_result)
-        else:
-            print(f"find_events: no standard structure found in stim #{stim_nr}, using default.")
+        result = i2t(
+            stim_nr=stim_nr,
+            i_stim=i_stim,
+            df_event_range=df_event_range,
+            time_delta=time_delta,
+            stim_char=stim_characteristics,
+            precision=precision,
+            default_dict_t=dict_t
+        )
+        # Unwrap any Panda Series to scalars
+        print(f"find_events result: {result}")
+        sanitized_result = {k: unwrap(v) for k, v in result.items()}
+        dict_t.update(sanitized_result)
 
         list_of_dict_t.append(dict_t)
 
@@ -569,8 +586,10 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
     return result
 
 if __name__ == "__main__":
+    from math import floor
     import parse
     import ui_state_classes as ui
+
     # Test find_events:  with a sample DataFrame
     list_sources = [r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_a.csv",
                     r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_b.csv",
@@ -584,41 +603,45 @@ if __name__ == "__main__":
                     #r"K:\Samples - pilot\cA24.csv",  # Works with ui.py
                     #r"K:\Samples - pilot\cB22.csv", # Doesn't Work with ui.py
     ]
+    t_volley_slope_width = 0.003 # default width for volley slope, in seconds
+    t_EPSP_slope_width = 0.007 # default width for EPSP
+    t_volley_slope_halfwidth = floor(t_volley_slope_width / 2)
+    t_EPSP_slope_halfwidth = floor(t_EPSP_slope_width / 2)
     default_dict_t = { # default values for df_t(imepoints)
         # TODO: rework and harmonize parameters
         # suggested format: feature-[param, value]
         # example: dict_param = {volley_slope-width: 3}
         # example: dict_values = {volley_slope-value: -0.3254}
-        'stim': 0,
-        't_stim': 0,
-        't_stim_method': 0,
-        't_stim_params': 0,
-        't_volley_slope_width': 0.0003, # only assign full width as we normally use odd length in discrete index for clarity
-        't_volley_slope_start': 0,
-        't_volley_slope_end': 0,
-        't_volley_slope_method': 'auto detect',
-        't_volley_slope_params': 'NA',
-        'volley_slope_mean': 0,
-        't_volley_amp': 0,
-        't_volley_amp_halfwidth': 0,
-        't_volley_amp_method': 'auto detect',
-        't_volley_amp_params': 'NA',
-        'volley_amp_mean': 0,
-        't_VEB': 0,
-        't_VEB_method': 0,
-        't_VEB_params': 0,
-        't_EPSP_slope_width': 0.0007, # only assign full width as we normally use odd length in discrete index for clarity
-        't_EPSP_slope_start': 0,
-        't_EPSP_slope_end': 0,
-        't_EPSP_slope_method': 'auto detect',
-        't_EPSP_slope_params': 'NA',
-        't_EPSP_amp': 0,
-        't_EPSP_amp_halfwidth': 0,
-        't_EPSP_amp_method': 'auto detect',
-        't_EPSP_amp_params': 'NA',
-        'norm_output_from': 0,
-        'norm_output_to': 0,
-    }
+            'stim': 0,
+            't_stim': 0,
+            't_stim_method': 'max prim',
+            't_stim_params': 'NA',
+            'amp_zero': 0,
+            't_volley_slope_width': t_volley_slope_width,
+            't_volley_slope_halfwidth': t_volley_slope_halfwidth,
+            't_volley_slope_start': 0,
+            't_volley_slope_end': 0,
+            't_volley_slope_method': 'default',
+            't_volley_slope_params': 'NA',
+            'volley_slope_mean': 0,
+            't_volley_amp': 0,
+            't_volley_amp_halfwidth': 0,
+            't_volley_amp_method': 'default',
+            't_volley_amp_params': 'NA',
+            'volley_amp_mean': 0,
+            't_EPSP_slope_width': t_EPSP_slope_width,
+            't_EPSP_slope_halfwidth': t_EPSP_slope_halfwidth,
+            't_EPSP_slope_start': 0,
+            't_EPSP_slope_end': 0,
+            't_EPSP_slope_method': 'default',
+            't_EPSP_slope_params': 'NA',
+            't_EPSP_amp': 0,
+            't_EPSP_amp_halfwidth': 0,
+            't_EPSP_amp_method': 'default',
+            't_EPSP_amp_params': 'NA',
+            'norm_output_from': 0,
+            'norm_output_to': 0,
+        }
     for _ in range(3):
         print()
     print("", "*** analysis_v2.py standalone test: ***")
@@ -639,7 +662,7 @@ if __name__ == "__main__":
             raise ValueError("Expected exactly one event in find_events result.")
         df_t = pd.DataFrame([dict_t])
         print()
-        print(f"*** df_t: {df_t}")
+        print(f"*** dict_t: {dict_t}")
         # print time rounded to 3 decimal places
         print(f"Time taken: {round(time.time() - t0, 3)} seconds")
         print()
