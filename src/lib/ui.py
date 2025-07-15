@@ -86,7 +86,7 @@ class Config:
         clear = True#False
 
         self.clear_cache = clear
-        self.transient = False # Block persisting of files
+        self.transient = True#False # Block persisting of files
         self.clear_timepoints = clear
         self.force_cfg_reset = clear
         self.verbose = self.dev_mode
@@ -3238,7 +3238,6 @@ class UIsub(Ui_MainWindow):
 
 
     def eventMouseover(self, event): # determine which event is being mouseovered
-        self.usage("eventMouseover")
         if uistate.df_recs2plot is None or uistate.df_recs2plot.empty:
             # print("No recordings to mouseover")
             return
@@ -3333,7 +3332,6 @@ class UIsub(Ui_MainWindow):
 
 
     def outputMouseover(self, event): # determine which event is being mouseovered
-        self.usage("outputMouseover")
         x, y = event.xdata, event.ydata
         str_ax = 'ax2' if uistate.slopeView() else 'ax1' if uistate.ampView() else None
         ax = getattr(uistate, str_ax)

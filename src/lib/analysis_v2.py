@@ -233,8 +233,8 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
             t_EPSP_slope_start = t_stim + 0.002 # default to 2 ms after stim
             t_EPSP_amp_method = t_EPSP_slope_method = 'default'
         # Calculate the end times for volley and EPSP slopes
-        t_volley_slope_end = t_volley_slope_start + default_dict_t['t_volley_slope_width']
-        t_EPSP_slope_end = t_EPSP_slope_start + default_dict_t['t_EPSP_slope_width']
+        t_volley_slope_end = round(t_volley_slope_start + default_dict_t['t_volley_slope_width'], precision)
+        t_EPSP_slope_end = round(t_EPSP_slope_start + default_dict_t['t_EPSP_slope_width'], precision)
 
         result = {
             'stim': stim_nr,
@@ -586,27 +586,26 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
     return result
 
 if __name__ == "__main__":
-    from math import floor
     import parse
     import ui_state_classes as ui
 
     # Test find_events:  with a sample DataFrame
     list_sources = [r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_a.csv",
                     r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_b.csv",
-                    r"C:\Users\xandmz\Documents\data\A_24_P0630-D4_Ch0_a.csv",
-                    r"C:\Users\xandmz\Documents\data\A_24_P0630-D4_Ch0_b.csv",
-                    r"C:\Users\xandmz\Documents\data\B_22_P0701-D3_Ch0_a.csv",
-                    r"C:\Users\xandmz\Documents\data\B_22_P0701-D3_Ch0_b.csv",
-                    r"C:\Users\xandmz\Documents\data\B_23_P0630-D3_Ch0_a.csv",
-                    r"C:\Users\xandmz\Documents\data\B_23_P0630-D3_Ch0_b.csv",
+                    #r"C:\Users\xandmz\Documents\data\A_24_P0630-D4_Ch0_a.csv",
+                    #r"C:\Users\xandmz\Documents\data\A_24_P0630-D4_Ch0_b.csv",
+                    #r"C:\Users\xandmz\Documents\data\B_22_P0701-D3_Ch0_a.csv",
+                    #r"C:\Users\xandmz\Documents\data\B_22_P0701-D3_Ch0_b.csv",
+                    #r"C:\Users\xandmz\Documents\data\B_23_P0630-D3_Ch0_a.csv",
+                    #r"C:\Users\xandmz\Documents\data\B_23_P0630-D3_Ch0_b.csv",
                     
                     #r"K:\Samples - pilot\cA24.csv",  # Works with ui.py
                     #r"K:\Samples - pilot\cB22.csv", # Doesn't Work with ui.py
     ]
-    t_volley_slope_width = 0.003 # default width for volley slope, in seconds
-    t_EPSP_slope_width = 0.007 # default width for EPSP
-    t_volley_slope_halfwidth = floor(t_volley_slope_width / 2)
-    t_EPSP_slope_halfwidth = floor(t_EPSP_slope_width / 2)
+    t_volley_slope_width = 0.0003 # default width for volley slope, in seconds
+    t_EPSP_slope_width = 0.0007 # default width for EPSP, in seconds
+    t_volley_slope_halfwidth = 0.0001
+    t_EPSP_slope_halfwidth = 0.0003
     default_dict_t = { # default values for df_t(imepoints)
         # TODO: rework and harmonize parameters
         # suggested format: feature-[param, value]

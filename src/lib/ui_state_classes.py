@@ -68,10 +68,12 @@ class UIstate:
         }
         # default_dict_t is used to store timepoints and their parameters
         # only assign full width as we normally use odd length in discrete index for clarity
-        t_volley_slope_width = 0.003 # default width for volley slope, in seconds
-        t_EPSP_slope_width = 0.007 # default width for EPSP
-        t_volley_slope_halfwidth = floor(t_volley_slope_width / 2)
-        t_EPSP_slope_halfwidth = floor(t_EPSP_slope_width / 2)
+        t_volley_slope_width = 0.0003 # default width for volley slope, in seconds
+        t_EPSP_slope_width = 0.0007 # default width for EPSP
+        resolution = 0.0001 # resolution in seconds TODO: hardcoded for 10KHz
+        t_volley_slope_halfwidth = self.floor_to_resolution(t_volley_slope_width / 2, resolution)
+        t_EPSP_slope_halfwidth = self.floor_to_resolution(t_EPSP_slope_width / 2, resolution)
+        print(f"UIstate: t_volley_slope_halfwidth={t_volley_slope_halfwidth}, t_EPSP_slope_halfwidth={t_EPSP_slope_halfwidth}")
         self.default_dict_t = { # default values for df_t(imepoints)
         # TODO: rework and harmonize parameters
         # suggested format: feature-[param, value]
@@ -326,7 +328,12 @@ class UIstate:
         show = self.checkBox
         return any(show.values())
     
+    def floor_to_resolution(self, value, resolution):
+        # Infer decimals from resolution, e.g., 0.0003 → 4 decimal places
+        decimals = abs(len(str(resolution).split('.')[-1]))
 
+        floored = floor(value / resolution) * resolution
+        return round(max(floored, resolution), decimals)
 
 if __name__ == "__main__":
     # test instantiation
