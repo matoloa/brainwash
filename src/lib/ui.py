@@ -86,7 +86,7 @@ class Config:
         clear = True#False
 
         self.clear_cache = clear
-        self.transient = True#False # Block persisting of files
+        self.transient = False # Block persisting of files
         self.clear_timepoints = clear
         self.force_cfg_reset = clear
         self.verbose = self.dev_mode
@@ -1078,10 +1078,6 @@ class UIsub(Ui_MainWindow):
                 index_end = model.index(row_idx, model.columnCount(QtCore.QModelIndex()) - 1)  # End of the row (last column)
                 selection.select(index_start, index_end)
             self.tableStim.selectionModel().select(selection, QtCore.QItemSelectionModel.Select)
-            self.setTableStimVisibility(True)
-        else:
-            print(f"* Hiding tableStim as df_t.shape[0] = {df_t.shape[0]}")
-            self.setTableStimVisibility(False)
         self.zoomAuto()
 
         t0 = time.time()
@@ -1305,7 +1301,8 @@ class UIsub(Ui_MainWindow):
     def darkmode(self):
         if uistate.darkmode:
             self.mainwindow.setStyleSheet("background-color: #2A2A2A; color: #fff;")
-            self.tableProj.setStyleSheet("""
+            
+            table_style = """
                 QTableView::item:selected {
                     background-color: #555;
                     color: #FFF;
@@ -1318,11 +1315,14 @@ class UIsub(Ui_MainWindow):
                     background-color: #333;
                     color: #FFF;
                 }
-            """)
-       
+            """
+            self.tableProj.setStyleSheet(table_style)
+            self.tableStim.setStyleSheet(table_style)
         else:
             self.mainwindow.setStyleSheet("")
             self.tableProj.setStyleSheet("")
+            self.tableStim.setStyleSheet("")
+
         uiplot.styleUpdate()
         self.graphRefresh()
 
@@ -1476,6 +1476,7 @@ class UIsub(Ui_MainWindow):
         self.applyConfigStates() # apply config states to UI elements
         self.graphAxes()
         self.darkmode() # set darkmode if set in bw_cfg. Requires tables and canvases be loaded!
+        self.setTableStimVisibility(uistate.showTimetable)
         self.setupToolBar()
         # set focus to TableProj, so that arrows work immediately
         self.tableProj.setFocus()
@@ -1562,13 +1563,20 @@ class UIsub(Ui_MainWindow):
         self.actionCopyOutput.setShortcut("Ctrl+C")
         self.menuEdit.addAction(self.actionCopyOutput)
         
-        # View menu
+# View menu
+        actionTimetable = QtWidgets.QAction("Toggle Timetable", self)
+        actionTimetable.setCheckable(True)
+        actionTimetable.setShortcut("Alt+T")
+        actionTimetable.setChecked(uistate.showTimetable)
+        actionTimetable.triggered.connect(self.triggerShowTimetable)
+        self.menuView.addAction(actionTimetable)
         for frame, (text, initial_state) in uistate.viewTools.items():
             action = QtWidgets.QAction(f"Toggle {text}", self)
-            action.setCheckable(True)  # Make the action checkable
-            action.setChecked(initial_state)  # Set the initial checked state
+            action.setCheckable(True)
+            action.setChecked(initial_state)
             action.triggered.connect(lambda state, frame=frame: self.toggleViewTool(frame))
             self.menuView.addAction(action)
+
 
         # Data menu
         self.actionAddData = QtWidgets.QAction("Add data files", self)
@@ -1787,6 +1795,12 @@ class UIsub(Ui_MainWindow):
         self.usage(f"triggerDarkmode set to {uistate.darkmode}")
         self.write_bw_cfg()
         self.darkmode()
+
+    def triggerShowTimetable(self):
+        self.usage("triggerShowTimetable")
+        uistate.showTimetable = not uistate.showTimetable
+        self.write_bw_cfg()
+        self.setTableStimVisibility(uistate.showTimetable)
 
     def triggerCopyTimepoints(self):
         self.usage("triggerCopyTimepoints")
@@ -2470,31 +2484,44 @@ class UIsub(Ui_MainWindow):
 
 # Writer functions
     
-    def write_bw_cfg(self):  # config file for program, global settings
-        if config.transient:
-            return
-        cfg = {"user_documents": str(self.user_documents), "projects_folder": str(self.projects_folder), "projectname": self.projectname, "darkmode": uistate.darkmode}
-        #TODO: maybe this should start going in the Brainwash user folder? not in repo or packaged app 
-        #with self.bw_cfg_yaml.open("w+") as file:
-        #    yaml.safe_dump(cfg, file)
-
     def get_bw_cfg(self):
-        # load program bw_cfg if present
-        # Set default values for bw_cfg.yaml
-        self.user_documents = Path.home() / "Documents"  # Where to look for raw data
-        self.projects_folder = self.user_documents / "Brainwash Projects"  # Where to store projects
+        # Set default values
+        self.user_documents = Path.home() / "Documents"
+        self.projects_folder = self.user_documents / "Brainwash Projects"
         self.projectname = "My Project"
         uistate.darkmode = False
-        # Override default if cfg.yaml exists
+        uistate.showTimetable = False
+
+        # Load config if present
         if config.bw_cfg_yaml is not None:
-            with Path(config.bw_cfg_yaml).open("r") as file:
-                cfg = yaml.safe_load(file)
-                projectfolder = Path(cfg['projects_folder']) / cfg['projectname']
-                if projectfolder.exists():  # if the folder stored in cfg.yaml exists, use it
-                    self.user_documents = Path(cfg['user_documents'])  # Where to look for raw data
-                    self.projects_folder = Path(cfg['projects_folder'])  # Where to save and read parsed data
-                    self.projectname = cfg['projectname']
-                uistate.darkmode = cfg['darkmode']
+            self.bw_cfg_yaml = Path(config.bw_cfg_yaml)
+            if self.bw_cfg_yaml.exists():
+                with self.bw_cfg_yaml.open("r") as file:
+                    cfg = yaml.safe_load(file) or {}
+                    projectfolder = Path(cfg.get('projects_folder', '')) / cfg.get('projectname', '')
+                    if projectfolder.exists():
+                        self.user_documents = Path(cfg.get('user_documents', self.user_documents))
+                        self.projects_folder = Path(cfg.get('projects_folder', self.projects_folder))
+                        self.projectname = cfg.get('projectname', self.projectname)
+                    uistate.darkmode = cfg.get('darkmode', False)
+                    uistate.showTimetable = cfg.get('showTimetable', False)
+        else:
+            self.bw_cfg_yaml = None  # Make sure it’s defined for consistency
+
+    def write_bw_cfg(self):  # Save global program settings
+        if config.transient or self.bw_cfg_yaml is None:
+            return
+        cfg = {
+            "user_documents": str(self.user_documents),
+            "projects_folder": str(self.projects_folder),
+            "projectname": self.projectname,
+            "darkmode": uistate.darkmode,
+            "showTimetable": uistate.showTimetable,
+        }
+        # TODO: maybe this should go in a user-specific Brainwash folder
+        with self.bw_cfg_yaml.open("w+") as file:
+            yaml.safe_dump(cfg, file)
+
 
     def df2csv(self, df, rec, key=None): # "writes dict[rec] to rec_{dict}.csv" TODO: Update, better description; replace "rec"
         if config.transient:

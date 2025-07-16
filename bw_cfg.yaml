@@ -1,4 +1,5 @@
-darkmode: true
+darkmode: false
 projectname: My Project
-projects_folder: /home/vscode/Documents/Brainwash Projects
-user_documents: /home/vscode/Documents
+projects_folder: C:\Users\xandmz\Documents\Brainwash Projects
+showTimetable: true
+user_documents: C:\Users\xandmz\Documents
