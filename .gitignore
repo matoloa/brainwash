@@ -30,7 +30,10 @@ venv/
 # location of current user's brainwash project folder
 projectFolderLocation.txt
 
+# bw config files
+cfg.yaml
+bw_cfg.yaml
+
 # Mats' convenience files
 *.bat
-cfg.yaml
 *.log

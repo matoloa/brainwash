@@ -119,17 +119,22 @@ uiplot = ui_plot.UIplot(uistate)
 ####################################################################
 
 class TableModel(QtCore.QAbstractTableModel):
-    def __init__(self, data=None):
+    def __init__(self, data=None, name =""):
         super(TableModel, self).__init__()
         self._data = data
+        self.name = name
 
-    def data(self, index, role=None):  # dataCell
-        if role is None:
-            value = self._data.iloc[index.row(), index.column()]
-            return value
+    def data(self, index, role=QtCore.Qt.DisplayRole):
+        if not index.isValid():
+            return None
         if role == QtCore.Qt.DisplayRole:
             value = self._data.iloc[index.row(), index.column()]
+            if self.name == "Stimulus table":
+                print(f"value={value} (type={type(value).__name__}) at {index.row()}, {index.column()}")
+            if isinstance(value, float):
+                return f"{value:.6f}"
             return str(value)
+        return None
 
     def dataRow(self, index, role=None):
         # TODO: return entire selected row
@@ -1631,7 +1636,7 @@ class UIsub(Ui_MainWindow):
             # Set up the table view
             if not hasattr(self, 'df_project'):
                 self.df_project = df_projectTemplate()
-            self.tablemodel = TableModel(self.df_project)
+            self.tablemodel = TableModel(self.df_project, name='Project table')
             self.tableProj.setModel(self.tablemodel)
 
             # Enable sorting on the QTableView
@@ -1647,7 +1652,7 @@ class UIsub(Ui_MainWindow):
 
 
     def setupTableStim(self):
-        self.tableStimModel = TableModel(pd.DataFrame([uistate.default_dict_t]))
+        self.tableStimModel = TableModel(pd.DataFrame([uistate.default_dict_t]), name='Stimulus table')
         self.tableStim.setModel(self.tableStimModel)
         self.tableStim.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.tableStim.verticalHeader().hide()
