@@ -1078,6 +1078,7 @@ class UIsub(Ui_MainWindow):
                 index_end = model.index(row_idx, model.columnCount(QtCore.QModelIndex()) - 1)  # End of the row (last column)
                 selection.select(index_start, index_end)
             self.tableStim.selectionModel().select(selection, QtCore.QItemSelectionModel.Select)
+            self.formatTableStimLayout(df_t=df_t)
         self.zoomAuto()
 
         t0 = time.time()
@@ -1563,7 +1564,7 @@ class UIsub(Ui_MainWindow):
         self.actionCopyOutput.setShortcut("Ctrl+C")
         self.menuEdit.addAction(self.actionCopyOutput)
         
-# View menu
+        # View menu
         actionTimetable = QtWidgets.QAction("Toggle Timetable", self)
         actionTimetable.setCheckable(True)
         actionTimetable.setShortcut("Alt+T")
@@ -1576,7 +1577,6 @@ class UIsub(Ui_MainWindow):
             action.setChecked(initial_state)
             action.triggered.connect(lambda state, frame=frame: self.toggleViewTool(frame))
             self.menuView.addAction(action)
-
 
         # Data menu
         self.actionAddData = QtWidgets.QAction("Add data files", self)
@@ -1642,6 +1642,7 @@ class UIsub(Ui_MainWindow):
             self.tableProj.setSelectionBehavior(TableProjSub.SelectRows)
             tableProj_selectionModel = self.tableProj.selectionModel()
             tableProj_selectionModel.selectionChanged.connect(self.tableProjSelectionChanged)
+            self.formatTableLayout()
         except Exception as e:
             print(f"Error setting up tableProj: {e}")
 
@@ -1653,8 +1654,69 @@ class UIsub(Ui_MainWindow):
         self.tableStim.verticalHeader().hide()
         tableStim_selectionModel = self.tableStim.selectionModel()
         tableStim_selectionModel.selectionChanged.connect(self.stimSelectionChanged)
-        self.setTableStimVisibility(False)
 
+    def formatTableLayout(self):
+        if config.verbose:
+            print("formatTableLayout")
+
+        self.tableProj.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
+        self.tableProj.verticalHeader().hide()
+
+        df_p = self.df_project
+        header = self.tableProj.horizontalHeader()
+
+        # ordered, visible columns
+        column_order = [
+            'recording_name',
+            'groups',
+            'stims',
+            'sweeps',
+            'sweep_duration',
+        ]
+        if uistate.checkBox['paired_stims']:
+            column_order.append('Tx')
+
+        col_indices = [df_p.columns.get_loc(name) for name in column_order]
+
+        # Show/hide columns and set resize behavior
+        num_columns = df_p.shape[1]
+        for col in range(num_columns):
+            if col in col_indices:
+                header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+                self.tableProj.setColumnHidden(col, False)
+            else:
+                self.tableProj.setColumnHidden(col, True)
+
+        self.tableProj.resizeColumnsToContents()
+
+        # Reorder visible columns
+        for i, col_index in enumerate(col_indices):
+            header.moveSection(header.visualIndex(col_index), i)
+
+    def formatTableStimLayout(self, df_t):
+        header = self.tableStim.horizontalHeader()
+        column_order = ['stim',
+                        't_stim',
+                        't_volley_slope_start',
+                        't_volley_slope_method',
+                        't_EPSP_slope_start',
+                        't_EPSP_slope_method',
+                        't_volley_amp',
+                        't_volley_amp_method',
+                        't_EPSP_amp',
+                        't_EPSP_amp_method',
+                        ]
+        col_indices = [df_t.columns.get_loc(col) for col in column_order if col in df_t.columns]
+        num_columns = df_t.shape[1]
+        for col in range(num_columns):
+            if col in col_indices:
+                header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+                self.tableStim.setColumnHidden(col, False)
+            else:
+                self.tableStim.setColumnHidden(col, True)
+        for i, col_index in enumerate(col_indices):
+            header.moveSection(header.visualIndex(col_index), i)
+        self.tableStim.resizeColumnsToContents()
 
     def setupFolders(self):
         self.dict_folders = self.build_dict_folders()
@@ -2247,7 +2309,6 @@ class UIsub(Ui_MainWindow):
             self.set_df_project(df_p)
             # Get the indices of the new rows, as they are in df_p
             uistate.new_indices = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
-        self.tableFormat()
         self.progressBarManager.__exit__(None, None, None)
         self.graphPreload()
         
@@ -2684,46 +2745,18 @@ class UIsub(Ui_MainWindow):
         if config.verbose:
             print("tableFormat")
         selected_rows = self.tableProj.selectionModel().selectedRows()
-        self.tableProj.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
+        # Update data
         self.tablemodel.setData(self.get_df_project())
-        header = self.tableProj.horizontalHeader()
-        self.tableProj.verticalHeader().hide()
-        df_p = self.df_project
-        # hide all columns except these:
-        list_show = [
-                        df_p.columns.get_loc('recording_name'),
-                        #df_p.columns.get_loc('ID'),
-                        df_p.columns.get_loc('sweeps'),
-                        df_p.columns.get_loc('groups'),
-                        df_p.columns.get_loc('stims'),
-                        df_p.columns.get_loc('sweep_duration'),
-                        #df_p.columns.get_loc('resets'),
-                    ]
-        if uistate.checkBox['paired_stims']:
-            list_show.append(df_p.columns.get_loc('Tx'))
-        num_columns = df_p.shape[1]
-        for col in range(num_columns):
-            if col in list_show:
-                header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
-                self.tableProj.setColumnHidden(col, False)
-            else:
-                self.tableProj.setColumnHidden(col, True)
-        self.tableProj.resizeColumnsToContents()
-    
-        # Rearrange column order
-        column_order = [df_p.columns.get_loc('recording_name'), df_p.columns.get_loc('groups'), df_p.columns.get_loc('stims'), df_p.columns.get_loc('sweeps'), df_p.columns.get_loc('sweep_duration')]
-        if uistate.checkBox['paired_stims']:
-            column_order.append(df_p.columns.get_loc('Tx'))
-        for i, col_index in enumerate(column_order):
-            header.moveSection(header.visualIndex(col_index), i)
-    
+        # Restore selection
         selection = QtCore.QItemSelection()
         for index in selected_rows:
             selection.select(index, index)
-        self.tableProj.selectionModel().select(selection, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
+        self.tableProj.selectionModel().select(
+            selection, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows
+        )
+        # Possibly update buttons or other UI
         self.setButtonParse()
-    
-
+       
     def tableUpdate(self):
         self.updating_tableProj = True # prevent tableProjSelectionChanged from firing
         # Update data
