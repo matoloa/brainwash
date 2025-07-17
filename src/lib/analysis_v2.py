@@ -215,8 +215,9 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
 
         # Volley
         if stim_char.get('volley_detected'):
-            t_volley_amp = df_event_range.loc[stim_char['i_volley_trough']].time
-            t_volley_slope_start = stim_char['t_volley_slope_start']
+            i_trough = stim_char['i_volley_trough']
+            t_volley_amp = df_event_range.iloc[i_trough]['time'] if i_trough is not None else t_stim + 0.0007
+            t_volley_slope_start = stim_char.get('t_volley_slope_start', t_stim + 0.001)
             t_volley_amp_method = t_volley_slope_method = 'auto detect'
         else:
             t_volley_amp = t_stim + 0.0007 # default to 0.7 ms after stim
@@ -225,8 +226,9 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
 
         # EPSP
         if stim_char.get('epsp_detected'):
-            t_EPSP_amp = df_event_range.loc[stim_char['i_epsp_min']].time
-            t_EPSP_slope_start = stim_char['t_EPSP_slope_start']
+            i_epsp_min = stim_char['i_epsp_min']
+            t_EPSP_amp = df_event_range.iloc[i_epsp_min]['time'] if i_epsp_min is not None else t_stim + 0.005
+            t_EPSP_slope_start = stim_char.get('t_EPSP_slope_start', t_stim + 0.002)
             t_EPSP_amp_method = t_EPSP_slope_method = 'auto detect'
         else:
             t_EPSP_amp = t_stim + 0.005 # default to 5 ms after stim
@@ -255,10 +257,19 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
 
     # Convert each index to a dictionary of t-values and add it to a list
     list_of_dict_t = []
+    margin_before = 5
+    min_interval_samples = 200  # 20 ms at 10 kHz to ensure no overlap in up to 50Hz trains
     for stim_nr, i_stim in enumerate(i_stims, start=1):
-        df_event_range = dfmean  # TODO: Remove or generalize this hardcoded range if needed
         dict_t = default_dict_t.copy()
-
+        # Define stop index, avoiding overlap with next stim
+        if stim_nr < len(i_stims):
+            next_stim = i_stims[stim_nr]
+            stop = min(i_stim + min_interval_samples, next_stim)
+        else:
+            stop = i_stim + min_interval_samples
+        # Define start index, with margin
+        start = max(i_stim - margin_before, 0)
+        df_event_range = dfmean.iloc[start:stop]
         stim_characteristics = characterize_graph(df_event_range, verbose=verbose)
         print(f"stim_characteristics: {stim_characteristics}")
 
@@ -676,7 +687,7 @@ if __name__ == "__main__":
     for event in list_event_summary:
         print(f"t_stim: {event['t_stim']}, vS:{event['t_volley_slope_method']}, ES: {event['t_EPSP_slope_method']}, "
               f"t_volley_slope: {event['t_volley_slope_start']} - {event['t_volley_slope_end']}, t_volley_amp: {event['t_volley_amp']}, "
-              f"t_EPSP_slope_start: {event['t_EPSP_slope_start']} - {event['t_EPSP_slope_end']}, t_EPSP_amp: {event['t_EPSP_amp']}")
+              f"t_EPSP_slope: {event['t_EPSP_slope_start']} - {event['t_EPSP_slope_end']}, t_EPSP_amp: {event['t_EPSP_amp']}")
               
 
 
