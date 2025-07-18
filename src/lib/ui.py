@@ -3832,25 +3832,30 @@ class UIsub(Ui_MainWindow):
         df_t = uistate.dft_copy # updated while dragging
         stim_idx = uistate.stim_select[0]
         t_row = df_t.iloc[stim_idx].to_dict()
-
+        
+        # Map drag actions to (method field, method value, aspect name, update values, plot updater)
         action_mapping = {
-            "EPSP slope": ("t_EPSP_slope_method", "manual", 'EPSP slope', {'t_EPSP_slope_start': t_row['t_EPSP_slope_start'], 't_EPSP_slope_end': t_row['t_EPSP_slope_end']}, uistate.updateDragZones),
-            "EPSP amp move": ("t_EPSP_amp_method", "manual", 'EPSP amp', {'t_EPSP_amp': t_row['t_EPSP_amp'], 't_EPSP_amp_halfwidth': t_row['t_EPSP_amp_halfwidth'], 'amp_zero': t_row['amp_zero']}, uistate.updatePointDragZone),
-            "volley slope": ("t_volley_slope_method", "manual", 'volley slope', {'t_volley_slope_start': t_row['t_volley_slope_start'], 't_volley_slope_end': t_row['t_volley_slope_end']}, uistate.updateDragZones),
-            "volley amp move": ("t_volley_amp_method", "manual", 'volley amp', {'t_volley_amp': t_row['t_volley_amp'], 't_volley_amp_halfwidth': t_row['t_volley_amp_halfwidth'], 'amp_zero': t_row['amp_zero']}, uistate.updatePointDragZone),
+            "EPSP slope": ("t_EPSP_slope_method", 'EPSP slope', {'t_EPSP_slope_start': t_row['t_EPSP_slope_start'], 't_EPSP_slope_end': t_row['t_EPSP_slope_end']}, uistate.updateDragZones),
+            "EPSP amp move": ("t_EPSP_amp_method", 'EPSP amp', {'t_EPSP_amp': t_row['t_EPSP_amp'], 't_EPSP_amp_halfwidth': t_row['t_EPSP_amp_halfwidth'], 'amp_zero': t_row['amp_zero']}, uistate.updatePointDragZone),
+            "volley slope": ("t_volley_slope_method", 'volley slope', {'t_volley_slope_start': t_row['t_volley_slope_start'], 't_volley_slope_end': t_row['t_volley_slope_end']}, uistate.updateDragZones),
+            "volley amp move": ("t_volley_amp_method", 'volley amp', {'t_volley_amp': t_row['t_volley_amp'], 't_volley_amp_halfwidth': t_row['t_volley_amp_halfwidth'], 'amp_zero': t_row['amp_zero']}, uistate.updatePointDragZone),
         }
+        # Apply the appropriate update if the current mouseover action matches a known drag type
         for action, values in action_mapping.items():
             if uistate.mouseover_action.startswith(action):
-                t_row[values[0]] = values[1]
-                aspect = values[2]
-                values[4]()
-                dict_t = values[3]
-                dict_t['stim'] = t_row['stim']
-                dict_t['t_stim'] = t_row['t_stim']
-                dict_t['norm_output_from'] = t_row['norm_output_from']
-                dict_t['norm_output_to'] = t_row['norm_output_to']
+                method_field = values[0]
+                aspect = values[1]
+                dict_t = values[2]
+                update_function = values[3]
+                dict_t[method_field] = "manual"     # ← Set 'manual' here
+                dict_t.update({
+                    'stim': t_row['stim'],
+                    't_stim': t_row['t_stim'],
+                    'norm_output_from': t_row['norm_output_from'],
+                    'norm_output_to': t_row['norm_output_to'],
+                })
+                update_function()
                 break
-
 
         #update selected dft row with the values from dict_t
         for key, value in dict_t.items():
@@ -3880,6 +3885,7 @@ class UIsub(Ui_MainWindow):
         uistate.dft_copy = df_t
         t_row = df_t.iloc[stim_idx].to_dict()
 
+        self.tableStimModel.setData(df_t)
         uiplot.plotUpdate(p_row=p_row, t_row=t_row, aspect=aspect, data_x=data_x, data_y=data_y)
 
         def update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot):
@@ -3911,7 +3917,6 @@ class UIsub(Ui_MainWindow):
             df_groupmean = self.get_dfgroupmean(group_ID)
             uiplot.addGroup(group_ID, self.dd_groups[group_ID], df_groupmean)
         self.mouseoverUpdate()
-
 
         if config.talkback:
             self.talkback()
