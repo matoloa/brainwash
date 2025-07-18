@@ -1667,12 +1667,12 @@ class UIsub(Ui_MainWindow):
 
         # ordered, visible columns
         column_order = [
+            'status',
             'recording_name',
             'groups',
             'stims',
             'sweeps',
             'sweep_duration',
-            'defaults',
         ]
         if uistate.checkBox['paired_stims']:
             column_order.append('Tx')
@@ -2690,25 +2690,29 @@ class UIsub(Ui_MainWindow):
     def save_df_project(self): # writes df_project to .csv
         self.df_project.to_csv(str(self.dict_folders['project'] / "project.brainwash"), index=False)
 
-    def mark_defaults(self, rec_name=None):
-        # updates df_project['defaults'] column with True if the recording has a default timepoint
+    def set_status(self, rec_name=None):
+        # Updates df_project['status'] and 'defaults' based on whether 'default' appears in each df_t
+        # TODO: expand this to cover more issues with recordings
         def has_default(rec):
             df_t = self.dict_ts.get(rec)
             if df_t is not None:
                 return 'default' in df_t.values
             else:
-                print(f"mark_defaults: {rec} not found in dict_ts")
+                print(f"set_status: {rec} not found in dict_ts")
                 return False
         df_p = self.get_df_project()
         if rec_name is not None:
-            df_p.loc[df_p['recording_name'] == rec_name, 'defaults'] = has_default(rec_name)
+            default_found = has_default(rec_name)
+            df_p.loc[df_p['recording_name'] == rec_name, 'status'] = "default" if default_found else ""
             if config.verbose:
-                print(f"mark_defaults: {rec_name} set to {df_p.loc[df_p['recording_name'] == rec_name, 'defaults'].values[0]}")
+                print(f"set_status: {rec_name} set to status = '{df_p.loc[df_p['recording_name'] == rec_name, 'status'].values[0]}'")
         else:
             for idx, row in df_p.iterrows():
-                df_p.at[idx, 'defaults'] = has_default(row['recording_name'])
+                rec = row['recording_name']
+                default_found = has_default(rec)
+                df_p.at[idx, 'status'] = "default" if default_found else ""
             if config.verbose:
-                print(f"mark_defaults: marked all defaults in {len(df_p)} recordings")
+                print(f"set_status: marked all statuses in {len(df_p)} recordings")
         self.set_df_project(df_p)
         self.tableUpdate()
 
@@ -2727,6 +2731,8 @@ class UIsub(Ui_MainWindow):
 # Table handling
 
     def setButtonParse(self):
+        if config.verbose:
+            print("setButtonParse")
         unparsed = self.df_project['sweeps'].eq("...").any()
         self.pushButtonParse.setVisible(bool(unparsed))
         self.checkBox_force1stim.setVisible(bool(unparsed))
@@ -2777,7 +2783,6 @@ class UIsub(Ui_MainWindow):
         self.tableProj.selectionModel().select(
             selection, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows
         )
-        # Possibly update buttons or other UI
         self.setButtonParse()
        
     def tableUpdate(self):
@@ -2848,11 +2853,8 @@ class UIsub(Ui_MainWindow):
             df_t['norm_EPSP_from'], df_t['norm_EPSP_to'] = uistate.lineEdit['norm_EPSP_from'], uistate.lineEdit['norm_EPSP_to']
             df_t['t_EPSP_amp_halfwidth'] = uistate.lineEdit['EPSP_amp_halfwidth_ms']/1000
             df_t['t_volley_amp_halfwidth'] = uistate.lineEdit['volley_amp_halfwidth_ms']/1000
-            df_p = self.get_df_project() # update (number of) 'stims' and 'defaults' columns
+            df_p = self.get_df_project() # update (number of) 'stims' columns
             stims = len(df_t)
-            has_default = 'default' in df_t.values
-            idx = df_p['ID'] == row['ID']
-            df_p.loc[idx, ['stims', 'defaults']] = [stims, has_default]
             self.set_df_project(df_p)
             # If the UI checkbox for 'timepoints_per_stim' is checked OR there's only 1 stim,
             # we assume timepoints don't need adjustment, so we cache df_t as-is.
@@ -2864,6 +2866,7 @@ class UIsub(Ui_MainWindow):
                 self.set_uniformTimepoints(p_row=row, df_t=df_t, dfoutput=dfoutput)
                 df_t = self.dict_ts[rec]
             self.df2csv(df=df_t, rec=rec, key="timepoints") # persist csv
+            self.set_status(rec) # update status in df_project
             return df_t
 
     def get_dfoutput(self, row, reset=False, df_t=None): # Requires df_t
@@ -3207,6 +3210,7 @@ class UIsub(Ui_MainWindow):
         print(f"Preloaded recordings and groups in {time.time()-t0:.2f} seconds.")
         self.graphRefresh()
         self.progressBarManager.__exit__(None, None, None)  # Hide progress bar
+        self.tableFormat()
         self.uiThaw()
         self.tableProjSelectionChanged()
 
@@ -3913,11 +3917,12 @@ class UIsub(Ui_MainWindow):
         self.persistOutput(rec_name=rec_name, dfoutput=dfoutput)
 
         self.set_dft(rec_name, df_t)
-        self.mark_defaults(rec_name=rec_name)
         uistate.dft_copy = df_t
         t_row = df_t.iloc[stim_idx].to_dict()
-
         self.tableStimModel.setData(df_t)
+
+        self.set_status(rec_name=rec_name)
+
         uiplot.plotUpdate(p_row=p_row, t_row=t_row, aspect=aspect, data_x=data_x, data_y=data_y)
 
         def update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot):
@@ -4070,6 +4075,7 @@ def df_projectTemplate():
             'ID',               # str: unique identifier for recording
             'host',             # str: computer name
             'path',             # str: path of original source file
+            'status',           # str: blank if ok, 'default' is default recordings. TODO: add more states
             'recording_name',   # str: name of recording
             'stims',            # int: number of stims in recording
             'sweeps',           # int: number of sweeps in recording
@@ -4083,7 +4089,6 @@ def df_projectTemplate():
             'stim',             # str: this recording is only from this stim (a/b)
             'paired_recording', # str: unique ID of paired recording
             'Tx',               # Boolean: Treatment / Control, for paired recordings
-            'defaults',         # Boolean: If True, this recording contains default values from analysis
             'exclude',          # Boolean: If True, exclude this recording from analysis
             'comment',          # str: user comment
         ]
