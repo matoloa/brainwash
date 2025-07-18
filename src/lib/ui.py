@@ -1672,6 +1672,7 @@ class UIsub(Ui_MainWindow):
             'stims',
             'sweeps',
             'sweep_duration',
+            'defaults',
         ]
         if uistate.checkBox['paired_stims']:
             column_order.append('Tx')
@@ -2689,6 +2690,28 @@ class UIsub(Ui_MainWindow):
     def save_df_project(self): # writes df_project to .csv
         self.df_project.to_csv(str(self.dict_folders['project'] / "project.brainwash"), index=False)
 
+    def mark_defaults(self, rec_name=None):
+        # updates df_project['defaults'] column with True if the recording has a default timepoint
+        def has_default(rec):
+            df_t = self.dict_ts.get(rec)
+            if df_t is not None:
+                return 'default' in df_t.values
+            else:
+                print(f"mark_defaults: {rec} not found in dict_ts")
+                return False
+        df_p = self.get_df_project()
+        if rec_name is not None:
+            df_p.loc[df_p['recording_name'] == rec_name, 'defaults'] = has_default(rec_name)
+            if config.verbose:
+                print(f"mark_defaults: {rec_name} set to {df_p.loc[df_p['recording_name'] == rec_name, 'defaults'].values[0]}")
+        else:
+            for idx, row in df_p.iterrows():
+                df_p.at[idx, 'defaults'] = has_default(row['recording_name'])
+            if config.verbose:
+                print(f"mark_defaults: marked all defaults in {len(df_p)} recordings")
+        self.set_df_project(df_p)
+        self.tableUpdate()
+
 
 
 # Timepoints dataframe handling
@@ -2771,6 +2794,7 @@ class UIsub(Ui_MainWindow):
             #print(f"tableUpdate: reselecting {len(uistate.rec_select)}: {idx}")
         self.updating_tableProj = False
 
+
 # Internal dataframe handling
   
     def get_dfmean(self, row):
@@ -2824,12 +2848,17 @@ class UIsub(Ui_MainWindow):
             df_t['norm_EPSP_from'], df_t['norm_EPSP_to'] = uistate.lineEdit['norm_EPSP_from'], uistate.lineEdit['norm_EPSP_to']
             df_t['t_EPSP_amp_halfwidth'] = uistate.lineEdit['EPSP_amp_halfwidth_ms']/1000
             df_t['t_volley_amp_halfwidth'] = uistate.lineEdit['volley_amp_halfwidth_ms']/1000
-            df_p = self.get_df_project() # update (number of) 'stims'
+            df_p = self.get_df_project() # update (number of) 'stims' and 'defaults' columns
             stims = len(df_t)
-            df_p.loc[df_p['ID'] == row['ID'], 'stims'] = stims
+            has_default = 'default' in df_t.values
+            idx = df_p['ID'] == row['ID']
+            df_p.loc[idx, ['stims', 'defaults']] = [stims, has_default]
             self.set_df_project(df_p)
+            # If the UI checkbox for 'timepoints_per_stim' is checked OR there's only 1 stim,
+            # we assume timepoints don't need adjustment, so we cache df_t as-is.
             if uistate.checkBox['timepoints_per_stim'] or stims == 1:
                 self.dict_ts[rec] = df_t # update cache
+            # Otherwise, compute a uniform timepoint structure based on the current row and df_t.
             else:
                 dfoutput = self.get_dfoutput(row=row, df_t=df_t)
                 self.set_uniformTimepoints(p_row=row, df_t=df_t, dfoutput=dfoutput)
@@ -3829,6 +3858,7 @@ class UIsub(Ui_MainWindow):
             self.mouseoverUpdate()
             return
         p_row = uistate.dfp_row_copy.to_dict()
+        rec_name = p_row['recording_name']
         df_t = uistate.dft_copy # updated while dragging
         stim_idx = uistate.stim_select[0]
         t_row = df_t.iloc[stim_idx].to_dict()
@@ -3843,6 +3873,7 @@ class UIsub(Ui_MainWindow):
         # Apply the appropriate update if the current mouseover action matches a known drag type
         for action, values in action_mapping.items():
             if uistate.mouseover_action.startswith(action):
+                #t_row[values[0]] = values[1]
                 method_field = values[0]
                 aspect = values[1]
                 dict_t = values[2]
@@ -3879,9 +3910,10 @@ class UIsub(Ui_MainWindow):
             for col in new_dfoutput.columns:
                 dfoutput.loc[dfoutput['stim'] == stim_num, col] = new_dfoutput.loc[new_dfoutput['stim'] == stim_num, col]
         print(f" - {dfoutput.columns}")
-        self.persistOutput(rec_name=p_row['recording_name'], dfoutput=dfoutput)
+        self.persistOutput(rec_name=rec_name, dfoutput=dfoutput)
 
-        self.set_dft(p_row['recording_name'], df_t)
+        self.set_dft(rec_name, df_t)
+        self.mark_defaults(rec_name=rec_name)
         uistate.dft_copy = df_t
         t_row = df_t.iloc[stim_idx].to_dict()
 
@@ -3889,7 +3921,7 @@ class UIsub(Ui_MainWindow):
         uiplot.plotUpdate(p_row=p_row, t_row=t_row, aspect=aspect, data_x=data_x, data_y=data_y)
 
         def update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot):
-            labelbase = f"{p_row['recording_name']} - stim {t_row['stim']}"
+            labelbase = f"{rec_name} - stim {t_row['stim']}"
             labelamp = f"{labelbase} {aspect}"
             aspect = aspect.replace(" ", "_")
             t_aspect = f"t_{aspect}"
@@ -3908,9 +3940,8 @@ class UIsub(Ui_MainWindow):
             else:
                 for i, t_row in uistate.dft_copy.iterrows():
                     update_amp_marker(t_row, aspect, p_row, dfmean, dfoutput, uiplot)
-        self.tableUpdate()
-
-         # update groups
+                
+        # update groups
         affected_groups = self.get_groupsOfRec(p_row['ID'])
         self.group_cache_purge(affected_groups)
         for group_ID in affected_groups:
@@ -4052,6 +4083,7 @@ def df_projectTemplate():
             'stim',             # str: this recording is only from this stim (a/b)
             'paired_recording', # str: unique ID of paired recording
             'Tx',               # Boolean: Treatment / Control, for paired recordings
+            'defaults',         # Boolean: If True, this recording contains default values from analysis
             'exclude',          # Boolean: If True, exclude this recording from analysis
             'comment',          # str: user comment
         ]

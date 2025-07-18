@@ -568,6 +568,9 @@ class UIplot():
 
     def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None):
         axe = self.uistate.axe
+        x = np.atleast_1d(x)
+        y = np.atleast_1d(y)
+        print(f"updateAmpMarker: {labelbase}, x: {x}, y: {y}, amp_x: {amp_x}, amp_zero: {amp_zero}, amp: {amp}")
         self.uistate.dict_rec_labels[f"{labelbase} marker"]['line'].set_data(x, y)
         if amp is not None:
             amp_y = amp_zero, (0 - amp) + amp_zero
