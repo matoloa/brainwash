@@ -235,7 +235,7 @@ def sample_abf(filepath):
 
 
 # %%
-def parse_abfFolder(folderpath):
+def parse_abfFolder(folderpath, dev=False):
     """
     Read, sort (by filename) and concatenate all .abf files in folderpath to a single df
     """
@@ -484,7 +484,7 @@ def metadata(df):
         }
     return dict_meta
 
-def source2df(source, recording_name=None):
+def source2df(source, recording_name=None, dev=False):
     """
     Usage: called by parse.source2df from ui.py
     Identifies type of file(s), and calls the appropriate parser
@@ -510,9 +510,9 @@ def source2df(source, recording_name=None):
         if csv_files:
             raise ValueError(".csv files not supported yet, please use abf or ibw files.")
         elif abf_files:
-            df = parse_abfFolder(path)
+            df = parse_abfFolder(path, dev=dev)
         elif ibw_files:
-            df = parse_ibwFolder(path)
+            df = parse_ibwFolder(path, dev=dev)
         else:
             raise ValueError(f"No valid files found.")
     else: # source_path is not a folder - parse as a single file
@@ -529,19 +529,19 @@ def source2df(source, recording_name=None):
 
 
 
-
 # %%
 if __name__ == "__main__":
+    dev = True
     source_folder = Path.home() / "Documents/Brainwash Data Source/"
     dict_folders = {'project': Path.home() / "Documents/Brainwash Projects/standalone_test"}
     dict_folders['data'] = dict_folders['project'] / "data"
     dict_folders['cache'] = dict_folders['project'] / "cache"
     dict_folders['project'].mkdir(parents=True, exist_ok=True)
     
-    list_sources = [r"C:\Users\xandmz\Documents\data\Rong Samples\Good recording"
+    list_sources = [#r"C:\Users\xandmz\Documents\data\Rong Samples\Good recording"
                     #r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_a.csv",
                     #r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_b.csv",
-                    ]
+
     # list_sources = [str(source_folder / "abf 1 channel/A_21_P0701-S2"),
     #                 str(source_folder / "abf 1 channel/A_24_P0630-D4"),
     #                 str(source_folder / "abf 1 channel/B_22_P0701-D3"),
@@ -554,11 +554,11 @@ if __name__ == "__main__":
     #list_sources = [r"K:\Brainwash Data Source\Rong Samples\SameTime"]
     #list_sources = [
     #                r"K:\Brainwash Data Source\csv\A_21_P0701-S2_Ch0_a.csv",
-    #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_1.ibw",
+                    r"K:\Brainwash Data Source\Rong Samples\Good recording",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_2.ibw",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_25.ibw",
     #                r"K:\Brainwash Data Source\abf 1 channel\A_21_P0701-S2\2022_07_01_0012.abf",
-    #                ]
+                    ]
 
         
     for _ in range(3):
@@ -570,7 +570,7 @@ if __name__ == "__main__":
     for source in tqdm(list_sources):
 
         print(" - processing", source)
-        df_raw = source2df(source)
+        df_raw = source2df(source, dev=dev)
         list_dfs.append(df_raw)
     t1 = time.time()
     print(f'time to parse: {t1-t0} seconds')
@@ -584,5 +584,3 @@ if __name__ == "__main__":
     t1 = time.time()
     print(f'time to process metadata: {t1-t0} seconds')
     print()
-
-# %%
