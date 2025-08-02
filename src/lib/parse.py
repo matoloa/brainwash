@@ -141,28 +141,38 @@ def ibw_read(file):
     return {'timestamp': timestamp, 'meta_sfA': meta_sfA, 'array': array}
 
 
-def parse_ibwFolder(folder, dev=False): # igor2, para
+def parse_ibwFolder(folder, dev=False):  # igor2, para
     files = sorted(list(folder.glob('*.ibw')))
     if dev:
         files = files[:100]
+
     results = Parallel(n_jobs=-1)(delayed(ibw_read)(file) for file in tqdm(files))
+
+    # Sweep length check
+    sweep_shapes = [r["array"].shape for r in results]
+    unique_shapes = set(sweep_shapes)
+    if len(unique_shapes) != 1:
+        raise ValueError(f"Inconsistent sweep shapes detected: {unique_shapes}")
+
     keys = results[0].keys()
-    res = {}
-    for key in keys:
-        res[key] = [i[key] for i in results]
+    res = {key: [r[key] for r in results] for key in keys}
+
     timesteps = res['meta_sfA']
     arrays = np.vstack(res['array'])
-    timestamps = res['timestamp']       
+    timestamps = res['timestamp']
 
     seconds = (pd.to_datetime("1970-01-01") - pd.to_datetime("1900-01-01")).total_seconds()
-    timestamp_array = (np.array(timestamps)-seconds)
-    measurement_start = min(timestamp_array)
+    timestamp_array = np.array(timestamps) - seconds
+    measurement_start = timestamp_array.min()
     timestamp_array -= measurement_start
-    voltage_raw = np.vstack(arrays)
-    df = pd.DataFrame(data=voltage_raw, index=timestamp_array)
+
+    voltage_raw = arrays
+    df = pd.DataFrame(data=voltage_raw)  # Removed index=timestamp_array to avoid mismatch
+
     timestep = timesteps[0][0]
     num_columns = voltage_raw.shape[1]
-    df.columns = np.round(np.arange(num_columns) * timestep, int(-np.log(timestep))).tolist()
+    df.columns = np.round(np.arange(num_columns) * timestep, int(-np.log10(timestep))).tolist()
+
     df = df.stack().reset_index()
     df.columns = ['t0', 'time', 'voltage_raw']
     df.t0 = df.t0.astype("float64")
@@ -531,7 +541,7 @@ def source2df(source, recording_name=None, dev=False):
 
 # %%
 if __name__ == "__main__":
-    dev = True
+    dev = False
     source_folder = Path.home() / "Documents/Brainwash Data Source/"
     dict_folders = {'project': Path.home() / "Documents/Brainwash Projects/standalone_test"}
     dict_folders['data'] = dict_folders['project'] / "data"
