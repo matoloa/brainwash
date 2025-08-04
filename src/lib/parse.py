@@ -498,9 +498,9 @@ def source2df(source, recording_name=None, dev=False):
     """
     Usage: called by parse.source2df from ui.py
     Identifies type of file(s), and calls the appropriate parser
-    * source: string of path to source file or folder
-    * recording_name: use to force a recording name
-    Returns a raw df; no postprocessing.
+    - source (str): Path to source file or folder
+    - recording_name (str, optional): Overrides default source-based recording name
+    Returns: DataFrame: Raw (unprocessed) output from the appropriate parser
     """
     path = Path(source)
     if not path.exists():
@@ -520,9 +520,15 @@ def source2df(source, recording_name=None, dev=False):
         if csv_files:
             raise ValueError(".csv files not supported yet, please use abf or ibw files.")
         elif abf_files:
-            df = parse_abfFolder(path, dev=dev)
+            try:
+                df = parse_abfFolder(path, dev=dev)
+            except Exception as e:
+                raise ValueError(f"Error parsing abf files in folder {path}: {e}")
         elif ibw_files:
-            df = parse_ibwFolder(path, dev=dev)
+            try:
+                df = parse_ibwFolder(path, dev=dev)
+            except Exception as e:
+                raise ValueError(f"Error parsing ibw files in folder {path}: {e}")
         else:
             raise ValueError(f"No valid files found.")
     else: # source_path is not a folder - parse as a single file
@@ -578,9 +584,12 @@ if __name__ == "__main__":
     list_dfs = []
     list_metas = []
     for source in tqdm(list_sources):
-
         print(" - processing", source)
-        df_raw = source2df(source, dev=dev)
+        try:
+            df_raw = source2df(source, dev=dev)
+        except Exception as e:
+            print(f"Error processing {source}: {e}")
+            continue
         list_dfs.append(df_raw)
     t1 = time.time()
     print(f'time to parse: {t1-t0} seconds')
