@@ -511,12 +511,11 @@ def source2df(source, recording_name=None, dev=False):
     # Source_path is a folder
     if path.is_dir(): # TODO: currently reads only one type of file:
         files = [f for f in path.iterdir() if f.is_file()]
-        print(f" - source is a folder: {source} with {len(files)} files:")
-        # if there are .abf files, parse and return only those.
         abf_files = [f for f in files if f.suffix.lstrip(".").lower() == "abf"]
         ibw_files = [f for f in files if f.suffix.lstrip(".").lower() == "ibw"]
         csv_files = [f for f in files if f.suffix.lstrip(".").lower() == "csv"]
-        print(f" - - found {len(abf_files)} abf files, {len(ibw_files)} ibw files, and {len(csv_files)} csv files.")
+        print(f" - {source} is a folder: with {len(files)} files:")
+        print(f" - - {len(abf_files)} abf files, {len(ibw_files)} ibw files, and {len(csv_files)} csv files.")
         if csv_files:
             raise ValueError(".csv files not supported yet, please use abf or ibw files.")
         elif abf_files:
@@ -602,4 +601,15 @@ if __name__ == "__main__":
             tqdm.write(f" - - {key}: {value}")
     t1 = time.time()
     print(f'time to process metadata: {t1-t0} seconds')
+    for _ in range(2):
+        print()
+    # Retrace steps of parseProjFiles:
+    # 1 Split by channels and sort by datetime
+    # 2 zeroSweeps
+    # 3 persistdf
+    print(df)
+    # * update ui.py to call these
+    # nstims: always FIND nstims. Mark them. Splitting applied by checkbox or button
+    # * splitting is a big operation; new files, new names - affects every aspect of processing
+    # * re-zero?
     print()
