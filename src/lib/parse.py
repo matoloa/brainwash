@@ -212,7 +212,6 @@ def parse_ibw(filepath, dev=False): # igor2, para
     df.time = df.time.astype("float64")
     df['datetime'] = pd.to_datetime((measurement_start + df.t0 + df.time), unit="s").round("us")
     df['channel'] = 0
-
     return df
 
 
@@ -265,11 +264,7 @@ def parse_abfFolder(folderpath, dev=False):
 
 def parse_abf(filepath, recording_name=None, keep_non_stim_data=False):
     """
-    reads a .abf 
-    returns a list of tuples: [(dict_meta, df_raw), ...]
-    WIP: There is considerable postprocessing in the original code - channels and stims - which is not yet implemented here
-        df_ch_st = df_ch.loc[df_ch.sweep_raw % nstims == i].copy()
-        df_ch_st['sweep'] = (df_ch_st.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
+    reads an .abf 
     """
     if recording_name is None:
         recording_name = os.path.basename(os.path.dirname(filepath))
@@ -297,6 +292,13 @@ def parse_abf(filepath, recording_name=None, keep_non_stim_data=False):
     df['timens'] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
     df['datetime'] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
     df.drop(columns=['sweepX', 'sweepY', 'timens'], inplace=True)
+    return df
+
+    ''' Legacy method
+    returns a list of tuples: [(dict_meta, df_raw), ...]
+    There was considerable postprocessing in the original code - channels and stims
+        df_ch_st = df_ch.loc[df_ch.sweep_raw % nstims == i].copy()
+        df_ch_st['sweep'] = (df_ch_st.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
     # 3) Assumptions: 2 stims, for now
     list_stims = ["a", "b"]
     nstims = len(list_stims)
@@ -327,13 +329,13 @@ def parse_abf(filepath, recording_name=None, keep_non_stim_data=False):
         }
         # 4a) add tuple to list
         list_tuple_data.append((dict_meta, df_raw))
-    return list_tuple_data
+    return list_tuple_data'''
 
 
 
 def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None, single_stim=False):
     """
-    WIP: Still operational, called from ui.py - TO BE REPLACED BY dataFile.
+    DEPRECATED: Still operational, called from ui.py
     * receives a df of project data file paths built in ui
         files that are already parsed are to be overwritten (ui.py passes filitered list of unparsed files)
     * creates a datafile by unique source file/channel/stim combination
@@ -569,7 +571,8 @@ if __name__ == "__main__":
     #list_sources = [r"K:\Brainwash Data Source\Rong Samples\SameTime"]
     #list_sources = [
     #                r"K:\Brainwash Data Source\csv\A_21_P0701-S2_Ch0_a.csv",
-                    r"K:\Brainwash Data Source\Rong Samples\Good recording",
+#                    r"K:\Brainwash Data Source\Rong Samples\Good recording",
+                    r"K:\Brainwash Data Source\abf 2 channel\KO_02",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_2.ibw",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_25.ibw",
     #                r"K:\Brainwash Data Source\abf 1 channel\A_21_P0701-S2\2022_07_01_0012.abf",
@@ -601,15 +604,16 @@ if __name__ == "__main__":
             tqdm.write(f" - - {key}: {value}")
     t1 = time.time()
     print(f'time to process metadata: {t1-t0} seconds')
-    for _ in range(2):
-        print()
-    # Retrace steps of parseProjFiles:
-    # 1 Split by channels and sort by datetime
-    # 2 zeroSweeps
-    # 3 persistdf
-    print(df)
+    print()
+    print(f"{len(list_dfs)} dataframe(s) processed:")
+    for df in tqdm(list_dfs):
+        print(df)
+#       split df by channel (longer list)
+#       sort df by datetime
+#       zeroSweeps
+#       persistdf
     # * update ui.py to call these
     # nstims: always FIND nstims. Mark them. Splitting applied by checkbox or button
     # * splitting is a big operation; new files, new names - affects every aspect of processing
-    # * re-zero?
+    # * re-zero stims.
     print()
