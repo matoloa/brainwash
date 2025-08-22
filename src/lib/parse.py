@@ -582,9 +582,10 @@ if __name__ == "__main__":
     for _ in range(3):
         print()
     print("", "*** parse.py standalone test: ***")
+    
+    # read sources
     t0 = time.time()
     list_dfs = []
-    list_metas = []
     for source in tqdm(list_sources):
         print(" - processing", source)
         try:
@@ -594,26 +595,72 @@ if __name__ == "__main__":
             continue
         list_dfs.append(df_raw)
     t1 = time.time()
-    print(f'time to parse: {t1-t0} seconds')
+    print(f'time to parse into {len(list_dfs)} dataframe(s): {t1-t0} seconds')
+    for df in list_dfs:
+        print(f" - df: {df.shape}, columns: {df.columns.tolist()}")
     print()
+
+    # report raw metadata
+    list_metas = []
     t0 = time.time()
     for df in tqdm(list_dfs):
-        list_metas.append(metadata(df_raw))
+        list_metas.append(metadata(df))
     for meta in list_metas:
         for key, value in meta.items():
             tqdm.write(f" - - {key}: {value}")
     t1 = time.time()
-    print(f'time to process metadata: {t1-t0} seconds')
+    print(f'time to process raw metadata: {t1-t0} seconds')
     print()
-    print(f"{len(list_dfs)} dataframe(s) processed:")
-    for df in tqdm(list_dfs):
+
+    # split by channel
+    t0 = time.time()
+    split_dfs = []
+    for df in list_dfs:
+        if 'channel' in df.columns:
+            for channel in df['channel'].unique():
+                split_dfs.append(df[df['channel'] == channel].copy())
+        else:
+            split_dfs.append(df.copy())
+    t1 = time.time()
+    print(f"time to split {len(list_dfs)} dataframe(s) by channel into {len(split_dfs)} dataframe(s): {t1-t0} seconds")
+    list_dfs = split_dfs
+    for df in list_dfs:
+        print(f" - df: {df.shape}, columns: {df.columns.tolist()}")
+
+    # sort df by datetime
+    t0 = time.time()
+    for df in list_dfs:
+        if 'datetime' in df.columns:
+            df.sort_values('datetime', inplace=True)
+    t1 = time.time()
+    print(f"time to sort {len(list_dfs)} dataframe(s) by datetime: {t1-t0} seconds")
+
+    # generate 'sweep' column
+    t0 = time.time()
+    list_metas = []
+    for df in list_dfs:
+        dict_meta = metadata(df)
+        nsweeps = dict_meta['nsweeps']
+        sweep_duration = dict_meta['sweep_duration']
+        # Assign sweep number
+        df["sweep"] = (df.groupby((df["time"] == 0).cumsum()).ngroup())
         print(df)
-#       split df by channel (longer list)
-#       sort df by datetime
-#       zeroSweeps
-#       persistdf
+
+    # zeroSweeps
+    t0 = time.time()
+    for df in list_dfs:
+        df = zeroSweeps(dfdata=df)
+    t1 = time.time()
+    print(f"time to zero sweep values in {len(list_dfs)} dataframe(s): {t1-t0} seconds")
+
+    # ERROR: nsweeps counts 960, but t0 counts 1200. Investigate.
+
+    # persistdf
+
+    print(f"{len(list_dfs)} dataframe(s) processed.")
+
     # * update ui.py to call these
     # nstims: always FIND nstims. Mark them. Splitting applied by checkbox or button
     # * splitting is a big operation; new files, new names - affects every aspect of processing
-    # * re-zero stims.
+    # * re-zero stims? Begs the question - don't zero until here?
     print()
