@@ -14,4 +14,5 @@ toml
 requests
 pyabf
 igor2
+pyarrow
 cx-Freeze==8.2 # for building the executable, allowing this here to, is not that big

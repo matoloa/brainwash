@@ -3,15 +3,14 @@ import os  # speak to OS (list dirs)
 from pathlib import Path
 
 import numpy as np
-import pandas as pd  # dataframe module, think excel, but good
+import pandas as pd
 import pyabf  # read data files atf, abf
 import igor2 as igor # read data files ibw
 
 from tqdm import tqdm
+import time
 #from joblib import Memory
 from joblib import Parallel, delayed
-import time
-
 #memory = Memory("../cache", verbose=1)
 
 verbose = True
@@ -496,10 +495,9 @@ def metadata(df):
         }
     return dict_meta
 
-def source2df(source, recording_name=None, dev=False):
+def source2dfs(source, recording_name=None, dev=False):
     """
-    Usage: called by parse.source2df from ui.py
-    Identifies type of file(s), and calls the appropriate parser
+     Identifies type of file(s), and calls the appropriate parser
     - source (str): Path to source file or folder
     - recording_name (str, optional): Overrides default source-based recording name
     Returns: DataFrame: Raw (unprocessed) output from the appropriate parser
@@ -516,9 +514,10 @@ def source2df(source, recording_name=None, dev=False):
         abf_files = [f for f in files if f.suffix.lstrip(".").lower() == "abf"]
         ibw_files = [f for f in files if f.suffix.lstrip(".").lower() == "ibw"]
         csv_files = [f for f in files if f.suffix.lstrip(".").lower() == "csv"]
-        print(f" - {source} is a folder: with {len(files)} files:")
+        print(f" - {source} is a folder with {len(files)} files:")
         print(f" - - {len(abf_files)} abf files, {len(ibw_files)} ibw files, and {len(csv_files)} csv files.")
         if csv_files:
+            # TODO: implement CSV parsing - check for correct column names
             raise ValueError(".csv files not supported yet, please use abf or ibw files.")
         elif abf_files:
             try:
@@ -532,7 +531,8 @@ def source2df(source, recording_name=None, dev=False):
                 raise ValueError(f"Error parsing ibw files in folder {path}: {e}")
         else:
             raise ValueError(f"No valid files found.")
-    else: # source_path is not a folder - parse as a single file
+    # source_path is not a folder - parse as a single file
+    else:
         PARSERS = {
             "csv": parse_csv,
             "abf": parse_abf,
@@ -542,8 +542,38 @@ def source2df(source, recording_name=None, dev=False):
         if filetype not in PARSERS:
             raise ValueError(f"Unsupported file type: {filetype}")
         df = PARSERS[filetype](source, recording_name=recording_name)
-    return df
 
+    # split by channel
+    split_dfs = []
+    for channel in df['channel'].unique():
+        split_dfs.append(df[df['channel'] == channel].copy())
+    list_dfs = split_dfs
+    # sort df by datetime
+    for df in list_dfs:
+        df.sort_values('datetime', inplace=True)
+    # generate 'sweep' column
+    for df in list_dfs:
+        df["sweep"] = (df.groupby((df["time"] == 0).cumsum()).ngroup())
+
+    # reorder columns
+    column_order = ['sweep', 'time', 'voltage_raw', 'channel', 't0', 'datetime']
+    for i, df in enumerate(list_dfs):
+        df_cols = [col for col in column_order if col in df.columns]
+        list_dfs[i] = df[df_cols + [col for col in df.columns if col not in df_cols]]
+
+    return list_dfs
+
+
+def sources2dfs(list_sources, dev=False):
+    """
+    Converts a list of source file paths to a list of raw DataFrames.
+    """
+    list_dfs = []
+    for source in list_sources:
+        print(f"Processing source: {source}")
+        dfs = source2dfs(source, dev=dev)
+        list_dfs.extend(dfs)
+    return list_dfs
 
 
 # %%
@@ -572,7 +602,7 @@ if __name__ == "__main__":
     #list_sources = [
     #                r"K:\Brainwash Data Source\csv\A_21_P0701-S2_Ch0_a.csv",
                     r"K:\Brainwash Data Source\Rong Samples\Good recording",
-    #                r"K:\Brainwash Data Source\abf 2 channel\KO_02",
+                    r"K:\Brainwash Data Source\abf 2 channel\KO_02",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_2.ibw",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_25.ibw",
     #                r"K:\Brainwash Data Source\abf 1 channel\A_21_P0701-S2\2022_07_01_0012.abf",
@@ -586,64 +616,15 @@ if __name__ == "__main__":
     # read sources
     t0 = time.time()
     list_dfs = []
-    for source in tqdm(list_sources):
-        print(" - processing", source)
-        try:
-            df_raw = source2df(source, dev=dev)
-        except Exception as e:
-            print(f"Error processing {source}: {e}")
-            continue
-        list_dfs.append(df_raw)
+    try:
+        list_dfs = sources2dfs(list_sources, dev=dev)
+    except Exception as e:
+        print(f"Error processing: {e}")
     t1 = time.time()
     print(f'time to parse into {len(list_dfs)} dataframe(s): {t1-t0} seconds')
     for df in list_dfs:
         print(f" - df: {df.shape}, columns: {df.columns.tolist()}")
     print()
-
-    # report raw metadata
-    list_metas = []
-    t0 = time.time()
-    for df in tqdm(list_dfs):
-        list_metas.append(metadata(df))
-    for meta in list_metas:
-        for key, value in meta.items():
-            tqdm.write(f" - - {key}: {value}")
-    t1 = time.time()
-    print(f'time to process raw metadata: {t1-t0} seconds')
-    print()
-
-    # split by channel
-    t0 = time.time()
-    split_dfs = []
-    for df in list_dfs:
-        if 'channel' in df.columns:
-            for channel in df['channel'].unique():
-                split_dfs.append(df[df['channel'] == channel].copy())
-        else:
-            split_dfs.append(df.copy())
-    t1 = time.time()
-    print(f"time to split {len(list_dfs)} dataframe(s) by channel into {len(split_dfs)} dataframe(s): {t1-t0} seconds")
-    list_dfs = split_dfs
-    for df in list_dfs:
-        print(f" - df: {df.shape}, columns: {df.columns.tolist()}")
-
-    # sort df by datetime
-    t0 = time.time()
-    for df in list_dfs:
-        if 'datetime' in df.columns:
-            df.sort_values('datetime', inplace=True)
-    t1 = time.time()
-    print(f"time to sort {len(list_dfs)} dataframe(s) by datetime: {t1-t0} seconds")
-
-    # generate 'sweep' column
-    t0 = time.time()
-    list_metas = []
-    for df in list_dfs:
-        dict_meta = metadata(df)
-        nsweeps = dict_meta['nsweeps']
-        sweep_duration = dict_meta['sweep_duration']
-        # Assign sweep number
-        df["sweep"] = (df.groupby((df["time"] == 0).cumsum()).ngroup())
 
     # report post-processed metadata
     list_metas = []

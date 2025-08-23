@@ -1,7 +1,7 @@
 import os  # TODO: replace use by pathlib?
 import sys
 from pathlib import Path
-import yaml
+
 from PyQt5 import QtCore, QtWidgets, QtGui, sip
 import numpy as np
 import pandas as pd
@@ -12,16 +12,22 @@ from matplotlib import use as matplotlib_use
 from matplotlib.figure import Figure
 matplotlib_use("Qt5Agg")
 
+import importlib # for reloading modules
 from datetime import datetime # used in project name defaults
-import json # for saving and loading dicts as strings
-import re # regular expressions
 import time # counting time for functions
+import re # regular expressions
+
+# used by talkback
 import uuid # generating unique talkback ID
 import socket # getting computer name and localdomain for df_project['host'] (not reported in talkback)
+import yaml # used by talkback
+
+# read and write
 import toml # for reading pyproject.toml
-import importlib # for reloading modules
+import json # for saving and loading dicts as strings
 import pickle # for saving and loading dicts
 
+# brainwash files
 import parse
 import analysis_v2 as analysis
 import ui_state_classes
@@ -357,24 +363,25 @@ class ParseDataThread(QtCore.QThread):
             recording_name = df_proj_row['recording_name']
             source_path = df_proj_row['path']
             # TODO OLD METHOD (DEPRECATE)
-            dict_data = parse.parseProjFiles(dict_folders=self.dict_folders, recording_name=recording_name, source_path=source_path, single_stim=uistate.checkBox['force1stim'])
-            for new_name, dict_sub in dict_data.items():
-                nsweeps = dict_sub.get('nsweeps', None) 
-                if nsweeps is not None:
-                    # Check for duplicates
-                    if new_name in recording_names:
-                        recording_names[new_name] += 1
-                        new_name = f"{new_name}({recording_names[new_name]})"
-                    else:
-                        recording_names[new_name] = 1
-                    df_proj_new_row = self.create_new_row(df_proj_row, new_name, dict_sub)
-                    self.rows.append(df_proj_new_row)
-            # TODO NEW METHOD (IMPLEMENT)
-            # iterate through a list of tuples (dict_meta, df_raw)
-            #list_tuple_data = parse.dataFile(source_path)
-            #for dict_meta, df_raw in list_tuple_data:
-                # Persist df_raw to disk
-                # Use returned metadata to update df_p
+            if(True):
+                dict_data = parse.parseProjFiles(dict_folders=self.dict_folders, recording_name=recording_name, source_path=source_path, single_stim=uistate.checkBox['force1stim'])
+                for new_name, dict_sub in dict_data.items():
+                    nsweeps = dict_sub.get('nsweeps', None) 
+                    if nsweeps is not None:
+                        # Check for duplicates
+                        if new_name in recording_names:
+                            recording_names[new_name] += 1
+                            new_name = f"{new_name}({recording_names[new_name]})"
+                        else:
+                            recording_names[new_name] = 1
+                        df_proj_new_row = self.create_new_row(df_proj_row, new_name, dict_sub)
+                        self.rows.append(df_proj_new_row)
+            else:
+                # df_raw = parse.sources2dfs(list_sources=)
+                if df_raw is None:
+                    raise ValueError("Failed to read source file")
+                # 
+                # TODO NEW METHOD (IMPLEMENT)
 
 class graphPreloadThread(QtCore.QThread):
     finished = QtCore.pyqtSignal()
