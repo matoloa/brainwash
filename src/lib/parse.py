@@ -479,9 +479,9 @@ def metadata(df):
                     "sweep_duration": duration of a sweep in seconds
                     "sampling_rate": sampling rate in Hz        }
     """
-    # Number of unique sweeps
-    nsweeps = df['t0'].nunique()
-    # Duration of one sweep: max time within a sweep (assuming uniform)
+    # Number of unique sweeps, by number of 'time'==0
+    nsweeps = df['time'].value_counts().get(0, 0)
+    # Duration of one sweep: max time within a sweep (assume uniform: varied sweep length should throw exception at parsing)
     first_sweep = df[df['t0'] == df['t0'].iloc[0]]
     time_diffs = first_sweep['time'].diff().dropna()
     dt = time_diffs.mode().iloc[0]  # Sample interval
@@ -571,8 +571,8 @@ if __name__ == "__main__":
     #list_sources = [r"K:\Brainwash Data Source\Rong Samples\SameTime"]
     #list_sources = [
     #                r"K:\Brainwash Data Source\csv\A_21_P0701-S2_Ch0_a.csv",
-#                    r"K:\Brainwash Data Source\Rong Samples\Good recording",
-                    r"K:\Brainwash Data Source\abf 2 channel\KO_02",
+                    r"K:\Brainwash Data Source\Rong Samples\Good recording",
+    #                r"K:\Brainwash Data Source\abf 2 channel\KO_02",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_2.ibw",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_25.ibw",
     #                r"K:\Brainwash Data Source\abf 1 channel\A_21_P0701-S2\2022_07_01_0012.abf",
@@ -644,23 +644,18 @@ if __name__ == "__main__":
         sweep_duration = dict_meta['sweep_duration']
         # Assign sweep number
         df["sweep"] = (df.groupby((df["time"] == 0).cumsum()).ngroup())
-        print(df)
 
-    # zeroSweeps
+    # report post-processed metadata
+    list_metas = []
     t0 = time.time()
-    for df in list_dfs:
-        df = zeroSweeps(dfdata=df)
+    for df in tqdm(list_dfs):
+        list_metas.append(metadata(df))
+    for meta in list_metas:
+        for key, value in meta.items():
+            tqdm.write(f" - - {key}: {value}")
     t1 = time.time()
-    print(f"time to zero sweep values in {len(list_dfs)} dataframe(s): {t1-t0} seconds")
-
-    # ERROR: nsweeps counts 960, but t0 counts 1200. Investigate.
-
-    # persistdf
+    print(f'time to process metadata: {t1-t0} seconds')
+    print()
 
     print(f"{len(list_dfs)} dataframe(s) processed.")
-
-    # * update ui.py to call these
-    # nstims: always FIND nstims. Mark them. Splitting applied by checkbox or button
-    # * splitting is a big operation; new files, new names - affects every aspect of processing
-    # * re-zero stims? Begs the question - don't zero until here?
     print()
