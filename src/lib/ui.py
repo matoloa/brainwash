@@ -970,7 +970,7 @@ class Filetreesub(Ui_Dialog):
         # self.ftree.model.parent_index   = self.ftree.model.setRootPath(projects_folder)
         # self.ftree.model.root_index     = self.ftree.model.index(projects_folder)
 
-        # Dataframe to addamp
+        # Dataframe to add
         self.names = []
         self.dfAdd = df_projectTemplate()
 
@@ -1006,7 +1006,6 @@ class Filetreesub(Ui_Dialog):
         dfAdd['recording_name'] = names
         self.dfAdd = dfAdd
         # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
-        # TODO: names that have been set manually are stored as a dict that persists while the addData window is open: this PATH should be replaced with this NAME (applied after default-naming, above)
         # format tableView
         header = self.tableView.horizontalHeader()
         self.tableView.setColumnHidden(0, True)  # host

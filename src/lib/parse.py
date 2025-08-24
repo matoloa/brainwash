@@ -602,7 +602,7 @@ if __name__ == "__main__":
     #list_sources = [
     #                r"K:\Brainwash Data Source\csv\A_21_P0701-S2_Ch0_a.csv",
                     r"K:\Brainwash Data Source\Rong Samples\Good recording",
-                    r"K:\Brainwash Data Source\abf 2 channel\KO_02",
+    #                r"K:\Brainwash Data Source\abf 2 channel\KO_02",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_2.ibw",
     #                r"K:\Brainwash Data Source\Rong Samples\Good recording\W100x1_1_25.ibw",
     #                r"K:\Brainwash Data Source\abf 1 channel\A_21_P0701-S2\2022_07_01_0012.abf",
@@ -640,3 +640,11 @@ if __name__ == "__main__":
 
     print(f"{len(list_dfs)} dataframe(s) processed.")
     print()
+
+    # testing persistence
+    # TODO: needs better naming policy for multiple dfs.
+    for i, df in enumerate(list_dfs):
+        df.to_parquet(str(dict_folders['data'] / f"df_{i}.parquet"), index=False)
+        df.to_csv(str(dict_folders['data'] / f"df_{i}.csv"), index=False)
+    print(f" - df_{i}.parquet saved in {dict_folders['data']}")
+    print(f" - df_{i}.csv saved in {dict_folders['data']}")
