@@ -12,6 +12,6 @@ line_length = 100
 
 [project]
 name = "brainwash"
-version = "0.9.1"
-description = "A visualization tool with convenience functions for electrophysiological recordings."
+version = "0.10.0"
+description = "A data visualization tool for electrophysiological recordings, with convenience functions."
 

@@ -642,9 +642,24 @@ if __name__ == "__main__":
     print()
 
     # testing persistence
-    # TODO: needs better naming policy for multiple dfs.
+    print(f"Testing persistence in {dict_folders['data']}")
     for i, df in enumerate(list_dfs):
+        t0 = time.time()
         df.to_parquet(str(dict_folders['data'] / f"df_{i}.parquet"), index=False)
+        t1 = time.time()
+        print(f" - df_{i}.parquet saved: {t1-t0:.2f} seconds")
+        t0 = time.time()
         df.to_csv(str(dict_folders['data'] / f"df_{i}.csv"), index=False)
-    print(f" - df_{i}.parquet saved in {dict_folders['data']}")
-    print(f" - df_{i}.csv saved in {dict_folders['data']}")
+        t1 = time.time()
+        print(f" - df_{i}.csv saved: {t1-t0:.2f} seconds")
+        t0 = time.time()
+        #reading formats back to _df
+        t0 = time.time()
+        df_read_parquet = pd.read_parquet(str(dict_folders['data'] / f"df_{i}.parquet"))
+        t1 = time.time()
+        print(f" - df_{i}.parquet read: {t1-t0:.2f} seconds")
+        t0 = time.time()
+        df_read_csv = pd.read_csv(str(dict_folders['data'] / f"df_{i}.csv"))
+        t1 = time.time()
+        print(f" - df_{i}.csv read: {t1-t0:.2f} seconds")
+        print()

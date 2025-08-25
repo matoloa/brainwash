@@ -356,32 +356,39 @@ class ParseDataThread(QtCore.QThread):
         return df_proj_new_row
 
     def run(self):
-        '''Parse data from files, persist them as bw csv:s, and update df_p'''
+        '''Parse data from files, persist them as bw parquet:s, and update df_p'''
         recording_names = {}
-        for i, (_, df_proj_row) in enumerate(self.df_p_to_update.iterrows()):
-            self.progress.emit(i)
-            recording_name = df_proj_row['recording_name']
-            source_path = df_proj_row['path']
-            # TODO OLD METHOD (DEPRECATE)
-            if(True):
-                dict_data = parse.parseProjFiles(dict_folders=self.dict_folders, recording_name=recording_name, source_path=source_path, single_stim=uistate.checkBox['force1stim'])
-                for new_name, dict_sub in dict_data.items():
-                    nsweeps = dict_sub.get('nsweeps', None) 
-                    if nsweeps is not None:
-                        # Check for duplicates
-                        if new_name in recording_names:
-                            recording_names[new_name] += 1
-                            new_name = f"{new_name}({recording_names[new_name]})"
-                        else:
-                            recording_names[new_name] = 1
-                        df_proj_new_row = self.create_new_row(df_proj_row, new_name, dict_sub)
-                        self.rows.append(df_proj_new_row)
-            else:
-                # df_raw = parse.sources2dfs(list_sources=)
-                if df_raw is None:
-                    raise ValueError("Failed to read source file")
-                # 
-                # TODO NEW METHOD (IMPLEMENT)
+        # TODO OLD METHOD (DEPRECATE)
+        if(False):
+            for i, (_, df_proj_row) in enumerate(self.df_p_to_update.iterrows()):
+                self.progress.emit(i)
+                recording_name = df_proj_row['recording_name']
+                source_path = df_proj_row['path']
+                # TODO OLD METHOD (DEPRECATE)
+                if(False):
+                    dict_data = parse.parseProjFiles(dict_folders=self.dict_folders, recording_name=recording_name, source_path=source_path, single_stim=uistate.checkBox['force1stim'])
+                    for new_name, dict_sub in dict_data.items():
+                        nsweeps = dict_sub.get('nsweeps', None) 
+                        if nsweeps is not None:
+                            # Check for duplicates
+                            if new_name in recording_names:
+                                recording_names[new_name] += 1
+                                new_name = f"{new_name}({recording_names[new_name]})"
+                            else:
+                                recording_names[new_name] = 1
+                            df_proj_new_row = self.create_new_row(df_proj_row, new_name, dict_sub)
+                            self.rows.append(df_proj_new_row)
+        else:
+            # TODO NEW METHOD (IMPLEMENT) WIP
+            print(f"Parsing sources...")
+            list_source_path = self.df_p_to_update['path'].tolist()
+            list_dfs_raw = parse.sources2dfs(list_sources=list_source_path)
+            if not list_dfs_raw:
+                raise ValueError("Failed to read source file")
+            # handle naming for split channels
+            # persist raws
+            # update df_p
+
 
 class graphPreloadThread(QtCore.QThread):
     finished = QtCore.pyqtSignal()
@@ -1227,7 +1234,7 @@ class UIsub(Ui_MainWindow):
         #print(f"persistOutput: rec_name: {rec_name}")
         #print(f"{dfoutput}")
         self.dict_outputs[rec_name] = dfoutput
-        self.df2csv(df=dfoutput, rec=rec_name, key="output")
+        self.df2file(df=dfoutput, rec=rec_name, key="output")
 
 
     def uiFreeze(self): # Disable selection changes and checkboxes
@@ -2152,8 +2159,8 @@ class UIsub(Ui_MainWindow):
         list_recording_names = set(df_p['recording_name'])
         for index, row in dfAdd.iterrows():
             check_recording_name = row['recording_name']
-            if check_recording_name.endswith('_mean.csv'):
-                print("recording_name must not end with _mean.csv - appending _X") # must not collide with internal naming
+            if check_recording_name.endswith('_mean.parquet'):
+                print("recording_name must not end with _mean.parquet - appending _X") # must not collide with internal naming
                 check_recording_name = check_recording_name + '_X'
                 dfAdd.at[index,'recording_name'] = check_recording_name
             if check_recording_name in list_recording_names:
@@ -2183,25 +2190,25 @@ class UIsub(Ui_MainWindow):
         if len(uistate.rec_select) == 1:
             df_p = self.get_df_project()
             old_recording_name = df_p.at[uistate.rec_select[0], 'recording_name']
-            old_data = self.dict_folders['data'] / (old_recording_name + ".csv")
-            old_timepoints = self.dict_folders['timepoints'] / (old_recording_name + ".csv")
-            old_mean = self.dict_folders['cache'] / (old_recording_name + "_mean.csv")
-            old_filter = self.dict_folders['cache'] / (old_recording_name + "_filter.csv")
-            old_bin = self.dict_folders['cache'] / (old_recording_name + "_bin.csv")
-            old_output = self.dict_folders['cache'] / (old_recording_name + "_output.csv")
-            
+            old_data = self.dict_folders['data'] / (old_recording_name + ".parquet")
+            old_timepoints = self.dict_folders['timepoints'] / (old_recording_name + ".parquet")
+            old_mean = self.dict_folders['cache'] / (old_recording_name + "_mean.parquet")
+            old_filter = self.dict_folders['cache'] / (old_recording_name + "_filter.parquet")
+            old_bin = self.dict_folders['cache'] / (old_recording_name + "_bin.parquet")
+            old_output = self.dict_folders['cache'] / (old_recording_name + "_output.parquet")
+
             RenameDialog = InputDialogPopup()
             new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query=old_recording_name)
             # check if the new name is a valid filename
             if new_recording_name is not None and re.match(r'^[a-zA-Z0-9_ -]+$', str(new_recording_name)) is not None:
                 list_recording_names = set(df_p['recording_name'])
                 if not new_recording_name in list_recording_names: # prevent duplicates
-                    new_data = self.dict_folders['data'] / (new_recording_name + ".csv")
-                    new_timepoints = self.dict_folders['timepoints'] / (new_recording_name + ".csv")
-                    new_mean = self.dict_folders['cache'] / (new_recording_name + "_mean.csv")
-                    new_filter = self.dict_folders['cache'] / (new_recording_name + "_filter.csv")
-                    new_bin = self.dict_folders['cache'] / (new_recording_name + "_bin.csv")
-                    new_output = self.dict_folders['cache'] / (new_recording_name + "_output.csv")
+                    new_data = self.dict_folders['data'] / (new_recording_name + ".parquet")
+                    new_timepoints = self.dict_folders['timepoints'] / (new_recording_name + ".parquet")
+                    new_mean = self.dict_folders['cache'] / (new_recording_name + "_mean.parquet")
+                    new_filter = self.dict_folders['cache'] / (new_recording_name + "_filter.parquet")
+                    new_bin = self.dict_folders['cache'] / (new_recording_name + "_bin.parquet")
+                    new_output = self.dict_folders['cache'] / (new_recording_name + "_output.parquet")
                     if old_data.exists():
                         os.rename(old_data, new_data)
                     else: # data SHOULD exist
@@ -2285,7 +2292,7 @@ class UIsub(Ui_MainWindow):
         # clear recording caches
         for cache_name in ['dict_datas', 'dict_means', 'dict_filters', 'dict_ts', 'dict_bins', 'dict_outputs']:
             removeFromCache(cache_name)
-        for folder_name, file_suffix in [('data', '.csv'), ('timepoints', '.csv'), ('cache', '_mean.csv'), ('cache', '_filter.csv'), ('cache', '_bin.csv'), ('cache', '_output.csv')]:
+        for folder_name, file_suffix in [('data', '.parquet'), ('timepoints', '.parquet'), ('cache', '_mean.parquet'), ('cache', '_filter.parquet'), ('cache', '_bin.parquet'), ('cache', '_output.parquet')]:
             removeFromDisk(folder_name, file_suffix)
 
 
@@ -2321,6 +2328,7 @@ class UIsub(Ui_MainWindow):
         
 
     def flipCI(self):
+        # Inverse Control/Intervention flags of currently selected and paired recordings
         if uistate.rec_select:
             df_p = self.get_df_project()
             already_flipped = []
@@ -2342,7 +2350,7 @@ class UIsub(Ui_MainWindow):
                 # clear caches and diff files
                 key_pair = name_rec[:-2]
                 self.dict_diffs.pop(key_pair, None)
-                path_diff = Path(f"{self.dict_folders['cache']}/{key_pair}_diff.csv")
+                path_diff = Path(f"{self.dict_folders['cache']}/{key_pair}_diff.parquet")
                 if path_diff.exists():
                     path_diff.unlink()
                 # TODO: clear group cache
@@ -2471,7 +2479,7 @@ class UIsub(Ui_MainWindow):
         for group_ID in group_IDs:
             if group_ID in self.dict_group_means:
                 del self.dict_group_means[group_ID]
-            path_group_mean_cache = Path(f"{self.dict_folders['cache']}/group_{group_ID}_mean.csv")
+            path_group_mean_cache = Path(f"{self.dict_folders['cache']}/group_{group_ID}_mean.parquet")
             if path_group_mean_cache.exists: # TODO: Upon adding a group, both of these conditions trigger. How?
                 print(f"{path_group_mean_cache} found when checking for existence...")
                 try:
@@ -2593,18 +2601,19 @@ class UIsub(Ui_MainWindow):
             yaml.safe_dump(cfg, file)
 
 
-    def df2csv(self, df, rec, key=None): # "writes dict[rec] to rec_{dict}.csv" TODO: Update, better description; replace "rec"
+    def df2file(self, df, rec, key=None):
+        # writes dict[rec] to <rec>_{dict}.parquet TODO: Update, better description; replace "rec"
         if config.transient:
             return
         self.dict_folders['cache'].mkdir(exist_ok=True)
         if key is None:
-            filepath = f"{self.dict_folders['cache']}/{rec}.csv"
+            filepath = f"{self.dict_folders['cache']}/{rec}.parquet"
         elif key == "timepoints":
-            filepath = f"{self.dict_folders['timepoints']}/{rec}.csv"
+            filepath = f"{self.dict_folders['timepoints']}/{rec}.parquet"
         else:
-            filepath = f"{self.dict_folders['cache']}/{rec}_{key}.csv"
+            filepath = f"{self.dict_folders['cache']}/{rec}_{key}.parquet"
         print(f"saved cache filepath: {filepath}")
-        df.to_csv(filepath, index=False)
+        df.to_parquet(filepath, index=False)
 
 
 
@@ -2726,11 +2735,11 @@ class UIsub(Ui_MainWindow):
 
 # Timepoints dataframe handling
 
-    def set_dft(self, rec_name, df): # persists df and saves it to .csv
+    def set_dft(self, rec_name, df): # persists df and saves it as a file
         #print(f"type: {type(df)}")
         print(f"set_dft of {rec_name}: {df}")
         self.dict_ts[rec_name] = df
-        self.df2csv(df=df, rec=rec_name, key="timepoints")
+        self.df2file(df=df, rec=rec_name, key="timepoints")
 
 
 
@@ -2815,9 +2824,9 @@ class UIsub(Ui_MainWindow):
             return self.dict_means[recording_name]
 
         persist = False
-        str_mean_path = f"{self.dict_folders['cache']}/{recording_name}_mean.csv"
+        str_mean_path = f"{self.dict_folders['cache']}/{recording_name}_mean.parquet"
         if Path(str_mean_path).exists(): #2: Read from file
-            dfmean = pd.read_csv(str_mean_path)
+            dfmean = pd.read_parquet(str_mean_path)
         else: #3: Create file
             dfmean, _ = parse.build_dfmean(self.get_dfdata(row=row))
             persist = True
@@ -2832,7 +2841,7 @@ class UIsub(Ui_MainWindow):
                 dfmean['savgol'] = analysis.addFilterSavgol(df = dfmean, window_length=window_length, poly_order=poly_order)
                 persist = True
         if persist:
-            self.df2csv(df=dfmean, rec=recording_name, key="mean")
+            self.df2file(df=dfmean, rec=recording_name, key="mean")
         self.dict_means[recording_name] = dfmean
         return self.dict_means[recording_name]
 
@@ -2842,10 +2851,10 @@ class UIsub(Ui_MainWindow):
         if rec in self.dict_ts.keys() and not reset:
             #print("returning cached dft")
             return self.dict_ts[rec]
-        str_t_path = f"{self.dict_folders['timepoints']}/{rec}.csv"
+        str_t_path = f"{self.dict_folders['timepoints']}/{rec}.parquet"
         if Path(str_t_path).exists() and not reset:
             #print("reading dft from file")
-            df_t = pd.read_csv(str_t_path)
+            df_t = pd.read_parquet(str_t_path)
             self.dict_ts[rec] = df_t
             return df_t
         else:
@@ -2871,7 +2880,7 @@ class UIsub(Ui_MainWindow):
                 dfoutput = self.get_dfoutput(row=row, df_t=df_t)
                 self.set_uniformTimepoints(p_row=row, df_t=df_t, dfoutput=dfoutput)
                 df_t = self.dict_ts[rec]
-            self.df2csv(df=df_t, rec=rec, key="timepoints") # persist csv
+            self.df2file(df=df_t, rec=rec, key="timepoints") # persist parquet
             self.set_status(rec) # update status in df_project
             return df_t
 
@@ -2880,9 +2889,9 @@ class UIsub(Ui_MainWindow):
         rec = row['recording_name']
         if rec in self.dict_outputs and not reset: #1: Return cached
             return self.dict_outputs[rec]
-        str_output_path = f"{self.dict_folders['cache']}/{rec}_output.csv"
+        str_output_path = f"{self.dict_folders['cache']}/{rec}_output.parquet"
         if Path(str_output_path).exists() and not reset: #2: Read from file
-            dfoutput = pd.read_csv(str_output_path)
+            dfoutput = pd.read_parquet(str_output_path)
         else: #3: Create file and cache
             print(f"creating output for {row['recording_name']}")
             dfmean = self.get_dfmean(row=row)
@@ -2914,25 +2923,25 @@ class UIsub(Ui_MainWindow):
         recording_name = row['recording_name']
         if recording_name in self.dict_datas: #1: Return cached
             return self.dict_datas[recording_name]
-        path_data = Path(f"{self.dict_folders['data']}/{recording_name}.csv")
+        path_data = Path(f"{self.dict_folders['data']}/{recording_name}.parquet")
         try: #2: Read from file - datafile should always exist
-            dfdata = pd.read_csv(path_data)
+            dfdata = pd.read_parquet(path_data)
             self.dict_datas[recording_name] = dfdata
             return self.dict_datas[recording_name]
         except FileNotFoundError:
-            print("did not find _mean.csv to load. Not imported?")
-            
+            print("did not find _mean.parquet to load. Not imported?")
+
     def get_dffilter(self, row):
         # returns an internal df_filter for the selected recording_name. If it does not exist, read it from file first.
         recording_name = row['recording_name']
         if recording_name in self.dict_filters: #1: Return cached
             return self.dict_filters[recording_name]
-        path_filter = Path(f"{self.dict_folders['cache']}/{recording_name}_filter.csv")
+        path_filter = Path(f"{self.dict_folders['cache']}/{recording_name}_filter.parquet")
         if Path(path_filter).exists(): #2: Read from file
-            dffilter = pd.read_csv(path_filter)
+            dffilter = pd.read_parquet(path_filter)
         else: #3: Create file
             dffilter = parse.zeroSweeps(dfdata=self.get_dfdata(row=row), dfmean=self.get_dfmean(row=row))
-            self.df2csv(df=dffilter, rec=recording_name, key="filter")
+            self.df2file(df=dffilter, rec=recording_name, key="filter")
             if row['filter'] == 'savgol':
                 dict_filter_params = json.loads(row['filter_params'])
                 window_length = int(dict_filter_params['window_length'])
@@ -2947,9 +2956,9 @@ class UIsub(Ui_MainWindow):
         rec = p_row['recording_name']
         if rec in self.dict_bins:
             return self.dict_bins[rec]
-        path_bin = Path(f"{self.dict_folders['cache']}/{rec}_bin.csv")
+        path_bin = Path(f"{self.dict_folders['cache']}/{rec}_bin.parquet")
         if path_bin.exists():
-            df_bins = pd.read_csv(path_bin)
+            df_bins = pd.read_parquet(path_bin)
         else:
             bin_size = int(uistate.lineEdit['bin_size'])
             df_filter = self.get_dffilter(p_row)
@@ -2971,7 +2980,7 @@ class UIsub(Ui_MainWindow):
             df_bins = pd.concat(binned_data, ignore_index=True)
             self.dict_bins[rec] = df_bins
             print(f"recalculate: {rec}, binned {df_filter['sweep'].nunique()} sweeps into {len(df_bins['sweep'].unique())} bins")
-            self.df2csv(df=df_bins, rec=rec, key="bin")
+            self.df2file(df=df_bins, rec=rec, key="bin")
         self.dict_bins[rec] = df_bins
         return df_bins
 
@@ -2986,8 +2995,8 @@ class UIsub(Ui_MainWindow):
         if key_pair in self.dict_diffs:
             return self.dict_diffs[key_pair]
         # 2: check for file
-        if Path(f"{self.dict_folders['cache']}/{key_pair}_diff.csv").exists():
-            dfdiff = pd.read_csv(f"{self.dict_folders['cache']}/{key_pair}_diff.csv")
+        if Path(f"{self.dict_folders['cache']}/{key_pair}_diff.parquet").exists():
+            dfdiff = pd.read_parquet(f"{self.dict_folders['cache']}/{key_pair}_diff.parquet")
             self.dict_diffs[key_pair] = dfdiff
             return dfdiff
         # 3: build a new diff
@@ -3043,7 +3052,7 @@ class UIsub(Ui_MainWindow):
             dfdiff['EPSP_amp'] = dfi.EPSP_amp / dfc.EPSP_amp
         if 'EPSP_slope' in dfi.columns:
             dfdiff['EPSP_slope'] = dfi.EPSP_slope / dfc.EPSP_slope
-        self.df2csv(df=dfdiff, rec=key_pair, key="diff")
+        self.df2file(df=dfdiff, rec=key_pair, key="diff")
         self.dict_diffs[key_pair] = dfdiff
         return dfdiff        
         
@@ -3053,11 +3062,11 @@ class UIsub(Ui_MainWindow):
             if config.verbose:
                 print(f"Returning cached group mean for group {group_ID}")
             return self.dict_group_means[group_ID]
-        group_path = Path(f"{self.dict_folders['cache']}/group_{group_ID}.csv")
+        group_path = Path(f"{self.dict_folders['cache']}/group_{group_ID}.parquet")
         if group_path.exists(): #2: Read from file
             if config.verbose:
                 print(f"Loading stored group mean for group {group_ID}")
-            group_mean = pd.read_csv(str(group_path))
+            group_mean = pd.read_parquet(str(group_path))
         else: #3: Create file
             if config.verbose:
                 print(f"Building new group mean for group {group_ID}")
@@ -3091,7 +3100,7 @@ class UIsub(Ui_MainWindow):
                 group_mean.columns = [col[0] if col[0] == 'sweep' else '_'.join(col).strip().replace('sem', 'SEM') for col in group_mean.columns.values]
             print(f"Group mean columns: {group_mean.columns}")
             print(f"Group mean: {group_mean}")
-            self.df2csv(df=group_mean, rec=f"group_{group_ID}", key="mean")
+            self.df2file(df=group_mean, rec=f"group_{group_ID}", key="mean")
         self.dict_group_means[group_ID] = group_mean
         return group_mean
 
