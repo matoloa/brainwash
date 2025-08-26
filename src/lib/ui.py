@@ -358,36 +358,40 @@ class ParseDataThread(QtCore.QThread):
     def run(self):
         '''Parse data from files, persist them as bw parquet:s, and update df_p'''
         recording_names = {}
-        # TODO OLD METHOD (DEPRECATE)
-        if(False):
-            for i, (_, df_proj_row) in enumerate(self.df_p_to_update.iterrows()):
-                self.progress.emit(i)
-                recording_name = df_proj_row['recording_name']
-                source_path = df_proj_row['path']
-                # TODO OLD METHOD (DEPRECATE)
-                if(False):
-                    dict_data = parse.parseProjFiles(dict_folders=self.dict_folders, recording_name=recording_name, source_path=source_path, single_stim=uistate.checkBox['force1stim'])
-                    for new_name, dict_sub in dict_data.items():
-                        nsweeps = dict_sub.get('nsweeps', None) 
-                        if nsweeps is not None:
-                            # Check for duplicates
-                            if new_name in recording_names:
-                                recording_names[new_name] += 1
-                                new_name = f"{new_name}({recording_names[new_name]})"
-                            else:
-                                recording_names[new_name] = 1
-                            df_proj_new_row = self.create_new_row(df_proj_row, new_name, dict_sub)
-                            self.rows.append(df_proj_new_row)
-        else:
-            # TODO NEW METHOD (IMPLEMENT) WIP
-            print(f"Parsing sources...")
-            list_source_path = self.df_p_to_update['path'].tolist()
-            list_dfs_raw = parse.sources2dfs(list_sources=list_source_path)
-            if not list_dfs_raw:
+        for i, (_, df_proj_row) in enumerate(self.df_p_to_update.iterrows()):
+            self.progress.emit(i)
+            recording_name = df_proj_row['recording_name']
+            source_path = df_proj_row['path']
+            dict_dfs_raw = parse.source2dfs(source=source_path)
+            if not dict_dfs_raw:
                 raise ValueError("Failed to read source file")
-            # handle naming for split channels
-            # persist raws
-            # update df_p
+            # convert dict - channel:df to recording_name:df
+            dict_name_df = {
+                (recording_name if len(dict_dfs_raw) == 1 else f"{recording_name}_ch{channel}"): df
+                for channel, df in dict_dfs_raw.items()
+            }
+            for rec, df_raw in dict_name_df.items():
+                self.df2file(df_raw, rec, key='data') # persist raws
+                dfmean, i_stim = parse.build_dfmean(df_raw)
+                self.df2file(dfmean, rec, key='mean') # persist mean
+                df = parse.zeroSweeps(df_raw, i_stim=i_stim) # TODO: why is this in parse?
+                self.df2file(df, rec, key='filter') # persist zeroed
+                # TODO: WIP sort this out, then ui.py is (theoretically) functional!
+                # get metadata for df_proj
+                # update df_p
+            if(False):  # OLD METHOD (DEPRECATE)
+                dict_data = parse.parseProjFiles(dict_folders=self.dict_folders, recording_name=recording_name, source_path=source_path, single_stim=uistate.checkBox['force1stim'])
+                for new_name, dict_sub in dict_data.items():
+                    nsweeps = dict_sub.get('nsweeps', None) 
+                    if nsweeps is not None:
+                        # Check for duplicates
+                        if new_name in recording_names:
+                            recording_names[new_name] += 1
+                            new_name = f"{new_name}({recording_names[new_name]})"
+                        else:
+                            recording_names[new_name] = 1
+                        df_proj_new_row = self.create_new_row(df_proj_row, new_name, dict_sub)
+                        self.rows.append(df_proj_new_row)
 
 
 class graphPreloadThread(QtCore.QThread):
@@ -2602,18 +2606,22 @@ class UIsub(Ui_MainWindow):
 
 
     def df2file(self, df, rec, key=None):
-        # writes dict[rec] to <rec>_{dict}.parquet TODO: Update, better description; replace "rec"
+        # writes dict[rec] to <rec>_{dict}.parquet TODO: more elegant, better description; replace "rec"
         if config.transient:
             return
         self.dict_folders['cache'].mkdir(exist_ok=True)
+        filetype = 'parquet'
         if key is None:
-            filepath = f"{self.dict_folders['cache']}/{rec}.parquet"
+            filepath = f"{self.dict_folders['cache']}/{rec}.{filetype}"
         elif key == "timepoints":
-            filepath = f"{self.dict_folders['timepoints']}/{rec}.parquet"
+            filepath = f"{self.dict_folders['timepoints']}/{rec}.{filetype}"
+        elif key == "data":
+            filepath = f"{self.dict_folders['data']}/{rec}.{filetype}"
         else:
-            filepath = f"{self.dict_folders['cache']}/{rec}_{key}.parquet"
-        print(f"saved cache filepath: {filepath}")
+            filepath = f"{self.dict_folders['cache']}/{rec}_{key}.{filetype}"
+
         df.to_parquet(filepath, index=False)
+        print(f"saved {filepath}")
 
 
 

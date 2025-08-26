@@ -222,7 +222,6 @@ def parse_csv(source_path):
     df = pd.read_csv(source_path)
     return df
 
-
 def sample_abf(filepath):
     """
     Extracts channelCount, sweepCount and sweep duration from an .abf file
@@ -243,7 +242,7 @@ def sample_abf(filepath):
 
 
 # %%
-def parse_abfFolder(folderpath, dev=False):
+def parse_abfFolder(folderpath):
     """
     Read, sort (by filename) and concatenate all .abf files in folderpath to a single df
     """
@@ -261,18 +260,15 @@ def parse_abfFolder(folderpath, dev=False):
     return df
 
 
-def parse_abf(filepath, recording_name=None, keep_non_stim_data=False):
+def parse_abf(filepath):
     """
     reads an .abf 
     """
-    if recording_name is None:
-        recording_name = os.path.basename(os.path.dirname(filepath))
     abf = pyabf.ABF(filepath)
     if False: # DEBUG
         print(f"abf: {abf}")
         for key, value in vars(abf).items():
             print(f"{key}: {value}")
-    sweeps = abf.sweepCount
     channels = abf.channelList
 
     # 1) build one big concatenated dataframe
@@ -470,6 +466,7 @@ def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None,
         return list_data
 
 
+
 def metadata(df):
     """
     Usage: called by parse.metadata(df) from ui.py
@@ -495,20 +492,18 @@ def metadata(df):
         }
     return dict_meta
 
-def source2dfs(source, recording_name=None, dev=False):
+
+
+def source2dfs(source, dev=False):
     """
      Identifies type of file(s), and calls the appropriate parser
     - source (str): Path to source file or folder
-    - recording_name (str, optional): Overrides default source-based recording name
-    Returns: DataFrame: Raw (unprocessed) output from the appropriate parser
+    Returns: a dict {channel:DataFrame} of Raw (unprocessed) output from the appropriate parser
     """
     path = Path(source)
     if not path.exists():
         raise FileNotFoundError(f"source2df: No such file or folder: '{source}'")
-    if recording_name is None: # default to the name of the source file or folder
-        recording_name = path.resolve().stem if path.is_file() \
-                        else path.resolve().name
-    # Source_path is a folder
+    # if source_path is a folder
     if path.is_dir(): # TODO: currently reads only one type of file:
         files = [f for f in path.iterdir() if f.is_file()]
         abf_files = [f for f in files if f.suffix.lstrip(".").lower() == "abf"]
@@ -531,7 +526,7 @@ def source2dfs(source, recording_name=None, dev=False):
                 raise ValueError(f"Error parsing ibw files in folder {path}: {e}")
         else:
             raise ValueError(f"No valid files found.")
-    # source_path is not a folder - parse as a single file
+    # if source_path is not a folder - parse as a single file
     else:
         PARSERS = {
             "csv": parse_csv,
@@ -541,39 +536,42 @@ def source2dfs(source, recording_name=None, dev=False):
         filetype = path.suffix.lstrip(".").lower()
         if filetype not in PARSERS:
             raise ValueError(f"Unsupported file type: {filetype}")
-        df = PARSERS[filetype](source, recording_name=recording_name)
+        df = PARSERS[filetype](source)
 
     # split by channel
-    split_dfs = []
+    dict_channeldfs = {}
     for channel in df['channel'].unique():
-        split_dfs.append(df[df['channel'] == channel].copy())
-    list_dfs = split_dfs
+        dict_channeldfs[channel] = df[df['channel'] == channel]
     # sort df by datetime
-    for df in list_dfs:
-        df.sort_values('datetime', inplace=True)
-    # generate 'sweep' column
-    for df in list_dfs:
+
+    for df in dict_channeldfs.values():
+        if not df['datetime'].is_monotonic_increasing:
+            print(" - - Warning: datetime not monotonic increasing, sorting.")
+            df.sort_values('datetime', inplace=True)
+    # generate 'sweep' column and drop channel column
+    for df in dict_channeldfs.values():
         df["sweep"] = (df.groupby((df["time"] == 0).cumsum()).ngroup())
+        df.drop(columns=["channel"], inplace=True)
 
     # reorder columns
-    column_order = ['sweep', 'time', 'voltage_raw', 'channel', 't0', 'datetime']
-    for i, df in enumerate(list_dfs):
+    column_order = ['sweep', 'time', 'voltage_raw', 't0', 'datetime']
+    for channel, df in dict_channeldfs.items():
         df_cols = [col for col in column_order if col in df.columns]
-        list_dfs[i] = df[df_cols + [col for col in df.columns if col not in df_cols]]
-
-    return list_dfs
+        dict_channeldfs[channel] = df[df_cols + [col for col in df.columns if col not in df_cols]]
+    
+    return dict_channeldfs
 
 
 def sources2dfs(list_sources, dev=False):
     """
     Converts a list of source file paths to a list of raw DataFrames.
     """
-    list_dfs = []
+    list_dicts = []
     for source in list_sources:
         print(f"Processing source: {source}")
-        dfs = source2dfs(source, dev=dev)
-        list_dfs.extend(dfs)
-    return list_dfs
+        dict_dfs = source2dfs(source, dev=dev)
+        list_dicts.append(dict_dfs)
+    return list_dicts
 
 
 # %%
@@ -615,22 +613,24 @@ if __name__ == "__main__":
     
     # read sources
     t0 = time.time()
-    list_dfs = []
     try:
-        list_dfs = sources2dfs(list_sources, dev=dev)
+        list_dicts = sources2dfs(list_sources, dev=dev)
     except Exception as e:
         print(f"Error processing: {e}")
     t1 = time.time()
-    print(f'time to parse into {len(list_dfs)} dataframe(s): {t1-t0} seconds')
-    for df in list_dfs:
-        print(f" - df: {df.shape}, columns: {df.columns.tolist()}")
+    print(f'time to parse into {len(list_dicts)} dataframe(s): {t1-t0} seconds')
+    for dict_dfs in list_dicts:
+        for channel, df in dict_dfs.items():
+            print(f" - channel {channel} df{df.shape}, columns: {df.columns.tolist()}")
     print()
 
     # report post-processed metadata
     list_metas = []
     t0 = time.time()
-    for df in tqdm(list_dfs):
-        list_metas.append(metadata(df))
+    for dict_dfs in list_dicts:
+        for channel, df in tqdm(dict_dfs.items()):
+            print(f" - Processing channel: {channel}")
+            list_metas.append(metadata(df))
     for meta in list_metas:
         for key, value in meta.items():
             tqdm.write(f" - - {key}: {value}")
@@ -638,28 +638,32 @@ if __name__ == "__main__":
     print(f'time to process metadata: {t1-t0} seconds')
     print()
 
-    print(f"{len(list_dfs)} dataframe(s) processed.")
+    print(f"{len(list_dicts)} dataframe(s) processed.")
     print()
 
     # testing persistence
     print(f"Testing persistence in {dict_folders['data']}")
-    for i, df in enumerate(list_dfs):
-        t0 = time.time()
-        df.to_parquet(str(dict_folders['data'] / f"df_{i}.parquet"), index=False)
-        t1 = time.time()
-        print(f" - df_{i}.parquet saved: {t1-t0:.2f} seconds")
-        t0 = time.time()
-        df.to_csv(str(dict_folders['data'] / f"df_{i}.csv"), index=False)
-        t1 = time.time()
-        print(f" - df_{i}.csv saved: {t1-t0:.2f} seconds")
-        t0 = time.time()
-        #reading formats back to _df
-        t0 = time.time()
-        df_read_parquet = pd.read_parquet(str(dict_folders['data'] / f"df_{i}.parquet"))
-        t1 = time.time()
-        print(f" - df_{i}.parquet read: {t1-t0:.2f} seconds")
-        t0 = time.time()
-        df_read_csv = pd.read_csv(str(dict_folders['data'] / f"df_{i}.csv"))
-        t1 = time.time()
-        print(f" - df_{i}.csv read: {t1-t0:.2f} seconds")
+    # make sure dict_folders exist
+    for folder in dict_folders.values():
+        folder.mkdir(parents=True, exist_ok=True)
+    for dict_df in list_dicts:
+        for channel, df in dict_df.items():
+            print(f" - channel {channel} df{df.shape}")
+            t0 = time.time()
+            df.to_parquet(str(dict_folders['data'] / f"df_{channel}.parquet"), index=False)
+            t1 = time.time()
+            print(f" - df_{channel}.parquet saved: {t1-t0:.2f} seconds")
+            t0 = time.time()
+            df.to_csv(str(dict_folders['data'] / f"df_{channel}.csv"), index=False)
+            t1 = time.time()
+            print(f" - df_{channel}.csv saved: {t1-t0:.2f} seconds")
+            t0 = time.time()
+            # reading formats back to _df
+            df_read_parquet = pd.read_parquet(str(dict_folders['data'] / f"df_{channel}.parquet"))
+            t1 = time.time()
+            print(f" - df_{channel}.parquet read: {t1-t0:.2f} seconds")
+            t0 = time.time()
+            df_read_csv = pd.read_csv(str(dict_folders['data'] / f"df_{channel}.csv"))
+            t1 = time.time()
+            print(f" - df_{channel}.csv read: {t1-t0:.2f} seconds")
         print()
