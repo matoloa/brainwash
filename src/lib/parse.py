@@ -117,21 +117,6 @@ def first_stim_index(dfmean, threshold_factor=0.75, min_time_difference=0.005):
     return max_index
 
 
-def persistdf(file_base, dict_folders, dfdata=None, dfmean=None, dffilter=None):
-    if dfdata is not None:
-        dict_folders['data'].mkdir(exist_ok=True)
-        str_data_path = f"{dict_folders['data']}/{file_base}.csv"
-        dfdata.to_csv(str_data_path, index=False)
-    if dfmean is not None:
-        dict_folders['cache'].mkdir(exist_ok=True)
-        str_mean_path = f"{dict_folders['cache']}/{file_base}_mean.csv"
-        dfmean.to_csv(str_mean_path, index=False)
-    if dffilter is not None:
-        dict_folders['cache'].mkdir(exist_ok=True)
-        str_mean_path = f"{dict_folders['cache']}/{file_base}_filter.csv"
-        dffilter.to_csv(str_mean_path, index=False)
-
-
 def ibw_read(file):
     ibw = igor.binarywave.load(file)
     timestamp = ibw['wave']['wave_header']['creationDate']
@@ -222,6 +207,7 @@ def parse_csv(source_path):
     df = pd.read_csv(source_path)
     return df
 
+
 def sample_abf(filepath):
     """
     Extracts channelCount, sweepCount and sweep duration from an .abf file
@@ -289,182 +275,6 @@ def parse_abf(filepath):
     df.drop(columns=['sweepX', 'sweepY', 'timens'], inplace=True)
     return df
 
-    ''' Legacy method
-    returns a list of tuples: [(dict_meta, df_raw), ...]
-    There was considerable postprocessing in the original code - channels and stims
-        df_ch_st = df_ch.loc[df_ch.sweep_raw % nstims == i].copy()
-        df_ch_st['sweep'] = (df_ch_st.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
-    # 3) Assumptions: 2 stims, for now
-    list_stims = ["a", "b"]
-    nstims = len(list_stims)
-    nchannels = df.channel.nunique()
-    sweep_duration = df.time.nunique()
-    df.sort_values(by=['datetime', 'channel'], inplace=True, ignore_index=True)
-    df['sweep_raw'] = df.index // (sweep_duration * nchannels)
-    # 4) split by channel and stim
-    list_tuple_data = []
-    for channel in df.channel.unique():
-        print(f" - channel: {channel} (nchannels: {nchannels}), nstims: {nstims}, sweep_duration: {sweep_duration}")
-        if keep_non_stim_data:
-            df_ch = df # TODO NOT TESTED!
-        else:
-            df_ch = df[df.channel==channel]
-        for i, stim in enumerate(list_stims):
-            full_recording_name = f"{recording_name}_Ch{channel}_{stim}"
-            df_ch_st = df_ch.loc[df_ch.sweep_raw % nstims == i].copy()
-            df_ch_st['sweep'] = (df_ch_st.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
-        df_raw = df
-        dict_meta = {
-            "recording_name": full_recording_name,
-            "channels": channels,
-            "nsweeps": sweeps,
-            "sweep_duration": len(abf.getAllXs()) / abf.sampleRate,
-            "sampling_rate": abf.sampleRate,
-            "resets": [],
-        }
-        # 4a) add tuple to list
-        list_tuple_data.append((dict_meta, df_raw))
-    return list_tuple_data'''
-
-
-
-def parseProjFiles(dict_folders, df=None, recording_name=None, source_path=None, single_stim=False):
-    """
-    DEPRECATED: Still operational, called from ui.py
-    * receives a df of project data file paths built in ui
-        files that are already parsed are to be overwritten (ui.py passes filitered list of unparsed files)
-    * creates a datafile by unique source file/channel/stim combination
-    * Stim defaults to a and b
-    * saves two files:
-        dict_folders['data']<recording_name>_Ch<Ch>_<Stim>.csv
-        dict_folders['cache']<recording_name>_Ch<Ch>_<Stim>_dfmean.csv
-    
-    returns a list of <recording_name>_Ch<Ch>_<Stim> for updating df_project recording names
-    calls build_dfmean() to create an average, prim and bis file, per channel-stim combo
-    """
-    def parser(dict_folders, recording_name, source_path):
-        df = None
-        dict_data = {}
-        if verbose:
-            print(f" - parser, source_path: {source_path}")
-        if Path(source_path).is_dir():
-            # check contents of folder: .ibw or .abf
-            list_files = [i for i in os.listdir(source_path) if -1 < i.find(".ibw") or -1 < i.find(".abf")]
-            filetype = None
-            if -1 < list_files[0].find(".abf"):
-                filetype = "abf"
-            elif -1 < list_files[0].find(".ibw"):
-                filetype = "ibw"
-            if filetype is None:
-                raise ValueError(f" - - no supported files found in {source_path}")
-
-            if filetype == "abf":
-                df = parse_abfFolder(folderpath=Path(source_path))
-            elif filetype == "ibw":
-                df = parse_ibwFolder(folder=Path(source_path))#, dev=True)
-        else:
-            # set filetype to last 3 letters of filename
-            filetype = source_path[-3:]
-            if filetype == "csv":
-                df = pd.read_csv(source_path)
-                file_base = os.path.splitext(os.path.basename(source_path))[0].replace('.', '_')
-                persistdf(file_base=file_base, dict_folders=dict_folders, dfdata=df)
-                dict_sub = {
-                    'nsweeps': df['sweep'].nunique(),
-                    # channel is what comes after the last Ch in the filename, and ends before the first _
-                    'channel': source_path.split("Ch")[-1].split("_")[0],
-                    # stim is the last letter in the filename, before the .csv
-                    'stim': source_path.split("_")[-1].split(".")[0],
-                    # sweep_duration is the difference between the highest and the lowest time in the file
-                    'sweep_duration': df['time'].max() - df['time'].min(),
-                    # reset is the first sweep number after every sweep_raw reset: finds recording breaks for display purposes
-                    'resets': df[(df['sweep_raw'] == df['sweep_raw'].min()) & (df['time'] == 0)]['sweep'].tolist()[1:]
-                    }
-                # TODO: Add checks for csv files; must be brainwash formatted!
-                dict_data[file_base] = dict_sub
-                return dict_data
-            elif filetype == "abf":
-                df = parse_abf(filepath=Path(source_path))
-            elif filetype == "ibw":
-                df = parse_ibw(filepath=Path(source_path))
-        if df is None:
-            raise ValueError(f" - - no supported files found in {source_path}")
-        df = df.sort_values(by='datetime').reset_index(drop=True)
-        # sort df2parse in channels and stims (a and b)
-        if single_stim:
-            if verbose:
-                print(" - - user set single_stim=True")
-                list_stims=["a"]
-        else: #default to 2 stims 
-            if verbose:
-                print(" - - default: two stims per channel")
-                list_stims=["a", "b"]
-        nstims = len(list_stims)
-        nchannels = df.channel.nunique()
-        sweep_duration = df.time.nunique()
-
-        print(f" - - nchannels: {nchannels}, nstims: {nstims}, sweep_duration: {sweep_duration}")
-
-        # TODO: Why is this copied?
-        dfcopy = df.copy()
-        dfcopy = dfcopy.sort_values(by=['datetime', 'channel']).reset_index(drop=True)
-        dfcopy['sweep_raw'] = dfcopy.index.to_numpy() // (sweep_duration * nchannels)
-        print (f" - - dfcopy: {dfcopy}")
-        for channel in dfcopy.channel.unique():
-            df_ch = dfcopy[dfcopy.channel==channel]
-            for i, stim in enumerate(list_stims):
-                file_base = f"{recording_name}_Ch{channel}_{stim}"
-                print(f"file_base: {file_base}")
-                if filetype == "abf": # split df by % nstims
-                    df_ch_st = df_ch.loc[df_ch.sweep_raw % nstims == i].copy()
-                    df_ch_st['sweep'] = (df_ch_st.sweep_raw / nstims).apply(lambda x: int(np.floor(x)))
-                elif filetype == "ibw":
-                    if False: # split df; time < 0.5 is stim a, time >= 0.5 is stim b
-                        # TODO: This is a stupid approach; don't split the data before the stims are placed!
-                        if stim == "a":
-                            df_ch_st = dfcopy.loc[dfcopy.time < 0.25].copy()
-                        if stim == "b":
-                            df_ch_st = dfcopy.loc[dfcopy.time >= 0.5].copy()  
-                    else:
-                        df_ch_st = dfcopy.copy()
-                    df_ch_st['sweep'] = df_ch_st.sweep_raw
-                df_ch_st.drop(columns=['channel'], inplace=True)
-                print(f"nunique: {df_ch_st['sweep'].nunique()}")
-                dfmean, i_stim = build_dfmean(df_ch_st)
-                dffilter = zeroSweeps(dfdata=df_ch_st, i_stim=i_stim)
-                persistdf(file_base=file_base, dict_folders=dict_folders, dfdata=df_ch_st, dfmean=dfmean, dffilter=dffilter)
-                # Build dict: keys are datafile names, values are a dict of nsweeps, channels, stim, and reset (the first sweep number after every sweep_raw reset: finds recording breaks for display purposes)
-                dict_sub = {
-                    'nsweeps': df_ch_st['sweep'].nunique(),
-                    'channel': channel,
-                    'stim': stim,
-                    'sweep_duration': df_ch_st['time'].max() - df_ch_st['time'].min(),
-                    'resets': df_ch_st[(df_ch_st['sweep_raw'] == df_ch_st['sweep_raw'].min()) & (df_ch_st['time'] == 0)]['sweep'].tolist()[1:]
-                }
-                dict_data[f"{recording_name}_Ch{channel}_{stim}"] = dict_sub
-        return dict_data
-
-    if verbose:
-        print(f"proj folder: {dict_folders['project']}")
-        if source_path is not None:
-            print(f"recording_name: {recording_name}")
-            print(f"source_path: {source_path}")
-        if df is not None:
-            print(f"recording_name: {df['recording_name']}")
-            print(f"path: {df['path']}")
-
-    if recording_name is not None:
-        list_data = parser(dict_folders=dict_folders, recording_name=recording_name, source_path=source_path)
-        return list_data
-
-    if df is not None:
-        df_unique_names = df.drop_duplicates(subset='recording_name')
-        for i, row in df_unique_names.iterrows():
-            recording_name = row['recording_name']
-            source_path = row['path']
-            list_data = parser(dict_folders=dict_folders, recording_name=recording_name, source_path=source_path)
-        return list_data
-
 
 
 def metadata(df):
@@ -491,7 +301,14 @@ def metadata(df):
         'sampling_rate': sampling_rate,  #Hz
         }
     return dict_meta
-
+''' the old dict_sub metadata was:
+                dict_sub = {
+                    'nsweeps': df_ch_st['sweep'].nunique(),
+                    'channel': channel,
+                    'stim': stim,
+                    'sweep_duration': df_ch_st['time'].max() - df_ch_st['time'].min(),
+                    'resets': df_ch_st[(df_ch_st['sweep_raw'] == df_ch_st['sweep_raw'].min()) & (df_ch_st['time'] == 0)]['sweep'].tolist()[1:]
+                }'''
 
 
 def source2dfs(source, dev=False):
@@ -513,7 +330,7 @@ def source2dfs(source, dev=False):
         print(f" - - {len(abf_files)} abf files, {len(ibw_files)} ibw files, and {len(csv_files)} csv files.")
         if csv_files:
             # TODO: implement CSV parsing - check for correct column names
-            raise ValueError(".csv files not supported yet, please use abf or ibw files.")
+            raise ValueError(".csv from folders are not supported yet.")
         elif abf_files:
             try:
                 df = parse_abfFolder(path, dev=dev)
@@ -538,8 +355,15 @@ def source2dfs(source, dev=False):
             raise ValueError(f"Unsupported file type: {filetype}")
         df = PARSERS[filetype](source)
 
-    # split by channel
     dict_channeldfs = {}
+    # if df has a 'sweep' column, it's from a prepared .csv - skip this cleanup
+    if 'sweep' in df.columns:
+        print(" - - Detected 'sweep' column, skipping cleanup.")
+        # TODO: extract channel from filename; "*_ch0"
+        dict_channeldfs[0] = df
+        return dict_channeldfs
+
+    # split by channel
     for channel in df['channel'].unique():
         dict_channeldfs[channel] = df[df['channel'] == channel]
     # sort df by datetime
@@ -562,6 +386,11 @@ def source2dfs(source, dev=False):
     return dict_channeldfs
 
 
+#############################################################
+#                  Standalone testing                       #
+#############################################################
+
+
 def sources2dfs(list_sources, dev=False):
     """
     Converts a list of source file paths to a list of raw DataFrames.
@@ -572,6 +401,21 @@ def sources2dfs(list_sources, dev=False):
         dict_dfs = source2dfs(source, dev=dev)
         list_dicts.append(dict_dfs)
     return list_dicts
+
+
+def persistdf(file_base, dict_folders, dfdata=None, dfmean=None, dffilter=None):
+    if dfdata is not None:
+        dict_folders['data'].mkdir(exist_ok=True)
+        str_data_path = f"{dict_folders['data']}/{file_base}.csv"
+        dfdata.to_csv(str_data_path, index=False)
+    if dfmean is not None:
+        dict_folders['cache'].mkdir(exist_ok=True)
+        str_mean_path = f"{dict_folders['cache']}/{file_base}_mean.csv"
+        dfmean.to_csv(str_mean_path, index=False)
+    if dffilter is not None:
+        dict_folders['cache'].mkdir(exist_ok=True)
+        str_mean_path = f"{dict_folders['cache']}/{file_base}_filter.csv"
+        dffilter.to_csv(str_mean_path, index=False)
 
 
 # %%

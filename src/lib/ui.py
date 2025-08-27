@@ -344,20 +344,19 @@ class ParseDataThread(QtCore.QThread):
         self.rows = []
         self.total = len(df_p_to_update)
 
-    def create_new_row(self, df_proj_row, new_name, dict_sub):
+    def create_new_row(self, df_proj_row, new_name, dict_meta):
         df_proj_new_row = df_proj_row.copy()
         df_proj_new_row['ID'] = str(uuid.uuid4())
         df_proj_new_row['recording_name'] = new_name
-        df_proj_new_row['sweeps'] = dict_sub.get('nsweeps', None)
-        df_proj_new_row['channel'] = dict_sub.get('channel', None)
-        df_proj_new_row['stim'] = dict_sub.get('stim', None)
-        df_proj_new_row['sweep_duration'] = dict_sub.get('sweep_duration', None)
-        df_proj_new_row['resets'] = dict_sub.get('resets', None)
+        df_proj_new_row['sweeps'] = dict_meta.get('nsweeps', None)
+        df_proj_new_row['channel'] = ""# dict_meta.get('channel', None)
+        df_proj_new_row['stim'] = ""# dict_meta.get('stim', None)
+        df_proj_new_row['sweep_duration'] = dict_meta.get('sweep_duration', None)
+        df_proj_new_row['resets'] = ""# dict_meta.get('resets', None)
         return df_proj_new_row
 
     def run(self):
         '''Parse data from files, persist them as bw parquet:s, and update df_p'''
-        recording_names = {}
         for i, (_, df_proj_row) in enumerate(self.df_p_to_update.iterrows()):
             self.progress.emit(i)
             recording_name = df_proj_row['recording_name']
@@ -371,27 +370,18 @@ class ParseDataThread(QtCore.QThread):
                 for channel, df in dict_dfs_raw.items()
             }
             for rec, df_raw in dict_name_df.items():
-                self.df2file(df_raw, rec, key='data') # persist raws
+                uisub.df2file(df_raw, rec, key='data') # persist raws
                 dfmean, i_stim = parse.build_dfmean(df_raw)
-                self.df2file(dfmean, rec, key='mean') # persist mean
-                df = parse.zeroSweeps(df_raw, i_stim=i_stim) # TODO: why is this in parse?
-                self.df2file(df, rec, key='filter') # persist zeroed
-                # TODO: WIP sort this out, then ui.py is (theoretically) functional!
-                # get metadata for df_proj
-                # update df_p
-            if(False):  # OLD METHOD (DEPRECATE)
-                dict_data = parse.parseProjFiles(dict_folders=self.dict_folders, recording_name=recording_name, source_path=source_path, single_stim=uistate.checkBox['force1stim'])
-                for new_name, dict_sub in dict_data.items():
-                    nsweeps = dict_sub.get('nsweeps', None) 
-                    if nsweeps is not None:
-                        # Check for duplicates
-                        if new_name in recording_names:
-                            recording_names[new_name] += 1
-                            new_name = f"{new_name}({recording_names[new_name]})"
-                        else:
-                            recording_names[new_name] = 1
-                        df_proj_new_row = self.create_new_row(df_proj_row, new_name, dict_sub)
-                        self.rows.append(df_proj_new_row)
+                uisub.df2file(dfmean, rec, key='mean') # persist mean
+                df = parse.zeroSweeps(df_raw, i_stim=i_stim)
+                uisub.df2file(df, rec, key='filter') # persist zeroed
+                # extract metadata
+                dict_meta = parse.metadata(df)
+                # TODO: create unique recording names
+                print(f"ParseDataThread, {recording_name}")
+                df_proj_new_row = self.create_new_row(df_proj_row=df_proj_row, new_name=recording_name, dict_meta=dict_meta)
+                self.rows.append(df_proj_new_row)
+        self.progress.emit(self.total)
 
 
 class graphPreloadThread(QtCore.QThread):
@@ -2617,6 +2607,7 @@ class UIsub(Ui_MainWindow):
             filepath = f"{self.dict_folders['timepoints']}/{rec}.{filetype}"
         elif key == "data":
             filepath = f"{self.dict_folders['data']}/{rec}.{filetype}"
+            self.dict_folders['data'].mkdir(exist_ok=True)
         else:
             filepath = f"{self.dict_folders['cache']}/{rec}_{key}.{filetype}"
 
