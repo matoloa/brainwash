@@ -42,22 +42,6 @@ def build_experimentcsv(dir_gen_data):
 # %%
 def build_dfmean(dfdata, rollingwidth=3):
     print("build_dfmean")
-    if False:
-        dfmean = dfdata.copy()
-        dfmean.drop(columns=['datetime', 'sweep_raw', 'sweep'], inplace=True)
-        dfmean.rename(columns={'voltage_raw': 'voltage'}, inplace=True)
-        # Aggregate rows with identical 'time' values by computing the mean
-        dfmean = dfmean.groupby('time').mean().reset_index()
-
-        # leftovers:
-        # Ensure aggregation over 'sweep' and 'time' removes all duplicates
-        dfdata = dfdata.groupby(['sweep', 'time'], as_index=False)['voltage_raw'].mean()
-        print("aggregation finished.")
-
-        # Check for duplicates after aggregation (for debugging purposes)
-        if dfdata.duplicated(['sweep', 'time']).any():
-            print("Warning: Still duplicates present after aggregation.")
-
     dfmean = pd.pivot_table(dfdata, values='voltage_raw', index='sweep', columns='time', aggfunc='mean').mean().to_frame(name='voltage')
     dfmean['prim'] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
     dfmean['bis'] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()
@@ -66,6 +50,7 @@ def build_dfmean(dfdata, rollingwidth=3):
     baseline_mean = dfmean.iloc[i_stim-20:i_stim-10]['voltage'].mean()  # Adjusted for potential NaNs
     dfmean['voltage'] = dfmean['voltage'] - baseline_mean
     return dfmean, i_stim
+
 
 def zeroSweeps(dfdata, i_stim=None, dfmean=None):
     # returns dfdata with sweeps zeroed to the mean of the 20th to 10th column before i_stim
@@ -228,7 +213,7 @@ def sample_abf(filepath):
 
 
 # %%
-def parse_abfFolder(folderpath):
+def parse_abfFolder(folderpath, dev=False):
     """
     Read, sort (by filename) and concatenate all .abf files in folderpath to a single df
     """

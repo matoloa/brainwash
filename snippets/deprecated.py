@@ -1,6 +1,22 @@
 # Functions that are not in use anymore, but might be useful again in the future
 
 
+# build_dfmean checking for duplicates (deprecated; now prevented at read)
+    dfmean = dfdata.copy()
+    dfmean.drop(columns=['datetime', 'sweep_raw', 'sweep'], inplace=True)
+    dfmean.rename(columns={'voltage_raw': 'voltage'}, inplace=True)
+    # Aggregate rows with identical 'time' values by computing the mean
+    dfmean = dfmean.groupby('time').mean().reset_index()
+
+    # leftovers:
+    # Ensure aggregation over 'sweep' and 'time' removes all duplicates
+    dfdata = dfdata.groupby(['sweep', 'time'], as_index=False)['voltage_raw'].mean()
+    print("aggregation finished.")
+
+    # Check for duplicates after aggregation (for debugging purposes)
+    if dfdata.duplicated(['sweep', 'time']).any():
+        print("Warning: Still duplicates present after aggregation.")
+
 '''
 
     Legacy method

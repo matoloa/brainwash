@@ -329,6 +329,9 @@ class ProgressBarManager:
         self.progressBar.setVisible(False)
 
     def update(self, i, task_description):
+        if self.total == 0:
+            print("*** ERROR: Update request for non-existent task.") # TODO: This scenario should have been prevented by the callers - why isn't it? Related to __exit__ setting it to 0?
+            return
         percentage = int((i) * 100 / self.total)
         self.progressBar.setValue(percentage)
         self.progressBar.setFormat(f"{task_description} {i + 1} / {self.total}:   %p% complete")
@@ -347,6 +350,7 @@ class ParseDataThread(QtCore.QThread):
     def create_new_row(self, df_proj_row, new_name, dict_meta):
         df_proj_new_row = df_proj_row.copy()
         df_proj_new_row['ID'] = str(uuid.uuid4())
+        df_proj_new_row['status'] = "Read"
         df_proj_new_row['recording_name'] = new_name
         df_proj_new_row['sweeps'] = dict_meta.get('nsweeps', None)
         df_proj_new_row['channel'] = ""# dict_meta.get('channel', None)
@@ -378,10 +382,10 @@ class ParseDataThread(QtCore.QThread):
                 # extract metadata
                 dict_meta = parse.metadata(df)
                 # TODO: create unique recording names
-                print(f"ParseDataThread, {recording_name}")
-                df_proj_new_row = self.create_new_row(df_proj_row=df_proj_row, new_name=recording_name, dict_meta=dict_meta)
+                print(f"ParseDataThread, {rec}")
+                df_proj_new_row = self.create_new_row(df_proj_row=df_proj_row, new_name=rec, dict_meta=dict_meta)
                 self.rows.append(df_proj_new_row)
-        self.progress.emit(self.total)
+        self.finished.emit()
 
 
 class graphPreloadThread(QtCore.QThread):
@@ -2294,14 +2298,14 @@ class UIsub(Ui_MainWindow):
         self.uiFreeze() # Thawed at the end of graphPreload()
         df_p = self.get_df_project()
         df_p_to_update = df_p[df_p['sweeps'] == "..."].copy()
-
-        self.thread = ParseDataThread(df_p_to_update, self.dict_folders)
-        self.thread.progress.connect(self.updateProgressBar)
-        self.thread.finished.connect(self.onParseDataFinished)
-        self.thread.start()
-
-        self.progressBarManager = ProgressBarManager(self.progressBar, len(df_p_to_update))
-        self.progressBarManager.__enter__()
+        if len(df_p_to_update) > 0:
+            print(f"parseData: {len(df_p_to_update)} files to parse.")
+            self.thread = ParseDataThread(df_p_to_update, self.dict_folders)
+            self.thread.progress.connect(self.updateProgressBar)
+            self.thread.finished.connect(self.onParseDataFinished)
+            self.thread.start()
+            self.progressBarManager = ProgressBarManager(self.progressBar, len(df_p_to_update))
+            self.progressBarManager.__enter__()
 
 
     def updateProgressBar(self, i):
@@ -2561,7 +2565,7 @@ class UIsub(Ui_MainWindow):
         self.user_documents = Path.home() / "Documents"
         self.projects_folder = self.user_documents / "Brainwash Projects"
         self.projectname = "My Project"
-        uistate.darkmode = False
+        uistate.darkmode = True
         uistate.showTimetable = False
 
         # Load config if present
@@ -2928,7 +2932,7 @@ class UIsub(Ui_MainWindow):
             self.dict_datas[recording_name] = dfdata
             return self.dict_datas[recording_name]
         except FileNotFoundError:
-            print("did not find _mean.parquet to load. Not imported?")
+            print(f"did not find {path_data}. Not imported?")
 
     def get_dffilter(self, row):
         # returns an internal df_filter for the selected recording_name. If it does not exist, read it from file first.
@@ -3213,11 +3217,14 @@ class UIsub(Ui_MainWindow):
         self.thread.finished.connect(lambda: self.ongraphPreloadFinished(t0))
 
         # Create ProgressBarManager and connect progress signal
-        self.progressBarManager = ProgressBarManager(self.progressBar, len(uistate.new_indices))
-        self.thread.progress.connect(lambda i: self.progressBarManager.update(i, "Preloading recording"))
+        if len(uistate.new_indices) > 0:
+            self.progressBarManager = ProgressBarManager(self.progressBar, len(uistate.new_indices))
+            self.thread.progress.connect(lambda i: self.progressBarManager.update(i, "Preloading recording"))
 
-        self.thread.start()
-        self.progressBarManager.__enter__()  # Show progress bar
+            self.thread.start()
+            self.progressBarManager.__enter__()  # Show progress bar
+        else:
+            print("No new recordings to preload.")
 
     def ongraphPreloadFinished(self, t0):
         self.graphGroups()
