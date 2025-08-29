@@ -1183,8 +1183,8 @@ class UIsub(Ui_MainWindow):
 
         #return
         # DEBUG block - for inquiring visiblity of specific lines
-        #for key, value in self.dd_groups.items():
-        #    print(f"update_show: {key}, show:{value['show']}")
+        for key, value in self.dd_groups.items():
+            print(f"update_show: {key}, show:{value['show']}")
         print (f"update_show: {len(uistate.dict_rec_show)}")
         for key, value in uistate.dict_rec_show.items():
             if key.endswith(" volley amp mean") or key.endswith(" volley slope mean"):
@@ -3203,7 +3203,7 @@ class UIsub(Ui_MainWindow):
 
     def graphPreload(self): # plot and hide imported recordings
         self.usage("graphPreload")
-        self.uiFreeze()
+        self.uiFreeze() # Freeze UI, thaw on graphPreloadFinished
         t0 = time.time()
         self.mouseoverDisconnect()
         if not uistate.new_indices:
