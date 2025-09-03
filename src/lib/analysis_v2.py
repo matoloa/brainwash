@@ -218,6 +218,10 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
             i_trough = stim_char['i_volley_trough']
             t_volley_amp = df_event_range.iloc[i_trough]['time'] if i_trough is not None else t_stim + 0.0007
             t_volley_slope_start = stim_char.get('t_volley_slope_start', t_stim + 0.001)
+            if isinstance(t_volley_slope_start, np.ndarray):
+                t_volley_slope_start = t_volley_slope_start[0][0]
+            else:
+                print("--- t_volley_slope_start NOT <numpy.ndarray> (check characterize_graph for consistency)")
             t_volley_amp_method = t_volley_slope_method = 'auto detect'
         else:
             t_volley_amp = t_stim + 0.0007 # default to 0.7 ms after stim
@@ -228,14 +232,19 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
         if stim_char.get('epsp_detected'):
             i_epsp_min = stim_char['i_epsp_min']
             t_EPSP_amp = df_event_range.iloc[i_epsp_min]['time'] if i_epsp_min is not None else t_stim + 0.005
+            # if t_EPSP_slope_start is type numpy.ndarray, pick the first element
             t_EPSP_slope_start = stim_char.get('t_EPSP_slope_start', t_stim + 0.002)
+            if isinstance(t_EPSP_slope_start, np.ndarray):
+                t_EPSP_slope_start = t_EPSP_slope_start[0][0]
+            else:
+                print("--- t_EPSP_slope_start NOT <numpy.ndarray> (check characterize_graph for consistency)")
             t_EPSP_amp_method = t_EPSP_slope_method = 'auto detect'
         else:
             t_EPSP_amp = t_stim + 0.005 # default to 5 ms after stim
             t_EPSP_slope_start = t_stim + 0.002 # default to 2 ms after stim
             t_EPSP_amp_method = t_EPSP_slope_method = 'default'
         # Calculate the end times for volley and EPSP slopes
-        t_volley_slope_end = round(t_volley_slope_start + default_dict_t['t_volley_slope_width'], precision)
+        t_volley_slope_end = 0#round(t_volley_slope_start + default_dict_t['t_volley_slope_width'], precision)
         t_EPSP_slope_end = round(t_EPSP_slope_start + default_dict_t['t_EPSP_slope_width'], precision)
 
         result = {

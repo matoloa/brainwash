@@ -89,12 +89,13 @@ class Config:
             print(f"Development mode - {time.strftime('%H:%M:%S')}")
         else:
             print(f"Deploy mode - {time.strftime('%H:%M:%S')}")
-        clear = True#False
+        clear = True#False # Clear all caches and temporary files
 
+        self.clear_project_folder = clear # Remove current project folder (datafiles) at launch
         self.clear_cache = clear
-        self.transient = False # Block persisting of files
         self.clear_timepoints = clear
         self.force_cfg_reset = clear
+        self.transient = False # Block persisting of files
         self.verbose = self.dev_mode
         self.talkback = not self.dev_mode
         self.hide_experimental = not self.dev_mode
@@ -1737,6 +1738,8 @@ class UIsub(Ui_MainWindow):
             self.deleteFolder(self.dict_folders['cache'])
         if config.clear_timepoints:
             self.deleteFolder(self.dict_folders['timepoints'])
+        if config.clear_project_folder:
+            self.deleteFolder(self.dict_folders['project'])
         # Make sure the necessary folders exist
         if not os.path.exists(self.projects_folder):
             os.makedirs(self.projects_folder)
@@ -2865,6 +2868,7 @@ class UIsub(Ui_MainWindow):
             default_dict_t = uistate.default_dict_t.copy()  # Default sizes
             dfmean = self.get_dfmean(row)
             df_t = analysis.find_events(dfmean=dfmean, default_dict_t=default_dict_t, verbose=False)
+            # TODO: Error handling!
             if df_t.empty:
                 print("get_dft: No stims found.")
                 return None
