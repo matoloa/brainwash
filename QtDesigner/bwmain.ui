@@ -123,8 +123,14 @@
         </widget>
         <widget class="QWidget" name="verticalLayoutWidget_3">
          <layout class="QVBoxLayout" name="verticalLayoutTools">
-          <item>
+          <item alignment="Qt::AlignTop">
            <widget class="QFrame" name="frameToolStim">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="minimumSize">
              <size>
               <width>211</width>
@@ -311,8 +317,14 @@
             <zorder>lineEdit_mean_selection_end</zorder>
            </widget>
           </item>
-          <item>
+          <item alignment="Qt::AlignTop">
            <widget class="QFrame" name="frameToolSweeps">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="minimumSize">
              <size>
               <width>211</width>
@@ -328,7 +340,7 @@
             <widget class="QPushButton" name="pushButton_sweeps_even">
              <property name="geometry">
               <rect>
-               <x>50</x>
+               <x>60</x>
                <y>70</y>
                <width>41</width>
                <height>25</height>
@@ -343,7 +355,7 @@
               <rect>
                <x>10</x>
                <y>10</y>
-               <width>81</width>
+               <width>151</width>
                <height>17</height>
               </rect>
              </property>
@@ -361,7 +373,7 @@
             <widget class="QPushButton" name="pushButton_sweeps_odd">
              <property name="geometry">
               <rect>
-               <x>110</x>
+               <x>120</x>
                <y>70</y>
                <width>41</width>
                <height>25</height>
@@ -374,7 +386,7 @@
             <widget class="QLineEdit" name="lineEdit_sweeps_range_to">
              <property name="geometry">
               <rect>
-               <x>110</x>
+               <x>120</x>
                <y>30</y>
                <width>41</width>
                <height>25</height>
@@ -384,9 +396,9 @@
             <widget class="QLabel" name="label_sweeps_dash">
              <property name="geometry">
               <rect>
-               <x>100</x>
+               <x>110</x>
                <y>30</y>
-               <width>21</width>
+               <width>16</width>
                <height>20</height>
               </rect>
              </property>
@@ -402,7 +414,7 @@
               <rect>
                <x>10</x>
                <y>30</y>
-               <width>131</width>
+               <width>41</width>
                <height>20</height>
               </rect>
              </property>
@@ -416,7 +428,7 @@
             <widget class="QLineEdit" name="lineEdit_sweeps_range_from">
              <property name="geometry">
               <rect>
-               <x>50</x>
+               <x>60</x>
                <y>30</y>
                <width>41</width>
                <height>25</height>
@@ -439,10 +451,24 @@
               <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
              </property>
             </widget>
+            <zorder>label_sweeps_dash</zorder>
+            <zorder>pushButton_sweeps_even</zorder>
+            <zorder>label_sweeps</zorder>
+            <zorder>pushButton_sweeps_odd</zorder>
+            <zorder>lineEdit_sweeps_range_to</zorder>
+            <zorder>label_sweeps_selection</zorder>
+            <zorder>lineEdit_sweeps_range_from</zorder>
+            <zorder>label_sweeps_select_even_odd</zorder>
            </widget>
           </item>
-          <item>
+          <item alignment="Qt::AlignTop">
            <widget class="QFrame" name="frameToolBin">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="minimumSize">
              <size>
               <width>211</width>
@@ -533,8 +559,14 @@
             </widget>
            </widget>
           </item>
-          <item>
+          <item alignment="Qt::AlignTop">
            <widget class="QFrame" name="frameToolAspect">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="minimumSize">
              <size>
               <width>211</width>
@@ -622,7 +654,7 @@
             <widget class="QLineEdit" name="lineEdit_EPSP_amp_halfwidth">
              <property name="geometry">
               <rect>
-               <x>50</x>
+               <x>60</x>
                <y>140</y>
                <width>31</width>
                <height>25</height>
@@ -644,7 +676,7 @@
               <rect>
                <x>10</x>
                <y>120</y>
-               <width>161</width>
+               <width>201</width>
                <height>17</height>
               </rect>
              </property>
@@ -759,8 +791,14 @@
             <zorder>checkBox_volley_amp_mean</zorder>
            </widget>
           </item>
-          <item>
+          <item alignment="Qt::AlignTop">
            <widget class="QFrame" name="frameToolScaling">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="minimumSize">
              <size>
               <width>211</width>
@@ -897,12 +935,18 @@
           <item>
            <layout class="QVBoxLayout" name="verticalLayoutGroups"/>
           </item>
-          <item>
+          <item alignment="Qt::AlignTop">
            <widget class="QFrame" name="frameToolPairedStim">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="minimumSize">
              <size>
               <width>211</width>
-              <height>51</height>
+              <height>71</height>
              </size>
             </property>
             <property name="frameShape">
@@ -914,7 +958,7 @@
             <widget class="QPushButton" name="pushButton_paired_data_flip">
              <property name="geometry">
               <rect>
-               <x>80</x>
+               <x>100</x>
                <y>30</y>
                <width>51</width>
                <height>25</height>
@@ -959,12 +1003,18 @@
             </widget>
            </widget>
           </item>
-          <item>
+          <item alignment="Qt::AlignTop">
            <widget class="QFrame" name="frameToolExport">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="minimumSize">
              <size>
               <width>211</width>
-              <height>51</height>
+              <height>71</height>
              </size>
             </property>
             <property name="frameShape">
@@ -1021,6 +1071,19 @@
             </widget>
            </widget>
           </item>
+          <item>
+           <spacer name="verticalSpacer">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
          </layout>
         </widget>
        </widget>
@@ -1042,7 +1105,7 @@
      <x>0</x>
      <y>0</y>
      <width>1270</width>
-     <height>21</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
