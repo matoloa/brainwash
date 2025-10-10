@@ -3399,6 +3399,8 @@ class UIsub(Ui_MainWindow):
                 self.lineEdit_mean_selection_end.setText("")
             else:
                 uiplot.xDeselect(ax = uistate.ax1, reset=True)
+                self.lineEdit_sweeps_range_from.setText("")
+                self.lineEdit_sweeps_range_to.setText("")
             return
 
     # left clicked on a graph
@@ -3443,6 +3445,7 @@ class UIsub(Ui_MainWindow):
             sweep_numbers = list(range(0, int(p_row['sweeps'])))
             uistate.x_on_click = sweep_numbers[np.abs(sweep_numbers - x).argmin()]
             uistate.x_select['output_start'] = uistate.x_on_click
+            self.lineEdit_sweeps_range_from.setText(str(uistate.x_select['output_start']))
             self.connectDragRelease(x_range=sweep_numbers, rec_ID=p_row['ID'], graph="output")
 
 
@@ -3674,6 +3677,8 @@ class UIsub(Ui_MainWindow):
             elif canvas == self.canvasOutput:
                 uistate.x_select['output_start'] = start
                 uistate.x_select['output_end'] = end
+                self.lineEdit_sweeps_range_from.setText(str(start))
+                self.lineEdit_sweeps_range_to.setText(str(end))
         uiplot.xSelect(canvas=canvas)
         canvas.mpl_disconnect(self.mouse_drag)
         canvas.mpl_disconnect(self.mouse_release)
