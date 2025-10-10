@@ -116,17 +116,28 @@ class UIstate:
 
     # Do NOT persist these
         self.pushButtons = { # these are cycled by uisub.connectUIstate; buttonname: methodname
+        # stim detection
             'pushButton_stim_detect': 'triggerStimDetect',
+        # sweep selection
+            'pushButton_sweeps_even': 'trigger_set_sweeps_even',
+            'pushButton_sweeps_odd': 'trigger_set_sweeps_odd',
+        # aspect toggles
             'pushButton_EPSP_amp_width_set_all': 'trigger_set_EPSP_amp_width_all',
             'pushButton_volley_amp_width_set_all': 'trigger_set_volley_amp_width_all',
+        # output scaling
             'pushButton_norm_range_set_all': 'trigger_set_norm_range_all',
+        # binning
             'pushButton_bin_size_set_all': 'trigger_set_bin_size_all',
+        # export
             'pushButton_export_selection': 'trigger_export_selection',
             'pushButton_export_groups': 'trigger_export_groups',
         }
         self.x_select = { # selected ranges on mean- and output graphs
+            # TODO: 'mean': set(), # set of x indices selected in mean graph - deprecate start/end
             'mean_start': None,
             'mean_end': None,
+            'output': set(), # set of x indices selected in output graph
+            # deprecated: use set instead
             'output_start': None,
             'output_end': None,
         }

@@ -93,8 +93,9 @@ class UIplot():
             axlines = ax1.get_lines() + ax2.get_lines()
             axpatches = ax1.patches + ax2.patches
             if reset:
-                self.uistate.x_select['output_start'] = None
-                self.uistate.x_select['output_end'] = None
+                self.uistate.x_select['output'] = set()
+                self.uistate.x_select['output_start'] = None # TODO: deprecate!
+                self.uistate.x_select['output_end'] = None # TODO: deprecate!
         else: # axm
             axlines = ax.get_lines()
             axpatches = ax.patches

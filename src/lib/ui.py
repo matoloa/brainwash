@@ -1939,6 +1939,18 @@ class UIsub(Ui_MainWindow):
         self.usage("triggerStimDetect")
         self.stimDetect()
 
+    def trigger_set_sweeps_even(self):
+        self.usage(f"trigger_set_sweeps_even")
+        self.lineEdit_sweeps_range_from.setText("Even")
+        self.lineEdit_sweeps_range_to.setText("")
+        print("Selected all even sweeps...")
+
+    def trigger_set_sweeps_odd(self):
+        self.usage(f"trigger_set_sweeps_odd")
+        self.lineEdit_sweeps_range_from.setText("Odd")
+        self.lineEdit_sweeps_range_to.setText("")
+        print("Selected all odd sweeps...")
+
     def trigger_set_EPSP_amp_width_all(self):
         self.usage(f"trigger_set_EPSP_amp_width_all")
         self.recalculate()
@@ -3444,8 +3456,8 @@ class UIsub(Ui_MainWindow):
         elif canvas == self.canvasOutput: # Output canvas (bottom graph) left-clicked: click and drag to select specific sweeps
             sweep_numbers = list(range(0, int(p_row['sweeps'])))
             uistate.x_on_click = sweep_numbers[np.abs(sweep_numbers - x).argmin()]
-            uistate.x_select['output_start'] = uistate.x_on_click
-            self.lineEdit_sweeps_range_from.setText(str(uistate.x_select['output_start']))
+            uistate.x_select['output_start'] = uistate.x_on_click # TODO: deprecate!
+            self.lineEdit_sweeps_range_from.setText(str(uistate.x_on_click))
             self.connectDragRelease(x_range=sweep_numbers, rec_ID=p_row['ID'], graph="output")
 
 
@@ -3653,8 +3665,9 @@ class UIsub(Ui_MainWindow):
             uistate.x_select['mean_end'] = uistate.x_drag
             self.lineEdit_mean_selection_end.setText(str(uistate.x_drag))
         else:
-            uistate.x_select['output_end'] = uistate.x_drag
-            print(f"uistate.x_select['output_end']: {uistate.x_select['output_end']}")
+            uistate.x_select['output_end'] = uistate.x_drag # TODO: deprecate!
+            uistate.x_select['output'] = set(range(min(uistate.x_on_click, uistate.x_drag), max(uistate.x_on_click, uistate.x_drag)+1))
+            print(f"uistate.x_select['output']: {uistate.x_select['output']}")
         uiplot.xSelect(canvas=canvas)
 
 
@@ -3665,18 +3678,22 @@ class UIsub(Ui_MainWindow):
                 self.lineEdit_mean_selection_end.setText("")
                 uistate.x_select['mean_end'] = None
             elif canvas == self.canvasOutput:
-                uistate.x_select['output_end'] = None
+                self.lineEdit_sweeps_range_to.setText("")
+                uistate.x_select['output_end'] = None # TODO: deprecate!
         else:
             start = min(uistate.x_on_click, uistate.x_drag)
             end = max(uistate.x_on_click, uistate.x_drag)
             if canvas == self.canvasMean:
+                # set range
+                # uistate.x_select['mean'] = set(range(start, end + 1))
                 uistate.x_select['mean_start'] = start
                 uistate.x_select['mean_end'] = end
                 self.lineEdit_mean_selection_start.setText(str(start)) # update, as it may have been resorted
                 self.lineEdit_mean_selection_end.setText(str(end))
             elif canvas == self.canvasOutput:
-                uistate.x_select['output_start'] = start
-                uistate.x_select['output_end'] = end
+                uistate.x_select['output'] = set(range(start, end + 1))
+                uistate.x_select['output_start'] = start # TODO: deprecate!
+                uistate.x_select['output_end'] = end # TODO: deprecate!
                 self.lineEdit_sweeps_range_from.setText(str(start))
                 self.lineEdit_sweeps_range_to.setText(str(end))
         uiplot.xSelect(canvas=canvas)
