@@ -89,7 +89,7 @@ class Config:
             print(f"Development mode - {time.strftime('%H:%M:%S')}")
         else:
             print(f"Deploy mode - {time.strftime('%H:%M:%S')}")
-        clear = True#False # Clear all caches and temporary files
+        clear = False # Clear all caches and temporary files
 
         self.clear_project_folder = clear # Remove current project folder (datafiles) at launch
         self.clear_cache = clear
