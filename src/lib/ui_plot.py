@@ -94,8 +94,8 @@ class UIplot():
             axpatches = ax1.patches + ax2.patches
             if reset:
                 self.uistate.x_select['output'] = set()
-                self.uistate.x_select['output_start'] = None # TODO: deprecate!
-                self.uistate.x_select['output_end'] = None # TODO: deprecate!
+                self.uistate.x_select['output_start'] = None
+                self.uistate.x_select['output_end'] = None
         else: # axm
             axlines = ax.get_lines()
             axpatches = ax.patches
@@ -131,19 +131,17 @@ class UIplot():
                 ax = self.uistate.ax2
             else:
                 ax = self.uistate.ax1
-                self.xDeselect(ax) # will clear both ax1 and ax2, if fed either one
-#                for x in x_points:
-#                    ax.axvline(x=x, color='blue', alpha=0.1, label='xSelect_point')
-                if self.uistate.x_select['output_end'] is None:
-                    print(f"Selected x: {self.uistate.x_select['output_start']}")
-                    ax.axvline(x=self.uistate.x_select['output_start'], color='blue', label='xSelect_x')
-                else:
-                    start, end = self.uistate.x_select['output_start'], self.uistate.x_select['output_end']
-                    print(f"Selected x_range: {start} - {end}")
-                    ax.axvline(x=start, color='blue', label='xSelect_start')
-                    ax.axvline(x=end, color='blue', label='xSelect_end')
-                    ax.axvspan(start, end, color='blue', alpha=0.1, label='xSelect_span')
-            canvas.draw()
+            self.xDeselect(ax) # will clear both ax1 and ax2, if fed either one
+            if self.uistate.x_select['output_end'] is None:
+                print(f"Selected x: {self.uistate.x_select['output_start']}")
+                ax.axvline(x=self.uistate.x_select['output_start'], color='blue', label='xSelect_x')
+            else:
+                start, end = self.uistate.x_select['output_start'], self.uistate.x_select['output_end']
+                print(f"Selected x_range: {start} - {end}")
+                ax.axvline(x=start, color='blue', label='xSelect_start')
+                ax.axvline(x=end, color='blue', label='xSelect_end')
+                ax.axvspan(start, end, color='blue', alpha=0.1, label='xSelect_span')
+        canvas.draw()
 
 
 

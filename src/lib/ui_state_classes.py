@@ -133,11 +133,10 @@ class UIstate:
             'pushButton_export_groups': 'trigger_export_groups',
         }
         self.x_select = { # selected ranges on mean- and output graphs
-            # TODO: 'mean': set(), # set of x indices selected in mean graph - deprecate start/end
+            # start and end: current drag operation; None if not dragging
             'mean_start': None,
             'mean_end': None,
             'output': set(), # set of x indices selected in output graph
-            # deprecated: use set instead
             'output_start': None,
             'output_end': None,
         }
