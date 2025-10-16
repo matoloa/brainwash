@@ -1528,13 +1528,18 @@ class UIsub(Ui_MainWindow):
         self.dict_group_means = {} # means of all group outputs
         self.dict_diffs = {} # all diffs (for paired stim)
 
+
     def sweepsSelect(self, even: bool):
+        if uistate.checkBox['EPSP_slope']:
+            ax = uistate.ax2
+        else:
+            ax = uistate.ax1
+        uiplot.xDeselect(ax, reset=True)
         self.lineEdit_sweeps_range_from.setText("Even" if even else "Odd")
-        self.lineEdit_sweeps_range_to.setText("")
         total_sweeps = uistate.dfp_row_copy['sweeps']
         selected = {i for i in range(total_sweeps) if (i % 2 == 0) == even}
         uistate.x_select['output'] = selected
-        print(f"Selected all {'even' if even else 'odd'} sweeps.")
+        print(f"Selected all {'even' if even else 'odd'}: {len(selected)} sweeps.")
 
 
 
@@ -3671,7 +3676,7 @@ class UIsub(Ui_MainWindow):
         else:
             uistate.x_select['output_end'] = uistate.x_drag
             uistate.x_select['output'] = set(range(min(uistate.x_on_click, uistate.x_drag), max(uistate.x_on_click, uistate.x_drag)+1))
-            print(f"uistate.x_select['output']: {uistate.x_select['output']}")
+            #print(f"uistate.x_select['output']: {uistate.x_select['output']}")
         uiplot.xSelect(canvas=canvas)
 
 

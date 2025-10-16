@@ -133,15 +133,24 @@ class UIplot():
                 ax = self.uistate.ax1
             self.xDeselect(ax) # will clear both ax1 and ax2, if fed either one
             if self.uistate.x_select['output_end'] is None:
+                # If only the start is selected, draw a line at the start
                 print(f"Selected x: {self.uistate.x_select['output_start']}")
                 ax.axvline(x=self.uistate.x_select['output_start'], color='blue', label='xSelect_x')
             else:
+                # If both start and end are selected, draw the range
                 start, end = self.uistate.x_select['output_start'], self.uistate.x_select['output_end']
                 print(f"Selected x_range: {start} - {end}")
                 ax.axvline(x=start, color='blue', label='xSelect_start')
                 ax.axvline(x=end, color='blue', label='xSelect_end')
                 ax.axvspan(start, end, color='blue', alpha=0.1, label='xSelect_span')
+            # draw the mean of selected sweeps on axm
+            self.axm_ghost()
         canvas.draw()
+
+    def axm_ghost(self):
+        # draw a ghost of the mean of selected sweeps on axm
+        print("axm_ghost: drawing ghost of selected sweeps on axm...")
+        print(f" - selected sweeps: {self.uistate.x_select['output']}")
 
 
 
