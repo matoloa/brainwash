@@ -144,13 +144,18 @@ class UIplot():
                 ax.axvline(x=end, color='blue', label='xSelect_end')
                 ax.axvspan(start, end, color='blue', alpha=0.1, label='xSelect_span')
             # draw the mean of selected sweeps on axm
-            self.axm_ghost()
         canvas.draw()
 
-    def axm_ghost(self):
-        # draw a ghost of the mean of selected sweeps on axm
-        print("axm_ghost: drawing ghost of selected sweeps on axm...")
+    def axe_mean_selected(self):
+        # clear previous mean line from axe
+        if 'axe mean selected sweeps' in self.uistate.dict_rec_labels:
+            self.uistate.dict_rec_labels['axe mean selected sweeps']['line'].remove()
+            del self.uistate.dict_rec_labels['axe mean selected sweeps']
+        self.uistate.axe.figure.canvas.draw()
+        # draw the mean of selected sweeps on axe
+        print("axe_mean_selected: drawing mean of selected sweeps on axe...")
         print(f" - selected sweeps: {self.uistate.x_select['output']}")
+
 
 
 

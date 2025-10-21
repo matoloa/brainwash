@@ -3683,40 +3683,39 @@ class UIsub(Ui_MainWindow):
     def dragReleased(self, event, canvas):
         self.usage("dragReleased")
         if uistate.x_drag is None: # click with no drag: start already set, clear end
-            if canvas == self.canvasMean:
+            if canvas is self.canvasMean:
                 self.lineEdit_mean_selection_end.setText("")
                 uistate.x_select['mean_end'] = None
-            elif canvas == self.canvasOutput:
+            elif canvas is self.canvasOutput:
                 self.lineEdit_sweeps_range_to.setText("")
                 uistate.x_select['output_end'] = None
-                uistate.x_select['output'] = uistate.x_on_click
+                uistate.x_select['output'] = {uistate.x_on_click} # Normalize single-sweep selection to a set so truthiness checks work for sweep 0
+            uiplot.xSelect(canvas=canvas)
         else:
             # drag complete, sort start and end
             start = min(uistate.x_on_click, uistate.x_drag)
             end = max(uistate.x_on_click, uistate.x_drag)
-            if canvas == self.canvasMean:
+            if canvas is self.canvasMean:
                 # set range
                 # uistate.x_select['mean'] = set(range(start, end + 1))
                 uistate.x_select['mean_start'] = start
                 uistate.x_select['mean_end'] = end
                 self.lineEdit_mean_selection_start.setText(str(start)) # update, as it may have been resorted
                 self.lineEdit_mean_selection_end.setText(str(end))
-            elif canvas == self.canvasOutput:
+            elif canvas is self.canvasOutput:
                 uistate.x_select['output'] = set(range(start, end + 1))
                 uistate.x_select['output_start'] = start
                 uistate.x_select['output_end'] = end
                 self.lineEdit_sweeps_range_from.setText(str(start))
                 self.lineEdit_sweeps_range_to.setText(str(end))
-        if canvas == self.canvasOutput:
-            # persist mean of selected stims
-            print (f"Plotting mean of selected sweeps: {uistate.x_select['output']}")
-        uiplot.xSelect(canvas=canvas)
         canvas.mpl_disconnect(self.mouse_drag)
         canvas.mpl_disconnect(self.mouse_release)
         self.mouse_drag = None
         self.mouse_release = None
         uistate.x_drag = None
         uistate.dragging = False
+        if canvas is self.canvasOutput:
+            uiplot.axe_mean_selected()
 
 
     def mouseoverUpdate(self):
