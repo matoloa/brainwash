@@ -3651,7 +3651,7 @@ class UIsub(Ui_MainWindow):
             return
         x_data = max_x_line.get_xdata()
         self.mouse_drag = canvas.mpl_connect('motion_notify_event', lambda event: self.xDrag(event, canvas=canvas, x_data=x_data, x_range=x_range))
-        self.mouse_release = canvas.mpl_connect('button_release_event', lambda event: self.dragReleased(event, canvas=canvas))
+        self.mouse_release = canvas.mpl_connect('button_release_event', lambda event: self.drag_released(event, canvas=canvas))
 
 
     def xDrag(self, event, canvas, x_data, x_range):
@@ -3680,42 +3680,43 @@ class UIsub(Ui_MainWindow):
         uiplot.xSelect(canvas=canvas)
 
 
-    def dragReleased(self, event, canvas):
+    def drag_released(self, event, canvas):
         self.usage("dragReleased")
-        if uistate.x_drag is None: # click with no drag: start already set, clear end
-            if canvas is self.canvasMean:
+        is_mean = canvas is self.canvasMean
+        is_output = canvas is self.canvasOutput
+
+        if uistate.x_drag is None: # click only
+            if is_mean:
                 self.lineEdit_mean_selection_end.setText("")
                 uistate.x_select['mean_end'] = None
-            elif canvas is self.canvasOutput:
+            elif is_output:
                 self.lineEdit_sweeps_range_to.setText("")
                 uistate.x_select['output_end'] = None
-                uistate.x_select['output'] = {uistate.x_on_click} # Normalize single-sweep selection to a set so truthiness checks work for sweep 0
-            uiplot.xSelect(canvas=canvas)
-        else:
-            # drag complete, sort start and end
-            start = min(uistate.x_on_click, uistate.x_drag)
-            end = max(uistate.x_on_click, uistate.x_drag)
-            if canvas is self.canvasMean:
-                # set range
-                # uistate.x_select['mean'] = set(range(start, end + 1))
+                uistate.x_select['output'] = {uistate.x_on_click}  # ensure set type
+                uiplot.update_axe_mean()
+        else: # click and drag
+            start, end = sorted((uistate.x_on_click, uistate.x_drag))
+            if is_mean:
                 uistate.x_select['mean_start'] = start
                 uistate.x_select['mean_end'] = end
-                self.lineEdit_mean_selection_start.setText(str(start)) # update, as it may have been resorted
+                self.lineEdit_mean_selection_start.setText(str(start))
                 self.lineEdit_mean_selection_end.setText(str(end))
-            elif canvas is self.canvasOutput:
-                uistate.x_select['output'] = set(range(start, end + 1))
+            elif is_output:
                 uistate.x_select['output_start'] = start
                 uistate.x_select['output_end'] = end
+                uistate.x_select['output'] = set(range(start, end + 1))
                 self.lineEdit_sweeps_range_from.setText(str(start))
                 self.lineEdit_sweeps_range_to.setText(str(end))
+                uiplot.update_axe_mean()
+        uiplot.xSelect(canvas=canvas)
+
+        # cleanup
         canvas.mpl_disconnect(self.mouse_drag)
         canvas.mpl_disconnect(self.mouse_release)
         self.mouse_drag = None
         self.mouse_release = None
         uistate.x_drag = None
         uistate.dragging = False
-        if canvas is self.canvasOutput:
-            uiplot.axe_mean_selected()
 
 
     def mouseoverUpdate(self):

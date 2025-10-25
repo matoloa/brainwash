@@ -146,7 +146,7 @@ class UIplot():
             # draw the mean of selected sweeps on axm
         canvas.draw()
 
-    def axe_mean_selected(self):
+    def update_axe_mean(self):
         # clear previous mean line from axe
         if 'axe mean selected sweeps' in self.uistate.dict_rec_labels:
             self.uistate.dict_rec_labels['axe mean selected sweeps']['line'].remove()
