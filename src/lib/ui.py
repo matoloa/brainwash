@@ -403,8 +403,8 @@ class graphPreloadThread(QtCore.QThread):
         self.i = 0
 
     def run(self):
-        df_p = self.df_p.loc[self.uistate.new_indices]
-        self.uistate.new_indices = []
+        df_p = self.df_p.loc[self.uistate.list_idx_recs2preload]
+        self.uistate.list_idx_recs2preload = []
         self.i = 0
         for i, p_row in df_p.iterrows():
             dft = self.uisub.get_dft(row=p_row)
@@ -1153,16 +1153,24 @@ class UIsub(Ui_MainWindow):
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableProj.clearSelection()
         selected_indexes = self.tableProj.selectionModel().selectedRows()
-        # build the list uistate.rec_select with indices
-        uistate.rec_select = [index.row() for index in selected_indexes]
-        #print(f" - rec_select: {uistate.rec_select}")
+        # build the list uistate.list_idx_select_recs with indices
+        uistate.list_idx_select_recs = [index.row() for index in selected_indexes]
+        #print(f" - rec_select: {uistate.list_idx_select_recs}")
         self.update_recs2plot()
         self.update_show()
         if uistate.df_recs2plot is None:
             print("No parsed recordings selected.")
             self.graphRefresh()
             return
-        # use the selected df_p row with the highest sweep duration
+        # if exactly one recording is selected, reference its data in uistate.df_rec_select_data
+        if len(uistate.list_idx_select_recs) == 1:
+            rec_ID = uistate.list_idx_select_recs[0]
+            #uistate.list_idx_select_recs = [] # list of selected indices in uisub.tableProj
+            #recording_name = uistate.df_recs2plot.loc[uistate.df_recs2plot['ID'] == rec_ID, 'recording_name'].values[0]
+            #uistate.df_rec_select_data = self.dict_filters[recording_name]
+        else:
+            uistate.df_rec_select_data = None
+        # use the selected df_p row with the highest sweep duration for layout formatting, so that the full x-axis is visible
         p_row = uistate.df_recs2plot.loc[uistate.df_recs2plot['sweep_duration'].idxmax()]
         uistate.dfp_row_copy = p_row.copy()
         df_t = self.get_dft(row=p_row)
@@ -1192,7 +1200,7 @@ class UIsub(Ui_MainWindow):
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableStim.clearSelection()
         selected_indexes = self.tableStim.selectionModel().selectedRows()
-        uistate.stim_select = [index.row() for index in selected_indexes]
+        uistate.list_idx_select_stims = [index.row() for index in selected_indexes]
         self.update_show()
         self.zoomAuto()
         self.mouseoverUpdate()
@@ -1206,7 +1214,7 @@ class UIsub(Ui_MainWindow):
             new_selection = {}
         else:
             selected_ids = set(uistate.df_recs2plot['ID'])
-            selected_stims = [stim + 1 for stim in uistate.stim_select] # stim_select is 0-based (indices) - convert to stims
+            selected_stims = [stim + 1 for stim in uistate.list_idx_select_stims] # stim_select is 0-based (indices) - convert to stims
             print(f"update_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}")
             # remove non-selected recs and stims
             new_selection = {k: v for k, v in uistate.dict_rec_labels.items() 
@@ -1373,7 +1381,7 @@ class UIsub(Ui_MainWindow):
 
     def talkback(self):
         p_row = uistate.dfp_row_copy
-        t_row = uistate.dft_copy.iloc[uistate.stim_select[0]]
+        t_row = uistate.dft_copy.iloc[uistate.list_idx_select_stims[0]]
         dfmean = self.get_dfmean(p_row)
 
         t_stim = t_row['t_stim']
@@ -1430,11 +1438,11 @@ class UIsub(Ui_MainWindow):
 
 
     def zoomAuto(self):
-        # print(f"zoomAuto, uistate.selected: {uistate.rec_select}, uistate.stim_select: {uistate.stim_select}")
-        if uistate.rec_select:
+        # print(f"zoomAuto, uistate.selected: {uistate.list_idx_select_recs}, uistate.list_idx_select_stims: {uistate.list_idx_select_stims}")
+        if uistate.list_idx_select_recs:
         # axm
             df_p = self.get_df_project()
-            df_selected = df_p.loc[uistate.rec_select]
+            df_selected = df_p.loc[uistate.list_idx_select_recs]
             max_sweep_duration = df_selected['sweep_duration'].max()
             uistate.zoom['mean_xlim'] = (0, max_sweep_duration)
         # axe
@@ -1451,8 +1459,8 @@ class UIsub(Ui_MainWindow):
 
 
     def update_recs2plot(self):
-        if uistate.rec_select:
-            df_project_selected = self.get_df_project().iloc[uistate.rec_select]
+        if uistate.list_idx_select_recs:
+            df_project_selected = self.get_df_project().iloc[uistate.list_idx_select_recs]
             uistate.df_recs2plot = df_project_selected[df_project_selected['sweeps'] != "..."]
             if uistate.df_recs2plot.empty:
                 uistate.df_recs2plot = None
@@ -2009,8 +2017,8 @@ class UIsub(Ui_MainWindow):
 
     def triggerClearGroups(self):
         self.usage("triggerClearGroups")
-        if uistate.rec_select:
-            self.clearGroupsByRow(uistate.rec_select)
+        if uistate.list_idx_select_recs:
+            self.clearGroupsByRow(uistate.list_idx_select_recs)
             self.tableUpdate()
             self.mouseoverUpdate()
         else:
@@ -2193,11 +2201,11 @@ class UIsub(Ui_MainWindow):
         uistate.dft_copy.to_clipboard(index=False)
 
     def copy_output(self):
-        if len(uistate.rec_select) < 1:
+        if len(uistate.list_idx_select_recs) < 1:
             print("copy_output: nothing selected.")
             return    
         selected_outputs = pd.DataFrame()
-        for rec in uistate.rec_select:
+        for rec in uistate.list_idx_select_recs:
             p_row = self.get_df_project().loc[rec]
             output = self.get_dfoutput(p_row)
             output.insert(0, 'recording_name', p_row['recording_name'])
@@ -2205,11 +2213,11 @@ class UIsub(Ui_MainWindow):
         selected_outputs.to_clipboard(index=False)
 
     def stimDetect(self):
-        if not uistate.rec_select:
+        if not uistate.list_idx_select_recs:
             print("No files selected.")
             return
         df_p = self.get_df_project()
-        for index in uistate.rec_select:
+        for index in uistate.list_idx_select_recs:
             p_row = df_p.loc[index]
             old_df_t = self.get_dft(p_row)
             rec_name = p_row['recording_name']
@@ -2253,8 +2261,8 @@ class UIsub(Ui_MainWindow):
             dfoutput = self.get_dfoutput(p_row)
             self.persistOutput(p_row['recording_name'], dfoutput)
             uiplot.addRow(p_row, new_df_t, dfmean, dfoutput)
-        uistate.stim_select = [0]
-        p_row = df_p.loc[uistate.rec_select[0]]
+        uistate.list_idx_select_stims = [0]
+        p_row = df_p.loc[uistate.list_idx_select_recs[0]]
         df_t = self.get_dft(p_row)
         self.tableStimModel.setData(df_t)
         self.tableStim.selectRow(0)
@@ -2298,9 +2306,9 @@ class UIsub(Ui_MainWindow):
 
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
-        if len(uistate.rec_select) == 1:
+        if len(uistate.list_idx_select_recs) == 1:
             df_p = self.get_df_project()
-            old_recording_name = df_p.at[uistate.rec_select[0], 'recording_name']
+            old_recording_name = df_p.at[uistate.list_idx_select_recs[0], 'recording_name']
             old_data = self.dict_folders['data'] / (old_recording_name + ".parquet")
             old_timepoints = self.dict_folders['timepoints'] / (old_recording_name + ".parquet")
             old_mean = self.dict_folders['cache'] / (old_recording_name + "_mean.parquet")
@@ -2334,15 +2342,15 @@ class UIsub(Ui_MainWindow):
                         os.rename(old_output, new_output)
                     if old_bin.exists():
                         os.rename(old_bin, new_bin)
-                    df_p.at[uistate.rec_select[0], 'recording_name'] = new_recording_name
+                    df_p.at[uistate.list_idx_select_recs[0], 'recording_name'] = new_recording_name
                     # For paired recordings: also rename any references to old_recording_name in df_p['paired_recording']
                     df_p.loc[df_p['paired_recording'] == old_recording_name, 'paired_recording'] = new_recording_name
                     self.set_df_project(df_p)
                     self.tableUpdate()
                     self.update_recs2plot()
-                    old_recording_ID = df_p.at[uistate.rec_select[0], 'ID']
+                    old_recording_ID = df_p.at[uistate.list_idx_select_recs[0], 'ID']
                     uiplot.unPlot(old_recording_ID)
-                    self.graphUpdate(row = df_p.loc[uistate.rec_select[0]])
+                    self.graphUpdate(row = df_p.loc[uistate.list_idx_select_recs[0]])
                     self.update_show(reset=True)
                 else:
                     print(f"new_recording_name {new_recording_name} already exists")
@@ -2353,11 +2361,11 @@ class UIsub(Ui_MainWindow):
 
 
     def deleteSelectedRows(self):
-        if not uistate.rec_select:
+        if not uistate.list_idx_select_recs:
             print("No files selected.")
             return
         df_p = self.get_df_project()
-        for index in uistate.rec_select:
+        for index in uistate.list_idx_select_recs:
             rec_name = df_p.at[index, 'recording_name']
             rec_ID = df_p.at[index, 'ID']
             sweeps = df_p.at[index, 'sweeps']
@@ -2368,15 +2376,15 @@ class UIsub(Ui_MainWindow):
                 uiplot.unPlot(rec_ID) # remove plotted lines
         # store the ID of the line below the last selected row
         reselect_ID = None
-        if uistate.rec_select[-1] < len(df_p) - 1:
-            reselect_ID = df_p.at[uistate.rec_select[-1] + 1, 'ID']
-        df_p.drop(uistate.rec_select, inplace=True)
+        if uistate.list_idx_select_recs[-1] < len(df_p) - 1:
+            reselect_ID = df_p.at[uistate.list_idx_select_recs[-1] + 1, 'ID']
+        df_p.drop(uistate.list_idx_select_recs, inplace=True)
         df_p.reset_index(inplace=True, drop=True)
         self.set_df_project(df_p)
         self.tableUpdate()
         # reselect the line below the last selected row
         if reselect_ID:
-            uistate.rec_select = df_p[df_p['ID'] == reselect_ID].index[0]
+            uistate.list_idx_select_recs = df_p[df_p['ID'] == reselect_ID].index[0]
         self.tableProjSelectionChanged()
 
 
@@ -2433,17 +2441,17 @@ class UIsub(Ui_MainWindow):
             df_p = pd.concat([df_p[df_p['sweeps'] != "..."], rows2add]).reset_index(drop=True)
             self.set_df_project(df_p)
             # Get the indices of the new rows, as they are in df_p
-            uistate.new_indices = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
+            uistate.list_idx_recs2preload = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
         self.progressBarManager.__exit__(None, None, None)
         self.graphPreload()
         
 
     def flipCI(self):
         # Inverse Control/Intervention flags of currently selected and paired recordings
-        if uistate.rec_select:
+        if uistate.list_idx_select_recs:
             df_p = self.get_df_project()
             already_flipped = []
-            for index in uistate.rec_select:
+            for index in uistate.list_idx_select_recs:
                 row = df_p.loc[index]
                 name_rec = row['recording_name'] 
                 name_pair = row['paired_recording']
@@ -2567,7 +2575,7 @@ class UIsub(Ui_MainWindow):
             print("No parsed files selected.")
             # TODO: set selection to clicked group
             return
-        selected_rec_IDs = dfp.loc[uistate.rec_select, 'ID'].tolist()  # selected rec_IDs
+        selected_rec_IDs = dfp.loc[uistate.list_idx_select_recs, 'ID'].tolist()  # selected rec_IDs
         all_in_group = all(rec_ID in self.dd_groups[group_ID]['rec_IDs'] for rec_ID in selected_rec_IDs)
         if all_in_group: # If all selected_rec_IDs are in the group_ID, ungroup them
             for rec_ID in selected_rec_IDs:
@@ -2924,10 +2932,10 @@ class UIsub(Ui_MainWindow):
         self.tableProj.resizeColumnsToContents()
         # Restore selection
         selection_model = self.tableProj.selectionModel()
-        for idx in uistate.rec_select:
+        for idx in uistate.list_idx_select_recs:
             index = self.tablemodel.index(idx, 0)  # get the QModelIndex for the row
             selection_model.select(index, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
-            #print(f"tableUpdate: reselecting {len(uistate.rec_select)}: {idx}")
+            #print(f"tableUpdate: reselecting {len(uistate.list_idx_select_recs)}: {idx}")
         self.updating_tableProj = False
 
 
@@ -3320,19 +3328,19 @@ class UIsub(Ui_MainWindow):
         self.uiFreeze() # Freeze UI, thaw on graphPreloadFinished
         t0 = time.time()
         self.mouseoverDisconnect()
-        if not uistate.new_indices:
+        if not uistate.list_idx_recs2preload:
             df_p = self.get_df_project()
-            uistate.new_indices = df_p[~df_p['sweeps'].eq("...")].index.tolist()
-        if not uistate.new_indices:
+            uistate.list_idx_recs2preload = df_p[~df_p['sweeps'].eq("...")].index.tolist()
+        if not uistate.list_idx_recs2preload:
             return
-        print(f"Preloading {len(uistate.new_indices)} recordings.")
+        print(f"Preloading {len(uistate.list_idx_recs2preload)} recordings.")
         self.progressBar.setValue(0)
         self.thread = graphPreloadThread(uistate, uiplot, self)
         self.thread.finished.connect(lambda: self.ongraphPreloadFinished(t0))
 
         # Create ProgressBarManager and connect progress signal
-        if len(uistate.new_indices) > 0:
-            self.progressBarManager = ProgressBarManager(self.progressBar, len(uistate.new_indices))
+        if len(uistate.list_idx_recs2preload) > 0:
+            self.progressBarManager = ProgressBarManager(self.progressBar, len(uistate.list_idx_recs2preload))
             self.thread.progress.connect(lambda i: self.progressBarManager.update(i, "Preloading recording"))
 
             self.thread.start()
@@ -3400,7 +3408,7 @@ class UIsub(Ui_MainWindow):
 
     def graphClicked(self, event, canvas): # graph click event
         self.usage("graphClicked")
-        if not uistate.rec_select: # no recording selected; do nothing
+        if not uistate.list_idx_select_recs: # no recording selected; do nothing
             return
         x = event.xdata
         if x is None: # clicked outside graph; do nothing
@@ -3427,16 +3435,16 @@ class UIsub(Ui_MainWindow):
     # left clicked on a graph
         uistate.dragging = True
         p_row = uistate.dfp_row_copy
-        stim_num = uistate.dft_copy.iloc[uistate.stim_select[0]]['stim']
+        stim_num = uistate.dft_copy.iloc[uistate.list_idx_select_stims[0]]['stim']
 
-        if (canvas == self.canvasEvent) and (len(uistate.rec_select) == 1) and ((len(uistate.stim_select) == 1)): # Event canvas left-clicked with just one rec and stim selected, middle graph: editing detected events
+        if (canvas == self.canvasEvent) and (len(uistate.list_idx_select_recs) == 1) and ((len(uistate.list_idx_select_stims) == 1)): # Event canvas left-clicked with just one rec and stim selected, middle graph: editing detected events
             label = f"{p_row['recording_name']} - stim {stim_num}"
             dict_event = uistate.dict_rec_labels[label]
             data_x = dict_event['line'].get_xdata()
             data_y = dict_event['line'].get_ydata()
             uistate.x_on_click = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
             #print(f"uistate.x_on_click: {uistate.x_on_click}")
-            t_row = uistate.dft_copy.iloc[uistate.stim_select[0]]
+            t_row = uistate.dft_copy.iloc[uistate.list_idx_select_stims[0]]
             if event.inaxes is not None:
                 if (event.button == 1 or event.button == 3) and (uistate.mouseover_action is not None):
                     action = uistate.mouseover_action
@@ -3544,7 +3552,7 @@ class UIsub(Ui_MainWindow):
                         p_row = uistate.dfp_row_copy
                         rec_name = p_row['recording_name']
                         rec_ID = p_row['ID']
-                        t_row = uistate.dft_copy.loc[uistate.stim_select[0]]
+                        t_row = uistate.dft_copy.loc[uistate.list_idx_select_stims[0]]
                         stim_num = t_row['stim']
                         #new_dict = {key: value for key, value in uistate.dict_rec_labels.items() if value.get('stim') == stim_num and value.get('rec_ID') == rec_ID and value.get('axis') == 'ax2'}
                         #EPSP_slope = new_dict.get(f"{rec_name} - stim {stim_num} EPSP slope")
@@ -3655,7 +3663,7 @@ class UIsub(Ui_MainWindow):
 
 
     def xDrag(self, event, canvas, x_data, x_range):
-        self.usage("xDrag")
+        #self.usage("xDrag")
         if not uistate.dragging:
             return
         if event.xdata is None:
@@ -3681,7 +3689,7 @@ class UIsub(Ui_MainWindow):
 
 
     def drag_released(self, event, canvas):
-        self.usage("dragReleased")
+        self.usage("drag_released")
         is_mean = canvas is self.canvasMean
         is_output = canvas is self.canvasOutput
 
@@ -3708,8 +3716,6 @@ class UIsub(Ui_MainWindow):
                 self.lineEdit_sweeps_range_from.setText(str(start))
                 self.lineEdit_sweeps_range_to.setText(str(end))
                 uiplot.update_axe_mean()
-        uiplot.xSelect(canvas=canvas)
-
         # cleanup
         canvas.mpl_disconnect(self.mouse_drag)
         canvas.mpl_disconnect(self.mouse_release)
@@ -3718,25 +3724,27 @@ class UIsub(Ui_MainWindow):
         uistate.x_drag = None
         uistate.dragging = False
 
+        uiplot.xSelect(canvas=canvas)
+
 
     def mouseoverUpdate(self):
         self.usage("mouseoverUpdate")
         self.mouseoverDisconnect()
         # if only one item is selected, make a new mouseover event connection
-        if uistate.rec_select and uistate.stim_select:
+        if uistate.list_idx_select_recs and uistate.list_idx_select_stims:
             self.mouseoverUpdateMarkers()
 
-        if len(uistate.rec_select) != 1:
+        if len(uistate.list_idx_select_recs) != 1:
             print("(multi-rec-selection) mouseoverUpdate calls self.graphRefresh()")
             self.graphRefresh()
             return
-        if len(uistate.stim_select) != 1:
+        if len(uistate.list_idx_select_stims) != 1:
             print("(multi-stim-selection) mouseoverUpdate calls self.graphRefresh()")
             self.graphRefresh()
             return
-        # print(f"mouseoverUpdate: {uistate.rec_select[0]}, {type(uistate.rec_select[0])}")
+        # print(f"mouseoverUpdate: {uistate.list_idx_select_recs[0]}, {type(uistate.list_idx_select_recs[0])}")
         rec_ID = uistate.dfp_row_copy['ID']
-        t_row = uistate.dft_copy.iloc[uistate.stim_select[0]]
+        t_row = uistate.dft_copy.iloc[uistate.list_idx_select_stims[0]]
         stim_num = t_row['stim']
         uistate.setMargins(axe=uistate.axe)
         dict_labels = {key: value for key, value in uistate.dict_rec_labels.items()
@@ -3949,7 +3957,7 @@ class UIsub(Ui_MainWindow):
         
         action = uistate.mouseover_action
         aspect = "_".join(action.split()[:2])
-        stim_idx = uistate.stim_select[0]
+        stim_idx = uistate.list_idx_select_stims[0]
         p_row = uistate.dfp_row_copy # TODO: deprecate uistate df copies
         n_stims = p_row['stims']
         df_t = uistate.dft_copy
@@ -4014,7 +4022,7 @@ class UIsub(Ui_MainWindow):
         p_row = uistate.dfp_row_copy.to_dict()
         rec_name = p_row['recording_name']
         df_t = uistate.dft_copy # updated while dragging
-        stim_idx = uistate.stim_select[0]
+        stim_idx = uistate.list_idx_select_stims[0]
         t_row = df_t.iloc[stim_idx].to_dict()
         
         # Map drag actions to (method field, method value, aspect name, update values, plot updater)

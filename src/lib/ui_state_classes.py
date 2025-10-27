@@ -147,14 +147,18 @@ class UIstate:
         self.ax1 = None # axis of output for amplitudes (bottom graph)
         self.ax2 = None # axis of output for slopes (bottom graph)
         self.frozen = False # True if ui is frozen
-        self.rec_select = [] # list of selected indices in uisub.tableProj
-        self.stim_select = [0] # list of selected indices in uisub.tableStim; default to first
+
+        self.list_idx_select_recs = [] # list of selected indices in uisub.tableProj
+        self.df_rec_select_data = None # df containing data of ONE selected recording (if more than one selected, None), used to plot means of selected sweeps in eventgraph
+        self.list_idx_recs2preload = [] # list of indices in uisub.df_project for freshly parsed recordings; used by uisub.graphPreload()
+        self.list_idx_select_stims = [0] # list of selected indices in uisub.tableStim; default to first
         self.df_recs2plot = None # df_project copy, filtered to selected AND parsed recordings (or all parsed, if none are selected)
+
         self.dict_rec_labels = {} # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, axis: str, line: 2DlineObject}}
         self.dict_rec_show = {} # copy containing only visible recs
+
         self.dict_group_labels = {} # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, axis: str, line: 2DlineObject}, fill: 2DfillObject}
         self.dict_group_show = {} # copy containing only visible groups
-        self.new_indices = [] # list of indices in uisub.df_project for freshly parsed recordings; used by uisub.graphPreload()
         # TODO: deprecate these
         self.dfp_row_copy = None # copy of selected row in uisub.tableProj
         self.dft_copy = None # copy of dft for storing measure points until either saved or rejected

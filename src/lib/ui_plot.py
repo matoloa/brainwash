@@ -118,11 +118,11 @@ class UIplot():
             ax = self.uistate.axm
             self.xDeselect(ax)
             if self.uistate.x_select['mean_end'] is None:
-                print(f"Selected x: {self.uistate.x_select['mean_start']}")
+                #print(f"Selected x: {self.uistate.x_select['mean_start']}")
                 ax.axvline(x=self.uistate.x_select['mean_start'], color='blue', label='xSelect_x')
             else:
                 start, end = self.uistate.x_select['mean_start'], self.uistate.x_select['mean_end']
-                print(f"Selected x_range: {start} - {end}")
+                #print(f"Selected x_range: {start} - {end}")
                 ax.axvline(x=start, color='blue', label='xSelect_start')
                 ax.axvline(x=end, color='blue', label='xSelect_end')
                 ax.axvspan(start, end, color='blue', alpha=0.1, label='xSelect_span')
@@ -134,12 +134,12 @@ class UIplot():
             self.xDeselect(ax) # will clear both ax1 and ax2, if fed either one
             if self.uistate.x_select['output_end'] is None:
                 # If only the start is selected, draw a line at the start
-                print(f"Selected x: {self.uistate.x_select['output_start']}")
+                #print(f"Selected x: {self.uistate.x_select['output_start']}")
                 ax.axvline(x=self.uistate.x_select['output_start'], color='blue', label='xSelect_x')
             else:
                 # If both start and end are selected, draw the range
                 start, end = self.uistate.x_select['output_start'], self.uistate.x_select['output_end']
-                print(f"Selected x_range: {start} - {end}")
+                #print(f"Selected x_range: {start} - {end}")
                 ax.axvline(x=start, color='blue', label='xSelect_start')
                 ax.axvline(x=end, color='blue', label='xSelect_end')
                 ax.axvspan(start, end, color='blue', alpha=0.1, label='xSelect_span')
@@ -147,14 +147,23 @@ class UIplot():
         canvas.draw()
 
     def update_axe_mean(self):
-        # clear previous mean line from axe
+        ''' updates the mean of selected sweeps drawn on axe, called by ui.py after:
+        * releasing drag on output, selecting sweeps
+        * TODO: writing sweep range in text boxes
+        * TODO: clicking odd/even buttons
+        '''
+        # clear any previous mean line from axe
         if 'axe mean selected sweeps' in self.uistate.dict_rec_labels:
             self.uistate.dict_rec_labels['axe mean selected sweeps']['line'].remove()
             del self.uistate.dict_rec_labels['axe mean selected sweeps']
+        # if exactly one RECORDING is selected, plot the mean of selected sweeps one axe, if any
+        if self.uistate.x_select['output'] and len(self.uistate.list_idx_select_recs) == 1:
+            print(f" - selected sweeps: {self.uistate.x_select['output']}")
+            # calculate mean of selected sweeps
+            rec_ID = self.uistate.list_idx_select_recs[0]
+            selected_sweeps = self.uistate.x_select['output']
+
         self.uistate.axe.figure.canvas.draw()
-        # draw the mean of selected sweeps on axe
-        print("axe_mean_selected: drawing mean of selected sweeps on axe...")
-        print(f" - selected sweeps: {self.uistate.x_select['output']}")
 
 
 
