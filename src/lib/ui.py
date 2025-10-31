@@ -2168,14 +2168,20 @@ class UIsub(Ui_MainWindow):
         elif lineEditName == "lineEdit_volley_amp_halfwidth":
             uistate.lineEdit['volley_amp_halfwidth_ms'] = num
 
-    def editSort(self, lineEdit, start, end):
+    def editSort(self, lineEdit, start, end, request='int'):
         def str2zero(text):
             try:
-                return max(0, int(text))
+                if request == 'float':
+                    return max(0, float(text))
+                else:
+                    return max(0, int(text))
             except ValueError:
                 return 0
         def num2str(num):
-            return str(max(0, int(num)))
+            if request == 'float':
+                return str(max(0, float(num)))
+            else:
+                return str(max(0, int(num)))
         num = str2zero(lineEdit.text())
         if lineEdit.objectName() == start.objectName():
             pair = str2zero(end.text())
@@ -2188,8 +2194,9 @@ class UIsub(Ui_MainWindow):
 
     def editMeanSelectRange(self, lineEdit):
         self.usage("editMeanSelectRange")
-        _ = self.editSort(lineEdit, start = self.lineEdit_mean_range_start, end = self.lineEdit_mean_range_end)
-        # TODO: show selection on graph
+        low, high = self.editSort(lineEdit, start = self.lineEdit_mean_selection_start, end = self.lineEdit_mean_selection_end, request='float')
+        uistate.x_select['mean_start'], uistate.x_select['mean_end'] = low, high
+        uiplot.xSelect(uistate.axm.figure.canvas)
 
     def editSweepSelectRange(self, lineEdit):
         self.usage("editSweepSelectRange")
