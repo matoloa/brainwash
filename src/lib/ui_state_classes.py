@@ -50,6 +50,7 @@ class UIstate:
             'event_start': -0.005, # in relation to current t_stim
             'event_end': 0.05,
             'precision': 4, # TODO: fix hardcoded precision
+            'filter': None, # filter to show in event graph; None uses 'voltage' column
             # colors and alpha
             'rgb_EPSP_amp': (0.2, 0.2, 1),
             'rgb_EPSP_slope': (0.5, 0.5, 1),
@@ -149,7 +150,8 @@ class UIstate:
         self.frozen = False # True if ui is frozen
 
         self.list_idx_select_recs = [] # list of selected indices in uisub.tableProj
-        self.df_rec_select_data = None # df containing data of ONE selected recording (if more than one selected, None), used to plot means of selected sweeps in eventgraph
+        self.df_rec_select_data = None # df_filtered of ONE selected recording (if more than one selected, None), used to plot means of selected sweeps in eventgraph
+        self.df_rec_select_time = None # dft of ONE selected recording (if more than one selected, None), used to offset mean sweeps in eventgraph
         self.list_idx_recs2preload = [] # list of indices in uisub.df_project for freshly parsed recordings; used by uisub.graphPreload()
         self.list_idx_select_stims = [0] # list of selected indices in uisub.tableStim; default to first
         self.df_recs2plot = None # df_project copy, filtered to selected AND parsed recordings (or all parsed, if none are selected)

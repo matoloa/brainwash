@@ -1162,23 +1162,25 @@ class UIsub(Ui_MainWindow):
             print("No parsed recordings selected.")
             self.graphRefresh()
             return
-        # if exactly one recording is selected, reference its data in uistate.df_rec_select_data
+        # if exactly one recording is selected, reference its data in uistate.df_rec_select_data, and timepoints in uistate.df_rec_select_time
         if len(uistate.list_idx_select_recs) == 1:
-            rec_ID = uistate.list_idx_select_recs[0]
-            #uistate.list_idx_select_recs = [] # list of selected indices in uisub.tableProj
-            #recording_name = uistate.df_recs2plot.loc[uistate.df_recs2plot['ID'] == rec_ID, 'recording_name'].values[0]
-            #uistate.df_rec_select_data = self.dict_filters[recording_name]
+            print(f"One recording selected: index {uistate.list_idx_select_recs[0]} out of {len(self.df_project)}")
+            p_row = self.df_project.iloc[uistate.list_idx_select_recs[0]]
+            uistate.df_rec_select_time = self.get_dft(row=p_row)
+            uistate.df_rec_select_data = self.dict_filters[p_row['recording_name']]
         else:
             uistate.df_rec_select_data = None
+            uistate.df_rec_select_time = None
+                    
         # use the selected df_p row with the highest sweep duration for layout formatting, so that the full x-axis is visible
-        p_row = uistate.df_recs2plot.loc[uistate.df_recs2plot['sweep_duration'].idxmax()]
-        uistate.dfp_row_copy = p_row.copy()
-        df_t = self.get_dft(row=p_row)
-        uistate.dft_copy = df_t.copy()
+        longest_p_row = uistate.df_recs2plot.loc[uistate.df_recs2plot['sweep_duration'].idxmax()]
+        uistate.dfp_row_copy = longest_p_row.copy() # TODO: deprecate copy use
+        longest_df_t = self.get_dft(row=longest_p_row)
+        uistate.dft_copy = longest_df_t.copy() # TODO: deprecate copy use
 
         if uistate.dict_rec_show:
             selected_stims = self.tableStim.selectionModel().selectedRows() # save selection
-            self.tableStimModel.setData(df_t)
+            self.tableStimModel.setData(longest_df_t)
             model = self.tableStim.model()
             selection = QtCore.QItemSelection()
             for index in selected_stims:
@@ -1187,7 +1189,7 @@ class UIsub(Ui_MainWindow):
                 index_end = model.index(row_idx, model.columnCount(QtCore.QModelIndex()) - 1)  # End of the row (last column)
                 selection.select(index_start, index_end)
             self.tableStim.selectionModel().select(selection, QtCore.QItemSelectionModel.Select)
-            self.formatTableStimLayout(df_t=df_t)
+            self.formatTableStimLayout(df_t=longest_df_t)
         self.zoomAuto()
 
         t0 = time.time()

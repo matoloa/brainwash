@@ -109,6 +109,8 @@ class UIplot():
         for patch in axpatches:
             if patch.get_label().startswith('xSelect'):
                 patch.remove()
+        if reset:
+            self.clear_axe_mean()
         ax.figure.canvas.draw()
 
 
@@ -146,26 +148,53 @@ class UIplot():
             # draw the mean of selected sweeps on axm
         canvas.draw()
 
+    def clear_axe_mean(self):
+        # if uistate.dict_rec_labels exists and contains keys that start with "axe mean selected sweeps", remove their lines and del the items
+        if self.uistate.dict_rec_labels:
+            for key in [k for k in self.uistate.dict_rec_labels if k.startswith('axe mean selected sweeps')]:
+                self.uistate.dict_rec_labels[key]['line'].remove()
+                del self.uistate.dict_rec_labels[key]
+        else:
+            print(" - - - - No dict_rec_labels to clear mean sweeps from")
+
+
     def update_axe_mean(self):
-        ''' updates the mean of selected sweeps drawn on axe, called by ui.py after:
+        '''
+        updates the mean of selected sweeps drawn on axe, called by ui.py after:
         * releasing drag on output, selecting sweeps
         * TODO: writing sweep range in text boxes
         * TODO: clicking odd/even buttons
         '''
-        # clear any previous mean line from axe
-        if 'axe mean selected sweeps' in self.uistate.dict_rec_labels:
-            self.uistate.dict_rec_labels['axe mean selected sweeps']['line'].remove()
-            del self.uistate.dict_rec_labels['axe mean selected sweeps']
-        # if exactly one RECORDING is selected, plot the mean of selected sweeps one axe, if any
+        self.clear_axe_mean()
+        # if exactly one RECORDING is selected, plot the mean of selected SWEEPS one axe, if any
         if self.uistate.x_select['output'] and len(self.uistate.list_idx_select_recs) == 1:
-            print(f" - selected sweeps: {self.uistate.x_select['output']}")
-            # calculate mean of selected sweeps
-            rec_ID = self.uistate.list_idx_select_recs[0]
-            selected_sweeps = self.uistate.x_select['output']
-
+            print(f" - selected sweep(s): {self.uistate.x_select['output']}")
+            # build mean of selected sweeps
+            idx_rec = self.uistate.list_idx_select_recs[0]
+            rec_ID = self.uistate.df_recs2plot.loc[idx_rec, 'ID']
+            selected = self.uistate.x_select['output']
+            df = self.uistate.df_rec_select_data
+            col = self.uistate.settings.get('filter') or 'voltage'
+            df_sweeps = df[df['sweep'].isin(selected)]
+            df_mean = (df_sweeps.groupby('time', as_index=False)[col].mean())
+            # calculate offset for t_stim
+            df_t = self.uistate.df_rec_select_time
+            n_stims = len(df_t)
+            dict_gradient = self.get_dict_gradient(n_stims)
+            alpha = self.uistate.settings['alpha_line']/2
+            for i_stim, t_row in df_t.iterrows():
+                color = dict_gradient[i_stim]
+                stim_num = i_stim + 1 # 1-numbering (visible to user)
+                stim_str = f"- stim {stim_num}"
+                t_stim = t_row['t_stim']
+                # add to Events
+                window_start = t_stim + self.uistate.settings['event_start']
+                window_end = t_stim + self.uistate.settings['event_end']
+                df_event = df_mean[(df_mean['time'] >= window_start) & (df_mean['time'] <= window_end)].copy()
+                df_event['time'] = df_event['time'] - t_stim  # shift event so that t_stim is at time 0
+                self.plot_line(f"axe mean selected sweeps {stim_str}", 'axe', df_event['time'], df_event[col], color, rec_ID, stim=stim_num, alpha=alpha)
+                self.uistate.dict_rec_labels[f"axe mean selected sweeps {stim_str}"]['line'].set_visible(True)
         self.uistate.axe.figure.canvas.draw()
-
-
 
 
     def styleUpdate(self):
@@ -302,7 +331,6 @@ class UIplot():
             else:
                 self.xSelect(canvas = ax1.figure.canvas)
 
-
         # 0-hline for Events
         if not 'Events y zero marker' in self.uistate.dict_rec_labels:
             hline0 = self.uistate.axe.axhline(0, linestyle='dotted', alpha=0.3)
@@ -318,6 +346,9 @@ class UIplot():
                 self.uistate.dict_rec_labels['output slope 100% marker'] = {'rec_ID':None, 'stim': None, 'line':hline100ax2, 'axis':'ax2'}
             uistate.dict_rec_labels['output amp 100% marker']['line'].set_visible(uistate.ampView())
             uistate.dict_rec_labels['output slope 100% marker']['line'].set_visible(uistate.slopeView())
+
+        # update mean of selected sweeps on axe
+        self.update_axe_mean()
 
         # redraw
         axm.figure.canvas.draw()
@@ -354,9 +385,10 @@ class UIplot():
         cmap = LinearSegmentedColormap.from_list("", colors)
         return {i: cmap(i/n_stims) for i in range(n_stims)}
 
-    def plot_line(self, label, axid, x, y, color, rec_ID, aspect=None, stim=None, width=1):
+    def plot_line(self, label, axid, x, y, color, rec_ID, aspect=None, stim=None, width=1, alpha=None):
         zorder = 0 if width > 1 else 1
-        line, = self.get_axis(axid).plot(x, y, color=color, label=label, alpha=self.uistate.settings['alpha_line'], linewidth=width, zorder=zorder)
+        alpha = alpha if alpha is not None else self.uistate.settings['alpha_line']
+        line, = self.get_axis(axid).plot(x, y, color=color, label=label, alpha=alpha, linewidth=width, zorder=zorder)
         line.set_visible(False)
         self.uistate.dict_rec_labels[label] = {'rec_ID':rec_ID, 'aspect':aspect, 'stim': stim, 'line':line, 'axis':axid}
 
@@ -436,6 +468,10 @@ class UIplot():
 
         x_axis = 'stim' if self.uistate.checkBox['output_per_stim'] else 'sweep'
         dict_gradient = self.get_dict_gradient(n_stims)
+
+        settings = self.uistate.settings # Event window, color, and alpha settings
+        variables = ['t_EPSP_amp', 't_EPSP_slope_start', 't_EPSP_slope_end', 't_volley_amp', 't_volley_slope_start', 't_volley_slope_end']
+
         # Process detected stims
         for i_stim, t_row in dft.iterrows():
             color = dict_gradient[i_stim]
@@ -445,11 +481,7 @@ class UIplot():
             amp_zero = t_row['amp_zero']
             out = dfoutput[dfoutput['stim'] == stim_num]# TODO: enable switch to dfdiff?
             y_position = dfmean.loc[dfmean.time == t_stim, rec_filter].values[0] # returns index, y_value
-            # Event window, color, and alpha settings
-            settings = self.uistate.settings
-            # Convert all variables except t_stim to stim-specific time
-            variables = ['t_EPSP_amp', 't_EPSP_slope_start', 't_EPSP_slope_end', 't_volley_amp', 't_volley_slope_start', 't_volley_slope_end']
-            for var in variables:
+            for var in variables: # Convert all variables except t_stim to stim-specific time
                t_row[var] -= t_stim
 
             # add markers to Mean
