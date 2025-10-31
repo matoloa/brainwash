@@ -3584,6 +3584,9 @@ class UIsub(Ui_MainWindow):
             if uistate.ghost_sweep is not None: # remove ghost sweep if outside output graph
                 self.exorcise()
             return
+        if len(uistate.list_idx_select_recs) != 1:
+            self.exorcise()
+            return
         x_axis = 'stim' if uistate.checkBox['output_per_stim'] else 'sweep'
         # find a visible line
         dict_out = {key: value for key, value in uistate.dict_rec_show.items() if value['axis'] == str_ax and (value['aspect'] in ['EPSP_amp', 'EPSP_slope'])}
@@ -3612,7 +3615,6 @@ class UIsub(Ui_MainWindow):
             else:
                 dfsource = self.get_dffilter(p_row)
 
-
             dfsweep = dfsource[dfsource['sweep'] == out_x_idx] # select only rows where sweep == out_x_idx
             sweep_x = dfsweep['time']-offset
             sweep_y = dfsweep[p_row['filter']] # get the value of the filter at the selected sweep
@@ -3627,7 +3629,6 @@ class UIsub(Ui_MainWindow):
             else:
                 uistate.ghost_sweep.set_data(sweep_x, sweep_y)
                 uistate.ghost_label.set_text(f"sweep {out_x_idx}")
-            uistate.axe.figure.canvas.draw()
             uistate.axe.figure.canvas.draw()
         uistate.last_out_x_idx = out_x_idx
         ax.figure.canvas.draw()
