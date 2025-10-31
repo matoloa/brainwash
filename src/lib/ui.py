@@ -1691,7 +1691,20 @@ class UIsub(Ui_MainWindow):
         self.actionCopyOutput.triggered.connect(self.triggerCopyOutput)
         self.actionCopyOutput.setShortcut("Ctrl+C")
         self.menuEdit.addAction(self.actionCopyOutput)
-        
+
+        self.menuEdit.addSeparator()
+        self.actionForAllSelected = QtWidgets.QAction("For ALL selected recordings...", self) # not connected: submenu header
+        self.menuEdit.addAction(self.actionForAllSelected)
+        self.actionKeepOnlySelectedSweeps = QtWidgets.QAction("   Keep only selected sweeps", self)
+        self.actionKeepOnlySelectedSweeps.triggered.connect(self.triggerKeepSelectedSweeps)
+        self.menuEdit.addAction(self.actionKeepOnlySelectedSweeps)
+        self.actionRemoveSelectedSweeps = QtWidgets.QAction("   Discard selected sweeps", self)
+        self.actionRemoveSelectedSweeps.triggered.connect(self.triggerRemoveSelectedSweeps)
+        self.menuEdit.addAction(self.actionRemoveSelectedSweeps)
+        self.actionSplitBySelectedSweeps = QtWidgets.QAction("   Split recordings by selected sweeps", self)
+        self.actionSplitBySelectedSweeps.triggered.connect(self.triggerSplitBySelectedSweeps)
+        self.menuEdit.addAction(self.actionSplitBySelectedSweeps)
+
         # View menu
         actionTimetable = QtWidgets.QAction("Toggle Timetable", self)
         actionTimetable.setCheckable(True)
@@ -2102,9 +2115,30 @@ class UIsub(Ui_MainWindow):
         self.parseData()
         self.setButtonParse()
 
+    def triggerKeepSelectedSweeps(self):
+        self.usage("triggerKeepSelectedSweeps")
+        self.KeepSelectedSweeps()
+
+    def triggerRemoveSelectedSweeps(self):
+        self.usage("triggerRemoveSelectedSweeps")
+        self.RemoveSelectedSweeps()
+
+    def triggerSplitBySelectedSweeps(self):
+        self.usage("triggerSplitBySelectedSweeps")
+        self.SplitBySelectedSweeps()
 
 
 # Data Editing functions
+    def KeepSelectedSweeps(self):
+        print("KeepSelectedSweeps - not yet implemented")
+
+    def RemoveSelectedSweeps(self):
+        print("RemoveSelectedSweeps - not yet implemented")
+
+    def SplitBySelectedSweeps(self):
+        print("SplitBySelectedSweeps - not yet implemented")
+
+
     def recalculate(self):
         # Placeholder function called when output must be recalculated
         # For now, it recalculates ALL outputs, triggered by any "set All" button
@@ -2169,7 +2203,7 @@ class UIsub(Ui_MainWindow):
             uistate.lineEdit['volley_amp_halfwidth_ms'] = num
 
     def editSort(self, lineEdit, start, end, request='int'):
-        def str2zero(text):
+        def str2num(text):
             try:
                 if request == 'float':
                     return max(0, float(text))
@@ -2182,11 +2216,11 @@ class UIsub(Ui_MainWindow):
                 return str(max(0, float(num)))
             else:
                 return str(max(0, int(num)))
-        num = str2zero(lineEdit.text())
+        num = str2num(lineEdit.text())
         if lineEdit.objectName() == start.objectName():
-            pair = str2zero(end.text())
+            pair = str2num(end.text())
         else:
-            pair = str2zero(start.text())
+            pair = str2num(start.text())
         low, high = min(num, pair), max(num, pair)
         start.setText(num2str(low))
         end.setText(num2str(high))
