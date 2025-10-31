@@ -1679,10 +1679,6 @@ class UIsub(Ui_MainWindow):
         #self.actionUndo.triggered.connect(self.triggerUndo)
         #self.actionUndo.setShortcut("Ctrl+Z")
         #self.menuEdit.addAction(self.actionUndo)
-        self.actionDarkmode = QtWidgets.QAction("Toggle Darkmode", self)
-        self.actionDarkmode.triggered.connect(self.triggerDarkmode)
-        self.actionDarkmode.setShortcut("Ctrl+D")
-        self.menuEdit.addAction(self.actionDarkmode)
         self.actionCopyTimepoints = QtWidgets.QAction("Copy timepoints", self)
         self.actionCopyTimepoints.triggered.connect(self.triggerCopyTimepoints)
         self.actionCopyTimepoints.setShortcut("Ctrl+T")
@@ -1706,6 +1702,10 @@ class UIsub(Ui_MainWindow):
         self.menuEdit.addAction(self.actionSplitBySelectedSweeps)
 
         # View menu
+        self.actionDarkmode = QtWidgets.QAction("Toggle Darkmode", self)
+        self.actionDarkmode.triggered.connect(self.triggerDarkmode)
+        self.actionDarkmode.setShortcut("Alt+D")
+        self.menuView.addAction(self.actionDarkmode)
         actionTimetable = QtWidgets.QAction("Toggle Timetable", self)
         actionTimetable.setCheckable(True)
         actionTimetable.setShortcut("Alt+T")
@@ -2129,21 +2129,38 @@ class UIsub(Ui_MainWindow):
 
 
 # Data Editing functions
+    def invalidSelection(self):
+        if not len(uistate.list_idx_select_recs):
+            print("No recordings selected")
+            return True
+        print(f"Selected recordings: {uistate.list_idx_select_recs}")
+        if not len(uistate.x_select['output']):
+            print("No sweeps selected")
+            return True
+        print(f"Selected sweeps: {uistate.x_select['output']}")
+        return False
+
     def KeepSelectedSweeps(self):
+        if self.invalidSelection():
+            return
         print("KeepSelectedSweeps - not yet implemented")
 
     def RemoveSelectedSweeps(self):
+        if self.invalidSelection():
+            return
         print("RemoveSelectedSweeps - not yet implemented")
 
     def SplitBySelectedSweeps(self):
+        if self.invalidSelection():
+            return
         print("SplitBySelectedSweeps - not yet implemented")
 
 
     def recalculate(self):
-        # Placeholder function called when output must be recalculated
+        # Placeholder function called when output must be recalculated: normalization changed, binning changed, amp halfwidth changed
         # For now, it recalculates ALL outputs, triggered by any "set All" button
         # TODO: make a (default) version that only affects selected recordings
-        print(f" - recalculate")
+        self.usage("recalculate")
         self.uiFreeze()
 
         norm_from = uistate.lineEdit['norm_EPSP_from']
