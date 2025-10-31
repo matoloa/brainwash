@@ -1545,6 +1545,8 @@ class UIsub(Ui_MainWindow):
         else:
             ax = uistate.ax1
         uiplot.xDeselect(ax, reset=True)
+        if len(uistate.list_idx_select_recs) == 0:
+            return
         self.lineEdit_sweeps_range_from.setText("Even" if even else "Odd")
         self.lineEdit_sweeps_range_to.setText("")
         total_sweeps = uistate.dfp_row_copy['sweeps']
@@ -1890,6 +1892,10 @@ class UIsub(Ui_MainWindow):
             checkBox = getattr(self, f"checkBox_{key}")
             checkBox.stateChanged.disconnect() if disconnect else checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
         # lineEdits
+        for lineEdit in [self.lineEdit_mean_selection_start, self.lineEdit_mean_selection_end,]:
+            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editMeanSelectRange(le))
+        for lineEdit in [self.lineEdit_sweeps_range_from, self.lineEdit_sweeps_range_to,]:
+            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editSweepSelectRange(le))
         for lineEdit in [self.lineEdit_norm_EPSP_start, self.lineEdit_norm_EPSP_end,]:
             lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editNormRange(le))
         for lineEdit in [self.lineEdit_EPSP_amp_halfwidth, self.lineEdit_volley_amp_halfwidth,]:
@@ -2162,27 +2168,41 @@ class UIsub(Ui_MainWindow):
         elif lineEditName == "lineEdit_volley_amp_halfwidth":
             uistate.lineEdit['volley_amp_halfwidth_ms'] = num
 
+    def editSort(self, lineEdit, start, end):
+        def str2zero(text):
+            try:
+                return max(0, int(text))
+            except ValueError:
+                return 0
+        def num2str(num):
+            return str(max(0, int(num)))
+        num = str2zero(lineEdit.text())
+        if lineEdit.objectName() == start.objectName():
+            pair = str2zero(end.text())
+        else:
+            pair = str2zero(start.text())
+        low, high = min(num, pair), max(num, pair)
+        start.setText(num2str(low))
+        end.setText(num2str(high))
+        return low, high
+
+    def editMeanSelectRange(self, lineEdit):
+        self.usage("editMeanSelectRange")
+        _ = self.editSort(lineEdit, start = self.lineEdit_mean_range_start, end = self.lineEdit_mean_range_end)
+        # TODO: show selection on graph
+
+    def editSweepSelectRange(self, lineEdit):
+        self.usage("editSweepSelectRange")
+        low, high = self.editSort(lineEdit, start = self.lineEdit_sweeps_range_from, end = self.lineEdit_sweeps_range_to)
+        uistate.x_select['output_start'], uistate.x_select['output_end'] = low, high
+        uistate.x_select['output'] = set(range(low, high + 1))
+        uiplot.xSelect(uistate.ax1.figure.canvas)
+        uiplot.update_axe_mean()
+
     def editNormRange(self, lineEdit):
         self.usage("editNormRange")
-        try:
-            num = max(0, int(lineEdit.text()))
-        except ValueError:
-            num = 0
-        if lineEdit.objectName() == "lineEdit_norm_EPSP_start": # start, cannot be higher than end
-            if num == uistate.lineEdit['norm_EPSP_from']:
-                self.lineEdit_norm_EPSP_start.setText(str(num))
-                return # no change
-            uistate.lineEdit['norm_EPSP_to'] = max(num, int(self.lineEdit_norm_EPSP_end.text()))
-            self.lineEdit_norm_EPSP_end.setText(str(uistate.lineEdit['norm_EPSP_to']))
-            uistate.lineEdit['norm_EPSP_from'] = num
-        else: # end, cannot be lower than start
-            if num == uistate.lineEdit['norm_EPSP_to']:
-                self.lineEdit_norm_EPSP_end.setText(str(num))
-                return # no change
-            uistate.lineEdit['norm_EPSP_to'] = min(num, int(self.lineEdit_norm_EPSP_start.text()))
-            self.lineEdit_norm_EPSP_start.setText(str(uistate.lineEdit['norm_EPSP_from']))
-            uistate.lineEdit['norm_EPSP_to'] = num
-        lineEdit.setText(str(num))
+        _ = self.editSort(lineEdit, start = self.lineEdit_norm_EPSP_start, end = self.lineEdit_norm_EPSP_end)
+        # TODO: show selection on graph
 
     def editBinSize(self, lineEdit):
         self.usage("editBinSize")
