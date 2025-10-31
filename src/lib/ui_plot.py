@@ -162,13 +162,13 @@ class UIplot():
         '''
         updates the mean of selected sweeps drawn on axe, called by ui.py after:
         * releasing drag on output, selecting sweeps
+        * clicking odd/even buttons
         * TODO: writing sweep range in text boxes
-        * TODO: clicking odd/even buttons
         '''
         self.clear_axe_mean()
         # if exactly one RECORDING is selected, plot the mean of selected SWEEPS one axe, if any
         if self.uistate.x_select['output'] and len(self.uistate.list_idx_select_recs) == 1:
-            print(f" - selected sweep(s): {self.uistate.x_select['output']}")
+            #print(f" - selected sweep(s): {self.uistate.x_select['output']}")
             # build mean of selected sweeps
             idx_rec = self.uistate.list_idx_select_recs[0]
             rec_ID = self.uistate.df_recs2plot.loc[idx_rec, 'ID']
@@ -181,7 +181,7 @@ class UIplot():
             df_t = self.uistate.df_rec_select_time
             n_stims = len(df_t)
             dict_gradient = self.get_dict_gradient(n_stims)
-            alpha = self.uistate.settings['alpha_line']/2
+            alpha = self.uistate.settings['alpha_line']/2 # make mean-of-selected-lines more transparent
             for i_stim, t_row in df_t.iterrows():
                 color = dict_gradient[i_stim]
                 stim_num = i_stim + 1 # 1-numbering (visible to user)

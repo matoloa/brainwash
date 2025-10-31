@@ -1546,10 +1546,12 @@ class UIsub(Ui_MainWindow):
             ax = uistate.ax1
         uiplot.xDeselect(ax, reset=True)
         self.lineEdit_sweeps_range_from.setText("Even" if even else "Odd")
+        self.lineEdit_sweeps_range_to.setText("")
         total_sweeps = uistate.dfp_row_copy['sweeps']
         selected = {i for i in range(total_sweeps) if (i % 2 == 0) == even}
         uistate.x_select['output'] = selected
         print(f"Selected all {'even' if even else 'odd'}: {len(selected)} sweeps.")
+        uiplot.update_axe_mean()
 
 
 
