@@ -84,11 +84,8 @@ class Config:
     def __init__(self):
         self.dev_mode = True # Development mode
         #self.dev_mode = False # Deploy mode
-        print("\n"*3)
-        if self.dev_mode:
-            print(f"Development mode - {time.strftime('%H:%M:%S')}")
-        else:
-            print(f"Deploy mode - {time.strftime('%H:%M:%S')}")
+        print("\n" * 3 + f"{'Development' if self.dev_mode else 'Deploy'} mode - {time.strftime('%H:%M:%S')}")
+
         clear = False # Clear all caches and temporary files
 
         self.clear_project_folder = clear # Remove current project folder (datafiles) at launch
@@ -2130,31 +2127,40 @@ class UIsub(Ui_MainWindow):
 
 # Data Editing functions
     def invalidSelection(self):
-        if not len(uistate.list_idx_select_recs):
+        n_recs = len(uistate.list_idx_select_recs)
+        n_sweeps = len(uistate.x_select['output'])
+        if not n_recs:
             print("No recordings selected")
             return True
-        print(f"Selected recordings: {uistate.list_idx_select_recs}")
-        if not len(uistate.x_select['output']):
+        print(f"{n_recs} selected recording{'s' if n_recs != 1 else ''}: {uistate.list_idx_select_recs}")
+        if not n_sweeps:
             print("No sweeps selected")
             return True
-        print(f"Selected sweeps: {uistate.x_select['output']}")
+        print(f"{n_sweeps} selected sweep{'s' if n_sweeps != 1 else ''}: {uistate.x_select['output']}")
         return False
 
     def KeepSelectedSweeps(self):
         if self.invalidSelection():
             return
         print("KeepSelectedSweeps - not yet implemented")
+        # get all sweeps for each selected recording
+        # get selected sweeps
+        # inverse selection
+        # call function to remove selected sweeps
 
     def RemoveSelectedSweeps(self):
         if self.invalidSelection():
             return
         print("RemoveSelectedSweeps - not yet implemented")
+        # call function to remove selected sweeps
 
     def SplitBySelectedSweeps(self):
         if self.invalidSelection():
             return
         print("SplitBySelectedSweeps - not yet implemented")
-
+        # call functions: create new recordings with selected sweeps
+        # call function to remove selected sweeps from original recordings
+        
 
     def recalculate(self):
         # Placeholder function called when output must be recalculated: normalization changed, binning changed, amp halfwidth changed
