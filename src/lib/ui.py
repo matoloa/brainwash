@@ -2126,21 +2126,68 @@ class UIsub(Ui_MainWindow):
 
 
 # Data Editing functions
-    def invalidSelection(self):
+    def validSelection(self):
         n_recs = len(uistate.list_idx_select_recs)
         n_sweeps = len(uistate.x_select['output'])
         if not n_recs:
             print("No recordings selected")
-            return True
+            return False
         print(f"{n_recs} selected recording{'s' if n_recs != 1 else ''}: {uistate.list_idx_select_recs}")
         if not n_sweeps:
             print("No sweeps selected")
-            return True
+            return False
         print(f"{n_sweeps} selected sweep{'s' if n_sweeps != 1 else ''}: {uistate.x_select['output']}")
-        return False
+        return True
+
+
+    def data_shift_sweeps(self, df, sweeps_removed):
+        """
+        Shifts all remaining sweeps down to close gaps after removal, e.g. removed {10, 11} → 12→10, 13→11, etc.
+        """
+        removed = np.array(sorted(sweeps_removed), dtype=np.int64)  # sorted array of removed sweep numbers
+        s = df['sweep'].to_numpy()  # convert sweep column to numpy array for vectorized operations
+        k = np.searchsorted(removed, s, side='right')  # count how many removed sweeps are <= each sweep value
+        df['sweep'] = s - k  # shift each sweep down by the count of removed sweeps before or equal to it
+        return df  # return DataFrame with adjusted sweep numbering
+
+
+    def data_remove_sweeps_by_ID(self, rec_ID):
+        '''
+        Remove selected sweeps from a recording. Renumbers remaining sweeps to a continuous sequence.
+        Clears cached data and outputs for the recording.
+        Parameters:
+            rec_ID (str): The recording ID from which to remove sweeps.
+        '''
+        self.usage("data_remove_sweeps_by_ID")
+        p_row = self.df_project[self.df_project['ID'] == rec_ID].iloc[0]
+        set_sweeps_to_remove = uistate.x_select['output']
+        rec_name = p_row['recording_name']
+        df_data_copy = self.get_dfdata(p_row).copy()
+        # check that selected sweeps exist in df_data
+        sweeps_to_remove = set()        
+        for sweep in set_sweeps_to_remove:
+            if sweep in df_data_copy['sweep'].values:
+                sweeps_to_remove.add(sweep)
+            else:
+                print(f"Sweep {sweep} not found in recording '{rec_name}', skipping.")
+        if not sweeps_to_remove:
+            print(f"No valid sweeps to remove in recording '{rec_name}'.")
+            return
+        n_total_sweeps = p_row['sweeps']
+        print(f"Recording '{rec_name}': removing {len(sweeps_to_remove)} sweep{'s' if len(sweeps_to_remove) != 1 else ''} out of {n_total_sweeps}...")
+
+        df_data_filtered = df_data_copy[~df_data_copy['sweep'].isin(sweeps_to_remove)].reset_index(drop=True)
+
+        # Renumber remaining sweeps to a continuous sequence
+        new_df = self.data_shift_sweeps(df_data_filtered, sweeps_to_remove)
+
+        # print summary of new df; only time == 0 values
+        print(f"Recording '{rec_name}': sweeps after removal and renumbering:")
+        print(new_df[new_df['time'] == 0][['sweep']])
+
 
     def KeepSelectedSweeps(self):
-        if self.invalidSelection():
+        if not self.validSelection():
             return
         print("KeepSelectedSweeps - not yet implemented")
         # get all sweeps for each selected recording
@@ -2148,14 +2195,18 @@ class UIsub(Ui_MainWindow):
         # inverse selection
         # call function to remove selected sweeps
 
+
     def RemoveSelectedSweeps(self):
-        if self.invalidSelection():
+        if not self.validSelection():
             return
-        print("RemoveSelectedSweeps - not yet implemented")
-        # call function to remove selected sweeps
+        # for each selected recording, remove selected sweeps, if they exist, and shift remaining sweep numbers to close gaps
+        for rec_idx in uistate.list_idx_select_recs:
+            rec_ID = self.df_project.at[rec_idx, 'ID']
+            self.data_remove_sweeps_by_ID(rec_ID)
+
 
     def SplitBySelectedSweeps(self):
-        if self.invalidSelection():
+        if not self.validSelection():
             return
         print("SplitBySelectedSweeps - not yet implemented")
         # call functions: create new recordings with selected sweeps
