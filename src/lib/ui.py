@@ -2172,18 +2172,13 @@ class UIsub(Ui_MainWindow):
                 print(f"Sweep {sweep} not found in recording '{rec_name}', skipping.")
         if not sweeps_to_remove:
             print(f"No valid sweeps to remove in recording '{rec_name}'.")
-            return
+            return None
         n_total_sweeps = p_row['sweeps']
         print(f"Recording '{rec_name}': removing {len(sweeps_to_remove)} sweep{'s' if len(sweeps_to_remove) != 1 else ''} out of {n_total_sweeps}...")
-
         df_data_filtered = df_data_copy[~df_data_copy['sweep'].isin(sweeps_to_remove)].reset_index(drop=True)
-
         # Renumber remaining sweeps to a continuous sequence
-        new_df = self.data_shift_sweeps(df_data_filtered, sweeps_to_remove)
-
-        # print summary of new df; only time == 0 values
-        print(f"Recording '{rec_name}': sweeps after removal and renumbering:")
-        print(new_df[new_df['time'] == 0][['sweep']])
+        pruned_df = self.data_shift_sweeps(df_data_filtered, sweeps_to_remove)
+        return pruned_df
 
 
     def KeepSelectedSweeps(self):
@@ -2202,7 +2197,10 @@ class UIsub(Ui_MainWindow):
         # for each selected recording, remove selected sweeps, if they exist, and shift remaining sweep numbers to close gaps
         for rec_idx in uistate.list_idx_select_recs:
             rec_ID = self.df_project.at[rec_idx, 'ID']
-            self.data_remove_sweeps_by_ID(rec_ID)
+            pruned_df = self.data_remove_sweeps_by_ID(rec_ID)
+            if pruned_df is not None:
+                print(pruned_df[pruned_df['time'] == 0][['sweep']])
+                # TODO: persist pruned_df as new data for the recording, clear cache and outputs, recalculate outputs
 
 
     def SplitBySelectedSweeps(self):
