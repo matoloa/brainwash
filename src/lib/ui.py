@@ -1010,6 +1010,44 @@ class InputDialogPopup(QtWidgets.QDialog):
             print(f"You entered: {text}")
             return text
 
+
+class ConfirmDialog(QtWidgets.QDialog):
+    """ Confirmation dialog with OK and Cancel buttons.
+    Usage:
+        dlg = ConfirmDialog(title='Confirm', message='Are you sure?')
+        ok = dlg.showConfirmDialog()
+        # ok is True when user pressed OK, False otherwise
+    """
+    def __init__(self, title: str = "Confirm", message: str = "Are you sure?"):
+        super().__init__()
+        self.setWindowTitle(title)
+        self.label = QtWidgets.QLabel(message, self)
+        self.buttonBox = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel,
+            QtCore.Qt.Horizontal,
+            self,
+        )
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self.label)
+        layout.addWidget(self.buttonBox)
+
+    def showConfirmDialog(self, title: str | None = None, message: str | None = None) -> bool:
+        """Show the dialog modally. Returns True for OK, False for Cancel."""
+        if title is not None:
+            self.setWindowTitle(title)
+        if message is not None:
+            self.label.setText(message)
+        result = self.exec_()
+        return result == QtWidgets.QDialog.Accepted
+
+def confirm(title: str = "Confirm", message: str = "Are you sure?") -> bool:
+    """Convenience function: show confirmation dialog and return bool result."""
+    dlg = ConfirmDialog(title=title, message=message)
+    return dlg.showConfirmDialog()
+
+
 class TableProjSub(QtWidgets.QTableView):
     # TODO: This class does the weirdest things to events; shifting event numbers around in non-standard ways and refuses to notice drops - but drag-into works. Why?
     def __init__(self, parent=None):
@@ -2140,6 +2178,25 @@ class UIsub(Ui_MainWindow):
         return True
 
 
+    def RemoveValidConfirmed(self):
+        if not self.validSelection():
+            return False
+        # Confirm with the user before performing destructive removal across recordings
+        selected_sweeps = uistate.x_select.get('output') if isinstance(uistate.x_select, dict) else None
+        n_sweeps = len(selected_sweeps) if selected_sweeps else 0
+        n_recs = len(uistate.list_idx_select_recs)
+        title = "Remove sweeps"
+        message = (
+            f"Remove {n_sweeps} selected sweep{'s' if n_sweeps != 1 else ''}\n"
+            f"from {n_recs} selected recording{'s' if n_recs != 1 else ''}?\n"
+            "This action cannot be undone."
+        )
+        if not confirm(title=title, message=message):
+            print("RemoveSelectedSweeps: cancelled by user")
+            return False
+        return True
+    
+
     def data_shift_sweeps(self, df, sweeps_removed):
         """
         Shifts all remaining sweeps down to close gaps after removal, e.g. removed {10, 11} → 12→10, 13→11, etc.
@@ -2182,25 +2239,29 @@ class UIsub(Ui_MainWindow):
 
 
     def KeepSelectedSweeps(self):
-        if not self.validSelection():
-            return
-        print("KeepSelectedSweeps - not yet implemented")
         # get all sweeps for each selected recording
         # get selected sweeps
         # inverse selection
+        if not self.RemoveValidConfirmed():
+            # restore selection
+            return
+        print("KeepSelectedSweeps - not yet implemented")
         # call function to remove selected sweeps
+        # clear selection
+        # clear cache directories for each recording, read source files again, rebuild data for each recording
 
 
     def RemoveSelectedSweeps(self):
-        if not self.validSelection():
-            return
         # for each selected recording, remove selected sweeps, if they exist, and shift remaining sweep numbers to close gaps
         for rec_idx in uistate.list_idx_select_recs:
             rec_ID = self.df_project.at[rec_idx, 'ID']
             pruned_df = self.data_remove_sweeps_by_ID(rec_ID)
             if pruned_df is not None:
                 print(pruned_df[pruned_df['time'] == 0][['sweep']])
-                # TODO: persist pruned_df as new data for the recording, clear cache and outputs, recalculate outputs
+                # update sweeps count in df_project
+
+                # TODO: persist pruned_df as new data for the recording
+                # clear cache directories for each recording, read source files again, rebuild data for each recording
 
 
     def SplitBySelectedSweeps(self):
