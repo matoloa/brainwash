@@ -2164,7 +2164,7 @@ class UIsub(Ui_MainWindow):
 
 
 # Data Editing functions
-    def validSelection(self):
+    def sweep_selection_valid(self):
         n_recs = len(uistate.list_idx_select_recs)
         n_sweeps = len(uistate.x_select['output'])
         if not n_recs:
@@ -2178,8 +2178,8 @@ class UIsub(Ui_MainWindow):
         return True
 
 
-    def RemoveValidConfirmed(self):
-        if not self.validSelection():
+    def sweep_removal_valid_confirmed(self):
+        if not self.sweep_selection_valid():
             return False
         # Confirm with the user before performing destructive removal across recordings
         selected_sweeps = uistate.x_select.get('output') if isinstance(uistate.x_select, dict) else None
@@ -2192,15 +2192,13 @@ class UIsub(Ui_MainWindow):
             "This action cannot be undone."
         )
         if not confirm(title=title, message=message):
-            print("RemoveSelectedSweeps: cancelled by user")
+            print("sweep_removal_valid_confirmed: cancelled by user")
             return False
         return True
     
 
-    def data_shift_sweeps(self, df, sweeps_removed):
-        """
-        Shifts all remaining sweeps down to close gaps after removal, e.g. removed {10, 11} → 12→10, 13→11, etc.
-        """
+    def sweep_shift_gaps(self, df, sweeps_removed):
+        """ Shifts all remaining sweeps down to close gaps after removal, e.g. removed {10, 11} → 12→10, 13→11, etc. """
         removed = np.array(sorted(sweeps_removed), dtype=np.int64)  # sorted array of removed sweep numbers
         s = df['sweep'].to_numpy()  # convert sweep column to numpy array for vectorized operations
         k = np.searchsorted(removed, s, side='right')  # count how many removed sweeps are <= each sweep value
@@ -2208,7 +2206,7 @@ class UIsub(Ui_MainWindow):
         return df  # return DataFrame with adjusted sweep numbering
 
 
-    def data_remove_sweeps_by_ID(self, rec_ID):
+    def sweep_remove_by_ID(self, rec_ID):
         '''
         Remove selected sweeps from a recording. Renumbers remaining sweeps to a continuous sequence.
         Clears cached data and outputs for the recording.
@@ -2234,7 +2232,7 @@ class UIsub(Ui_MainWindow):
         print(f"Recording '{rec_name}': removing {len(sweeps_to_remove)} sweep{'s' if len(sweeps_to_remove) != 1 else ''} out of {n_total_sweeps}...")
         df_data_filtered = df_data_copy[~df_data_copy['sweep'].isin(sweeps_to_remove)].reset_index(drop=True)
         # Renumber remaining sweeps to a continuous sequence
-        pruned_df = self.data_shift_sweeps(df_data_filtered, sweeps_to_remove)
+        pruned_df = self.sweep_shift_gaps(df_data_filtered, sweeps_to_remove)
         return pruned_df
 
 
@@ -2242,7 +2240,7 @@ class UIsub(Ui_MainWindow):
         # get all sweeps for each selected recording
         # get selected sweeps
         # inverse selection
-        if not self.RemoveValidConfirmed():
+        if not self.sweep_removal_valid_confirmed():
             # restore selection
             return
         print("KeepSelectedSweeps - not yet implemented")
@@ -2253,9 +2251,11 @@ class UIsub(Ui_MainWindow):
 
     def RemoveSelectedSweeps(self):
         # for each selected recording, remove selected sweeps, if they exist, and shift remaining sweep numbers to close gaps
+        if not self.sweep_removal_valid_confirmed():
+            return
         for rec_idx in uistate.list_idx_select_recs:
             rec_ID = self.df_project.at[rec_idx, 'ID']
-            pruned_df = self.data_remove_sweeps_by_ID(rec_ID)
+            pruned_df = self.sweep_remove_by_ID(rec_ID)
             if pruned_df is not None:
                 print(pruned_df[pruned_df['time'] == 0][['sweep']])
                 # update sweeps count in df_project
@@ -2265,7 +2265,19 @@ class UIsub(Ui_MainWindow):
 
 
     def SplitBySelectedSweeps(self):
-        if not self.validSelection():
+        if not self.sweep_selection_valid():
+            return
+        selected_sweeps = uistate.x_select.get('output') if isinstance(uistate.x_select, dict) else None
+        n_sweeps = len(selected_sweeps) if selected_sweeps else 0
+        n_recs = len(uistate.list_idx_select_recs)
+        title = "Split sweeps by selection"
+        message = (
+            f"Split {n_recs} selected recording{'s' if n_recs != 1 else ''}?\n"
+            f"by {n_sweeps} selected sweep{'s' if n_sweeps != 1 else ''}?\n"
+            "This action cannot be undone."
+        )
+        if not confirm(title=title, message=message):
+            print("SplitBySelectedSweeps: cancelled by user")
             return
         print("SplitBySelectedSweeps - not yet implemented")
         # call functions: create new recordings with selected sweeps
