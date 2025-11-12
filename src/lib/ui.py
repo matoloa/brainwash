@@ -2152,15 +2152,15 @@ class UIsub(Ui_MainWindow):
 
     def triggerKeepSelectedSweeps(self):
         self.usage("triggerKeepSelectedSweeps")
-        self.KeepSelectedSweeps()
+        self.sweep_keep_selected()
 
     def triggerRemoveSelectedSweeps(self):
         self.usage("triggerRemoveSelectedSweeps")
-        self.RemoveSelectedSweeps()
+        self.sweep_remove_selected()
 
     def triggerSplitBySelectedSweeps(self):
         self.usage("triggerSplitBySelectedSweeps")
-        self.SplitBySelectedSweeps()
+        self.sweep_split_by_selected()
 
 
 # Data Editing functions
@@ -2236,20 +2236,23 @@ class UIsub(Ui_MainWindow):
         return pruned_df
 
 
-    def KeepSelectedSweeps(self):
-        # get all sweeps for each selected recording
-        # get selected sweeps
-        # inverse selection
-        if not self.sweep_removal_valid_confirmed():
-            # restore selection
+    def sweep_keep_selected(self):
+        # if selection is valid, invert it and call sweep_remove_selection (which clears selection)
+        if not self.sweep_selection_valid():
             return
-        print("KeepSelectedSweeps - not yet implemented")
-        # call function to remove selected sweeps
-        # clear selection
-        # clear cache directories for each recording, read source files again, rebuild data for each recording
+        n_sweeps_all = 0
+        for rec_idx in uistate.list_idx_select_recs: # get all sweeps from the longest selected recording
+            p_row = self.df_project.iloc[rec_idx]
+            n_sweeps = p_row['sweeps']
+            if n_sweeps > n_sweeps_all:
+                n_sweeps_all = n_sweeps
+        print(f"sweep_keep_selected: longest selected recording has {n_sweeps_all} sweep{'s' if n_sweeps_all != 1 else ''}.")
+        set_sweeps_to_remove = uistate.x_select['output'] # get selected sweeps
+        uistate.x_select['output'] = set(range(n_sweeps_all)) - set_sweeps_to_remove # inverse selection
+        self.sweep_remove_selected()
 
 
-    def RemoveSelectedSweeps(self):
+    def sweep_remove_selected(self):
         # for each selected recording, remove selected sweeps, if they exist, and shift remaining sweep numbers to close gaps
         if not self.sweep_removal_valid_confirmed():
             return
@@ -2259,12 +2262,18 @@ class UIsub(Ui_MainWindow):
             if pruned_df is not None:
                 print(pruned_df[pruned_df['time'] == 0][['sweep']])
                 # update sweeps count in df_project
-
                 # TODO: persist pruned_df as new data for the recording
+                uistate.x_select['output'] = set() # clear selection
                 # clear cache directories for each recording, read source files again, rebuild data for each recording
 
+                # clear selections and recalculate outputs
+                uistate.list_idx_select_recs = []
+                self.tableProj.clearSelection()
+                self.recalculate()
+                uiplot.xDeselect(ax = uistate.ax1, reset=True)
+                
 
-    def SplitBySelectedSweeps(self):
+    def sweep_split_by_selected(self):
         if not self.sweep_selection_valid():
             return
         selected_sweeps = uistate.x_select.get('output') if isinstance(uistate.x_select, dict) else None
@@ -2277,9 +2286,9 @@ class UIsub(Ui_MainWindow):
             "This action cannot be undone."
         )
         if not confirm(title=title, message=message):
-            print("SplitBySelectedSweeps: cancelled by user")
+            print("sweep_split_by_selected: cancelled by user")
             return
-        print("SplitBySelectedSweeps - not yet implemented")
+        print("sweep_split_by_selected - not yet implemented")
         # call functions: create new recordings with selected sweeps
         # call function to remove selected sweeps from original recordings
         
