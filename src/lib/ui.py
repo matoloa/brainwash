@@ -2249,7 +2249,7 @@ class UIsub(Ui_MainWindow):
         print(f"sweep_keep_selected: longest selected recording has {n_sweeps_all} sweep{'s' if n_sweeps_all != 1 else ''}.")
         set_sweeps_to_remove = uistate.x_select['output'] # get selected sweeps
         uistate.x_select['output'] = set(range(n_sweeps_all)) - set_sweeps_to_remove # inverse selection
-        self.sweep_remove_selected()
+        self.sweep_remove_selected() # removes inverted selection and clears selection
 
 
     def sweep_remove_selected(self):
@@ -2260,17 +2260,20 @@ class UIsub(Ui_MainWindow):
             rec_ID = self.df_project.at[rec_idx, 'ID']
             pruned_df = self.sweep_remove_by_ID(rec_ID)
             if pruned_df is not None:
+                uiplot.xDeselect(ax = uistate.ax1, reset=True)
                 print(pruned_df[pruned_df['time'] == 0][['sweep']])
-                # update sweeps count in df_project
                 # TODO: persist pruned_df as new data for the recording
-                uistate.x_select['output'] = set() # clear selection
+                # update sweeps count in df_project
+                
                 # clear cache directories for each recording, read source files again, rebuild data for each recording
 
                 # clear selections and recalculate outputs
-                uistate.list_idx_select_recs = []
-                self.tableProj.clearSelection()
-                self.recalculate()
-                uiplot.xDeselect(ax = uistate.ax1, reset=True)
+                uistate.list_idx_select_recs = [] # clear uistate selection list
+                uiplot.xDeselect(ax = uistate.ax1, reset=True) # clear sweep selection: resets uistate.x_select
+                self.lineEdit_sweeps_range_from.setText("") # clear lineEdits
+                self.lineEdit_sweeps_range_to.setText("")
+                self.tableProj.clearSelection() # clear visual effect of df_project selection
+                self.recalculate() # outputs
                 
 
     def sweep_split_by_selected(self):
