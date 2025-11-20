@@ -2208,8 +2208,9 @@ class UIsub(Ui_MainWindow):
 
     def sweep_remove_by_ID(self, rec_ID):
         '''
-        Remove selected sweeps from a recording. Renumbers remaining sweeps to a continuous sequence.
-        Clears cached data and outputs for the recording.
+        Remove selected sweeps from the DATA FILE of a recording,
+        renumbers remaining sweeps to a continuous sequence.
+        Clears cached data for the recording.
         Parameters:
             rec_ID (str): The recording ID from which to remove sweeps.
         '''
@@ -2227,13 +2228,18 @@ class UIsub(Ui_MainWindow):
                 print(f"Sweep {sweep} not found in recording '{rec_name}', skipping.")
         if not sweeps_to_remove:
             print(f"No valid sweeps to remove in recording '{rec_name}'.")
-            return None
+            return
         n_total_sweeps = p_row['sweeps']
         print(f"Recording '{rec_name}': removing {len(sweeps_to_remove)} sweep{'s' if len(sweeps_to_remove) != 1 else ''} out of {n_total_sweeps}...")
         df_data_filtered = df_data_copy[~df_data_copy['sweep'].isin(sweeps_to_remove)].reset_index(drop=True)
         # Renumber remaining sweeps to a continuous sequence
         pruned_df = self.sweep_shift_gaps(df_data_filtered, sweeps_to_remove)
-        return pruned_df
+        self.df2file(df=pruned_df, rec=rec_name, key='data')  # overwrite data file with pruned data
+        n_remaining_sweeps = len(pruned_df['sweep'].unique())
+        print(f"Recording '{rec_name}': {n_remaining_sweeps} sweep{'s' if n_remaining_sweeps != 1 else ''} remain.")
+        self.df_project.loc[self.df_project['ID'] == rec_ID, 'sweeps'] = n_remaining_sweeps # update sweeps count in df_project
+        # TODO: selectively clear cache files for the recording
+        return
 
 
     def sweep_keep_selected(self):
@@ -2258,22 +2264,14 @@ class UIsub(Ui_MainWindow):
             return
         for rec_idx in uistate.list_idx_select_recs:
             rec_ID = self.df_project.at[rec_idx, 'ID']
-            pruned_df = self.sweep_remove_by_ID(rec_ID)
-            if pruned_df is not None:
-                uiplot.xDeselect(ax = uistate.ax1, reset=True)
-                print(pruned_df[pruned_df['time'] == 0][['sweep']])
-                # TODO: persist pruned_df as new data for the recording
-                # update sweeps count in df_project
-                
-                # clear cache directories for each recording, read source files again, rebuild data for each recording
-
-                # clear selections and recalculate outputs
-                uistate.list_idx_select_recs = [] # clear uistate selection list
-                uiplot.xDeselect(ax = uistate.ax1, reset=True) # clear sweep selection: resets uistate.x_select
-                self.lineEdit_sweeps_range_from.setText("") # clear lineEdits
-                self.lineEdit_sweeps_range_to.setText("")
-                self.tableProj.clearSelection() # clear visual effect of df_project selection
-                self.recalculate() # outputs
+            self.sweep_remove_by_ID(rec_ID)
+        # clear selections and recalculate outputs
+        uistate.list_idx_select_recs = [] # clear uistate selection list
+        uiplot.xDeselect(ax = uistate.ax1, reset=True) # clear sweep selection: resets uistate.x_select
+        self.lineEdit_sweeps_range_from.setText("") # clear lineEdits
+        self.lineEdit_sweeps_range_to.setText("")
+        self.tableProj.clearSelection() # clear visual effect of df_project selection
+        self.recalculate() # outputs, binning, group handling
                 
 
     def sweep_split_by_selected(self):
@@ -2943,7 +2941,7 @@ class UIsub(Ui_MainWindow):
 
 
     def df2file(self, df, rec, key=None):
-        # writes dict[rec] to <rec>_{dict}.parquet TODO: more elegant, better description; replace "rec"
+        # writes dict[rec] to <rec>_{dict}.parquet TODO: better description; replace "rec"
         if config.transient:
             return
         self.dict_folders['cache'].mkdir(exist_ok=True)
