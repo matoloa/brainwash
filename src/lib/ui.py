@@ -2210,7 +2210,7 @@ class UIsub(Ui_MainWindow):
         '''
         Remove selected sweeps from the DATA FILE of a recording,
         renumbers remaining sweeps to a continuous sequence.
-        Clears cached data for the recording.
+        Clear cached data for the recording.
         Parameters:
             rec_ID (str): The recording ID from which to remove sweeps.
         '''
@@ -2231,14 +2231,28 @@ class UIsub(Ui_MainWindow):
             return
         n_total_sweeps = p_row['sweeps']
         print(f"Recording '{rec_name}': removing {len(sweeps_to_remove)} sweep{'s' if len(sweeps_to_remove) != 1 else ''} out of {n_total_sweeps}...")
-        df_data_filtered = df_data_copy[~df_data_copy['sweep'].isin(sweeps_to_remove)].reset_index(drop=True)
-        # Renumber remaining sweeps to a continuous sequence
-        pruned_df = self.sweep_shift_gaps(df_data_filtered, sweeps_to_remove)
+        print(f"Sweeps to remove: {sorted(sweeps_to_remove)}")
+
+        df_data_filtered = df_data_copy[~df_data_copy['sweep'].isin(sweeps_to_remove)].reset_index(drop=True) # remove selected sweeps
+        print(f"Sweeps excluded, remaining sweeps: {df_data_filtered['sweep'].unique()}")
+        pruned_df = self.sweep_shift_gaps(df_data_filtered, sweeps_to_remove) # renumber remaining sweeps to close gaps
+        print(f"Gaps closed, remaining sweeps: {pruned_df['sweep'].unique()}")
         self.df2file(df=pruned_df, rec=rec_name, key='data')  # overwrite data file with pruned data
         n_remaining_sweeps = len(pruned_df['sweep'].unique())
-        print(f"Recording '{rec_name}': {n_remaining_sweeps} sweep{'s' if n_remaining_sweeps != 1 else ''} remain.")
         self.df_project.loc[self.df_project['ID'] == rec_ID, 'sweeps'] = n_remaining_sweeps # update sweeps count in df_project
-        # TODO: selectively clear cache files for the recording
+        self.save_df_project()
+        print(f"Recording '{rec_name}': {n_remaining_sweeps} sweep{'s' if n_remaining_sweeps != 1 else ''} remain.")
+        # clear cache files for the recording
+        old_timepoints = self.dict_folders['timepoints'] / (rec_name + ".parquet")
+        old_mean = self.dict_folders['cache'] / (rec_name + "_mean.parquet")
+        old_filter = self.dict_folders['cache'] / (rec_name + "_filter.parquet")
+        old_bin = self.dict_folders['cache'] / (rec_name + "_bin.parquet")
+        old_output = self.dict_folders['cache'] / (rec_name + "_output.parquet")
+        for old_file in [old_timepoints, old_mean, old_filter, old_bin, old_output]:
+            if old_file.exists():
+                old_file.unlink()
+                if config.verbose:
+                    print(f"Deleted cache file: {old_file}")
         return
 
 
@@ -2603,8 +2617,8 @@ class UIsub(Ui_MainWindow):
         self.set_df_project(df_p)
         self.tableUpdate()
         # reselect the line below the last selected row
-        if reselect_ID:
-            uistate.list_idx_select_recs = df_p[df_p['ID'] == reselect_ID].index[0]
+        if reselect_ID is not None:
+            uistate.list_idx_select_recs = [df_p[df_p['ID'] == reselect_ID].index[0]]
         self.tableProjSelectionChanged()
 
 
