@@ -2242,6 +2242,10 @@ class UIsub(Ui_MainWindow):
         self.df_project.loc[self.df_project['ID'] == rec_ID, 'sweeps'] = n_remaining_sweeps # update sweeps count in df_project
         self.save_df_project()
         print(f"Recording '{rec_name}': {n_remaining_sweeps} sweep{'s' if n_remaining_sweeps != 1 else ''} remain.")
+        # TODO: cache FILES are destroyed here, but in-memory cache (self.dict_<cache>) is not updated!
+        # clear cached data for the recording
+        # TODO: make this selective.
+        self.resetCacheDicts()
         # clear cache files for the recording
         old_timepoints = self.dict_folders['timepoints'] / (rec_name + ".parquet")
         old_mean = self.dict_folders['cache'] / (rec_name + "_mean.parquet")
