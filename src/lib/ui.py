@@ -2242,10 +2242,6 @@ class UIsub(Ui_MainWindow):
         self.df_project.loc[self.df_project['ID'] == rec_ID, 'sweeps'] = n_remaining_sweeps # update sweeps count in df_project
         self.save_df_project()
         print(f"Recording '{rec_name}': {n_remaining_sweeps} sweep{'s' if n_remaining_sweeps != 1 else ''} remain.")
-        # TODO: cache FILES are destroyed here, but in-memory cache (self.dict_<cache>) is not updated!
-        # clear cached data for the recording
-        # TODO: make this selective.
-        self.resetCacheDicts()
         # clear cache files for the recording
         old_timepoints = self.dict_folders['timepoints'] / (rec_name + ".parquet")
         old_mean = self.dict_folders['cache'] / (rec_name + "_mean.parquet")
@@ -2289,6 +2285,7 @@ class UIsub(Ui_MainWindow):
         self.lineEdit_sweeps_range_from.setText("") # clear lineEdits
         self.lineEdit_sweeps_range_to.setText("")
         self.tableProj.clearSelection() # clear visual effect of df_project selection
+        self.resetCacheDicts() # TODO: make this selective.
         self.recalculate() # outputs, binning, group handling
                 
 
@@ -2307,9 +2304,14 @@ class UIsub(Ui_MainWindow):
         if not confirm(title=title, message=message):
             print("sweep_split_by_selected: cancelled by user")
             return
-        print("sweep_split_by_selected - not yet implemented")
-        # call functions: create new recordings with selected sweeps
-        # call function to remove selected sweeps from original recordings
+        print("sweep_split_by_selected - BEING IMPLEMENTED")
+        A_sweeps = selected_sweeps
+        # B_sweeps = the not selected sweeps present in this recording
+        for rec_idx in uistate.list_idx_select_recs:
+            rec_ID = self.df_project.at[rec_idx, 'ID']
+            # 1) create new a _B recording with selected sweeps.
+            print(f"Would split recording ID {rec_ID} by selected sweeps {selected_sweeps}")
+            # 2) remove selected sweeps from original recordings, rename them _A
         
 
     def recalculate(self):
