@@ -1180,10 +1180,10 @@ class UIsub(Ui_MainWindow):
             return
         # if exactly one recording is selected, reference its data in uistate.df_rec_select_data, and timepoints in uistate.df_rec_select_time
         if len(uistate.list_idx_select_recs) == 1:
-            print(f"One recording selected: index {uistate.list_idx_select_recs[0]} out of {len(self.df_project)}")
+            print(f"One recording selected: index {uistate.list_idx_select_recs[0]} out of {len(self.df_project)-1}")
             p_row = self.df_project.iloc[uistate.list_idx_select_recs[0]]
             uistate.df_rec_select_time = self.get_dft(row=p_row)
-            uistate.df_rec_select_data = self.dict_filters[p_row['recording_name']]
+            uistate.df_rec_select_data = self.get_dffilter(p_row)
         else:
             uistate.df_rec_select_data = None
             uistate.df_rec_select_time = None
@@ -2311,10 +2311,11 @@ class UIsub(Ui_MainWindow):
             # rename original recording to rec_A
             self.df_project.loc[self.df_project['ID'] == source_row['ID'], 'recording_name'] = rec_A
             self.rename_files_by_rec_name(old_name=source_name, new_name=rec_A)
-            # remove selected sweeps from A, all other sweeps from B
+            # remove selected sweeps from A, all other sweeps from B, updates df_project and kills cache files
             self.sweep_remove_by_ID(source_row['ID'], selection=selected_sweeps)
             self.sweep_remove_by_ID(copy_row['ID'], selection=other_sweeps)
-            # sweep_remove_by_ID updates df_project and cache files itself
+            uiplot.unPlot(source_row['ID'])
+            self.graphUpdate(row = source_row)
         self.resetCacheDicts()
         self.sweep_unselect()
         self.recalculate() # outputs, binning, group handling
