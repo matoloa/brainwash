@@ -345,18 +345,6 @@ class ParseDataThread(QtCore.QThread):
         self.rows = []
         self.total = len(df_p_to_update)
 
-    def create_new_row(self, df_proj_row, new_name, dict_meta):
-        df_proj_new_row = df_proj_row.copy()
-        df_proj_new_row['ID'] = str(uuid.uuid4())
-        df_proj_new_row['status'] = "Read"
-        df_proj_new_row['recording_name'] = new_name
-        df_proj_new_row['sweeps'] = dict_meta.get('nsweeps', None)
-        df_proj_new_row['channel'] = ""# dict_meta.get('channel', None)
-        df_proj_new_row['stim'] = ""# dict_meta.get('stim', None)
-        df_proj_new_row['sweep_duration'] = dict_meta.get('sweep_duration', None)
-        df_proj_new_row['resets'] = ""# dict_meta.get('resets', None)
-        return df_proj_new_row
-
     def run(self):
         '''Parse data from files, persist them as bw parquet:s, and update df_p'''
         for i, (_, df_proj_row) in enumerate(self.df_p_to_update.iterrows()):
@@ -372,16 +360,9 @@ class ParseDataThread(QtCore.QThread):
                 for channel, df in dict_dfs_raw.items()
             }
             for rec, df_raw in dict_name_df.items():
-                uisub.df2file(df_raw, rec, key='data') # persist raws
-                dfmean, i_stim = parse.build_dfmean(df_raw)
-                uisub.df2file(dfmean, rec, key='mean') # persist mean
-                df = parse.zeroSweeps(df_raw, i_stim=i_stim)
-                uisub.df2file(df, rec, key='filter') # persist zeroed
-                # extract metadata
-                dict_meta = parse.metadata(df)
-                # TODO: create unique recording names
-                print(f"ParseDataThread, {rec}")
-                df_proj_new_row = self.create_new_row(df_proj_row=df_proj_row, new_name=rec, dict_meta=dict_meta)
+                if config.verbose:
+                    print(f"ParseDataThread: {rec}")
+                df_proj_new_row = uisub.create_recording(df_proj_row, rec, df_raw)
                 self.rows.append(df_proj_new_row)
         self.finished.emit()
 
@@ -2206,17 +2187,17 @@ class UIsub(Ui_MainWindow):
         return df  # return DataFrame with adjusted sweep numbering
 
 
-    def sweep_remove_by_ID(self, rec_ID):
+    def sweep_remove_by_ID(self, rec_ID, selection=None):
         '''
         Remove selected sweeps from the DATA FILE of a recording,
         renumbers remaining sweeps to a continuous sequence.
-        Clear cached data for the recording.
+        Clears cached data for the recording.
         Parameters:
             rec_ID (str): The recording ID from which to remove sweeps.
         '''
         self.usage("data_remove_sweeps_by_ID")
         p_row = self.df_project[self.df_project['ID'] == rec_ID].iloc[0]
-        set_sweeps_to_remove = uistate.x_select['output']
+        set_sweeps_to_remove = selection if selection is not None else uistate.x_select['output']
         rec_name = p_row['recording_name']
         df_data_copy = self.get_dfdata(p_row).copy()
         # check that selected sweeps exist in df_data
@@ -2239,7 +2220,8 @@ class UIsub(Ui_MainWindow):
         print(f"Gaps closed, remaining sweeps: {pruned_df['sweep'].unique()}")
         self.df2file(df=pruned_df, rec=rec_name, key='data')  # overwrite data file with pruned data
         n_remaining_sweeps = len(pruned_df['sweep'].unique())
-        self.df_project.loc[self.df_project['ID'] == rec_ID, 'sweeps'] = n_remaining_sweeps # update sweeps count in df_project
+        df_project = self.get_df_project()
+        df_project.loc[df_project['ID'] == rec_ID, 'sweeps'] = n_remaining_sweeps # update sweeps count in df_project
         self.save_df_project()
         print(f"Recording '{rec_name}': {n_remaining_sweeps} sweep{'s' if n_remaining_sweeps != 1 else ''} remain.")
         # clear cache files for the recording
@@ -2279,40 +2261,110 @@ class UIsub(Ui_MainWindow):
         for rec_idx in uistate.list_idx_select_recs:
             rec_ID = self.df_project.at[rec_idx, 'ID']
             self.sweep_remove_by_ID(rec_ID)
-        # clear selections and recalculate outputs
+        self.sweep_unselect()
+        self.resetCacheDicts()
+        self.recalculate() # outputs, binning, group handling        
+
+
+    def sweep_unselect(self):
+        # clear selections and recalculate outputs        
         uistate.list_idx_select_recs = [] # clear uistate selection list
         uiplot.xDeselect(ax = uistate.ax1, reset=True) # clear sweep selection: resets uistate.x_select
         self.lineEdit_sweeps_range_from.setText("") # clear lineEdits
         self.lineEdit_sweeps_range_to.setText("")
         self.tableProj.clearSelection() # clear visual effect of df_project selection
-        self.resetCacheDicts() # TODO: make this selective.
-        self.recalculate() # outputs, binning, group handling
-                
+
 
     def sweep_split_by_selected(self):
         if not self.sweep_selection_valid():
             return
-        selected_sweeps = uistate.x_select.get('output') if isinstance(uistate.x_select, dict) else None
-        n_sweeps = len(selected_sweeps) if selected_sweeps else 0
+        n_sweeps_all = 0
+        for rec_idx in uistate.list_idx_select_recs: # get all sweeps from the longest selected recording
+            p_row = self.df_project.iloc[rec_idx]
+            n_sweeps = p_row['sweeps']
+            if n_sweeps > n_sweeps_all:
+                n_sweeps_all = n_sweeps
+        selected_sweeps = uistate.x_select.get('output')
+        n_sweeps = len(selected_sweeps)
         n_recs = len(uistate.list_idx_select_recs)
         title = "Split sweeps by selection"
         message = (
-            f"Split {n_recs} selected recording{'s' if n_recs != 1 else ''}?\n"
+            f"Split {n_recs} selected recording{'s' if n_recs != 1 else ''}\n"
             f"by {n_sweeps} selected sweep{'s' if n_sweeps != 1 else ''}?\n"
             "This action cannot be undone."
         )
         if not confirm(title=title, message=message):
             print("sweep_split_by_selected: cancelled by user")
             return
-        print("sweep_split_by_selected - BEING IMPLEMENTED")
-        A_sweeps = selected_sweeps
-        # B_sweeps = the not selected sweeps present in this recording
+        other_sweeps = set(range(n_sweeps_all)) - selected_sweeps
+        # copy original df_project for loop: self.df_project will be modified
+        original_df_project = self.get_df_project().copy()
         for rec_idx in uistate.list_idx_select_recs:
-            rec_ID = self.df_project.at[rec_idx, 'ID']
-            # 1) create new a _B recording with selected sweeps.
-            print(f"Would split recording ID {rec_ID} by selected sweeps {selected_sweeps}")
-            # 2) remove selected sweeps from original recordings, rename them _A
-        
+            source_row = original_df_project.iloc[rec_idx]
+            source_name = source_row['recording_name']
+            rec_A = source_name + "_A"
+            rec_B = source_name + "_B"
+            print(f"Will split {source_name} into:\n {rec_A}: {len(selected_sweeps)} sweeps {min(selected_sweeps)}-{max(selected_sweeps)}\n {rec_B}: {len(other_sweeps)} sweeps {min(other_sweeps)}-{max(other_sweeps)}")
+            # Copy current recording to new rec_B
+            self.duplicate_recording(source_p_row=source_row, new_name=rec_B)
+            copy_row = self.df_project[self.df_project['recording_name'] == rec_B].iloc[0]
+            # rename original recording to rec_A
+            self.df_project.loc[self.df_project['ID'] == source_row['ID'], 'recording_name'] = rec_A
+            self.rename_files_by_rec_name(old_name=source_name, new_name=rec_A)
+            # remove selected sweeps from A, all other sweeps from B
+            self.sweep_remove_by_ID(source_row['ID'], selection=selected_sweeps)
+            self.sweep_remove_by_ID(copy_row['ID'], selection=other_sweeps)
+            # sweep_remove_by_ID updates df_project and cache files itself
+        self.resetCacheDicts()
+        self.sweep_unselect()
+        self.recalculate() # outputs, binning, group handling
+
+
+    def duplicate_recording(self, source_p_row, new_name=None):
+        source_name = source_p_row['recording_name']
+        if new_name is None:
+            new_name = f"{source_name}_copy"
+        if new_name in self.df_project['recording_name'].values:
+            print(f"duplicate_recording: recording name '{new_name}' already exists, choose a different name.")
+            return
+        df_proj_new_row = source_p_row.copy()
+        df_proj_new_row['ID'] = str(uuid.uuid4()) # new unique ID
+        df_proj_new_row['recording_name'] = new_name
+        # Update data files: copy source data file to new data file
+        df_project = self.get_df_project()
+        self.df_project = pd.concat([df_project, pd.DataFrame([df_proj_new_row])], ignore_index=True)
+        self.save_df_project()
+        df_data = self.get_dfdata(source_p_row)
+        self.df2file(df_data, new_name, key='data') # persist data file
+        dfmean, i_stim = parse.build_dfmean(df_data)
+        self.df2file(dfmean, new_name, key='mean') # persist mean
+        df = parse.zeroSweeps(df_data, i_stim=i_stim)
+        self.df2file(df, new_name, key='filter') # persist zeroed        
+        return
+
+
+    def create_recording(self, df_proj_row, rec, df_raw):
+        def create_row(df_proj_row, new_name, dict_meta):
+            df_proj_new_row = df_proj_row.copy()
+            df_proj_new_row['ID'] = str(uuid.uuid4())
+            df_proj_new_row['status'] = "Read"
+            df_proj_new_row['recording_name'] = new_name
+            df_proj_new_row['sweeps'] = dict_meta.get('nsweeps', None)
+            df_proj_new_row['channel'] = ""# dict_meta.get('channel', None)
+            df_proj_new_row['stim'] = ""# dict_meta.get('stim', None)
+            df_proj_new_row['sweep_duration'] = dict_meta.get('sweep_duration', None)
+            df_proj_new_row['resets'] = ""# dict_meta.get('resets', None)
+            return df_proj_new_row
+        self.df2file(df_raw, rec, key='data') # persist raws
+        dfmean, i_stim = parse.build_dfmean(df_raw)
+        self.df2file(dfmean, rec, key='mean') # persist mean
+        df = parse.zeroSweeps(df_raw, i_stim=i_stim)
+        self.df2file(df, rec, key='filter') # persist zeroed
+        dict_meta = parse.metadata(df) # extract metadata
+        # TODO: create unique recording names
+        df_proj_new_row = create_row(df_proj_row=df_proj_row, new_name=rec, dict_meta=dict_meta)
+        return df_proj_new_row
+
 
     def recalculate(self):
         # Placeholder function called when output must be recalculated: normalization changed, binning changed, amp halfwidth changed
@@ -2546,58 +2598,43 @@ class UIsub(Ui_MainWindow):
 
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
-        if len(uistate.list_idx_select_recs) == 1:
-            df_p = self.get_df_project()
-            old_recording_name = df_p.at[uistate.list_idx_select_recs[0], 'recording_name']
-            old_data = self.dict_folders['data'] / (old_recording_name + ".parquet")
-            old_timepoints = self.dict_folders['timepoints'] / (old_recording_name + ".parquet")
-            old_mean = self.dict_folders['cache'] / (old_recording_name + "_mean.parquet")
-            old_filter = self.dict_folders['cache'] / (old_recording_name + "_filter.parquet")
-            old_bin = self.dict_folders['cache'] / (old_recording_name + "_bin.parquet")
-            old_output = self.dict_folders['cache'] / (old_recording_name + "_output.parquet")
-
-            RenameDialog = InputDialogPopup()
-            new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query=old_recording_name)
-            # check if the new name is a valid filename
-            if new_recording_name is not None and re.match(r'^[a-zA-Z0-9_ -]+$', str(new_recording_name)) is not None:
-                list_recording_names = set(df_p['recording_name'])
-                if not new_recording_name in list_recording_names: # prevent duplicates
-                    new_data = self.dict_folders['data'] / (new_recording_name + ".parquet")
-                    new_timepoints = self.dict_folders['timepoints'] / (new_recording_name + ".parquet")
-                    new_mean = self.dict_folders['cache'] / (new_recording_name + "_mean.parquet")
-                    new_filter = self.dict_folders['cache'] / (new_recording_name + "_filter.parquet")
-                    new_bin = self.dict_folders['cache'] / (new_recording_name + "_bin.parquet")
-                    new_output = self.dict_folders['cache'] / (new_recording_name + "_output.parquet")
-                    if old_data.exists():
-                        os.rename(old_data, new_data)
-                    else: # data SHOULD exist
-                        raise FileNotFoundError
-                    if old_timepoints.exists():
-                        os.rename(old_timepoints, new_timepoints)
-                    if old_mean.exists():
-                        os.rename(old_mean, new_mean)
-                    if old_filter.exists():
-                        os.rename(old_filter, new_filter)
-                    if old_output.exists():
-                        os.rename(old_output, new_output)
-                    if old_bin.exists():
-                        os.rename(old_bin, new_bin)
-                    df_p.at[uistate.list_idx_select_recs[0], 'recording_name'] = new_recording_name
-                    # For paired recordings: also rename any references to old_recording_name in df_p['paired_recording']
-                    df_p.loc[df_p['paired_recording'] == old_recording_name, 'paired_recording'] = new_recording_name
-                    self.set_df_project(df_p)
-                    self.tableUpdate()
-                    self.update_recs2plot()
-                    old_recording_ID = df_p.at[uistate.list_idx_select_recs[0], 'ID']
-                    uiplot.unPlot(old_recording_ID)
-                    self.graphUpdate(row = df_p.loc[uistate.list_idx_select_recs[0]])
-                    self.update_show(reset=True)
-                else:
-                    print(f"new_recording_name {new_recording_name} already exists")
-            else:
-                print(f"new_recording_name {new_recording_name} is not a valid filename")    
-        else:
+        if len(uistate.list_idx_select_recs) != 1:
             print("Rename: please select one row only for renaming.")
+            return
+        df_p = self.get_df_project()
+        old_recording_name = df_p.at[uistate.list_idx_select_recs[0], 'recording_name']
+        RenameDialog = InputDialogPopup()
+        new_recording_name = RenameDialog.showInputDialog(title='Rename recording', query=old_recording_name)
+        # check if the new name is a valid filename
+        if new_recording_name is not None and re.match(r'^[a-zA-Z0-9_ -]+$', str(new_recording_name)) is not None:
+            list_recording_names = set(df_p['recording_name'])
+            if not new_recording_name in list_recording_names: # prevent duplicates
+                self.rename_files_by_rec_name(old_name=old_recording_name, new_name=new_recording_name)
+                df_p.at[uistate.list_idx_select_recs[0], 'recording_name'] = new_recording_name
+                # For paired recordings: also rename any references to old_recording_name in df_p['paired_recording']
+                df_p.loc[df_p['paired_recording'] == old_recording_name, 'paired_recording'] = new_recording_name
+                self.set_df_project(df_p)
+                self.tableUpdate()
+                self.update_recs2plot()
+                old_recording_ID = df_p.at[uistate.list_idx_select_recs[0], 'ID']
+                uiplot.unPlot(old_recording_ID)
+                self.graphUpdate(row = df_p.loc[uistate.list_idx_select_recs[0]])
+                self.update_show(reset=True)
+            else:
+                print(f"new_recording_name {new_recording_name} already exists")
+        else:
+            print(f"new_recording_name {new_recording_name} is not a valid filename")    
+
+
+    def rename_files_by_rec_name(self, old_name, new_name):
+        for folder_name, file_suffix in [('data', '.parquet'), ('timepoints', '.parquet'), ('cache', '_mean.parquet'), ('cache', '_filter.parquet'), ('cache', '_bin.parquet'), ('cache', '_output.parquet')]:
+            old_file_path = Path(self.dict_folders[folder_name] / (old_name + file_suffix))
+            new_file_path = Path(self.dict_folders[folder_name] / (new_name + file_suffix))
+            if old_file_path.exists():
+                old_file_path.rename(new_file_path)
+            elif folder_name == 'data':
+                print(f"recording_rename_files: file not found: {old_file_path}")
+                raise FileNotFoundError
 
 
     def deleteSelectedRows(self):
