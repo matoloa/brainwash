@@ -165,12 +165,18 @@ class UIstate:
         self.dft_copy = None # copy of dft for storing measure points until either saved or rejected
 
     # Mouseover variables
+        # Meangraph Mouseover variables
+        self.mean_mouseover_stim_select = None # name of stim that will be selected if clicked
+        self.mean_stim_x_ranges = {} # dict: stim_num: (x_start, x_end)
+        self.mean_x_margin = None # for mouseover detection boundaries of clickable points
+        self.mean_y_margin = None # for mouseover detection boundaries of clickable points
+
         # Eventgraph Mouseover variables
         self.mouseover_action = None # name of action to take if clicked at current mouseover: EPSP amp move, EPSP slope move/resize, volley amp move, volley slope move/resize
         self.mouseover_plot = None # plot of tentative EPSP slope
         self.mouseover_blob = None # scatterplot indicating mouseover of dragable point; move point or resize slope
-        self.x_margin = None # for mouseover detection boundaries
-        self.y_margin = None # for mouseover detection boundaries
+        self.x_margin = None # for mouseover detection boundaries of clickable points
+        self.y_margin = None # for mouseover detection boundaries of clickable points
         self.x_on_click = None # x-value closest to mousebutton down
         self.x_drag_last = None # last x-value within the same dragging event; prevents needless update when holding drag still
         self.x_drag = None # x-value of current dragging

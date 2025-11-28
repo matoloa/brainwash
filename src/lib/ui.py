@@ -3759,16 +3759,72 @@ class UIsub(Ui_MainWindow):
             self.connectDragRelease(x_range=sweep_numbers, rec_ID=p_row['ID'], graph="output")
 
     def meanMouseover(self, event): # determine which event is being mouseovered
+        x = event.xdata
+        y = event.ydata
+        if x is None or y is None:
+            return
         dft = uistate.df_rec_select_time
         if dft is None or dft.empty:
             print("No single recording selected with timepoints to mouseover.")
             return
         n_stims = len(dft)
         if n_stims <2:
-            print("Not enough stims to mouseover.")
+            # print("Not enough stims to mouseover.")
             return
-        # One recording selected, with 2 or more stims:
+        # One recording selected, with 2 or more stims, define mouseover zones
+        dfp = self.get_df_project()
+        p_row = dfp.iloc[uistate.list_idx_select_recs[0]]
+        rec_name = f"{p_row['recording_name']}"
+        rec_filter = p_row['filter'] # the filter currently used for this recording
+        if rec_filter != 'voltage':
+            label_core = f"{rec_name} ({rec_filter})"
+        else:
+            label_core = rec_name        
+
         axm = uistate.axm
+        uistate.mean_mouseover_stim_select = None # name of stim that will be selected if clicked
+        uistate.mean_stim_x_ranges = {} # dict: stim_num: (x_start, x_end)
+        # y_margin is 10% of y-axis range
+        uistate.mean_y_margin = (axm.get_ylim()[1] - axm.get_ylim()[0]) * 0.1
+        y_range = -uistate.mean_y_margin, uistate.mean_y_margin # stim markers should be at y~0
+        # x_margin is 25% of the shortest distance between stims OR 1% of x-axis range, whichever is smaller
+        t_stims = dft['t_stim'].values
+        t_diffs = np.diff(t_stims)
+        min_t_diff = np.min(t_diffs)
+        x_axis_range = axm.get_xlim()[1] - axm.get_xlim()[0]
+        uistate.mean_x_margin = min(x_axis_range * 0.01, min_t_diff * 0.25)
+
+        # build detection zones for each stim
+        for row in dft.itertuples(index=False):
+            stim = row.stim
+            t_stim = row.t_stim
+            x_range = t_stim - uistate.mean_x_margin, t_stim + uistate.mean_x_margin
+            uistate.mean_stim_x_ranges[stim] = x_range
+        # check if mouse is within any of the stim zones
+        for stim, x_range in uistate.mean_stim_x_ranges.items():
+            if x_range[0] <= x <= x_range[1] and y_range[0] <= y <= y_range[1]:
+                uistate.mean_mouseover_stim_select = stim
+                # print(f"meanMouseover of {uistate.mean_mouseover_stim_select}: x={x}, y={y}")
+                # find corresponding selection marker:
+                stim_str = f"- stim {stim}"
+                label = (f"mean {rec_name} {stim_str} marker")
+                stim_marker = uistate.dict_rec_labels.get(label)
+                # print(f"{label}: {stim_marker}")
+                # zorder mouseovered marker to top, alpha 1
+                if stim_marker is not None:
+                    stim_marker_line = stim_marker.get('line')
+                    stim_marker_line.set_zorder(10)
+                    stim_marker_line.set_alpha(1.0)
+                break
+            else:
+                # reset all stim markers to default zorder and alpha
+                stim_str = f"- stim {stim}"
+                label = (f"mean {rec_name} {stim_str} marker")
+                stim_marker = uistate.dict_rec_labels.get(label)
+                if stim_marker is not None:
+                    stim_marker_line = stim_marker.get('line')
+                    stim_marker_line.set_zorder(0)
+                    stim_marker_line.set_alpha(0.4)
         
         axm.figure.canvas.draw()
         
