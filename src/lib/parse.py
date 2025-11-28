@@ -327,7 +327,8 @@ def source2dfs(source, dev=False):
             except Exception as e:
                 raise ValueError(f"Error parsing ibw files in folder {path}: {e}")
         else:
-            raise ValueError(f"No valid files found.")
+            print(f"No valid files found.")
+            return {}
     # if source_path is not a folder - parse as a single file
     else:
         PARSERS = {

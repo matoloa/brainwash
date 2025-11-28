@@ -353,7 +353,8 @@ class ParseDataThread(QtCore.QThread):
             source_path = df_proj_row['path']
             dict_dfs_raw = parse.source2dfs(source=source_path)
             if not dict_dfs_raw:
-                raise ValueError("Failed to read source file")
+                print(f"Failed to read source file at: {source_path}")
+                continue
             # convert dict - channel:df to recording_name:df
             dict_name_df = {
                 (recording_name if len(dict_dfs_raw) == 1 else f"{recording_name}_ch{channel}"): df
@@ -2702,6 +2703,7 @@ class UIsub(Ui_MainWindow):
             self.thread = ParseDataThread(df_p_to_update, self.dict_folders)
             self.thread.progress.connect(self.updateProgressBar)
             self.thread.finished.connect(self.onParseDataFinished)
+            self.thread.finished.connect(self.thread.deleteLater)  # Auto-cleanup when done
             self.thread.start()
             self.progressBarManager = ProgressBarManager(self.progressBar, len(df_p_to_update))
             self.progressBarManager.__enter__()
@@ -3615,6 +3617,7 @@ class UIsub(Ui_MainWindow):
         self.progressBar.setValue(0)
         self.thread = graphPreloadThread(uistate, uiplot, self)
         self.thread.finished.connect(lambda: self.ongraphPreloadFinished(t0))
+        self.thread.finished.connect(self.thread.deleteLater)  # Auto-cleanup when done
 
         # Create ProgressBarManager and connect progress signal
         if len(uistate.list_idx_recs2preload) > 0:
@@ -3755,6 +3758,20 @@ class UIsub(Ui_MainWindow):
             self.lineEdit_sweeps_range_from.setText(str(uistate.x_on_click))
             self.connectDragRelease(x_range=sweep_numbers, rec_ID=p_row['ID'], graph="output")
 
+    def meanMouseover(self, event): # determine which event is being mouseovered
+        dft = uistate.df_rec_select_time
+        if dft is None or dft.empty:
+            print("No single recording selected with timepoints to mouseover.")
+            return
+        n_stims = len(dft)
+        if n_stims <2:
+            print("Not enough stims to mouseover.")
+            return
+        # One recording selected, with 2 or more stims:
+        axm = uistate.axm
+        
+        axm.figure.canvas.draw()
+        
 
     def eventMouseover(self, event): # determine which event is being mouseovered
         if uistate.df_recs2plot is None or uistate.df_recs2plot.empty:
@@ -4044,6 +4061,7 @@ class UIsub(Ui_MainWindow):
             elif label.endswith("volley slope marker"):
                 uistate.updateDragZones(aspect="volley slope", x=line.get_xdata(), y=line.get_ydata())
 
+        self.mouseoverMean = self.canvasMean.mpl_connect('motion_notify_event', self.meanMouseover)
         self.mouseoverEvent = self.canvasEvent.mpl_connect('motion_notify_event', self.eventMouseover)
         self.mouseoverOutput = self.canvasOutput.mpl_connect('motion_notify_event', self.outputMouseover)
         self.mouseLeaveOutput = self.canvasOutput.mpl_connect('axes_leave_event', self.on_leave_output)
@@ -4058,7 +4076,7 @@ class UIsub(Ui_MainWindow):
         precision = uistate.settings['precision']
 
         EPSP_slope_markers = {k: v for k, v in uistate.dict_rec_show.items() if k.endswith(" EPSP slope marker")}
-        # print(f"mouseoverUpdateMarkers: {EPSP_slope_markers.keys()}")
+        print(f"mouseoverUpdateMarkers: {EPSP_slope_markers.keys()}")
         for marker in EPSP_slope_markers.values():
             p_row = df_p.loc[df_p['ID'] == marker['rec_ID']].squeeze()
             dfmean = self.get_dfmean(row=p_row)
@@ -4079,7 +4097,7 @@ class UIsub(Ui_MainWindow):
             marker['line'].set_data([event_x_start, event_x_end], [y_start, y_end])
 
         EPSP_amp_markers = {k: v for k, v in uistate.dict_rec_show.items() if k.endswith(" EPSP amp marker")}
-        # print(f"mouseoverUpdateMarkers: {EPSP_amp_markers.keys()}")
+        print(f"mouseoverUpdateMarkers: {EPSP_amp_markers.keys()}")
         for marker in EPSP_amp_markers.values():
             p_row = df_p.loc[df_p['ID'] == marker['rec_ID']].squeeze()
             dfmean = self.get_dfmean(row=p_row)
@@ -4099,7 +4117,7 @@ class UIsub(Ui_MainWindow):
             marker['line'].set_data([event_x_start, event_x_start], [y_start, y_start])
         
         volley_slope_markers = {k: v for k, v in uistate.dict_rec_show.items() if k.endswith(" volley slope marker")}
-        # print(f"mouseoverUpdateMarkers: {volley_slope_markers.keys()}")
+        print(f"mouseoverUpdateMarkers: {volley_slope_markers.keys()}")
         for marker in volley_slope_markers.values():
             p_row = df_p.loc[df_p['ID'] == marker['rec_ID']].squeeze()
             dfmean = self.get_dfmean(row=p_row)
@@ -4120,7 +4138,7 @@ class UIsub(Ui_MainWindow):
             marker['line'].set_data([event_x_start, event_x_end], [y_start, y_end])
 
         volley_amp_markers = {k: v for k, v in uistate.dict_rec_show.items() if k.endswith(" volley amp marker")}
-        #print(f"mouseoverUpdateMarkers: {volley_amp_markers.keys()}")
+        print(f"mouseoverUpdateMarkers: {volley_amp_markers.keys()}")
         for marker in volley_amp_markers.values():
             p_row = df_p.loc[df_p['ID'] == marker['rec_ID']].squeeze()
             dfmean = self.get_dfmean(row=p_row)
