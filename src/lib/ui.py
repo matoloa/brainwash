@@ -1215,10 +1215,16 @@ class UIsub(Ui_MainWindow):
 
 
     def stimSelectionChanged(self):
-        self.usage("stimSelectionChanged")
+        self.usage(f"stimSelectionChanged")
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableStim.clearSelection()
-        selected_indexes = self.tableStim.selectionModel().selectedRows()
+        if uistate.mean_mouseover_stim_select is None: # clicked table
+            selected_indexes = self.tableStim.selectionModel().selectedRows()
+        else: # clicked graph
+            row = uistate.mean_mouseover_stim_select - 1
+            selected_indexes = [self.tableStimModel.index(row, 0)]
+        uistate.mean_mouseover_stim_select = None
+        # build the list uistate.list_idx_select_stims with indices
         uistate.list_idx_select_stims = [index.row() for index in selected_indexes]
         self.update_show()
         self.zoomAuto()
@@ -3154,7 +3160,10 @@ class UIsub(Ui_MainWindow):
             print("setButtonParse")
         unparsed = self.df_project['sweeps'].eq("...").any()
         self.pushButtonParse.setVisible(bool(unparsed))
-        self.checkBox_force1stim.setVisible(bool(unparsed))
+        if config.hide_experimental:
+            self.checkBox_force1stim.setVisible(False)
+        else:
+            self.checkBox_force1stim.setVisible(bool(unparsed))
 
     def checkBox_force1stim_changed(self, state):
         uistate.checkBox['force1stim'] = state == 2
@@ -3745,6 +3754,10 @@ class UIsub(Ui_MainWindow):
                     self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', lambda event: self.eventDragReleased(event, data_x, data_y))
 
         elif canvas == self.canvasMean: # Mean canvas (top graph) left-clicked: overview and selecting ranges for finding relevant stims
+            if uistate.mean_mouseover_stim_select is not None:
+                uistate.dragging = False
+                self.stimSelectionChanged()
+                return
             dfmean = self.get_dfmean(p_row) # Required for event dragging, x and y
             time_values = dfmean['time'].values
             uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
@@ -3804,10 +3817,10 @@ class UIsub(Ui_MainWindow):
         for stim, x_range in uistate.mean_stim_x_ranges.items():
             if x_range[0] <= x <= x_range[1] and y_range[0] <= y <= y_range[1]:
                 uistate.mean_mouseover_stim_select = stim
-                # print(f"meanMouseover of {uistate.mean_mouseover_stim_select}: x={x}, y={y}")
+                print(f"meanMouseover of {uistate.mean_mouseover_stim_select}: x={x}, y={y}")
                 # find corresponding selection marker:
                 stim_str = f"- stim {stim}"
-                label = (f"mean {rec_name} {stim_str} marker")
+                label = (f"mean {label_core} {stim_str} marker")
                 stim_marker = uistate.dict_rec_labels.get(label)
                 # print(f"{label}: {stim_marker}")
                 # zorder mouseovered marker to top, alpha 1
@@ -3819,7 +3832,7 @@ class UIsub(Ui_MainWindow):
             else:
                 # reset all stim markers to default zorder and alpha
                 stim_str = f"- stim {stim}"
-                label = (f"mean {rec_name} {stim_str} marker")
+                label = (f"mean {label_core} {stim_str} marker")
                 stim_marker = uistate.dict_rec_labels.get(label)
                 if stim_marker is not None:
                     stim_marker_line = stim_marker.get('line')
