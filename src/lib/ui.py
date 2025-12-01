@@ -410,6 +410,19 @@ class graphPreloadThread(QtCore.QThread):
 #####################################################################
 
 class Ui_MainWindow(QtCore.QObject):
+    def _cleanup_threads(self):
+        # Stop and wait for all running threads
+        for thread in getattr(self, '_threads', []):
+            if isinstance(thread, QtCore.QThread) and thread.isRunning():
+                thread.quit()
+                thread.wait()
+        self._threads = []
+
+    def closeEvent(self, event):
+        # Ensure all threads are stopped on window close
+        self._cleanup_threads()
+        super().closeEvent(event)
+        
     def setupUi(self, mainWindow):
         mainWindow.setObjectName("mainWindow")
         mainWindow.resize(1270, 1050)
@@ -1215,16 +1228,10 @@ class UIsub(Ui_MainWindow):
 
 
     def stimSelectionChanged(self):
-        self.usage(f"stimSelectionChanged")
+        self.usage("stimSelectionChanged")
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableStim.clearSelection()
-        if uistate.mean_mouseover_stim_select is None: # clicked table
-            selected_indexes = self.tableStim.selectionModel().selectedRows()
-        else: # clicked graph
-            row = uistate.mean_mouseover_stim_select - 1
-            selected_indexes = [self.tableStimModel.index(row, 0)]
-        uistate.mean_mouseover_stim_select = None
-        # build the list uistate.list_idx_select_stims with indices
+        selected_indexes = self.tableStim.selectionModel().selectedRows()
         uistate.list_idx_select_stims = [index.row() for index in selected_indexes]
         self.update_show()
         self.zoomAuto()
@@ -2702,32 +2709,40 @@ class UIsub(Ui_MainWindow):
 
     def parseData(self): 
         self.uiFreeze() # Thawed at the end of graphPreload()
+        # Clean up any existing thread before starting a new one
+        self._cleanup_threads()
         df_p = self.get_df_project()
         df_p_to_update = df_p[df_p['sweeps'] == "..."].copy()
         if len(df_p_to_update) > 0:
             print(f"parseData: {len(df_p_to_update)} files to parse.")
-            self.thread = ParseDataThread(df_p_to_update, self.dict_folders)
-            self.thread.progress.connect(self.updateProgressBar)
-            self.thread.finished.connect(self.onParseDataFinished)
-            self.thread.finished.connect(self.thread.deleteLater)  # Auto-cleanup when done
-            self.thread.start()
+            thread = ParseDataThread(df_p_to_update, self.dict_folders)
+            self._current_parse_thread = thread  # Store reference for use in callbacks
+            thread.progress.connect(self.updateProgressBar)
+            thread.finished.connect(self.onParseDataFinished)
+            thread.finished.connect(thread.deleteLater)  # Auto-cleanup when done
+            thread.finished.connect(lambda: self._threads.remove(thread) if thread in self._threads else None)
+            thread.finished.connect(lambda: setattr(self, '_current_parse_thread', None))
+            self._threads.append(thread)
+            thread.start()
             self.progressBarManager = ProgressBarManager(self.progressBar, len(df_p_to_update))
             self.progressBarManager.__enter__()
 
 
     def updateProgressBar(self, i):
-        self.thread.progress.connect(lambda i: self.progressBarManager.update(i, "Parsing file "))
+        self.progressBarManager.update(i, "Parsing file ")
 
 
     def onParseDataFinished(self):
         self.progressBarManager.__exit__(None, None, None)
-        if self.thread.rows:
-            rows2add = pd.concat(self.thread.rows, axis=1).transpose()
-            df_p = self.get_df_project()
-            df_p = pd.concat([df_p[df_p['sweeps'] != "..."], rows2add]).reset_index(drop=True)
-            self.set_df_project(df_p)
-            # Get the indices of the new rows, as they are in df_p
-            uistate.list_idx_recs2preload = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
+        if hasattr(self, '_current_parse_thread') and self._current_parse_thread is not None:
+            thread = self._current_parse_thread
+            if thread.rows:
+                rows2add = pd.concat(thread.rows, axis=1).transpose()
+                df_p = self.get_df_project()
+                df_p = pd.concat([df_p[df_p['sweeps'] != "..."], rows2add]).reset_index(drop=True)
+                self.set_df_project(df_p)
+                # Get the indices of the new rows, as they are in df_p
+                uistate.list_idx_recs2preload = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
         self.progressBarManager.__exit__(None, None, None)
         self.graphPreload()
         
@@ -3160,10 +3175,7 @@ class UIsub(Ui_MainWindow):
             print("setButtonParse")
         unparsed = self.df_project['sweeps'].eq("...").any()
         self.pushButtonParse.setVisible(bool(unparsed))
-        if config.hide_experimental:
-            self.checkBox_force1stim.setVisible(False)
-        else:
-            self.checkBox_force1stim.setVisible(bool(unparsed))
+        self.checkBox_force1stim.setVisible(bool(unparsed))
 
     def checkBox_force1stim_changed(self, state):
         uistate.checkBox['force1stim'] = state == 2
@@ -3617,6 +3629,8 @@ class UIsub(Ui_MainWindow):
         self.uiFreeze() # Freeze UI, thaw on graphPreloadFinished
         t0 = time.time()
         self.mouseoverDisconnect()
+        # Clean up any existing thread before starting a new one
+        self._cleanup_threads()
         if not uistate.list_idx_recs2preload:
             df_p = self.get_df_project()
             uistate.list_idx_recs2preload = df_p[~df_p['sweeps'].eq("...")].index.tolist()
@@ -3624,16 +3638,18 @@ class UIsub(Ui_MainWindow):
             return
         print(f"Preloading {len(uistate.list_idx_recs2preload)} recordings.")
         self.progressBar.setValue(0)
-        self.thread = graphPreloadThread(uistate, uiplot, self)
-        self.thread.finished.connect(lambda: self.ongraphPreloadFinished(t0))
-        self.thread.finished.connect(self.thread.deleteLater)  # Auto-cleanup when done
+        thread = graphPreloadThread(uistate, uiplot, self)
+        thread.finished.connect(lambda: self.ongraphPreloadFinished(t0))
+        thread.finished.connect(thread.deleteLater)  # Auto-cleanup when done
+        thread.finished.connect(lambda: self._threads.remove(thread) if thread in self._threads else None)
+        self._threads.append(thread)
 
         # Create ProgressBarManager and connect progress signal
         if len(uistate.list_idx_recs2preload) > 0:
             self.progressBarManager = ProgressBarManager(self.progressBar, len(uistate.list_idx_recs2preload))
-            self.thread.progress.connect(lambda i: self.progressBarManager.update(i, "Preloading recording"))
+            thread.progress.connect(lambda i: self.progressBarManager.update(i, "Preloading recording"))
 
-            self.thread.start()
+            thread.start()
             self.progressBarManager.__enter__()  # Show progress bar
         else:
             print("No new recordings to preload.")
@@ -3754,10 +3770,6 @@ class UIsub(Ui_MainWindow):
                     self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', lambda event: self.eventDragReleased(event, data_x, data_y))
 
         elif canvas == self.canvasMean: # Mean canvas (top graph) left-clicked: overview and selecting ranges for finding relevant stims
-            if uistate.mean_mouseover_stim_select is not None:
-                uistate.dragging = False
-                self.stimSelectionChanged()
-                return
             dfmean = self.get_dfmean(p_row) # Required for event dragging, x and y
             time_values = dfmean['time'].values
             uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
@@ -3817,10 +3829,10 @@ class UIsub(Ui_MainWindow):
         for stim, x_range in uistate.mean_stim_x_ranges.items():
             if x_range[0] <= x <= x_range[1] and y_range[0] <= y <= y_range[1]:
                 uistate.mean_mouseover_stim_select = stim
-                print(f"meanMouseover of {uistate.mean_mouseover_stim_select}: x={x}, y={y}")
+                # print(f"meanMouseover of {uistate.mean_mouseover_stim_select}: x={x}, y={y}")
                 # find corresponding selection marker:
                 stim_str = f"- stim {stim}"
-                label = (f"mean {label_core} {stim_str} marker")
+                label = (f"mean {rec_name} {stim_str} marker")
                 stim_marker = uistate.dict_rec_labels.get(label)
                 # print(f"{label}: {stim_marker}")
                 # zorder mouseovered marker to top, alpha 1
@@ -3832,7 +3844,7 @@ class UIsub(Ui_MainWindow):
             else:
                 # reset all stim markers to default zorder and alpha
                 stim_str = f"- stim {stim}"
-                label = (f"mean {label_core} {stim_str} marker")
+                label = (f"mean {rec_name} {stim_str} marker")
                 stim_marker = uistate.dict_rec_labels.get(label)
                 if stim_marker is not None:
                     stim_marker_line = stim_marker.get('line')
