@@ -62,7 +62,7 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
         a dataframe. Per sweep (row): EPSP_amp, EPSP_slope, volley_amp, volley_EPSP
     """
     t0 = time.time()
-    print (f"build_dfoutput: {dict_t}")
+    print(f"build_dfoutput: {dict_t}")
     normFrom = dict_t['norm_output_from'] # start
     normTo = dict_t['norm_output_to'] # end
     list_col = ['stim', 'sweep']
@@ -107,7 +107,6 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
         else:
             dfoutput['EPSP_slope'] = np.nan
             dfoutput['EPSP_slope_norm'] = np.nan
-
 
     # volley_amp
     if 't_volley_amp' in dict_t.keys():

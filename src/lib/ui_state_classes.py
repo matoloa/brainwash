@@ -160,9 +160,11 @@ class UIstate:
 
         self.dict_group_labels = {} # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, axis: str, line: 2DlineObject}, fill: 2DfillObject}
         self.dict_group_show = {} # copy containing only visible groups
-        # TODO: deprecate these
+
+        # TODO: deprecate other uses: don't use for setting max length of x-axis or the like
+        self.dft_temp = None # copy of selected dft for storing measure points until either saved or rejected
+        # TODO: deprecate
         self.dfp_row_copy = None # copy of selected row in uisub.tableProj
-        self.dft_copy = None # copy of dft for storing measure points until either saved or rejected
 
     # Mouseover variables
         # Meangraph Mouseover variables
