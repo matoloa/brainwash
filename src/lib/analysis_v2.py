@@ -604,13 +604,17 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
         
     return result
 
+
+# %% test code
 if __name__ == "__main__":
     import parse
     import ui_state_classes as ui
 
     # Test find_events:  with a sample DataFrame
-    list_sources = [r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_a.csv",
-                    r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_b.csv",
+
+    list_sources = [
+                    #r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_a.csv",
+                    #r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_b.csv",
                     #r"C:\Users\xandmz\Documents\data\A_24_P0630-D4_Ch0_a.csv",
                     #r"C:\Users\xandmz\Documents\data\A_24_P0630-D4_Ch0_b.csv",
                     #r"C:\Users\xandmz\Documents\data\B_22_P0701-D3_Ch0_a.csv",
@@ -621,6 +625,13 @@ if __name__ == "__main__":
                     #r"K:\Samples - pilot\cA24.csv",  # Works with ui.py
                     #r"K:\Samples - pilot\cB22.csv", # Doesn't Work with ui.py
     ]
+    # add all .csv files in /home/mato/Documents/Brainwash Data Source/talkback KetaDexa to list_sources
+    folder_test = Path.home() / 'Documents' / 'Brainwash Data Source' / 'talkback KetaDexa'
+    #folder_test = Path.home() / 'Documents' / 'Brainwash Data Source' / 'talkback Lactate24SR'
+    for file in folder_test.glob('*slice*.csv'):
+        list_sources.append(str(file))
+
+    # default dict_t
     t_volley_slope_width = 0.0003 # default width for volley slope, in seconds
     t_EPSP_slope_width = 0.0007 # default width for EPSP, in seconds
     t_volley_slope_halfwidth = 0.0001
@@ -665,7 +676,16 @@ if __name__ == "__main__":
         t0 = time.time()
         df = pd.read_csv(source)
         print(f"Loaded {source} with shape {df.shape}")
-        dfmean, i_stim = parse.build_dfmean(df)
+        # if 'voltage_raw' in df.columns:
+        print (f"Columns: {df.columns.tolist()}")
+        if 'voltage_raw' in df.columns: # raw data
+            dfmean, i_stim = parse.build_dfmean(df)
+        else: #dfmean, recovered from talkback slice
+            rollingwidth=3
+            df['prim'] = df.voltage.rolling(rollingwidth, center=True).mean().diff()
+            i_stim = find_i_stims(df)
+            dfmean = df
+ 
         print(f"DataFrame mean shape: {dfmean.shape}, i_stim: {i_stim}")
         dict_events = find_events(dfmean, default_dict_t, verbose=True)
         dict_t = default_dict_t.copy()  # Create a copy of the default dictionary
@@ -692,22 +712,28 @@ if __name__ == "__main__":
             't_EPSP_amp': df_t['t_EPSP_amp'].values[0],
         })
     print("Event Summary:")
+    successful_volley_slope = 0
+    successful_EPSP_slope = 0
     for event in list_event_summary:
+        if event['t_EPSP_slope_method'] == 'auto detect':
+            successful_EPSP_slope += 1
+        if event['t_volley_slope_method'] == 'auto detect':
+            successful_volley_slope += 1
         print(f"t_stim: {event['t_stim']}, vS:{event['t_volley_slope_method']}, ES: {event['t_EPSP_slope_method']}, "
               f"t_volley_slope: {event['t_volley_slope_start']} - {event['t_volley_slope_end']}, t_volley_amp: {event['t_volley_amp']}, "
               f"t_EPSP_slope: {event['t_EPSP_slope_start']} - {event['t_EPSP_slope_end']}, t_EPSP_amp: {event['t_EPSP_amp']}")
+    print(f"\nFolder tested: {folder_test}")
+    print(f"   Successful volley slope detections: {successful_volley_slope}/{len(list_event_summary)}")
+    print(f"   Successful EPSP slope detections: {successful_EPSP_slope}/{len(list_event_summary)}")
               
 
 
-
-
-'''
 # Jupyter Notebook testers
 
 # %%
-if __name__ == "__main__":
+if False: #__name__ == "__main__":
     # read slices and meta
-    folder_talkback = Path.home() / 'Documents' / 'Brainwash Data Source' / 'talkback KetaDexa'
+    # folder_talkback = Path.home() / 'Documents' / 'Brainwash Data Source' / 'talkback KetaDexa'
     folder_talkback = Path.home() / 'Documents' / 'Brainwash Data Source' / 'talkback Lactate24SR'
     slice_filepaths = sorted(list(folder_talkback.glob('*slice*')))
     meta_filepaths = sorted(list(folder_talkback.glob('*meta*')))
@@ -734,7 +760,7 @@ if __name__ == "__main__":
 
 
 # %%
-if __name__ == "__main__":
+if False: # __name__ == "__main__":
     sweepname = df.sweepname.unique()[0]
     sweepname = 'd1fdaa03-6a4a-4e32-9691-ad4ef09a1e1c'
     dfsweep = df.loc[df.sweepname == sweepname, ['time', 'voltage']]
@@ -742,7 +768,7 @@ if __name__ == "__main__":
 
 # %%
 # calculate and report test set
-if __name__ == "__main__":
+if False: # __name__ == "__main__":
     from analysis_evaluation import evaluate_and_report
 
     def check_sweep(sweepname):
@@ -768,7 +794,7 @@ if __name__ == "__main__":
 
 # %%
 # find worst offenders
-if __name__ == "__main__":
+if False: #__name__ == "__main__":
     def check_sweep(sweepname):
         dfsweep = df.loc[df.sweepname == sweepname, ['time', 'voltage', 'prim', 'bis']]
         result = characterize_graph(dfsweep, stim_amp=0.005, verbose=False, plot=False, multiplots=True)
@@ -791,7 +817,7 @@ if __name__ == "__main__":
 
 # %%
 # plot worst offenders
-if __name__ == "__main__":
+if False: # __name__ == "__main__":
     results = []
     for sweepname in worst_list:
         dfsweep = df.loc[df.sweepname == sweepname, ['time', 'voltage']]
@@ -800,4 +826,3 @@ if __name__ == "__main__":
         results.append(result)
     dfresults = pd.DataFrame(results)
     #dfresults
-'''
