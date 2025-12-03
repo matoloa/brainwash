@@ -575,7 +575,7 @@ class UIplot():
             self.plot_group_lines('ax2', group_ID, dict_group, df_groupmean)
 
 
-    def update(self, prow, trow, aspect, data_x, data_y, amp=None): # TODO: unspaghetti this
+    def update(self, prow, trow, aspect, data_x, data_y, amp=None):
         """
         Updates the existing plotted artists stored in `self.uistate.dict_rec_labels`.
         Parameters
@@ -622,7 +622,8 @@ class UIplot():
         for key in required_keys:
             if key not in trow:
                 raise KeyError(f"trow missing required key: '{key}'")
-        
+
+        # TODO: unspaghetti this mess
         norm = self.uistate.checkBox['norm_EPSP']
         stim_offset = trow['t_stim']
         label_core = f"{prow['recording_name']} - stim {trow['stim']} {aspect}"
