@@ -1723,6 +1723,9 @@ class UIsub(Ui_MainWindow):
         self.menuEdit.addSeparator()
         self.actionForAllSelected = QtWidgets.QAction("For ALL selected recordings...", self) # not connected: submenu header
         self.menuEdit.addAction(self.actionForAllSelected)
+        self.actionReAnalyzeRecordings = QtWidgets.QAction("   Reanalyze selected recordings", self)
+        self.actionReAnalyzeRecordings.triggered.connect(self.triggerReAnalyzeRecordings)
+        self.menuEdit.addAction(self.actionReAnalyzeRecordings)
         self.actionKeepOnlySelectedSweeps = QtWidgets.QAction("   Keep only selected sweeps", self)
         self.actionKeepOnlySelectedSweeps.triggered.connect(self.triggerKeepSelectedSweeps)
         self.menuEdit.addAction(self.actionKeepOnlySelectedSweeps)
@@ -2147,6 +2150,10 @@ class UIsub(Ui_MainWindow):
         self.parseData()
         self.setButtonParse()
 
+    def triggerReAnalyzeRecordings(self):
+        self.usage("triggerReAnalyzeRecordings")
+        self.reanalyze_recordings()
+
     def triggerKeepSelectedSweeps(self):
         self.usage("triggerKeepSelectedSweeps")
         self.sweep_keep_selected()
@@ -2192,7 +2199,30 @@ class UIsub(Ui_MainWindow):
             print("sweep_removal_valid_confirmed: cancelled by user")
             return False
         return True
-    
+
+    def reanalyze_recordings(self):
+        self.usage("reanalyze_recordings")
+        n_recs = len(uistate.list_idx_select_recs)
+        print(f"Reanalyzing {n_recs} selected recording{'s' if n_recs != 1 else ''}...")
+        # purge df timepoints and cache for selected recordings
+        for rec_idx in uistate.list_idx_select_recs:
+            p_row = self.df_project.iloc[rec_idx]
+            rec_name = p_row['recording_name']
+            # delete timepoints file
+            timepoints_file = self.dict_folders['timepoints'] / (rec_name + ".parquet")
+            if timepoints_file.exists():
+                timepoints_file.unlink()
+                if config.verbose:
+                    print(f"Deleted timepoints file: {timepoints_file}")
+            # delete cached output file
+            cache_file = self.dict_folders['cache'] / (rec_name + "_output.parquet")
+            if cache_file.exists():
+                cache_file.unlink()
+                if config.verbose:
+                    print(f"Deleted cached output file: {cache_file}")
+            self.set_rec_status(rec_name)
+        self.resetCacheDicts()
+        self.recalculate() # outputs, binning, group handling
 
     def sweep_shift_gaps(self, df, sweeps_removed):
         """ Shifts all remaining sweeps down to close gaps after removal, e.g. removed {10, 11} → 12→10, 13→11, etc. """
@@ -3137,29 +3167,34 @@ class UIsub(Ui_MainWindow):
         self.df_project.to_csv(str(self.dict_folders['project'] / "project.brainwash"), index=False)
 
     def set_rec_status(self, rec_name=None): # TODO: should run on ID - not name!
-        # Updates df_project['status'] and 'defaults' based on whether 'default' appears in each df_t
-        # TODO: expand this to cover more issues with recordings
-        def has_default(rec_name):
-            df_t = self.dict_ts.get(rec_name)
-            if df_t is not None:
-                return 'default' in df_t.values
+        # Updates df_project['status'] to 'manual' if there is a single manual point, else 'default' if there is a default point, else 'auto'
+        # TODO: expand this to cover more issues with recordings and specify algorithm used.
+        def status(rec_name, dfp, marker_list):
+            prow = dfp[dfp['recording_name'] == rec_name]
+            if isinstance(prow, pd.DataFrame):
+                p_series = prow.iloc[0]
             else:
-                print(f"set_rec_status: {rec_name} not found in dict_ts")
-                return False
-        df_p = self.get_df_project()
+                p_series = prow
+            dft = self.get_dft(p_series)
+            for marker in marker_list:
+                if marker in dft.values:
+                    dfp.loc[dfp['recording_name'] == rec_name, 'status'] = marker
+                    if config.verbose:
+                        print(f"set_rec_status: {rec_name} set to status = '{marker}'")
+                    return
+            dfp.loc[dfp['recording_name'] == rec_name, 'status'] = 'auto'
+            return
+        # in order of priority, look for these markers in the timepoints dataframe
+        marker_list = ['manual', 'default']
+        dfp = self.get_df_project()
+
         if rec_name is not None:
-            default_found = has_default(rec_name)
-            df_p.loc[df_p['recording_name'] == rec_name, 'status'] = "default" if default_found else ""
-            if config.verbose:
-                print(f"set_status: {rec_name} set to status = '{df_p.loc[df_p['recording_name'] == rec_name, 'status'].values[0]}'")
+            status(rec_name, dfp, marker_list)
         else:
-            for idx, row in df_p.iterrows():
-                rec = row['recording_name']
-                default_found = has_default(rec)
-                df_p.at[idx, 'status'] = "default" if default_found else ""
-            if config.verbose:
-                print(f"set_status: marked all statuses in {len(df_p)} recordings")
-        self.set_df_project(df_p)
+            for i, row in dfp.iterrows():
+                status(row['recording_name'], dfp, marker_list)
+    
+        self.set_df_project(dfp)
         self.tableUpdate()
 
 
@@ -4487,9 +4522,8 @@ class UIsub(Ui_MainWindow):
         self.persistOutput(rec_name=rec_name, dfoutput=dfoutput)
 
         self.set_dft(rec_name, dft_temp)
-        self.tableStimModel.setData(dft_temp)
+        self.tableStimModel.setData(self.get_dft(prow))
         self.set_rec_status(rec_name=rec_name)
-        # dict_trow = dft_temp.iloc[stim_idx].to_dict()
 
         uiplot.update(prow=prow, trow=trow_temp, aspect=aspect, data_x=data_x, data_y=data_y)
 
