@@ -1725,6 +1725,7 @@ class UIsub(Ui_MainWindow):
         self.menuEdit.addAction(self.actionForAllSelected)
         self.actionReAnalyzeRecordings = QtWidgets.QAction("   Reanalyze selected recordings", self)
         self.actionReAnalyzeRecordings.triggered.connect(self.triggerReAnalyzeRecordings)
+        self.actionReAnalyzeRecordings.setShortcut("Alt+A")
         self.menuEdit.addAction(self.actionReAnalyzeRecordings)
         self.actionKeepOnlySelectedSweeps = QtWidgets.QAction("   Keep only selected sweeps", self)
         self.actionKeepOnlySelectedSweeps.triggered.connect(self.triggerKeepSelectedSweeps)
