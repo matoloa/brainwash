@@ -375,6 +375,7 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
     verboses += f"volley: search region {volley_start}, {volley_end}\n"
     v_prom = 0.001
     v_peaks = []
+    i_veb = volley_start
     while len(v_peaks) < 2 and v_prom > 1e-6: # iterative volley search until at least 2 prominent peaks are found
         v_peaks, v_peak_props = find_peaks(volley_region, prominence=v_prom)
         v_prom /= 2

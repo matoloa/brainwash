@@ -2705,7 +2705,7 @@ class UIsub(Ui_MainWindow):
                 uiplot.unPlot(rec_ID) # remove plotted lines
         # store the ID of the line below the last selected row
         reselect_ID = None
-        if uistate.list_idx_select_recs[-1] < len(df_p) - 1:
+        if uistate.list_idx_select_recs[-1] < (len(df_p) - 1):
             reselect_ID = df_p.at[uistate.list_idx_select_recs[-1] + 1, 'ID']
         df_p.drop(uistate.list_idx_select_recs, inplace=True)
         df_p.reset_index(inplace=True, drop=True)
