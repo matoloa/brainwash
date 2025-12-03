@@ -575,53 +575,100 @@ class UIplot():
             self.plot_group_lines('ax2', group_ID, dict_group, df_groupmean)
 
 
-    def plotUpdate(self, p_row, t_row, aspect, data_x, data_y, amp=None): # TODO: unspaghetti this
+    def update(self, prow, trow, aspect, data_x, data_y, amp=None): # TODO: unspaghetti this
+        """
+        Updates the existing plotted artists stored in `self.uistate.dict_rec_labels`.
+        Parameters
+        - prow (pandas.Series): df_project row for selected recording.
+        - trow (pandas.Series): dft (timepoint) row for selected stim.
+        - aspect (str): One of 'EPSP slope', 'volley slope', 'EPSP amp', 'volley amp'.
+            Controls which markers/lines are updated.
+        - data_x (np.ndarray-like): x-values (time or shifted time) corresponding to
+            the event window or mean trace used to sample y-values for marker placement.
+        - data_y (np.ndarray-like): y-values aligned with `data_x` (voltage trace).
+        - amp (float, optional): amplitude value used for drawing amplitude markers
+        """
+
+        # Validate input formats
+        if not isinstance(prow, pd.Series):
+            raise TypeError(f"prow must be pandas.Series, got {type(prow).__name__}")
+        if not isinstance(trow, (pd.Series, dict)):
+            raise TypeError(f"trow must be pandas.Series or dict, got {type(trow).__name__}")
+        if isinstance(trow, dict) and not trow:
+            raise ValueError("trow dict is empty")
+       
+        valid_aspects = ['EPSP slope', 'volley slope', 'EPSP amp', 'volley amp']
+        if aspect not in valid_aspects:
+            raise ValueError(f"aspect must be one of {valid_aspects}, got '{aspect}'")
+        if not isinstance(data_x, np.ndarray):
+            try:
+                data_x = np.asarray(data_x)
+            except (TypeError, ValueError):
+                raise TypeError(f"data_x must be array-like, got {type(data_x).__name__}")
+        if not isinstance(data_y, np.ndarray):
+            try:
+                data_y = np.asarray(data_y)
+            except (TypeError, ValueError):
+                raise TypeError(f"data_y must be array-like, got {type(data_y).__name__}")
+        
+        if len(data_x) != len(data_y):
+            raise ValueError(f"data_x and data_y must have same length, got {len(data_x)} and {len(data_y)}")
+
+        if amp is not None and not isinstance(amp, (int, float, np.number)):
+            raise TypeError(f"amp must be numeric or None, got {type(amp).__name__}")
+        
+        # Validate required keys in trow
+        required_keys = ['t_stim', 'stim', 'amp_zero']
+        for key in required_keys:
+            if key not in trow:
+                raise KeyError(f"trow missing required key: '{key}'")
+        
         norm = self.uistate.checkBox['norm_EPSP']
-        stim_offset = t_row['t_stim']
-        label_base = f"{p_row['recording_name']} - stim {t_row['stim']} {aspect}"
+        stim_offset = trow['t_stim']
+        label_core = f"{prow['recording_name']} - stim {trow['stim']} {aspect}"
 
         if aspect in ['EPSP slope', 'volley slope']:
-            x_start = t_row[f't_{aspect.replace(" ", "_")}_start']-stim_offset
-            x_end = t_row[f't_{aspect.replace(" ", "_")}_end']-stim_offset
+            x_start = trow[f't_{aspect.replace(" ", "_")}_start']-stim_offset
+            x_end = trow[f't_{aspect.replace(" ", "_")}_end']-stim_offset
             y_start = data_y[np.abs(data_x - x_start).argmin()]
             y_end = data_y[np.abs(data_x - x_end).argmin()]
-            self.updateLine(f"{label_base} marker", [x_start, x_end], [y_start, y_end])
+            self.updateLine(f"{label_core} marker", [x_start, x_end], [y_start, y_end])
             if self.uistate.checkBox['output_per_stim']:
-                label_base = f"{p_row['recording_name']} {aspect}"
+                label_core = f"{prow['recording_name']} {aspect}"
             if aspect == 'volley slope':
                 if self.uistate.checkBox['output_per_stim']:
-                    self.updateOutLine(label_base)
+                    self.updateOutLine(label_core)
                 else:
-                    volley_slope_mean = t_row.get('volley_slope_mean')
+                    volley_slope_mean = trow.get('volley_slope_mean')
                     print(f" - - - volley_slope_mean: {volley_slope_mean}")
                     #if volley_slope_mean is None:
                     #    volley_slope_mean = self.uistate.mouseover_out[0].get_ydata().mean()
-                    self.updateOutMean(f"{label_base} mean", volley_slope_mean)
+                    self.updateOutMean(f"{label_core} mean", volley_slope_mean)
             else: # EPSP slope
                 if norm:
-                    label_base += " norm"
-                self.updateOutLine(label_base)
+                    label_core += " norm"
+                self.updateOutLine(label_core)
         elif aspect in ['EPSP amp', 'volley amp']:
             key = aspect.replace(" ", "_")
-            t_amp = t_row[f't_{key}'] - stim_offset
+            t_amp = trow[f't_{key}'] - stim_offset
             y_position = data_y[np.abs(data_x - t_amp).argmin()]
-            amp_x = t_amp - t_row[f't_{key}_halfwidth'], t_amp + t_row[f't_{key}_halfwidth']
-            self.updateAmpMarker(label_base, t_amp, y_position, amp_x, t_row['amp_zero'], amp=amp)
+            amp_x = t_amp - trow[f't_{key}_halfwidth'], t_amp + trow[f't_{key}_halfwidth']
+            self.updateAmpMarker(label_core, t_amp, y_position, amp_x, trow['amp_zero'], amp=amp)
             if self.uistate.checkBox['output_per_stim']:
-                label_base = f"{p_row['recording_name']} {aspect}"
+                label_core = f"{prow['recording_name']} {aspect}"
             if aspect == 'volley amp':
                 if self.uistate.checkBox['output_per_stim']:
-                    self.updateOutLine(label_base)
+                    self.updateOutLine(label_core)
                 else:
-                    volley_amp_mean = t_row.get('volley_amp_mean')
+                    volley_amp_mean = trow.get('volley_amp_mean')
                     print(f" - - - volley_amp_mean: {volley_amp_mean}")
                     #if volley_amp_mean is None:
                     #    volley_amp_mean = self.uistate.mouseover_out[0].get_ydata().mean()
-                    self.updateOutMean(f"{label_base} mean", volley_amp_mean)
+                    self.updateOutMean(f"{label_core} mean", volley_amp_mean)
             else: # EPSP amp
                 if norm:
-                    label_base += " norm"
-                self.updateOutLine(label_base)
+                    label_core += " norm"
+                self.updateOutLine(label_core)
 
     def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None):
         axe = self.uistate.axe

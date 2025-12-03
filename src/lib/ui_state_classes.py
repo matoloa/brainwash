@@ -148,23 +148,23 @@ class UIstate:
         self.ax2 = None # axis of output for slopes (bottom graph)
         self.frozen = False # True if ui is frozen
 
+        self.list_idx_recs2preload = [] # list of indices in uisub.df_project for freshly parsed recordings; used by uisub.graphPreload()
         self.list_idx_select_recs = [] # list of selected indices in uisub.tableProj
+        self.list_idx_select_stims = [0] # list of selected indices in uisub.tableStim; default to first
+        self.float_sweep_duration_max = None # maximum sweep duration of all recordings in df_recs2plot; used to set x-limits of eventgraph. Updated on rec selection change.
+
+    # Liabilities: TODO: are these properly updated/cleared when selections change?
         self.df_rec_select_data = None # df_filtered of ONE selected recording (if more than one selected, None), used to plot means of selected sweeps in eventgraph
         self.df_rec_select_time = None # dft of ONE selected recording (if more than one selected, None), used to offset mean sweeps in eventgraph
-        self.list_idx_recs2preload = [] # list of indices in uisub.df_project for freshly parsed recordings; used by uisub.graphPreload()
-        self.list_idx_select_stims = [0] # list of selected indices in uisub.tableStim; default to first
         self.df_recs2plot = None # df_project copy, filtered to selected AND parsed recordings (or all parsed, if none are selected)
 
+    # Plotted lines and fills
         self.dict_rec_labels = {} # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, axis: str, line: 2DlineObject}}
         self.dict_rec_show = {} # copy containing only visible recs
 
+    # Groups (mean of recs)
         self.dict_group_labels = {} # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, axis: str, line: 2DlineObject}, fill: 2DfillObject}
         self.dict_group_show = {} # copy containing only visible groups
-
-        # TODO: deprecate other uses: don't use for setting max length of x-axis or the like
-        self.dft_temp = None # copy of selected dft for storing measure points until either saved or rejected
-        # TODO: deprecate
-        self.dfp_row_copy = None # copy of selected row in uisub.tableProj
 
     # Mouseover variables
         # Meangraph Mouseover variables
@@ -184,6 +184,7 @@ class UIstate:
         self.x_drag = None # x-value of current dragging
         self.dragging = False # True if dragging; allows right-click to cancel drag
         self.mouseover_out = None # output of dragged aspect
+        self.dft_temp = None # temporary dft, updated during dragging, replaces dft at release
 
         # Eventgraph Mouseover coordinates, for plotting. Set on row selection.
         self.EPSP_amp_xy = None # x,y
