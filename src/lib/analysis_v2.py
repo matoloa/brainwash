@@ -177,33 +177,6 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
     2) Acquires i and t from characterize_graph() for the provided dfmean and converts index to time values
     3) Returns a DataFrame of the t-values for each stim
     """
-    # i_stims: list of indices of stimulation artefacts in dfmean. If None, autodetects using find_i_stims.
-    if i_stims is None:
-        i_stims = find_i_stims(dfmean=dfmean)
-    if not i_stims:
-        print("find_events: no stimulation artefacts found. Returning empty DataFrame.")
-        return pd.DataFrame()
-    
-    # calculate time delta and sampling frequency
-    time_values = dfmean['time'].values
-    time_delta = time_values[1] - time_values[0]
-    sampling_Hz = 1 / time_delta
-
-    if precision is None:
-        precision = len(str(time_values[1] - time_values[0]).split('.')[1])
-
-    if verbose:
-        print(f"find_i_stims: {len(i_stims)}: sampling_Hz: {sampling_Hz}")
-        print(i_stims)
-
-    def unwrap(v):
-        if isinstance(v, pd.Series):
-            if len(v) == 1:
-                return v.iloc[0]
-            else:
-                raise ValueError(f"Expected scalar or single-element Series, got Series with {len(v)} elements: {v}")
-        return v
-            
     def i2t(stim_nr, i_stim, df_event_range, time_delta, stim_char, precision, default_dict_t):
         # Converts i (index) to t (time from start of sweep in dfmean)
         t_stim = round(df_event_range.loc[i_stim].time, precision)
@@ -262,8 +235,34 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
             't_EPSP_amp_method': t_EPSP_amp_method,
         }
         return result
+    def unwrap(v):
+        if isinstance(v, pd.Series):
+            if len(v) == 1:
+                return v.iloc[0]
+            else:
+                raise ValueError(f"Expected scalar or single-element Series, got Series with {len(v)} elements: {v}")
+        return v
 
-    # Convert each index to a dictionary of t-values and add it to a list
+    # i_stims: list of indices of stimulation artefacts in dfmean. If None, autodetects using find_i_stims.
+    if i_stims is None:
+        i_stims = find_i_stims(dfmean=dfmean)
+    if not i_stims:
+        print("find_events: no stimulation artefacts found. Returning empty DataFrame.")
+        return pd.DataFrame()
+    
+    # calculate time delta and sampling frequency
+    time_values = dfmean['time'].values
+    time_delta = time_values[1] - time_values[0]
+    sampling_Hz = 1 / time_delta
+
+    if precision is None:
+        precision = len(str(time_values[1] - time_values[0]).split('.')[1])
+
+    if verbose:
+        print(f"find_i_stims: {len(i_stims)}: sampling_Hz: {sampling_Hz}")
+        print(i_stims)
+
+        # Convert each index to a dictionary of t-values and add it to a list
     list_of_dict_t = []
     margin_before = 5
     min_interval_samples = 200  # 20 ms at 10 kHz to ensure no overlap in up to 50Hz trains
