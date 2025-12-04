@@ -251,6 +251,19 @@ class UIplot():
                 del dict_show[key]
 
 
+    def exterminate(self):
+        # cycles through every line, on every graph, and kills it.
+        axes = [self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2,]
+        for axis in axes:
+            if axis is None:
+                continue
+            for line in list(axis.lines):
+                line.remove()
+            axis.figure.canvas.draw()
+        self.uistate.dict_rec_labels = {}
+        self.uistate.dict_rec_show = {}
+
+
     def unPlotGroup(self, group_ID=None):
         dict_group = self.uistate.dict_group_labels
         if group_ID is None:

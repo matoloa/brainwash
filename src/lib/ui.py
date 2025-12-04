@@ -1508,8 +1508,15 @@ class UIsub(Ui_MainWindow):
     def zoomAuto(self):
         # set and apply Auto-zoom parameters for all axes
         self.usage("zoomAuto")
-        # get voltage range of selected recordings
-        dfv_select = self.get_dfv().loc[uistate.list_idx_select_recs]
+        dfv = self.get_dfv()
+        # invalid df or invalid indices
+        if dfv is None or len(dfv) == 0:
+            return
+        # intersect selected indices with df index
+        valid_idx = [i for i in uistate.list_idx_select_recs if i in dfv.index]
+        if not valid_idx:
+            return
+        dfv_select = dfv.loc[valid_idx]
         if dfv_select is None or dfv_select.empty:
             return
         # axm:
@@ -1815,6 +1822,11 @@ class UIsub(Ui_MainWindow):
         self.menuEdit.addAction(self.actionSplitBySelectedSweeps)
 
         # View menu
+        self.actionRefresh = QtWidgets.QAction("Refresh Graphs", self)
+        self.actionRefresh.triggered.connect(self.triggerRefresh)
+        self.actionRefresh.setShortcut("F5")
+        self.menuView.addAction(self.actionRefresh)
+        self.actionRefresh = QtWidgets.QAction("Refresh Graphs", self)
         self.actionDarkmode = QtWidgets.QAction("Toggle Darkmode", self)
         self.actionDarkmode.triggered.connect(self.triggerDarkmode)
         self.actionDarkmode.setShortcut("Alt+D")
@@ -2121,6 +2133,11 @@ class UIsub(Ui_MainWindow):
     def trigger_set_bin_size_all(self):
         self.usage(f"trigger_set_bin_size_all")
         uistate.checkBox['bin'] = True
+        self.recalculate()
+
+    def triggerRefresh(self):
+        self.usage(f"refresh graphs")
+        uiplot.exterminate()
         self.recalculate()
 
     def triggerDarkmode(self):
