@@ -1,78 +1,76 @@
-name: Build Windows Installer (Win11+ compatible)
+name: Build Linux AppImage + Windows MSI
 
 on:
-  workflow_dispatch:
-  # push:
-  #   tags: ['v*']
+  workflow_dispatch:      # lets you run it manually
 
 jobs:
-  build-windows:
-    runs-on: windows-latest  # Windows Server 2022 → has full Win11 SDK support
-    defaults:
-      run:
-        shell: powershell
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: Linux
+          - os: windows-latest
+            platform: Windows
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.12 (official python.org build)
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           architecture: x64
           cache: pip
 
-      - name: Upgrade pip & install build tools
+      - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install "cx_Freeze>=7.1" pywin32
+          pip install "cx_Freeze==8.2.0" toml
 
-      - name: Download and embed VC++ Redistributable (required on clean Win11 installs)
-        run: |
-          Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "vc_redist.x64.exe"
+      - name: Install patchelf (Linux only)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y patchelf
 
-      - name: Build MSI + Portable ZIP with cx_Freeze
+      - name: Build with cx_Freeze
         working-directory: ./src
         run: |
-          python build_with_cxfreeze_multiarch_setup.py bdist_msi bdist_zip
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            echo "Building Linux AppImage..."
+            python build_with_cxfreeze_multiarch_setup.py bdist_appimage
+          else
+            echo "Building Windows MSI..."
+            python build_with_cxfreeze_multiarch_setup.py bdist_msi
+          fi
 
       - name: Extract version from pyproject.toml
         id: version
         run: |
-          $ver = python - <<EOF
-          import toml, sys
-          data = toml.load("../pyproject.toml")
-          print(data["project"]["version"])
-          EOF
-          echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
+          VER=$(python -c "import toml; print(toml.load('../pyproject.toml')['project']['version'])")
+          echo "version=$VER" >> $GITHUB_OUTPUT
+        shell: bash
 
-      - name: Prepare final artifacts
+      - name: Collect & rename Windows portable ZIP (Windows only)
+        if: runner.os == 'Windows'
+        working-directory: ./src
+        shell: powershell
         run: |
-          $ver = "${{ steps.version.outputs.VERSION }}"
-          New-Item -ItemType Directory -Path upload -Force
+          $ver = "${{ steps.version.outputs.version }}"
+          $zip = Get-ChildItem -Path build -Recurse -Include "*.zip" | Select-Object -First 1
+          if ($zip) {
+            Copy-Item $zip.FullName "dist/BrainWash-$ver-Windows-x64-Portable.zip"
+            Write-Host "Portable ZIP created: BrainWash-$ver-Windows-x64-Portable.zip"
+          }
 
-          Move-Item "src/dist/*.msi" "upload/BrainWash-$ver-Windows-x64-Installer.msi"
-          Move-Item "src/dist/*.zip" "upload/BrainWash-$ver-Windows-x64-Portable.zip"
-
-          # Also copy VC++ redist for users without it
-          Copy-Item "../vc_redist.x64.exe" "upload/VC_Redist_2022_x64.exe"
-
-      - name: Upload Installer (MSI)
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: BrainWash-${{ steps.version.outputs.VERSION }}-Windows11-x64-Installer
-          path: upload/*Installer.msi
-
-      - name: Upload Portable ZIP
-        uses: actions/upload-artifact@v4
-        with:
-          name: BrainWash-${{ steps.version.outputs.VERSION }}-Windows11-x64-Portable
-          path: upload/*Portable.zip
-
-      - name: Upload VC++ Redist (recommended for clean installs)
-        uses: actions/upload-artifact@v4
-        with:
-          name: VC_Redistributable
-          path: upload/VC_Redist_2022_x64.exe
+          name: BrainWash-${{ steps.version.outputs.version }}-${{ runner.os }}
+          path: |
+            src/dist/*.AppImage
+            src/dist/*.msi
+            src/dist/*Portable.zip
+          if-no-files-found: error
