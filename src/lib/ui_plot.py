@@ -698,7 +698,8 @@ class UIplot():
     def updateOutMean(self, label, mean):
         print(f"updateOutMean: {label}, {mean}")
         linedict = self.uistate.dict_rec_labels[label]
-        linedict['line'].set_ydata(mean)
+        linedict['line'].set_ydata([mean] * len(linedict['line'].get_xdata()))
+        # linedict['line'].set_ydata(mean)
 
 
 

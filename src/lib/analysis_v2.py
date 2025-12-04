@@ -50,7 +50,6 @@ def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
 
 
 def build_dfoutput(df, dict_t, filter='voltage', quick=False):
-    print(f"{dict_t=}")
     # TODO: check amps width calculations
     # TODO: implement quick, to operate without amp_hws
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
@@ -62,7 +61,7 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
         a dataframe. Per sweep (row): EPSP_amp, EPSP_slope, volley_amp, volley_EPSP
     """
     t0 = time.time()
-    print(f"build_dfoutput: {dict_t}")
+    # print(f"build_dfoutput: {dict_t}")
     normFrom = dict_t['norm_output_from'] # start
     normTo = dict_t['norm_output_to'] # end
     list_col = ['stim', 'sweep']
@@ -136,7 +135,7 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
         else:
             dfoutput['volley_slope'] = np.nan
 
-    print(f'build_df_output: {round((time.time()-t0)*1000)} ms, list_col: {list_col}')
+    # print(f'build_dfoutput: {round((time.time()-t0)*1000)} ms, list_col: {list_col}')
     return dfoutput[list_col]
 
 
