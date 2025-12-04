@@ -1541,7 +1541,7 @@ class UIsub(Ui_MainWindow):
         uistate.zoom['output_xlim'] = first, last
 
         self.zoomReset()
-        print(f"zoomAuto: output_xlim: {uistate.zoom['output_xlim']}")
+
 
     def zoomReset(self, axis=None):
         self.usage("zoomReset")
@@ -1560,27 +1560,16 @@ class UIsub(Ui_MainWindow):
                 print("zoomReset: axe")
                 axis.axes.set_xlim(uistate.zoom['event_xlim'])
                 axis.axes.set_ylim(uistate.zoom['event_ylim'])
-            # axes_in_figure = axis.figure.get_axes()
-            # for ax in axes_in_figure: # TODO:why is Event resetting output axes?
-            #     if ax.get_ylabel() == "Amplitude (mV)":
-            #         ax.set_ylim(uistate.zoom['output_ax1_ylim'])
-            #     elif ax.get_ylabel() == "Slope (mV/ms)":
-            #         ax.set_ylim(uistate.zoom['output_ax2_ylim'])
-            #     df_p = self.get_df_project()
-            #     x_axis = 'stim' if uistate.checkBox['output_per_stim'] else 'sweep'
-            #     max_value = round(df_p[x_axis].max())  # Round to the nearest integer
-            #     uistate.zoom['output_xlim'] = [0, max_value]
-            #     print(f"zoomReset: output_xlim: {uistate.zoom['output_xlim']}")
-            #     ax.set_xlim(uistate.zoom['output_xlim'])
         elif axis == uistate.ax1 or axis == uistate.ax2:
             if config.verbose:
                 print("zoomReset: ax1/ax2")
-            axis.axes.set_xlim(uistate.zoom['event_xlim'])
-            axis.axes.set_ylim(uistate.zoom['event_ylim'])
+            uistate.ax1.axes.set_xlim(uistate.zoom['output_xlim'])
+            uistate.ax2.axes.set_xlim(uistate.zoom['output_xlim'])
+            uistate.ax1.axes.set_ylim(uistate.zoom['output_ax1_ylim'])
+            uistate.ax2.axes.set_ylim(uistate.zoom['output_ax2_ylim'])
         else:
             raise ValueError("zoomReset: unknown axis")
         axis.figure.canvas.draw_idle()
-
 
 
     def update_recs2plot(self):

@@ -288,13 +288,28 @@ class UIplot():
 
         # arrange axes and labels
         axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
-        #axm.axis('off')
-        axm.set_xlim(uistate.zoom['mean_xlim'])
+
+        axm.axis('off')
+        #axm.set_xlim(uistate.zoom['mean_xlim'])
+        #axm.set_ylim(uistate.zoom['mean_ylim'])
+        #axm.set_xlabel("Time (s)")
+        #axe.set_ylabel("Voltage (V)")
 
         axe.set_xlabel("Time (s)")
         axe.set_ylabel("Voltage (V)")
         axe.set_xlim(uistate.zoom['event_xlim'])
         axe.set_ylim(uistate.zoom['event_ylim'])
+
+        # Convert y-axis from V → mV
+        axe.set_ylabel("Voltage (mV)")
+        axe.set_yticks(axe.get_yticks())  # keeps same positions
+        axe.set_yticklabels([f"{y*1e3:.1f}" for y in axe.get_yticks()])
+
+        # Convert x-axis from s → ms
+        axe.set_xlabel("Time (ms)")
+        axe.set_xticks(axe.get_xticks())
+        axe.set_xticklabels([f"{x*1e3:.1f}" for x in axe.get_xticks()])
+
 
         if uistate.checkBox['norm_EPSP']:
             ax1.set_ylabel("Amplitude %")
