@@ -4468,6 +4468,7 @@ class UIsub(Ui_MainWindow):
   
 
     def eventDragUpdate(self, x_start, x_end, precision):
+        # TODO: Overhaul this whole magic-string-mess
         '''
         Updates output graph uistate.mouseover_out while dragging event markers
         x_start: new start time of slope or amplitude
@@ -4526,25 +4527,29 @@ class UIsub(Ui_MainWindow):
                 for i, i_trow in dft_temp.iterrows():
                     dft_temp.at[i, key] = round(i_trow['t_stim'] - offset, precision)
 
-        trow = dft_temp.iloc[stim_idx]
-        dict_t['t_EPSP_amp_halfwidth'] = trow['t_EPSP_amp_halfwidth']
-        dict_t['t_volley_amp_halfwidth'] = trow['t_volley_amp_halfwidth']
-        dict_t['norm_output_from'] = trow['norm_output_from']
-        dict_t['norm_output_to'] = trow['norm_output_to']
+        trow_temp = dft_temp.iloc[stim_idx]
+        dict_t['t_EPSP_amp_halfwidth'] = trow_temp['t_EPSP_amp_halfwidth']
+        dict_t['t_volley_amp_halfwidth'] = trow_temp['t_volley_amp_halfwidth']
+        dict_t['norm_output_from'] = trow_temp['norm_output_from']
+        dict_t['norm_output_to'] = trow_temp['norm_output_to']
 
         if x_axis == 'stim':
             print ("eventDragUpdate: dfstimoutput removed from last analysis.")
             # TODO: fix eventDragUpdate for dfstimoutput
             # out = analysis.build_dfstimoutput(dfmean=dfmean, dft=dft_temp)
         elif x_axis == 'sweep':
-            dict_t['stim'] = trow['stim']
-            dict_t['amp_zero'] = trow['amp_zero']
+            dict_t['stim'] = trow_temp['stim']
+            dict_t['amp_zero'] = trow_temp['amp_zero']
             out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
-
-        outkey = f"{aspect}_norm" if uistate.checkBox['norm_EPSP'] and aspect in ["EPSP_amp", "EPSP_slope"] else aspect
-        aspect_norm = f"{aspect}_norm"
-        print(f"eventDragUpdate - outkey {outkey}, {aspect}: {out[aspect].iloc[0]}, {aspect_norm}: {out[aspect_norm].iloc[0]}")
-
+        
+        # norm handling for EPSP
+        if aspect in ["EPSP_amp", "EPSP_slope"]:
+            aspect_norm = f"{aspect}_norm"
+            outkey = aspect_norm if uistate.checkBox['norm_EPSP'] else aspect
+            # print(f"eventDragUpdate - outkey {outkey}, {aspect}: t({trow_temp[f"t_{aspect}"]}) {out[aspect].iloc[0]}, {aspect_norm}: {out[aspect_norm].iloc[0]}")
+        else:
+            outkey = aspect
+            # print(f"eventDragUpdate - outkey {outkey}, {aspect}: {out[aspect].iloc[0]}")
 
         if uistate.mouseover_out is None:
             uistate.mouseover_out = axis.plot(out[x_axis], out[outkey], color=uistate.settings[f'rgb_{aspect}'], linewidth=3)
@@ -4565,14 +4570,12 @@ class UIsub(Ui_MainWindow):
             print("x_drag == x_on_click")
             self.mouseoverUpdate()
             return
-        prow = self.get_prow()
-        rec_name = prow['recording_name']
 
         dft_temp = uistate.dft_temp # copied on clicked, updated while dragging
         stim_idx = uistate.list_idx_select_stims[0]
         trow_temp = dft_temp.iloc[stim_idx]
         
-        # Map drag actions to (0:method value, 1:aspect name, 2:{update values}, 3:plot updat function)
+        # Map drag actions to (0:method value, 1:aspect name, 2:{new measuring points}, 3:plot update function)
         action_mapping = {
             "EPSP slope": ("t_EPSP_slope_method", 'EPSP slope',
                            {'t_EPSP_slope_start': trow_temp['t_EPSP_slope_start'], 't_EPSP_slope_end': trow_temp['t_EPSP_slope_end']},
@@ -4587,28 +4590,31 @@ class UIsub(Ui_MainWindow):
                                 {'t_volley_amp': trow_temp['t_volley_amp'], 't_volley_amp_halfwidth': trow_temp['t_volley_amp_halfwidth'], 'amp_zero': trow_temp['amp_zero']},
                                   uistate.updatePointDragZone),
         }
-        # Apply the appropriate update if the current mouseover action matches a known drag type
+        # Build a dict_t of new measuring points and update drag zones
         for action, values in action_mapping.items():
             if uistate.mouseover_action.startswith(action):
                 method_field = values[0]
                 aspect = values[1]
-                dict_t = values[2]
+                dict_t_updates = values[2]
                 update_function = values[3]
-                dict_t[method_field] = "manual"
-                dict_t.update({
+                dict_t_updates[method_field] = "manual"
+                dict_t_updates.update({
                     'stim': trow_temp['stim'],
                     't_stim': trow_temp['t_stim'],
                     'norm_output_from': trow_temp['norm_output_from'],
                     'norm_output_to': trow_temp['norm_output_to'],
                 })
-                # print(f" - - - {values[2]}")
                 update_function()
                 break
 
-        #update selected dft row with the values from dict_t
-        for key, value in dict_t.items():
+        # update selected row of dft_temp with the values from dict_t
+        for key, value in dict_t_updates.items():
             dft_temp.loc[dft_temp.index[stim_idx], key] = value
+            # old_trow = self.get_trow()
+            # print(f" - * - stim{old_trow['stim']} {key} was {old_trow[key]}, set to {dft_temp.loc[dft_temp.index[stim_idx], key]}.")
 
+        prow = self.get_prow()
+        rec_name = prow['recording_name']
         dfmean = self.get_dfmean(row=prow)
 
         # update dfoutput; dict and file, with normalized columns if applicable
@@ -4618,8 +4624,8 @@ class UIsub(Ui_MainWindow):
             dfoutput = self.get_dfoutput(row=prow)
             dffilter = self.get_dffilter(row=prow)
             stim_num = trow_temp['stim']
-            new_dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
-            print(f"dfoutput: {dfoutput}")
+            new_dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t_updates)
+            #print(f"dfoutput: {dfoutput}")
             # update volley means
             if aspect == "volley amp":
                 dft_temp.loc[dft_temp.index[stim_idx], 'volley_amp_mean'] = new_dfoutput['volley_amp'].mean()
@@ -4629,40 +4635,36 @@ class UIsub(Ui_MainWindow):
             new_dfoutput['stim'] = int(stim_num)
             for col in new_dfoutput.columns:
                 dfoutput.loc[dfoutput['stim'] == stim_num, col] = new_dfoutput.loc[new_dfoutput['stim'] == stim_num, col]
-                print(f"Set stim {stim_num}, col: {col} to:\n{new_dfoutput.loc[new_dfoutput['stim'] == stim_num, col].values}")
-        #print(f" - {new_dfoutput.columns}")
-        #print(f" - {dfoutput.columns}")
-        #print(dfoutput['stim'].unique(), trow_temp['stim'])
-        #print(dfoutput.loc[dfoutput['stim'] == trow_temp['stim']])
-
+ 
         self.persistOutput(rec_name=rec_name, dfoutput=dfoutput)
 
         self.set_dft(rec_name, dft_temp)
         self.tableStimModel.setData(self.get_dft(prow))
         self.set_rec_status(rec_name=rec_name)
+        trow = self.get_trow()
+        uiplot.update(prow=prow, trow=trow, aspect=aspect, data_x=data_x, data_y=data_y)
 
-        uiplot.update(prow=prow, trow=trow_temp, aspect=aspect, data_x=data_x, data_y=data_y)
-
-        def update_amp_marker(trow, aspect, prow, dfmean, dfoutput, uiplot):
+        def update_amp_marker(trow, aspect, prow, dfmean, dfoutput):
             labelbase = f"{rec_name} - stim {trow['stim']}"
             labelamp = f"{labelbase} {aspect}"
-            aspect = aspect.replace(" ", "_")
-            t_aspect = f"t_{aspect}"
+            column_name = aspect.replace(" ", "_")
+            t_aspect = f"t_{column_name}"
             stim_offset = trow['t_stim']
             x = trow[t_aspect] - stim_offset
             y = dfmean.loc[dfmean['time'] == trow[t_aspect], prow['filter']].values[0]
-            amp = dfoutput.loc[dfoutput['stim'] == trow['stim']][aspect].mean()/1000 # conversion: mV to V
+            amp = dfoutput.loc[dfoutput['stim'] == trow['stim']][column_name].mean()/1000 # conversion: mV to V
             t_amp = trow[t_aspect] - stim_offset
             amp_x = t_amp - trow[f'{t_aspect}_halfwidth'], t_amp + trow[f'{t_aspect}_halfwidth']
             uiplot.updateAmpMarker(labelamp, x, y, amp_x, trow['amp_zero'], amp=amp)
 
         if aspect in ["EPSP amp", "volley amp"]:
-            print(f" - {aspect} updated")
-            if uistate.checkBox['timepoints_per_stim']:
-                update_amp_marker(trow_temp, aspect, prow, dfmean, dfoutput, uiplot)
+            #print(f" - {aspect} updated")
+            if False:#uistate.checkBox['timepoints_per_stim']:
+                update_amp_marker(trow, aspect, prow, dfmean, dfoutput)
             else:
-                for i, trow_temp in dft_temp.iterrows():
-                    update_amp_marker(trow_temp, aspect, prow, dfmean, dfoutput, uiplot)
+                dft = self.get_dft(prow)
+                for i, i_trow in dft.iterrows():
+                    update_amp_marker(i_trow, aspect, prow, dfmean, dfoutput)
                 
         # update groups
         affected_groups = self.get_groupsOfRec(prow['ID'])

@@ -665,6 +665,7 @@ class UIplot():
                     print(f" - - - volley_amp_mean: {volley_amp_mean}")
                     #if volley_amp_mean is None:
                     #    volley_amp_mean = self.uistate.mouseover_out[0].get_ydata().mean()
+                    self.updateOutLine(label_core)
                     self.updateOutMean(f"{label_core} mean", volley_amp_mean)
             else: # EPSP amp
                 if norm:
