@@ -1,76 +1,39 @@
-name: Build Linux AppImage + Windows MSI
+# .github/workflows/windows.yml
+name: Windows Build
 
-on:
-  workflow_dispatch:      # lets you run it manually
+on: workflow_dispatch
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-22.04
-            platform: Linux
-          - os: windows-latest
-            platform: Windows
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          architecture: x64
-          cache: pip
 
-      - name: Install dependencies
+      - name: Install requirements
         run: |
-          python -m pip install --upgrade pip
+          pip install --upgrade pip
           pip install -r requirements.txt
-          pip install "cx_Freeze==8.2.0" toml
+          pip install cx_Freeze==8.2.0 toml
 
-      - name: Install patchelf (Linux only)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update -qq && sudo apt-get install -y patchelf
+      - name: Build MSI
+        working-directory: src
+        run: python build_with_cxfreeze_multiarch_setup.py bdist_msi
 
-      - name: Build with cx_Freeze
-        working-directory: ./src
-        run: |
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            echo "Building Linux AppImage..."
-            python build_with_cxfreeze_multiarch_setup.py bdist_appimage
-          else
-            echo "Building Windows MSI..."
-            python build_with_cxfreeze_multiarch_setup.py bdist_msi
-          fi
-
-      - name: Extract version from pyproject.toml
+      - name: Extract version
         id: version
         run: |
-          VER=$(python -c "import toml; print(toml.load('../pyproject.toml')['project']['version'])")
-          echo "version=$VER" >> $GITHUB_OUTPUT
-        shell: bash
+          $v = python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])"
+          echo "version=$v" >> $GITHUB_OUTPUT
+        working-directory: src
 
-      - name: Collect & rename Windows portable ZIP (Windows only)
-        if: runner.os == 'Windows'
-        working-directory: ./src
-        shell: powershell
-        run: |
-          $ver = "${{ steps.version.outputs.version }}"
-          $zip = Get-ChildItem -Path build -Recurse -Include "*.zip" | Select-Object -First 1
-          if ($zip) {
-            Copy-Item $zip.FullName "dist/BrainWash-$ver-Windows-x64-Portable.zip"
-            Write-Host "Portable ZIP created: BrainWash-$ver-Windows-x64-Portable.zip"
-          }
-
-      - name: Upload artifacts
+      - name: Upload MSI
         uses: actions/upload-artifact@v4
         with:
-          name: BrainWash-${{ steps.version.outputs.version }}-${{ runner.os }}
-          path: |
-            src/dist/*.AppImage
-            src/dist/*.msi
-            src/dist/*Portable.zip
-          if-no-files-found: error
+          name: brainwash-${{ steps.version.outputs.version }}-win64
+          path: src/dist/*.msi
