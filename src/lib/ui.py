@@ -95,7 +95,7 @@ class Config:
         self.transient = False # Block persisting of files
         self.verbose = self.dev_mode
         self.talkback = not self.dev_mode
-        self.hide_experimental = not self.dev_mode
+        self.hide_experimental = True#not self.dev_mode
         self.track_widget_focus = False
         self.terminal_space = 372 if self.dev_mode else 0
         # get project_name and version number from pyproject.toml
@@ -947,6 +947,10 @@ class Ui_MainWindow(QtCore.QObject):
         if config.hide_experimental:
             # explicit hide command required for Windows, but not Linux (?)
             self.checkBox_show_all_events.setVisible(False)
+            self.checkBox_bin.setVisible(False)
+            self.checkBox_output_per_stim.setVisible(False)
+            self.checkBox_paired_stims.setVisible(False)
+            self.checkBox_timepoints_per_stim.setVisible(False)
             self.pushButton_stim_assign_threshold.setVisible(False)
             self.label_stim_detection_threshold.setVisible(False)
             # hide binning for separate recordings
