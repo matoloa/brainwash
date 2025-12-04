@@ -67,6 +67,9 @@ class UIstate:
             'output_ax1_ylim': (0, 1.2),
             'output_ax2_ylim': (0, 1.2),
         }
+        self.dfv = None
+            # used to store per-recording voltage ranges for output scaling
+
         # default_dict_t is used to store timepoints and their parameters
         # only assign full width as we normally use odd length in discrete index for clarity
         t_volley_slope_width = 0.0003 # default width for volley slope, in seconds

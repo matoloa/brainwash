@@ -1414,8 +1414,7 @@ class UIsub(Ui_MainWindow):
 
     def talkback(self):
         prow = self.get_prow()
-        dft = self.get_dft(row=prow)
-        trow = self.get_trow(p_row=prow)
+        trow = self.get_trow()
         dfmean = self.get_dfmean(prow)
         t_stim = trow['t_stim']
         t_start = t_stim - 0.002
@@ -1470,25 +1469,112 @@ class UIsub(Ui_MainWindow):
         self.graphRefresh()
 
 
+    def get_dfv(self):
+        # returns a dfV filtered by recording selection. Builds one if there is none.
+        # NB: assumes the dfV shares indices with df_project!
+        # TODO: deprecate by setting and maintaining y-limits as df_project columns
+        if uistate.dfv is not None:
+            return uistate.dfv
+        t0 = time.time()
+        dfv = self.get_df_project().copy()
+        # find voltage range of selected recordings
+        for i, row in dfv.iterrows():
+            dffilter = self.get_dffilter(row)
+            # mean voltages
+            dfv.loc[i, 'vmin'] = dffilter['voltage'].min()
+            dfv.loc[i, 'vmax'] = dffilter['voltage'].max()
+            # event voltages # TODO: Hardcoded components - make configurable
+            trow = self.get_trow(dfp_idx=i)
+            event_start = trow['t_stim'] + 0.001 # s after stim
+            event_end = event_start + 0.08
+            dfv.loc[i, 'event_vmin'] = dffilter[(dffilter['time'] >= event_start) & (dffilter['time'] <= event_end)]['voltage'].min()
+            dfv.loc[i, 'event_vmax'] = 0.0005 # dffilter[(dffilter['time'] >= event_start) & (dffilter['time'] <= event_end)]['voltage'].max()
+            # output measurements
+            dfout = self.get_dfoutput(row) # TODO: Norm handling
+            dfv.loc[i, 'amp_min'] = dfout['EPSP_amp'].min()
+            dfv.loc[i, 'amp_max'] = dfout['EPSP_amp'].max()
+            dfv.loc[i, 'slope_min'] = dfout['EPSP_slope'].min()
+            dfv.loc[i, 'slope_max'] = dfout['EPSP_slope'].max()
+            print(f"* * * * \n{dfv}")
+            uistate.dfv = dfv
+        print(f" - get_dfv voltage range calc time: {round((time.time() - t0) * 1000)} ms")
+        return uistate.dfv
+
+
     def zoomAuto(self):
-        # print(f"zoomAuto, uistate.selected: {uistate.list_idx_select_recs}, uistate.list_idx_select_stims: {uistate.list_idx_select_stims}")
-        if uistate.list_idx_select_recs:
-        # axm
-            df_p = self.get_df_project()
-            df_selected = df_p.loc[uistate.list_idx_select_recs]
-            max_sweep_duration = df_selected['sweep_duration'].max()
-            uistate.zoom['mean_xlim'] = (0, max_sweep_duration)
-        # axe
+        # set and apply Auto-zoom parameters for all axes
+        self.usage("zoomAuto")
+        # get voltage range of selected recordings
+        dfv_select = self.get_dfv().loc[uistate.list_idx_select_recs]
+        if dfv_select is None or dfv_select.empty:
+            return
+        # axm:
+        vmin = dfv_select['vmin'].min()
+        vmax = dfv_select['vmax'].max()
+        uistate.zoom['mean_xlim'] = (0, dfv_select['sweep_duration'].max())
+        uistate.zoom['mean_ylim'] = (vmin, vmax)
+        # axe:
+        event_vmin = dfv_select['event_vmin'].min()
+        event_vmax = dfv_select['event_vmax'].max()
+        margin = 0.05
+        uistate.zoom['event_ylim'] = (event_vmin-abs(event_vmin*margin), event_vmax+abs(event_vmax*margin))
+
         # ax1 and ax2
-            if uistate.checkBox['bin']:
-                first, last = 0, max((df_selected['sweeps'].max()-1)/uistate.lineEdit['bin_size']-1, 1)
-            else:
-                first, last = 0, max(df_selected['sweeps'].max()-1, 1)
-            if uistate.checkBox['output_per_stim']:
-                first, last = 1, max(df_selected['stims'].max(), 2)
-            uistate.zoom['output_xlim'] = first, last
-            
+        if uistate.checkBox['bin']:
+            first, last = 0, max((dfv_select['sweeps'].max()-1)/uistate.lineEdit['bin_size']-1, 1)
+        else:
+            first, last = 0, max(dfv_select['sweeps'].max()-1, 1)
+        if uistate.checkBox['output_per_stim']:
+            first, last = 1, max(dfv_select['stims'].max(), 2)
+        amp_min = dfv_select['amp_min'].min()
+        amp_max = dfv_select['amp_max'].max()
+        slope_min = dfv_select['slope_min'].min()
+        slope_max = dfv_select['slope_max'].max()
+        uistate.zoom['output_ax1_ylim'] = 0, amp_max*(1+margin)
+        uistate.zoom['output_ax2_ylim'] = 0, slope_max*(1+margin)
+        uistate.zoom['output_xlim'] = first, last
+
+        self.zoomReset()
         print(f"zoomAuto: output_xlim: {uistate.zoom['output_xlim']}")
+
+    def zoomReset(self, axis=None):
+        self.usage("zoomReset")
+        if axis is None:
+            for axis in [uistate.axm, uistate.axe, uistate.ax1, uistate.ax2,]:
+                print(f"zoomReset: all canvases: {axis}")
+                self.zoomReset(axis)
+            return
+        if axis == uistate.axm:
+            if config.verbose:
+                print("zoomReset: axm")
+            axis.axes.set_xlim(uistate.zoom['mean_xlim'])
+            axis.axes.set_ylim(uistate.zoom['mean_ylim'])
+        elif axis == uistate.axe:
+            if config.verbose:
+                print("zoomReset: axe")
+                axis.axes.set_xlim(uistate.zoom['event_xlim'])
+                axis.axes.set_ylim(uistate.zoom['event_ylim'])
+            # axes_in_figure = axis.figure.get_axes()
+            # for ax in axes_in_figure: # TODO:why is Event resetting output axes?
+            #     if ax.get_ylabel() == "Amplitude (mV)":
+            #         ax.set_ylim(uistate.zoom['output_ax1_ylim'])
+            #     elif ax.get_ylabel() == "Slope (mV/ms)":
+            #         ax.set_ylim(uistate.zoom['output_ax2_ylim'])
+            #     df_p = self.get_df_project()
+            #     x_axis = 'stim' if uistate.checkBox['output_per_stim'] else 'sweep'
+            #     max_value = round(df_p[x_axis].max())  # Round to the nearest integer
+            #     uistate.zoom['output_xlim'] = [0, max_value]
+            #     print(f"zoomReset: output_xlim: {uistate.zoom['output_xlim']}")
+            #     ax.set_xlim(uistate.zoom['output_xlim'])
+        elif axis == uistate.ax1 or axis == uistate.ax2:
+            if config.verbose:
+                print("zoomReset: ax1/ax2")
+            axis.axes.set_xlim(uistate.zoom['event_xlim'])
+            axis.axes.set_ylim(uistate.zoom['event_ylim'])
+        else:
+            raise ValueError("zoomReset: unknown axis")
+        axis.figure.canvas.draw_idle()
+
 
 
     def update_recs2plot(self):
@@ -3283,22 +3369,30 @@ class UIsub(Ui_MainWindow):
 
 
 # Internal dataframe handling
-    def get_prow(self):
+    def get_prow(self, dfp_idx=None):
         # returns the selected row with the lowest index in df_project
+        if dfp_idx is not None:
+            dfp = self.get_df_project()
+            row = dfp.loc[dfp_idx]
+            return row
         if not uistate.list_idx_select_recs:
             print("get_prow: No recording selected.")
             return None
-        df_p = self.get_df_project()
-        row = df_p.loc[uistate.list_idx_select_recs[0]]
+        dfp = self.get_df_project()
+        row = dfp.loc[uistate.list_idx_select_recs[0]]
         return row
     
-    def get_trow(self):
+    def get_trow(self, dfp_idx=None):
         # returns the selected row with the lowest index in df_t
+        if dfp_idx is not None:
+            dft = self.get_dft(self.get_prow(dfp_idx))
+            row = dft.loc[uistate.list_idx_select_stims[0]]
+            return row
         if not uistate.list_idx_select_stims:
             print("get_trow: No stim selected.")
             return None
-        df_t = self.get_dft(self.get_prow())
-        row = df_t.loc[uistate.list_idx_select_stims[0]]
+        dft = self.get_dft(self.get_prow())
+        row = dft.loc[uistate.list_idx_select_stims[0]]
         return row
 
     def get_dfmean(self, row):
@@ -3779,7 +3873,9 @@ class UIsub(Ui_MainWindow):
         if x is None: # clicked outside graph; do nothing
             return
         if event.button == 2: # middle click, reset zoom
-            self.zoomReset(canvas=canvas)
+            axis = canvas.axes
+            #print(f"axis: {axis}, type {type(axis)}")
+            self.zoomReset(axis=axis)
             return
         if event.button == 3: # right click, deselect
             if uistate.dragging:
@@ -4630,27 +4726,6 @@ class UIsub(Ui_MainWindow):
                 ax.hline = ax.axhline(y=bottom, color='r', linestyle='--')
 
         canvas.draw()
-
-
-    def zoomReset(self, canvas): # TODO: Update with axm
-        if canvas == uistate.axe:
-            axes_in_figure = canvas.figure.get_axes()
-            for ax in axes_in_figure:
-                if ax.get_ylabel() == "Amplitude (mV)":
-                    ax.set_ylim(uistate.zoom['output_ax1_ylim'])
-                elif ax.get_ylabel() == "Slope (mV/ms)":
-                    ax.set_ylim(uistate.zoom['output_ax2_ylim'])
-                df_p = self.get_df_project()
-                x_axis = 'stim' if uistate.checkBox['output_per_stim'] else 'sweep'
-                max_value = round(df_p[x_axis].max())  # Round to the nearest integer
-                uistate.zoom['output_xlim'] = [0, max_value]
-                print(f"zoomReset: output_xlim: {uistate.zoom['output_xlim']}")
-                ax.set_xlim(uistate.zoom['output_xlim'])
-        else:
-            canvas.axes.set_xlim(uistate.zoom['event_xlim'])
-            canvas.axes.set_ylim(uistate.zoom['event_ylim'])
-        canvas.draw()
-
 
 
 # pyqtSlot decorators
