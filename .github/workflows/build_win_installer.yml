@@ -30,7 +30,6 @@ jobs:
         run: |
           $v = python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])"
           echo "version=$v" >> $GITHUB_OUTPUT
-        working-directory: src
 
       - name: Upload MSI
         uses: actions/upload-artifact@v4
