@@ -260,6 +260,8 @@ class UIplot():
                 continue
             for line in list(axis.lines):
                 line.remove()
+            for coll in list(axis.collections):
+                coll.remove()
             axis.figure.canvas.draw()
         # clean up references
         uis.dict_rec_labels = {}
@@ -270,6 +272,9 @@ class UIplot():
         uis.mouseover_action = None
         uis.ghost_sweep = None
         uis.ghost_label = None
+        uis.dict_group_labels = {}
+        uis.dict_group_show = {}
+
 
     def unPlotGroup(self, group_ID=None):
         dict_group = self.uistate.dict_group_labels

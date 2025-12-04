@@ -1809,10 +1809,11 @@ class UIsub(Ui_MainWindow):
         self.menuEdit.addSeparator()
         self.actionForAllSelected = QtWidgets.QAction("For ALL selected recordings...", self) # not connected: submenu header
         self.menuEdit.addAction(self.actionForAllSelected)
-        self.actionReAnalyzeRecordings = QtWidgets.QAction("   Reanalyze selected recordings", self)
-        self.actionReAnalyzeRecordings.triggered.connect(self.triggerReAnalyzeRecordings)
-        self.actionReAnalyzeRecordings.setShortcut("Alt+A")
+        self.actionReAnalyzeRecordings = QtWidgets.QAction("   Reanalyze", self)
+        self.actionReAnalyzeRecordings.triggered.connect(self.triggerReanalyze)
+        self.actionReAnalyzeRecordings.setShortcut("A")
         self.menuEdit.addAction(self.actionReAnalyzeRecordings)
+
         self.actionKeepOnlySelectedSweeps = QtWidgets.QAction("   Keep only selected sweeps", self)
         self.actionKeepOnlySelectedSweeps.triggered.connect(self.triggerKeepSelectedSweeps)
         self.menuEdit.addAction(self.actionKeepOnlySelectedSweeps)
@@ -2253,9 +2254,14 @@ class UIsub(Ui_MainWindow):
         self.parseData()
         self.setButtonParse()
 
-    def triggerReAnalyzeRecordings(self):
-        self.usage("triggerReAnalyzeRecordings")
+    def triggerReanalyze(self):
+        self.usage("triggerReanalyze")
+        selection = uistate.list_idx_select_recs
         self.reanalyze_recordings()
+        self.tableProj.clearSelection()
+        uistate.list_idx_select_recs = selection
+        self.tableUpdate()
+        self.tableProjSelectionChanged()
 
     def triggerKeepSelectedSweeps(self):
         self.usage("triggerKeepSelectedSweeps")
