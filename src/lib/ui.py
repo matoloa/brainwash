@@ -1526,12 +1526,14 @@ class UIsub(Ui_MainWindow):
             first, last = 0, max(dfv_select['sweeps'].max()-1, 1)
         if uistate.checkBox['output_per_stim']:
             first, last = 1, max(dfv_select['stims'].max(), 2)
-        amp_min = dfv_select['amp_min'].min()
+        
+        amp_min = 0 if uistate.checkBox['output_ymin0'] else dfv_select['amp_min'].min()
         amp_max = dfv_select['amp_max'].max()
-        slope_min = dfv_select['slope_min'].min()
+        slope_min = 0 if uistate.checkBox['output_ymin0'] else dfv_select['slope_min'].min()
         slope_max = dfv_select['slope_max'].max()
-        uistate.zoom['output_ax1_ylim'] = 0, amp_max*(1+margin)
-        uistate.zoom['output_ax2_ylim'] = 0, slope_max*(1+margin)
+
+        uistate.zoom['output_ax1_ylim'] = amp_min, amp_max*(1+margin)
+        uistate.zoom['output_ax2_ylim'] = slope_min, slope_max*(1+margin)
         uistate.zoom['output_xlim'] = first, last
 
         self.zoomReset()
@@ -1603,11 +1605,7 @@ class UIsub(Ui_MainWindow):
             elif key == 'timepoints_per_stim':
                 self.checkBox_timepoints_per_stim_changed(state)
             elif key == 'output_ymin0':
-                if state == 2:
-                    current_ylim = uistate.zoom['output_ax1_ylim']
-                    uistate.zoom['output_ax1_ylim'] = (0, current_ylim[1])
-                    current_ylim = uistate.zoom['output_ax2_ylim']
-                    uistate.zoom['output_ax2_ylim'] = (0, current_ylim[1])
+                self.zoomAuto()
             elif key == 'bin':
                 self.checkBox_bin_changed(state)
         self.update_show()
