@@ -1,67 +1,70 @@
-'''
-Usage:
-    with cx-freeze==8.2.0
-    python build_with_cxfreeze_multiarch_setup.py bdist_appimage > cxbuild_appimage.log
-    python build_with_cxfreeze_multiarch_setup.py bdist_msi > cxbuild_msi.log
-'''
-
+# build_with_cxfreeze_multiarch_setup.py
 import sys
 import os
 from setuptools import find_packages
 from cx_Freeze import setup, Executable
-import toml  # for reading pyproject.toml
+import toml
 
-
+# Load version from pyproject.toml (one level up)
 pyproject = toml.load("../pyproject.toml")
-version = pyproject['project']['version']
+version = pyproject["project"]["version"]
 
-# base="Win32GUI" should be used only for Windows GUI app
-print(f"sys.platform: {sys.platform}")
-base = "Win32GUI" if sys.platform == "win32" else None
+print(f"Building brainwash v{version} on {sys.platform}")
 
+# GUI base: only use Win32GUI on Windows when not in console/debug mode
+base = None
+if sys.platform == "win32":
+    # If running from terminal (has real stdout), keep console for debugging
+    base = "Win32GUI" if not sys.stdout.isatty() else "Console"
 
-# Include the path to the Python script you want to freeze.
+# Your main script
 script_path = "main.py"
 
-# include paths files
-include_files = [("../pyproject.toml", "lib/pyproject.toml"), "lib/"]
+# Files/folders to include
+include_files = [
+    ("../pyproject.toml", "lib/pyproject.toml"),
+    "lib/",                      # entire lib folder
+    "assets/",                   # if you have one
+]
 
-# windows build
-# Find the vcomp140.dll file in the system
-#vcomp140_dll_path = os.path.join(os.environ['windir'], 'System32', 'vcomp140.dll')
-#print(f"vcomp140_dll_path: {vcomp140_dll_path}, exists: {os.path.exists(vcomp140_dll_path)}")
+# Common build options
+build_exe_options = {
+    "packages": ["pyabf", "igor2", "tqdm", "sklearn", "numpy", "scipy", "seaborn", "matplotlib", "pandas"],
+    "excludes": ["tkinter", "email", "pytest", "test", "unittest"],
+    "include_files": include_files,
+    "include_msvcr": True,                    # Critical: bundles VC++ runtime → works on clean Win11
+    "optimize": 2,
+}
 
-# Linux: commented for now. No signs of malfunction. If needed, change to proper paths. We dropped conda in Linux for pip and venv. 
-		 #("/home/jonathan/mambaforge/envs/brainwash/lib/libcblas.so", "lib/libcblas.so"), ("/home/jonathan/mambaforge/envs/brainwash/lib/libcblas.so.3", "lib/libcblas.so.3")]
+# MSI-specific options (only used on Windows)
+bdist_msi_options = {
+    "upgrade_code": "{A1B2C3D4-5678-90AB-CDEF-1234567890AB}",  # Keep this forever!
+    "add_to_path": False,
+    "initial_target_dir": r"[ProgramFiles64Folder]\BrainWash",
+    "summary_data": {
+        "author": "Your Name",
+        "comments": "Electrophysiology analysis tool",
+    },
+}
 
-
-# Create an executable.
+# Executable definition
 exe = Executable(
     script=script_path,
     base=base,
-    #targetName="hello.exe"  # The name of the output executable.
+    icon="assets/icon.ico" if os.path.exists("assets/icon.ico") else None,
+    target_name="BrainWash.exe",  # Nice clean name in Windows
 )
 
-# Setup cx_Freeze options.
-options = {
-    "build_exe": {
-        "includes": [],
-        "excludes": ["tkinter", "email", "pytest"],
-        "packages": ["pyabf", "igor2", "tqdm", "sklearn", "numpy", "scipy", "seaborn"],
-        "include_files": include_files
-    }
-}
-
-
-# Call the setup function.
+# Final setup — cx_Freeze automatically picks the right targets from command line
 setup(
-    name="brainwash",
+    name="BrainWash",
     version=version,
-    description="",
-    #packages=find_packages(where="src"),
-    #package_dir={"": "src"},
-    #include_package_data=True,
-    options=options,
+    description="Advanced electrophysiology data analysis",
+    author="Your Name",
+    options={
+        "build_exe": build_exe_options,
+        "bdist_msi": bdist_msi_options,     # Used only on Windows
+        "bdist_appimage": build_exe_options,  # Used only on Linux
+    },
     executables=[exe],
 )
-
