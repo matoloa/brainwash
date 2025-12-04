@@ -1394,6 +1394,38 @@ class UIsub(Ui_MainWindow):
         uistate.frozen = False
 
 
+    def toggleHeatmap(self):
+        uistate.showTimetable = not uistate.showTimetable
+        print(f"Heatmap is {uistate.showTimetable}")
+        if not uistate.showTimetable:
+            return
+        t0 = time.time()
+        d_group_ndf = {}
+        list_l = []
+        for key, sub_dict in self.dd_groups.items():
+            if(sub_dict['show']):
+                n = len(sub_dict['rec_IDs'])
+                df = self.get_dfgroupmean(key)
+                list_l.append(len(df))
+                d_group_ndf[key] = [n, df]
+        if len(d_group_ndf) == 2:
+            if list_l[0] == list_l[1]:
+                for key, ndf in d_group_ndf.items():
+                    n = ndf[0]
+                    df = ndf[1]
+                    l = len(df)
+                    list_l.append(l)
+                    print(f"{key} - N: {n} - {l} sweeps")
+                # perform test
+                df_ttest = analysis.ttest_df(d_group_ndf)
+                print(df_ttest)
+            else:
+                print("t-test requires number of sweeps to match")
+        else:
+            print ("t-test currently only available between exactly 2 shown groups")
+        print(f"Heatmap: {round((time.time()-t0)*1000)} ms")
+        
+
     def setTableStimVisibility(self, state):
         widget = self.h_splitterMaster.widget(1)  # Get the second widget in the splitter
         widget.setVisible(state)
@@ -1829,17 +1861,26 @@ class UIsub(Ui_MainWindow):
         self.actionRefresh.triggered.connect(self.triggerRefresh)
         self.actionRefresh.setShortcut("F5")
         self.menuView.addAction(self.actionRefresh)
-        self.actionRefresh = QtWidgets.QAction("Refresh Graphs", self)
+
+        self.actionHeatmap = QtWidgets.QAction("Toggle Heatmap", self)
+        self.actionHeatmap.setCheckable(True)
+        self.actionHeatmap.setChecked(uistate.showHeatmap)
+        self.actionHeatmap.setShortcut("H")
+        self.actionHeatmap.triggered.connect(self.triggerShowHeatmap)
+        self.menuView.addAction(self.actionHeatmap)
+
         self.actionDarkmode = QtWidgets.QAction("Toggle Darkmode", self)
         self.actionDarkmode.triggered.connect(self.triggerDarkmode)
         self.actionDarkmode.setShortcut("Alt+D")
         self.menuView.addAction(self.actionDarkmode)
+
         actionTimetable = QtWidgets.QAction("Toggle Timetable", self)
         actionTimetable.setCheckable(True)
-        actionTimetable.setShortcut("Alt+T")
         actionTimetable.setChecked(uistate.showTimetable)
+        actionTimetable.setShortcut("Alt+T")
         actionTimetable.triggered.connect(self.triggerShowTimetable)
         self.menuView.addAction(actionTimetable)
+
         for frame, (text, initial_state) in uistate.viewTools.items():
             action = QtWidgets.QAction(f"Toggle {text}", self)
             action.setCheckable(True)
@@ -2152,6 +2193,10 @@ class UIsub(Ui_MainWindow):
         self.usage(f"triggerDarkmode set to {uistate.darkmode}")
         self.write_bw_cfg()
         self.darkmode()
+
+    def triggerShowHeatmap(self):
+        self.usage("triggerShowHeatmap")
+        self.toggleHeatmap()
 
     def triggerShowTimetable(self):
         self.usage("triggerShowTimetable")

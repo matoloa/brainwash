@@ -266,14 +266,14 @@ class UIplot():
         # clean up references
         uis.dict_rec_labels = {}
         uis.dict_rec_show = {}
+        uis.dict_group_labels = {}
+        uis.dict_group_show = {}
         uis.mouseover_plot = None
         uis.mouseover_blob = None
         uis.mouseover_out = None
         uis.mouseover_action = None
         uis.ghost_sweep = None
         uis.ghost_label = None
-        uis.dict_group_labels = {}
-        uis.dict_group_show = {}
 
 
     def unPlotGroup(self, group_ID=None):

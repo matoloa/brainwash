@@ -16,6 +16,7 @@
 import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter, find_peaks
+from scipy.stats import ttest_ind_from_stats
 import os
 import json
 import sys
@@ -33,6 +34,44 @@ sys.path.append(str(reporoot / 'src/lib/'))
 def valid(*args):
     return all(isinstance(x, (int, float)) and x is not None and not np.isnan(x) for x in args)
 
+def ttest_df(d_group_ndf):
+    # extract groups in consistent order
+    keys = sorted(d_group_ndf.keys())
+    k1, k2 = keys[0], keys[1]
+
+    n1, df1 = d_group_ndf[k1]
+    n2, df2 = d_group_ndf[k2]
+
+    # columns to test: (mean_col, sem_col, output_name)
+    cols = [
+        ("EPSP_amp_norm_mean",   "EPSP_amp_norm_SEM",   "p_amp_norm"),
+        ("EPSP_amp_mean",        "EPSP_amp_SEM",        "p_amp"),
+        ("EPSP_slope_norm_mean", "EPSP_slope_norm_SEM", "p_slope_norm"),
+        ("EPSP_slope_mean",      "EPSP_slope_SEM",      "p_slope"),
+    ]
+
+    sweeps = df1["sweep"].values
+    out = {"sweep": sweeps}
+
+    for mean_col, sem_col, outname in cols:
+        pvals = []
+        for i in range(len(sweeps)):
+            m1 = df1.loc[i, mean_col]
+            s1 = df1.loc[i, sem_col] * np.sqrt(n1)
+
+            m2 = df2.loc[i, mean_col]
+            s2 = df2.loc[i, sem_col] * np.sqrt(n2)
+
+            _, p = ttest_ind_from_stats(
+                mean1=m1, std1=s1, nobs1=n1,
+                mean2=m2, std2=s2, nobs2=n2,
+                equal_var=False
+            )
+            pvals.append(p)
+
+        out[outname] = pvals
+
+    return pd.DataFrame(out)
 
 def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
     """
