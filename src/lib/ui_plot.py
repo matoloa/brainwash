@@ -516,8 +516,8 @@ class UIplot():
                     self.plot_line(f"{label} {stim_str} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                 self.plot_line(f"{label} {stim_str} amp_zero marker", 'axe', [-0.002, -0.001], [amp_zero, amp_zero], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num) # TODO: hardcoded x
 
-            if not np.isnan(t_row['t_EPSP_slope_start']):
-                x_start, x_end = t_row['t_EPSP_slope_start'], t_row['t_EPSP_slope_end']
+            x_start, x_end = t_row['t_EPSP_slope_start'], t_row['t_EPSP_slope_end']
+            if not (np.isnan(x_start) or np.isnan(x_end)):
                 index = (df_event['time'] - x_start).abs().idxmin()
                 y_start = df_event.loc[index, rec_filter] if index in df_event.index else None
                 index = (df_event['time'] - x_end).abs().idxmin()
@@ -544,8 +544,8 @@ class UIplot():
                 self.plot_hline(f"{label} {stim_str} volley amp mean", 'ax1', volley_amp_mean, settings['rgb_volley_amp'], rec_ID, aspect='volley_amp_mean', stim=stim_num)
                 self.plot_line(f"{label} {stim_str} volley amp", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
 
-            if not np.isnan(t_row['t_volley_slope_start']):
-                x_start, x_end = t_row['t_volley_slope_start'], t_row['t_volley_slope_end']
+            x_start, x_end = t_row['t_volley_slope_start'], t_row['t_volley_slope_end']
+            if not (np.isnan(x_start) or np.isnan(x_end)):
                 index = (df_event['time'] - x_start).abs().idxmin()
                 y_start = df_event.loc[index, rec_filter] if index in df_event.index else None
                 index = (df_event['time'] - x_end).abs().idxmin()

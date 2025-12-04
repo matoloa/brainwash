@@ -1959,14 +1959,16 @@ class UIsub(Ui_MainWindow):
         header = self.tableStim.horizontalHeader()
         column_order = ['stim',
                         't_stim',
-                        't_volley_slope_start',
-                        't_volley_slope_method',
                         't_EPSP_slope_start',
+                        't_EPSP_slope_end',
                         't_EPSP_slope_method',
-                        't_volley_amp',
-                        't_volley_amp_method',
                         't_EPSP_amp',
                         't_EPSP_amp_method',
+                        't_volley_slope_start',
+                        't_volley_slope_end',
+                        't_volley_slope_method',
+                        't_volley_amp',
+                        't_volley_amp_method',
                         ]
         col_indices = [dft.columns.get_loc(col) for col in column_order if col in dft.columns]
         num_columns = dft.shape[1]

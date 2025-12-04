@@ -215,7 +215,7 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
             t_EPSP_slope_start = t_stim + 0.002 # default to 2 ms after stim
             t_EPSP_amp_method = t_EPSP_slope_method = 'default'
         # Calculate the end times for volley and EPSP slopes
-        t_volley_slope_end = 0#round(t_volley_slope_start + default_dict_t['t_volley_slope_width'], precision)
+        t_volley_slope_end = round(t_volley_slope_start + default_dict_t['t_volley_slope_width'], precision)
         t_EPSP_slope_end = round(t_EPSP_slope_start + default_dict_t['t_EPSP_slope_width'], precision)
 
         result = {
@@ -234,6 +234,7 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
             't_EPSP_amp_method': t_EPSP_amp_method,
         }
         return result
+    
     def unwrap(v):
         if isinstance(v, pd.Series):
             if len(v) == 1:
