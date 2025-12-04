@@ -1505,9 +1505,11 @@ class UIsub(Ui_MainWindow):
         return uistate.dfv
 
 
-    def zoomAuto(self):
+    def zoomAuto(self, reset=False):
         # set and apply Auto-zoom parameters for all axes
         self.usage("zoomAuto")
+        if reset:
+            uistate.dfv = None
         dfv = self.get_dfv()
         # invalid df or invalid indices
         if dfv is None or len(dfv) == 0:
@@ -1551,10 +1553,10 @@ class UIsub(Ui_MainWindow):
 
 
     def zoomReset(self, axis=None):
-        self.usage("zoomReset")
+        #self.usage("zoomReset")
         if axis is None:
             for axis in [uistate.axm, uistate.axe, uistate.ax1, uistate.ax2,]:
-                print(f"zoomReset: all canvases: {axis}")
+                #print(f"zoomReset: all canvases: {axis}")
                 self.zoomReset(axis)
             return
         if axis == uistate.axm:
@@ -2137,8 +2139,12 @@ class UIsub(Ui_MainWindow):
 
     def triggerRefresh(self):
         self.usage(f"refresh graphs")
-        uiplot.exterminate()
+        selection = uistate.list_idx_select_recs
+        self.tableProj.clearSelection()
         self.recalculate()
+        uistate.list_idx_select_recs = selection
+        self.tableUpdate()
+        self.tableProjSelectionChanged()
 
     def triggerDarkmode(self):
         uistate.darkmode = not uistate.darkmode
@@ -2532,7 +2538,7 @@ class UIsub(Ui_MainWindow):
         bin_size = uistate.lineEdit['bin_size']
         if binSweeps:
             print(f"binSweeps: {binSweeps}, bin_size: {bin_size}")
-        uiplot.unPlot()
+        uiplot.exterminate()
         df_p = self.get_df_project()
         for _, p_row in df_p.iterrows():
             rec = p_row['recording_name']
@@ -2554,6 +2560,7 @@ class UIsub(Ui_MainWindow):
         self.group_cache_purge()
         # TODO: rest of group handling
 
+        uistate.dfv = None
         uiplot.hideAll()
         self.update_show(reset=True)
         self.mouseoverUpdate()

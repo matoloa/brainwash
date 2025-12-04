@@ -253,16 +253,23 @@ class UIplot():
 
     def exterminate(self):
         # cycles through every line, on every graph, and kills it.
-        axes = [self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2,]
+        uis = self.uistate
+        axes = [uis.axm, uis.axe, uis.ax1, uis.ax2,]
         for axis in axes:
             if axis is None:
                 continue
             for line in list(axis.lines):
                 line.remove()
             axis.figure.canvas.draw()
-        self.uistate.dict_rec_labels = {}
-        self.uistate.dict_rec_show = {}
-
+        # clean up references
+        uis.dict_rec_labels = {}
+        uis.dict_rec_show = {}
+        uis.mouseover_plot = None
+        uis.mouseover_blob = None
+        uis.mouseover_out = None
+        uis.mouseover_action = None
+        uis.ghost_sweep = None
+        uis.ghost_label = None
 
     def unPlotGroup(self, group_ID=None):
         dict_group = self.uistate.dict_group_labels
