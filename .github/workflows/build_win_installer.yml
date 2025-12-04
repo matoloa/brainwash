@@ -2,9 +2,7 @@ name: Build Linux AppImage + Windows MSI
 
 on:
   workflow_dispatch:      # lets you run it manually
-  push:
-    branches: [ main, windows-build ]   # remove this line if you don't want auto-run
-
+ 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
