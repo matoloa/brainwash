@@ -82,22 +82,24 @@ if debug_mode:
 
 class Config:
     def __init__(self):
-        self.dev_mode = True # Development mode
-        #self.dev_mode = False # Deploy mode
+        # self.dev_mode = True # Development mode
+        self.dev_mode = False # Deploy mode
         print("\n" * 3 + f"{'Development' if self.dev_mode else 'Deploy'} mode - {time.strftime('%H:%M:%S')}")
 
-        clear = False # Clear all caches and temporary files
-
+        clear = False # Clear all caches and temporary files at launch
         self.clear_project_folder = clear # Remove current project folder (datafiles) at launch
         self.clear_cache = clear
         self.clear_timepoints = clear
         self.force_cfg_reset = clear
+
         self.transient = False # Block persisting of files
+
         self.verbose = self.dev_mode
         self.talkback = not self.dev_mode
-        self.hide_experimental = True#not self.dev_mode
+        self.hide_experimental = not self.dev_mode
         self.track_widget_focus = False
-        self.terminal_space = 372 if self.dev_mode else 0
+        self.terminal_space = 372 if self.dev_mode else 100 # pixels reserved for viewing prints
+
         # get project_name and version number from pyproject.toml
         pathtoml = [i + "/pyproject.toml" for i in ["../..", "..", ".", "lib", "/lib"] if Path(i + "/pyproject.toml").is_file()]
         # you will want this eventually so I fix it now
@@ -945,16 +947,22 @@ class Ui_MainWindow(QtCore.QObject):
         self.progressBar.setValue(0)
 
         if config.hide_experimental:
-            # explicit hide command required for Windows, but not Linux (?)
             self.checkBox_show_all_events.setVisible(False)
-            self.checkBox_bin.setVisible(False)
             self.checkBox_output_per_stim.setVisible(False)
             self.checkBox_paired_stims.setVisible(False)
             self.checkBox_timepoints_per_stim.setVisible(False)
             self.pushButton_stim_assign_threshold.setVisible(False)
+            self.pushButton_stim_detect.setVisible(False)
             self.label_stim_detection_threshold.setVisible(False)
-            # hide binning for separate recordings
-            #self.checkBox_bin.setVisible(False)
+            self.frameToolBin.setVisible(False)
+#            self.checkBox_bin.setVisible(False)
+            self.pushButton_norm_range_set_all.setVisible(False)
+            self.frameToolExport.setVisible(False)
+            self.lineEdit_EPSP_amp_halfwidth.setVisible(False)
+            self.lineEdit_volley_amp_halfwidth.setVisible(False)
+            self.label_header_amp_halfwidth.setVisible(False)
+            self.label_EPSP_amp_halfwidth.setVisible(False)
+            self.label_volley_amp_halfwidth.setVisible(False)
 
 
 
@@ -1533,8 +1541,8 @@ class UIsub(Ui_MainWindow):
             dfv.loc[i, 'vmax'] = dffilter['voltage'].max()
             # event voltages # TODO: Hardcoded components - make configurable
             trow = self.get_trow(dfp_idx=i)
-            event_start = trow['t_stim'] + 0.001 # s after stim
-            event_end = event_start + 0.08
+            event_start = trow['t_stim'] + 0.002 # s after stim
+            event_end = event_start + 0.040
             dfv.loc[i, 'event_vmin'] = dffilter[(dffilter['time'] >= event_start) & (dffilter['time'] <= event_end)]['voltage'].min()
             dfv.loc[i, 'event_vmax'] = 0.0005 # dffilter[(dffilter['time'] >= event_start) & (dffilter['time'] <= event_end)]['voltage'].max()
             # output measurements
@@ -1552,6 +1560,26 @@ class UIsub(Ui_MainWindow):
     def zoomAuto(self, reset=False):
         # set and apply Auto-zoom parameters for all axes
         self.usage("zoomAuto")
+        prow = self.get_prow()
+        trow = self.get_trow()
+        dfmean = self.get_dfmean(prow)
+        # axm:
+        vmin = dfmean['voltage'].min()
+        vmax = dfmean['voltage'].max()
+        uistate.zoom['mean_xlim'] = (0, prow['sweep_duration'].max())
+        uistate.zoom['mean_ylim'] = (vmin, vmax)
+        # axe:
+        uistate.zoom['event_ylim'] = (-0.0012, 0.0002)
+        event_start = trow['t_stim'] + 0.002 # s after stim
+        event_end = event_start + 0.040
+        uistate.zoom['event_xlim'] = (event_start, event_end)
+        # ax1 and ax2
+        uistate.zoom['output_ax1_ylim'] = (0, 1.2)
+        uistate.zoom['output_ax2_ylim'] = (0, 1.2)
+        uistate.zoom['output_xlim'] = (0, prow['sweeps'])
+        self.zoomReset()        
+        return
+
         if reset:
             uistate.dfv = None
         dfv = self.get_dfv()
@@ -1611,8 +1639,8 @@ class UIsub(Ui_MainWindow):
         elif axis == uistate.axe:
             if config.verbose:
                 print("zoomReset: axe")
-                axis.axes.set_xlim(uistate.zoom['event_xlim'])
-                axis.axes.set_ylim(uistate.zoom['event_ylim'])
+            axis.axes.set_xlim(uistate.zoom['event_xlim'])
+            axis.axes.set_ylim(uistate.zoom['event_ylim'])
         elif axis == uistate.ax1 or axis == uistate.ax2:
             if config.verbose:
                 print("zoomReset: ax1/ax2")
@@ -2623,7 +2651,7 @@ class UIsub(Ui_MainWindow):
         self.group_cache_purge()
         # TODO: rest of group handling
 
-        uistate.dfv = None
+        #uistate.dfv = None
         uiplot.hideAll()
         self.update_show(reset=True)
         self.mouseoverUpdate()
@@ -3467,17 +3495,22 @@ class UIsub(Ui_MainWindow):
         return row
     
     def get_trow(self, dfp_idx=None):
-        # returns the selected row with the lowest index in df_t
         if dfp_idx is not None:
             dft = self.get_dft(self.get_prow(dfp_idx))
-            row = dft.loc[uistate.list_idx_select_stims[0]]
-            return row
-        if not uistate.list_idx_select_stims:
-            print("get_trow: No stim selected.")
+        else:
+            if not uistate.list_idx_select_stims:
+                print("get_trow: No stim selected.")
+                return None
+            dft = self.get_dft(self.get_prow())
+        if dft is None or len(dft) == 0:
+            print("get_trow: Empty dataframe.")
             return None
-        dft = self.get_dft(self.get_prow())
-        row = dft.loc[uistate.list_idx_select_stims[0]]
-        return row
+        # ensure index is valid
+        idx = uistate.list_idx_select_stims[0] if uistate.list_idx_select_stims else 0
+        if idx < 0 or idx >= len(dft):
+            idx = 0
+            uistate.list_idx_select_stims = [0]
+        return dft.loc[idx]
 
     def get_dfmean(self, row):
         # returns an internal df mean for the selected file. If it does not exist, read it from file first.
