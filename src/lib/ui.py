@@ -82,8 +82,8 @@ if debug_mode:
 
 class Config:
     def __init__(self):
-        # self.dev_mode = True # Development mode
-        self.dev_mode = False # Deploy mode
+        self.dev_mode = True # Development mode
+        # self.dev_mode = False # Deploy mode
         print("\n" * 3 + f"{'Development' if self.dev_mode else 'Deploy'} mode - {time.strftime('%H:%M:%S')}")
 
         clear = False # Clear all caches and temporary files at launch
@@ -1561,21 +1561,18 @@ class UIsub(Ui_MainWindow):
         # set and apply Auto-zoom parameters for all axes
         self.usage("zoomAuto")
         prow = self.get_prow()
-        trow = self.get_trow()
         dfmean = self.get_dfmean(prow)
         # axm:
         vmin = dfmean['voltage'].min()
         vmax = dfmean['voltage'].max()
-        uistate.zoom['mean_xlim'] = (0, prow['sweep_duration'].max())
+        uistate.zoom['mean_xlim'] = (0, prow['sweep_duration'])
         uistate.zoom['mean_ylim'] = (vmin, vmax)
         # axe:
-        uistate.zoom['event_ylim'] = (-0.0012, 0.0002)
-        event_start = trow['t_stim'] + 0.002 # s after stim
-        event_end = event_start + 0.040
-        uistate.zoom['event_xlim'] = (event_start, event_end)
+        uistate.zoom['event_ylim'] = (-0.0015, 0.0002)
+        uistate.zoom['event_xlim'] = (-0.0012, 0.030)
         # ax1 and ax2
-        uistate.zoom['output_ax1_ylim'] = (0, 1.2)
-        uistate.zoom['output_ax2_ylim'] = (0, 1.2)
+        uistate.zoom['output_ax1_ylim'] = (0, 1.5)
+        uistate.zoom['output_ax2_ylim'] = (0, 1.5)
         uistate.zoom['output_xlim'] = (0, prow['sweeps'])
         self.zoomReset()        
         return
@@ -3996,16 +3993,15 @@ class UIsub(Ui_MainWindow):
 
 
     def graphClicked(self, event, canvas): # graph click event
-        self.usage("graphClicked")
         if not uistate.list_idx_select_recs: # no recording selected; do nothing
             return
         x = event.xdata
         if x is None: # clicked outside graph; do nothing
             return
+        self.usage("graphClicked")
         if event.button == 2: # middle click, reset zoom
-            axis = canvas.axes
             #print(f"axis: {axis}, type {type(axis)}")
-            self.zoomReset(axis=axis)
+            self.zoomAuto()
             return
         if event.button == 3: # right click, deselect
             if uistate.dragging:

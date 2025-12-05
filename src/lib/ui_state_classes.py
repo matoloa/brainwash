@@ -61,7 +61,7 @@ class UIstate:
         self.zoom = {
             'mean_xlim': (0, 1),
             'mean_ylim': (-1, 1),
-            'event_xlim': (self.settings['event_start']/2, self.settings['event_end']/2),
+            'event_xlim': (-0.0012, 0.030),
             'event_ylim': (-0.001, 0.0002),
             'output_xlim': (0, None),
             'output_ax1_ylim': (0, 1.2),
