@@ -1418,9 +1418,12 @@ class UIsub(Ui_MainWindow):
                     list_l.append(l)
                     print(f"{key} - N: {n} - {l} sweeps")
                 # perform test
-                df_ttest = analysis.ttest_df(d_group_ndf)
-                uiplot.heatmap(df_ttest)
-
+                norm = uistate.checkBox['norm_EPSP']
+                amp =  uistate.checkBox['EPSP_amp']
+                slope =  uistate.checkBox['EPSP_slope']
+                df_ttest = analysis.ttest_df(d_group_ndf, norm=norm, amp=amp, slope=slope)
+                if not df_ttest.empty:
+                    uiplot.heatmap(df_ttest)
                 print(df_ttest)
             else:
                 print("t-test requires number of sweeps to match")
@@ -3741,12 +3744,25 @@ class UIsub(Ui_MainWindow):
                 }).reset_index()
                 group_mean.columns = [col[0] if col[0] == 'stim' else '_'.join(col).strip().replace('sem', 'SEM') for col in group_mean.columns.values]
             else:
-                group_mean = pd.concat(dfs).groupby('sweep').agg({
-                    'EPSP_amp_norm': ['mean', 'sem'],
-                    'EPSP_slope_norm': ['mean', 'sem'],
-                    'EPSP_amp': ['mean', 'sem'],
-                    'EPSP_slope': ['mean', 'sem']
-                }).reset_index()
+                if len(dfs) == 0:
+                    group_mean = pd.DataFrame({
+                        "sweep": [],
+                        "EPSP_amp_norm_mean": [],
+                        "EPSP_amp_norm_SEM": [],
+                        "EPSP_slope_norm_mean": [],
+                        "EPSP_slope_norm_SEM": [],
+                        "EPSP_amp_mean": [],
+                        "EPSP_amp_SEM": [],
+                        "EPSP_slope_mean": [],
+                        "EPSP_slope_SEM": [],
+                    })
+                else:
+                    group_mean = pd.concat(dfs).groupby('sweep').agg({
+                        'EPSP_amp_norm': ['mean', 'sem'],
+                        'EPSP_slope_norm': ['mean', 'sem'],
+                        'EPSP_amp': ['mean', 'sem'],
+                        'EPSP_slope': ['mean', 'sem']
+                    }).reset_index()
                 group_mean.columns = [col[0] if col[0] == 'sweep' else '_'.join(col).strip().replace('sem', 'SEM') for col in group_mean.columns.values]
             print(f"Group mean columns: {group_mean.columns}")
             print(f"Group mean: {group_mean}")

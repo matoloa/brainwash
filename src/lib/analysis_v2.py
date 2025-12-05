@@ -34,24 +34,28 @@ sys.path.append(str(reporoot / 'src/lib/'))
 def valid(*args):
     return all(isinstance(x, (int, float)) and x is not None and not np.isnan(x) for x in args)
 
-def ttest_df(d_group_ndf):
-    # extract groups in consistent order
+
+def ttest_df(d_group_ndf, norm=False, amp=False, slope=False):
     keys = sorted(d_group_ndf.keys())
     k1, k2 = keys[0], keys[1]
-
     n1, df1 = d_group_ndf[k1]
     n2, df2 = d_group_ndf[k2]
 
-    # columns to test: (mean_col, sem_col, output_name)
-    cols = [
-        ("EPSP_amp_norm_mean",   "EPSP_amp_norm_SEM",   "p_amp_norm"),
-        ("EPSP_amp_mean",        "EPSP_amp_SEM",        "p_amp"),
-        ("EPSP_slope_norm_mean", "EPSP_slope_norm_SEM", "p_slope_norm"),
-        ("EPSP_slope_mean",      "EPSP_slope_SEM",      "p_slope"),
-    ]
-
     sweeps = df1["sweep"].values
     out = {"sweep": sweeps}
+
+    cols = []
+
+    if amp:
+        if norm:
+            cols.append(("EPSP_amp_norm_mean", "EPSP_amp_norm_SEM", "p_amp_norm"))
+        else:
+            cols.append(("EPSP_amp_mean", "EPSP_amp_SEM", "p_amp"))
+    if slope:
+        if norm:
+            cols.append(("EPSP_slope_norm_mean", "EPSP_slope_norm_SEM", "p_slope_norm"))
+        else:
+            cols.append(("EPSP_slope_mean", "EPSP_slope_SEM", "p_slope"))
 
     for mean_col, sem_col, outname in cols:
         pvals = []
@@ -72,6 +76,7 @@ def ttest_df(d_group_ndf):
         out[outname] = pvals
 
     return pd.DataFrame(out)
+
 
 def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
     """

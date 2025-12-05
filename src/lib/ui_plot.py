@@ -20,7 +20,8 @@ class UIplot():
 
 
     def heatmap(self, df):
-        ax = self.uistate.ax1
+        ax1 = self.uistate.ax1
+        ax2 = self.uistate.ax2
 
         if not hasattr(self.uistate, "dict_heatmap"):
             self.uistate.dict_heatmap = {}
@@ -33,11 +34,19 @@ class UIplot():
             sig = ps < 0.05
             xs = sweeps[sig]
 
+            if "amp" in col:
+                ax = ax1
+            elif "slope" in col:
+                ax = ax2
+            else:
+                continue
+
             for x in xs:
                 sc = ax.scatter([x], [0], marker="o", color="red")
                 self.uistate.dict_heatmap.setdefault(col, {})[x] = sc
 
-        ax.figure.canvas.draw()
+        ax1.figure.canvas.draw()
+        ax2.figure.canvas.draw()
 
 
     def heatunmap(self):
