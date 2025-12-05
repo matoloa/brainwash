@@ -70,6 +70,7 @@ class UIstate:
         self.dfv = None # used to store per-recording voltage ranges for output scaling
         self.showTimetable = False
         self.showHeatmap = False
+        self.dict_heatmap = {}
 
         # default_dict_t is used to store timepoints and their parameters
         # only assign full width as we normally use odd length in discrete index for clarity

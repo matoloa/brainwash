@@ -19,6 +19,45 @@ class UIplot():
         print(f"UIplot instantiated: {self.uistate.anyView()}")
 
 
+    def heatmap(self, df):
+        ax = self.uistate.ax1
+
+        if not hasattr(self.uistate, "dict_heatmap"):
+            self.uistate.dict_heatmap = {}
+
+        sweeps = df["sweep"].values
+        pcols = [c for c in df.columns if c.startswith("p_")]
+
+        for col in pcols:
+            ps = df[col].values
+            sig = ps < 0.05
+            xs = sweeps[sig]
+
+            for x in xs:
+                sc = ax.scatter([x], [0], marker="o", color="red")
+                self.uistate.dict_heatmap.setdefault(col, {})[x] = sc
+
+        ax.figure.canvas.draw()
+
+
+    def heatunmap(self):
+        d = getattr(self.uistate, "dict_heatmap", None)
+        if d is None:
+            return
+        ax = self.uistate.ax1
+        #print(f"heatunmap: {d}")
+        for col in list(d.keys()):
+            for x, sc in list(d[col].items()):
+                try:
+                    sc.remove()
+                except:
+                    pass
+            d[col].clear()
+
+        d.clear()
+        ax.figure.canvas.draw()
+
+
     def create_barplot(self, dict_group_color_ratio_SEM, str_aspect, output_path):
         plt.figure(figsize=(6, 6))
         group_names = []

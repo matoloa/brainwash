@@ -1395,9 +1395,10 @@ class UIsub(Ui_MainWindow):
 
 
     def toggleHeatmap(self):
-        uistate.showTimetable = not uistate.showTimetable
-        print(f"Heatmap is {uistate.showTimetable}")
-        if not uistate.showTimetable:
+        uistate.showHeatmap = not uistate.showHeatmap
+        print(f"Heatmap is {uistate.showHeatmap}")
+        if not uistate.showHeatmap:
+            uiplot.heatunmap()
             return
         t0 = time.time()
         d_group_ndf = {}
@@ -1418,6 +1419,8 @@ class UIsub(Ui_MainWindow):
                     print(f"{key} - N: {n} - {l} sweeps")
                 # perform test
                 df_ttest = analysis.ttest_df(d_group_ndf)
+                uiplot.heatmap(df_ttest)
+
                 print(df_ttest)
             else:
                 print("t-test requires number of sweeps to match")
