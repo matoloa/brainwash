@@ -1233,10 +1233,16 @@ class UIsub(Ui_MainWindow):
 
 
     def stimSelectionChanged(self):
-        self.usage("stimSelectionChanged")
+        self.usage(f"stimSelectionChanged")
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableStim.clearSelection()
-        selected_indexes = self.tableStim.selectionModel().selectedRows()
+        if uistate.mean_mouseover_stim_select is None: # clicked table
+            selected_indexes = self.tableStim.selectionModel().selectedRows()
+        else: # clicked graph
+            row = uistate.mean_mouseover_stim_select - 1
+            selected_indexes = [self.tableStimModel.index(row, 0)]
+        uistate.mean_mouseover_stim_select = None
+        # build the list uistate.list_idx_select_stims with indices
         uistate.list_idx_select_stims = [index.row() for index in selected_indexes]
         self.update_show()
         self.zoomAuto()
@@ -3377,7 +3383,11 @@ class UIsub(Ui_MainWindow):
             print("setButtonParse")
         unparsed = self.df_project['sweeps'].eq("...").any()
         self.pushButtonParse.setVisible(bool(unparsed))
-        self.checkBox_force1stim.setVisible(bool(unparsed))
+        if config.hide_experimental:
+            self.checkBox_force1stim.setVisible(False)
+        else:
+            self.checkBox_force1stim.setVisible(bool(unparsed))
+
 
     def checkBox_force1stim_changed(self, state):
         uistate.checkBox['force1stim'] = state == 2
@@ -4012,6 +4022,10 @@ class UIsub(Ui_MainWindow):
                     self.mouse_release = self.canvasEvent.mpl_connect('button_release_event', lambda event: self.eventDragReleased(event, data_x, data_y))
 
         elif canvas == self.canvasMean: # Mean canvas (top graph) left-clicked: overview and selecting ranges for finding relevant stims
+            if uistate.mean_mouseover_stim_select is not None:
+                uistate.dragging = False
+                self.stimSelectionChanged()
+                return
             dfmean = self.get_dfmean(prow) # Required for event dragging, x and y
             time_values = dfmean['time'].values
             uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
