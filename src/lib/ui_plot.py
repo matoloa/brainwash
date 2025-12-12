@@ -19,6 +19,54 @@ class UIplot():
         print(f"UIplot instantiated: {self.uistate.anyView()}")
 
 
+    def heatmap(self, df):
+        ax1 = self.uistate.ax1
+        ax2 = self.uistate.ax2
+
+        if not hasattr(self.uistate, "dict_heatmap"):
+            self.uistate.dict_heatmap = {}
+
+        sweeps = df["sweep"].values
+        pcols = [c for c in df.columns if c.startswith("p_")]
+
+        for col in pcols:
+            ps = df[col].values
+            sig = ps < 0.05
+            xs = sweeps[sig]
+
+            if "amp" in col:
+                ax = ax1
+            elif "slope" in col:
+                ax = ax2
+            else:
+                continue
+
+            for x in xs:
+                sc = ax.scatter([x], [0], marker="o", color="red")
+                self.uistate.dict_heatmap.setdefault(col, {})[x] = sc
+
+        ax1.figure.canvas.draw()
+        ax2.figure.canvas.draw()
+
+
+    def heatunmap(self):
+        d = getattr(self.uistate, "dict_heatmap", None)
+        if d is None:
+            return
+        ax = self.uistate.ax1
+        #print(f"heatunmap: {d}")
+        for col in list(d.keys()):
+            for x, sc in list(d[col].items()):
+                try:
+                    sc.remove()
+                except:
+                    pass
+            d[col].clear()
+
+        d.clear()
+        ax.figure.canvas.draw()
+
+
     def create_barplot(self, dict_group_color_ratio_SEM, str_aspect, output_path):
         plt.figure(figsize=(6, 6))
         group_names = []
@@ -251,6 +299,31 @@ class UIplot():
                 del dict_show[key]
 
 
+    def exterminate(self):
+        # cycles through every line, on every graph, and kills it.
+        uis = self.uistate
+        axes = [uis.axm, uis.axe, uis.ax1, uis.ax2,]
+        for axis in axes:
+            if axis is None:
+                continue
+            for line in list(axis.lines):
+                line.remove()
+            for coll in list(axis.collections):
+                coll.remove()
+            axis.figure.canvas.draw()
+        # clean up references
+        uis.dict_rec_labels = {}
+        uis.dict_rec_show = {}
+        uis.dict_group_labels = {}
+        uis.dict_group_show = {}
+        uis.mouseover_plot = None
+        uis.mouseover_blob = None
+        uis.mouseover_out = None
+        uis.mouseover_action = None
+        uis.ghost_sweep = None
+        uis.ghost_label = None
+
+
     def unPlotGroup(self, group_ID=None):
         dict_group = self.uistate.dict_group_labels
         if group_ID is None:
@@ -288,13 +361,28 @@ class UIplot():
 
         # arrange axes and labels
         axm, axe, ax1, ax2 = self.uistate.axm, self.uistate.axe, self.uistate.ax1, self.uistate.ax2
-        #axm.axis('off')
-        axm.set_xlim(uistate.zoom['mean_xlim'])
+
+        axm.axis('off')
+        #axm.set_xlim(uistate.zoom['mean_xlim'])
+        #axm.set_ylim(uistate.zoom['mean_ylim'])
+        #axm.set_xlabel("Time (s)")
+        #axe.set_ylabel("Voltage (V)")
 
         axe.set_xlabel("Time (s)")
         axe.set_ylabel("Voltage (V)")
         axe.set_xlim(uistate.zoom['event_xlim'])
         axe.set_ylim(uistate.zoom['event_ylim'])
+
+        # Convert y-axis from V → mV
+        axe.set_ylabel("Voltage (mV)")
+        axe.set_yticks(axe.get_yticks())  # keeps same positions
+        axe.set_yticklabels([f"{y*1e3:.1f}" for y in axe.get_yticks()])
+
+        # Convert x-axis from s → ms
+        axe.set_xlabel("Time (ms)")
+        axe.set_xticks(axe.get_xticks())
+        axe.set_xticklabels([f"{x*1e3:.1f}" for x in axe.get_xticks()])
+
 
         if uistate.checkBox['norm_EPSP']:
             ax1.set_ylabel("Amplitude %")
@@ -516,8 +604,8 @@ class UIplot():
                     self.plot_line(f"{label} {stim_str} EPSP amp norm", 'ax1', out[x_axis], out['EPSP_amp_norm'], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num)
                 self.plot_line(f"{label} {stim_str} amp_zero marker", 'axe', [-0.002, -0.001], [amp_zero, amp_zero], settings['rgb_EPSP_amp'], rec_ID, aspect='EPSP_amp', stim=stim_num) # TODO: hardcoded x
 
-            if not np.isnan(t_row['t_EPSP_slope_start']):
-                x_start, x_end = t_row['t_EPSP_slope_start'], t_row['t_EPSP_slope_end']
+            x_start, x_end = t_row['t_EPSP_slope_start'], t_row['t_EPSP_slope_end']
+            if not (np.isnan(x_start) or np.isnan(x_end)):
                 index = (df_event['time'] - x_start).abs().idxmin()
                 y_start = df_event.loc[index, rec_filter] if index in df_event.index else None
                 index = (df_event['time'] - x_end).abs().idxmin()
@@ -544,8 +632,8 @@ class UIplot():
                 self.plot_hline(f"{label} {stim_str} volley amp mean", 'ax1', volley_amp_mean, settings['rgb_volley_amp'], rec_ID, aspect='volley_amp_mean', stim=stim_num)
                 self.plot_line(f"{label} {stim_str} volley amp", 'ax1', out[x_axis], out['volley_amp'], settings['rgb_volley_amp'], rec_ID, aspect='volley_amp', stim=stim_num)
 
-            if not np.isnan(t_row['t_volley_slope_start']):
-                x_start, x_end = t_row['t_volley_slope_start'], t_row['t_volley_slope_end']
+            x_start, x_end = t_row['t_volley_slope_start'], t_row['t_volley_slope_end']
+            if not (np.isnan(x_start) or np.isnan(x_end)):
                 index = (df_event['time'] - x_start).abs().idxmin()
                 y_start = df_event.loc[index, rec_filter] if index in df_event.index else None
                 index = (df_event['time'] - x_end).abs().idxmin()
@@ -575,53 +663,102 @@ class UIplot():
             self.plot_group_lines('ax2', group_ID, dict_group, df_groupmean)
 
 
-    def plotUpdate(self, p_row, t_row, aspect, data_x, data_y, amp=None): # TODO: unspaghetti this
+    def update(self, prow, trow, aspect, data_x, data_y, amp=None):
+        """
+        Updates the existing plotted artists stored in `self.uistate.dict_rec_labels`.
+        Parameters
+        - prow (pandas.Series): df_project row for selected recording.
+        - trow (pandas.Series): dft (timepoint) row for selected stim.
+        - aspect (str): One of 'EPSP slope', 'volley slope', 'EPSP amp', 'volley amp'.
+            Controls which markers/lines are updated.
+        - data_x (np.ndarray-like): x-values (time or shifted time) corresponding to
+            the event window or mean trace used to sample y-values for marker placement.
+        - data_y (np.ndarray-like): y-values aligned with `data_x` (voltage trace).
+        - amp (float, optional): amplitude value used for drawing amplitude markers
+        """
+
+        # Validate input formats
+        if not isinstance(prow, pd.Series):
+            raise TypeError(f"prow must be pandas.Series, got {type(prow).__name__}")
+        if not isinstance(trow, (pd.Series, dict)):
+            raise TypeError(f"trow must be pandas.Series or dict, got {type(trow).__name__}")
+        if isinstance(trow, dict) and not trow:
+            raise ValueError("trow dict is empty")
+       
+        valid_aspects = ['EPSP slope', 'volley slope', 'EPSP amp', 'volley amp']
+        if aspect not in valid_aspects:
+            raise ValueError(f"aspect must be one of {valid_aspects}, got '{aspect}'")
+        if not isinstance(data_x, np.ndarray):
+            try:
+                data_x = np.asarray(data_x)
+            except (TypeError, ValueError):
+                raise TypeError(f"data_x must be array-like, got {type(data_x).__name__}")
+        if not isinstance(data_y, np.ndarray):
+            try:
+                data_y = np.asarray(data_y)
+            except (TypeError, ValueError):
+                raise TypeError(f"data_y must be array-like, got {type(data_y).__name__}")
+        
+        if len(data_x) != len(data_y):
+            raise ValueError(f"data_x and data_y must have same length, got {len(data_x)} and {len(data_y)}")
+
+        if amp is not None and not isinstance(amp, (int, float, np.number)):
+            raise TypeError(f"amp must be numeric or None, got {type(amp).__name__}")
+        
+        # Validate required keys in trow
+        required_keys = ['t_stim', 'stim', 'amp_zero']
+        for key in required_keys:
+            if key not in trow:
+                raise KeyError(f"trow missing required key: '{key}'")
+
+        # TODO: unspaghetti this mess
         norm = self.uistate.checkBox['norm_EPSP']
-        stim_offset = t_row['t_stim']
-        label_base = f"{p_row['recording_name']} - stim {t_row['stim']} {aspect}"
+        stim_offset = trow['t_stim']
+        label_core = f"{prow['recording_name']} - stim {trow['stim']} {aspect}"
 
         if aspect in ['EPSP slope', 'volley slope']:
-            x_start = t_row[f't_{aspect.replace(" ", "_")}_start']-stim_offset
-            x_end = t_row[f't_{aspect.replace(" ", "_")}_end']-stim_offset
+            x_start = trow[f't_{aspect.replace(" ", "_")}_start']-stim_offset
+            x_end = trow[f't_{aspect.replace(" ", "_")}_end']-stim_offset
             y_start = data_y[np.abs(data_x - x_start).argmin()]
             y_end = data_y[np.abs(data_x - x_end).argmin()]
-            self.updateLine(f"{label_base} marker", [x_start, x_end], [y_start, y_end])
+            self.updateLine(f"{label_core} marker", [x_start, x_end], [y_start, y_end])
             if self.uistate.checkBox['output_per_stim']:
-                label_base = f"{p_row['recording_name']} {aspect}"
+                label_core = f"{prow['recording_name']} {aspect}"
             if aspect == 'volley slope':
                 if self.uistate.checkBox['output_per_stim']:
-                    self.updateOutLine(label_base)
+                    self.updateOutLine(label_core)
                 else:
-                    volley_slope_mean = t_row.get('volley_slope_mean')
+                    volley_slope_mean = trow.get('volley_slope_mean')
                     print(f" - - - volley_slope_mean: {volley_slope_mean}")
                     #if volley_slope_mean is None:
                     #    volley_slope_mean = self.uistate.mouseover_out[0].get_ydata().mean()
-                    self.updateOutMean(f"{label_base} mean", volley_slope_mean)
+                    self.updateOutMean(f"{label_core} mean", volley_slope_mean)
             else: # EPSP slope
                 if norm:
-                    label_base += " norm"
-                self.updateOutLine(label_base)
+                    label_core += " norm"
+                self.updateOutLine(label_core)
         elif aspect in ['EPSP amp', 'volley amp']:
             key = aspect.replace(" ", "_")
-            t_amp = t_row[f't_{key}'] - stim_offset
+            t_amp = trow[f't_{key}'] - stim_offset
             y_position = data_y[np.abs(data_x - t_amp).argmin()]
-            amp_x = t_amp - t_row[f't_{key}_halfwidth'], t_amp + t_row[f't_{key}_halfwidth']
-            self.updateAmpMarker(label_base, t_amp, y_position, amp_x, t_row['amp_zero'], amp=amp)
+            amp_x = t_amp - trow[f't_{key}_halfwidth'], t_amp + trow[f't_{key}_halfwidth']
+            self.updateAmpMarker(label_core, t_amp, y_position, amp_x, trow['amp_zero'], amp=amp)
             if self.uistate.checkBox['output_per_stim']:
-                label_base = f"{p_row['recording_name']} {aspect}"
+                label_core = f"{prow['recording_name']} {aspect}"
             if aspect == 'volley amp':
                 if self.uistate.checkBox['output_per_stim']:
-                    self.updateOutLine(label_base)
+                    self.updateOutLine(label_core)
                 else:
-                    volley_amp_mean = t_row.get('volley_amp_mean')
+                    volley_amp_mean = trow.get('volley_amp_mean')
                     print(f" - - - volley_amp_mean: {volley_amp_mean}")
                     #if volley_amp_mean is None:
                     #    volley_amp_mean = self.uistate.mouseover_out[0].get_ydata().mean()
-                    self.updateOutMean(f"{label_base} mean", volley_amp_mean)
+                    self.updateOutLine(label_core)
+                    self.updateOutMean(f"{label_core} mean", volley_amp_mean)
             else: # EPSP amp
                 if norm:
-                    label_base += " norm"
-                self.updateOutLine(label_base)
+                    label_core += " norm"
+                self.updateOutLine(label_core)
 
     def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None):
         axe = self.uistate.axe
@@ -650,7 +787,8 @@ class UIplot():
     def updateOutMean(self, label, mean):
         print(f"updateOutMean: {label}, {mean}")
         linedict = self.uistate.dict_rec_labels[label]
-        linedict['line'].set_ydata(mean)
+        linedict['line'].set_ydata([mean] * len(linedict['line'].get_xdata()))
+        # linedict['line'].set_ydata(mean)
 
 
 

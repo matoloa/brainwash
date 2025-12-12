@@ -16,6 +16,7 @@
 import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter, find_peaks
+from scipy.stats import ttest_ind_from_stats
 import os
 import json
 import sys
@@ -34,6 +35,49 @@ def valid(*args):
     return all(isinstance(x, (int, float)) and x is not None and not np.isnan(x) for x in args)
 
 
+def ttest_df(d_group_ndf, norm=False, amp=False, slope=False):
+    keys = sorted(d_group_ndf.keys())
+    k1, k2 = keys[0], keys[1]
+    n1, df1 = d_group_ndf[k1]
+    n2, df2 = d_group_ndf[k2]
+
+    sweeps = df1["sweep"].values
+    out = {"sweep": sweeps}
+
+    cols = []
+
+    if amp:
+        if norm:
+            cols.append(("EPSP_amp_norm_mean", "EPSP_amp_norm_SEM", "p_amp_norm"))
+        else:
+            cols.append(("EPSP_amp_mean", "EPSP_amp_SEM", "p_amp"))
+    if slope:
+        if norm:
+            cols.append(("EPSP_slope_norm_mean", "EPSP_slope_norm_SEM", "p_slope_norm"))
+        else:
+            cols.append(("EPSP_slope_mean", "EPSP_slope_SEM", "p_slope"))
+
+    for mean_col, sem_col, outname in cols:
+        pvals = []
+        for i in range(len(sweeps)):
+            m1 = df1.loc[i, mean_col]
+            s1 = df1.loc[i, sem_col] * np.sqrt(n1)
+
+            m2 = df2.loc[i, mean_col]
+            s2 = df2.loc[i, sem_col] * np.sqrt(n2)
+
+            _, p = ttest_ind_from_stats(
+                mean1=m1, std1=s1, nobs1=n1,
+                mean2=m2, std2=s2, nobs2=n2,
+                equal_var=False
+            )
+            pvals.append(p)
+
+        out[outname] = pvals
+
+    return pd.DataFrame(out)
+
+
 def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
     """
     vectorized measure slope
@@ -50,7 +94,6 @@ def measureslope_vec(df, t_start, t_end, name="EPSP", filter='voltage',):
 
 
 def build_dfoutput(df, dict_t, filter='voltage', quick=False):
-    print(f"{dict_t=}")
     # TODO: check amps width calculations
     # TODO: implement quick, to operate without amp_hws
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_* 
@@ -62,7 +105,7 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
         a dataframe. Per sweep (row): EPSP_amp, EPSP_slope, volley_amp, volley_EPSP
     """
     t0 = time.time()
-    print (f"build_dfoutput: {dict_t}")
+    # print(f"build_dfoutput: {dict_t}")
     normFrom = dict_t['norm_output_from'] # start
     normTo = dict_t['norm_output_to'] # end
     list_col = ['stim', 'sweep']
@@ -108,7 +151,6 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
             dfoutput['EPSP_slope'] = np.nan
             dfoutput['EPSP_slope_norm'] = np.nan
 
-
     # volley_amp
     if 't_volley_amp' in dict_t.keys():
         list_col.append('volley_amp')
@@ -137,7 +179,7 @@ def build_dfoutput(df, dict_t, filter='voltage', quick=False):
         else:
             dfoutput['volley_slope'] = np.nan
 
-    print(f'build_df_output: {round((time.time()-t0)*1000)} ms, list_col: {list_col}')
+    # print(f'build_dfoutput: {round((time.time()-t0)*1000)} ms, list_col: {list_col}')
     return dfoutput[list_col]
 
 
@@ -178,33 +220,6 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
     2) Acquires i and t from characterize_graph() for the provided dfmean and converts index to time values
     3) Returns a DataFrame of the t-values for each stim
     """
-    # i_stims: list of indices of stimulation artefacts in dfmean. If None, autodetects using find_i_stims.
-    if i_stims is None:
-        i_stims = find_i_stims(dfmean=dfmean)
-    if not i_stims:
-        print("find_events: no stimulation artefacts found. Returning empty DataFrame.")
-        return pd.DataFrame()
-    
-    # calculate time delta and sampling frequency
-    time_values = dfmean['time'].values
-    time_delta = time_values[1] - time_values[0]
-    sampling_Hz = 1 / time_delta
-
-    if precision is None:
-        precision = len(str(time_values[1] - time_values[0]).split('.')[1])
-
-    if verbose:
-        print(f"find_i_stims: {len(i_stims)}: sampling_Hz: {sampling_Hz}")
-        print(i_stims)
-
-    def unwrap(v):
-        if isinstance(v, pd.Series):
-            if len(v) == 1:
-                return v.iloc[0]
-            else:
-                raise ValueError(f"Expected scalar or single-element Series, got Series with {len(v)} elements: {v}")
-        return v
-            
     def i2t(stim_nr, i_stim, df_event_range, time_delta, stim_char, precision, default_dict_t):
         # Converts i (index) to t (time from start of sweep in dfmean)
         t_stim = round(df_event_range.loc[i_stim].time, precision)
@@ -244,7 +259,7 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
             t_EPSP_slope_start = t_stim + 0.002 # default to 2 ms after stim
             t_EPSP_amp_method = t_EPSP_slope_method = 'default'
         # Calculate the end times for volley and EPSP slopes
-        t_volley_slope_end = 0#round(t_volley_slope_start + default_dict_t['t_volley_slope_width'], precision)
+        t_volley_slope_end = round(t_volley_slope_start + default_dict_t['t_volley_slope_width'], precision)
         t_EPSP_slope_end = round(t_EPSP_slope_start + default_dict_t['t_EPSP_slope_width'], precision)
 
         result = {
@@ -263,8 +278,35 @@ def find_events(dfmean, default_dict_t, i_stims=None, stim_amp=0.005, precision=
             't_EPSP_amp_method': t_EPSP_amp_method,
         }
         return result
+    
+    def unwrap(v):
+        if isinstance(v, pd.Series):
+            if len(v) == 1:
+                return v.iloc[0]
+            else:
+                raise ValueError(f"Expected scalar or single-element Series, got Series with {len(v)} elements: {v}")
+        return v
 
-    # Convert each index to a dictionary of t-values and add it to a list
+    # i_stims: list of indices of stimulation artefacts in dfmean. If None, autodetects using find_i_stims.
+    if i_stims is None:
+        i_stims = find_i_stims(dfmean=dfmean)
+    if not i_stims:
+        print("find_events: no stimulation artefacts found. Returning empty DataFrame.")
+        return pd.DataFrame()
+    
+    # calculate time delta and sampling frequency
+    time_values = dfmean['time'].values
+    time_delta = time_values[1] - time_values[0]
+    sampling_Hz = 1 / time_delta
+
+    if precision is None:
+        precision = len(str(time_values[1] - time_values[0]).split('.')[1])
+
+    if verbose:
+        print(f"find_i_stims: {len(i_stims)}: sampling_Hz: {sampling_Hz}")
+        print(i_stims)
+
+        # Convert each index to a dictionary of t-values and add it to a list
     list_of_dict_t = []
     margin_before = 5
     min_interval_samples = 200  # 20 ms at 10 kHz to ensure no overlap in up to 50Hz trains
@@ -377,6 +419,7 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
     verboses += f"volley: search region {volley_start}, {volley_end}\n"
     v_prom = 0.001
     v_peaks = []
+    i_veb = volley_start
     while len(v_peaks) < 2 and v_prom > 1e-6: # iterative volley search until at least 2 prominent peaks are found
         v_peaks, v_peak_props = find_peaks(volley_region, prominence=v_prom)
         v_prom /= 2
@@ -605,13 +648,17 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
         
     return result
 
+
+# %% test code
 if __name__ == "__main__":
     import parse
     import ui_state_classes as ui
 
     # Test find_events:  with a sample DataFrame
-    list_sources = [r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_a.csv",
-                    r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_b.csv",
+
+    list_sources = [
+                    #r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_a.csv",
+                    #r"C:\Users\xandmz\Documents\data\A_21_P0701-S2_Ch0_b.csv",
                     #r"C:\Users\xandmz\Documents\data\A_24_P0630-D4_Ch0_a.csv",
                     #r"C:\Users\xandmz\Documents\data\A_24_P0630-D4_Ch0_b.csv",
                     #r"C:\Users\xandmz\Documents\data\B_22_P0701-D3_Ch0_a.csv",
@@ -622,6 +669,13 @@ if __name__ == "__main__":
                     #r"K:\Samples - pilot\cA24.csv",  # Works with ui.py
                     #r"K:\Samples - pilot\cB22.csv", # Doesn't Work with ui.py
     ]
+    # add all .csv files in /home/mato/Documents/Brainwash Data Source/talkback KetaDexa to list_sources
+    folder_test = Path.home() / 'Documents' / 'Brainwash Data Source' / 'talkback KetaDexa'
+    #folder_test = Path.home() / 'Documents' / 'Brainwash Data Source' / 'talkback Lactate24SR'
+    for file in folder_test.glob('*slice*.csv'):
+        list_sources.append(str(file))
+
+    # default dict_t
     t_volley_slope_width = 0.0003 # default width for volley slope, in seconds
     t_EPSP_slope_width = 0.0007 # default width for EPSP, in seconds
     t_volley_slope_halfwidth = 0.0001
@@ -666,7 +720,16 @@ if __name__ == "__main__":
         t0 = time.time()
         df = pd.read_csv(source)
         print(f"Loaded {source} with shape {df.shape}")
-        dfmean, i_stim = parse.build_dfmean(df)
+        # if 'voltage_raw' in df.columns:
+        print (f"Columns: {df.columns.tolist()}")
+        if 'voltage_raw' in df.columns: # raw data
+            dfmean, i_stim = parse.build_dfmean(df)
+        else: #dfmean, recovered from talkback slice
+            rollingwidth=3
+            df['prim'] = df.voltage.rolling(rollingwidth, center=True).mean().diff()
+            i_stim = find_i_stims(df)
+            dfmean = df
+ 
         print(f"DataFrame mean shape: {dfmean.shape}, i_stim: {i_stim}")
         dict_events = find_events(dfmean, default_dict_t, verbose=True)
         dict_t = default_dict_t.copy()  # Create a copy of the default dictionary
@@ -693,22 +756,28 @@ if __name__ == "__main__":
             't_EPSP_amp': df_t['t_EPSP_amp'].values[0],
         })
     print("Event Summary:")
+    successful_volley_slope = 0
+    successful_EPSP_slope = 0
     for event in list_event_summary:
+        if event['t_EPSP_slope_method'] == 'auto detect':
+            successful_EPSP_slope += 1
+        if event['t_volley_slope_method'] == 'auto detect':
+            successful_volley_slope += 1
         print(f"t_stim: {event['t_stim']}, vS:{event['t_volley_slope_method']}, ES: {event['t_EPSP_slope_method']}, "
               f"t_volley_slope: {event['t_volley_slope_start']} - {event['t_volley_slope_end']}, t_volley_amp: {event['t_volley_amp']}, "
               f"t_EPSP_slope: {event['t_EPSP_slope_start']} - {event['t_EPSP_slope_end']}, t_EPSP_amp: {event['t_EPSP_amp']}")
+    print(f"\nFolder tested: {folder_test}")
+    print(f"   Successful volley slope detections: {successful_volley_slope}/{len(list_event_summary)}")
+    print(f"   Successful EPSP slope detections: {successful_EPSP_slope}/{len(list_event_summary)}")
               
 
 
-
-
-'''
 # Jupyter Notebook testers
 
 # %%
-if __name__ == "__main__":
+if False: #__name__ == "__main__":
     # read slices and meta
-    folder_talkback = Path.home() / 'Documents' / 'Brainwash Data Source' / 'talkback KetaDexa'
+    # folder_talkback = Path.home() / 'Documents' / 'Brainwash Data Source' / 'talkback KetaDexa'
     folder_talkback = Path.home() / 'Documents' / 'Brainwash Data Source' / 'talkback Lactate24SR'
     slice_filepaths = sorted(list(folder_talkback.glob('*slice*')))
     meta_filepaths = sorted(list(folder_talkback.glob('*meta*')))
@@ -735,7 +804,7 @@ if __name__ == "__main__":
 
 
 # %%
-if __name__ == "__main__":
+if False: # __name__ == "__main__":
     sweepname = df.sweepname.unique()[0]
     sweepname = 'd1fdaa03-6a4a-4e32-9691-ad4ef09a1e1c'
     dfsweep = df.loc[df.sweepname == sweepname, ['time', 'voltage']]
@@ -743,7 +812,7 @@ if __name__ == "__main__":
 
 # %%
 # calculate and report test set
-if __name__ == "__main__":
+if False: # __name__ == "__main__":
     from analysis_evaluation import evaluate_and_report
 
     def check_sweep(sweepname):
@@ -769,7 +838,7 @@ if __name__ == "__main__":
 
 # %%
 # find worst offenders
-if __name__ == "__main__":
+if False: #__name__ == "__main__":
     def check_sweep(sweepname):
         dfsweep = df.loc[df.sweepname == sweepname, ['time', 'voltage', 'prim', 'bis']]
         result = characterize_graph(dfsweep, stim_amp=0.005, verbose=False, plot=False, multiplots=True)
@@ -792,7 +861,7 @@ if __name__ == "__main__":
 
 # %%
 # plot worst offenders
-if __name__ == "__main__":
+if False: # __name__ == "__main__":
     results = []
     for sweepname in worst_list:
         dfsweep = df.loc[df.sweepname == sweepname, ['time', 'voltage']]
@@ -801,4 +870,3 @@ if __name__ == "__main__":
         results.append(result)
     dfresults = pd.DataFrame(results)
     #dfresults
-'''

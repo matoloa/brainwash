@@ -1,0 +1,38 @@
+# .github/workflows/windows.yml
+name: Windows Build
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install requirements
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install cx_Freeze==8.2.0 toml
+
+      - name: Build MSI
+        working-directory: src
+        run: python build_with_cxfreeze_multiarch_setup.py bdist_msi
+
+      - name: Extract version
+        id: version
+        run: |
+          $v = python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])"
+          echo "version=$v" >> $GITHUB_OUTPUT
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: brainwash-${{ steps.version.outputs.version }}-win64
+          path: src/dist/*.msi
