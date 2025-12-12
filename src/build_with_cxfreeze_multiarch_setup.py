@@ -53,7 +53,11 @@ exe = Executable(
 options = {
     "build_exe": {
         "includes": [],
-        "zip_include_packages": ["sklearn", "joblib", "scipy", "numpy"],
+        "zip_include_packages": [
+            "joblib",
+            "scipy",
+            "numpy",
+        ],  # Removed "sklearn" to keep it loose for patching
         "include_msvcr": True,
         "excludes": ["tkinter", "email", "pytest"],
         "packages": [
@@ -87,6 +91,9 @@ if sys.platform == "win32":
     arch = "amd64" if "64" in platform.architecture()[0] else "win32"
     build_dir = f"build/exe.win-{arch}-{python_version}"  # Dynamically compute for matrix compatibility
     sklearn_dir = os.path.join(build_dir, "lib", "sklearn")
+    print(
+        f"sklearn_dir: {sklearn_dir}, exists: {os.path.exists(sklearn_dir)}"
+    )  # For debugging in logs
     if os.path.exists(sklearn_dir):
         distributor_file = os.path.join(sklearn_dir, "_distributor_init.py")
         with open(distributor_file, "w") as f:
