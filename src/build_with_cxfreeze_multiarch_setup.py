@@ -48,9 +48,19 @@ exe = Executable(
 options = {
     "build_exe": {
         "includes": [],
+        "zip_include_packages": ["sklearn", "joblib", "scipy", "numpy"],
         "include_msvcr": True,
         "excludes": ["tkinter", "email", "pytest"],
-        "packages": ["pyabf", "igor2", "tqdm", "sklearn", "numpy", "scipy", "seaborn"],
+        "packages": [
+            "pyabf",
+            "igor2",
+            "tqdm",
+            "joblib",
+            "sklearn",
+            "numpy",
+            "scipy",
+            "seaborn",
+        ],
         "include_files": include_files,
     }
 }
