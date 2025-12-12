@@ -6,12 +6,10 @@ Usage:
     # For Windows portable ZIP: zip contents of `build/exe.win-amd64-3.12/` (name varies by Python/platform) into `brainwash-${VERSION}-windows.zip`
 """
 
-import os
 import sys
 
 import toml  # for reading pyproject.toml
 from cx_Freeze import Executable, setup
-from setuptools import find_packages
 
 pyproject = toml.load("../pyproject.toml")
 version = pyproject["project"]["version"]
@@ -25,7 +23,10 @@ base = "Win32GUI" if sys.platform == "win32" else None
 script_path = "main.py"
 
 # include paths files
-include_files = [("../pyproject.toml", "lib/pyproject.toml"), "lib/"]
+include_files = [
+    ("../pyproject.toml", "lib/pyproject.toml"),
+    "lib/",
+]
 
 # windows build
 # Find the vcomp140.dll file in the system
@@ -40,7 +41,7 @@ include_files = [("../pyproject.toml", "lib/pyproject.toml"), "lib/"]
 exe = Executable(
     script=script_path,
     base=base,
-    # targetName="hello.exe"  # The name of the output executable.
+    target_name="brainwash",  # Name of output exe/AppImage
 )
 
 # Setup cx_Freeze options.
