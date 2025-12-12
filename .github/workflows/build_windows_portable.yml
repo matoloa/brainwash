@@ -1,0 +1,76 @@
+name: Build Windows portable ZIP with cx_Freeze
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest]
+        python-version: ["3.12"]
+
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # List files for debugging
+      - name: List files
+        run: dir .
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Extract version from pyproject.toml
+      - name: Extract version from pyproject.toml
+        run: |
+          python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])" | ForEach-Object { $_.trim() } | Out-File -FilePath $env:GITHUB_ENV -Encoding UTF8 -Append
+          Get-Content $env:GITHUB_ENV | Where-Object { $_ -match '^VERSION=' } | ForEach-Object { Write-Output "Extracted version: $($_.split('=')[1])" }
+        shell: pwsh
+
+      # Build the executable
+      - name: Build with cx_Freeze
+        working-directory: ./src
+        run: python build_with_cxfreeze_multiarch_setup.py build_exe > cxbuild_exe.log
+        shell: cmd
+
+      - name: List build files for debugging
+        working-directory: ./src
+        run: |
+          dir dist\ || echo "dist\ not found"
+          dir build\ || echo "build\ not found"
+        shell: cmd
+
+      # Package into portable ZIP
+      - name: Package portable ZIP
+        working-directory: ./src
+        shell: pwsh
+        run: |
+          $version = "${{ env.VERSION }}"
+          Compress-Archive -Path "dist/*" -DestinationPath "../brainwash-${version}-windows-portable.zip" -CompressionLevel Optimal
+          Write-Output "Created ZIP: ../brainwash-${version}-windows-portable.zip"
+
+      # List artifacts for debugging
+      - name: List artifacts
+        run: |
+          dir brainwash-*.zip
+        shell: cmd
+
+      # Upload artifacts
+      - name: Upload Windows portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: brainwash-${{ env.VERSION }}-windows-portable
+          path: brainwash-${{ env.VERSION }}-windows-portable.zip
+          compression-level: 0
