@@ -2,6 +2,7 @@ import os
 import platform
 import sys
 
+import pyarrow
 import toml  # for reading pyproject.toml
 from cx_Freeze import Executable, setup
 from sklearn import __path__ as sklearn_path
@@ -27,6 +28,12 @@ if sys.platform == "win32":
         for filename in os.listdir(libs_dir):
             if filename.endswith(".dll"):
                 include_files.append((os.path.join(libs_dir, filename), filename))
+
+    # Add DLLs from pyarrow
+    pyarrow_path = pyarrow.__path__[0]
+    for filename in os.listdir(pyarrow_path):
+        if filename.endswith(".dll"):
+            include_files.append((os.path.join(pyarrow_path, filename), filename))
 
 # windows build
 # Find the vcomp140.dll file in the system
@@ -69,6 +76,7 @@ options = {
             "numpy",
             "scipy",
             "seaborn",
+            "pyarrow",
         ],
         "include_files": include_files,
     }
