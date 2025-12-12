@@ -5,7 +5,7 @@ pandas
 joblib
 matplotlib
 numpy
-scikit-learn
+scikit-learn==1.7.1
 scipy
 seaborn
 tqdm
@@ -15,4 +15,4 @@ requests
 pyabf
 igor2
 pyarrow
-cx-Freeze==8.2 # for building the executable, allowing this here to, is not that big
+cx-Freeze==8.5 # for building the executable, allowing this here to, is not that big
