@@ -2,7 +2,6 @@ import os
 import platform
 import sys
 
-import pyarrow
 import toml  # for reading pyproject.toml
 from cx_Freeze import Executable, setup
 from sklearn import __path__ as sklearn_path
@@ -29,12 +28,6 @@ if sys.platform == "win32":
             if filename.endswith(".dll"):
                 include_files.append((os.path.join(libs_dir, filename), filename))
 
-    # Add DLLs from pyarrow
-    pyarrow_path = pyarrow.__path__[0]
-    for filename in os.listdir(pyarrow_path):
-        if filename.endswith(".dll"):
-            include_files.append((os.path.join(pyarrow_path, filename), filename))
-
     # Add additional system DLLs for runtime dependencies
     windir = os.environ["windir"]
     system32 = os.path.join(windir, "System32")
@@ -45,6 +38,7 @@ if sys.platform == "win32":
         "msvcp140_1.dll",
         "msvcp140_2.dll",
         "msvcp140_atomic_wait.dll",
+        "ucrtbase.dll",  # For Universal CRT
     ]
     for dll in additional_dlls:
         dll_path = os.path.join(system32, dll)
@@ -83,7 +77,12 @@ options = {
             "numpy",
         ],  # Removed "sklearn" to keep it loose for patching
         "include_msvcr": True,
-        "excludes": ["tkinter", "email", "pytest"],
+        "excludes": [
+            "tkinter",
+            "email",
+            "pytest",
+            "pyarrow",
+        ],  # Explicitly exclude pyarrow to avoid optional import issues
         "packages": [
             "pyabf",
             "igor2",
@@ -93,7 +92,6 @@ options = {
             "numpy",
             "scipy",
             "seaborn",
-            "pyarrow",
         ],
         "include_files": include_files,
     }
