@@ -11,16 +11,32 @@ cx_freeze can do this by manual tuning
 * avoid intels MKL, use openblas. MKL is huge and comes with only minor performance improvement (maybe).  Conda forge for linux seems to go openblas by default. Check windows, mkl is in windows and eats 750 MB in the build. Switch to openblas by: "mamba install "blas=*=openblas", figure out a way for this to be done on env creation. WARNING: some forums from 2019 indicated that windows scipy was only compatible with mkl, but that was 4 years ago.
 
 ## Distribution builds
-This requires a development version of cx_freeze (v6.16):
-pip install --upgrade --pre --extra-index-url https://marcelotduarte.github.io/packages/ cx_Freeze
-Build from src folder [SIC], this is needed as cxfreeze does not handle our repo structure cracefully. When it does, it should be from repo root.
+Note: cx_Freeze==8.2.0 is included in requirements.txt. Install via `pip install -r ../requirements.txt`.
+Build from the src/ folder using build_with_cxfreeze_multiarch_setup.py, as cx_Freeze does not handle our repo structure gracefully.
 
 ### Windows
-> python setup.py build_exe --silent-level 2
-check you build folder sizes by 
-> du -shc ~/miniconda3/* | sort -rh
-Then zip the folder and distribute.
+From the src/ folder, run:
+
+```
+python build_with_cxfreeze_multiarch_setup.py build_exe > cxbuild_exe.log
+```
+
+This creates dist/brainwash.exe with all libraries and dependencies -- a fully portable Windows application.
+
+Zip the entire dist/ folder as brainwash-{version}-windows.zip for distribution.
+
+To check folder sizes (on Windows):
+```
+powershell "Get-ChildItem -Recurse dist | Measure-Object -Property Length -Sum"
+```
 
 ### Linux
-$ python setup.py bdist_appimage
-Results in an appimage, ready for distribution.
+From the src/ folder, run:
+
+```
+python build_with_cxfreeze_multiarch_setup.py bdist_appimage > cxbuild_appimage.log
+```
+
+Results in dist/brainwash-{version}-x86_64.AppImage, ready for distribution.
+
+There's a GitHub Action in .github/workflows/build_linux_appimage.yml to automate this.
