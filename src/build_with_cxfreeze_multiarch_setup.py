@@ -35,6 +35,23 @@ if sys.platform == "win32":
         if filename.endswith(".dll"):
             include_files.append((os.path.join(pyarrow_path, filename), filename))
 
+    # Add additional system DLLs for runtime dependencies
+    windir = os.environ["windir"]
+    system32 = os.path.join(windir, "System32")
+    additional_dlls = [
+        "vcruntime140.dll",
+        "vcruntime140_1.dll",
+        "concrt140.dll",
+        "msvcp140_1.dll",
+        "msvcp140_2.dll",
+        "msvcp140_atomic_wait.dll",
+    ]
+    for dll in additional_dlls:
+        dll_path = os.path.join(system32, dll)
+        if os.path.exists(dll_path):
+            include_files.append((dll_path, dll))
+            print(f"Added {dll} from {dll_path}")
+
 # windows build
 # Find the vcomp140.dll file in the system
 vcomp140_dll_path = os.path.join(os.environ["windir"], "System32", "vcomp140.dll")
