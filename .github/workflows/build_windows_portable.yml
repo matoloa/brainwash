@@ -34,10 +34,11 @@ jobs:
 
       # Extract version from pyproject.toml
       - name: Extract version from pyproject.toml
-        run: |
-          python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])" | ForEach-Object { $_.trim() } | Out-File -FilePath $env:GITHUB_ENV -Encoding UTF8 -Append
-          Get-Content $env:GITHUB_ENV | Where-Object { $_ -match '^VERSION=' } | ForEach-Object { Write-Output "Extracted version: $($_.split('=')[1])" }
         shell: pwsh
+        run: |
+          $version = python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])"
+          echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Output "Extracted version: $version"
 
       # Build the executable
       - name: Build with cx_Freeze
@@ -47,9 +48,7 @@ jobs:
 
       - name: List build files for debugging
         working-directory: ./src
-        run: |
-          dir dist\ || echo "dist\ not found"
-          dir build\ || echo "build\ not found"
+        run: dir /s build\ || echo "build\ not found"
         shell: cmd
 
       # Package into portable ZIP
@@ -57,14 +56,15 @@ jobs:
         working-directory: ./src
         shell: pwsh
         run: |
-          $version = "${{ env.VERSION }}"
-          Compress-Archive -Path "dist/*" -DestinationPath "../brainwash-${version}-windows-portable.zip" -CompressionLevel Optimal
-          Write-Output "Created ZIP: ../brainwash-${version}-windows-portable.zip"
+          $exe_dir = Get-ChildItem -Recurse -Path build -Directory | Where-Object { Test-Path (Join-Path $_.FullName "brainwash.exe") } | Select-Object -ExpandProperty FullName -First 1
+          if (-not $exe_dir) { Write-Error "Executable directory not found in build/"; exit 1 }
+          $version = $env:VERSION
+          $zip_path = "../brainwash-${version}-windows-portable.zip"
+          Compress-Archive -Path "$exe_dir\*" -DestinationPath $zip_path -CompressionLevel Optimal
+          Write-Output "Created portable ZIP from $exe_dir`: $zip_path"
 
-      # List artifacts for debugging
-      - name: List artifacts
-        run: |
-          dir brainwash-*.zip
+      - name: List artifacts for debugging
+        run: dir brainwash-*.zip
         shell: cmd
 
       # Upload artifacts
