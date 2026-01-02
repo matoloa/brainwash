@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import logging
+import os
 import sys
 
 # import lib.method
@@ -9,8 +11,58 @@ from PyQt5 import QtWidgets
 from lib.ui import UIsub
 
 if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
-    MainWindow = QtWidgets.QMainWindow()
-    ui = UIsub(MainWindow)
-    MainWindow.show()
-    sys.exit(app.exec_())
+    # Determine log path for frozen app or dev
+    if getattr(sys, "frozen", False):
+        log_dir = os.path.dirname(sys.executable)
+    else:
+        log_dir = os.path.dirname(os.path.abspath(__file__))
+    log_path = os.path.join(log_dir, "brainwash_debug.log")
+
+    debug = "--debug" in sys.argv
+    level = logging.DEBUG if debug else logging.INFO
+
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)-8s %(message)s",
+        handlers=[
+            logging.FileHandler(log_path, encoding="utf-8"),
+            logging.StreamHandler(),
+        ],
+    )
+    logger = logging.getLogger(__name__)
+
+    logger.info(
+        f"Brainwash starting... platform={sys.platform}, frozen={getattr(sys, 'frozen', False)}, argv={sys.argv}, py={sys.version[:10]}"
+    )
+    if debug:
+        try:
+            from PyQt5.QtCore import PYQT_VERSION_STR, QT_VERSION_STR
+
+            logger.debug(f"PyQt5 v{PYQT_VERSION_STR}, Qt v{QT_VERSION_STR}")
+        except Exception:
+            logger.debug("PyQt5/Qt versions unavailable")
+
+    if debug and sys.platform == "win32":
+        try:
+            import ctypes
+
+            ctypes.windll.kernel32.AllocConsole()
+            ctypes.windll.kernel32.SetConsoleTitleW("Brainwash Debug Console")
+            logger.info("Allocated Windows debug console")
+        except Exception as e:
+            logger.warning(f"Failed to allocate console: {e}")
+
+    try:
+        app = QtWidgets.QApplication(sys.argv)
+        logger.info(f"QApplication created, platformName='{app.platformName()}'")
+        MainWindow = QtWidgets.QMainWindow()
+        logger.info("QMainWindow created")
+        logger.info("Instantiating UIsub...")
+        ui = UIsub(MainWindow)
+        logger.info("UIsub instantiated successfully")
+        MainWindow.show()
+        logger.info("MainWindow shown, entering event loop")
+        sys.exit(app.exec_())
+    except Exception:
+        logger.exception("Startup failed with exception:")
+        sys.exit(1)
