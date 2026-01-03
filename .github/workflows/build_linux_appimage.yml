@@ -22,7 +22,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      
+
       # Jonathan's addition from Grok
       - name: List files
         run: ls -la
@@ -39,8 +39,8 @@ jobs:
 
       # Build the executable
       - name: Build with cx_Freeze
-        working-directory: ./src  # Adjust to your subdirectory
-        run: python build_with_cxfreeze_multiarch_setup.py bdist_appimage > cxbuild_appimage.log
+        working-directory: ./src # Adjust to your subdirectory
+        run: python build_with_cxfreeze_multiarch_setup_old.py bdist_appimage > cxbuild_appimage.log
         # run: python setup.py build_exe
 
       - name: List files for debugging
@@ -62,4 +62,4 @@ jobs:
         with:
           name: brainwash-${{ env.VERSION }}-x86_64.AppImage
           path: src/dist/
-          compression-level: 0  # Disable compression
+          compression-level: 0 # Disable compression
