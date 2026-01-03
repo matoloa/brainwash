@@ -20,6 +20,9 @@ if __name__ == "__main__":
     log_path = os.path.join(log_dir, "brainwash_debug.log")
 
     debug = "--debug" in sys.argv
+    print("FROZEN:", getattr(sys, "frozen", False))
+    print("LOG_DIR:", repr(log_dir))
+    print("LOG_PATH:", repr(log_path))
     level = logging.DEBUG if debug else logging.INFO
 
     logging.basicConfig(
