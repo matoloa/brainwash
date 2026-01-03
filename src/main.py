@@ -3,6 +3,7 @@
 import logging
 import os
 import sys
+import tempfile
 
 # import lib.method
 from PyQt5 import QtWidgets
@@ -13,7 +14,7 @@ from lib.ui import UIsub
 if __name__ == "__main__":
     # Determine log path for frozen app or dev
     if getattr(sys, "frozen", False):
-        log_dir = os.path.dirname(sys.executable)
+        log_dir = tempfile.gettempdir()
     else:
         log_dir = os.path.dirname(os.path.abspath(__file__))
     log_path = os.path.join(log_dir, "brainwash_debug.log")
