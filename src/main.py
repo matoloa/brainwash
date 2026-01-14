@@ -9,9 +9,11 @@ import tempfile
 from PyQt5 import QtWidgets
 
 # from lib.parse import *
-from lib.ui import UIsub
 
 if __name__ == "__main__":
+    debug = "--debug" in sys.argv
+    if debug:
+        os.environ['BRAINWASH_DEBUG'] = '1'
     # Determine log path for frozen app or dev
     if getattr(sys, "frozen", False):
         log_dir = tempfile.gettempdir()
@@ -19,7 +21,6 @@ if __name__ == "__main__":
         log_dir = os.path.dirname(os.path.abspath(__file__))
     log_path = os.path.join(log_dir, "brainwash_debug.log")
 
-    debug = "--debug" in sys.argv
     print("FROZEN:", getattr(sys, "frozen", False))
     print("LOG_DIR:", repr(log_dir))
     print("LOG_PATH:", repr(log_path))
@@ -35,9 +36,16 @@ if __name__ == "__main__":
     )
     logger = logging.getLogger(__name__)
 
+    # Suppress Matplotlib font spam (noisy on frozen Windows first-run)
+    logging.getLogger('matplotlib').setLevel(logging.WARNING)
+    logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
+
     logger.info(
         f"Brainwash starting... platform={sys.platform}, frozen={getattr(sys, 'frozen', False)}, argv={sys.argv}, py={sys.version[:10]}"
     )
+    # import intentionally late to make sure it inherits logging level
+    from lib.ui import UIsub
+
     if debug:
         try:
             from PyQt5.QtCore import PYQT_VERSION_STR, QT_VERSION_STR
