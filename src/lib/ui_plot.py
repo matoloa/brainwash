@@ -441,6 +441,14 @@ class UIplot():
         # redraw
         axm.figure.canvas.draw()
         axe.figure.canvas.draw()
+        print(" * * * ax1 lines: ")
+        for line in ax1.lines:
+            x, y = line.get_data()
+            print(len(x), len(y))
+        print(" * * * ax2 lines: ")
+        for line in ax2.lines:
+            x, y = line.get_data()
+            print(len(x), len(y))
         ax1.figure.canvas.draw() # ax2 should be on the same canvas
         print(f" - - {round((time.time() - t0) * 1000)} ms")
 
@@ -469,7 +477,7 @@ class UIplot():
         return axis_dict.get(axisname, None)
 
     def get_dict_gradient(self, n_stims):
-        colors = [(1, 0.3, 0), "green", "teal"]  # RGB for a redder orange
+        colors = [(1, 0.3, 0), "green", (0, 0.3, 1)]  # RGB for a redder orange and a tealer blue
         cmap = LinearSegmentedColormap.from_list("", colors)
         return {i: cmap(i/n_stims) for i in range(n_stims)}
 
@@ -782,11 +790,14 @@ class UIplot():
         print(f"updateOutLine: {label}")
         mouseover_out = self.uistate.mouseover_out
         linedict = self.uistate.dict_rec_labels[label]
+        linedict['line'].set_xdata(mouseover_out[0].get_xdata())
         linedict['line'].set_ydata(mouseover_out[0].get_ydata())
 
     def updateOutMean(self, label, mean):
         print(f"updateOutMean: {label}, {mean}")
+        mouseover_out = self.uistate.mouseover_out
         linedict = self.uistate.dict_rec_labels[label]
+        linedict['line'].set_xdata(mouseover_out[0].get_xdata())
         linedict['line'].set_ydata([mean] * len(linedict['line'].get_xdata()))
         # linedict['line'].set_ydata(mean)
 
