@@ -4234,6 +4234,7 @@ class UIsub(Ui_MainWindow):
         x, y = event.xdata, event.ydata
         str_ax = 'ax2' if uistate.slopeView() else 'ax1' if uistate.ampView() else None
         ax = getattr(uistate, str_ax)
+        print(f"outputMouseover: x={x}, y={y}, str_ax={str_ax}")
         if str_ax is None or x is None or y is None or not event.inaxes == ax or not (uistate.slopeView() or uistate.ampView()):
             if uistate.ghost_sweep is not None: # remove ghost sweep if outside output graph
                 self.exorcise()
@@ -4242,6 +4243,7 @@ class UIsub(Ui_MainWindow):
             self.exorcise()
             return
         x_axis = 'stim' if uistate.checkBox['output_per_stim'] else 'sweep'
+
         # find a visible line
         dict_out = {key: value for key, value in uistate.dict_rec_show.items() if value['axis'] == str_ax and (value['aspect'] in ['EPSP_amp', 'EPSP_slope'])}
         if not dict_out:
@@ -4250,6 +4252,9 @@ class UIsub(Ui_MainWindow):
         x_data = dict_pop['line'].get_xdata()
         # find closest x_index
         out_x_idx = (np.abs(x_data - x)).argmin()
+    
+        print(f"* * * outputMouseover: out_x_idx={out_x_idx}, sweeps={sweeps}")
+
         if out_x_idx == uistate.last_out_x_idx: # prevent update if same x
             return
 

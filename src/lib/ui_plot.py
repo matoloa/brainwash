@@ -441,14 +441,6 @@ class UIplot():
         # redraw
         axm.figure.canvas.draw()
         axe.figure.canvas.draw()
-        print(" * * * ax1 lines: ")
-        for line in ax1.lines:
-            x, y = line.get_data()
-            print(len(x), len(y))
-        print(" * * * ax2 lines: ")
-        for line in ax2.lines:
-            x, y = line.get_data()
-            print(len(x), len(y))
         ax1.figure.canvas.draw() # ax2 should be on the same canvas
         print(f" - - {round((time.time() - t0) * 1000)} ms")
 
@@ -770,6 +762,7 @@ class UIplot():
 
     def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None):
         axe = self.uistate.axe
+        print(f"updateAmpMarker called with labelbase: {labelbase}, x: {x}, y: {y}, amp_x: {amp_x}, amp_zero: {amp_zero}, amp: {amp}")
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
         print(f"updateAmpMarker: {labelbase}, x: {x}, y: {y}, amp_x: {amp_x}, amp_zero: {amp_zero}, amp: {amp}")
