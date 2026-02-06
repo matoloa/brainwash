@@ -4253,7 +4253,7 @@ class UIsub(Ui_MainWindow):
         # find closest x_index
         out_x_idx = (np.abs(x_data - x)).argmin()
     
-        print(f"* * * outputMouseover: out_x_idx={out_x_idx}, sweeps={sweeps}")
+        # print(f"* * * outputMouseover: out_x_idx={out_x_idx}, sweeps={sweeps}")
 
         if out_x_idx == uistate.last_out_x_idx: # prevent update if same x
             return
