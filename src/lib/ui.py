@@ -76,8 +76,10 @@ logger = logging.getLogger(__name__)
 debug_mode = os.getenv("BRAINWASH_DEBUG", "0") == "1"
 if debug_mode:
     logger.setLevel(logging.DEBUG)
+    logger.info(f"Brainwash loglevel debug")
 else:
     logger.setLevel(logging.INFO)
+    logger.info(f"Brainwash loglevel info")
 if debug_mode:
     logger.debug(f"ui.py: os.getcwd(): {os.getcwd()}")
     logger.debug(f"ui.py: sys.path: {sys.path}")
