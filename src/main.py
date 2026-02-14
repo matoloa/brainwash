@@ -16,6 +16,7 @@ if __name__ == "__main__":
         os.environ['BRAINWASH_DEBUG'] = '1'
     # Determine log path for frozen app or dev
     if getattr(sys, "frozen", False):
+        print("frozen==False: trying to get tempfile")
         log_dir = tempfile.gettempdir()
     else:
         log_dir = os.path.dirname(os.path.abspath(__file__))
