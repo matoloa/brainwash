@@ -5,6 +5,8 @@ from pathlib import Path
 from PyQt5 import QtCore, QtWidgets, QtGui, sip
 import numpy as np
 import pandas as pd
+import tempfile
+
 # Matplotlib slowdown fix for frozen Windows
 if getattr(sys, 'frozen', False):
     os.environ.setdefault('MPLCONFIGDIR', os.path.join(tempfile.gettempdir(), 'matplotlib'))
