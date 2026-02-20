@@ -15,3 +15,11 @@ name = "brainwash"
 version = "0.10.0"
 description = "A data visualization tool for electrophysiological recordings, with convenience functions."
 requires-python = ">=3.12"
+dependencies = [
+    "cx-freeze==8.5",
+]
+
+[dependency-groups]
+dev = [
+    "pyqt5-stubs>=5.15.6.0",
+]
