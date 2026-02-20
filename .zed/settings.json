@@ -1,0 +1,26 @@
+{
+  "lsp": {
+    "pyright": {
+      "settings": {
+        "python": {
+          "pythonPath": ".venv/Scripts/python.exe",
+          "venvPath": ".",
+          "venv": ".venv",
+        },
+        "pyright": {
+          "pythonVersion": "3.12",
+        },
+      },
+    },
+    "ruff": {
+      "initialization_options": {
+        "settings": {
+          "interpreter": [".venv/Scripts/python.exe"],
+        },
+      },
+    },
+  },
+  "python": {
+    "defaultFormatter": "ruff",
+  },
+}

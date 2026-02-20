@@ -14,4 +14,4 @@ line_length = 100
 name = "brainwash"
 version = "0.10.0"
 description = "A data visualization tool for electrophysiological recordings, with convenience functions."
-
+requires-python = ">=3.12"
