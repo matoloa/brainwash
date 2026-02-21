@@ -113,9 +113,10 @@ def _ibw_results_to_df(results):
     Each element of `results` corresponds to one .ibw file (= one sweep).
     Returns a DataFrame with columns: t0, time, voltage_raw, datetime, channel.
 
-    t0 is the sweep start time in seconds relative to the first sweep, taken
-    directly from the IBW creation timestamps — NOT from the post-stack row
-    index, which would be a dimensionless sweep counter rather than seconds.
+    Each .ibw file is treated as an independent sweep: t0 is always 0 (the
+    sweep starts at its own t=0), and datetime is the absolute wall-clock time
+    derived from the file's creation timestamp. Sweeps are not assumed to be
+    continuous or evenly spaced; inter-sweep timing lives in datetime only.
     """
     keys = results[0].keys()
     res = {key: [r[key] for r in results] for key in keys}
@@ -124,14 +125,11 @@ def _ibw_results_to_df(results):
     voltage_raw = np.vstack(res["array"])
     timestamps = res["timestamp"]
 
-    # Convert Mac HFS+ epoch (1904-01-01) timestamps to seconds since
-    # 1970-01-01, then make relative to the earliest sweep.
+    # Convert Mac HFS+ epoch (1904-01-01) to Unix epoch (1970-01-01).
     seconds = (
         pd.to_datetime("1970-01-01") - pd.to_datetime("1900-01-01")
     ).total_seconds()
-    timestamp_array = np.array(timestamps) - seconds
-    measurement_start = timestamp_array.min()
-    timestamp_array -= measurement_start  # sweep start times, seconds from t=0
+    unix_timestamps = np.array(timestamps) - seconds  # absolute Unix time per sweep
 
     timestep = timesteps[0][0]
     num_columns = voltage_raw.shape[1]
@@ -143,18 +141,16 @@ def _ibw_results_to_df(results):
     df = df.stack().reset_index()
     df.columns = ["sweep_idx", "time", "voltage_raw"]
 
-    # Map integer sweep index → actual start time in seconds.
-    # Numpy fancy indexing: sweep_idx values are 0..n_sweeps-1, matching
-    # timestamp_array's positions exactly. Avoids Series.map(dict) which
-    # Pyright incorrectly rejects (stubs only type the callable overload).
-    df["t0"] = timestamp_array[df["sweep_idx"].to_numpy(dtype=int)]
-    df.drop(columns=["sweep_idx"], inplace=True)
+    # t0 = 0 for every row: each .ibw file is its own independent sweep.
+    df["t0"] = 0.0
 
-    df["t0"] = df["t0"].astype("float64")
+    # datetime = absolute creation time of that file + within-sweep time.
+    sweep_unix = unix_timestamps[df["sweep_idx"].to_numpy(dtype=int)]
+    df["datetime"] = pd.to_datetime(sweep_unix + df["time"].to_numpy(), unit="s")
+    df["datetime"] = df["datetime"].dt.round("us")
+
+    df.drop(columns=["sweep_idx"], inplace=True)
     df["time"] = df["time"].astype("float64")
-    df["datetime"] = pd.to_datetime(
-        (measurement_start + df["t0"] + df["time"]), unit="s"
-    ).round("us")
     df["channel"] = 0
 
     return df
@@ -176,16 +172,16 @@ def parse_ibwFolder(folder, dev=False):  # igor2, para
     return _ibw_results_to_df(results)
 
 
-def parse_ibw(filepath, dev=False):  # igor2, para
-    # Wrapped in a list because ibw_read / Parallel expect an iterable of files.
-    # TODO: EVERY attempt to read a single filepath without this list wrapper
-    # has failed with unresolvable mismatch errors.
-    files = [Path(filepath)]
-    for file in files:
-        if not file.exists():
-            raise FileNotFoundError(f"No such file: '{file}'")
-    results = Parallel(n_jobs=-1)(delayed(ibw_read)(file) for file in tqdm(files))
-    return _ibw_results_to_df(results)
+def parse_ibw(filepath, dev=False):
+    """
+    Read a single .ibw file by delegating to parse_ibwFolder on its parent
+    directory. All .ibw files in that folder are read, which matches the
+    intended use: the user places only the relevant sweeps in the folder.
+    """
+    folder = Path(filepath).parent
+    if not Path(filepath).exists():
+        raise FileNotFoundError(f"No such file: '{filepath}'")
+    return parse_ibwFolder(folder, dev=dev)
 
 
 def parse_csv(source_path):
@@ -280,7 +276,7 @@ def metadata(df):
     # Number of unique sweeps, by number of 'time'==0
     nsweeps = df["time"].value_counts().get(0, 0)
     # Duration of one sweep: max time within a sweep (assume uniform: varied sweep length should throw exception at parsing)
-    first_sweep = df[df["t0"] == df["t0"].iloc[0]]
+    first_sweep = df[df["sweep"] == df["sweep"].iloc[0]]
     time_diffs = first_sweep["time"].diff().dropna()
     dt = time_diffs.mode().iloc[0]  # Sample interval
     sweep_duration = round(first_sweep["time"].max() + dt, 6)
