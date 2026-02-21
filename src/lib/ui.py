@@ -409,7 +409,11 @@ class ParseDataThread(QtCore.QThread):
                     print(f"ParseDataThread: {rec}")
                 df_proj_new_row = uisub.create_recording(df_proj_row, rec, df_raw)
                 self.rows.append(df_proj_new_row)
+        print(
+            f"ParseDataThread.run: loop done, {len(self.rows)} rows collected, about to emit finished"
+        )
         self.finished.emit()
+        print("ParseDataThread.run: finished emitted, run() returning")
 
 
 class graphPreloadThread(QtCore.QThread):
@@ -426,18 +430,31 @@ class graphPreloadThread(QtCore.QThread):
         self.i = 0
 
     def run(self):
+        print(
+            f"graphPreloadThread.run: entered, {len(self.uistate.list_idx_recs2preload)} recordings"
+        )
         df_p = self.df_p.loc[self.uistate.list_idx_recs2preload]
         self.uistate.list_idx_recs2preload = []
         self.i = 0
         for i, p_row in df_p.iterrows():
+            print(f"graphPreloadThread.run: processing {p_row['recording_name']}")
+            print(f"graphPreloadThread.run: calling get_dft")
             dft = self.uisub.get_dft(row=p_row)
+            print(f"graphPreloadThread.run: get_dft returned {type(dft)}")
+            print(f"graphPreloadThread.run: calling get_dfmean")
             dfmean = self.uisub.get_dfmean(row=p_row)
+            print(f"graphPreloadThread.run: calling get_dffilter")
             _ = self.uisub.get_dffilter(row=p_row)
+            print(f"graphPreloadThread.run: calling get_dfoutput")
             if self.uistate.checkBox["paired_stims"]:
                 dfoutput = self.uisub.get_dfdiff(row=p_row)
             else:
                 dfoutput = self.uisub.get_dfoutput(row=p_row)
+            print(f"graphPreloadThread.run: get_dfoutput returned {type(dfoutput)}")
             if dfoutput is None:
+                print(
+                    "graphPreloadThread.run: dfoutput is None, returning early (finished will NOT emit)"
+                )
                 return
             print(
                 f"graphPreloadThread, {p_row['recording_name']} calls uiplot.addRow() dfoutput columns: {dfoutput.columns}"
@@ -2996,7 +3013,11 @@ class UIsub(Ui_MainWindow):
         self.df2file(dfmean, rec, key="mean")  # persist mean
         df = parse.zeroSweeps(df_raw, i_stim=i_stim)
         self.df2file(df, rec, key="filter")  # persist zeroed
+        print(
+            f"create_recording: calling metadata. df.shape={df.shape}, columns={df.columns.tolist()}, has_sweep={'sweep' in df.columns}"
+        )
         dict_meta = parse.metadata(df)  # extract metadata
+        print(f"create_recording: metadata returned {dict_meta}")
         # TODO: create unique recording names
         df_proj_new_row = create_row(
             df_proj_row=df_proj_row, new_name=rec, dict_meta=dict_meta
@@ -3438,6 +3459,7 @@ class UIsub(Ui_MainWindow):
         self.progressBarManager.update(i, "Parsing file ")
 
     def onParseDataFinished(self):
+        print("onParseDataFinished: entered")
         self.progressBarManager.__exit__(None, None, None)
         if (
             hasattr(self, "_current_parse_thread")
@@ -3456,6 +3478,7 @@ class UIsub(Ui_MainWindow):
                     df_p.index >= len(df_p) - len(rows2add)
                 ].tolist()
         self.progressBarManager.__exit__(None, None, None)
+        print("onParseDataFinished: calling graphPreload")
         self.graphPreload()
 
     def flipCI(self):
@@ -4557,6 +4580,7 @@ class UIsub(Ui_MainWindow):
         self.graphPreload()
 
     def graphPreload(self):  # plot and hide imported recordings
+        print("graphPreload: entered")
         self.usage("graphPreload")
         self.uiFreeze()  # Freeze UI, thaw on graphPreloadFinished
         t0 = time.time()
@@ -4564,13 +4588,21 @@ class UIsub(Ui_MainWindow):
         # Clean up any existing thread before starting a new one
         self._cleanup_threads()
         if not uistate.list_idx_recs2preload:
+            print(
+                "graphPreload: list_idx_recs2preload empty, falling back to all parsed recordings"
+            )
             df_p = self.get_df_project()
             uistate.list_idx_recs2preload = df_p[
                 ~df_p["sweeps"].eq("...")
             ].index.tolist()
         if not uistate.list_idx_recs2preload:
+            print(
+                "graphPreload: nothing to preload, returning early (uiThaw will NOT be called)"
+            )
             return
-        print(f"Preloading {len(uistate.list_idx_recs2preload)} recordings.")
+        print(
+            f"graphPreload: starting thread for {len(uistate.list_idx_recs2preload)} recordings: {uistate.list_idx_recs2preload}"
+        )
         self.progressBar.setValue(0)
         thread = graphPreloadThread(uistate, uiplot, self)
         thread.finished.connect(lambda: self.ongraphPreloadFinished(t0))
