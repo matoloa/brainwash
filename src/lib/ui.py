@@ -3964,7 +3964,11 @@ class UIsub(Ui_MainWindow):
                 status(row["recording_name"], dfp, marker_list)
 
         self.set_df_project(dfp)
-        self.tableUpdate()
+        # tableUpdate() touches Qt widgets and must only run on the GUI thread.
+        # Worker threads (e.g. graphPreloadThread) call set_rec_status too, so
+        # guard the call to avoid a cross-thread Qt deadlock.
+        if QtCore.QThread.currentThread() is QtWidgets.QApplication.instance().thread():
+            self.tableUpdate()
 
     # Timepoints dataframe handling
 
