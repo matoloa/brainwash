@@ -174,14 +174,14 @@ def parse_ibwFolder(folder, dev=False):  # igor2, para
 
 def parse_ibw(filepath, dev=False):
     """
-    Read a single .ibw file by delegating to parse_ibwFolder on its parent
-    directory. All .ibw files in that folder are read, which matches the
-    intended use: the user places only the relevant sweeps in the folder.
+    Read a single .ibw file. Mirrors parse_abf: one file in, one sweep out.
+    For reading a whole folder of sweeps, use parse_ibwFolder instead.
     """
-    folder = Path(filepath).parent
-    if not Path(filepath).exists():
+    filepath = Path(filepath)
+    if not filepath.exists():
         raise FileNotFoundError(f"No such file: '{filepath}'")
-    return parse_ibwFolder(folder, dev=dev)
+    results = [ibw_read(filepath)]
+    return _ibw_results_to_df(results)
 
 
 def parse_csv(source_path):
