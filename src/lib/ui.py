@@ -4,6 +4,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+# pandas 3.0 changed the default string dtype to Arrow-backed string[pyarrow],
+# which rejects assignment of non-string values (int, float, etc.).
+# The project DataFrame mixes strings, ints and floats in the same CSV-loaded
+# DataFrame, so we opt back into the legacy object-dtype string behaviour.
+pd.options.future.infer_string = False
 from matplotlib import use as matplotlib_use
 
 # TODO: kick these out to ui_plot.py
