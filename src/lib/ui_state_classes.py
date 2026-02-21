@@ -166,12 +166,12 @@ class UIstate:
             "t_volley_slope_end": 0,
             "t_volley_slope_method": "default",
             "t_volley_slope_params": "NA",
-            "volley_slope_mean": 0,
+            "volley_slope_mean": 0.0,
             "t_volley_amp": 0,
             "t_volley_amp_halfwidth": 0,  # Deprecated
             "t_volley_amp_method": "default",
             "t_volley_amp_params": "NA",
-            "volley_amp_mean": 0,
+            "volley_amp_mean": 0.0,
             "t_VEB": 0,  # Deprecated
             "t_VEB_method": 0,  # Deprecated
             "t_VEB_params": 0,  # Deprecated
