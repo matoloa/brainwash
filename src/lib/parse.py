@@ -266,7 +266,6 @@ def parse_abf(filepath):
 
 
 def metadata(df):
-    print(f"metadata: entered. df.shape={df.shape}, columns={df.columns.tolist()}")
     """
     Usage: called by parse.metadata(df) from ui.py
     returns a dict with metadata from the df:
@@ -276,27 +275,19 @@ def metadata(df):
     """
     # Number of unique sweeps, by number of 'time'==0
     nsweeps = df["time"].value_counts().get(0, 0)
-    print(f"metadata: nsweeps={nsweeps}")
     # Duration of one sweep: max time within a sweep (assume uniform: varied sweep length should throw exception at parsing)
     first_sweep = df[df["sweep"] == df["sweep"].iloc[0]]
-    print(f"metadata: first_sweep.shape={first_sweep.shape}")
     time_diffs = first_sweep["time"].diff().dropna()
-    print(
-        f"metadata: time_diffs len={len(time_diffs)}, head={time_diffs.head(3).tolist()}"
-    )
     dt = time_diffs.mode().iloc[0]  # Sample interval
-    print(f"metadata: dt={dt}")
     sweep_duration = round(first_sweep["time"].max() + dt, 6)
     # Sampling rate: 1 / interval between time samples (assume uniform)
     time_diffs = first_sweep["time"].diff().dropna()
     sampling_rate = int(round(1 / time_diffs.mode().iloc[0]))
-    print(f"metadata: sampling_rate={sampling_rate}, sweep_duration={sweep_duration}")
     dict_meta = {
         "nsweeps": nsweeps,  # number of sweeps in the recording
         "sweep_duration": sweep_duration,  # time in seconds
         "sampling_rate": sampling_rate,  # Hz
     }
-    print(f"metadata: returning {dict_meta}")
     return dict_meta
 
 

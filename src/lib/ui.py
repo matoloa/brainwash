@@ -377,6 +377,7 @@ class ProgressBarManager:
 
 class ParseDataThread(QtCore.QThread):
     progress = QtCore.pyqtSignal(int)
+    finished = QtCore.pyqtSignal()  # custom signal, decoupled from QThread.finished
 
     def __init__(self, df_p_to_update, dict_folders):
         super().__init__()
@@ -387,33 +388,36 @@ class ParseDataThread(QtCore.QThread):
 
     def run(self):
         """Parse data from files, persist them as bw parquet:s, and update df_p"""
-        for i, (_, df_proj_row) in enumerate(self.df_p_to_update.iterrows()):
-            self.progress.emit(i)
-            recording_name = df_proj_row["recording_name"]
-            source_path = df_proj_row["path"]
-            dict_dfs_raw = parse.source2dfs(source=source_path)
-            if not dict_dfs_raw:
-                print(f"Failed to read source file at: {source_path}")
-                continue
-            # convert dict - channel:df to recording_name:df
-            dict_name_df = {
-                (
-                    recording_name
-                    if len(dict_dfs_raw) == 1
-                    else f"{recording_name}_ch{channel}"
-                ): df
-                for channel, df in dict_dfs_raw.items()
-            }
-            for rec, df_raw in dict_name_df.items():
-                if config.verbose:
-                    print(f"ParseDataThread: {rec}")
-                df_proj_new_row = uisub.create_recording(df_proj_row, rec, df_raw)
-                self.rows.append(df_proj_new_row)
-        print(
-            f"ParseDataThread.run: loop done, {len(self.rows)} rows collected, about to emit finished"
-        )
-        self.finished.emit()
-        print("ParseDataThread.run: finished emitted, run() returning")
+        try:
+            for i, (_, df_proj_row) in enumerate(self.df_p_to_update.iterrows()):
+                recording_name = df_proj_row["recording_name"]
+                source_path = df_proj_row["path"]
+                self.progress.emit(i)
+                dict_dfs_raw = parse.source2dfs(source=source_path)
+                if not dict_dfs_raw:
+                    print(f"Failed to read source file at: {source_path}")
+                    continue
+                # convert dict - channel:df to recording_name:df
+                dict_name_df = {
+                    (
+                        recording_name
+                        if len(dict_dfs_raw) == 1
+                        else f"{recording_name}_ch{channel}"
+                    ): df
+                    for channel, df in dict_dfs_raw.items()
+                }
+                for rec, df_raw in dict_name_df.items():
+                    if config.verbose:
+                        print(f"ParseDataThread: {rec}")
+                    df_proj_new_row = uisub.create_recording(df_proj_row, rec, df_raw)
+                    self.rows.append(df_proj_new_row)
+        except Exception as e:
+            import traceback
+
+            print(f"ParseDataThread.run: EXCEPTION: {e}")
+            print(traceback.format_exc())
+        finally:
+            self.finished.emit()
 
 
 class graphPreloadThread(QtCore.QThread):
@@ -3001,7 +3005,10 @@ class UIsub(Ui_MainWindow):
             df_proj_new_row["ID"] = str(uuid.uuid4())
             df_proj_new_row["status"] = "Read"
             df_proj_new_row["recording_name"] = new_name
-            df_proj_new_row["sweeps"] = dict_meta.get("nsweeps", None)
+            nsweeps = dict_meta.get("nsweeps")
+            df_proj_new_row["sweeps"] = (
+                str(int(nsweeps)) if nsweeps is not None else None
+            )
             df_proj_new_row["channel"] = ""  # dict_meta.get('channel', None)
             df_proj_new_row["stim"] = ""  # dict_meta.get('stim', None)
             df_proj_new_row["sweep_duration"] = dict_meta.get("sweep_duration", None)
@@ -3013,11 +3020,7 @@ class UIsub(Ui_MainWindow):
         self.df2file(dfmean, rec, key="mean")  # persist mean
         df = parse.zeroSweeps(df_raw, i_stim=i_stim)
         self.df2file(df, rec, key="filter")  # persist zeroed
-        print(
-            f"create_recording: calling metadata. df.shape={df.shape}, columns={df.columns.tolist()}, has_sweep={'sweep' in df.columns}"
-        )
         dict_meta = parse.metadata(df)  # extract metadata
-        print(f"create_recording: metadata returned {dict_meta}")
         # TODO: create unique recording names
         df_proj_new_row = create_row(
             df_proj_row=df_proj_row, new_name=rec, dict_meta=dict_meta
@@ -4596,9 +4599,8 @@ class UIsub(Ui_MainWindow):
                 ~df_p["sweeps"].eq("...")
             ].index.tolist()
         if not uistate.list_idx_recs2preload:
-            print(
-                "graphPreload: nothing to preload, returning early (uiThaw will NOT be called)"
-            )
+            print("graphPreload: nothing to preload, returning early")
+            self.uiThaw()
             return
         print(
             f"graphPreload: starting thread for {len(uistate.list_idx_recs2preload)} recordings: {uistate.list_idx_recs2preload}"
