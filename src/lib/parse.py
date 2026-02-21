@@ -107,7 +107,7 @@ def ibw_read(file):
     return {"timestamp": timestamp, "meta_sfA": meta_sfA, "array": array}
 
 
-def _ibw_results_to_df(results):
+def _ibw_results_to_df(results, gain=1.0):
     """
     Shared helper: converts a list of ibw_read() dicts into a tidy DataFrame.
 
@@ -118,12 +118,17 @@ def _ibw_results_to_df(results):
     sweep starts at its own t=0), and datetime is the absolute wall-clock time
     derived from the file's creation timestamp. Sweeps are not assumed to be
     continuous or evenly spaced; inter-sweep timing lives in datetime only.
+
+    gain: multiplicative scale factor applied to voltage_raw after reading.
+          IBW files may store voltage in V or mV depending on the recording
+          setup, and may not be correctly labelled. Use gain=1e-3 to convert
+          mV → V (SI). Defaults to 1.0 (no conversion).
     """
     keys = results[0].keys()
     res = {key: [r[key] for r in results] for key in keys}
 
     timesteps = res["meta_sfA"]
-    voltage_raw = np.vstack(res["array"])
+    voltage_raw = np.vstack(res["array"]) * gain  # apply manual gain (V or mV → V)
     timestamps = res["timestamp"]
 
     # Convert Mac HFS+ epoch (1904-01-01) to Unix epoch (1970-01-01).
@@ -162,7 +167,7 @@ def _ibw_results_to_df(results):
     return df
 
 
-def parse_ibwFolder(folder, dev=False):  # igor2, para
+def parse_ibwFolder(folder, dev=False, gain=1.0):  # igor2, para
     files = sorted(list(folder.glob("*.ibw")))
     if dev:
         files = files[:100]
@@ -175,10 +180,10 @@ def parse_ibwFolder(folder, dev=False):  # igor2, para
     if len(unique_shapes) != 1:
         raise ValueError(f"Inconsistent sweep shapes detected: {unique_shapes}")
 
-    return _ibw_results_to_df(results)
+    return _ibw_results_to_df(results, gain=gain)
 
 
-def parse_ibw(filepath, dev=False):
+def parse_ibw(filepath, dev=False, gain=1.0):
     """
     Read a single .ibw file. Mirrors parse_abf: one file in, one sweep out.
     For reading a whole folder of sweeps, use parse_ibwFolder instead.
@@ -187,7 +192,7 @@ def parse_ibw(filepath, dev=False):
     if not filepath.exists():
         raise FileNotFoundError(f"No such file: '{filepath}'")
     results = [ibw_read(filepath)]
-    return _ibw_results_to_df(results)
+    return _ibw_results_to_df(results, gain=gain)
 
 
 def parse_csv(source_path):
@@ -312,10 +317,13 @@ def metadata(df):
                 }"""
 
 
-def source2dfs(source, dev=False):
+def source2dfs(source, dev=False, gain=1.0):
     """
-     Identifies type of file(s), and calls the appropriate parser
+    Identifies type of file(s), and calls the appropriate parser.
     - source (str): Path to source file or folder
+    - gain (float): multiplicative voltage scale factor, passed to IBW parsers only.
+                    Use gain=1e-3 when IBW files are stored in mV and V (SI) is needed.
+                    Has no effect on ABF files (pyabf handles unit conversion internally).
     Returns: a dict {channel:DataFrame} of Raw (unprocessed) output from the appropriate parser
     """
     path = Path(source)
@@ -341,7 +349,7 @@ def source2dfs(source, dev=False):
                 raise ValueError(f"Error parsing abf files in folder {path}: {e}")
         elif ibw_files:
             try:
-                df = parse_ibwFolder(path, dev=dev)
+                df = parse_ibwFolder(path, dev=dev, gain=gain)
             except Exception as e:
                 raise ValueError(f"Error parsing ibw files in folder {path}: {e}")
         else:
@@ -349,15 +357,15 @@ def source2dfs(source, dev=False):
             return {}
     # if source_path is not a folder - parse as a single file
     else:
-        PARSERS = {
-            "csv": parse_csv,
-            "abf": parse_abf,
-            "ibw": parse_ibw,
-        }
         filetype = path.suffix.lstrip(".").lower()
-        if filetype not in PARSERS:
+        if filetype == "csv":
+            df = parse_csv(source)
+        elif filetype == "abf":
+            df = parse_abf(source)
+        elif filetype == "ibw":
+            df = parse_ibw(source, gain=gain)
+        else:
             raise ValueError(f"Unsupported file type: {filetype}")
-        df = PARSERS[filetype](source)
 
     dict_channeldfs = {}
     # if df has a 'sweep' column, it's from a prepared .csv - skip this cleanup
@@ -397,14 +405,16 @@ def source2dfs(source, dev=False):
 #############################################################
 
 
-def sources2dfs(list_sources, dev=False):
+def sources2dfs(list_sources, dev=False, gain=1.0):
     """
     Converts a list of source file paths to a list of raw DataFrames.
+    - gain (float): multiplicative voltage scale factor, forwarded to source2dfs.
+                    See source2dfs for details.
     """
     list_dicts = []
     for source in list_sources:
         print(f"Processing source: {source}")
-        dict_dfs = source2dfs(source, dev=dev)
+        dict_dfs = source2dfs(source, dev=dev, gain=gain)
         list_dicts.append(dict_dfs)
     return list_dicts
 
