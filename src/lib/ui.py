@@ -1,6 +1,7 @@
 import os  # TODO: replace use by pathlib?
 import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from matplotlib import use as matplotlib_use
@@ -5102,6 +5103,9 @@ class UIsub(Ui_MainWindow):
             print("connectDragRelease: Incorrect graph reference.")
             return
 
+        filtered_values = [
+            line for line in filtered_values if len(line.get_xdata()) > 0
+        ]
         max_x_line = max(
             filtered_values, key=lambda line: line.get_xdata()[-1], default=None
         )

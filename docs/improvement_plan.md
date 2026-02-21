@@ -16,7 +16,7 @@ After installing, re-run diagnostics. The real logic errors (buried under stubs 
 
 ---
 
-### Step 1.2 — Fix the `build_dfstimoutput` missing-function bug
+### Step 1.2 — Fix the `build_dfstimoutput` missing-function bug SKIP FOR NOW
 
 This is a real runtime crash. `ui.py` L4151 calls `analysis.build_dfstimoutput(...)` where `analysis` is `analysis_v2`. That function only exists in `analysis_v1`. The code path is triggered when `checkBox["output_per_stim"]` is `True`.
 
