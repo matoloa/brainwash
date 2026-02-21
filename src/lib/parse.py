@@ -1,3 +1,4 @@
+import math
 import os
 import time
 from pathlib import Path
@@ -133,8 +134,13 @@ def _ibw_results_to_df(results):
 
     timestep = timesteps[0][0]
     num_columns = voltage_raw.shape[1]
+    print(
+        f"_ibw_results_to_df: timestep={timestep:.6g} s | "
+        f"sampling rate={round(1 / timestep)} Hz | "
+        f"{num_columns} samples/sweep"
+    )
     time_columns = np.round(
-        np.arange(num_columns) * timestep, int(-np.log10(timestep))
+        np.arange(num_columns) * timestep, math.ceil(-np.log10(timestep))
     ).tolist()
 
     df = pd.DataFrame(data=voltage_raw, columns=time_columns)
@@ -288,6 +294,11 @@ def metadata(df):
         "sweep_duration": sweep_duration,  # time in seconds
         "sampling_rate": sampling_rate,  # Hz
     }
+    print(
+        f"metadata: {nsweeps} sweeps | "
+        f"{sampling_rate} Hz (dt={dt:.6g} s) | "
+        f"sweep duration {sweep_duration:.6g} s"
+    )
     return dict_meta
 
 
