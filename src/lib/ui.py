@@ -2712,6 +2712,11 @@ class UIsub(Ui_MainWindow):
         self.dialog.show()
 
     def triggerParse(self):  # parse non-parsed files and folders in self.df_project
+        if uistate.frozen:
+            print(
+                "triggerParse: UI is frozen (already parsing), ignoring duplicate call"
+            )
+            return
         self.usage("triggerParse")
         self.mouseoverDisconnect()
         self.parseData()
@@ -3434,6 +3439,12 @@ class UIsub(Ui_MainWindow):
             removeFromDisk(folder_name, file_suffix)
 
     def parseData(self):
+        if (
+            hasattr(self, "_current_parse_thread")
+            and self._current_parse_thread is not None
+        ):
+            print("parseData: already parsing, ignoring duplicate call")
+            return
         self.uiFreeze()  # Thawed at the end of graphPreload()
         # Clean up any existing thread before starting a new one
         self._cleanup_threads()
