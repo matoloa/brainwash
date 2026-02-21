@@ -440,42 +440,49 @@ class graphPreloadThread(QtCore.QThread):
         self.i = 0
 
     def run(self):
-        print(
-            f"graphPreloadThread.run: entered, {len(self.uistate.list_idx_recs2preload)} recordings"
-        )
-        df_p = self.df_p.loc[self.uistate.list_idx_recs2preload]
-        self.uistate.list_idx_recs2preload = []
-        self.i = 0
-        for i, p_row in df_p.iterrows():
-            print(f"graphPreloadThread.run: processing {p_row['recording_name']}")
-            print(f"graphPreloadThread.run: calling get_dft")
-            dft = self.uisub.get_dft(row=p_row)
-            print(f"graphPreloadThread.run: get_dft returned {type(dft)}")
-            print(f"graphPreloadThread.run: calling get_dfmean")
-            dfmean = self.uisub.get_dfmean(row=p_row)
-            print(f"graphPreloadThread.run: calling get_dffilter")
-            _ = self.uisub.get_dffilter(row=p_row)
-            print(f"graphPreloadThread.run: calling get_dfoutput")
-            if self.uistate.checkBox["paired_stims"]:
-                dfoutput = self.uisub.get_dfdiff(row=p_row)
-            else:
-                dfoutput = self.uisub.get_dfoutput(row=p_row)
-            print(f"graphPreloadThread.run: get_dfoutput returned {type(dfoutput)}")
-            if dfoutput is None:
-                print(
-                    "graphPreloadThread.run: dfoutput is None, returning early (finished will NOT emit)"
-                )
-                return
+        try:
             print(
-                f"graphPreloadThread, {p_row['recording_name']} calls uiplot.addRow() dfoutput columns: {dfoutput.columns}"
+                f"graphPreloadThread.run: entered, {len(self.uistate.list_idx_recs2preload)} recordings"
             )
-            self.uiplot.addRow(
-                p_row=p_row.to_dict(), dft=dft, dfmean=dfmean, dfoutput=dfoutput
-            )
-            self.progress.emit(i)
-            self.i += 1
-            print(f"Preloaded {p_row['recording_name']}")
-        self.finished.emit()
+            df_p = self.df_p.loc[self.uistate.list_idx_recs2preload]
+            self.uistate.list_idx_recs2preload = []
+            self.i = 0
+            for i, p_row in df_p.iterrows():
+                print(f"graphPreloadThread.run: processing {p_row['recording_name']}")
+                print(f"graphPreloadThread.run: calling get_dft")
+                dft = self.uisub.get_dft(row=p_row)
+                print(f"graphPreloadThread.run: get_dft returned {type(dft)}")
+                print(f"graphPreloadThread.run: calling get_dfmean")
+                dfmean = self.uisub.get_dfmean(row=p_row)
+                print(f"graphPreloadThread.run: calling get_dffilter")
+                _ = self.uisub.get_dffilter(row=p_row)
+                print(f"graphPreloadThread.run: calling get_dfoutput")
+                if self.uistate.checkBox["paired_stims"]:
+                    dfoutput = self.uisub.get_dfdiff(row=p_row)
+                else:
+                    dfoutput = self.uisub.get_dfoutput(row=p_row)
+                print(f"graphPreloadThread.run: get_dfoutput returned {type(dfoutput)}")
+                if dfoutput is None:
+                    print(
+                        "graphPreloadThread.run: dfoutput is None, skipping this recording"
+                    )
+                    continue
+                print(
+                    f"graphPreloadThread, {p_row['recording_name']} calls uiplot.addRow() dfoutput columns: {dfoutput.columns}"
+                )
+                self.uiplot.addRow(
+                    p_row=p_row.to_dict(), dft=dft, dfmean=dfmean, dfoutput=dfoutput
+                )
+                self.progress.emit(i)
+                self.i += 1
+                print(f"Preloaded {p_row['recording_name']}")
+        except Exception as e:
+            import traceback
+
+            print(f"graphPreloadThread.run: EXCEPTION: {e}")
+            print(traceback.format_exc())
+        finally:
+            self.finished.emit()
 
 
 #####################################################################
@@ -4203,13 +4210,21 @@ class UIsub(Ui_MainWindow):
                     else:
                         dfinput = self.get_dffilter(row)
                     dfoutput_stim = analysis.build_dfoutput(df=dfinput, dict_t=dict_t)
+                    print(
+                        f"get_dfoutput: build_dfoutput done for stim row {i}, assigning means"
+                    )
                     dft.at[i, "volley_amp_mean"] = dfoutput_stim["volley_amp"].mean()
+                    print(f"get_dfoutput: volley_amp_mean assigned")
                     dft.at[i, "volley_slope_mean"] = dfoutput_stim[
                         "volley_slope"
                     ].mean()
+                    print(f"get_dfoutput: volley_slope_mean assigned, concat next")
                     dfoutput = pd.concat([dfoutput, dfoutput_stim])
-                    # print(f"dfoutput_stim: {dfoutput_stim}")
+                    print(f"get_dfoutput: concat done, loop continuing")
                 self.set_dft(rec, dft)
+                print(
+                    f"get_dfoutput: set_dft done, returning dfoutput shape={dfoutput.shape}"
+                )
         dfoutput.reset_index(inplace=True)
         # print(f"dfoutput: {dfoutput}")
         return dfoutput
