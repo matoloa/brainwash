@@ -3005,10 +3005,7 @@ class UIsub(Ui_MainWindow):
             df_proj_new_row["ID"] = str(uuid.uuid4())
             df_proj_new_row["status"] = "Read"
             df_proj_new_row["recording_name"] = new_name
-            nsweeps = dict_meta.get("nsweeps")
-            df_proj_new_row["sweeps"] = (
-                str(int(nsweeps)) if nsweeps is not None else None
-            )
+            df_proj_new_row["sweeps"] = dict_meta.get("nsweeps", None)
             df_proj_new_row["channel"] = ""  # dict_meta.get('channel', None)
             df_proj_new_row["stim"] = ""  # dict_meta.get('stim', None)
             df_proj_new_row["sweep_duration"] = dict_meta.get("sweep_duration", None)

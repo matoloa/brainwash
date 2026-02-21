@@ -3,6 +3,14 @@
 import sys
 
 # import lib.method
+import pandas as pd
+
+# pandas 3.0 changed the default string dtype to Arrow-backed string[pyarrow],
+# which rejects assignment of non-string values (int, float, etc.).
+# The project DataFrame mixes strings, ints and floats in the same CSV-loaded
+# DataFrame, so we opt back into the legacy object-dtype string behaviour.
+pd.options.future.infer_string = False
+
 from PyQt5 import QtWidgets
 
 # from lib.parse import *
