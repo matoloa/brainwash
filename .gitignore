@@ -37,3 +37,6 @@ bw_cfg.yaml
 # Mats' convenience files
 *.bat
 *.log
+
+# Windows reserved device name — not a real file, but git sees it as untracked
+nul
