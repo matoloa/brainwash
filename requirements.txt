@@ -1,3 +1,9 @@
+# Runtime dependencies are managed in pyproject.toml and locked via uv.lock.
+# Use `uv sync` to install the full environment.
+#
+# This file is kept for reference / legacy tooling only.
+# Do NOT add new dependencies here — add them to pyproject.toml instead.
+
 #python==3.12
 pyqt5
 scipy-openblas64
@@ -15,4 +21,3 @@ requests
 pyabf
 igor2
 pyarrow
-cx-Freeze==8.5 # for building the executable, allowing this here to, is not that big

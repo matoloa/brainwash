@@ -1,0 +1,4 @@
+# Build dependencies — only needed to package the application with cx_Freeze.
+# Not required for running or developing brainwash.
+# Install with: uv pip install -r requirements-build.txt
+cx-Freeze==8.5

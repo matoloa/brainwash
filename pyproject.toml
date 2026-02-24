@@ -1,3 +1,6 @@
+[tool.uv]
+constraint-dependencies = ["pyqt5-qt5==5.15.2"]
+
 [tool.black]
 line-length = 150
 
@@ -16,10 +19,28 @@ version = "0.10.0"
 description = "A data visualization tool for electrophysiological recordings, with convenience functions."
 requires-python = ">=3.12"
 dependencies = [
-    "cx-freeze==8.5",
+    "pyqt5==5.15.11",
+    "pandas",
+    "numpy",
+    "scipy",
+    "scipy-openblas64",
+    "scikit-learn==1.7.1",
+    "matplotlib",
+    "seaborn",
+    "joblib",
+    "tqdm",
+    "pyyaml",
+    "toml",
+    "requests",
+    "pyabf",
+    "igor2",
+    "pyarrow",
 ]
 
 [dependency-groups]
 dev = [
     "pyqt5-stubs>=5.15.6.0",
+]
+build = [
+    "cx-freeze==8.5",
 ]
