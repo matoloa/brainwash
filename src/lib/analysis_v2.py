@@ -1,35 +1,15 @@
-# ---
-# jupyter:
-#   jupytext:
-#     text_representation:
-#       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.17.1
-#   kernelspec:
-#     display_name: Python 3 (ipykernel)
-#     language: python
-#     name: python3
-# ---
-
-# %%
 import json
-import os
-import sys
 import time
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks, savgol_filter
 from scipy.stats import ttest_ind_from_stats
 from sklearn.linear_model import LinearRegression
 
-reporoot = Path(os.getcwd()).parent
-sys.path.append(str(reporoot / "src/lib/"))
 
-
-# %%
 def valid(*args):
     return all(
         isinstance(x, (int, float)) and x is not None and not np.isnan(x) for x in args
@@ -488,12 +468,6 @@ def find_events(
     return df_t
 
 
-# %%
-import matplotlib.pyplot as plt
-import numpy as np
-from scipy.signal import find_peaks
-
-
 def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots=False):
     """
     Characterize a graph based on feature prominence and shape consistency.
@@ -872,8 +846,15 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
     return result
 
 
-# %% test code
+# test code
 if __name__ == "__main__":
+    import os
+    import sys
+    from pathlib import Path as _Path
+
+    _reporoot = _Path(os.getcwd()).parent
+    sys.path.append(str(_reporoot / "src/lib/"))
+
     import parse
     import ui_state_classes as ui
 
@@ -1007,7 +988,6 @@ if __name__ == "__main__":
 
 # Jupyter Notebook testers
 
-# %%
 if False:  # __name__ == "__main__":
     # read slices and meta
     # folder_talkback = Path.home() / 'Documents' / 'Brainwash Data Source' / 'talkback KetaDexa'
@@ -1048,14 +1028,12 @@ if False:  # __name__ == "__main__":
     )
 
 
-# %%
 if False:  # __name__ == "__main__":
     sweepname = df.sweepname.unique()[0]
     sweepname = "d1fdaa03-6a4a-4e32-9691-ad4ef09a1e1c"
     dfsweep = df.loc[df.sweepname == sweepname, ["time", "voltage"]]
     characterize_graph(dfsweep, stim_amp=0.005, verbose=True, plot=True)
 
-# %%
 # calculate and report test set
 if False:  # __name__ == "__main__":
     from analysis_evaluation import evaluate_and_report
@@ -1087,11 +1065,11 @@ if False:  # __name__ == "__main__":
         dfresults_av2, meta, signals, offset_thresholds=[1, 2, 3, 5, 10]
     )
 
-# %%
 # find worst offenders
 if False:  # __name__ == "__main__":
-
-    def check_sweep(sweepname):
+    # check_sweep_multiplot: variant of check_sweep above that enables multiplots=True
+    # for compact side-by-side visualisation of many sweeps.
+    def check_sweep_multiplot(sweepname):
         dfsweep = df.loc[df.sweepname == sweepname, ["time", "voltage", "prim", "bis"]]
         result = characterize_graph(
             dfsweep, stim_amp=0.005, verbose=False, plot=False, multiplots=True
@@ -1102,7 +1080,7 @@ if False:  # __name__ == "__main__":
     results = []
     signals = []
     for sweepname in df.sweepname.unique():
-        result = check_sweep(sweepname)
+        result = check_sweep_multiplot(sweepname)
         results.append(result)
         signal = df[df["sweepname"] == sweepname][["time", "voltage"]].copy()
         signals.append(signal)
@@ -1117,7 +1095,6 @@ if False:  # __name__ == "__main__":
     ].sweepname.values.tolist()
     display(dfdiff.loc[dfdiff.t_EPSP_slope_start.abs().nlargest(5).index])
 
-# %%
 # plot worst offenders
 if False:  # __name__ == "__main__":
     results = []
