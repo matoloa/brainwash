@@ -389,10 +389,11 @@ class ParseDataThread(QtCore.QThread):
     progress = QtCore.pyqtSignal(int)
     finished = QtCore.pyqtSignal()  # custom signal, decoupled from QThread.finished
 
-    def __init__(self, df_p_to_update, dict_folders):
+    def __init__(self, df_p_to_update, dict_folders, uisub):
         super().__init__()
         self.df_p_to_update = df_p_to_update
         self.dict_folders = dict_folders
+        self.uisub = uisub
         self.rows = []
         self.total = len(df_p_to_update)
 
@@ -419,7 +420,9 @@ class ParseDataThread(QtCore.QThread):
                 for rec, df_raw in dict_name_df.items():
                     if config.verbose:
                         print(f"ParseDataThread: {rec}")
-                    df_proj_new_row = uisub.create_recording(df_proj_row, rec, df_raw)
+                    df_proj_new_row = self.uisub.create_recording(
+                        df_proj_row, rec, df_raw
+                    )
                     self.rows.append(df_proj_new_row)
         except Exception as e:
             import traceback
@@ -3081,7 +3084,7 @@ class UIsub(
         df_p_to_update = df_p[df_p["sweeps"] == "..."].copy()
         if len(df_p_to_update) > 0:
             print(f"parseData: {len(df_p_to_update)} files to parse.")
-            thread = ParseDataThread(df_p_to_update, self.dict_folders)
+            thread = ParseDataThread(df_p_to_update, self.dict_folders, self)
             self._current_parse_thread = thread  # Store reference for use in callbacks
             thread.progress.connect(self.updateProgressBar)
             thread.finished.connect(self.onParseDataFinished)
