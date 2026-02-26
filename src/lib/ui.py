@@ -453,14 +453,14 @@ class graphPreloadThread(QtCore.QThread):
             self.i = 0
             for i, p_row in df_p.iterrows():
                 print(f"graphPreloadThread.run: processing {p_row['recording_name']}")
-                print(f"graphPreloadThread.run: calling get_dft")
+                print("graphPreloadThread.run: calling get_dft")
                 dft = self.uisub.get_dft(row=p_row)
                 print(f"graphPreloadThread.run: get_dft returned {type(dft)}")
-                print(f"graphPreloadThread.run: calling get_dfmean")
+                print("graphPreloadThread.run: calling get_dfmean")
                 dfmean = self.uisub.get_dfmean(row=p_row)
-                print(f"graphPreloadThread.run: calling get_dffilter")
+                print("graphPreloadThread.run: calling get_dffilter")
                 _ = self.uisub.get_dffilter(row=p_row)
-                print(f"graphPreloadThread.run: calling get_dfoutput")
+                print("graphPreloadThread.run: calling get_dfoutput")
                 if self.uistate.checkBox["paired_stims"]:
                     dfoutput = self.uisub.get_dfdiff(row=p_row)
                 else:
@@ -1432,7 +1432,7 @@ class UIsub(
             print("No widget has focus.")
 
     def find_widgets_with_top_left_coordinates(self, widget):
-        print(f"trying child geometry")
+        print("trying child geometry")
         for child in widget.findChildren(QtWidgets.QWidget):
             # print(f"attribs: {dir(child.geometry())}")
             print(
@@ -1508,7 +1508,7 @@ class UIsub(
         print(f" - - mouseoverUpdate: {round((time.time() - t0) * 1000)} ms")
 
     def stimSelectionChanged(self):
-        self.usage(f"stimSelectionChanged")
+        self.usage("stimSelectionChanged")
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableStim.clearSelection()
         if uistate.mean_mouseover_stim_select is None:  # clicked table
@@ -2467,32 +2467,32 @@ class UIsub(
         self.stimDetect()
 
     def trigger_set_sweeps_even(self):
-        self.usage(f"trigger_set_sweeps_even")
+        self.usage("trigger_set_sweeps_even")
         self.sweepsSelect(even=True)
 
     def trigger_set_sweeps_odd(self):
-        self.usage(f"trigger_set_sweeps_odd")
+        self.usage("trigger_set_sweeps_odd")
         self.sweepsSelect(even=False)
 
     def trigger_set_EPSP_amp_width_all(self):
-        self.usage(f"trigger_set_EPSP_amp_width_all")
+        self.usage("trigger_set_EPSP_amp_width_all")
         self.recalculate()
 
     def trigger_set_volley_amp_width_all(self):
-        self.usage(f"trigger_set_volley_amp_width_all")
+        self.usage("trigger_set_volley_amp_width_all")
         self.recalculate()
 
     def trigger_set_norm_range_all(self):
-        self.usage(f"trigger_set_norm_range_all")
+        self.usage("trigger_set_norm_range_all")
         self.recalculate()
 
     def trigger_set_bin_size_all(self):
-        self.usage(f"trigger_set_bin_size_all")
+        self.usage("trigger_set_bin_size_all")
         uistate.checkBox["bin"] = True
         self.recalculate()
 
     def triggerRefresh(self):
-        self.usage(f"refresh graphs")
+        self.usage("refresh graphs")
         selection = uistate.list_idx_select_recs
         self.tableProj.clearSelection()
         self.recalculate()
