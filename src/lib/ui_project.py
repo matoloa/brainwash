@@ -4,15 +4,16 @@
 # file persistence helpers (df2file, persistOutput), and the two main init methods
 # (bootstrap, loadProject).
 #
+# Also owns df_projectTemplate — the schema/factory for the project DataFrame.
+# ui.py imports it from here directly.
+#
 # Module-level singletons are injected by ui.py at startup (after all
 # singletons and widget classes are created but before any UIsub instance
 # is constructed):
 #
-#   import ui_project
 #   ui_project.uistate          = uistate
 #   ui_project.config           = config
 #   ui_project.uiplot           = uiplot
-#   ui_project.df_projectTemplate = df_projectTemplate
 #   ui_project.InputDialogPopup = InputDialogPopup
 
 from __future__ import annotations
@@ -28,12 +29,42 @@ import yaml
 from PyQt5 import QtCore, QtWidgets
 
 # ---------------------------------------------------------------------------
+# Project DataFrame schema
+# ---------------------------------------------------------------------------
+
+
+def df_projectTemplate():
+    return pd.DataFrame(
+        columns=[
+            "ID",  # str: unique identifier for recording
+            "host",  # str: computer name
+            "path",  # str: path of original source file
+            "status",  # str: blank if ok, 'default' is default recordings. TODO: add more states
+            "recording_name",  # str: name of recording
+            "stims",  # int: number of stims in recording
+            "sweeps",  # int: number of sweeps in recording
+            "sweep_duration",  # float: duration of each sweep in seconds
+            "resets",  # str: list of number of first sweep in source file, for breaking up tables of non-continuous recordings
+            "filter",  # str: filter used for analysis
+            "filter_params",  # str: filter parameters
+            "groups",  # str: group name(s); maintained by uisub.dfgroups and its functions
+            "parsetimestamp",  # str: timestamp of parsing of original source file
+            "channel",  # str: this recording is only from this channel
+            "stim",  # str: this recording is only from this stim (a/b)
+            "paired_recording",  # str: unique ID of paired recording
+            "Tx",  # Boolean: Treatment / Control, for paired recordings
+            "exclude",  # Boolean: If True, exclude this recording from analysis
+            "comment",  # str: user comment
+        ]
+    )
+
+
+# ---------------------------------------------------------------------------
 # Injected singletons — set by ui.py before any UIsub instance is created.
 # ---------------------------------------------------------------------------
 uistate = None  # type: ignore[assignment]
 config = None  # type: ignore[assignment]
 uiplot = None  # type: ignore[assignment]
-df_projectTemplate = None  # type: ignore[assignment]
 InputDialogPopup = None  # type: ignore[assignment]
 
 
@@ -95,7 +126,7 @@ class ProjectMixin:
         self.mainwindow.setGeometry(
             0,
             0,
-            int(screen.width() * 0.96),
+            int(screen.width() * 0.999),
             int(screen.height()) - config.terminal_space,
         )
 
