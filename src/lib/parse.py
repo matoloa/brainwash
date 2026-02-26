@@ -380,10 +380,18 @@ def source2dfs(source, dev=False, gain=1.0):
         dict_channeldfs[channel] = df[df["channel"] == channel]
     # sort df by datetime
 
-    for df in dict_channeldfs.values():
-        if not df["datetime"].is_monotonic_increasing:
-            print(" - - Warning: datetime not monotonic increasing, sorting.")
-            df.sort_values("datetime", inplace=True)
+    for channel, df in dict_channeldfs.items():
+        # Group rows into sweeps by detecting time resets (time == 0 starts a new sweep).
+        sweep_groups = (df["time"] == 0).cumsum()
+        # Check that each sweep's start datetime is monotonically increasing.
+        sweep_start_dt = df.groupby(sweep_groups)["datetime"].first()
+        if not sweep_start_dt.is_monotonic_increasing:
+            print(
+                " - - Warning: sweep start datetimes not monotonic increasing, sorting sweeps."
+            )
+            sweep_order = sweep_start_dt.sort_values().index
+            sorted_pieces = [df[sweep_groups == grp] for grp in sweep_order]
+            dict_channeldfs[channel] = pd.concat(sorted_pieces).reset_index(drop=True)
     # generate 'sweep' column and drop channel column
     for df in dict_channeldfs.values():
         df["sweep"] = df.groupby((df["time"] == 0).cumsum()).ngroup()
