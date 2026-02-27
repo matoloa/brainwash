@@ -13,14 +13,6 @@ _src_dir = str(Path(__file__).parent)
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-import pandas as pd
-
-# pandas 3.0 changed the default string dtype to Arrow-backed string[pyarrow],
-# which rejects assignment of non-string values (int, float, etc.).
-# The project DataFrame mixes strings, ints and floats in the same CSV-loaded
-# DataFrame, so we opt back into the legacy object-dtype string behaviour.
-pd.options.future.infer_string = False
-
 from PyQt5 import QtWidgets
 
 
@@ -67,6 +59,15 @@ if __name__ == "__main__":
         f"frozen={getattr(sys, 'frozen', False)}, "
         f"argv={sys.argv}, py={sys.version[:10]}"
     )
+
+    # pandas 3.0 changed the default string dtype to Arrow-backed string[pyarrow],
+    # which rejects assignment of non-string values (int, float, etc.).
+    # The project DataFrame mixes strings, ints and floats in the same CSV-loaded
+    # DataFrame, so we opt back into the legacy object-dtype string behaviour.
+    # Imported late so any pandas logging is captured by the handler above.
+    import pandas as pd
+
+    pd.options.future.infer_string = False
 
     # Import intentionally late so the logging config is in place before any
     # module-level code in ui.py runs.
