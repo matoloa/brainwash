@@ -31,7 +31,8 @@ exe = Executable(
 options = {
     "build_exe": {
         "includes": [],
-        "zip_include_packages": [],
+        "zip_include_packages": ["*"],
+        "no_compress": False,
         "include_msvcr": True,
         "excludes": ["tkinter", "email", "pytest", "pyarrow"],
         "packages": [

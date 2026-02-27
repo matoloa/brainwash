@@ -92,6 +92,19 @@ if __name__ == "__main__":
         except Exception as e:
             logger.warning(f"Failed to allocate console: {e}")
 
+    # Install a global exception hook so uncaught exceptions in Qt slots
+    # (which PyQt5 normally swallows) are written to the log file.
+    def _excepthook(exc_type, exc_value, exc_tb):
+        logger.critical(
+            "Uncaught exception",
+            exc_info=(exc_type, exc_value, exc_tb),
+        )
+
+    sys.excepthook = _excepthook
+
+    # PyQt5 >= 5.5 lets you intercept exceptions thrown inside slots via
+    # sys.excepthook — but only when the C++ side re-raises them.  For full
+    # coverage we also monkey-patch the two most crash-prone entry points.
     try:
         app = QtWidgets.QApplication(sys.argv)
         logger.info(f"QApplication created, platformName='{app.platformName()}'")
@@ -101,6 +114,34 @@ if __name__ == "__main__":
 
         ui = UIsub(MainWindow)
         logger.info("UIsub instantiated successfully")
+
+        # Wrap the two most crash-prone interactive entry-points so that any
+        # exception that escapes them is logged with a full traceback before
+        # Qt has a chance to silently swallow it.
+        import functools
+
+        def _log_exceptions(method_name):
+            original = getattr(ui, method_name)
+
+            @functools.wraps(original)
+            def wrapper(*args, **kwargs):
+                try:
+                    return original(*args, **kwargs)
+                except Exception:
+                    logger.exception(f"Exception in UIsub.{method_name}")
+                    raise  # re-raise so Qt still sees it
+
+            setattr(ui, method_name, wrapper)
+
+        for _m in (
+            "tableProjSelectionChanged",
+            "ongraphPreloadFinished",
+            "graphRefresh",
+            "update_show",
+            "mouseoverUpdate",
+            "zoomAuto",
+        ):
+            _log_exceptions(_m)
 
         MainWindow.show()
         MainWindow.raise_()  # bring to top of Z-order
