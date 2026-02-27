@@ -142,14 +142,13 @@ options = {
         #   • xmlrpc is pulled in by some stdlib modules at init time.
         # Excluding them causes an immediate ModuleNotFoundError on startup.
         "excludes": [
+            # tkinter: desktop GUI toolkit, never used
             "tkinter",
-            "unittest",
+            # pytest: test runner, not needed at runtime
             "pytest",
-            "email",
-            "http",
-            "pydoc",
+            # doctest: pulled in by nothing we ship
             "doctest",
-            "difflib",
+            # network protocol modules that nothing in our stack imports:
             "ftplib",
             "imaplib",
             "mailbox",
@@ -157,6 +156,13 @@ options = {
             "poplib",
             "smtplib",
             "telnetlib",
+            # NOTE: do NOT exclude any of the following — they are pulled in
+            # eagerly at import time by scipy, requests, or other packages:
+            #   unittest  — scipy._lib._testutils imports it unconditionally
+            #   email     — scipy / requests pull it in at import time
+            #   http      — requests pulls http.client / http.cookiejar
+            #   pydoc     — scipy._lib._docscrape imports it
+            #   difflib   — scipy._lib._docscrape imports it
         ],
         # ------------------------------------------------------------------ #
         # path_excludes / zip_exclude_packages                                #
