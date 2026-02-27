@@ -51,8 +51,8 @@ options = {
             "scipy.optimize",
             # sklearn internals that are loaded dynamically
             "sklearn.utils._cython_blas",
-            "sklearn.neighbors.typedefs",
-            "sklearn.neighbors.quad_tree",
+            "sklearn.utils._typedefs",
+            "sklearn.neighbors._quad_tree",
             "sklearn.tree._utils",
             # PyQt5 extras
             "PyQt5.sip",
