@@ -41,6 +41,7 @@ def df_projectTemplate():
             "path",  # str: path of original source file
             "status",  # str: blank if ok, 'default' is default recordings. TODO: add more states
             "recording_name",  # str: name of recording
+            "gain",  # float: gain of recording, added by brainwash
             "stims",  # int: number of stims in recording
             "sweeps",  # int: number of sweeps in recording
             "sweep_duration",  # float: duration of each sweep in seconds
@@ -79,6 +80,7 @@ class ProjectMixin:
         # Determine column order based on the state of uistate.checkBox['output_per_stim']
         column_order = (
             [
+                "gain",
                 "stim",
                 "bin",
                 "EPSP_slope",
@@ -90,6 +92,7 @@ class ProjectMixin:
             ]
             if uistate.checkBox["output_per_stim"]
             else [
+                "gain",
                 "stim",
                 "sweep",
                 "EPSP_slope",
