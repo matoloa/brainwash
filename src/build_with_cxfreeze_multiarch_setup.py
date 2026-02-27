@@ -5,58 +5,122 @@ from cx_Freeze import Executable, setup
 
 pyproject = toml.load("../pyproject.toml")
 version = pyproject["project"]["version"]
-# base="Win32GUI" should be used only for Windows GUI app
+
 print(f"sys.platform: {sys.platform}")
-base = "Win32GUI" if sys.platform == "win32" else None
-# Include the path to the Python script you want to freeze.
+
+# "gui" is the modern cx_Freeze 7+ name for Win32GUI; works on all platforms
+base = "gui" if sys.platform == "win32" else None
+
 script_path = "main.py"
-# include paths files
+
+# pyproject.toml is read at runtime by ui.py (Config.__init__) to get the
+# version string.  It is placed at lib/pyproject.toml so the existing search
+# list in ui.py ("lib" entry) finds it without any code changes.
+# "lib/" copies the whole src/lib directory into build/exe.*/lib/.
 include_files = [
     ("../pyproject.toml", "lib/pyproject.toml"),
     "lib/",
 ]
-# windows build
-# Find the vcomp140.dll file in the system
-# vcomp140_dll_path = os.path.join(os.environ['windir'], 'System32', 'vcomp140.dll')
-# print(f"vcomp140_dll_path: {vcomp140_dll_path}, exists: {os.path.exists(vcomp140_dll_path)}")
-# Linux: commented for now. No signs of malfunction. If needed, change to proper paths. We dropped conda in Linux for pip and venv.
-# ("/home/jonathan/mambaforge/envs/brainwash/lib/libcblas.so", "lib/libcblas.so"), ("/home/jonathan/mambaforge/envs/brainwash/lib/libcblas.so.3", "lib/libcblas.so.3")]
-# Create an executable.
+
 exe = Executable(
     script=script_path,
     base=base,
-    target_name="brainwash",  # Name of output exe/AppImage
+    target_name="brainwash",
 )
-# Setup cx_Freeze options.
+
 options = {
     "build_exe": {
-        "includes": [],
-        "no_compress": False,
-        "include_msvcr": True,
-        "excludes": ["tkinter", "email", "pytest", "pyarrow"],
+        # ------------------------------------------------------------------ #
+        # includes: individual modules cx_Freeze may miss via static analysis #
+        # ------------------------------------------------------------------ #
+        "includes": [
+            # matplotlib backends / font machinery
+            "matplotlib.backends.backend_qt5agg",
+            "matplotlib.backends.backend_agg",
+            "matplotlib.figure",
+            "matplotlib.font_manager",
+            "matplotlib.ticker",
+            "matplotlib.colors",
+            "matplotlib.lines",
+            "matplotlib.style",
+            # scipy sub-modules used directly
+            "scipy.signal",
+            "scipy.stats",
+            "scipy.linalg",
+            "scipy.sparse",
+            "scipy.optimize",
+            # sklearn internals that are loaded dynamically
+            "sklearn.utils._cython_blas",
+            "sklearn.neighbors.typedefs",
+            "sklearn.neighbors.quad_tree",
+            "sklearn.tree._utils",
+            # PyQt5 extras
+            "PyQt5.sip",
+            # standard-library modules used at runtime
+            "pickle",
+            "socket",
+            "uuid",
+            "importlib",
+        ],
+        # ------------------------------------------------------------------ #
+        # packages: whole packages — all submodules are pulled in             #
+        # ------------------------------------------------------------------ #
         "packages": [
+            # Qt
+            "PyQt5",
+            # numeric / scientific
+            "numpy",
+            "scipy",
+            "scipy_openblas64",  # scipy's bundled OpenBLAS — required at runtime
+            "sklearn",
+            # plotting
+            "matplotlib",
+            "seaborn",
+            # data
+            "pandas",
+            "pyarrow",  # pandas uses it for Arrow-backed dtypes
+            # I/O helpers
             "pyabf",
             "igor2",
-            "tqdm",
+            # parallelism / progress
             "joblib",
-            "sklearn",
-            "numpy",
-            "numpy.core",
-            "scipy",
-            "scipy.linalg",
-            "seaborn",
+            "tqdm",
+            # config / serialisation
+            "toml",
+            "yaml",  # PyYAML
+            "requests",
+        ],
+        # ------------------------------------------------------------------ #
+        # excludes: only things that are genuinely never needed               #
+        # ------------------------------------------------------------------ #
+        "excludes": [
+            "tkinter",
+            "unittest",
+            "pytest",
+            "email",
+            "http",
+            "xml",
+            "pydoc",
+            "doctest",
+            "difflib",
+            "ftplib",
+            "imaplib",
+            "mailbox",
+            "nntplib",
+            "poplib",
+            "smtplib",
+            "telnetlib",
+            "xmlrpc",
         ],
         "include_files": include_files,
+        "include_msvcr": True,
     }
 }
-# Call the setup function.
+
 setup(
     name="brainwash",
     version=version,
     description="",
-    # packages=find_packages(where="src"),
-    # package_dir={"": "src"},
-    # include_package_data=True,
     options=options,
     executables=[exe],
 )

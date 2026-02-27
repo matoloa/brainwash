@@ -137,31 +137,50 @@ class Config:
         )  # pixels reserved for viewing prints
 
         # get project_name and version number from pyproject.toml
-        pathtoml = [
-            i + "/pyproject.toml"
-            for i in ["../..", "..", ".", "lib", "/lib"]
-            if Path(i + "/pyproject.toml").is_file()
-        ]
-        # you will want this eventually so I fix it now
-        pathbwcfgyaml = [
-            i + "/bw_cfg.yaml"
-            for i in ["../..", "..", ".", "lib", "/lib"]
-            if Path(i + "/bw_cfg.yaml").is_file()
-        ]
-        if len(pathtoml) == 0:
-            # not found, we may be in an appimage
-            pathtoml = [
-                i + "/pyproject.toml"
-                for i in sys.path
-                if Path(i + "/pyproject.toml").is_file()
-            ]
-            pathbwcfgyaml = [
-                i + "/bw_cfg.yaml"
-                for i in sys.path
-                if Path(i + "/bw_cfg.yaml").is_file()
-            ]
-        pyproject = toml.load(pathtoml[0])
-        self.bw_cfg_yaml = pathbwcfgyaml[0] if len(pathbwcfgyaml) == 1 else None
+        #
+        # Search order (most-specific first):
+        #   1. Frozen build: the exe lives in build/exe.*/ and we copy
+        #      pyproject.toml to lib/pyproject.toml next to it, so look
+        #      relative to sys.executable first.
+        #   2. Development: relative paths from cwd (src/ or repo root).
+        #   3. Fallback: walk every entry in sys.path (AppImage, editable
+        #      installs, unusual working directories).
+        def _find_file(filename: str) -> Path | None:
+            # 1. Relative to the executable (frozen) or this source file (dev)
+            anchors: list[Path] = []
+            if getattr(sys, "frozen", False):
+                anchors.append(Path(sys.executable).parent)
+            anchors.append(Path(__file__).parent)  # src/lib/
+            anchors.append(Path(__file__).parent.parent)  # src/
+            anchors.append(Path(__file__).parent.parent.parent)  # repo root
+
+            for anchor in anchors:
+                for rel in ["lib/" + filename, filename]:
+                    candidate = anchor / rel
+                    if candidate.is_file():
+                        return candidate
+
+            # 2. sys.path fallback (AppImage / unusual layouts)
+            for entry in sys.path:
+                candidate = Path(entry) / filename
+                if candidate.is_file():
+                    return candidate
+
+            return None
+
+        toml_path = _find_file("pyproject.toml")
+        if toml_path is None:
+            raise FileNotFoundError(
+                "pyproject.toml not found. Searched relative to executable, "
+                "source file, and all sys.path entries."
+            )
+        logger.debug("Config: loading pyproject.toml from %s", toml_path)
+
+        bwcfg_path = _find_file("bw_cfg.yaml")
+        logger.debug("Config: bw_cfg.yaml %s", bwcfg_path or "not found")
+
+        pyproject = toml.load(toml_path)
+        self.bw_cfg_yaml = str(bwcfg_path) if bwcfg_path is not None else None
         self.program_name = pyproject["project"]["name"]
         self.version = pyproject["project"]["version"]
 
