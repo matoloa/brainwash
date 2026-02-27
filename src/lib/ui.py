@@ -1733,6 +1733,13 @@ class UIsub(
             )
         # lineEdits
         for lineEdit in [
+            self.lineEdit_split_at_time,
+            self.lineEdit_import_gain,
+        ]:
+            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(
+                lambda le=lineEdit: self.editImportOptions(le)
+            )
+        for lineEdit in [
             self.lineEdit_mean_selection_start,
             self.lineEdit_mean_selection_end,
         ]:
@@ -2125,6 +2132,23 @@ class UIsub(
         start.setText(num2str(low))
         end.setText(num2str(high))
         return low, high
+
+    def editImportOptions(self, lineEdit):
+        self.usage("editImportOptions")
+        lineEditName = lineEdit.objectName()
+        try:
+            text = lineEdit.text().replace(",", ".")
+            num = max(0, float(text))
+        except ValueError:
+            num = 0
+        lineEdit.setText(str(num))
+        if lineEditName == "lineEdit_split_at_time":
+            uistate.split_at_time = float(lineEdit.text())
+            if uistate.split_at_time is not None and uistate.split_at_time != 0:
+                uistate.checkBox["splitOddEven"] = False
+                self.checkBox_splitOddEven.setChecked(False)
+        elif lineEditName == "lineEdit_import_gain":
+            uistate.import_gain = float(lineEdit.text())
 
     def editMeanSelectRange(self, lineEdit):
         self.usage("editMeanSelectRange")
