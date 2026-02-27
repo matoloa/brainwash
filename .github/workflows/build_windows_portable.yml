@@ -68,4 +68,4 @@ jobs:
         with:
           name: brainwash-${{ env.VERSION }}-windows-portable
           path: ${{ env.EXE_DIR }}
-          compression-level: 0
+          compression-level: 6
