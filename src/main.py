@@ -57,7 +57,7 @@ if __name__ == "__main__":
     logger.info(
         f"Brainwash starting — platform={sys.platform}, "
         f"frozen={getattr(sys, 'frozen', False)}, "
-        f"argv={sys.argv}, py={sys.version[:10]}"
+        f"argv={sys.argv}, py={sys.version[:50]}"
     )
 
     # pandas 3.0 changed the default string dtype to Arrow-backed string[pyarrow],
@@ -65,12 +65,13 @@ if __name__ == "__main__":
     # The project DataFrame mixes strings, ints and floats in the same CSV-loaded
     # DataFrame, so we opt back into the legacy object-dtype string behaviour.
     # Imported late so any pandas logging is captured by the handler above.
-    import pandas as pd
+    # import pandas as pd
 
-    pd.options.future.infer_string = False
+    # pd.options.future.infer_string = False
 
     # Import intentionally late so the logging config is in place before any
     # module-level code in ui.py runs.
+    #
     from lib.ui import UIsub
 
     if debug:
