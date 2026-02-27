@@ -3,9 +3,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-from PyQt5 import QtCore, QtGui, QtWidgets, sip
 import numpy as np
 import pandas as pd
+from PyQt5 import QtCore, QtGui, QtWidgets, sip
 
 # pandas 3.0 changed the default string dtype to Arrow-backed string[pyarrow],
 # which rejects assignment of non-string values (int, float, etc.).
@@ -496,6 +496,11 @@ class graphPreloadThread(QtCore.QThread):
                 print("graphPreloadThread.run: calling get_dft")
                 dft = self.uisub.get_dft(row=p_row)
                 print(f"graphPreloadThread.run: get_dft returned {type(dft)}")
+                if dft is None:
+                    print(
+                        f"graphPreloadThread.run: dft is None for {p_row['recording_name']} (no stims detected), skipping"
+                    )
+                    continue
                 print("graphPreloadThread.run: calling get_dfmean")
                 dfmean = self.uisub.get_dfmean(row=p_row)
                 print("graphPreloadThread.run: calling get_dffilter")
@@ -523,8 +528,9 @@ class graphPreloadThread(QtCore.QThread):
         except Exception as e:
             import traceback
 
-            print(f"graphPreloadThread.run: EXCEPTION: {e}")
-            print(traceback.format_exc())
+            logger.exception(
+                f"graphPreloadThread.run: EXCEPTION: {e}\n{traceback.format_exc()}"
+            )
         finally:
             self.finished.emit()
 
@@ -1041,10 +1047,11 @@ class UIsub(
             uistate.dict_group_show = new_group_selection
 
         # return
-        # DEBUG block - for inquiring visiblity of specific lines
-        for key, value in self.dd_groups.items():
-            print(f"update_show: {key}, show:{value['show']}")
+        # DEBUG block - for inquiring visibility of specific lines
         print(f"update_show: {len(uistate.dict_rec_show)}")
+        if self.dd_groups is not None:
+            for key, value in self.dd_groups.items():
+                print(f"update_show: {key}, show:{value['show']}")
         for key, value in uistate.dict_rec_show.items():
             if key.endswith(" volley amp mean") or key.endswith(" volley slope mean"):
                 print(f"update_show: {key}, show:{value['line'].get_visible()}")

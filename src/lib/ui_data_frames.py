@@ -197,6 +197,18 @@ class DataFrameMixin:
         if Path(str_t_path).exists() and not reset:
             # print("reading dft from file")
             dft = pd.read_parquet(str_t_path)
+            # Migrate old column names: norm_EPSP_from/to → norm_output_from/to
+            if "norm_EPSP_from" in dft.columns:
+                dft.rename(
+                    columns={
+                        "norm_EPSP_from": "norm_output_from",
+                        "norm_EPSP_to": "norm_output_to",
+                    },
+                    inplace=True,
+                )
+                self.df2file(
+                    df=dft, rec=rec, key="timepoints"
+                )  # re-persist with corrected names
             self.dict_ts[rec] = dft
             return dft
         else:
@@ -210,7 +222,7 @@ class DataFrameMixin:
             if dft.empty:
                 print("get_dft: No stims found.")
                 return None
-            dft["norm_EPSP_from"], dft["norm_EPSP_to"] = (
+            dft["norm_output_from"], dft["norm_output_to"] = (
                 uistate.lineEdit["norm_EPSP_from"],
                 uistate.lineEdit["norm_EPSP_to"],
             )
@@ -248,7 +260,16 @@ class DataFrameMixin:
         str_output_path = f"{self.dict_folders['cache']}/{rec}_output.parquet"
         if Path(str_output_path).exists() and not reset:  # 2: Read from file
             dfoutput = pd.read_parquet(str_output_path)
-        else:  # 3: Create file and cache
+            # Migrate old files that had a spurious 'index' column from reset_index(inplace=True).
+            if "index" in dfoutput.columns:
+                dfoutput.drop(columns=["index"], inplace=True)
+                dfoutput.reset_index(drop=True, inplace=True)
+                self.df2file(
+                    df=dfoutput, rec=rec, key="output"
+                )  # re-persist clean version
+            else:
+                dfoutput.reset_index(drop=True, inplace=True)
+        else:  # 3: Create from scratch and persist
             print(f"creating output for {row['recording_name']}")
             dfmean = self.get_dfmean(row=row)
             if dft is None:
@@ -280,8 +301,11 @@ class DataFrameMixin:
                 print(
                     f"get_dfoutput: set_dft done, returning dfoutput shape={dfoutput.shape}"
                 )
-        dfoutput.reset_index(inplace=True)
-        # print(f"dfoutput: {dfoutput}")
+            dfoutput.reset_index(drop=True, inplace=True)
+            # Persist the clean (no spurious index column) version to disk.
+            self.df2file(df=dfoutput, rec=rec, key="output")
+        # Cache and return
+        self.dict_outputs[rec] = dfoutput
         return dfoutput
 
     # ------------------------------------------------------------------
