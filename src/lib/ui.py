@@ -2143,12 +2143,15 @@ class UIsub(
             num = 0
         lineEdit.setText(str(num))
         if lineEditName == "lineEdit_split_at_time":
-            uistate.split_at_time = float(lineEdit.text())
-            if uistate.split_at_time is not None and uistate.split_at_time != 0:
+            uistate.lineEdit["split_at_time"] = float(lineEdit.text())
+            if (
+                uistate.lineEdit["split_at_time"] is not None
+                and uistate.lineEdit["split_at_time"] != 0
+            ):
                 uistate.checkBox["splitOddEven"] = False
                 self.checkBox_splitOddEven.setChecked(False)
         elif lineEditName == "lineEdit_import_gain":
-            uistate.import_gain = float(lineEdit.text())
+            uistate.lineEdit["import_gain"] = float(lineEdit.text())
 
     def editMeanSelectRange(self, lineEdit):
         self.usage("editMeanSelectRange")
