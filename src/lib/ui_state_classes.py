@@ -94,7 +94,7 @@ class UIstate:
             "volley_amp_mean": True,  # display mean of volley_amp in output
             "volley_slope": False,
             "volley_slope_mean": True,  # display mean of volley_slope in output
-            "force1stim": False,  # prevent splitting of channels when multiple stims are detected
+            "splitOddEven": False,  # split parsed file into odd _1 and even _2 recordings
             "show_all_events": False,  # show ghosts of non-selected events in eventgraph output graph
             "timepoints_per_stim": False,  # allow setting (non-uniform) timepoints per stim
             "output_per_stim": False,  # output per stim (for binned trains) instead of per sweep (for consecutive sweeps)

@@ -38,6 +38,7 @@ import parse
 # read and write
 import toml  # for reading pyproject.toml
 import ui_data_frames
+import ui_designer  # Import the Designer-generated UI code
 import ui_groups
 import ui_plot
 import ui_project
@@ -510,660 +511,6 @@ class graphPreloadThread(QtCore.QThread):
             self.finished.emit()
 
 
-#####################################################################
-# section directly copied from pyuic output - do not alter!         #
-# NB: 'object' must be 'QtCore.QObject' for pyqtSlot(list) to work  #
-#####################################################################
-
-
-class Ui_MainWindow(QtCore.QObject):
-    def _cleanup_threads(self):
-        # Stop and wait for all running threads
-        for thread in getattr(self, "_threads", []):
-            if isinstance(thread, QtCore.QThread) and thread.isRunning():
-                thread.quit()
-                thread.wait()
-        self._threads = []
-
-    def closeEvent(self, event):
-        # Ensure all threads are stopped on window close
-        self._cleanup_threads()
-        super().closeEvent(event)
-
-    def setupUi(self, mainWindow):
-        mainWindow.setObjectName("mainWindow")
-        mainWindow.resize(1270, 1050)
-        self.centralwidget = QtWidgets.QWidget(mainWindow)
-        self.centralwidget.setObjectName("centralwidget")
-        self.horizontalLayoutCentralwidget = QtWidgets.QHBoxLayout(self.centralwidget)
-        self.horizontalLayoutCentralwidget.setObjectName(
-            "horizontalLayoutCentralwidget"
-        )
-        self.verticalMasterLayout = QtWidgets.QVBoxLayout()
-        self.verticalMasterLayout.setObjectName("verticalMasterLayout")
-        self.h_splitterMaster = QtWidgets.QSplitter(self.centralwidget)
-        self.h_splitterMaster.setOrientation(QtCore.Qt.Horizontal)
-        self.h_splitterMaster.setObjectName("h_splitterMaster")
-        self.layoutWidget = QtWidgets.QWidget(self.h_splitterMaster)
-        self.layoutWidget.setObjectName("layoutWidget")
-        self.verticalLayoutProj = QtWidgets.QVBoxLayout(self.layoutWidget)
-        self.verticalLayoutProj.setSizeConstraint(QtWidgets.QLayout.SetMinimumSize)
-        self.verticalLayoutProj.setContentsMargins(0, 0, 0, 0)
-        self.verticalLayoutProj.setObjectName("verticalLayoutProj")
-        self.horizontalLayoutProjParse = QtWidgets.QHBoxLayout()
-        self.horizontalLayoutProjParse.setObjectName("horizontalLayoutProjParse")
-        self.pushButtonParse = QtWidgets.QPushButton(self.layoutWidget)
-        self.pushButtonParse.setObjectName("pushButtonParse")
-        self.horizontalLayoutProjParse.addWidget(self.pushButtonParse)
-        self.verticalLayoutProj.addLayout(self.horizontalLayoutProjParse)
-        self.horizontalLayoutProjStim = QtWidgets.QHBoxLayout()
-        self.horizontalLayoutProjStim.setObjectName("horizontalLayoutProjStim")
-        self.checkBox_force1stim = QtWidgets.QCheckBox(self.layoutWidget)
-        self.checkBox_force1stim.setObjectName("checkBox_force1stim")
-        self.horizontalLayoutProjStim.addWidget(self.checkBox_force1stim)
-        self.verticalLayoutProj.addLayout(self.horizontalLayoutProjStim)
-        self.verticalLayoutWidget = QtWidgets.QWidget(self.h_splitterMaster)
-        self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
-        self.verticalLayoutStim = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
-        self.verticalLayoutStim.setContentsMargins(0, 0, 0, 0)
-        self.verticalLayoutStim.setObjectName("verticalLayoutStim")
-        self.tableStim = QtWidgets.QTableView(self.verticalLayoutWidget)
-        self.tableStim.setEnabled(True)
-        self.tableStim.setMinimumSize(QtCore.QSize(50, 0))
-        self.tableStim.setObjectName("tableStim")
-        self.verticalLayoutStim.addWidget(self.tableStim)
-        self.verticalLayoutWidget_2 = QtWidgets.QWidget(self.h_splitterMaster)
-        self.verticalLayoutWidget_2.setObjectName("verticalLayoutWidget_2")
-        self.verticalLayoutGraphs = QtWidgets.QVBoxLayout(self.verticalLayoutWidget_2)
-        self.verticalLayoutGraphs.setContentsMargins(0, 0, 0, 0)
-        self.verticalLayoutGraphs.setObjectName("verticalLayoutGraphs")
-        self.v_splitterGraphs = QtWidgets.QSplitter(self.verticalLayoutWidget_2)
-        self.v_splitterGraphs.setOrientation(QtCore.Qt.Vertical)
-        self.v_splitterGraphs.setObjectName("v_splitterGraphs")
-        self.horizontalLayoutWidget = QtWidgets.QWidget(self.v_splitterGraphs)
-        self.horizontalLayoutWidget.setObjectName("horizontalLayoutWidget")
-        self.horizontalLayoutMean = QtWidgets.QHBoxLayout(self.horizontalLayoutWidget)
-        self.horizontalLayoutMean.setContentsMargins(0, 0, 0, 0)
-        self.horizontalLayoutMean.setObjectName("horizontalLayoutMean")
-        self.graphMean = QtWidgets.QWidget(self.horizontalLayoutWidget)
-        self.graphMean.setMinimumSize(QtCore.QSize(100, 100))
-        self.graphMean.setObjectName("graphMean")
-        self.horizontalLayoutMean.addWidget(self.graphMean)
-        self.horizontalLayoutWidget_2 = QtWidgets.QWidget(self.v_splitterGraphs)
-        self.horizontalLayoutWidget_2.setObjectName("horizontalLayoutWidget_2")
-        self.horizontalLayoutEvent = QtWidgets.QHBoxLayout(
-            self.horizontalLayoutWidget_2
-        )
-        self.horizontalLayoutEvent.setContentsMargins(0, 0, 0, 0)
-        self.horizontalLayoutEvent.setObjectName("horizontalLayoutEvent")
-        self.graphEvent = QtWidgets.QWidget(self.horizontalLayoutWidget_2)
-        self.graphEvent.setMinimumSize(QtCore.QSize(100, 100))
-        self.graphEvent.setObjectName("graphEvent")
-        self.horizontalLayoutEvent.addWidget(self.graphEvent)
-        self.horizontalLayoutWidget_3 = QtWidgets.QWidget(self.v_splitterGraphs)
-        self.horizontalLayoutWidget_3.setObjectName("horizontalLayoutWidget_3")
-        self.horizontalLayoutOutput = QtWidgets.QHBoxLayout(
-            self.horizontalLayoutWidget_3
-        )
-        self.horizontalLayoutOutput.setContentsMargins(0, 0, 0, 0)
-        self.horizontalLayoutOutput.setObjectName("horizontalLayoutOutput")
-        self.graphOutput = QtWidgets.QWidget(self.horizontalLayoutWidget_3)
-        self.graphOutput.setMinimumSize(QtCore.QSize(100, 100))
-        self.graphOutput.setObjectName("graphOutput")
-        self.horizontalLayoutOutput.addWidget(self.graphOutput)
-        self.verticalLayoutGraphs.addWidget(self.v_splitterGraphs)
-        self.verticalLayoutWidget_3 = QtWidgets.QWidget(self.h_splitterMaster)
-        self.verticalLayoutWidget_3.setObjectName("verticalLayoutWidget_3")
-        self.verticalLayoutTools = QtWidgets.QVBoxLayout(self.verticalLayoutWidget_3)
-        self.verticalLayoutTools.setContentsMargins(0, 0, 0, 0)
-        self.verticalLayoutTools.setObjectName("verticalLayoutTools")
-        self.frameToolStim = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
-        )
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(
-            self.frameToolStim.sizePolicy().hasHeightForWidth()
-        )
-        self.frameToolStim.setSizePolicy(sizePolicy)
-        self.frameToolStim.setMinimumSize(QtCore.QSize(211, 201))
-        self.frameToolStim.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frameToolStim.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frameToolStim.setObjectName("frameToolStim")
-        self.checkBox_show_all_events = QtWidgets.QCheckBox(self.frameToolStim)
-        self.checkBox_show_all_events.setGeometry(QtCore.QRect(10, 30, 151, 23))
-        self.checkBox_show_all_events.setObjectName("checkBox_show_all_events")
-        self.checkBox_timepoints_per_stim = QtWidgets.QCheckBox(self.frameToolStim)
-        self.checkBox_timepoints_per_stim.setGeometry(QtCore.QRect(10, 50, 161, 23))
-        self.checkBox_timepoints_per_stim.setObjectName("checkBox_timepoints_per_stim")
-        self.label_stims = QtWidgets.QLabel(self.frameToolStim)
-        self.label_stims.setGeometry(QtCore.QRect(10, 10, 62, 17))
-        font = QtGui.QFont()
-        font.setFamily("DejaVu Sans")
-        font.setBold(True)
-        font.setWeight(75)
-        self.label_stims.setFont(font)
-        self.label_stims.setObjectName("label_stims")
-        self.pushButton_stim_assign_threshold = QtWidgets.QPushButton(
-            self.frameToolStim
-        )
-        self.pushButton_stim_assign_threshold.setGeometry(QtCore.QRect(20, 170, 61, 25))
-        self.pushButton_stim_assign_threshold.setObjectName(
-            "pushButton_stim_assign_threshold"
-        )
-        self.label_stim_detection_threshold = QtWidgets.QLabel(self.frameToolStim)
-        self.label_stim_detection_threshold.setGeometry(QtCore.QRect(10, 150, 141, 17))
-        font = QtGui.QFont()
-        font.setFamily("DejaVu Sans")
-        font.setBold(False)
-        font.setWeight(50)
-        self.label_stim_detection_threshold.setFont(font)
-        self.label_stim_detection_threshold.setObjectName(
-            "label_stim_detection_threshold"
-        )
-        self.label_mean_to = QtWidgets.QLabel(self.frameToolStim)
-        self.label_mean_to.setGeometry(QtCore.QRect(90, 120, 21, 20))
-        self.label_mean_to.setAlignment(
-            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
-        )
-        self.label_mean_to.setObjectName("label_mean_to")
-        self.lineEdit_mean_selection_end = QtWidgets.QLineEdit(self.frameToolStim)
-        self.lineEdit_mean_selection_end.setGeometry(QtCore.QRect(100, 120, 61, 25))
-        self.lineEdit_mean_selection_end.setObjectName("lineEdit_mean_selection_end")
-        self.label_mean_selected_range = QtWidgets.QLabel(self.frameToolStim)
-        self.label_mean_selected_range.setGeometry(QtCore.QRect(10, 100, 71, 17))
-        font = QtGui.QFont()
-        font.setFamily("DejaVu Sans")
-        font.setBold(False)
-        font.setWeight(50)
-        self.label_mean_selected_range.setFont(font)
-        self.label_mean_selected_range.setObjectName("label_mean_selected_range")
-        self.lineEdit_mean_selection_start = QtWidgets.QLineEdit(self.frameToolStim)
-        self.lineEdit_mean_selection_start.setGeometry(QtCore.QRect(20, 120, 61, 25))
-        self.lineEdit_mean_selection_start.setObjectName(
-            "lineEdit_mean_selection_start"
-        )
-        self.pushButton_stim_detect = QtWidgets.QPushButton(self.frameToolStim)
-        self.pushButton_stim_detect.setGeometry(QtCore.QRect(90, 170, 61, 25))
-        self.pushButton_stim_detect.setObjectName("pushButton_stim_detect")
-        self.checkBox_output_per_stim = QtWidgets.QCheckBox(self.frameToolStim)
-        self.checkBox_output_per_stim.setGeometry(QtCore.QRect(10, 70, 161, 23))
-        self.checkBox_output_per_stim.setObjectName("checkBox_output_per_stim")
-        self.checkBox_show_all_events.raise_()
-        self.checkBox_timepoints_per_stim.raise_()
-        self.label_stims.raise_()
-        self.pushButton_stim_assign_threshold.raise_()
-        self.label_stim_detection_threshold.raise_()
-        self.label_mean_to.raise_()
-        self.label_mean_selected_range.raise_()
-        self.pushButton_stim_detect.raise_()
-        self.checkBox_output_per_stim.raise_()
-        self.lineEdit_mean_selection_start.raise_()
-        self.lineEdit_mean_selection_end.raise_()
-        self.verticalLayoutTools.addWidget(self.frameToolStim, 0, QtCore.Qt.AlignTop)
-        self.frameToolSweeps = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
-        )
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(
-            self.frameToolSweeps.sizePolicy().hasHeightForWidth()
-        )
-        self.frameToolSweeps.setSizePolicy(sizePolicy)
-        self.frameToolSweeps.setMinimumSize(QtCore.QSize(211, 111))
-        self.frameToolSweeps.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frameToolSweeps.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frameToolSweeps.setObjectName("frameToolSweeps")
-        self.pushButton_sweeps_even = QtWidgets.QPushButton(self.frameToolSweeps)
-        self.pushButton_sweeps_even.setGeometry(QtCore.QRect(60, 70, 41, 25))
-        self.pushButton_sweeps_even.setObjectName("pushButton_sweeps_even")
-        self.label_sweeps = QtWidgets.QLabel(self.frameToolSweeps)
-        self.label_sweeps.setGeometry(QtCore.QRect(10, 10, 151, 17))
-        font = QtGui.QFont()
-        font.setFamily("DejaVu Sans")
-        font.setBold(True)
-        font.setWeight(75)
-        self.label_sweeps.setFont(font)
-        self.label_sweeps.setObjectName("label_sweeps")
-        self.pushButton_sweeps_odd = QtWidgets.QPushButton(self.frameToolSweeps)
-        self.pushButton_sweeps_odd.setGeometry(QtCore.QRect(120, 70, 41, 25))
-        self.pushButton_sweeps_odd.setObjectName("pushButton_sweeps_odd")
-        self.lineEdit_sweeps_range_to = QtWidgets.QLineEdit(self.frameToolSweeps)
-        self.lineEdit_sweeps_range_to.setGeometry(QtCore.QRect(120, 30, 41, 25))
-        self.lineEdit_sweeps_range_to.setObjectName("lineEdit_sweeps_range_to")
-        self.label_sweeps_dash = QtWidgets.QLabel(self.frameToolSweeps)
-        self.label_sweeps_dash.setGeometry(QtCore.QRect(110, 30, 16, 20))
-        self.label_sweeps_dash.setAlignment(
-            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
-        )
-        self.label_sweeps_dash.setObjectName("label_sweeps_dash")
-        self.label_sweeps_selection = QtWidgets.QLabel(self.frameToolSweeps)
-        self.label_sweeps_selection.setGeometry(QtCore.QRect(10, 30, 41, 20))
-        self.label_sweeps_selection.setAlignment(
-            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
-        )
-        self.label_sweeps_selection.setObjectName("label_sweeps_selection")
-        self.lineEdit_sweeps_range_from = QtWidgets.QLineEdit(self.frameToolSweeps)
-        self.lineEdit_sweeps_range_from.setGeometry(QtCore.QRect(60, 30, 41, 25))
-        self.lineEdit_sweeps_range_from.setObjectName("lineEdit_sweeps_range_from")
-        self.label_sweeps_select_even_odd = QtWidgets.QLabel(self.frameToolSweeps)
-        self.label_sweeps_select_even_odd.setGeometry(QtCore.QRect(10, 70, 41, 20))
-        self.label_sweeps_select_even_odd.setAlignment(
-            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
-        )
-        self.label_sweeps_select_even_odd.setObjectName("label_sweeps_select_even_odd")
-        self.label_sweeps_dash.raise_()
-        self.pushButton_sweeps_even.raise_()
-        self.label_sweeps.raise_()
-        self.pushButton_sweeps_odd.raise_()
-        self.lineEdit_sweeps_range_to.raise_()
-        self.label_sweeps_selection.raise_()
-        self.lineEdit_sweeps_range_from.raise_()
-        self.label_sweeps_select_even_odd.raise_()
-        self.verticalLayoutTools.addWidget(self.frameToolSweeps, 0, QtCore.Qt.AlignTop)
-        self.frameToolBin = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
-        )
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.frameToolBin.sizePolicy().hasHeightForWidth())
-        self.frameToolBin.setSizePolicy(sizePolicy)
-        self.frameToolBin.setMinimumSize(QtCore.QSize(211, 111))
-        self.frameToolBin.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frameToolBin.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frameToolBin.setObjectName("frameToolBin")
-        self.checkBox_bin = QtWidgets.QCheckBox(self.frameToolBin)
-        self.checkBox_bin.setGeometry(QtCore.QRect(10, 30, 151, 23))
-        self.checkBox_bin.setObjectName("checkBox_bin")
-        self.label_bins = QtWidgets.QLabel(self.frameToolBin)
-        self.label_bins.setGeometry(QtCore.QRect(10, 10, 62, 17))
-        font = QtGui.QFont()
-        font.setFamily("DejaVu Sans")
-        font.setBold(True)
-        font.setWeight(75)
-        self.label_bins.setFont(font)
-        self.label_bins.setObjectName("label_bins")
-        self.pushButton_bin_size_set_all = QtWidgets.QPushButton(self.frameToolBin)
-        self.pushButton_bin_size_set_all.setGeometry(QtCore.QRect(90, 80, 51, 25))
-        self.pushButton_bin_size_set_all.setObjectName("pushButton_bin_size_set_all")
-        self.label_bin_size = QtWidgets.QLabel(self.frameToolBin)
-        self.label_bin_size.setGeometry(QtCore.QRect(10, 60, 71, 17))
-        font = QtGui.QFont()
-        font.setFamily("DejaVu Sans")
-        font.setBold(False)
-        font.setWeight(50)
-        self.label_bin_size.setFont(font)
-        self.label_bin_size.setObjectName("label_bin_size")
-        self.lineEdit_bin_size = QtWidgets.QLineEdit(self.frameToolBin)
-        self.lineEdit_bin_size.setGeometry(QtCore.QRect(20, 80, 61, 25))
-        self.lineEdit_bin_size.setObjectName("lineEdit_bin_size")
-        self.verticalLayoutTools.addWidget(self.frameToolBin, 0, QtCore.Qt.AlignTop)
-        self.frameToolAspect = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
-        )
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(
-            self.frameToolAspect.sizePolicy().hasHeightForWidth()
-        )
-        self.frameToolAspect.setSizePolicy(sizePolicy)
-        self.frameToolAspect.setMinimumSize(QtCore.QSize(211, 171))
-        self.frameToolAspect.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frameToolAspect.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frameToolAspect.setObjectName("frameToolAspect")
-        self.checkBox_EPSP_slope = QtWidgets.QCheckBox(self.frameToolAspect)
-        self.checkBox_EPSP_slope.setGeometry(QtCore.QRect(10, 30, 101, 23))
-        self.checkBox_EPSP_slope.setObjectName("checkBox_EPSP_slope")
-        self.checkBox_volley_slope = QtWidgets.QCheckBox(self.frameToolAspect)
-        self.checkBox_volley_slope.setGeometry(QtCore.QRect(10, 70, 101, 23))
-        self.checkBox_volley_slope.setObjectName("checkBox_volley_slope")
-        self.checkBox_EPSP_amp = QtWidgets.QCheckBox(self.frameToolAspect)
-        self.checkBox_EPSP_amp.setGeometry(QtCore.QRect(10, 50, 101, 23))
-        self.checkBox_EPSP_amp.setObjectName("checkBox_EPSP_amp")
-        self.label_aspect = QtWidgets.QLabel(self.frameToolAspect)
-        self.label_aspect.setGeometry(QtCore.QRect(10, 10, 62, 17))
-        font = QtGui.QFont()
-        font.setFamily("DejaVu Sans")
-        font.setBold(True)
-        font.setWeight(75)
-        self.label_aspect.setFont(font)
-        self.label_aspect.setObjectName("label_aspect")
-        self.checkBox_volley_amp = QtWidgets.QCheckBox(self.frameToolAspect)
-        self.checkBox_volley_amp.setGeometry(QtCore.QRect(10, 90, 101, 23))
-        self.checkBox_volley_amp.setObjectName("checkBox_volley_amp")
-        self.lineEdit_EPSP_amp_halfwidth = QtWidgets.QLineEdit(self.frameToolAspect)
-        self.lineEdit_EPSP_amp_halfwidth.setGeometry(QtCore.QRect(60, 140, 31, 25))
-        self.lineEdit_EPSP_amp_halfwidth.setObjectName("lineEdit_EPSP_amp_halfwidth")
-        self.lineEdit_volley_amp_halfwidth = QtWidgets.QLineEdit(self.frameToolAspect)
-        self.lineEdit_volley_amp_halfwidth.setGeometry(QtCore.QRect(140, 140, 31, 25))
-        self.lineEdit_volley_amp_halfwidth.setObjectName(
-            "lineEdit_volley_amp_halfwidth"
-        )
-        self.label_header_amp_halfwidth = QtWidgets.QLabel(self.frameToolAspect)
-        self.label_header_amp_halfwidth.setGeometry(QtCore.QRect(10, 120, 201, 17))
-        font = QtGui.QFont()
-        font.setFamily("DejaVu Sans")
-        font.setBold(True)
-        font.setWeight(75)
-        self.label_header_amp_halfwidth.setFont(font)
-        self.label_header_amp_halfwidth.setObjectName("label_header_amp_halfwidth")
-        self.label_EPSP_amp_halfwidth = QtWidgets.QLabel(self.frameToolAspect)
-        self.label_EPSP_amp_halfwidth.setGeometry(QtCore.QRect(20, 140, 51, 20))
-        self.label_EPSP_amp_halfwidth.setAlignment(
-            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
-        )
-        self.label_EPSP_amp_halfwidth.setObjectName("label_EPSP_amp_halfwidth")
-        self.label_volley_amp_halfwidth = QtWidgets.QLabel(self.frameToolAspect)
-        self.label_volley_amp_halfwidth.setGeometry(QtCore.QRect(100, 140, 51, 20))
-        self.label_volley_amp_halfwidth.setAlignment(
-            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
-        )
-        self.label_volley_amp_halfwidth.setObjectName("label_volley_amp_halfwidth")
-        self.pushButton_EPSP_amp_width_set_all = QtWidgets.QPushButton(
-            self.frameToolAspect
-        )
-        self.pushButton_EPSP_amp_width_set_all.setGeometry(
-            QtCore.QRect(40, 170, 51, 25)
-        )
-        self.pushButton_EPSP_amp_width_set_all.setObjectName(
-            "pushButton_EPSP_amp_width_set_all"
-        )
-        self.pushButton_volley_amp_width_set_all = QtWidgets.QPushButton(
-            self.frameToolAspect
-        )
-        self.pushButton_volley_amp_width_set_all.setGeometry(
-            QtCore.QRect(130, 170, 51, 25)
-        )
-        self.pushButton_volley_amp_width_set_all.setObjectName(
-            "pushButton_volley_amp_width_set_all"
-        )
-        self.checkBox_volley_slope_mean = QtWidgets.QCheckBox(self.frameToolAspect)
-        self.checkBox_volley_slope_mean.setGeometry(QtCore.QRect(120, 70, 101, 23))
-        self.checkBox_volley_slope_mean.setObjectName("checkBox_volley_slope_mean")
-        self.checkBox_volley_amp_mean = QtWidgets.QCheckBox(self.frameToolAspect)
-        self.checkBox_volley_amp_mean.setGeometry(QtCore.QRect(120, 90, 61, 23))
-        self.checkBox_volley_amp_mean.setObjectName("checkBox_volley_amp_mean")
-        self.checkBox_EPSP_slope.raise_()
-        self.checkBox_volley_slope.raise_()
-        self.checkBox_EPSP_amp.raise_()
-        self.label_aspect.raise_()
-        self.checkBox_volley_amp.raise_()
-        self.label_header_amp_halfwidth.raise_()
-        self.label_EPSP_amp_halfwidth.raise_()
-        self.label_volley_amp_halfwidth.raise_()
-        self.lineEdit_EPSP_amp_halfwidth.raise_()
-        self.lineEdit_volley_amp_halfwidth.raise_()
-        self.pushButton_EPSP_amp_width_set_all.raise_()
-        self.pushButton_volley_amp_width_set_all.raise_()
-        self.checkBox_volley_slope_mean.raise_()
-        self.checkBox_volley_amp_mean.raise_()
-        self.verticalLayoutTools.addWidget(self.frameToolAspect, 0, QtCore.Qt.AlignTop)
-        self.frameToolScaling = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
-        )
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(
-            self.frameToolScaling.sizePolicy().hasHeightForWidth()
-        )
-        self.frameToolScaling.setSizePolicy(sizePolicy)
-        self.frameToolScaling.setMinimumSize(QtCore.QSize(211, 131))
-        self.frameToolScaling.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frameToolScaling.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frameToolScaling.setObjectName("frameToolScaling")
-        self.lineEdit_norm_EPSP_end = QtWidgets.QLineEdit(self.frameToolScaling)
-        self.lineEdit_norm_EPSP_end.setGeometry(QtCore.QRect(80, 70, 41, 25))
-        self.lineEdit_norm_EPSP_end.setObjectName("lineEdit_norm_EPSP_end")
-        self.label_norm_on_sweep = QtWidgets.QLabel(self.frameToolScaling)
-        self.label_norm_on_sweep.setGeometry(QtCore.QRect(10, 50, 131, 20))
-        self.label_norm_on_sweep.setAlignment(
-            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
-        )
-        self.label_norm_on_sweep.setObjectName("label_norm_on_sweep")
-        self.checkBox_norm_EPSP = QtWidgets.QCheckBox(self.frameToolScaling)
-        self.checkBox_norm_EPSP.setGeometry(QtCore.QRect(10, 30, 111, 23))
-        self.checkBox_norm_EPSP.setObjectName("checkBox_norm_EPSP")
-        self.label_relative_to = QtWidgets.QLabel(self.frameToolScaling)
-        self.label_relative_to.setGeometry(QtCore.QRect(70, 70, 21, 20))
-        self.label_relative_to.setAlignment(
-            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
-        )
-        self.label_relative_to.setObjectName("label_relative_to")
-        self.label_scaling = QtWidgets.QLabel(self.frameToolScaling)
-        self.label_scaling.setGeometry(QtCore.QRect(10, 10, 81, 17))
-        font = QtGui.QFont()
-        font.setFamily("DejaVu Sans")
-        font.setBold(True)
-        font.setWeight(75)
-        self.label_scaling.setFont(font)
-        self.label_scaling.setObjectName("label_scaling")
-        self.lineEdit_norm_EPSP_start = QtWidgets.QLineEdit(self.frameToolScaling)
-        self.lineEdit_norm_EPSP_start.setGeometry(QtCore.QRect(20, 70, 41, 25))
-        self.lineEdit_norm_EPSP_start.setObjectName("lineEdit_norm_EPSP_start")
-        self.checkBox_output_ymin0 = QtWidgets.QCheckBox(self.frameToolScaling)
-        self.checkBox_output_ymin0.setGeometry(QtCore.QRect(10, 100, 111, 23))
-        self.checkBox_output_ymin0.setObjectName("checkBox_output_ymin0")
-        self.pushButton_norm_range_set_all = QtWidgets.QPushButton(
-            self.frameToolScaling
-        )
-        self.pushButton_norm_range_set_all.setGeometry(QtCore.QRect(130, 70, 51, 25))
-        self.pushButton_norm_range_set_all.setObjectName(
-            "pushButton_norm_range_set_all"
-        )
-        self.label_norm_on_sweep.raise_()
-        self.checkBox_norm_EPSP.raise_()
-        self.label_relative_to.raise_()
-        self.label_scaling.raise_()
-        self.checkBox_output_ymin0.raise_()
-        self.lineEdit_norm_EPSP_end.raise_()
-        self.lineEdit_norm_EPSP_start.raise_()
-        self.pushButton_norm_range_set_all.raise_()
-        self.verticalLayoutTools.addWidget(self.frameToolScaling, 0, QtCore.Qt.AlignTop)
-        self.verticalLayoutGroups = QtWidgets.QVBoxLayout()
-        self.verticalLayoutGroups.setObjectName("verticalLayoutGroups")
-        self.verticalLayoutTools.addLayout(self.verticalLayoutGroups)
-        self.frameToolPairedStim = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
-        )
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(
-            self.frameToolPairedStim.sizePolicy().hasHeightForWidth()
-        )
-        self.frameToolPairedStim.setSizePolicy(sizePolicy)
-        self.frameToolPairedStim.setMinimumSize(QtCore.QSize(211, 71))
-        self.frameToolPairedStim.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frameToolPairedStim.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frameToolPairedStim.setObjectName("frameToolPairedStim")
-        self.pushButton_paired_data_flip = QtWidgets.QPushButton(
-            self.frameToolPairedStim
-        )
-        self.pushButton_paired_data_flip.setGeometry(QtCore.QRect(100, 30, 51, 25))
-        self.pushButton_paired_data_flip.setObjectName("pushButton_paired_data_flip")
-        self.label_paired_data = QtWidgets.QLabel(self.frameToolPairedStim)
-        self.label_paired_data.setGeometry(QtCore.QRect(8, 10, 91, 17))
-        font = QtGui.QFont()
-        font.setFamily("DejaVu Sans")
-        font.setBold(True)
-        font.setWeight(75)
-        self.label_paired_data.setFont(font)
-        self.label_paired_data.setObjectName("label_paired_data")
-        self.checkBox_paired_stims = QtWidgets.QCheckBox(self.frameToolPairedStim)
-        self.checkBox_paired_stims.setGeometry(QtCore.QRect(8, 30, 90, 23))
-        self.checkBox_paired_stims.setObjectName("checkBox_paired_stims")
-        self.verticalLayoutTools.addWidget(
-            self.frameToolPairedStim, 0, QtCore.Qt.AlignTop
-        )
-        self.frameToolExport = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
-        )
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(
-            self.frameToolExport.sizePolicy().hasHeightForWidth()
-        )
-        self.frameToolExport.setSizePolicy(sizePolicy)
-        self.frameToolExport.setMinimumSize(QtCore.QSize(211, 71))
-        self.frameToolExport.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frameToolExport.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frameToolExport.setObjectName("frameToolExport")
-        self.pushButton_export_selection = QtWidgets.QPushButton(self.frameToolExport)
-        self.pushButton_export_selection.setGeometry(QtCore.QRect(10, 30, 81, 25))
-        self.pushButton_export_selection.setObjectName("pushButton_export_selection")
-        self.label_export = QtWidgets.QLabel(self.frameToolExport)
-        self.label_export.setGeometry(QtCore.QRect(10, 10, 81, 17))
-        font = QtGui.QFont()
-        font.setFamily("DejaVu Sans")
-        font.setBold(True)
-        font.setWeight(75)
-        self.label_export.setFont(font)
-        self.label_export.setObjectName("label_export")
-        self.pushButton_export_groups = QtWidgets.QPushButton(self.frameToolExport)
-        self.pushButton_export_groups.setGeometry(QtCore.QRect(100, 30, 81, 25))
-        self.pushButton_export_groups.setObjectName("pushButton_export_groups")
-        self.verticalLayoutTools.addWidget(self.frameToolExport, 0, QtCore.Qt.AlignTop)
-        spacerItem = QtWidgets.QSpacerItem(
-            20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
-        )
-        self.verticalLayoutTools.addItem(spacerItem)
-        self.verticalMasterLayout.addWidget(self.h_splitterMaster)
-        self.progressBar = QtWidgets.QProgressBar(self.centralwidget)
-        self.progressBar.setProperty("value", 24)
-        self.progressBar.setObjectName("progressBar")
-        self.verticalMasterLayout.addWidget(self.progressBar)
-        self.horizontalLayoutCentralwidget.addLayout(self.verticalMasterLayout)
-        mainWindow.setCentralWidget(self.centralwidget)
-        self.menubar = QtWidgets.QMenuBar(mainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1270, 22))
-        self.menubar.setObjectName("menubar")
-        self.menuFile = QtWidgets.QMenu(self.menubar)
-        self.menuFile.setObjectName("menuFile")
-        self.menuData = QtWidgets.QMenu(self.menubar)
-        self.menuData.setObjectName("menuData")
-        self.menuGroups = QtWidgets.QMenu(self.menubar)
-        self.menuGroups.setObjectName("menuGroups")
-        self.menuEdit = QtWidgets.QMenu(self.menubar)
-        self.menuEdit.setObjectName("menuEdit")
-        self.menuView = QtWidgets.QMenu(self.menubar)
-        self.menuView.setObjectName("menuView")
-        mainWindow.setMenuBar(self.menubar)
-        self.statusbar = QtWidgets.QStatusBar(mainWindow)
-        self.statusbar.setObjectName("statusbar")
-        mainWindow.setStatusBar(self.statusbar)
-        self.menubar.addAction(self.menuFile.menuAction())
-        self.menubar.addAction(self.menuEdit.menuAction())
-        self.menubar.addAction(self.menuView.menuAction())
-        self.menubar.addAction(self.menuData.menuAction())
-        self.menubar.addAction(self.menuGroups.menuAction())
-
-        self.retranslateUi(mainWindow)
-        QtCore.QMetaObject.connectSlotsByName(mainWindow)
-
-    def retranslateUi(self, mainWindow):
-        _translate = QtCore.QCoreApplication.translate
-        mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash"))
-        self.pushButtonParse.setText(_translate("mainWindow", "Import"))
-        self.checkBox_force1stim.setText(_translate("mainWindow", "Single stim"))
-        self.checkBox_show_all_events.setText(
-            _translate("mainWindow", "Show all events")
-        )
-        self.checkBox_timepoints_per_stim.setText(
-            _translate("mainWindow", "Timepoints per stim")
-        )
-        self.label_stims.setText(_translate("mainWindow", "Stims"))
-        self.pushButton_stim_assign_threshold.setText(
-            _translate("mainWindow", "Assign")
-        )
-        self.label_stim_detection_threshold.setText(
-            _translate("mainWindow", "Detection Threshold")
-        )
-        self.label_mean_to.setText(_translate("mainWindow", "-"))
-        self.label_mean_selected_range.setText(_translate("mainWindow", "Selection"))
-        self.pushButton_stim_detect.setText(_translate("mainWindow", "Detect"))
-        self.checkBox_output_per_stim.setText(
-            _translate("mainWindow", "Output per stim")
-        )
-        self.pushButton_sweeps_even.setText(_translate("mainWindow", "Even"))
-        self.label_sweeps.setText(_translate("mainWindow", "Select sweeps"))
-        self.pushButton_sweeps_odd.setText(_translate("mainWindow", "Odd"))
-        self.label_sweeps_dash.setText(_translate("mainWindow", "-"))
-        self.label_sweeps_selection.setText(_translate("mainWindow", "Range"))
-        self.label_sweeps_select_even_odd.setText(_translate("mainWindow", "Select"))
-        self.checkBox_bin.setText(_translate("mainWindow", "Bin sweeps"))
-        self.label_bins.setText(_translate("mainWindow", "Bins"))
-        self.pushButton_bin_size_set_all.setText(_translate("mainWindow", "Set All"))
-        self.label_bin_size.setText(_translate("mainWindow", "Bin size"))
-        self.checkBox_EPSP_slope.setText(_translate("mainWindow", "EPSP slope"))
-        self.checkBox_volley_slope.setText(_translate("mainWindow", "volley slope"))
-        self.checkBox_EPSP_amp.setText(_translate("mainWindow", "EPSP amp."))
-        self.label_aspect.setText(_translate("mainWindow", "Aspect"))
-        self.checkBox_volley_amp.setText(_translate("mainWindow", "volley amp."))
-        self.label_header_amp_halfwidth.setText(
-            _translate("mainWindow", "Amplitude width (as ± ms)")
-        )
-        self.label_EPSP_amp_halfwidth.setText(_translate("mainWindow", "EPSP"))
-        self.label_volley_amp_halfwidth.setText(_translate("mainWindow", "volley"))
-        self.pushButton_EPSP_amp_width_set_all.setText(
-            _translate("mainWindow", "Set All")
-        )
-        self.pushButton_volley_amp_width_set_all.setText(
-            _translate("mainWindow", "Set All")
-        )
-        self.checkBox_volley_slope_mean.setText(_translate("mainWindow", "mean"))
-        self.checkBox_volley_amp_mean.setText(_translate("mainWindow", "mean"))
-        self.label_norm_on_sweep.setText(_translate("mainWindow", "Norm on sweep(s)"))
-        self.checkBox_norm_EPSP.setText(_translate("mainWindow", "Relative"))
-        self.label_relative_to.setText(_translate("mainWindow", "-"))
-        self.label_scaling.setText(_translate("mainWindow", "Scaling"))
-        self.checkBox_output_ymin0.setText(_translate("mainWindow", "output Ymin 0"))
-        self.pushButton_norm_range_set_all.setText(_translate("mainWindow", "Set All"))
-        self.pushButton_paired_data_flip.setText(_translate("mainWindow", "Flip C/I"))
-        self.label_paired_data.setText(_translate("mainWindow", "Paired data"))
-        self.checkBox_paired_stims.setText(_translate("mainWindow", "stim / stim"))
-        self.pushButton_export_selection.setText(_translate("mainWindow", "selection"))
-        self.label_export.setText(_translate("mainWindow", "Export"))
-        self.pushButton_export_groups.setText(_translate("mainWindow", "groups"))
-        self.menuFile.setTitle(_translate("mainWindow", "File"))
-        self.menuData.setTitle(_translate("mainWindow", "Data"))
-        self.menuGroups.setTitle(_translate("mainWindow", "Groups"))
-        self.menuEdit.setTitle(_translate("mainWindow", "Edit"))
-        self.menuView.setTitle(_translate("mainWindow", "View"))
-
-        ################################################################
-        #       non-QtDesigner-generated instructions                  #
-        ################################################################
-
-        self.pushButtonParse.setVisible(False)
-        self.checkBox_force1stim.setVisible(False)
-        self.progressBar.setVisible(False)
-        self.progressBar.setValue(0)
-
-        if config.hide_experimental:
-            self.checkBox_show_all_events.setVisible(False)
-            self.checkBox_output_per_stim.setVisible(False)
-            self.checkBox_paired_stims.setVisible(False)
-            self.checkBox_timepoints_per_stim.setVisible(False)
-            self.pushButton_stim_assign_threshold.setVisible(False)
-            self.pushButton_stim_detect.setVisible(False)
-            self.label_stim_detection_threshold.setVisible(False)
-            self.frameToolBin.setVisible(False)
-            #            self.checkBox_bin.setVisible(False)
-            self.pushButton_norm_range_set_all.setVisible(False)
-            self.frameToolExport.setVisible(False)
-            self.lineEdit_EPSP_amp_halfwidth.setVisible(False)
-            self.lineEdit_volley_amp_halfwidth.setVisible(False)
-            self.label_header_amp_halfwidth.setVisible(False)
-            self.label_EPSP_amp_halfwidth.setVisible(False)
-            self.label_volley_amp_halfwidth.setVisible(False)
-
-
 ################################################################
 #        Dialog and table classes                              #
 ################################################################
@@ -1407,7 +754,7 @@ ui_data_frames.uiplot = uiplot
 
 # Composes Ui_MainWindow with all mixins.
 class UIsub(
-    Ui_MainWindow,
+    ui_designer.Ui_mainWindow,
     ui_groups.GroupMixin,
     ui_sweep_ops.SweepOpsMixin,
     ui_project.ProjectMixin,
@@ -1418,6 +765,31 @@ class UIsub(
         self.setupUi(mainwindow)  # as generated by QtDesigner - do not touch!
         if config.verbose:
             print(" - UIsub init, verbose mode")
+
+        # Custom UI initialization - non-QtDesigner-generated instructions
+        self.pushButtonParse.setVisible(False)
+        self.frameParseOptions.setVisible(False)
+        self.progressBar.setVisible(False)
+        self.progressBar.setValue(0)
+
+        if config.hide_experimental:
+            self.checkBox_show_all_events.setVisible(False)
+            self.checkBox_output_per_stim.setVisible(False)
+            self.checkBox_paired_stims.setVisible(False)
+            self.checkBox_timepoints_per_stim.setVisible(False)
+            self.pushButton_stim_assign_threshold.setVisible(False)
+            self.pushButton_stim_detect.setVisible(False)
+            self.label_stim_detection_threshold.setVisible(False)
+            self.frameToolBin.setVisible(False)
+            #            self.checkBox_bin.setVisible(False)
+            self.pushButton_norm_range_set_all.setVisible(False)
+            self.frameToolExport.setVisible(False)
+            self.lineEdit_EPSP_amp_halfwidth.setVisible(False)
+            self.lineEdit_volley_amp_halfwidth.setVisible(False)
+            self.label_header_amp_halfwidth.setVisible(False)
+            self.label_EPSP_amp_halfwidth.setVisible(False)
+            self.label_volley_amp_halfwidth.setVisible(False)
+
         self.bootstrap(mainwindow)  # set up general UI
         self.loadProject()  # load project data
 
@@ -1944,8 +1316,8 @@ class UIsub(
                 self.label_relative_to.setVisible(state == 2)
                 self.lineEdit_norm_EPSP_start.setVisible(state == 2)
                 self.lineEdit_norm_EPSP_end.setVisible(state == 2)
-            elif key == "force1stim":
-                self.checkBox_force1stim_changed(state)
+            elif key == "splitOddEven":
+                self.checkBox_splitOddEven_changed(state)
             elif key == "output_per_stim":
                 self.checkBox_output_per_stim_changed(state)
             elif key == "timepoints_per_stim":
@@ -2064,19 +1436,19 @@ class UIsub(
 
     def setupMenus(self):
         # File menu
-        self.actionNew = QtWidgets.QAction("New project", self)
+        self.actionNew = QtWidgets.QAction("New project")
         self.actionNew.triggered.connect(self.triggerNewProject)
         self.actionNew.setShortcut("Ctrl+N")
         self.menuFile.addAction(self.actionNew)
-        self.actionOpen = QtWidgets.QAction("Open project", self)
+        self.actionOpen = QtWidgets.QAction("Open project")
         self.actionOpen.triggered.connect(self.triggerOpenProject)
         self.actionOpen.setShortcut("Ctrl+O")
         self.menuFile.addAction(self.actionOpen)
-        self.actionRenameProject = QtWidgets.QAction("Rename project", self)
+        self.actionRenameProject = QtWidgets.QAction("Rename project")
         self.actionRenameProject.triggered.connect(self.renameProject)
         self.actionRenameProject.setShortcut("Ctrl+R")
         self.menuFile.addAction(self.actionRenameProject)
-        self.actionExit = QtWidgets.QAction("Exit", self)
+        self.actionExit = QtWidgets.QAction("Exit")
         self.actionExit.triggered.connect(QtWidgets.qApp.quit)
         # self.actionExit.setShortcut("Ctrl+Q")  # Set shortcut for Exit
         self.menuFile.addAction(self.actionExit)
@@ -2086,41 +1458,41 @@ class UIsub(
         # self.actionUndo.triggered.connect(self.triggerUndo)
         # self.actionUndo.setShortcut("Ctrl+Z")
         # self.menuEdit.addAction(self.actionUndo)
-        self.actionCopyTimepoints = QtWidgets.QAction("Copy timepoints", self)
+        self.actionCopyTimepoints = QtWidgets.QAction("Copy timepoints")
         self.actionCopyTimepoints.triggered.connect(self.triggerCopyTimepoints)
         self.actionCopyTimepoints.setShortcut("Ctrl+T")
         self.menuEdit.addAction(self.actionCopyTimepoints)
-        self.actionCopyOutput = QtWidgets.QAction("Copy output", self)
+        self.actionCopyOutput = QtWidgets.QAction("Copy output")
         self.actionCopyOutput.triggered.connect(self.triggerCopyOutput)
         self.actionCopyOutput.setShortcut("Ctrl+C")
         self.menuEdit.addAction(self.actionCopyOutput)
 
         self.menuEdit.addSeparator()
         self.actionForAllSelected = QtWidgets.QAction(
-            "For ALL selected recordings...", self
+            "For ALL selected recordings..."
         )  # not connected: submenu header
         self.menuEdit.addAction(self.actionForAllSelected)
-        self.actionReAnalyzeRecordings = QtWidgets.QAction("   Reanalyze", self)
+        self.actionReAnalyzeRecordings = QtWidgets.QAction("   Reanalyze")
         self.actionReAnalyzeRecordings.triggered.connect(self.triggerReanalyze)
         self.actionReAnalyzeRecordings.setShortcut("A")
         self.menuEdit.addAction(self.actionReAnalyzeRecordings)
 
         self.actionKeepOnlySelectedSweeps = QtWidgets.QAction(
-            "   Keep only selected sweeps", self
+            "   Keep only selected sweeps"
         )
         self.actionKeepOnlySelectedSweeps.triggered.connect(
             self.triggerKeepSelectedSweeps
         )
         self.menuEdit.addAction(self.actionKeepOnlySelectedSweeps)
         self.actionRemoveSelectedSweeps = QtWidgets.QAction(
-            "   Discard selected sweeps", self
+            "   Discard selected sweeps"
         )
         self.actionRemoveSelectedSweeps.triggered.connect(
             self.triggerRemoveSelectedSweeps
         )
         self.menuEdit.addAction(self.actionRemoveSelectedSweeps)
         self.actionSplitBySelectedSweeps = QtWidgets.QAction(
-            "   Split recordings by selected sweeps", self
+            "   Split recordings by selected sweeps"
         )
         self.actionSplitBySelectedSweeps.triggered.connect(
             self.triggerSplitBySelectedSweeps
@@ -2128,24 +1500,24 @@ class UIsub(
         self.menuEdit.addAction(self.actionSplitBySelectedSweeps)
 
         # View menu
-        self.actionRefresh = QtWidgets.QAction("Refresh Graphs", self)
+        self.actionRefresh = QtWidgets.QAction("Refresh Graphs")
         self.actionRefresh.triggered.connect(self.triggerRefresh)
         self.actionRefresh.setShortcut("F5")
         self.menuView.addAction(self.actionRefresh)
 
-        self.actionHeatmap = QtWidgets.QAction("Toggle Heatmap", self)
+        self.actionHeatmap = QtWidgets.QAction("Toggle Heatmap")
         self.actionHeatmap.setCheckable(True)
         self.actionHeatmap.setChecked(uistate.showHeatmap)
         self.actionHeatmap.setShortcut("H")
         self.actionHeatmap.triggered.connect(self.triggerShowHeatmap)
         self.menuView.addAction(self.actionHeatmap)
 
-        self.actionDarkmode = QtWidgets.QAction("Toggle Darkmode", self)
+        self.actionDarkmode = QtWidgets.QAction("Toggle Darkmode")
         self.actionDarkmode.triggered.connect(self.triggerDarkmode)
         self.actionDarkmode.setShortcut("Alt+D")
         self.menuView.addAction(self.actionDarkmode)
 
-        actionTimetable = QtWidgets.QAction("Toggle Timetable", self)
+        actionTimetable = QtWidgets.QAction("Toggle Timetable")
         actionTimetable.setCheckable(True)
         actionTimetable.setChecked(uistate.showTimetable)
         actionTimetable.setShortcut("Alt+T")
@@ -2153,7 +1525,7 @@ class UIsub(
         self.menuView.addAction(actionTimetable)
 
         for frame, (text, initial_state) in uistate.viewTools.items():
-            action = QtWidgets.QAction(f"Toggle {text}", self)
+            action = QtWidgets.QAction(f"Toggle {text}")
             action.setCheckable(True)
             action.setChecked(initial_state)
             action.triggered.connect(
@@ -2162,39 +1534,39 @@ class UIsub(
             self.menuView.addAction(action)
 
         # Data menu
-        self.actionAddData = QtWidgets.QAction("Add data files", self)
+        self.actionAddData = QtWidgets.QAction("Add data files")
         self.actionAddData.triggered.connect(self.triggerAddData)
         self.menuData.addAction(self.actionAddData)
-        self.actionParse = QtWidgets.QAction("Import all added datafiles", self)
+        self.actionParse = QtWidgets.QAction("Import all added datafiles")
         self.actionParse.triggered.connect(self.triggerParse)
         self.actionParse.setShortcut("Ctrl+I")
         self.menuData.addAction(self.actionParse)
-        self.actionDelete = QtWidgets.QAction("Delete selected data", self)
+        self.actionDelete = QtWidgets.QAction("Delete selected data")
         self.actionDelete.triggered.connect(self.triggerDelete)
         self.actionDelete.setShortcut("DEL")
         self.menuData.addAction(self.actionDelete)
-        self.actionRenameRecording = QtWidgets.QAction("Rename recording", self)
+        self.actionRenameRecording = QtWidgets.QAction("Rename recording")
         self.actionRenameRecording.triggered.connect(self.triggerRenameRecording)
         self.actionRenameRecording.setShortcut("F2")
         self.menuData.addAction(self.actionRenameRecording)
 
         # Group menu
-        self.actionNewGroup = QtWidgets.QAction("Add a group", self)
+        self.actionNewGroup = QtWidgets.QAction("Add a group")
         self.actionNewGroup.triggered.connect(self.triggerNewGroup)
         self.actionNewGroup.setShortcut("+")
         self.menuGroups.addAction(self.actionNewGroup)
-        self.actionRemoveEmptyGroup = QtWidgets.QAction("Remove last empty group", self)
+        self.actionRemoveEmptyGroup = QtWidgets.QAction("Remove last empty group")
         self.actionRemoveEmptyGroup.triggered.connect(self.triggerRemoveLastEmptyGroup)
         self.actionRemoveEmptyGroup.setShortcut("-")
         self.menuGroups.addAction(self.actionRemoveEmptyGroup)
-        self.actionRemoveGroup = QtWidgets.QAction("Force remove last group", self)
+        self.actionRemoveGroup = QtWidgets.QAction("Force remove last group")
         self.actionRemoveGroup.triggered.connect(self.triggerRemoveLastGroup)
         self.actionRemoveGroup.setShortcut("Ctrl+-")
         self.menuGroups.addAction(self.actionRemoveGroup)
-        self.actionClearGroups = QtWidgets.QAction("Clear group(s) in selection", self)
+        self.actionClearGroups = QtWidgets.QAction("Clear group(s) in selection")
         self.actionClearGroups.triggered.connect(self.triggerClearGroups)
         self.menuGroups.addAction(self.actionClearGroups)
-        self.actionResetGroups = QtWidgets.QAction("Remove all groups", self)
+        self.actionResetGroups = QtWidgets.QAction("Remove all groups")
         self.actionResetGroups.triggered.connect(self.triggerEditGroups)
         self.menuGroups.addAction(self.actionResetGroups)
 
@@ -3210,15 +2582,12 @@ class UIsub(
             print("setButtonParse")
         unparsed = self.df_project["sweeps"].eq("...").any()
         self.pushButtonParse.setVisible(bool(unparsed))
-        if config.hide_experimental:
-            self.checkBox_force1stim.setVisible(False)
-        else:
-            self.checkBox_force1stim.setVisible(bool(unparsed))
+        self.frameParseOptions.setVisible(bool(unparsed))
 
-    def checkBox_force1stim_changed(self, state):
-        uistate.checkBox["force1stim"] = state == 2
+    def checkBox_splitOddEven_changed(self, state):
+        uistate.checkBox["splitOddEven"] = state == 2
         if config.verbose:
-            print(f"checkBox_force1stim_changed: {state}")
+            print(f"checkBox_splitOddEven_changed: {state}")
 
     def checkBox_output_per_stim_changed(self, state):
         uistate.checkBox["output_per_stim"] = state == 2
