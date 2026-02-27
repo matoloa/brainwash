@@ -1,5 +1,6 @@
 import math
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -9,6 +10,11 @@ import pandas as pd
 import pyabf
 from joblib import Parallel, delayed
 from tqdm import tqdm
+
+# joblib spawns worker processes via multiprocessing, which breaks in frozen
+# cx_Freeze builds because the frozen executable can't re-import itself as a
+# worker. Force single-process execution when running frozen.
+_N_JOBS = 1 if getattr(sys, "frozen", False) else -1
 
 verbose = True
 
@@ -172,7 +178,7 @@ def parse_ibwFolder(folder, dev=False, gain=1.0):  # igor2, para
     if dev:
         files = files[:100]
 
-    results = Parallel(n_jobs=-1)(delayed(ibw_read)(file) for file in tqdm(files))
+    results = Parallel(n_jobs=_N_JOBS)(delayed(ibw_read)(file) for file in tqdm(files))
     t0 = time.perf_counter()
     print(f" - - sorting {len(files)} .ibw files in folder {folder} by timestamp...")
     results.sort(key=lambda r: r["timestamp"])

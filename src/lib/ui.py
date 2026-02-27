@@ -463,8 +463,9 @@ class ParseDataThread(QtCore.QThread):
         except Exception as e:
             import traceback
 
-            print(f"ParseDataThread.run: EXCEPTION: {e}")
-            print(traceback.format_exc())
+            logger.exception(
+                f"ParseDataThread.run: EXCEPTION: {e}\n{traceback.format_exc()}"
+            )
         finally:
             self.finished.emit()
 
