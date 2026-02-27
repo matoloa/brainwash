@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1270</width>
-    <height>1050</height>
+    <width>1580</width>
+    <height>1205</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -28,7 +28,7 @@
            <enum>QLayout::SetMinimumSize</enum>
           </property>
           <item>
-           <layout class="QHBoxLayout" name="horizontalLayoutProjParse">
+           <layout class="QHBoxLayout" name="horizontalLayoutProjParseButton">
             <item>
              <widget class="QPushButton" name="pushButtonParse">
               <property name="text">
@@ -39,12 +39,98 @@
            </layout>
           </item>
           <item>
-           <layout class="QHBoxLayout" name="horizontalLayoutProjStim">
+           <layout class="QHBoxLayout" name="horizontalLayoutProjParseOptions">
             <item>
-             <widget class="QCheckBox" name="checkBox_force1stim">
-              <property name="text">
-               <string>Single stim</string>
+             <widget class="QFrame" name="frameParseOptions">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
               </property>
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>111</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>16777215</width>
+                <height>111</height>
+               </size>
+              </property>
+              <property name="frameShape">
+               <enum>QFrame::StyledPanel</enum>
+              </property>
+              <property name="frameShadow">
+               <enum>QFrame::Raised</enum>
+              </property>
+              <widget class="QCheckBox" name="checkBox_splitOddEven">
+               <property name="geometry">
+                <rect>
+                 <x>10</x>
+                 <y>10</y>
+                 <width>131</width>
+                 <height>17</height>
+                </rect>
+               </property>
+               <property name="text">
+                <string>Split odd/even sweeps</string>
+               </property>
+              </widget>
+              <widget class="QLineEdit" name="lineEdit_split_at_time">
+               <property name="geometry">
+                <rect>
+                 <x>80</x>
+                 <y>40</y>
+                 <width>41</width>
+                 <height>25</height>
+                </rect>
+               </property>
+              </widget>
+              <widget class="QLabel" name="label_splitTime">
+               <property name="geometry">
+                <rect>
+                 <x>10</x>
+                 <y>40</y>
+                 <width>61</width>
+                 <height>20</height>
+                </rect>
+               </property>
+               <property name="text">
+                <string>Split at (ms)</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+               </property>
+              </widget>
+              <widget class="QLabel" name="label_gain">
+               <property name="geometry">
+                <rect>
+                 <x>10</x>
+                 <y>70</y>
+                 <width>61</width>
+                 <height>20</height>
+                </rect>
+               </property>
+               <property name="text">
+                <string>Apply gain</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+               </property>
+              </widget>
+              <widget class="QLineEdit" name="lineEdit_import_gain">
+               <property name="geometry">
+                <rect>
+                 <x>80</x>
+                 <y>70</y>
+                 <width>41</width>
+                 <height>25</height>
+                </rect>
+               </property>
+              </widget>
              </widget>
             </item>
            </layout>
@@ -1104,8 +1190,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1270</width>
-     <height>22</height>
+     <width>1580</width>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 
 import sys
+from pathlib import Path
+
+# Ensure `src/` is on sys.path so `lib` is importable regardless of how
+# main.py is invoked (e.g. `python src/main.py`, `python -m src.main`,
+# or a frozen cx_Freeze executable).
+_src_dir = str(Path(__file__).parent)
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
 
 # import lib.method
 import pandas as pd

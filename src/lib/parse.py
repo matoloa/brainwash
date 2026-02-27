@@ -168,11 +168,15 @@ def _ibw_results_to_df(results, gain=1.0):
 
 
 def parse_ibwFolder(folder, dev=False, gain=1.0):  # igor2, para
-    files = sorted(list(folder.glob("*.ibw")))
+    files = list(folder.glob("*.ibw"))
     if dev:
         files = files[:100]
 
     results = Parallel(n_jobs=-1)(delayed(ibw_read)(file) for file in tqdm(files))
+    t0 = time.perf_counter()
+    print(f" - - sorting {len(files)} .ibw files in folder {folder} by timestamp...")
+    results.sort(key=lambda r: r["timestamp"])
+    print(f" - - sorting took {time.perf_counter() - t0:.6f}s")
 
     # Sweep length check: all .ibw files in the folder must have the same shape.
     sweep_shapes = [r["array"].shape for r in results]
@@ -317,7 +321,7 @@ def metadata(df):
                 }"""
 
 
-def source2dfs(source, dev=False, gain=1.0):
+def source2dfs(source, dev=False, split_odd_even=False, split_at_time=None, gain=1.0):
     """
     Identifies type of file(s), and calls the appropriate parser.
     - source (str): Path to source file or folder
@@ -380,10 +384,20 @@ def source2dfs(source, dev=False, gain=1.0):
         dict_channeldfs[channel] = df[df["channel"] == channel]
     # sort df by datetime
 
-    for df in dict_channeldfs.values():
-        if not df["datetime"].is_monotonic_increasing:
-            print(" - - Warning: datetime not monotonic increasing, sorting.")
-            df.sort_values("datetime", inplace=True)
+    for channel, df in dict_channeldfs.items():
+        # Group rows into sweeps by detecting time resets (time == 0 starts a new sweep).
+        sweep_groups = (df["time"] == 0).cumsum()
+        # Check that each sweep's start datetime is monotonically increasing.
+        sweep_start_dt = df.groupby(sweep_groups)["datetime"].first()
+        if not sweep_start_dt.is_monotonic_increasing:
+            print(
+                " - - Warning: sweep start datetimes not monotonic increasing, sorting sweeps."
+            )
+            t0 = time.time()
+            sweep_order = sweep_start_dt.sort_values().index
+            sorted_pieces = [df[sweep_groups == grp] for grp in sweep_order]
+            dict_channeldfs[channel] = pd.concat(sorted_pieces).reset_index(drop=True)
+            print(" - - Sorted sweeps in {:.2f} seconds".format(time.time() - t0))
     # generate 'sweep' column and drop channel column
     for df in dict_channeldfs.values():
         df["sweep"] = df.groupby((df["time"] == 0).cumsum()).ngroup()

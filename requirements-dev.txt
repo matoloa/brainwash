@@ -1,7 +1,14 @@
+# Dev dependencies are managed in pyproject.toml under [dependency-groups] dev.
+# Use `uv sync --group dev` or `uv sync --all-groups` to install them.
+#
+# This file is kept for reference / legacy tooling only.
+# Do NOT add new dependencies here — add them to pyproject.toml instead.
+
 jupyterlab
 jupytext
 flake8
 flake8-black
 black
 isort
-
+pytest
+PyQt5-stubs

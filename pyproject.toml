@@ -1,6 +1,9 @@
 [tool.uv]
 constraint-dependencies = ["pyqt5-qt5==5.15.2"]
 
+[tool.pytest.ini_options]
+testpaths = ["src/lib"]
+
 [tool.black]
 line-length = 150
 
@@ -15,7 +18,7 @@ line_length = 100
 
 [project]
 name = "brainwash"
-version = "0.10.0"
+version = "0.11.0"
 description = "A data visualization tool for electrophysiological recordings, with convenience functions."
 requires-python = ">=3.12"
 dependencies = [
@@ -40,6 +43,13 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pyqt5-stubs>=5.15.6.0",
+    "jupyterlab",
+    "jupytext",
+    "flake8",
+    "flake8-black",
+    "black",
+    "isort",
+    "pytest",
 ]
 build = [
     "cx-freeze==8.5",

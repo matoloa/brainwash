@@ -1,4 +1,27 @@
-# %%
+# analysis_v1.py
+# ---------------------------------------------------------------------------
+# DEPRECATED — scheduled for retirement once all gaps are covered in v2.
+#
+# Status (Phase 6 audit):
+#   - build_dfoutput        → superseded by analysis_v2.build_dfoutput
+#   - build_dfstimoutput    → NOT YET ported to v2 (multi-stim edge case;
+#                             see Step 1.2 in improvement_plan.md — SKIP FOR NOW)
+#   - find_i_EPSP_peak_max  → logic embedded in analysis_v2.characterize_graph
+#   - find_i_VEB_prim_peak_max → logic embedded in analysis_v2.characterize_graph
+#   - find_i_volley_slope   → logic embedded in analysis_v2.characterize_graph
+#   - find_all_i / find_all_t → superseded by analysis_v2.find_events +
+#                               analysis_v2.characterize_graph
+#   - measureslope          → superseded by analysis_v2 (inline usage)
+#   - measureslope_vec      → superseded by analysis_v2.measureslope_vec
+#
+# Remaining blocker before deletion:
+#   1. Port build_dfstimoutput to analysis_v2.py
+#   2. Remove the import of analysis_v1 in analysis_evaluation.py
+#      (replace with direct calls to analysis_v2.characterize_graph)
+#
+# Do NOT add new imports of this module. Use analysis_v2 for all new code.
+# ---------------------------------------------------------------------------
+
 """
 analysis module to characterize and calculate features from diagrams
 
@@ -55,7 +78,6 @@ SKALL HELST LETAS UPP D'R VOLLEY 'R SLUT
 
 """
 
-# %%
 import time
 
 import numpy as np  # numeric calculations module
@@ -83,7 +105,6 @@ def regression_line(x_data, y_data):
     return {"x": x, "y": y, "r_value": r_value, "p_value": p_value, "std_err": std_err}
 
 
-# %%
 def build_dfoutput(df, dict_t, filter="voltage", quick=False):
     # TODO: implement quick, to operate without amp_hws
     """Measures each sweep in df (e.g. from <save_file_name>.csv) at specificed times t_*
@@ -323,12 +344,10 @@ def addFilterSavgol(df, window_length=9, poly_order=3):
     return df["savgol"]
 
 
-# %%
 def find_i_stim_prim_max(dfmean):
     return dfmean["prim"].idxmax()
 
 
-# %%
 def find_i_stims(dfmean, threshold=0.1, min_time_difference=0.005, verbose=False):
     prim_max = find_i_stim_prim_max(dfmean)
     prim_max_y = dfmean.prim.max()
@@ -355,7 +374,6 @@ def find_i_stims(dfmean, threshold=0.1, min_time_difference=0.005, verbose=False
     return filtered_indices
 
 
-# %%
 def find_i_EPSP_peak_max(
     dfmean,
     sampling_Hz=10000,
@@ -407,7 +425,6 @@ def find_i_EPSP_peak_max(
     return i_EPSP
 
 
-# %%
 def find_i_VEB_prim_peak_max(
     dfmean,
     i_stim,
@@ -479,7 +496,6 @@ def find_i_VEB_prim_peak_max(
     return i_VEB
 
 
-# %%
 def find_i_EPSP_slope_bis0(dfmean, i_VEB, i_EPSP, happy=False, verbose=False):
     """ """
 
@@ -503,7 +519,6 @@ def find_i_EPSP_slope_bis0(dfmean, i_VEB, i_EPSP, happy=False, verbose=False):
     return i_EPSP_slope[0]
 
 
-# %%
 def find_i_EPSP_slope_mindist_bis0(
     dfmean, i_VEB, i_EPSP, EPSP_slope_size=3, happy=False
 ):  # TODO: set rolling_width to 2(EPSP width)+1
@@ -529,7 +544,6 @@ def find_i_EPSP_slope_mindist_bis0(
     return i_EPSP_slope[0]
 
 
-# %%
 def find_i_volley_slope(dfmean, i_stim, i_VEB, happy=False):
     """
     returns index of volley slope center
@@ -549,7 +563,6 @@ def find_i_volley_slope(dfmean, i_stim, i_VEB, happy=False):
     return i_volleyslope
 
 
-# %%
 def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=False):
     """
     Runs all index-detections in the appropriate sequence,
@@ -681,7 +694,6 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
     return df_i
 
 
-# %%
 def find_all_t(
     dfmean,
     default_dict_t,
@@ -807,7 +819,6 @@ def measureslope(df, t_start, t_end, filter="voltage"):
     return slope
 
 
-# %%
 def measureslope_vec(
     df,
     t_start,
@@ -831,7 +842,6 @@ def measureslope_vec(
     return dfslopes
 
 
-# %%
 """ Standalone test:"""
 if __name__ == "__main__":
     # Temporary default_dict_t for standalone tests
@@ -884,6 +894,4 @@ if __name__ == "__main__":
     dft = find_all_t(dfmean, default_dict_t=default_dict_t)
     display(dft)
 
-# %%
 
-# %%
