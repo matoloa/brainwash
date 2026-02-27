@@ -1,9 +1,9 @@
-import logging
 import os  # TODO: replace use by pathlib?
 import sys
 import tempfile
 from pathlib import Path
 
+from PyQt5 import QtCore, QtGui, QtWidgets, sip
 import numpy as np
 import pandas as pd
 
@@ -12,23 +12,24 @@ import pandas as pd
 # The project DataFrame mixes strings, ints and floats in the same CSV-loaded
 # DataFrame, so we opt back into the legacy object-dtype string behaviour.
 pd.options.future.infer_string = False
-from matplotlib import use as matplotlib_use
 
-# TODO: kick these out to ui_plot.py
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-from PyQt5 import QtCore, QtGui, QtWidgets, sip
-
-# Matplotlib slowdown fix for frozen Windows builds: redirect config dir to temp
+# Matplotlib slowdown fix for frozen Windows builds: redirect config dir to temp.
+# Must be set before matplotlib is imported so it sees the override on first init.
 if getattr(sys, "frozen", False):
     os.environ.setdefault(
         "MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "matplotlib")
     )
 
+# TODO: kick these out to ui_plot.py
+from matplotlib import use as matplotlib_use
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+
 matplotlib_use("Qt5Agg")
 
 import importlib  # for reloading modules
 import json  # for saving and loading dicts as strings
+import logging
 import pickle  # for saving and loading dicts
 import re  # regular expressions
 import socket  # getting computer name and localdomain for df_project['host'] (not reported in talkback)
