@@ -800,9 +800,10 @@ class UIplot:
             out = dfoutput[
                 dfoutput["stim"] == stim_num
             ]  # TODO: enable switch to dfdiff?
-            y_position = dfmean.loc[dfmean.time == t_stim, rec_filter].values[
-                0
-            ]  # returns index, y_value
+            _t_idx = (dfmean["time"] - t_stim).abs().idxmin()
+            y_position = dfmean.loc[
+                _t_idx, rec_filter
+            ]  # nearest-time lookup (float-safe)
             for (
                 var
             ) in variables:  # Convert all variables except t_stim to stim-specific time

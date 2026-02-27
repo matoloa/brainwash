@@ -102,9 +102,8 @@ if __name__ == "__main__":
 
     sys.excepthook = _excepthook
 
-    # PyQt5 >= 5.5 lets you intercept exceptions thrown inside slots via
-    # sys.excepthook — but only when the C++ side re-raises them.  For full
-    # coverage we also monkey-patch the two most crash-prone entry points.
+    import functools
+
     try:
         app = QtWidgets.QApplication(sys.argv)
         logger.info(f"QApplication created, platformName='{app.platformName()}'")
@@ -115,11 +114,9 @@ if __name__ == "__main__":
         ui = UIsub(MainWindow)
         logger.info("UIsub instantiated successfully")
 
-        # Wrap the two most crash-prone interactive entry-points so that any
-        # exception that escapes them is logged with a full traceback before
-        # Qt has a chance to silently swallow it.
-        import functools
-
+        # Wrap key methods on the instance (not the class) so that direct
+        # Python call-sites get exception logging.  Qt-dispatched slot calls
+        # are covered by sys.excepthook above.
         def _log_exceptions(method_name):
             original = getattr(ui, method_name)
 
@@ -129,7 +126,7 @@ if __name__ == "__main__":
                     return original(*args, **kwargs)
                 except Exception:
                     logger.exception(f"Exception in UIsub.{method_name}")
-                    raise  # re-raise so Qt still sees it
+                    raise
 
             setattr(ui, method_name, wrapper)
 
@@ -140,6 +137,9 @@ if __name__ == "__main__":
             "update_show",
             "mouseoverUpdate",
             "zoomAuto",
+            "stimSelectionChanged",
+            "graphPreload",
+            "graphUpdate",
         ):
             _log_exceptions(_m)
 
