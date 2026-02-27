@@ -423,7 +423,9 @@ class ParseDataThread(QtCore.QThread):
                 recording_name = df_proj_row["recording_name"]
                 source_path = df_proj_row["path"]
                 self.progress.emit(i)
-                dict_dfs_raw = parse.source2dfs(source=source_path)
+                dict_dfs_raw = parse.source2dfs(
+                    source=source_path, gain=uistate.lineEdit["import_gain"]
+                )
                 if not dict_dfs_raw:
                     print(f"Failed to read source file at: {source_path}")
                     continue
