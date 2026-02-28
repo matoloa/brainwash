@@ -1,14 +1,16 @@
 # tests for parse.py — the current (v2) parsing pipeline
 #
 # Covered:
-#   - first_stim_index    (pure logic, synthetic data)
-#   - metadata            (pure logic, synthetic data)
-#   - build_dfmean        (pure logic, synthetic data)
-#   - zeroSweeps          (pure logic, synthetic data)
-#   - persistdf           (I/O, temp directory)
-#   - source2dfs          (file I/O — skipped when real ABFs are absent)
-#   - sources2dfs         (file I/O — skipped when real ABFs are absent)
-#   - parse_abf / folder  (file I/O — skipped when real ABFs are absent)
+#   - first_stim_index              (pure logic, synthetic data)
+#   - metadata                      (pure logic, synthetic data)
+#   - build_dfmean                  (pure logic, synthetic data)
+#   - zeroSweeps                    (pure logic, synthetic data)
+#   - persistdf                     (I/O, temp directory)
+#   - source2dfs                    (file I/O — skipped when real ABFs are absent)
+#   - source2dfs split_odd_even     (pure logic, synthetic CSV)
+#   - source2dfs split_at_time      (pure logic, synthetic CSV)
+#   - sources2dfs                   (file I/O — skipped when real ABFs are absent)
+#   - parse_abf / folder            (file I/O — skipped when real ABFs are absent)
 #
 # Real test-data ABF files are not committed to the repo. Place them at:
 #   src/lib/test_data/A_21_P0701-S2/2022_07_01_0012.abf  (1-channel)
@@ -435,6 +437,258 @@ class TestParseAbf(unittest.TestCase):
         df = parse_abfFolder(_ABF_1CH.parent)
         self.assertIsInstance(df, pd.DataFrame)
         self.assertGreater(len(df), 0)
+
+
+# ---------------------------------------------------------------------------
+# Helpers for split tests: write a synthetic pre-parsed CSV that source2dfs
+# accepts via parse_csv (the 'sweep' column fast-path) so we can exercise the
+# splitting logic without real ABF/IBW files.
+# ---------------------------------------------------------------------------
+
+
+def _write_synthetic_csv(
+    path: Path, n_sweeps: int = 8, n_timepoints: int = 20, dt: float = 0.001
+):
+    """
+    Write a minimal Brainwash-format CSV (sweep, time, voltage_raw, t0, datetime)
+    with n_sweeps sweeps, each n_timepoints samples long.
+    Sweep datetimes are spaced sweep_duration seconds apart so that elapsed-time
+    splitting is predictable.
+    """
+    sweep_duration = n_timepoints * dt
+    times = np.round(np.arange(n_timepoints) * dt, 6)
+    rows = []
+    for sw in range(n_sweeps):
+        t0 = sw * sweep_duration
+        for t in times:
+            rows.append(
+                {
+                    "sweep": sw,
+                    "time": t,
+                    "voltage_raw": float(
+                        sw
+                    ),  # voltage == sweep index for easy checking
+                    "t0": t0,
+                    "datetime": pd.Timestamp("2024-01-01")
+                    + pd.Timedelta(seconds=t0 + t),
+                }
+            )
+    pd.DataFrame(rows).to_csv(path, index=False)
+
+
+# ---------------------------------------------------------------------------
+# Tests: source2dfs — split_odd_even  (pure logic, synthetic CSV)
+# ---------------------------------------------------------------------------
+
+
+class TestSource2dfsOddEven(unittest.TestCase):
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.csv_path = Path(self._tmpdir.name) / "rec.csv"
+        self.n_sweeps = 8
+        _write_synthetic_csv(self.csv_path, n_sweeps=self.n_sweeps)
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def test_returns_even_and_odd_keys(self):
+        result = source2dfs(str(self.csv_path), split_odd_even=True)
+        keys = set(result.keys())
+        self.assertIn((0, "even"), keys)
+        self.assertIn((0, "odd"), keys)
+
+    def test_only_even_and_odd_keys_present(self):
+        result = source2dfs(str(self.csv_path), split_odd_even=True)
+        self.assertEqual(len(result), 2)
+
+    def test_even_sweep_count(self):
+        """For 8 sweeps (0-7), even positions (0,2,4,6) → 4 sweeps."""
+        result = source2dfs(str(self.csv_path), split_odd_even=True)
+        df_even = result[(0, "even")]
+        self.assertEqual(df_even["sweep"].nunique(), self.n_sweeps // 2)
+
+    def test_odd_sweep_count(self):
+        """For 8 sweeps (0-7), odd positions (1,3,5,7) → 4 sweeps."""
+        result = source2dfs(str(self.csv_path), split_odd_even=True)
+        df_odd = result[(0, "odd")]
+        self.assertEqual(df_odd["sweep"].nunique(), self.n_sweeps // 2)
+
+    def test_even_sweeps_renumbered_from_zero(self):
+        result = source2dfs(str(self.csv_path), split_odd_even=True)
+        df_even = result[(0, "even")]
+        sweep_ids = sorted(df_even["sweep"].unique())
+        self.assertEqual(sweep_ids, list(range(len(sweep_ids))))
+
+    def test_odd_sweeps_renumbered_from_zero(self):
+        result = source2dfs(str(self.csv_path), split_odd_even=True)
+        df_odd = result[(0, "odd")]
+        sweep_ids = sorted(df_odd["sweep"].unique())
+        self.assertEqual(sweep_ids, list(range(len(sweep_ids))))
+
+    def test_no_row_loss(self):
+        """Total rows across even + odd must equal rows in the original recording."""
+        result_plain = source2dfs(str(self.csv_path))
+        n_total_plain = sum(len(df) for df in result_plain.values())
+        result_split = source2dfs(str(self.csv_path), split_odd_even=True)
+        n_total_split = sum(len(df) for df in result_split.values())
+        self.assertEqual(n_total_plain, n_total_split)
+
+    def test_required_columns_present(self):
+        result = source2dfs(str(self.csv_path), split_odd_even=True)
+        for key, df in result.items():
+            for col in ("sweep", "time", "voltage_raw"):
+                self.assertIn(col, df.columns, f"Column '{col}' missing in {key}")
+
+    def test_odd_even_mutually_exclusive_raises(self):
+        with self.assertRaises(ValueError):
+            source2dfs(str(self.csv_path), split_odd_even=True, split_at_time=0.05)
+
+    def test_odd_sweep_voltage_values_are_odd_indexed(self):
+        """voltage_raw == original sweep index; odd-position sweeps have indices 1,3,5,7."""
+        result = source2dfs(str(self.csv_path), split_odd_even=True)
+        df_odd = result[(0, "odd")]
+        # After renumbering, check that unique voltage values are the original odd sweep indices
+        original_voltages = sorted(df_odd["voltage_raw"].unique())
+        self.assertEqual(original_voltages, [1.0, 3.0, 5.0, 7.0])
+
+    def test_even_sweep_voltage_values_are_even_indexed(self):
+        """voltage_raw == original sweep index; even-position sweeps have indices 0,2,4,6."""
+        result = source2dfs(str(self.csv_path), split_odd_even=True)
+        df_even = result[(0, "even")]
+        original_voltages = sorted(df_even["voltage_raw"].unique())
+        self.assertEqual(original_voltages, [0.0, 2.0, 4.0, 6.0])
+
+
+# ---------------------------------------------------------------------------
+# Tests: source2dfs — split_at_time  (pure logic, synthetic CSV)
+# ---------------------------------------------------------------------------
+
+
+class TestSource2dfsSplitAtTime(unittest.TestCase):
+    """
+    Each sweep has n_timepoints=20 samples at dt=0.001 s → time runs 0.000 … 0.019 s.
+    split_at_time=0.010 cuts every sweep at t=0.010:
+      part 'a': rows where time < 0.010  → 10 samples × 8 sweeps = 80 rows, time 0.000–0.009
+      part 'b': rows where time >= 0.010 → 10 samples × 8 sweeps = 80 rows, time re-zeroed 0.000–0.009
+    Both parts retain all 8 sweeps.
+    """
+
+    N_SWEEPS = 8
+    N_TP = 20
+    DT = 0.001
+    SWEEP_DURATION = N_TP * DT  # 0.020 s
+    SPLIT_T = int(N_TP / 2) * DT  # 0.010 s — midpoint of each sweep
+
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.csv_path = Path(self._tmpdir.name) / "rec.csv"
+        _write_synthetic_csv(
+            self.csv_path, n_sweeps=self.N_SWEEPS, n_timepoints=self.N_TP, dt=self.DT
+        )
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def test_returns_a_and_b_keys(self):
+        result = source2dfs(str(self.csv_path), split_at_time=self.SPLIT_T)
+        self.assertIn((0, "a"), result)
+        self.assertIn((0, "b"), result)
+
+    def test_only_a_and_b_keys_present(self):
+        result = source2dfs(str(self.csv_path), split_at_time=self.SPLIT_T)
+        self.assertEqual(len(result), 2)
+
+    def test_both_parts_retain_all_sweeps(self):
+        """Both 'a' and 'b' must contain all N_SWEEPS sweeps."""
+        result = source2dfs(str(self.csv_path), split_at_time=self.SPLIT_T)
+        self.assertEqual(result[(0, "a")]["sweep"].nunique(), self.N_SWEEPS)
+        self.assertEqual(result[(0, "b")]["sweep"].nunique(), self.N_SWEEPS)
+
+    def test_part_a_time_range(self):
+        """Part 'a' should contain only samples with time < split_at_time."""
+        result = source2dfs(str(self.csv_path), split_at_time=self.SPLIT_T)
+        df_a = result[(0, "a")]
+        self.assertTrue((df_a["time"] < self.SPLIT_T).all())
+
+    def test_part_b_time_starts_at_zero(self):
+        """Part 'b' time must be re-zeroed: min time per sweep == 0."""
+        result = source2dfs(str(self.csv_path), split_at_time=self.SPLIT_T)
+        df_b = result[(0, "b")]
+        min_per_sweep = df_b.groupby("sweep")["time"].min()
+        self.assertTrue((min_per_sweep == 0.0).all())
+
+    def test_part_b_time_max(self):
+        """Part 'b' max within-sweep time should equal sweep_duration - split_at_time - dt."""
+        result = source2dfs(str(self.csv_path), split_at_time=self.SPLIT_T)
+        df_b = result[(0, "b")]
+        expected_max = round(self.SWEEP_DURATION - self.SPLIT_T - self.DT, 9)
+        actual_max = round(df_b.groupby("sweep")["time"].max().iloc[0], 9)
+        self.assertAlmostEqual(actual_max, expected_max, places=6)
+
+    def test_no_row_loss(self):
+        """Total rows across 'a' + 'b' must equal the total rows in the original."""
+        result_plain = source2dfs(str(self.csv_path))
+        n_plain = sum(len(df) for df in result_plain.values())
+        result_split = source2dfs(str(self.csv_path), split_at_time=self.SPLIT_T)
+        n_split = sum(len(df) for df in result_split.values())
+        self.assertEqual(n_plain, n_split)
+
+    def test_part_a_row_count(self):
+        """Part 'a' should have exactly (samples before split) × N_SWEEPS rows."""
+        result = source2dfs(str(self.csv_path), split_at_time=self.SPLIT_T)
+        df_a = result[(0, "a")]
+        samples_before = int(self.SPLIT_T / self.DT)
+        self.assertEqual(len(df_a), samples_before * self.N_SWEEPS)
+
+    def test_part_b_row_count(self):
+        """Part 'b' should have exactly (samples from split onward) × N_SWEEPS rows."""
+        result = source2dfs(str(self.csv_path), split_at_time=self.SPLIT_T)
+        df_b = result[(0, "b")]
+        samples_after = self.N_TP - int(self.SPLIT_T / self.DT)
+        self.assertEqual(len(df_b), samples_after * self.N_SWEEPS)
+
+    def test_required_columns_present(self):
+        result = source2dfs(str(self.csv_path), split_at_time=self.SPLIT_T)
+        for key, df in result.items():
+            for col in ("sweep", "time", "voltage_raw"):
+                self.assertIn(col, df.columns, f"Column '{col}' missing in {key}")
+
+    def test_split_beyond_last_sample_returns_full_a_empty_b(self):
+        """A split_at_time beyond the last sample → full recording in 'a', empty 'b'."""
+        beyond = self.SWEEP_DURATION + 1.0
+        result = source2dfs(str(self.csv_path), split_at_time=beyond)
+        df_a = result[(0, "a")]
+        df_b = result[(0, "b")]
+        result_plain = source2dfs(str(self.csv_path))
+        n_plain = sum(len(df) for df in result_plain.values())
+        self.assertEqual(len(df_a), n_plain)
+        self.assertEqual(len(df_b), 0)
+
+    def test_split_at_zero_treated_as_no_split(self):
+        """split_at_time=0 should return the plain unsplit dict."""
+        result = source2dfs(str(self.csv_path), split_at_time=0)
+        for key in result:
+            self.assertNotIsInstance(key, tuple)
+
+    def test_voltage_raw_unchanged_in_both_parts(self):
+        """voltage_raw values in 'a' + 'b' per sweep must equal those in the original."""
+        result_plain = source2dfs(str(self.csv_path))
+        result_split = source2dfs(str(self.csv_path), split_at_time=self.SPLIT_T)
+        df_plain = (
+            next(iter(result_plain.values()))
+            .sort_values(["sweep", "time"])
+            .reset_index(drop=True)
+        )
+        df_a = result_split[(0, "a")]
+        df_b = result_split[(0, "b")].copy()
+        # Restore original time in 'b' for merging: add back the split offset per sweep
+        df_b["time"] = df_b["time"] + self.SPLIT_T
+        combined = (
+            pd.concat([df_a, df_b])
+            .sort_values(["sweep", "time"])
+            .reset_index(drop=True)
+        )
+        self.assertTrue(combined["voltage_raw"].equals(df_plain["voltage_raw"]))
 
 
 # ---------------------------------------------------------------------------

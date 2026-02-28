@@ -105,7 +105,7 @@ class UIstate:
             "paired_stims": False,  # Recs are paired: output per pair is Intervention / Control
         }
         self.lineEdit = {  # storage of user input; used to update df_t
-            "split_at_time": 0.0,
+            "split_at_time": 0.0,  # in s (SI). User enters ms; converted at input in editImportOptions.
             "import_gain": 1.0,
             "norm_EPSP_from": 0,
             "norm_EPSP_to": 0,

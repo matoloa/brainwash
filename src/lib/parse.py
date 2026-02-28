@@ -331,10 +331,20 @@ def source2dfs(source, dev=False, split_odd_even=False, split_at_time=None, gain
     """
     Identifies type of file(s), and calls the appropriate parser.
     - source (str): Path to source file or folder
+    - split_odd_even (bool): if True, split each channel's DataFrame into two by odd/even sweep
+                             index (0-based), returning keys like (channel, 'even') and
+                             (channel, 'odd'). Mutually exclusive with split_at_time.
+    - split_at_time (float | None): if set, cut every sweep at this within-sweep time (seconds).
+                                    Part 'a' contains rows where time < split_at_time (first
+                                    event); part 'b' contains rows where time >= split_at_time
+                                    (second event), with time re-zeroed to start from 0.
+                                    Both parts retain all sweeps. Mutually exclusive with
+                                    split_odd_even.
     - gain (float): multiplicative voltage scale factor, passed to IBW parsers only.
                     Use gain=1e-3 when IBW files are stored in mV and V (SI) is needed.
                     Has no effect on ABF files (pyabf handles unit conversion internally).
-    Returns: a dict {channel:DataFrame} of Raw (unprocessed) output from the appropriate parser
+    Returns: a dict {channel:DataFrame} of Raw (unprocessed) output from the appropriate parser,
+             or a dict {(channel, label):DataFrame} when a split is requested.
     """
     path = Path(source)
     if not path.exists():
@@ -378,44 +388,108 @@ def source2dfs(source, dev=False, split_odd_even=False, split_at_time=None, gain
             raise ValueError(f"Unsupported file type: {filetype}")
 
     dict_channeldfs = {}
-    # if df has a 'sweep' column, it's from a prepared .csv - skip this cleanup
+    # if df has a 'sweep' column, it's from a prepared .csv - skip channel/sweep cleanup
     if "sweep" in df.columns:
         print(" - - Detected 'sweep' column, skipping cleanup.")
         # TODO: extract channel from filename; "*_ch0"
         dict_channeldfs[0] = df
-        return dict_channeldfs
+        # fall through to optional splitting below instead of returning early
+    else:
+        # split by channel
+        for channel in df["channel"].unique():
+            dict_channeldfs[channel] = df[df["channel"] == channel]
+        # sort df by datetime
 
-    # split by channel
-    for channel in df["channel"].unique():
-        dict_channeldfs[channel] = df[df["channel"] == channel]
-    # sort df by datetime
+        for channel, df in dict_channeldfs.items():
+            # Group rows into sweeps by detecting time resets (time == 0 starts a new sweep).
+            sweep_groups = (df["time"] == 0).cumsum()
+            # Check that each sweep's start datetime is monotonically increasing.
+            sweep_start_dt = df.groupby(sweep_groups)["datetime"].first()
+            if not sweep_start_dt.is_monotonic_increasing:
+                print(
+                    " - - Warning: sweep start datetimes not monotonic increasing, sorting sweeps."
+                )
+                t0 = time.time()
+                sweep_order = sweep_start_dt.sort_values().index
+                sorted_pieces = [df[sweep_groups == grp] for grp in sweep_order]
+                dict_channeldfs[channel] = pd.concat(sorted_pieces).reset_index(
+                    drop=True
+                )
+                print(" - - Sorted sweeps in {:.2f} seconds".format(time.time() - t0))
+        # generate 'sweep' column and drop channel column
+        for df in dict_channeldfs.values():
+            df["sweep"] = df.groupby((df["time"] == 0).cumsum()).ngroup()
+            df.drop(columns=["channel"], inplace=True)
 
-    for channel, df in dict_channeldfs.items():
-        # Group rows into sweeps by detecting time resets (time == 0 starts a new sweep).
-        sweep_groups = (df["time"] == 0).cumsum()
-        # Check that each sweep's start datetime is monotonically increasing.
-        sweep_start_dt = df.groupby(sweep_groups)["datetime"].first()
-        if not sweep_start_dt.is_monotonic_increasing:
+        # reorder columns
+        column_order = ["sweep", "time", "voltage_raw", "t0", "datetime"]
+        for channel, df in dict_channeldfs.items():
+            df_cols = [col for col in column_order if col in df.columns]
+            dict_channeldfs[channel] = df[
+                df_cols + [col for col in df.columns if col not in df_cols]
+            ]
+
+    # ------------------------------------------------------------------
+    # Optional on-read splitting
+    # ------------------------------------------------------------------
+
+    if split_odd_even and split_at_time:
+        raise ValueError("split_odd_even and split_at_time are mutually exclusive.")
+
+    if split_odd_even:
+        split_result = {}
+        for channel, df in dict_channeldfs.items():
+            sweeps = df["sweep"].unique()
+            sweeps_sorted = sorted(sweeps)
+            even_sweeps = {s for i, s in enumerate(sweeps_sorted) if i % 2 == 0}
+            odd_sweeps = {s for i, s in enumerate(sweeps_sorted) if i % 2 != 0}
+            df_even = df[df["sweep"].isin(even_sweeps)].copy().reset_index(drop=True)
+            df_odd = df[df["sweep"].isin(odd_sweeps)].copy().reset_index(drop=True)
+            # renumber sweeps to be contiguous from 0
+            for part_df in (df_even, df_odd):
+                old_sweeps = sorted(part_df["sweep"].unique())
+                remap = {old: new for new, old in enumerate(old_sweeps)}
+                part_df["sweep"] = part_df["sweep"].map(remap)
+            split_result[(channel, "even")] = df_even
+            split_result[(channel, "odd")] = df_odd
             print(
-                " - - Warning: sweep start datetimes not monotonic increasing, sorting sweeps."
+                f" - - split_odd_even ch{channel}: "
+                f"{len(even_sweeps)} even sweeps, {len(odd_sweeps)} odd sweeps."
             )
-            t0 = time.time()
-            sweep_order = sweep_start_dt.sort_values().index
-            sorted_pieces = [df[sweep_groups == grp] for grp in sweep_order]
-            dict_channeldfs[channel] = pd.concat(sorted_pieces).reset_index(drop=True)
-            print(" - - Sorted sweeps in {:.2f} seconds".format(time.time() - t0))
-    # generate 'sweep' column and drop channel column
-    for df in dict_channeldfs.values():
-        df["sweep"] = df.groupby((df["time"] == 0).cumsum()).ngroup()
-        df.drop(columns=["channel"], inplace=True)
+        return split_result
 
-    # reorder columns
-    column_order = ["sweep", "time", "voltage_raw", "t0", "datetime"]
-    for channel, df in dict_channeldfs.items():
-        df_cols = [col for col in column_order if col in df.columns]
-        dict_channeldfs[channel] = df[
-            df_cols + [col for col in df.columns if col not in df_cols]
-        ]
+    if split_at_time is not None and split_at_time > 0:
+        split_result = {}
+        for channel, df in dict_channeldfs.items():
+            # Cut every sweep at the within-sweep time point.
+            # Part 'a': time < split_at_time  (first event, e.g. baseline / first stim).
+            # Part 'b': time >= split_at_time (second event), time re-zeroed to start from 0.
+            # Both parts keep all sweeps.
+            df_a = df[df["time"] < split_at_time].copy().reset_index(drop=True)
+            df_b = df[df["time"] >= split_at_time].copy().reset_index(drop=True)
+            if df_a.empty:
+                print(
+                    f" - - split_at_time ch{channel}: split_at_time {split_at_time}s is at or "
+                    f"before the first sample; part 'a' is empty."
+                )
+            if df_b.empty:
+                print(
+                    f" - - split_at_time ch{channel}: split_at_time {split_at_time}s is beyond "
+                    f"the last sample ({df['time'].max():.6g}s); part 'b' is empty."
+                )
+            else:
+                # Re-zero time in part 'b' so it starts from 0 within each sweep,
+                # matching the convention every downstream function expects.
+                split_offset = df_b.groupby("sweep")["time"].transform("min")
+                df_b["time"] = (df_b["time"] - split_offset).round(9)
+            split_result[(channel, "a")] = df_a
+            split_result[(channel, "b")] = df_b
+            n_sweeps = df["sweep"].nunique()
+            print(
+                f" - - split_at_time ch{channel}: cut at t={split_at_time}s; "
+                f"'a' {len(df_a)} rows, 'b' {len(df_b)} rows across {n_sweeps} sweeps."
+            )
+        return split_result
 
     return dict_channeldfs
 

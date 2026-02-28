@@ -443,21 +443,34 @@ class ParseDataThread(QtCore.QThread):
                 recording_name = df_proj_row["recording_name"]
                 source_path = df_proj_row["path"]
                 self.progress.emit(i)
+                split_odd_even = uistate.checkBox.get("splitOddEven", False)
+                split_at_time = uistate.lineEdit.get("split_at_time", 0) or None
                 dict_dfs_raw = parse.source2dfs(
-                    source=source_path, gain=uistate.lineEdit["import_gain"]
+                    source=source_path,
+                    gain=uistate.lineEdit["import_gain"],
+                    split_odd_even=split_odd_even,
+                    split_at_time=split_at_time,
                 )
                 if not dict_dfs_raw:
                     print(f"Failed to read source file at: {source_path}")
                     continue
-                # convert dict - channel:df to recording_name:df
-                dict_name_df = {
-                    (
-                        recording_name
-                        if len(dict_dfs_raw) == 1
-                        else f"{recording_name}_ch{channel}"
-                    ): df
-                    for channel, df in dict_dfs_raw.items()
-                }
+                # Keys are either plain channel ints {ch: df} or split tuples {(ch, label): df}.
+                # Normalise both into recording_name:df, appending _ch / _label suffixes as needed.
+                first_key = next(iter(dict_dfs_raw))
+                split_keys = isinstance(first_key, tuple)
+                n_channels = len(
+                    {k[0] for k in dict_dfs_raw} if split_keys else dict_dfs_raw
+                )
+                dict_name_df = {}
+                for key, df in dict_dfs_raw.items():
+                    if split_keys:
+                        channel, label = key
+                        ch_suffix = f"_ch{channel}" if n_channels > 1 else ""
+                        dict_name_df[f"{recording_name}{ch_suffix}_{label}"] = df
+                    else:
+                        channel = key
+                        ch_suffix = f"_ch{channel}" if n_channels > 1 else ""
+                        dict_name_df[f"{recording_name}{ch_suffix}"] = df
                 for rec, df_raw in dict_name_df.items():
                     logger.debug("ParseDataThread: %s", rec)
                     print(f"ParseDataThread: {rec}")
@@ -2188,7 +2201,7 @@ class UIsub(
             num = 0
         lineEdit.setText(str(num))
         if lineEditName == "lineEdit_split_at_time":
-            uistate.lineEdit["split_at_time"] = float(lineEdit.text())
+            uistate.lineEdit["split_at_time"] = float(lineEdit.text()) / 1000.0
             if (
                 uistate.lineEdit["split_at_time"] is not None
                 and uistate.lineEdit["split_at_time"] != 0
