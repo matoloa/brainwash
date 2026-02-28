@@ -1534,6 +1534,10 @@ class UIsub(
         self.actionReAnalyzeRecordings.setShortcut("A")
         self.menuEdit.addAction(self.actionReAnalyzeRecordings)
 
+        self.actionSweepOpsHeader = QtWidgets.QAction(
+            "   — sweep selection —"
+        )  # not connected: section header
+        self.menuEdit.addAction(self.actionSweepOpsHeader)
         self.actionKeepOnlySelectedSweeps = QtWidgets.QAction(
             "   Keep only selected sweeps"
         )
@@ -1555,6 +1559,24 @@ class UIsub(
             self.triggerSplitBySelectedSweeps
         )
         self.menuEdit.addAction(self.actionSplitBySelectedSweeps)
+
+        self.actionTimeOpsHeader = QtWidgets.QAction(
+            "   — time selection —"
+        )  # not connected: section header
+        self.menuEdit.addAction(self.actionTimeOpsHeader)
+        self.actionKeepOnlySelectedTime = QtWidgets.QAction(
+            "   Keep only selected time"
+        )
+        self.actionKeepOnlySelectedTime.triggered.connect(self.triggerKeepSelectedTime)
+        self.menuEdit.addAction(self.actionKeepOnlySelectedTime)
+        self.actionDiscardSelectedTime = QtWidgets.QAction("   Discard selected time")
+        self.actionDiscardSelectedTime.triggered.connect(
+            self.triggerDiscardSelectedTime
+        )
+        self.menuEdit.addAction(self.actionDiscardSelectedTime)
+        self.actionSplitByTime = QtWidgets.QAction("   Split recordings by time")
+        self.actionSplitByTime.triggered.connect(self.triggerSplitByTime)
+        self.menuEdit.addAction(self.actionSplitByTime)
 
         # View menu
         self.actionRefresh = QtWidgets.QAction("Refresh Graphs")
@@ -1856,6 +1878,9 @@ class UIsub(
         self.lineEdit_norm_EPSP_end.setVisible(norm)
         self.lineEdit_norm_EPSP_start.setText(f"{uistate.lineEdit['norm_EPSP_from']}")
         self.lineEdit_norm_EPSP_end.setText(f"{uistate.lineEdit['norm_EPSP_to']}")
+        self.lineEdit_split_at_time.setText(
+            f"{uistate.lineEdit['split_at_time'] * 1000:g}"
+        )
         self.lineEdit_EPSP_amp_halfwidth.setText(
             f"{uistate.lineEdit['EPSP_amp_halfwidth_ms']}"
         )
@@ -2169,9 +2194,9 @@ class UIsub(
         def str2num(text):
             try:
                 if request == "float":
-                    return max(0, float(text))
+                    return max(0, float(text.replace(",", ".")))
                 else:
-                    return max(0, int(text))
+                    return max(0, int(text.replace(",", ".")))
             except ValueError:
                 return 0
 
@@ -2219,7 +2244,9 @@ class UIsub(
             end=self.lineEdit_mean_selection_end,
             request="float",
         )
-        uistate.x_select["mean_start"], uistate.x_select["mean_end"] = low, high
+        # lineEdits display ms; uistate stores s
+        uistate.x_select["mean_start"] = low / 1000.0
+        uistate.x_select["mean_end"] = high / 1000.0 if high else None
         uiplot.xSelect(uistate.axm.figure.canvas)
 
     def editSweepSelectRange(self, lineEdit):
@@ -3051,7 +3078,7 @@ class UIsub(
             uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
             uistate.x_select["mean_start"] = uistate.x_on_click
             self.lineEdit_mean_selection_start.setText(
-                str(uistate.x_select["mean_start"])
+                f"{uistate.x_select['mean_start'] * 1000:g}"
             )
             self.connectDragRelease(
                 x_range=time_values, rec_ID=prow["ID"], graph="mean"
@@ -3426,7 +3453,7 @@ class UIsub(
         uistate.x_drag_last = uistate.x_drag
         if canvas == self.canvasMean:
             uistate.x_select["mean_end"] = uistate.x_drag
-            self.lineEdit_mean_selection_end.setText(str(uistate.x_drag))
+            self.lineEdit_mean_selection_end.setText(f"{uistate.x_drag * 1000:g}")
         else:
             uistate.x_select["output_end"] = uistate.x_drag
             uistate.x_select["output"] = set(
@@ -3447,6 +3474,9 @@ class UIsub(
             if is_mean:
                 self.lineEdit_mean_selection_end.setText("")
                 uistate.x_select["mean_end"] = None
+                self.lineEdit_mean_selection_start.setText(
+                    f"{uistate.x_select['mean_start'] * 1000:g}"
+                )
             elif is_output:
                 self.lineEdit_sweeps_range_to.setText("")
                 uistate.x_select["output_end"] = None
@@ -3457,8 +3487,8 @@ class UIsub(
             if is_mean:
                 uistate.x_select["mean_start"] = start
                 uistate.x_select["mean_end"] = end
-                self.lineEdit_mean_selection_start.setText(str(start))
-                self.lineEdit_mean_selection_end.setText(str(end))
+                self.lineEdit_mean_selection_start.setText(f"{start * 1000:g}")
+                self.lineEdit_mean_selection_end.setText(f"{end * 1000:g}")
             elif is_output:
                 uistate.x_select["output_start"] = start
                 uistate.x_select["output_end"] = end
