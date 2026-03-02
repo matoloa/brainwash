@@ -56,12 +56,8 @@ class GroupMixin:
         with open(path_dd_groups, "wb") as f:
             pickle.dump(dd_groups, f)
 
-    def get_groupsOfRec(
-        self, rec_ID
-    ):  # returns a set of all 'group ID' that have rec_ID in their 'rec_IDs' list
-        return list(
-            [key for key, value in self.dd_groups.items() if rec_ID in value["rec_IDs"]]
-        )
+    def get_groupsOfRec(self, rec_ID):  # returns a set of all 'group ID' that have rec_ID in their 'rec_IDs' list
+        return list([key for key, value in self.dd_groups.items() if rec_ID in value["rec_IDs"]])
 
     # ------------------------------------------------------------------
     # Create / remove
@@ -114,9 +110,7 @@ class GroupMixin:
     def group_rename(self, group_ID, new_group_name):
         if new_group_name in [group["group_name"] for group in self.dd_groups.values()]:
             print(f"Group name {new_group_name} already exists.")
-        elif (
-            re.match(r"^[a-zA-Z0-9_ -]+$", str(new_group_name)) is not None
-        ):  # True if valid filename
+        elif re.match(r"^[a-zA-Z0-9_ -]+$", str(new_group_name)) is not None:  # True if valid filename
             self.dd_groups[group_ID]["group_name"] = new_group_name
             self.group_save_dd()
             self.groupControlsRefresh()
@@ -150,12 +144,8 @@ class GroupMixin:
             print("No parsed files selected.")
             # TODO: set selection to clicked group
             return
-        selected_rec_IDs = dfp.loc[
-            uistate.list_idx_select_recs, "ID"
-        ].tolist()  # selected rec_IDs
-        all_in_group = all(
-            rec_ID in self.dd_groups[group_ID]["rec_IDs"] for rec_ID in selected_rec_IDs
-        )
+        selected_rec_IDs = dfp.loc[uistate.list_idx_select_recs, "ID"].tolist()  # selected rec_IDs
+        all_in_group = all(rec_ID in self.dd_groups[group_ID]["rec_IDs"] for rec_ID in selected_rec_IDs)
         if all_in_group:  # If all selected_rec_IDs are in the group_ID, ungroup them
             for rec_ID in selected_rec_IDs:
                 self.group_rec_ungroup(rec_ID, group_ID)
@@ -171,9 +161,7 @@ class GroupMixin:
     # Cache
     # ------------------------------------------------------------------
 
-    def group_cache_purge(
-        self, group_IDs=None
-    ):  # clear cache so that a new group mean is calculated
+    def group_cache_purge(self, group_IDs=None):  # clear cache so that a new group mean is calculated
         if not self.dict_group_means:
             print("No groups to purge.")
             return
@@ -183,12 +171,8 @@ class GroupMixin:
         for group_ID in group_IDs:
             if group_ID in self.dict_group_means:
                 del self.dict_group_means[group_ID]
-            path_group_mean_cache = Path(
-                f"{self.dict_folders['cache']}/group_{group_ID}_mean.parquet"
-            )
-            if (
-                path_group_mean_cache.exists
-            ):  # TODO: Upon adding a group, both of these conditions trigger. How?
+            path_group_mean_cache = Path(f"{self.dict_folders['cache']}/group_{group_ID}_mean.parquet")
+            if path_group_mean_cache.exists:  # TODO: Upon adding a group, both of these conditions trigger. How?
                 print(f"{path_group_mean_cache} found when checking for existence...")
                 try:
                     path_group_mean_cache.unlink()
@@ -197,17 +181,13 @@ class GroupMixin:
                     print("...but NOT when attempting to unlink.")
             uiplot.unPlotGroup(group_ID)
             if group_ID in self.dd_groups and self.dd_groups[group_ID]["rec_IDs"]:
-                uiplot.addGroup(
-                    group_ID, self.dd_groups[group_ID], self.get_dfgroupmean(group_ID)
-                )
+                uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.get_dfgroupmean(group_ID))
 
     # ------------------------------------------------------------------
     # Qt widget controls
     # ------------------------------------------------------------------
 
-    def group_controls_add(
-        self, group_ID
-    ):  # Create menu for adding to group and checkbox for showing group
+    def group_controls_add(self, group_ID):  # Create menu for adding to group and checkbox for showing group
         group_name = self.dd_groups[group_ID]["group_name"]
         # print(f"group_controls_add, group_ID: {group_ID}, type: {type(group_ID)} group_name: {group_name}")
         dict_group = self.dd_groups.get(group_ID)
@@ -223,25 +203,17 @@ class GroupMixin:
             QtWidgets.QAction(f"Add selection to {group_name}", self),
         )
         self.new_group_menu_item = getattr(self, f"actionAddTo_{str_ID}")
-        self.new_group_menu_item.triggered.connect(
-            lambda checked, add_group_ID=group_ID: self.group_selection(add_group_ID)
-        )
+        self.new_group_menu_item.triggered.connect(lambda checked, add_group_ID=group_ID: self.group_selection(add_group_ID))
         self.new_group_menu_item.setShortcut(f"{str_ID}")
         self.menuGroups.addAction(self.new_group_menu_item)
         self.new_checkbox = CustomCheckBox(group_ID)
-        self.new_checkbox.rightClicked.connect(
-            self.triggerGroupRename
-        )  # str_ID is passed by CustomCheckBox
+        self.new_checkbox.rightClicked.connect(self.triggerGroupRename)  # str_ID is passed by CustomCheckBox
         self.new_checkbox.setObjectName(f"checkBox_group_{str_ID}")
         self.new_checkbox.setText(f"{str_ID}. {group_name}")
-        self.new_checkbox.setStyleSheet(
-            f"background-color: {color};"
-        )  # Set the background color
+        self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the background color
         self.new_checkbox.setMaximumWidth(100)  # Set the maximum width
         self.new_checkbox.setChecked(bool(dict_group["show"]))
-        self.new_checkbox.stateChanged.connect(
-            lambda state, group_ID=group_ID: self.groupCheckboxChanged(state, group_ID)
-        )
+        self.new_checkbox.stateChanged.connect(lambda state, group_ID=group_ID: self.groupCheckboxChanged(state, group_ID))
         self.verticalLayoutGroups.addWidget(self.new_checkbox)
 
     def group_controls_remove(self, group_ID=None):
@@ -283,17 +255,11 @@ class GroupMixin:
         else:
             if rec_ID is not None:
                 list_rec_in_groups = group_list(rec_ID)
-                df_p.loc[df_p["ID"] == rec_ID, "groups"] = (
-                    ", ".join(sorted(list_rec_in_groups)) if list_rec_in_groups else " "
-                )
+                df_p.loc[df_p["ID"] == rec_ID, "groups"] = ", ".join(sorted(list_rec_in_groups)) if list_rec_in_groups else " "
             else:
                 for i, row in df_p.iterrows():
                     rec_ID = row["ID"]
                     list_rec_in_groups = group_list(rec_ID)
-                    df_p.at[i, "groups"] = (
-                        ", ".join(sorted(list_rec_in_groups))
-                        if list_rec_in_groups
-                        else " "
-                    )
+                    df_p.at[i, "groups"] = ", ".join(sorted(list_rec_in_groups)) if list_rec_in_groups else " "
         self.set_df_project(df_p)
         self.tableFormat()

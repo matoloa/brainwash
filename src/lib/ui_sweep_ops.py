@@ -91,26 +91,18 @@ class SweepOpsMixin:
         if not n_recs:
             print("No recordings selected")
             return False
-        print(
-            f"{n_recs} selected recording{'s' if n_recs != 1 else ''}: {uistate.list_idx_select_recs}"
-        )
+        print(f"{n_recs} selected recording{'s' if n_recs != 1 else ''}: {uistate.list_idx_select_recs}")
         if not n_sweeps:
             print("No sweeps selected")
             return False
-        print(
-            f"{n_sweeps} selected sweep{'s' if n_sweeps != 1 else ''}: {uistate.x_select['output']}"
-        )
+        print(f"{n_sweeps} selected sweep{'s' if n_sweeps != 1 else ''}: {uistate.x_select['output']}")
         return True
 
     def sweep_removal_valid_confirmed(self):
         if not self.sweep_selection_valid():
             return False
         # Confirm with the user before performing destructive removal across recordings
-        selected_sweeps = (
-            uistate.x_select.get("output")
-            if isinstance(uistate.x_select, dict)
-            else None
-        )
+        selected_sweeps = uistate.x_select.get("output") if isinstance(uistate.x_select, dict) else None
         n_sweeps = len(selected_sweeps) if selected_sweeps else 0
         n_recs = len(uistate.list_idx_select_recs)
         title = "Remove sweeps"
@@ -130,18 +122,10 @@ class SweepOpsMixin:
 
     def sweep_shift_gaps(self, df, sweeps_removed):
         """Shifts all remaining sweeps down to close gaps after removal, e.g. removed {10, 11} → 12→10, 13→11, etc."""
-        removed = np.array(
-            sorted(sweeps_removed), dtype=np.int64
-        )  # sorted array of removed sweep numbers
-        s = df[
-            "sweep"
-        ].to_numpy()  # convert sweep column to numpy array for vectorized operations
-        k = np.searchsorted(
-            removed, s, side="right"
-        )  # count how many removed sweeps are <= each sweep value
-        df["sweep"] = (
-            s - k
-        )  # shift each sweep down by the count of removed sweeps before or equal to it
+        removed = np.array(sorted(sweeps_removed), dtype=np.int64)  # sorted array of removed sweep numbers
+        s = df["sweep"].to_numpy()  # convert sweep column to numpy array for vectorized operations
+        k = np.searchsorted(removed, s, side="right")  # count how many removed sweeps are <= each sweep value
+        df["sweep"] = s - k  # shift each sweep down by the count of removed sweeps before or equal to it
         return df  # return DataFrame with adjusted sweep numbering
 
     def sweep_remove_by_ID(self, rec_ID, selection=None):
@@ -154,9 +138,7 @@ class SweepOpsMixin:
         """
         self.usage("data_remove_sweeps_by_ID")
         p_row = self.df_project[self.df_project["ID"] == rec_ID].iloc[0]
-        set_sweeps_to_remove = (
-            selection if selection is not None else uistate.x_select["output"]
-        )
+        set_sweeps_to_remove = selection if selection is not None else uistate.x_select["output"]
         rec_name = p_row["recording_name"]
         df_data_copy = self.get_dfdata(p_row).copy()
         # check that selected sweeps exist in df_data
@@ -170,33 +152,19 @@ class SweepOpsMixin:
             print(f"No valid sweeps to remove in recording '{rec_name}'.")
             return
         n_total_sweeps = p_row["sweeps"]
-        print(
-            f"Recording '{rec_name}': removing {len(sweeps_to_remove)} sweep{'s' if len(sweeps_to_remove) != 1 else ''} out of {n_total_sweeps}..."
-        )
+        print(f"Recording '{rec_name}': removing {len(sweeps_to_remove)} sweep{'s' if len(sweeps_to_remove) != 1 else ''} out of {n_total_sweeps}...")
         print(f"Sweeps to remove: {sorted(sweeps_to_remove)}")
 
-        df_data_filtered = df_data_copy[
-            ~df_data_copy["sweep"].isin(sweeps_to_remove)
-        ].reset_index(drop=True)  # remove selected sweeps
-        print(
-            f"Sweeps excluded, remaining sweeps: {df_data_filtered['sweep'].unique()}"
-        )
-        pruned_df = self.sweep_shift_gaps(
-            df_data_filtered, sweeps_to_remove
-        )  # renumber remaining sweeps to close gaps
+        df_data_filtered = df_data_copy[~df_data_copy["sweep"].isin(sweeps_to_remove)].reset_index(drop=True)  # remove selected sweeps
+        print(f"Sweeps excluded, remaining sweeps: {df_data_filtered['sweep'].unique()}")
+        pruned_df = self.sweep_shift_gaps(df_data_filtered, sweeps_to_remove)  # renumber remaining sweeps to close gaps
         print(f"Gaps closed, remaining sweeps: {pruned_df['sweep'].unique()}")
-        self.df2file(
-            df=pruned_df, rec=rec_name, key="data"
-        )  # overwrite data file with pruned data
+        self.df2file(df=pruned_df, rec=rec_name, key="data")  # overwrite data file with pruned data
         n_remaining_sweeps = len(pruned_df["sweep"].unique())
         df_project = self.get_df_project()
-        df_project.loc[df_project["ID"] == rec_ID, "sweeps"] = (
-            n_remaining_sweeps  # update sweeps count in df_project
-        )
+        df_project.loc[df_project["ID"] == rec_ID, "sweeps"] = n_remaining_sweeps  # update sweeps count in df_project
         self.save_df_project()
-        print(
-            f"Recording '{rec_name}': {n_remaining_sweeps} sweep{'s' if n_remaining_sweeps != 1 else ''} remain."
-        )
+        print(f"Recording '{rec_name}': {n_remaining_sweeps} sweep{'s' if n_remaining_sweeps != 1 else ''} remain.")
         # clear cache files for the recording
         old_timepoints = self.dict_folders["timepoints"] / (rec_name + ".parquet")
         old_mean = self.dict_folders["cache"] / (rec_name + "_mean.parquet")
@@ -215,20 +183,14 @@ class SweepOpsMixin:
         if not self.sweep_selection_valid():
             return
         n_sweeps_all = 0
-        for rec_idx in (
-            uistate.list_idx_select_recs
-        ):  # get all sweeps from the longest selected recording
+        for rec_idx in uistate.list_idx_select_recs:  # get all sweeps from the longest selected recording
             p_row = self.df_project.iloc[rec_idx]
             n_sweeps = p_row["sweeps"]
             if n_sweeps > n_sweeps_all:
                 n_sweeps_all = n_sweeps
-        print(
-            f"sweep_keep_selected: longest selected recording has {n_sweeps_all} sweep{'s' if n_sweeps_all != 1 else ''}."
-        )
+        print(f"sweep_keep_selected: longest selected recording has {n_sweeps_all} sweep{'s' if n_sweeps_all != 1 else ''}.")
         set_sweeps_to_remove = uistate.x_select["output"]  # get selected sweeps
-        uistate.x_select["output"] = (
-            set(range(n_sweeps_all)) - set_sweeps_to_remove
-        )  # inverse selection
+        uistate.x_select["output"] = set(range(n_sweeps_all)) - set_sweeps_to_remove  # inverse selection
         self.sweep_remove_selected()  # removes inverted selection and clears selection
 
     def sweep_remove_selected(self):
@@ -245,9 +207,7 @@ class SweepOpsMixin:
     def sweep_unselect(self):
         # clear selections and recalculate outputs
         uistate.list_idx_select_recs = []  # clear uistate selection list
-        uiplot.xDeselect(
-            ax=uistate.ax1, reset=True
-        )  # clear sweep selection: resets uistate.x_select
+        uiplot.xDeselect(ax=uistate.ax1, reset=True)  # clear sweep selection: resets uistate.x_select
         self.lineEdit_sweeps_range_from.setText("")  # clear lineEdits
         self.lineEdit_sweeps_range_to.setText("")
         self.tableProj.clearSelection()  # clear visual effect of df_project selection
@@ -295,12 +255,8 @@ class SweepOpsMixin:
             df_source = self.get_dfdata(source_row).copy()
 
             # --- Partition in memory and renumber each half ---
-            df_A = df_source[df_source["sweep"].isin(selected_sweeps)].reset_index(
-                drop=True
-            )
-            df_B = df_source[df_source["sweep"].isin(other_sweeps)].reset_index(
-                drop=True
-            )
+            df_A = df_source[df_source["sweep"].isin(selected_sweeps)].reset_index(drop=True)
+            df_B = df_source[df_source["sweep"].isin(other_sweeps)].reset_index(drop=True)
             df_A = self.sweep_shift_gaps(df_A, selected_sweeps)
             df_B = self.sweep_shift_gaps(df_B, other_sweeps)
 
@@ -315,23 +271,15 @@ class SweepOpsMixin:
             df_proj_B["recording_name"] = rec_B
             df_proj_B["sweeps"] = n_sweeps_B
             df_proj_B["sweep_duration"] = sweep_duration_B
-            self.df_project = pd.concat(
-                [self.get_df_project(), pd.DataFrame([df_proj_B])], ignore_index=True
-            )
+            self.df_project = pd.concat([self.get_df_project(), pd.DataFrame([df_proj_B])], ignore_index=True)
 
             # --- Rename source files to rec_A names (filesystem rename only, no data written) ---
             self.rename_files_by_rec_name(old_name=source_name, new_name=rec_A)
 
             # --- Update rec_A entry in df_project ---
-            self.df_project.loc[
-                self.df_project["ID"] == source_row["ID"], "recording_name"
-            ] = rec_A
-            self.df_project.loc[self.df_project["ID"] == source_row["ID"], "sweeps"] = (
-                n_sweeps_A
-            )
-            self.df_project.loc[
-                self.df_project["ID"] == source_row["ID"], "sweep_duration"
-            ] = sweep_duration_A
+            self.df_project.loc[self.df_project["ID"] == source_row["ID"], "recording_name"] = rec_A
+            self.df_project.loc[self.df_project["ID"] == source_row["ID"], "sweeps"] = n_sweeps_A
+            self.df_project.loc[self.df_project["ID"] == source_row["ID"], "sweep_duration"] = sweep_duration_A
 
             # --- Write both halves directly (no intermediate full copy) ---
             self.df2file(df=df_A, rec=rec_A, key="data")
@@ -388,10 +336,7 @@ class SweepOpsMixin:
         df_cropped = df[mask].copy().reset_index(drop=True)
 
         if df_cropped.empty:
-            print(
-                f"time_crop_by_ID: time window [{keep_start_s}, {keep_end_s}] s "
-                f"contains no samples in '{rec_name}' — skipping."
-            )
+            print(f"time_crop_by_ID: time window [{keep_start_s}, {keep_end_s}] s " f"contains no samples in '{rec_name}' — skipping.")
             return
 
         # Re-zero time per-sweep so each sweep starts at 0.
@@ -400,9 +345,7 @@ class SweepOpsMixin:
 
         new_sweep_duration = parse.metadata(df_cropped)["sweep_duration"]
         self.df2file(df=df_cropped, rec=rec_name, key="data")
-        self.df_project.loc[self.df_project["ID"] == rec_ID, "sweep_duration"] = (
-            new_sweep_duration
-        )
+        self.df_project.loc[self.df_project["ID"] == rec_ID, "sweep_duration"] = new_sweep_duration
         self.save_df_project()
         self._clear_rec_cache(rec_name)
         print(
@@ -490,10 +433,7 @@ class SweepOpsMixin:
             df_after = df[df["time"] > end_s].copy()
 
             if df_before.empty and df_after.empty:
-                print(
-                    f"time_discard_selected: discarding [{start_s}, {end_s}] s "
-                    f"leaves nothing in '{rec_name}' — skipping."
-                )
+                print(f"time_discard_selected: discarding [{start_s}, {end_s}] s " f"leaves nothing in '{rec_name}' — skipping.")
                 continue
 
             # Re-zero the 'after' fragment per-sweep so it continues from
@@ -504,9 +444,7 @@ class SweepOpsMixin:
                 # shift 'after' so it immediately follows 'before' with one dt gap
                 dt = df["time"].diff().dropna().mode().iloc[0]
                 df_after = df_after.copy()
-                df_after["time"] = (
-                    df_after["time"] - after_start + before_end + dt
-                ).round(9)
+                df_after["time"] = (df_after["time"] - after_start + before_end + dt).round(9)
                 df_joined = pd.concat([df_before, df_after]).reset_index(drop=True)
             elif df_before.empty:
                 df_joined = df_after.copy().reset_index(drop=True)
@@ -519,9 +457,7 @@ class SweepOpsMixin:
 
             new_sweep_duration = parse.metadata(df_joined)["sweep_duration"]
             self.df2file(df=df_joined, rec=rec_name, key="data")
-            self.df_project.loc[self.df_project["ID"] == rec_ID, "sweep_duration"] = (
-                new_sweep_duration
-            )
+            self.df_project.loc[self.df_project["ID"] == rec_ID, "sweep_duration"] = new_sweep_duration
             self.save_df_project()
             self._clear_rec_cache(rec_name)
             print(
@@ -560,9 +496,7 @@ class SweepOpsMixin:
             name_b = f"{base_name}_{suf_b}"
             if name_a not in existing and name_b not in existing:
                 return name_a, name_b
-        raise RuntimeError(
-            f"_next_free_time_split_pair: all 13 letter pairs are taken for '{base_name}'"
-        )
+        raise RuntimeError(f"_next_free_time_split_pair: all 13 letter pairs are taken for '{base_name}'")
 
     def _clear_rec_cache(self, rec_name: str):
         """Delete all cache / timepoint files for *rec_name*."""
@@ -636,9 +570,7 @@ class SweepOpsMixin:
                 print(f"sweep_split_by_time: '{raw}' is not a valid number.")
                 return
             if split_ms <= 0:
-                print(
-                    f"sweep_split_by_time: split time must be > 0 ms (got {split_ms})."
-                )
+                print(f"sweep_split_by_time: split time must be > 0 ms (got {split_ms}).")
                 return
             split_s = split_ms / 1000.0
 
@@ -685,17 +617,12 @@ class SweepOpsMixin:
                 print(f"sweep_split_by_time: {exc}")
                 continue
 
-            print(
-                f"sweep_split_by_time: splitting '{source_name}' at t={split_s}s "
-                f"→ '{rec_a}' (part a) and '{rec_b}' (part b)."
-            )
+            print(f"sweep_split_by_time: splitting '{source_name}' at t={split_s}s " f"→ '{rec_a}' (part a) and '{rec_b}' (part b).")
 
             # --- Read source data exactly once ---
             df_source = self.get_dfdata(source_row)
             if df_source is None:
-                print(
-                    f"sweep_split_by_time: could not read data for '{source_name}', skipping."
-                )
+                print(f"sweep_split_by_time: could not read data for '{source_name}', skipping.")
                 continue
             df_source = df_source.copy()
 
@@ -705,15 +632,11 @@ class SweepOpsMixin:
 
             if df_a.empty:
                 print(
-                    f"sweep_split_by_time: split_s={split_s}s is at or before the first sample "
-                    f"in '{source_name}'; part 'a' is empty — skipping."
+                    f"sweep_split_by_time: split_s={split_s}s is at or before the first sample " f"in '{source_name}'; part 'a' is empty — skipping."
                 )
                 continue
             if df_b.empty:
-                print(
-                    f"sweep_split_by_time: split_s={split_s}s is beyond the last sample "
-                    f"in '{source_name}'; part 'b' is empty — skipping."
-                )
+                print(f"sweep_split_by_time: split_s={split_s}s is beyond the last sample " f"in '{source_name}'; part 'b' is empty — skipping.")
                 continue
 
             # Re-zero time in part 'b' per-sweep so it starts from 0.
@@ -738,23 +661,15 @@ class SweepOpsMixin:
             df_proj_b["recording_name"] = rec_b
             df_proj_b["sweeps"] = n_sweeps_b
             df_proj_b["sweep_duration"] = sweep_duration_b
-            self.df_project = pd.concat(
-                [self.get_df_project(), pd.DataFrame([df_proj_b])], ignore_index=True
-            )
+            self.df_project = pd.concat([self.get_df_project(), pd.DataFrame([df_proj_b])], ignore_index=True)
 
             # --- Rename source files to rec_a names (filesystem rename only) ---
             self.rename_files_by_rec_name(old_name=source_name, new_name=rec_a)
 
             # --- Update rec_a entry in df_project (reuses source row's ID) ---
-            self.df_project.loc[
-                self.df_project["ID"] == source_row["ID"], "recording_name"
-            ] = rec_a
-            self.df_project.loc[self.df_project["ID"] == source_row["ID"], "sweeps"] = (
-                n_sweeps_a
-            )
-            self.df_project.loc[
-                self.df_project["ID"] == source_row["ID"], "sweep_duration"
-            ] = sweep_duration_a
+            self.df_project.loc[self.df_project["ID"] == source_row["ID"], "recording_name"] = rec_a
+            self.df_project.loc[self.df_project["ID"] == source_row["ID"], "sweeps"] = n_sweeps_a
+            self.df_project.loc[self.df_project["ID"] == source_row["ID"], "sweep_duration"] = sweep_duration_a
 
             # --- Write both halves as source data files ---
             self.df2file(df=df_a, rec=rec_a, key="data")

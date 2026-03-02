@@ -55,9 +55,7 @@ if __name__ == "__main__":
     logging.getLogger("matplotlib.font_manager").setLevel(logging.WARNING)
 
     logger.info(
-        f"Brainwash starting — platform={sys.platform}, "
-        f"frozen={getattr(sys, 'frozen', False)}, "
-        f"argv={sys.argv}, py={sys.version[:50]}"
+        f"Brainwash starting — platform={sys.platform}, " f"frozen={getattr(sys, 'frozen', False)}, " f"argv={sys.argv}, py={sys.version[:50]}"
     )
 
     # pandas 3.0 changed the default string dtype to Arrow-backed string[pyarrow],

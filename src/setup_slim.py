@@ -3,9 +3,8 @@ from setuptools import find_packages
 from cx_Freeze import setup, Executable
 import toml  # for reading pyproject.toml
 
-
 pyproject = toml.load("../pyproject.toml")
-version = pyproject['project']['version']
+version = pyproject["project"]["version"]
 
 # base="Win32GUI" should be used only for Windows GUI app
 print(f"sys.platform: {sys.platform}")
@@ -20,8 +19,8 @@ include_files = ["lib/", ("../pyproject.toml", "lib/pyproject.toml")]
 # Create an executable.
 exe = Executable(
     script=script_path,
-    #base=base,
-    #targetName="hello.exe"  # The name of the output executable.
+    # base=base,
+    # targetName="hello.exe"  # The name of the output executable.
 )
 # Setup cx_Freeze options.
 options = {
@@ -41,11 +40,10 @@ setup(
     name="Brainwash",
     version=version,
     description="",
-    #packages=find_packages(where="src"),
-    #package_dir={"": "src"},
-    #include_package_data=True,
+    # packages=find_packages(where="src"),
+    # package_dir={"": "src"},
+    # include_package_data=True,
     options=options,
     executables=[exe],
-    base=base
+    base=base,
 )
-

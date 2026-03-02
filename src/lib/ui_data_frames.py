@@ -38,9 +38,7 @@ class DataFrameMixin:
     # ------------------------------------------------------------------
 
     def binSweeps(self):
-        print(
-            "binSweeps - later on, this is to bin only the selected recording: now it does nothing and should be hidden"
-        )
+        print("binSweeps - later on, this is to bin only the selected recording: now it does nothing and should be hidden")
 
     # ------------------------------------------------------------------
     # Voltage-range DataFrame
@@ -64,12 +62,8 @@ class DataFrameMixin:
             trow = self.get_trow(dfp_idx=i)
             event_start = trow["t_stim"] + 0.002  # s after stim
             event_end = event_start + 0.040
-            dfv.loc[i, "event_vmin"] = dffilter[
-                (dffilter["time"] >= event_start) & (dffilter["time"] <= event_end)
-            ]["voltage"].min()
-            dfv.loc[i, "event_vmax"] = (
-                0.0005  # dffilter[(dffilter['time'] >= event_start) & (dffilter['time'] <= event_end)]['voltage'].max()
-            )
+            dfv.loc[i, "event_vmin"] = dffilter[(dffilter["time"] >= event_start) & (dffilter["time"] <= event_end)]["voltage"].min()
+            dfv.loc[i, "event_vmax"] = 0.0005  # dffilter[(dffilter['time'] >= event_start) & (dffilter['time'] <= event_end)]['voltage'].max()
             # output measurements
             dfout = self.get_dfoutput(row)  # TODO: Norm handling
             dfv.loc[i, "amp_min"] = dfout["EPSP_amp"].min()
@@ -78,9 +72,7 @@ class DataFrameMixin:
             dfv.loc[i, "slope_max"] = dfout["EPSP_slope"].max()
             print(f"* * * * \n{dfv}")
             uistate.dfv = dfv
-        print(
-            f" - get_dfv voltage range calc time: {round((time.time() - t0) * 1000)} ms"
-        )
+        print(f" - get_dfv voltage range calc time: {round((time.time() - t0) * 1000)} ms")
         return uistate.dfv
 
     # ------------------------------------------------------------------
@@ -100,9 +92,7 @@ class DataFrameMixin:
         volley_amp_halfwidth_ms = uistate.lineEdit["volley_amp_halfwidth_ms"]
         dt = uistate.default_dict_t
         dt["t_EPSP_amp_halfwidth"] = EPSP_amp_halfwidth_ms / 1000  # convert to seconds
-        dt["t_volley_amp_halfwidth"] = (
-            volley_amp_halfwidth_ms / 1000
-        )  # convert to seconds
+        dt["t_volley_amp_halfwidth"] = volley_amp_halfwidth_ms / 1000  # convert to seconds
         dt["norm_output_from"] = norm_from
         dt["norm_output_to"] = norm_to
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
@@ -174,9 +164,7 @@ class DataFrameMixin:
                 dict_filter_params = json.loads(row["filter_params"])
                 window_length = int(dict_filter_params["window_length"])
                 poly_order = int(dict_filter_params["poly_order"])
-                dfmean["savgol"] = analysis.addFilterSavgol(
-                    df=dfmean, window_length=window_length, poly_order=poly_order
-                )
+                dfmean["savgol"] = analysis.addFilterSavgol(df=dfmean, window_length=window_length, poly_order=poly_order)
                 persist = True
         if persist:
             self.df2file(df=dfmean, rec=recording_name, key="mean")
@@ -206,18 +194,14 @@ class DataFrameMixin:
                     },
                     inplace=True,
                 )
-                self.df2file(
-                    df=dft, rec=rec, key="timepoints"
-                )  # re-persist with corrected names
+                self.df2file(df=dft, rec=rec, key="timepoints")  # re-persist with corrected names
             self.dict_ts[rec] = dft
             return dft
         else:
             print("creating dft")
             default_dict_t = uistate.default_dict_t.copy()  # Default sizes
             dfmean = self.get_dfmean(row)
-            dft = analysis.find_events(
-                dfmean=dfmean, default_dict_t=default_dict_t, verbose=False
-            )
+            dft = analysis.find_events(dfmean=dfmean, default_dict_t=default_dict_t, verbose=False)
             # TODO: Error handling!
             if dft.empty:
                 print("get_dft: No stims found.")
@@ -226,12 +210,8 @@ class DataFrameMixin:
                 uistate.lineEdit["norm_EPSP_from"],
                 uistate.lineEdit["norm_EPSP_to"],
             )
-            dft["t_EPSP_amp_halfwidth"] = (
-                uistate.lineEdit["EPSP_amp_halfwidth_ms"] / 1000
-            )
-            dft["t_volley_amp_halfwidth"] = (
-                uistate.lineEdit["volley_amp_halfwidth_ms"] / 1000
-            )
+            dft["t_EPSP_amp_halfwidth"] = uistate.lineEdit["EPSP_amp_halfwidth_ms"] / 1000
+            dft["t_volley_amp_halfwidth"] = uistate.lineEdit["volley_amp_halfwidth_ms"] / 1000
             df_p = self.get_df_project()  # update (number of) 'stims' columns
             stims = len(dft)
             self.set_df_project(df_p)
@@ -264,9 +244,7 @@ class DataFrameMixin:
             if "index" in dfoutput.columns:
                 dfoutput.drop(columns=["index"], inplace=True)
                 dfoutput.reset_index(drop=True, inplace=True)
-                self.df2file(
-                    df=dfoutput, rec=rec, key="output"
-                )  # re-persist clean version
+                self.df2file(df=dfoutput, rec=rec, key="output")  # re-persist clean version
             else:
                 dfoutput.reset_index(drop=True, inplace=True)
         else:  # 3: Create from scratch and persist
@@ -286,21 +264,15 @@ class DataFrameMixin:
                     else:
                         dfinput = self.get_dffilter(row)
                     dfoutput_stim = analysis.build_dfoutput(df=dfinput, dict_t=dict_t)
-                    print(
-                        f"get_dfoutput: build_dfoutput done for stim row {i}, assigning means"
-                    )
+                    print(f"get_dfoutput: build_dfoutput done for stim row {i}, assigning means")
                     dft.at[i, "volley_amp_mean"] = dfoutput_stim["volley_amp"].mean()
                     print(f"get_dfoutput: volley_amp_mean assigned")
-                    dft.at[i, "volley_slope_mean"] = dfoutput_stim[
-                        "volley_slope"
-                    ].mean()
+                    dft.at[i, "volley_slope_mean"] = dfoutput_stim["volley_slope"].mean()
                     print(f"get_dfoutput: volley_slope_mean assigned, concat next")
                     dfoutput = pd.concat([dfoutput, dfoutput_stim])
                     print(f"get_dfoutput: concat done, loop continuing")
                 self.set_dft(rec, dft)
-                print(
-                    f"get_dfoutput: set_dft done, returning dfoutput shape={dfoutput.shape}"
-                )
+                print(f"get_dfoutput: set_dft done, returning dfoutput shape={dfoutput.shape}")
             dfoutput.reset_index(drop=True, inplace=True)
             # Persist the clean (no spurious index column) version to disk.
             self.df2file(df=dfoutput, rec=rec, key="output")
@@ -334,23 +306,17 @@ class DataFrameMixin:
         recording_name = row["recording_name"]
         if recording_name in self.dict_filters:  # 1: Return cached
             return self.dict_filters[recording_name]
-        path_filter = Path(
-            f"{self.dict_folders['cache']}/{recording_name}_filter.parquet"
-        )
+        path_filter = Path(f"{self.dict_folders['cache']}/{recording_name}_filter.parquet")
         if Path(path_filter).exists():  # 2: Read from file
             dffilter = pd.read_parquet(path_filter)
         else:  # 3: Create file
-            dffilter = parse.zeroSweeps(
-                dfdata=self.get_dfdata(row=row), dfmean=self.get_dfmean(row=row)
-            )
+            dffilter = parse.zeroSweeps(dfdata=self.get_dfdata(row=row), dfmean=self.get_dfmean(row=row))
             self.df2file(df=dffilter, rec=recording_name, key="filter")
             if row["filter"] == "savgol":
                 dict_filter_params = json.loads(row["filter_params"])
                 window_length = int(dict_filter_params["window_length"])
                 poly_order = int(dict_filter_params["poly_order"])
-                dffilter["savgol"] = analysis.addFilterSavgol(
-                    df=dffilter, window_length=window_length, poly_order=poly_order
-                )
+                dffilter["savgol"] = analysis.addFilterSavgol(df=dffilter, window_length=window_length, poly_order=poly_order)
         # Cache and return
         self.dict_filters[recording_name] = dffilter
         return self.dict_filters[recording_name]
@@ -376,29 +342,18 @@ class DataFrameMixin:
             for bin_num in range(num_bins):
                 sweep_start = bin_num * bin_size
                 sweep_end = sweep_start + bin_size
-                df_bin = df_filter[
-                    (df_filter["sweep"] >= sweep_start)
-                    & (df_filter["sweep"] < sweep_end)
-                ]
+                df_bin = df_filter[(df_filter["sweep"] >= sweep_start) & (df_filter["sweep"] < sweep_end)]
                 if df_bin.empty:
                     continue
-                agg_funcs = {
-                    col: "mean"
-                    for col in df_bin.columns
-                    if col not in ["sweep", "time"]
-                }
-                agg_funcs["time"] = (
-                    "first"  # Keep the first time value as representative
-                )
+                agg_funcs = {col: "mean" for col in df_bin.columns if col not in ["sweep", "time"]}
+                agg_funcs["time"] = "first"  # Keep the first time value as representative
                 df_bin_grouped = df_bin.groupby("time", as_index=False).agg(agg_funcs)
                 # Assign the bin number as the new sweep value
                 df_bin_grouped["sweep"] = bin_num
                 binned_data.append(df_bin_grouped)
             df_bins = pd.concat(binned_data, ignore_index=True)
             self.dict_bins[rec] = df_bins
-            print(
-                f"recalculate: {rec}, binned {df_filter['sweep'].nunique()} sweeps into {len(df_bins['sweep'].unique())} bins"
-            )
+            print(f"recalculate: {rec}, binned {df_filter['sweep'].nunique()} sweeps into {len(df_bins['sweep'].unique())} bins")
             self.df2file(df=df_bins, rec=rec, key="bin")
         self.dict_bins[rec] = df_bins
         return df_bins
@@ -413,17 +368,13 @@ class DataFrameMixin:
         # TODO: check if row has a paired recording
         # Otherwise, find the paired recording
         rec_paired = None
-        key_pair = rec_select[
-            :-2
-        ]  # remove stim id ("_a" or "_b") from selected recording_name
+        key_pair = rec_select[:-2]  # remove stim id ("_a" or "_b") from selected recording_name
         # 1: check for cached diff
         if key_pair in self.dict_diffs:
             return self.dict_diffs[key_pair]
         # 2: check for file
         if Path(f"{self.dict_folders['cache']}/{key_pair}_diff.parquet").exists():
-            dfdiff = pd.read_parquet(
-                f"{self.dict_folders['cache']}/{key_pair}_diff.parquet"
-            )
+            dfdiff = pd.read_parquet(f"{self.dict_folders['cache']}/{key_pair}_diff.parquet")
             self.dict_diffs[key_pair] = dfdiff
             return dfdiff
         # 3: build a new diff
@@ -433,14 +384,9 @@ class DataFrameMixin:
             if row["paired_recording"] in dfp["recording_name"].values:
                 rec_paired = row["paired_recording"]
         # 3.2: if not, find a recording with a matching name
-        if (
-            rec_paired is None
-        ):  # set rec_paired to the first recording_name that starts with rec_paired, but isn't rec_select
+        if rec_paired is None:  # set rec_paired to the first recording_name that starts with rec_paired, but isn't rec_select
             for i, row_check in dfp.iterrows():
-                if (
-                    row_check["recording_name"].startswith(key_pair)
-                    and row_check["recording_name"] != rec_select
-                ):
+                if row_check["recording_name"].startswith(key_pair) and row_check["recording_name"] != rec_select:
                     rec_paired = row_check["recording_name"]
                     break
         if rec_paired is None:  # if still None, return
@@ -459,22 +405,14 @@ class DataFrameMixin:
             print("Tx is NaN - loop should trigger!")
             row["Tx"] = False
             # default: assume Tx has the highest max EPSP_amp, or EPSP_slope if there is no EPSP_amp
-            if any(
-                (
-                    dfout_select[col].max() > dfout_paired[col].max()
-                    for col in ["EPSP_amp", "EPSP_slope"]
-                    if col in dfout_select.columns
-                )
-            ):
+            if any((dfout_select[col].max() > dfout_paired[col].max() for col in ["EPSP_amp", "EPSP_slope"] if col in dfout_select.columns)):
                 row["Tx"] = True
                 row_paired["Tx"] = False
                 dfp.loc[row.name, "Tx"] = row["Tx"]
                 dfp.loc[row_paired.name, "Tx"] = row_paired["Tx"]
                 print(f"{rec_select} is Tx, {rec_paired} is control. Saving df_p...")
                 self.set_df_project(dfp)
-            elif not any(
-                col in dfout_select.columns for col in ["EPSP_amp", "EPSP_slope"]
-            ):
+            elif not any(col in dfout_select.columns for col in ["EPSP_amp", "EPSP_slope"]):
                 print("Selected recording has no measurements.")
                 return
         else:
@@ -541,10 +479,7 @@ class DataFrameMixin:
                     .reset_index()
                 )
                 group_mean.columns = [
-                    col[0]
-                    if col[0] == "stim"
-                    else "_".join(col).strip().replace("sem", "SEM")
-                    for col in group_mean.columns.values
+                    col[0] if col[0] == "stim" else "_".join(col).strip().replace("sem", "SEM") for col in group_mean.columns.values
                 ]
             else:
                 if len(dfs) == 0:
@@ -576,10 +511,7 @@ class DataFrameMixin:
                         .reset_index()
                     )
                 group_mean.columns = [
-                    col[0]
-                    if col[0] == "sweep"
-                    else "_".join(col).strip().replace("sem", "SEM")
-                    for col in group_mean.columns.values
+                    col[0] if col[0] == "sweep" else "_".join(col).strip().replace("sem", "SEM") for col in group_mean.columns.values
                 ]
             print(f"Group mean columns: {group_mean.columns}")
             print(f"Group mean: {group_mean}")
@@ -591,9 +523,7 @@ class DataFrameMixin:
     # Uniform timepoints across stims
     # ------------------------------------------------------------------
 
-    def set_uniformTimepoints(
-        self, p_row=None, dft=None, dfoutput=None
-    ):  # NB: requires both dfoutput and df_t to be present!
+    def set_uniformTimepoints(self, p_row=None, dft=None, dfoutput=None):  # NB: requires both dfoutput and df_t to be present!
         variables = [
             "t_volley_amp",
             "t_volley_slope_start",
@@ -629,17 +559,13 @@ class DataFrameMixin:
                 print(f"t_template_row: {t_template_row}")
                 t_stim = round(t_template_row["t_stim"].values[0], precision)
                 for var in variables:
-                    t_template_row[var] = round(
-                        t_template_row[var].values[0] - t_stim, precision
-                    )
+                    t_template_row[var] = round(t_template_row[var].values[0] - t_stim, precision)
                 if "stim" not in df_t.columns:
                     df_t["stim"] = None
                 for i, row_t in df_t.iterrows():
                     df_t.at[i, "stim"] = i + 1  # stims numbered from 1
                     for var in variables:
-                        df_t.at[i, var] = round(
-                            t_template_row[var].values[0] + row_t["t_stim"], precision
-                        )
+                        df_t.at[i, var] = round(t_template_row[var].values[0] + row_t["t_stim"], precision)
                     for method in methods:
                         df_t.at[i, method] = f"=stim_{stim_max}"
                     for param in params:

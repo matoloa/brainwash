@@ -21,20 +21,12 @@ verbose = True
 
 def build_dfmean(dfdata, rollingwidth=3):
     print("build_dfmean")
-    dfmean = (
-        pd.pivot_table(
-            dfdata, values="voltage_raw", index="sweep", columns="time", aggfunc="mean"
-        )
-        .mean()
-        .to_frame(name="voltage")
-    )
+    dfmean = pd.pivot_table(dfdata, values="voltage_raw", index="sweep", columns="time", aggfunc="mean").mean().to_frame(name="voltage")
     dfmean["prim"] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
     dfmean["bis"] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()
     dfmean.reset_index(inplace=True)
     i_stim = first_stim_index(dfmean)
-    baseline_mean = dfmean.iloc[i_stim - 20 : i_stim - 10][
-        "voltage"
-    ].mean()  # Adjusted for potential NaNs
+    baseline_mean = dfmean.iloc[i_stim - 20 : i_stim - 10]["voltage"].mean()  # Adjusted for potential NaNs
     dfmean["voltage"] = dfmean["voltage"] - baseline_mean
     return dfmean, i_stim
 
@@ -54,25 +46,17 @@ def zeroSweeps(dfdata, i_stim=None, dfmean=None):
     if duplicates.any():
         print("Warning: Duplicates found before zeroing.")
         print(df_zeroed[duplicates])
-        df_zeroed = (
-            df_zeroed.groupby(["sweep", "time"])
-            .agg({"voltage_raw": "mean"})
-            .reset_index()
-        )
+        df_zeroed = df_zeroed.groupby(["sweep", "time"]).agg({"voltage_raw": "mean"}).reset_index()
         print("Duplicates removed.")
         print(df_zeroed)
 
     dfpivot = df_zeroed.pivot(
         index="sweep", columns="time", values="voltage_raw"
     )  # Reshape df_zeroed to have one row per 'sweep' and one column per 'time'
-    ser_mean = dfpivot.iloc[
-        :, i_stim - 20 : i_stim - 10
-    ].mean(
+    ser_mean = dfpivot.iloc[:, i_stim - 20 : i_stim - 10].mean(
         axis=1
     )  # Calculate the mean of 'voltage_raw' values from the 20th to the 10th column before i_stim for each 'sweep'
-    dfpivot = dfpivot.subtract(
-        ser_mean, axis="rows"
-    )  # Subtract the calculated means from dfpivot
+    dfpivot = dfpivot.subtract(ser_mean, axis="rows")  # Subtract the calculated means from dfpivot
 
     # handle the reassignment to 'voltage' to ensure length matches
     df_zeroed = df_zeroed.drop(columns=["voltage_raw"])
@@ -95,10 +79,7 @@ def first_stim_index(dfmean, threshold_factor=0.75, min_time_difference=0.005):
     for i in range(1, len(above_threshold_indices)):
         current_index = above_threshold_indices[i]
         previous_index = above_threshold_indices[i - 1]
-        if (
-            dfmean["time"][current_index] - dfmean["time"][previous_index]
-            > min_time_difference
-        ):
+        if dfmean["time"][current_index] - dfmean["time"][previous_index] > min_time_difference:
             break
         if dfmean["prim"][current_index] > dfmean["prim"][max_index]:
             max_index = current_index
@@ -138,21 +119,13 @@ def _ibw_results_to_df(results, gain=1.0):
     timestamps = res["timestamp"]
 
     # Convert Mac HFS+ epoch (1904-01-01) to Unix epoch (1970-01-01).
-    seconds = (
-        pd.to_datetime("1970-01-01") - pd.to_datetime("1900-01-01")
-    ).total_seconds()
+    seconds = (pd.to_datetime("1970-01-01") - pd.to_datetime("1900-01-01")).total_seconds()
     unix_timestamps = np.array(timestamps) - seconds  # absolute Unix time per sweep
 
     timestep = timesteps[0][0]
     num_columns = voltage_raw.shape[1]
-    print(
-        f"_ibw_results_to_df: timestep={timestep:.6g} s | "
-        f"sampling rate={round(1 / timestep)} Hz | "
-        f"{num_columns} samples/sweep"
-    )
-    time_columns = np.round(
-        np.arange(num_columns) * timestep, math.ceil(-np.log10(timestep))
-    ).tolist()
+    print(f"_ibw_results_to_df: timestep={timestep:.6g} s | " f"sampling rate={round(1 / timestep)} Hz | " f"{num_columns} samples/sweep")
+    time_columns = np.round(np.arange(num_columns) * timestep, math.ceil(-np.log10(timestep))).tolist()
 
     df = pd.DataFrame(data=voltage_raw, columns=time_columns)
     df = df.stack().reset_index()
@@ -238,9 +211,7 @@ def parse_abfFolder(folderpath, dev=False):
     """
     Read, sort (by filename) and concatenate all .abf files in folderpath to a single df
     """
-    list_files = sorted(
-        [i for i in os.listdir(folderpath) if -1 < i.find(".abf")]
-    )  # [:2] # stop before item 2 [begin:end]
+    list_files = sorted([i for i in os.listdir(folderpath) if -1 < i.find(".abf")])  # [:2] # stop before item 2 [begin:end]
     if verbose:
         print(f"list_files: {list_files}")
     listdf = []
@@ -279,9 +250,7 @@ def parse_abf(filepath):
     df["time"] = df.sweepX  # time in seconds from start of sweep recording
     df["voltage_raw"] = df.sweepY / 1000  # mv to V
     df["timens"] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
-    df["datetime"] = df.timens.astype("datetime64[ns]") + (
-        abf.abfDateTime - pd.to_datetime(0)
-    )
+    df["datetime"] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
     df.drop(columns=["sweepX", "sweepY", "timens"], inplace=True)
     return df
 
@@ -309,11 +278,7 @@ def metadata(df):
         "sweep_duration": sweep_duration,  # time in seconds
         "sampling_rate": sampling_rate,  # Hz
     }
-    print(
-        f"metadata: {nsweeps} sweeps | "
-        f"{sampling_rate} Hz (dt={dt:.6g} s) | "
-        f"sweep duration {sweep_duration:.6g} s"
-    )
+    print(f"metadata: {nsweeps} sweeps | " f"{sampling_rate} Hz (dt={dt:.6g} s) | " f"sweep duration {sweep_duration:.6g} s")
     return dict_meta
 
 
@@ -356,9 +321,7 @@ def source2dfs(source, dev=False, split_odd_even=False, split_at_time=None, gain
         ibw_files = [f for f in files if f.suffix.lstrip(".").lower() == "ibw"]
         csv_files = [f for f in files if f.suffix.lstrip(".").lower() == "csv"]
         print(f" - {source} is a folder with {len(files)} files:")
-        print(
-            f" - - {len(abf_files)} abf files, {len(ibw_files)} ibw files, and {len(csv_files)} csv files."
-        )
+        print(f" - - {len(abf_files)} abf files, {len(ibw_files)} ibw files, and {len(csv_files)} csv files.")
         if csv_files:
             # TODO: implement CSV parsing - check for correct column names
             raise ValueError(".csv from folders are not supported yet.")
@@ -406,15 +369,11 @@ def source2dfs(source, dev=False, split_odd_even=False, split_at_time=None, gain
             # Check that each sweep's start datetime is monotonically increasing.
             sweep_start_dt = df.groupby(sweep_groups)["datetime"].first()
             if not sweep_start_dt.is_monotonic_increasing:
-                print(
-                    " - - Warning: sweep start datetimes not monotonic increasing, sorting sweeps."
-                )
+                print(" - - Warning: sweep start datetimes not monotonic increasing, sorting sweeps.")
                 t0 = time.time()
                 sweep_order = sweep_start_dt.sort_values().index
                 sorted_pieces = [df[sweep_groups == grp] for grp in sweep_order]
-                dict_channeldfs[channel] = pd.concat(sorted_pieces).reset_index(
-                    drop=True
-                )
+                dict_channeldfs[channel] = pd.concat(sorted_pieces).reset_index(drop=True)
                 print(" - - Sorted sweeps in {:.2f} seconds".format(time.time() - t0))
         # generate 'sweep' column and drop channel column
         for df in dict_channeldfs.values():
@@ -425,9 +384,7 @@ def source2dfs(source, dev=False, split_odd_even=False, split_at_time=None, gain
         column_order = ["sweep", "time", "voltage_raw", "t0", "datetime"]
         for channel, df in dict_channeldfs.items():
             df_cols = [col for col in column_order if col in df.columns]
-            dict_channeldfs[channel] = df[
-                df_cols + [col for col in df.columns if col not in df_cols]
-            ]
+            dict_channeldfs[channel] = df[df_cols + [col for col in df.columns if col not in df_cols]]
 
     # ------------------------------------------------------------------
     # Optional on-read splitting
@@ -452,10 +409,7 @@ def source2dfs(source, dev=False, split_odd_even=False, split_at_time=None, gain
                 part_df["sweep"] = part_df["sweep"].map(remap)
             split_result[(channel, "even")] = df_even
             split_result[(channel, "odd")] = df_odd
-            print(
-                f" - - split_odd_even ch{channel}: "
-                f"{len(even_sweeps)} even sweeps, {len(odd_sweeps)} odd sweeps."
-            )
+            print(f" - - split_odd_even ch{channel}: " f"{len(even_sweeps)} even sweeps, {len(odd_sweeps)} odd sweeps.")
         return split_result
 
     if split_at_time is not None and split_at_time > 0:
@@ -468,10 +422,7 @@ def source2dfs(source, dev=False, split_odd_even=False, split_at_time=None, gain
             df_a = df[df["time"] < split_at_time].copy().reset_index(drop=True)
             df_b = df[df["time"] >= split_at_time].copy().reset_index(drop=True)
             if df_a.empty:
-                print(
-                    f" - - split_at_time ch{channel}: split_at_time {split_at_time}s is at or "
-                    f"before the first sample; part 'a' is empty."
-                )
+                print(f" - - split_at_time ch{channel}: split_at_time {split_at_time}s is at or " f"before the first sample; part 'a' is empty.")
             if df_b.empty:
                 print(
                     f" - - split_at_time ch{channel}: split_at_time {split_at_time}s is beyond "
@@ -486,8 +437,7 @@ def source2dfs(source, dev=False, split_odd_even=False, split_at_time=None, gain
             split_result[(channel, "b")] = df_b
             n_sweeps = df["sweep"].nunique()
             print(
-                f" - - split_at_time ch{channel}: cut at t={split_at_time}s; "
-                f"'a' {len(df_a)} rows, 'b' {len(df_b)} rows across {n_sweeps} sweeps."
+                f" - - split_at_time ch{channel}: cut at t={split_at_time}s; " f"'a' {len(df_a)} rows, 'b' {len(df_b)} rows across {n_sweeps} sweeps."
             )
         return split_result
 
@@ -532,9 +482,7 @@ def persistdf(file_base, dict_folders, dfdata=None, dfmean=None, dffilter=None):
 if __name__ == "__main__":
     dev = False
     source_folder = Path.home() / "Documents/Brainwash Data Source/"
-    dict_folders = {
-        "project": Path.home() / "Documents/Brainwash Projects/standalone_test"
-    }
+    dict_folders = {"project": Path.home() / "Documents/Brainwash Projects/standalone_test"}
     dict_folders["data"] = dict_folders["project"] / "data"
     dict_folders["cache"] = dict_folders["project"] / "cache"
     dict_folders["project"].mkdir(parents=True, exist_ok=True)
@@ -604,9 +552,7 @@ if __name__ == "__main__":
         for channel, df in dict_df.items():
             print(f" - channel {channel} df{df.shape}")
             t0 = time.time()
-            df.to_parquet(
-                str(dict_folders["data"] / f"df_{channel}.parquet"), index=False
-            )
+            df.to_parquet(str(dict_folders["data"] / f"df_{channel}.parquet"), index=False)
             t1 = time.time()
             print(f" - df_{channel}.parquet saved: {t1 - t0:.2f} seconds")
             t0 = time.time()
@@ -615,9 +561,7 @@ if __name__ == "__main__":
             print(f" - df_{channel}.csv saved: {t1 - t0:.2f} seconds")
             t0 = time.time()
             # reading formats back to _df
-            df_read_parquet = pd.read_parquet(
-                str(dict_folders["data"] / f"df_{channel}.parquet")
-            )
+            df_read_parquet = pd.read_parquet(str(dict_folders["data"] / f"df_{channel}.parquet"))
             t1 = time.time()
             print(f" - df_{channel}.parquet read: {t1 - t0:.2f} seconds")
             t0 = time.time()

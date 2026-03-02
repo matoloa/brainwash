@@ -94,9 +94,7 @@ def _make_sweep_df(
 
 
 class TestFirstStimIndex(unittest.TestCase):
-    def _dfmean_from_voltage(
-        self, voltage: np.ndarray, dt: float = 0.001
-    ) -> pd.DataFrame:
+    def _dfmean_from_voltage(self, voltage: np.ndarray, dt: float = 0.001) -> pd.DataFrame:
         """Compute a minimal dfmean directly from a voltage array."""
         times = np.round(np.arange(len(voltage)) * dt, 6)
         dfmean = pd.DataFrame({"time": times, "voltage": voltage})
@@ -255,9 +253,7 @@ class TestZeroSweeps(unittest.TestCase):
         for sweep in df_zeroed["sweep"].unique():
             sw = df_zeroed[df_zeroed["sweep"] == sweep]
             baseline = sw.iloc[i - 20 : i - 10]["voltage"].mean()
-            self.assertAlmostEqual(
-                baseline, 0.0, places=6, msg=f"Sweep {sweep} baseline not zeroed"
-            )
+            self.assertAlmostEqual(baseline, 0.0, places=6, msg=f"Sweep {sweep} baseline not zeroed")
 
     def test_row_count_preserved(self):
         """zeroSweeps should not add or drop rows."""
@@ -446,9 +442,7 @@ class TestParseAbf(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-def _write_synthetic_csv(
-    path: Path, n_sweeps: int = 8, n_timepoints: int = 20, dt: float = 0.001
-):
+def _write_synthetic_csv(path: Path, n_sweeps: int = 8, n_timepoints: int = 20, dt: float = 0.001):
     """
     Write a minimal Brainwash-format CSV (sweep, time, voltage_raw, t0, datetime)
     with n_sweeps sweeps, each n_timepoints samples long.
@@ -465,12 +459,9 @@ def _write_synthetic_csv(
                 {
                     "sweep": sw,
                     "time": t,
-                    "voltage_raw": float(
-                        sw
-                    ),  # voltage == sweep index for easy checking
+                    "voltage_raw": float(sw),  # voltage == sweep index for easy checking
                     "t0": t0,
-                    "datetime": pd.Timestamp("2024-01-01")
-                    + pd.Timedelta(seconds=t0 + t),
+                    "datetime": pd.Timestamp("2024-01-01") + pd.Timedelta(seconds=t0 + t),
                 }
             )
     pd.DataFrame(rows).to_csv(path, index=False)
@@ -582,9 +573,7 @@ class TestSource2dfsSplitAtTime(unittest.TestCase):
     def setUp(self):
         self._tmpdir = tempfile.TemporaryDirectory()
         self.csv_path = Path(self._tmpdir.name) / "rec.csv"
-        _write_synthetic_csv(
-            self.csv_path, n_sweeps=self.N_SWEEPS, n_timepoints=self.N_TP, dt=self.DT
-        )
+        _write_synthetic_csv(self.csv_path, n_sweeps=self.N_SWEEPS, n_timepoints=self.N_TP, dt=self.DT)
 
     def tearDown(self):
         self._tmpdir.cleanup()
@@ -674,20 +663,12 @@ class TestSource2dfsSplitAtTime(unittest.TestCase):
         """voltage_raw values in 'a' + 'b' per sweep must equal those in the original."""
         result_plain = source2dfs(str(self.csv_path))
         result_split = source2dfs(str(self.csv_path), split_at_time=self.SPLIT_T)
-        df_plain = (
-            next(iter(result_plain.values()))
-            .sort_values(["sweep", "time"])
-            .reset_index(drop=True)
-        )
+        df_plain = next(iter(result_plain.values())).sort_values(["sweep", "time"]).reset_index(drop=True)
         df_a = result_split[(0, "a")]
         df_b = result_split[(0, "b")].copy()
         # Restore original time in 'b' for merging: add back the split offset per sweep
         df_b["time"] = df_b["time"] + self.SPLIT_T
-        combined = (
-            pd.concat([df_a, df_b])
-            .sort_values(["sweep", "time"])
-            .reset_index(drop=True)
-        )
+        combined = pd.concat([df_a, df_b]).sort_values(["sweep", "time"]).reset_index(drop=True)
         self.assertTrue(combined["voltage_raw"].equals(df_plain["voltage_raw"]))
 
 
