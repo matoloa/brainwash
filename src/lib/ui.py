@@ -112,7 +112,10 @@ logger.debug("ui.py: os.getcwd(): %s", os.getcwd())
 
 class Config:
     def __init__(self):
-        self.dev_mode = os.getenv("BRAINWASH_DEBUG", "0") == "1"  # Respect --debug flag
+        self.dev_mode = (
+            not getattr(sys, "frozen", False)
+            or os.getenv("BRAINWASH_DEBUG", "0") == "1"
+        )
         print(
             "\n" * 3
             + f"{'Development' if self.dev_mode else 'Deploy'} mode - {time.strftime('%H:%M:%S')}"
