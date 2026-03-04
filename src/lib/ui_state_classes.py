@@ -58,6 +58,9 @@ class UIstate:
     ghost_sweep: Optional[matplotlib.lines.Line2D]
     ghost_label: Optional[matplotlib.text.Text]
 
+    # --- Global bw_cfg (not persisted in project cfg.pkl) ---
+    darkmode: bool
+
     def __init__(self):
         self.reset()
 
@@ -214,7 +217,7 @@ class UIstate:
             "output_end": None,
         }
 
-        # self.darkmode = False # set by global bw cfg
+        # darkmode is owned by bw_cfg.yaml, not the project cfg.pkl; set by get_bw_cfg()
         self.axm = None  # axis of mean graph (top)
         self.axe = None  # axis of event graph (middle)
         self.ax1 = None  # axis of output for amplitudes (bottom graph)
@@ -410,17 +413,21 @@ class UIstate:
                 data = pickle.load(f)
             if data is not None:
                 self.set_state(data)
-            # check if version is compatible
-            if bw_version != self.version:
-                print(f"Warning: project_cfg.yaml is from {self.version} - current version is {bw_version}")
-                cfg_v = self.version.split(".")
-                bw_v = bw_version.split(".")
-                if cfg_v[0] != bw_v[0]:
-                    print("Major version mismatch: Project may not load correctly")
-                elif cfg_v[1] != bw_v[1]:
-                    print("Minor version mismatch: Some settings may not load correctly")
-                elif cfg_v[2] != bw_v[2]:
-                    print("Patch version mismatch: Minor changes may not load correctly")
+                # check if version is compatible
+                if bw_version != self.version:
+                    print(f"Warning: cfg.pkl is from {self.version} - current version is {bw_version}")
+                    cfg_v = self.version.split(".")
+                    bw_v = bw_version.split(".")
+                    if cfg_v[0] != bw_v[0]:
+                        print("Major version mismatch: Project may not load correctly")
+                    elif cfg_v[1] != bw_v[1]:
+                        print("Minor version mismatch: Some settings may not load correctly")
+                    elif cfg_v[2] != bw_v[2]:
+                        print("Patch version mismatch: Minor changes may not load correctly")
+            else:
+                print("Warning: cfg.pkl is empty or corrupt, resetting to defaults")
+                self.reset()
+                self.save_cfg(projectfolder, bw_version)
         else:
             self.reset()
             self.save_cfg(projectfolder, bw_version)

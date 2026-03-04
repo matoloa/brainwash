@@ -194,6 +194,7 @@ class ProjectMixin:
         self.projectname = "My Project"
         uistate.darkmode = True
         uistate.showTimetable = False
+        uistate.showHeatmap = False
 
         # Load config if present
         if config.bw_cfg_yaml is not None:
@@ -206,8 +207,9 @@ class ProjectMixin:
                         self.user_documents = Path(cfg.get("user_documents", self.user_documents))
                         self.projects_folder = Path(cfg.get("projects_folder", self.projects_folder))
                         self.projectname = cfg.get("projectname", self.projectname)
-                    uistate.darkmode = cfg.get("darkmode", False)
+                    uistate.darkmode = cfg.get("darkmode", True)
                     uistate.showTimetable = cfg.get("showTimetable", False)
+                    uistate.showHeatmap = cfg.get("showHeatmap", False)
         else:
             self.bw_cfg_yaml = None  # Make sure it's defined for consistency
 
@@ -220,6 +222,7 @@ class ProjectMixin:
             "projectname": self.projectname,
             "darkmode": uistate.darkmode,
             "showTimetable": uistate.showTimetable,
+            "showHeatmap": uistate.showHeatmap,
         }
         # TODO: maybe this should go in a user-specific Brainwash folder
         with self.bw_cfg_yaml.open("w+") as file:

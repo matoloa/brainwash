@@ -165,10 +165,16 @@ class Config:
         logger.debug("Config: loading pyproject.toml from %s", toml_path)
 
         bwcfg_path = _find_file("bw_cfg.yaml")
-        logger.debug("Config: bw_cfg.yaml %s", bwcfg_path or "not found")
+        if bwcfg_path is None:
+            # File doesn't exist yet — place it next to pyproject.toml so it
+            # will be found on the next launch and write_bw_cfg can create it.
+            bwcfg_path = toml_path.parent / "bw_cfg.yaml"
+            logger.debug("Config: bw_cfg.yaml not found, will create at %s", bwcfg_path)
+        else:
+            logger.debug("Config: bw_cfg.yaml found at %s", bwcfg_path)
 
         pyproject = toml.load(toml_path)
-        self.bw_cfg_yaml = str(bwcfg_path) if bwcfg_path is not None else None
+        self.bw_cfg_yaml = str(bwcfg_path)
         self.program_name = pyproject["project"]["name"]
         self.version = pyproject["project"]["version"]
 
