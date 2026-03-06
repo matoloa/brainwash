@@ -16,7 +16,9 @@ pd.options.future.infer_string = False
 # Matplotlib slowdown fix for frozen Windows builds: redirect config dir to temp.
 # Must be set before matplotlib is imported so it sees the override on first init.
 if getattr(sys, "frozen", False):
-    os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "matplotlib"))
+    os.environ.setdefault(
+        "MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "matplotlib")
+    )
 
 # TODO: kick these out to ui_plot.py
 from matplotlib import use as matplotlib_use
@@ -110,11 +112,19 @@ logger.debug("ui.py: os.getcwd(): %s", os.getcwd())
 
 class Config:
     def __init__(self):
-        self.dev_mode = not getattr(sys, "frozen", False) or os.getenv("BRAINWASH_DEBUG", "0") == "1"
-        print("\n" * 3 + f"{'Development' if self.dev_mode else 'Deploy'} mode - {time.strftime('%H:%M:%S')}")
+        self.dev_mode = (
+            not getattr(sys, "frozen", False)
+            or os.getenv("BRAINWASH_DEBUG", "0") == "1"
+        )
+        print(
+            "\n" * 3
+            + f"{'Development' if self.dev_mode else 'Deploy'} mode - {time.strftime('%H:%M:%S')}"
+        )
 
         clear = False  # Clear all caches and temporary files at launch
-        self.clear_project_folder = clear  # Remove current project folder (datafiles) at launch
+        self.clear_project_folder = (
+            clear  # Remove current project folder (datafiles) at launch
+        )
         self.clear_cache = clear
         self.clear_timepoints = clear
         self.force_cfg_reset = clear
@@ -125,7 +135,9 @@ class Config:
         self.talkback = not self.dev_mode
         self.hide_experimental = not self.dev_mode
         self.track_widget_focus = False
-        self.terminal_space = 372 if self.dev_mode else 100  # pixels reserved for viewing prints
+        self.terminal_space = (
+            372 if self.dev_mode else 100
+        )  # pixels reserved for viewing prints
 
         # get project_name and version number from pyproject.toml
         #
@@ -161,7 +173,10 @@ class Config:
 
         toml_path = _find_file("pyproject.toml")
         if toml_path is None:
-            raise FileNotFoundError("pyproject.toml not found. Searched relative to executable, " "source file, and all sys.path entries.")
+            raise FileNotFoundError(
+                "pyproject.toml not found. Searched relative to executable, "
+                "source file, and all sys.path entries."
+            )
         logger.debug("Config: loading pyproject.toml from %s", toml_path)
 
         bwcfg_path = _find_file("bw_cfg.yaml")
@@ -238,13 +253,17 @@ class TableModel(QtCore.QAbstractTableModel):
     def sort(self, column, order):
         try:
             self.layoutAboutToBeChanged.emit()
-            self._data = self._data.sort_values(self._data.columns[column], ascending=order == QtCore.Qt.AscendingOrder)
+            self._data = self._data.sort_values(
+                self._data.columns[column], ascending=order == QtCore.Qt.AscendingOrder
+            )
             self.layoutChanged.emit()
         except Exception as e:
             print(f"Error sorting table: {e}")
 
 
-class FileTreeSelectorModel(QtWidgets.QFileSystemModel):  # Paired with a FileTreeSelectorView
+class FileTreeSelectorModel(
+    QtWidgets.QFileSystemModel
+):  # Paired with a FileTreeSelectorView
     paths_selected = QtCore.pyqtSignal(list)
 
     def __init__(self, parent=None, root_path="."):
@@ -260,7 +279,9 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel):  # Paired with a FileTr
         self.directoryLoaded.connect(self._loaded)
 
     def _loaded(self, path):
-        logger.debug("_loaded %s rowCount=%s", self.root_path, self.rowCount(self.parent_index))
+        logger.debug(
+            "_loaded %s rowCount=%s", self.root_path, self.rowCount(self.parent_index)
+        )
         print("_loaded", self.root_path, self.rowCount(self.parent_index))
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
@@ -271,7 +292,10 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel):  # Paired with a FileTr
                 return self.checkState(index)
 
     def flags(self, index):
-        return QtWidgets.QFileSystemModel.flags(self, index) | QtCore.Qt.ItemIsUserCheckable
+        return (
+            QtWidgets.QFileSystemModel.flags(self, index)
+            | QtCore.Qt.ItemIsUserCheckable
+        )
 
     def checkState(self, index):
         if index in self.checks:
@@ -423,7 +447,9 @@ class ProgressBarManager:
 
 class ParseDataThread(QtCore.QThread):
     progress = QtCore.pyqtSignal(int)
-    sub_progress = QtCore.pyqtSignal(int, int)  # (current_file_idx, total_files) within one ibw folder
+    sub_progress = QtCore.pyqtSignal(
+        int, int
+    )  # (current_file_idx, total_files) within one ibw folder
     status_update = QtCore.pyqtSignal(str)  # freeform status text for post-read phases
     finished = QtCore.pyqtSignal()  # custom signal, decoupled from QThread.finished
 
@@ -465,7 +491,9 @@ class ParseDataThread(QtCore.QThread):
                 # Normalise both into recording_name:df, appending _ch / _label suffixes as needed.
                 first_key = next(iter(dict_dfs_raw))
                 split_keys = isinstance(first_key, tuple)
-                n_channels = len({k[0] for k in dict_dfs_raw} if split_keys else dict_dfs_raw)
+                n_channels = len(
+                    {k[0] for k in dict_dfs_raw} if split_keys else dict_dfs_raw
+                )
                 dict_name_df = {}
                 for key, df in dict_dfs_raw.items():
                     if split_keys:
@@ -479,12 +507,16 @@ class ParseDataThread(QtCore.QThread):
                 for rec, df_raw in dict_name_df.items():
                     logger.debug("ParseDataThread: %s", rec)
                     print(f"ParseDataThread: {rec}")
-                    df_proj_new_row = self.uisub.create_recording(df_proj_row, rec, df_raw, status_callback=_status_callback)
+                    df_proj_new_row = self.uisub.create_recording(
+                        df_proj_row, rec, df_raw, status_callback=_status_callback
+                    )
                     self.rows.append(df_proj_new_row)
         except Exception as e:
             import traceback
 
-            logger.exception(f"ParseDataThread.run: EXCEPTION: {e}\n{traceback.format_exc()}")
+            logger.exception(
+                f"ParseDataThread.run: EXCEPTION: {e}\n{traceback.format_exc()}"
+            )
         finally:
             self.finished.emit()
 
@@ -504,7 +536,9 @@ class graphPreloadThread(QtCore.QThread):
 
     def run(self):
         try:
-            print(f"graphPreloadThread.run: entered, {len(self.uistate.list_idx_recs2preload)} recordings")
+            print(
+                f"graphPreloadThread.run: entered, {len(self.uistate.list_idx_recs2preload)} recordings"
+            )
             df_p = self.df_p.loc[self.uistate.list_idx_recs2preload]
             self.uistate.list_idx_recs2preload = []
             self.i = 0
@@ -514,7 +548,9 @@ class graphPreloadThread(QtCore.QThread):
                 dft = self.uisub.get_dft(row=p_row)
                 print(f"graphPreloadThread.run: get_dft returned {type(dft)}")
                 if dft is None:
-                    print(f"graphPreloadThread.run: dft is None for {p_row['recording_name']} (no stims detected), skipping")
+                    print(
+                        f"graphPreloadThread.run: dft is None for {p_row['recording_name']} (no stims detected), skipping"
+                    )
                     continue
                 print("graphPreloadThread.run: calling get_dfmean")
                 dfmean = self.uisub.get_dfmean(row=p_row)
@@ -527,17 +563,25 @@ class graphPreloadThread(QtCore.QThread):
                     dfoutput = self.uisub.get_dfoutput(row=p_row)
                 print(f"graphPreloadThread.run: get_dfoutput returned {type(dfoutput)}")
                 if dfoutput is None:
-                    print("graphPreloadThread.run: dfoutput is None, skipping this recording")
+                    print(
+                        "graphPreloadThread.run: dfoutput is None, skipping this recording"
+                    )
                     continue
-                print(f"graphPreloadThread, {p_row['recording_name']} calls uiplot.addRow() dfoutput columns: {dfoutput.columns}")
-                self.uiplot.addRow(p_row=p_row.to_dict(), dft=dft, dfmean=dfmean, dfoutput=dfoutput)
+                print(
+                    f"graphPreloadThread, {p_row['recording_name']} calls uiplot.addRow() dfoutput columns: {dfoutput.columns}"
+                )
+                self.uiplot.addRow(
+                    p_row=p_row.to_dict(), dft=dft, dfmean=dfmean, dfoutput=dfoutput
+                )
                 self.progress.emit(i)
                 self.i += 1
                 print(f"Preloaded {p_row['recording_name']}")
         except Exception as e:
             import traceback
 
-            logger.exception(f"graphPreloadThread.run: EXCEPTION: {e}\n{traceback.format_exc()}")
+            logger.exception(
+                f"graphPreloadThread.run: EXCEPTION: {e}\n{traceback.format_exc()}"
+            )
         finally:
             self.finished.emit()
 
@@ -554,7 +598,9 @@ class Ui_Dialog(QtWidgets.QWidget):
         self.buttonBox = QtWidgets.QDialogButtonBox(Dialog)
         self.buttonBox.setGeometry(QtCore.QRect(930, 480, 161, 32))
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(
+            QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok
+        )
         self.buttonBox.setObjectName("buttonBox")
         self.widget = FileTreeSelectorDialog(Dialog)
         self.widget.setGeometry(QtCore.QRect(10, 10, 451, 501))
@@ -622,7 +668,9 @@ class ConfirmDialog(QtWidgets.QDialog):
         layout.addWidget(self.label)
         layout.addWidget(self.buttonBox)
 
-    def showConfirmDialog(self, title: str | None = None, message: str | None = None) -> bool:
+    def showConfirmDialog(
+        self, title: str | None = None, message: str | None = None
+    ) -> bool:
         """Show the dialog modally. Returns True for OK, False for Cancel."""
         if title is not None:
             self.setWindowTitle(title)
@@ -662,7 +710,9 @@ class TableProjSub(QtWidgets.QTableView):
             print("Files dropped:", file_urls)
             # Handle the dropped files here
             dfAdd = df_projectTemplate()
-            dfAdd["path"] = file_urls  # needs to be first, as it sets the number of rows
+            dfAdd["path"] = (
+                file_urls  # needs to be first, as it sets the number of rows
+            )
             dfAdd["host"] = str(self.parent.fqdn)
             dfAdd["filter"] = "voltage"
             # NTH: more intelligent default naming; lowest level unique name?
@@ -675,7 +725,9 @@ class TableProjSub(QtWidgets.QTableView):
                     print(f"File {i} already in df_project")
                     duplicates.append(i)
                 else:
-                    names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
+                    names.append(
+                        os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i)
+                    )
             if not names:
                 print("No new files to add.")
                 return
@@ -712,7 +764,9 @@ class Filetreesub(Ui_Dialog):
         self.buttonBoxAddGroup.setStandardButtons(QtWidgets.QDialogButtonBox.NoButton)
         self.buttonBoxAddGroup.setObjectName("buttonBoxAddGroup")
 
-        self.ftree.view.clicked.connect(self.widget.on_treeView_fileTreeSelector_clicked)
+        self.ftree.view.clicked.connect(
+            self.widget.on_treeView_fileTreeSelector_clicked
+        )
         self.ftree.model.paths_selected.connect(self.pathsSelectedUpdateTable)
         self.buttonBox.accepted.connect(self.addDf)
 
@@ -733,7 +787,9 @@ class Filetreesub(Ui_Dialog):
         # For now, use name + lowest level folder
         names = []
         for i in paths:
-            names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
+            names.append(
+                os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i)
+            )
         dfAdd["recording_name"] = names
         self.dfAdd = dfAdd
         # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
@@ -776,9 +832,12 @@ ui_data_frames.uistate = uistate
 ui_data_frames.config = config
 ui_data_frames.uiplot = uiplot
 
+from lib import ui_menus
+
+ui_menus.uistate = uistate
 
 ####################################################################
-#                    Main class (UIsub)                            #
+# MAIN UI CLASS
 ####################################################################
 
 
@@ -789,6 +848,7 @@ class UIsub(
     ui_sweep_ops.SweepOpsMixin,
     ui_project.ProjectMixin,
     ui_data_frames.DataFrameMixin,
+    ui_menus.MenuMixin,
 ):
     def __init__(self, mainwindow):
         logger.debug("UIsub __init__ started")
@@ -879,7 +939,9 @@ class UIsub(
         else:
             uistate.df_rec_select_data = None
             uistate.df_rec_select_time = None
-            longest_sweep_prow = uistate.df_recs2plot.loc[uistate.df_recs2plot["sweep_duration"].idxmax()]
+            longest_sweep_prow = uistate.df_recs2plot.loc[
+                uistate.df_recs2plot["sweep_duration"].idxmax()
+            ]
             uistate.float_sweep_duration_max = longest_sweep_prow["sweep_duration"]
             dft_for_format = self.get_dft(row=longest_sweep_prow)
 
@@ -889,7 +951,9 @@ class UIsub(
             num_stims = len(dft_for_format)
             # Clamp saved stim indices to the row count of the new recording.
             # This prevents stale out-of-range indices when switching recordings.
-            valid_stim_indices = [i for i in uistate.list_idx_select_stims if i < num_stims]
+            valid_stim_indices = [
+                i for i in uistate.list_idx_select_stims if i < num_stims
+            ]
             if not valid_stim_indices and num_stims > 0:
                 valid_stim_indices = [0]  # default to first stim
             uistate.list_idx_select_stims = valid_stim_indices
@@ -899,18 +963,27 @@ class UIsub(
             selection = QtCore.QItemSelection()
             for row_idx in uistate.list_idx_select_stims:
                 index_start = model.index(row_idx, 0)
-                index_end = model.index(row_idx, model.columnCount(QtCore.QModelIndex()) - 1)
+                index_end = model.index(
+                    row_idx, model.columnCount(QtCore.QModelIndex()) - 1
+                )
                 selection.select(index_start, index_end)
-            self.tableStim.selectionModel().select(selection, QtCore.QItemSelectionModel.ClearAndSelect)
+            self.tableStim.selectionModel().select(
+                selection, QtCore.QItemSelectionModel.ClearAndSelect
+            )
             self.formatTableStimLayout(dft=dft_for_format)
         else:
             # No stims detected — clear stim selection so downstream logic is consistent.
             uistate.list_idx_select_stims = []
-            logger.debug("tableProjSelectionChanged: dft_for_format is None (no stims detected), clearing stim selection")
+            logger.debug(
+                "tableProjSelectionChanged: dft_for_format is None (no stims detected), clearing stim selection"
+            )
 
         # Now that the stim table and uistate.list_idx_select_stims are up-to-date,
         # populate the single-rec/single-stim convenience references.
-        if len(uistate.list_idx_select_recs) == 1 and len(uistate.list_idx_select_stims) == 1:
+        if (
+            len(uistate.list_idx_select_recs) == 1
+            and len(uistate.list_idx_select_stims) == 1
+        ):
             uistate.df_rec_select_time = self.get_dft(row=prow)
             uistate.df_rec_select_data = self.get_dffilter(prow)
             uistate.float_sweep_duration_max = prow["sweep_duration"]
@@ -1018,8 +1091,12 @@ class UIsub(
             return
 
         selected_ids = set(uistate.df_recs2plot["ID"])
-        selected_stims = {stim + 1 for stim in uistate.list_idx_select_stims}  # stim_select is 0-based (indices) - convert to stims
-        print(f"update_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}")
+        selected_stims = {
+            stim + 1 for stim in uistate.list_idx_select_stims
+        }  # stim_select is 0-based (indices) - convert to stims
+        print(
+            f"update_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}"
+        )
 
         # rec lines
         new_rec_show = {}
@@ -1032,7 +1109,11 @@ class UIsub(
 
         # group lines
         if self.dd_groups is not None:
-            selected_groups = {group for rec_ID in selected_ids for group in self.get_groupsOfRec(rec_ID)}
+            selected_groups = {
+                group
+                for rec_ID in selected_ids
+                for group in self.get_groupsOfRec(rec_ID)
+            }
             new_group_show = {}
             for k, v in uistate.dict_group_labels.items():
                 visible = self._is_group_visible(v, selected_groups)
@@ -1109,7 +1190,9 @@ class UIsub(
                 norm = uistate.checkBox["norm_EPSP"]
                 amp = uistate.checkBox["EPSP_amp"]
                 slope = uistate.checkBox["EPSP_slope"]
-                df_ttest = analysis.ttest_df(d_group_ndf, norm=norm, amp=amp, slope=slope)
+                df_ttest = analysis.ttest_df(
+                    d_group_ndf, norm=norm, amp=amp, slope=slope
+                )
                 if not df_ttest.empty:
                     uiplot.heatmap(df_ttest)
                 print(df_ttest)
@@ -1120,7 +1203,9 @@ class UIsub(
         print(f"Heatmap: {round((time.time() - t0) * 1000)} ms")
 
     def setTableStimVisibility(self, state):
-        widget = self.h_splitterMaster.widget(1)  # Get the second widget in the splitter
+        widget = self.h_splitterMaster.widget(
+            1
+        )  # Get the second widget in the splitter
         widget.setVisible(state)
 
     def onSplitterMoved(self, pos, index):
@@ -1153,7 +1238,9 @@ class UIsub(
         t_end = t_stim + 0.018
         dfevent = dfmean[(dfmean["time"] >= t_start) & (dfmean["time"] < t_end)]
         dfevent = dfevent[["time", "voltage"]]
-        path_talkback_df = Path(f"{self.projects_folder}/talkback/talkback_slice_{prow['ID']}_stim.csv")
+        path_talkback_df = Path(
+            f"{self.projects_folder}/talkback/talkback_slice_{prow['ID']}_stim.csv"
+        )
         if not path_talkback_df.parent.exists():
             path_talkback_df.parent.mkdir(parents=True, exist_ok=True)
         dfevent.to_csv(path_talkback_df, index=False)
@@ -1169,7 +1256,9 @@ class UIsub(
         dict_event = {key: trow[key] for key in keys}
         print(f"talkback dict_event: {dict_event}")
         # store dict_event as .csv named after recording_name
-        path_talkback = Path(f"{self.projects_folder}/talkback/talkback_meta_{prow['ID']}_stim.csv")
+        path_talkback = Path(
+            f"{self.projects_folder}/talkback/talkback_meta_{prow['ID']}_stim.csv"
+        )
         with open(path_talkback, "w") as f:
             json.dump(dict_event, f)
 
@@ -1210,7 +1299,9 @@ class UIsub(
         self.graphRefresh()
 
     @staticmethod
-    def _ylim_from_artists(axis, pad=0.10, min_span=1e-9, x_min=None, x_max=None, ymin=None):
+    def _ylim_from_artists(
+        axis, pad=0.10, min_span=1e-9, x_min=None, x_max=None, ymin=None
+    ):
         """Return (ymin, ymax) from all finite y-data on *axis*, with fractional padding.
 
         Skips single-point artists (vlines, markers) whose y-span would otherwise
@@ -1309,7 +1400,9 @@ class UIsub(
         # 0.5 ms after t=0 (the stim); x-axis on axe is already shifted so t=0 is
         # the stim, so the offset is absolute, not relative to event_start.
         artefact_offset = 0.0005  # seconds after t_stim=0 — clears the artefact spike
-        uistate.zoom["event_ylim"] = self._ylim_from_artists(uistate.axe, x_min=artefact_offset) or (
+        uistate.zoom["event_ylim"] = self._ylim_from_artists(
+            uistate.axe, x_min=artefact_offset
+        ) or (
             -0.0015,
             0.0002,
         )
@@ -1320,11 +1413,15 @@ class UIsub(
         # ax1 / ax2: fit to plotted output artists; fall back to (0, 1.5).
         # ymin=0: output values are always non-negative, so never let padding
         # pull the bottom below zero.
-        uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.ax1, ymin=0) or (
+        uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(
+            uistate.ax1, ymin=0
+        ) or (
             0,
             1.5,
         )
-        uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.ax2, ymin=0) or (
+        uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(
+            uistate.ax2, ymin=0
+        ) or (
             0,
             1.5,
         )
@@ -1371,8 +1468,12 @@ class UIsub(
 
     def update_recs2plot(self):
         if uistate.list_idx_select_recs:
-            df_project_selected = self.get_df_project().iloc[uistate.list_idx_select_recs]
-            uistate.df_recs2plot = df_project_selected[df_project_selected["sweeps"] != "..."]
+            df_project_selected = self.get_df_project().iloc[
+                uistate.list_idx_select_recs
+            ]
+            uistate.df_recs2plot = df_project_selected[
+                df_project_selected["sweeps"] != "..."
+            ]
             if uistate.df_recs2plot.empty:
                 uistate.df_recs2plot = None
         else:
@@ -1469,11 +1570,23 @@ class UIsub(
             sizes = []
             for widget in widgets:
                 # original_size_policy = widget.sizePolicy()
-                widget.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
+                widget.setSizePolicy(
+                    QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored
+                )
                 if splitter.orientation() == QtCore.Qt.Horizontal:
-                    sizes.append(int(proportions[widgets.index(widget)] * splitter.sizeHint().width()))
+                    sizes.append(
+                        int(
+                            proportions[widgets.index(widget)]
+                            * splitter.sizeHint().width()
+                        )
+                    )
                 else:
-                    sizes.append(int(proportions[widgets.index(widget)] * splitter.sizeHint().height()))
+                    sizes.append(
+                        int(
+                            proportions[widgets.index(widget)]
+                            * splitter.sizeHint().height()
+                        )
+                    )
                 # widget.setSizePolicy(original_size_policy)
             splitter.setSizes(sizes)
 
@@ -1482,147 +1595,15 @@ class UIsub(
             graph.setLayout(QtWidgets.QVBoxLayout())
             canvas = MplCanvas(parent=graph)
             graph.layout().addWidget(canvas)
-            canvas.mpl_connect("button_press_event", lambda event: self.graphClicked(event, canvas))
+            canvas.mpl_connect(
+                "button_press_event", lambda event: self.graphClicked(event, canvas)
+            )
             canvas.show()
             return canvas
 
         self.canvasMean = setup_graph(self.graphMean)
         self.canvasEvent = setup_graph(self.graphEvent)
         self.canvasOutput = setup_graph(self.graphOutput)
-
-    def setupMenus(self):
-        # File menu
-        self.actionNew = QtWidgets.QAction("New project")
-        self.actionNew.triggered.connect(self.triggerNewProject)
-        self.actionNew.setShortcut("Ctrl+N")
-        self.menuFile.addAction(self.actionNew)
-        self.actionOpen = QtWidgets.QAction("Open project")
-        self.actionOpen.triggered.connect(self.triggerOpenProject)
-        self.actionOpen.setShortcut("Ctrl+O")
-        self.menuFile.addAction(self.actionOpen)
-        self.actionRenameProject = QtWidgets.QAction("Rename project")
-        self.actionRenameProject.triggered.connect(self.renameProject)
-        self.actionRenameProject.setShortcut("Ctrl+R")
-        self.menuFile.addAction(self.actionRenameProject)
-        self.actionExit = QtWidgets.QAction("Exit")
-        self.actionExit.triggered.connect(QtWidgets.qApp.quit)
-        # self.actionExit.setShortcut("Ctrl+Q")  # Set shortcut for Exit
-        self.menuFile.addAction(self.actionExit)
-
-        # Edit menu
-        # self.actionUndo = QtWidgets.QAction("Undo", self) # TODO: Implement undo
-        # self.actionUndo.triggered.connect(self.triggerUndo)
-        # self.actionUndo.setShortcut("Ctrl+Z")
-        # self.menuEdit.addAction(self.actionUndo)
-        self.actionCopyTimepoints = QtWidgets.QAction("Copy timepoints")
-        self.actionCopyTimepoints.triggered.connect(self.triggerCopyTimepoints)
-        self.actionCopyTimepoints.setShortcut("Ctrl+T")
-        self.menuEdit.addAction(self.actionCopyTimepoints)
-        self.actionCopyOutput = QtWidgets.QAction("Copy output")
-        self.actionCopyOutput.triggered.connect(self.triggerCopyOutput)
-        self.actionCopyOutput.setShortcut("Ctrl+C")
-        self.menuEdit.addAction(self.actionCopyOutput)
-
-        self.menuEdit.addSeparator()
-        self.actionForAllSelected = QtWidgets.QAction("For ALL selected recordings...")  # not connected: submenu header
-        self.menuEdit.addAction(self.actionForAllSelected)
-        self.actionReAnalyzeRecordings = QtWidgets.QAction("   Reanalyze")
-        self.actionReAnalyzeRecordings.triggered.connect(self.triggerReanalyze)
-        self.actionReAnalyzeRecordings.setShortcut("A")
-        self.menuEdit.addAction(self.actionReAnalyzeRecordings)
-
-        self.actionSweepOpsHeader = QtWidgets.QAction("   — sweep selection —")  # not connected: section header
-        self.menuEdit.addAction(self.actionSweepOpsHeader)
-        self.actionKeepOnlySelectedSweeps = QtWidgets.QAction("   Keep only selected sweeps")
-        self.actionKeepOnlySelectedSweeps.triggered.connect(self.triggerKeepSelectedSweeps)
-        self.menuEdit.addAction(self.actionKeepOnlySelectedSweeps)
-        self.actionRemoveSelectedSweeps = QtWidgets.QAction("   Discard selected sweeps")
-        self.actionRemoveSelectedSweeps.triggered.connect(self.triggerRemoveSelectedSweeps)
-        self.menuEdit.addAction(self.actionRemoveSelectedSweeps)
-        self.actionSplitBySelectedSweeps = QtWidgets.QAction("   Split recordings by selected sweeps")
-        self.actionSplitBySelectedSweeps.triggered.connect(self.triggerSplitBySelectedSweeps)
-        self.menuEdit.addAction(self.actionSplitBySelectedSweeps)
-
-        self.actionTimeOpsHeader = QtWidgets.QAction("   — time selection —")  # not connected: section header
-        self.menuEdit.addAction(self.actionTimeOpsHeader)
-        self.actionKeepOnlySelectedTime = QtWidgets.QAction("   Keep only selected time")
-        self.actionKeepOnlySelectedTime.triggered.connect(self.triggerKeepSelectedTime)
-        self.menuEdit.addAction(self.actionKeepOnlySelectedTime)
-        self.actionDiscardSelectedTime = QtWidgets.QAction("   Discard selected time")
-        self.actionDiscardSelectedTime.triggered.connect(self.triggerDiscardSelectedTime)
-        self.menuEdit.addAction(self.actionDiscardSelectedTime)
-        self.actionSplitByTime = QtWidgets.QAction("   Split recordings by time")
-        self.actionSplitByTime.triggered.connect(self.triggerSplitByTime)
-        self.menuEdit.addAction(self.actionSplitByTime)
-
-        # View menu
-        self.actionRefresh = QtWidgets.QAction("Refresh Graphs")
-        self.actionRefresh.triggered.connect(self.triggerRefresh)
-        self.actionRefresh.setShortcut("F5")
-        self.menuView.addAction(self.actionRefresh)
-
-        self.actionHeatmap = QtWidgets.QAction("Toggle Heatmap")
-        self.actionHeatmap.setCheckable(True)
-        self.actionHeatmap.setChecked(uistate.showHeatmap)
-        self.actionHeatmap.setShortcut("H")
-        self.actionHeatmap.triggered.connect(self.triggerShowHeatmap)
-        self.menuView.addAction(self.actionHeatmap)
-
-        self.actionDarkmode = QtWidgets.QAction("Toggle Darkmode")
-        self.actionDarkmode.triggered.connect(self.triggerDarkmode)
-        self.actionDarkmode.setShortcut("Alt+D")
-        self.menuView.addAction(self.actionDarkmode)
-
-        actionTimetable = QtWidgets.QAction("Toggle Timetable")
-        actionTimetable.setCheckable(True)
-        actionTimetable.setChecked(uistate.showTimetable)
-        actionTimetable.setShortcut("Alt+T")
-        actionTimetable.triggered.connect(self.triggerShowTimetable)
-        self.menuView.addAction(actionTimetable)
-
-        for frame, (text, initial_state) in uistate.viewTools.items():
-            action = QtWidgets.QAction(f"Toggle {text}")
-            action.setCheckable(True)
-            action.setChecked(initial_state)
-            action.triggered.connect(lambda state, frame=frame: self.toggleViewTool(frame))
-            self.menuView.addAction(action)
-
-        # Data menu
-        self.actionAddData = QtWidgets.QAction("Add data files")
-        self.actionAddData.triggered.connect(self.triggerAddData)
-        self.menuData.addAction(self.actionAddData)
-        self.actionParse = QtWidgets.QAction("Import all added datafiles")
-        self.actionParse.triggered.connect(self.triggerParse)
-        self.actionParse.setShortcut("Ctrl+I")
-        self.menuData.addAction(self.actionParse)
-        self.actionDelete = QtWidgets.QAction("Delete selected data")
-        self.actionDelete.triggered.connect(self.triggerDelete)
-        self.actionDelete.setShortcut("DEL")
-        self.menuData.addAction(self.actionDelete)
-        self.actionRenameRecording = QtWidgets.QAction("Rename recording")
-        self.actionRenameRecording.triggered.connect(self.triggerRenameRecording)
-        self.actionRenameRecording.setShortcut("F2")
-        self.menuData.addAction(self.actionRenameRecording)
-
-        # Group menu
-        self.actionNewGroup = QtWidgets.QAction("Add a group")
-        self.actionNewGroup.triggered.connect(self.triggerNewGroup)
-        self.actionNewGroup.setShortcut("+")
-        self.menuGroups.addAction(self.actionNewGroup)
-        self.actionRemoveEmptyGroup = QtWidgets.QAction("Remove last empty group")
-        self.actionRemoveEmptyGroup.triggered.connect(self.triggerRemoveLastEmptyGroup)
-        self.actionRemoveEmptyGroup.setShortcut("-")
-        self.menuGroups.addAction(self.actionRemoveEmptyGroup)
-        self.actionRemoveGroup = QtWidgets.QAction("Force remove last group")
-        self.actionRemoveGroup.triggered.connect(self.triggerRemoveLastGroup)
-        self.actionRemoveGroup.setShortcut("Ctrl+-")
-        self.menuGroups.addAction(self.actionRemoveGroup)
-        self.actionClearGroups = QtWidgets.QAction("Clear group(s) in selection")
-        self.actionClearGroups.triggered.connect(self.triggerClearGroups)
-        self.menuGroups.addAction(self.actionClearGroups)
-        self.actionResetGroups = QtWidgets.QAction("Remove all groups")
-        self.actionResetGroups.triggered.connect(self.triggerEditGroups)
-        self.menuGroups.addAction(self.actionResetGroups)
 
     def setupTableProj(self):
         try:
@@ -1649,7 +1630,9 @@ class UIsub(
             self.pushButtonParse.pressed.connect(self.triggerParse)
             self.tableProj.setSelectionBehavior(TableProjSub.SelectRows)
             tableProj_selectionModel = self.tableProj.selectionModel()
-            tableProj_selectionModel.selectionChanged.connect(self.tableProjSelectionChanged)
+            tableProj_selectionModel.selectionChanged.connect(
+                self.tableProjSelectionChanged
+            )
             self.formatTableLayout()
         except Exception as e:
             print(f"Error setting up tableProj: {e}")
@@ -1666,7 +1649,9 @@ class UIsub(
         logger.debug("formatTableLayout")
         print("formatTableLayout")
 
-        self.tableProj.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
+        self.tableProj.setSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred
+        )
         self.tableProj.verticalHeader().hide()
 
         df_p = self.df_project
@@ -1717,7 +1702,9 @@ class UIsub(
             "t_volley_amp",
             "t_volley_amp_method",
         ]
-        col_indices = [dft.columns.get_loc(col) for col in column_order if col in dft.columns]
+        col_indices = [
+            dft.columns.get_loc(col) for col in column_order if col in dft.columns
+        ]
         num_columns = dft.shape[1]
         for col in range(num_columns):
             if col in col_indices:
@@ -1758,10 +1745,17 @@ class UIsub(
 
     def build_dict_folders(self):
         dict_folders = {
-            "project": self.projects_folder / self.projectname,  # path to project folder
-            "data": self.projects_folder / self.projectname / "data",  # path to project data subfolder
-            "timepoints": self.projects_folder / self.projectname / "timepoints",  # path to project timepoints subfolder
-            "cache": self.projects_folder / f"cache {config.version}" / self.projectname,  # path to project cache subfolder
+            "project": self.projects_folder
+            / self.projectname,  # path to project folder
+            "data": self.projects_folder
+            / self.projectname
+            / "data",  # path to project data subfolder
+            "timepoints": self.projects_folder
+            / self.projectname
+            / "timepoints",  # path to project timepoints subfolder
+            "cache": self.projects_folder
+            / f"cache {config.version}"
+            / self.projectname,  # path to project cache subfolder
         }
         return dict_folders
 
@@ -1772,14 +1766,18 @@ class UIsub(
             (
                 checkBox.stateChanged.disconnect()
                 if disconnect
-                else checkBox.stateChanged.connect(lambda state, key=key: self.viewSettingsChanged(key, state))
+                else checkBox.stateChanged.connect(
+                    lambda state, key=key: self.viewSettingsChanged(key, state)
+                )
             )
         # lineEdits
         for lineEdit in [
             self.lineEdit_split_at_time,
             self.lineEdit_import_gain,
         ]:
-            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editImportOptions(le))
+            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(
+                lambda le=lineEdit: self.editImportOptions(le)
+            )
         for lineEdit in [
             self.lineEdit_mean_selection_start,
             self.lineEdit_mean_selection_end,
@@ -1787,7 +1785,9 @@ class UIsub(
             (
                 lineEdit.editingFinished.disconnect()
                 if disconnect
-                else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editMeanSelectRange(le))
+                else lineEdit.editingFinished.connect(
+                    lambda le=lineEdit: self.editMeanSelectRange(le)
+                )
             )
         for lineEdit in [
             self.lineEdit_sweeps_range_from,
@@ -1796,22 +1796,30 @@ class UIsub(
             (
                 lineEdit.editingFinished.disconnect()
                 if disconnect
-                else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editSweepSelectRange(le))
+                else lineEdit.editingFinished.connect(
+                    lambda le=lineEdit: self.editSweepSelectRange(le)
+                )
             )
         for lineEdit in [
             self.lineEdit_norm_EPSP_start,
             self.lineEdit_norm_EPSP_end,
         ]:
-            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editNormRange(le))
+            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(
+                lambda le=lineEdit: self.editNormRange(le)
+            )
         for lineEdit in [
             self.lineEdit_EPSP_amp_halfwidth,
             self.lineEdit_volley_amp_halfwidth,
         ]:
-            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editAmpHalfwidth(le))
+            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(
+                lambda le=lineEdit: self.editAmpHalfwidth(le)
+            )
         for lineEdit in [
             self.lineEdit_bin_size,
         ]:
-            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(lambda le=lineEdit: self.editBinSize(le))
+            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(
+                lambda le=lineEdit: self.editBinSize(le)
+            )
 
         # pushButtons
         for str_button, str_function in uistate.pushButtons.items():
@@ -1820,7 +1828,9 @@ class UIsub(
         # SplitterMoved
         for splitter_name in ["h_splitterMaster", "v_splitterGraphs"]:
             splitter = getattr(self, splitter_name)
-            splitter.splitterMoved.disconnect() if disconnect else splitter.splitterMoved.connect(self.onSplitterMoved)
+            splitter.splitterMoved.disconnect() if disconnect else splitter.splitterMoved.connect(
+                self.onSplitterMoved
+            )
 
     def applyConfigStates(self):
         # Disconnect signals to prevent editingFinished from triggering from .setText
@@ -1836,9 +1846,15 @@ class UIsub(
         self.lineEdit_norm_EPSP_end.setVisible(norm)
         self.lineEdit_norm_EPSP_start.setText(f"{uistate.lineEdit['norm_EPSP_from']}")
         self.lineEdit_norm_EPSP_end.setText(f"{uistate.lineEdit['norm_EPSP_to']}")
-        self.lineEdit_split_at_time.setText(f"{uistate.lineEdit['split_at_time'] * 1000:g}")
-        self.lineEdit_EPSP_amp_halfwidth.setText(f"{uistate.lineEdit['EPSP_amp_halfwidth_ms']}")
-        self.lineEdit_volley_amp_halfwidth.setText(f"{uistate.lineEdit['volley_amp_halfwidth_ms']}")
+        self.lineEdit_split_at_time.setText(
+            f"{uistate.lineEdit['split_at_time'] * 1000:g}"
+        )
+        self.lineEdit_EPSP_amp_halfwidth.setText(
+            f"{uistate.lineEdit['EPSP_amp_halfwidth_ms']}"
+        )
+        self.lineEdit_volley_amp_halfwidth.setText(
+            f"{uistate.lineEdit['volley_amp_halfwidth_ms']}"
+        )
 
         # apply splitter proportions from project config
         self.setSplitterSizes("h_splitterMaster", "v_splitterGraphs")
@@ -2004,7 +2020,9 @@ class UIsub(
                 self.dialog,
                 "Open Directory",
                 str(self.projects_folder),
-                QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks | QtWidgets.QFileDialog.DontUseNativeDialog,
+                QtWidgets.QFileDialog.ShowDirsOnly
+                | QtWidgets.QFileDialog.DontResolveSymlinks
+                | QtWidgets.QFileDialog.DontUseNativeDialog,
             )
         )
         logger.debug("Received projectfolder: %s", str_projectfolder)
@@ -2026,7 +2044,9 @@ class UIsub(
 
     def triggerParse(self):  # parse non-parsed files and folders in self.df_project
         if uistate.frozen:
-            print("triggerParse: UI is frozen (already parsing), ignoring duplicate call")
+            print(
+                "triggerParse: UI is frozen (already parsing), ignoring duplicate call"
+            )
             return
         self.usage("triggerParse")
         self.mouseoverDisconnect()
@@ -2077,14 +2097,18 @@ class UIsub(
         if new_name is None:
             new_name = f"{source_name}_copy"
         if new_name in self.df_project["recording_name"].values:
-            print(f"duplicate_recording: recording name '{new_name}' already exists, choose a different name.")
+            print(
+                f"duplicate_recording: recording name '{new_name}' already exists, choose a different name."
+            )
             return
         df_proj_new_row = source_p_row.copy()
         df_proj_new_row["ID"] = str(uuid.uuid4())  # new unique ID
         df_proj_new_row["recording_name"] = new_name
         # Update data files: copy source data file to new data file
         df_project = self.get_df_project()
-        self.df_project = pd.concat([df_project, pd.DataFrame([df_proj_new_row])], ignore_index=True)
+        self.df_project = pd.concat(
+            [df_project, pd.DataFrame([df_proj_new_row])], ignore_index=True
+        )
         self.save_df_project()
         df_data = self.get_dfdata(source_p_row)
         self.df2file(df_data, new_name, key="data")  # persist data file
@@ -2118,7 +2142,9 @@ class UIsub(
         self.df2file(df, rec, key="filter")  # persist zeroed
         dict_meta = parse.metadata(df)  # extract metadata
         # TODO: create unique recording names
-        df_proj_new_row = create_row(df_proj_row=df_proj_row, new_name=rec, dict_meta=dict_meta)
+        df_proj_new_row = create_row(
+            df_proj_row=df_proj_row, new_name=rec, dict_meta=dict_meta
+        )
         return df_proj_new_row
 
     # recalculate → DataFrameMixin (ui_data_frames.py)
@@ -2173,7 +2199,10 @@ class UIsub(
         lineEdit.setText(str(num))
         if lineEditName == "lineEdit_split_at_time":
             uistate.lineEdit["split_at_time"] = float(lineEdit.text()) / 1000.0
-            if uistate.lineEdit["split_at_time"] is not None and uistate.lineEdit["split_at_time"] != 0:
+            if (
+                uistate.lineEdit["split_at_time"] is not None
+                and uistate.lineEdit["split_at_time"] != 0
+            ):
                 uistate.checkBox["splitOddEven"] = False
                 self.checkBox_splitOddEven.setChecked(False)
         elif lineEditName == "lineEdit_import_gain":
@@ -2265,17 +2294,27 @@ class UIsub(
                 continue
             print(f"Detecting stims for {rec_name}")
             if uistate.x_select["mean_start"] is not None:
-                print(f" - range: {uistate.x_select['mean_start']} to {uistate.x_select['mean_end']}")
+                print(
+                    f" - range: {uistate.x_select['mean_start']} to {uistate.x_select['mean_end']}"
+                )
             dfmean = self.get_dfmean(p_row)
-            if uistate.x_select["mean_start"] is not None and uistate.x_select["mean_end"] is not None:
+            if (
+                uistate.x_select["mean_start"] is not None
+                and uistate.x_select["mean_end"] is not None
+            ):
                 dfmean_range = dfmean[
-                    (dfmean["time"] >= uistate.x_select["mean_start"]) & (dfmean["time"] <= uistate.x_select["mean_end"])
+                    (dfmean["time"] >= uistate.x_select["mean_start"])
+                    & (dfmean["time"] <= uistate.x_select["mean_end"])
                 ].reset_index(drop=True)
             else:
                 dfmean_range = dfmean
             default_dict_t = uistate.default_dict_t.copy()  # Default sizes
-            print(f"stimDetect: {rec_name} calling find_events within range:\n{uistate.x_select}")
-            new_df_t = analysis.find_events(dfmean=dfmean_range, default_dict_t=default_dict_t, verbose=False)
+            print(
+                f"stimDetect: {rec_name} calling find_events within range:\n{uistate.x_select}"
+            )
+            new_df_t = analysis.find_events(
+                dfmean=dfmean_range, default_dict_t=default_dict_t, verbose=False
+            )
             if new_df_t is None:
                 print(f"StimDetect: No stims found for {rec_name}.")
                 continue
@@ -2283,9 +2322,15 @@ class UIsub(
                 self.set_dft(rec_name, new_df_t)
             else:
                 dfoutput = self.get_dfoutput(p_row)
-                print(f"stimDetect: {rec_name} calling set_uniformTimepoints with df_t:\n{new_df_t}")
+                print(
+                    f"stimDetect: {rec_name} calling set_uniformTimepoints with df_t:\n{new_df_t}"
+                )
                 # list_obsolete_stim_idx: a list of idx of old_df_t rows, that have a t_stim that isn't in new_df_t
-                list_obsolete_stim_idx = [i for i, row in old_df_t.iterrows() if row["t_stim"] not in new_df_t["t_stim"].values]
+                list_obsolete_stim_idx = [
+                    i
+                    for i, row in old_df_t.iterrows()
+                    if row["t_stim"] not in new_df_t["t_stim"].values
+                ]
                 if list_obsolete_stim_idx:
                     print(f"Obsolete stims: {list_obsolete_stim_idx}")
                     for idx in list_obsolete_stim_idx:
@@ -2317,7 +2362,9 @@ class UIsub(
         for index, row in dfAdd.iterrows():
             check_recording_name = row["recording_name"]
             if check_recording_name.endswith("_mean.parquet"):
-                print("recording_name must not end with _mean.parquet - appending _X")  # must not collide with internal naming
+                print(
+                    "recording_name must not end with _mean.parquet - appending _X"
+                )  # must not collide with internal naming
                 check_recording_name = check_recording_name + "_X"
                 dfAdd.at[index, "recording_name"] = check_recording_name
             if check_recording_name in list_recording_names:
@@ -2349,15 +2396,26 @@ class UIsub(
         df_p = self.get_df_project()
         old_recording_name = df_p.at[uistate.list_idx_select_recs[0], "recording_name"]
         RenameDialog = InputDialogPopup()
-        new_recording_name = RenameDialog.showInputDialog(title="Rename recording", query=old_recording_name)
+        new_recording_name = RenameDialog.showInputDialog(
+            title="Rename recording", query=old_recording_name
+        )
         # check if the new name is a valid filename
-        if new_recording_name is not None and re.match(r"^[a-zA-Z0-9_ -]+$", str(new_recording_name)) is not None:
+        if (
+            new_recording_name is not None
+            and re.match(r"^[a-zA-Z0-9_ -]+$", str(new_recording_name)) is not None
+        ):
             list_recording_names = set(df_p["recording_name"])
             if not new_recording_name in list_recording_names:  # prevent duplicates
-                self.rename_files_by_rec_name(old_name=old_recording_name, new_name=new_recording_name)
-                df_p.at[uistate.list_idx_select_recs[0], "recording_name"] = new_recording_name
+                self.rename_files_by_rec_name(
+                    old_name=old_recording_name, new_name=new_recording_name
+                )
+                df_p.at[uistate.list_idx_select_recs[0], "recording_name"] = (
+                    new_recording_name
+                )
                 # For paired recordings: also rename any references to old_recording_name in df_p['paired_recording']
-                df_p.loc[df_p["paired_recording"] == old_recording_name, "paired_recording"] = new_recording_name
+                df_p.loc[
+                    df_p["paired_recording"] == old_recording_name, "paired_recording"
+                ] = new_recording_name
                 self.set_df_project(df_p)
                 self.tableUpdate()
                 self.update_recs2plot()
@@ -2379,8 +2437,12 @@ class UIsub(
             ("cache", "_bin.parquet"),
             ("cache", "_output.parquet"),
         ]:
-            old_file_path = Path(self.dict_folders[folder_name] / (old_name + file_suffix))
-            new_file_path = Path(self.dict_folders[folder_name] / (new_name + file_suffix))
+            old_file_path = Path(
+                self.dict_folders[folder_name] / (old_name + file_suffix)
+            )
+            new_file_path = Path(
+                self.dict_folders[folder_name] / (new_name + file_suffix)
+            )
             if old_file_path.exists():
                 old_file_path.rename(new_file_path)
             elif folder_name == "data":
@@ -2428,9 +2490,13 @@ class UIsub(
                 print(f"purgeRecordingData: file not found: {file_path}")
 
         groups2purge = self.get_groupsOfRec(rec_ID)
-        if groups2purge:  # if rec_ID is in groups, purge those group caches and update dd_groups
+        if (
+            groups2purge
+        ):  # if rec_ID is in groups, purge those group caches and update dd_groups
             # print(f"purgeRecordingData: {rec_name} in groups: {groups2purge}")
-            for group_ID in groups2purge:  # remove rec_ID from rec_IDs of all affected groups
+            for (
+                group_ID
+            ) in groups2purge:  # remove rec_ID from rec_IDs of all affected groups
                 print(f"purgeRecordingData: pre  {self.dd_groups[group_ID]['rec_IDs']}")
                 self.dd_groups[group_ID]["rec_IDs"].remove(rec_ID)
                 print(f"purgeRecordingData: post {self.dd_groups[group_ID]['rec_IDs']}")
@@ -2457,7 +2523,10 @@ class UIsub(
             removeFromDisk(folder_name, file_suffix)
 
     def parseData(self):
-        if hasattr(self, "_current_parse_thread") and self._current_parse_thread is not None:
+        if (
+            hasattr(self, "_current_parse_thread")
+            and self._current_parse_thread is not None
+        ):
             print("parseData: already parsing, ignoring duplicate call")
             return
         self.uiFreeze()  # Thawed at the end of graphPreload()
@@ -2474,11 +2543,19 @@ class UIsub(
             thread.status_update.connect(self.updateStatusBar)
             thread.finished.connect(self.onParseDataFinished)
             thread.finished.connect(thread.deleteLater)  # Auto-cleanup when done
-            thread.finished.connect(lambda: (self._threads.remove(thread) if thread in self._threads else None))
-            thread.finished.connect(lambda: setattr(self, "_current_parse_thread", None))
+            thread.finished.connect(
+                lambda: (
+                    self._threads.remove(thread) if thread in self._threads else None
+                )
+            )
+            thread.finished.connect(
+                lambda: setattr(self, "_current_parse_thread", None)
+            )
             self._threads.append(thread)
             thread.start()
-            self.progressBarManager = ProgressBarManager(self.progressBar, len(df_p_to_update))
+            self.progressBarManager = ProgressBarManager(
+                self.progressBar, len(df_p_to_update)
+            )
             self.progressBarManager.__enter__()
 
     def updateProgressBar(self, i):
@@ -2493,15 +2570,22 @@ class UIsub(
     def onParseDataFinished(self):
         print("onParseDataFinished: entered")
         self.progressBarManager.__exit__(None, None, None)
-        if hasattr(self, "_current_parse_thread") and self._current_parse_thread is not None:
+        if (
+            hasattr(self, "_current_parse_thread")
+            and self._current_parse_thread is not None
+        ):
             thread = self._current_parse_thread
             if thread.rows:
                 rows2add = pd.concat(thread.rows, axis=1).transpose()
                 df_p = self.get_df_project()
-                df_p = pd.concat([df_p[df_p["sweeps"] != "..."], rows2add]).reset_index(drop=True)
+                df_p = pd.concat([df_p[df_p["sweeps"] != "..."], rows2add]).reset_index(
+                    drop=True
+                )
                 self.set_df_project(df_p)
                 # Get the indices of the new rows, as they are in df_p
-                uistate.list_idx_recs2preload = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
+                uistate.list_idx_recs2preload = df_p.index[
+                    df_p.index >= len(df_p) - len(rows2add)
+                ].tolist()
         self.progressBarManager.__exit__(None, None, None)
         print("onParseDataFinished: calling graphPreload")
         self.graphPreload()
@@ -2529,7 +2613,9 @@ class UIsub(
                 # clear caches and diff files
                 key_pair = name_rec[:-2]
                 self.dict_diffs.pop(key_pair, None)
-                path_diff = Path(f"{self.dict_folders['cache']}/{key_pair}_diff.parquet")
+                path_diff = Path(
+                    f"{self.dict_folders['cache']}/{key_pair}_diff.parquet"
+                )
                 if path_diff.exists():
                     path_diff.unlink()
                 # TODO: clear group cache
@@ -2556,7 +2642,9 @@ class UIsub(
             for marker in marker_list:
                 if marker in dft.values:
                     dfp.loc[dfp["recording_name"] == rec_name, "status"] = marker
-                    logger.debug("set_rec_status: %s set to status = '%s'", rec_name, marker)
+                    logger.debug(
+                        "set_rec_status: %s set to status = '%s'", rec_name, marker
+                    )
                     print(f"set_rec_status: {rec_name} set to status = '{marker}'")
                     return
             dfp.loc[dfp["recording_name"] == rec_name, "status"] = "auto"
@@ -2674,7 +2762,9 @@ class UIsub(
         if dfp_idx is not None:
             prow = self.get_prow(dfp_idx)
             if prow is None:
-                logger.debug("get_trow: get_prow(%s) returned None, returning None", dfp_idx)
+                logger.debug(
+                    "get_trow: get_prow(%s) returned None, returning None", dfp_idx
+                )
                 return None
             dft = self.get_dft(prow)
         else:
@@ -2683,7 +2773,9 @@ class UIsub(
                 return None
             prow = self.get_prow()
             if prow is None:
-                logger.debug("get_trow: get_prow() returned None (no recording selected), returning None")
+                logger.debug(
+                    "get_trow: get_prow() returned None (no recording selected), returning None"
+                )
                 return None
             dft = self.get_dft(prow)
         if dft is None or len(dft) == 0:
@@ -2725,13 +2817,18 @@ class UIsub(
         uistate.axm = self.canvasMean.axes
         uistate.axe = self.canvasEvent.axes
         ax1 = self.canvasOutput.axes
-        if uistate.ax2 is not None and hasattr(uistate, "ax2"):  # remove ax2 if it exists
+        if uistate.ax2 is not None and hasattr(
+            uistate, "ax2"
+        ):  # remove ax2 if it exists
             uistate.ax2.remove()
         ax2 = ax1.twinx()
         uistate.ax2 = ax2  # Store the ax2 instance
         uistate.ax1 = ax1
         # connect scroll event if not already connected #TODO: when graphAxes is called only once, the check should be redundant
-        if not hasattr(self, "scroll_event_connected") or not self.scroll_event_connected:
+        if (
+            not hasattr(self, "scroll_event_connected")
+            or not self.scroll_event_connected
+        ):
             self.canvasMean.mpl_connect(
                 "scroll_event",
                 lambda event: self.zoomOnScroll(event=event, graph="mean"),
@@ -2759,25 +2856,37 @@ class UIsub(
         # Clean up any existing thread before starting a new one
         self._cleanup_threads()
         if not uistate.list_idx_recs2preload:
-            print("graphPreload: list_idx_recs2preload empty, falling back to all parsed recordings")
+            print(
+                "graphPreload: list_idx_recs2preload empty, falling back to all parsed recordings"
+            )
             df_p = self.get_df_project()
-            uistate.list_idx_recs2preload = df_p[~df_p["sweeps"].eq("...")].index.tolist()
+            uistate.list_idx_recs2preload = df_p[
+                ~df_p["sweeps"].eq("...")
+            ].index.tolist()
         if not uistate.list_idx_recs2preload:
             print("graphPreload: nothing to preload, returning early")
             self.uiThaw()
             return
-        print(f"graphPreload: starting thread for {len(uistate.list_idx_recs2preload)} recordings: {uistate.list_idx_recs2preload}")
+        print(
+            f"graphPreload: starting thread for {len(uistate.list_idx_recs2preload)} recordings: {uistate.list_idx_recs2preload}"
+        )
         self.progressBar.setValue(0)
         thread = graphPreloadThread(uistate, uiplot, self)
         thread.finished.connect(lambda: self.ongraphPreloadFinished(t0))
         thread.finished.connect(thread.deleteLater)  # Auto-cleanup when done
-        thread.finished.connect(lambda: self._threads.remove(thread) if thread in self._threads else None)
+        thread.finished.connect(
+            lambda: self._threads.remove(thread) if thread in self._threads else None
+        )
         self._threads.append(thread)
 
         # Create ProgressBarManager and connect progress signal
         if len(uistate.list_idx_recs2preload) > 0:
-            self.progressBarManager = ProgressBarManager(self.progressBar, len(uistate.list_idx_recs2preload))
-            thread.progress.connect(lambda i: self.progressBarManager.update(i, "Preloading recording"))
+            self.progressBarManager = ProgressBarManager(
+                self.progressBar, len(uistate.list_idx_recs2preload)
+            )
+            thread.progress.connect(
+                lambda i: self.progressBarManager.update(i, "Preloading recording")
+            )
 
             thread.start()
             self.progressBarManager.__enter__()  # Show progress bar
@@ -2801,9 +2910,15 @@ class UIsub(
         all_group_ids = set(self.dd_groups.keys())
         if not all_group_ids:
             return
-        groups_with_records = {group_id: group_info for group_id, group_info in self.dd_groups.items() if group_info["rec_IDs"]}
+        groups_with_records = {
+            group_id: group_info
+            for group_id, group_info in self.dd_groups.items()
+            if group_info["rec_IDs"]
+        }
         already_plotted_groups = set(uistate.get_groupSet())
-        groups_to_plot = all_group_ids & set(groups_with_records.keys()) - already_plotted_groups
+        groups_to_plot = (
+            all_group_ids & set(groups_with_records.keys()) - already_plotted_groups
+        )
         if groups_to_plot:
             for group_ID in groups_to_plot:
                 dict_group = self.dd_groups[group_ID]
@@ -2816,12 +2931,20 @@ class UIsub(
             dfmean = self.get_dfmean(row=row)
             dft = self.get_dft(row=row)
             print(f"graphUpdate dft: {dft}")
-            dfoutput = self.get_dfdiff(row=row) if uistate.checkBox["paired_stims"] else self.get_dfoutput(row=row)
+            dfoutput = (
+                self.get_dfdiff(row=row)
+                if uistate.checkBox["paired_stims"]
+                else self.get_dfoutput(row=row)
+            )
             if dfoutput is not None:
                 uiplot.addRow(p_row=row, dft=dft, dfmean=dfmean, dfoutput=dfoutput)
 
         def processDataFrame(df):
-            list_to_plot = [rec for rec in df["recording_name"].tolist() if rec not in uistate.get_recSet()]
+            list_to_plot = [
+                rec
+                for rec in df["recording_name"].tolist()
+                if rec not in uistate.get_recSet()
+            ]
             for rec in list_to_plot:
                 row = df[df["recording_name"] == rec].iloc[0]
                 processRow(row)
@@ -2876,7 +2999,9 @@ class UIsub(
             return
 
         if (
-            (canvas == self.canvasEvent) and (len(uistate.list_idx_select_recs) == 1) and (len(uistate.list_idx_select_stims) == 1)
+            (canvas == self.canvasEvent)
+            and (len(uistate.list_idx_select_recs) == 1)
+            and (len(uistate.list_idx_select_stims) == 1)
         ):  # Event canvas left-clicked with just one rec and stim selected, middle graph: editing detected events
             uistate.dft_temp = self.get_dft(prow).copy()
             trow = uistate.dft_temp.loc[uistate.list_idx_select_stims[0]]
@@ -2884,10 +3009,14 @@ class UIsub(
             dict_event = uistate.dict_rec_labels[label]
             data_x = dict_event["line"].get_xdata()
             data_y = dict_event["line"].get_ydata()
-            uistate.x_on_click = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
+            uistate.x_on_click = data_x[
+                np.abs(data_x - x).argmin()
+            ]  # time-value of the nearest index
             # print(f"uistate.x_on_click: {uistate.x_on_click}")
             if event.inaxes is not None:
-                if (event.button == 1 or event.button == 3) and (uistate.mouseover_action is not None):
+                if (event.button == 1 or event.button == 3) and (
+                    uistate.mouseover_action is not None
+                ):
                     action = uistate.mouseover_action
                     # print(f"mouseover action: {action}")
                     if action.startswith("EPSP slope"):
@@ -2897,13 +3026,17 @@ class UIsub(
                         )
                         self.mouse_drag = self.canvasEvent.mpl_connect(
                             "motion_notify_event",
-                            lambda event: self.eventDragSlope(event, action, data_x, data_y, start, end),
+                            lambda event: self.eventDragSlope(
+                                event, action, data_x, data_y, start, end
+                            ),
                         )
                     elif action == "EPSP amp move":
                         start = trow["t_EPSP_amp"] - trow["t_stim"]
                         self.mouse_drag = self.canvasEvent.mpl_connect(
                             "motion_notify_event",
-                            lambda event: self.eventDragPoint(event, data_x, data_y, start),
+                            lambda event: self.eventDragPoint(
+                                event, data_x, data_y, start
+                            ),
                         )
                     elif action.startswith("volley slope"):
                         start, end = (
@@ -2912,20 +3045,26 @@ class UIsub(
                         )
                         self.mouse_drag = self.canvasEvent.mpl_connect(
                             "motion_notify_event",
-                            lambda event: self.eventDragSlope(event, action, data_x, data_y, start, end),
+                            lambda event: self.eventDragSlope(
+                                event, action, data_x, data_y, start, end
+                            ),
                         )
                     elif action == "volley amp move":
                         start = trow["t_volley_amp"] - trow["t_stim"]
                         self.mouse_drag = self.canvasEvent.mpl_connect(
                             "motion_notify_event",
-                            lambda event: self.eventDragPoint(event, data_x, data_y, start),
+                            lambda event: self.eventDragPoint(
+                                event, data_x, data_y, start
+                            ),
                         )
                     self.mouse_release = self.canvasEvent.mpl_connect(
                         "button_release_event",
                         lambda event: self.eventDragReleased(event, data_x, data_y),
                     )
 
-        elif canvas == self.canvasMean:  # Mean canvas (top graph) left-clicked: overview and selecting ranges for finding relevant stims
+        elif (
+            canvas == self.canvasMean
+        ):  # Mean canvas (top graph) left-clicked: overview and selecting ranges for finding relevant stims
             if uistate.mean_mouseover_stim_select is not None:
                 uistate.dragging = False
                 self.stimSelectionChanged()
@@ -2934,14 +3073,22 @@ class UIsub(
             time_values = dfmean["time"].values
             uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
             uistate.x_select["mean_start"] = uistate.x_on_click
-            self.lineEdit_mean_selection_start.setText(f"{uistate.x_select['mean_start'] * 1000:g}")
-            self.connectDragRelease(x_range=time_values, rec_ID=prow["ID"], graph="mean")
-        elif canvas == self.canvasOutput:  # Output canvas (bottom graph) left-clicked: click and drag to select specific sweeps
+            self.lineEdit_mean_selection_start.setText(
+                f"{uistate.x_select['mean_start'] * 1000:g}"
+            )
+            self.connectDragRelease(
+                x_range=time_values, rec_ID=prow["ID"], graph="mean"
+            )
+        elif (
+            canvas == self.canvasOutput
+        ):  # Output canvas (bottom graph) left-clicked: click and drag to select specific sweeps
             sweep_numbers = list(range(0, int(prow["sweeps"])))
             uistate.x_on_click = sweep_numbers[np.abs(sweep_numbers - x).argmin()]
             uistate.x_select["output_start"] = uistate.x_on_click
             self.lineEdit_sweeps_range_from.setText(str(uistate.x_on_click))
-            self.connectDragRelease(x_range=sweep_numbers, rec_ID=prow["ID"], graph="output")
+            self.connectDragRelease(
+                x_range=sweep_numbers, rec_ID=prow["ID"], graph="output"
+            )
 
     def meanMouseover(self, event):  # determine which event is being mouseovered
         x = event.xdata
@@ -2968,7 +3115,9 @@ class UIsub(
             label_core = rec_name
 
         axm = uistate.axm
-        uistate.mean_mouseover_stim_select = None  # name of stim that will be selected if clicked
+        uistate.mean_mouseover_stim_select = (
+            None  # name of stim that will be selected if clicked
+        )
         uistate.mean_stim_x_ranges = {}  # dict: stim_num: (x_start, x_end)
         # Margins are set pixel-based by _recalc_axm_detection_zones; recompute
         # here only as a fallback when they have not been initialised yet.
@@ -3014,7 +3163,9 @@ class UIsub(
         axm.figure.canvas.draw()
 
     def eventMouseover(self, event):  # determine which event is being mouseovered
-        if uistate.df_rec_select_data is None:  # no single recording/stim combo selected
+        if (
+            uistate.df_rec_select_data is None
+        ):  # no single recording/stim combo selected
             return
         axe = uistate.axe
 
@@ -3044,7 +3195,9 @@ class UIsub(
                     color = uistate.settings["rgb_volley_slope"]
 
                 if uistate.mouseover_blob is None:
-                    uistate.mouseover_blob = axe.scatter(x_range[1], y_range[1], color=color, s=100, alpha=alpha)
+                    uistate.mouseover_blob = axe.scatter(
+                        x_range[1], y_range[1], color=color, s=100, alpha=alpha
+                    )
                 else:
                     uistate.mouseover_blob.set_offsets([x_range[1], y_range[1]])
                     uistate.mouseover_blob.set_sizes([100])
@@ -3074,7 +3227,9 @@ class UIsub(
                     color = uistate.settings["rgb_volley_amp"]
 
                 if uistate.mouseover_blob is None:
-                    uistate.mouseover_blob = axe.scatter(x, y, color=color, s=100, alpha=alpha)
+                    uistate.mouseover_blob = axe.scatter(
+                        x, y, color=color, s=100, alpha=alpha
+                    )
                 else:
                     uistate.mouseover_blob.set_offsets([x, y])
                     uistate.mouseover_blob.set_sizes([100])
@@ -3098,7 +3253,10 @@ class UIsub(
                 zones["volley slope move"] = uistate.volley_slope_move_zone
             uistate.mouseover_action = None
             for action, zone in zones.items():
-                if zone["x"][0] <= x <= zone["x"][1] and zone["y"][0] <= y <= zone["y"][1]:
+                if (
+                    zone["x"][0] <= x <= zone["x"][1]
+                    and zone["y"][0] <= y <= zone["y"][1]
+                ):
                     uistate.mouseover_action = action
                     plotMouseover(action, axe)
 
@@ -3110,7 +3268,9 @@ class UIsub(
                         trow = self.get_trow()
                         # new_dict = {key: value for key, value in uistate.dict_rec_labels.items() if value.get('stim') == stim_num and value.get('rec_ID') == rec_ID and value.get('axis') == 'ax2'}
                         # EPSP_slope = new_dict.get(f"{rec_name} - stim {stim_num} EPSP slope")
-                        EPSP_slope = uistate.dict_rec_labels.get(f"{rec_name} - stim {trow['stim']} EPSP slope")
+                        EPSP_slope = uistate.dict_rec_labels.get(
+                            f"{rec_name} - stim {trow['stim']} EPSP slope"
+                        )
                         line = EPSP_slope.get("line")
                         line.set_linewidth(10)
                         print(f"{EPSP_slope} - {action}")
@@ -3129,8 +3289,16 @@ class UIsub(
         str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
         ax = getattr(uistate, str_ax)
         # print(f"outputMouseover: x={x}, y={y}, str_ax={str_ax}")
-        if str_ax is None or x is None or y is None or not event.inaxes == ax or not (uistate.slopeView() or uistate.ampView()):
-            if uistate.ghost_sweep is not None:  # remove ghost sweep if outside output graph
+        if (
+            str_ax is None
+            or x is None
+            or y is None
+            or not event.inaxes == ax
+            or not (uistate.slopeView() or uistate.ampView())
+        ):
+            if (
+                uistate.ghost_sweep is not None
+            ):  # remove ghost sweep if outside output graph
                 self.exorcise()
             return
         if len(uistate.list_idx_select_recs) != 1:
@@ -3140,7 +3308,10 @@ class UIsub(
 
         # find a visible line
         dict_out = {
-            key: value for key, value in uistate.dict_rec_show.items() if value["axis"] == str_ax and (value["aspect"] in ["EPSP_amp", "EPSP_slope"])
+            key: value
+            for key, value in uistate.dict_rec_show.items()
+            if value["axis"] == str_ax
+            and (value["aspect"] in ["EPSP_amp", "EPSP_slope"])
         }
         if not dict_out:
             return
@@ -3170,13 +3341,19 @@ class UIsub(
             else:
                 dfsource = self.get_dffilter(p_row)
 
-            dfsweep = dfsource[dfsource["sweep"] == out_x_idx]  # select only rows where sweep == out_x_idx
+            dfsweep = dfsource[
+                dfsource["sweep"] == out_x_idx
+            ]  # select only rows where sweep == out_x_idx
             sweep_x = dfsweep["time"] - offset
-            sweep_y = dfsweep[p_row["filter"]]  # get the value of the filter at the selected sweep
+            sweep_y = dfsweep[
+                p_row["filter"]
+            ]  # get the value of the filter at the selected sweep
 
             if uistate.ghost_sweep is None:
                 ghost_color = "white" if uistate.darkmode else "black"
-                (uistate.ghost_sweep,) = uistate.axe.plot(sweep_x, sweep_y, color=ghost_color, alpha=0.5, zorder=0)
+                (uistate.ghost_sweep,) = uistate.axe.plot(
+                    sweep_x, sweep_y, color=ghost_color, alpha=0.5, zorder=0
+                )
                 if uistate.ghost_label is None:
                     uistate.ghost_label = uistate.axe.text(
                         1,
@@ -3212,27 +3389,38 @@ class UIsub(
         # function to set up x scales for dragging and releasing on mean- and output canvases
         if graph == "mean":  # uistate.axm
             canvas = self.canvasMean
-            filtered_values = [value["line"] for value in uistate.dict_rec_labels.values() if value["rec_ID"] == rec_ID and value["axis"] == "axm"]
+            filtered_values = [
+                value["line"]
+                for value in uistate.dict_rec_labels.values()
+                if value["rec_ID"] == rec_ID and value["axis"] == "axm"
+            ]
         elif graph == "output":  # uistate.ax1+ax2
             canvas = self.canvasOutput
             filtered_values = [
                 value["line"]
                 for value in uistate.dict_rec_labels.values()
-                if value["rec_ID"] == rec_ID and (value["axis"] == "ax1" or value["axis"] == "ax2")
+                if value["rec_ID"] == rec_ID
+                and (value["axis"] == "ax1" or value["axis"] == "ax2")
             ]
         else:
             print("connectDragRelease: Incorrect graph reference.")
             return
 
-        filtered_values = [line for line in filtered_values if len(line.get_xdata()) > 0]
-        max_x_line = max(filtered_values, key=lambda line: line.get_xdata()[-1], default=None)
+        filtered_values = [
+            line for line in filtered_values if len(line.get_xdata()) > 0
+        ]
+        max_x_line = max(
+            filtered_values, key=lambda line: line.get_xdata()[-1], default=None
+        )
         if max_x_line is None:
             print("No lines found. Cannot set up drag and release.")
             return
         x_data = max_x_line.get_xdata()
         self.mouse_drag = canvas.mpl_connect(
             "motion_notify_event",
-            lambda event: self.xDrag(event, canvas=canvas, x_data=x_data, x_range=x_range),
+            lambda event: self.xDrag(
+                event, canvas=canvas, x_data=x_data, x_range=x_range
+            ),
         )
         self.mouse_release = canvas.mpl_connect(
             "button_release_event",
@@ -3247,7 +3435,9 @@ class UIsub(
             return
         x = event.xdata  # mouse x position
         x_drag = np.abs(x_data - x).argmin()  # index closest to x
-        if x_drag == uistate.x_drag_last:  # return if the pointer hasn't moved a full idx since last update
+        if (
+            x_drag == uistate.x_drag_last
+        ):  # return if the pointer hasn't moved a full idx since last update
             return
         if x_drag < 0:
             x_drag = 0
@@ -3278,7 +3468,9 @@ class UIsub(
             if is_mean:
                 self.lineEdit_mean_selection_end.setText("")
                 uistate.x_select["mean_end"] = None
-                self.lineEdit_mean_selection_start.setText(f"{uistate.x_select['mean_start'] * 1000:g}")
+                self.lineEdit_mean_selection_start.setText(
+                    f"{uistate.x_select['mean_start'] * 1000:g}"
+                )
             elif is_output:
                 self.lineEdit_sweeps_range_to.setText("")
                 uistate.x_select["output_end"] = None
@@ -3326,13 +3518,17 @@ class UIsub(
         # print(f"mouseoverUpdate: {uistate.list_idx_select_recs[0]}, {type(uistate.list_idx_select_recs[0])}")
         prow = self.get_prow()
         if prow is None:
-            logger.debug("mouseoverUpdate: prow is None, calling graphRefresh and returning")
+            logger.debug(
+                "mouseoverUpdate: prow is None, calling graphRefresh and returning"
+            )
             self.graphRefresh()
             return
         rec_ID = prow["ID"]
         trow = self.get_trow()
         if trow is None:
-            logger.debug("mouseoverUpdate: trow is None, calling graphRefresh and returning")
+            logger.debug(
+                "mouseoverUpdate: trow is None, calling graphRefresh and returning"
+            )
             self.graphRefresh()
             return
         stim_num = trow["stim"]
@@ -3340,7 +3536,10 @@ class UIsub(
         dict_labels = {
             key: value
             for key, value in uistate.dict_rec_labels.items()
-            if key.endswith(" marker") and value["rec_ID"] == rec_ID and value["axis"] == "axe" and value["stim"] == stim_num
+            if key.endswith(" marker")
+            and value["rec_ID"] == rec_ID
+            and value["axis"] == "axe"
+            and value["stim"] == stim_num
         }
         if not dict_labels:
             print("(no labels) mouseoverUpdate calls self.graphRefresh()")
@@ -3350,7 +3549,9 @@ class UIsub(
         for label, value in dict_labels.items():
             line = value["line"]
             if label.endswith("EPSP amp marker"):
-                uistate.updatePointDragZone(aspect="EPSP amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
+                uistate.updatePointDragZone(
+                    aspect="EPSP amp move", x=line.get_xdata()[0], y=line.get_ydata()[0]
+                )
             elif label.endswith("volley amp marker"):
                 uistate.updatePointDragZone(
                     aspect="volley amp move",
@@ -3358,14 +3559,26 @@ class UIsub(
                     y=line.get_ydata()[0],
                 )
             elif label.endswith("EPSP slope marker"):
-                uistate.updateDragZones(aspect="EPSP slope", x=line.get_xdata(), y=line.get_ydata())
+                uistate.updateDragZones(
+                    aspect="EPSP slope", x=line.get_xdata(), y=line.get_ydata()
+                )
             elif label.endswith("volley slope marker"):
-                uistate.updateDragZones(aspect="volley slope", x=line.get_xdata(), y=line.get_ydata())
+                uistate.updateDragZones(
+                    aspect="volley slope", x=line.get_xdata(), y=line.get_ydata()
+                )
 
-        self.mouseoverMean = self.canvasMean.mpl_connect("motion_notify_event", self.meanMouseover)
-        self.mouseoverEvent = self.canvasEvent.mpl_connect("motion_notify_event", self.eventMouseover)
-        self.mouseoverOutput = self.canvasOutput.mpl_connect("motion_notify_event", self.outputMouseover)
-        self.mouseLeaveOutput = self.canvasOutput.mpl_connect("axes_leave_event", self.on_leave_output)
+        self.mouseoverMean = self.canvasMean.mpl_connect(
+            "motion_notify_event", self.meanMouseover
+        )
+        self.mouseoverEvent = self.canvasEvent.mpl_connect(
+            "motion_notify_event", self.eventMouseover
+        )
+        self.mouseoverOutput = self.canvasOutput.mpl_connect(
+            "motion_notify_event", self.outputMouseover
+        )
+        self.mouseLeaveOutput = self.canvasOutput.mpl_connect(
+            "axes_leave_event", self.on_leave_output
+        )
         # print("mouseoverUpdate calls self.graphRefresh()")
         self.graphRefresh()
 
@@ -3375,7 +3588,11 @@ class UIsub(
         df_p = self.get_df_project()
         precision = uistate.settings["precision"]
 
-        EPSP_slope_markers = {k: v for k, v in uistate.dict_rec_show.items() if k.endswith(" EPSP slope marker")}
+        EPSP_slope_markers = {
+            k: v
+            for k, v in uistate.dict_rec_show.items()
+            if k.endswith(" EPSP slope marker")
+        }
         # print(f"mouseoverUpdateMarkers: {EPSP_slope_markers.keys()}")
         for marker in EPSP_slope_markers.values():
             p_row = df_p.loc[df_p["ID"] == marker["rec_ID"]].squeeze()
@@ -3391,7 +3608,9 @@ class UIsub(
             )
             # event_x: location on event graph, for drawing event markers
             if not analysis.valid(x_start, x_end):
-                print("ERROR - EPSP_slope_markers: invalid x_start or x_end in mouseoverUpdateMarkers")
+                print(
+                    "ERROR - EPSP_slope_markers: invalid x_start or x_end in mouseoverUpdateMarkers"
+                )
                 print(type(x_start), x_start)
                 print(type(x_end), x_end)
                 return
@@ -3403,7 +3622,11 @@ class UIsub(
             y_end = dfmean.loc[(dfmean["time"] - x_end).abs().idxmin(), "voltage"]
             marker["line"].set_data([event_x_start, event_x_end], [y_start, y_end])
 
-        EPSP_amp_markers = {k: v for k, v in uistate.dict_rec_show.items() if k.endswith(" EPSP amp marker")}
+        EPSP_amp_markers = {
+            k: v
+            for k, v in uistate.dict_rec_show.items()
+            if k.endswith(" EPSP amp marker")
+        }
         # print(f"mouseoverUpdateMarkers: {EPSP_amp_markers.keys()}")
         for marker in EPSP_amp_markers.values():
             p_row = df_p.loc[df_p["ID"] == marker["rec_ID"]].squeeze()
@@ -3416,14 +3639,20 @@ class UIsub(
             x_start = round(t_row["t_EPSP_amp"], precision)
             # event_x: location on event graph, for drawing event markers
             if not analysis.valid(x_start):
-                print("ERROR - EPSP_amp_markers: invalid x_start or x_end in mouseoverUpdateMarkers")
+                print(
+                    "ERROR - EPSP_amp_markers: invalid x_start or x_end in mouseoverUpdateMarkers"
+                )
                 print(type(x_start), x_start)
                 return
             event_x_start = round(t_row["t_EPSP_amp"] - t_stim, precision)
             y_start = dfmean.loc[(dfmean["time"] - x_start).abs().idxmin(), "voltage"]
             marker["line"].set_data([event_x_start, event_x_start], [y_start, y_start])
 
-        volley_slope_markers = {k: v for k, v in uistate.dict_rec_show.items() if k.endswith(" volley slope marker")}
+        volley_slope_markers = {
+            k: v
+            for k, v in uistate.dict_rec_show.items()
+            if k.endswith(" volley slope marker")
+        }
         # print(f"mouseoverUpdateMarkers: {volley_slope_markers.keys()}")
         for marker in volley_slope_markers.values():
             p_row = df_p.loc[df_p["ID"] == marker["rec_ID"]].squeeze()
@@ -3439,7 +3668,9 @@ class UIsub(
             )
             # event_x: location on event graph, for drawing event markers
             if not analysis.valid(x_start, x_end):
-                print("ERROR - volley_slope_markers: invalid x_start or x_end in mouseoverUpdateMarkers")
+                print(
+                    "ERROR - volley_slope_markers: invalid x_start or x_end in mouseoverUpdateMarkers"
+                )
                 print(type(x_start), x_start)
                 print(type(x_end), x_end)
                 return
@@ -3451,7 +3682,11 @@ class UIsub(
             y_end = dfmean.loc[(dfmean["time"] - x_end).abs().idxmin(), "voltage"]
             marker["line"].set_data([event_x_start, event_x_end], [y_start, y_end])
 
-        volley_amp_markers = {k: v for k, v in uistate.dict_rec_show.items() if k.endswith(" volley amp marker")}
+        volley_amp_markers = {
+            k: v
+            for k, v in uistate.dict_rec_show.items()
+            if k.endswith(" volley amp marker")
+        }
         # print(f"mouseoverUpdateMarkers: {volley_amp_markers.keys()}")
         for marker in volley_amp_markers.values():
             p_row = df_p.loc[df_p["ID"] == marker["rec_ID"]].squeeze()
@@ -3464,7 +3699,9 @@ class UIsub(
             x_start = round(t_row["t_volley_amp"], precision)
             # event_x: location on event graph, for drawing event markers
             if not analysis.valid(x_start):
-                print("ERROR - volley_amp_markers: invalid x_start or x_end in mouseoverUpdateMarkers")
+                print(
+                    "ERROR - volley_amp_markers: invalid x_start or x_end in mouseoverUpdateMarkers"
+                )
                 print(type(x_start), x_start)
                 return
             event_x_start = round(t_row["t_volley_amp"] - t_stim, precision)
@@ -3488,14 +3725,20 @@ class UIsub(
             uistate.mouseover_out = None
         uistate.mouseover_action = None
 
-    def eventDragSlope(self, event, action, data_x, data_y, prior_slope_start, prior_slope_end):  # graph dragging event
+    def eventDragSlope(
+        self, event, action, data_x, data_y, prior_slope_start, prior_slope_end
+    ):  # graph dragging event
         # self.usage("eventDragSlope")
         self.canvasEvent.mpl_disconnect(self.mouseoverEvent)
         if event.xdata is None or action is None:
             return
         x = event.xdata
-        uistate.x_drag = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
-        if uistate.x_drag == uistate.x_drag_last:  # if the dragged event hasn't moved an index point, change nothing
+        uistate.x_drag = data_x[
+            np.abs(data_x - x).argmin()
+        ]  # time-value of the nearest index
+        if (
+            uistate.x_drag == uistate.x_drag_last
+        ):  # if the dragged event hasn't moved an index point, change nothing
             return
         precision = uistate.settings["precision"]
         time_diff = uistate.x_drag - uistate.x_on_click
@@ -3523,14 +3766,20 @@ class UIsub(
         self.canvasEvent.draw()
         self.eventDragUpdate(x_start, x_end, precision)
 
-    def eventDragPoint(self, event, data_x, data_y, prior_amp):  # maingraph dragging event
+    def eventDragPoint(
+        self, event, data_x, data_y, prior_amp
+    ):  # maingraph dragging event
         # self.usage("eventDragPoint")
         self.canvasEvent.mpl_disconnect(self.mouseoverEvent)
         if event.xdata is None:
             return
         x = event.xdata
-        uistate.x_drag = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
-        if uistate.x_drag == uistate.x_drag_last:  # if the dragged event hasn't moved an index point, change nothing
+        uistate.x_drag = data_x[
+            np.abs(data_x - x).argmin()
+        ]  # time-value of the nearest index
+        if (
+            uistate.x_drag == uistate.x_drag_last
+        ):  # if the dragged event hasn't moved an index point, change nothing
             return
         precision = uistate.settings["precision"]
         time_diff = uistate.x_drag - uistate.x_on_click
@@ -3604,7 +3853,9 @@ class UIsub(
 
         for key, value in dict_t.items():
             dft_temp.at[stim_idx, key] = value
-            if not uistate.checkBox["timepoints_per_stim"] and n_stims > 1:  # update all timepoints in df_t
+            if (
+                not uistate.checkBox["timepoints_per_stim"] and n_stims > 1
+            ):  # update all timepoints in df_t
                 offset = dft_temp.at[stim_idx, "t_stim"] - dft_temp.at[stim_idx, key]
                 for i, i_trow in dft_temp.iterrows():
                     dft_temp.at[i, key] = round(i_trow["t_stim"] - offset, precision)
@@ -3750,9 +4001,13 @@ class UIsub(
             # print(f"dfoutput: {dfoutput}")
             # update volley means
             if aspect == "volley amp":
-                dft_temp.loc[dft_temp.index[stim_idx], "volley_amp_mean"] = new_dfoutput["volley_amp"].mean()
+                dft_temp.loc[dft_temp.index[stim_idx], "volley_amp_mean"] = (
+                    new_dfoutput["volley_amp"].mean()
+                )
             elif aspect == "volley slope":
-                dft_temp.loc[dft_temp.index[stim_idx], "volley_slope_mean"] = new_dfoutput["volley_slope"].mean()
+                dft_temp.loc[dft_temp.index[stim_idx], "volley_slope_mean"] = (
+                    new_dfoutput["volley_slope"].mean()
+                )
 
             new_dfoutput["stim"] = int(stim_num)
             dfoutput.set_index(["stim", "sweep"], inplace=True)
@@ -3768,7 +4023,9 @@ class UIsub(
         self.set_rec_status(rec_name=rec_name)
         trow = self.get_trow()
         if trow is None:
-            logger.debug("eventDragReleased: trow is None after drag commit, falling back to mouseoverUpdate")
+            logger.debug(
+                "eventDragReleased: trow is None after drag commit, falling back to mouseoverUpdate"
+            )
             self.mouseoverUpdate()
             return
         uiplot.update(prow=prow, trow=trow, aspect=aspect, data_x=data_x, data_y=data_y)
@@ -3781,7 +4038,10 @@ class UIsub(
             stim_offset = trow["t_stim"]
             x = trow[t_aspect] - stim_offset
             y = dfmean.loc[dfmean["time"] == trow[t_aspect], prow["filter"]].values[0]
-            amp = dfoutput.loc[dfoutput["stim"] == trow["stim"]][column_name].mean() / 1000  # conversion: mV to V
+            amp = (
+                dfoutput.loc[dfoutput["stim"] == trow["stim"]][column_name].mean()
+                / 1000
+            )  # conversion: mV to V
             t_amp = trow[t_aspect] - stim_offset
             amp_x = (
                 t_amp - trow[f"{t_aspect}_halfwidth"],
@@ -3827,7 +4087,9 @@ class UIsub(
         else:
             zoom = 1 / 1.1
 
-        if event.xdata is None or event.ydata is None:  # if the scroll event was outside the axes, extrapolate x and y
+        if (
+            event.xdata is None or event.ydata is None
+        ):  # if the scroll event was outside the axes, extrapolate x and y
             x_display, y_display = ax.transAxes.inverted().transform((event.x, event.y))
             x = x_display * (ax.get_xlim()[1] - ax.get_xlim()[0]) + ax.get_xlim()[0]
             y = y_display * (ax.get_ylim()[1] - ax.get_ylim()[0]) + ax.get_ylim()[0]
@@ -3845,33 +4107,51 @@ class UIsub(
         # Apply the zoom
         ymin0 = uistate.checkBox["output_ymin0"]
         if on_x:  # check this first; x takes precedence
-            ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
+            ax.set_xlim(
+                x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom
+            )
         elif "slope_left" in locals():  # on output
             if on_left:
                 if slope_left:  # scroll left y zoom output slope y
-                    ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom  # TODO: uistate.checkBox...
+                    ymin = (
+                        0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom
+                    )  # TODO: uistate.checkBox...
                     ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
                 else:  # scroll left y to zoom output amp y
-                    ymin = 0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom  # TODO: uistate.checkBox...
+                    ymin = (
+                        0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom
+                    )  # TODO: uistate.checkBox...
                     ax1.set_ylim(ymin, y + (ax1.get_ylim()[1] - y) / zoom)
             elif on_right and not slope_left:  # scroll right y to zoom output slope y
-                ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom  # TODO: uistate.checkBox...
+                ymin = (
+                    0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom
+                )  # TODO: uistate.checkBox...
                 ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
             else:  # default, scroll graph to zoom all
                 ax1.set_xlim(
                     x - (x - ax1.get_xlim()[0]) / zoom,
                     x + (ax1.get_xlim()[1] - x) / zoom,
                 )
-                ymin = 0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom  # TODO: uistate.checkBox...
+                ymin = (
+                    0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom
+                )  # TODO: uistate.checkBox...
                 ax1.set_ylim(ymin, y + (ax1.get_ylim()[1] - y) / zoom)
-                ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom  # TODO: uistate.checkBox...
+                ymin = (
+                    0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom
+                )  # TODO: uistate.checkBox...
                 ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
         else:  # on mean or event graphs
             if on_left:  # scroll left x to zoom mean or event x
-                ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
+                ax.set_ylim(
+                    y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom
+                )
             else:
-                ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
-                ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
+                ax.set_xlim(
+                    x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom
+                )
+                ax.set_ylim(
+                    y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom
+                )
 
         # TODO: this block is dev visualization for debugging
         if False:
