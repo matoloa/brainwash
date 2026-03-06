@@ -636,6 +636,7 @@ class UIplot:
         stim=None,
         variant="raw",
     ):
+        is_zero_width = amp_x[0] == amp_x[1]
         (xline,) = self.get_axis(axid).plot(
             amp_x,
             [amp_y[1], amp_y[1]],
@@ -661,6 +662,7 @@ class UIplot:
             "stim": stim,
             "line": xline,
             "axis": axid,
+            "is_zero_width": is_zero_width,
         }
         self.uistate.dict_rec_labels[f"{label} y marker"] = {
             "rec_ID": rec_ID,
@@ -669,6 +671,7 @@ class UIplot:
             "stim": stim,
             "line": yline,
             "axis": axid,
+            "is_zero_width": False,
         }
 
     def plot_vline(
@@ -1329,12 +1332,19 @@ class UIplot:
         )
         self.uistate.dict_rec_labels[f"{labelbase} marker"]["line"].set_data(x, y)
         if amp is not None:
+            is_zero_width = amp_x[0] == amp_x[1]
             amp_y = amp_zero, (0 - amp) + amp_zero
             self.uistate.dict_rec_labels[f"{labelbase} x marker"]["line"].set_data(
                 amp_x, [amp_y[1], amp_y[1]]
             )
             self.uistate.dict_rec_labels[f"{labelbase} y marker"]["line"].set_data(
                 [x, x], amp_y
+            )
+            self.uistate.dict_rec_labels[f"{labelbase} x marker"]["is_zero_width"] = (
+                is_zero_width
+            )
+            self.uistate.dict_rec_labels[f"{labelbase} y marker"]["is_zero_width"] = (
+                False
             )
         if draw:
             axe.figure.canvas.draw()

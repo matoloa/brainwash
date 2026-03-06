@@ -169,7 +169,7 @@ class UIstate:
             "t_volley_slope_params": "NA",
             "volley_slope_mean": 0.0,
             "t_volley_amp": 0,
-            "t_volley_amp_halfwidth": 0,  # Deprecated
+            "t_volley_amp_halfwidth": 0,
             "t_volley_amp_method": "default",
             "t_volley_amp_params": "NA",
             "volley_amp_mean": 0.0,
@@ -183,7 +183,7 @@ class UIstate:
             "t_EPSP_slope_method": "default",
             "t_EPSP_slope_params": "NA",
             "t_EPSP_amp": 0,
-            "t_EPSP_amp_halfwidth": 0,  # Deprecated
+            "t_EPSP_amp_halfwidth": 0,
             "t_EPSP_amp_method": "default",
             "t_EPSP_amp_params": "NA",
             "norm_output_from": 0,

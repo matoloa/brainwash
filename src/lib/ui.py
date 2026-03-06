@@ -1001,6 +1001,7 @@ class UIsub(
         # update_show now runs with a correct, clamped uistate.list_idx_select_stims
         self.update_show()
         self.zoomAuto()
+        self.update_amp_lineEdits()
 
         t0 = time.time()
         self.mouseoverUpdate()  # always ends with a single graphRefresh()
@@ -1020,10 +1021,13 @@ class UIsub(
         uistate.list_idx_select_stims = [index.row() for index in selected_indexes]
         self.update_show()
         self.zoomAuto()
+        self.update_amp_lineEdits()
         self.mouseoverUpdate()
 
     def _is_rec_visible(self, v: dict, selected_ids: set, selected_stims: set) -> bool:
         """Predicate: should this rec-label entry be visible given current UI state."""
+        if v.get("is_zero_width"):
+            return False
         if v["rec_ID"] not in selected_ids:
             return False
         if v["stim"] is not None and v["stim"] not in selected_stims:
@@ -1904,11 +1908,35 @@ class UIsub(
 
     def trigger_set_EPSP_amp_width_all(self):
         self.usage("trigger_set_EPSP_amp_width_all")
+        try:
+            num = max(0, float(self.lineEdit_EPSP_amp_halfwidth.text()))
+        except ValueError:
+            return
+        val_in_seconds = num / 1000
+        for _, prow in self.get_df_project().iterrows():
+            df_t = self.get_dft(prow)
+            if df_t is not None:
+                for idx_stim in range(len(df_t)):
+                    df_t.at[idx_stim, "t_EPSP_amp_halfwidth"] = val_in_seconds
+                self.set_dft(prow["recording_name"], df_t)
         self.recalculate()
+        self.update_amp_lineEdits()
 
     def trigger_set_volley_amp_width_all(self):
         self.usage("trigger_set_volley_amp_width_all")
+        try:
+            num = max(0, float(self.lineEdit_volley_amp_halfwidth.text()))
+        except ValueError:
+            return
+        val_in_seconds = num / 1000
+        for _, prow in self.get_df_project().iterrows():
+            df_t = self.get_dft(prow)
+            if df_t is not None:
+                for idx_stim in range(len(df_t)):
+                    df_t.at[idx_stim, "t_volley_amp_halfwidth"] = val_in_seconds
+                self.set_dft(prow["recording_name"], df_t)
         self.recalculate()
+        self.update_amp_lineEdits()
 
     def trigger_set_norm_range_all(self):
         self.usage("trigger_set_norm_range_all")
@@ -2149,18 +2177,73 @@ class UIsub(
 
     # recalculate → DataFrameMixin (ui_data_frames.py)
 
+    def update_amp_lineEdits(self):
+        if not uistate.list_idx_select_recs:
+            return
+
+        selected_EPSP_hws = set()
+        selected_volley_hws = set()
+
+        for idx_rec in uistate.list_idx_select_recs:
+            prow = self.get_prow(idx_rec)
+            df_t = self.get_dft(prow)
+
+            stims_to_check = (
+                uistate.list_idx_select_stims if uistate.list_idx_select_stims else [0]
+            )
+
+            for idx_stim in stims_to_check:
+                if idx_stim < len(df_t):
+                    selected_EPSP_hws.add(
+                        df_t.iloc[idx_stim]["t_EPSP_amp_halfwidth"] * 1000
+                    )
+                    selected_volley_hws.add(
+                        df_t.iloc[idx_stim]["t_volley_amp_halfwidth"] * 1000
+                    )
+
+        self.connectUIstate(disconnect=True)
+
+        if len(selected_EPSP_hws) == 1:
+            self.lineEdit_EPSP_amp_halfwidth.setText(f"{selected_EPSP_hws.pop():g}")
+        else:
+            self.lineEdit_EPSP_amp_halfwidth.setText("-")
+
+        if len(selected_volley_hws) == 1:
+            self.lineEdit_volley_amp_halfwidth.setText(f"{selected_volley_hws.pop():g}")
+        else:
+            self.lineEdit_volley_amp_halfwidth.setText("-")
+
+        self.connectUIstate(disconnect=False)
+
     def editAmpHalfwidth(self, lineEdit):
         lineEditName = lineEdit.objectName()
         self.usage(f"editAmpHalfwidth {lineEditName}")
         try:
             num = max(0, float(lineEdit.text()))
         except ValueError:
-            num = 0
-        lineEdit.setText(str(num))
-        if lineEditName == "lineEdit_EPSP_amp_halfwidth":
-            uistate.lineEdit["EPSP_amp_halfwidth_ms"] = num
-        elif lineEditName == "lineEdit_volley_amp_halfwidth":
-            uistate.lineEdit["volley_amp_halfwidth_ms"] = num
+            self.update_amp_lineEdits()
+            return
+
+        val_in_seconds = num / 1000
+
+        for idx_rec in uistate.list_idx_select_recs:
+            prow = self.get_prow(idx_rec)
+            df_t = self.get_dft(prow)
+            stims_to_edit = (
+                uistate.list_idx_select_stims if uistate.list_idx_select_stims else [0]
+            )
+
+            for idx_stim in stims_to_edit:
+                if idx_stim < len(df_t):
+                    if lineEditName == "lineEdit_EPSP_amp_halfwidth":
+                        df_t.at[idx_stim, "t_EPSP_amp_halfwidth"] = val_in_seconds
+                    elif lineEditName == "lineEdit_volley_amp_halfwidth":
+                        df_t.at[idx_stim, "t_volley_amp_halfwidth"] = val_in_seconds
+
+            self.set_dft(prow["recording_name"], df_t)
+
+        self.recalculate(selection=uistate.list_idx_select_recs)
+        self.update_amp_lineEdits()
 
     def editSort(self, lineEdit, start, end, request="int"):
         def str2num(text):
@@ -3873,7 +3956,7 @@ class UIsub(
         elif x_axis == "sweep":
             dict_t["stim"] = trow_temp["stim"]
             dict_t["amp_zero"] = trow_temp["amp_zero"]
-            out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
+            out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, quick=True)
 
         # norm handling for EPSP
         if aspect in ["EPSP_amp", "EPSP_slope"]:
@@ -4012,6 +4095,8 @@ class UIsub(
             new_dfoutput["stim"] = int(stim_num)
             dfoutput.set_index(["stim", "sweep"], inplace=True)
             new_dfoutput.set_index(["stim", "sweep"], inplace=True)
+            dfoutput = dfoutput.astype(float)
+            new_dfoutput = new_dfoutput.astype(float)
             dfoutput.update(new_dfoutput)
             dfoutput.reset_index(inplace=True)
             new_dfoutput.reset_index(inplace=True)

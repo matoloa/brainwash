@@ -54,13 +54,7 @@ class DataFrameMixin:
 
         norm_from = uistate.lineEdit["norm_EPSP_from"]
         norm_to = uistate.lineEdit["norm_EPSP_to"]
-        EPSP_amp_halfwidth_ms = uistate.lineEdit["EPSP_amp_halfwidth_ms"]
-        volley_amp_halfwidth_ms = uistate.lineEdit["volley_amp_halfwidth_ms"]
         dt = uistate.default_dict_t
-        dt["t_EPSP_amp_halfwidth"] = EPSP_amp_halfwidth_ms / 1000  # convert to seconds
-        dt["t_volley_amp_halfwidth"] = (
-            volley_amp_halfwidth_ms / 1000
-        )  # convert to seconds
         dt["norm_output_from"] = norm_from
         dt["norm_output_to"] = norm_to
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
@@ -92,8 +86,6 @@ class DataFrameMixin:
         for _, p_row in rows.iterrows():
             rec = p_row["recording_name"]
             df_t = self.get_dft(p_row)
-            df_t["t_EPSP_amp_halfwidth"] = dt["t_EPSP_amp_halfwidth"]
-            df_t["t_volley_amp_halfwidth"] = dt["t_volley_amp_halfwidth"]
             df_t["norm_output_from"] = dt["norm_output_from"]
             df_t["norm_output_to"] = dt["norm_output_to"]
             self.set_dft(rec, df_t)
@@ -202,12 +194,6 @@ class DataFrameMixin:
             dft["norm_output_from"], dft["norm_output_to"] = (
                 uistate.lineEdit["norm_EPSP_from"],
                 uistate.lineEdit["norm_EPSP_to"],
-            )
-            dft["t_EPSP_amp_halfwidth"] = (
-                uistate.lineEdit["EPSP_amp_halfwidth_ms"] / 1000
-            )
-            dft["t_volley_amp_halfwidth"] = (
-                uistate.lineEdit["volley_amp_halfwidth_ms"] / 1000
             )
             df_p = self.get_df_project()  # update (number of) 'stims' columns
             stims = len(dft)
