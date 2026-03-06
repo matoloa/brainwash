@@ -129,19 +129,11 @@ def build_dfoutput(df, dict_t, filter="voltage", quick=False):
         t_EPSP_amp = dict_t["t_EPSP_amp"]
         if valid(t_EPSP_amp):
             amp_zero = dict_t["amp_zero"]
-            EPSP_w = (
-                dict_t["t_EPSP_amp_width"]
-                if "t_EPSP_amp_width" in dict_t.keys()
-                else 2 * dict_t["t_EPSP_amp_halfwidth"]
-            )
+            EPSP_w = dict_t["t_EPSP_amp_width"] if "t_EPSP_amp_width" in dict_t.keys() else 2 * dict_t["t_EPSP_amp_halfwidth"]
             if EPSP_w == 0 or quick:  # single point
-                df_EPSP_amp = (
-                    df[df["time"] == t_EPSP_amp].copy()
-                )  # filter out all time (from sweep start) that do not match t_EPSP_amp
+                df_EPSP_amp = df[df["time"] == t_EPSP_amp].copy()  # filter out all time (from sweep start) that do not match t_EPSP_amp
                 df_EPSP_amp.reset_index(inplace=True, drop=True)
-                dfoutput["EPSP_amp"] = (
-                    -1000 * df_EPSP_amp[filter]
-                )  # invert and convert to mV
+                dfoutput["EPSP_amp"] = -1000 * df_EPSP_amp[filter]  # invert and convert to mV
             else:  # mean (SLOW)
                 start_time = t_EPSP_amp - EPSP_w / 2
                 end_time = t_EPSP_amp + EPSP_w / 2
@@ -149,8 +141,7 @@ def build_dfoutput(df, dict_t, filter="voltage", quick=False):
                     lambda sweep_df: (
                         (
                             sweep_df.loc[
-                                (sweep_df["time"] >= start_time)
-                                & (sweep_df["time"] <= end_time),
+                                (sweep_df["time"] >= start_time) & (sweep_df["time"] <= end_time),
                                 filter,
                             ].mean()
                             - amp_zero
@@ -161,9 +152,7 @@ def build_dfoutput(df, dict_t, filter="voltage", quick=False):
         else:
             dfoutput["EPSP_amp"] = np.nan
         # Normalize EPSP_amp
-        selected_values = dfoutput[
-            (dfoutput.index >= normFrom) & (dfoutput.index <= normTo)
-        ]["EPSP_amp"]
+        selected_values = dfoutput[(dfoutput.index >= normFrom) & (dfoutput.index <= normTo)]["EPSP_amp"]
         norm_mean = selected_values.mean() / 100  # divide by 100 to get percentage
         dfoutput["EPSP_amp_norm"] = dfoutput["EPSP_amp"] / norm_mean
         list_col.extend(["EPSP_amp", "EPSP_amp_norm"])
@@ -172,16 +161,12 @@ def build_dfoutput(df, dict_t, filter="voltage", quick=False):
         t_EPSP_slope_start = dict_t["t_EPSP_slope_start"]
         t_EPSP_slope_end = dict_t["t_EPSP_slope_end"]
         if valid(t_EPSP_slope_start):
-            df_EPSP_slope = measureslope_vec(
-                df=df, filter=filter, t_start=t_EPSP_slope_start, t_end=t_EPSP_slope_end
-            )
+            df_EPSP_slope = measureslope_vec(df=df, filter=filter, t_start=t_EPSP_slope_start, t_end=t_EPSP_slope_end)
             dfoutput["EPSP_slope"] = -df_EPSP_slope["value"]  # invert
         else:
             dfoutput["EPSP_slope"] = np.nan
         # Normalize EPSP_slope
-        selected_values = dfoutput[
-            (dfoutput.index >= normFrom) & (dfoutput.index <= normTo)
-        ]["EPSP_slope"]
+        selected_values = dfoutput[(dfoutput.index >= normFrom) & (dfoutput.index <= normTo)]["EPSP_slope"]
         norm_mean = selected_values.mean() / 100  # divide by 100 to get percentage
         dfoutput["EPSP_slope_norm"] = dfoutput["EPSP_slope"] / norm_mean
         list_col.extend(["EPSP_slope", "EPSP_slope_norm"])
@@ -190,19 +175,11 @@ def build_dfoutput(df, dict_t, filter="voltage", quick=False):
         t_volley_amp = dict_t["t_volley_amp"]
         if valid(t_volley_amp):
             amp_zero = dict_t["amp_zero"]
-            volley_w = (
-                dict_t["t_volley_amp_width"]
-                if "t_volley_amp_width" in dict_t.keys()
-                else 2 * dict_t["t_volley_amp_halfwidth"]
-            )
+            volley_w = dict_t["t_volley_amp_width"] if "t_volley_amp_width" in dict_t.keys() else 2 * dict_t["t_volley_amp_halfwidth"]
             if volley_w == 0 or quick:  # single point
-                df_volley_amp = df[
-                    df["time"] == t_volley_amp
-                ].copy()  # filter out all time (from sweep start) that do not match t_volley_amp
+                df_volley_amp = df[df["time"] == t_volley_amp].copy()  # filter out all time (from sweep start) that do not match t_volley_amp
                 df_volley_amp.reset_index(inplace=True, drop=True)
-                dfoutput["volley_amp"] = (
-                    -1000 * df_volley_amp[filter]
-                )  # invert and convert to mV
+                dfoutput["volley_amp"] = -1000 * df_volley_amp[filter]  # invert and convert to mV
             else:  # mean (SLOW)
                 start_time = t_volley_amp - volley_w / 2
                 end_time = t_volley_amp + volley_w / 2
@@ -210,8 +187,7 @@ def build_dfoutput(df, dict_t, filter="voltage", quick=False):
                     lambda sweep_df: (
                         (
                             sweep_df.loc[
-                                (sweep_df["time"] >= start_time)
-                                & (sweep_df["time"] <= end_time),
+                                (sweep_df["time"] >= start_time) & (sweep_df["time"] <= end_time),
                                 filter,
                             ].mean()
                             - amp_zero
@@ -277,19 +253,11 @@ def build_dfstimoutput(df, df_t, filter="voltage"):
             end_index = np.abs(df["time"] - end_time).idxmin()
             df_EPSP_amp = df.iloc[start_index : end_index + 1].copy()
             df_EPSP_amp.reset_index(drop=True, inplace=True)
-            df_stimoutput.at[i, "EPSP_amp"] = (
-                (df_EPSP_amp[filter].mean() - amp_zero) * -1000
-                if not df_EPSP_amp.empty
-                else np.nan
-            )
+            df_stimoutput.at[i, "EPSP_amp"] = (df_EPSP_amp[filter].mean() - amp_zero) * -1000 if not df_EPSP_amp.empty else np.nan
             # Normalize EPSP_amp
             selected_values = df_stimoutput["EPSP_amp"][normFrom : normTo + 1]
-            norm_mean = (
-                np.mean(selected_values) / 100
-            )  # divide by 100 to get percentage
-            df_stimoutput.at[i, "EPSP_amp_norm"] = (
-                df_stimoutput.at[i, "EPSP_amp"] / norm_mean if norm_mean else np.nan
-            )
+            norm_mean = np.mean(selected_values) / 100  # divide by 100 to get percentage
+            df_stimoutput.at[i, "EPSP_amp_norm"] = df_stimoutput.at[i, "EPSP_amp"] / norm_mean if norm_mean else np.nan
         # EPSP_slope
         if valid(t_row["t_EPSP_slope_start"]) and valid(t_row["t_EPSP_slope_end"]):
             slope_EPSP = measureslope(
@@ -301,12 +269,8 @@ def build_dfstimoutput(df, df_t, filter="voltage"):
             df_stimoutput.at[i, "EPSP_slope"] = -slope_EPSP if slope_EPSP else np.nan
             # Normalize EPSP_slope
             selected_values = df_stimoutput["EPSP_slope"][normFrom : normTo + 1]
-            norm_mean = (
-                np.mean(selected_values) / 100
-            )  # divide by 100 to get percentage
-            df_stimoutput.at[i, "EPSP_slope_norm"] = (
-                df_stimoutput.at[i, "EPSP_slope"] / norm_mean if norm_mean else np.nan
-            )
+            norm_mean = np.mean(selected_values) / 100  # divide by 100 to get percentage
+            df_stimoutput.at[i, "EPSP_slope_norm"] = df_stimoutput.at[i, "EPSP_slope"] / norm_mean if norm_mean else np.nan
         # volley_amp
         if valid(t_row["t_volley_amp"]):
             start_time = t_row["t_volley_amp"] - volley_hw
@@ -315,11 +279,7 @@ def build_dfstimoutput(df, df_t, filter="voltage"):
             end_index = np.abs(df["time"] - end_time).idxmin()
             df_volley_amp = df.iloc[start_index : end_index + 1].copy()
             df_volley_amp.reset_index(drop=True, inplace=True)
-            df_stimoutput.at[i, "volley_amp"] = (
-                (df_volley_amp[filter].mean() - amp_zero) * -1000
-                if not df_volley_amp.empty
-                else np.nan
-            )
+            df_stimoutput.at[i, "volley_amp"] = (df_volley_amp[filter].mean() - amp_zero) * -1000 if not df_volley_amp.empty else np.nan
         # volley_slope
         if valid(t_row["t_volley_slope_start"]) and valid(t_row["t_volley_slope_end"]):
             volley_EPSP = measureslope(
@@ -328,9 +288,7 @@ def build_dfstimoutput(df, df_t, filter="voltage"):
                 t_start=t_row["t_volley_slope_start"],
                 t_end=t_row["t_volley_slope_end"],
             )
-            df_stimoutput.at[i, "volley_slope"] = (
-                -volley_EPSP if volley_EPSP else np.nan
-            )
+            df_stimoutput.at[i, "volley_slope"] = -volley_EPSP if volley_EPSP else np.nan
 
     # print(f'build_df_stimoutput: {round((time.time()-t0)*1000)} ms, columns: {df_stimoutput.columns}')
     return df_stimoutput
@@ -338,9 +296,7 @@ def build_dfstimoutput(df, df_t, filter="voltage"):
 
 def addFilterSavgol(df, window_length=9, poly_order=3):
     # returns a column containing a smoothed version of the voltage column in a df; dfmean or dffilter
-    df["savgol"] = savgol_filter(
-        df.voltage, window_length=window_length, polyorder=poly_order
-    )
+    df["savgol"] = savgol_filter(df.voltage, window_length=window_length, polyorder=poly_order)
     return df["savgol"]
 
 
@@ -360,10 +316,7 @@ def find_i_stims(dfmean, threshold=0.1, min_time_difference=0.005, verbose=False
     for i in range(1, len(above_threshold_indices)):
         current_index = above_threshold_indices[i]
         previous_index = above_threshold_indices[i - 1]
-        if (
-            dfmean["time"][current_index] - dfmean["time"][previous_index]
-            > min_time_difference
-        ):
+        if dfmean["time"][current_index] - dfmean["time"][previous_index] > min_time_difference:
             filtered_indices.append(max_index)
             max_index = current_index
         elif dfmean["prim"][current_index] > dfmean["prim"][max_index]:
@@ -399,9 +352,7 @@ def find_i_EPSP_peak_max(
 
     # Slice dfmean according to limitleft and limitright
     if limitright != -1:
-        dfmean_sliced = dfmean[
-            (limitleft <= dfmean.index) & (dfmean.index <= limitright)
-        ]
+        dfmean_sliced = dfmean[(limitleft <= dfmean.index) & (dfmean.index <= limitright)]
     else:
         dfmean_sliced = dfmean[limitleft <= dfmean.index]
 
@@ -448,9 +399,7 @@ def find_i_VEB_prim_peak_max(
         print(f" . . . sampling_Hz: {sampling_Hz}")
 
     # convert time constraints (where to look for the VEB) to indexes
-    minimum_acceptable_i_for_VEB = int(
-        i_stim + 0.001 * sampling_Hz
-    )  # The VEB is not within a ms of the i_stim
+    minimum_acceptable_i_for_VEB = int(i_stim + 0.001 * sampling_Hz)  # The VEB is not within a ms of the i_stim
     max_acceptable_i_for_VEB = int(
         i_EPSP - np.floor((param_minimum_width_of_EPSP * 0.001 * sampling_Hz) / 2)
     )  # 0.001 for ms to seconds, *sampling_Hz for seconds to recorded points
@@ -463,16 +412,12 @@ def find_i_VEB_prim_peak_max(
         )
 
     # create a window to the acceptable range:
-    prim_sample = dfmean["prim"].values[
-        minimum_acceptable_i_for_VEB:max_acceptable_i_for_VEB
-    ]
+    prim_sample = dfmean["prim"].values[minimum_acceptable_i_for_VEB:max_acceptable_i_for_VEB]
 
     # find the sufficiently wide and promintent peaks within this range
     i_peaks, properties = find_peaks(
         prim_sample,
-        width=param_minimum_width_of_VEB
-        * 1000
-        / sampling_Hz,  # *1000 for ms to seconds, / sampling_Hz for seconds to recorded points
+        width=param_minimum_width_of_VEB * 1000 / sampling_Hz,  # *1000 for ms to seconds, / sampling_Hz for seconds to recorded points
         prominence=param_prim_prominence / 1000,  # TODO: unit?
     )
 
@@ -508,38 +453,26 @@ def find_i_EPSP_slope_bis0(dfmean, i_VEB, i_EPSP, happy=False, verbose=False):
         return np.nan
     if 1 < len(i_EPSP_slope):
         if not happy:
-            raise ValueError(
-                f"Found multiple positive zero-crossings in dfmean.bis[i_VEB: i_EPSP]:{i_EPSP_slope}"
-            )
+            raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[i_VEB: i_EPSP]:{i_EPSP_slope}")
         else:
             if verbose:
-                print(
-                    "More EPSPs than we wanted but I'm happy, so I pick the first one and move on."
-                )
+                print("More EPSPs than we wanted but I'm happy, so I pick the first one and move on.")
     return i_EPSP_slope[0]
 
 
-def find_i_EPSP_slope_mindist_bis0(
-    dfmean, i_VEB, i_EPSP, EPSP_slope_size=3, happy=False
-):  # TODO: set rolling_width to 2(EPSP width)+1
+def find_i_EPSP_slope_mindist_bis0(dfmean, i_VEB, i_EPSP, EPSP_slope_size=3, happy=False):  # TODO: set rolling_width to 2(EPSP width)+1
     # Experimental: not used
     """Look for lowest sum of deviation from straight line (= 0 bis)"""
     width = 2 * EPSP_slope_size + 1
     sertemp = dfmean.bis[i_VEB + 4 : i_EPSP].abs()
     sertemp = sertemp.rolling(width, center=True).mean().diff()
 
-    i_EPSP_slope = (
-        sertemp[0 < sertemp.apply(np.sign)].index.values - 1
-    )  # compensate for diff coming after local minimas
+    i_EPSP_slope = sertemp[0 < sertemp.apply(np.sign)].index.values - 1  # compensate for diff coming after local minimas
     if 1 < len(i_EPSP_slope):
         if not happy:
-            raise ValueError(
-                f"Found multiple positive zero-crossings in dfmean.bis[i_VEB: i_EPSP]:{i_EPSP_slope}"
-            )
+            raise ValueError(f"Found multiple positive zero-crossings in dfmean.bis[i_VEB: i_EPSP]:{i_EPSP_slope}")
         else:
-            print(
-                "More EPSPs than we wanted but I'm happy, so I pick the first one and move on."
-            )
+            print("More EPSPs than we wanted but I'm happy, so I pick the first one and move on.")
     print(f" . . . i_EPSP_slope: {i_EPSP_slope}")
     return i_EPSP_slope[0]
 
@@ -611,9 +544,7 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
             verbose=False,
         )
         if dict_i["i_EPSP_amp"] is not np.nan:
-            dict_i["i_VEB"] = find_i_VEB_prim_peak_max(
-                dfmean=dfmean, i_stim=i, i_EPSP=dict_i["i_EPSP_amp"]
-            )
+            dict_i["i_VEB"] = find_i_VEB_prim_peak_max(dfmean=dfmean, i_stim=i, i_EPSP=dict_i["i_EPSP_amp"])
             if dict_i["i_VEB"] is not np.nan:
                 dict_i["i_EPSP_slope"] = find_i_EPSP_slope_bis0(
                     dfmean=dfmean,
@@ -622,9 +553,7 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
                     happy=True,
                 )
                 if dict_i["i_EPSP_slope"] is not np.nan:
-                    dict_i["i_volley_slope"] = find_i_volley_slope(
-                        dfmean=dfmean, i_stim=i, i_VEB=dict_i["i_VEB"], happy=True
-                    )
+                    dict_i["i_volley_slope"] = find_i_volley_slope(dfmean=dfmean, i_stim=i, i_VEB=dict_i["i_VEB"], happy=True)
                     if dict_i["i_volley_slope"] is not np.nan:
                         dict_i["i_volley_amp"] = dfmean.loc[
                             dict_i["i_volley_slope"] : dict_i["i_VEB"], "voltage"
@@ -632,9 +561,7 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
         list_dict_i.append(dict_i)
     df_i = pd.DataFrame(list_dict_i)
     df_i_numeric = df_i.select_dtypes(include=[np.number])
-    list_nan = [
-        i for i in range(len(df_i_numeric)) if df_i_numeric.iloc[i].isnull().any()
-    ]
+    list_nan = [i for i in range(len(df_i_numeric)) if df_i_numeric.iloc[i].isnull().any()]
     if list_nan:
         methods = [
             "t_volley_amp_method",
@@ -655,9 +582,7 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
             if not df_i_numeric.iloc[i].isnull().any():
                 # create a template for i_values based difference from i_stim
                 i_values = df_i_numeric.iloc[i]
-                i_template = {
-                    key: i_values[key] - i_stims[i] for key in i_values.keys()
-                }
+                i_template = {key: i_values[key] - i_stims[i] for key in i_values.keys()}
                 # apply the template to all rows with np.nan
                 for j in list_nan:
                     for key in df_i_numeric.columns:
@@ -665,9 +590,7 @@ def find_all_i(dfmean, i_stims=None, param_min_time_from_i_stim=0.0005, verbose=
                     for key in methods:
                         df_i.loc[j, key] = "Extrapolated"
                     for key in params:
-                        df_i.loc[j, key] = (
-                            f"stim {i + 1}"  # user readable references are 1-indexed
-                        )
+                        df_i.loc[j, key] = f"stim {i + 1}"  # user readable references are 1-indexed
                 break
         else:  # no stim-row with all values. Apply dodgy default values based on i_stim
             for index, row in df_i.iterrows():
@@ -715,16 +638,12 @@ def find_all_t(
         i_volley_slope_width = round(default_dict_t["t_volley_slope_width"] / deltat)
         i_EPSP_slope_width = round(default_dict_t["t_EPSP_slope_width"] / deltat)
         t_volley_slope_start = (
-            dfmean.loc[
-                row["i_volley_slope"] - ((i_volley_slope_width - 1) // 2) - 1
-            ].time
+            dfmean.loc[row["i_volley_slope"] - ((i_volley_slope_width - 1) // 2) - 1].time
             if "i_volley_slope" in row and row["i_volley_slope"] in dfmean.index
             else None
         )
         t_volley_slope_end = (
-            dfmean.loc[
-                row["i_volley_slope"] + ((i_volley_slope_width - 1) // 2) - 1
-            ].time
+            dfmean.loc[row["i_volley_slope"] + ((i_volley_slope_width - 1) // 2) - 1].time
             if "i_volley_slope" in row and row["i_volley_slope"] in dfmean.index
             else None
         )
@@ -738,43 +657,21 @@ def find_all_t(
             if "i_EPSP_slope" in row and row["i_EPSP_slope"] in dfmean.index
             else None
         )
-        t_volley_amp = (
-            dfmean.loc[row["i_volley_amp"]].time
-            if "i_volley_amp" in row and row["i_volley_amp"] in dfmean.index
-            else None
-        )
-        t_EPSP_amp = (
-            dfmean.loc[row["i_EPSP_amp"]].time
-            if "i_EPSP_amp" in row and row["i_EPSP_amp"] in dfmean.index
-            else None
-        )
+        t_volley_amp = dfmean.loc[row["i_volley_amp"]].time if "i_volley_amp" in row and row["i_volley_amp"] in dfmean.index else None
+        t_EPSP_amp = dfmean.loc[row["i_EPSP_amp"]].time if "i_EPSP_amp" in row and row["i_EPSP_amp"] in dfmean.index else None
         amp_zero_idx_start = row["i_stim"] - 20  # TODO: fix hardcoded value
         amp_zero_idx_end = row["i_stim"] - 10  # TODO: fix hardcoded value
-        amp_zero = dfmean.loc[
-            amp_zero_idx_start:amp_zero_idx_end
-        ].voltage.mean()  # TODO: fix hardcoded filter: "voltage"
+        amp_zero = dfmean.loc[amp_zero_idx_start:amp_zero_idx_end].voltage.mean()  # TODO: fix hardcoded filter: "voltage"
         return {
             "stim": index + 1,
             "amp_zero": amp_zero,  # mean of dfmean.voltage 20-10 indices before i_stim, in Volts
             "t_stim": round(dfmean.loc[row["i_stim"]].time, precision),
-            "t_volley_slope_start": round(t_volley_slope_start, precision)
-            if t_volley_slope_start is not None
-            else None,
-            "t_volley_slope_end": round(t_volley_slope_end, precision)
-            if t_volley_slope_end is not None
-            else None,
-            "t_EPSP_slope_start": round(t_EPSP_slope_start, precision)
-            if t_EPSP_slope_start is not None
-            else None,
-            "t_EPSP_slope_end": round(t_EPSP_slope_end, precision)
-            if t_EPSP_slope_end is not None
-            else None,
-            "t_volley_amp": round(t_volley_amp, precision)
-            if t_volley_amp is not None
-            else None,
-            "t_EPSP_amp": round(t_EPSP_amp, precision)
-            if t_EPSP_amp is not None
-            else None,
+            "t_volley_slope_start": round(t_volley_slope_start, precision) if t_volley_slope_start is not None else None,
+            "t_volley_slope_end": round(t_volley_slope_end, precision) if t_volley_slope_end is not None else None,
+            "t_EPSP_slope_start": round(t_EPSP_slope_start, precision) if t_EPSP_slope_start is not None else None,
+            "t_EPSP_slope_end": round(t_EPSP_slope_end, precision) if t_EPSP_slope_end is not None else None,
+            "t_volley_amp": round(t_volley_amp, precision) if t_volley_amp is not None else None,
+            "t_EPSP_amp": round(t_EPSP_amp, precision) if t_EPSP_amp is not None else None,
         }
 
     df_indices = find_all_i(dfmean, param_min_time_from_i_stim=0.0005)
@@ -795,9 +692,7 @@ def find_all_t(
     df_t = pd.DataFrame(list_of_dict_t)
 
     # conserve all columns that already start with "t_"
-    list_t_columns_in_df_indices = [
-        col for col in df_indices.columns if col.startswith("t_")
-    ]
+    list_t_columns_in_df_indices = [col for col in df_indices.columns if col.startswith("t_")]
     for col in list_t_columns_in_df_indices:
         df_t[col] = df_indices[col]
 
@@ -829,9 +724,7 @@ def measureslope_vec(
     """
     vectorized measure slope
     """
-    df_filtered = df[
-        (t_start <= df.time) & (df.time <= t_end)
-    ]  # NB: including start and end
+    df_filtered = df[(t_start <= df.time) & (df.time <= t_end)]  # NB: including start and end
     dfpivot = df_filtered.pivot(index="sweep", columns="time", values=filter)
     coefs = np.polyfit(dfpivot.columns, dfpivot.T, deg=1).T
     dfslopes = pd.DataFrame(index=dfpivot.index)
@@ -883,15 +776,9 @@ if __name__ == "__main__":
     # path_filterfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_filter.csv")
     # dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file
     # path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/Good recording_Ch0_a_mean.csv")
-    path_meanfile = Path.home() / (
-        "Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_Ch0_a_mean.csv"
-    )
+    path_meanfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/A_21_P0701-S2_Ch0_a_mean.csv")
     print(f"\n\n\nRunning as main: standalone test of {str(path_meanfile)}")
-    dfmean = pd.read_csv(
-        str(path_meanfile)
-    )  # a persisted average of all sweeps in that data file
+    dfmean = pd.read_csv(str(path_meanfile))  # a persisted average of all sweeps in that data file
     # dfmean['tris'] = dfmean.bis.rolling(3, center=True).mean().diff()
     dft = find_all_t(dfmean, default_dict_t=default_dict_t)
     display(dft)
-
-

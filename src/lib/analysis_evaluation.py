@@ -41,12 +41,8 @@ import analysis_v2
 
 # %%
 # read slices and meta
-folder_talkback = (
-    Path.home() / "Documents" / "Brainwash Data Source" / "talkback KetaDexa"
-)
-folder_talkback = (
-    Path.home() / "Documents" / "Brainwash Data Source" / "talkback Lactate24SR"
-)
+folder_talkback = Path.home() / "Documents" / "Brainwash Data Source" / "talkback KetaDexa"
+folder_talkback = Path.home() / "Documents" / "Brainwash Data Source" / "talkback Lactate24SR"
 slice_filepaths = sorted(list(folder_talkback.glob("*slice*")))
 meta_filepaths = sorted(list(folder_talkback.glob("*meta*")))
 
@@ -63,12 +59,7 @@ def load_slice(path, sweep=1):
     return df
 
 
-df = pd.concat(
-    [
-        load_slice(slice_filepath, sweep)
-        for sweep, slice_filepath in enumerate(slice_filepaths)
-    ]
-)
+df = pd.concat([load_slice(slice_filepath, sweep) for sweep, slice_filepath in enumerate(slice_filepaths)])
 # df.sort_index(inplace=True)
 # assert(df.isna().sum().max() < 2)
 # df = df.dropna()
@@ -88,12 +79,7 @@ def load_meta(path, sweep=1):
     return df
 
 
-meta = pd.concat(
-    [
-        load_meta(meta_filepath, sweep)
-        for sweep, meta_filepath in enumerate(meta_filepaths)
-    ]
-)
+meta = pd.concat([load_meta(meta_filepath, sweep) for sweep, meta_filepath in enumerate(meta_filepaths)])
 # meta
 
 # %% [markdown]
@@ -136,24 +122,16 @@ def compute_slope_metrics(dfresults, signals, meta):
         anal_epsp_slope = compute_slope(signal, anal_epsp_start, num_points=7)
 
         if true_volley_slope != 0:
-            pred_volley_mape = (
-                abs((pred_volley_slope - true_volley_slope) / true_volley_slope) * 100
-            )
-            anal_volley_mape = (
-                abs((anal_volley_slope - true_volley_slope) / true_volley_slope) * 100
-            )
+            pred_volley_mape = abs((pred_volley_slope - true_volley_slope) / true_volley_slope) * 100
+            anal_volley_mape = abs((anal_volley_slope - true_volley_slope) / true_volley_slope) * 100
         else:
             pred_volley_mape = 0 if pred_volley_slope == 0 else 100
             anal_volley_mape = 0 if anal_volley_slope == 0 else 100
         volley_mape_list.append((pred_volley_mape, anal_volley_mape))
 
         if true_epsp_slope != 0:
-            pred_epsp_mape = (
-                abs((pred_epsp_slope - true_epsp_slope) / true_epsp_slope) * 100
-            )
-            anal_epsp_mape = (
-                abs((anal_epsp_slope - true_epsp_slope) / true_epsp_slope) * 100
-            )
+            pred_epsp_mape = abs((pred_epsp_slope - true_epsp_slope) / true_epsp_slope) * 100
+            anal_epsp_mape = abs((anal_epsp_slope - true_epsp_slope) / true_epsp_slope) * 100
         else:
             pred_epsp_mape = 0 if pred_epsp_slope == 0 else 100
             anal_epsp_mape = 0 if anal_epsp_slope == 0 else 100
@@ -173,9 +151,7 @@ def compute_slope_metrics(dfresults, signals, meta):
 
 
 # %%
-def evaluate_and_report(
-    dfresults, meta, signals, time_scale_factor=10000, offset_thresholds=None
-):
+def evaluate_and_report(dfresults, meta, signals, time_scale_factor=10000, offset_thresholds=None):
     """
     Evaluate predictions and generate a formatted report with tables for multiple methods.
     Dynamically detects methods by splitting dfresults column names on "-", supporting 1 to 5 methods.
@@ -222,9 +198,7 @@ def evaluate_and_report(
     # Validate methods and columns
     methods = sorted(method_cols.keys())
     if not (1 <= len(methods) <= 5):
-        raise ValueError(
-            f"Number of detected methods must be between 1 and 5, found {len(methods)}: {methods}"
-        )
+        raise ValueError(f"Number of detected methods must be between 1 and 5, found {len(methods)}: {methods}")
 
     for method in methods:
         expected_cols = [
@@ -267,22 +241,12 @@ def evaluate_and_report(
             )
             * time_scale_factor
         ).round(0)
-        volley_offsets = [
-            (threshold <= diff["t_volley_slope_start"].abs()).sum() / len(diff)
-            for threshold in offset_thresholds
-        ]
-        epsp_offsets = [
-            (threshold <= diff["t_EPSP_slope_start"].abs()).sum() / len(diff)
-            for threshold in offset_thresholds
-        ]
+        volley_offsets = [(threshold <= diff["t_volley_slope_start"].abs()).sum() / len(diff) for threshold in offset_thresholds]
+        epsp_offsets = [(threshold <= diff["t_EPSP_slope_start"].abs()).sum() / len(diff) for threshold in offset_thresholds]
 
         # Compute MAE and RMSE in index points
-        errors_volley = (
-            dfresults[pred_cols[1]] - meta["t_volley_slope_start"]
-        ) * time_scale_factor
-        errors_epsp = (
-            dfresults[pred_cols[0]] - meta["t_EPSP_slope_start"]
-        ) * time_scale_factor
+        errors_volley = (dfresults[pred_cols[1]] - meta["t_volley_slope_start"]) * time_scale_factor
+        errors_epsp = (dfresults[pred_cols[0]] - meta["t_EPSP_slope_start"]) * time_scale_factor
         mae_volley = errors_volley.abs().mean()
         mae_epsp = errors_epsp.abs().mean()
         rmse_volley = np.sqrt((errors_volley**2).mean())
@@ -322,9 +286,7 @@ def evaluate_and_report(
         volley_mape_list = []
         epsp_mape_list = []
 
-        for idx, (result, signal) in enumerate(
-            zip(dfresults.to_dict("records"), signals)
-        ):
+        for idx, (result, signal) in enumerate(zip(dfresults.to_dict("records"), signals)):
             true_volley_start = meta.iloc[idx]["t_volley_slope_start"]
             true_epsp_start = meta.iloc[idx]["t_EPSP_slope_start"]
 
@@ -340,18 +302,13 @@ def evaluate_and_report(
             epsp_detected_slopes.append(pred_epsp_slope)
 
             if true_volley_slope != 0:
-                pred_volley_mape = (
-                    abs((pred_volley_slope - true_volley_slope) / true_volley_slope)
-                    * 100
-                )
+                pred_volley_mape = abs((pred_volley_slope - true_volley_slope) / true_volley_slope) * 100
             else:
                 pred_volley_mape = 0 if pred_volley_slope == 0 else 100
             volley_mape_list.append(pred_volley_mape)
 
             if true_epsp_slope != 0:
-                pred_epsp_mape = (
-                    abs((pred_epsp_slope - true_epsp_slope) / true_epsp_slope) * 100
-                )
+                pred_epsp_mape = abs((pred_epsp_slope - true_epsp_slope) / true_epsp_slope) * 100
             else:
                 pred_epsp_mape = 0 if pred_epsp_slope == 0 else 100
             epsp_mape_list.append(pred_epsp_mape)
@@ -370,9 +327,7 @@ def evaluate_and_report(
     headers = [""] + [f"{threshold}<=" for threshold in offset_thresholds]
     longest_label = max(len(f"{method} Volley Slope") for method in methods)
     col_width = max(10, longest_label, max(len(header) for header in headers) + 2)
-    header_line = f"{headers[0]:<{col_width}} " + " ".join(
-        f"{header:^{col_width}}" for header in headers[1:]
-    )
+    header_line = f"{headers[0]:<{col_width}} " + " ".join(f"{header:^{col_width}}" for header in headers[1:])
     print(header_line)
     print("-" * (col_width * len(headers) + len(headers) - 1))
 
@@ -392,24 +347,18 @@ def evaluate_and_report(
     print("-" * 50)
     headers = [""] + ["MAE", "RMSE"]
     col_width = max(10, longest_label, max(len(header) for header in headers) + 2)
-    header_line = f"{headers[0]:<{col_width}} " + " ".join(
-        f"{header:^{col_width}}" for header in headers[1:]
-    )
+    header_line = f"{headers[0]:<{col_width}} " + " ".join(f"{header:^{col_width}}" for header in headers[1:])
     print(header_line)
     print("-" * (col_width * len(headers) + len(headers) - 1))
     for method in methods:
         mae = method_metrics[method]["mae_volley"]
         rmse = method_metrics[method]["rmse_volley"]
-        print(
-            f"{f'{method} Volley Slope':<{col_width}} {mae:^{col_width}.2f} {rmse:^{col_width}.2f}"
-        )
+        print(f"{f'{method} Volley Slope':<{col_width}} {mae:^{col_width}.2f} {rmse:^{col_width}.2f}")
     print("")
     for method in methods:
         mae = method_metrics[method]["mae_epsp"]
         rmse = method_metrics[method]["rmse_epsp"]
-        print(
-            f"{f'{method} EPSP Slope':<{col_width}} {mae:^{col_width}.2f} {rmse:^{col_width}.2f}"
-        )
+        print(f"{f'{method} EPSP Slope':<{col_width}} {mae:^{col_width}.2f} {rmse:^{col_width}.2f}")
     print("\n")
 
     # Slope Impact Metrics Table (True Slope and Detected Slope in One Column, MAPE Separate)
@@ -417,34 +366,24 @@ def evaluate_and_report(
     print("-" * 50)
     headers = [""] + ["Slope (True/Estimated)", "MAPE"]
     col_width = max(10, longest_label, max(len(header) for header in headers) + 2)
-    header_line = f"{headers[0]:<{col_width}} " + " ".join(
-        f"{header:^{col_width}}" for header in headers[1:]
-    )
+    header_line = f"{headers[0]:<{col_width}} " + " ".join(f"{header:^{col_width}}" for header in headers[1:])
     print(header_line)
     print("-" * (col_width * len(headers) + len(headers) - 1))
 
     # Volley Slope Section
-    print(
-        f"{'True Volley Slope':<{col_width}} {avg_true_volley_slope:^{col_width}.4f} {'':^{col_width}}"
-    )
+    print(f"{'True Volley Slope':<{col_width}} {avg_true_volley_slope:^{col_width}.4f} {'':^{col_width}}")
     for method in methods:
         detected_slope = slope_metrics[method]["volley_detected_slope"]
         mape = slope_metrics[method]["volley_mape"]
-        print(
-            f"{f'{method} Volley Slope':<{col_width}} {detected_slope:^{col_width}.4f} {mape:^{col_width}.2f}%"
-        )
+        print(f"{f'{method} Volley Slope':<{col_width}} {detected_slope:^{col_width}.4f} {mape:^{col_width}.2f}%")
     print("")
 
     # EPSP Slope Section
-    print(
-        f"{'True EPSP Slope':<{col_width}} {avg_true_epsp_slope:^{col_width}.4f} {'':^{col_width}}"
-    )
+    print(f"{'True EPSP Slope':<{col_width}} {avg_true_epsp_slope:^{col_width}.4f} {'':^{col_width}}")
     for method in methods:
         detected_slope = slope_metrics[method]["epsp_detected_slope"]
         mape = slope_metrics[method]["epsp_mape"]
-        print(
-            f"{f'{method} EPSP Slope':<{col_width}} {detected_slope:^{col_width}.4f} {mape:^{col_width}.2f}%"
-        )
+        print(f"{f'{method} EPSP Slope':<{col_width}} {detected_slope:^{col_width}.4f} {mape:^{col_width}.2f}%")
     print("\n")
 
     print(f"{'=' * 50}\n")
@@ -468,9 +407,7 @@ if __name__ == "__main__":
     # The canonical check_sweep below uses analysis_v2.characterize_graph.
     def check_sweep_v1(sweepname):
         dfsweep = df.loc[df.sweepname == sweepname, ["time", "voltage", "prim", "bis"]]
-        result = analysis_v1.find_all_t(dfsweep, default_dict_t)[
-            ["t_volley_slope_start", "t_EPSP_slope_start"]
-        ]
+        result = analysis_v1.find_all_t(dfsweep, default_dict_t)[["t_volley_slope_start", "t_EPSP_slope_start"]]
         result.columns = [f"analytic_v1-{i}" for i in result.columns]
         result["sweepname"] = sweepname
         return result
@@ -487,9 +424,7 @@ if __name__ == "__main__":
     # check_sweep: canonical version using analysis_v2.characterize_graph.
     def check_sweep(sweepname):
         dfsweep = df.loc[df.sweepname == sweepname, ["time", "voltage", "prim", "bis"]]
-        result = analysis_v2.characterize_graph(
-            dfsweep, stim_amp=0.005, verbose=False, plot=False
-        )
+        result = analysis_v2.characterize_graph(dfsweep, stim_amp=0.005, verbose=False, plot=False)
         result.update({"sweepname": sweepname})
         return result
 
@@ -501,18 +436,11 @@ if __name__ == "__main__":
         signal = df[df["sweepname"] == sweepname][["time", "voltage"]].copy()
         signals.append(signal)
     dfresults_av2 = pd.DataFrame(results)
-    dfresults_av2 = dfresults_av2[
-        [col for col in dfresults_av2 if col.startswith("t_")] + ["sweepname"]
-    ]
-    dfresults_av2.columns = [
-        "analytic_v2-" + col if col.startswith("t_") else col
-        for col in dfresults_av2.columns
-    ]
+    dfresults_av2 = dfresults_av2[[col for col in dfresults_av2 if col.startswith("t_")] + ["sweepname"]]
+    dfresults_av2.columns = ["analytic_v2-" + col if col.startswith("t_") else col for col in dfresults_av2.columns]
     dfresults_av2
 
-    dfresults_av2 = pd.merge(
-        dfresults_av1, dfresults_av2, right_on="sweepname", left_on="sweepname"
-    )  # noqa: F821
+    dfresults_av2 = pd.merge(dfresults_av1, dfresults_av2, right_on="sweepname", left_on="sweepname")  # noqa: F821
 
     evaluate_and_report(dfresults, meta, signals)
 

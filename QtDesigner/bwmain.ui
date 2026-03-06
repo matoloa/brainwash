@@ -339,7 +339,7 @@
               <rect>
                <x>10</x>
                <y>100</y>
-               <width>71</width>
+               <width>81</width>
                <height>17</height>
               </rect>
              </property>
@@ -351,7 +351,7 @@
               </font>
              </property>
              <property name="text">
-              <string>Selection</string>
+              <string>Selection (ms)</string>
              </property>
             </widget>
             <widget class="QLineEdit" name="lineEdit_mean_selection_start">

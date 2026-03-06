@@ -572,7 +572,11 @@ def characterize_graph(df, stim_amp=0.005, verbose=False, plot=False, multiplots
     epsp_detected = False
     epsp_depth = 0
     i_epsp_min = None
-    epsp_start = i_veb if volley_detected else i_stim_pos + 2
+    epsp_start = (
+        i_veb
+        if volley_detected
+        else (i_stim_pos + 2 if i_stim_pos is not None else volley_end)
+    )
     epsp_end = min(
         epsp_start + int(0.02 / dt), len(voltage) - 1
     )  # Clamp to array length

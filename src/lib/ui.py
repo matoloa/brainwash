@@ -112,7 +112,10 @@ logger.debug("ui.py: os.getcwd(): %s", os.getcwd())
 
 class Config:
     def __init__(self):
-        self.dev_mode = os.getenv("BRAINWASH_DEBUG", "0") == "1"  # Respect --debug flag
+        self.dev_mode = (
+            not getattr(sys, "frozen", False)
+            or os.getenv("BRAINWASH_DEBUG", "0") == "1"
+        )
         print(
             "\n" * 3
             + f"{'Development' if self.dev_mode else 'Deploy'} mode - {time.strftime('%H:%M:%S')}"
@@ -177,10 +180,16 @@ class Config:
         logger.debug("Config: loading pyproject.toml from %s", toml_path)
 
         bwcfg_path = _find_file("bw_cfg.yaml")
-        logger.debug("Config: bw_cfg.yaml %s", bwcfg_path or "not found")
+        if bwcfg_path is None:
+            # File doesn't exist yet — place it next to pyproject.toml so it
+            # will be found on the next launch and write_bw_cfg can create it.
+            bwcfg_path = toml_path.parent / "bw_cfg.yaml"
+            logger.debug("Config: bw_cfg.yaml not found, will create at %s", bwcfg_path)
+        else:
+            logger.debug("Config: bw_cfg.yaml found at %s", bwcfg_path)
 
         pyproject = toml.load(toml_path)
-        self.bw_cfg_yaml = str(bwcfg_path) if bwcfg_path is not None else None
+        self.bw_cfg_yaml = str(bwcfg_path)
         self.program_name = pyproject["project"]["name"]
         self.version = pyproject["project"]["version"]
 
@@ -404,6 +413,8 @@ class ProgressBarManager:
         self.progressBar.setValue(0)
         self.progressBar.setFormat("")
         self.progressBar.setVisible(True)
+        self._outer_text = ""
+        self._sub_text = ""
         return self
 
     def __exit__(self, type, value, traceback):
@@ -419,13 +430,27 @@ class ProgressBarManager:
             return
         percentage = int((i) * 100 / self.total)
         self.progressBar.setValue(percentage)
-        self.progressBar.setFormat(
-            f"{task_description} {i + 1} / {self.total}:   %p% complete"
-        )
+        self._outer_text = f"{task_description} {i + 1} / {self.total}:   %p% complete"
+        self._sub_text = ""
+        self.progressBar.setFormat(self._outer_text)
+
+    def update_sub(self, idx, total):
+        """Amend the progress bar format string with sub-step progress (e.g. .ibw file index).
+        Does not change the bar value — that is owned by the outer recording-level update()."""
+        sub = f"  (reading file {idx + 1} / {total})"
+        self.progressBar.setFormat(self._outer_text + sub)
+
+    def set_status(self, text):
+        """Append a freeform status string to the outer label without touching the bar value."""
+        self.progressBar.setFormat(self._outer_text + f"  ({text})")
 
 
 class ParseDataThread(QtCore.QThread):
     progress = QtCore.pyqtSignal(int)
+    sub_progress = QtCore.pyqtSignal(
+        int, int
+    )  # (current_file_idx, total_files) within one ibw folder
+    status_update = QtCore.pyqtSignal(str)  # freeform status text for post-read phases
     finished = QtCore.pyqtSignal()  # custom signal, decoupled from QThread.finished
 
     def __init__(self, df_p_to_update, dict_folders, uisub):
@@ -443,26 +468,47 @@ class ParseDataThread(QtCore.QThread):
                 recording_name = df_proj_row["recording_name"]
                 source_path = df_proj_row["path"]
                 self.progress.emit(i)
+                split_odd_even = uistate.checkBox.get("splitOddEven", False)
+                split_at_time = uistate.lineEdit.get("split_at_time", 0) or None
+
+                def _sub_progress_callback(idx, total):
+                    self.sub_progress.emit(idx, total)
+
+                def _status_callback(text):
+                    self.status_update.emit(text)
+
                 dict_dfs_raw = parse.source2dfs(
-                    source=source_path, gain=uistate.lineEdit["import_gain"]
+                    source=source_path,
+                    gain=uistate.lineEdit["import_gain"],
+                    split_odd_even=split_odd_even,
+                    split_at_time=split_at_time,
+                    progress_callback=_sub_progress_callback,
                 )
                 if not dict_dfs_raw:
                     print(f"Failed to read source file at: {source_path}")
                     continue
-                # convert dict - channel:df to recording_name:df
-                dict_name_df = {
-                    (
-                        recording_name
-                        if len(dict_dfs_raw) == 1
-                        else f"{recording_name}_ch{channel}"
-                    ): df
-                    for channel, df in dict_dfs_raw.items()
-                }
+                # Keys are either plain channel ints {ch: df} or split tuples {(ch, label): df}.
+                # Normalise both into recording_name:df, appending _ch / _label suffixes as needed.
+                first_key = next(iter(dict_dfs_raw))
+                split_keys = isinstance(first_key, tuple)
+                n_channels = len(
+                    {k[0] for k in dict_dfs_raw} if split_keys else dict_dfs_raw
+                )
+                dict_name_df = {}
+                for key, df in dict_dfs_raw.items():
+                    if split_keys:
+                        channel, label = key
+                        ch_suffix = f"_ch{channel}" if n_channels > 1 else ""
+                        dict_name_df[f"{recording_name}{ch_suffix}_{label}"] = df
+                    else:
+                        channel = key
+                        ch_suffix = f"_ch{channel}" if n_channels > 1 else ""
+                        dict_name_df[f"{recording_name}{ch_suffix}"] = df
                 for rec, df_raw in dict_name_df.items():
                     logger.debug("ParseDataThread: %s", rec)
                     print(f"ParseDataThread: {rec}")
                     df_proj_new_row = self.uisub.create_recording(
-                        df_proj_row, rec, df_raw
+                        df_proj_row, rec, df_raw, status_callback=_status_callback
                     )
                     self.rows.append(df_proj_new_row)
         except Exception as e:
@@ -1204,6 +1250,10 @@ class UIsub(
     def darkmode(self):
         if uistate.darkmode:
             self.mainwindow.setStyleSheet("background-color: #2A2A2A; color: #fff;")
+            self.progressBar.setStyleSheet(
+                "QProgressBar { text-align: center; color: #fff; font-weight: bold; background-color: #333; border: 1px solid #555; border-radius: 3px; }"
+                "QProgressBar::chunk { background-color: #1a6ea8; border-radius: 3px; }"
+            )
 
             table_style = """
                 QTableView::item:selected {
@@ -1225,6 +1275,10 @@ class UIsub(
             self.mainwindow.setStyleSheet("")
             self.tableProj.setStyleSheet("")
             self.tableStim.setStyleSheet("")
+            self.progressBar.setStyleSheet(
+                "QProgressBar { text-align: center; color: #000; font-weight: bold; background-color: #e0e0e0; border: 1px solid #bbb; border-radius: 3px; }"
+                "QProgressBar::chunk { background-color: #4caf50; border-radius: 3px; }"
+            )
 
         uiplot.styleUpdate()
         self.graphRefresh()
@@ -1521,6 +1575,10 @@ class UIsub(
         self.actionReAnalyzeRecordings.setShortcut("A")
         self.menuEdit.addAction(self.actionReAnalyzeRecordings)
 
+        self.actionSweepOpsHeader = QtWidgets.QAction(
+            "   — sweep selection —"
+        )  # not connected: section header
+        self.menuEdit.addAction(self.actionSweepOpsHeader)
         self.actionKeepOnlySelectedSweeps = QtWidgets.QAction(
             "   Keep only selected sweeps"
         )
@@ -1542,6 +1600,24 @@ class UIsub(
             self.triggerSplitBySelectedSweeps
         )
         self.menuEdit.addAction(self.actionSplitBySelectedSweeps)
+
+        self.actionTimeOpsHeader = QtWidgets.QAction(
+            "   — time selection —"
+        )  # not connected: section header
+        self.menuEdit.addAction(self.actionTimeOpsHeader)
+        self.actionKeepOnlySelectedTime = QtWidgets.QAction(
+            "   Keep only selected time"
+        )
+        self.actionKeepOnlySelectedTime.triggered.connect(self.triggerKeepSelectedTime)
+        self.menuEdit.addAction(self.actionKeepOnlySelectedTime)
+        self.actionDiscardSelectedTime = QtWidgets.QAction("   Discard selected time")
+        self.actionDiscardSelectedTime.triggered.connect(
+            self.triggerDiscardSelectedTime
+        )
+        self.menuEdit.addAction(self.actionDiscardSelectedTime)
+        self.actionSplitByTime = QtWidgets.QAction("   Split recordings by time")
+        self.actionSplitByTime.triggered.connect(self.triggerSplitByTime)
+        self.menuEdit.addAction(self.actionSplitByTime)
 
         # View menu
         self.actionRefresh = QtWidgets.QAction("Refresh Graphs")
@@ -1772,8 +1848,12 @@ class UIsub(
         # checkBoxes
         for key, value in uistate.checkBox.items():
             checkBox = getattr(self, f"checkBox_{key}")
-            checkBox.stateChanged.disconnect() if disconnect else checkBox.stateChanged.connect(
-                lambda state, key=key: self.viewSettingsChanged(key, state)
+            (
+                checkBox.stateChanged.disconnect()
+                if disconnect
+                else checkBox.stateChanged.connect(
+                    lambda state, key=key: self.viewSettingsChanged(key, state)
+                )
             )
         # lineEdits
         for lineEdit in [
@@ -1787,15 +1867,23 @@ class UIsub(
             self.lineEdit_mean_selection_start,
             self.lineEdit_mean_selection_end,
         ]:
-            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(
-                lambda le=lineEdit: self.editMeanSelectRange(le)
+            (
+                lineEdit.editingFinished.disconnect()
+                if disconnect
+                else lineEdit.editingFinished.connect(
+                    lambda le=lineEdit: self.editMeanSelectRange(le)
+                )
             )
         for lineEdit in [
             self.lineEdit_sweeps_range_from,
             self.lineEdit_sweeps_range_to,
         ]:
-            lineEdit.editingFinished.disconnect() if disconnect else lineEdit.editingFinished.connect(
-                lambda le=lineEdit: self.editSweepSelectRange(le)
+            (
+                lineEdit.editingFinished.disconnect()
+                if disconnect
+                else lineEdit.editingFinished.connect(
+                    lambda le=lineEdit: self.editSweepSelectRange(le)
+                )
             )
         for lineEdit in [
             self.lineEdit_norm_EPSP_start,
@@ -1843,6 +1931,9 @@ class UIsub(
         self.lineEdit_norm_EPSP_end.setVisible(norm)
         self.lineEdit_norm_EPSP_start.setText(f"{uistate.lineEdit['norm_EPSP_from']}")
         self.lineEdit_norm_EPSP_end.setText(f"{uistate.lineEdit['norm_EPSP_to']}")
+        self.lineEdit_split_at_time.setText(
+            f"{uistate.lineEdit['split_at_time'] * 1000:g}"
+        )
         self.lineEdit_EPSP_amp_halfwidth.setText(
             f"{uistate.lineEdit['EPSP_amp_halfwidth_ms']}"
         )
@@ -2112,7 +2203,7 @@ class UIsub(
         self.df2file(df, new_name, key="filter")  # persist zeroed
         return
 
-    def create_recording(self, df_proj_row, rec, df_raw):
+    def create_recording(self, df_proj_row, rec, df_raw, status_callback=None):
         def create_row(df_proj_row, new_name, dict_meta):
             df_proj_new_row = df_proj_row.copy()
             df_proj_new_row["ID"] = str(uuid.uuid4())
@@ -2125,8 +2216,12 @@ class UIsub(
             df_proj_new_row["resets"] = ""  # dict_meta.get('resets', None)
             return df_proj_new_row
 
+        if status_callback:
+            status_callback("building dataframe...")
         self.df2file(df_raw, rec, key="data")  # persist raws
         dfmean, i_stim = parse.build_dfmean(df_raw)
+        if status_callback:
+            status_callback("writing to disk...")
         self.df2file(dfmean, rec, key="mean")  # persist mean
         df = parse.zeroSweeps(df_raw, i_stim=i_stim)
         self.df2file(df, rec, key="filter")  # persist zeroed
@@ -2156,9 +2251,9 @@ class UIsub(
         def str2num(text):
             try:
                 if request == "float":
-                    return max(0, float(text))
+                    return max(0, float(text.replace(",", ".")))
                 else:
-                    return max(0, int(text))
+                    return max(0, int(text.replace(",", ".")))
             except ValueError:
                 return 0
 
@@ -2188,7 +2283,7 @@ class UIsub(
             num = 0
         lineEdit.setText(str(num))
         if lineEditName == "lineEdit_split_at_time":
-            uistate.lineEdit["split_at_time"] = float(lineEdit.text())
+            uistate.lineEdit["split_at_time"] = float(lineEdit.text()) / 1000.0
             if (
                 uistate.lineEdit["split_at_time"] is not None
                 and uistate.lineEdit["split_at_time"] != 0
@@ -2206,7 +2301,9 @@ class UIsub(
             end=self.lineEdit_mean_selection_end,
             request="float",
         )
-        uistate.x_select["mean_start"], uistate.x_select["mean_end"] = low, high
+        # lineEdits display ms; uistate stores s
+        uistate.x_select["mean_start"] = low / 1000.0
+        uistate.x_select["mean_end"] = high / 1000.0 if high else None
         uiplot.xSelect(uistate.axm.figure.canvas)
 
     def editSweepSelectRange(self, lineEdit):
@@ -2527,6 +2624,8 @@ class UIsub(
             thread = ParseDataThread(df_p_to_update, self.dict_folders, self)
             self._current_parse_thread = thread  # Store reference for use in callbacks
             thread.progress.connect(self.updateProgressBar)
+            thread.sub_progress.connect(self.updateSubProgressBar)
+            thread.status_update.connect(self.updateStatusBar)
             thread.finished.connect(self.onParseDataFinished)
             thread.finished.connect(thread.deleteLater)  # Auto-cleanup when done
             thread.finished.connect(
@@ -2546,6 +2645,12 @@ class UIsub(
 
     def updateProgressBar(self, i):
         self.progressBarManager.update(i, "Parsing file ")
+
+    def updateSubProgressBar(self, idx, total):
+        self.progressBarManager.update_sub(idx, total)
+
+    def updateStatusBar(self, text):
+        self.progressBarManager.set_status(text)
 
     def onParseDataFinished(self):
         print("onParseDataFinished: entered")
@@ -3038,7 +3143,7 @@ class UIsub(
             uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
             uistate.x_select["mean_start"] = uistate.x_on_click
             self.lineEdit_mean_selection_start.setText(
-                str(uistate.x_select["mean_start"])
+                f"{uistate.x_select['mean_start'] * 1000:g}"
             )
             self.connectDragRelease(
                 x_range=time_values, rec_ID=prow["ID"], graph="mean"
@@ -3413,7 +3518,7 @@ class UIsub(
         uistate.x_drag_last = uistate.x_drag
         if canvas == self.canvasMean:
             uistate.x_select["mean_end"] = uistate.x_drag
-            self.lineEdit_mean_selection_end.setText(str(uistate.x_drag))
+            self.lineEdit_mean_selection_end.setText(f"{uistate.x_drag * 1000:g}")
         else:
             uistate.x_select["output_end"] = uistate.x_drag
             uistate.x_select["output"] = set(
@@ -3434,6 +3539,9 @@ class UIsub(
             if is_mean:
                 self.lineEdit_mean_selection_end.setText("")
                 uistate.x_select["mean_end"] = None
+                self.lineEdit_mean_selection_start.setText(
+                    f"{uistate.x_select['mean_start'] * 1000:g}"
+                )
             elif is_output:
                 self.lineEdit_sweeps_range_to.setText("")
                 uistate.x_select["output_end"] = None
@@ -3444,8 +3552,8 @@ class UIsub(
             if is_mean:
                 uistate.x_select["mean_start"] = start
                 uistate.x_select["mean_end"] = end
-                self.lineEdit_mean_selection_start.setText(str(start))
-                self.lineEdit_mean_selection_end.setText(str(end))
+                self.lineEdit_mean_selection_start.setText(f"{start * 1000:g}")
+                self.lineEdit_mean_selection_end.setText(f"{end * 1000:g}")
             elif is_output:
                 uistate.x_select["output_start"] = start
                 uistate.x_select["output_end"] = end

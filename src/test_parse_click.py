@@ -111,11 +111,7 @@ def _find_source_and_project():
             except Exception:
                 continue
             # Look for a parsed recording (sweeps != "...")
-            parsed = (
-                df_p[df_p["sweeps"] != "..."]
-                if "sweeps" in df_p.columns
-                else pd.DataFrame()
-            )
+            parsed = df_p[df_p["sweeps"] != "..."] if "sweeps" in df_p.columns else pd.DataFrame()
             if parsed.empty:
                 continue
             row = parsed.iloc[0]
@@ -128,9 +124,7 @@ def _find_source_and_project():
                 "timepoints": proj_dir / "timepoints",
                 "cache": cache_dir,
             }
-            log.info(
-                f"Found project: {proj_dir.name}, using recording: {row['recording_name']}"
-            )
+            log.info(f"Found project: {proj_dir.name}, using recording: {row['recording_name']}")
             return row.get("path", None), row, folders
 
     # Fall back to auto-finding a raw source file
@@ -152,9 +146,7 @@ def _find_source_and_project():
     return None, None, None
 
 
-source_path, existing_row, existing_folders = step(
-    "0 – find source path / project", _find_source_and_project
-) or (None, None, None)
+source_path, existing_row, existing_folders = step("0 – find source path / project", _find_source_and_project) or (None, None, None)
 
 if source_path is None and existing_row is None:
     log.error("No source path found. Pass a path as argv[1]. Aborting.")
@@ -286,13 +278,9 @@ if existing_row is not None and existing_folders is not None:
                 )
         else:
             log.info("  building dft from scratch via find_events")
-            df = analysis.find_events(
-                dfmean=dfmean, default_dict_t=default_dict_t.copy(), verbose=False
-            )
+            df = analysis.find_events(dfmean=dfmean, default_dict_t=default_dict_t.copy(), verbose=False)
             if df is None or df.empty:
-                raise ValueError(
-                    "find_events returned empty/None dft — no stims detected"
-                )
+                raise ValueError("find_events returned empty/None dft — no stims detected")
             df["norm_output_from"] = 0
             df["norm_output_to"] = 0
             df["t_EPSP_amp_halfwidth"] = 0
@@ -338,23 +326,15 @@ if existing_row is not None and existing_folders is not None:
             df = pd.DataFrame()
             for i, t_row in dft.iterrows():
                 dict_t = t_row.to_dict()
-                log.info(
-                    f"    stim {i}: norm_output_from={dict_t.get('norm_output_from')}, "
-                    f"norm_output_to={dict_t.get('norm_output_to')}"
-                )
+                log.info(f"    stim {i}: norm_output_from={dict_t.get('norm_output_from')}, " f"norm_output_to={dict_t.get('norm_output_to')}")
                 dfout_stim = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
-                log.info(
-                    f"    stim {i}: output shape={dfout_stim.shape}, "
-                    f"cols={list(dfout_stim.columns)}"
-                )
+                log.info(f"    stim {i}: output shape={dfout_stim.shape}, " f"cols={list(dfout_stim.columns)}")
                 df = pd.concat([df, dfout_stim])
             df.reset_index(drop=True, inplace=True)
             log.info(f"  built: shape={df.shape}")
         # Sanity checks
         if "index" in df.columns:
-            raise AssertionError(
-                "dfoutput still has spurious 'index' column after migration"
-            )
+            raise AssertionError("dfoutput still has spurious 'index' column after migration")
         required_out = ["stim", "sweep", "EPSP_amp"]
         missing_out = [c for c in required_out if c not in df.columns]
         if missing_out:
@@ -366,26 +346,18 @@ if existing_row is not None and existing_folders is not None:
     # --- A6: simulate addRow (the logic that runs when user clicks a recording) ---
     def _simulate_addrow():
         if dfmean is None or dft is None or dfoutput is None:
-            raise ValueError(
-                "Cannot simulate addRow — prerequisite DataFrames are None"
-            )
+            raise ValueError("Cannot simulate addRow — prerequisite DataFrames are None")
 
         rec_filter = row.get("filter", "voltage")
         log.info(f"  rec_filter='{rec_filter}'")
 
         # Check rec_filter column exists in dfmean
         if rec_filter not in dfmean.columns:
-            raise KeyError(
-                f"dfmean missing column '{rec_filter}' (rec_filter). "
-                f"Available: {list(dfmean.columns)}"
-            )
+            raise KeyError(f"dfmean missing column '{rec_filter}' (rec_filter). " f"Available: {list(dfmean.columns)}")
 
         # Check rec_filter column exists in dffilter
         if rec_filter not in dffilter.columns:
-            raise KeyError(
-                f"dffilter missing column '{rec_filter}' (rec_filter). "
-                f"Available: {list(dffilter.columns)}"
-            )
+            raise KeyError(f"dffilter missing column '{rec_filter}' (rec_filter). " f"Available: {list(dffilter.columns)}")
 
         n_stims = len(dft)
         log.info(f"  n_stims={n_stims}")
@@ -406,10 +378,7 @@ if existing_row is not None and existing_folders is not None:
             out = dfoutput[dfoutput["stim"] == stim_num]
             log.info(f"  stim {stim_num}: t_stim={t_stim}, out rows={len(out)}")
             if out.empty:
-                log.warning(
-                    f"    dfoutput has no rows for stim {stim_num} — "
-                    f"dfoutput['stim'] unique: {dfoutput['stim'].unique().tolist()}"
-                )
+                log.warning(f"    dfoutput has no rows for stim {stim_num} — " f"dfoutput['stim'] unique: {dfoutput['stim'].unique().tolist()}")
 
             # y_position lookup (mirrors addRow line exactly)
             y_pos_series = dfmean.loc[dfmean.time == t_stim, rec_filter]
@@ -425,9 +394,7 @@ if existing_row is not None and existing_folders is not None:
             # Event window
             window_start = t_stim + settings["event_start"]
             window_end = t_stim + settings["event_end"]
-            df_event = dfmean[
-                (dfmean["time"] >= window_start) & (dfmean["time"] <= window_end)
-            ].copy()
+            df_event = dfmean[(dfmean["time"] >= window_start) & (dfmean["time"] <= window_end)].copy()
             df_event["time"] = df_event["time"] - t_stim
             log.info(f"    df_event rows={len(df_event)}")
             if df_event.empty:
@@ -455,10 +422,7 @@ if existing_row is not None and existing_folders is not None:
 
             # out[x_axis] lookup — this is what crashes if 'sweep' column missing
             if x_axis not in out.columns:
-                raise KeyError(
-                    f"dfoutput missing column '{x_axis}'. "
-                    f"Available: {list(out.columns)}"
-                )
+                raise KeyError(f"dfoutput missing column '{x_axis}'. " f"Available: {list(out.columns)}")
 
             # EPSP_amp in output
             if "EPSP_amp" in out.columns:
@@ -504,15 +468,12 @@ elif source_path is not None:
     # B3 – zeroSweeps
     dffilter = step("B3 – zeroSweeps", lambda: parse.zeroSweeps(df_raw, i_stim=i_stim))
     log.info(
-        f"  dffilter shape={dffilter.shape if dffilter is not None else 'None'}, "
-        f"cols={list(dffilter.columns) if dffilter is not None else []}"
+        f"  dffilter shape={dffilter.shape if dffilter is not None else 'None'}, " f"cols={list(dffilter.columns) if dffilter is not None else []}"
     )
 
     # B4 – find_events
     def _find_events():
-        dft = analysis.find_events(
-            dfmean=dfmean, default_dict_t=default_dict_t.copy(), verbose=True
-        )
+        dft = analysis.find_events(dfmean=dfmean, default_dict_t=default_dict_t.copy(), verbose=True)
         if dft is None or dft.empty:
             raise ValueError("find_events returned empty/None — no stims detected")
         # apply column name fix
@@ -539,10 +500,7 @@ elif source_path is not None:
         dfout = pd.DataFrame()
         for i, t_row in dft.iterrows():
             dict_t = t_row.to_dict()
-            log.info(
-                f"  stim {i}: norm_output_from={dict_t.get('norm_output_from')}, "
-                f"norm_output_to={dict_t.get('norm_output_to')}"
-            )
+            log.info(f"  stim {i}: norm_output_from={dict_t.get('norm_output_from')}, " f"norm_output_to={dict_t.get('norm_output_to')}")
             dfout_stim = analysis.build_dfoutput(df=dffilter, dict_t=dict_t)
             log.info(f"    shape={dfout_stim.shape}, cols={list(dfout_stim.columns)}")
             dfout = pd.concat([dfout, dfout_stim])
@@ -575,9 +533,7 @@ def _parquet_roundtrip():
         df2 = pd.read_parquet(path)
         df2.reset_index(drop=True, inplace=True)
         if "index" in df2.columns:
-            raise AssertionError(
-                f"Parquet round-trip added spurious 'index' column: {list(df2.columns)}"
-            )
+            raise AssertionError(f"Parquet round-trip added spurious 'index' column: {list(df2.columns)}")
         log.info(f"  round-trip OK, cols={list(df2.columns)}")
         return df2
     finally:

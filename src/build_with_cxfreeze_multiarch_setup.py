@@ -210,27 +210,19 @@ def _remove_bloat(build_root: str) -> None:
         nonlocal removed_bytes
         if not os.path.exists(path):
             return
-        sz = sum(
-            os.path.getsize(os.path.join(r, f))
-            for r, _, fs in os.walk(path)
-            for f in fs
-        )
+        sz = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(path) for f in fs)
         shutil.rmtree(path, ignore_errors=True)
         removed_bytes += sz
         print(f"  removed {sz / 1e6:.1f} MB  {os.path.relpath(path, build_root)}")
 
     # ---- test directories -----------------------------------------------
     for pattern in ("tests", "test", "_test", "benchmarks", "examples"):
-        for match in _glob.glob(
-            os.path.join(build_root, "**", pattern), recursive=True
-        ):
+        for match in _glob.glob(os.path.join(build_root, "**", pattern), recursive=True):
             if os.path.isdir(match):
                 _rm(match)
 
     # ---- PyQt5 bindings stubs (needed only for PyQt5 tooling, not runtime) -
-    for match in _glob.glob(
-        os.path.join(build_root, "**", "PyQt5", "bindings"), recursive=True
-    ):
+    for match in _glob.glob(os.path.join(build_root, "**", "PyQt5", "bindings"), recursive=True):
         _rm(match)
 
     # ---- Unused Qt5 DLLs ------------------------------------------------
@@ -292,11 +284,7 @@ def _remove_bloat(build_root: str) -> None:
 _build_base = os.path.join(os.path.dirname(__file__), "..", "build")
 if os.path.isdir(_build_base):
     _candidates = sorted(
-        [
-            d
-            for d in os.listdir(_build_base)
-            if d.startswith("exe.") and os.path.isdir(os.path.join(_build_base, d))
-        ],
+        [d for d in os.listdir(_build_base) if d.startswith("exe.") and os.path.isdir(os.path.join(_build_base, d))],
         reverse=True,  # newest first if multiple exist
     )
     if _candidates:
