@@ -278,7 +278,6 @@ class UIplot:
                 self.uistate.dict_rec_labels[f"axe mean selected sweeps {stim_str}"][
                     "line"
                 ].set_visible(True)
-        self.uistate.axe.figure.canvas.draw()
 
     def styleUpdate(self):
         axm, axe, ax1, ax2 = (
@@ -401,6 +400,8 @@ class UIplot:
                 )
             axis = getattr(uistate, axid)
             axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)
+        print(f" - - graphRefresh: legends: {round((time.time() - t0) * 1000)} ms")
+        t1 = time.time()
 
         # arrange axes and labels
         axm, axe, ax1, ax2 = (
@@ -411,10 +412,6 @@ class UIplot:
         )
 
         axm.axis("off")
-        # axm.set_xlim(uistate.zoom['mean_xlim'])
-        # axm.set_ylim(uistate.zoom['mean_ylim'])
-        # axm.set_xlabel("Time (s)")
-        # axe.set_ylabel("Voltage (V)")
 
         axe.set_xlim(uistate.zoom["event_xlim"])
         axe.set_ylim(uistate.zoom["event_ylim"])
@@ -448,6 +445,8 @@ class UIplot:
         print(f"output_xlim: {uistate.zoom['output_xlim']}")
         ax1.figure.subplots_adjust(bottom=0.2)
         self.oneAxisLeft()
+        print(f" - - graphRefresh: axis setup: {round((time.time() - t1) * 1000)} ms")
+        t1 = time.time()
 
         # maintain drag selections through reselection
         if uistate.x_select["mean_start"] is not None:
@@ -505,15 +504,28 @@ class UIplot:
             uistate.dict_rec_labels["output slope 100% marker"]["line"].set_visible(
                 uistate.slopeView()
             )
+        print(
+            f" - - graphRefresh: markers/hlines: {round((time.time() - t1) * 1000)} ms"
+        )
+        t1 = time.time()
 
         # update mean of selected sweeps on axe
         self.update_axe_mean()
+        print(
+            f" - - graphRefresh: update_axe_mean: {round((time.time() - t1) * 1000)} ms"
+        )
+        t1 = time.time()
 
         # redraw
         axm.figure.canvas.draw()
+        print(f" - - graphRefresh: draw axm: {round((time.time() - t1) * 1000)} ms")
+        t1 = time.time()
         axe.figure.canvas.draw()
+        print(f" - - graphRefresh: draw axe: {round((time.time() - t1) * 1000)} ms")
+        t1 = time.time()
         ax1.figure.canvas.draw()  # ax2 should be on the same canvas
-        print(f" - - {round((time.time() - t0) * 1000)} ms")
+        print(f" - - graphRefresh: draw ax1/ax2: {round((time.time() - t1) * 1000)} ms")
+        print(f" - - graphRefresh total: {round((time.time() - t0) * 1000)} ms")
 
     def oneAxisLeft(self):
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2

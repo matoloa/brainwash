@@ -1189,7 +1189,13 @@ class UIsub(
 
     def talkback(self):
         prow = self.get_prow()
+        if prow is None:
+            logger.debug("talkback: prow is None, returning early")
+            return
         trow = self.get_trow()
+        if trow is None:
+            logger.debug("talkback: trow is None, returning early")
+            return
         dfmean = self.get_dfmean(prow)
         t_stim = trow["t_stim"]
         t_start = t_stim - 0.002
@@ -1272,8 +1278,8 @@ class UIsub(
         for line in axis.get_lines():
             if not line.get_visible():
                 continue
-            xdata = np.asarray(line.get_xdata(), dtype=float)
-            ydata = np.asarray(line.get_ydata(), dtype=float)
+            xdata = np.asarray(line.get_xdata(), dtype=float).ravel()
+            ydata = np.asarray(line.get_ydata(), dtype=float).ravel()
             mask = np.isfinite(ydata)
             if x_min is not None:
                 mask &= xdata >= x_min
@@ -1303,8 +1309,12 @@ class UIsub(
             return
         uistate.setMargins(axe=uistate.axe)
         if uistate.mouseover_action in ("EPSP slope", "volley slope"):
+            if uistate.mouseover_plot is None:
+                return
             uistate.updateDragZones()
         elif uistate.mouseover_action in ("EPSP amp move", "volley amp move"):
+            if uistate.mouseover_blob is None:
+                return
             uistate.updatePointDragZone()
 
     def zoomAuto(self, reset=False):
@@ -1378,9 +1388,6 @@ class UIsub(
             uistate.ax2.axes.set_ylim(uistate.zoom["output_ax2_ylim"])
         else:
             raise ValueError("zoomReset: unknown axis")
-        axis.figure.canvas.draw_idle()
-        if axis == uistate.axe:
-            self._recalc_axe_drag_zones()
 
     def update_recs2plot(self):
         if uistate.list_idx_select_recs:
@@ -2834,12 +2841,24 @@ class UIsub(
 
     def get_trow(self, dfp_idx=None):
         if dfp_idx is not None:
-            dft = self.get_dft(self.get_prow(dfp_idx))
+            prow = self.get_prow(dfp_idx)
+            if prow is None:
+                logger.debug(
+                    "get_trow: get_prow(%s) returned None, returning None", dfp_idx
+                )
+                return None
+            dft = self.get_dft(prow)
         else:
             if not uistate.list_idx_select_stims:
                 print("get_trow: No stim selected.")
                 return None
-            dft = self.get_dft(self.get_prow())
+            prow = self.get_prow()
+            if prow is None:
+                logger.debug(
+                    "get_trow: get_prow() returned None (no recording selected), returning None"
+                )
+                return None
+            dft = self.get_dft(prow)
         if dft is None or len(dft) == 0:
             print("get_trow: Empty dataframe.")
             return None
@@ -3056,6 +3075,9 @@ class UIsub(
         # left clicked on a graph
         uistate.dragging = True
         prow = self.get_prow()
+        if prow is None:
+            uistate.dragging = False
+            return
 
         if (
             (canvas == self.canvasEvent)
@@ -3164,6 +3186,8 @@ class UIsub(
             return
         # One recording selected, with 2 or more stims, define mouseover zones
         prow = self.get_prow()
+        if prow is None:
+            return
         rec_name = f"{prow['recording_name']}"
         rec_filter = prow["filter"]  # the filter currently used for this recording
         if rec_filter != "voltage":
@@ -4015,6 +4039,7 @@ class UIsub(
             ),
         }
         # Build a dict_t of new measuring points and update drag zones
+        dict_t_updates = {}
         for action, values in action_mapping.items():
             if uistate.mouseover_action.startswith(action):
                 method_field = values[0]
@@ -4032,6 +4057,13 @@ class UIsub(
                 )
                 update_function()
                 break
+        else:
+            logger.warning(
+                "eventDragReleased: mouseover_action '%s' did not match any known action; aborting update.",
+                uistate.mouseover_action,
+            )
+            self.mouseoverUpdate()
+            return
 
         # update selected row of dft_temp with the values from dict_t
         for key, value in dict_t_updates.items():
@@ -4074,6 +4106,12 @@ class UIsub(
         self.tableStimModel.setData(self.get_dft(prow))
         self.set_rec_status(rec_name=rec_name)
         trow = self.get_trow()
+        if trow is None:
+            logger.debug(
+                "eventDragReleased: trow is None after drag commit, falling back to mouseoverUpdate"
+            )
+            self.mouseoverUpdate()
+            return
         uiplot.update(prow=prow, trow=trow, aspect=aspect, data_x=data_x, data_y=data_y)
 
         def update_amp_marker(trow, aspect, prow, dfmean, dfoutput):

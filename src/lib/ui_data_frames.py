@@ -43,47 +43,6 @@ class DataFrameMixin:
         )
 
     # ------------------------------------------------------------------
-    # Voltage-range DataFrame
-    # ------------------------------------------------------------------
-
-    def get_dfv(self):
-        # returns a dfV filtered by recording selection. Builds one if there is none.
-        # NB: assumes the dfV shares indices with df_project!
-        # TODO: deprecate by setting and maintaining y-limits as df_project columns
-        if uistate.dfv is not None:
-            return uistate.dfv
-        t0 = time.time()
-        dfv = self.get_df_project().copy()
-        # find voltage range of selected recordings
-        for i, row in dfv.iterrows():
-            dffilter = self.get_dffilter(row)
-            # mean voltages
-            dfv.loc[i, "vmin"] = dffilter["voltage"].min()
-            dfv.loc[i, "vmax"] = dffilter["voltage"].max()
-            # event voltages # TODO: Hardcoded components - make configurable
-            trow = self.get_trow(dfp_idx=i)
-            event_start = trow["t_stim"] + 0.002  # s after stim
-            event_end = event_start + 0.040
-            dfv.loc[i, "event_vmin"] = dffilter[
-                (dffilter["time"] >= event_start) & (dffilter["time"] <= event_end)
-            ]["voltage"].min()
-            dfv.loc[i, "event_vmax"] = (
-                0.0005  # dffilter[(dffilter['time'] >= event_start) & (dffilter['time'] <= event_end)]['voltage'].max()
-            )
-            # output measurements
-            dfout = self.get_dfoutput(row)  # TODO: Norm handling
-            dfv.loc[i, "amp_min"] = dfout["EPSP_amp"].min()
-            dfv.loc[i, "amp_max"] = dfout["EPSP_amp"].max()
-            dfv.loc[i, "slope_min"] = dfout["EPSP_slope"].min()
-            dfv.loc[i, "slope_max"] = dfout["EPSP_slope"].max()
-            print(f"* * * * \n{dfv}")
-            uistate.dfv = dfv
-        print(
-            f" - get_dfv voltage range calc time: {round((time.time() - t0) * 1000)} ms"
-        )
-        return uistate.dfv
-
-    # ------------------------------------------------------------------
     # Recalculate all outputs
     # ------------------------------------------------------------------
 
@@ -134,7 +93,6 @@ class DataFrameMixin:
         self.group_cache_purge()
         # TODO: rest of group handling
 
-        # uistate.dfv = None
         uiplot.hideAll()
         self.update_show(reset=True)
         self.mouseoverUpdate()

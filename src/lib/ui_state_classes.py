@@ -13,9 +13,6 @@ if TYPE_CHECKING:
 
 
 class UIstate:
-    # --- Persisted DataFrame state ---
-    dfv: Optional[pd.DataFrame]
-
     # --- Axes (not persisted) ---
     axm: Optional[matplotlib.axes.Axes]
     axe: Optional[matplotlib.axes.Axes]
@@ -138,7 +135,6 @@ class UIstate:
             "output_ax1_ylim": (0, 1.2),
             "output_ax2_ylim": (0, 1.2),
         }
-        self.dfv = None  # used to store per-recording voltage ranges for output scaling
         self.showTimetable = False
         self.showHeatmap = False
         self.dict_heatmap = {}
