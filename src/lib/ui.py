@@ -3306,7 +3306,7 @@ class UIsub(
         x, y = event.xdata, event.ydata
         str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
         ax = getattr(uistate, str_ax)
-        print(f"outputMouseover: x={x}, y={y}, str_ax={str_ax}")
+        # print(f"outputMouseover: x={x}, y={y}, str_ax={str_ax}")
         if (
             str_ax is None
             or x is None

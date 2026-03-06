@@ -342,38 +342,18 @@ class UIplot:
             del dict_rec[key]
             if key in dict_show:
                 del dict_show[key]
-
-    def exterminate(self):
-        # cycles through every line, on every graph, and kills it.
-        uis = self.uistate
-        axes = [
-            uis.axm,
-            uis.axe,
-            uis.ax1,
-            uis.ax2,
-        ]
-        for axis in axes:
-            if axis is None:
-                continue
-            for line in list(axis.lines):
-                line.remove()
-            for coll in list(axis.collections):
-                coll.remove()
-            axis.figure.canvas.draw()
-        # clean up references
-        uis.dict_rec_labels = {}
-        uis.dict_rec_show = {}
-        uis.dict_group_labels = {}
-        uis.dict_group_show = {}
-        uis.mouseover_plot = None
-        uis.mouseover_blob = None
-        uis.mouseover_out = None
-        uis.mouseover_action = None
-        uis.ghost_sweep = None
-        uis.ghost_label = None
+        if rec_ID is None:
+            uis = self.uistate
+            uis.mouseover_plot = None
+            uis.mouseover_blob = None
+            uis.mouseover_out = None
+            uis.mouseover_action = None
+            uis.ghost_sweep = None
+            uis.ghost_label = None
 
     def unPlotGroup(self, group_ID=None):
         dict_group = self.uistate.dict_group_labels
+        dict_group_show = self.uistate.dict_group_show
         if group_ID is None:
             keys_to_remove = list(dict_group.keys())  # Remove all if group_ID is None
         else:
@@ -386,6 +366,8 @@ class UIplot:
             dict_group[key]["fill"].remove()
             dict_group[key]["line"].remove()
             del dict_group[key]
+            if key in dict_group_show:
+                del dict_group_show[key]
 
     def graphRefresh(self, dd_groups):
         # show only selected and imported lines, only appropriate aspects
