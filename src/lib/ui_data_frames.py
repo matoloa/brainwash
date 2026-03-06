@@ -46,10 +46,9 @@ class DataFrameMixin:
     # Recalculate all outputs
     # ------------------------------------------------------------------
 
-    def recalculate(self):
-        # Placeholder function called when output must be recalculated: normalization changed, binning changed, amp halfwidth changed
-        # For now, it recalculates ALL outputs, triggered by any "set All" button
-        # TODO: make a (default) version that only affects selected recordings
+    def recalculate(self, selection=None):
+        # Recalculates outputs when normalization, binning, or amp halfwidth changes.
+        # selection: list of df_project row indices to recalculate, or None to recalculate all.
         self.usage("recalculate")
         self.uiFreeze()
 
@@ -70,10 +69,27 @@ class DataFrameMixin:
         bin_size = uistate.lineEdit["bin_size"]
         if binSweeps:
             print(f"binSweeps: {binSweeps}, bin_size: {bin_size}")
-        uiplot.unPlot()
-        uiplot.unPlotGroup()
+
         df_p = self.get_df_project()
-        for _, p_row in df_p.iterrows():
+        rows = df_p.iloc[selection] if selection is not None else df_p
+
+        if selection is None:
+            uiplot.unPlot()
+            uiplot.unPlotGroup()
+        else:
+            for _, p_row in rows.iterrows():
+                uiplot.unPlot(p_row["ID"])
+            affected_group_IDs = list(
+                {
+                    g
+                    for _, p_row in rows.iterrows()
+                    for g in self.get_groupsOfRec(p_row["ID"])
+                }
+            )
+            for group_ID in affected_group_IDs:
+                uiplot.unPlotGroup(group_ID)
+
+        for _, p_row in rows.iterrows():
             rec = p_row["recording_name"]
             df_t = self.get_dft(p_row)
             df_t["t_EPSP_amp_halfwidth"] = dt["t_EPSP_amp_halfwidth"]
@@ -90,11 +106,13 @@ class DataFrameMixin:
         self.tableFormat()
 
         # group handling
-        self.group_cache_purge()
-        # TODO: rest of group handling
+        if selection is None:
+            self.group_cache_purge()
+        else:
+            self.group_cache_purge(affected_group_IDs)
 
         uiplot.hideAll()
-        self.update_show(reset=True)
+        self.update_show(reset=(selection is None))
         self.mouseoverUpdate()
         self.uiThaw()
 

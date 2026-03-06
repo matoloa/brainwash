@@ -1025,9 +1025,13 @@ class UIsub(
             return False
         return True
 
-    def _is_group_visible(self, v: dict, selected_groups: set) -> bool:
-        """Predicate: should this group-label entry be visible given current UI state."""
-        if v["group_ID"] not in selected_groups:
+    def _is_group_visible(self, v: dict, selected_groups: set | None) -> bool:
+        """Predicate: should this group-label entry be visible given current UI state.
+
+        When selected_groups is None (no recordings selected), all checkbox-ticked
+        groups are shown on ax1/ax2 regardless of recording membership.
+        """
+        if selected_groups is not None and v["group_ID"] not in selected_groups:
             return False
         aspect = v.get("aspect")
         if aspect and not uistate.checkBox.get(aspect, True):
@@ -1043,7 +1047,7 @@ class UIsub(
         return True
 
     def update_show(self, reset=False):
-        if reset or uistate.df_recs2plot is None:
+        if reset:
             for v in uistate.dict_rec_labels.values():
                 v["line"].set_visible(False)
             uistate.dict_rec_show = {}
@@ -1052,6 +1056,23 @@ class UIsub(
                     v["line"].set_visible(False)
                     v["fill"].set_visible(False)
                 uistate.dict_group_show = {}
+            return
+
+        if uistate.df_recs2plot is None:
+            # No recordings selected — hide all rec lines but keep checkbox-ticked
+            # groups visible on ax1/ax2.
+            for v in uistate.dict_rec_labels.values():
+                v["line"].set_visible(False)
+            uistate.dict_rec_show = {}
+            if self.dd_groups is not None:
+                new_group_show = {}
+                for k, v in uistate.dict_group_labels.items():
+                    visible = self._is_group_visible(v, selected_groups=None)
+                    v["line"].set_visible(visible)
+                    v["fill"].set_visible(visible)
+                    if visible:
+                        new_group_show[k] = v
+                uistate.dict_group_show = new_group_show
             return
 
         selected_ids = set(uistate.df_recs2plot["ID"])
