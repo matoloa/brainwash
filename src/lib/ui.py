@@ -981,138 +981,85 @@ class UIsub(
         self.zoomAuto()
         self.mouseoverUpdate()
 
+    def _is_rec_visible(self, v: dict, selected_ids: set, selected_stims: set) -> bool:
+        """Predicate: should this rec-label entry be visible given current UI state."""
+        if v["rec_ID"] not in selected_ids:
+            return False
+        if v["stim"] is not None and v["stim"] not in selected_stims:
+            return False
+        aspect = v.get("aspect")
+        if aspect and not uistate.checkBox.get(aspect, True):
+            return False
+        # norm/raw switch: only EPSP amp/slope have a norm variant
+        variant = v.get("variant")
+        norm_active = uistate.checkBox["norm_EPSP"]
+        if variant == "norm" and not norm_active:
+            return False
+        if variant == "raw" and norm_active and aspect in ("EPSP_amp", "EPSP_slope"):
+            return False
+        return True
+
+    def _is_group_visible(self, v: dict, selected_groups: set) -> bool:
+        """Predicate: should this group-label entry be visible given current UI state."""
+        if v["group_ID"] not in selected_groups:
+            return False
+        aspect = v.get("aspect")
+        if aspect and not uistate.checkBox.get(aspect, True):
+            return False
+        variant = v.get("variant")
+        norm_active = uistate.checkBox["norm_EPSP"]
+        if variant == "norm" and not norm_active:
+            return False
+        if variant == "raw" and norm_active:
+            return False
+        if not self.dd_groups[v["group_ID"]]["show"]:
+            return False
+        return True
+
     def update_show(self, reset=False):
-        aspects = [
-            "EPSP_amp",
-            "EPSP_slope",
-            "volley_amp",
-            "volley_slope",
-            "volley_amp_mean",
-            "volley_slope_mean",
-        ]
-        old_selection = uistate.dict_rec_show
-        if uistate.df_recs2plot is None:
-            reset = True
-            new_selection = {}
-        else:
-            selected_ids = set(uistate.df_recs2plot["ID"])
-            selected_stims = [
-                stim + 1 for stim in uistate.list_idx_select_stims
-            ]  # stim_select is 0-based (indices) - convert to stims
-            print(
-                f"update_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}, reset: {reset}"
-            )
-            # remove non-selected recs and stims
-            new_selection = {
-                k: v
-                for k, v in uistate.dict_rec_labels.items()
-                if v["rec_ID"] in selected_ids
-                and (v["stim"] in selected_stims or v["stim"] is None)
-                and all(
-                    uistate.checkBox[aspect] or v.get("aspect", "") != aspect
-                    for aspect in aspects
-                )
-            }
-            if not uistate.checkBox["norm_EPSP"]:
-                filters = [" norm"]
-            else:
-                filters = [
-                    " EPSP amp",
-                    " EPSP slope",
-                ]
-            new_selection = {
-                k: v
-                for k, v in new_selection.items()
-                if not any(k.endswith(f) for f in filters)
-            }
-        if reset:  # Hide all lines
-            obsolete_lines = uistate.dict_rec_labels
-        else:
-            obsolete_lines = {
-                k: v for k, v in old_selection.items() if k not in new_selection
-            }
-        for line_dict in obsolete_lines.values():
-            line_dict["line"].set_visible(False)
-        # Show what's now selected
-        added_lines = {k: v for k, v in new_selection.items() if k not in old_selection}
-        for line_dict in added_lines.values():
-            line_dict["line"].set_visible(True)
-        uistate.dict_rec_show = new_selection
+        if reset or uistate.df_recs2plot is None:
+            for v in uistate.dict_rec_labels.values():
+                v["line"].set_visible(False)
+            uistate.dict_rec_show = {}
+            if self.dd_groups is not None:
+                for v in uistate.dict_group_labels.values():
+                    v["line"].set_visible(False)
+                    v["fill"].set_visible(False)
+                uistate.dict_group_show = {}
+            return
 
-        # group view
-        if self.dd_groups is not None:
-            reset_groups = False
-            if uistate.dict_group_show == {}:
-                reset_groups = True
-            old_group_selection = uistate.dict_group_show.copy()
-            # if any recs are selected, show only groups that contain selected recs
-            if uistate.df_recs2plot is not None:
-                selected_groups = {
-                    group
-                    for rec_ID in selected_ids
-                    for group in self.get_groupsOfRec(rec_ID)
-                }
-                new_group_selection = {
-                    k: v
-                    for k, v in uistate.dict_group_labels.items()
-                    if v["group_ID"] in selected_groups
-                }
-            else:
-                new_group_selection = uistate.dict_group_labels.copy()
-            new_group_selection = {
-                k: v
-                for k, v in new_group_selection.items()
-                if all(
-                    uistate.checkBox[aspect] or v.get("aspect", "") != aspect
-                    for aspect in aspects
-                )
-            }
-            if uistate.checkBox["norm_EPSP"]:
-                filters = [" norm"]
-            else:
-                filters = [" mean"]
-            new_group_selection = {
-                k: v
-                for k, v in new_group_selection.items()
-                if any(k.endswith(f) for f in filters)
-                and self.dd_groups[v["group_ID"]]["show"]
-            }
-            if reset_groups:  # Hide all lines
-                obsolete_group_lines = uistate.dict_group_labels
-            else:
-                obsolete_group_lines = {
-                    k: v
-                    for k, v in old_group_selection.items()
-                    if k not in new_group_selection
-                }
-            print(f"obsolete_group_lines: {obsolete_group_lines.keys()}")
-            for k, line_dict in obsolete_group_lines.items():
-                print(f"Obsolete group line key: {k}")
-                line_dict["line"].set_visible(False)
-                line_dict["fill"].set_visible(False)
-            # Show what's now selected
-            added_group_lines = {
-                k: v
-                for k, v in new_group_selection.items()
-                if k not in old_group_selection
-            }
-            print(f"added_group_lines: {added_group_lines.keys()}")
-            for k, line_dict in added_group_lines.items():
-                print(f"Added group line key: {k}")
-                line_dict["line"].set_visible(True)
-                line_dict["fill"].set_visible(True)
-            uistate.dict_group_show = new_group_selection
+        selected_ids = set(uistate.df_recs2plot["ID"])
+        selected_stims = {
+            stim + 1 for stim in uistate.list_idx_select_stims
+        }  # stim_select is 0-based (indices) - convert to stims
+        print(
+            f"update_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}"
+        )
 
-        # return
-        # DEBUG block - for inquiring visibility of specific lines
-        print(f"update_show: {len(uistate.dict_rec_show)}")
+        # rec lines
+        new_rec_show = {}
+        for k, v in uistate.dict_rec_labels.items():
+            visible = self._is_rec_visible(v, selected_ids, selected_stims)
+            v["line"].set_visible(visible)
+            if visible:
+                new_rec_show[k] = v
+        uistate.dict_rec_show = new_rec_show
+
+        # group lines
         if self.dd_groups is not None:
-            for key, value in self.dd_groups.items():
-                print(f"update_show: {key}, show:{value['show']}")
-        for key, value in uistate.dict_rec_show.items():
-            if key.endswith(" volley amp mean") or key.endswith(" volley slope mean"):
-                print(f"update_show: {key}, show:{value['line'].get_visible()}")
-                print(f" - ydata: {value['line'].get_ydata()}")
+            selected_groups = {
+                group
+                for rec_ID in selected_ids
+                for group in self.get_groupsOfRec(rec_ID)
+            }
+            new_group_show = {}
+            for k, v in uistate.dict_group_labels.items():
+                visible = self._is_group_visible(v, selected_groups)
+                v["line"].set_visible(visible)
+                v["fill"].set_visible(visible)
+                if visible:
+                    new_group_show[k] = v
+            uistate.dict_group_show = new_group_show
 
     ##################################################################
     #    WIP section: TODO: move to appropriate header               #
