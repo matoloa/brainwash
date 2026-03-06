@@ -1256,6 +1256,43 @@ class UIsub(
         uiplot.styleUpdate()
         self.graphRefresh()
 
+    @staticmethod
+    def _ylim_from_artists(axis, pad=0.10, min_span=1e-9, x_min=None, x_max=None):
+        """Return (ymin, ymax) from all finite y-data on *axis*, with fractional padding.
+
+        Skips single-point artists (vlines, markers) whose y-span would otherwise
+        collapse the range, and ignores invisible lines.  Returns None when no
+        usable data is found so callers can fall back to a sensible default.
+
+        x_min / x_max: if given, only y-values whose corresponding x falls within
+        [x_min, x_max] are considered.  Useful for excluding a stim artefact that
+        sits at the left edge of the event window.
+        """
+        all_y = []
+        for line in axis.get_lines():
+            if not line.get_visible():
+                continue
+            xdata = np.asarray(line.get_xdata(), dtype=float)
+            ydata = np.asarray(line.get_ydata(), dtype=float)
+            mask = np.isfinite(ydata)
+            if x_min is not None:
+                mask &= xdata >= x_min
+            if x_max is not None:
+                mask &= xdata <= x_max
+            finite = ydata[mask]
+            if finite.size < 2:  # skip markers / degenerate artists
+                continue
+            all_y.append(finite)
+        if not all_y:
+            return None
+        yall = np.concatenate(all_y)
+        lo, hi = float(yall.min()), float(yall.max())
+        span = hi - lo
+        if span < min_span:  # flat data — expand symmetrically
+            span = max(abs(hi), min_span)
+            lo, hi = hi - span, hi + span
+        return (lo - pad * span, hi + pad * span)
+
     def zoomAuto(self, reset=False):
         # set and apply Auto-zoom parameters for all axes
         self.usage("zoomAuto")
@@ -1264,17 +1301,34 @@ class UIsub(
             logger.debug("zoomAuto: no recording selected, skipping")
             return
         dfmean = self.get_dfmean(prow)
-        # axm:
+        # axm: derive from mean voltage data
         vmin = dfmean["voltage"].min()
         vmax = dfmean["voltage"].max()
         uistate.zoom["mean_xlim"] = (0, prow["sweep_duration"])
         uistate.zoom["mean_ylim"] = (vmin, vmax)
-        # axe:
-        uistate.zoom["event_ylim"] = (-0.0015, 0.0002)
-        uistate.zoom["event_xlim"] = (-0.0012, 0.030)
-        # ax1 and ax2
-        uistate.zoom["output_ax1_ylim"] = (0, 1.5)
-        uistate.zoom["output_ax2_ylim"] = (0, 1.5)
+        # axe: fit to plotted event artists, skipping the stim artefact by starting
+        # 0.5 ms after t=0 (the stim); x-axis on axe is already shifted so t=0 is
+        # the stim, so the offset is absolute, not relative to event_start.
+        artefact_offset = 0.0005  # seconds after t_stim=0 — clears the artefact spike
+        uistate.zoom["event_ylim"] = self._ylim_from_artists(
+            uistate.axe, x_min=artefact_offset
+        ) or (
+            -0.0015,
+            0.0002,
+        )
+        uistate.zoom["event_xlim"] = (
+            uistate.settings["event_start"],
+            uistate.settings["event_end"],
+        )
+        # ax1 / ax2: fit to plotted output artists; fall back to (0, 1.5)
+        uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.ax1) or (
+            0,
+            1.5,
+        )
+        uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.ax2) or (
+            0,
+            1.5,
+        )
         uistate.zoom["output_xlim"] = (0, prow["sweeps"])
         self.zoomReset()
 
