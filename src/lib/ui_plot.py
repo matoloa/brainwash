@@ -138,7 +138,7 @@ class UIplot:
         plt.close()
         print(f"Saved scatter plot to {output_path}")
 
-    def xDeselect(self, ax, reset=False):
+    def xDeselect(self, ax, reset=False, draw=True):
         # clear previous axvlines and axvspans
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
         if ax == ax1 or ax == ax2:
@@ -149,8 +149,8 @@ class UIplot:
                 self.uistate.x_select["output_start"] = None
                 self.uistate.x_select["output_end"] = None
         else:  # axm
-            axlines = ax.get_lines()
-            axpatches = ax.patches
+            axlines = list(ax.get_lines())
+            axpatches = list(ax.patches)
             if reset:
                 self.uistate.x_select["mean_start"] = None
                 self.uistate.x_select["mean_end"] = None
@@ -163,13 +163,14 @@ class UIplot:
                 patch.remove()
         if reset:
             self.clear_axe_mean()
-        ax.figure.canvas.draw()
+        if draw:
+            ax.figure.canvas.draw()
 
-    def xSelect(self, canvas):
+    def xSelect(self, canvas, draw=True):
         # draws a selected range of x values on <canvas>
         if canvas == self.uistate.axm.figure.canvas:
             ax = self.uistate.axm
-            self.xDeselect(ax)
+            self.xDeselect(ax, draw=False)
             if self.uistate.x_select["mean_end"] is None:
                 # print(f"Selected x: {self.uistate.x_select['mean_start']}")
                 ax.axvline(
@@ -191,7 +192,9 @@ class UIplot:
                 ax = self.uistate.ax2
             else:
                 ax = self.uistate.ax1
-            self.xDeselect(ax)  # will clear both ax1 and ax2, if fed either one
+            self.xDeselect(
+                ax, draw=False
+            )  # will clear both ax1 and ax2, if fed either one
             if self.uistate.x_select["output_end"] is None:
                 # If only the start is selected, draw a line at the start
                 # print(f"Selected x: {self.uistate.x_select['output_start']}")
@@ -210,8 +213,8 @@ class UIplot:
                 ax.axvline(x=start, color="blue", label="xSelect_start")
                 ax.axvline(x=end, color="blue", label="xSelect_end")
                 ax.axvspan(start, end, color="blue", alpha=0.1, label="xSelect_span")
-            # draw the mean of selected sweeps on axm
-        canvas.draw()
+            if draw:
+                canvas.draw()
 
     def clear_axe_mean(self):
         # if uistate.dict_rec_labels exists and contains keys that start with "axe mean selected sweeps", remove their lines and del the items
@@ -226,7 +229,7 @@ class UIplot:
         else:
             print(" - - - - No dict_rec_labels to clear mean sweeps from")
 
-    def update_axe_mean(self):
+    def update_axe_mean(self, draw=True):
         """
         updates the mean of selected sweeps drawn on axe, called by ui.py after:
         * releasing drag on output, selecting sweeps
@@ -282,6 +285,8 @@ class UIplot:
                 self.uistate.dict_rec_labels[f"axe mean selected sweeps {stim_str}"][
                     "line"
                 ].set_visible(True)
+        if draw:
+            self.uistate.axe.figure.canvas.draw()
 
     def styleUpdate(self):
         axm, axe, ax1, ax2 = (
@@ -322,7 +327,7 @@ class UIplot:
                 if len(lines) > 0:
                     for line in lines:
                         line.set_visible(False)
-                patches = ax.patches
+                patches = list(ax.patches)
                 if len(patches) > 0:
                     for patch in patches:
                         patch.remove()
@@ -454,12 +459,12 @@ class UIplot:
 
         # maintain drag selections through reselection
         if uistate.x_select["mean_start"] is not None:
-            self.xSelect(canvas=axm.figure.canvas)
+            self.xSelect(canvas=axm.figure.canvas, draw=False)
         if uistate.x_select["output_start"] is not None:
             if uistate.checkBox["EPSP_slope"]:
-                self.xSelect(canvas=ax2.figure.canvas)
+                self.xSelect(canvas=ax2.figure.canvas, draw=False)
             else:
-                self.xSelect(canvas=ax1.figure.canvas)
+                self.xSelect(canvas=ax1.figure.canvas, draw=False)
 
         # 0-hline for Events
         if not "Events y zero marker" in self.uistate.dict_rec_labels:
@@ -514,7 +519,7 @@ class UIplot:
         t1 = time.time()
 
         # update mean of selected sweeps on axe
-        self.update_axe_mean()
+        self.update_axe_mean(draw=False)
         print(
             f" - - graphRefresh: update_axe_mean: {round((time.time() - t1) * 1000)} ms"
         )
@@ -1312,7 +1317,7 @@ class UIplot:
                     label_core += " norm"
                 self.updateOutLine(label_core)
 
-    def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None):
+    def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None, draw=False):
         axe = self.uistate.axe
         print(
             f"updateAmpMarker called with labelbase: {labelbase}, x: {x}, y: {y}, amp_x: {amp_x}, amp_zero: {amp_zero}, amp: {amp}"
@@ -1331,13 +1336,15 @@ class UIplot:
             self.uistate.dict_rec_labels[f"{labelbase} y marker"]["line"].set_data(
                 [x, x], amp_y
             )
-        axe.figure.canvas.draw()
+        if draw:
+            axe.figure.canvas.draw()
 
-    def updateLine(self, plot_to_update, x_data, y_data):
+    def updateLine(self, plot_to_update, x_data, y_data, draw=False):
         axe = self.uistate.axe
         dict_line = self.uistate.dict_rec_labels[plot_to_update]
         dict_line["line"].set_data(x_data, y_data)
-        axe.figure.canvas.draw()
+        if draw:
+            axe.figure.canvas.draw()
 
     def updateOutLine(self, label):
         print(f"updateOutLine: {label}")
