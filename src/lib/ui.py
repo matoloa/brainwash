@@ -906,18 +906,70 @@ class UIsub(
         uistate.list_idx_select_recs = [index.row() for index in selected_indexes]
         # print(f" - rec_select: {uistate.list_idx_select_recs}")
         self.update_recs2plot()
-        self.update_show()
+
         if uistate.df_recs2plot is None:
             print("No parsed recordings selected.")
+            uistate.list_idx_select_stims = []
+            self.update_show()
             self.graphRefresh()
             return
+
         prow = self.get_prow()
-        # if exactly one stim of one recording is selected, reference its data in uistate.df_rec_select_data, and timepoints in uistate.df_rec_select_time
+
+        # Determine the dft to use for the stim table layout.
+        # Use the recording with the longest sweep when multiple are selected so the
+        # full x-axis is always visible.
+        if len(uistate.list_idx_select_recs) == 1:
+            dft_for_format = self.get_dft(row=prow)
+        else:
+            uistate.df_rec_select_data = None
+            uistate.df_rec_select_time = None
+            longest_sweep_prow = uistate.df_recs2plot.loc[
+                uistate.df_recs2plot["sweep_duration"].idxmax()
+            ]
+            uistate.float_sweep_duration_max = longest_sweep_prow["sweep_duration"]
+            dft_for_format = self.get_dft(row=longest_sweep_prow)
+
+        # Refresh the stim table contents first, then clamp/restore the stim selection
+        # so that update_show() and mouseoverUpdate() see a valid stim index.
+        if dft_for_format is not None:
+            num_stims = len(dft_for_format)
+            # Clamp saved stim indices to the row count of the new recording.
+            # This prevents stale out-of-range indices when switching recordings.
+            valid_stim_indices = [
+                i for i in uistate.list_idx_select_stims if i < num_stims
+            ]
+            if not valid_stim_indices and num_stims > 0:
+                valid_stim_indices = [0]  # default to first stim
+            uistate.list_idx_select_stims = valid_stim_indices
+
+            self.tableStimModel.setData(dft_for_format)
+            model = self.tableStim.model()
+            selection = QtCore.QItemSelection()
+            for row_idx in uistate.list_idx_select_stims:
+                index_start = model.index(row_idx, 0)
+                index_end = model.index(
+                    row_idx, model.columnCount(QtCore.QModelIndex()) - 1
+                )
+                selection.select(index_start, index_end)
+            self.tableStim.selectionModel().select(
+                selection, QtCore.QItemSelectionModel.ClearAndSelect
+            )
+            self.formatTableStimLayout(dft=dft_for_format)
+        else:
+            # No stims detected — clear stim selection so downstream logic is consistent.
+            uistate.list_idx_select_stims = []
+            logger.debug(
+                "tableProjSelectionChanged: dft_for_format is None (no stims detected), clearing stim selection"
+            )
+
+        # Now that the stim table and uistate.list_idx_select_stims are up-to-date,
+        # populate the single-rec/single-stim convenience references.
         if (
             len(uistate.list_idx_select_recs) == 1
             and len(uistate.list_idx_select_stims) == 1
         ):
-            uistate.df_rec_select_time = dft_for_format = self.get_dft(row=prow)
+            uistate.df_rec_select_time = self.get_dft(row=prow)
             uistate.df_rec_select_data = self.get_dffilter(prow)
             uistate.float_sweep_duration_max = prow["sweep_duration"]
             logger.debug(
@@ -930,39 +982,13 @@ class UIsub(
         else:
             uistate.df_rec_select_data = None
             uistate.df_rec_select_time = None
-            # store the selected prow with the highest sweep duration for layout formatting, so that the full x-axis is visible
-            longest_sweep_prow = uistate.df_recs2plot.loc[
-                uistate.df_recs2plot["sweep_duration"].idxmax()
-            ]
-            uistate.float_sweep_duration_max = longest_sweep_prow["sweep_duration"]
-            dft_for_format = self.get_dft(row=longest_sweep_prow)
 
-        if uistate.dict_rec_show and dft_for_format is not None:
-            selected_stims = (
-                self.tableStim.selectionModel().selectedRows()
-            )  # save selection
-            self.tableStimModel.setData(dft_for_format)
-            model = self.tableStim.model()
-            selection = QtCore.QItemSelection()
-            for index in selected_stims:
-                row_idx = index.row()
-                index_start = model.index(row_idx, 0)  # Start of the row (first column)
-                index_end = model.index(
-                    row_idx, model.columnCount(QtCore.QModelIndex()) - 1
-                )  # End of the row (last column)
-                selection.select(index_start, index_end)
-            self.tableStim.selectionModel().select(
-                selection, QtCore.QItemSelectionModel.Select
-            )
-            self.formatTableStimLayout(dft=dft_for_format)
-        elif dft_for_format is None:
-            logger.debug(
-                "tableProjSelectionChanged: dft_for_format is None (no stims detected), skipping stim table update"
-            )
+        # update_show now runs with a correct, clamped uistate.list_idx_select_stims
+        self.update_show()
         self.zoomAuto()
 
         t0 = time.time()
-        self.mouseoverUpdate()
+        self.mouseoverUpdate()  # always ends with a single graphRefresh()
         print(f" - - mouseoverUpdate: {round((time.time() - t0) * 1000)} ms")
 
     def stimSelectionChanged(self):
@@ -1250,61 +1276,6 @@ class UIsub(
         uistate.zoom["output_ax1_ylim"] = (0, 1.5)
         uistate.zoom["output_ax2_ylim"] = (0, 1.5)
         uistate.zoom["output_xlim"] = (0, prow["sweeps"])
-        self.zoomReset()
-        return
-
-        if reset:
-            uistate.dfv = None
-        dfv = self.get_dfv()
-        # invalid df or invalid indices
-        if dfv is None or len(dfv) == 0:
-            return
-        # intersect selected indices with df index
-        valid_idx = [i for i in uistate.list_idx_select_recs if i in dfv.index]
-        if not valid_idx:
-            return
-        dfv_select = dfv.loc[valid_idx]
-        if dfv_select is None or dfv_select.empty:
-            return
-        # axm:
-        vmin = dfv_select["vmin"].min()
-        vmax = dfv_select["vmax"].max()
-        uistate.zoom["mean_xlim"] = (0, dfv_select["sweep_duration"].max())
-        uistate.zoom["mean_ylim"] = (vmin, vmax)
-        # axe:
-        event_vmin = dfv_select["event_vmin"].min()
-        event_vmax = dfv_select["event_vmax"].max()
-        margin = 0.05
-        uistate.zoom["event_ylim"] = (
-            event_vmin - abs(event_vmin * margin),
-            event_vmax + abs(event_vmax * margin),
-        )
-
-        # ax1 and ax2
-        if uistate.checkBox["bin"]:
-            first, last = (
-                0,
-                max(
-                    (dfv_select["sweeps"].max() - 1) / uistate.lineEdit["bin_size"] - 1,
-                    1,
-                ),
-            )
-        else:
-            first, last = 0, max(dfv_select["sweeps"].max() - 1, 1)
-        if uistate.checkBox["output_per_stim"]:
-            first, last = 1, max(dfv_select["stims"].max(), 2)
-
-        amp_min = 0 if uistate.checkBox["output_ymin0"] else dfv_select["amp_min"].min()
-        amp_max = dfv_select["amp_max"].max()
-        slope_min = (
-            0 if uistate.checkBox["output_ymin0"] else dfv_select["slope_min"].min()
-        )
-        slope_max = dfv_select["slope_max"].max()
-
-        uistate.zoom["output_ax1_ylim"] = amp_min, amp_max * (1 + margin)
-        uistate.zoom["output_ax2_ylim"] = slope_min, slope_max * (1 + margin)
-        uistate.zoom["output_xlim"] = first, last
-
         self.zoomReset()
 
     def zoomReset(self, axis=None):
@@ -2916,7 +2887,8 @@ class UIsub(
     def ongraphPreloadFinished(self, t0):
         self.graphGroups()
         print(f"Preloaded recordings and groups in {time.time() - t0:.2f} seconds.")
-        self.graphRefresh()
+        # Do NOT call graphRefresh() here — tableProjSelectionChanged() below ends
+        # with mouseoverUpdate() → graphRefresh(), so calling it here would double-draw.
         self.progressBarManager.__exit__(None, None, None)  # Hide progress bar
         self.tableFormat()
         self.uiThaw()
