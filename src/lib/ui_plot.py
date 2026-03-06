@@ -9,6 +9,10 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D  # for custom legend; TODO: still used?
 from matplotlib.ticker import FixedLocator, FuncFormatter
 
+STIM_MARKER_SIZE = (
+    10  # diameter in points; drives both rendering and hit-zone calculation
+)
+
 
 class UIplot:
     def __init__(self, uistate):
@@ -599,7 +603,7 @@ class UIplot:
             marker="o",
             markerfacecolor=color,
             markeredgecolor=color,
-            markersize=10,
+            markersize=STIM_MARKER_SIZE,
             alpha=0.4,
             zorder=0,
             label=label,

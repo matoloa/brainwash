@@ -303,6 +303,18 @@ class UIstate:
             - axe.transData.inverted().transform((0, 0))[1]
         )
 
+    def setMarginsAxm(
+        self, axm, pixels=10
+    ):  # set pixel-based margins for axm mouseover detection
+        self.mean_x_margin = (
+            axm.transData.inverted().transform((pixels, 0))[0]
+            - axm.transData.inverted().transform((0, 0))[0]
+        )
+        self.mean_y_margin = (
+            axm.transData.inverted().transform((0, pixels))[1]
+            - axm.transData.inverted().transform((0, 0))[1]
+        )
+
     def updateDragZones(self, aspect=None, x=None, y=None):
         # print(f"*** updateDragZones: {aspect} {x} {y}")
         if aspect is None:

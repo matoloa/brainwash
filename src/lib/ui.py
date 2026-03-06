@@ -1284,7 +1284,9 @@ class UIsub(
         self.graphRefresh()
 
     @staticmethod
-    def _ylim_from_artists(axis, pad=0.10, min_span=1e-9, x_min=None, x_max=None):
+    def _ylim_from_artists(
+        axis, pad=0.10, min_span=1e-9, x_min=None, x_max=None, ymin=None
+    ):
         """Return (ymin, ymax) from all finite y-data on *axis*, with fractional padding.
 
         Skips single-point artists (vlines, markers) whose y-span would otherwise
@@ -1294,6 +1296,10 @@ class UIsub(
         x_min / x_max: if given, only y-values whose corresponding x falls within
         [x_min, x_max] are considered.  Useful for excluding a stim artefact that
         sits at the left edge of the event window.
+
+        ymin: if given, clamps the returned lower bound to this value.  Pass 0 for
+        axes whose data is always non-negative (e.g. output ax1/ax2) so that the
+        bottom never dips below zero due to the fractional padding.
         """
         all_y = []
         for line in axis.get_lines():
@@ -1318,7 +1324,11 @@ class UIsub(
         if span < min_span:  # flat data — expand symmetrically
             span = max(abs(hi), min_span)
             lo, hi = hi - span, hi + span
-        return (lo - pad * span, hi + pad * span)
+        lo = lo - pad * span
+        hi = hi + pad * span
+        if ymin is not None:
+            lo = max(lo, ymin)
+        return (lo, hi)
 
     def _recalc_axe_drag_zones(self):
         """Recalculate axe mouseover detection zone margins after any zoom change.
@@ -1338,6 +1348,21 @@ class UIsub(
                 return
             uistate.updatePointDragZone()
 
+    def _recalc_axm_detection_zones(self):
+        """Recalculate axm mouseover detection zone margins after any zoom change.
+
+        Must be called after axm limits have been committed so that the
+        pixel→data transform reflects the new scale.
+
+        The hit zone is set to the marker radius (STIM_MARKER_SIZE / 2) plus a
+        5-pixel buffer on every side, so the whole rendered blob is always inside
+        the detection area with a small margin to spare.
+        """
+        if uistate.df_rec_select_time is None or uistate.df_rec_select_time.empty:
+            return
+        pixels = ui_plot.STIM_MARKER_SIZE // 2 + 5
+        uistate.setMarginsAxm(axm=uistate.axm, pixels=pixels)
+
     def zoomAuto(self, reset=False):
         # set and apply Auto-zoom parameters for all axes
         self.usage("zoomAuto")
@@ -1345,12 +1370,17 @@ class UIsub(
         if prow is None:
             logger.debug("zoomAuto: no recording selected, skipping")
             return
-        dfmean = self.get_dfmean(prow)
-        # axm: derive from mean voltage data
-        vmin = dfmean["voltage"].min()
-        vmax = dfmean["voltage"].max()
+        # axm: derive from raw mean voltage data with fractional padding.
+        # _ylim_from_artists is intentionally not used here: axm also contains
+        # axvline artists (stim selection markers) whose y-data spans [0, 1] in
+        # axes-fraction space and would corrupt the range.
         uistate.zoom["mean_xlim"] = (0, prow["sweep_duration"])
-        uistate.zoom["mean_ylim"] = (vmin, vmax)
+        dfmean = self.get_dfmean(prow)
+        vmin = float(dfmean["voltage"].min())
+        vmax = float(dfmean["voltage"].max())
+        pad = 0.10
+        span = vmax - vmin
+        uistate.zoom["mean_ylim"] = (vmin - pad * span, vmax + pad * span)
         # axe: fit to plotted event artists, skipping the stim artefact by starting
         # 0.5 ms after t=0 (the stim); x-axis on axe is already shifted so t=0 is
         # the stim, so the offset is absolute, not relative to event_start.
@@ -1365,18 +1395,25 @@ class UIsub(
             uistate.settings["event_start"],
             uistate.settings["event_end"],
         )
-        # ax1 / ax2: fit to plotted output artists; fall back to (0, 1.5)
-        uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.ax1) or (
+        # ax1 / ax2: fit to plotted output artists; fall back to (0, 1.5).
+        # ymin=0: output values are always non-negative, so never let padding
+        # pull the bottom below zero.
+        uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(
+            uistate.ax1, ymin=0
+        ) or (
             0,
             1.5,
         )
-        uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.ax2) or (
+        uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(
+            uistate.ax2, ymin=0
+        ) or (
             0,
             1.5,
         )
         uistate.zoom["output_xlim"] = (0, prow["sweeps"])
         self.zoomReset()
         self._recalc_axe_drag_zones()
+        self._recalc_axm_detection_zones()
 
     def zoomReset(self, axis=None):
         # self.usage("zoomReset")
@@ -1395,11 +1432,14 @@ class UIsub(
             print("zoomReset: axm")
             axis.axes.set_xlim(uistate.zoom["mean_xlim"])
             axis.axes.set_ylim(uistate.zoom["mean_ylim"])
+            self._recalc_axm_detection_zones()
+            axis.figure.canvas.draw_idle()
         elif axis == uistate.axe:
             logger.debug("zoomReset: axe")
             print("zoomReset: axe")
             axis.axes.set_xlim(uistate.zoom["event_xlim"])
             axis.axes.set_ylim(uistate.zoom["event_ylim"])
+            axis.figure.canvas.draw_idle()
         elif axis == uistate.ax1 or axis == uistate.ax2:
             logger.debug("zoomReset: ax1/ax2")
             print("zoomReset: ax1/ax2")
@@ -1407,6 +1447,7 @@ class UIsub(
             uistate.ax2.axes.set_xlim(uistate.zoom["output_xlim"])
             uistate.ax1.axes.set_ylim(uistate.zoom["output_ax1_ylim"])
             uistate.ax2.axes.set_ylim(uistate.zoom["output_ax2_ylim"])
+            uistate.ax1.figure.canvas.draw_idle()
         else:
             raise ValueError("zoomReset: unknown axis")
 
@@ -3221,18 +3262,14 @@ class UIsub(
             None  # name of stim that will be selected if clicked
         )
         uistate.mean_stim_x_ranges = {}  # dict: stim_num: (x_start, x_end)
-        # y_margin is 10% of y-axis range
-        uistate.mean_y_margin = (axm.get_ylim()[1] - axm.get_ylim()[0]) * 0.1
+        # Margins are set pixel-based by _recalc_axm_detection_zones; recompute
+        # here only as a fallback when they have not been initialised yet.
+        if uistate.mean_x_margin is None or uistate.mean_y_margin is None:
+            uistate.setMarginsAxm(axm=axm, pixels=ui_plot.STIM_MARKER_SIZE // 2 + 5)
         y_range = (
             -uistate.mean_y_margin,
             uistate.mean_y_margin,
         )  # stim markers should be at y~0
-        # x_margin is 25% of the shortest distance between stims OR 1% of x-axis range, whichever is smaller
-        t_stims = dft["t_stim"].values
-        t_diffs = np.diff(t_stims)
-        min_t_diff = np.min(t_diffs)
-        x_axis_range = axm.get_xlim()[1] - axm.get_xlim()[0]
-        uistate.mean_x_margin = min(x_axis_range * 0.01, min_t_diff * 0.25)
 
         # build detection zones for each stim
         for row in dft.itertuples(index=False):
@@ -4267,10 +4304,12 @@ class UIsub(
 
         canvas.draw()
 
-        # After zooming the event graph, the pixel→data scale has changed, so the
+        # After zooming, the pixel→data scale has changed, so the
         # mouseover detection zones must be recalculated against the new limits.
         if graph == "event":
             self._recalc_axe_drag_zones()
+        elif graph == "mean":
+            self._recalc_axm_detection_zones()
 
     # pyqtSlot decorators
     @QtCore.pyqtSlot()
