@@ -1293,6 +1293,20 @@ class UIsub(
             lo, hi = hi - span, hi + span
         return (lo - pad * span, hi + pad * span)
 
+    def _recalc_axe_drag_zones(self):
+        """Recalculate axe mouseover detection zone margins after any zoom change.
+
+        Must be called after axe limits have been committed so that the
+        pixel→data transform reflects the new scale.
+        """
+        if uistate.mouseover_action is None:
+            return
+        uistate.setMargins(axe=uistate.axe)
+        if uistate.mouseover_action in ("EPSP slope", "volley slope"):
+            uistate.updateDragZones()
+        elif uistate.mouseover_action in ("EPSP amp move", "volley amp move"):
+            uistate.updatePointDragZone()
+
     def zoomAuto(self, reset=False):
         # set and apply Auto-zoom parameters for all axes
         self.usage("zoomAuto")
@@ -1331,6 +1345,7 @@ class UIsub(
         )
         uistate.zoom["output_xlim"] = (0, prow["sweeps"])
         self.zoomReset()
+        self._recalc_axe_drag_zones()
 
     def zoomReset(self, axis=None):
         # self.usage("zoomReset")
@@ -1364,6 +1379,8 @@ class UIsub(
         else:
             raise ValueError("zoomReset: unknown axis")
         axis.figure.canvas.draw_idle()
+        if axis == uistate.axe:
+            self._recalc_axe_drag_zones()
 
     def update_recs2plot(self):
         if uistate.list_idx_select_recs:
@@ -4190,6 +4207,11 @@ class UIsub(
                 ax.hline = ax.axhline(y=bottom, color="r", linestyle="--")
 
         canvas.draw()
+
+        # After zooming the event graph, the pixel→data scale has changed, so the
+        # mouseover detection zones must be recalculated against the new limits.
+        if graph == "event":
+            self._recalc_axe_drag_zones()
 
     # pyqtSlot decorators
     @QtCore.pyqtSlot()
