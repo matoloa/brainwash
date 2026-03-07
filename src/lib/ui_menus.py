@@ -32,16 +32,6 @@ class MenuMixin:
         # self.actionUndo.setShortcut("Ctrl+Z")
         # self.menuEdit.addAction(self.actionUndo)
 
-        self.actionCopyTimepoints = QtWidgets.QAction("Copy timepoints")
-        self.actionCopyTimepoints.triggered.connect(self.triggerCopyTimepoints)
-        self.actionCopyTimepoints.setShortcut("Ctrl+T")
-        self.menuEdit.addAction(self.actionCopyTimepoints)
-
-        self.actionCopyOutput = QtWidgets.QAction("Copy output")
-        self.actionCopyOutput.triggered.connect(self.triggerCopyOutput)
-        self.actionCopyOutput.setShortcut("Ctrl+C")
-        self.menuEdit.addAction(self.actionCopyOutput)
-
         self.actionSetGain = QtWidgets.QAction("Set gain")
         self.actionSetGain.triggered.connect(self.triggerSetGain)
         self.actionSetGain.setShortcut("G")
@@ -124,6 +114,8 @@ class MenuMixin:
         self.actionTimetable.triggered.connect(self.triggerShowTimetable)
         self.menuView.addAction(self.actionTimetable)
 
+        # Dynamically add a checkable toggle per toolbar panel (frame name → [title, visible])
+        # lambda captures frame by default arg to avoid closure-over-loop-variable bug
         for frame, (text, initial_state) in uistate.viewTools.items():
             action = QtWidgets.QAction(f"Toggle {text}", self.menuView)
             action.setCheckable(True)
@@ -181,3 +173,52 @@ class MenuMixin:
         self.actionResetGroups = QtWidgets.QAction("Remove all groups")
         self.actionResetGroups.triggered.connect(self.triggerEditGroups)
         self.menuGroups.addAction(self.actionResetGroups)
+
+        # Export menu (triggers → ExportMixin in ui_export.py)
+        # — Copy section —
+        self.actionCopyProjectSummary = QtWidgets.QAction("Copy project summary")
+        self.actionCopyProjectSummary.triggered.connect(self.triggerCopyProjectSummary)
+        self.menuExport.addAction(self.actionCopyProjectSummary)
+
+        self.actionCopyTimepoints = QtWidgets.QAction("Copy timepoints")
+        self.actionCopyTimepoints.triggered.connect(self.triggerCopyTimepoints)
+        self.actionCopyTimepoints.setShortcut("Ctrl+T")
+        self.menuExport.addAction(self.actionCopyTimepoints)
+
+        self.actionCopyOutput = QtWidgets.QAction("Copy output")
+        self.actionCopyOutput.triggered.connect(self.triggerCopyOutput)
+        self.actionCopyOutput.setShortcut("Ctrl+C")
+        self.menuExport.addAction(self.actionCopyOutput)
+
+        self.menuExport.addSeparator()
+
+        # — Sweeps section —
+        self.actionExportSweepsCsv = QtWidgets.QAction("Export sweeps to .csv")
+        self.actionExportSweepsCsv.triggered.connect(self.triggerExportSweepsCsv)
+        self.menuExport.addAction(self.actionExportSweepsCsv)
+
+        self.actionExportSweepsXls = QtWidgets.QAction("Export sweeps to .xls")
+        self.actionExportSweepsXls.triggered.connect(self.triggerExportSweepsXls)
+        self.menuExport.addAction(self.actionExportSweepsXls)
+
+        self.actionExportSweepsIbw = QtWidgets.QAction("Export sweeps to .ibw")
+        self.actionExportSweepsIbw.triggered.connect(self.triggerExportSweepsIbw)
+        self.menuExport.addAction(self.actionExportSweepsIbw)
+
+        self.menuExport.addSeparator()
+
+        # — Output section —
+        self.actionExportOutputCsv = QtWidgets.QAction("Export output to .csv")
+        self.actionExportOutputCsv.triggered.connect(self.triggerExportOutputCsv)
+        self.menuExport.addAction(self.actionExportOutputCsv)
+
+        self.actionExportOutputXls = QtWidgets.QAction("Export output to .xls")
+        self.actionExportOutputXls.triggered.connect(self.triggerExportOutputXls)
+        self.menuExport.addAction(self.actionExportOutputXls)
+
+        self.menuExport.addSeparator()
+
+        # — Image section —
+        self.actionExportOutputImage = QtWidgets.QAction("Output to image")
+        self.actionExportOutputImage.triggered.connect(self.triggerExportOutputImage)
+        self.menuExport.addAction(self.actionExportOutputImage)

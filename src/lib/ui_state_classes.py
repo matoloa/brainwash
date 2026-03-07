@@ -85,7 +85,6 @@ class UIstate:
             "frameToolAspect": ["Aspect toggles", True],
             "frameToolScaling": ["Output Scaling", True],
             "frameToolPairedStim": ["Paired stims", False],
-            "frameToolExport": ["Image Export", True],
         }
         self.checkBox = {  # these are cycled by uisub.connectUIstate; maintain format!
             "EPSP_amp": True,
@@ -202,9 +201,6 @@ class UIstate:
             "pushButton_norm_range_set_all": "trigger_set_norm_range_all",
             # binning
             "pushButton_bin_size_set_all": "trigger_set_bin_size_all",
-            # export
-            "pushButton_export_selection": "trigger_export_selection",
-            "pushButton_export_groups": "trigger_export_groups",
         }
         self.x_select = {  # selected ranges on mean- and output graphs
             # start and end: current drag operation; None if not dragging
@@ -425,7 +421,12 @@ class UIstate:
         self.version = state.get("version")
         self.colors = state.get("colors")
         self.splitter = state.get("splitter")
-        self.viewTools = state.get("viewTools")
+        # Filter out any keys saved in old configs that no longer exist as widgets
+        valid_view_tools = set(self.viewTools.keys())  # from reset()
+        loaded_view_tools = state.get("viewTools") or {}
+        self.viewTools = {
+            k: v for k, v in loaded_view_tools.items() if k in valid_view_tools
+        }
         self.checkBox = state.get("checkBox")
         self.lineEdit = state.get("lineEdit")
         self.settings = state.get("settings")

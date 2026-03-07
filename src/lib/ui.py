@@ -832,9 +832,13 @@ ui_data_frames.uistate = uistate
 ui_data_frames.config = config
 ui_data_frames.uiplot = uiplot
 
-from lib import ui_menus
+from lib import ui_export, ui_menus
 
 ui_menus.uistate = uistate
+
+ui_export.uistate = uistate
+ui_export.config = config
+ui_export.uiplot = uiplot
 
 ####################################################################
 # MAIN UI CLASS
@@ -849,6 +853,7 @@ class UIsub(
     ui_project.ProjectMixin,
     ui_data_frames.DataFrameMixin,
     ui_menus.MenuMixin,
+    ui_export.ExportMixin,
 ):
     def __init__(self, mainwindow):
         logger.debug("UIsub __init__ started")
@@ -876,7 +881,6 @@ class UIsub(
             self.frameToolBin.setVisible(False)
             #            self.checkBox_bin.setVisible(False)
             self.pushButton_norm_range_set_all.setVisible(False)
-            self.frameToolExport.setVisible(False)
 
         logger.debug("Pre-bootstrap")
         self.bootstrap(mainwindow)  # set up general UI
@@ -1875,14 +1879,6 @@ class UIsub(
         print(f"checkBox_paired_stims_changed: {uistate.checkBox['paired_stims']}")
         # TODO: reconnect this
 
-    def trigger_export_selection(self):
-        self.usage("trigger_export_selection - DEPRECATED")
-        # self.export_selection()
-
-    def trigger_export_groups(self):
-        self.usage("trigger_export_groups - DEPRECATED")
-        # self.export_groups()
-
     def triggerGroupRename(self, group_ID):
         self.usage("triggerGroupRename")
         RenameDialog = InputDialogPopup()
@@ -1937,13 +1933,10 @@ class UIsub(
         self.write_bw_cfg()
         self.setTableStimVisibility(uistate.showTimetable)
 
-    def triggerCopyTimepoints(self):
-        self.usage("triggerCopyTimepoints")
-        self.copy_dft()
-
-    def triggerCopyOutput(self):
-        self.usage("triggerCopyOutput")
-        self.copy_output()
+    # triggerCopyTimepoints, triggerCopyOutput, triggerCopyProjectSummary,
+    # triggerExportSweepsCsv, triggerExportSweepsXls, triggerExportSweepsIbw,
+    # triggerExportOutputCsv, triggerExportOutputXls, triggerExportOutputImage
+    # → ExportMixin (ui_export.py)
 
     def pushButton_paired_data_flip_pressed(self):
         self.usage("pushButton_paired_data_flip_pressed")
