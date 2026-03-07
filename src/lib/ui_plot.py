@@ -623,7 +623,7 @@ class UIplot:
             "axis": axid,
         }
 
-    def plot_cross(
+    def plot_amp_width(
         self,
         label,
         axid,
@@ -948,7 +948,7 @@ class UIplot:
                     x_position + t_row["t_EPSP_amp_halfwidth"],
                 )
                 amp_y = amp_zero, amp_zero - (out["EPSP_amp"].mean() / 1000)  # mV to V
-                self.plot_cross(
+                self.plot_amp_width(
                     f"{label} {stim_str} EPSP amp",
                     "axe",
                     x_position,
@@ -1062,7 +1062,7 @@ class UIplot:
                     x_position + t_row["t_volley_amp_halfwidth"],
                 )
                 amp_y = amp_zero, amp_zero - volley_amp_mean / 1000  # mV to V
-                self.plot_cross(
+                self.plot_amp_width(
                     f"{label} {stim_str} volley amp",
                     "axe",
                     x_position,
@@ -1338,7 +1338,7 @@ class UIplot:
                 amp_x, [amp_y[1], amp_y[1]]
             )
             self.uistate.dict_rec_labels[f"{labelbase} y marker"]["line"].set_data(
-                [x, x], amp_y
+                [x[0], x[0]], amp_y
             )
             self.uistate.dict_rec_labels[f"{labelbase} x marker"]["is_zero_width"] = (
                 is_zero_width

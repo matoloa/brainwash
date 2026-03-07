@@ -3336,6 +3336,8 @@ class UIsub(
                 zones["volley slope move"] = uistate.volley_slope_move_zone
             uistate.mouseover_action = None
             for action, zone in zones.items():
+                if not zone:
+                    continue
                 if (
                     zone["x"][0] <= x <= zone["x"][1]
                     and zone["y"][0] <= y <= zone["y"][1]
