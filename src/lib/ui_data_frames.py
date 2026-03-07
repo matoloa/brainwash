@@ -133,7 +133,12 @@ class DataFrameMixin:
         if Path(str_mean_path).exists():  # 2: Read from file
             dfmean = pd.read_parquet(str_mean_path)
         else:  # 3: Create file
-            dfmean, _ = parse.build_dfmean(self.get_dfdata(row=row))
+            dfdata = self.get_dfdata(row=row)
+            gain = float(row["gain"]) if pd.notna(row["gain"]) else 1.0
+            if gain != 1.0:
+                dfdata = dfdata.copy()
+                dfdata["voltage_raw"] = dfdata["voltage_raw"] * gain
+            dfmean, _ = parse.build_dfmean(dfdata)
             persist = True
 
         # if the filter is not a column in dfmean, create it
@@ -303,9 +308,12 @@ class DataFrameMixin:
         if Path(path_filter).exists():  # 2: Read from file
             dffilter = pd.read_parquet(path_filter)
         else:  # 3: Create file
-            dffilter = parse.zeroSweeps(
-                dfdata=self.get_dfdata(row=row), dfmean=self.get_dfmean(row=row)
-            )
+            dfdata = self.get_dfdata(row=row)
+            gain = float(row["gain"]) if pd.notna(row["gain"]) else 1.0
+            if gain != 1.0:
+                dfdata = dfdata.copy()
+                dfdata["voltage_raw"] = dfdata["voltage_raw"] * gain
+            dffilter = parse.zeroSweeps(dfdata=dfdata, dfmean=self.get_dfmean(row=row))
             self.df2file(df=dffilter, rec=recording_name, key="filter")
             if row["filter"] == "savgol":
                 dict_filter_params = json.loads(row["filter_params"])

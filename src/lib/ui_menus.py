@@ -42,17 +42,12 @@ class MenuMixin:
         self.actionCopyOutput.setShortcut("Ctrl+C")
         self.menuEdit.addAction(self.actionCopyOutput)
 
+        self.actionSetGain = QtWidgets.QAction("Set gain")
+        self.actionSetGain.triggered.connect(self.triggerSetGain)
+        self.actionSetGain.setShortcut("G")
+        self.menuEdit.addAction(self.actionSetGain)
+
         self.menuEdit.addSeparator()
-
-        self.actionForAllSelected = QtWidgets.QAction(
-            "For ALL selected recordings..."
-        )  # not connected: submenu header
-        self.menuEdit.addAction(self.actionForAllSelected)
-
-        self.actionReAnalyzeRecordings = QtWidgets.QAction("   Reanalyze")
-        self.actionReAnalyzeRecordings.triggered.connect(self.triggerReanalyze)
-        self.actionReAnalyzeRecordings.setShortcut("A")
-        self.menuEdit.addAction(self.actionReAnalyzeRecordings)
 
         self.actionSweepOpsHeader = QtWidgets.QAction(
             "   — sweep selection —"
@@ -157,6 +152,11 @@ class MenuMixin:
         self.actionRenameRecording.triggered.connect(self.triggerRenameRecording)
         self.actionRenameRecording.setShortcut("F2")
         self.menuData.addAction(self.actionRenameRecording)
+
+        self.actionReAnalyzeRecordings = QtWidgets.QAction("Reanalyze selected")
+        self.actionReAnalyzeRecordings.triggered.connect(self.triggerReanalyze)
+        self.actionReAnalyzeRecordings.setShortcut("A")
+        self.menuData.addAction(self.actionReAnalyzeRecordings)
 
         # Group menu
         self.actionNewGroup = QtWidgets.QAction("Add a group")

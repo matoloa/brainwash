@@ -877,11 +877,6 @@ class UIsub(
             #            self.checkBox_bin.setVisible(False)
             self.pushButton_norm_range_set_all.setVisible(False)
             self.frameToolExport.setVisible(False)
-            self.lineEdit_EPSP_amp_halfwidth.setVisible(False)
-            self.lineEdit_volley_amp_halfwidth.setVisible(False)
-            self.label_header_amp_halfwidth.setVisible(False)
-            self.label_EPSP_amp_halfwidth.setVisible(False)
-            self.label_volley_amp_halfwidth.setVisible(False)
 
         logger.debug("Pre-bootstrap")
         self.bootstrap(mainwindow)  # set up general UI
@@ -2058,32 +2053,82 @@ class UIsub(
         self.tableUpdate()
         self.tableProjSelectionChanged()
 
+    def triggerSetGain(self):
+        self.usage("triggerSetGain")
+        selection = uistate.list_idx_select_recs
+        if not selection:
+            print("SetGain: no recordings selected.")
+            return
+
+        df_p = self.get_df_project()
+        gains = df_p.loc[selection, "gain"].dropna().unique()
+        current = str(gains[0]) if len(gains) == 1 else "-"
+        n = len(selection)
+        noun = "recording" if n == 1 else "recordings"
+
+        dlg = QtWidgets.QDialog()
+        dlg.setWindowTitle("Set Gain")
+        dlg.setFixedSize(300, 130)
+        layout = QtWidgets.QVBoxLayout(dlg)
+
+        label = QtWidgets.QLabel(f"{n} {noun} selected")
+        layout.addWidget(label)
+
+        line_edit = QtWidgets.QLineEdit(current)
+        line_edit.selectAll()
+        layout.addWidget(line_edit)
+
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel,
+            QtCore.Qt.Horizontal,
+        )
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        layout.addWidget(buttons)
+
+        line_edit.setFocus()
+        if dlg.exec_() != QtWidgets.QDialog.Accepted:
+            return
+
+        raw = line_edit.text().strip()
+        try:
+            new_gain = float(raw.replace(",", "."))
+        except ValueError:
+            print(f"SetGain: '{raw}' is not a valid number.")
+            return
+
+        df_p.loc[selection, "gain"] = new_gain
+        self.set_df_project(df_p)
+        print(f"SetGain: set gain={new_gain} on {n} {noun}.")
+        self.reanalyze_recordings()
+
     # triggerKeepSelectedSweeps, triggerRemoveSelectedSweeps, triggerSplitBySelectedSweeps,
     # sweep_selection_valid, sweep_removal_valid_confirmed → SweepOpsMixin (ui_sweep_ops.py)
 
     def reanalyze_recordings(self):
         self.usage("reanalyze_recordings")
-        n_recs = len(uistate.list_idx_select_recs)
+        selection = uistate.list_idx_select_recs
+        n_recs = len(selection)
         print(f"Reanalyzing {n_recs} selected recording{'s' if n_recs != 1 else ''}...")
-        # purge df timepoints and cache for selected recordings
-        for rec_idx in uistate.list_idx_select_recs:
+        # purge all derived cache files for selected recordings
+        for rec_idx in selection:
             p_row = self.df_project.iloc[rec_idx]
             rec_name = p_row["recording_name"]
-            # delete timepoints file
-            timepoints_file = self.dict_folders["timepoints"] / (rec_name + ".parquet")
-            if timepoints_file.exists():
-                timepoints_file.unlink()
-                logger.debug("Deleted timepoints file: %s", timepoints_file)
-                print(f"Deleted timepoints file: {timepoints_file}")
-            # delete cached output file
-            cache_file = self.dict_folders["cache"] / (rec_name + "_output.parquet")
-            if cache_file.exists():
-                cache_file.unlink()
-                logger.debug("Deleted cached output file: %s", cache_file)
-                print(f"Deleted cached output file: {cache_file}")
+            for folder, suffix in [
+                ("timepoints", ".parquet"),
+                ("cache", "_mean.parquet"),
+                ("cache", "_filter.parquet"),
+                ("cache", "_bin.parquet"),
+                ("cache", "_output.parquet"),
+            ]:
+                path = self.dict_folders[folder] / (rec_name + suffix)
+                if path.exists():
+                    path.unlink()
+                    logger.debug("Deleted %s", path)
+                    print(f"Deleted {path}")
             self.set_rec_status(rec_name)
         self.resetCacheDicts()
-        self.recalculate()  # outputs, binning, group handling
+        self.recalculate(selection=selection)  # rebuild only affected recordings
 
     # sweep_shift_gaps, sweep_remove_by_ID, sweep_keep_selected, sweep_remove_selected,
     # sweep_unselect, sweep_split_by_selected → SweepOpsMixin (ui_sweep_ops.py)
@@ -2120,6 +2165,9 @@ class UIsub(
             df_proj_new_row["ID"] = str(uuid.uuid4())
             df_proj_new_row["status"] = "Read"
             df_proj_new_row["recording_name"] = new_name
+            df_proj_new_row["gain"] = uistate.lineEdit[
+                "import_gain"
+            ]  # capture gain at parse time
             df_proj_new_row["sweeps"] = dict_meta.get("nsweeps", None)
             df_proj_new_row["channel"] = ""  # dict_meta.get('channel', None)
             df_proj_new_row["stim"] = ""  # dict_meta.get('stim', None)
@@ -2187,7 +2235,7 @@ class UIsub(
         lineEditName = lineEdit.objectName()
         self.usage(f"editAmpHalfwidth {lineEditName}")
         try:
-            num = max(0, float(lineEdit.text()))
+            num = max(0, float(lineEdit.text().replace(",", ".")))
         except ValueError:
             self.update_amp_lineEdits()
             return
@@ -2296,7 +2344,7 @@ class UIsub(
     def editBinSize(self, lineEdit):
         self.usage("editBinSize")
         try:
-            num = max(2, int(lineEdit.text()))
+            num = max(2, int(lineEdit.text().replace(",", ".")))
         except ValueError:
             num = 10
         lineEdit.setText(str(num))
