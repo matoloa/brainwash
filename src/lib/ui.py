@@ -1906,38 +1906,6 @@ class UIsub(
         self.usage("trigger_set_sweeps_odd")
         self.sweepsSelect(even=False)
 
-    def trigger_set_EPSP_amp_width_all(self):
-        self.usage("trigger_set_EPSP_amp_width_all")
-        try:
-            num = max(0, float(self.lineEdit_EPSP_amp_halfwidth.text()))
-        except ValueError:
-            return
-        val_in_seconds = num / 1000
-        for _, prow in self.get_df_project().iterrows():
-            df_t = self.get_dft(prow)
-            if df_t is not None:
-                for idx_stim in range(len(df_t)):
-                    df_t.at[idx_stim, "t_EPSP_amp_halfwidth"] = val_in_seconds
-                self.set_dft(prow["recording_name"], df_t)
-        self.recalculate()
-        self.update_amp_lineEdits()
-
-    def trigger_set_volley_amp_width_all(self):
-        self.usage("trigger_set_volley_amp_width_all")
-        try:
-            num = max(0, float(self.lineEdit_volley_amp_halfwidth.text()))
-        except ValueError:
-            return
-        val_in_seconds = num / 1000
-        for _, prow in self.get_df_project().iterrows():
-            df_t = self.get_dft(prow)
-            if df_t is not None:
-                for idx_stim in range(len(df_t)):
-                    df_t.at[idx_stim, "t_volley_amp_halfwidth"] = val_in_seconds
-                self.set_dft(prow["recording_name"], df_t)
-        self.recalculate()
-        self.update_amp_lineEdits()
-
     def trigger_set_norm_range_all(self):
         self.usage("trigger_set_norm_range_all")
         self.recalculate()

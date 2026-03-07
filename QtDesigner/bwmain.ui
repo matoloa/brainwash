@@ -809,32 +809,6 @@
               <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
              </property>
             </widget>
-            <widget class="QPushButton" name="pushButton_EPSP_amp_width_set_all">
-             <property name="geometry">
-              <rect>
-               <x>40</x>
-               <y>170</y>
-               <width>51</width>
-               <height>25</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string>Set All</string>
-             </property>
-            </widget>
-            <widget class="QPushButton" name="pushButton_volley_amp_width_set_all">
-             <property name="geometry">
-              <rect>
-               <x>130</x>
-               <y>170</y>
-               <width>51</width>
-               <height>25</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string>Set All</string>
-             </property>
-            </widget>
             <widget class="QCheckBox" name="checkBox_volley_slope_mean">
              <property name="geometry">
               <rect>
@@ -871,8 +845,6 @@
             <zorder>label_volley_amp_halfwidth</zorder>
             <zorder>lineEdit_EPSP_amp_halfwidth</zorder>
             <zorder>lineEdit_volley_amp_halfwidth</zorder>
-            <zorder>pushButton_EPSP_amp_width_set_all</zorder>
-            <zorder>pushButton_volley_amp_width_set_all</zorder>
             <zorder>checkBox_volley_slope_mean</zorder>
             <zorder>checkBox_volley_amp_mean</zorder>
            </widget>

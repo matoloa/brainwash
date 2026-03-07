@@ -198,8 +198,6 @@ class UIstate:
             "pushButton_sweeps_even": "trigger_set_sweeps_even",
             "pushButton_sweeps_odd": "trigger_set_sweeps_odd",
             # aspect toggles
-            "pushButton_EPSP_amp_width_set_all": "trigger_set_EPSP_amp_width_all",
-            "pushButton_volley_amp_width_set_all": "trigger_set_volley_amp_width_all",
             # output scaling
             "pushButton_norm_range_set_all": "trigger_set_norm_range_all",
             # binning
