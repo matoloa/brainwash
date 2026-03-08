@@ -78,32 +78,20 @@ class ProjectMixin:
     # ------------------------------------------------------------------
 
     def persistOutput(self, rec_name, dfoutput):
-        # Determine column order based on the state of uistate.checkBox['output_per_stim']
-        column_order = (
-            [
-                "gain",
-                "stim",
-                "bin",
-                "EPSP_slope",
-                "EPSP_slope_norm",
-                "EPSP_amp",
-                "EPSP_amp_norm",
-                "volley_amp",
-                "volley_slope",
-            ]
-            if uistate.checkBox["output_per_stim"]
-            else [
-                "gain",
-                "stim",
-                "sweep",
-                "EPSP_slope",
-                "EPSP_slope_norm",
-                "EPSP_amp",
-                "EPSP_amp_norm",
-                "volley_amp",
-                "volley_slope",
-            ]
-        )
+        # Column order for the persisted output file.
+        # gain and bin_size belong in df_project, not here.
+        # sweep holds raw sweep numbers normally, or bin numbers when binning is
+        # active (get_dfbin already assigns bin numbers into the sweep column).
+        column_order = [
+            "stim",
+            "sweep",
+            "EPSP_slope",
+            "EPSP_slope_norm",
+            "EPSP_amp",
+            "EPSP_amp_norm",
+            "volley_amp",
+            "volley_slope",
+        ]
         # Clean up column order, save to dict and file.
         missing_columns = set(column_order) - set(dfoutput.columns)
         extra_columns = set(dfoutput.columns) - set(column_order)

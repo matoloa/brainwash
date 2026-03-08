@@ -432,13 +432,11 @@ class UIplot:
         if uistate.checkBox["norm_EPSP"]:
             ax1.set_ylabel("Amplitude %")
             ax2.set_ylabel("Slope %")
-            ax1.set_ylim(0, 550)
-            ax2.set_ylim(0, 550)
         else:
             ax1.set_ylabel("Amplitude (mV)")
             ax2.set_ylabel("Slope (mV/ms)")
-            ax1.set_ylim(uistate.zoom["output_ax1_ylim"])
-            ax2.set_ylim(uistate.zoom["output_ax2_ylim"])
+        ax1.set_ylim(uistate.zoom["output_ax1_ylim"])
+        ax2.set_ylim(uistate.zoom["output_ax2_ylim"])
         ax1.set_xlim(uistate.zoom["output_xlim"])
         ax2.set_xlim(uistate.zoom["output_xlim"])
         if uistate.checkBox["output_per_stim"]:
@@ -1210,7 +1208,7 @@ class UIplot:
         if df_groupmean["EPSP_slope_mean"].notna().any():
             self.plot_group_lines("ax2", group_ID, dict_group, df_groupmean)
 
-    def update(self, prow, trow, aspect, data_x, data_y, amp=None):
+    def update(self, prow, trow, aspect, data_x, data_y, amp=None, dfoutput=None):
         """
         Updates the existing plotted artists stored in `self.uistate.dict_rec_labels`.
         Parameters
@@ -1222,6 +1220,9 @@ class UIplot:
             the event window or mean trace used to sample y-values for marker placement.
         - data_y (np.ndarray-like): y-values aligned with `data_x` (voltage trace).
         - amp (float, optional): amplitude value used for drawing amplitude markers
+        - dfoutput (DataFrame, optional): when provided, the amp output line is
+            populated directly from this dataframe (full-width mean) instead of
+            copying from the live-drag mouseover_out (single-point).
         """
 
         # Validate input formats
@@ -1311,14 +1312,33 @@ class UIplot:
                 else:
                     volley_amp_mean = trow.get("volley_amp_mean")
                     print(f" - - - volley_amp_mean: {volley_amp_mean}")
-                    # if volley_amp_mean is None:
-                    #    volley_amp_mean = self.uistate.mouseover_out[0].get_ydata().mean()
-                    self.updateOutLine(label_core)
+                    if dfoutput is not None:
+                        stim_num = trow["stim"]
+                        x_axis = (
+                            "stim"
+                            if self.uistate.checkBox["output_per_stim"]
+                            else "sweep"
+                        )
+                        self.updateOutLineFromDf(
+                            label_core, dfoutput, stim_num, key, x_axis
+                        )
+                    else:
+                        self.updateOutLine(label_core)
                     self.updateOutMean(f"{label_core} mean", volley_amp_mean)
             else:  # EPSP amp
                 if norm:
                     label_core += " norm"
-                self.updateOutLine(label_core)
+                if dfoutput is not None:
+                    stim_num = trow["stim"]
+                    x_axis = (
+                        "stim" if self.uistate.checkBox["output_per_stim"] else "sweep"
+                    )
+                    col = f"{key}_norm" if norm else key
+                    self.updateOutLineFromDf(
+                        label_core, dfoutput, stim_num, col, x_axis
+                    )
+                else:
+                    self.updateOutLine(label_core)
 
     def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None, draw=False):
         axe = self.uistate.axe
@@ -1359,13 +1379,51 @@ class UIplot:
     def updateOutLine(self, label):
         print(f"updateOutLine: {label}")
         mouseover_out = self.uistate.mouseover_out
+        if mouseover_out is None:
+            print(
+                f"updateOutLine: mouseover_out is None, skipping update for '{label}'"
+            )
+            return
         linedict = self.uistate.dict_rec_labels[label]
         linedict["line"].set_xdata(mouseover_out[0].get_xdata())
         linedict["line"].set_ydata(mouseover_out[0].get_ydata())
 
+    def updateOutLineFromDf(self, label, dfoutput, stim_num, column, x_axis):
+        """Populate an output line directly from a dfoutput DataFrame.
+
+        Used on drag-release for amp aspects so that the persisted full-width
+        mean values are reflected in the plot, rather than the single-point
+        live-drag preview held in mouseover_out.
+
+        Parameters
+        - label: key in dict_rec_labels to update
+        - dfoutput: the fully-recalculated output DataFrame
+        - stim_num: stim number (1-based) to filter dfoutput rows
+        - column: column name to use for y-values (e.g. 'EPSP_amp' or 'EPSP_amp_norm')
+        - x_axis: 'sweep' or 'stim' — selects the x-column from dfoutput
+        """
+        print(
+            f"updateOutLineFromDf: {label}, stim={stim_num}, col={column}, x={x_axis}"
+        )
+        df_stim = dfoutput[dfoutput["stim"] == stim_num]
+        if df_stim.empty or column not in df_stim.columns:
+            print(
+                f"updateOutLineFromDf: no data for stim={stim_num} col={column}, falling back to updateOutLine"
+            )
+            self.updateOutLine(label)
+            return
+        linedict = self.uistate.dict_rec_labels[label]
+        linedict["line"].set_xdata(df_stim[x_axis].values)
+        linedict["line"].set_ydata(df_stim[column].values)
+
     def updateOutMean(self, label, mean):
         print(f"updateOutMean: {label}, {mean}")
         mouseover_out = self.uistate.mouseover_out
+        if mouseover_out is None:
+            print(
+                f"updateOutMean: mouseover_out is None, skipping update for '{label}'"
+            )
+            return
         linedict = self.uistate.dict_rec_labels[label]
         linedict["line"].set_xdata(mouseover_out[0].get_xdata())
         linedict["line"].set_ydata([mean] * len(linedict["line"].get_xdata()))

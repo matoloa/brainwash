@@ -1034,13 +1034,21 @@ class UIsub(
         aspect = v.get("aspect")
         if aspect and not uistate.checkBox.get(aspect, True):
             return False
-        # norm/raw switch: only EPSP amp/slope have a norm variant
+        # norm/raw switch: only EPSP amp/slope have a norm variant.
+        # Only applies to ax1/ax2 output lines — markers on axe represent physical
+        # measurement positions and are always shown regardless of normalisation.
         variant = v.get("variant")
         norm_active = uistate.checkBox["norm_EPSP"]
-        if variant == "norm" and not norm_active:
-            return False
-        if variant == "raw" and norm_active and aspect in ("EPSP_amp", "EPSP_slope"):
-            return False
+        axis = v.get("axis")
+        if axis in ("ax1", "ax2"):
+            if variant == "norm" and not norm_active:
+                return False
+            if (
+                variant == "raw"
+                and norm_active
+                and aspect in ("EPSP_amp", "EPSP_slope")
+            ):
+                return False
         return True
 
     def _is_group_visible(self, v: dict, selected_groups: set | None) -> bool:
@@ -1414,16 +1422,16 @@ class UIsub(
             uistate.settings["event_end"],
         )
         # ax1 / ax2: fit to plotted output artists; fall back to (0, 1.5).
-        # ymin=0: output values are always non-negative, so never let padding
-        # pull the bottom below zero.
+        # Clamp bottom to zero only when output_ymin0 is checked.
+        ymin_clamp = 0 if uistate.checkBox["output_ymin0"] else None
         uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(
-            uistate.ax1, ymin=0
+            uistate.ax1, ymin=ymin_clamp
         ) or (
             0,
             1.5,
         )
         uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(
-            uistate.ax2, ymin=0
+            uistate.ax2, ymin=ymin_clamp
         ) or (
             0,
             1.5,
@@ -1491,6 +1499,7 @@ class UIsub(
                 self.label_relative_to.setVisible(state == 2)
                 self.lineEdit_norm_EPSP_start.setVisible(state == 2)
                 self.lineEdit_norm_EPSP_end.setVisible(state == 2)
+                self.zoomAuto()
             elif key == "splitOddEven":
                 self.checkBox_splitOddEven_changed(state)
             elif key == "output_per_stim":
@@ -2365,8 +2374,9 @@ class UIsub(
         selected_outputs = pd.DataFrame()
         for rec in uistate.list_idx_select_recs:
             p_row = self.get_df_project().loc[rec]
-            output = self.get_dfoutput(p_row)
+            output = self.get_dfoutput(p_row).copy()
             output.insert(0, "recording_name", p_row["recording_name"])
+            output.insert(1, "gain", p_row["gain"])
             selected_outputs = pd.concat([selected_outputs, output], ignore_index=True)
         selected_outputs.to_clipboard(index=False)
 
@@ -3997,8 +4007,10 @@ class UIsub(
         self.canvasEvent.mpl_disconnect(self.mouse_drag)
         self.canvasEvent.mpl_disconnect(self.mouse_release)
         uistate.x_drag_last = None
-        if uistate.x_drag == uistate.x_on_click:  # nothing to update
-            print("x_drag == x_on_click")
+        if (
+            uistate.x_drag is None or uistate.x_drag == uistate.x_on_click
+        ):  # nothing to update (no movement or same position)
+            print("x_drag is None or x_drag == x_on_click")
             self.mouseoverUpdate()
             return
 
@@ -4124,7 +4136,14 @@ class UIsub(
             )
             self.mouseoverUpdate()
             return
-        uiplot.update(prow=prow, trow=trow, aspect=aspect, data_x=data_x, data_y=data_y)
+        uiplot.update(
+            prow=prow,
+            trow=trow,
+            aspect=aspect,
+            data_x=data_x,
+            data_y=data_y,
+            dfoutput=dfoutput,
+        )
 
         def update_amp_marker(trow, aspect, prow, dfmean, dfoutput):
             labelbase = f"{rec_name} - stim {trow['stim']}"
