@@ -2165,6 +2165,7 @@ class UIsub(
             df_proj_new_row["channel"] = ""  # dict_meta.get('channel', None)
             df_proj_new_row["stim"] = ""  # dict_meta.get('stim', None)
             df_proj_new_row["sweep_duration"] = dict_meta.get("sweep_duration", None)
+            df_proj_new_row["sampling_rate"] = dict_meta.get("sampling_rate", None)
             df_proj_new_row["resets"] = ""  # dict_meta.get('resets', None)
             return df_proj_new_row
 
@@ -2178,7 +2179,6 @@ class UIsub(
         df = parse.zeroSweeps(df_raw, i_stim=i_stim)
         self.df2file(df, rec, key="filter")  # persist zeroed
         dict_meta = parse.metadata(df)  # extract metadata
-        # TODO: create unique recording names
         df_proj_new_row = create_row(
             df_proj_row=df_proj_row, new_name=rec, dict_meta=dict_meta
         )

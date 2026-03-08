@@ -45,6 +45,7 @@ def df_projectTemplate():
             "stims",  # int: number of stims in recording
             "sweeps",  # int: number of sweeps in recording
             "sweep_duration",  # float: duration of each sweep in seconds
+            "sampling_rate",  # int: sampling rate in Hz
             "resets",  # str: list of number of first sweep in source file, for breaking up tables of non-continuous recordings
             "filter",  # str: filter used for analysis
             "filter_params",  # str: filter parameters
@@ -363,6 +364,10 @@ class ProjectMixin:
         self.df_project = pd.read_csv(
             str(path_projectfolder / "project.brainwash"), dtype={"group_IDs": str}
         )
+        # Backfill any columns added to the schema since this project was last saved
+        for col in df_projectTemplate().columns:
+            if col not in self.df_project.columns:
+                self.df_project[col] = None
         uistate.load_cfg(self.dict_folders["project"], config.version)
         self.tableFormat()
         self.write_bw_cfg()
