@@ -83,7 +83,9 @@ class UIstate:
             "frameToolStim": ["Stim detection", True],
             "frameToolSweeps": ["Sweep selection", True],
             "frameToolAspect": ["Aspect toggles", True],
-            "frameToolScaling": ["Output Scaling", True],
+            "frameToolBin": ["Binning", True],
+            "frameToolXscale": ["X axis", True],
+            "frameToolYscale": ["Y scaling", True],
             "frameToolPairedStim": ["Paired stims", False],
         }
         self.checkBox = {  # these are cycled by uisub.connectUIstate; maintain format!

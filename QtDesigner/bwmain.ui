@@ -423,7 +423,7 @@
             <property name="frameShadow">
              <enum>QFrame::Raised</enum>
             </property>
-            <widget class="QLabel" name="label_scaling_3">
+            <widget class="QLabel" name="label_x_axis">
              <property name="geometry">
               <rect>
                <x>10</x>
@@ -443,7 +443,7 @@
               <string>X axis</string>
              </property>
             </widget>
-            <widget class="QRadioButton" name="radioButton_xscale_sweeps">
+            <widget class="QRadioButton" name="radioButton_xscale_sweep">
              <property name="geometry">
               <rect>
                <x>10</x>
@@ -453,8 +453,11 @@
               </rect>
              </property>
              <property name="text">
-              <string>Sweeps</string>
+              <string>Sweep</string>
              </property>
+             <attribute name="buttonGroup">
+              <string notr="true">buttonGroup_x_axis</string>
+             </attribute>
             </widget>
             <widget class="QRadioButton" name="radioButton_xscale_time">
              <property name="geometry">
@@ -468,6 +471,9 @@
              <property name="text">
               <string>Time</string>
              </property>
+             <attribute name="buttonGroup">
+              <string notr="true">buttonGroup_x_axis</string>
+             </attribute>
             </widget>
             <widget class="QRadioButton" name="radioButton_xscale_timestamp">
              <property name="geometry">
@@ -481,6 +487,9 @@
              <property name="text">
               <string>Timestamp</string>
              </property>
+             <attribute name="buttonGroup">
+              <string notr="true">buttonGroup_x_axis</string>
+             </attribute>
             </widget>
             <widget class="QRadioButton" name="radioButton_xscale_bin">
              <property name="geometry">
@@ -494,6 +503,9 @@
              <property name="text">
               <string>Bin</string>
              </property>
+             <attribute name="buttonGroup">
+              <string notr="true">buttonGroup_x_axis</string>
+             </attribute>
             </widget>
             <widget class="QRadioButton" name="radioButton_xscale_stim">
              <property name="geometry">
@@ -507,6 +519,9 @@
              <property name="text">
               <string>Stim</string>
              </property>
+             <attribute name="buttonGroup">
+              <string notr="true">buttonGroup_x_axis</string>
+             </attribute>
             </widget>
            </widget>
           </item>
@@ -585,7 +600,7 @@
               <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
              </property>
             </widget>
-            <widget class="QLabel" name="label_scaling">
+            <widget class="QLabel" name="label_y_axis">
              <property name="geometry">
               <rect>
                <x>10</x>
@@ -644,7 +659,7 @@
             <zorder>label_norm_on_sweep</zorder>
             <zorder>checkBox_norm_EPSP</zorder>
             <zorder>label_relative_to</zorder>
-            <zorder>label_scaling</zorder>
+            <zorder>label_y_axis</zorder>
             <zorder>checkBox_output_ymin0</zorder>
             <zorder>lineEdit_norm_EPSP_end</zorder>
             <zorder>lineEdit_norm_EPSP_start</zorder>
@@ -1246,4 +1261,7 @@
  </widget>
  <resources/>
  <connections/>
+ <buttongroups>
+  <buttongroup name="buttonGroup_x_axis"/>
+ </buttongroups>
 </ui>
