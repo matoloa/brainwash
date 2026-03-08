@@ -304,7 +304,8 @@ def metadata(df):
     returns a dict with metadata from the df:
     dict_meta: {    "nsweeps": number of sweeps in the recording
                     "sweep_duration": duration of a sweep in seconds
-                    "sampling_rate": sampling rate in Hz        }
+                    "sampling_rate": sampling rate in Hz
+                    "sweep_hz": inter-sweep rate in Hz (None if fewer than 2 sweeps)  }
     """
     # Number of unique sweeps, by number of 'time'==0
     nsweeps = df["time"].value_counts().get(0, 0)
@@ -316,15 +317,32 @@ def metadata(df):
     # Sampling rate: 1 / interval between time samples (assume uniform)
     time_diffs = first_sweep["time"].diff().dropna()
     sampling_rate = int(round(1 / time_diffs.mode().iloc[0]))
+    # Inter-sweep rate: derived from t0 differences across all sweeps.
+    # t0 holds the absolute start time (in seconds) of each sweep for every row.
+    # We take one t0 value per sweep (the first row of each sweep) then compute
+    # the median interval between consecutive sweep starts.
+    sweep_hz = None
+    if "t0" in df.columns:
+        sweep_t0s = df.groupby("sweep")["t0"].first().sort_values()
+        if len(sweep_t0s) >= 2:
+            intervals = sweep_t0s.diff().dropna()
+            median_interval = intervals.median()
+            if median_interval > 0:
+                raw_hz = 1.0 / median_interval
+                # Round to 3 significant figures
+                magnitude = math.floor(math.log10(abs(raw_hz)))
+                sweep_hz = round(raw_hz, -magnitude + 2)
     dict_meta = {
         "nsweeps": nsweeps,  # number of sweeps in the recording
         "sweep_duration": sweep_duration,  # time in seconds
         "sampling_rate": sampling_rate,  # Hz
+        "sweep_hz": sweep_hz,  # inter-sweep rate in Hz; None if fewer than 2 sweeps
     }
     print(
         f"metadata: {nsweeps} sweeps | "
         f"{sampling_rate} Hz (dt={dt:.6g} s) | "
-        f"sweep duration {sweep_duration:.6g} s"
+        f"sweep duration {sweep_duration:.6g} s | "
+        f"sweep_hz {sweep_hz}"
     )
     return dict_meta
 

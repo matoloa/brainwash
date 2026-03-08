@@ -2165,7 +2165,6 @@ class UIsub(
         def create_row(df_proj_row, new_name, dict_meta):
             df_proj_new_row = df_proj_row.copy()
             df_proj_new_row["ID"] = str(uuid.uuid4())
-            df_proj_new_row["status"] = "Read"
             df_proj_new_row["recording_name"] = new_name
             df_proj_new_row["gain"] = uistate.lineEdit[
                 "import_gain"
@@ -2176,6 +2175,16 @@ class UIsub(
             df_proj_new_row["sweep_duration"] = dict_meta.get("sweep_duration", None)
             df_proj_new_row["sampling_rate"] = dict_meta.get("sampling_rate", None)
             df_proj_new_row["resets"] = ""  # dict_meta.get('resets', None)
+            # sweep_hz: inter-sweep rate derived from t0 timestamps; NaN if unavailable
+            sweep_hz = dict_meta.get("sweep_hz", None)
+            df_proj_new_row["sweep_hz"] = (
+                sweep_hz if sweep_hz is not None else float("nan")
+            )
+            # Build pipe-delimited status flags; append "default Hz" when sweep_hz is absent
+            status_flags = ["Read"]
+            if sweep_hz is None:
+                status_flags.append("default Hz")
+            df_proj_new_row["status"] = "|".join(status_flags)
             return df_proj_new_row
 
         if status_callback:

@@ -45,7 +45,9 @@ def df_projectTemplate():
             "stims",  # int: number of stims in recording
             "sweeps",  # int: number of sweeps in recording
             "sweep_duration",  # float: duration of each sweep in seconds
+            "sweep_hz",  # float: assumed inter-sweep rate in Hz for time-axis display; NaN triggers 1 Hz fallback with status warning
             "sampling_rate",  # int: sampling rate in Hz
+            "bin_size",  # int: bin size in sweeps for output; 0 means binning disabled
             "resets",  # str: list of number of first sweep in source file, for breaking up tables of non-continuous recordings
             "filter",  # str: filter used for analysis
             "filter_params",  # str: filter parameters
