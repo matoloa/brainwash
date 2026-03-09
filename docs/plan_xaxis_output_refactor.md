@@ -63,39 +63,39 @@ still be plotted with any x-axis mode, and vice versa.
 All UI structure changes happen here, before any logic is touched. This
 phase produces new widget names that later phases wire up.
 
-**0.1** In `ui_designer.py` and `bwmain.ui`, rename `frameToolScaling` to
-`frameToolYscale` throughout. Update the frame label to "Y scaling".
-- Update `uistate.viewTools` key from `"frameToolScaling"` to
-  `"frameToolYscale"`.
-- Update `uistate.set_state` filter and any equality checks.
-- Note: saved configs referencing `"frameToolScaling"` will silently drop
-  the key on load and fall back to visible. This is harmless.
+> **Status: complete.** All steps below have been implemented in
+> `ui_designer.py` and `bwmain.py`. This section is retained for reference
+> and to document the actual widget names used (which differ slightly from
+> the original drafts).
 
-**0.2** Add `frameToolXscale` as a new `QFrame` in `verticalLayoutTools`,
-inserted between `frameToolBin` and `frameToolYscale` (i.e. after binning,
-before y-scaling). Frame label: "X axis".
-- Minimum size: 211 × 111 (consistent with neighbours).
-- Add to `uistate.viewTools` as `"frameToolXscale": ["X axis", True]`.
+**0.1** ✅ `frameToolScaling` renamed to `frameToolYscale` throughout
+`ui_designer.py`. `uistate.viewTools` key updated to `"frameToolYscale"`.
 
-**0.3** Inside `frameToolXscale`, add a `QButtonGroup` (object name
-`buttonGroup_x_axis`) containing four `QRadioButton`s:
-- `radioButton_x_sweep` — "Sweep" (default, always enabled)
-- `radioButton_x_time` — "Time (s)" (enabled when `sweep_hz` is set)
-- `radioButton_x_stim` — "Stim" (enabled when `stims > 1`)
-- `radioButton_x_timestamp` — "Timestamp" (always disabled — future)
+**0.2** ✅ `frameToolXscale` added to `verticalLayoutTools` between
+`frameToolBin` and `frameToolYscale`. Added to `uistate.viewTools` as
+`"frameToolXscale": ["X axis", True]`.
 
-**0.4** Inside `frameToolXscale`, add a `QLineEdit` (`lineEdit_sweep_hz`)
-and its label (`label_sweep_hz`, text "Sweep Hz") for the per-recording Hz
-input. Add a `QPushButton` (`pushButton_sweep_hz_set_all`, text "Set All").
+**0.3** ✅ `buttonGroup_x_axis` added inside `frameToolXscale` with five
+`QRadioButton`s. Note: actual widget names use the `_xscale_` infix, not
+`_x_` as originally drafted. There is also a fifth button not in the
+original draft. The canonical names are:
+- `radioButton_xscale_sweep` — "Sweep" (default, always enabled)
+- `radioButton_xscale_time` — "Time" (enabled when `sweep_hz` is set)
+- `radioButton_xscale_stim` — "Stim" (enabled when `stims > 1`)
+- `radioButton_xscale_bin` — "Bin" (enabled when binning is active)
+- `radioButton_xscale_timestamp` — "Timestamp" (always disabled — future)
 
-**0.5** Move `checkBox_output_per_stim` from `frameToolStim` into its own
-clearly labelled position within `frameToolStim` — no change in function,
-just confirm it remains there and is not relocated to `frameToolXscale`.
+**0.4** ~~Add `lineEdit_sweep_hz`, `label_sweep_hz`, and
+`pushButton_sweep_hz_set_all` inside `frameToolXscale`.~~ **Dropped.**
+`sweep_hz` is a rare per-recording calibration value, not a display
+preference. It will be set via an Edit menu dialog (see Phase 4) rather
+than a permanent widget in the toolbar panel.
 
-**0.6** Update `retranslateUi` for all new widget labels.
+**0.5** ✅ `checkBox_output_per_stim` remains in `frameToolStim`.
 
-**0.7** Smoke-test: launch the app, verify all frames are visible and
-toggleable from the View menu, verify no widget references are broken.
+**0.6** ✅ `retranslateUi` updated for all new widget labels.
+
+**0.7** ✅ Smoke-tested: frames visible and toggleable from the View menu.
 
 ---
 
@@ -223,27 +223,39 @@ the convention self-documenting.
 
 ---
 
-## Phase 4 — `sweep_hz` widget wiring
+## Phase 4 — `sweep_hz` Edit menu action
 
-**4.1** Connect `lineEdit_sweep_hz` to a new handler `editSweepHz`:
-- Parse and validate input (positive float).
-- Write value into `df_project["sweep_hz"]` for selected recording(s).
-- Remove `"default Hz"` flag from `status` if present.
+`sweep_hz` is a rare per-recording calibration value. Rather than a
+permanent widget in `frameToolXscale`, it is exposed through the Edit menu
+using the same `QInputDialog` pattern as "Set gain".
+
+**4.1** Add `"Set sweep Hz"` to `menuEdit` in `ui_menus.py`, placed
+alongside `actionSetGain`:
+- Action text: `"Set sweep Hz"`
+- Shortcut: none (rare operation).
+- Connect to a new handler `triggerSetSweepHz`.
+
+**4.2** Implement `triggerSetSweepHz`:
+- Open a `QInputDialog.getDouble` (or `.getText`) pre-populated with the
+  current `p_row["sweep_hz"]` (or `1.0` if `NaN`) for the first selected
+  recording.
+- Validate input: must be a positive float.
+- On confirm, write the value into `df_project["sweep_hz"]` for **all
+  selected recordings** (multi-selection applies to all, replacing the
+  former `pushButton_sweep_hz_set_all` concept).
+- Remove the `"default Hz"` pipe-flag from `status` for each updated row.
 - Save config. Do not trigger recalculate — this is display-only.
 
-**4.2** Connect `pushButton_sweep_hz_set_all` to `trigger_set_sweep_hz_all`:
-- Write current `lineEdit_sweep_hz` value into `df_project["sweep_hz"]`
-  for all recordings.
-- Clear `"default Hz"` status flags accordingly.
+**4.3** Surface the `"default Hz"` warning through the existing `status`
+column in `tableProject`. No additional visual indicator is needed in the
+toolbar panel; the status column is already the established place for
+per-recording warnings of this kind.
 
-**4.3** When a recording is selected, populate `lineEdit_sweep_hz` from
-`p_row["sweep_hz"]` (or the fallback `1.0` if `NaN`), consistent with how
-other per-recording lineEdits are populated in `tableProjSelectionChanged`.
-
-**4.4** Add a visual indicator (e.g. italic text or tooltip) on
-`lineEdit_sweep_hz` when the value is the 1 Hz fallback, to surface the
-`"default Hz"` warning in the UI without requiring the user to inspect
-`status`.
+**4.4** Enable `radioButton_xscale_time` only when `sweep_hz` is not `NaN`
+for the selected recording (handled in Phase 9 radio button wiring).
+A tooltip on `radioButton_xscale_time` may show the current Hz value
+(e.g. `"Time (s) — 10.0 Hz"`) to give at-a-glance readability without
+permanent UI real estate.
 
 ---
 
