@@ -37,11 +37,6 @@ class DataFrameMixin:
     # Stub / trivial helpers
     # ------------------------------------------------------------------
 
-    def binSweeps(self):
-        print(
-            "binSweeps - later on, this is to bin only the selected recording: now it does nothing and should be hidden"
-        )
-
     # ------------------------------------------------------------------
     # Recalculate all outputs
     # ------------------------------------------------------------------
@@ -58,11 +53,6 @@ class DataFrameMixin:
         dt["norm_output_from"] = norm_from
         dt["norm_output_to"] = norm_to
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
-
-        binSweeps = uistate.checkBox["bin"]
-        bin_size = uistate.lineEdit["bin_size"]
-        if binSweeps:
-            print(f"binSweeps: {binSweeps}, bin_size: {bin_size}")
 
         df_p = self.get_df_project()
         rows = df_p.iloc[selection] if selection is not None else df_p
@@ -89,7 +79,7 @@ class DataFrameMixin:
             df_t["norm_output_from"] = dt["norm_output_from"]
             df_t["norm_output_to"] = dt["norm_output_to"]
             self.set_dft(rec, df_t)
-            if binSweeps:
+            if pd.notna(p_row["bin_size"]):
                 dfbin = self.get_dfbin(p_row)
                 print(dfbin)
             dfoutput = self.get_dfoutput(p_row, reset=True)
@@ -249,7 +239,7 @@ class DataFrameMixin:
                 dfoutput = pd.DataFrame()
                 for i, t_row in dft.iterrows():
                     dict_t = t_row.to_dict()
-                    if uistate.checkBox["bin"]:
+                    if pd.notna(row["bin_size"]):
                         dfinput = self.get_dfbin(row)
                     else:
                         dfinput = self.get_dffilter(row)
@@ -333,13 +323,18 @@ class DataFrameMixin:
     def get_dfbin(self, p_row):
         # returns an internal df_bin for the selected recording_name. If it does not exist, read it from file first.
         rec = p_row["recording_name"]
+        if pd.isna(p_row["bin_size"]):
+            raise ValueError(
+                f"get_dfbin called for '{rec}' but bin_size is NaN — "
+                "callers must not reach get_dfbin when binning is off."
+            )
         if rec in self.dict_bins:
             return self.dict_bins[rec]
         path_bin = Path(f"{self.dict_folders['cache']}/{rec}_bin.parquet")
         if path_bin.exists():
             df_bins = pd.read_parquet(path_bin)
         else:
-            bin_size = int(uistate.lineEdit["bin_size"])
+            bin_size = int(p_row["bin_size"])
             df_filter = self.get_dffilter(p_row)
             max_sweep = df_filter["sweep"].max()
             num_bins = (max_sweep // bin_size) + 1

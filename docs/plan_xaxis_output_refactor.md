@@ -7,9 +7,10 @@ _Created: 2026-03-08_
 The output graph x-axis mode is currently handled ad hoc at every call site
 via an inline ternary on `checkBox["output_per_stim"]`. This makes it
 impossible to add new x-axis options (time, sweep_hz-based) without patching
-every site again. In parallel, the bin cache has a correctness bug: it
-encodes no bin-size information, so stale files are silently returned when
-`bin_size` changes.
+every site again. In parallel, the bin cache has a correctness bug: the
+in-memory dict and the disk file are never invalidated when `bin_size`
+changes, so stale results are silently returned for the remainder of the
+session and across sessions.
 
 This plan adds the Qt Designer UI changes first, then fixes the bin cache,
 unifies the analysis layer, completes stim mode, and finally adds proper
@@ -133,58 +134,92 @@ status field is treated as a `|`-delimited set of flags; checked with
 
 ## Phase 2 — `get_dfbin` hardening
 
+The cache filename stays `{rec}_bin.parquet` and the `dict_bins` key stays
+bare `rec`. There is never more than one valid bin per recording at a time,
+so encoding bin size in the filename buys nothing except disk clutter and
+more complex purge logic. The correctness bug is fixed by proper invalidation
+at the point of change instead.
+
 **2.1** Change `get_dfbin` to read `bin_size` from `p_row["bin_size"]`
 instead of `uistate.lineEdit["bin_size"]`.
 - Add a guard at entry: if `pd.isna(p_row["bin_size"])`, raise `ValueError`
   with a clear message. Callers must not reach `get_dfbin` when binning is
   off.
 
-**2.2** Change the cache filename to `{rec}_bin{N}.parquet` where
-`N = int(p_row["bin_size"])`.
-- Update the `df2file` call to use the new key.
-- Update the in-memory cache dict lookup (`dict_bins`) to use
-  `f"{rec}_bin{N}"` as the dict key rather than bare `rec`.
+**2.2** Add cache invalidation to `editBinSize`:
+- After updating `uistate.lineEdit["bin_size"]`, compare the new value
+  against the current `df_project["bin_size"]` for each recording where
+  binning is active (i.e. `bin_size` is not `NaN`).
+- For any recording whose stored `bin_size` differs from the new value,
+  evict `dict_bins[rec]` and `dict_outputs[rec]` from the in-memory caches,
+  and delete `{rec}_bin.parquet` from disk.
+- This ensures `get_dfbin` always recomputes with the current bin size; no
+  stale result can be returned from dict or disk.
 
-**2.3** Update `purgeRecordingData` to glob and delete all
-`{rec}_bin*.parquet` files for a recording, since there may now be more
-than one on disk.
+**2.3** `purgeRecordingData` and the hardcoded suffix lists in
+`reanalyze_recordings` and `rename_files_by_rec_name` require no changes —
+they already reference `"_bin.parquet"` as a single fixed suffix, which
+remains correct.
 
 ---
 
-## Phase 3 — Bin checkbox & widget wiring
+## Phase 3 — Bin widget wiring
 
-**3.1** Rewrite `checkBox_bin_changed`:
-- On check: write `uistate.lineEdit["bin_size"]` into
-  `df_project["bin_size"]` for all selected recordings (or all recordings
-  if none selected), then call `recalculate`.
-- On uncheck: write `NaN` into `df_project["bin_size"]` for the same
-  scope, then call `recalculate`.
+`lineEdit_bin_size` is the single authoritative control for binning.
+Values `0` or `1` mean binning off (stored as `NaN` in `df_project`);
+values `≥2` mean binning on. `checkBox_bin` is removed entirely — it was
+redundant once `df_project["bin_size"]` is the source of truth.
+
+**3.0** Remove `checkBox_bin` and `label_bins` from `frameToolBin` in
+`ui_designer.py` (and `bwmain.py`). Update `retranslateUi` accordingly.
+Optionally update `label_bin_size` text to `"Bin size (0 = off)"` to make
+the convention self-documenting.
+
+**3.1** Rewrite `editBinSize`:
+- If the field is empty, do nothing and return (mixed-selection sentinel —
+  see 3.5).
+- Parse input → `int`, clamp to `≥0`. Values `0` or `1` → derive `NaN`;
+  values `≥2` → use the int as-is.
+- Normalise the display: show `"0"` when the derived value is `NaN`, else
+  show the int.
+- Write the derived value into `df_project["bin_size"]` for all selected
+  recordings (or all recordings if none selected).
+- Perform cache invalidation as specified in Phase 2.2 for any recording
+  whose stored `bin_size` changed.
+- Call `recalculate`.
 
 **3.2** Rewrite `trigger_set_bin_size_all`:
-- Write the current `lineEdit` value into `df_project["bin_size"]` for all
-  recordings where `bin_size` is not already `NaN` (only affect recordings
-  where binning is already active).
-- If no recordings have binning active, enable all (matches current intent).
+- If the field is empty, do nothing and return.
+- Parse and derive the value the same way as `editBinSize`.
+- Write the derived value into `df_project["bin_size"]` for **all**
+  recordings, regardless of their current state.
+- Perform cache invalidation as in Phase 2.2.
 - Call `recalculate`.
 
-**3.3** Rewrite `editBinSize`:
-- Update `uistate.lineEdit["bin_size"]` as before.
-- Also update `df_project["bin_size"]` for any recording where it is not
-  `NaN` (i.e. binning is currently active for that recording).
-- Call `recalculate`.
-
-**3.4** Update `get_dfoutput`:
+**3.3** Update `get_dfoutput`:
 - Replace `uistate.checkBox["bin"]` branch condition with
   `pd.notna(p_row["bin_size"])`.
 - Remove all `uistate.checkBox["bin"]` reads from the data layer.
 
-**3.5** Update `recalculate`:
-- Derive `binSweeps` per row from `p_row["bin_size"]` rather than the
-  global checkbox.
+**3.4** Update `recalculate`:
+- Derive `binSweeps` per row from `pd.notna(p_row["bin_size"])` rather
+  than the global checkbox.
+- Remove the `uistate.checkBox["bin"]` and `uistate.lineEdit["bin_size"]`
+  reads at the top of `recalculate`.
 
-**3.6** `uistate.checkBox["bin"]` is kept as a pure UI display state
-(drives the checkbox visual) but is no longer authoritative for data
-routing. Add a comment documenting this.
+**3.5** Populate `lineEdit_bin_size` in `tableProjSelectionChanged`:
+- Single recording selected: show `"0"` if `bin_size` is `NaN`, else show
+  the stored int.
+- Multiple recordings selected with identical `bin_size` values: show the
+  same representation as above.
+- Multiple recordings selected with differing `bin_size` values: show `""`
+  (blank). `editBinSize` treats blank as a no-op, so the field is inert
+  until the user types a new value.
+
+**3.6** Remove `checkBox_bin_changed` entirely. Remove `"bin"` from
+`uistate.checkBox` and from the `viewSettingsChanged` dispatcher. Remove
+`"bin"` from `uistate.viewTools` if present. Remove the
+`connectUIstate` wiring for `checkBox_bin`.
 
 ---
 

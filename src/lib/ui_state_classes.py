@@ -102,7 +102,6 @@ class UIstate:
             "output_ymin0": True,  # set output y-axis minimum to 0
             # break these out to separate mod-class?
             "norm_EPSP": False,  # show normalized EPSPs (they're always calculated)
-            "bin": False,  # binning of output
             "paired_stims": False,  # Recs are paired: output per pair is Intervention / Control
         }
         self.lineEdit = {  # storage of user input; used to update df_t
@@ -110,7 +109,6 @@ class UIstate:
             "import_gain": 1.0,
             "norm_EPSP_from": 0,
             "norm_EPSP_to": 0,
-            "bin_size": 10,
             "EPSP_amp_halfwidth_ms": 0,  # in ms here (visible to user). NB: in s in df_t!
             "volley_amp_halfwidth_ms": 0,  # in ms here (visible to user). NB: in s in df_t!
         }
@@ -201,8 +199,6 @@ class UIstate:
             # aspect toggles
             # output scaling
             "pushButton_norm_range_set_all": "trigger_set_norm_range_all",
-            # binning
-            "pushButton_bin_size_set_all": "trigger_set_bin_size_all",
         }
         self.x_select = {  # selected ranges on mean- and output graphs
             # start and end: current drag operation; None if not dragging
@@ -423,14 +419,24 @@ class UIstate:
         self.version = state.get("version")
         self.colors = state.get("colors")
         self.splitter = state.get("splitter")
-        # Filter out any keys saved in old configs that no longer exist as widgets
+        # Filter out any keys saved in old configs that no longer exist as widgets.
+        # This lets us remove keys from these dicts without old cfg.pkl files
+        # re-introducing stale keys on next load.
         valid_view_tools = set(self.viewTools.keys())  # from reset()
         loaded_view_tools = state.get("viewTools") or {}
         self.viewTools = {
             k: v for k, v in loaded_view_tools.items() if k in valid_view_tools
         }
-        self.checkBox = state.get("checkBox")
-        self.lineEdit = state.get("lineEdit")
+        valid_checkboxes = set(self.checkBox.keys())
+        loaded_checkboxes = state.get("checkBox") or {}
+        self.checkBox = {
+            k: v for k, v in loaded_checkboxes.items() if k in valid_checkboxes
+        }
+        valid_line_edits = set(self.lineEdit.keys())
+        loaded_line_edits = state.get("lineEdit") or {}
+        self.lineEdit = {
+            k: v for k, v in loaded_line_edits.items() if k in valid_line_edits
+        }
         self.settings = state.get("settings")
         self.zoom = state.get("zoom")
         self.default_dict_t = state.get("default_dict_t")

@@ -1,3 +1,4 @@
+import math
 import os  # TODO: replace use by pathlib?
 import sys
 import tempfile
@@ -879,7 +880,6 @@ class UIsub(
             self.pushButton_stim_detect.setVisible(False)
             self.label_stim_detection_threshold.setVisible(False)
             self.frameToolBin.setVisible(False)
-            #            self.checkBox_bin.setVisible(False)
             self.pushButton_norm_range_set_all.setVisible(False)
 
         logger.debug("Pre-bootstrap")
@@ -996,6 +996,30 @@ class UIsub(
         else:
             uistate.df_rec_select_data = None
             uistate.df_rec_select_time = None
+
+        # Populate lineEdit_bin_size from df_project for the selected recording(s).
+        # Single or uniform multi-selection: show "0" (off) or the int value.
+        # Mixed (differing bin_size values): show "" so editBinSize treats it as a no-op.
+        self.connectUIstate(disconnect=True)
+        df_p = self.get_df_project()
+        if uistate.list_idx_select_recs:
+            bin_values = {df_p.loc[i, "bin_size"] for i in uistate.list_idx_select_recs}
+            # Treat NaN as a single distinct value for uniformity checks
+            nan_count = sum(1 for v in bin_values if pd.isna(v))
+            non_nan = {v for v in bin_values if pd.notna(v)}
+            uniform = (nan_count == 0 and len(non_nan) == 1) or (
+                nan_count == len(uistate.list_idx_select_recs)
+            )
+            if uniform:
+                single = non_nan.pop() if non_nan else float("nan")
+                self.lineEdit_bin_size.setText(
+                    "0" if pd.isna(single) else str(int(single))
+                )
+            else:
+                self.lineEdit_bin_size.setText("")
+        else:
+            self.lineEdit_bin_size.setText("")
+        self.connectUIstate()
 
         # update_show now runs with a correct, clamped uistate.list_idx_select_stims
         self.update_show()
@@ -1508,8 +1532,7 @@ class UIsub(
                 self.checkBox_timepoints_per_stim_changed(state)
             elif key == "output_ymin0":
                 self.zoomAuto()
-            elif key == "bin":
-                self.checkBox_bin_changed(state)
+
         self.update_show()
         self.mouseoverUpdate()
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
@@ -1912,7 +1935,32 @@ class UIsub(
 
     def trigger_set_bin_size_all(self):
         self.usage("trigger_set_bin_size_all")
-        uistate.checkBox["bin"] = True
+        text = self.lineEdit_bin_size.text().strip()
+        if not text:
+            return
+        try:
+            num = int(text.replace(",", "."))
+        except ValueError:
+            return
+        derived = float("nan") if num <= 1 else num
+        df_p = self.get_df_project()
+        for idx in df_p.index:
+            p_row = df_p.loc[idx]
+            rec = p_row["recording_name"]
+            old = p_row["bin_size"]
+            if not (pd.isna(derived) and pd.isna(old)) and old != derived:
+                self.dict_bins.pop(rec, None)
+                self.dict_outputs.pop(rec, None)
+                path_bin = self.dict_folders["cache"] / f"{rec}_bin.parquet"
+                if path_bin.exists():
+                    path_bin.unlink()
+                    print(
+                        f"trigger_set_bin_size_all: invalidated bin cache for '{rec}'"
+                    )
+            df_p.at[idx, "bin_size"] = derived
+        self.set_df_project(df_p)
+        display = "0" if pd.isna(derived) else str(derived)
+        self.lineEdit_bin_size.setText(display)
         self.recalculate()
 
     def triggerRefresh(self):
@@ -2354,14 +2402,41 @@ class UIsub(
 
     def editBinSize(self, lineEdit):
         self.usage("editBinSize")
+        text = lineEdit.text().strip()
+        if not text:
+            return  # blank = mixed-selection sentinel; do nothing
         try:
-            num = max(2, int(lineEdit.text().replace(",", ".")))
+            num = int(text.replace(",", "."))
         except ValueError:
-            num = 10
-        lineEdit.setText(str(num))
-        uistate.lineEdit["bin_size"] = num
-        print(f"editBinSize: {num}")
+            num = 0
+        derived = float("nan") if num <= 1 else float(num)
+        display = "0" if math.isnan(derived) else str(int(derived))
+        lineEdit.setText(display)
+        print(f"editBinSize: num={num} -> derived={derived}")
+
+        # Determine scope: selected recordings, or all if none selected.
+        df_p = self.get_df_project()
+        if uistate.list_idx_select_recs:
+            indices = uistate.list_idx_select_recs
+        else:
+            indices = list(df_p.index)
+
+        for idx in indices:
+            p_row = df_p.loc[idx]
+            rec = p_row["recording_name"]
+            old = p_row["bin_size"]
+            changed = not (math.isnan(derived) and pd.isna(old)) and old != derived
+            if changed:
+                self.dict_bins.pop(rec, None)
+                self.dict_outputs.pop(rec, None)
+                path_bin = self.dict_folders["cache"] / f"{rec}_bin.parquet"
+                if path_bin.exists():
+                    path_bin.unlink()
+                    print(f"editBinSize: invalidated bin cache for '{rec}'")
+            df_p.at[idx, "bin_size"] = derived
+        self.set_df_project(df_p)
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
+        self.recalculate()
 
     def copy_dft(self):
         # get selected dft(s) and copy to clipboard
@@ -2815,12 +2890,6 @@ class UIsub(
         print(f"checkBox_timepoints_per_stim_changed: {state}")
         if state == 0:
             self.set_uniformTimepoints()
-
-    def checkBox_bin_changed(self, state):
-        uistate.checkBox["bin"] = state == 2
-        print(f"checkBox_bin_changed: {state}")
-        if state == 2:
-            self.binSweeps()
 
     def tableFormat(self):
         logger.debug("tableFormat")
@@ -3449,7 +3518,7 @@ class UIsub(
             t_row = df_t[df_t["stim"] == stim].iloc[0]
             offset = t_row["t_stim"]
 
-            if uistate.checkBox["bin"]:
+            if pd.notna(p_row["bin_size"]):
                 dfsource = self.get_dfbin(p_row)
             else:
                 dfsource = self.get_dffilter(p_row)
