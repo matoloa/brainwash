@@ -13,9 +13,6 @@ if TYPE_CHECKING:
 
 
 class UIstate:
-    # --- Persisted DataFrame state ---
-    dfv: Optional[pd.DataFrame]
-
     # --- Axes (not persisted) ---
     axm: Optional[matplotlib.axes.Axes]
     axe: Optional[matplotlib.axes.Axes]
@@ -86,9 +83,10 @@ class UIstate:
             "frameToolStim": ["Stim detection", True],
             "frameToolSweeps": ["Sweep selection", True],
             "frameToolAspect": ["Aspect toggles", True],
-            "frameToolScaling": ["Output Scaling", True],
+            "frameToolBin": ["Binning", True],
+            "frameToolXscale": ["X axis", True],
+            "frameToolYscale": ["Y scaling", True],
             "frameToolPairedStim": ["Paired stims", False],
-            "frameToolExport": ["Image Export", True],
         }
         self.checkBox = {  # these are cycled by uisub.connectUIstate; maintain format!
             "EPSP_amp": True,
@@ -104,7 +102,6 @@ class UIstate:
             "output_ymin0": True,  # set output y-axis minimum to 0
             # break these out to separate mod-class?
             "norm_EPSP": False,  # show normalized EPSPs (they're always calculated)
-            "bin": False,  # binning of output
             "paired_stims": False,  # Recs are paired: output per pair is Intervention / Control
         }
         self.lineEdit = {  # storage of user input; used to update df_t
@@ -112,7 +109,6 @@ class UIstate:
             "import_gain": 1.0,
             "norm_EPSP_from": 0,
             "norm_EPSP_to": 0,
-            "bin_size": 10,
             "EPSP_amp_halfwidth_ms": 0,  # in ms here (visible to user). NB: in s in df_t!
             "volley_amp_halfwidth_ms": 0,  # in ms here (visible to user). NB: in s in df_t!
         }
@@ -138,7 +134,6 @@ class UIstate:
             "output_ax1_ylim": (0, 1.2),
             "output_ax2_ylim": (0, 1.2),
         }
-        self.dfv = None  # used to store per-recording voltage ranges for output scaling
         self.showTimetable = False
         self.showHeatmap = False
         self.dict_heatmap = {}
@@ -148,8 +143,12 @@ class UIstate:
         t_volley_slope_width = 0.0003  # default width for volley slope, in seconds
         t_EPSP_slope_width = 0.0007  # default width for EPSP
         resolution = 0.0001  # resolution in seconds TODO: hardcoded for 10KHz
-        t_volley_slope_halfwidth = self.floor_to_resolution(t_volley_slope_width / 2, resolution)
-        t_EPSP_slope_halfwidth = self.floor_to_resolution(t_EPSP_slope_width / 2, resolution)
+        t_volley_slope_halfwidth = self.floor_to_resolution(
+            t_volley_slope_width / 2, resolution
+        )
+        t_EPSP_slope_halfwidth = self.floor_to_resolution(
+            t_EPSP_slope_width / 2, resolution
+        )
         # print(f"UIstate: t_volley_slope_halfwidth={t_volley_slope_halfwidth}, t_EPSP_slope_halfwidth={t_EPSP_slope_halfwidth}")
         self.default_dict_t = {  # default values for df_t(imepoints)
             # TODO: rework and harmonize parameters
@@ -169,7 +168,7 @@ class UIstate:
             "t_volley_slope_params": "NA",
             "volley_slope_mean": 0.0,
             "t_volley_amp": 0,
-            "t_volley_amp_halfwidth": 0,  # Deprecated
+            "t_volley_amp_halfwidth": 0,
             "t_volley_amp_method": "default",
             "t_volley_amp_params": "NA",
             "volley_amp_mean": 0.0,
@@ -183,7 +182,7 @@ class UIstate:
             "t_EPSP_slope_method": "default",
             "t_EPSP_slope_params": "NA",
             "t_EPSP_amp": 0,
-            "t_EPSP_amp_halfwidth": 0,  # Deprecated
+            "t_EPSP_amp_halfwidth": 0,
             "t_EPSP_amp_method": "default",
             "t_EPSP_amp_params": "NA",
             "norm_output_from": 0,
@@ -198,15 +197,8 @@ class UIstate:
             "pushButton_sweeps_even": "trigger_set_sweeps_even",
             "pushButton_sweeps_odd": "trigger_set_sweeps_odd",
             # aspect toggles
-            "pushButton_EPSP_amp_width_set_all": "trigger_set_EPSP_amp_width_all",
-            "pushButton_volley_amp_width_set_all": "trigger_set_volley_amp_width_all",
             # output scaling
             "pushButton_norm_range_set_all": "trigger_set_norm_range_all",
-            # binning
-            "pushButton_bin_size_set_all": "trigger_set_bin_size_all",
-            # export
-            "pushButton_export_selection": "trigger_export_selection",
-            "pushButton_export_groups": "trigger_export_groups",
         }
         self.x_select = {  # selected ranges on mean- and output graphs
             # start and end: current drag operation; None if not dragging
@@ -226,36 +218,36 @@ class UIstate:
 
         self.list_idx_recs2preload = []  # list of indices in uisub.df_project for freshly parsed recordings; used by uisub.graphPreload()
         self.list_idx_select_recs = []  # list of selected indices in uisub.tableProj
-        self.list_idx_select_stims = [0]  # list of selected indices in uisub.tableStim; default to first
-        self.float_sweep_duration_max = (
-            None  # maximum sweep duration of all recordings in df_recs2plot; used to set x-limits of eventgraph. Updated on rec selection change.
-        )
+        self.list_idx_select_stims = [
+            0
+        ]  # list of selected indices in uisub.tableStim; default to first
+        self.float_sweep_duration_max = None  # maximum sweep duration of all recordings in df_recs2plot; used to set x-limits of eventgraph. Updated on rec selection change.
 
         # Liabilities: TODO: are these properly updated/cleared when selections change?
-        self.df_rec_select_data = (
-            None  # df_filtered of ONE selected recording (if more than one selected, None), used to plot means of selected sweeps in eventgraph
-        )
+        self.df_rec_select_data = None  # df_filtered of ONE selected recording (if more than one selected, None), used to plot means of selected sweeps in eventgraph
         self.df_rec_select_time = None  # dft of ONE selected recording (if more than one selected, None), used to offset mean sweeps in eventgraph
         self.df_recs2plot = None  # df_project copy, filtered to selected AND parsed recordings (or all parsed, if none are selected)
 
         # Plotted lines and fills
-        self.dict_rec_labels = (
-            {}
-        )  # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, axis: str, line: 2DlineObject}}
-        self.dict_rec_show = {}  # copy containing only visible recs
+        self.dict_rec_labels = {}  # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, variant: str ("raw"|"norm"|None), axis: str, line: 2DlineObject}}
+        self.dict_rec_show = {}  # subset of dict_rec_labels containing only currently visible entries
 
         # Groups (mean of recs)
-        self.dict_group_labels = (
-            {}
-        )  # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, axis: str, line: 2DlineObject}, fill: 2DfillObject}
-        self.dict_group_show = {}  # copy containing only visible groups
+        self.dict_group_labels = {}  # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, variant: str ("raw"|"norm"), axis: str, line: 2DlineObject, fill: 2DfillObject}}
+        self.dict_group_show = {}  # subset of dict_group_labels containing only currently visible entries
 
         # Mouseover variables
         # Meangraph Mouseover variables
-        self.mean_mouseover_stim_select = None  # name of stim that will be selected if clicked
+        self.mean_mouseover_stim_select = (
+            None  # name of stim that will be selected if clicked
+        )
         self.mean_stim_x_ranges = {}  # dict: stim_num: (x_start, x_end)
-        self.mean_x_margin = None  # for mouseover detection boundaries of clickable points
-        self.mean_y_margin = None  # for mouseover detection boundaries of clickable points
+        self.mean_x_margin = (
+            None  # for mouseover detection boundaries of clickable points
+        )
+        self.mean_y_margin = (
+            None  # for mouseover detection boundaries of clickable points
+        )
 
         # Eventgraph Mouseover variables
         self.mouseover_action = None  # name of action to take if clicked at current mouseover: EPSP amp move, EPSP slope move/resize, volley amp move, volley slope move/resize
@@ -268,7 +260,9 @@ class UIstate:
         self.x_drag = None  # x-value of current dragging
         self.dragging = False  # True if dragging; allows right-click to cancel drag
         self.mouseover_out = None  # output of dragged aspect
-        self.dft_temp = None  # temporary dft, updated during dragging, replaces dft at release
+        self.dft_temp = (
+            None  # temporary dft, updated during dragging, replaces dft at release
+        )
 
         # Eventgraph Mouseover coordinates, for plotting. Set on row selection.
         self.EPSP_amp_xy = None  # x,y
@@ -292,15 +286,37 @@ class UIstate:
         self.ghost_label = None
 
     def setMargins(self, axe, pixels=10):  # set margins for mouseover detection
-        self.x_margin = axe.transData.inverted().transform((pixels, 0))[0] - axe.transData.inverted().transform((0, 0))[0]
-        self.y_margin = axe.transData.inverted().transform((0, pixels))[1] - axe.transData.inverted().transform((0, 0))[1]
+        self.x_margin = (
+            axe.transData.inverted().transform((pixels, 0))[0]
+            - axe.transData.inverted().transform((0, 0))[0]
+        )
+        self.y_margin = (
+            axe.transData.inverted().transform((0, pixels))[1]
+            - axe.transData.inverted().transform((0, 0))[1]
+        )
+
+    def setMarginsAxm(
+        self, axm, pixels=10
+    ):  # set pixel-based margins for axm mouseover detection
+        self.mean_x_margin = (
+            axm.transData.inverted().transform((pixels, 0))[0]
+            - axm.transData.inverted().transform((0, 0))[0]
+        )
+        self.mean_y_margin = (
+            axm.transData.inverted().transform((0, pixels))[1]
+            - axm.transData.inverted().transform((0, 0))[1]
+        )
 
     def updateDragZones(self, aspect=None, x=None, y=None):
         # print(f"*** updateDragZones: {aspect} {x} {y}")
         if aspect is None:
             # Fall back to stored state when called without arguments
-            assert self.mouseover_action is not None, "updateDragZones: called with no aspect and mouseover_action is not set"
-            assert self.mouseover_plot is not None, "updateDragZones: called with no x/y and mouseover_plot is not set"
+            assert self.mouseover_action is not None, (
+                "updateDragZones: called with no aspect and mouseover_action is not set"
+            )
+            assert self.mouseover_plot is not None, (
+                "updateDragZones: called with no x/y and mouseover_plot is not set"
+            )
             aspect = self.mouseover_action
             x = self.mouseover_plot[0].get_xdata()
             y = self.mouseover_plot[0].get_ydata()
@@ -318,8 +334,12 @@ class UIstate:
         # print(f"*** updatePointDragZone: {aspect} {x} {y}")
         if aspect is None:
             # Fall back to stored state when called without arguments
-            assert self.mouseover_action is not None, "updatePointDragZone: called with no aspect and mouseover_action is not set"
-            assert self.mouseover_blob is not None, "updatePointDragZone: called with no x/y and mouseover_blob is not set"
+            assert self.mouseover_action is not None, (
+                "updatePointDragZone: called with no aspect and mouseover_action is not set"
+            )
+            assert self.mouseover_blob is not None, (
+                "updatePointDragZone: called with no x/y and mouseover_blob is not set"
+            )
             aspect = self.mouseover_action
             x, y = self.mouseover_blob.get_offsets()[0].tolist()  # type: ignore[index, union-attr]
         else:
@@ -399,14 +419,31 @@ class UIstate:
         self.version = state.get("version")
         self.colors = state.get("colors")
         self.splitter = state.get("splitter")
-        self.viewTools = state.get("viewTools")
-        self.checkBox = state.get("checkBox")
-        self.lineEdit = state.get("lineEdit")
+        # Filter out any keys saved in old configs that no longer exist as widgets.
+        # This lets us remove keys from these dicts without old cfg.pkl files
+        # re-introducing stale keys on next load.
+        valid_view_tools = set(self.viewTools.keys())  # from reset()
+        loaded_view_tools = state.get("viewTools") or {}
+        self.viewTools = {
+            k: v for k, v in loaded_view_tools.items() if k in valid_view_tools
+        }
+        valid_checkboxes = set(self.checkBox.keys())
+        loaded_checkboxes = state.get("checkBox") or {}
+        self.checkBox = {
+            k: v for k, v in loaded_checkboxes.items() if k in valid_checkboxes
+        }
+        valid_line_edits = set(self.lineEdit.keys())
+        loaded_line_edits = state.get("lineEdit") or {}
+        self.lineEdit = {
+            k: v for k, v in loaded_line_edits.items() if k in valid_line_edits
+        }
         self.settings = state.get("settings")
         self.zoom = state.get("zoom")
         self.default_dict_t = state.get("default_dict_t")
 
-    def load_cfg(self, projectfolder, bw_version, force_reset=False):  # load state from project config file
+    def load_cfg(
+        self, projectfolder, bw_version, force_reset=False
+    ):  # load state from project config file
         path_pkl = projectfolder / "cfg.pkl"
         if path_pkl.exists() and not force_reset:
             with open(path_pkl, "rb") as f:
@@ -415,15 +452,21 @@ class UIstate:
                 self.set_state(data)
                 # check if version is compatible
                 if bw_version != self.version:
-                    print(f"Warning: cfg.pkl is from {self.version} - current version is {bw_version}")
+                    print(
+                        f"Warning: cfg.pkl is from {self.version} - current version is {bw_version}"
+                    )
                     cfg_v = self.version.split(".")
                     bw_v = bw_version.split(".")
                     if cfg_v[0] != bw_v[0]:
                         print("Major version mismatch: Project may not load correctly")
                     elif cfg_v[1] != bw_v[1]:
-                        print("Minor version mismatch: Some settings may not load correctly")
+                        print(
+                            "Minor version mismatch: Some settings may not load correctly"
+                        )
                     elif cfg_v[2] != bw_v[2]:
-                        print("Patch version mismatch: Minor changes may not load correctly")
+                        print(
+                            "Patch version mismatch: Minor changes may not load correctly"
+                        )
             else:
                 print("Warning: cfg.pkl is empty or corrupt, resetting to defaults")
                 self.reset()
@@ -432,7 +475,9 @@ class UIstate:
             self.reset()
             self.save_cfg(projectfolder, bw_version)
 
-    def save_cfg(self, projectfolder, bw_version=None):  # save state to project config file
+    def save_cfg(
+        self, projectfolder, bw_version=None
+    ):  # save state to project config file
         path_pkl = projectfolder / "cfg.pkl"
         data = self.get_state()
         if bw_version is not None:

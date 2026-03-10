@@ -115,25 +115,21 @@ def build_dfoutput(df, dict_t, filter="voltage", quick=False):
         t_EPSP_amp = dict_t["t_EPSP_amp"]
         if valid(t_EPSP_amp):
             amp_zero = dict_t["amp_zero"]
-            EPSP_w = (
-                dict_t["t_EPSP_amp_width"]
-                if "t_EPSP_amp_width" in dict_t.keys()
-                else 2 * dict_t["t_EPSP_amp_halfwidth"]
-            )
+            EPSP_hw = dict_t["t_EPSP_amp_halfwidth"]
             print(
-                f"build_dfoutput: EPSP_amp t={t_EPSP_amp}, w={EPSP_w}, path={'single' if EPSP_w == 0 or quick else 'groupby'}"
+                f"build_dfoutput: EPSP_amp t={t_EPSP_amp}, hw={EPSP_hw}, path={'single' if EPSP_hw == 0 or quick else 'groupby'}"
             )
-            if EPSP_w == 0 or quick:  # single point
+            if EPSP_hw == 0 or quick:  # single point
                 df_EPSP_amp = (
                     df[df["time"] == t_EPSP_amp].copy()
                 )  # filter out all time (from sweep start) that do not match t_EPSP_amp
                 df_EPSP_amp.reset_index(inplace=True, drop=True)
                 dfoutput["EPSP_amp"] = (
-                    -1000 * df_EPSP_amp[filter]
-                )  # invert and convert to mV
+                    df_EPSP_amp[filter] - amp_zero
+                ) * -1000  # invert and convert to mV
             else:  # mean (SLOW)
-                start_time = t_EPSP_amp - EPSP_w
-                end_time = t_EPSP_amp + EPSP_w
+                start_time = t_EPSP_amp - EPSP_hw
+                end_time = t_EPSP_amp + EPSP_hw
                 dfoutput["EPSP_amp"] = df.groupby("sweep").apply(
                     lambda sweep_df: (
                         (
@@ -196,25 +192,21 @@ def build_dfoutput(df, dict_t, filter="voltage", quick=False):
         t_volley_amp = dict_t["t_volley_amp"]
         if valid(t_volley_amp):
             amp_zero = dict_t["amp_zero"]
-            volley_w = (
-                dict_t["t_volley_amp_width"]
-                if "t_volley_amp_width" in dict_t.keys()
-                else 2 * dict_t["t_volley_amp_halfwidth"]
-            )
+            volley_hw = dict_t["t_volley_amp_halfwidth"]
             print(
-                f"build_dfoutput: volley_amp t={t_volley_amp}, w={volley_w}, path={'single' if volley_w == 0 or quick else 'groupby'}"
+                f"build_dfoutput: volley_amp t={t_volley_amp}, hw={volley_hw}, path={'single' if volley_hw == 0 or quick else 'groupby'}"
             )
-            if volley_w == 0 or quick:  # single point
+            if volley_hw == 0 or quick:  # single point
                 df_volley_amp = df[
                     df["time"] == t_volley_amp
                 ].copy()  # filter out all time (from sweep start) that do not match t_volley_amp
                 df_volley_amp.reset_index(inplace=True, drop=True)
                 dfoutput["volley_amp"] = (
-                    -1000 * df_volley_amp[filter]
-                )  # invert and convert to mV
+                    df_volley_amp[filter] - amp_zero
+                ) * -1000  # invert and convert to mV
             else:  # mean (SLOW)
-                start_time = t_volley_amp - volley_w
-                end_time = t_volley_amp + volley_w
+                start_time = t_volley_amp - volley_hw
+                end_time = t_volley_amp + volley_hw
                 dfoutput["volley_amp"] = df.groupby("sweep").apply(
                     lambda sweep_df: (
                         (

@@ -41,10 +41,13 @@ def df_projectTemplate():
             "path",  # str: path of original source file
             "status",  # str: blank if ok, 'default' is default recordings. TODO: add more states
             "recording_name",  # str: name of recording
-            "gain",  # float: gain of recording, added by brainwash
+            "gain",  # float: gain of recording, applied at cache-build time; defaults to 1.0
             "stims",  # int: number of stims in recording
             "sweeps",  # int: number of sweeps in recording
             "sweep_duration",  # float: duration of each sweep in seconds
+            "sweep_hz",  # float: assumed inter-sweep rate in Hz for time-axis display; NaN triggers 1 Hz fallback with status warning
+            "sampling_rate",  # int: sampling rate in Hz
+            "bin_size",  # int: bin size in sweeps for output; 0 means binning disabled
             "resets",  # str: list of number of first sweep in source file, for breaking up tables of non-continuous recordings
             "filter",  # str: filter used for analysis
             "filter_params",  # str: filter parameters
@@ -77,39 +80,31 @@ class ProjectMixin:
     # ------------------------------------------------------------------
 
     def persistOutput(self, rec_name, dfoutput):
-        # Determine column order based on the state of uistate.checkBox['output_per_stim']
-        column_order = (
-            [
-                "gain",
-                "stim",
-                "bin",
-                "EPSP_slope",
-                "EPSP_slope_norm",
-                "EPSP_amp",
-                "EPSP_amp_norm",
-                "volley_amp",
-                "volley_slope",
-            ]
-            if uistate.checkBox["output_per_stim"]
-            else [
-                "gain",
-                "stim",
-                "sweep",
-                "EPSP_slope",
-                "EPSP_slope_norm",
-                "EPSP_amp",
-                "EPSP_amp_norm",
-                "volley_amp",
-                "volley_slope",
-            ]
-        )
+        # Column order for the persisted output file.
+        # gain and bin_size belong in df_project, not here.
+        # sweep holds raw sweep numbers normally, or bin numbers when binning is
+        # active (get_dfbin already assigns bin numbers into the sweep column).
+        column_order = [
+            "stim",
+            "sweep",
+            "EPSP_slope",
+            "EPSP_slope_norm",
+            "EPSP_amp",
+            "EPSP_amp_norm",
+            "volley_amp",
+            "volley_slope",
+        ]
         # Clean up column order, save to dict and file.
         missing_columns = set(column_order) - set(dfoutput.columns)
         extra_columns = set(dfoutput.columns) - set(column_order)
         if missing_columns:
-            print(f"Warning: The following columns in column_order don't exist in dfoutput: {missing_columns}")
+            print(
+                f"Warning: The following columns in column_order don't exist in dfoutput: {missing_columns}"
+            )
         if extra_columns:
-            print(f"Warning: The following columns exist in dfoutput but not in column_order: {extra_columns}")
+            print(
+                f"Warning: The following columns exist in dfoutput but not in column_order: {extra_columns}"
+            )
         dfoutput = dfoutput.reindex(columns=column_order)
         self.dict_outputs[rec_name] = dfoutput
         self.df2file(df=dfoutput, rec=rec_name, key="output")
@@ -133,7 +128,9 @@ class ProjectMixin:
         self.setupMenus()
         self.setupCanvases()  # for graphs, and connect graphClicked(event, <canvas>)
 
-        self.fqdn = socket.getfqdn()  # get computer name and local domain, for project file
+        self.fqdn = (
+            socket.getfqdn()
+        )  # get computer name and local domain, for project file
 
         # debug mode; for printing widget focus every 1000ms
         if config.track_widget_focus:
@@ -155,7 +152,9 @@ class ProjectMixin:
         if projectpath.exists():
             self.load_df_project(self.dict_folders["project"])
         else:
-            print(f"Project file {self.dict_folders['project'] / 'project.brainwash'} not found, creating new project file")
+            print(
+                f"Project file {self.dict_folders['project'] / 'project.brainwash'} not found, creating new project file"
+            )
             self.df_project = df_projectTemplate()
         # If local cfg.pkl exists, load it, otherwise create it
         uistate.reset()
@@ -164,7 +163,9 @@ class ProjectMixin:
             bw_version=config.version,
             force_reset=config.force_cfg_reset,
         )
-        self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
+        self.mainwindow.setWindowTitle(
+            f"Brainwash {config.version} - {self.projectname}"
+        )
 
         # Load group data
         self.dd_groups = self.group_get_dd()
@@ -202,10 +203,16 @@ class ProjectMixin:
             if self.bw_cfg_yaml.exists():
                 with self.bw_cfg_yaml.open("r") as file:
                     cfg = yaml.safe_load(file) or {}
-                    projectfolder = Path(cfg.get("projects_folder", "")) / cfg.get("projectname", "")
+                    projectfolder = Path(cfg.get("projects_folder", "")) / cfg.get(
+                        "projectname", ""
+                    )
                     if projectfolder.exists():
-                        self.user_documents = Path(cfg.get("user_documents", self.user_documents))
-                        self.projects_folder = Path(cfg.get("projects_folder", self.projects_folder))
+                        self.user_documents = Path(
+                            cfg.get("user_documents", self.user_documents)
+                        )
+                        self.projects_folder = Path(
+                            cfg.get("projects_folder", self.projects_folder)
+                        )
                         self.projectname = cfg.get("projectname", self.projectname)
                     uistate.darkmode = cfg.get("darkmode", True)
                     uistate.showTimetable = cfg.get("showTimetable", False)
@@ -256,7 +263,9 @@ class ProjectMixin:
     # ------------------------------------------------------------------
 
     def newProject(self):
-        self.dict_folders["project"].mkdir(exist_ok=True)  # make sure the project folder exists
+        self.dict_folders["project"].mkdir(
+            exist_ok=True
+        )  # make sure the project folder exists
         # Find lowest integer to append to new_project_name to make it unique
         date = datetime.now().strftime("%Y-%m-%d")
         i = 0
@@ -293,12 +302,16 @@ class ProjectMixin:
 
     def renameProject(self):  # changes name of project folder and updates .cfg
         RenameDialog = InputDialogPopup()
-        new_project_name = RenameDialog.showInputDialog(title="Rename project", query="")
+        new_project_name = RenameDialog.showInputDialog(
+            title="Rename project", query=""
+        )
         # check if ok
         if (self.projects_folder / new_project_name).exists():
             if config.verbose:
                 print(f"Project name {new_project_name} already exists")
-        elif re.match(r"^[a-zA-Z0-9_ -]+$", str(new_project_name)) is not None:  # True if valid filename
+        elif (
+            re.match(r"^[a-zA-Z0-9_ -]+$", str(new_project_name)) is not None
+        ):  # True if valid filename
             dict_old = self.dict_folders
             self.projectname = new_project_name
             self.dict_folders = self.build_dict_folders()
@@ -306,7 +319,9 @@ class ProjectMixin:
             if Path(dict_old["cache"]).exists():
                 dict_old["cache"].rename(self.dict_folders["cache"])
             self.write_bw_cfg()  # update boot-up-path in bw_cfg.yaml to new project folder
-            self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
+            self.mainwindow.setWindowTitle(
+                f"Brainwash {config.version} - {self.projectname}"
+            )
         else:
             print(f"Project name {new_project_name} is not a valid path.")
 
@@ -327,17 +342,27 @@ class ProjectMixin:
             self.df_project = df
         self.save_df_project()
 
-    def load_df_project(self, str_projectfolder):  # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
+    def load_df_project(
+        self, str_projectfolder
+    ):  # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
         self.graphWipe()
         self.resetCacheDicts()  # clear internal caches
         path_projectfolder = Path(str_projectfolder)
         self.projectname = str(path_projectfolder.stem)
         print(f"load_df_project: {self.projectname}")
         self.dict_folders = self.build_dict_folders()
-        self.df_project = pd.read_csv(str(path_projectfolder / "project.brainwash"), dtype={"group_IDs": str})
+        self.df_project = pd.read_csv(
+            str(path_projectfolder / "project.brainwash"), dtype={"group_IDs": str}
+        )
+        # Backfill any columns added to the schema since this project was last saved
+        for col in df_projectTemplate().columns:
+            if col not in self.df_project.columns:
+                self.df_project[col] = None
         uistate.load_cfg(self.dict_folders["project"], config.version)
         self.tableFormat()
         self.write_bw_cfg()
 
     def save_df_project(self):  # writes df_project to .csv
-        self.df_project.to_csv(str(self.dict_folders["project"] / "project.brainwash"), index=False)
+        self.df_project.to_csv(
+            str(self.dict_folders["project"] / "project.brainwash"), index=False
+        )
