@@ -304,23 +304,28 @@ comment pointing to v2. Do not delete yet.
 
 ## Phase 6 — Cache key separation
 
-**6.1** Add new recognised keys to `df2file` / cache path builder:
-- `"output_stim"` → `{rec}_output_stim.parquet`
-- `"output_bin{N}"` → `{rec}_output_bin{N}.parquet`
-- `"output_stim_bin{N}"` → `{rec}_output_stim_bin{N}.parquet`
+`output_per_stim` is a row-level distinction within the output dataframe,
+not a file-level one. When `output_per_stim` is active, `get_dfoutput`
+produces additional rows (one per stim) and a `stim` counter column in the
+same dataframe — it does not write a separate file. The cache therefore
+splits on bin state only:
 
-**6.2** Update `get_dfoutput` to select the correct cache path based on
-`p_row["bin_size"]` and `uistate.checkBox["output_per_stim"]`:
+| bin_size | key            | Cache file                 |
+|----------|----------------|----------------------------|
+| NaN      | `"output"`     | `{rec}_output.parquet`     |
+| set      | `"output_bin"` | `{rec}_output_bin.parquet` |
 
-| output_per_stim | bin_size | Cache file                         |
-|-----------------|----------|------------------------------------|
-| False           | NaN      | `{rec}_output.parquet`             |
-| False           | N        | `{rec}_output_bin{N}.parquet`      |
-| True            | NaN      | `{rec}_output_stim.parquet`        |
-| True            | N        | `{rec}_output_stim_bin{N}.parquet` |
+**6.1** Add `"output_bin"` as a recognised key in `df2file` (no other new
+keys are needed). It follows the existing literal-suffix convention:
+`{rec}_output_bin.parquet`.
 
-**6.3** Update `resetCacheDicts` and `purgeRecordingData` to cover all new
-cache keys and file patterns.
+**6.2** Update `get_dfoutput` to select the cache path based on
+`p_row["bin_size"]`: use `key="output_bin"` when bin_size is not NaN,
+`key="output"` otherwise. Both paths apply regardless of
+`output_per_stim`.
+
+**6.3** Update `resetCacheDicts` and `purgeRecordingData` to include
+`"_output_bin.parquet"` alongside `"_output.parquet"`.
 
 ---
 
