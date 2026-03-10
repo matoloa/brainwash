@@ -37,6 +37,10 @@ class MenuMixin:
         self.actionSetGain.setShortcut("G")
         self.menuEdit.addAction(self.actionSetGain)
 
+        self.actionSetSweepHz = QtWidgets.QAction("Set sweep Hz")
+        self.actionSetSweepHz.triggered.connect(self.triggerSetSweepHz)
+        self.menuEdit.addAction(self.actionSetSweepHz)
+
         self.menuEdit.addSeparator()
 
         self.actionSweepOpsHeader = QtWidgets.QAction(

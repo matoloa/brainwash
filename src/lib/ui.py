@@ -2152,6 +2152,64 @@ class UIsub(
         print(f"SetGain: set gain={new_gain} on {n} {noun}.")
         self.reanalyze_recordings()
 
+    def triggerSetSweepHz(self):
+        self.usage("triggerSetSweepHz")
+        selection = uistate.list_idx_select_recs
+        if not selection:
+            print("SetSweepHz: no recordings selected.")
+            return
+
+        df_p = self.get_df_project()
+        n = len(selection)
+        noun = "recording" if n == 1 else "recordings"
+
+        existing = df_p.loc[selection, "sweep_hz"].dropna().unique()
+        current = f"{existing[0]:.4g}" if len(existing) == 1 else ""
+
+        dlg = QtWidgets.QDialog()
+        dlg.setWindowTitle("Set Sweep Hz")
+        dlg.setFixedSize(300, 130)
+        layout = QtWidgets.QVBoxLayout(dlg)
+
+        label = QtWidgets.QLabel(f"{n} {noun} selected")
+        layout.addWidget(label)
+
+        line_edit = QtWidgets.QLineEdit(current)
+        line_edit.setPlaceholderText("e.g. 0.1")
+        line_edit.selectAll()
+        layout.addWidget(line_edit)
+
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel,
+            QtCore.Qt.Horizontal,
+        )
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        layout.addWidget(buttons)
+
+        line_edit.setFocus()
+        if dlg.exec_() != QtWidgets.QDialog.Accepted:
+            return
+
+        raw = line_edit.text().strip()
+        try:
+            new_hz = float(raw.replace(",", "."))
+            if new_hz <= 0:
+                raise ValueError
+        except ValueError:
+            print(f"SetSweepHz: '{raw}' is not a valid positive number.")
+            return
+
+        df_p.loc[selection, "sweep_hz"] = new_hz
+        # Remove "default Hz" pipe-flag from status for each updated row
+        for idx in selection:
+            flags = [
+                f for f in str(df_p.at[idx, "status"]).split("|") if f != "default Hz"
+            ]
+            df_p.at[idx, "status"] = "|".join(flags)
+        self.set_df_project(df_p)
+        print(f"SetSweepHz: set sweep_hz={new_hz} on {n} {noun}.")
+
     # triggerKeepSelectedSweeps, triggerRemoveSelectedSweeps, triggerSplitBySelectedSweeps,
     # sweep_selection_valid, sweep_removal_valid_confirmed → SweepOpsMixin (ui_sweep_ops.py)
 
