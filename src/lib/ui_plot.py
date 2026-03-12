@@ -439,14 +439,7 @@ class UIplot:
         ax2.set_ylim(uistate.zoom["output_ax2_ylim"])
         ax1.set_xlim(uistate.zoom["output_xlim"])
         ax2.set_xlim(uistate.zoom["output_xlim"])
-        if uistate.checkBox["output_per_stim"]:
-            x_axis = "stim"
-            if uistate.df_recs2plot is not None:
-                x_max = int(uistate.df_recs2plot["stims"].max())
-                ax1.xaxis.set_major_locator(FixedLocator(range(1, x_max + 1)))
-                ax2.xaxis.set_major_locator(FixedLocator(range(1, x_max + 1)))
-        else:
-            x_axis = "sweep"
+        x_axis = "sweep"
         ax1.set_xlabel(x_axis)
         ax2.set_xlabel(x_axis)
         print(f"output_xlim: {uistate.zoom['output_xlim']}")
@@ -742,10 +735,7 @@ class UIplot:
         else:
             aspect = "EPSP_slope"
             str_aspect = "EPSP slope"
-        if self.uistate.checkBox["output_per_stim"]:
-            x = df_groupmean.stim
-        else:
-            x = df_groupmean.sweep
+        x = df_groupmean.sweep
         label_mean = f"{group_name} {str_aspect} mean"
         label_norm = f"{group_name} {str_aspect} norm"
         y_mean = df_groupmean[f"{aspect}_mean"].fillna(0)
@@ -823,7 +813,7 @@ class UIplot:
             rec_ID=rec_ID,
         )
 
-        x_axis = "stim" if self.uistate.checkBox["output_per_stim"] else "sweep"
+        x_axis = "sweep"
         dict_gradient = self.get_dict_gradient(n_stims)
 
         settings = self.uistate.settings  # Event window, color, and alpha settings
@@ -1278,17 +1268,12 @@ class UIplot:
             y_start = data_y[np.abs(data_x - x_start).argmin()]
             y_end = data_y[np.abs(data_x - x_end).argmin()]
             self.updateLine(f"{label_core} marker", [x_start, x_end], [y_start, y_end])
-            if self.uistate.checkBox["output_per_stim"]:
-                label_core = f"{prow['recording_name']} {aspect}"
             if aspect == "volley slope":
-                if self.uistate.checkBox["output_per_stim"]:
-                    self.updateOutLine(label_core)
-                else:
-                    volley_slope_mean = trow.get("volley_slope_mean")
-                    print(f" - - - volley_slope_mean: {volley_slope_mean}")
-                    # if volley_slope_mean is None:
-                    #    volley_slope_mean = self.uistate.mouseover_out[0].get_ydata().mean()
-                    self.updateOutMean(f"{label_core} mean", volley_slope_mean)
+                volley_slope_mean = trow.get("volley_slope_mean")
+                print(f" - - - volley_slope_mean: {volley_slope_mean}")
+                # if volley_slope_mean is None:
+                #    volley_slope_mean = self.uistate.mouseover_out[0].get_ydata().mean()
+                self.updateOutMean(f"{label_core} mean", volley_slope_mean)
             else:  # EPSP slope
                 if norm:
                     label_core += " norm"
@@ -1304,38 +1289,25 @@ class UIplot:
             self.updateAmpMarker(
                 label_core, t_amp, y_position, amp_x, trow["amp_zero"], amp=amp
             )
-            if self.uistate.checkBox["output_per_stim"]:
-                label_core = f"{prow['recording_name']} {aspect}"
             if aspect == "volley amp":
-                if self.uistate.checkBox["output_per_stim"]:
-                    self.updateOutLine(label_core)
+                volley_amp_mean = trow.get("volley_amp_mean")
+                print(f" - - - volley_amp_mean: {volley_amp_mean}")
+                if dfoutput is not None:
+                    stim_num = trow["stim"]
+                    self.updateOutLineFromDf(
+                        label_core, dfoutput, stim_num, key, "sweep"
+                    )
                 else:
-                    volley_amp_mean = trow.get("volley_amp_mean")
-                    print(f" - - - volley_amp_mean: {volley_amp_mean}")
-                    if dfoutput is not None:
-                        stim_num = trow["stim"]
-                        x_axis = (
-                            "stim"
-                            if self.uistate.checkBox["output_per_stim"]
-                            else "sweep"
-                        )
-                        self.updateOutLineFromDf(
-                            label_core, dfoutput, stim_num, key, x_axis
-                        )
-                    else:
-                        self.updateOutLine(label_core)
-                    self.updateOutMean(f"{label_core} mean", volley_amp_mean)
+                    self.updateOutLine(label_core)
+                self.updateOutMean(f"{label_core} mean", volley_amp_mean)
             else:  # EPSP amp
                 if norm:
                     label_core += " norm"
                 if dfoutput is not None:
                     stim_num = trow["stim"]
-                    x_axis = (
-                        "stim" if self.uistate.checkBox["output_per_stim"] else "sweep"
-                    )
                     col = f"{key}_norm" if norm else key
                     self.updateOutLineFromDf(
-                        label_core, dfoutput, stim_num, col, x_axis
+                        label_core, dfoutput, stim_num, col, "sweep"
                     )
                 else:
                     self.updateOutLine(label_core)

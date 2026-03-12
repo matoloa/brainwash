@@ -156,7 +156,7 @@ class Ui_mainWindow(object):
             self.frameToolStim.sizePolicy().hasHeightForWidth()
         )
         self.frameToolStim.setSizePolicy(sizePolicy)
-        self.frameToolStim.setMinimumSize(QtCore.QSize(211, 201))
+        self.frameToolStim.setMinimumSize(QtCore.QSize(211, 181))
         self.frameToolStim.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frameToolStim.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frameToolStim.setObjectName("frameToolStim")
@@ -177,12 +177,12 @@ class Ui_mainWindow(object):
         self.pushButton_stim_assign_threshold = QtWidgets.QPushButton(
             self.frameToolStim
         )
-        self.pushButton_stim_assign_threshold.setGeometry(QtCore.QRect(20, 170, 61, 25))
+        self.pushButton_stim_assign_threshold.setGeometry(QtCore.QRect(20, 150, 61, 25))
         self.pushButton_stim_assign_threshold.setObjectName(
             "pushButton_stim_assign_threshold"
         )
         self.label_stim_detection_threshold = QtWidgets.QLabel(self.frameToolStim)
-        self.label_stim_detection_threshold.setGeometry(QtCore.QRect(10, 150, 141, 17))
+        self.label_stim_detection_threshold.setGeometry(QtCore.QRect(10, 130, 141, 17))
         font = QtGui.QFont()
         font.setFamily("DejaVu Sans")
         font.setBold(False)
@@ -192,16 +192,16 @@ class Ui_mainWindow(object):
             "label_stim_detection_threshold"
         )
         self.label_mean_to = QtWidgets.QLabel(self.frameToolStim)
-        self.label_mean_to.setGeometry(QtCore.QRect(90, 120, 21, 20))
+        self.label_mean_to.setGeometry(QtCore.QRect(90, 100, 21, 20))
         self.label_mean_to.setAlignment(
             QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
         )
         self.label_mean_to.setObjectName("label_mean_to")
         self.lineEdit_mean_selection_end = QtWidgets.QLineEdit(self.frameToolStim)
-        self.lineEdit_mean_selection_end.setGeometry(QtCore.QRect(100, 120, 61, 25))
+        self.lineEdit_mean_selection_end.setGeometry(QtCore.QRect(100, 100, 61, 25))
         self.lineEdit_mean_selection_end.setObjectName("lineEdit_mean_selection_end")
         self.label_mean_selected_range = QtWidgets.QLabel(self.frameToolStim)
-        self.label_mean_selected_range.setGeometry(QtCore.QRect(10, 100, 81, 17))
+        self.label_mean_selected_range.setGeometry(QtCore.QRect(10, 80, 81, 17))
         font = QtGui.QFont()
         font.setFamily("DejaVu Sans")
         font.setBold(False)
@@ -209,16 +209,13 @@ class Ui_mainWindow(object):
         self.label_mean_selected_range.setFont(font)
         self.label_mean_selected_range.setObjectName("label_mean_selected_range")
         self.lineEdit_mean_selection_start = QtWidgets.QLineEdit(self.frameToolStim)
-        self.lineEdit_mean_selection_start.setGeometry(QtCore.QRect(20, 120, 61, 25))
+        self.lineEdit_mean_selection_start.setGeometry(QtCore.QRect(20, 100, 61, 25))
         self.lineEdit_mean_selection_start.setObjectName(
             "lineEdit_mean_selection_start"
         )
         self.pushButton_stim_detect = QtWidgets.QPushButton(self.frameToolStim)
-        self.pushButton_stim_detect.setGeometry(QtCore.QRect(90, 170, 61, 25))
+        self.pushButton_stim_detect.setGeometry(QtCore.QRect(90, 150, 61, 25))
         self.pushButton_stim_detect.setObjectName("pushButton_stim_detect")
-        self.checkBox_output_per_stim = QtWidgets.QCheckBox(self.frameToolStim)
-        self.checkBox_output_per_stim.setGeometry(QtCore.QRect(10, 70, 161, 23))
-        self.checkBox_output_per_stim.setObjectName("checkBox_output_per_stim")
         self.checkBox_show_all_events.raise_()
         self.checkBox_timepoints_per_stim.raise_()
         self.label_stims.raise_()
@@ -227,7 +224,6 @@ class Ui_mainWindow(object):
         self.label_mean_to.raise_()
         self.label_mean_selected_range.raise_()
         self.pushButton_stim_detect.raise_()
-        self.checkBox_output_per_stim.raise_()
         self.lineEdit_mean_selection_start.raise_()
         self.lineEdit_mean_selection_end.raise_()
         self.verticalLayoutTools.addWidget(self.frameToolStim, 0, QtCore.Qt.AlignTop)
@@ -613,9 +609,6 @@ class Ui_mainWindow(object):
             _translate("mainWindow", "Selection (ms)")
         )
         self.pushButton_stim_detect.setText(_translate("mainWindow", "Detect"))
-        self.checkBox_output_per_stim.setText(
-            _translate("mainWindow", "Output per stim")
-        )
         self.label_x_axis.setText(_translate("mainWindow", "X axis"))
         self.radioButton_xscale_sweep.setText(_translate("mainWindow", "Sweep"))
         self.radioButton_xscale_time.setText(_translate("mainWindow", "Time"))

@@ -1,6 +1,7 @@
 # Output Graph X-Axis Refactor — Implementation Plan
 
 _Created: 2026-03-08_
+_Updated: 2026-05-29_
 
 ## Background
 
@@ -17,23 +18,32 @@ unifies the analysis layer, completes stim mode, and finally adds proper
 x-axis mode state — in that order, so each phase has stable ground beneath
 it.
 
-### Important distinction
+### Key design decisions
 
-**`checkBox_output_per_stim`** and **x-axis mode** are orthogonal concerns:
+**`checkBox_output_per_stim` is deprecated and removed.** It conflated two
+orthogonal concerns that must be separated:
 
-- `output_per_stim` controls *how output values are computed*: checked means
-  measure each stim position against the mean waveform
-  (`build_dfstimoutput`); unchecked means measure each sweep at the stim
-  timepoints (`build_dfoutput`). This is a data pipeline choice. It belongs
-  in `frameToolStim` and is not replaced by the x-axis radio buttons.
+- *How output values are computed* is not a user toggle. For any recording
+  with stims, `get_dfoutput` always produces a combined dataframe with one
+  row per (stim × sweep), `stim` as a grouping column. Stim-mode measurement
+  (slicing `dfmean` around each stim window) is handled internally and is
+  always available when stims exist — it does not require a separate checkbox
+  or a separate output file.
 
-- **x-axis mode** controls *how the output graph's x-axis is labelled and
-  scaled*: sweep index, seconds (via `sweep_hz`), or stim number in train.
-  This is a display/rendering choice applied to whatever output data exists.
-  It lives in the new `frameToolXscale`.
+- *How the output graph's x-axis is labelled and scaled* is a display
+  choice: sweep index, seconds (via `sweep_hz`), or stim number in train.
+  This lives in the new `frameToolXscale` radio button group and is stored
+  in `uistate.x_axis_mode`.
 
-These must not be conflated. A recording with `output_per_stim` checked can
-still be plotted with any x-axis mode, and vice versa.
+**`dfoutput` schema is unified.** Both sweep-mode and stim-mode measurements
+share the same column layout: `stim`, `sweep`, `EPSP_amp`, `EPSP_amp_norm`,
+`EPSP_slope`, `EPSP_slope_norm`, `volley_amp`, `volley_slope`. In sweep mode
+`sweep` is the meaningful x-axis column; in stim mode `stim` is. There is
+no structurally separate `dfstimoutput`.
+
+**`build_dfstimoutput` in `analysis_v1.py` is fully deprecated.** The v2
+analysis layer provides a clean internal helper for stim-window measurement
+that is called by `build_dfoutput`, not offered as an alternative to it.
 
 ---
 
@@ -41,6 +51,10 @@ still be plotted with any x-axis mode, and vice versa.
 
 - `frameToolScaling` is split into `frameToolYscale` (existing y-axis
   normalisation controls) and `frameToolXscale` (new x-axis mode controls).
+- `checkBox_output_per_stim` is removed from `frameToolStim` and from
+  `uistate.checkBox`. All code paths that branched on it are replaced by
+  unconditional logic or by `uistate.x_axis == "stim"` where the branch was
+  purely a display decision.
 - x-axis mode is a string stored in `uistate.x_axis_mode`
   (`"sweep"`, `"time"`, `"stim"`), set by a `QButtonGroup` of radio buttons
   in `frameToolXscale`. `"timestamp"` is reserved but disabled.
@@ -49,12 +63,12 @@ still be plotted with any x-axis mode, and vice versa.
   from inter-sweep interval at parse time; falls back to 1 Hz with a status
   warning `"default Hz"`).
 - `bin_size` lives in `df_project` per recording; `NaN` means binning off.
-- Each (recording × output_mode × bin_size) combination has its own cache
-  file.
+- Each (recording × bin_size) combination has its own cache file. There is
+  no per-stim-mode cache split — stim is a column in the unified output, not
+  a file-level distinction.
 - A single `measure_waveform` core function handles all measurement work;
   mode-specific wrappers handle iteration and cache routing.
-- Stim mode (`output_per_stim`) is fully interactive (drag, mouseover,
-  release).
+- Stim x-axis mode is fully interactive (drag, mouseover, release).
 
 ---
 
@@ -63,10 +77,9 @@ still be plotted with any x-axis mode, and vice versa.
 All UI structure changes happen here, before any logic is touched. This
 phase produces new widget names that later phases wire up.
 
-> **Status: complete.** All steps below have been implemented in
-> `ui_designer.py` and `bwmain.py`. This section is retained for reference
-> and to document the actual widget names used (which differ slightly from
-> the original drafts).
+> **Status: mostly complete.** Steps 0.1–0.4, 0.6–0.7 have been implemented
+> in `ui_designer.py` and `bwmain.py`. Step 0.5 is revised: the checkbox is
+> now removed rather than retained.
 
 **0.1** ✅ `frameToolScaling` renamed to `frameToolYscale` throughout
 `ui_designer.py`. `uistate.viewTools` key updated to `"frameToolYscale"`.
@@ -91,7 +104,11 @@ original draft. The canonical names are:
 preference. It will be set via an Edit menu dialog (see Phase 4) rather
 than a permanent widget in the toolbar panel.
 
-**0.5** ✅ `checkBox_output_per_stim` remains in `frameToolStim`.
+**0.5** Remove `checkBox_output_per_stim` from `frameToolStim` in
+`ui_designer.py` (and `bwmain.py`). Update `retranslateUi` accordingly.
+~~`checkBox_output_per_stim` remains in `frameToolStim`.~~ **Revised:** the
+checkbox is deprecated; stim-mode computation is now always performed when
+stims exist, and x-axis selection is handled by `radioButton_xscale_stim`.
 
 **0.6** ✅ `retranslateUi` updated for all new widget labels.
 
@@ -272,21 +289,25 @@ All changes in `analysis_v2.py`.
 - Slope path: use scalar `measureslope` (not `measureslope_vec`) since the
   snippet is a single waveform.
 
-**5.2** Rewrite `build_dfoutput` as a sweep-mode wrapper:
-- Iterate `df.groupby("sweep")`.
-- For each group, call `measure_waveform`.
-- Assemble result dataframe with columns `stim`, `sweep`, measured values.
-- Keep `measureslope_vec` fast path for slope by passing the full df;
-  restructure surrounding logic accordingly.
+**5.2** Rewrite `build_dfoutput` as the single output-computation entry
+point:
+- Always produces a unified dataframe with columns `stim`, `sweep`, and all
+  measured value columns.
+- **Sweep-mode iteration** (always performed for sweep-indexed recordings):
+  iterate `df.groupby("sweep")`; for each sweep call `measure_waveform` at
+  each stim's timepoints. Assemble rows keyed by `(stim, sweep)`. Keep the
+  `measureslope_vec` fast path for slope by passing the full df and
+  restructuring surrounding logic accordingly.
+- **Stim-mode rows** (performed additionally when `len(dft) > 1`): for each
+  stim, slice `dfmean` around the stim window and call `measure_waveform`.
+  Append these rows with `sweep = NaN` and `stim` set to the stim number.
+  These rows are used when `uistate.x_axis == "stim"`.
+- The caller (`get_dfoutput`) passes both `dffilter` and `dfmean`; the
+  function decides internally which rows to compute.
 
-**5.3** Write `build_dfstimoutput` in `analysis_v2.py` as a stim-mode
-wrapper:
-- Input: `dfmean`, `dft`, `filter`.
-- Iterate `dft` rows; for each stim slice `dfmean` around `t_stim` window.
-- Call `measure_waveform` for each slice.
-- Return dataframe with columns `stim` + measured values (one row per
-  stim).
-- Replaces the diverged copy in `analysis_v1.py`.
+**5.3** ~~Write `build_dfstimoutput` in `analysis_v2.py` as a stim-mode
+wrapper.~~ **Revised:** stim-mode measurement is folded into `build_dfoutput`
+(see 5.2). No separate `build_dfstimoutput` function is needed in v2.
 
 **5.4** Write `build_dfbinstimoutput` as the binned-train wrapper:
 - Input: `dfbin`, `dft`, `filter`.
@@ -298,17 +319,20 @@ wrapper:
   (one row per bin × stim).
 
 **5.5** Mark `build_dfstimoutput` in `analysis_v1.py` as deprecated with a
-comment pointing to v2. Do not delete yet.
+comment pointing to the unified `build_dfoutput` in v2. Do not delete until
+v2 implementation is smoke-tested.
+
+**5.6** Remove the `uistate.checkBox["output_per_stim"]` branch from
+`get_dfoutput` in `ui_data_frames.py`. `get_dfoutput` now always calls
+`build_dfoutput` (v2) unconditionally, passing both `dffilter` and `dfmean`.
 
 ---
 
 ## Phase 6 — Cache key separation
 
-`output_per_stim` is a row-level distinction within the output dataframe,
-not a file-level one. When `output_per_stim` is active, `get_dfoutput`
-produces additional rows (one per stim) and a `stim` counter column in the
-same dataframe — it does not write a separate file. The cache therefore
-splits on bin state only:
+`dfoutput` is a unified dataframe — stim-mode rows (where `sweep` is `NaN`)
+and sweep-mode rows coexist in the same file. There is no file-level split
+on stim mode. The cache therefore splits on bin state only:
 
 | bin_size | key            | Cache file                 |
 |----------|----------------|----------------------------|
@@ -320,9 +344,8 @@ keys are needed). It follows the existing literal-suffix convention:
 `{rec}_output_bin.parquet`.
 
 **6.2** Update `get_dfoutput` to select the cache path based on
-`p_row["bin_size"]`: use `key="output_bin"` when bin_size is not NaN,
-`key="output"` otherwise. Both paths apply regardless of
-`output_per_stim`.
+`p_row["bin_size"]`: use `key="output_bin"` when `bin_size` is not `NaN`,
+`key="output"` otherwise.
 
 **6.3** Update `resetCacheDicts` and `purgeRecordingData` to include
 `"_output_bin.parquet"` alongside `"_output.parquet"`.
@@ -352,9 +375,9 @@ axis label:
 
 **7.5** Add `x_axis_values(dfoutput, prow) -> Series` method returning the
 x-values to plot for a given recording:
-- `"sweep"` → `dfoutput["sweep"]`
-- `"time"` → `dfoutput["sweep"] / prow["sweep_hz"]`
-- `"stim"` → `dfoutput["stim"]`
+- `"sweep"` → rows where `sweep` is not `NaN`; x = `dfoutput["sweep"]`
+- `"time"` → same rows as sweep; x = `dfoutput["sweep"] / prow["sweep_hz"]`
+- `"stim"` → rows where `sweep` is `NaN`; x = `dfoutput["stim"]`
 
 **7.6** Replace all inline ternaries of the form
 `"stim" if uistate.checkBox["output_per_stim"] else "sweep"` with
@@ -372,25 +395,38 @@ x-values to plot for a given recording:
 gated on `checkBox["output_per_stim"]` should instead be gated on
 `uistate.x_axis == "stim"`.
 
+**7.10** Remove `checkBox_output_per_stim_changed` handler from `ui.py`.
+Remove `"output_per_stim"` from `uistate.checkBox` and from the
+`viewSettingsChanged` dispatcher. Remove the `connectUIstate` wiring for
+`checkBox_output_per_stim`.
+
 ---
 
 ## Phase 8 — Stim mode completion
 
+Stim-mode rows (`sweep == NaN`) are now always present in `dfoutput` when
+`len(dft) > 1`. The interactive layer needs to be completed to consume them.
+
 **8.1** Complete `outputMouseover` for stim mode:
 - Remove the early `return` stub.
-- Implement ghost waveform using `dfmean` sliced around the hovered stim
-  (same window logic as `build_dfstimoutput`).
+- When `uistate.x_axis == "stim"`, filter `dfoutput` to stim rows and use
+  `dfoutput["stim"]` as x. Implement ghost waveform by slicing `dfmean`
+  around the hovered stim (same window logic as the stim-mode measurement
+  in `build_dfoutput`).
 
 **8.2** Complete `eventDragUpdate` for stim mode:
-- Wire up the commented-out `build_dfstimoutput` call, now that Phase 5
-  provides a working v2 implementation.
+- Remove the `x_axis = "stim" / "sweep"` branch that was driven by
+  `checkBox["output_per_stim"]`.
+- When `uistate.x_axis == "stim"`, call `build_dfoutput` with the temporary
+  timepoints and filter to stim rows for the live preview plot.
 
 **8.3** Complete `eventDragReleased` for stim mode:
-- Implement the `if False:` branch for `build_dfstimoutput`.
+- Remove the `if False:` branch. `build_dfoutput` now always produces stim
+  rows when appropriate; no separate call needed.
 
 **8.4** Smoke-test full stim-mode interaction cycle:
-- Select a train recording → enable `output_per_stim` → drag timepoints →
-  verify output graph updates correctly.
+- Select a train recording → switch x-axis radio button to "Stim" →
+  drag timepoints → verify output graph updates correctly with stim as x.
 
 ---
 
@@ -405,27 +441,26 @@ Only after Phases 1–8 are solid.
 - Call `graphRefresh` — no recalculate needed, x-axis mode is display-only.
 
 **9.2** Enable/disable radio buttons based on recording state:
-- `radioButton_x_stim`: enabled only when selected recording has
+- `radioButton_xscale_stim`: enabled only when selected recording has
   `stims > 1`.
-- `radioButton_x_time`: enabled only when `sweep_hz` is not `NaN`.
-- `radioButton_x_timestamp`: always disabled (future).
+- `radioButton_xscale_time`: enabled only when `sweep_hz` is not `NaN`.
+- `radioButton_xscale_timestamp`: always disabled (future).
 
 **9.3** Populate the button group selection from `uistate.x_axis_mode` when
 a recording is selected, in `tableProjSelectionChanged`.
 
-**9.4** Note: `checkBox_output_per_stim` is unaffected by this phase. It
-remains in `frameToolStim` as a data pipeline control, independent of the
-x-axis display mode.
+**9.4** Note: `checkBox_output_per_stim` has been removed (Phase 0.5 /
+Phase 7.10). The Stim radio button is the sole control for stim x-axis
+display. It does not gate computation — stim-mode rows are always computed
+when stims exist.
 
 ---
 
 ## Open questions
 
-- Should `"stim"` x-axis mode be available when `output_per_stim` is
-  unchecked? Semantically it could mean "show sweep-mode output but label
-  x by stim number" — which is probably not useful. Consider disabling
-  `radioButton_x_stim` when `output_per_stim` is unchecked, or coupling
-  them so selecting stim x-axis implies enabling `output_per_stim`.
+- Should `radioButton_xscale_stim` be enabled for single-stim recordings
+  (`stims == 1`)? The stim-mode plot would be a single point, which is
+  probably not useful. Current proposal: require `stims > 1`.
 - `build_dfbinstimoutput` output has a composite key (bin × stim). The
   output graph shows one line per stim (x = bin), matching how sweep mode
   shows one line per stim today. Confirm this is the intended layout.
@@ -435,3 +470,7 @@ x-axis display mode.
   until parser reliably provides this for all file types.
 - Status field delimiter: `|` is proposed for flag separation. Confirm no
   existing status value contains `|` before committing.
+- Stim-mode rows in the unified `dfoutput` use `sweep = NaN` as the
+  sentinel. Confirm this does not break any existing consumers that iterate
+  all rows without filtering (e.g. normalisation range selection, group mean
+  calculation in `get_dfgroupmean`).

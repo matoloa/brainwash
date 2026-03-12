@@ -98,7 +98,6 @@ class UIstate:
             "splitOddEven": False,  # split parsed file into odd _1 and even _2 recordings
             "show_all_events": False,  # show ghosts of non-selected events in eventgraph output graph
             "timepoints_per_stim": False,  # allow setting (non-uniform) timepoints per stim
-            "output_per_stim": False,  # output per stim (for binned trains) instead of per sweep (for consecutive sweeps)
             "output_ymin0": True,  # set output y-axis minimum to 0
             # break these out to separate mod-class?
             "norm_EPSP": False,  # show normalized EPSPs (they're always calculated)

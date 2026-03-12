@@ -873,7 +873,6 @@ class UIsub(
 
         if config.hide_experimental:
             self.checkBox_show_all_events.setVisible(False)
-            self.checkBox_output_per_stim.setVisible(False)
             self.checkBox_paired_stims.setVisible(False)
             self.checkBox_timepoints_per_stim.setVisible(False)
             self.pushButton_stim_assign_threshold.setVisible(False)
@@ -1526,8 +1525,6 @@ class UIsub(
                 self.zoomAuto()
             elif key == "splitOddEven":
                 self.checkBox_splitOddEven_changed(state)
-            elif key == "output_per_stim":
-                self.checkBox_output_per_stim_changed(state)
             elif key == "timepoints_per_stim":
                 self.checkBox_timepoints_per_stim_changed(state)
             elif key == "output_ymin0":
@@ -2927,22 +2924,6 @@ class UIsub(
         logger.debug("checkBox_splitOddEven_changed: %s", state)
         print(f"checkBox_splitOddEven_changed: {state}")
 
-    def checkBox_output_per_stim_changed(self, state):
-        uistate.checkBox["output_per_stim"] = state == 2
-        print(f"checkBox_output_per_stim_changed: {state}")
-        self.uiFreeze()
-        df_p = self.get_df_project()
-        for i, p_row in df_p.iterrows():
-            dfoutput = self.get_dfoutput(p_row, reset=True)
-            self.persistOutput(p_row["recording_name"], dfoutput)
-            uiplot.unPlot(p_row["ID"])
-            df_t = self.get_dft(p_row)
-            dfmean = self.get_dfmean(p_row)
-            uiplot.addRow(p_row=p_row, dft=df_t, dfmean=dfmean, dfoutput=dfoutput)
-            self.update_show(reset=True)
-        self.uiThaw()
-        self.zoomAuto()
-
     def checkBox_timepoints_per_stim_changed(self, state):
         uistate.checkBox["timepoints_per_stim"] = state == 2
         print(f"checkBox_timepoints_per_stim_changed: {state}")
@@ -3544,7 +3525,7 @@ class UIsub(
         if len(uistate.list_idx_select_recs) != 1:
             self.exorcise()
             return
-        x_axis = "stim" if uistate.checkBox["output_per_stim"] else "sweep"
+        x_axis = "sweep"
 
         # find a visible line
         dict_out = {
@@ -4073,16 +4054,9 @@ class UIsub(
         n_stims = prow["stims"]
         dft_temp = uistate.dft_temp  # set when clicked
         stim_offset = dft_temp.at[stim_idx, "t_stim"]
-        dffilter = None
+        dffilter = self.get_dffilter(row=prow)
         dict_t = None
-
-        if uistate.checkBox["output_per_stim"]:
-            x_axis = "stim"
-            dfmean = self.get_dfmean(row=prow)
-        else:
-            x_axis = "sweep"
-            dffilter = self.get_dffilter(row=prow)
-            dfmean = None
+        x_axis = "sweep"
 
         if aspect in ["EPSP_slope", "volley_slope"]:
             axis = uistate.ax2
@@ -4106,14 +4080,9 @@ class UIsub(
         dict_t["norm_output_from"] = trow_temp["norm_output_from"]
         dict_t["norm_output_to"] = trow_temp["norm_output_to"]
 
-        if x_axis == "stim":
-            print("eventDragUpdate: dfstimoutput removed from last analysis.")
-            # TODO: fix eventDragUpdate for dfstimoutput
-            # out = analysis.build_dfstimoutput(dfmean=dfmean, dft=dft_temp)
-        elif x_axis == "sweep":
-            dict_t["stim"] = trow_temp["stim"]
-            dict_t["amp_zero"] = trow_temp["amp_zero"]
-            out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, quick=True)
+        dict_t["stim"] = trow_temp["stim"]
+        dict_t["amp_zero"] = trow_temp["amp_zero"]
+        out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, quick=True)
 
         # norm handling for EPSP
         if aspect in ["EPSP_amp", "EPSP_slope"]:
@@ -4233,32 +4202,29 @@ class UIsub(
         dfmean = self.get_dfmean(row=prow)
 
         # update dfoutput; dict and file, with normalized columns if applicable
-        if False:  # uistate.checkBox['output_per_stim']:
-            dfoutput = analysis.build_dfstimoutput(df=dfmean, df_t=dft_temp)
-        else:
-            dfoutput = self.get_dfoutput(row=prow)
-            dffilter = self.get_dffilter(row=prow)
-            stim_num = trow_temp["stim"]
-            new_dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t_updates)
-            # print(f"dfoutput: {dfoutput}")
-            # update volley means
-            if aspect == "volley amp":
-                dft_temp.loc[dft_temp.index[stim_idx], "volley_amp_mean"] = (
-                    new_dfoutput["volley_amp"].mean()
-                )
-            elif aspect == "volley slope":
-                dft_temp.loc[dft_temp.index[stim_idx], "volley_slope_mean"] = (
-                    new_dfoutput["volley_slope"].mean()
-                )
+        dfoutput = self.get_dfoutput(row=prow)
+        dffilter = self.get_dffilter(row=prow)
+        stim_num = trow_temp["stim"]
+        new_dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t_updates)
+        # print(f"dfoutput: {dfoutput}")
+        # update volley means
+        if aspect == "volley amp":
+            dft_temp.loc[dft_temp.index[stim_idx], "volley_amp_mean"] = new_dfoutput[
+                "volley_amp"
+            ].mean()
+        elif aspect == "volley slope":
+            dft_temp.loc[dft_temp.index[stim_idx], "volley_slope_mean"] = new_dfoutput[
+                "volley_slope"
+            ].mean()
 
-            new_dfoutput["stim"] = int(stim_num)
-            dfoutput.set_index(["stim", "sweep"], inplace=True)
-            new_dfoutput.set_index(["stim", "sweep"], inplace=True)
-            dfoutput = dfoutput.astype(float)
-            new_dfoutput = new_dfoutput.astype(float)
-            dfoutput.update(new_dfoutput)
-            dfoutput.reset_index(inplace=True)
-            new_dfoutput.reset_index(inplace=True)
+        new_dfoutput["stim"] = int(stim_num)
+        dfoutput.set_index(["stim", "sweep"], inplace=True)
+        new_dfoutput.set_index(["stim", "sweep"], inplace=True)
+        dfoutput = dfoutput.astype(float)
+        new_dfoutput = new_dfoutput.astype(float)
+        dfoutput.update(new_dfoutput)
+        dfoutput.reset_index(inplace=True)
+        new_dfoutput.reset_index(inplace=True)
 
         self.persistOutput(rec_name=rec_name, dfoutput=dfoutput)
 

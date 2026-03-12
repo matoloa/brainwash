@@ -233,32 +233,27 @@ class DataFrameMixin:
             if dft is None:
                 dft = self.get_dft(row=row)
             # print(f"df_t: {df_t}")
-            if uistate.checkBox["output_per_stim"]:
-                dfoutput = analysis.build_dfstimoutput(df=dfmean, df_t=dft)
-            else:
-                dfoutput = pd.DataFrame()
-                for i, t_row in dft.iterrows():
-                    dict_t = t_row.to_dict()
-                    if pd.notna(row["bin_size"]):
-                        dfinput = self.get_dfbin(row)
-                    else:
-                        dfinput = self.get_dffilter(row)
-                    dfoutput_stim = analysis.build_dfoutput(df=dfinput, dict_t=dict_t)
-                    print(
-                        f"get_dfoutput: build_dfoutput done for stim row {i}, assigning means"
-                    )
-                    dft.at[i, "volley_amp_mean"] = dfoutput_stim["volley_amp"].mean()
-                    print(f"get_dfoutput: volley_amp_mean assigned")
-                    dft.at[i, "volley_slope_mean"] = dfoutput_stim[
-                        "volley_slope"
-                    ].mean()
-                    print(f"get_dfoutput: volley_slope_mean assigned, concat next")
-                    dfoutput = pd.concat([dfoutput, dfoutput_stim])
-                    print(f"get_dfoutput: concat done, loop continuing")
-                self.set_dft(rec, dft)
+            dfoutput = pd.DataFrame()
+            for i, t_row in dft.iterrows():
+                dict_t = t_row.to_dict()
+                if pd.notna(row["bin_size"]):
+                    dfinput = self.get_dfbin(row)
+                else:
+                    dfinput = self.get_dffilter(row)
+                dfoutput_stim = analysis.build_dfoutput(df=dfinput, dict_t=dict_t)
                 print(
-                    f"get_dfoutput: set_dft done, returning dfoutput shape={dfoutput.shape}"
+                    f"get_dfoutput: build_dfoutput done for stim row {i}, assigning means"
                 )
+                dft.at[i, "volley_amp_mean"] = dfoutput_stim["volley_amp"].mean()
+                print(f"get_dfoutput: volley_amp_mean assigned")
+                dft.at[i, "volley_slope_mean"] = dfoutput_stim["volley_slope"].mean()
+                print(f"get_dfoutput: volley_slope_mean assigned, concat next")
+                dfoutput = pd.concat([dfoutput, dfoutput_stim])
+                print(f"get_dfoutput: concat done, loop continuing")
+            self.set_dft(rec, dft)
+            print(
+                f"get_dfoutput: set_dft done, returning dfoutput shape={dfoutput.shape}"
+            )
             dfoutput.reset_index(drop=True, inplace=True)
             # Persist the clean (no spurious index column) version to disk.
             self.df2file(df=dfoutput, rec=rec, key="output")
@@ -492,10 +487,24 @@ class DataFrameMixin:
                     p_row = matching_rows.iloc[0]
                 df = self.get_dfoutput(row=p_row)
                 dfs.append(df)
-            if uistate.checkBox["output_per_stim"]:
+            if len(dfs) == 0:
+                group_mean = pd.DataFrame(
+                    {
+                        "sweep": [],
+                        "EPSP_amp_norm_mean": [],
+                        "EPSP_amp_norm_SEM": [],
+                        "EPSP_slope_norm_mean": [],
+                        "EPSP_slope_norm_SEM": [],
+                        "EPSP_amp_mean": [],
+                        "EPSP_amp_SEM": [],
+                        "EPSP_slope_mean": [],
+                        "EPSP_slope_SEM": [],
+                    }
+                )
+            else:
                 group_mean = (
                     pd.concat(dfs)
-                    .groupby("stim")
+                    .groupby("sweep")
                     .agg(
                         {
                             "EPSP_amp_norm": ["mean", "sem"],
@@ -506,47 +515,12 @@ class DataFrameMixin:
                     )
                     .reset_index()
                 )
-                group_mean.columns = [
-                    col[0]
-                    if col[0] == "stim"
-                    else "_".join(col).strip().replace("sem", "SEM")
-                    for col in group_mean.columns.values
-                ]
-            else:
-                if len(dfs) == 0:
-                    group_mean = pd.DataFrame(
-                        {
-                            "sweep": [],
-                            "EPSP_amp_norm_mean": [],
-                            "EPSP_amp_norm_SEM": [],
-                            "EPSP_slope_norm_mean": [],
-                            "EPSP_slope_norm_SEM": [],
-                            "EPSP_amp_mean": [],
-                            "EPSP_amp_SEM": [],
-                            "EPSP_slope_mean": [],
-                            "EPSP_slope_SEM": [],
-                        }
-                    )
-                else:
-                    group_mean = (
-                        pd.concat(dfs)
-                        .groupby("sweep")
-                        .agg(
-                            {
-                                "EPSP_amp_norm": ["mean", "sem"],
-                                "EPSP_slope_norm": ["mean", "sem"],
-                                "EPSP_amp": ["mean", "sem"],
-                                "EPSP_slope": ["mean", "sem"],
-                            }
-                        )
-                        .reset_index()
-                    )
-                group_mean.columns = [
-                    col[0]
-                    if col[0] == "sweep"
-                    else "_".join(col).strip().replace("sem", "SEM")
-                    for col in group_mean.columns.values
-                ]
+            group_mean.columns = [
+                col[0]
+                if col[0] == "sweep"
+                else "_".join(col).strip().replace("sem", "SEM")
+                for col in group_mean.columns.values
+            ]
             print(f"Group mean columns: {group_mean.columns}")
             print(f"Group mean: {group_mean}")
             self.df2file(df=group_mean, rec=f"group_{group_ID}", key="mean")
