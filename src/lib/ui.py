@@ -40,7 +40,7 @@ import time  # counting time for functions
 import uuid  # generating unique talkback ID
 from datetime import datetime  # used in project name defaults
 
-import analysis_v2 as analysis
+import analysis_v3 as analysis
 
 # brainwash files
 import parse
@@ -2554,7 +2554,10 @@ class UIsub(
                 f"stimDetect: {rec_name} calling find_events within range:\n{uistate.x_select}"
             )
             new_df_t = analysis.find_events(
-                dfmean=dfmean_range, default_dict_t=default_dict_t, verbose=False
+                dfmean=dfmean_range,
+                default_dict_t=default_dict_t,
+                filter=p_row["filter"],
+                verbose=False,
             )
             if new_df_t is None:
                 print(f"StimDetect: No stims found for {rec_name}.")
@@ -4082,7 +4085,14 @@ class UIsub(
 
         dict_t["stim"] = trow_temp["stim"]
         dict_t["amp_zero"] = trow_temp["amp_zero"]
-        out = analysis.build_dfoutput(df=dffilter, dict_t=dict_t, quick=True)
+        dft_single = uistate.dft_temp.iloc[[stim_idx]].copy()
+        dft_single.update(pd.DataFrame([dict_t]))
+        out = analysis.build_dfoutput(
+            dffilter=dffilter,
+            dfmean=self.get_dfmean(row=prow),
+            dft=dft_single,
+            quick=True,
+        )
 
         # norm handling for EPSP
         if aspect in ["EPSP_amp", "EPSP_slope"]:
@@ -4205,7 +4215,13 @@ class UIsub(
         dfoutput = self.get_dfoutput(row=prow)
         dffilter = self.get_dffilter(row=prow)
         stim_num = trow_temp["stim"]
-        new_dfoutput = analysis.build_dfoutput(df=dffilter, dict_t=dict_t_updates)
+        dft_single = uistate.dft_temp.iloc[[stim_idx]].copy()
+        dft_single.update(pd.DataFrame([dict_t_updates]))
+        new_dfoutput = analysis.build_dfoutput(
+            dffilter=dffilter,
+            dfmean=dfmean,
+            dft=dft_single,
+        )
         # print(f"dfoutput: {dfoutput}")
         # update volley means
         if aspect == "volley amp":

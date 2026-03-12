@@ -164,7 +164,7 @@ if source_path is None and existing_row is None:
 # Import library modules
 # ---------------------------------------------------------------------------
 parse = step("1 – import parse", lambda: __import__("parse"))
-analysis = step("1b – import analysis_v2", lambda: __import__("analysis_v2"))
+analysis = step("1b – import analysis_v3", lambda: __import__("analysis_v3"))
 
 if parse is None or analysis is None:
     log.error("Cannot import core modules. Aborting.")

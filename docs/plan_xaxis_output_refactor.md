@@ -1,7 +1,7 @@
 # Output Graph X-Axis Refactor — Implementation Plan
 
 _Created: 2026-03-08_
-_Updated: 2026-05-29_
+_Updated: 2026-06-10_
 
 ## Background
 
@@ -41,9 +41,38 @@ share the same column layout: `stim`, `sweep`, `EPSP_amp`, `EPSP_amp_norm`,
 `sweep` is the meaningful x-axis column; in stim mode `stim` is. There is
 no structurally separate `dfstimoutput`.
 
-**`build_dfstimoutput` in `analysis_v1.py` is fully deprecated.** The v2
-analysis layer provides a clean internal helper for stim-window measurement
-that is called by `build_dfoutput`, not offered as an alternative to it.
+**`build_dfstimoutput` in `analysis_v1.py` is fully deprecated.** The v3
+analysis layer (`analysis_v3.py`) provides `measure_waveform` as the clean
+internal helper for stim-window measurement, called by `build_dfoutput`.
+
+**`analysis_v3.py` supersedes `analysis_v2.py`.** v3 is production-only
+(no `__main__`, no notebook cells, no plotting inside detection functions).
+`analysis_v2.py` is frozen as legacy; `analysis_evaluation.py` is the home
+for test harnesses and notebook-style evaluation code.
+
+**`amp_zero` has two distinct roles that must not be conflated.**
+- *Measurement* (`build_dfoutput`): computed per-sweep from `dffilter[filter]`
+  in the 2 ms before `t_stim`, via `_compute_amp_zero_per_sweep`. Tracks
+  per-sweep DC drift; subtracted from voltage at measurement timepoint.
+- *Plotting* (`addRow`, `update` in `ui_plot.py`): computed fresh from
+  `dfmean[rec_filter]` in the 2 ms before `t_stim` as `amp_zero_plot`.
+  Completely independent of `dft["amp_zero"]`; anchors the zero line and
+  amplitude bracket on `axe` to the displayed waveform's local baseline.
+  `dft["amp_zero"]` (set by `find_timepoints`) is not used for plotting.
+
+---
+
+**`find_timepoints` replaces `characterize_graph` + `i2t`.** Same sequential
+detection logic (stim → volley M-shape → EPSP trough → slope windows) but
+returns only the 14 time-valued keys needed to populate one `dft` row.
+All tuning knobs are explicit params with defaults (hookable via
+`default_dict_t` later):
+- `volley_slope_n_points` (default 3)
+- `epsp_slope_n_points` (default 7)
+- `volley_slope_search_fraction` (default 0.5)
+- `epsp_slope_search_fraction` (default 0.25)
+- `filter` (default `"voltage"`) — used for baseline/amp_zero computation;
+  must match `rec_filter` so `amp_zero` aligns with the plotted waveform.
 
 ---
 
@@ -278,53 +307,100 @@ permanent UI real estate.
 
 ## Phase 5 — Analysis layer unification
 
-All changes in `analysis_v2.py`.
+> **Status: complete.** All changes implemented in `analysis_v3.py`.
+> `ui.py`, `ui_data_frames.py`, and `test_parse_click.py` rerouted to
+> `import analysis_v3 as analysis`. `analysis_v1.py` deprecation header
+> updated to point to v3. `analysis_v2.py` frozen as legacy.
 
-**5.1** Extract `measure_waveform(df_snippet, dict_t, filter) -> dict`.
-- Input: single-waveform dataframe with columns `time` and `<filter>`;
-  `dict_t` with timepoint keys.
-- Output: plain dict of measured values (`EPSP_amp`, `EPSP_slope`,
-  `volley_amp`, `volley_slope`, and their `_norm` variants).
-- No sweep or stim awareness — pure signal measurement.
-- Slope path: use scalar `measureslope` (not `measureslope_vec`) since the
-  snippet is a single waveform.
+### v3 design rationale
 
-**5.2** Rewrite `build_dfoutput` as the single output-computation entry
-point:
-- Always produces a unified dataframe with columns `stim`, `sweep`, and all
-  measured value columns.
-- **Sweep-mode iteration** (always performed for sweep-indexed recordings):
-  iterate `df.groupby("sweep")`; for each sweep call `measure_waveform` at
-  each stim's timepoints. Assemble rows keyed by `(stim, sweep)`. Keep the
-  `measureslope_vec` fast path for slope by passing the full df and
-  restructuring surrounding logic accordingly.
-- **Stim-mode rows** (performed additionally when `len(dft) > 1`): for each
-  stim, slice `dfmean` around the stim window and call `measure_waveform`.
-  Append these rows with `sweep = NaN` and `stim` set to the stim number.
-  These rows are used when `uistate.x_axis == "stim"`.
-- The caller (`get_dfoutput`) passes both `dffilter` and `dfmean`; the
-  function decides internally which rows to compute.
+`analysis_v2.characterize_graph` was doing two jobs — detection and
+characterisation — and producing ~25 outputs of which only 4 time values
+survived into `dft`. The `i2t` translation layer inside `find_events` was
+a lossy repackaging step. Measured values (`epsp_depth`, `volley_slope_value`,
+noise level, region tuples, all index outputs) were computed and immediately
+discarded.
 
-**5.3** ~~Write `build_dfstimoutput` in `analysis_v2.py` as a stim-mode
-wrapper.~~ **Revised:** stim-mode measurement is folded into `build_dfoutput`
-(see 5.2). No separate `build_dfstimoutput` function is needed in v2.
+`analysis_v3` separates concerns cleanly:
+- **Detection** → `find_timepoints` (timepoints only, no measurements)
+- **Measurement** → `measure_waveform` (measurements only, no detection)
+- **Iteration** → `build_dfoutput` (orchestrates both)
 
-**5.4** Write `build_dfbinstimoutput` as the binned-train wrapper:
-- Input: `dfbin`, `dft`, `filter`.
-- Outer loop: `dfbin.groupby("sweep")` (each group is one bin's waveform).
-- Inner loop: iterate `dft` rows (stims).
-- For each (bin, stim) pair, slice the bin waveform around `t_stim` and
-  call `measure_waveform`.
-- Return dataframe with columns `bin`, `stim` + measured values
-  (one row per bin × stim).
+Test harnesses and notebook code that previously lived in `analysis_v2.py`
+belong in `analysis_evaluation.py` and dedicated notebooks — not in the
+production module.
 
-**5.5** Mark `build_dfstimoutput` in `analysis_v1.py` as deprecated with a
-comment pointing to the unified `build_dfoutput` in v2. Do not delete until
-v2 implementation is smoke-tested.
+### Implemented functions
 
-**5.6** Remove the `uistate.checkBox["output_per_stim"]` branch from
-`get_dfoutput` in `ui_data_frames.py`. `get_dfoutput` now always calls
-`build_dfoutput` (v2) unconditionally, passing both `dffilter` and `dfmean`.
+**`valid(*args)`** — unchanged from v2.
+
+**`measureslope_vec(...)`** — unchanged from v2.
+
+**`_scalar_measureslope(df_snippet, t_start, t_end, filter)`** — private
+scalar slope helper for single-waveform measurement; used by
+`measure_waveform`.
+
+**`find_i_stims(dfmean, ...)`** — same logic as v2, cleaned up.
+
+**`find_timepoints(df_snippet, default_dict_t, filter, ...) -> dict`** —
+replaces `characterize_graph` + `i2t`. Returns exactly the keys needed for
+one `dft` row. All tuning knobs are explicit params with defaults (see Key
+design decisions above).
+
+**`find_events(dfmean, default_dict_t, filter, ...) -> pd.DataFrame`** —
+thin loop: `find_i_stims` → per-stim snippet → `find_timepoints` → assemble
+`dft`. No nested `i2t`. `filter` forwarded so `amp_zero` in `dft` is
+computed from the correct column.
+
+**`measure_waveform(df_snippet, dict_t, filter) -> dict`** — pure
+single-waveform measurement. Returns `EPSP_amp`, `EPSP_slope`, `volley_amp`,
+`volley_slope`. No sweep or stim awareness.
+
+**`_compute_amp_zero_per_sweep(dffilter, t_stim, filter) -> pd.Series`** —
+private helper; computes per-sweep amp_zero as mean of `dffilter[filter]`
+in the 2 ms before `t_stim`. Used by `build_dfoutput` sweep-mode path.
+
+**`build_dfoutput(dffilter, dfmean, dft, filter, quick) -> pd.DataFrame`** —
+unified entry point. Signature change from v2: accepts `dffilter`, `dfmean`,
+and `dft` as separate arguments (v2 took `df` and `dict_t`).
+- Sweep-mode rows: one per sweep × stim, using `measureslope_vec` fast path
+  for slopes and `_compute_amp_zero_per_sweep` for per-sweep zero reference.
+- Stim-mode rows (`sweep=NaN`): one per stim when `len(dft) > 1`, measured
+  from `dfmean` slices via `measure_waveform`.
+- Column order enforced: `stim`, `sweep`, `EPSP_amp`, `EPSP_amp_norm`,
+  `EPSP_slope`, `EPSP_slope_norm`, `volley_amp`, `volley_slope`.
+
+**`build_dfbinstimoutput(dfbin, dft, filter) -> pd.DataFrame`** — binned
+train wrapper. Outer loop: bins (`dfbin.groupby("sweep")`). Inner loop:
+stims (`dft` rows). Returns `bin`, `stim` + measured values.
+
+**`ttest_df(...)`** and **`addFilterSavgol(...)`** — ported from v2 (were
+missing from v3 initially; added to complete the public API).
+
+### Caller changes
+
+**`get_dfoutput` (`ui_data_frames.py`)**: old per-stim loop replaced with
+single `build_dfoutput(dffilter, dfmean, dft)` call. `volley_amp_mean` /
+`volley_slope_mean` back-fill now reads from sweep-mode rows of the unified
+output.
+
+**`eventDragUpdate` / `eventDragReleased` (`ui.py`)**: construct a
+single-row `dft` from `dft_temp` patched with dragged values; pass as
+`dft=` alongside `dffilter=` and `dfmean=`.
+
+**`get_dft` (`ui_data_frames.py`)** and **`stimDetect` (`ui.py`)**: pass
+`filter=row["filter"]` / `filter=p_row["filter"]` to `find_events`.
+
+### amp_zero plotting fix (`ui_plot.py`)
+
+`addRow` previously used `t_row["amp_zero"]` (always `0` in v2) to anchor
+the zero line and amplitude bracket on `axe`. In v3, `dft["amp_zero"]` is a
+real voltage value, making the inconsistency visible. Fixed by computing
+`amp_zero_plot` directly from the displayed waveform:
+- `addRow`: mean of `dfmean[rec_filter]` in the 2 ms before `t_stim`.
+- `update`: mean of `data_y[data_x < 0]` (axe data is already time-shifted).
+`dft["amp_zero"]` is now used only by `build_dfoutput` for measurement
+arithmetic; it is never read by the plotting layer.
 
 ---
 

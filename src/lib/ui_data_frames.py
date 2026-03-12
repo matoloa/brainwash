@@ -18,7 +18,7 @@ import json
 import time
 from pathlib import Path
 
-import analysis_v2 as analysis
+import analysis_v3 as analysis
 import pandas as pd
 import parse
 
@@ -180,7 +180,10 @@ class DataFrameMixin:
             default_dict_t = uistate.default_dict_t.copy()  # Default sizes
             dfmean = self.get_dfmean(row)
             dft = analysis.find_events(
-                dfmean=dfmean, default_dict_t=default_dict_t, verbose=False
+                dfmean=dfmean,
+                default_dict_t=default_dict_t,
+                filter=row["filter"],
+                verbose=False,
             )
             # TODO: Error handling!
             if dft.empty:
@@ -232,30 +235,27 @@ class DataFrameMixin:
             dfmean = self.get_dfmean(row=row)
             if dft is None:
                 dft = self.get_dft(row=row)
-            # print(f"df_t: {df_t}")
-            dfoutput = pd.DataFrame()
-            for i, t_row in dft.iterrows():
-                dict_t = t_row.to_dict()
-                if pd.notna(row["bin_size"]):
-                    dfinput = self.get_dfbin(row)
-                else:
-                    dfinput = self.get_dffilter(row)
-                dfoutput_stim = analysis.build_dfoutput(df=dfinput, dict_t=dict_t)
-                print(
-                    f"get_dfoutput: build_dfoutput done for stim row {i}, assigning means"
-                )
-                dft.at[i, "volley_amp_mean"] = dfoutput_stim["volley_amp"].mean()
-                print(f"get_dfoutput: volley_amp_mean assigned")
-                dft.at[i, "volley_slope_mean"] = dfoutput_stim["volley_slope"].mean()
-                print(f"get_dfoutput: volley_slope_mean assigned, concat next")
-                dfoutput = pd.concat([dfoutput, dfoutput_stim])
-                print(f"get_dfoutput: concat done, loop continuing")
-            self.set_dft(rec, dft)
-            print(
-                f"get_dfoutput: set_dft done, returning dfoutput shape={dfoutput.shape}"
+            if pd.notna(row["bin_size"]):
+                dfinput = self.get_dfbin(row)
+            else:
+                dfinput = self.get_dffilter(row)
+            dfoutput = analysis.build_dfoutput(
+                dffilter=dfinput,
+                dfmean=dfmean,
+                dft=dft,
             )
+            # Back-fill volley means into dft from the sweep-mode rows
+            for i, t_row in dft.iterrows():
+                stim_nr = t_row["stim"]
+                sweep_rows = dfoutput[
+                    (dfoutput["stim"] == stim_nr) & dfoutput["sweep"].notna()
+                ]
+                dft.at[i, "volley_amp_mean"] = sweep_rows["volley_amp"].mean()
+                dft.at[i, "volley_slope_mean"] = sweep_rows["volley_slope"].mean()
+            self.set_dft(rec, dft)
+            print(f"get_dfoutput: done, dfoutput.shape={dfoutput.shape}")
             dfoutput.reset_index(drop=True, inplace=True)
-            # Persist the clean (no spurious index column) version to disk.
+            # Persist the clean version to disk.
             self.df2file(df=dfoutput, rec=rec, key="output")
         # Cache and return
         self.dict_outputs[rec] = dfoutput
