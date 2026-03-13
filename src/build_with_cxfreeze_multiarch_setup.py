@@ -32,10 +32,12 @@ print(f"site-packages: {_venv_site}")
 # pyproject.toml is read at runtime by ui.py (Config.__init__) to get the
 # version string.  It is placed at lib/pyproject.toml so the existing search
 # list in ui.py ("lib" entry) finds it without any code changes.
-# "lib/" copies the whole src/lib directory into build/exe.*/lib/.
+# NOTE: do NOT add "lib/" here — cx_Freeze already freezes the lib package
+# automatically (it is imported by main.py).  Adding it as an include_files
+# entry would copy a raw directory into build/exe.*/lib/, which makes Python
+# see lib/lib/__init__.py and breaks all "from lib import …" imports.
 include_files = [
     ("../pyproject.toml", "lib/pyproject.toml"),
-    ("lib/", "lib"),
 ]
 
 # ---------------------------------------------------------------------------
