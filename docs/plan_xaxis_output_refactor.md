@@ -117,15 +117,17 @@ phase produces new widget names that later phases wire up.
 `frameToolBin` and `frameToolYscale`. Added to `uistate.viewTools` as
 `"frameToolXscale": ["X axis", True]`.
 
-**0.3** ✅ `buttonGroup_x_axis` added inside `frameToolXscale` with five
+**0.3** ✅ `buttonGroup_x_axis` added inside `frameToolXscale` with four
 `QRadioButton`s. Note: actual widget names use the `_xscale_` infix, not
-`_x_` as originally drafted. There is also a fifth button not in the
-original draft. The canonical names are:
+`_x_` as originally drafted. The canonical names are:
 - `radioButton_xscale_sweep` — "Sweep" (default, always enabled)
 - `radioButton_xscale_time` — "Time" (enabled when `sweep_hz` is set)
 - `radioButton_xscale_stim` — "Stim" (enabled when `stims > 1`)
-- `radioButton_xscale_bin` — "Bin" (enabled when binning is active)
 - `radioButton_xscale_timestamp` — "Timestamp" (always disabled — future)
+
+`radioButton_xscale_bin` was removed: when binning is active, sweep-mode
+x-axis already shows bin 1, bin 2, etc. — a separate mode would be
+redundant.
 
 **0.4** ~~Add `lineEdit_sweep_hz`, `label_sweep_hz`, and
 `pushButton_sweep_hz_set_all` inside `frameToolXscale`.~~ **Dropped.**
@@ -655,20 +657,67 @@ Stim-mode rows (`sweep == NaN`) are now always present in `dfoutput` when
 
 Only after Phases 1–8 are solid.
 
-**9.1** Connect `buttonGroup_x_axis` (added in Phase 0) to a single handler
-`x_axis_mode_changed(mode: str)`:
-- Write `mode` into `uistate.x_axis_mode`.
-- Save config.
-- Call `graphRefresh` — no recalculate needed, x-axis mode is display-only.
+**9.1** ~~Connect `buttonGroup_x_axis` (added in Phase 0) to a single handler
+`x_axis_mode_changed(mode: str)`:~~ **Done.**
+- `_RADIO_TO_MODE` / `_MODE_TO_RADIO` class-level dicts on `UIsub` map
+  between widget `objectName()` and mode string.
+- `x_axis_mode_changed(self, button)` is the `buttonClicked` handler:
+  resolves mode via `_RADIO_TO_MODE`, writes to `uistate.x_axis_mode`,
+  calls `save_cfg`, then `update_show` + `zoomAuto` + `graphRefresh`.
+  Early-returns if mode is unchanged.
+- Signal wired in `connectUIstate` (first entry, before checkboxes) so
+  it participates in the standard disconnect/reconnect cycle used by
+  `tableProjSelectionChanged`, `applyConfigStates`, `uiFreeze`/`uiThaw`.
 
-**9.2** Enable/disable radio buttons based on recording state:
-- `radioButton_xscale_stim`: enabled only when selected recording has
-  `stims > 1`.
-- `radioButton_xscale_time`: enabled only when `sweep_hz` is not `NaN`.
+**9.1a** Dual-artist approach for instant mode toggling:
+- `addRow` (`ui_plot.py`) now **always** creates both sweep-mode and
+  stim-mode output artists, regardless of the current `x_axis_mode`.
+  Sweep-mode lines use `out["sweep"]` as x-data; stim-mode lines use
+  `out_stim["stim"]` (from `dfoutput[dfoutput["sweep"].isna()]`).
+- Each artist is tagged with `x_mode="sweep"` or `x_mode="stim"` in
+  `dict_rec_labels` (new key on all plot helpers: `plot_line`,
+  `plot_marker`, `plot_vline`, `plot_hline`, `plot_amp_width`).
+  Artists not tied to a mode (mean lines, event lines, axe markers)
+  keep `x_mode=None`.
+- `_is_rec_visible` (`ui.py`) filters on `x_mode`: lines with
+  `x_mode is not None and x_mode != uistate.x_axis_mode` are hidden.
+  This makes toggling a pure visibility + zoom change — no unplot/rebuild.
+- `x_axis_xlim` (`ui_state_classes.py`) now accepts an optional `dft`
+  parameter and uses `len(dft)` for the stim count, avoiding the
+  `int(prow["stims"])` NaN crash (`df_project["stims"]` is unreliably
+  populated). `zoomAuto` passes `dft=self.get_dft(row=prow)`.
+
+**9.2** ~~Enable/disable radio buttons based on recording state:~~ **Done.**
+Implemented in `update_x_axis_radio_buttons()`:
+- `radioButton_xscale_sweep`: always enabled.
+- `radioButton_xscale_stim`: enabled when any selected recording has a
+  cached dft with `len(dft) >= 1` (i.e. at least one stim detected).
+  Single-stim recordings produce a single data point — unusual but allowed.
+- `radioButton_xscale_time`: enabled only when any selected recording has
+  `sweep_hz` that is not `NaN`.
 - `radioButton_xscale_timestamp`: always disabled (future).
+- **Data source:** stim count comes from the cached `dict_ts` (populated by
+  `get_dft`), not from `df_project["stims"]` — the latter is never written
+  back by `get_dft` and is unreliably `NaN` for most recordings.
+- **Fallback:** if the persisted `x_axis_mode` is no longer available for
+  the current selection (e.g. switching to a recording with no stims while
+  "stim" is active), the mode auto-reverts to `"sweep"`.
+- **Disabled styling:** the darkmode blanket stylesheet (`color: #fff`) on
+  `mainWindow` overrides Qt's built-in disabled palette, making disabled
+  radio buttons visually indistinguishable. Fixed by applying per-widget
+  `setStyleSheet(f"color: {disabled_color}")` on disabled buttons (cleared
+  to `""` when enabled so the parent stylesheet applies normally).
+- `uiFreeze` disables all radio buttons; `uiThaw` re-enables sweep
+  (the full state is restored by `tableProjSelectionChanged` which runs
+  after thaw).
 
-**9.3** Populate the button group selection from `uistate.x_axis_mode` when
-a recording is selected, in `tableProjSelectionChanged`.
+**9.3** ~~Populate the button group selection from `uistate.x_axis_mode` when
+a recording is selected, in `tableProjSelectionChanged`.~~ **Done.**
+- `update_x_axis_radio_buttons()` is called from `tableProjSelectionChanged`
+  inside the `connectUIstate(disconnect=True)` block, so `setChecked` does
+  not re-trigger the handler.
+- `applyConfigStates` also restores the radio button selection from
+  `uistate.x_axis_mode` (between the `disconnect`/`reconnect` pair).
 
 **9.4** Note: `checkBox_output_per_stim` has been removed (Phase 0.5 /
 Phase 7.10). The Stim radio button is the sole control for stim x-axis
@@ -679,9 +728,9 @@ when stims exist.
 
 ## Open questions
 
-- Should `radioButton_xscale_stim` be enabled for single-stim recordings
-  (`stims == 1`)? The stim-mode plot would be a single point, which is
-  probably not useful. Current proposal: require `stims > 1`.
+- ~~Should `radioButton_xscale_stim` be enabled for single-stim recordings
+  (`stims == 1`)?~~ **Resolved:** yes. A single data point is unusual but
+  the user should be free to view it that way. Threshold is `>= 1`.
 - `build_dfbinstimoutput` output has a composite key (bin × stim). The
   output graph shows one line per stim (x = bin), matching how sweep mode
   shows one line per stim today. Confirm this is the intended layout.

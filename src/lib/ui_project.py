@@ -54,7 +54,6 @@ def df_projectTemplate():
             "groups",  # str: group name(s); maintained by uisub.dfgroups and its functions
             "parsetimestamp",  # str: timestamp of parsing of original source file
             "channel",  # str: this recording is only from this channel
-            "stim",  # str: this recording is only from this stim (a/b)
             "paired_recording",  # str: unique ID of paired recording
             "Tx",  # Boolean: Treatment / Control, for paired recordings
             "exclude",  # Boolean: If True, exclude this recording from analysis

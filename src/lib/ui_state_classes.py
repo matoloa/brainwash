@@ -411,7 +411,7 @@ class UIstate:
         """Human-readable axis label for the current x-axis mode."""
         return {"sweep": "Sweep", "time": "Time (s)", "stim": "Stim"}[self.x_axis_mode]
 
-    def x_axis_xlim(self, prow) -> tuple:
+    def x_axis_xlim(self, prow, dft=None) -> tuple:
         """Return (xmin, xmax) for the output graph given the current mode."""
         mode = self.x_axis_mode
         if mode == "sweep":
@@ -421,7 +421,15 @@ class UIstate:
                 raise ValueError("x_axis_xlim called in time mode but sweep_hz is NaN")
             return (0, prow["sweeps"] / prow["sweep_hz"])
         elif mode == "stim":
-            return (0, int(prow["stims"]))
+            if dft is not None:
+                return (0, len(dft))
+            stims = prow["stims"]
+            if pd.isna(stims):
+                raise ValueError(
+                    "x_axis_xlim called in stim mode but prow['stims'] is NaN "
+                    "and no dft was provided"
+                )
+            return (0, int(stims))
         raise ValueError(f"Unknown x_axis_mode: {mode!r}")
 
     def x_axis_values(self, dfoutput, prow):

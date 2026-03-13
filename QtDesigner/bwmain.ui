@@ -400,7 +400,7 @@
             <property name="minimumSize">
              <size>
               <width>0</width>
-              <height>91</height>
+              <height>71</height>
              </size>
             </property>
             <property name="frameShape">
@@ -472,22 +472,6 @@
              </property>
              <property name="text">
               <string>Timestamp</string>
-             </property>
-             <attribute name="buttonGroup">
-              <string notr="true">buttonGroup_x_axis</string>
-             </attribute>
-            </widget>
-            <widget class="QRadioButton" name="radioButton_xscale_bin">
-             <property name="geometry">
-              <rect>
-               <x>100</x>
-               <y>70</y>
-               <width>82</width>
-               <height>17</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string>Bin</string>
              </property>
              <attribute name="buttonGroup">
               <string notr="true">buttonGroup_x_axis</string>

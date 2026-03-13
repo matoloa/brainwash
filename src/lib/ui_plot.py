@@ -573,6 +573,7 @@ class UIplot:
         width=1,
         alpha=None,
         variant="raw",
+        x_mode=None,
     ):
         zorder = 0 if width > 1 else 1
         alpha = alpha if alpha is not None else self.uistate.settings["alpha_line"]
@@ -587,10 +588,21 @@ class UIplot:
             "stim": stim,
             "line": line,
             "axis": axid,
+            "x_mode": x_mode,
         }
 
     def plot_marker(
-        self, label, axid, x, y, color, rec_ID, aspect=None, stim=None, variant="raw"
+        self,
+        label,
+        axid,
+        x,
+        y,
+        color,
+        rec_ID,
+        aspect=None,
+        stim=None,
+        variant="raw",
+        x_mode=None,
     ):
         (marker,) = self.get_axis(axid).plot(
             x,
@@ -611,6 +623,7 @@ class UIplot:
             "stim": stim,
             "line": marker,
             "axis": axid,
+            "x_mode": x_mode,
         }
 
     def plot_amp_width(
@@ -625,6 +638,7 @@ class UIplot:
         aspect=None,
         stim=None,
         variant="raw",
+        x_mode=None,
     ):
         is_zero_width = amp_x[0] == amp_x[1]
         (xline,) = self.get_axis(axid).plot(
@@ -653,6 +667,7 @@ class UIplot:
             "line": xline,
             "axis": axid,
             "is_zero_width": is_zero_width,
+            "x_mode": x_mode,
         }
         self.uistate.dict_rec_labels[f"{label} y marker"] = {
             "rec_ID": rec_ID,
@@ -662,6 +677,7 @@ class UIplot:
             "line": yline,
             "axis": axid,
             "is_zero_width": False,
+            "x_mode": x_mode,
         }
 
     def plot_vline(
@@ -675,6 +691,7 @@ class UIplot:
         stim=None,
         linewidth=8,
         variant="raw",
+        x_mode=None,
     ):
         vline = self.get_axis(axid).axvline(
             x=x,
@@ -692,6 +709,7 @@ class UIplot:
             "stim": stim,
             "line": vline,
             "axis": axid,
+            "x_mode": x_mode,
         }
 
     def plot_hline(
@@ -705,6 +723,7 @@ class UIplot:
         stim=None,
         linewidth=1,
         variant="raw",
+        x_mode=None,
     ):
         hline = self.get_axis(axid).axhline(
             y=y,
@@ -722,6 +741,7 @@ class UIplot:
             "stim": stim,
             "line": hline,
             "axis": axid,
+            "x_mode": x_mode,
         }
 
     def plot_group_lines(self, axid, group_ID, dict_group, df_groupmean):
@@ -865,42 +885,6 @@ class UIplot:
                 rec_ID,
                 stim=stim_num,
             )
-            if self.uistate.x_axis == "stim":  # also add to output
-                self.plot_marker(
-                    f"ax1 mean {label} {stim_str} marker",
-                    "ax1",
-                    stim_num,
-                    y_position,
-                    color,
-                    rec_ID,
-                    stim=stim_num,
-                )
-                self.plot_marker(
-                    f"ax2 mean {label} {stim_str} marker",
-                    "ax2",
-                    stim_num,
-                    y_position,
-                    color,
-                    rec_ID,
-                    stim=stim_num,
-                )
-                self.plot_vline(
-                    f"ax1 mean {label} {stim_str} selection marker",
-                    "ax1",
-                    stim_num,
-                    color,
-                    rec_ID,
-                    stim=stim_num,
-                )
-                self.plot_vline(
-                    f"ax2 mean {label} {stim_str} selection marker",
-                    "ax2",
-                    stim_num,
-                    color,
-                    rec_ID,
-                    stim=stim_num,
-                )
-
             # add to Events
             window_start = t_stim + settings["event_start"]
             window_end = t_stim + settings["event_end"]
@@ -958,29 +942,30 @@ class UIplot:
                     aspect="EPSP_amp",
                     stim=stim_num,
                 )
-                if self.uistate.x_axis == "sweep":
-                    self.plot_line(
-                        f"{label} {stim_str} EPSP amp",
-                        "ax1",
-                        out[self.uistate.x_axis],
-                        out["EPSP_amp"],
-                        settings["rgb_EPSP_amp"],
-                        rec_ID,
-                        aspect="EPSP_amp",
-                        stim=stim_num,
-                        variant="raw",
-                    )
-                    self.plot_line(
-                        f"{label} {stim_str} EPSP amp norm",
-                        "ax1",
-                        out[self.uistate.x_axis],
-                        out["EPSP_amp_norm"],
-                        settings["rgb_EPSP_amp"],
-                        rec_ID,
-                        aspect="EPSP_amp",
-                        stim=stim_num,
-                        variant="norm",
-                    )
+                self.plot_line(
+                    f"{label} {stim_str} EPSP amp",
+                    "ax1",
+                    out["sweep"],
+                    out["EPSP_amp"],
+                    settings["rgb_EPSP_amp"],
+                    rec_ID,
+                    aspect="EPSP_amp",
+                    stim=stim_num,
+                    variant="raw",
+                    x_mode="sweep",
+                )
+                self.plot_line(
+                    f"{label} {stim_str} EPSP amp norm",
+                    "ax1",
+                    out["sweep"],
+                    out["EPSP_amp_norm"],
+                    settings["rgb_EPSP_amp"],
+                    rec_ID,
+                    aspect="EPSP_amp",
+                    stim=stim_num,
+                    variant="norm",
+                    x_mode="sweep",
+                )
                 self.plot_line(
                     f"{label} {stim_str} amp_zero marker",
                     "axe",
@@ -1013,29 +998,30 @@ class UIplot:
                     stim=stim_num,
                     width=5,
                 )
-                if self.uistate.x_axis == "sweep":
-                    self.plot_line(
-                        f"{label} {stim_str} EPSP slope",
-                        "ax2",
-                        out[self.uistate.x_axis],
-                        out["EPSP_slope"],
-                        settings["rgb_EPSP_slope"],
-                        rec_ID,
-                        aspect="EPSP_slope",
-                        stim=stim_num,
-                        variant="raw",
-                    )
-                    self.plot_line(
-                        f"{label} {stim_str} EPSP slope norm",
-                        "ax2",
-                        out[self.uistate.x_axis],
-                        out["EPSP_slope_norm"],
-                        settings["rgb_EPSP_slope"],
-                        rec_ID,
-                        aspect="EPSP_slope",
-                        stim=stim_num,
-                        variant="norm",
-                    )
+                self.plot_line(
+                    f"{label} {stim_str} EPSP slope",
+                    "ax2",
+                    out["sweep"],
+                    out["EPSP_slope"],
+                    settings["rgb_EPSP_slope"],
+                    rec_ID,
+                    aspect="EPSP_slope",
+                    stim=stim_num,
+                    variant="raw",
+                    x_mode="sweep",
+                )
+                self.plot_line(
+                    f"{label} {stim_str} EPSP slope norm",
+                    "ax2",
+                    out["sweep"],
+                    out["EPSP_slope_norm"],
+                    settings["rgb_EPSP_slope"],
+                    rec_ID,
+                    aspect="EPSP_slope",
+                    stim=stim_num,
+                    variant="norm",
+                    x_mode="sweep",
+                )
 
             if not np.isnan(t_row["t_volley_amp"]):
                 x_position = t_row["t_volley_amp"]
@@ -1083,16 +1069,18 @@ class UIplot:
                     rec_ID,
                     aspect="volley_amp_mean",
                     stim=stim_num,
+                    x_mode="sweep",
                 )
                 self.plot_line(
                     f"{label} {stim_str} volley amp",
                     "ax1",
-                    out[self.uistate.x_axis],
+                    out["sweep"],
                     out["volley_amp"],
                     settings["rgb_volley_amp"],
                     rec_ID,
                     aspect="volley_amp",
                     stim=stim_num,
+                    x_mode="sweep",
                 )
 
             x_start, x_end = t_row["t_volley_slope_start"], t_row["t_volley_slope_end"]
@@ -1127,79 +1115,89 @@ class UIplot:
                     rec_ID,
                     aspect="volley_slope_mean",
                     stim=stim_num,
+                    x_mode="sweep",
                 )
                 self.plot_line(
                     f"{label} {stim_str} volley slope",
                     "ax2",
-                    out[self.uistate.x_axis],
+                    out["sweep"],
                     out["volley_slope"],
                     settings["rgb_volley_slope"],
                     rec_ID,
                     aspect="volley_slope",
                     stim=stim_num,
+                    x_mode="sweep",
                 )
 
-        if self.uistate.x_axis == "stim":  # add stim-lines to output
-            out = dfoutput[dfoutput["sweep"].isna()]
+        # Stim-mode aggregate lines (always created when stim-mode rows exist;
+        # visibility controlled by x_mode filtering in _is_rec_visible).
+        out_stim = dfoutput[dfoutput["sweep"].isna()]
+        if not out_stim.empty:
             self.plot_line(
                 f"{label} EPSP amp",
                 "ax1",
-                out[self.uistate.x_axis],
-                out["EPSP_amp"],
+                out_stim["stim"],
+                out_stim["EPSP_amp"],
                 settings["rgb_EPSP_amp"],
                 rec_ID,
                 aspect="EPSP_amp",
                 variant="raw",
+                x_mode="stim",
             )
             self.plot_line(
                 f"{label} EPSP amp norm",
                 "ax1",
-                out[self.uistate.x_axis],
-                out["EPSP_amp_norm"],
+                out_stim["stim"],
+                out_stim["EPSP_amp_norm"],
                 settings["rgb_EPSP_amp"],
                 rec_ID,
                 aspect="EPSP_amp",
                 variant="norm",
+                x_mode="stim",
             )
             self.plot_line(
                 f"{label} EPSP slope",
                 "ax2",
-                out[self.uistate.x_axis],
-                out["EPSP_slope"],
+                out_stim["stim"],
+                out_stim["EPSP_slope"],
                 settings["rgb_EPSP_slope"],
                 rec_ID,
                 aspect="EPSP_slope",
                 variant="raw",
+                x_mode="stim",
             )
             self.plot_line(
                 f"{label} EPSP slope norm",
                 "ax2",
-                out[self.uistate.x_axis],
-                out["EPSP_slope_norm"],
+                out_stim["stim"],
+                out_stim["EPSP_slope_norm"],
                 settings["rgb_EPSP_slope"],
                 rec_ID,
                 aspect="EPSP_slope",
                 variant="norm",
+                x_mode="stim",
             )
             self.plot_line(
                 f"{label} volley amp",
                 "ax1",
-                out[self.uistate.x_axis],
-                out["volley_amp"],
+                out_stim["stim"],
+                out_stim["volley_amp"],
                 settings["rgb_volley_amp"],
                 rec_ID,
                 aspect="volley_amp",
                 variant="raw",
+                x_mode="stim",
             )
             self.plot_line(
                 f"{label} volley slope",
                 "ax2",
-                out[self.uistate.x_axis],
-                out["volley_slope"],
+                out_stim["stim"],
+                out_stim["volley_slope"],
                 settings["rgb_volley_slope"],
                 rec_ID,
                 aspect="volley_slope",
                 variant="raw",
+                x_mode="stim",
             )
 
     def addGroup(self, group_ID, dict_group, df_groupmean):
