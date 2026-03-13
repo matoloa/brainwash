@@ -1381,9 +1381,10 @@ class UIsub(
         [x_min, x_max] are considered.  Useful for excluding a stim artefact that
         sits at the left edge of the event window.
 
-        ymin: if given, clamps the returned lower bound to this value.  Pass 0 for
-        axes whose data is always non-negative (e.g. output ax1/ax2) so that the
-        bottom never dips below zero due to the fractional padding.
+        ymin: if given, forces the returned lower bound to exactly this value,
+        overriding the data-fitted bottom entirely.  Pass 0 when the checkbox
+        "output_ymin0" is checked so that the bottom is always anchored at zero,
+        matching the behaviour of zoomOnScroll.
         """
         all_y = []
         for line in axis.get_lines():
@@ -1411,7 +1412,7 @@ class UIsub(
         lo = lo - pad * span
         hi = hi + pad * span
         if ymin is not None:
-            lo = max(lo, ymin)
+            lo = ymin
         return (lo, hi)
 
     def _recalc_axe_drag_zones(self):
