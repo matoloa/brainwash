@@ -4210,7 +4210,6 @@ class UIsub(
         n_stims = prow["stims"]
         dft_temp = uistate.dft_temp  # set when clicked
         stim_offset = dft_temp.at[stim_idx, "t_stim"]
-        dffilter = self.get_dffilter(row=prow)
         dict_t = None
         if aspect in ["EPSP_slope", "volley_slope"]:
             axis = uistate.ax2
@@ -4238,36 +4237,62 @@ class UIsub(
         dict_t["amp_zero"] = trow_temp["amp_zero"]
         dft_single = uistate.dft_temp.iloc[[stim_idx]].copy()
         dft_single.update(pd.DataFrame([dict_t]))
-        out = analysis.build_dfoutput(
-            dffilter=dffilter,
-            dfmean=self.get_dfmean(row=prow),
-            dft=dft_single,
-            quick=True,
-        )
 
-        # norm handling for EPSP
-        if aspect in ["EPSP_amp", "EPSP_slope"]:
-            aspect_norm = f"{aspect}_norm"
-            outkey = aspect_norm if uistate.checkBox["norm_EPSP"] else aspect
-            # print(f"eventDragUpdate - outkey {outkey}, {aspect}: t({trow_temp[f"t_{aspect}"]}) {out[aspect].iloc[0]}, {aspect_norm}: {out[aspect_norm].iloc[0]}")
+        if uistate.x_axis == "stim":
+            # In stim mode the output x-axis is stim-numbered.  The per-sweep
+            # build_dfoutput result has sweep-space x-values which are meaningless
+            # here.  Instead, re-measure dfmean around the stim window — exactly
+            # the same logic used in build_dfoutput's stim-mode section and in
+            # the 8.4 release-path block — so the preview point lands at the
+            # correct stim x-position and reflects the dfmean aggregate.
+            dfmean = self.get_dfmean(row=prow)
+            dict_t_stim = dft_single.iloc[0].to_dict()
+            t_stim = dict_t_stim.get("t_stim", 0.0)
+            t_win_start = t_stim - dict_t_stim.get("t_volley_slope_width", 0.0003)
+            t_win_end = dict_t_stim.get("t_EPSP_amp", t_stim + 0.01) + dict_t_stim.get(
+                "t_EPSP_amp_width",
+                2 * dict_t_stim.get("t_EPSP_amp_halfwidth", 0.001),
+            )
+            snippet = (
+                dfmean[(dfmean["time"] >= t_win_start) & (dfmean["time"] <= t_win_end)]
+                .copy()
+                .reset_index(drop=True)
+            )
+            measured = analysis.measure_waveform(
+                snippet, dict_t_stim, filter=prow.get("filter", "voltage")
+            )
+            stim_num = int(dict_t_stim["stim"])
+            drag_x = np.array([stim_num])
+            drag_y = np.array([measured.get(aspect, np.nan)])
+            outkey = aspect  # norm not applied in stim-mode preview
         else:
-            outkey = aspect
-            # print(f"eventDragUpdate - outkey {outkey}, {aspect}: {out[aspect].iloc[0]}")
-
-        # Drag preview always uses sweep-mode x-values (per-sweep measurements).
-        # In stim mode the aggregate is a single point from dfmean that doesn't
-        # change meaningfully per drag step; rebuild happens on release.
-        drag_x = out["sweep"]
+            dffilter = self.get_dffilter(row=prow)
+            out = analysis.build_dfoutput(
+                dffilter=dffilter,
+                dfmean=self.get_dfmean(row=prow),
+                dft=dft_single,
+                quick=True,
+            )
+            # norm handling for EPSP
+            if aspect in ["EPSP_amp", "EPSP_slope"]:
+                aspect_norm = f"{aspect}_norm"
+                outkey = aspect_norm if uistate.checkBox["norm_EPSP"] else aspect
+            else:
+                outkey = aspect
+            drag_x = out["sweep"]
+            drag_y = out[outkey]
 
         if uistate.mouseover_out is None:
             uistate.mouseover_out = axis.plot(
                 drag_x,
-                out[outkey],
+                drag_y,
                 color=uistate.settings[f"rgb_{aspect}"],
                 linewidth=3,
+                marker="o",
+                markersize=6,
             )
         else:
-            uistate.mouseover_out[0].set_data(drag_x, out[outkey])
+            uistate.mouseover_out[0].set_data(drag_x, drag_y)
 
         self.canvasOutput.draw()
 
@@ -4435,6 +4460,7 @@ class UIsub(
                 )
 
         self.persistOutput(rec_name=rec_name, dfoutput=dfoutput, p_row=prow)
+        uiplot.updateStimLines(rec_name=rec_name, dfoutput=dfoutput)
 
         self.set_dft(rec_name, dft_temp)
         self.tableStimModel.setData(self.get_dft(prow))

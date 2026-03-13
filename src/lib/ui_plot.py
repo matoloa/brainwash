@@ -1382,6 +1382,51 @@ class UIplot:
         linedict["line"].set_xdata(mouseover_out[0].get_xdata())
         linedict["line"].set_ydata(mouseover_out[0].get_ydata())
 
+    def updateStimLines(self, rec_name: str, dfoutput: "pd.DataFrame") -> None:
+        """Refresh all stim-mode output artists for *rec_name* from *dfoutput*.
+
+        Called after a drag-release that updates a stim-mode row so that the
+        ax1/ax2 stim-mode lines (x_mode="stim") reflect the new measurements
+        without requiring a full graphRefresh.
+
+        The stim-mode artists are identified by their x_mode == "stim" entry in
+        dict_rec_labels.  Their labels follow the pattern
+        ``"{rec_name} {aspect}"`` (no stim-number suffix), e.g.
+        ``"rec1 EPSP amp"``.
+
+        Column mapping (matches addRow):
+            label suffix          → dfoutput column
+            "EPSP amp"            → "EPSP_amp"
+            "EPSP amp norm"       → "EPSP_amp_norm"
+            "EPSP slope"          → "EPSP_slope"
+            "EPSP slope norm"     → "EPSP_slope_norm"
+            "volley amp"          → "volley_amp"
+            "volley slope"        → "volley_slope"
+        """
+        out_stim = dfoutput[dfoutput["sweep"].isna()]
+        if out_stim.empty:
+            return
+
+        suffix_to_col = {
+            "EPSP amp": "EPSP_amp",
+            "EPSP amp norm": "EPSP_amp_norm",
+            "EPSP slope": "EPSP_slope",
+            "EPSP slope norm": "EPSP_slope_norm",
+            "volley amp": "volley_amp",
+            "volley slope": "volley_slope",
+        }
+
+        for suffix, col in suffix_to_col.items():
+            label = f"{rec_name} {suffix}"
+            if label not in self.uistate.dict_rec_labels:
+                continue
+            if col not in out_stim.columns:
+                continue
+            linedict = self.uistate.dict_rec_labels[label]
+            linedict["line"].set_xdata(out_stim["stim"].values)
+            linedict["line"].set_ydata(out_stim[col].values)
+            print(f"updateStimLines: refreshed '{label}'")
+
     def updateOutLineFromDf(self, label, dfoutput, stim_num, column, x_axis=None):
         """Populate an output line directly from a dfoutput DataFrame.
 
