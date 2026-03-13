@@ -441,6 +441,8 @@ class UIplot:
         ax2.set_xlim(uistate.zoom["output_xlim"])
         ax1.set_xlabel(uistate.x_axis_xlabel())
         ax2.set_xlabel(uistate.x_axis_xlabel())
+        ax1.xaxis.set_major_locator(uistate.x_axis_locator())
+        ax2.xaxis.set_major_locator(uistate.x_axis_locator())
         fmt = uistate.x_axis_formatter()
         ax1.xaxis.set_major_formatter(fmt)
         ax2.xaxis.set_major_formatter(fmt)

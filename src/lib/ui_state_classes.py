@@ -5,13 +5,37 @@ from math import ceil, floor
 from typing import TYPE_CHECKING, Optional
 
 import pandas as pd
-from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import AutoLocator, FuncFormatter, Locator
 
 if TYPE_CHECKING:
     import matplotlib.axes
     import matplotlib.collections
     import matplotlib.lines
     import matplotlib.text
+
+
+class TimeModeLocator(Locator):
+    """A matplotlib Locator that calculates ticks based on converted time units
+    rather than raw sweep numbers, so that ticks fall on clean time intervals."""
+
+    def __init__(self, sweep_hz: float, divisor: float):
+        self.sweep_hz = sweep_hz
+        self.divisor = divisor
+        self._auto = AutoLocator()
+
+    def set_axis(self, axis):
+        self._auto.set_axis(axis)
+        super().set_axis(axis)
+
+    def tick_values(self, vmin, vmax):
+        tmin = vmin / self.sweep_hz / self.divisor
+        tmax = vmax / self.sweep_hz / self.divisor
+        time_ticks = self._auto.tick_values(tmin, tmax)
+        return [t * self.divisor * self.sweep_hz for t in time_ticks]
+
+    def __call__(self):
+        vmin, vmax = self.axis.get_view_interval()
+        return self.tick_values(vmin, vmax)
 
 
 class UIstate:
@@ -478,6 +502,12 @@ class UIstate:
                 return (-0.5, 1.5)
             return (0, n)
         raise ValueError(f"Unknown x_axis_mode: {mode!r}")
+
+    def x_axis_locator(self):
+        """Return a Locator that places ticks at nice intervals in the current mode."""
+        if self.x_axis_mode == "time":
+            return TimeModeLocator(self._time_sweep_hz, self._time_divisor)
+        return AutoLocator()
 
     def x_axis_formatter(self):
         """Return a FuncFormatter that converts sweep-number ticks to time.
