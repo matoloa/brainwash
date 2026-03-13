@@ -1320,9 +1320,7 @@ class UIplot:
                 print(f" - - - volley_amp_mean: {volley_amp_mean}")
                 if dfoutput is not None:
                     stim_num = trow["stim"]
-                    self.updateOutLineFromDf(
-                        label_core, dfoutput, stim_num, key, self.uistate.x_axis
-                    )
+                    self.updateOutLineFromDf(label_core, dfoutput, stim_num, key)
                 else:
                     self.updateOutLine(label_core)
                 self.updateOutMean(f"{label_core} mean", volley_amp_mean)
@@ -1332,9 +1330,7 @@ class UIplot:
                 if dfoutput is not None:
                     stim_num = trow["stim"]
                     col = f"{key}_norm" if norm else key
-                    self.updateOutLineFromDf(
-                        label_core, dfoutput, stim_num, col, self.uistate.x_axis
-                    )
+                    self.updateOutLineFromDf(label_core, dfoutput, stim_num, col)
                 else:
                     self.updateOutLine(label_core)
 
@@ -1386,7 +1382,7 @@ class UIplot:
         linedict["line"].set_xdata(mouseover_out[0].get_xdata())
         linedict["line"].set_ydata(mouseover_out[0].get_ydata())
 
-    def updateOutLineFromDf(self, label, dfoutput, stim_num, column, x_axis):
+    def updateOutLineFromDf(self, label, dfoutput, stim_num, column, x_axis=None):
         """Populate an output line directly from a dfoutput DataFrame.
 
         Used on drag-release for amp aspects so that the persisted full-width
@@ -1398,11 +1394,8 @@ class UIplot:
         - dfoutput: the fully-recalculated output DataFrame
         - stim_num: stim number (1-based) to filter dfoutput rows
         - column: column name to use for y-values (e.g. 'EPSP_amp' or 'EPSP_amp_norm')
-        - x_axis: 'sweep' or 'stim' — selects the x-column from dfoutput
         """
-        print(
-            f"updateOutLineFromDf: {label}, stim={stim_num}, col={column}, x={x_axis}"
-        )
+        print(f"updateOutLineFromDf: {label}, stim={stim_num}, col={column}")
         df_stim = dfoutput[dfoutput["stim"] == stim_num]
         if df_stim.empty or column not in df_stim.columns:
             print(
@@ -1411,7 +1404,10 @@ class UIplot:
             self.updateOutLine(label)
             return
         linedict = self.uistate.dict_rec_labels[label]
-        linedict["line"].set_xdata(df_stim[x_axis].values)
+        x_col = linedict.get("x_mode", "sweep")
+        if x_col not in df_stim.columns:
+            x_col = "sweep"
+        linedict["line"].set_xdata(df_stim[x_col].values)
         linedict["line"].set_ydata(df_stim[column].values)
 
     def updateOutMean(self, label, mean):
