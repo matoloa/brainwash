@@ -1140,7 +1140,7 @@ class UIplot:
                 )
 
         if self.uistate.x_axis == "stim":  # add stim-lines to output
-            out = dfoutput
+            out = dfoutput[dfoutput["sweep"].isna()]
             self.plot_line(
                 f"{label} EPSP amp",
                 "ax1",

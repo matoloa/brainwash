@@ -3548,13 +3548,34 @@ class UIsub(
         if out_x_idx == uistate.last_out_x_idx:  # prevent update if same x
             return
 
-        if uistate.x_axis == "stim":  # Not connected yet
-            return
-        else:  # sweep
-            rec_ID = dict_pop["rec_ID"]
-            df_p = self.get_df_project()
-            p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
-            df_t = self.get_dft(p_row)
+        rec_ID = dict_pop["rec_ID"]
+        df_p = self.get_df_project()
+        p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
+        df_t = self.get_dft(p_row)
+        rec_filter = p_row["filter"]
+        settings = uistate.settings
+
+        if uistate.x_axis == "stim":
+            # Ghost waveform: show the dfmean snippet for the hovered stim.
+            # out_x_idx is a positional index into x_data; recover actual stim number.
+            stim_num = int(x_data[out_x_idx])
+            matching = df_t[df_t["stim"] == stim_num]
+            if matching.empty:
+                return
+            t_row = matching.iloc[0]
+            t_stim = t_row["t_stim"]
+
+            # Slice dfmean around this stim's event window (same as addRow)
+            dfmean = self.get_dfmean(row=p_row)
+            window_start = t_stim + settings["event_start"]
+            window_end = t_stim + settings["event_end"]
+            snippet = dfmean[
+                (dfmean["time"] >= window_start) & (dfmean["time"] <= window_end)
+            ].copy()
+            snippet_x = snippet["time"] - t_stim  # shift so t_stim = 0
+            snippet_y = snippet[rec_filter]
+            ghost_label_text = f"stim {stim_num}"
+        else:  # sweep (or time — same source data)
             stim = dict_pop["stim"]
             t_row = df_t[df_t["stim"] == stim].iloc[0]
             offset = t_row["t_stim"]
@@ -3567,31 +3588,30 @@ class UIsub(
             dfsweep = dfsource[
                 dfsource["sweep"] == out_x_idx
             ]  # select only rows where sweep == out_x_idx
-            sweep_x = dfsweep["time"] - offset
-            sweep_y = dfsweep[
-                p_row["filter"]
-            ]  # get the value of the filter at the selected sweep
+            snippet_x = dfsweep["time"] - offset
+            snippet_y = dfsweep[rec_filter]
+            ghost_label_text = f"sweep {out_x_idx}"
 
-            if uistate.ghost_sweep is None:
-                ghost_color = "white" if uistate.darkmode else "black"
-                (uistate.ghost_sweep,) = uistate.axe.plot(
-                    sweep_x, sweep_y, color=ghost_color, alpha=0.5, zorder=0
+        if uistate.ghost_sweep is None:
+            ghost_color = "white" if uistate.darkmode else "black"
+            (uistate.ghost_sweep,) = uistate.axe.plot(
+                snippet_x, snippet_y, color=ghost_color, alpha=0.5, zorder=0
+            )
+            if uistate.ghost_label is None:
+                uistate.ghost_label = uistate.axe.text(
+                    1,
+                    1,
+                    ghost_label_text,
+                    transform=uistate.axe.transAxes,
+                    ha="left",
+                    va="bottom",
                 )
-                if uistate.ghost_label is None:
-                    uistate.ghost_label = uistate.axe.text(
-                        1,
-                        1,
-                        f"sweep {out_x_idx}",
-                        transform=uistate.axe.transAxes,
-                        ha="left",
-                        va="bottom",
-                    )
-                else:
-                    uistate.ghost_label.set_text(f"sweep {out_x_idx}")
             else:
-                uistate.ghost_sweep.set_data(sweep_x, sweep_y)
-                uistate.ghost_label.set_text(f"sweep {out_x_idx}")
-            uistate.axe.figure.canvas.draw()
+                uistate.ghost_label.set_text(ghost_label_text)
+        else:
+            uistate.ghost_sweep.set_data(snippet_x, snippet_y)
+            uistate.ghost_label.set_text(ghost_label_text)
+        uistate.axe.figure.canvas.draw()
         uistate.last_out_x_idx = out_x_idx
         ax.figure.canvas.draw()
 
@@ -4100,15 +4120,20 @@ class UIsub(
             outkey = aspect
             # print(f"eventDragUpdate - outkey {outkey}, {aspect}: {out[aspect].iloc[0]}")
 
+        # Drag preview always uses sweep-mode x-values (per-sweep measurements).
+        # In stim mode the aggregate is a single point from dfmean that doesn't
+        # change meaningfully per drag step; rebuild happens on release.
+        drag_x = out["sweep"]
+
         if uistate.mouseover_out is None:
             uistate.mouseover_out = axis.plot(
-                out[uistate.x_axis],
+                drag_x,
                 out[outkey],
                 color=uistate.settings[f"rgb_{aspect}"],
                 linewidth=3,
             )
         else:
-            uistate.mouseover_out[0].set_data(out[uistate.x_axis], out[outkey])
+            uistate.mouseover_out[0].set_data(drag_x, out[outkey])
 
         self.canvasOutput.draw()
 
@@ -4239,6 +4264,42 @@ class UIsub(
         dfoutput.reset_index(inplace=True)
         new_dfoutput.reset_index(inplace=True)
 
+        # --- 8.4: Refresh the stim-mode row (sweep==NaN) for this stim ---
+        # build_dfoutput with dft_single (len=1) only produces sweep-mode rows.
+        # Re-measure dfmean around the stim window so the stim-mode aggregate
+        # reflects the new timepoints after the drag.
+        if len(dft_temp) > 1:
+            dict_t_stim = dft_single.iloc[0].to_dict()
+            t_stim = dict_t_stim.get("t_stim", 0.0)
+            t_win_start = t_stim - dict_t_stim.get("t_volley_slope_width", 0.0003)
+            t_win_end = dict_t_stim.get("t_EPSP_amp", t_stim + 0.01) + dict_t_stim.get(
+                "t_EPSP_amp_width",
+                2 * dict_t_stim.get("t_EPSP_amp_halfwidth", 0.001),
+            )
+            snippet = (
+                dfmean[(dfmean["time"] >= t_win_start) & (dfmean["time"] <= t_win_end)]
+                .copy()
+                .reset_index(drop=True)
+            )
+            measured = analysis.measure_waveform(
+                snippet, dict_t_stim, filter=prow.get("filter", "voltage")
+            )
+            # Update the stim-mode row in dfoutput
+            stim_mask = (dfoutput["stim"] == int(stim_num)) & dfoutput["sweep"].isna()
+            if stim_mask.any():
+                for col, val in measured.items():
+                    if col in dfoutput.columns:
+                        dfoutput.loc[stim_mask, col] = val
+            else:
+                # Stim-mode row doesn't exist yet (shouldn't happen, but be safe)
+                stim_row = {"stim": int(stim_num), "sweep": np.nan}
+                stim_row.update(measured)
+                stim_row["EPSP_amp_norm"] = np.nan
+                stim_row["EPSP_slope_norm"] = np.nan
+                dfoutput = pd.concat(
+                    [dfoutput, pd.DataFrame([stim_row])], ignore_index=True
+                )
+
         self.persistOutput(rec_name=rec_name, dfoutput=dfoutput, p_row=prow)
 
         self.set_dft(rec_name, dft_temp)
@@ -4281,7 +4342,7 @@ class UIsub(
 
         if aspect in ["EPSP amp", "volley amp"]:
             # print(f" - {aspect} updated")
-            if False:  # uistate.checkBox['timepoints_per_stim']:
+            if uistate.checkBox["timepoints_per_stim"]:
                 update_amp_marker(trow, aspect, prow, dfmean, dfoutput)
             else:
                 dft = self.get_dft(prow)

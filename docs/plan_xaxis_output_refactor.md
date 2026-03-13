@@ -559,26 +559,95 @@ remaining reference is in `snippets/deprecated.py`, which is inert.
 Stim-mode rows (`sweep == NaN`) are now always present in `dfoutput` when
 `len(dft) > 1`. The interactive layer needs to be completed to consume them.
 
-**8.1** Complete `outputMouseover` for stim mode:
-- Remove the early `return` stub.
-- When `uistate.x_axis == "stim"`, filter `dfoutput` to stim rows and use
-  `dfoutput["stim"]` as x. Implement ghost waveform by slicing `dfmean`
-  around the hovered stim (same window logic as the stim-mode measurement
-  in `build_dfoutput`).
+### Codebase status (evaluated 2026-06-10)
 
-**8.2** Complete `eventDragUpdate` for stim mode:
-- Remove the `x_axis = "stim" / "sweep"` branch that was driven by
-  `checkBox["output_per_stim"]`.
-- When `uistate.x_axis == "stim"`, call `build_dfoutput` with the temporary
-  timepoints and filter to stim rows for the live preview plot.
+- `uistate.x_axis` property, `x_axis_xlabel()`, `x_axis_xlim()`,
+  `x_axis_values()` are all implemented in `ui_state_classes.py`.
+- `build_dfoutput` (v3) produces stim-mode rows when `len(dft) > 1`.
+- `addRow` in `ui_plot.py` already has a `if self.uistate.x_axis == "stim"`
+  block (line ~1142) that plots stim-lines to ax1/ax2.
+- `eventDragUpdate` already uses `out[uistate.x_axis]` for the live preview
+  (line ~4107). No `checkBox["output_per_stim"]` branch remains.
+- `outputMouseover` has an early-return stub: `if uistate.x_axis == "stim": return`
+  (line ~3551).
+- `eventDragReleased` has `if False: # uistate.checkBox['timepoints_per_stim']`
+  (line ~4284) — this gates amp marker update scope, not stim-mode output.
 
-**8.3** Complete `eventDragReleased` for stim mode:
-- Remove the `if False:` branch. `build_dfoutput` now always produces stim
-  rows when appropriate; no separate call needed.
+### Known bugs to fix in this phase
 
-**8.4** Smoke-test full stim-mode interaction cycle:
-- Select a train recording → switch x-axis radio button to "Stim" →
-  drag timepoints → verify output graph updates correctly with stim as x.
+1. **`addRow` stim-lines block uses unfiltered `dfoutput`.** The block at
+   line ~1142 does `out = dfoutput` which includes _both_ sweep-mode rows
+   (`sweep` ≠ NaN) and stim-mode rows (`sweep` = NaN). When plotting
+   `out["stim"]` as x, the sweep-mode rows contribute duplicate stim values
+   with per-sweep y-values, producing garbled lines. Must filter to stim-mode
+   rows only: `out = dfoutput[dfoutput["sweep"].isna()]`.
+
+2. **`eventDragUpdate` live preview is meaningless in stim mode.**
+   `build_dfoutput` with `dft_single` (len = 1) never produces stim-mode
+   rows. So `out["stim"]` is just the constant stim number repeated per
+   sweep — not a useful x-axis. Dragging adjusts per-sweep measurements and
+   the stim-mode output is a single aggregate point from dfmean that doesn't
+   change meaningfully per drag step.
+
+3. **`eventDragReleased` does not refresh stim-mode rows.** It calls
+   `build_dfoutput` with `dft_single` (len = 1), which produces only
+   sweep-mode rows. The stim-mode rows in the persisted `dfoutput` are
+   never updated after a drag. Requires a second `build_dfoutput` call
+   with full `dft_temp` or a targeted `measure_waveform` call.
+
+### Steps
+
+**8.1** ~~Fix `addRow` stim-lines block (`ui_plot.py`, line ~1142):~~ **Done.**
+- Changed `out = dfoutput` → `out = dfoutput[dfoutput["sweep"].isna()]`.
+- This ensures only stim-mode rows (one per stim, measured from dfmean)
+  are used for the stim x-axis plot lines.
+
+**8.2** ~~Complete `outputMouseover` for stim mode (`ui.py`, line ~3551):~~ **Done.**
+- Replaced the early `return` stub. Refactored the method to extract
+  `rec_ID`, `df_p`, `p_row`, `df_t`, `rec_filter`, `settings` into shared
+  preamble above the stim/sweep branch.
+- Stim branch: recovers actual stim number from `x_data[out_x_idx]` (since
+  `out_x_idx` is a positional index, not the stim value). Looks up `t_row`
+  in `dft`, slices `dfmean` around the stim's event window using
+  `settings["event_start"]` / `settings["event_end"]` (same window as
+  `addRow`), shifts to stim-relative time, labels ghost `"stim {stim_num}"`.
+- Sweep branch: unchanged logic, just unified variable names (`snippet_x`,
+  `snippet_y`, `ghost_label_text`) so the ghost-drawing code after the
+  branch is shared.
+
+**8.3** ~~Handle `eventDragUpdate` in stim mode (`ui.py`, line ~4103):~~ **Done.**
+- Replaced `out[uistate.x_axis]` with local `drag_x = out["sweep"]`.
+  Drag preview always uses sweep-mode x-values regardless of `x_axis_mode`,
+  because `build_dfoutput` with `dft_single` (len=1) only produces
+  sweep-mode rows, and the stim-mode aggregate doesn't change meaningfully
+  per drag step.
+- The stim-mode output is rebuilt from scratch on release (step 8.4).
+
+**8.4** ~~Refresh stim-mode rows on drag release (`ui.py`, `eventDragReleased`):~~ **Done.**
+- Added a block after `dfoutput.update(new_dfoutput)` / `reset_index`,
+  gated on `len(dft_temp) > 1` (stim-mode rows only exist for multi-stim).
+- Builds `dict_t_stim` from `dft_single.iloc[0]`, computes the same
+  window boundaries as `build_dfoutput`'s stim-mode section
+  (`t_stim - t_volley_slope_width` … `t_EPSP_amp + t_EPSP_amp_width`),
+  slices `dfmean`, calls `analysis.measure_waveform`.
+- Updates the existing stim-mode row (`stim == stim_num & sweep.isna()`)
+  in `dfoutput`, or appends a new row if none exists (defensive fallback).
+- Runs before `self.persistOutput`, so the saved file includes the
+  refreshed stim-mode aggregate.
+
+**8.5** ~~Clean up the `if False:` guard in `eventDragReleased` (line ~4320):~~ **Done.**
+- Replaced `if False:  # uistate.checkBox['timepoints_per_stim']:` with
+  `if uistate.checkBox["timepoints_per_stim"]:`.
+- Runtime behaviour is unchanged (checkbox is hidden, always False), but
+  the conditional is now live and will work if the checkbox is re-exposed.
+
+**8.6** Smoke-test full stim-mode interaction cycle:
+- Select a train recording (stims > 1) → switch x-axis radio button to
+  "Stim" → verify output graph shows one point per stim for each aspect.
+- Drag a timepoint → verify live preview shows per-sweep data during drag.
+- Release → verify output graph updates with corrected stim-mode points.
+- Mouseover output graph → verify ghost waveform shows the stim's dfmean
+  snippet on axe.
 
 ---
 
