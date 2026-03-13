@@ -162,7 +162,7 @@ class UIstate:
             "output_ax1_ylim": (0, 1.2),
             "output_ax2_ylim": (0, 1.2),
         }
-        self.x_axis_mode = "sweep"  # "sweep", "time", or "stim"
+        self.x_axis_mode = "time"  # "sweep", "time", or "stim"
         self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
         self._time_unit_label = "s"  # set by x_axis_xlim when mode == "time"
         self._time_sweep_hz = 1.0  # set by x_axis_xlim when mode == "time"
@@ -570,7 +570,7 @@ class UIstate:
         self.version = state.get("version")
         self.colors = state.get("colors")
         self.splitter = state.get("splitter")
-        self.x_axis_mode = state.get("x_axis_mode", "sweep")
+        self.x_axis_mode = state.get("x_axis_mode", "time")
         # Filter out any keys saved in old configs that no longer exist as widgets.
         # This lets us remove keys from these dicts without old cfg.pkl files
         # re-introducing stale keys on next load.

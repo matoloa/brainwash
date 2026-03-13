@@ -1613,14 +1613,14 @@ class UIsub(
             else:
                 radio.setStyleSheet(f"color: {disabled_color};")
 
-        # If the persisted mode is no longer available, fall back to sweep.
+        # If the persisted mode is no longer available, fall back to time or sweep.
         mode = uistate.x_axis_mode
         if mode == "stim" and not has_stims:
-            mode = "sweep"
+            mode = "time" if has_sweep_hz else "sweep"
         elif mode == "time" and not has_sweep_hz:
             mode = "sweep"
         elif mode == "timestamp":
-            mode = "sweep"
+            mode = "time" if has_sweep_hz else "sweep"
         if mode != uistate.x_axis_mode:
             uistate.x_axis_mode = mode
 
