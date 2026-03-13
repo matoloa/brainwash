@@ -5,7 +5,7 @@ from math import ceil, floor
 from typing import TYPE_CHECKING, Optional
 
 import pandas as pd
-from matplotlib.ticker import AutoLocator, FuncFormatter, Locator
+from matplotlib.ticker import AutoLocator, FixedLocator, FuncFormatter, Locator
 
 if TYPE_CHECKING:
     import matplotlib.axes
@@ -166,6 +166,7 @@ class UIstate:
         self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
         self._time_unit_label = "s"  # set by x_axis_xlim when mode == "time"
         self._time_sweep_hz = 1.0  # set by x_axis_xlim when mode == "time"
+        self._stim_tick_locs: list[int] = []  # set by x_axis_xlim when mode == "stim"
         self.showTimetable = False
         self.showHeatmap = False
         self.dict_heatmap = {}
@@ -488,8 +489,9 @@ class UIstate:
             # Return sweep-space limits; tick labels are converted by x_axis_formatter.
             return (0, n)
         elif mode == "stim":
-            if dft is not None:
-                n = len(dft)
+            if dft is not None and len(dft) > 0 and "stim" in dft.columns:
+                stim_min = int(dft["stim"].min())
+                stim_max = int(dft["stim"].max())
             else:
                 stims = prow["stims"]
                 if pd.isna(stims):
@@ -498,15 +500,18 @@ class UIstate:
                         "and no dft was provided"
                     )
                 n = int(stims)
-            if n <= 1:
-                return (-0.5, 1.5)
-            return (0, n)
+                stim_min = 1
+                stim_max = n
+            self._stim_tick_locs = list(range(stim_min, stim_max + 1))
+            return (stim_min - 0.5, stim_max + 0.5)
         raise ValueError(f"Unknown x_axis_mode: {mode!r}")
 
     def x_axis_locator(self):
         """Return a Locator that places ticks at nice intervals in the current mode."""
         if self.x_axis_mode == "time":
             return TimeModeLocator(self._time_sweep_hz, self._time_divisor)
+        if self.x_axis_mode == "stim":
+            return FixedLocator(self._stim_tick_locs)
         return AutoLocator()
 
     def x_axis_formatter(self):
