@@ -1459,7 +1459,7 @@ class UIsub(
             0,
             1.5,
         )
-        uistate.zoom["output_xlim"] = (0, prow["sweeps"])
+        uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow)
         self.zoomReset()
         self._recalc_axe_drag_zones()
         self._recalc_axm_detection_zones()
@@ -3529,8 +3529,6 @@ class UIsub(
         if len(uistate.list_idx_select_recs) != 1:
             self.exorcise()
             return
-        x_axis = "sweep"
-
         # find a visible line
         dict_out = {
             key: value
@@ -3550,7 +3548,7 @@ class UIsub(
         if out_x_idx == uistate.last_out_x_idx:  # prevent update if same x
             return
 
-        if x_axis == "stim":  # Not connected yet
+        if uistate.x_axis == "stim":  # Not connected yet
             return
         else:  # sweep
             rec_ID = dict_pop["rec_ID"]
@@ -4060,8 +4058,6 @@ class UIsub(
         stim_offset = dft_temp.at[stim_idx, "t_stim"]
         dffilter = self.get_dffilter(row=prow)
         dict_t = None
-        x_axis = "sweep"
-
         if aspect in ["EPSP_slope", "volley_slope"]:
             axis = uistate.ax2
             dict_t = handle_slope(aspect, x_start, x_end, precision, stim_offset)
@@ -4106,13 +4102,13 @@ class UIsub(
 
         if uistate.mouseover_out is None:
             uistate.mouseover_out = axis.plot(
-                out[x_axis],
+                out[uistate.x_axis],
                 out[outkey],
                 color=uistate.settings[f"rgb_{aspect}"],
                 linewidth=3,
             )
         else:
-            uistate.mouseover_out[0].set_data(out[x_axis], out[outkey])
+            uistate.mouseover_out[0].set_data(out[uistate.x_axis], out[outkey])
 
         self.canvasOutput.draw()
 

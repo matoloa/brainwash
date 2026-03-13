@@ -4,12 +4,13 @@ import pickle
 from math import floor
 from typing import TYPE_CHECKING, Optional
 
+import pandas as pd
+
 if TYPE_CHECKING:
     import matplotlib.axes
     import matplotlib.collections
     import matplotlib.lines
     import matplotlib.text
-    import pandas as pd
 
 
 class UIstate:
@@ -54,6 +55,9 @@ class UIstate:
     last_out_x_idx: Optional[int]
     ghost_sweep: Optional[matplotlib.lines.Line2D]
     ghost_label: Optional[matplotlib.text.Text]
+
+    # --- X-axis mode (persisted) ---
+    x_axis_mode: str  # "sweep", "time", or "stim"
 
     # --- Global bw_cfg (not persisted in project cfg.pkl) ---
     darkmode: bool
@@ -133,6 +137,7 @@ class UIstate:
             "output_ax1_ylim": (0, 1.2),
             "output_ax2_ylim": (0, 1.2),
         }
+        self.x_axis_mode = "sweep"  # "sweep", "time", or "stim"
         self.showTimetable = False
         self.showHeatmap = False
         self.dict_heatmap = {}
@@ -395,6 +400,48 @@ class UIstate:
     def get_groupSet(self):  # returns a set of all group IDs that are currently plotted
         return set([value["group_ID"] for value in self.dict_group_labels.values()])
 
+    # --- x-axis mode helpers (7.2–7.5) ---
+
+    @property
+    def x_axis(self) -> str:
+        """Single call site for all plot-layer x-axis decisions."""
+        return self.x_axis_mode
+
+    def x_axis_xlabel(self) -> str:
+        """Human-readable axis label for the current x-axis mode."""
+        return {"sweep": "Sweep", "time": "Time (s)", "stim": "Stim"}[self.x_axis_mode]
+
+    def x_axis_xlim(self, prow) -> tuple:
+        """Return (xmin, xmax) for the output graph given the current mode."""
+        mode = self.x_axis_mode
+        if mode == "sweep":
+            return (0, prow["sweeps"])
+        elif mode == "time":
+            if pd.isna(prow["sweep_hz"]):
+                raise ValueError("x_axis_xlim called in time mode but sweep_hz is NaN")
+            return (0, prow["sweeps"] / prow["sweep_hz"])
+        elif mode == "stim":
+            return (0, int(prow["stims"]))
+        raise ValueError(f"Unknown x_axis_mode: {mode!r}")
+
+    def x_axis_values(self, dfoutput, prow):
+        """Return the x-values Series to plot for the current mode."""
+        mode = self.x_axis_mode
+        if mode == "sweep":
+            mask = dfoutput["sweep"].notna()
+            return dfoutput.loc[mask, "sweep"]
+        elif mode == "time":
+            if pd.isna(prow["sweep_hz"]):
+                raise ValueError(
+                    "x_axis_values called in time mode but sweep_hz is NaN"
+                )
+            mask = dfoutput["sweep"].notna()
+            return dfoutput.loc[mask, "sweep"] / prow["sweep_hz"]
+        elif mode == "stim":
+            mask = dfoutput["sweep"].isna()
+            return dfoutput.loc[mask, "stim"]
+        raise ValueError(f"Unknown x_axis_mode: {mode!r}")
+
     def get_state(self):
         try:
             return {
@@ -407,6 +454,7 @@ class UIstate:
                 "settings": self.settings,
                 "zoom": self.zoom,
                 "default_dict_t": self.default_dict_t,
+                "x_axis_mode": self.x_axis_mode,
             }
         except AttributeError:
             # One or more attributes are missing (e.g. loading a stale pickle).
@@ -418,6 +466,7 @@ class UIstate:
         self.version = state.get("version")
         self.colors = state.get("colors")
         self.splitter = state.get("splitter")
+        self.x_axis_mode = state.get("x_axis_mode", "sweep")
         # Filter out any keys saved in old configs that no longer exist as widgets.
         # This lets us remove keys from these dicts without old cfg.pkl files
         # re-introducing stale keys on next load.

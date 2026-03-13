@@ -7,7 +7,7 @@ import seaborn as sns
 from matplotlib import style
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D  # for custom legend; TODO: still used?
-from matplotlib.ticker import FixedLocator, FuncFormatter
+from matplotlib.ticker import FuncFormatter
 
 STIM_MARKER_SIZE = (
     10  # diameter in points; drives both rendering and hit-zone calculation
@@ -439,9 +439,8 @@ class UIplot:
         ax2.set_ylim(uistate.zoom["output_ax2_ylim"])
         ax1.set_xlim(uistate.zoom["output_xlim"])
         ax2.set_xlim(uistate.zoom["output_xlim"])
-        x_axis = "sweep"
-        ax1.set_xlabel(x_axis)
-        ax2.set_xlabel(x_axis)
+        ax1.set_xlabel(uistate.x_axis_xlabel())
+        ax2.set_xlabel(uistate.x_axis_xlabel())
         print(f"output_xlim: {uistate.zoom['output_xlim']}")
         ax1.figure.subplots_adjust(bottom=0.2)
         self.oneAxisLeft()
@@ -813,7 +812,6 @@ class UIplot:
             rec_ID=rec_ID,
         )
 
-        x_axis = "sweep"
         dict_gradient = self.get_dict_gradient(n_stims)
 
         settings = self.uistate.settings  # Event window, color, and alpha settings
@@ -867,7 +865,7 @@ class UIplot:
                 rec_ID,
                 stim=stim_num,
             )
-            if x_axis == "stim":  # also add to output
+            if self.uistate.x_axis == "stim":  # also add to output
                 self.plot_marker(
                     f"ax1 mean {label} {stim_str} marker",
                     "ax1",
@@ -960,11 +958,11 @@ class UIplot:
                     aspect="EPSP_amp",
                     stim=stim_num,
                 )
-                if x_axis == "sweep":
+                if self.uistate.x_axis == "sweep":
                     self.plot_line(
                         f"{label} {stim_str} EPSP amp",
                         "ax1",
-                        out[x_axis],
+                        out[self.uistate.x_axis],
                         out["EPSP_amp"],
                         settings["rgb_EPSP_amp"],
                         rec_ID,
@@ -975,7 +973,7 @@ class UIplot:
                     self.plot_line(
                         f"{label} {stim_str} EPSP amp norm",
                         "ax1",
-                        out[x_axis],
+                        out[self.uistate.x_axis],
                         out["EPSP_amp_norm"],
                         settings["rgb_EPSP_amp"],
                         rec_ID,
@@ -1015,11 +1013,11 @@ class UIplot:
                     stim=stim_num,
                     width=5,
                 )
-                if x_axis == "sweep":
+                if self.uistate.x_axis == "sweep":
                     self.plot_line(
                         f"{label} {stim_str} EPSP slope",
                         "ax2",
-                        out[x_axis],
+                        out[self.uistate.x_axis],
                         out["EPSP_slope"],
                         settings["rgb_EPSP_slope"],
                         rec_ID,
@@ -1030,7 +1028,7 @@ class UIplot:
                     self.plot_line(
                         f"{label} {stim_str} EPSP slope norm",
                         "ax2",
-                        out[x_axis],
+                        out[self.uistate.x_axis],
                         out["EPSP_slope_norm"],
                         settings["rgb_EPSP_slope"],
                         rec_ID,
@@ -1089,7 +1087,7 @@ class UIplot:
                 self.plot_line(
                     f"{label} {stim_str} volley amp",
                     "ax1",
-                    out[x_axis],
+                    out[self.uistate.x_axis],
                     out["volley_amp"],
                     settings["rgb_volley_amp"],
                     rec_ID,
@@ -1133,7 +1131,7 @@ class UIplot:
                 self.plot_line(
                     f"{label} {stim_str} volley slope",
                     "ax2",
-                    out[x_axis],
+                    out[self.uistate.x_axis],
                     out["volley_slope"],
                     settings["rgb_volley_slope"],
                     rec_ID,
@@ -1141,12 +1139,12 @@ class UIplot:
                     stim=stim_num,
                 )
 
-        if x_axis == "stim":  # add stim-lines to output
+        if self.uistate.x_axis == "stim":  # add stim-lines to output
             out = dfoutput
             self.plot_line(
                 f"{label} EPSP amp",
                 "ax1",
-                out[x_axis],
+                out[self.uistate.x_axis],
                 out["EPSP_amp"],
                 settings["rgb_EPSP_amp"],
                 rec_ID,
@@ -1156,7 +1154,7 @@ class UIplot:
             self.plot_line(
                 f"{label} EPSP amp norm",
                 "ax1",
-                out[x_axis],
+                out[self.uistate.x_axis],
                 out["EPSP_amp_norm"],
                 settings["rgb_EPSP_amp"],
                 rec_ID,
@@ -1166,7 +1164,7 @@ class UIplot:
             self.plot_line(
                 f"{label} EPSP slope",
                 "ax2",
-                out[x_axis],
+                out[self.uistate.x_axis],
                 out["EPSP_slope"],
                 settings["rgb_EPSP_slope"],
                 rec_ID,
@@ -1176,7 +1174,7 @@ class UIplot:
             self.plot_line(
                 f"{label} EPSP slope norm",
                 "ax2",
-                out[x_axis],
+                out[self.uistate.x_axis],
                 out["EPSP_slope_norm"],
                 settings["rgb_EPSP_slope"],
                 rec_ID,
@@ -1186,7 +1184,7 @@ class UIplot:
             self.plot_line(
                 f"{label} volley amp",
                 "ax1",
-                out[x_axis],
+                out[self.uistate.x_axis],
                 out["volley_amp"],
                 settings["rgb_volley_amp"],
                 rec_ID,
@@ -1196,7 +1194,7 @@ class UIplot:
             self.plot_line(
                 f"{label} volley slope",
                 "ax2",
-                out[x_axis],
+                out[self.uistate.x_axis],
                 out["volley_slope"],
                 settings["rgb_volley_slope"],
                 rec_ID,
@@ -1318,7 +1316,7 @@ class UIplot:
                 if dfoutput is not None:
                     stim_num = trow["stim"]
                     self.updateOutLineFromDf(
-                        label_core, dfoutput, stim_num, key, "sweep"
+                        label_core, dfoutput, stim_num, key, self.uistate.x_axis
                     )
                 else:
                     self.updateOutLine(label_core)
@@ -1330,7 +1328,7 @@ class UIplot:
                     stim_num = trow["stim"]
                     col = f"{key}_norm" if norm else key
                     self.updateOutLineFromDf(
-                        label_core, dfoutput, stim_num, col, "sweep"
+                        label_core, dfoutput, stim_num, col, self.uistate.x_axis
                     )
                 else:
                     self.updateOutLine(label_core)

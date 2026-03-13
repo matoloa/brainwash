@@ -471,48 +471,86 @@ disk-cleanup list. `resetCacheDicts` needs no change — it clears the entire
 **7.1** Add `x_axis_mode` string field to `uistate` (persisted in config),
 default `"sweep"`. Valid values: `"sweep"`, `"time"`, `"stim"`.
 
+- Add to `reset()` as `self.x_axis_mode = "sweep"`.
+- Add to `get_state()` return dict.
+- In `set_state()`, use `self.x_axis_mode = state.get("x_axis_mode", "sweep")`
+  so old `cfg.pkl` files without the key fall back gracefully.
+
 **7.2** Add `x_axis` as a `@property` on `UIstate` returning
-`uistate.x_axis_mode`. This is the single call site for all plot-layer
+`self.x_axis_mode`. This is the single call site for all plot-layer
 x-axis decisions.
 
-**7.3** Add `x_axis_xlabel(prow) -> str` method returning a human-readable
-axis label:
+When replacing the current local `x_axis = "sweep"` assignments (step 7.6),
+remove the locals entirely — do not shadow the property with a same-named
+local variable.
+
+**7.3** Add `x_axis_xlabel() -> str` method returning a human-readable
+axis label (no `prow` needed — label depends only on mode):
 - `"sweep"` → `"Sweep"`
 - `"time"` → `"Time (s)"`
 - `"stim"` → `"Stim"`
 
 **7.4** Add `x_axis_xlim(prow) -> tuple` method:
 - `"sweep"` → `(0, prow["sweeps"])`
-- `"time"` → `(0, prow["sweeps"] / prow["sweep_hz"])`, falling back to
-  `prow["sweeps"]` if `sweep_hz` is `NaN`.
+- `"time"` → `(0, prow["sweeps"] / prow["sweep_hz"])`
 - `"stim"` → `(0, int(prow["stims"]))`
+
+No NaN fallback is needed. `sweep_hz` is derived at parse time from the
+median interval between consecutive sweep `t0` timestamps (`parse.metadata`)
+and is reliable for the vast majority of recordings. The NaN case only arises
+for single-sweep recordings or files missing `t0` — both degenerate cases
+where a time axis is meaningless. Rather than silently producing misleading
+values, the time radio button is disabled when `sweep_hz` is NaN (enforced
+in Phase 9.2), so `x_axis_xlim` is never called with `x_axis_mode == "time"`
+and a NaN `sweep_hz`. An assertion or early raise is appropriate as a
+defensive guard:
+
+    if pd.isna(prow["sweep_hz"]):
+        raise ValueError("x_axis_xlim called in time mode but sweep_hz is NaN")
 
 **7.5** Add `x_axis_values(dfoutput, prow) -> Series` method returning the
 x-values to plot for a given recording:
 - `"sweep"` → rows where `sweep` is not `NaN`; x = `dfoutput["sweep"]`
 - `"time"` → same rows as sweep; x = `dfoutput["sweep"] / prow["sweep_hz"]`
+  (same NaN guard as 7.4 — unreachable when radio button is disabled)
 - `"stim"` → rows where `sweep` is `NaN`; x = `dfoutput["stim"]`
 
-**7.6** Replace all inline ternaries of the form
-`"stim" if uistate.checkBox["output_per_stim"] else "sweep"` with
-`uistate.x_axis`. Affected sites:
-- `ui_plot.py`: `graphRefresh`, `addRow`, `update`
-- `ui.py`: `eventDragUpdate`, `outputMouseover`
+**7.6** Replace all hardcoded `x_axis = "sweep"` locals with
+`uistate.x_axis`. Remove the local variable entirely at each site;
+read the property directly. Affected sites:
+- `ui_plot.py` `graphRefresh` (line ~442): `x_axis = "sweep"` and
+  `ax1.set_xlabel(x_axis)` / `ax2.set_xlabel(x_axis)`
+- `ui_plot.py` `addRow` (line ~816): `x_axis = "sweep"` and all
+  downstream `out[x_axis]` references
+- `ui_plot.py` `update` → `updateOutLineFromDf` callers (lines ~1326,
+  ~1334): currently pass literal `"sweep"` — replace with `uistate.x_axis`
+- `ui.py` `eventDragUpdate` (line ~4063): `x_axis = "sweep"` and
+  `out[x_axis]` references
+- `ui.py` `outputMouseover` (line ~3532): `x_axis = "sweep"` and the
+  `if x_axis == "stim"` guard
 
 **7.7** Fix `zoomAuto`: replace hardcoded `(0, prow["sweeps"])` with
 `uistate.x_axis_xlim(prow)`.
 
 **7.8** Fix `graphRefresh` x-axis label: replace hardcoded string with
-`uistate.x_axis_xlabel(prow)`.
+`uistate.x_axis_xlabel()`.
 
-**7.9** Fix `graphRefresh` tick locator: the `FixedLocator` block currently
-gated on `checkBox["output_per_stim"]` should instead be gated on
-`uistate.x_axis == "stim"`.
+Note: `graphRefresh` does not currently receive `prow`. It does not need
+one for the label (7.3 is prow-free), but if future steps require prow
+inside `graphRefresh` (e.g. for tick formatting), it can be retrieved
+from the first selected recording via `uistate.list_idx_select_recs` and
+`df_project`.
 
-**7.10** Remove `checkBox_output_per_stim_changed` handler from `ui.py`.
-Remove `"output_per_stim"` from `uistate.checkBox` and from the
-`viewSettingsChanged` dispatcher. Remove the `connectUIstate` wiring for
-`checkBox_output_per_stim`.
+**7.9** ~~Fix `graphRefresh` tick locator.~~ **Removed — no-op.** The
+`FixedLocator` block gated on `checkBox["output_per_stim"]` no longer
+exists in the active codebase. `FixedLocator` is imported but unused in
+`ui_plot.py`; the import can be cleaned up. If stim-mode tick formatting
+is needed in the future, add it in Phase 8 or 9.
+
+**7.10** ~~Remove `checkBox_output_per_stim_changed` and related wiring.~~
+**Removed — no-op.** `"output_per_stim"` no longer exists in
+`uistate.checkBox`, `viewSettingsChanged`, or `connectUIstate`. The only
+remaining reference is in `snippets/deprecated.py`, which is inert.
 
 ---
 
