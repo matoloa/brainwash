@@ -726,6 +726,68 @@ when stims exist.
 
 ---
 
+## Phase 10 — Post-wiring fixes
+
+Fixes for issues discovered after Phase 9 wiring was complete.
+
+**10.1** ~~`df_project["stims"]` never populated by `get_dft`.~~ **Done.**
+- **Bug:** `get_dft` (`ui_data_frames.py` L196–198) computed
+  `stims = len(dft)` but never assigned it into `df_p` before calling
+  `set_df_project(df_p)`. The comment said "update (number of) 'stims'
+  columns" but the actual write was missing.
+- **Fix:** Added `df_p.loc[row["ID"] == df_p["ID"], "stims"] = stims`
+  between the computation and `set_df_project`, matching the pattern
+  already used by `stimDetect` (`ui.py`).
+- **Impact:** `prow["stims"]` is now reliably populated for any recording
+  whose dft has been created. Consumers like `x_axis_xlim` (stim-mode
+  fallback path), `eventDragUpdate`, and the project table display now
+  see the correct value instead of NaN.
+
+**10.2** ~~Output x-axis length not adjusted for current bin size.~~ **Done.**
+- **Bug:** `x_axis_xlim` (`ui_state_classes.py`) in sweep mode returned
+  `(0, prow["sweeps"])` — the raw sweep count. When binning is active,
+  the plotted x-data uses bin indices (0 … num_bins−1), so the axis had
+  a large blank tail (e.g. 100 sweeps with bin_size=5 → data spans 0–19
+  but axis went 0–100).
+- **Fix:** In both sweep and time mode branches, check
+  `pd.notna(prow.get("bin_size"))` and if so compute
+  `n = ceil(sweeps / bin_size)` before using `n` in the return value.
+  Added `ceil` to the `from math import` line.
+- **Impact:** Auto-zoom now fits the axis tightly to the actual bin count.
+  Time mode also correctly scales bin count by `sweep_hz`.
+
+**10.3** ~~Group lines missing `x_mode` tagging.~~ **Done.**
+- **Bug:** `plot_group_lines` (`ui_plot.py`) registered entries in
+  `dict_group_labels` without an `x_mode` key. `_is_group_visible`
+  (`ui.py`) didn't check `x_mode`. Group mean/SEM lines were always
+  visible regardless of x-axis mode, misaligned in stim mode.
+- **Fix (a):** Added `"x_mode": "sweep"` to both `label_mean` and
+  `label_norm` dicts in `plot_group_lines`.
+- **Fix (b):** Added `x_mode` filtering to `_is_group_visible`, using the
+  same pattern as `_is_rec_visible`: if `x_mode is not None` and doesn't
+  match `uistate.x_axis_mode`, return `False`.
+- **Impact:** Group lines are hidden in stim mode (where sweep-indexed
+  data would be misaligned). When stim-aggregated group means are
+  implemented later, those entries can be tagged `x_mode="stim"` and
+  will appear automatically.
+
+**10.4** ~~Single-stim recording UX in stim mode.~~ **Done.**
+- **Issue:** Recordings with 1 stim got x-axis `(0, 1)`, compressing
+  the single data point against the axis edges.
+- **Fix:** In the stim branch of `x_axis_xlim`, after computing `n`,
+  return `(-0.5, 1.5)` when `n <= 1`. This gives comfortable margins
+  around the single point.
+
+**10.5** Time mode untestable (`sweep_hz` NaN). **Deferred — data issue.**
+- The time-mode code path is implemented and looks correct
+  (`x_axis_values` divides by `sweep_hz`, radio button is disabled when
+  `sweep_hz` is NaN, `triggerSetSweepHz` allows manual entry).
+- Test recordings lack `t0` data so the parser returns `sweep_hz = None`.
+- Can be tested by either finding a recording with `t0` timestamps or
+  using `triggerSetSweepHz` to manually set a value.
+
+---
+
 ## Open questions
 
 - ~~Should `radioButton_xscale_stim` be enabled for single-stim recordings

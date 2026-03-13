@@ -1089,6 +1089,11 @@ class UIsub(
         """
         if selected_groups is not None and v["group_ID"] not in selected_groups:
             return False
+        # x_mode filtering: group lines tagged with a specific x_mode are only
+        # visible when that mode is active.
+        x_mode = v.get("x_mode")
+        if x_mode is not None and x_mode != uistate.x_axis_mode:
+            return False
         aspect = v.get("aspect")
         if aspect and not uistate.checkBox.get(aspect, True):
             return False
@@ -1255,10 +1260,21 @@ class UIsub(
             1
         )  # Get the second widget in the splitter
         widget.setVisible(state)
+        if state:
+            # Ensure the timetable panel gets at least 20% of window width
+            # (floored to a minimum of 100 px).
+            sizes = self.h_splitterMaster.sizes()
+            total = sum(sizes)
+            min_width = max(100, int(total * 0.20))
+            if sizes[1] < min_width:
+                deficit = min_width - sizes[1]
+                # Steal space from the graphs panel (widget 2) preferentially.
+                sizes[2] = max(0, sizes[2] - deficit)
+                sizes[1] = min_width
+                self.h_splitterMaster.setSizes(sizes)
 
-    def onSplitterMoved(self, pos, index):
-        splitter = self.sender()
-        splitter_name = splitter.objectName()
+    def onSplitterMoved(self, splitter_name, pos, index):
+        splitter = getattr(self, splitter_name)
         total_size = sum(splitter.sizes())
         proportions = [size / total_size for size in splitter.sizes()]
         # print(f"{splitter_name}, total_size: {total_size}, Proportions: {proportions}")
@@ -1963,7 +1979,9 @@ class UIsub(
         for splitter_name in ["h_splitterMaster", "v_splitterGraphs"]:
             splitter = getattr(self, splitter_name)
             splitter.splitterMoved.disconnect() if disconnect else splitter.splitterMoved.connect(
-                self.onSplitterMoved
+                lambda pos, index, sn=splitter_name: self.onSplitterMoved(
+                    sn, pos, index
+                )
             )
 
     def applyConfigStates(self):

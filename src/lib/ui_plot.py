@@ -801,6 +801,7 @@ class UIplot:
             "axis": axid,
             "line": meanline,
             "fill": meanfill,
+            "x_mode": "sweep",
         }
         self.uistate.dict_group_labels[label_norm] = {
             "group_ID": group_ID,
@@ -810,6 +811,7 @@ class UIplot:
             "axis": axid,
             "line": normline,
             "fill": normfill,
+            "x_mode": "sweep",
         }
 
     def addRow(self, p_row, dft, dfmean, dfoutput):

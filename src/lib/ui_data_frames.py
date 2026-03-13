@@ -195,6 +195,7 @@ class DataFrameMixin:
             )
             df_p = self.get_df_project()  # update (number of) 'stims' columns
             stims = len(dft)
+            df_p.loc[row["ID"] == df_p["ID"], "stims"] = stims
             self.set_df_project(df_p)
             # If the UI checkbox for 'timepoints_per_stim' is checked OR there's only 1 stim,
             # we assume timepoints don't need adjustment, so we cache df_t as-is.

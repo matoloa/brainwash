@@ -33,8 +33,13 @@ from PyQt5 import QtCore, QtWidgets
 # ---------------------------------------------------------------------------
 
 
+# Columns that are logically integers but may contain NaN.  Using pandas'
+# nullable Int64 dtype prevents display as "1.0", "2.0", etc.
+_INT_COLUMNS = ["stims", "sampling_rate", "bin_size"]
+
+
 def df_projectTemplate():
-    return pd.DataFrame(
+    df = pd.DataFrame(
         columns=[
             "ID",  # str: unique identifier for recording
             "host",  # str: computer name
@@ -60,6 +65,9 @@ def df_projectTemplate():
             "comment",  # str: user comment
         ]
     )
+    for col in _INT_COLUMNS:
+        df[col] = df[col].astype(pd.Int64Dtype())
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +370,11 @@ class ProjectMixin:
         for col in df_projectTemplate().columns:
             if col not in self.df_project.columns:
                 self.df_project[col] = None
+        # Restore nullable-integer dtypes lost during CSV round-trip (CSV
+        # reads integer-with-NaN columns as float64, producing "1.0" display).
+        for col in _INT_COLUMNS:
+            if col in self.df_project.columns:
+                self.df_project[col] = self.df_project[col].astype(pd.Int64Dtype())
         uistate.load_cfg(self.dict_folders["project"], config.version)
         self.tableFormat()
         self.write_bw_cfg()

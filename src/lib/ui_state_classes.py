@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pickle
-from math import floor
+from math import ceil, floor
 from typing import TYPE_CHECKING, Optional
 
 import pandas as pd
@@ -415,21 +415,31 @@ class UIstate:
         """Return (xmin, xmax) for the output graph given the current mode."""
         mode = self.x_axis_mode
         if mode == "sweep":
-            return (0, prow["sweeps"])
+            n = prow["sweeps"]
+            if pd.notna(prow.get("bin_size")):
+                n = ceil(n / prow["bin_size"])
+            return (0, n)
         elif mode == "time":
             if pd.isna(prow["sweep_hz"]):
                 raise ValueError("x_axis_xlim called in time mode but sweep_hz is NaN")
-            return (0, prow["sweeps"] / prow["sweep_hz"])
+            n = prow["sweeps"]
+            if pd.notna(prow.get("bin_size")):
+                n = ceil(n / prow["bin_size"])
+            return (0, n / prow["sweep_hz"])
         elif mode == "stim":
             if dft is not None:
-                return (0, len(dft))
-            stims = prow["stims"]
-            if pd.isna(stims):
-                raise ValueError(
-                    "x_axis_xlim called in stim mode but prow['stims'] is NaN "
-                    "and no dft was provided"
-                )
-            return (0, int(stims))
+                n = len(dft)
+            else:
+                stims = prow["stims"]
+                if pd.isna(stims):
+                    raise ValueError(
+                        "x_axis_xlim called in stim mode but prow['stims'] is NaN "
+                        "and no dft was provided"
+                    )
+                n = int(stims)
+            if n <= 1:
+                return (-0.5, 1.5)
+            return (0, n)
         raise ValueError(f"Unknown x_axis_mode: {mode!r}")
 
     def x_axis_values(self, dfoutput, prow):
