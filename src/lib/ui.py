@@ -2337,6 +2337,10 @@ class UIsub(
             df_p.at[idx, "status"] = "|".join(flags)
         self.set_df_project(df_p)
         print(f"SetSweepHz: set sweep_hz={new_hz} on {n} {noun}.")
+        self.update_x_axis_radio_buttons()
+        for idx in selection:
+            uiplot.unPlot(rec_ID=df_p.loc[idx, "ID"])
+        self.graphUpdate()
 
     # triggerKeepSelectedSweeps, triggerRemoveSelectedSweeps, triggerSplitBySelectedSweeps,
     # sweep_selection_valid, sweep_removal_valid_confirmed → SweepOpsMixin (ui_sweep_ops.py)
