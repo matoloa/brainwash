@@ -2587,7 +2587,7 @@ class UIsub(
             self.set_df_project(df_p)
             uiplot.unPlot(rec_ID)
             dfoutput = self.get_dfoutput(p_row)
-            self.persistOutput(p_row["recording_name"], dfoutput)
+            self.persistOutput(p_row["recording_name"], dfoutput, p_row=p_row)
             uiplot.addRow(p_row, new_df_t, dfmean, dfoutput)
         uistate.list_idx_select_stims = [0]
         p_row = df_p.loc[uistate.list_idx_select_recs[0]]
@@ -2763,6 +2763,7 @@ class UIsub(
             ("cache", "_filter.parquet"),
             ("cache", "_bin.parquet"),
             ("cache", "_output.parquet"),
+            ("cache", "_output_bin.parquet"),
         ]:
             removeFromDisk(folder_name, file_suffix)
 
@@ -4242,7 +4243,7 @@ class UIsub(
         dfoutput.reset_index(inplace=True)
         new_dfoutput.reset_index(inplace=True)
 
-        self.persistOutput(rec_name=rec_name, dfoutput=dfoutput)
+        self.persistOutput(rec_name=rec_name, dfoutput=dfoutput, p_row=prow)
 
         self.set_dft(rec_name, dft_temp)
         self.tableStimModel.setData(self.get_dft(prow))

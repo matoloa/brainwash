@@ -79,7 +79,7 @@ class ProjectMixin:
     # Output persistence helper
     # ------------------------------------------------------------------
 
-    def persistOutput(self, rec_name, dfoutput):
+    def persistOutput(self, rec_name, dfoutput, p_row=None):
         # Column order for the persisted output file.
         # gain and bin_size belong in df_project, not here.
         # sweep holds raw sweep numbers normally, or bin numbers when binning is
@@ -107,7 +107,12 @@ class ProjectMixin:
             )
         dfoutput = dfoutput.reindex(columns=column_order)
         self.dict_outputs[rec_name] = dfoutput
-        self.df2file(df=dfoutput, rec=rec_name, key="output")
+        # Select cache key based on bin state (Phase 6).
+        if p_row is not None and pd.notna(p_row["bin_size"]):
+            cache_key = "output_bin"
+        else:
+            cache_key = "output"
+        self.df2file(df=dfoutput, rec=rec_name, key=cache_key)
 
     # ------------------------------------------------------------------
     # Bootstrapping — general (non-project-specific) UI init

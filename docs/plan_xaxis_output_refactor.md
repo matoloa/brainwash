@@ -406,6 +406,35 @@ arithmetic; it is never read by the plotting layer.
 
 ## Phase 6 — Cache key separation
 
+### Shape rationale
+
+`output` and `output_bin` share the same column schema: `stim`, `sweep`,
+`EPSP_amp`, `EPSP_amp_norm`, `EPSP_slope`, `EPSP_slope_norm`, `volley_amp`,
+`volley_slope`. The only difference is the number of sweep-mode rows and the
+magnitude of the `sweep` values (raw sweep numbers vs sequential bin
+numbers).
+
+Stim-mode rows use `sweep = NaN` in both files. This is correct because:
+
+- Stim-mode rows are measured from `dfmean`, which is independent of
+  binning. The stim-mode rows in `output` and `output_bin` are therefore
+  identical in content; only their cache location differs.
+- `sweep = NaN` provides a reliable sentinel for filtering:
+  `sweep.notna()` → sweep-mode, `sweep.isna()` → stim-mode. This is the
+  single convention used by Phase 7's `x_axis_values()` and all plotting
+  code.
+- `eventDragReleased` does `.set_index(["stim", "sweep"]).update()` to
+  splice recalculated rows. Because `NaN ≠ NaN` in index lookups,
+  stim-mode rows are safely excluded from the update — which is correct,
+  since drag-release should never overwrite stim-mean measurements.
+
+No new columns or schema changes are needed. `build_dfbinstimoutput`
+(per-bin stim measurement) exists in `analysis_v3.py` but is not wired
+into this path; if it is used in the future it would produce sweep-mode-like
+rows with integer `sweep` values, not stim-mode rows.
+
+### Cache design
+
 `dfoutput` is a unified dataframe — stim-mode rows (where `sweep` is `NaN`)
 and sweep-mode rows coexist in the same file. There is no file-level split
 on stim mode. The cache therefore splits on bin state only:
@@ -415,16 +444,25 @@ on stim mode. The cache therefore splits on bin state only:
 | NaN      | `"output"`     | `{rec}_output.parquet`     |
 | set      | `"output_bin"` | `{rec}_output_bin.parquet` |
 
-**6.1** Add `"output_bin"` as a recognised key in `df2file` (no other new
-keys are needed). It follows the existing literal-suffix convention:
-`{rec}_output_bin.parquet`.
+The in-memory dict (`dict_outputs[rec]`) holds whichever variant is
+currently active. When `bin_size` changes, `get_dfoutput` with `reset=True`
+evicts the stale entry and loads or rebuilds the correct variant from the
+appropriate cache file.
+
+### Steps
+
+**6.1** `df2file` already handles arbitrary keys via the `else` branch
+(`{rec}_{key}.parquet`), so `key="output_bin"` works with no changes.
+No new special cases are needed.
 
 **6.2** Update `get_dfoutput` to select the cache path based on
 `p_row["bin_size"]`: use `key="output_bin"` when `bin_size` is not `NaN`,
 `key="output"` otherwise.
 
-**6.3** Update `resetCacheDicts` and `purgeRecordingData` to include
-`"_output_bin.parquet"` alongside `"_output.parquet"`.
+**6.3** Update `purgeRecordingData` to include `("cache",
+"_output_bin.parquet")` alongside `("cache", "_output.parquet")` in the
+disk-cleanup list. `resetCacheDicts` needs no change — it clears the entire
+`dict_outputs` dict, which holds only the active variant per recording.
 
 ---
 

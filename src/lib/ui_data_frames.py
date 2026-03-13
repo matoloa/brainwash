@@ -83,7 +83,7 @@ class DataFrameMixin:
                 dfbin = self.get_dfbin(p_row)
                 print(dfbin)
             dfoutput = self.get_dfoutput(p_row, reset=True)
-            self.persistOutput(rec, dfoutput)
+            self.persistOutput(rec, dfoutput, p_row=p_row)
             uiplot.addRow(p_row, df_t, self.get_dfmean(p_row), dfoutput)
         self.tableFormat()
 
@@ -216,9 +216,12 @@ class DataFrameMixin:
     def get_dfoutput(self, row, reset=False, dft=None):  # Requires df_t
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
         rec = row["recording_name"]
+        bin_active = pd.notna(row["bin_size"])
+        cache_key = "output_bin" if bin_active else "output"
+        cache_suffix = "_output_bin" if bin_active else "_output"
         if rec in self.dict_outputs and not reset:  # 1: Return cached
             return self.dict_outputs[rec]
-        str_output_path = f"{self.dict_folders['cache']}/{rec}_output.parquet"
+        str_output_path = f"{self.dict_folders['cache']}/{rec}{cache_suffix}.parquet"
         if Path(str_output_path).exists() and not reset:  # 2: Read from file
             dfoutput = pd.read_parquet(str_output_path)
             # Migrate old files that had a spurious 'index' column from reset_index(inplace=True).
@@ -226,7 +229,7 @@ class DataFrameMixin:
                 dfoutput.drop(columns=["index"], inplace=True)
                 dfoutput.reset_index(drop=True, inplace=True)
                 self.df2file(
-                    df=dfoutput, rec=rec, key="output"
+                    df=dfoutput, rec=rec, key=cache_key
                 )  # re-persist clean version
             else:
                 dfoutput.reset_index(drop=True, inplace=True)
@@ -256,7 +259,7 @@ class DataFrameMixin:
             print(f"get_dfoutput: done, dfoutput.shape={dfoutput.shape}")
             dfoutput.reset_index(drop=True, inplace=True)
             # Persist the clean version to disk.
-            self.df2file(df=dfoutput, rec=rec, key="output")
+            self.df2file(df=dfoutput, rec=rec, key=cache_key)
         # Cache and return
         self.dict_outputs[rec] = dfoutput
         return dfoutput
@@ -587,7 +590,7 @@ class DataFrameMixin:
                 print(f"Uniform timepoints applied to {p_row['recording_name']}.")
                 self.set_dft(p_row["recording_name"], df_t)
                 dfoutput = self.get_dfoutput(p_row, reset=True)
-                self.persistOutput(p_row["recording_name"], dfoutput)
+                self.persistOutput(p_row["recording_name"], dfoutput, p_row=p_row)
 
         if p_row is None:  # apply to all recordings
             print(f"set_uniformTimepoints for all recordings")
