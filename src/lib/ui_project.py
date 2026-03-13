@@ -375,9 +375,59 @@ class ProjectMixin:
         for col in _INT_COLUMNS:
             if col in self.df_project.columns:
                 self.df_project[col] = self.df_project[col].astype(pd.Int64Dtype())
+        self._backfill_sweep_hz()
         uistate.load_cfg(self.dict_folders["project"], config.version)
         self.tableFormat()
         self.write_bw_cfg()
+
+    def _backfill_sweep_hz(self):
+        """Recompute sweep_hz for recordings where it is NaN.
+
+        Older projects (or IBW imports before the datetime fallback was added
+        to parse.metadata) may have sweep_hz=NaN even though the raw data
+        parquet contains enough timing information to derive it.  This runs
+        once per project load and only touches recordings that need it.
+        """
+        import pyarrow.parquet as pq
+
+        from lib import parse
+
+        df_p = self.df_project
+        missing = df_p["sweep_hz"].isna()
+        if not missing.any():
+            return
+        data_dir = self.dict_folders.get("data")
+        if data_dir is None or not data_dir.exists():
+            return
+        updated = 0
+        for idx in df_p.index[missing]:
+            rec = df_p.at[idx, "recording_name"]
+            path_data = data_dir / f"{rec}.parquet"
+            if not path_data.exists():
+                continue
+            try:
+                # Read only the columns needed — fast even for large files.
+                schema = pq.read_schema(str(path_data))
+                available = set(schema.names)
+                if "sweep" not in available or "datetime" not in available:
+                    continue
+                df_raw = pd.read_parquet(str(path_data), columns=["sweep", "datetime"])
+                sweep_hz = parse.compute_sweep_hz(df_raw)
+                if sweep_hz is not None:
+                    df_p.at[idx, "sweep_hz"] = sweep_hz
+                    # Clear the "default Hz" status flag.
+                    flags = [
+                        f
+                        for f in str(df_p.at[idx, "status"]).split("|")
+                        if f != "default Hz"
+                    ]
+                    df_p.at[idx, "status"] = "|".join(flags)
+                    updated += 1
+            except Exception as exc:
+                print(f"_backfill_sweep_hz: skipping {rec}: {exc}")
+        if updated:
+            print(f"_backfill_sweep_hz: computed sweep_hz for {updated} recording(s)")
+            self.save_df_project()
 
     def save_df_project(self):  # writes df_project to .csv
         self.df_project.to_csv(

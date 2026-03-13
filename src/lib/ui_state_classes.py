@@ -5,6 +5,7 @@ from math import ceil, floor
 from typing import TYPE_CHECKING, Optional
 
 import pandas as pd
+from matplotlib.ticker import FuncFormatter
 
 if TYPE_CHECKING:
     import matplotlib.axes
@@ -138,6 +139,9 @@ class UIstate:
             "output_ax2_ylim": (0, 1.2),
         }
         self.x_axis_mode = "sweep"  # "sweep", "time", or "stim"
+        self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
+        self._time_unit_label = "s"  # set by x_axis_xlim when mode == "time"
+        self._time_sweep_hz = 1.0  # set by x_axis_xlim when mode == "time"
         self.showTimetable = False
         self.showHeatmap = False
         self.dict_heatmap = {}
@@ -407,12 +411,41 @@ class UIstate:
         """Single call site for all plot-layer x-axis decisions."""
         return self.x_axis_mode
 
+    @staticmethod
+    def time_axis_unit(max_seconds: float) -> tuple:
+        """Choose the most readable time unit for the x-axis.
+
+        Returns (divisor, suffix) where divisor converts raw seconds to
+        display values and suffix is the unit string for the axis label.
+
+        Thresholds:
+        - < 120 s   → seconds  (divisor=1,    suffix="s")
+        - < 120 min → minutes  (divisor=60,   suffix="min")
+        - otherwise → hours    (divisor=3600, suffix="h")
+        """
+        if max_seconds < 120:
+            return (1.0, "s")
+        if max_seconds < 7200:
+            return (60.0, "min")
+        return (3600.0, "h")
+
     def x_axis_xlabel(self) -> str:
-        """Human-readable axis label for the current x-axis mode."""
-        return {"sweep": "Sweep", "time": "Time (s)", "stim": "Stim"}[self.x_axis_mode]
+        """Human-readable axis label for the current x-axis mode.
+
+        In time mode, uses the cached unit label set by x_axis_xlim.
+        """
+        if self.x_axis_mode == "time":
+            return f"Time ({self._time_unit_label})"
+        return {"sweep": "Sweep", "stim": "Stim"}[self.x_axis_mode]
 
     def x_axis_xlim(self, prow, dft=None) -> tuple:
-        """Return (xmin, xmax) for the output graph given the current mode."""
+        """Return (xmin, xmax) for the output graph given the current mode.
+
+        In time mode, also caches the auto-scaled unit (divisor and label)
+        for use by x_axis_xlabel and x_axis_formatter.  The returned limits
+        are always in sweep-space (same coordinates as the line x-data);
+        the FuncFormatter converts tick labels to the chosen time unit.
+        """
         mode = self.x_axis_mode
         if mode == "sweep":
             n = prow["sweeps"]
@@ -425,7 +458,11 @@ class UIstate:
             n = prow["sweeps"]
             if pd.notna(prow.get("bin_size")):
                 n = ceil(n / prow["bin_size"])
-            return (0, n / prow["sweep_hz"])
+            self._time_sweep_hz = prow["sweep_hz"]
+            max_seconds = n / self._time_sweep_hz
+            self._time_divisor, self._time_unit_label = self.time_axis_unit(max_seconds)
+            # Return sweep-space limits; tick labels are converted by x_axis_formatter.
+            return (0, n)
         elif mode == "stim":
             if dft is not None:
                 n = len(dft)
@@ -442,19 +479,38 @@ class UIstate:
             return (0, n)
         raise ValueError(f"Unknown x_axis_mode: {mode!r}")
 
+    def x_axis_formatter(self):
+        """Return a FuncFormatter that converts sweep-number ticks to time.
+
+        Only meaningful when x_axis_mode == "time".  For other modes returns
+        a passthrough formatter (tick value displayed as-is with no decimals).
+
+        Must be called after x_axis_xlim (which caches _time_sweep_hz and
+        _time_divisor).
+        """
+        if self.x_axis_mode == "time":
+            sweep_hz = self._time_sweep_hz
+            divisor = self._time_divisor
+
+            def _fmt(val, _pos):
+                t = val / sweep_hz / divisor
+                # Drop trailing zeros: "2.5" not "2.500", "3" not "3.0"
+                return f"{t:g}"
+
+            return FuncFormatter(_fmt)
+        # Sweep / stim: integer ticks, no decimals.
+        return FuncFormatter(lambda val, _pos: f"{val:g}")
+
     def x_axis_values(self, dfoutput, prow):
-        """Return the x-values Series to plot for the current mode."""
+        """Return the x-values Series to plot for the current mode.
+
+        Time mode returns sweep numbers (same as sweep mode); the
+        FuncFormatter on the axis handles display conversion.
+        """
         mode = self.x_axis_mode
-        if mode == "sweep":
+        if mode == "sweep" or mode == "time":
             mask = dfoutput["sweep"].notna()
             return dfoutput.loc[mask, "sweep"]
-        elif mode == "time":
-            if pd.isna(prow["sweep_hz"]):
-                raise ValueError(
-                    "x_axis_values called in time mode but sweep_hz is NaN"
-                )
-            mask = dfoutput["sweep"].notna()
-            return dfoutput.loc[mask, "sweep"] / prow["sweep_hz"]
         elif mode == "stim":
             mask = dfoutput["sweep"].isna()
             return dfoutput.loc[mask, "stim"]

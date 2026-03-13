@@ -298,6 +298,33 @@ def parse_abf(filepath):
     return df
 
 
+def compute_sweep_hz(df):
+    """Derive inter-sweep rate (Hz) from a raw data DataFrame.
+
+    Uses the ``datetime`` column (absolute wall-clock timestamps) which is
+    populated by all parsers (ABF, IBW, CSV).  The ``t0`` column is not used:
+    for ABF it encodes the same intervals already present in ``datetime``,
+    and for IBW it is a constant 0.0 placeholder.
+
+    The DataFrame must contain ``sweep`` and ``datetime`` columns.  Returns
+    the rounded Hz value, or *None* if it cannot be determined (e.g. fewer
+    than 2 sweeps or ``datetime`` column is absent).
+    """
+    if "datetime" not in df.columns:
+        return None
+    sweep_dts = df.groupby("sweep")["datetime"].first().sort_values()
+    if len(sweep_dts) < 2:
+        return None
+    intervals = sweep_dts.diff().dropna().dt.total_seconds()
+    median_interval = intervals.median()
+    if median_interval <= 0:
+        return None
+    raw_hz = 1.0 / median_interval
+    # Round to 3 significant figures
+    magnitude = math.floor(math.log10(abs(raw_hz)))
+    return round(raw_hz, -magnitude + 2)
+
+
 def metadata(df):
     """
     Usage: called by parse.metadata(df) from ui.py
@@ -317,21 +344,7 @@ def metadata(df):
     # Sampling rate: 1 / interval between time samples (assume uniform)
     time_diffs = first_sweep["time"].diff().dropna()
     sampling_rate = int(round(1 / time_diffs.mode().iloc[0]))
-    # Inter-sweep rate: derived from t0 differences across all sweeps.
-    # t0 holds the absolute start time (in seconds) of each sweep for every row.
-    # We take one t0 value per sweep (the first row of each sweep) then compute
-    # the median interval between consecutive sweep starts.
-    sweep_hz = None
-    if "t0" in df.columns:
-        sweep_t0s = df.groupby("sweep")["t0"].first().sort_values()
-        if len(sweep_t0s) >= 2:
-            intervals = sweep_t0s.diff().dropna()
-            median_interval = intervals.median()
-            if median_interval > 0:
-                raw_hz = 1.0 / median_interval
-                # Round to 3 significant figures
-                magnitude = math.floor(math.log10(abs(raw_hz)))
-                sweep_hz = round(raw_hz, -magnitude + 2)
+    sweep_hz = compute_sweep_hz(df)
     dict_meta = {
         "nsweeps": nsweeps,  # number of sweeps in the recording
         "sweep_duration": sweep_duration,  # time in seconds

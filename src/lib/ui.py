@@ -1058,9 +1058,13 @@ class UIsub(
         # x_mode filtering: lines tagged with a specific x_mode are only visible
         # when that mode is active.  Lines with x_mode=None (mean, event, axe
         # markers) are always eligible.
+        # Time mode reuses sweep-mode artists (same underlying data — sweep
+        # numbers — with a FuncFormatter converting tick labels to time units),
+        # so x_mode="sweep" lines are visible in both "sweep" and "time" modes.
         x_mode = v.get("x_mode")
         if x_mode is not None and x_mode != uistate.x_axis_mode:
-            return False
+            if not (x_mode == "sweep" and uistate.x_axis_mode == "time"):
+                return False
         aspect = v.get("aspect")
         if aspect and not uistate.checkBox.get(aspect, True):
             return False
@@ -1093,7 +1097,8 @@ class UIsub(
         # visible when that mode is active.
         x_mode = v.get("x_mode")
         if x_mode is not None and x_mode != uistate.x_axis_mode:
-            return False
+            if not (x_mode == "sweep" and uistate.x_axis_mode == "time"):
+                return False
         aspect = v.get("aspect")
         if aspect and not uistate.checkBox.get(aspect, True):
             return False
