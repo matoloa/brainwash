@@ -52,9 +52,7 @@ import analysis_v2
 
 # %%
 # Adjust folder_talkback to point at your local data directory.
-folder_talkback = (
-    Path.home() / "Documents" / "Brainwash Data Source" / "talkback KetaDexa"
-)
+folder_talkback = Path.home() / "Documents" / "Brainwash Data Source" / "talkback KetaDexa"
 # folder_talkback = Path.home() / "Documents" / "Brainwash Data Source" / "talkback Lactate24SR"
 
 slice_filepaths = sorted(folder_talkback.glob("*slice*"))
@@ -81,13 +79,9 @@ def load_meta(path, sweep=1):
     return df
 
 
-df = pd.concat([load_slice(p, i) for i, p in enumerate(slice_filepaths)]).reset_index(
-    drop=True
-)
+df = pd.concat([load_slice(p, i) for i, p in enumerate(slice_filepaths)]).reset_index(drop=True)
 
-meta = pd.concat([load_meta(p, i) for i, p in enumerate(meta_filepaths)]).reset_index(
-    drop=True
-)
+meta = pd.concat([load_meta(p, i) for i, p in enumerate(meta_filepaths)]).reset_index(drop=True)
 
 print(f"df shape: {df.shape},  meta shape: {meta.shape}")
 
@@ -100,9 +94,7 @@ sweepname = df.sweepname.unique()[0]
 # sweepname = "d1fdaa03-6a4a-4e32-9691-ad4ef09a1e1c"  # known-hard sweep
 
 dfsweep = df.loc[df.sweepname == sweepname, ["time", "voltage"]]
-result = analysis_v2.characterize_graph(
-    dfsweep, stim_amp=0.005, verbose=True, plot=True
-)
+result = analysis_v2.characterize_graph(dfsweep, stim_amp=0.005, verbose=True, plot=True)
 result
 
 # %% [markdown]
@@ -113,18 +105,13 @@ result
 def check_sweep(sweepname):
     """Run characterize_graph on a single sweep; return result dict + sweepname."""
     dfsweep = df.loc[df.sweepname == sweepname, ["time", "voltage", "prim", "bis"]]
-    result = analysis_v2.characterize_graph(
-        dfsweep, stim_amp=0.005, verbose=False, plot=False
-    )
+    result = analysis_v2.characterize_graph(dfsweep, stim_amp=0.005, verbose=False, plot=False)
     result.update({"sweepname": sweepname})
     return result
 
 
 results = [check_sweep(sw) for sw in df.sweepname.unique()]
-signals = [
-    df.loc[df.sweepname == sw, ["time", "voltage"]].copy()
-    for sw in df.sweepname.unique()
-]
+signals = [df.loc[df.sweepname == sw, ["time", "voltage"]].copy() for sw in df.sweepname.unique()]
 
 dfresults = pd.DataFrame(results)
 t_cols = [c for c in dfresults.columns if c.startswith("t_")]
@@ -141,9 +128,7 @@ if "t_EPSP_slope_start" in meta.columns and "t_volley_slope_start" in meta.colum
     dfdiff = pd.DataFrame({"sweepname": dfresults["sweepname"]})
     for col in ["t_EPSP_slope_start", "t_volley_slope_start"]:
         if col in dfresults.columns:
-            dfdiff[f"delta_{col}"] = (
-                (dfresults[col].values - meta[col].values) * TIME_SCALE
-            ).round(1)
+            dfdiff[f"delta_{col}"] = ((dfresults[col].values - meta[col].values) * TIME_SCALE).round(1)
     display(dfdiff)  # type: ignore[name-defined]  # noqa: F821
 else:
     print("meta does not contain ground-truth slope columns — skipping diff.")
@@ -158,6 +143,4 @@ if "delta_t_EPSP_slope_start" in dfdiff.columns:
     for sw in worst:
         dfsweep = df.loc[df.sweepname == sw, ["time", "voltage"]]
         print(f"--- {sw} ---")
-        analysis_v2.characterize_graph(
-            dfsweep, stim_amp=0.005, verbose=False, plot=True, multiplots=True
-        )
+        analysis_v2.characterize_graph(dfsweep, stim_amp=0.005, verbose=False, plot=True, multiplots=True)

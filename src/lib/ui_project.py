@@ -105,13 +105,9 @@ class ProjectMixin:
         missing_columns = set(column_order) - set(dfoutput.columns)
         extra_columns = set(dfoutput.columns) - set(column_order)
         if missing_columns:
-            print(
-                f"Warning: The following columns in column_order don't exist in dfoutput: {missing_columns}"
-            )
+            print(f"Warning: The following columns in column_order don't exist in dfoutput: {missing_columns}")
         if extra_columns:
-            print(
-                f"Warning: The following columns exist in dfoutput but not in column_order: {extra_columns}"
-            )
+            print(f"Warning: The following columns exist in dfoutput but not in column_order: {extra_columns}")
         dfoutput = dfoutput.reindex(columns=column_order)
         self.dict_outputs[rec_name] = dfoutput
         # Select cache key based on bin state (Phase 6).
@@ -140,9 +136,7 @@ class ProjectMixin:
         self.setupMenus()
         self.setupCanvases()  # for graphs, and connect graphClicked(event, <canvas>)
 
-        self.fqdn = (
-            socket.getfqdn()
-        )  # get computer name and local domain, for project file
+        self.fqdn = socket.getfqdn()  # get computer name and local domain, for project file
 
         # debug mode; for printing widget focus every 1000ms
         if config.track_widget_focus:
@@ -164,9 +158,7 @@ class ProjectMixin:
         if projectpath.exists():
             self.load_df_project(self.dict_folders["project"])
         else:
-            print(
-                f"Project file {self.dict_folders['project'] / 'project.brainwash'} not found, creating new project file"
-            )
+            print(f"Project file {self.dict_folders['project'] / 'project.brainwash'} not found, creating new project file")
             self.df_project = df_projectTemplate()
         # If local cfg.pkl exists, load it, otherwise create it
         uistate.reset()
@@ -175,9 +167,7 @@ class ProjectMixin:
             bw_version=config.version,
             force_reset=config.force_cfg_reset,
         )
-        self.mainwindow.setWindowTitle(
-            f"Brainwash {config.version} - {self.projectname}"
-        )
+        self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
 
         # Load group data
         self.dd_groups = self.group_get_dd()
@@ -215,16 +205,10 @@ class ProjectMixin:
             if self.bw_cfg_yaml.exists():
                 with self.bw_cfg_yaml.open("r") as file:
                     cfg = yaml.safe_load(file) or {}
-                    projectfolder = Path(cfg.get("projects_folder", "")) / cfg.get(
-                        "projectname", ""
-                    )
+                    projectfolder = Path(cfg.get("projects_folder", "")) / cfg.get("projectname", "")
                     if projectfolder.exists():
-                        self.user_documents = Path(
-                            cfg.get("user_documents", self.user_documents)
-                        )
-                        self.projects_folder = Path(
-                            cfg.get("projects_folder", self.projects_folder)
-                        )
+                        self.user_documents = Path(cfg.get("user_documents", self.user_documents))
+                        self.projects_folder = Path(cfg.get("projects_folder", self.projects_folder))
                         self.projectname = cfg.get("projectname", self.projectname)
                     uistate.darkmode = cfg.get("darkmode", True)
                     uistate.showTimetable = cfg.get("showTimetable", False)
@@ -275,9 +259,7 @@ class ProjectMixin:
     # ------------------------------------------------------------------
 
     def newProject(self):
-        self.dict_folders["project"].mkdir(
-            exist_ok=True
-        )  # make sure the project folder exists
+        self.dict_folders["project"].mkdir(exist_ok=True)  # make sure the project folder exists
         # Find lowest integer to append to new_project_name to make it unique
         date = datetime.now().strftime("%Y-%m-%d")
         i = 0
@@ -314,16 +296,12 @@ class ProjectMixin:
 
     def renameProject(self):  # changes name of project folder and updates .cfg
         RenameDialog = InputDialogPopup()
-        new_project_name = RenameDialog.showInputDialog(
-            title="Rename project", query=""
-        )
+        new_project_name = RenameDialog.showInputDialog(title="Rename project", query="")
         # check if ok
         if (self.projects_folder / new_project_name).exists():
             if config.verbose:
                 print(f"Project name {new_project_name} already exists")
-        elif (
-            re.match(r"^[a-zA-Z0-9_ -]+$", str(new_project_name)) is not None
-        ):  # True if valid filename
+        elif re.match(r"^[a-zA-Z0-9_ -]+$", str(new_project_name)) is not None:  # True if valid filename
             dict_old = self.dict_folders
             self.projectname = new_project_name
             self.dict_folders = self.build_dict_folders()
@@ -331,9 +309,7 @@ class ProjectMixin:
             if Path(dict_old["cache"]).exists():
                 dict_old["cache"].rename(self.dict_folders["cache"])
             self.write_bw_cfg()  # update boot-up-path in bw_cfg.yaml to new project folder
-            self.mainwindow.setWindowTitle(
-                f"Brainwash {config.version} - {self.projectname}"
-            )
+            self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
         else:
             print(f"Project name {new_project_name} is not a valid path.")
 
@@ -354,18 +330,14 @@ class ProjectMixin:
             self.df_project = df
         self.save_df_project()
 
-    def load_df_project(
-        self, str_projectfolder
-    ):  # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
+    def load_df_project(self, str_projectfolder):  # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
         self.graphWipe()
         self.resetCacheDicts()  # clear internal caches
         path_projectfolder = Path(str_projectfolder)
         self.projectname = str(path_projectfolder.stem)
         print(f"load_df_project: {self.projectname}")
         self.dict_folders = self.build_dict_folders()
-        self.df_project = pd.read_csv(
-            str(path_projectfolder / "project.brainwash"), dtype={"group_IDs": str}
-        )
+        self.df_project = pd.read_csv(str(path_projectfolder / "project.brainwash"), dtype={"group_IDs": str})
         # Backfill any columns added to the schema since this project was last saved
         for col in df_projectTemplate().columns:
             if col not in self.df_project.columns:
@@ -416,11 +388,7 @@ class ProjectMixin:
                 if sweep_hz is not None:
                     df_p.at[idx, "sweep_hz"] = sweep_hz
                     # Clear the "default Hz" status flag.
-                    flags = [
-                        f
-                        for f in str(df_p.at[idx, "status"]).split("|")
-                        if f != "default Hz"
-                    ]
+                    flags = [f for f in str(df_p.at[idx, "status"]).split("|") if f != "default Hz"]
                     df_p.at[idx, "status"] = "|".join(flags)
                     updated += 1
             except Exception as exc:
@@ -430,6 +398,4 @@ class ProjectMixin:
             self.save_df_project()
 
     def save_df_project(self):  # writes df_project to .csv
-        self.df_project.to_csv(
-            str(self.dict_folders["project"] / "project.brainwash"), index=False
-        )
+        self.df_project.to_csv(str(self.dict_folders["project"] / "project.brainwash"), index=False)

@@ -3,10 +3,9 @@ import os
 import toml
 from cx_Freeze import setup, Executable
 
-
 pyproject = toml.load("pyproject.toml")
-version = pyproject['project']['version']
-description = pyproject['project']['description']
+version = pyproject["project"]["version"]
+description = pyproject["project"]["description"]
 # Base setting for GUI applications (hides console on Windows)
 base = "Win32GUI" if sys.platform == "win32" else None
 
@@ -16,7 +15,7 @@ executables = [
         script="src/main.py",
         base=base,
         target_name="MyApp",
-        icon="icon.ico" if sys.platform == "win32" else None  # Optional: Add an .ico file for Windows
+        icon="icon.ico" if sys.platform == "win32" else None,  # Optional: Add an .ico file for Windows
     )
 ]
 
@@ -50,12 +49,15 @@ if get_qt_plugins_paths:
 if sys.platform == "win32":
     # Include PyQt5 plugins and DLLs for Windows
     from PyQt5.QtCore import QLibraryInfo
+
     qt_plugins_path = QLibraryInfo.location(QLibraryInfo.PluginsPath)
-    include_files.extend([
-        (os.path.join(qt_plugins_path, "styles"), "styles"),
-        (os.path.join(qt_plugins_path, "imageformats"), "imageformats"),
-        (os.path.join(qt_plugins_path, "platforms"), "platforms"),
-    ])
+    include_files.extend(
+        [
+            (os.path.join(qt_plugins_path, "styles"), "styles"),
+            (os.path.join(qt_plugins_path, "imageformats"), "imageformats"),
+            (os.path.join(qt_plugins_path, "platforms"), "platforms"),
+        ]
+    )
 elif sys.platform == "darwin":
     # Include PyQt5 frameworks for macOS
     include_files.append(("PyQt5/Qt/plugins", "PyQt5/Qt/plugins"))
