@@ -109,6 +109,10 @@ options = {
         # packages: whole packages — all submodules are pulled in             #
         # ------------------------------------------------------------------ #
         "packages": [
+            # application source package — list explicitly so cx_Freeze
+            # includes all submodules, even those imported lazily at runtime
+            # (e.g. lib.parse imported inside _backfill_sweep_hz).
+            "lib",
             # Qt
             "PyQt5",
             # numeric / scientific
