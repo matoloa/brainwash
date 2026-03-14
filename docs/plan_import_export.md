@@ -184,82 +184,51 @@ def sample_atf(filepath):
 
 ## Phase 2 — Export to .csv
 
-This implements `triggerExportOutputCsv` and `triggerExportSweepsCsv` in `ui_export.py`.
+Implements four menu commands in `ui_export.py` (wired in `ui_menus.py`):
 
-### Step 2.1 — Output CSV export
+- **Export menu → Sweeps section:** `triggerExportSweepsCsv`
+- **Export menu → Output section:** `triggerExportOutputCsv`
 
-`triggerExportOutputCsv`:
+"Sweeps" means the raw electrophysiology data files (the `data/<rec>.parquet` content). "Output" means the computed per-sweep analysis results (the `cache/<rec>_output.parquet` content). Filters, means, and other cached derivatives are not exported here.
 
-1. Collect all visible recordings from `uistate.dict_rec_show`.
-2. For each, call `self.get_dfoutput(row)`.
-3. Ask the user for a save path via `QFileDialog.getSaveFileName` with filter `"CSV files (*.csv)"`.
-4. If a single recording is selected, write `dfoutput.to_csv(path, index=False)`.
-5. If multiple recordings are selected, write a combined CSV with an additional leading column `recording_name`. Offer the user a choice (single combined file vs. one file per recording) via a simple `QMessageBox` with three buttons: *Combined*, *Per recording*, *Cancel*.
-6. For per-recording export, derive filenames as `<stem>_output.csv` in the chosen directory.
+### Step 2.1 — Shared save-dialog helper
 
-Column order should match `persistOutput`'s `column_order`: `stim`, `sweep`, `EPSP_slope`, `EPSP_slope_norm`, `EPSP_amp`, `EPSP_amp_norm`, `volley_amp`, `volley_slope`.
+Add a private `_csv_save_dialog(default_stem: str) -> str | None` helper to `ExportMixin` that:
 
-### Step 2.2 — Sweep (raw data) CSV export
+1. Opens `QFileDialog.getSaveFileName` with a `"CSV files (*.csv)"` filter.
+2. Returns the chosen path, or `None` if the user cancelled.
 
-`triggerExportSweepsCsv`:
+For multi-recording exports, open `QFileDialog.getExistingDirectory` instead and offer a `QMessageBox` with three buttons — *Combined*, *Per recording*, *Cancel* — before the directory dialog.
 
-1. For each selected recording, call `self.get_dfdata(row)`.
-2. Same save-dialog pattern as 2.1, but default filename `<rec>_sweeps.csv`.
-3. Write with `df.to_csv(path, index=False)`.
-4. Columns: `sweep`, `time`, `voltage_raw`, `t0`, `datetime` — the natural parquet schema.
+### Step 2.2 — Sweep CSV export (`triggerExportSweepsCsv`)
 
-### Step 2.3 — Shared export helper
+Exports raw sweep data (voltage trace + time axis) for the selected recording(s).
 
-Add a private `_export_dialog_and_write(dfs: dict[str, pd.DataFrame], default_stem: str, file_filter: str, write_fn)` method to `ExportMixin`. Both 2.1 and 2.2 call this. It handles:
-- The `QFileDialog`.
-- The combined-vs-per-recording `QMessageBox` (only shown when `len(dfs) > 1`).
-- Calling `write_fn(df, path)` for each output.
-- A status-bar message on completion: *"Exported N file(s) to `<dir>`."*
+1. Determine the selected recording(s) from `uistate`.
+2. Load raw sweep data for each selected recording.
+3. For a single recording: prompt for a save path, default filename `<rec>_sweeps.csv`.
+4. For multiple recordings: prompt for *Combined* vs *Per recording* (Step 2.1 helper), then a directory; derive filenames as `<rec>_sweeps.csv` per recording.
+5. Combined mode: stack all recordings into one DataFrame, prepend a `recording` column.
+6. Write with `index=False`.
+7. Show a status-bar message on completion.
 
----
+The exported columns are those of the raw data parquet schema: `sweep`, `time`, `voltage_raw`, `t0`, `datetime`.
 
-## Phase 3 — Export to .xls
+### Step 2.3 — Output CSV export (`triggerExportOutputCsv`)
 
-Implements `triggerExportOutputXls` and `triggerExportSweepsXls`.
+Exports computed analysis output for the selected recording(s).
 
-### Step 3.1 — Dependency
+1. Same selection and save-dialog pattern as Step 2.2, but default filename `<rec>_output.csv`.
+2. Load output data for each selected recording.
+3. Combined mode: stack recordings, prepend a `recording` column.
+4. Write with `index=False`.
+5. Show a status-bar message on completion.
 
-Add `openpyxl` to `pyproject.toml` dependencies (needed by pandas' `to_excel` with `.xlsx`). Note: use `.xlsx` (not `.xls`) — `.xls` is the legacy BIFF format; pandas dropped its write support. The menu label can say "Export to .xls" but the actual file extension should be `.xlsx`. If the menu label matters for legacy muscle-memory reasons, name the file `<rec>.xlsx` and update the menu strings to say `Export output to .xlsx` / `Export sweeps to .xlsx`.
-
-```
-uv add openpyxl
-```
-
-### Step 3.2 — Output XLS export
-
-`triggerExportOutputXls`:
-
-1. Same collection logic as `triggerExportOutputCsv` (Step 2.1).
-2. File dialog with filter `"Excel files (*.xlsx)"`.
-3. **Single recording**: write one sheet named `output` with `df.to_excel(writer, sheet_name='output', index=False)`.
-4. **Multiple recordings (combined)**: one Excel workbook, one sheet per recording (sheet name = recording name, truncated to 31 chars — Excel limit). Use `pd.ExcelWriter` context manager.
-5. **Multiple recordings (per-file)**: one workbook per recording, single sheet named `output`.
-
-### Step 3.3 — Sweep XLS export
-
-`triggerExportSweepsXls`:
-
-Same as 3.2 but for raw sweep data. Sheet name `sweeps`.
-
-For multi-recording combined exports the sheet-per-recording approach is useful here because each recording may have a different sweep count / sample rate; stacking them in a single sheet would be confusing.
-
-### Step 3.4 — Metadata sheet
-
-For both output and sweep XLS exports, add a second sheet named `info` containing:
-- The relevant `df_project` row for each recording (one row per recording in combined mode).
-- Export timestamp.
-- Brainwash version (from `pyproject.toml` / `config.version`).
-
-This allows the recipient of an Excel file to trace back the recording parameters without the original project file.
+Column order matches the output parquet schema: `stim`, `sweep`, `EPSP_slope`, `EPSP_slope_norm`, `EPSP_amp`, `EPSP_amp_norm`, `volley_amp`, `volley_slope`.
 
 ---
 
-## Phase 4 — Export to .ibw (Igor Binary Wave)
+## Phase 3 — Export to .ibw (Igor Binary Wave)
 
 Implements `triggerExportSweepsIbw`.
 
@@ -267,7 +236,7 @@ Implements `triggerExportSweepsIbw`.
 
 IBW (Igor Binary Wave) is the native format of Igor Pro and a common exchange format in electrophysiology labs. The `igor2` package is already a dependency and can write IBW files. Each sweep becomes one wave. Voltage is stored in SI units (Volts); the x-axis scaling is set from the sample interval.
 
-### Step 4.1 — Per-sweep IBW writer helper
+### Step 3.1 — Per-sweep IBW writer helper
 
 Add `export_ibw(dfdata: pd.DataFrame, folder: Path, rec_name: str)` to `parse.py` (alongside the existing IBW reader):
 
@@ -310,7 +279,7 @@ def export_ibw(dfdata, folder, rec_name):
 
 > **Note:** Verify the exact igor2 write API before implementation — `igor2` versions differ in their write interface. The above is illustrative; the actual call may be `ibw_io.save(path, wave_dict)` or use a higher-level helper. Check `igor2` docs / source at implementation time.
 
-### Step 4.2 — UI trigger
+### Step 3.2 — UI trigger
 
 `triggerExportSweepsIbw`:
 
@@ -320,7 +289,7 @@ def export_ibw(dfdata, folder, rec_name):
 4. Call `parse.export_ibw(dfdata, folder, rec_name)` for each.
 5. Show a summary: *"Exported N sweeps across M recordings to `<dir>`."*
 
-### Step 4.3 — IBW round-trip test
+### Step 3.3 — IBW round-trip test
 
 Add a test in `src/lib/test_parse.py`:
 1. Load a known ABF file with `parse_abf`.
@@ -331,7 +300,7 @@ Add a test in `src/lib/test_parse.py`:
 
 ---
 
-## Phase 5 — Publishable Image Export
+## Phase 4 — Publishable Image Export
 
 ### Background
 
@@ -343,7 +312,7 @@ The UI currently has four matplotlib axes:
 
 `triggerExportOutputImage` needs to produce a standalone, publication-quality figure from these axes. The key requirement is **decoupling the export figure from the interactive UI figure** — the exported figure must have journal-appropriate formatting (font sizes, linewidths, no toolbar artefacts, correct figure dimensions) without altering the live display.
 
-### Step 5.1 — Journal template dataclass
+### Step 4.1 — Journal template dataclass
 
 Add `src/lib/ui_image_export.py` (new file). Define:
 
@@ -375,7 +344,7 @@ class JournalTemplate:
     layout: Literal["vertical", "horizontal"] = "vertical"
 ```
 
-### Step 5.2 — Built-in templates for relevant journals
+### Step 4.2 — Built-in templates for relevant journals
 
 Add a `JOURNAL_TEMPLATES: dict[str, JournalTemplate]` dict in `ui_image_export.py` with the following presets. All dimensions follow the respective journal's author guidelines for single-column and double-column figures.
 
@@ -393,7 +362,7 @@ Add a `JOURNAL_TEMPLATES: dict[str, JournalTemplate]` dict in `ui_image_export.p
 
 > **Caveat:** Journal specifications change. The implementer should verify current guidelines at implementation time. These values are based on guidelines current as of 2025.
 
-### Step 5.3 — Figure renderer
+### Step 4.3 — Figure renderer
 
 Add `render_publication_figure(uistate, uiplot, template: JournalTemplate, selected_recs: list[str]) -> matplotlib.figure.Figure` to `ui_image_export.py`.
 
@@ -414,7 +383,7 @@ Algorithm:
 4. **Scale bars instead of axis ticks** (optional, off by default): if `template.scale_bars = True`, suppress axis ticks and draw manual scale bars. This is common in neuroscience figures for the event trace panel.
 5. Return the figure without displaying it.
 
-### Step 5.4 — Save dialog and formats
+### Step 4.4 — Save dialog and formats
 
 `triggerExportOutputImage` (in `ui_export.py`):
 
@@ -428,7 +397,7 @@ Algorithm:
 3. Save via `fig.savefig(path, dpi=template.dpi, bbox_inches='tight')`.
 4. For SVG output, set `dpi=96` (SVG is vector; the `dpi` kwarg in matplotlib's SVG backend controls the coordinate scale for embedded bitmaps only).
 
-### Step 5.5 — ExportImageDialog
+### Step 4.5 — ExportImageDialog
 
 New `QDialog` subclass in `ui_image_export.py`:
 
@@ -452,7 +421,7 @@ ExportImageDialog
 
 Selecting a template from the dropdown populates the dimension/DPI fields. Changing any field triggers a debounced (300 ms) preview re-render.
 
-### Step 5.6 — Menu addition
+### Step 4.6 — Menu addition
 
 Add to `MenuMixin.setupMenus` in `ui_menus.py`, under the Image section:
 
@@ -466,9 +435,9 @@ self.menuExport.addAction(self.actionExportOutputImageTemplate)
 
 ---
 
-## Phase 6 — `ui_export.py` shared utilities
+## Phase 5 — `ui_export.py` shared utilities
 
-### Step 6.1 — Status bar feedback helper
+### Step 5.1 — Status bar feedback helper
 
 Add `_export_status(self, msg: str)` to `ExportMixin`:
 ```python
@@ -480,22 +449,22 @@ def _export_status(self, msg: str):
 
 All export triggers call this on success or failure, so the user always gets feedback even when a file dialog is dismissed.
 
-### Step 6.2 — Guard against empty selection
+### Step 5.2 — Guard against empty selection
 
 Add `_require_selection(self) -> list[pd.Series] | None` to `ExportMixin`:
 - Returns a list of `df_project` rows for currently visible/selected recordings.
 - If the list is empty, shows a `QMessageBox.warning` and returns `None`.
 - All export triggers check the return value of this guard before proceeding.
 
-### Step 6.3 — Progress dialog for large exports
+### Step 5.3 — Progress dialog for large exports
 
-For exports that iterate over many recordings or write large files (XLS multi-sheet, IBW per-sweep), wrap the loop in a `QProgressDialog`. Use the existing `tqdm`-style callbacks where already present in `parse.py` (e.g. `progress_callback` in `parse_ibwFolder`).
+For exports that iterate over many recordings or write large files (IBW per-sweep), wrap the loop in a `QProgressDialog`. Use the existing `tqdm`-style callbacks where already present in `parse.py` (e.g. `progress_callback` in `parse_ibwFolder`).
 
 ---
 
-## Phase 7 — Tests
+## Phase 6 — Tests
 
-### Step 7.1 — CSV round-trip test
+### Step 6.1 — CSV round-trip test
 
 In `src/lib/test_parse.py`:
 1. Generate a minimal synthetic `dfdata` DataFrame (3 sweeps × 100 samples).
@@ -505,7 +474,7 @@ In `src/lib/test_parse.py`:
 5. Assert `df["sweep"].nunique() == 3`.
 6. Assert column set matches `_BW_CSV_SWEEP_COLS`.
 
-### Step 7.2 — Journal template sanity test
+### Step 6.2 — Journal template sanity test
 
 In a new `src/lib/test_image_export.py`:
 1. Instantiate every template in `JOURNAL_TEMPLATES`.
@@ -523,15 +492,13 @@ In a new `src/lib/test_image_export.py`:
 |---|---|---|---|---|
 | **1 — CSV Import** | 1.1 → 1.4 | Low | ~2–3 hrs | — |
 | **2 — CSV Export** | 2.1 → 2.3 | Low | ~2–3 hrs | — |
-| **3 — XLS Export** | 3.1 → 3.4 | Low | ~3–4 hrs | Phase 2 (shared helper) |
-| **4 — IBW Export** | 4.1 → 4.3 | Medium | ~4–6 hrs | — |
-| **5 — Image Export** | 5.1 → 5.6 | Medium–High | ~1–2 days | — |
-| **6 — Shared utilities** | 6.1 → 6.3 | Low | ~2 hrs | Phases 2–5 |
-| **7 — Tests** | 7.1 → 7.3 | Low | ~3–4 hrs | Phases 1, 2, 5 |
+| **3 — IBW Export** | 3.1 → 3.3 | Medium | ~4–6 hrs | — |
+| **4 — Image Export** | 4.1 → 4.6 | Medium–High | ~1–2 days | — |
+| **5 — Shared utilities** | 5.1 → 5.3 | Low | ~2 hrs | Phases 2–4 |
+| **6 — Tests** | 6.1 → 6.2 | Low | ~3–4 hrs | Phases 1, 2, 4 |
 
-Phases 1, 2, 4, and 5 are independent and can be parallelised across contributors.
-Phase 3 should follow Phase 2 so the shared `_export_dialog_and_write` helper is in place.
-Phase 6 utilities should be extracted once at least two export phases are in progress (to avoid premature abstraction).
+Phases 1, 2, 3, and 4 are independent and can be parallelised across contributors.
+Phase 5 utilities should be extracted once at least two export phases are in progress (to avoid premature abstraction).
 
 ---
 
