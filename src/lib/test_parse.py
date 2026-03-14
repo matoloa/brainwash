@@ -32,9 +32,12 @@ from parse import (
     metadata,
     parse_abf,
     parse_abfFolder,
+    parse_atf,
+    parse_atfFolder,
     parse_csv,
     parse_csvFolder,
     persistdf,
+    sample_atf,
     source2dfs,
     sources2dfs,
     zeroSweeps,
@@ -49,6 +52,83 @@ _ABF_2CH = _TEST_DATA / "KO_02" / "2022_01_24_0000.abf"
 
 _skip_no_1ch = unittest.skipUnless(_ABF_1CH.exists(), f"real ABF absent: {_ABF_1CH}")
 _skip_no_2ch = unittest.skipUnless(_ABF_2CH.exists(), f"real ABF absent: {_ABF_2CH}")
+
+
+# ---------------------------------------------------------------------------
+# ATF synthetic file helpers
+# ---------------------------------------------------------------------------
+
+
+def _write_synthetic_atf(
+    path: Path,
+    n_sweeps: int = 3,
+    n_timepoints: int = 20,
+    n_channels: int = 1,
+    sample_rate_hz: int = 10000,
+) -> Path:
+    """
+    Write a minimal but valid ATF 1.0 file with n_channels channels and n_sweeps sweeps.
+
+    Layout follows the pCLAMP ATF 1.0 spec:
+      Line 1 : ATF\t1.0
+      Line 2 : <nHeaderItems>\t<nDataCols>
+      Lines 3..(3+nHeaderItems-1) : header key=value pairs
+      Next line : tab-separated column names
+      Data lines : one row per time-point (all sweeps concatenated, time resets to 0
+                   at the start of every sweep — standard pCLAMP behaviour)
+
+    Voltage is written in mV; parse_atf divides by 1000 so voltage_raw = sweep_idx mV/1000.
+    """
+    dt = 1.0 / sample_rate_hz
+    sweep_len_sec = n_timepoints * dt
+    # Each channel contributes one column per sweep in the data section.
+    n_data_cols = 1 + n_channels * n_sweeps  # Time + traces
+
+    # Header items: AcquisitionMode, Comment, YTop, YBottom, SyncTimeUnits,
+    # SweepStartTimesMS, SignalsExported, Signals — 8 items total.
+    signal_names = [f"IN {ch}" for ch in range(n_channels)]
+    signals_per_sweep = "\t".join(
+        f'"{sig}"' for sig in signal_names for _ in range(n_sweeps)
+    )
+    # SweepStartTimesMS: one entry per sweep (ms offsets from recording start)
+    sweep_starts = ",".join(
+        str(round(sw * sweep_len_sec * 1000, 3)) for sw in range(n_sweeps)
+    )
+    header_lines = [
+        '"AcquisitionMode=Episodic Stimulation"',
+        '"Comment="',
+        '"YTop=200"',
+        '"YBottom=-200"',
+        '"SyncTimeUnits=20"',
+        f'"SweepStartTimesMS={sweep_starts}"',
+        f'"SignalsExported={";".join(signal_names)}"',
+        f'"Signals=\t{signals_per_sweep}"',
+    ]
+    n_header_items = len(header_lines)
+
+    # Column header row: Time(s)  then "Trace #N" for each trace column
+    col_names = ["Time (s)"] + [
+        f"Trace #{sw * n_channels + ch + 1}"
+        for sw in range(n_sweeps)
+        for ch in range(n_channels)
+    ]
+
+    with open(path, "w", newline="\n") as fh:
+        fh.write("ATF\t1.0\n")
+        fh.write(f"{n_header_items}\t{n_data_cols}\n")
+        for line in header_lines:
+            fh.write(line + "\n")
+        fh.write("\t".join(f'"{c}"' for c in col_names) + "\n")
+        for t_idx in range(n_timepoints):
+            t = round(t_idx * dt, 9)
+            # voltage for each trace: sweep_index mV (so voltage_raw = sweep_idx / 1000 V)
+            vals = [t] + [
+                float(sw)  # mV value = sweep index
+                for sw in range(n_sweeps)
+                for _ch in range(n_channels)
+            ]
+            fh.write("\t".join(str(v) for v in vals) + "\n")
+    return path
 
 
 # ---------------------------------------------------------------------------
@@ -888,6 +968,213 @@ class TestParseCsvFolder(unittest.TestCase):
         self.assertEqual(len(result), 2)
         for df in result.values():
             self.assertIn("sweep", df.columns)
+
+
+# ---------------------------------------------------------------------------
+# ATF parsing tests
+# ---------------------------------------------------------------------------
+
+
+class TestParseAtf(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.atf_1ch = _write_synthetic_atf(
+            Path(self.tmpdir) / "test_1ch.atf",
+            n_sweeps=3,
+            n_timepoints=20,
+            n_channels=1,
+        )
+        self.atf_2ch = _write_synthetic_atf(
+            Path(self.tmpdir) / "test_2ch.atf",
+            n_sweeps=4,
+            n_timepoints=10,
+            n_channels=2,
+        )
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmpdir)
+
+    def test_returns_dataframe(self):
+        df = parse_atf(self.atf_1ch)
+        self.assertIsInstance(df, pd.DataFrame)
+
+    def test_has_required_columns(self):
+        df = parse_atf(self.atf_1ch)
+        for col in ("time", "voltage_raw", "channel", "t0", "datetime"):
+            self.assertIn(col, df.columns)
+
+    def test_row_count_single_channel(self):
+        # 3 sweeps * 20 timepoints * 1 channel
+        df = parse_atf(self.atf_1ch)
+        self.assertEqual(len(df), 3 * 20 * 1)
+
+    def test_row_count_two_channels(self):
+        # 4 sweeps * 10 timepoints * 2 channels
+        df = parse_atf(self.atf_2ch)
+        self.assertEqual(len(df), 4 * 10 * 2)
+
+    def test_channel_values_single_channel(self):
+        df = parse_atf(self.atf_1ch)
+        self.assertEqual(sorted(df["channel"].unique()), [0])
+
+    def test_channel_values_two_channels(self):
+        df = parse_atf(self.atf_2ch)
+        self.assertEqual(sorted(df["channel"].unique()), [0, 1])
+
+    def test_time_resets_per_sweep(self):
+        # Each sweep's first time value should be 0.0 (pyabf.ATF resets sweepX)
+        df = parse_atf(self.atf_1ch)
+        ch0 = df[df["channel"] == 0]
+        # Detect sweep groups by time resets
+        sweep_groups = (ch0["time"] == 0).cumsum()
+        first_times = ch0.groupby(sweep_groups)["time"].first()
+        self.assertTrue((first_times == 0.0).all())
+
+    def test_voltage_raw_is_mv_divided_by_1000(self):
+        # Sweep 0 has voltage 0.0 mV → 0.0 V; sweep 1 has 1.0 mV → 0.001 V
+        df = parse_atf(self.atf_1ch)
+        ch0 = df[df["channel"] == 0]
+        sweep_groups = (ch0["time"] == 0).cumsum()
+        # First sweep (group 1) should have voltage_raw == 0.0
+        sweep0_vals = ch0[sweep_groups == 1]["voltage_raw"].unique()
+        self.assertAlmostEqual(float(sweep0_vals[0]), 0.0)
+        # Second sweep (group 2) should have voltage_raw == 0.001
+        sweep1_vals = ch0[sweep_groups == 2]["voltage_raw"].unique()
+        self.assertAlmostEqual(float(sweep1_vals[0]), 0.001)
+
+    def test_t0_is_nan(self):
+        df = parse_atf(self.atf_1ch)
+        self.assertTrue(df["t0"].isna().all())
+
+    def test_datetime_is_nat(self):
+        df = parse_atf(self.atf_1ch)
+        self.assertTrue(df["datetime"].isna().all())
+
+
+class TestParseAtfFolder(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        _write_synthetic_atf(
+            Path(self.tmpdir) / "rec1.atf", n_sweeps=2, n_timepoints=10, n_channels=1
+        )
+        _write_synthetic_atf(
+            Path(self.tmpdir) / "rec2.atf", n_sweeps=3, n_timepoints=10, n_channels=1
+        )
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmpdir)
+
+    def test_returns_dataframe(self):
+        df = parse_atfFolder(self.tmpdir)
+        self.assertIsInstance(df, pd.DataFrame)
+
+    def test_row_count_is_sum_of_files(self):
+        # rec1: 2 sweeps * 10 tp * 1 ch = 20; rec2: 3 * 10 * 1 = 30 → total 50
+        df = parse_atfFolder(self.tmpdir)
+        self.assertEqual(len(df), 50)
+
+    def test_has_required_columns(self):
+        df = parse_atfFolder(self.tmpdir)
+        for col in ("time", "voltage_raw", "channel"):
+            self.assertIn(col, df.columns)
+
+
+class TestSampleAtf(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.atf = _write_synthetic_atf(
+            Path(self.tmpdir) / "meta.atf",
+            n_sweeps=5,
+            n_timepoints=100,
+            n_channels=2,
+            sample_rate_hz=10000,
+        )
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmpdir)
+
+    def test_returns_dict_with_required_keys(self):
+        meta = sample_atf(self.atf)
+        for key in ("channel_count", "sweep_count", "sample_rate", "sweep_duration"):
+            self.assertIn(key, meta)
+
+    def test_channel_count(self):
+        meta = sample_atf(self.atf)
+        self.assertEqual(meta["channel_count"], 2)
+
+    def test_sweep_count(self):
+        meta = sample_atf(self.atf)
+        self.assertEqual(meta["sweep_count"], 5)
+
+    def test_sample_rate(self):
+        meta = sample_atf(self.atf)
+        self.assertEqual(meta["sample_rate"], 10000)
+
+    def test_sweep_duration(self):
+        # 100 timepoints at 10000 Hz → 0.01 s
+        meta = sample_atf(self.atf)
+        self.assertAlmostEqual(meta["sweep_duration"], 0.01, places=4)
+
+
+class TestSource2dfsAtf(unittest.TestCase):
+    """Verify that source2dfs dispatches correctly to the ATF parsers."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.atf_file = _write_synthetic_atf(
+            Path(self.tmpdir) / "single.atf", n_sweeps=3, n_timepoints=20, n_channels=1
+        )
+        self.atf_folder = Path(self.tmpdir) / "folder"
+        self.atf_folder.mkdir()
+        _write_synthetic_atf(
+            self.atf_folder / "a.atf", n_sweeps=2, n_timepoints=10, n_channels=1
+        )
+        _write_synthetic_atf(
+            self.atf_folder / "b.atf", n_sweeps=2, n_timepoints=10, n_channels=1
+        )
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmpdir)
+
+    def test_single_atf_returns_dict(self):
+        result = source2dfs(str(self.atf_file))
+        self.assertIsInstance(result, dict)
+        self.assertGreater(len(result), 0)
+
+    def test_single_atf_has_sweep_column(self):
+        result = source2dfs(str(self.atf_file))
+        for df in result.values():
+            self.assertIn("sweep", df.columns)
+
+    def test_single_atf_sweep_count(self):
+        result = source2dfs(str(self.atf_file))
+        df = result[0]
+        self.assertEqual(df["sweep"].nunique(), 3)
+
+    def test_single_atf_required_columns(self):
+        result = source2dfs(str(self.atf_file))
+        df = result[0]
+        for col in ("sweep", "time", "voltage_raw"):
+            self.assertIn(col, df.columns)
+
+    def test_atf_folder_returns_dict(self):
+        result = source2dfs(str(self.atf_folder))
+        self.assertIsInstance(result, dict)
+        self.assertGreater(len(result), 0)
+
+    def test_atf_folder_sweep_count(self):
+        # 2 files * 2 sweeps each = 4 sweeps total
+        result = source2dfs(str(self.atf_folder))
+        df = result[0]
+        self.assertEqual(df["sweep"].nunique(), 4)
 
 
 # ---------------------------------------------------------------------------

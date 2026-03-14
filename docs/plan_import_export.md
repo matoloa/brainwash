@@ -83,53 +83,40 @@ Add `parse_csvFolder(folder_path)` to `parse.py`:
 
 ### Background
 
-ATF (Axon Text Format) is a tab-delimited text format produced by pCLAMP and older Axon software. It is structurally similar to ABF in that it contains multi-channel, multi-sweep voltage traces with a time axis, but it is human-readable ASCII. `pyabf` does not read ATF; however, ATF files are straightforwardly parseable with standard Python since the format is well-documented and simple.
+ATF (Axon Text Format) is a tab-delimited text format produced by pCLAMP and older Axon software. It is structurally similar to ABF in that it contains multi-channel, multi-sweep voltage traces with a time axis, but it is human-readable ASCII. `pyabf` includes an `ATF` class that reads ATF files and exposes the same sweep-oriented interface as `pyabf.ABF` (`setSweep()`, `sweepX`, `sweepY`, `sweepCount`, `channelCount`, `dataRate`, `sweepLengthSec`, `channelList`). No new dependencies are required.
 
 The wiring mirrors the ABF mechanism exactly: `parse_atf` → `parse_atfFolder` → `source2dfs` dispatch.
 
 ### Step 1b.1 — Add `parse_atf(filepath)`
 
-Add to `parse.py`, alongside `parse_abf`:
+Add to `parse.py`, alongside `parse_abf`. Use `pyabf.ATF` as the backend — the same pattern as `parse_abf` uses `pyabf.ABF`:
 
 ```python
 def parse_atf(filepath):
     """
-    Read a single Axon Text Format (.atf) file.
+    Read a single Axon Text Format (.atf) file using pyabf.ATF.
     Returns a raw DataFrame with columns: time, voltage_raw, channel, t0, datetime.
-    ATF header lines begin with a quoted string or start with "ATF"; data begins
-    after the column-header line (detected by the presence of "Time" in the row).
     """
-    filepath = Path(filepath)
-    # Skip ATF header block — scan for the column-name row
-    with open(filepath, "r") as fh:
-        lines = fh.readlines()
-    # Find the first line that starts with "Time" (case-insensitive) — that's the header row
-    header_idx = next(i for i, l in enumerate(lines) if l.strip().lower().startswith('"time"') or l.strip().lower().startswith('time'))
-    col_names = lines[header_idx].strip().split("\t")
-    data_lines = lines[header_idx + 1:]
-    df_raw = pd.read_csv(
-        pd.io.common.StringIO("".join(data_lines)),
-        sep="\t",
-        header=None,
-        names=col_names,
-    )
-    # ATF typically has one Time column and N trace columns ("Trace #1", "Trace #2", ...)
-    time_col = col_names[0]
-    trace_cols = [c for c in col_names if c != time_col]
+    atf = pyabf.ATF(filepath)
+    channels = atf.channelList
     dfs = []
-    for ch_idx, trace_col in enumerate(trace_cols):
-        df_ch = pd.DataFrame({
-            "time": df_raw[time_col].to_numpy(dtype=np.float64),
-            "voltage_raw": df_raw[trace_col].to_numpy(dtype=np.float64) / 1000,  # mV → V
-            "channel": ch_idx,
-            "t0": np.nan,
-            "datetime": pd.NaT,
-        })
-        dfs.append(df_ch)
+    for ch in channels:
+        sweep_dfs = []
+        for sweep in atf.sweepList:
+            atf.setSweep(sweep, channel=ch)
+            df_sweep = pd.DataFrame({
+                "time": atf.sweepX.astype(np.float64),
+                "voltage_raw": atf.sweepY.astype(np.float64) / 1000,  # mV → V
+                "channel": ch,
+                "t0": np.nan,
+                "datetime": pd.NaT,
+            })
+            sweep_dfs.append(df_sweep)
+        dfs.append(pd.concat(sweep_dfs))
     return pd.concat(dfs).reset_index(drop=True)
 ```
 
-> **Note:** ATF files do not embed an absolute timestamp, so `t0` and `datetime` are left as `NaN`/`NaT`. The sweep-splitting logic in `source2dfs` uses time-resets (time == 0) to detect sweep boundaries, which works correctly for ATF's concatenated time column as long as the time axis restarts at 0 for each sweep (standard pCLAMP behaviour). Verify against real ATF files at implementation time.
+> **Note:** ATF files do not embed an absolute timestamp, so `t0` and `datetime` are left as `NaN`/`NaT`. `pyabf.ATF` exposes `sweepX` starting from 0 for each sweep, so the sweep-splitting logic in `source2dfs` (detecting `time == 0` resets) works correctly without any special handling.
 
 ### Step 1b.2 — Add `parse_atfFolder(folderpath)`
 
@@ -143,7 +130,7 @@ def parse_atfFolder(folderpath, dev=False):
     list_files = sorted([f for f in os.listdir(folderpath) if f.lower().endswith(".atf")])
     listdf = []
     for filename in list_files:
-        df = parse_atf(folderpath / filename)
+        df = parse_atf(Path(folderpath) / filename)
         listdf.append(df)
     df = pd.concat(listdf).reset_index(drop=True)
     return df
@@ -170,11 +157,28 @@ elif filetype == "atf":
 
 ### Step 1b.4 — `sample_atf` metadata helper
 
-Add a lightweight `sample_atf(filepath)` alongside `sample_abf`, returning the same `dict_metadata` shape (`channel_count`, `sweep_count`, `sample_rate`, `sweep_duration`). This is used by `triggerAddData` to populate `df_project` before full parsing.
+Add a lightweight `sample_atf(filepath)` alongside `sample_abf`, returning the same `dict_metadata` shape. Because `pyabf.ATF` already exposes all the needed attributes, this is a direct mirror of `sample_abf`:
+
+```python
+def sample_atf(filepath):
+    """
+    Extracts channelCount, sweepCount and sweep duration from an .atf file.
+    """
+    atf = pyabf.ATF(filepath, loadData=False)
+    dict_metadata = {
+        "channel_count": atf.channelCount,
+        "sweep_count": atf.sweepCount,
+        "sample_rate": atf.dataRate,
+        "sweep_duration": atf.sweepLengthSec,
+    }
+    return dict_metadata
+```
+
+> **Note:** `loadData=False` was originally intended as a fast header-only probe, but `dataRate` and `sweepLengthSec` are only populated after the data array is parsed — they are absent in header-only mode. ATF files are small ASCII text, so a full load (`loadData=True`, the default) is inexpensive and is what the implementation uses.
 
 ### Step 1b.5 — UI wiring
 
-In `triggerAddData`'s file dialog filter string, add `*.atf`. No other UI changes needed — `source2dfs` handles the rest.
+`triggerAddData` uses `Filetreesub`, a file-tree widget rather than a filter-string dialog, so no filter string needs updating. No UI changes are needed — `source2dfs` handles dispatch automatically once the ATF parsers are wired in.
 
 ---
 

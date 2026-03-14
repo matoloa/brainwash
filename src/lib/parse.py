@@ -302,6 +302,23 @@ def parse_csvFolder(folder_path):
     return result
 
 
+def sample_atf(filepath):
+    """
+    Extracts channelCount, sweepCount and sweep duration from an .atf file.
+    ATF files are ASCII text, so a full load is inexpensive. dataRate and
+    sweepLengthSec are only populated after the data array is parsed, so
+    loadData=True (the default) is required.
+    """
+    atf = pyabf.ATF(filepath)
+    dict_metadata = {
+        "channel_count": atf.channelCount,
+        "sweep_count": atf.sweepCount,
+        "sample_rate": atf.dataRate,
+        "sweep_duration": atf.sweepLengthSec,
+    }
+    return dict_metadata
+
+
 def sample_abf(filepath):
     """
     Extracts channelCount, sweepCount and sweep duration from an .abf file
@@ -322,6 +339,52 @@ def sample_abf(filepath):
 
 
 # %%
+def parse_atfFolder(folderpath, dev=False):
+    """
+    Read, sort (by filename) and concatenate all .atf files in folderpath to a single df.
+    """
+    list_files = sorted(
+        [f for f in os.listdir(folderpath) if f.lower().endswith(".atf")]
+    )
+    if verbose:
+        print(f"list_files (atf): {list_files}")
+    listdf = []
+    for filename in list_files:
+        df = parse_atf(Path(folderpath) / filename)
+        listdf.append(df)
+    df = pd.concat(listdf).reset_index(drop=True)
+    return df
+
+
+def parse_atf(filepath):
+    """
+    Read a single Axon Text Format (.atf) file using pyabf.ATF.
+    Returns a raw DataFrame with columns: time, voltage_raw, channel, t0, datetime.
+    ATF files do not embed an absolute timestamp, so t0 and datetime are left as
+    NaN/NaT. pyabf.ATF resets sweepX to 0 at the start of each sweep, so the
+    time-reset sweep detection in source2dfs works without any special handling.
+    """
+    atf = pyabf.ATF(filepath)
+    channels = atf.channelList
+    dfs = []
+    for ch in channels:
+        sweep_dfs = []
+        for sweep in atf.sweepList:
+            atf.setSweep(sweep, channel=ch)
+            df_sweep = pd.DataFrame(
+                {
+                    "time": atf.sweepX.astype(np.float64),
+                    "voltage_raw": atf.sweepY.astype(np.float64) / 1000,  # mV → V
+                    "channel": ch,
+                    "t0": np.nan,
+                    "datetime": pd.NaT,
+                }
+            )
+            sweep_dfs.append(df_sweep)
+        dfs.append(pd.concat(sweep_dfs))
+    return pd.concat(dfs).reset_index(drop=True)
+
+
 def parse_abfFolder(folderpath, dev=False):
     """
     Read, sort (by filename) and concatenate all .abf files in folderpath to a single df
@@ -391,9 +454,11 @@ def compute_sweep_hz(df):
     sweep_dts = df.groupby("sweep")["datetime"].first().sort_values()
     if len(sweep_dts) < 2:
         return None
+    if sweep_dts.isna().all():
+        return None
     intervals = sweep_dts.diff().dropna().dt.total_seconds()
     median_interval = intervals.median()
-    if median_interval <= 0:
+    if pd.isna(median_interval) or median_interval <= 0:
         return None
     raw_hz = 1.0 / median_interval
     # Round to 3 significant figures
@@ -485,9 +550,11 @@ def source2dfs(
         abf_files = [f for f in files if f.suffix.lstrip(".").lower() == "abf"]
         ibw_files = [f for f in files if f.suffix.lstrip(".").lower() == "ibw"]
         csv_files = [f for f in files if f.suffix.lstrip(".").lower() == "csv"]
+        atf_files = [f for f in files if f.suffix.lstrip(".").lower() == "atf"]
         print(f" - {source} is a folder with {len(files)} files:")
         print(
-            f" - - {len(abf_files)} abf files, {len(ibw_files)} ibw files, and {len(csv_files)} csv files."
+            f" - - {len(abf_files)} abf files, {len(ibw_files)} ibw files, "
+            f"{len(csv_files)} csv files, and {len(atf_files)} atf files."
         )
         if csv_files:
             try:
@@ -506,6 +573,11 @@ def source2dfs(
                 )
             except Exception as e:
                 raise ValueError(f"Error parsing ibw files in folder {path}: {e}")
+        elif atf_files:
+            try:
+                df = parse_atfFolder(path)
+            except Exception as e:
+                raise ValueError(f"Error parsing atf files in folder {path}: {e}")
         else:
             print(f"No valid files found.")
             return {}
@@ -521,6 +593,8 @@ def source2dfs(
             df = parse_abf(source)
         elif filetype == "ibw":
             df = parse_ibw(source, gain=gain)
+        elif filetype == "atf":
+            df = parse_atf(source)
         else:
             raise ValueError(f"Unsupported file type: {filetype}")
 
