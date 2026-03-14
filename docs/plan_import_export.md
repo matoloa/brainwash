@@ -31,22 +31,24 @@ The work in this plan fills in all the `TODO: implement` stubs and adds the publ
 
 ### Background
 
-Previous versions of Brainwash wrote raw sweep data as CSV with columns matching the current `data/<rec>.parquet` schema (`sweep`, `time`, `voltage_raw`, and optionally `t0`, `datetime`). `parse_csv` in `parse.py` currently just calls `pd.read_csv` and returns — it does no validation, no version sniffing, and returns a plain DataFrame rather than the `{channel: DataFrame}` dict that `source2dfs` callers expect.
+Previous versions of Brainwash wrote raw sweep data as CSV with columns matching the current `data/<rec>.parquet` schema (`sweep`, `time`, `voltage_raw`, and optionally `t0`, `datetime`). `parse_csv` in `parse.py` currently just calls `pd.read_csv` and returns — it does no validation and returns a plain DataFrame rather than the `{channel: DataFrame}` dict that `source2dfs` callers expect.
 
-There are also "output" CSVs — the per-sweep event tables written by old `persistOutput` — with columns `stim`, `sweep`, `EPSP_slope`, `EPSP_slope_norm`, `EPSP_amp`, `EPSP_amp_norm`, `volley_amp`, `volley_slope`. These should be importable directly as pre-analysed recordings (bypassing the full parse+analysis pipeline).
+Git history confirms that `voltage_raw` has been the column name in all CSV-writing code throughout the entire history of the project. The bare `voltage` column name only ever appeared in derived/computed intermediates (`dfmean`, `dffilter`), never in the raw data CSVs written by `persistdf`. There are therefore no data files in the wild with a legacy `voltage` column — only `voltage_raw`.
+
+Only raw sweep data CSVs need to be supported for import. Output CSVs (per-sweep event tables from old `persistOutput`) are out of scope.
 
 ### Step 1.1 — Define a BW CSV version schema
 
-Add a module-level dict in `parse.py`:
+Add a module-level constant in `parse.py`:
 
 ```python
-# Minimum required columns for each recognised BW CSV flavour.
-_BW_CSV_SWEEP_COLS   = {"sweep", "time", "voltage_raw"}
-_BW_CSV_OUTPUT_COLS  = {"stim", "sweep", "EPSP_slope", "EPSP_amp"}
-_BW_CSV_LEGACY_COLS  = {"sweep", "time", "voltage"}   # pre-v0.10 used "voltage" not "voltage_raw"
+# Minimum required columns for a Brainwash raw sweep CSV.
+_BW_CSV_SWEEP_COLS = {"sweep", "time", "voltage_raw"}
 ```
 
-Add a helper `detect_bw_csv_type(df) -> str | None` that returns `"sweep"`, `"output"`, `"legacy_sweep"`, or `None` (unknown).
+Add a helper `detect_bw_csv_type(df) -> str | None` that returns `"sweep"` if `_BW_CSV_SWEEP_COLS` is a subset of `df.columns`, or `None` (unknown/unsupported).
+
+Use a **subset check** (`_BW_CSV_SWEEP_COLS.issubset(df.columns)`) rather than exact equality so that files with additional columns (e.g. extra annotation columns) are still accepted.
 
 ### Step 1.2 — Upgrade `parse_csv`
 
@@ -54,26 +56,10 @@ Replace the current three-line body of `parse_csv` with:
 
 1. Read with `pd.read_csv(source_path)`.
 2. Call `detect_bw_csv_type(df)`.
-3. **If `"sweep"`**: rename nothing, validate columns, add missing optional columns (`t0`, `datetime`) as `pd.NaT` / `None` so downstream code does not crash. Return a `{0: df}` dict (channel 0), matching `parse_ibwFolder` / `parse_abfFolder` conventions. The caller (`source2dfs`) will then run the normal sweep-numbering cleanup.
-4. **If `"legacy_sweep"`**: rename `"voltage"` → `"voltage_raw"`. Then as above.
-5. **If `"output"`**: return a special sentinel `{"__output__": df}` so `source2dfs` (and then `loadProject` / `triggerAddData`) can detect it and route to the pre-analysed import path (Step 1.3).
-6. **If `None`**: raise `ValueError` with a message listing expected columns.
+3. **If `"sweep"`**: validate columns, add missing optional columns (`t0`, `datetime`) as `pd.NaT` / `None` so downstream code does not crash. Return a `{0: df}` dict (channel 0), matching `parse_ibwFolder` / `parse_abfFolder` conventions. The caller (`source2dfs`) will then run the normal sweep-numbering cleanup via the existing `"sweep" in df.columns` fast-path.
+4. **If `None`**: raise `ValueError` with a message listing the required columns (`_BW_CSV_SWEEP_COLS`).
 
-### Step 1.3 — Pre-analysed output CSV import path
-
-When `source2dfs` detects the `"__output__"` sentinel it should:
-
-1. Return the dict as-is up to the `source2dfs` caller.
-2. The caller (`ui.py` / `triggerAddData`) detects `"__output__"` and routes to a new method `import_preanalysed_csv(source_path, df_output)` on `ProjectMixin` (in `ui_project.py`).
-3. `import_preanalysed_csv`:
-   - Creates a `df_project` row with `status = "imported_output"`, `path = source_path`, `recording_name` derived from filename stem.
-   - Writes `df_output` directly to `cache/<rec>_output.parquet` via `df2file`.
-   - Sets `dict_outputs[rec] = df_output` in the cache.
-   - Adds the row to `df_project` and calls `set_df_project`.
-   - Displays a non-blocking info dialog: *"Imported pre-analysed output from `<filename>`. Sweep data not available — Output view only."*
-4. Recordings imported this way are marked in `df_project.status = "imported_output"`. The UI should gracefully skip analysis steps (Event view, sweep table) that require `dfdata`, and show the Output graphs as normal.
-
-### Step 1.4 — Folder of CSVs
+### Step 1.3 — Folder of CSVs
 
 `source2dfs` already handles folder inputs for ABF and IBW. Extend the folder branch:
 
@@ -84,15 +70,12 @@ if csv_files:
 ```
 
 Add `parse_csvFolder(folder_path)` to `parse.py`:
-- If all CSVs share the same schema, treat each file as one recording (one channel per file), stack them into a `{stem: df}` dict.
-- If they all look like output CSVs, return `{"__output__": concatenated_df}` with a `recording_name` column derived from filenames.
-- If mixed types, raise `ValueError` with a clear message.
+- Validate that all CSVs pass `detect_bw_csv_type` as `"sweep"`. If any file fails, raise `ValueError` with a clear message identifying the offending file.
+- Treat each file as one recording (one channel per file), stack them into a `{stem: df}` dict.
 
-### Step 1.5 — UI wiring for CSV import
+### Step 1.4 — UI wiring for CSV import
 
-`triggerAddData` already opens a file dialog. Add `*.csv` to the filter string. No other UI changes are needed — the routing in Step 1.3 handles the rest.
-
-Add a visual indicator in the recording list (`df_project` table view) for `status == "imported_output"` rows — e.g. a distinct colour or an "(output only)" suffix on the recording name.
+`triggerAddData` already opens a file dialog. Add `*.csv` to the filter string. No other UI changes are needed.
 
 ---
 
@@ -518,15 +501,7 @@ In `src/lib/test_parse.py`:
 5. Assert `df["sweep"].nunique() == 3`.
 6. Assert column set matches `_BW_CSV_SWEEP_COLS`.
 
-### Step 7.2 — Output CSV import test
-
-1. Generate a minimal `dfoutput` with correct column names.
-2. Write to CSV.
-3. Call `parse.parse_csv(csv_path)`.
-4. Assert `detect_bw_csv_type` returns `"output"`.
-5. Assert `parse_csv` returns `{"__output__": df}`.
-
-### Step 7.3 — Journal template sanity test
+### Step 7.2 — Journal template sanity test
 
 In a new `src/lib/test_image_export.py`:
 1. Instantiate every template in `JOURNAL_TEMPLATES`.
@@ -542,7 +517,7 @@ In a new `src/lib/test_image_export.py`:
 
 | Phase | Steps | Risk | Effort | Depends on |
 |---|---|---|---|---|
-| **1 — CSV Import** | 1.1 → 1.5 | Low–Medium | ~4–6 hrs | — |
+| **1 — CSV Import** | 1.1 → 1.4 | Low | ~2–3 hrs | — |
 | **2 — CSV Export** | 2.1 → 2.3 | Low | ~2–3 hrs | — |
 | **3 — XLS Export** | 3.1 → 3.4 | Low | ~3–4 hrs | Phase 2 (shared helper) |
 | **4 — IBW Export** | 4.1 → 4.3 | Medium | ~4–6 hrs | — |
@@ -558,14 +533,10 @@ Phase 6 utilities should be extracted once at least two export phases are in pro
 
 ## Open Questions
 
-1. **Legacy CSV column ambiguity**: Are there Brainwash CSV files in the wild with additional columns not listed in `_BW_CSV_SWEEP_COLS` (e.g. `voltage_filter`, per-stim annotation columns)? If so, `detect_bw_csv_type` needs to be more lenient (subset check rather than exact match).
+1. **IBW write API stability**: `igor2`'s write interface is not as well-documented as its read interface. Consider whether `neurodata-without-borders/pynwb` or a direct binary pack using `struct` is a more reliable fallback if `igor2.binarywave.save` proves fragile.
 
-2. **Multi-stim output CSV layout**: `persistOutput` always writes one `stim` column, so a recording with multiple stims would have multiple rows per sweep. Does the old CSV export follow the same layout? Confirm before implementing the import path.
+2. **Scale bars in image export**: Do we want scale bars as the default for the event trace panel, or axis ticks? Neuroscience conventions lean toward scale bars for traces but axis ticks for time-series output plots. Make this a per-template setting rather than a global toggle.
 
-3. **IBW write API stability**: `igor2`'s write interface is not as well-documented as its read interface. Consider whether `neurodata-without-borders/pynwb` or a direct binary pack using `struct` is a more reliable fallback if `igor2.binarywave.save` proves fragile.
+3. **Figure preview performance**: Rendering a full 600-DPI figure for the preview thumbnail will be slow. The debounce in Step 5.5 (300 ms) plus a low-DPI preview render (96 DPI) should be sufficient, but test with 20+ recordings before committing to this approach.
 
-4. **Scale bars in image export**: Do we want scale bars as the default for the event trace panel, or axis ticks? Neuroscience conventions lean toward scale bars for traces but axis ticks for time-series output plots. Make this a per-template setting rather than a global toggle.
-
-5. **Figure preview performance**: Rendering a full 600-DPI figure for the preview thumbnail will be slow. The debounce in Step 5.5 (300 ms) plus a low-DPI preview render (96 DPI) should be sufficient, but test with 20+ recordings before committing to this approach.
-
-6. **XLS vs XLSX menu label**: Decide whether to update the menu strings (currently "Export sweeps to .xls") to say `.xlsx`, or keep legacy naming with the understanding that the actual extension will be `.xlsx`. Consistency with what users expect to see in the file system favours updating the labels.
+4. **XLS vs XLSX menu label**: Decide whether to update the menu strings (currently "Export sweeps to .xls") to say `.xlsx`, or keep legacy naming with the understanding that the actual extension will be `.xlsx`. Consistency with what users expect to see in the file system favours updating the labels.

@@ -18,15 +18,40 @@ _N_JOBS = 1 if getattr(sys, "frozen", False) else -1
 
 verbose = True
 
+# ---------------------------------------------------------------------------
+# BW CSV schema
+# ---------------------------------------------------------------------------
+
+# Minimum required columns for a Brainwash raw sweep CSV.
+_BW_CSV_SWEEP_COLS = {"sweep", "time", "voltage_raw"}
+
+
+def detect_bw_csv_type(df) -> str | None:
+    """
+    Return "sweep" if df looks like a Brainwash raw sweep CSV, else None.
+    Uses a subset check so extra columns (annotations, etc.) are tolerated.
+    """
+    if _BW_CSV_SWEEP_COLS.issubset(df.columns):
+        return "sweep"
+    return None
+
 
 def build_dfmean(dfdata, rollingwidth=3):
     print("build_dfmean")
-    dfmean = pd.pivot_table(dfdata, values="voltage_raw", index="sweep", columns="time", aggfunc="mean").mean().to_frame(name="voltage")
+    dfmean = (
+        pd.pivot_table(
+            dfdata, values="voltage_raw", index="sweep", columns="time", aggfunc="mean"
+        )
+        .mean()
+        .to_frame(name="voltage")
+    )
     dfmean["prim"] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
     dfmean["bis"] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()
     dfmean.reset_index(inplace=True)
     i_stim = first_stim_index(dfmean)
-    baseline_mean = dfmean.iloc[i_stim - 20 : i_stim - 10]["voltage"].mean()  # Adjusted for potential NaNs
+    baseline_mean = dfmean.iloc[i_stim - 20 : i_stim - 10][
+        "voltage"
+    ].mean()  # Adjusted for potential NaNs
     dfmean["voltage"] = dfmean["voltage"] - baseline_mean
     return dfmean, i_stim
 
@@ -46,17 +71,25 @@ def zeroSweeps(dfdata, i_stim=None, dfmean=None):
     if duplicates.any():
         print("Warning: Duplicates found before zeroing.")
         print(df_zeroed[duplicates])
-        df_zeroed = df_zeroed.groupby(["sweep", "time"]).agg({"voltage_raw": "mean"}).reset_index()
+        df_zeroed = (
+            df_zeroed.groupby(["sweep", "time"])
+            .agg({"voltage_raw": "mean"})
+            .reset_index()
+        )
         print("Duplicates removed.")
         print(df_zeroed)
 
     dfpivot = df_zeroed.pivot(
         index="sweep", columns="time", values="voltage_raw"
     )  # Reshape df_zeroed to have one row per 'sweep' and one column per 'time'
-    ser_mean = dfpivot.iloc[:, i_stim - 20 : i_stim - 10].mean(
+    ser_mean = dfpivot.iloc[
+        :, i_stim - 20 : i_stim - 10
+    ].mean(
         axis=1
     )  # Calculate the mean of 'voltage_raw' values from the 20th to the 10th column before i_stim for each 'sweep'
-    dfpivot = dfpivot.subtract(ser_mean, axis="rows")  # Subtract the calculated means from dfpivot
+    dfpivot = dfpivot.subtract(
+        ser_mean, axis="rows"
+    )  # Subtract the calculated means from dfpivot
 
     # handle the reassignment to 'voltage' to ensure length matches
     df_zeroed = df_zeroed.drop(columns=["voltage_raw"])
@@ -79,7 +112,10 @@ def first_stim_index(dfmean, threshold_factor=0.75, min_time_difference=0.005):
     for i in range(1, len(above_threshold_indices)):
         current_index = above_threshold_indices[i]
         previous_index = above_threshold_indices[i - 1]
-        if dfmean["time"][current_index] - dfmean["time"][previous_index] > min_time_difference:
+        if (
+            dfmean["time"][current_index] - dfmean["time"][previous_index]
+            > min_time_difference
+        ):
             break
         if dfmean["prim"][current_index] > dfmean["prim"][max_index]:
             max_index = current_index
@@ -119,13 +155,21 @@ def _ibw_results_to_df(results, gain=1.0):
     timestamps = res["timestamp"]
 
     # Convert Mac HFS+ epoch (1904-01-01) to Unix epoch (1970-01-01).
-    seconds = (pd.to_datetime("1970-01-01") - pd.to_datetime("1900-01-01")).total_seconds()
+    seconds = (
+        pd.to_datetime("1970-01-01") - pd.to_datetime("1900-01-01")
+    ).total_seconds()
     unix_timestamps = np.array(timestamps) - seconds  # absolute Unix time per sweep
 
     timestep = timesteps[0][0]
     num_columns = voltage_raw.shape[1]
-    print(f"_ibw_results_to_df: timestep={timestep:.6g} s | " f"sampling rate={round(1 / timestep)} Hz | " f"{num_columns} samples/sweep")
-    time_columns = np.round(np.arange(num_columns) * timestep, math.ceil(-np.log10(timestep))).tolist()
+    print(
+        f"_ibw_results_to_df: timestep={timestep:.6g} s | "
+        f"sampling rate={round(1 / timestep)} Hz | "
+        f"{num_columns} samples/sweep"
+    )
+    time_columns = np.round(
+        np.arange(num_columns) * timestep, math.ceil(-np.log10(timestep))
+    ).tolist()
 
     df = pd.DataFrame(data=voltage_raw, columns=time_columns)
     df = df.stack().reset_index()
@@ -153,13 +197,17 @@ def parse_ibwFolder(folder, dev=False, gain=1.0, progress_callback=None):  # igo
 
     total = len(files)
     if progress_callback is not None:
-        gen = Parallel(n_jobs=_N_JOBS, return_as="generator", batch_size=1)(delayed(ibw_read)(file) for file in files)
+        gen = Parallel(n_jobs=_N_JOBS, return_as="generator", batch_size=1)(
+            delayed(ibw_read)(file) for file in files
+        )
         results = []
         for idx, result in enumerate(gen):
             results.append(result)
             progress_callback(idx, total)
     else:
-        results = Parallel(n_jobs=_N_JOBS)(delayed(ibw_read)(file) for file in tqdm(files))
+        results = Parallel(n_jobs=_N_JOBS)(
+            delayed(ibw_read)(file) for file in tqdm(files)
+        )
     t0 = time.perf_counter()
     print(f" - - sorting {len(files)} .ibw files in folder {folder} by timestamp...")
     results.sort(key=lambda r: r["timestamp"])
@@ -188,11 +236,70 @@ def parse_ibw(filepath, dev=False, gain=1.0):
 
 def parse_csv(source_path):
     """
-    WIP: called by dataFile, assumes a Brainwash formatted csv file for now
-    It is therefore currently the only parser that does not return a raw dataframe
+    Read a Brainwash raw sweep CSV and return a {0: df} dict compatible with
+    the source2dfs pipeline.
+
+    Required columns: sweep, time, voltage_raw  (see _BW_CSV_SWEEP_COLS).
+    Optional columns: t0, datetime — padded with NaN/NaT if absent so
+    downstream code does not crash.
+
+    Raises ValueError for unrecognised column layouts.
     """
     df = pd.read_csv(source_path)
-    return df
+    csv_type = detect_bw_csv_type(df)
+    if csv_type == "sweep":
+        if "t0" not in df.columns:
+            df["t0"] = float("nan")
+        if "datetime" not in df.columns:
+            df["datetime"] = pd.NaT
+        elif df["datetime"].dtype == object:
+            df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce")
+        return {0: df}
+    else:
+        raise ValueError(
+            f"parse_csv: unrecognised CSV layout in '{source_path}'.\n"
+            f"Required columns: {sorted(_BW_CSV_SWEEP_COLS)}.\n"
+            f"Found columns: {sorted(df.columns.tolist())}."
+        )
+
+
+def parse_csvFolder(folder_path):
+    """
+    Read a folder of Brainwash raw sweep CSVs.
+
+    Each file is treated as one recording.  All files must pass
+    detect_bw_csv_type as "sweep"; a clear ValueError is raised for any
+    file that does not.
+
+    Returns a dict {stem: df} where stem is the filename without extension.
+    """
+    folder_path = Path(folder_path)
+    csv_files = sorted(folder_path.glob("*.csv"))
+    if not csv_files:
+        raise ValueError(f"parse_csvFolder: no .csv files found in '{folder_path}'.")
+
+    result = {}
+    for f in csv_files:
+        df = pd.read_csv(f)
+        csv_type = detect_bw_csv_type(df)
+        if csv_type != "sweep":
+            raise ValueError(
+                f"parse_csvFolder: '{f.name}' is not a recognised Brainwash sweep CSV.\n"
+                f"Required columns: {sorted(_BW_CSV_SWEEP_COLS)}.\n"
+                f"Found columns: {sorted(df.columns.tolist())}."
+            )
+        if "t0" not in df.columns:
+            df["t0"] = float("nan")
+        if "datetime" not in df.columns:
+            df["datetime"] = pd.NaT
+        elif df["datetime"].dtype == object:
+            df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce")
+        result[f.stem] = df
+
+    print(
+        f" - - parse_csvFolder: loaded {len(result)} CSV file(s) from '{folder_path}'."
+    )
+    return result
 
 
 def sample_abf(filepath):
@@ -219,7 +326,9 @@ def parse_abfFolder(folderpath, dev=False):
     """
     Read, sort (by filename) and concatenate all .abf files in folderpath to a single df
     """
-    list_files = sorted([i for i in os.listdir(folderpath) if -1 < i.find(".abf")])  # [:2] # stop before item 2 [begin:end]
+    list_files = sorted(
+        [i for i in os.listdir(folderpath) if -1 < i.find(".abf")]
+    )  # [:2] # stop before item 2 [begin:end]
     if verbose:
         print(f"list_files: {list_files}")
     listdf = []
@@ -258,7 +367,9 @@ def parse_abf(filepath):
     df["time"] = df.sweepX  # time in seconds from start of sweep recording
     df["voltage_raw"] = df.sweepY / 1000  # mv to V
     df["timens"] = (df.t0 + df.time) * 1_000_000_000  # to nanoseconds
-    df["datetime"] = df.timens.astype("datetime64[ns]") + (abf.abfDateTime - pd.to_datetime(0))
+    df["datetime"] = df.timens.astype("datetime64[ns]") + (
+        abf.abfDateTime - pd.to_datetime(0)
+    )
     df.drop(columns=["sweepX", "sweepY", "timens"], inplace=True)
     return df
 
@@ -299,10 +410,13 @@ def metadata(df):
                     "sampling_rate": sampling rate in Hz
                     "sweep_hz": inter-sweep rate in Hz (None if fewer than 2 sweeps)  }
     """
-    # Number of unique sweeps, by number of 'time'==0
-    nsweeps = df["time"].value_counts().get(0, 0)
+    # Number of unique sweeps.  The 'sweep' column is always present by the
+    # time metadata() is called (assigned by source2dfs or already in the CSV),
+    # so nunique() is the authoritative count.
+    nsweeps = df["sweep"].nunique()
+    first_sweep_id = df["sweep"].iloc[0]
+    first_sweep = df[df["sweep"] == first_sweep_id]
     # Duration of one sweep: max time within a sweep (assume uniform: varied sweep length should throw exception at parsing)
-    first_sweep = df[df["sweep"] == df["sweep"].iloc[0]]
     time_diffs = first_sweep["time"].diff().dropna()
     dt = time_diffs.mode().iloc[0]  # Sample interval
     sweep_duration = round(first_sweep["time"].max() + dt, 6)
@@ -317,7 +431,10 @@ def metadata(df):
         "sweep_hz": sweep_hz,  # inter-sweep rate in Hz; None if fewer than 2 sweeps
     }
     print(
-        f"metadata: {nsweeps} sweeps | " f"{sampling_rate} Hz (dt={dt:.6g} s) | " f"sweep duration {sweep_duration:.6g} s | " f"sweep_hz {sweep_hz}"
+        f"metadata: {nsweeps} sweeps | "
+        f"{sampling_rate} Hz (dt={dt:.6g} s) | "
+        f"sweep duration {sweep_duration:.6g} s | "
+        f"sweep_hz {sweep_hz}"
     )
     return dict_meta
 
@@ -361,6 +478,7 @@ def source2dfs(
     path = Path(source)
     if not path.exists():
         raise FileNotFoundError(f"source2df: No such file or folder: '{source}'")
+    _csv_pre_parsed = False
     # if source_path is a folder
     if path.is_dir():  # TODO: currently reads only one type of file:
         files = [f for f in path.iterdir() if f.is_file()]
@@ -368,10 +486,14 @@ def source2dfs(
         ibw_files = [f for f in files if f.suffix.lstrip(".").lower() == "ibw"]
         csv_files = [f for f in files if f.suffix.lstrip(".").lower() == "csv"]
         print(f" - {source} is a folder with {len(files)} files:")
-        print(f" - - {len(abf_files)} abf files, {len(ibw_files)} ibw files, and {len(csv_files)} csv files.")
+        print(
+            f" - - {len(abf_files)} abf files, {len(ibw_files)} ibw files, and {len(csv_files)} csv files."
+        )
         if csv_files:
-            # TODO: implement CSV parsing - check for correct column names
-            raise ValueError(".csv from folders are not supported yet.")
+            try:
+                return parse_csvFolder(path)
+            except Exception as e:
+                raise ValueError(f"Error parsing csv files in folder {path}: {e}")
         elif abf_files:
             try:
                 df = parse_abfFolder(path, dev=dev)
@@ -379,7 +501,9 @@ def source2dfs(
                 raise ValueError(f"Error parsing abf files in folder {path}: {e}")
         elif ibw_files:
             try:
-                df = parse_ibwFolder(path, dev=dev, gain=gain, progress_callback=progress_callback)
+                df = parse_ibwFolder(
+                    path, dev=dev, gain=gain, progress_callback=progress_callback
+                )
             except Exception as e:
                 raise ValueError(f"Error parsing ibw files in folder {path}: {e}")
         else:
@@ -389,7 +513,10 @@ def source2dfs(
     else:
         filetype = path.suffix.lstrip(".").lower()
         if filetype == "csv":
-            df = parse_csv(source)
+            dict_channeldfs = parse_csv(source)
+            # parse_csv already returns {0: df} with a 'sweep' column;
+            # skip the df-based cleanup block and fall through to splitting.
+            _csv_pre_parsed = True
         elif filetype == "abf":
             df = parse_abf(source)
         elif filetype == "ibw":
@@ -397,41 +524,50 @@ def source2dfs(
         else:
             raise ValueError(f"Unsupported file type: {filetype}")
 
-    dict_channeldfs = {}
-    # if df has a 'sweep' column, it's from a prepared .csv - skip channel/sweep cleanup
-    if "sweep" in df.columns:
-        print(" - - Detected 'sweep' column, skipping cleanup.")
-        # TODO: extract channel from filename; "*_ch0"
-        dict_channeldfs[0] = df
-        # fall through to optional splitting below instead of returning early
-    else:
-        # split by channel
-        for channel in df["channel"].unique():
-            dict_channeldfs[channel] = df[df["channel"] == channel]
-        # sort df by datetime
+    if not _csv_pre_parsed:
+        dict_channeldfs = {}
+        # if df has a 'sweep' column, it's from a prepared .csv - skip channel/sweep cleanup
+        if "sweep" in df.columns:
+            print(" - - Detected 'sweep' column, skipping cleanup.")
+            # TODO: extract channel from filename; "*_ch0"
+            dict_channeldfs[0] = df
+            # fall through to optional splitting below instead of returning early
+        else:
+            # split by channel
+            for channel in df["channel"].unique():
+                dict_channeldfs[channel] = df[df["channel"] == channel]
+            # sort df by datetime
 
-        for channel, df in dict_channeldfs.items():
-            # Group rows into sweeps by detecting time resets (time == 0 starts a new sweep).
-            sweep_groups = (df["time"] == 0).cumsum()
-            # Check that each sweep's start datetime is monotonically increasing.
-            sweep_start_dt = df.groupby(sweep_groups)["datetime"].first()
-            if not sweep_start_dt.is_monotonic_increasing:
-                print(" - - Warning: sweep start datetimes not monotonic increasing, sorting sweeps.")
-                t0 = time.time()
-                sweep_order = sweep_start_dt.sort_values().index
-                sorted_pieces = [df[sweep_groups == grp] for grp in sweep_order]
-                dict_channeldfs[channel] = pd.concat(sorted_pieces).reset_index(drop=True)
-                print(" - - Sorted sweeps in {:.2f} seconds".format(time.time() - t0))
-        # generate 'sweep' column and drop channel column
-        for df in dict_channeldfs.values():
-            df["sweep"] = df.groupby((df["time"] == 0).cumsum()).ngroup()
-            df.drop(columns=["channel"], inplace=True)
+            for channel, df in dict_channeldfs.items():
+                # Group rows into sweeps by detecting time resets (time == 0 starts a new sweep).
+                sweep_groups = (df["time"] == 0).cumsum()
+                # Check that each sweep's start datetime is monotonically increasing.
+                sweep_start_dt = df.groupby(sweep_groups)["datetime"].first()
+                if not sweep_start_dt.is_monotonic_increasing:
+                    print(
+                        " - - Warning: sweep start datetimes not monotonic increasing, sorting sweeps."
+                    )
+                    t0 = time.time()
+                    sweep_order = sweep_start_dt.sort_values().index
+                    sorted_pieces = [df[sweep_groups == grp] for grp in sweep_order]
+                    dict_channeldfs[channel] = pd.concat(sorted_pieces).reset_index(
+                        drop=True
+                    )
+                    print(
+                        " - - Sorted sweeps in {:.2f} seconds".format(time.time() - t0)
+                    )
+            # generate 'sweep' column and drop channel column
+            for df in dict_channeldfs.values():
+                df["sweep"] = df.groupby((df["time"] == 0).cumsum()).ngroup()
+                df.drop(columns=["channel"], inplace=True)
 
-        # reorder columns
-        column_order = ["sweep", "time", "voltage_raw", "t0", "datetime"]
-        for channel, df in dict_channeldfs.items():
-            df_cols = [col for col in column_order if col in df.columns]
-            dict_channeldfs[channel] = df[df_cols + [col for col in df.columns if col not in df_cols]]
+            # reorder columns
+            column_order = ["sweep", "time", "voltage_raw", "t0", "datetime"]
+            for channel, df in dict_channeldfs.items():
+                df_cols = [col for col in column_order if col in df.columns]
+                dict_channeldfs[channel] = df[
+                    df_cols + [col for col in df.columns if col not in df_cols]
+                ]
 
     # ------------------------------------------------------------------
     # Optional on-read splitting
@@ -456,7 +592,10 @@ def source2dfs(
                 part_df["sweep"] = part_df["sweep"].map(remap)
             split_result[(channel, "even")] = df_even
             split_result[(channel, "odd")] = df_odd
-            print(f" - - split_odd_even ch{channel}: " f"{len(even_sweeps)} even sweeps, {len(odd_sweeps)} odd sweeps.")
+            print(
+                f" - - split_odd_even ch{channel}: "
+                f"{len(even_sweeps)} even sweeps, {len(odd_sweeps)} odd sweeps."
+            )
         return split_result
 
     if split_at_time is not None and split_at_time > 0:
@@ -469,7 +608,10 @@ def source2dfs(
             df_a = df[df["time"] < split_at_time].copy().reset_index(drop=True)
             df_b = df[df["time"] >= split_at_time].copy().reset_index(drop=True)
             if df_a.empty:
-                print(f" - - split_at_time ch{channel}: split_at_time {split_at_time}s is at or " f"before the first sample; part 'a' is empty.")
+                print(
+                    f" - - split_at_time ch{channel}: split_at_time {split_at_time}s is at or "
+                    f"before the first sample; part 'a' is empty."
+                )
             if df_b.empty:
                 print(
                     f" - - split_at_time ch{channel}: split_at_time {split_at_time}s is beyond "
@@ -484,7 +626,8 @@ def source2dfs(
             split_result[(channel, "b")] = df_b
             n_sweeps = df["sweep"].nunique()
             print(
-                f" - - split_at_time ch{channel}: cut at t={split_at_time}s; " f"'a' {len(df_a)} rows, 'b' {len(df_b)} rows across {n_sweeps} sweeps."
+                f" - - split_at_time ch{channel}: cut at t={split_at_time}s; "
+                f"'a' {len(df_a)} rows, 'b' {len(df_b)} rows across {n_sweeps} sweeps."
             )
         return split_result
 
@@ -529,7 +672,9 @@ def persistdf(file_base, dict_folders, dfdata=None, dfmean=None, dffilter=None):
 if __name__ == "__main__":
     dev = False
     source_folder = Path.home() / "Documents/Brainwash Data Source/"
-    dict_folders = {"project": Path.home() / "Documents/Brainwash Projects/standalone_test"}
+    dict_folders = {
+        "project": Path.home() / "Documents/Brainwash Projects/standalone_test"
+    }
     dict_folders["data"] = dict_folders["project"] / "data"
     dict_folders["cache"] = dict_folders["project"] / "cache"
     dict_folders["project"].mkdir(parents=True, exist_ok=True)
@@ -599,7 +744,9 @@ if __name__ == "__main__":
         for channel, df in dict_df.items():
             print(f" - channel {channel} df{df.shape}")
             t0 = time.time()
-            df.to_parquet(str(dict_folders["data"] / f"df_{channel}.parquet"), index=False)
+            df.to_parquet(
+                str(dict_folders["data"] / f"df_{channel}.parquet"), index=False
+            )
             t1 = time.time()
             print(f" - df_{channel}.parquet saved: {t1 - t0:.2f} seconds")
             t0 = time.time()
@@ -608,7 +755,9 @@ if __name__ == "__main__":
             print(f" - df_{channel}.csv saved: {t1 - t0:.2f} seconds")
             t0 = time.time()
             # reading formats back to _df
-            df_read_parquet = pd.read_parquet(str(dict_folders["data"] / f"df_{channel}.parquet"))
+            df_read_parquet = pd.read_parquet(
+                str(dict_folders["data"] / f"df_{channel}.parquet")
+            )
             t1 = time.time()
             print(f" - df_{channel}.parquet read: {t1 - t0:.2f} seconds")
             t0 = time.time()

@@ -25,11 +25,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from parse import (
+    _BW_CSV_SWEEP_COLS,
     build_dfmean,
+    detect_bw_csv_type,
     first_stim_index,
     metadata,
     parse_abf,
     parse_abfFolder,
+    parse_csv,
+    parse_csvFolder,
     persistdf,
     source2dfs,
     sources2dfs,
@@ -94,7 +98,9 @@ def _make_sweep_df(
 
 
 class TestFirstStimIndex(unittest.TestCase):
-    def _dfmean_from_voltage(self, voltage: np.ndarray, dt: float = 0.001) -> pd.DataFrame:
+    def _dfmean_from_voltage(
+        self, voltage: np.ndarray, dt: float = 0.001
+    ) -> pd.DataFrame:
         """Compute a minimal dfmean directly from a voltage array."""
         times = np.round(np.arange(len(voltage)) * dt, 6)
         dfmean = pd.DataFrame({"time": times, "voltage": voltage})
@@ -253,7 +259,9 @@ class TestZeroSweeps(unittest.TestCase):
         for sweep in df_zeroed["sweep"].unique():
             sw = df_zeroed[df_zeroed["sweep"] == sweep]
             baseline = sw.iloc[i - 20 : i - 10]["voltage"].mean()
-            self.assertAlmostEqual(baseline, 0.0, places=6, msg=f"Sweep {sweep} baseline not zeroed")
+            self.assertAlmostEqual(
+                baseline, 0.0, places=6, msg=f"Sweep {sweep} baseline not zeroed"
+            )
 
     def test_row_count_preserved(self):
         """zeroSweeps should not add or drop rows."""
@@ -442,7 +450,9 @@ class TestParseAbf(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-def _write_synthetic_csv(path: Path, n_sweeps: int = 8, n_timepoints: int = 20, dt: float = 0.001):
+def _write_synthetic_csv(
+    path: Path, n_sweeps: int = 8, n_timepoints: int = 20, dt: float = 0.001
+):
     """
     Write a minimal Brainwash-format CSV (sweep, time, voltage_raw, t0, datetime)
     with n_sweeps sweeps, each n_timepoints samples long.
@@ -459,9 +469,12 @@ def _write_synthetic_csv(path: Path, n_sweeps: int = 8, n_timepoints: int = 20, 
                 {
                     "sweep": sw,
                     "time": t,
-                    "voltage_raw": float(sw),  # voltage == sweep index for easy checking
+                    "voltage_raw": float(
+                        sw
+                    ),  # voltage == sweep index for easy checking
                     "t0": t0,
-                    "datetime": pd.Timestamp("2024-01-01") + pd.Timedelta(seconds=t0 + t),
+                    "datetime": pd.Timestamp("2024-01-01")
+                    + pd.Timedelta(seconds=t0 + t),
                 }
             )
     pd.DataFrame(rows).to_csv(path, index=False)
@@ -573,7 +586,9 @@ class TestSource2dfsSplitAtTime(unittest.TestCase):
     def setUp(self):
         self._tmpdir = tempfile.TemporaryDirectory()
         self.csv_path = Path(self._tmpdir.name) / "rec.csv"
-        _write_synthetic_csv(self.csv_path, n_sweeps=self.N_SWEEPS, n_timepoints=self.N_TP, dt=self.DT)
+        _write_synthetic_csv(
+            self.csv_path, n_sweeps=self.N_SWEEPS, n_timepoints=self.N_TP, dt=self.DT
+        )
 
     def tearDown(self):
         self._tmpdir.cleanup()
@@ -663,13 +678,264 @@ class TestSource2dfsSplitAtTime(unittest.TestCase):
         """voltage_raw values in 'a' + 'b' per sweep must equal those in the original."""
         result_plain = source2dfs(str(self.csv_path))
         result_split = source2dfs(str(self.csv_path), split_at_time=self.SPLIT_T)
-        df_plain = next(iter(result_plain.values())).sort_values(["sweep", "time"]).reset_index(drop=True)
+        df_plain = (
+            next(iter(result_plain.values()))
+            .sort_values(["sweep", "time"])
+            .reset_index(drop=True)
+        )
         df_a = result_split[(0, "a")]
         df_b = result_split[(0, "b")].copy()
         # Restore original time in 'b' for merging: add back the split offset per sweep
         df_b["time"] = df_b["time"] + self.SPLIT_T
-        combined = pd.concat([df_a, df_b]).sort_values(["sweep", "time"]).reset_index(drop=True)
+        combined = (
+            pd.concat([df_a, df_b])
+            .sort_values(["sweep", "time"])
+            .reset_index(drop=True)
+        )
         self.assertTrue(combined["voltage_raw"].equals(df_plain["voltage_raw"]))
+
+
+# ---------------------------------------------------------------------------
+# CSV schema detection
+# ---------------------------------------------------------------------------
+
+
+class TestDetectBwCsvType(unittest.TestCase):
+    def _make_df(self, columns):
+        return pd.DataFrame(columns=columns)
+
+    def test_sweep_csv_detected(self):
+        df = self._make_df(["sweep", "time", "voltage_raw"])
+        self.assertEqual(detect_bw_csv_type(df), "sweep")
+
+    def test_sweep_csv_with_extra_columns_detected(self):
+        df = self._make_df(["sweep", "time", "voltage_raw", "t0", "datetime", "extra"])
+        self.assertEqual(detect_bw_csv_type(df), "sweep")
+
+    def test_missing_voltage_raw_returns_none(self):
+        df = self._make_df(["sweep", "time"])
+        self.assertIsNone(detect_bw_csv_type(df))
+
+    def test_missing_sweep_returns_none(self):
+        df = self._make_df(["time", "voltage_raw"])
+        self.assertIsNone(detect_bw_csv_type(df))
+
+    def test_missing_time_returns_none(self):
+        df = self._make_df(["sweep", "voltage_raw"])
+        self.assertIsNone(detect_bw_csv_type(df))
+
+    def test_empty_df_returns_none(self):
+        df = self._make_df([])
+        self.assertIsNone(detect_bw_csv_type(df))
+
+    def test_bw_csv_sweep_cols_constant(self):
+        self.assertEqual(_BW_CSV_SWEEP_COLS, {"sweep", "time", "voltage_raw"})
+
+
+# ---------------------------------------------------------------------------
+# parse_csv — single file
+# ---------------------------------------------------------------------------
+
+
+def _write_sweep_csv(path, n_sweeps=3, n_timepoints=10, include_optional=True):
+    """Write a minimal Brainwash sweep CSV to path."""
+    dt = 0.001
+    rows = []
+    for sw in range(n_sweeps):
+        t0_val = sw * n_timepoints * dt
+        for i in range(n_timepoints):
+            row = {
+                "sweep": sw,
+                "time": round(i * dt, 6),
+                "voltage_raw": float(sw),
+            }
+            if include_optional:
+                row["t0"] = t0_val
+                row["datetime"] = pd.Timestamp("2024-01-01") + pd.Timedelta(
+                    seconds=t0_val + i * dt
+                )
+            rows.append(row)
+    pd.DataFrame(rows).to_csv(path, index=False)
+
+
+class TestParseCsv(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmpdir)
+
+    def test_returns_dict_with_key_zero(self):
+        p = Path(self.tmpdir) / "rec.csv"
+        _write_sweep_csv(p)
+        result = parse_csv(p)
+        self.assertIsInstance(result, dict)
+        self.assertIn(0, result)
+
+    def test_returned_df_has_required_columns(self):
+        p = Path(self.tmpdir) / "rec.csv"
+        _write_sweep_csv(p)
+        df = parse_csv(p)[0]
+        for col in _BW_CSV_SWEEP_COLS:
+            self.assertIn(col, df.columns)
+
+    def test_optional_t0_padded_when_absent(self):
+        p = Path(self.tmpdir) / "rec.csv"
+        _write_sweep_csv(p, include_optional=False)
+        df = parse_csv(p)[0]
+        self.assertIn("t0", df.columns)
+
+    def test_optional_datetime_padded_when_absent(self):
+        p = Path(self.tmpdir) / "rec.csv"
+        _write_sweep_csv(p, include_optional=False)
+        df = parse_csv(p)[0]
+        self.assertIn("datetime", df.columns)
+
+    def test_sweep_count_preserved(self):
+        p = Path(self.tmpdir) / "rec.csv"
+        _write_sweep_csv(p, n_sweeps=5)
+        df = parse_csv(p)[0]
+        self.assertEqual(df["sweep"].nunique(), 5)
+
+    def test_extra_columns_preserved(self):
+        p = Path(self.tmpdir) / "rec.csv"
+        _write_sweep_csv(p)
+        # append an extra column
+        df_raw = pd.read_csv(p)
+        df_raw["annotation"] = "x"
+        df_raw.to_csv(p, index=False)
+        df = parse_csv(p)[0]
+        self.assertIn("annotation", df.columns)
+
+    def test_bad_csv_raises_value_error(self):
+        p = Path(self.tmpdir) / "bad.csv"
+        pd.DataFrame({"a": [1], "b": [2]}).to_csv(p, index=False)
+        with self.assertRaises(ValueError):
+            parse_csv(p)
+
+    def test_source2dfs_accepts_csv(self):
+        """source2dfs should return the same {0: df} result for a sweep CSV."""
+        p = Path(self.tmpdir) / "rec.csv"
+        _write_sweep_csv(p, n_sweeps=4)
+        result = source2dfs(str(p))
+        self.assertIsInstance(result, dict)
+        self.assertIn(0, result)
+        self.assertEqual(result[0]["sweep"].nunique(), 4)
+
+
+# ---------------------------------------------------------------------------
+# parse_csvFolder — folder of CSVs
+# ---------------------------------------------------------------------------
+
+
+class TestParseCsvFolder(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmpdir)
+
+    def _populate(self, names, n_sweeps=3, bad=False):
+        for name in names:
+            p = Path(self.tmpdir) / name
+            if bad:
+                pd.DataFrame({"a": [1], "b": [2]}).to_csv(p, index=False)
+            else:
+                _write_sweep_csv(p, n_sweeps=n_sweeps)
+
+    def test_returns_dict_keyed_by_stem(self):
+        self._populate(["rec_a.csv", "rec_b.csv"])
+        result = parse_csvFolder(self.tmpdir)
+        self.assertIn("rec_a", result)
+        self.assertIn("rec_b", result)
+
+    def test_each_value_is_dataframe(self):
+        self._populate(["x.csv", "y.csv"])
+        result = parse_csvFolder(self.tmpdir)
+        for df in result.values():
+            self.assertIsInstance(df, pd.DataFrame)
+
+    def test_sweep_count_per_file(self):
+        self._populate(["r1.csv", "r2.csv"], n_sweeps=4)
+        result = parse_csvFolder(self.tmpdir)
+        for df in result.values():
+            self.assertEqual(df["sweep"].nunique(), 4)
+
+    def test_required_columns_present(self):
+        self._populate(["r.csv"])
+        df = parse_csvFolder(self.tmpdir)["r"]
+        for col in _BW_CSV_SWEEP_COLS:
+            self.assertIn(col, df.columns)
+
+    def test_bad_file_raises_value_error(self):
+        self._populate(["good.csv"])
+        self._populate(["bad.csv"], bad=True)
+        with self.assertRaises(ValueError):
+            parse_csvFolder(self.tmpdir)
+
+    def test_empty_folder_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            parse_csvFolder(self.tmpdir)
+
+    def test_source2dfs_accepts_csv_folder(self):
+        self._populate(["a.csv", "b.csv"], n_sweeps=3)
+        result = source2dfs(self.tmpdir)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(len(result), 2)
+        for df in result.values():
+            self.assertIn("sweep", df.columns)
+
+
+# ---------------------------------------------------------------------------
+# CSV round-trip: write via to_csv, read back via source2dfs
+# ---------------------------------------------------------------------------
+
+
+class TestCsvRoundTrip(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmpdir)
+
+    def test_round_trip_preserves_sweep_count(self):
+        p = Path(self.tmpdir) / "rt.csv"
+        _write_sweep_csv(p, n_sweeps=3, n_timepoints=20)
+        result = source2dfs(str(p))
+        df = result[0]
+        self.assertEqual(df["sweep"].nunique(), 3)
+
+    def test_round_trip_column_set_matches_schema(self):
+        p = Path(self.tmpdir) / "rt.csv"
+        _write_sweep_csv(p, n_sweeps=3, n_timepoints=20)
+        result = source2dfs(str(p))
+        df = result[0]
+        self.assertTrue(_BW_CSV_SWEEP_COLS.issubset(df.columns))
+
+    def test_round_trip_row_count(self):
+        n_sweeps, n_tp = 3, 20
+        p = Path(self.tmpdir) / "rt.csv"
+        _write_sweep_csv(p, n_sweeps=n_sweeps, n_timepoints=n_tp)
+        result = source2dfs(str(p))
+        df = result[0]
+        self.assertEqual(len(df), n_sweeps * n_tp)
+
+    def test_round_trip_voltage_values_intact(self):
+        """voltage_raw values equal the sweep index (as written by _write_sweep_csv)."""
+        p = Path(self.tmpdir) / "rt.csv"
+        _write_sweep_csv(p, n_sweeps=4, n_timepoints=10)
+        result = source2dfs(str(p))
+        df = result[0]
+        for sw in range(4):
+            vals = df.loc[df["sweep"] == sw, "voltage_raw"].unique()
+            self.assertEqual(len(vals), 1)
+            self.assertAlmostEqual(vals[0], float(sw))
 
 
 # ---------------------------------------------------------------------------
