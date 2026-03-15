@@ -1278,7 +1278,14 @@ class UIplot:
         # TODO: unspaghetti this mess
         norm = self.uistate.checkBox["norm_EPSP"]
         stim_offset = trow["t_stim"]
-        label_core = f"{prow['recording_name']} - stim {trow['stim']} {aspect}"
+        rec_filter = prow.get("filter")
+        if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
+            rec_filter = "voltage"
+        rec_name = prow["recording_name"]
+        if rec_filter != "voltage":
+            label_core = f"{rec_name} ({rec_filter}) - stim {trow['stim']} {aspect}"
+        else:
+            label_core = f"{rec_name} - stim {trow['stim']} {aspect}"
 
         if aspect in ["EPSP slope", "volley slope"]:
             x_start = trow[f"t_{aspect.replace(' ', '_')}_start"] - stim_offset

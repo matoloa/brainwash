@@ -1028,9 +1028,11 @@ class UIsub(
             if len(filters) == 1:
                 f_mode = filters[0]
                 if pd.isna(f_mode) or f_mode is None or f_mode == "none":
+                    uistate.settings["filter"] = None
                     self.radioButton_filter_none.setChecked(True)
                     print("tableProjSelectionChanged: filter set to none")
                 elif f_mode == "savgol":
+                    uistate.settings["filter"] = "savgol"
                     self.radioButton_filter_savgol.setChecked(True)
                     print("tableProjSelectionChanged: filter set to savgol")
 
@@ -1058,6 +1060,7 @@ class UIsub(
 
             if len(windows) == 1:
                 val = str(windows.pop())
+                uistate.lineEdit["savgol_window"] = int(val)
                 self.lineEdit_savgol_window.setText(val)
                 print(f"tableProjSelectionChanged: savgol_window set to {val}")
             else:
@@ -1065,6 +1068,7 @@ class UIsub(
 
             if len(polys) == 1:
                 val = str(polys.pop())
+                uistate.lineEdit["savgol_poly"] = int(val)
                 self.lineEdit_savgol_poly.setText(val)
                 print(f"tableProjSelectionChanged: savgol_poly set to {val}")
             else:
@@ -1615,14 +1619,13 @@ class UIsub(
         mode_str = button.objectName().replace("radioButton_filter_", "")
         mode = mode_str if mode_str != "none" else None
 
-        if mode == uistate.settings.get("filter"):
-            return
-
         self.usage(f"filter_mode_changed → {mode}")
         uistate.settings["filter"] = mode
         print(f"filter_mode_changed: uistate.settings['filter'] set to {mode}")
 
         df_p = self.get_df_project()
+        if "filter" in df_p.columns and df_p["filter"].dtype != object:
+            df_p["filter"] = df_p["filter"].astype(object)
         selected_idx = uistate.list_idx_select_recs
         if len(selected_idx) > 0:
             for idx in selected_idx:
@@ -1637,14 +1640,14 @@ class UIsub(
             return
 
         key = lineEdit.objectName().replace("lineEdit_", "")
-        if val == uistate.lineEdit.get(key):
-            return
 
         self.usage(f"editSavgolParams → {key}: {val}")
         uistate.lineEdit[key] = val
         print(f"editSavgolParams: uistate.lineEdit['{key}'] set to {val}")
 
         df_p = self.get_df_project()
+        if "filter_params" in df_p.columns and df_p["filter_params"].dtype != object:
+            df_p["filter_params"] = df_p["filter_params"].astype(object)
         selected_idx = uistate.list_idx_select_recs
 
         import json
@@ -1668,9 +1671,8 @@ class UIsub(
 
                 df_p.at[idx, "filter_params"] = json.dumps(params)
 
-            if uistate.settings.get("filter") == "savgol":
-                self.recalculate(selection=selected_idx)
-                self.update_show()
+            self.recalculate(selection=selected_idx)
+            self.update_show()
 
     def x_axis_mode_changed(self, button):
         """Handler for buttonGroup_x_axis.buttonClicked signal."""
@@ -3565,7 +3567,15 @@ class UIsub(
         ):  # Event canvas left-clicked with just one rec and stim selected, middle graph: editing detected events
             uistate.dft_temp = self.get_dft(prow).copy()
             trow = uistate.dft_temp.loc[uistate.list_idx_select_stims[0]]
-            label = f"{prow['recording_name']} - stim {trow['stim']}"
+            rec_filter = prow["filter"]
+            if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
+                rec_filter = "voltage"
+            rec_name = prow["recording_name"]
+            if rec_filter != "voltage":
+                label_core = f"{rec_name} ({rec_filter})"
+            else:
+                label_core = rec_name
+            label = f"{label_core} - stim {trow['stim']}"
             dict_event = uistate.dict_rec_labels[label]
             data_x = dict_event["line"].get_xdata()
             data_y = dict_event["line"].get_ydata()
@@ -4411,6 +4421,8 @@ class UIsub(
             }
 
         action = uistate.mouseover_action
+        if action is None:
+            return
         aspect = "_".join(action.split()[:2])
         stim_idx = uistate.list_idx_select_stims[0]
         prow = self.get_prow()
@@ -4508,6 +4520,16 @@ class UIsub(
     def eventDragReleased(self, event, data_x, data_y):  # graph release event
         # TODO: Overhaul this whole magic-string-mess
         self.usage("eventDragReleased")
+        if getattr(uistate, "mouseover_action", None) is None:
+            uistate.dragging = False
+            if getattr(self, "mouse_release", None) is not None:
+                self.canvasEvent.mpl_disconnect(self.mouse_release)
+                self.mouse_release = None
+            if getattr(self, "mouse_drag", None) is not None:
+                self.canvasEvent.mpl_disconnect(self.mouse_drag)
+                self.mouse_drag = None
+            self.mouseoverUpdate()
+            return
         print(f" - uistate.mouseover_action: {uistate.mouseover_action}")
         self.canvasEvent.mpl_disconnect(self.mouse_drag)
         self.canvasEvent.mpl_disconnect(self.mouse_release)
@@ -4691,13 +4713,23 @@ class UIsub(
         )
 
         def update_amp_marker(trow, aspect, prow, dfmean, dfoutput):
-            labelbase = f"{rec_name} - stim {trow['stim']}"
+            rec_filter = prow["filter"]
+            if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
+                rec_filter = "voltage"
+            if rec_filter != "voltage":
+                label_core = f"{rec_name} ({rec_filter})"
+            else:
+                label_core = rec_name
+            labelbase = f"{label_core} - stim {trow['stim']}"
             labelamp = f"{labelbase} {aspect}"
             column_name = aspect.replace(" ", "_")
             t_aspect = f"t_{column_name}"
             stim_offset = trow["t_stim"]
             x = trow[t_aspect] - stim_offset
-            y = dfmean.loc[dfmean["time"] == trow[t_aspect], prow["filter"]].values[0]
+            rec_filter = prow["filter"]
+            if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
+                rec_filter = "voltage"
+            y = dfmean.loc[dfmean["time"] == trow[t_aspect], rec_filter].values[0]
             amp = (
                 dfoutput.loc[dfoutput["stim"] == trow["stim"]][column_name].mean()
                 / 1000
