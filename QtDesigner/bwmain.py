@@ -18,7 +18,9 @@ class Ui_mainWindow(object):
         self.centralwidget = QtWidgets.QWidget(mainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayoutCentralwidget = QtWidgets.QHBoxLayout(self.centralwidget)
-        self.horizontalLayoutCentralwidget.setObjectName("horizontalLayoutCentralwidget")
+        self.horizontalLayoutCentralwidget.setObjectName(
+            "horizontalLayoutCentralwidget"
+        )
         self.verticalMasterLayout = QtWidgets.QVBoxLayout()
         self.verticalMasterLayout.setObjectName("verticalMasterLayout")
         self.h_splitterMaster = QtWidgets.QSplitter(self.centralwidget)
@@ -31,18 +33,26 @@ class Ui_mainWindow(object):
         self.verticalLayoutProj.setContentsMargins(0, 0, 0, 0)
         self.verticalLayoutProj.setObjectName("verticalLayoutProj")
         self.horizontalLayoutProjParseButton = QtWidgets.QHBoxLayout()
-        self.horizontalLayoutProjParseButton.setObjectName("horizontalLayoutProjParseButton")
+        self.horizontalLayoutProjParseButton.setObjectName(
+            "horizontalLayoutProjParseButton"
+        )
         self.pushButtonParse = QtWidgets.QPushButton(self.layoutWidget)
         self.pushButtonParse.setObjectName("pushButtonParse")
         self.horizontalLayoutProjParseButton.addWidget(self.pushButtonParse)
         self.verticalLayoutProj.addLayout(self.horizontalLayoutProjParseButton)
         self.horizontalLayoutProjParseOptions = QtWidgets.QHBoxLayout()
-        self.horizontalLayoutProjParseOptions.setObjectName("horizontalLayoutProjParseOptions")
+        self.horizontalLayoutProjParseOptions.setObjectName(
+            "horizontalLayoutProjParseOptions"
+        )
         self.frameParseOptions = QtWidgets.QFrame(self.layoutWidget)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.frameParseOptions.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.frameParseOptions.sizePolicy().hasHeightForWidth()
+        )
         self.frameParseOptions.setSizePolicy(sizePolicy)
         self.frameParseOptions.setMinimumSize(QtCore.QSize(0, 111))
         self.frameParseOptions.setMaximumSize(QtCore.QSize(16777215, 111))
@@ -57,11 +67,15 @@ class Ui_mainWindow(object):
         self.lineEdit_split_at_time.setObjectName("lineEdit_split_at_time")
         self.label_splitTime = QtWidgets.QLabel(self.frameParseOptions)
         self.label_splitTime.setGeometry(QtCore.QRect(10, 40, 61, 20))
-        self.label_splitTime.setAlignment(QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft)
+        self.label_splitTime.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_splitTime.setObjectName("label_splitTime")
         self.label_gain = QtWidgets.QLabel(self.frameParseOptions)
         self.label_gain.setGeometry(QtCore.QRect(10, 70, 61, 20))
-        self.label_gain.setAlignment(QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft)
+        self.label_gain.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_gain.setObjectName("label_gain")
         self.lineEdit_import_gain = QtWidgets.QLineEdit(self.frameParseOptions)
         self.lineEdit_import_gain.setGeometry(QtCore.QRect(80, 70, 41, 25))
@@ -97,7 +111,9 @@ class Ui_mainWindow(object):
         self.horizontalLayoutMean.addWidget(self.graphMean)
         self.horizontalLayoutWidget_2 = QtWidgets.QWidget(self.v_splitterGraphs)
         self.horizontalLayoutWidget_2.setObjectName("horizontalLayoutWidget_2")
-        self.horizontalLayoutEvent = QtWidgets.QHBoxLayout(self.horizontalLayoutWidget_2)
+        self.horizontalLayoutEvent = QtWidgets.QHBoxLayout(
+            self.horizontalLayoutWidget_2
+        )
         self.horizontalLayoutEvent.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayoutEvent.setObjectName("horizontalLayoutEvent")
         self.graphEvent = QtWidgets.QWidget(self.horizontalLayoutWidget_2)
@@ -106,7 +122,9 @@ class Ui_mainWindow(object):
         self.horizontalLayoutEvent.addWidget(self.graphEvent)
         self.horizontalLayoutWidget_3 = QtWidgets.QWidget(self.v_splitterGraphs)
         self.horizontalLayoutWidget_3.setObjectName("horizontalLayoutWidget_3")
-        self.horizontalLayoutOutput = QtWidgets.QHBoxLayout(self.horizontalLayoutWidget_3)
+        self.horizontalLayoutOutput = QtWidgets.QHBoxLayout(
+            self.horizontalLayoutWidget_3
+        )
         self.horizontalLayoutOutput.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayoutOutput.setObjectName("horizontalLayoutOutput")
         self.graphOutput = QtWidgets.QWidget(self.horizontalLayoutWidget_3)
@@ -120,10 +138,14 @@ class Ui_mainWindow(object):
         self.verticalLayoutTools.setContentsMargins(0, 0, 0, 0)
         self.verticalLayoutTools.setObjectName("verticalLayoutTools")
         self.frameToolStim = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.frameToolStim.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.frameToolStim.sizePolicy().hasHeightForWidth()
+        )
         self.frameToolStim.setSizePolicy(sizePolicy)
         self.frameToolStim.setMinimumSize(QtCore.QSize(211, 181))
         self.frameToolStim.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -143,9 +165,13 @@ class Ui_mainWindow(object):
         font.setWeight(75)
         self.label_stims.setFont(font)
         self.label_stims.setObjectName("label_stims")
-        self.pushButton_stim_assign_threshold = QtWidgets.QPushButton(self.frameToolStim)
+        self.pushButton_stim_assign_threshold = QtWidgets.QPushButton(
+            self.frameToolStim
+        )
         self.pushButton_stim_assign_threshold.setGeometry(QtCore.QRect(20, 150, 61, 25))
-        self.pushButton_stim_assign_threshold.setObjectName("pushButton_stim_assign_threshold")
+        self.pushButton_stim_assign_threshold.setObjectName(
+            "pushButton_stim_assign_threshold"
+        )
         self.label_stim_detection_threshold = QtWidgets.QLabel(self.frameToolStim)
         self.label_stim_detection_threshold.setGeometry(QtCore.QRect(10, 130, 141, 17))
         font = QtGui.QFont()
@@ -153,10 +179,14 @@ class Ui_mainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_stim_detection_threshold.setFont(font)
-        self.label_stim_detection_threshold.setObjectName("label_stim_detection_threshold")
+        self.label_stim_detection_threshold.setObjectName(
+            "label_stim_detection_threshold"
+        )
         self.label_mean_to = QtWidgets.QLabel(self.frameToolStim)
         self.label_mean_to.setGeometry(QtCore.QRect(90, 100, 21, 20))
-        self.label_mean_to.setAlignment(QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft)
+        self.label_mean_to.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_mean_to.setObjectName("label_mean_to")
         self.lineEdit_mean_selection_end = QtWidgets.QLineEdit(self.frameToolStim)
         self.lineEdit_mean_selection_end.setGeometry(QtCore.QRect(100, 100, 61, 25))
@@ -171,7 +201,9 @@ class Ui_mainWindow(object):
         self.label_mean_selected_range.setObjectName("label_mean_selected_range")
         self.lineEdit_mean_selection_start = QtWidgets.QLineEdit(self.frameToolStim)
         self.lineEdit_mean_selection_start.setGeometry(QtCore.QRect(20, 100, 61, 25))
-        self.lineEdit_mean_selection_start.setObjectName("lineEdit_mean_selection_start")
+        self.lineEdit_mean_selection_start.setObjectName(
+            "lineEdit_mean_selection_start"
+        )
         self.pushButton_stim_detect = QtWidgets.QPushButton(self.frameToolStim)
         self.pushButton_stim_detect.setGeometry(QtCore.QRect(90, 150, 61, 25))
         self.pushButton_stim_detect.setObjectName("pushButton_stim_detect")
@@ -187,10 +219,14 @@ class Ui_mainWindow(object):
         self.lineEdit_mean_selection_end.raise_()
         self.verticalLayoutTools.addWidget(self.frameToolStim, 0, QtCore.Qt.AlignTop)
         self.frameToolXscale = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.frameToolXscale.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.frameToolXscale.sizePolicy().hasHeightForWidth()
+        )
         self.frameToolXscale.setSizePolicy(sizePolicy)
         self.frameToolXscale.setMinimumSize(QtCore.QSize(0, 71))
         self.frameToolXscale.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -224,10 +260,14 @@ class Ui_mainWindow(object):
         self.buttonGroup_x_axis.addButton(self.radioButton_xscale_stim)
         self.verticalLayoutTools.addWidget(self.frameToolXscale)
         self.frameToolYscale = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.frameToolYscale.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.frameToolYscale.sizePolicy().hasHeightForWidth()
+        )
         self.frameToolYscale.setSizePolicy(sizePolicy)
         self.frameToolYscale.setMinimumSize(QtCore.QSize(211, 111))
         self.frameToolYscale.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -238,14 +278,18 @@ class Ui_mainWindow(object):
         self.lineEdit_norm_EPSP_end.setObjectName("lineEdit_norm_EPSP_end")
         self.label_norm_on_sweep = QtWidgets.QLabel(self.frameToolYscale)
         self.label_norm_on_sweep.setGeometry(QtCore.QRect(10, 50, 131, 20))
-        self.label_norm_on_sweep.setAlignment(QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft)
+        self.label_norm_on_sweep.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_norm_on_sweep.setObjectName("label_norm_on_sweep")
         self.checkBox_norm_EPSP = QtWidgets.QCheckBox(self.frameToolYscale)
         self.checkBox_norm_EPSP.setGeometry(QtCore.QRect(10, 30, 111, 23))
         self.checkBox_norm_EPSP.setObjectName("checkBox_norm_EPSP")
         self.label_relative_to = QtWidgets.QLabel(self.frameToolYscale)
         self.label_relative_to.setGeometry(QtCore.QRect(70, 70, 21, 20))
-        self.label_relative_to.setAlignment(QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft)
+        self.label_relative_to.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_relative_to.setObjectName("label_relative_to")
         self.label_y_axis = QtWidgets.QLabel(self.frameToolYscale)
         self.label_y_axis.setGeometry(QtCore.QRect(10, 10, 81, 17))
@@ -263,7 +307,9 @@ class Ui_mainWindow(object):
         self.checkBox_output_ymin0.setObjectName("checkBox_output_ymin0")
         self.pushButton_norm_range_set_all = QtWidgets.QPushButton(self.frameToolYscale)
         self.pushButton_norm_range_set_all.setGeometry(QtCore.QRect(130, 70, 51, 25))
-        self.pushButton_norm_range_set_all.setObjectName("pushButton_norm_range_set_all")
+        self.pushButton_norm_range_set_all.setObjectName(
+            "pushButton_norm_range_set_all"
+        )
         self.label_norm_on_sweep.raise_()
         self.checkBox_norm_EPSP.raise_()
         self.label_relative_to.raise_()
@@ -274,10 +320,14 @@ class Ui_mainWindow(object):
         self.pushButton_norm_range_set_all.raise_()
         self.verticalLayoutTools.addWidget(self.frameToolYscale)
         self.frameToolSweeps = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.frameToolSweeps.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.frameToolSweeps.sizePolicy().hasHeightForWidth()
+        )
         self.frameToolSweeps.setSizePolicy(sizePolicy)
         self.frameToolSweeps.setMinimumSize(QtCore.QSize(211, 111))
         self.frameToolSweeps.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -302,18 +352,24 @@ class Ui_mainWindow(object):
         self.lineEdit_sweeps_range_to.setObjectName("lineEdit_sweeps_range_to")
         self.label_sweeps_dash = QtWidgets.QLabel(self.frameToolSweeps)
         self.label_sweeps_dash.setGeometry(QtCore.QRect(110, 30, 16, 20))
-        self.label_sweeps_dash.setAlignment(QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft)
+        self.label_sweeps_dash.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_sweeps_dash.setObjectName("label_sweeps_dash")
         self.label_sweeps_selection = QtWidgets.QLabel(self.frameToolSweeps)
         self.label_sweeps_selection.setGeometry(QtCore.QRect(10, 30, 41, 20))
-        self.label_sweeps_selection.setAlignment(QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft)
+        self.label_sweeps_selection.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_sweeps_selection.setObjectName("label_sweeps_selection")
         self.lineEdit_sweeps_range_from = QtWidgets.QLineEdit(self.frameToolSweeps)
         self.lineEdit_sweeps_range_from.setGeometry(QtCore.QRect(60, 30, 41, 25))
         self.lineEdit_sweeps_range_from.setObjectName("lineEdit_sweeps_range_from")
         self.label_sweeps_select_even_odd = QtWidgets.QLabel(self.frameToolSweeps)
         self.label_sweeps_select_even_odd.setGeometry(QtCore.QRect(10, 70, 41, 20))
-        self.label_sweeps_select_even_odd.setAlignment(QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft)
+        self.label_sweeps_select_even_odd.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_sweeps_select_even_odd.setObjectName("label_sweeps_select_even_odd")
         self.label_sweeps_dash.raise_()
         self.pushButton_sweeps_even.raise_()
@@ -325,7 +381,9 @@ class Ui_mainWindow(object):
         self.label_sweeps_select_even_odd.raise_()
         self.verticalLayoutTools.addWidget(self.frameToolSweeps, 0, QtCore.Qt.AlignTop)
         self.frameToolBin = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.frameToolBin.sizePolicy().hasHeightForWidth())
@@ -354,11 +412,57 @@ class Ui_mainWindow(object):
         self.label_bin_zero_means_off.setFont(font)
         self.label_bin_zero_means_off.setObjectName("label_bin_zero_means_off")
         self.verticalLayoutTools.addWidget(self.frameToolBin)
+        self.frameToolFilter = QtWidgets.QFrame(self.verticalLayoutWidget_3)
+        self.frameToolFilter.setMinimumSize(QtCore.QSize(0, 111))
+        self.frameToolFilter.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frameToolFilter.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frameToolFilter.setObjectName("frameToolFilter")
+        self.label_filter = QtWidgets.QLabel(self.frameToolFilter)
+        self.label_filter.setGeometry(QtCore.QRect(10, 10, 62, 17))
+        font = QtGui.QFont()
+        font.setFamily("DejaVu Sans")
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_filter.setFont(font)
+        self.label_filter.setObjectName("label_filter")
+        self.radioButton_filter_none = QtWidgets.QRadioButton(self.frameToolFilter)
+        self.radioButton_filter_none.setGeometry(QtCore.QRect(10, 30, 82, 17))
+        self.radioButton_filter_none.setObjectName("radioButton_filter_none")
+        self.buttonGroup_filter = QtWidgets.QButtonGroup(mainWindow)
+        self.buttonGroup_filter.setObjectName("buttonGroup_filter")
+        self.buttonGroup_filter.addButton(self.radioButton_filter_none)
+        self.radioButton_filter_savgol = QtWidgets.QRadioButton(self.frameToolFilter)
+        self.radioButton_filter_savgol.setGeometry(QtCore.QRect(10, 50, 82, 17))
+        self.radioButton_filter_savgol.setObjectName("radioButton_filter_savgol")
+        self.buttonGroup_filter.addButton(self.radioButton_filter_savgol)
+        self.label_savgol_window = QtWidgets.QLabel(self.frameToolFilter)
+        self.label_savgol_window.setGeometry(QtCore.QRect(20, 70, 41, 20))
+        self.label_savgol_window.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
+        self.label_savgol_window.setObjectName("label_savgol_window")
+        self.label_savgol_poly = QtWidgets.QLabel(self.frameToolFilter)
+        self.label_savgol_poly.setGeometry(QtCore.QRect(110, 70, 31, 20))
+        self.label_savgol_poly.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
+        self.label_savgol_poly.setObjectName("label_savgol_poly")
+        self.lineEdit_savgol_window = QtWidgets.QLineEdit(self.frameToolFilter)
+        self.lineEdit_savgol_window.setGeometry(QtCore.QRect(70, 70, 31, 25))
+        self.lineEdit_savgol_window.setObjectName("lineEdit_savgol_window")
+        self.lineEdit_savgol_poly = QtWidgets.QLineEdit(self.frameToolFilter)
+        self.lineEdit_savgol_poly.setGeometry(QtCore.QRect(140, 70, 21, 25))
+        self.lineEdit_savgol_poly.setObjectName("lineEdit_savgol_poly")
+        self.verticalLayoutTools.addWidget(self.frameToolFilter)
         self.frameToolAspect = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.frameToolAspect.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.frameToolAspect.sizePolicy().hasHeightForWidth()
+        )
         self.frameToolAspect.setSizePolicy(sizePolicy)
         self.frameToolAspect.setMinimumSize(QtCore.QSize(211, 171))
         self.frameToolAspect.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -389,7 +493,9 @@ class Ui_mainWindow(object):
         self.lineEdit_EPSP_amp_halfwidth.setObjectName("lineEdit_EPSP_amp_halfwidth")
         self.lineEdit_volley_amp_halfwidth = QtWidgets.QLineEdit(self.frameToolAspect)
         self.lineEdit_volley_amp_halfwidth.setGeometry(QtCore.QRect(140, 140, 31, 25))
-        self.lineEdit_volley_amp_halfwidth.setObjectName("lineEdit_volley_amp_halfwidth")
+        self.lineEdit_volley_amp_halfwidth.setObjectName(
+            "lineEdit_volley_amp_halfwidth"
+        )
         self.label_header_amp_halfwidth = QtWidgets.QLabel(self.frameToolAspect)
         self.label_header_amp_halfwidth.setGeometry(QtCore.QRect(10, 120, 201, 17))
         font = QtGui.QFont()
@@ -400,11 +506,15 @@ class Ui_mainWindow(object):
         self.label_header_amp_halfwidth.setObjectName("label_header_amp_halfwidth")
         self.label_EPSP_amp_halfwidth = QtWidgets.QLabel(self.frameToolAspect)
         self.label_EPSP_amp_halfwidth.setGeometry(QtCore.QRect(20, 140, 51, 20))
-        self.label_EPSP_amp_halfwidth.setAlignment(QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft)
+        self.label_EPSP_amp_halfwidth.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_EPSP_amp_halfwidth.setObjectName("label_EPSP_amp_halfwidth")
         self.label_volley_amp_halfwidth = QtWidgets.QLabel(self.frameToolAspect)
         self.label_volley_amp_halfwidth.setGeometry(QtCore.QRect(100, 140, 51, 20))
-        self.label_volley_amp_halfwidth.setAlignment(QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft)
+        self.label_volley_amp_halfwidth.setAlignment(
+            QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft
+        )
         self.label_volley_amp_halfwidth.setObjectName("label_volley_amp_halfwidth")
         self.checkBox_volley_slope_mean = QtWidgets.QCheckBox(self.frameToolAspect)
         self.checkBox_volley_slope_mean.setGeometry(QtCore.QRect(120, 70, 101, 23))
@@ -429,16 +539,22 @@ class Ui_mainWindow(object):
         self.verticalLayoutGroups.setObjectName("verticalLayoutGroups")
         self.verticalLayoutTools.addLayout(self.verticalLayoutGroups)
         self.frameToolPairedStim = QtWidgets.QFrame(self.verticalLayoutWidget_3)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.frameToolPairedStim.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.frameToolPairedStim.sizePolicy().hasHeightForWidth()
+        )
         self.frameToolPairedStim.setSizePolicy(sizePolicy)
         self.frameToolPairedStim.setMinimumSize(QtCore.QSize(211, 71))
         self.frameToolPairedStim.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frameToolPairedStim.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frameToolPairedStim.setObjectName("frameToolPairedStim")
-        self.pushButton_paired_data_flip = QtWidgets.QPushButton(self.frameToolPairedStim)
+        self.pushButton_paired_data_flip = QtWidgets.QPushButton(
+            self.frameToolPairedStim
+        )
         self.pushButton_paired_data_flip.setGeometry(QtCore.QRect(100, 30, 51, 25))
         self.pushButton_paired_data_flip.setObjectName("pushButton_paired_data_flip")
         self.label_paired_data = QtWidgets.QLabel(self.frameToolPairedStim)
@@ -452,8 +568,12 @@ class Ui_mainWindow(object):
         self.checkBox_paired_stims = QtWidgets.QCheckBox(self.frameToolPairedStim)
         self.checkBox_paired_stims.setGeometry(QtCore.QRect(8, 30, 90, 23))
         self.checkBox_paired_stims.setObjectName("checkBox_paired_stims")
-        self.verticalLayoutTools.addWidget(self.frameToolPairedStim, 0, QtCore.Qt.AlignTop)
-        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.verticalLayoutTools.addWidget(
+            self.frameToolPairedStim, 0, QtCore.Qt.AlignTop
+        )
+        spacerItem = QtWidgets.QSpacerItem(
+            20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
+        )
         self.verticalLayoutTools.addItem(spacerItem)
         self.verticalMasterLayout.addWidget(self.h_splitterMaster)
         self.progressBar = QtWidgets.QProgressBar(self.centralwidget)
@@ -495,16 +615,28 @@ class Ui_mainWindow(object):
         _translate = QtCore.QCoreApplication.translate
         mainWindow.setWindowTitle(_translate("mainWindow", "Brainwash"))
         self.pushButtonParse.setText(_translate("mainWindow", "Import"))
-        self.checkBox_splitOddEven.setText(_translate("mainWindow", "Split odd/even sweeps"))
+        self.checkBox_splitOddEven.setText(
+            _translate("mainWindow", "Split odd/even sweeps")
+        )
         self.label_splitTime.setText(_translate("mainWindow", "Split at (ms)"))
         self.label_gain.setText(_translate("mainWindow", "Apply gain"))
-        self.checkBox_show_all_events.setText(_translate("mainWindow", "Show all events"))
-        self.checkBox_timepoints_per_stim.setText(_translate("mainWindow", "Timepoints per stim"))
+        self.checkBox_show_all_events.setText(
+            _translate("mainWindow", "Show all events")
+        )
+        self.checkBox_timepoints_per_stim.setText(
+            _translate("mainWindow", "Timepoints per stim")
+        )
         self.label_stims.setText(_translate("mainWindow", "Stims"))
-        self.pushButton_stim_assign_threshold.setText(_translate("mainWindow", "Assign"))
-        self.label_stim_detection_threshold.setText(_translate("mainWindow", "Detection Threshold"))
+        self.pushButton_stim_assign_threshold.setText(
+            _translate("mainWindow", "Assign")
+        )
+        self.label_stim_detection_threshold.setText(
+            _translate("mainWindow", "Detection Threshold")
+        )
         self.label_mean_to.setText(_translate("mainWindow", "-"))
-        self.label_mean_selected_range.setText(_translate("mainWindow", "Selection (ms)"))
+        self.label_mean_selected_range.setText(
+            _translate("mainWindow", "Selection (ms)")
+        )
         self.pushButton_stim_detect.setText(_translate("mainWindow", "Detect"))
         self.label_x_axis.setText(_translate("mainWindow", "X axis"))
         self.radioButton_xscale_sweep.setText(_translate("mainWindow", "Sweep"))
@@ -524,13 +656,22 @@ class Ui_mainWindow(object):
         self.label_sweeps_selection.setText(_translate("mainWindow", "Range"))
         self.label_sweeps_select_even_odd.setText(_translate("mainWindow", "Select"))
         self.label_bins.setText(_translate("mainWindow", "Bin size"))
-        self.label_bin_zero_means_off.setText(_translate("mainWindow", "0 = no binning"))
+        self.label_bin_zero_means_off.setText(
+            _translate("mainWindow", "0 = no binning")
+        )
+        self.label_filter.setText(_translate("mainWindow", "Filter"))
+        self.radioButton_filter_none.setText(_translate("mainWindow", "None"))
+        self.radioButton_filter_savgol.setText(_translate("mainWindow", "SavGol"))
+        self.label_savgol_window.setText(_translate("mainWindow", "Window"))
+        self.label_savgol_poly.setText(_translate("mainWindow", "Poly"))
         self.checkBox_EPSP_slope.setText(_translate("mainWindow", "EPSP slope"))
         self.checkBox_volley_slope.setText(_translate("mainWindow", "volley slope"))
         self.checkBox_EPSP_amp.setText(_translate("mainWindow", "EPSP amp."))
         self.label_aspect.setText(_translate("mainWindow", "Aspect"))
         self.checkBox_volley_amp.setText(_translate("mainWindow", "volley amp."))
-        self.label_header_amp_halfwidth.setText(_translate("mainWindow", "Amplitude width (as ± ms)"))
+        self.label_header_amp_halfwidth.setText(
+            _translate("mainWindow", "Amplitude width (as ± ms)")
+        )
         self.label_EPSP_amp_halfwidth.setText(_translate("mainWindow", "EPSP"))
         self.label_volley_amp_halfwidth.setText(_translate("mainWindow", "volley"))
         self.checkBox_volley_slope_mean.setText(_translate("mainWindow", "mean"))

@@ -119,7 +119,6 @@ def ttest_df(d_group_ndf, norm=False, amp=False, slope=False) -> pd.DataFrame:
 def addFilterSavgol(df, window_length: int = 9, poly_order: int = 3) -> pd.Series:
     """
     Compute a Savitzky-Golay smoothed column from df['voltage'] and return it.
-    The result is also written into df['savgol'] in place.
     """
     df["savgol"] = savgol_filter(
         df.voltage, window_length=window_length, polyorder=poly_order
