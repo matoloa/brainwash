@@ -223,16 +223,14 @@ Discontinued: Igor2 cannot write IBW files natively.
 ### Background
 
 The UI currently has four matplotlib axes:
-- `axm` — the "mean sweep" panel (event view, single sweep overlay).
-- `axe` — the expanded event view (zoomed single sweep with event markers).
 - `ax1` — Output: amplitude (EPSP_amp or EPSP_amp_norm vs. x-axis).
 - `ax2` — Output: slope (EPSP_slope or EPSP_slope_norm vs. x-axis).
 
-`triggerExportOutputImage` needs to produce a standalone, publication-quality figure from these axes. The key requirement is **decoupling the export figure from the interactive UI figure** — the exported figure must have journal-appropriate formatting (font sizes, linewidths, no toolbar artefacts, correct figure dimensions) without altering the live display.
+The goal is to produce a standalone, publication-quality figure from ax1 and ax2 of selected groups. NOT recordings. The key requirement is **decoupling the export figure from the interactive UI figure** — the exported figure must have journal-appropriate formatting (font sizes, linewidths, no toolbar artefacts, correct figure dimensions) without altering the live display.
 
 ### Step 4.1 — Journal template dataclass
 
-Add `src/lib/ui_image_export.py` (new file). Define:
+Add `src/lib/ui_output_image.py` (new file). Define:
 
 ```python
 from dataclasses import dataclass, field
@@ -277,7 +275,12 @@ Add a `JOURNAL_TEMPLATES: dict[str, JournalTemplate]` dict in `ui_image_export.p
 
 > **Caveat:** Journal specifications change. The implementer should verify current guidelines at implementation time. These values are based on guidelines current as of 2025.
 
-### Step 4.3 — Figure renderer
+### Step 4.3 — Menu addition
+
+Add to `MenuMixin.setupMenus` in `ui_menus.py`, under the Image section:
+Replace the existing `actionExportOutputImage` with one export command per template: `Groups to <template>`
+
+### Step 4.4 — Figure renderer
 
 Add `render_publication_figure(uistate, uiplot, template: JournalTemplate, selected_recs: list[str]) -> matplotlib.figure.Figure` to `ui_image_export.py`.
 
@@ -292,137 +295,8 @@ Algorithm:
    ```
 2. **Add subplots** according to `template.panels` and `template.layout`.
 3. **Re-plot the data** from scratch onto the new axes:
-   - For each `rec` in `selected_recs`, retrieve `dfoutput` and `dfdata` from the caches already held in `uistate`.
+   - Operate on selected groups - not recs.
    - Apply `template` styling (font sizes, linewidths) using `matplotlib.rcParams` within a `matplotlib.rc_context({...})` context manager so the interactive display is not altered.
    - Mirror the same colour logic as `UIplot` (`uistate.settings["rgb_EPSP_amp"]`, etc.).
-4. **Scale bars instead of axis ticks** (optional, off by default): if `template.scale_bars = True`, suppress axis ticks and draw manual scale bars. This is common in neuroscience figures for the event trace panel.
+
 5. Return the figure without displaying it.
-
-### Step 4.4 — Save dialog and formats
-
-`triggerExportOutputImage` (in `ui_export.py`):
-
-1. Open an `ExportImageDialog` (new `QDialog`, Step 5.5) that lets the user:
-   - Choose a journal template from a dropdown.
-   - Optionally override width/height/DPI.
-   - Choose which panels to include (checkboxes: Event trace, Amplitude, Slope, Mean sweep).
-   - Choose output format: PNG, SVG, PDF, TIFF.
-   - Preview a thumbnail (low-DPI render of the figure, shown in a `QLabel`).
-2. On *Export*, call `render_publication_figure(...)` at full DPI.
-3. Save via `fig.savefig(path, dpi=template.dpi, bbox_inches='tight')`.
-4. For SVG output, set `dpi=96` (SVG is vector; the `dpi` kwarg in matplotlib's SVG backend controls the coordinate scale for embedded bitmaps only).
-
-### Step 4.5 — ExportImageDialog
-
-New `QDialog` subclass in `ui_image_export.py`:
-
-```
-ExportImageDialog
-├── QComboBox         — journal template selector
-├── QGroupBox "Dimensions"
-│   ├── QDoubleSpinBox  width (mm)
-│   ├── QDoubleSpinBox  height (mm)
-│   └── QSpinBox        DPI
-├── QGroupBox "Panels"
-│   ├── QCheckBox  Event trace
-│   ├── QCheckBox  Amplitude output
-│   ├── QCheckBox  Slope output
-│   └── QCheckBox  Mean sweep
-├── QGroupBox "Format"
-│   └── QComboBox  PNG / SVG / PDF / TIFF
-├── QLabel            — live preview (thumbnail at ~100 dpi)
-└── QDialogButtonBox  Export | Cancel
-```
-
-Selecting a template from the dropdown populates the dimension/DPI fields. Changing any field triggers a debounced (300 ms) preview re-render.
-
-### Step 4.6 — Menu addition
-
-Add to `MenuMixin.setupMenus` in `ui_menus.py`, under the Image section:
-
-```python
-self.actionExportOutputImageTemplate = QtWidgets.QAction("Output to image (journal template)")
-self.actionExportOutputImageTemplate.triggered.connect(self.triggerExportOutputImage)
-self.menuExport.addAction(self.actionExportOutputImageTemplate)
-```
-
-(Replace or rename the existing `actionExportOutputImage` — the new dialog supersedes the old stub.)
-
----
-
-## Phase 5 — `ui_export.py` shared utilities
-
-### Step 5.1 — Status bar feedback helper
-
-Add `_export_status(self, msg: str)` to `ExportMixin`:
-```python
-def _export_status(self, msg: str):
-    if hasattr(self, "statusBar"):
-        self.statusBar().showMessage(msg, 5000)
-    print(msg)
-```
-
-All export triggers call this on success or failure, so the user always gets feedback even when a file dialog is dismissed.
-
-### Step 5.2 — Guard against empty selection
-
-Add `_require_selection(self) -> list[pd.Series] | None` to `ExportMixin`:
-- Returns a list of `df_project` rows for currently visible/selected recordings.
-- If the list is empty, shows a `QMessageBox.warning` and returns `None`.
-- All export triggers check the return value of this guard before proceeding.
-
-### Step 5.3 — Progress dialog for large exports
-
-For exports that iterate over many recordings or write large files (IBW per-sweep), wrap the loop in a `QProgressDialog`. Use the existing `tqdm`-style callbacks where already present in `parse.py` (e.g. `progress_callback` in `parse_ibwFolder`).
-
----
-
-## Phase 6 — Tests
-
-### Step 6.1 — CSV round-trip test
-
-In `src/lib/test_parse.py`:
-1. Generate a minimal synthetic `dfdata` DataFrame (3 sweeps × 100 samples).
-2. Write to CSV with `dfdata.to_csv`.
-3. Call `parse.source2dfs(csv_path)`.
-4. Assert returned dict has key `0`.
-5. Assert `df["sweep"].nunique() == 3`.
-6. Assert column set matches `_BW_CSV_SWEEP_COLS`.
-
-### Step 6.2 — Journal template sanity test
-
-In a new `src/lib/test_image_export.py`:
-1. Instantiate every template in `JOURNAL_TEMPLATES`.
-2. For each, assert `width_mm > 0`, `height_mm > 0`, `dpi >= 150`.
-3. Create a minimal mock `uistate` with empty dicts.
-4. Call `render_publication_figure(mock_uistate, mock_uiplot, template, selected_recs=[])`.
-5. Assert the returned object is a `matplotlib.figure.Figure`.
-6. Assert figure width (in inches) ≈ `template.width_mm / 25.4` within 1%.
-
----
-
-## Execution Order Summary
-
-| Phase | Steps | Risk | Effort | Depends on |
-|---|---|---|---|---|
-| **1 — CSV Import** | 1.1 → 1.4 | Low | ~2–3 hrs | — |
-| **2 — CSV Export** | 2.1 → 2.3 | Low | ~2–3 hrs | — |
-| **3 — IBW Export** | 3.1 → 3.3 | Medium | ~4–6 hrs | — |
-| **4 — Image Export** | 4.1 → 4.6 | Medium–High | ~1–2 days | — |
-| **5 — Shared utilities** | 5.1 → 5.3 | Low | ~2 hrs | Phases 2–4 |
-| **6 — Tests** | 6.1 → 6.2 | Low | ~3–4 hrs | Phases 1, 2, 4 |
-
-Phases 1, 2, 3, and 4 are independent and can be parallelised across contributors.
-Phase 5 utilities should be extracted once at least two export phases are in progress (to avoid premature abstraction).
-
----
-
-## Open Questions
-
-1. **IBW write API stability**: `igor2`'s write interface is not as well-documented as its read interface. Consider whether `neurodata-without-borders/pynwb` or a direct binary pack using `struct` is a more reliable fallback if `igor2.binarywave.save` proves fragile.
-
-2. **Scale bars in image export**: Do we want scale bars as the default for the event trace panel, or axis ticks? Neuroscience conventions lean toward scale bars for traces but axis ticks for time-series output plots. Make this a per-template setting rather than a global toggle.
-
-3. **Figure preview performance**: Rendering a full 600-DPI figure for the preview thumbnail will be slow. The debounce in Step 5.5 (300 ms) plus a low-DPI preview render (96 DPI) should be sufficient, but test with 20+ recordings before committing to this approach.
-
-4. **XLS vs XLSX menu label**: Decide whether to update the menu strings (currently "Export sweeps to .xls") to say `.xlsx`, or keep legacy naming with the understanding that the actual extension will be `.xlsx`. Consistency with what users expect to see in the file system favours updating the labels.
