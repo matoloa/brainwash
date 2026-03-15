@@ -176,8 +176,13 @@ class ExportMixin:
             )
             return
 
+        group_names = {
+            str(gid): ginfo.get("group_name", str(gid))
+            for gid, ginfo in getattr(self, "dd_groups", {}).items()
+        }
+
         figures = export_image.render_publication_figure(
-            uistate, uiplot, template, selected_groups
+            uistate, uiplot, template, selected_groups, group_names
         )
 
         export_dir = self.projects_folder / "Export"
