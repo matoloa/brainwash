@@ -297,6 +297,5 @@ Algorithm:
 3. **Re-plot the data** from scratch onto the new axes:
    - Operate on selected groups - not recs.
    - Apply `template` styling (font sizes, linewidths) using `matplotlib.rcParams` within a `matplotlib.rc_context({...})` context manager so the interactive display is not altered.
-   - Mirror the same colour logic as `UIplot` (`uistate.settings["rgb_EPSP_amp"]`, etc.).
 
-5. Return the figure without displaying it.
+5. Save the image as `<project name>_<template>.<format>` in the `Brainwash Project`/`Export` folder.

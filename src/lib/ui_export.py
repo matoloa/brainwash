@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import ui_output_image
 from PyQt5 import QtCore, QtWidgets
 
 # ---------------------------------------------------------------------------
@@ -148,6 +149,44 @@ class ExportMixin:
     # Image export triggers
     # ------------------------------------------------------------------
 
-    def triggerExportOutputImage(self):
-        self.usage("triggerExportOutputImage")
-        pass  # TODO: implement
+    def triggerExportOutputImage(self, template_key: str | bool = "jneurosci_1col"):
+        if isinstance(template_key, bool):
+            template_key = "jneurosci_1col"
+
+        self.usage(f"triggerExportOutputImage: {template_key}")
+
+        selected_groups = list(
+            set(str(info["group_ID"]) for info in uistate.dict_group_show.values())
+        )
+
+        if not selected_groups:
+            QtWidgets.QMessageBox.warning(
+                None,
+                "Export Error",
+                "No groups are currently displayed to export.",
+            )
+            return
+
+        template = ui_output_image.JOURNAL_TEMPLATES.get(template_key)
+        if not template:
+            QtWidgets.QMessageBox.warning(
+                None,
+                "Export Error",
+                f"Template '{template_key}' not found.",
+            )
+            return
+
+        fig = ui_output_image.render_publication_figure(
+            uistate, uiplot, template, selected_groups
+        )
+
+        export_dir = self.projects_folder / "Export"
+        export_dir.mkdir(parents=True, exist_ok=True)
+
+        out_path_png = export_dir / f"{self.projectname}_{template_key}.png"
+        out_path_pdf = export_dir / f"{self.projectname}_{template_key}.pdf"
+
+        fig.savefig(out_path_png, dpi=template.dpi, bbox_inches="tight")
+        fig.savefig(out_path_pdf, dpi=template.dpi, bbox_inches="tight")
+
+        self._export_status(f"Exported {template.name} figure to {export_dir}")

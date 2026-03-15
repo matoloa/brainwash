@@ -1,3 +1,4 @@
+import ui_output_image
 from PyQt5 import QtWidgets
 
 uistate = None
@@ -211,6 +212,9 @@ class MenuMixin:
         self.menuExport.addSeparator()
 
         # — Image section —
-        self.actionExportOutputImage = QtWidgets.QAction("Output to image")
-        self.actionExportOutputImage.triggered.connect(self.triggerExportOutputImage)
-        self.menuExport.addAction(self.actionExportOutputImage)
+        for key, template in ui_output_image.JOURNAL_TEMPLATES.items():
+            action = QtWidgets.QAction(f"Groups to {template.name}", self.menuExport)
+            action.triggered.connect(
+                lambda checked=False, k=key: self.triggerExportOutputImage(k)
+            )
+            self.menuExport.addAction(action)

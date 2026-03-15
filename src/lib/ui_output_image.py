@@ -1,0 +1,176 @@
+from dataclasses import dataclass, field
+from typing import Literal
+
+import matplotlib
+import matplotlib.figure
+
+
+@dataclass
+class JournalTemplate:
+    name: str
+    # Figure dimensions in mm (converted to inches for matplotlib)
+    width_mm: float
+    height_mm: float
+    # Font
+    font_family: str = "Arial"
+    font_size_axis_label: float = 7.0
+    font_size_tick_label: float = 6.0
+    font_size_legend: float = 6.0
+    # Line widths in points
+    linewidth_data: float = 0.75
+    linewidth_axes: float = 0.5
+    # DPI for raster outputs
+    dpi: int = 600
+    # Which panels to include
+    panels: list[Literal["event", "amp", "slope", "mean"]] = field(
+        default_factory=lambda: ["event", "amp", "slope"]
+    )
+    # Layout: "vertical" (stacked) or "horizontal" (side by side)
+    layout: Literal["vertical", "horizontal"] = "vertical"
+
+
+JOURNAL_TEMPLATES: dict[str, JournalTemplate] = {
+    "jneurosci_1col": JournalTemplate(
+        name="JNeurosci (1 col)", width_mm=85, height_mm=60
+    ),
+    "jneurosci_2col": JournalTemplate(
+        name="JNeurosci (2 col)", width_mm=174, height_mm=120
+    ),
+    "jphysiol_1col": JournalTemplate(
+        name="JPhysiol (1 col)", width_mm=85, height_mm=65
+    ),
+    "jphysiol_2col": JournalTemplate(
+        name="JPhysiol (2 col)", width_mm=174, height_mm=130
+    ),
+    "nature_1col": JournalTemplate(name="Nature (1 col)", width_mm=89, height_mm=65),
+    "nature_2col": JournalTemplate(name="Nature (2 col)", width_mm=183, height_mm=130),
+}
+
+
+def render_publication_figure(
+    uistate, uiplot, template: JournalTemplate, selected_groups: list[str]
+) -> matplotlib.figure.Figure:
+    """
+    Render a standalone, publication-quality figure from ax1 and ax2 of selected groups.
+    """
+    rc_params = {
+        "font.family": template.font_family,
+        "axes.labelsize": template.font_size_axis_label,
+        "xtick.labelsize": template.font_size_tick_label,
+        "ytick.labelsize": template.font_size_tick_label,
+        "legend.fontsize": template.font_size_legend,
+        "lines.linewidth": template.linewidth_data,
+        "axes.linewidth": template.linewidth_axes,
+    }
+
+    with matplotlib.rc_context(rc_params):
+        # Create a fresh figure using the provided template dimensions
+        fig = matplotlib.figure.Figure(
+            figsize=(template.width_mm / 25.4, template.height_mm / 25.4),
+            dpi=template.dpi,
+        )
+
+        num_panels = len(template.panels)
+        if num_panels == 0:
+            return fig
+
+        if template.layout == "vertical":
+            nrows, ncols = num_panels, 1
+        else:
+            nrows, ncols = 1, num_panels
+
+        axes = fig.subplots(nrows, ncols, squeeze=False).flatten()
+
+        for idx, panel in enumerate(template.panels):
+            ax = axes[idx]
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+
+            if uistate.checkBox.get("norm_EPSP"):
+                if panel == "amp":
+                    ax.axhline(
+                        100,
+                        linestyle="dotted",
+                        alpha=0.3,
+                        color=uistate.settings["rgb_EPSP_amp"],
+                    )
+                elif panel == "slope":
+                    ax.axhline(
+                        100,
+                        linestyle="dotted",
+                        alpha=0.3,
+                        color=uistate.settings["rgb_EPSP_slope"],
+                    )
+
+            # Re-plot data by identifying relevant lines from the existing interactive axes
+            # We fetch data directly from the plotted group lines in uistate
+            # to mirror exactly what was calculated, applying only new styling.
+            for label, info in uistate.dict_group_labels.items():
+                group_id_str = str(info["group_ID"])
+                # We only plot if the group ID is in selected_groups
+                if group_id_str not in [str(g) for g in selected_groups]:
+                    continue
+
+                # Only plot lines that are currently toggled visible in the UI
+                if label not in uistate.dict_group_show:
+                    continue
+
+                axis_src = info.get("axis")
+                line = info.get("line")
+                fill = info.get("fill")
+                if not line:
+                    continue
+
+                # Check if this line corresponds to the current panel
+                if panel == "amp" and axis_src == "ax1":
+                    ax.set_ylabel(
+                        "Amplitude %"
+                        if uistate.checkBox.get("norm_EPSP")
+                        else "Amplitude (mV)"
+                    )
+                elif panel == "slope" and axis_src == "ax2":
+                    ax.set_ylabel(
+                        "Slope %"
+                        if uistate.checkBox.get("norm_EPSP")
+                        else "Slope (mV/ms)"
+                    )
+                else:
+                    # Ignore event/mean panels for now unless they match the source axis
+                    # Future expansion could handle axm/axe
+                    continue
+
+                # Plot the line
+                xdata = line.get_xdata()
+                ydata = line.get_ydata()
+                color = line.get_color()
+
+                ax.plot(
+                    xdata,
+                    ydata,
+                    label=label,
+                    color=color,
+                    linestyle=line.get_linestyle(),
+                    marker=line.get_marker(),
+                )
+
+                if fill:
+                    # Fill is a PolyCollection
+                    for path in fill.get_paths():
+                        verts = path.vertices
+                        ax.fill(
+                            verts[:, 0],
+                            verts[:, 1],
+                            alpha=0.3,
+                            color=color,
+                            edgecolor="none",
+                        )
+
+            ax.set_xlabel(
+                uistate.x_axis_xlabel() if hasattr(uistate, "x_axis_xlabel") else "Time"
+            )
+
+            if ax.get_legend_handles_labels()[1]:
+                ax.legend(frameon=False)
+
+        fig.tight_layout()
+        return fig
