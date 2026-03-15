@@ -176,17 +176,17 @@ class ExportMixin:
             )
             return
 
-        fig = ui_output_image.render_publication_figure(
+        figures = ui_output_image.render_publication_figure(
             uistate, uiplot, template, selected_groups
         )
 
         export_dir = self.projects_folder / "Export"
         export_dir.mkdir(parents=True, exist_ok=True)
 
-        out_path_png = export_dir / f"{self.projectname}_{template_key}.png"
-        out_path_pdf = export_dir / f"{self.projectname}_{template_key}.pdf"
+        for panel_name, fig in figures.items():
+            out_path_png = (
+                export_dir / f"{self.projectname}_{template_key}_{panel_name}.png"
+            )
+            fig.savefig(out_path_png, dpi=template.dpi, bbox_inches="tight")
 
-        fig.savefig(out_path_png, dpi=template.dpi, bbox_inches="tight")
-        fig.savefig(out_path_pdf, dpi=template.dpi, bbox_inches="tight")
-
-        self._export_status(f"Exported {template.name} figure to {export_dir}")
+        self._export_status(f"Exported {template.name} figures to {export_dir}")

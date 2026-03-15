@@ -49,9 +49,10 @@ JOURNAL_TEMPLATES: dict[str, JournalTemplate] = {
 
 def render_publication_figure(
     uistate, uiplot, template: JournalTemplate, selected_groups: list[str]
-) -> matplotlib.figure.Figure:
+) -> dict[str, matplotlib.figure.Figure]:
     """
     Render a standalone, publication-quality figure from ax1 and ax2 of selected groups.
+    Returns a dictionary mapping panel names (e.g. 'amplitude', 'slope') to their respective matplotlib Figure.
     """
     rc_params = {
         "font.family": template.font_family,
@@ -63,26 +64,23 @@ def render_publication_figure(
         "axes.linewidth": template.linewidth_axes,
     }
 
+    figures = {}
+    panel_name_map = {
+        "amp": "amplitude",
+        "slope": "slope",
+        "event": "event",
+        "mean": "mean",
+    }
+
     with matplotlib.rc_context(rc_params):
-        # Create a fresh figure using the provided template dimensions
-        fig = matplotlib.figure.Figure(
-            figsize=(template.width_mm / 25.4, template.height_mm / 25.4),
-            dpi=template.dpi,
-        )
+        for panel in template.panels:
+            # Create a fresh figure for each panel using the provided template dimensions
+            fig = matplotlib.figure.Figure(
+                figsize=(template.width_mm / 25.4, template.height_mm / 25.4),
+                dpi=template.dpi,
+            )
 
-        num_panels = len(template.panels)
-        if num_panels == 0:
-            return fig
-
-        if template.layout == "vertical":
-            nrows, ncols = num_panels, 1
-        else:
-            nrows, ncols = 1, num_panels
-
-        axes = fig.subplots(nrows, ncols, squeeze=False).flatten()
-
-        for idx, panel in enumerate(template.panels):
-            ax = axes[idx]
+            ax = fig.add_subplot(111)
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
 
@@ -105,6 +103,7 @@ def render_publication_figure(
             # Re-plot data by identifying relevant lines from the existing interactive axes
             # We fetch data directly from the plotted group lines in uistate
             # to mirror exactly what was calculated, applying only new styling.
+            has_data = False
             for label, info in uistate.dict_group_labels.items():
                 group_id_str = str(info["group_ID"])
                 # We only plot if the group ID is in selected_groups
@@ -139,6 +138,7 @@ def render_publication_figure(
                     # Future expansion could handle axm/axe
                     continue
 
+                has_data = True
                 # Plot the line
                 xdata = line.get_xdata()
                 ydata = line.get_ydata()
@@ -165,12 +165,18 @@ def render_publication_figure(
                             edgecolor="none",
                         )
 
-            ax.set_xlabel(
-                uistate.x_axis_xlabel() if hasattr(uistate, "x_axis_xlabel") else "Time"
-            )
+            if has_data:
+                ax.set_xlabel(
+                    uistate.x_axis_xlabel()
+                    if hasattr(uistate, "x_axis_xlabel")
+                    else "Time"
+                )
 
-            if ax.get_legend_handles_labels()[1]:
-                ax.legend(frameon=False)
+                if ax.get_legend_handles_labels()[1]:
+                    ax.legend(frameon=False)
 
-        fig.tight_layout()
-        return fig
+                fig.tight_layout()
+                panel_key = panel_name_map.get(panel, panel)
+                figures[panel_key] = fig
+
+    return figures
