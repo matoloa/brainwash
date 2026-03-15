@@ -1020,6 +1020,56 @@ class UIsub(
                 self.lineEdit_bin_size.setText("")
         else:
             self.lineEdit_bin_size.setText("")
+
+        # Populate filter settings
+        if len(uistate.list_idx_select_recs) > 0:
+            selected_df = df_p.loc[uistate.list_idx_select_recs]
+            filters = selected_df["filter"].unique()
+            if len(filters) == 1:
+                f_mode = filters[0]
+                if pd.isna(f_mode) or f_mode is None or f_mode == "none":
+                    self.radioButton_filter_none.setChecked(True)
+                    print("tableProjSelectionChanged: filter set to none")
+                elif f_mode == "savgol":
+                    self.radioButton_filter_savgol.setChecked(True)
+                    print("tableProjSelectionChanged: filter set to savgol")
+
+            import json
+
+            windows = set()
+            polys = set()
+            for params_str in selected_df["filter_params"]:
+                try:
+                    params = (
+                        json.loads(params_str)
+                        if pd.notna(params_str) and params_str
+                        else {}
+                    )
+                    windows.add(
+                        params.get(
+                            "window_length", uistate.lineEdit.get("savgol_window", 9)
+                        )
+                    )
+                    polys.add(
+                        params.get("poly_order", uistate.lineEdit.get("savgol_poly", 3))
+                    )
+                except Exception:
+                    pass
+
+            if len(windows) == 1:
+                val = str(windows.pop())
+                self.lineEdit_savgol_window.setText(val)
+                print(f"tableProjSelectionChanged: savgol_window set to {val}")
+            else:
+                self.lineEdit_savgol_window.setText("")
+
+            if len(polys) == 1:
+                val = str(polys.pop())
+                self.lineEdit_savgol_poly.setText(val)
+                print(f"tableProjSelectionChanged: savgol_poly set to {val}")
+            else:
+                self.lineEdit_savgol_poly.setText("")
+
         self.connectUIstate()
 
         # update_show now runs with a correct, clamped uistate.list_idx_select_stims
@@ -1560,6 +1610,68 @@ class UIsub(
     }
     _MODE_TO_RADIO = {v: k for k, v in _RADIO_TO_MODE.items()}
 
+    def filter_mode_changed(self, button):
+        """Handler for buttonGroup_filter.buttonClicked signal."""
+        mode_str = button.objectName().replace("radioButton_filter_", "")
+        mode = mode_str if mode_str != "none" else None
+
+        if mode == uistate.settings.get("filter"):
+            return
+
+        self.usage(f"filter_mode_changed → {mode}")
+        uistate.settings["filter"] = mode
+        print(f"filter_mode_changed: uistate.settings['filter'] set to {mode}")
+
+        df_p = self.get_df_project()
+        selected_idx = uistate.list_idx_select_recs
+        if len(selected_idx) > 0:
+            for idx in selected_idx:
+                df_p.at[idx, "filter"] = mode
+            self.recalculate(selection=selected_idx)
+            self.update_show()
+
+    def editSavgolParams(self, lineEdit):
+        try:
+            val = int(lineEdit.text())
+        except ValueError:
+            return
+
+        key = lineEdit.objectName().replace("lineEdit_", "")
+        if val == uistate.lineEdit.get(key):
+            return
+
+        self.usage(f"editSavgolParams → {key}: {val}")
+        uistate.lineEdit[key] = val
+        print(f"editSavgolParams: uistate.lineEdit['{key}'] set to {val}")
+
+        df_p = self.get_df_project()
+        selected_idx = uistate.list_idx_select_recs
+
+        import json
+
+        if len(selected_idx) > 0:
+            for idx in selected_idx:
+                try:
+                    params_str = df_p.at[idx, "filter_params"]
+                    params = (
+                        json.loads(params_str)
+                        if pd.notna(params_str) and params_str
+                        else {}
+                    )
+                except Exception:
+                    params = {}
+
+                if key == "savgol_window":
+                    params["window_length"] = val
+                elif key == "savgol_poly":
+                    params["poly_order"] = val
+
+                df_p.at[idx, "filter_params"] = json.dumps(params)
+
+            if uistate.settings.get("filter") == "savgol":
+                self.recalculate(selection=selected_idx)
+                self.update_show()
+
     def x_axis_mode_changed(self, button):
         """Handler for buttonGroup_x_axis.buttonClicked signal."""
         mode = self._RADIO_TO_MODE.get(button.objectName())
@@ -1917,6 +2029,14 @@ class UIsub(
                 pass  # no connections yet
         else:
             self.buttonGroup_x_axis.buttonClicked.connect(self.x_axis_mode_changed)
+        # filter radio button group
+        if disconnect:
+            try:
+                self.buttonGroup_filter.buttonClicked.disconnect()
+            except TypeError:
+                pass
+        else:
+            self.buttonGroup_filter.buttonClicked.connect(self.filter_mode_changed)
         # checkBoxes
         for key, value in uistate.checkBox.items():
             checkBox = getattr(self, f"checkBox_{key}")
@@ -2007,6 +2127,19 @@ class UIsub(
                 lineEdit.editingFinished.connect(
                     lambda le=lineEdit: self.editBinSize(le)
                 )
+        for lineEdit in [
+            self.lineEdit_savgol_window,
+            self.lineEdit_savgol_poly,
+        ]:
+            if disconnect:
+                try:
+                    lineEdit.editingFinished.disconnect()
+                except TypeError:
+                    pass
+            else:
+                lineEdit.editingFinished.connect(
+                    lambda le=lineEdit: self.editSavgolParams(le)
+                )
 
         # pushButtons
         for str_button, str_function in uistate.pushButtons.items():
@@ -2040,6 +2173,17 @@ class UIsub(
         for key, value in uistate.checkBox.items():
             checkBox = getattr(self, f"checkBox_{key}")
             checkBox.setChecked(value)
+
+        if uistate.settings.get("filter") == "savgol":
+            self.radioButton_filter_savgol.setChecked(True)
+        else:
+            self.radioButton_filter_none.setChecked(True)
+
+        self.lineEdit_savgol_window.setText(
+            str(uistate.lineEdit.get("savgol_window", 9))
+        )
+        self.lineEdit_savgol_poly.setText(str(uistate.lineEdit.get("savgol_poly", 3)))
+
         norm = uistate.checkBox["norm_EPSP"]
         self.label_norm_on_sweep.setVisible(norm)
         self.label_relative_to.setVisible(norm)
@@ -3525,6 +3669,8 @@ class UIsub(
             return
         rec_name = f"{prow['recording_name']}"
         rec_filter = prow["filter"]  # the filter currently used for this recording
+        if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
+            rec_filter = "voltage"
         if rec_filter != "voltage":
             label_core = f"{rec_name} ({rec_filter})"
         else:
@@ -3746,6 +3892,8 @@ class UIsub(
         p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
         df_t = self.get_dft(p_row)
         rec_filter = p_row["filter"]
+        if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
+            rec_filter = "voltage"
         settings = uistate.settings
 
         if uistate.x_axis == "stim":

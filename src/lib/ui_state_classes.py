@@ -139,6 +139,8 @@ class UIstate:
             "norm_EPSP_to": 0,
             "EPSP_amp_halfwidth_ms": 0,  # in ms here (visible to user). NB: in s in df_t!
             "volley_amp_halfwidth_ms": 0,  # in ms here (visible to user). NB: in s in df_t!
+            "savgol_window": 9,
+            "savgol_poly": 3,
         }
         self.settings = {
             "event_start": -0.005,  # in relation to current t_stim

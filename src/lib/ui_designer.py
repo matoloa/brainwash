@@ -437,9 +437,13 @@ class Ui_mainWindow(object):
         self.radioButton_filter_none = QtWidgets.QRadioButton(self.frameToolFilter)
         self.radioButton_filter_none.setGeometry(QtCore.QRect(10, 30, 82, 17))
         self.radioButton_filter_none.setObjectName("radioButton_filter_none")
+        self.buttonGroup_filter = QtWidgets.QButtonGroup(mainWindow)
+        self.buttonGroup_filter.setObjectName("buttonGroup_filter")
+        self.buttonGroup_filter.addButton(self.radioButton_filter_none)
         self.radioButton_filter_savgol = QtWidgets.QRadioButton(self.frameToolFilter)
         self.radioButton_filter_savgol.setGeometry(QtCore.QRect(10, 50, 82, 17))
         self.radioButton_filter_savgol.setObjectName("radioButton_filter_savgol")
+        self.buttonGroup_filter.addButton(self.radioButton_filter_savgol)
         self.label_savgol_window = QtWidgets.QLabel(self.frameToolFilter)
         self.label_savgol_window.setGeometry(QtCore.QRect(20, 70, 41, 20))
         self.label_savgol_window.setAlignment(

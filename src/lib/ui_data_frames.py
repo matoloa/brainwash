@@ -73,8 +73,43 @@ class DataFrameMixin:
             for group_ID in affected_group_IDs:
                 uiplot.unPlotGroup(group_ID)
 
+        import json
+
         for _, p_row in rows.iterrows():
             rec = p_row["recording_name"]
+
+            if p_row["filter"] == "savgol":
+                try:
+                    params_str = p_row["filter_params"]
+                    params = (
+                        json.loads(params_str)
+                        if pd.notna(params_str) and params_str
+                        else {}
+                    )
+                except Exception:
+                    params = {}
+                wl = int(params.get("window_length", 9))
+                po = int(params.get("poly_order", 3))
+
+                df_mean = self.get_dfmean(p_row)
+                df_mean["savgol"] = analysis.addFilterSavgol(
+                    df_mean, window_length=wl, poly_order=po
+                )
+                self.df2file(df=df_mean, rec=rec, key="mean")
+
+                df_filter = self.get_dffilter(p_row)
+                df_filter["savgol"] = analysis.addFilterSavgol(
+                    df_filter, window_length=wl, poly_order=po
+                )
+                self.df2file(df=df_filter, rec=rec, key="filter")
+
+                if pd.notna(p_row["bin_size"]):
+                    df_bin = self.get_dfbin(p_row)
+                    df_bin["savgol"] = analysis.addFilterSavgol(
+                        df_bin, window_length=wl, poly_order=po
+                    )
+                    self.df2file(df=df_bin, rec=rec, key="bin")
+
             df_t = self.get_dft(p_row)
             df_t["norm_output_from"] = dt["norm_output_from"]
             df_t["norm_output_to"] = dt["norm_output_to"]
@@ -115,29 +150,39 @@ class DataFrameMixin:
     def get_dfmean(self, row):
         # returns an internal df mean for the selected file. If it does not exist, read it from file first.
         recording_name = row["recording_name"]
-        if recording_name in self.dict_means:  # 1: Return cached
-            return self.dict_means[recording_name]
-
         persist = False
-        str_mean_path = f"{self.dict_folders['cache']}/{recording_name}_mean.parquet"
-        if Path(str_mean_path).exists():  # 2: Read from file
-            dfmean = pd.read_parquet(str_mean_path)
-        else:  # 3: Create file
-            dfdata = self.get_dfdata(row=row)
-            gain = float(row["gain"]) if pd.notna(row["gain"]) else 1.0
-            if gain != 1.0:
-                dfdata = dfdata.copy()
-                dfdata["voltage_raw"] = dfdata["voltage_raw"] * gain
-            dfmean, _ = parse.build_dfmean(dfdata)
-            persist = True
+
+        if recording_name in self.dict_means:  # 1: Return cached
+            dfmean = self.dict_means[recording_name]
+        else:
+            str_mean_path = (
+                f"{self.dict_folders['cache']}/{recording_name}_mean.parquet"
+            )
+            if Path(str_mean_path).exists():  # 2: Read from file
+                dfmean = pd.read_parquet(str_mean_path)
+            else:  # 3: Create file
+                dfdata = self.get_dfdata(row=row)
+                gain = float(row["gain"]) if pd.notna(row["gain"]) else 1.0
+                if gain != 1.0:
+                    dfdata = dfdata.copy()
+                    dfdata["voltage_raw"] = dfdata["voltage_raw"] * gain
+                dfmean, _ = parse.build_dfmean(dfdata)
+                persist = True
 
         # if the filter is not a column in dfmean, create it
         if row["filter"] == "savgol":
-            # TODO: extract parameters from df_p, use default for now
             if "savgol" not in dfmean.columns:
-                dict_filter_params = json.loads(row["filter_params"])
-                window_length = int(dict_filter_params["window_length"])
-                poly_order = int(dict_filter_params["poly_order"])
+                try:
+                    params_str = row["filter_params"]
+                    params = (
+                        json.loads(params_str)
+                        if pd.notna(params_str) and params_str
+                        else {}
+                    )
+                except Exception:
+                    params = {}
+                window_length = int(params.get("window_length", 9))
+                poly_order = int(params.get("poly_order", 3))
                 dfmean["savgol"] = analysis.addFilterSavgol(
                     df=dfmean, window_length=window_length, poly_order=poly_order
                 )
@@ -250,10 +295,17 @@ class DataFrameMixin:
                 dfinput = self.get_dfbin(row)
             else:
                 dfinput = self.get_dffilter(row)
+            filter_val = row.get("filter")
+            filter_col = (
+                filter_val
+                if pd.notna(filter_val) and filter_val and filter_val != "none"
+                else "voltage"
+            )
             dfoutput = analysis.build_dfoutput(
                 dffilter=dfinput,
                 dfmean=dfmean,
                 dft=dft,
+                filter=filter_col,
             )
             # Back-fill volley means into dft from the sweep-mode rows
             for i, t_row in dft.iterrows():
@@ -296,28 +348,48 @@ class DataFrameMixin:
     def get_dffilter(self, row):
         # returns an internal df_filter for the selected recording_name. If it does not exist, read it from file first.
         recording_name = row["recording_name"]
+        persist = False
+
         if recording_name in self.dict_filters:  # 1: Return cached
-            return self.dict_filters[recording_name]
-        path_filter = Path(
-            f"{self.dict_folders['cache']}/{recording_name}_filter.parquet"
-        )
-        if Path(path_filter).exists():  # 2: Read from file
-            dffilter = pd.read_parquet(path_filter)
-        else:  # 3: Create file
-            dfdata = self.get_dfdata(row=row)
-            gain = float(row["gain"]) if pd.notna(row["gain"]) else 1.0
-            if gain != 1.0:
-                dfdata = dfdata.copy()
-                dfdata["voltage_raw"] = dfdata["voltage_raw"] * gain
-            dffilter = parse.zeroSweeps(dfdata=dfdata, dfmean=self.get_dfmean(row=row))
-            self.df2file(df=dffilter, rec=recording_name, key="filter")
-            if row["filter"] == "savgol":
-                dict_filter_params = json.loads(row["filter_params"])
-                window_length = int(dict_filter_params["window_length"])
-                poly_order = int(dict_filter_params["poly_order"])
+            dffilter = self.dict_filters[recording_name]
+        else:
+            path_filter = Path(
+                f"{self.dict_folders['cache']}/{recording_name}_filter.parquet"
+            )
+            if Path(path_filter).exists():  # 2: Read from file
+                dffilter = pd.read_parquet(path_filter)
+            else:  # 3: Create file
+                dfdata = self.get_dfdata(row=row)
+                gain = float(row["gain"]) if pd.notna(row["gain"]) else 1.0
+                if gain != 1.0:
+                    dfdata = dfdata.copy()
+                    dfdata["voltage_raw"] = dfdata["voltage_raw"] * gain
+                dffilter = parse.zeroSweeps(
+                    dfdata=dfdata, dfmean=self.get_dfmean(row=row)
+                )
+                persist = True
+
+        if row["filter"] == "savgol":
+            if "savgol" not in dffilter.columns:
+                try:
+                    params_str = row["filter_params"]
+                    params = (
+                        json.loads(params_str)
+                        if pd.notna(params_str) and params_str
+                        else {}
+                    )
+                except Exception:
+                    params = {}
+                window_length = int(params.get("window_length", 9))
+                poly_order = int(params.get("poly_order", 3))
                 dffilter["savgol"] = analysis.addFilterSavgol(
                     df=dffilter, window_length=window_length, poly_order=poly_order
                 )
+                persist = True
+
+        if persist:
+            self.df2file(df=dffilter, rec=recording_name, key="filter")
+
         # Cache and return
         self.dict_filters[recording_name] = dffilter
         return self.dict_filters[recording_name]
@@ -334,44 +406,70 @@ class DataFrameMixin:
                 f"get_dfbin called for '{rec}' but bin_size is NaN — "
                 "callers must not reach get_dfbin when binning is off."
             )
+        persist = False
+
         if rec in self.dict_bins:
-            return self.dict_bins[rec]
-        path_bin = Path(f"{self.dict_folders['cache']}/{rec}_bin.parquet")
-        if path_bin.exists():
-            df_bins = pd.read_parquet(path_bin)
+            df_bins = self.dict_bins[rec]
         else:
-            bin_size = int(p_row["bin_size"])
-            df_filter = self.get_dffilter(p_row)
-            max_sweep = df_filter["sweep"].max()
-            num_bins = (max_sweep // bin_size) + 1
-            binned_data = []
-            for bin_num in range(num_bins):
-                sweep_start = bin_num * bin_size
-                sweep_end = sweep_start + bin_size
-                df_bin = df_filter[
-                    (df_filter["sweep"] >= sweep_start)
-                    & (df_filter["sweep"] < sweep_end)
-                ]
-                if df_bin.empty:
-                    continue
-                agg_funcs = {
-                    col: "mean"
-                    for col in df_bin.columns
-                    if col not in ["sweep", "time"]
-                }
-                agg_funcs["time"] = (
-                    "first"  # Keep the first time value as representative
+            path_bin = Path(f"{self.dict_folders['cache']}/{rec}_bin.parquet")
+            if path_bin.exists():
+                df_bins = pd.read_parquet(path_bin)
+            else:
+                bin_size = int(p_row["bin_size"])
+                df_filter = self.get_dffilter(p_row)
+                max_sweep = df_filter["sweep"].max()
+                num_bins = (max_sweep // bin_size) + 1
+                binned_data = []
+                for bin_num in range(num_bins):
+                    sweep_start = bin_num * bin_size
+                    sweep_end = sweep_start + bin_size
+                    df_bin = df_filter[
+                        (df_filter["sweep"] >= sweep_start)
+                        & (df_filter["sweep"] < sweep_end)
+                    ]
+                    if df_bin.empty:
+                        continue
+                    agg_funcs = {
+                        col: "mean"
+                        for col in df_bin.columns
+                        if col not in ["sweep", "time"]
+                    }
+                    agg_funcs["time"] = (
+                        "first"  # Keep the first time value as representative
+                    )
+                    df_bin_grouped = df_bin.groupby("time", as_index=False).agg(
+                        agg_funcs
+                    )
+                    # Assign the bin number as the new sweep value
+                    df_bin_grouped["sweep"] = bin_num
+                    binned_data.append(df_bin_grouped)
+                df_bins = pd.concat(binned_data, ignore_index=True)
+                persist = True
+                print(
+                    f"recalculate: {rec}, binned {df_filter['sweep'].nunique()} sweeps into {len(df_bins['sweep'].unique())} bins"
                 )
-                df_bin_grouped = df_bin.groupby("time", as_index=False).agg(agg_funcs)
-                # Assign the bin number as the new sweep value
-                df_bin_grouped["sweep"] = bin_num
-                binned_data.append(df_bin_grouped)
-            df_bins = pd.concat(binned_data, ignore_index=True)
-            self.dict_bins[rec] = df_bins
-            print(
-                f"recalculate: {rec}, binned {df_filter['sweep'].nunique()} sweeps into {len(df_bins['sweep'].unique())} bins"
-            )
+
+        if p_row["filter"] == "savgol":
+            if "savgol" not in df_bins.columns:
+                try:
+                    params_str = p_row["filter_params"]
+                    params = (
+                        json.loads(params_str)
+                        if pd.notna(params_str) and params_str
+                        else {}
+                    )
+                except Exception:
+                    params = {}
+                window_length = int(params.get("window_length", 9))
+                poly_order = int(params.get("poly_order", 3))
+                df_bins["savgol"] = analysis.addFilterSavgol(
+                    df=df_bins, window_length=window_length, poly_order=poly_order
+                )
+                persist = True
+
+        if persist:
             self.df2file(df=df_bins, rec=rec, key="bin")
+
         self.dict_bins[rec] = df_bins
         return df_bins
 
