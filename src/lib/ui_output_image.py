@@ -22,34 +22,22 @@ class JournalTemplate:
     # DPI for raster outputs
     dpi: int = 600
     # Which panels to include
-    panels: list[Literal["event", "amp", "slope", "mean"]] = field(
-        default_factory=lambda: ["event", "amp", "slope"]
-    )
+    panels: list[Literal["event", "amp", "slope", "mean"]] = field(default_factory=lambda: ["event", "amp", "slope"])
     # Layout: "vertical" (stacked) or "horizontal" (side by side)
     layout: Literal["vertical", "horizontal"] = "vertical"
 
 
 JOURNAL_TEMPLATES: dict[str, JournalTemplate] = {
-    "jneurosci_1col": JournalTemplate(
-        name="JNeurosci (1 col)", width_mm=85, height_mm=60
-    ),
-    "jneurosci_2col": JournalTemplate(
-        name="JNeurosci (2 col)", width_mm=174, height_mm=120
-    ),
-    "jphysiol_1col": JournalTemplate(
-        name="JPhysiol (1 col)", width_mm=85, height_mm=65
-    ),
-    "jphysiol_2col": JournalTemplate(
-        name="JPhysiol (2 col)", width_mm=174, height_mm=130
-    ),
+    "jneurosci_1col": JournalTemplate(name="JNeurosci (1 col)", width_mm=85, height_mm=60),
+    "jneurosci_2col": JournalTemplate(name="JNeurosci (2 col)", width_mm=174, height_mm=120),
+    "jphysiol_1col": JournalTemplate(name="JPhysiol (1 col)", width_mm=85, height_mm=65),
+    "jphysiol_2col": JournalTemplate(name="JPhysiol (2 col)", width_mm=174, height_mm=130),
     "nature_1col": JournalTemplate(name="Nature (1 col)", width_mm=89, height_mm=65),
     "nature_2col": JournalTemplate(name="Nature (2 col)", width_mm=183, height_mm=130),
 }
 
 
-def render_publication_figure(
-    uistate, uiplot, template: JournalTemplate, selected_groups: list[str]
-) -> dict[str, matplotlib.figure.Figure]:
+def render_publication_figure(uistate, uiplot, template: JournalTemplate, selected_groups: list[str]) -> dict[str, matplotlib.figure.Figure]:
     """
     Render a standalone, publication-quality figure from ax1 and ax2 of selected groups.
     Returns a dictionary mapping panel names (e.g. 'amplitude', 'slope') to their respective matplotlib Figure.
@@ -122,17 +110,9 @@ def render_publication_figure(
 
                 # Check if this line corresponds to the current panel
                 if panel == "amp" and axis_src == "ax1":
-                    ax.set_ylabel(
-                        "Amplitude %"
-                        if uistate.checkBox.get("norm_EPSP")
-                        else "Amplitude (mV)"
-                    )
+                    ax.set_ylabel("Amplitude %" if uistate.checkBox.get("norm_EPSP") else "Amplitude (mV)")
                 elif panel == "slope" and axis_src == "ax2":
-                    ax.set_ylabel(
-                        "Slope %"
-                        if uistate.checkBox.get("norm_EPSP")
-                        else "Slope (mV/ms)"
-                    )
+                    ax.set_ylabel("Slope %" if uistate.checkBox.get("norm_EPSP") else "Slope (mV/ms)")
                 else:
                     # Ignore event/mean panels for now unless they match the source axis
                     # Future expansion could handle axm/axe
@@ -166,11 +146,7 @@ def render_publication_figure(
                         )
 
             if has_data:
-                ax.set_xlabel(
-                    uistate.x_axis_xlabel()
-                    if hasattr(uistate, "x_axis_xlabel")
-                    else "Time"
-                )
+                ax.set_xlabel(uistate.x_axis_xlabel() if hasattr(uistate, "x_axis_xlabel") else "Time")
 
                 if ax.get_legend_handles_labels()[1]:
                     ax.legend(frameon=False)

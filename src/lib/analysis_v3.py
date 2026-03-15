@@ -32,9 +32,7 @@ from scipy.stats import ttest_ind_from_stats
 
 def valid(*args) -> bool:
     """Return True iff every argument is a non-NaN finite number."""
-    return all(
-        isinstance(x, (int, float)) and x is not None and not np.isnan(x) for x in args
-    )
+    return all(isinstance(x, (int, float)) and x is not None and not np.isnan(x) for x in args)
 
 
 def measureslope_vec(df, t_start, t_end, name="EPSP", filter="voltage") -> pd.DataFrame:
@@ -121,9 +119,7 @@ def addFilterSavgol(df, window_length: int = 9, poly_order: int = 3) -> pd.Serie
     Compute a Savitzky-Golay smoothed column from df['voltage'] and return it.
     The result is also written into df['savgol'] in place.
     """
-    df["savgol"] = savgol_filter(
-        df.voltage, window_length=window_length, polyorder=poly_order
-    )
+    df["savgol"] = savgol_filter(df.voltage, window_length=window_length, polyorder=poly_order)
     return df["savgol"]
 
 
@@ -146,9 +142,7 @@ def _scalar_measureslope(df_snippet, t_start, t_end, filter="voltage") -> float:
 # ---------------------------------------------------------------------------
 
 
-def find_i_stims(
-    dfmean, threshold=0.1, min_time_difference=0.005, verbose=False
-) -> list:
+def find_i_stims(dfmean, threshold=0.1, min_time_difference=0.005, verbose=False) -> list:
     """
     Find indices of stimulation events in dfmean using the 'prim' column.
 
@@ -285,20 +279,12 @@ def find_timepoints(
         _log("stim: not detected, using index-based fallbacks")
 
     # Baseline (pre-stim mean)
-    baseline_end = (
-        (int(i_stim_neg) - 2)
-        if stim_detected and i_stim_neg is not None
-        else int(0.1 * n)
-    )
+    baseline_end = (int(i_stim_neg) - 2) if stim_detected and i_stim_neg is not None else int(0.1 * n)
     baseline_end = max(baseline_end, 1)
     baseline = np.mean(voltage[:baseline_end])
 
     # t_stim: time of the negative artefact peak, or time[0] as fallback
-    t_stim = (
-        float(times[int(i_stim_neg)])
-        if stim_detected and i_stim_neg is not None
-        else float(times[0])
-    )
+    t_stim = float(times[int(i_stim_neg)]) if stim_detected and i_stim_neg is not None else float(times[0])
 
     # amp_zero placeholder (pre-stim baseline in volts)
     amp_zero = float(baseline)
@@ -312,11 +298,7 @@ def find_timepoints(
     i_volley_right = None
     i_veb = None  # end-of-volley boundary for EPSP search
 
-    volley_start = (
-        (int(i_stim_neg) + int(0.0005 / dt))
-        if stim_detected and i_stim_neg is not None
-        else int(0.001 / dt)
-    )
+    volley_start = (int(i_stim_neg) + int(0.0005 / dt)) if stim_detected and i_stim_neg is not None else int(0.001 / dt)
     volley_end = min(volley_start + int(0.005 / dt), n)
     volley_region = voltage[volley_start:volley_end]
 
@@ -339,9 +321,7 @@ def find_timepoints(
                 i_volley_right = p2 + volley_start
                 i_volley_trough = between[0] + volley_start
                 i_veb = i_volley_right
-                _log(
-                    f"volley M-shape: left={i_volley_left}, trough={i_volley_trough}, right={i_volley_right}"
-                )
+                _log(f"volley M-shape: left={i_volley_left}, trough={i_volley_trough}, right={i_volley_right}")
                 break
 
     # ------------------------------------------------------------------
@@ -370,9 +350,7 @@ def find_timepoints(
             i_epsp_min = int(e_peaks[0]) + epsp_start
             epsp_depth = baseline - voltage[i_epsp_min]
             epsp_detected = bool(epsp_depth > 0.0001)
-            _log(
-                f"EPSP min: i={i_epsp_min}, t={times[i_epsp_min]:.5f}, depth={epsp_depth:.5f}"
-            )
+            _log(f"EPSP min: i={i_epsp_min}, t={times[i_epsp_min]:.5f}, depth={epsp_depth:.5f}")
         else:
             _log("EPSP: no trough found")
 
@@ -394,9 +372,7 @@ def find_timepoints(
             pad = vn
             raw = voltage[left : trough + pad]
             smoothed = np.asarray(
-                savgol_filter(
-                    raw, window_length=min(savgol_win, len(raw)), polyorder=0
-                ),
+                savgol_filter(raw, window_length=min(savgol_win, len(raw)), polyorder=0),
                 dtype=float,
             )
             t_raw = np.asarray(times[left : trough + pad], dtype=float)
@@ -418,9 +394,7 @@ def find_timepoints(
         t_volley_slope_start = t_stim + 0.001  # 1 ms after stim
         _log(f"volley slope: using default t={t_volley_slope_start:.5f}")
 
-    t_volley_slope_end = round(
-        t_volley_slope_start + default_dict_t.get("t_volley_slope_width", 0.0003), 6
-    )
+    t_volley_slope_end = round(t_volley_slope_start + default_dict_t.get("t_volley_slope_width", 0.0003), 6)
 
     # ------------------------------------------------------------------
     # 5. EPSP slope window (best-R² en-point interval)
@@ -439,9 +413,7 @@ def find_timepoints(
             pad = en
             raw = voltage[right : epsp_min + pad]
             smoothed = np.asarray(
-                savgol_filter(
-                    raw, window_length=min(savgol_win, len(raw)), polyorder=1
-                ),
+                savgol_filter(raw, window_length=min(savgol_win, len(raw)), polyorder=1),
                 dtype=float,
             )
             t_raw = np.asarray(times[right : epsp_min + pad], dtype=float)
@@ -467,9 +439,7 @@ def find_timepoints(
         t_EPSP_slope_start = t_stim + 0.002  # 2 ms after stim
         _log(f"EPSP slope: using default t={t_EPSP_slope_start:.5f}")
 
-    t_EPSP_slope_end = round(
-        t_EPSP_slope_start + default_dict_t.get("t_EPSP_slope_width", 0.0007), 6
-    )
+    t_EPSP_slope_end = round(t_EPSP_slope_start + default_dict_t.get("t_EPSP_slope_width", 0.0007), 6)
 
     # ------------------------------------------------------------------
     # 6. Amp timepoints (trough times, or fixed offsets as fallback)
@@ -658,9 +628,7 @@ def measure_waveform(df_snippet, dict_t: dict, filter: str = "voltage") -> dict:
             row = df_snippet[df_snippet["time"] == t_EPSP_amp]
             val = (row[filter].iloc[0] - amp_zero) * -1000 if not row.empty else np.nan
         else:
-            mask = (df_snippet["time"] >= t_EPSP_amp - t_EPSP_w / 2) & (
-                df_snippet["time"] <= t_EPSP_amp + t_EPSP_w / 2
-            )
+            mask = (df_snippet["time"] >= t_EPSP_amp - t_EPSP_w / 2) & (df_snippet["time"] <= t_EPSP_amp + t_EPSP_w / 2)
             mean_v = df_snippet.loc[mask, filter].mean()
             val = (mean_v - amp_zero) * -1000 if not np.isnan(mean_v) else np.nan
         result["EPSP_amp"] = val
@@ -678,17 +646,13 @@ def measure_waveform(df_snippet, dict_t: dict, filter: str = "voltage") -> dict:
 
     # -- Volley amplitude --
     t_volley_amp = dict_t.get("t_volley_amp", np.nan)
-    t_volley_w = dict_t.get(
-        "t_volley_amp_width", 2 * dict_t.get("t_volley_amp_halfwidth", 0)
-    )
+    t_volley_w = dict_t.get("t_volley_amp_width", 2 * dict_t.get("t_volley_amp_halfwidth", 0))
     if valid(t_volley_amp):
         if t_volley_w == 0:
             row = df_snippet[df_snippet["time"] == t_volley_amp]
             val = (row[filter].iloc[0] - amp_zero) * -1000 if not row.empty else np.nan
         else:
-            mask = (df_snippet["time"] >= t_volley_amp - t_volley_w / 2) & (
-                df_snippet["time"] <= t_volley_amp + t_volley_w / 2
-            )
+            mask = (df_snippet["time"] >= t_volley_amp - t_volley_w / 2) & (df_snippet["time"] <= t_volley_amp + t_volley_w / 2)
             mean_v = df_snippet.loc[mask, filter].mean()
             val = (mean_v - amp_zero) * -1000 if not np.isnan(mean_v) else np.nan
         result["volley_amp"] = val
@@ -803,10 +767,7 @@ def build_dfoutput(
         Stim-mode rows have sweep=NaN.
     """
     t0 = time.time()
-    print(
-        f"build_dfoutput: entered, dffilter.shape={dffilter.shape}, "
-        f"nsweeps={dffilter['sweep'].nunique()}, nstims={len(dft)}"
-    )
+    print(f"build_dfoutput: entered, dffilter.shape={dffilter.shape}, " f"nsweeps={dffilter['sweep'].nunique()}, nstims={len(dft)}")
 
     all_rows = []
 
@@ -829,23 +790,18 @@ def build_dfoutput(
 
         # EPSP_amp
         t_EPSP_amp = dict_t.get("t_EPSP_amp", np.nan)
-        t_EPSP_w = dict_t.get(
-            "t_EPSP_amp_width", 2 * dict_t.get("t_EPSP_amp_halfwidth", 0)
-        )
+        t_EPSP_w = dict_t.get("t_EPSP_amp_width", 2 * dict_t.get("t_EPSP_amp_halfwidth", 0))
         if valid(t_EPSP_amp):
             t_EPSP_amp_f = float(t_EPSP_amp)
             if t_EPSP_w == 0 or quick:
-                dfblock["EPSP_amp"] = _measure_amp_at_time_per_sweep(
-                    dffilter, t_EPSP_amp_f, amp_zero_per_sweep, filter
-                ).values
+                dfblock["EPSP_amp"] = _measure_amp_at_time_per_sweep(dffilter, t_EPSP_amp_f, amp_zero_per_sweep, filter).values
             else:
                 half = float(t_EPSP_w) / 2
                 amp_by_sweep = dffilter.groupby("sweep").apply(
                     lambda s: (
                         (
                             s.loc[
-                                (s["time"] >= t_EPSP_amp_f - half)
-                                & (s["time"] <= t_EPSP_amp_f + half),
+                                (s["time"] >= t_EPSP_amp_f - half) & (s["time"] <= t_EPSP_amp_f + half),
                                 filter,
                             ].mean()
                             - amp_zero_per_sweep.get(s.name, 0.0)
@@ -853,12 +809,8 @@ def build_dfoutput(
                         * -1000
                     )
                 )
-                dfblock["EPSP_amp"] = pd.Series(
-                    amp_by_sweep.values, index=dfblock.index
-                )
-            dfblock["EPSP_amp_norm"] = _normalize_column(
-                pd.Series(dfblock["EPSP_amp"].values, dtype=float), norm_from, norm_to
-            ).values
+                dfblock["EPSP_amp"] = pd.Series(amp_by_sweep.values, index=dfblock.index)
+            dfblock["EPSP_amp_norm"] = _normalize_column(pd.Series(dfblock["EPSP_amp"].values, dtype=float), norm_from, norm_to).values
         else:
             dfblock["EPSP_amp"] = np.nan
             dfblock["EPSP_amp_norm"] = np.nan
@@ -869,32 +821,25 @@ def build_dfoutput(
         if valid(t_EPSP_s, t_EPSP_e) and t_EPSP_s < t_EPSP_e:
             df_slopes = measureslope_vec(dffilter, t_EPSP_s, t_EPSP_e, filter=filter)
             dfblock["EPSP_slope"] = -df_slopes["value"].values  # type: ignore[operator]
-            dfblock["EPSP_slope_norm"] = _normalize_column(
-                pd.Series(dfblock["EPSP_slope"].values, dtype=float), norm_from, norm_to
-            ).values
+            dfblock["EPSP_slope_norm"] = _normalize_column(pd.Series(dfblock["EPSP_slope"].values, dtype=float), norm_from, norm_to).values
         else:
             dfblock["EPSP_slope"] = np.nan
             dfblock["EPSP_slope_norm"] = np.nan
 
         # Volley_amp
         t_volley_amp = dict_t.get("t_volley_amp", np.nan)
-        t_volley_w = dict_t.get(
-            "t_volley_amp_width", 2 * dict_t.get("t_volley_amp_halfwidth", 0)
-        )
+        t_volley_w = dict_t.get("t_volley_amp_width", 2 * dict_t.get("t_volley_amp_halfwidth", 0))
         if valid(t_volley_amp):
             t_volley_amp_f = float(t_volley_amp)
             if t_volley_w == 0 or quick:
-                dfblock["volley_amp"] = _measure_amp_at_time_per_sweep(
-                    dffilter, t_volley_amp_f, amp_zero_per_sweep, filter
-                ).values
+                dfblock["volley_amp"] = _measure_amp_at_time_per_sweep(dffilter, t_volley_amp_f, amp_zero_per_sweep, filter).values
             else:
                 half = float(t_volley_w) / 2
                 volley_by_sweep = dffilter.groupby("sweep").apply(
                     lambda s: (
                         (
                             s.loc[
-                                (s["time"] >= t_volley_amp_f - half)
-                                & (s["time"] <= t_volley_amp_f + half),
+                                (s["time"] >= t_volley_amp_f - half) & (s["time"] <= t_volley_amp_f + half),
                                 filter,
                             ].mean()
                             - amp_zero_per_sweep.get(s.name, 0.0)
@@ -902,9 +847,7 @@ def build_dfoutput(
                         * -1000
                     )
                 )
-                dfblock["volley_amp"] = pd.Series(
-                    volley_by_sweep.values, index=dfblock.index
-                )
+                dfblock["volley_amp"] = pd.Series(volley_by_sweep.values, index=dfblock.index)
         else:
             dfblock["volley_amp"] = np.nan
 
@@ -912,18 +855,13 @@ def build_dfoutput(
         t_volley_s = dict_t.get("t_volley_slope_start", np.nan)
         t_volley_e = dict_t.get("t_volley_slope_end", np.nan)
         if valid(t_volley_s, t_volley_e) and t_volley_s < t_volley_e:
-            df_slopes = measureslope_vec(
-                dffilter, t_volley_s, t_volley_e, filter=filter
-            )
+            df_slopes = measureslope_vec(dffilter, t_volley_s, t_volley_e, filter=filter)
             dfblock["volley_slope"] = -df_slopes["value"].values  # type: ignore[operator]
         else:
             dfblock["volley_slope"] = np.nan
 
         all_rows.append(dfblock)
-        print(
-            f"build_dfoutput: stim {stim_nr} sweep-mode done "
-            f"({round((time.time() - t0) * 1000)}ms)"
-        )
+        print(f"build_dfoutput: stim {stim_nr} sweep-mode done " f"({round((time.time() - t0) * 1000)}ms)")
 
     # ------------------------------------------------------------------
     # Stim-mode rows: measure dfmean sliced around each stim window
@@ -939,14 +877,8 @@ def build_dfoutput(
             # Window: from just before stim to just after EPSP region
             # Use t_EPSP_slope_end as a reasonable right boundary, with fallback
             t_win_start = t_stim - dict_t.get("t_volley_slope_width", 0.0003)
-            t_win_end = dict_t.get("t_EPSP_amp", t_stim + 0.01) + dict_t.get(
-                "t_EPSP_amp_width", 2 * dict_t.get("t_EPSP_amp_halfwidth", 0.001)
-            )
-            snippet = (
-                dfmean[(dfmean["time"] >= t_win_start) & (dfmean["time"] <= t_win_end)]
-                .copy()
-                .reset_index(drop=True)
-            )
+            t_win_end = dict_t.get("t_EPSP_amp", t_stim + 0.01) + dict_t.get("t_EPSP_amp_width", 2 * dict_t.get("t_EPSP_amp_halfwidth", 0.001))
+            snippet = dfmean[(dfmean["time"] >= t_win_start) & (dfmean["time"] <= t_win_end)].copy().reset_index(drop=True)
 
             measured = measure_waveform(snippet, dict_t, filter=filter)
             stim_row = {"stim": stim_nr, "sweep": np.nan}
@@ -957,10 +889,7 @@ def build_dfoutput(
             stim_rows.append(stim_row)
 
         all_rows.append(pd.DataFrame(stim_rows))
-        print(
-            f"build_dfoutput: stim-mode rows done "
-            f"({round((time.time() - t0) * 1000)}ms)"
-        )
+        print(f"build_dfoutput: stim-mode rows done " f"({round((time.time() - t0) * 1000)}ms)")
 
     # ------------------------------------------------------------------
     # Assemble and enforce column order
@@ -981,10 +910,7 @@ def build_dfoutput(
             dfoutput[col] = np.nan
     dfoutput = dfoutput[col_order]  # type: ignore[assignment]
 
-    print(
-        f"build_dfoutput: done {round((time.time() - t0) * 1000)}ms, "
-        f"shape={dfoutput.shape}"
-    )
+    print(f"build_dfoutput: done {round((time.time() - t0) * 1000)}ms, " f"shape={dfoutput.shape}")
     return dfoutput
 
 
@@ -1024,14 +950,8 @@ def build_dfbinstimoutput(
             t_stim = dict_t.get("t_stim", np.nan)
 
             t_win_start = t_stim - dict_t.get("t_volley_slope_width", 0.0003)
-            t_win_end = dict_t.get("t_EPSP_amp", t_stim + 0.01) + dict_t.get(
-                "t_EPSP_amp_width", 2 * dict_t.get("t_EPSP_amp_halfwidth", 0.001)
-            )
-            snippet = (
-                bin_df[(bin_df["time"] >= t_win_start) & (bin_df["time"] <= t_win_end)]
-                .copy()
-                .reset_index(drop=True)
-            )
+            t_win_end = dict_t.get("t_EPSP_amp", t_stim + 0.01) + dict_t.get("t_EPSP_amp_width", 2 * dict_t.get("t_EPSP_amp_halfwidth", 0.001))
+            snippet = bin_df[(bin_df["time"] >= t_win_start) & (bin_df["time"] <= t_win_end)].copy().reset_index(drop=True)
 
             measured = measure_waveform(snippet, dict_t, filter=filter)
             row = {"bin": bin_nr, "stim": stim_nr}
