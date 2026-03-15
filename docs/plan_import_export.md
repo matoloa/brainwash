@@ -213,75 +213,8 @@ Column order matches the output parquet schema: `stim`, `sweep`, `EPSP_slope`, `
 
 ---
 
-## Phase 3 — Export to .ibw (Igor Binary Wave)
-
-Implements `triggerExportSweepsIbw`.
-
-### Background
-
-IBW (Igor Binary Wave) is the native format of Igor Pro and a common exchange format in electrophysiology labs. The `igor2` package is already a dependency and can write IBW files. Each sweep becomes one wave. Voltage is stored in SI units (Volts); the x-axis scaling is set from the sample interval.
-
-### Step 3.1 — Per-sweep IBW writer helper
-
-Add `export_ibw(dfdata: pd.DataFrame, folder: Path, rec_name: str)` to `parse.py` (alongside the existing IBW reader):
-
-```python
-import igor2.binarywave as ibw_io
-
-def export_ibw(dfdata, folder, rec_name):
-    """
-    Write each sweep in dfdata as a separate .ibw file.
-    Files are named <rec_name>_s<sweep_number_zero_padded>.ibw
-    """
-    folder = Path(folder)
-    folder.mkdir(exist_ok=True)
-    n_sweeps = dfdata["sweep"].nunique()
-    pad = len(str(n_sweeps))
-    sample_interval = None  # computed from first sweep
-    for sweep_id, sweep_df in dfdata.groupby("sweep"):
-        voltage = sweep_df["voltage_raw"].to_numpy(dtype=np.float64)
-        if sample_interval is None:
-            times = sweep_df["time"].to_numpy()
-            sample_interval = float(times[1] - times[0]) if len(times) > 1 else 1e-4
-        # Build minimal igor wave dict
-        wave = {
-            "version": 5,
-            "wave": {
-                "waveHeader": {
-                    "npnts": len(voltage),
-                    "type": 4,  # NT_FP64
-                    "sfA": [sample_interval, 0.0, 0.0, 0.0],
-                    "sfB": [0.0, 0.0, 0.0, 0.0],
-                    "dataUnits": b"V",
-                    "xUnits": b"s",
-                },
-                "wData": voltage,
-            },
-        }
-        fname = folder / f"{rec_name}_s{str(sweep_id).zfill(pad)}.ibw"
-        ibw_io.save(str(fname), wave)
-```
-
-> **Note:** Verify the exact igor2 write API before implementation — `igor2` versions differ in their write interface. The above is illustrative; the actual call may be `ibw_io.save(path, wave_dict)` or use a higher-level helper. Check `igor2` docs / source at implementation time.
-
-### Step 3.2 — UI trigger
-
-`triggerExportSweepsIbw`:
-
-1. For each selected recording, call `self.get_dfdata(row)`.
-2. Ask user to choose an **output folder** (not a file) via `QFileDialog.getExistingDirectory`.
-3. If multiple recordings, create a subfolder per recording inside the chosen directory.
-4. Call `parse.export_ibw(dfdata, folder, rec_name)` for each.
-5. Show a summary: *"Exported N sweeps across M recordings to `<dir>`."*
-
-### Step 3.3 — IBW round-trip test
-
-Add a test in `src/lib/test_parse.py`:
-1. Load a known ABF file with `parse_abf`.
-2. Write to IBW via `export_ibw`.
-3. Re-read with `parse_ibwFolder`.
-4. Assert voltage arrays are equal within floating-point tolerance.
-5. Assert sweep count matches.
+## CANCELLED Phase 3 — Export to .ibw (Igor Binary Wave)
+Discontinued: Igor2 cannot write IBW files natively.
 
 ---
 
@@ -333,17 +266,14 @@ class JournalTemplate:
 
 Add a `JOURNAL_TEMPLATES: dict[str, JournalTemplate]` dict in `ui_image_export.py` with the following presets. All dimensions follow the respective journal's author guidelines for single-column and double-column figures.
 
-| Key | Journal | Width (mm) | Height (mm) | Notes |
-|---|---|---|---|---|
-| `"jneurosci_1col"` | Journal of Neuroscience | 85 | 60 | Single column |
-| `"jneurosci_2col"` | Journal of Neuroscience | 174 | 120 | Full width |
-| `"jphysiol_1col"` | Journal of Physiology | 85 | 65 | Single column |
-| `"jphysiol_2col"` | Journal of Physiology | 174 | 130 | Full width |
-| `"elife_1col"` | eLife | 83 | 60 | Single column |
-| `"elife_2col"` | eLife | 167 | 120 | Full width |
-| `"nature_1col"` | Nature family | 89 | 65 | Single column |
-| `"nature_2col"` | Nature family | 183 | 130 | Full width |
-| `"custom"` | (user-defined) | 120 | 90 | Default fallback |
+| Key | Journal | Width (mm) | Height (mm) | Notes | Updated |
+|---|---|---|---|---|---|
+| `"jneurosci_1col"` | Journal of Neuroscience | 85 | 60 | Single column | 2026-03-15 |
+| `"jneurosci_2col"` | Journal of Neuroscience | 174 | 120 | Full width | 2026-03-15 |
+| `"jphysiol_1col"` | Journal of Physiology | 85 | 65 | Single column | 2026-03-15 |
+| `"jphysiol_2col"` | Journal of Physiology | 174 | 130 | Full width | 2026-03-15 |
+| `"nature_1col"` | Nature family | 89 | 65 | Single column | 2026-03-15 |
+| `"nature_2col"` | Nature family | 183 | 130 | Full width | 2026-03-15 |
 
 > **Caveat:** Journal specifications change. The implementer should verify current guidelines at implementation time. These values are based on guidelines current as of 2025.
 

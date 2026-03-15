@@ -94,16 +94,16 @@ class ExportMixin:
             df_data = self.get_dfdata(p_row)
             if df_data is not None and not df_data.empty:
                 out_path = export_dir / f"{rec_name}_sweeps.csv"
-                cols_to_export = [c for c in ["sweep", "time", "voltage_raw", "t0", "datetime"] if c in df_data.columns]
+                cols_to_export = [
+                    c
+                    for c in ["sweep", "time", "voltage_raw", "t0", "datetime"]
+                    if c in df_data.columns
+                ]
                 df_export = df_data[cols_to_export] if cols_to_export else df_data
                 df_export.to_csv(out_path, index=False)
                 count += 1
 
         self._export_status(f"Exported sweeps for {count} recording(s) to {export_dir}")
-
-    def triggerExportSweepsIbw(self):
-        self.usage("triggerExportSweepsIbw")
-        pass  # TODO: implement
 
     # ------------------------------------------------------------------
     # Output export triggers

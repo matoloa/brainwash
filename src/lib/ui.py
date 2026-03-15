@@ -2163,7 +2163,7 @@ class UIsub(
         self.setTableStimVisibility(uistate.showTimetable)
 
     # triggerCopyTimepoints, triggerCopyOutput, triggerCopyProjectSummary,
-    # triggerExportSweepsCsv, triggerExportSweepsXls, triggerExportSweepsIbw,
+    # triggerExportSweepsCsv, triggerExportSweepsXls,
     # triggerExportOutputCsv, triggerExportOutputXls, triggerExportOutputImage
     # → ExportMixin (ui_export.py)
 

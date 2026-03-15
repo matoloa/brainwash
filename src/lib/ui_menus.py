@@ -201,10 +201,6 @@ class MenuMixin:
         self.actionExportSweepsCsv.triggered.connect(self.triggerExportSweepsCsv)
         self.menuExport.addAction(self.actionExportSweepsCsv)
 
-        self.actionExportSweepsIbw = QtWidgets.QAction("Export sweeps to .ibw")
-        self.actionExportSweepsIbw.triggered.connect(self.triggerExportSweepsIbw)
-        self.menuExport.addAction(self.actionExportSweepsIbw)
-
         self.menuExport.addSeparator()
 
         # — Output section —
