@@ -14,6 +14,9 @@
 
 from __future__ import annotations
 
+import pandas as pd
+from PyQt5 import QtCore, QtWidgets
+
 # ---------------------------------------------------------------------------
 # Injected singletons — set by ui.py before any UIsub instance is created.
 # ---------------------------------------------------------------------------
@@ -25,6 +28,36 @@ uiplot = None  # type: ignore[assignment]
 class ExportMixin:
     """Mixin that provides all export trigger methods for UIsub.
     Menu item wiring lives in MenuMixin (ui_menus.py)."""
+
+    def _export_status(self, msg: str):
+        if hasattr(self, "statusBar"):
+            self.statusBar().showMessage(msg, 5000)
+        print(msg)
+
+    def _require_selection(self) -> list[pd.Series] | None:
+        if not uistate.list_idx_select_recs:
+            QtWidgets.QMessageBox.warning(
+                None,
+                "Export Error",
+                "No recordings selected for export.",
+            )
+            return None
+
+        selected_rows = []
+        df_project = self.get_df_project()
+        for idx in uistate.list_idx_select_recs:
+            if idx in df_project.index:
+                selected_rows.append(df_project.loc[idx])
+
+        if not selected_rows:
+            QtWidgets.QMessageBox.warning(
+                None,
+                "Export Error",
+                "Selected recordings could not be found in the project.",
+            )
+            return None
+
+        return selected_rows
 
     # ------------------------------------------------------------------
     # Copy triggers
@@ -48,11 +81,25 @@ class ExportMixin:
 
     def triggerExportSweepsCsv(self):
         self.usage("triggerExportSweepsCsv")
-        pass  # TODO: implement
+        rows = self._require_selection()
+        if not rows:
+            return
 
-    def triggerExportSweepsXls(self):
-        self.usage("triggerExportSweepsXls")
-        pass  # TODO: implement
+        export_dir = self.projects_folder / "Export"
+        export_dir.mkdir(parents=True, exist_ok=True)
+
+        count = 0
+        for i, p_row in enumerate(rows):
+            rec_name = p_row["recording_name"]
+            df_data = self.get_dfdata(p_row)
+            if df_data is not None and not df_data.empty:
+                out_path = export_dir / f"{rec_name}_sweeps.csv"
+                cols_to_export = [c for c in ["sweep", "time", "voltage_raw", "t0", "datetime"] if c in df_data.columns]
+                df_export = df_data[cols_to_export] if cols_to_export else df_data
+                df_export.to_csv(out_path, index=False)
+                count += 1
+
+        self._export_status(f"Exported sweeps for {count} recording(s) to {export_dir}")
 
     def triggerExportSweepsIbw(self):
         self.usage("triggerExportSweepsIbw")
@@ -64,11 +111,38 @@ class ExportMixin:
 
     def triggerExportOutputCsv(self):
         self.usage("triggerExportOutputCsv")
-        pass  # TODO: implement
+        rows = self._require_selection()
+        if not rows:
+            return
 
-    def triggerExportOutputXls(self):
-        self.usage("triggerExportOutputXls")
-        pass  # TODO: implement
+        export_dir = self.projects_folder / "Export"
+        export_dir.mkdir(parents=True, exist_ok=True)
+
+        count = 0
+        for i, p_row in enumerate(rows):
+            rec_name = p_row["recording_name"]
+            df_out = self.get_dfoutput(p_row)
+            if df_out is not None and not df_out.empty:
+                out_path = export_dir / f"{rec_name}_output.csv"
+                cols_to_export = [
+                    c
+                    for c in [
+                        "stim",
+                        "sweep",
+                        "EPSP_slope",
+                        "EPSP_slope_norm",
+                        "EPSP_amp",
+                        "EPSP_amp_norm",
+                        "volley_amp",
+                        "volley_slope",
+                    ]
+                    if c in df_out.columns
+                ]
+                df_export = df_out[cols_to_export] if cols_to_export else df_out
+                df_export.to_csv(out_path, index=False)
+                count += 1
+
+        self._export_status(f"Exported output for {count} recording(s) to {export_dir}")
 
     # ------------------------------------------------------------------
     # Image export triggers

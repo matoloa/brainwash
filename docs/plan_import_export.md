@@ -191,38 +191,23 @@ Implements four menu commands in `ui_export.py` (wired in `ui_menus.py`):
 
 "Sweeps" means the raw electrophysiology data files (the `data/<rec>.parquet` content). "Output" means the computed per-sweep analysis results (the `cache/<rec>_output.parquet` content). Filters, means, and other cached derivatives are not exported here.
 
-### Step 2.1 — Shared save-dialog helper
+Exported data is written to an Export directory (might have to be created) in the project directory: 'Brainwash Projects', same file name but with `.csv` extension instead of `.parquet`.
 
-Add a private `_csv_save_dialog(default_stem: str) -> str | None` helper to `ExportMixin` that:
-
-1. Opens `QFileDialog.getSaveFileName` with a `"CSV files (*.csv)"` filter.
-2. Returns the chosen path, or `None` if the user cancelled.
-
-For multi-recording exports, open `QFileDialog.getExistingDirectory` instead and offer a `QMessageBox` with three buttons — *Combined*, *Per recording*, *Cancel* — before the directory dialog.
-
-### Step 2.2 — Sweep CSV export (`triggerExportSweepsCsv`)
+### Step 2.1 — Sweep CSV export (`triggerExportSweepsCsv`)
 
 Exports raw sweep data (voltage trace + time axis) for the selected recording(s).
 
 1. Determine the selected recording(s) from `uistate`.
-2. Load raw sweep data for each selected recording.
-3. For a single recording: prompt for a save path, default filename `<rec>_sweeps.csv`.
-4. For multiple recordings: prompt for *Combined* vs *Per recording* (Step 2.1 helper), then a directory; derive filenames as `<rec>_sweeps.csv` per recording.
-5. Combined mode: stack all recordings into one DataFrame, prepend a `recording` column.
-6. Write with `index=False`.
-7. Show a status-bar message on completion.
+2. Write each recording's sweep data to a recording-specific CSV file with `index=False`.
 
 The exported columns are those of the raw data parquet schema: `sweep`, `time`, `voltage_raw`, `t0`, `datetime`.
 
-### Step 2.3 — Output CSV export (`triggerExportOutputCsv`)
+### Step 2.2 — Output CSV export (`triggerExportOutputCsv`)
 
 Exports computed analysis output for the selected recording(s).
 
-1. Same selection and save-dialog pattern as Step 2.2, but default filename `<rec>_output.csv`.
-2. Load output data for each selected recording.
-3. Combined mode: stack recordings, prepend a `recording` column.
-4. Write with `index=False`.
-5. Show a status-bar message on completion.
+1. Load output data for each selected recording.
+2. Write each recording's output data to a recording-specific CSV file with `index=False`.
 
 Column order matches the output parquet schema: `stim`, `sweep`, `EPSP_slope`, `EPSP_slope_norm`, `EPSP_amp`, `EPSP_amp_norm`, `volley_amp`, `volley_slope`.
 
