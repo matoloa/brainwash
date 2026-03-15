@@ -833,14 +833,14 @@ ui_data_frames.uistate = uistate
 ui_data_frames.config = config
 ui_data_frames.uiplot = uiplot
 
-import lib.ui_export as ui_export
+import lib.export_data as export_data
 import lib.ui_menus as ui_menus
 
 ui_menus.uistate = uistate
 
-ui_export.uistate = uistate
-ui_export.config = config
-ui_export.uiplot = uiplot
+export_data.uistate = uistate
+export_data.config = config
+export_data.uiplot = uiplot
 
 ####################################################################
 # MAIN UI CLASS
@@ -855,7 +855,7 @@ class UIsub(
     ui_project.ProjectMixin,
     ui_data_frames.DataFrameMixin,
     ui_menus.MenuMixin,
-    ui_export.ExportMixin,
+    export_data.ExportMixin,
 ):
     def __init__(self, mainwindow):
         logger.debug("UIsub __init__ started")
@@ -2165,7 +2165,7 @@ class UIsub(
     # triggerCopyTimepoints, triggerCopyOutput, triggerCopyProjectSummary,
     # triggerExportSweepsCsv, triggerExportSweepsXls,
     # triggerExportOutputCsv, triggerExportOutputXls, triggerExportOutputImage
-    # → ExportMixin (ui_export.py)
+    # → ExportMixin (export_data.py)
 
     def pushButton_paired_data_flip_pressed(self):
         self.usage("pushButton_paired_data_flip_pressed")

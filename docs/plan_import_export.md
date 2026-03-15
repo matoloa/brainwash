@@ -7,7 +7,7 @@
 Brainwash already has skeletal scaffolding for import/export:
 
 - `parse.py` has a `parse_csv` stub (L189–195) that reads a CSV and returns a DataFrame, but it has no column validation, version detection, or integration with the full `source2dfs` pipeline.
-- `ui_export.py` (ExportMixin) has trigger methods for every export action, but all are `pass` / `TODO`.
+- `export_data.py` (ExportMixin) has trigger methods for every export action, but all are `pass` / `TODO`.
 - `ui_menus.py` (MenuMixin) has the Export menu fully wired up: Copy section, Sweeps section (CSV, XLS, IBW), Output section (CSV, XLS), and an Image section.
 - The internal data model is now parquet-backed (`data/<rec>.parquet`, `cache/<rec>_output.parquet`), but the legacy data layer used CSV everywhere — both for raw sweep data and for computed output.
 
@@ -184,7 +184,7 @@ def sample_atf(filepath):
 
 ## Phase 2 — Export to .csv
 
-Implements four menu commands in `ui_export.py` (wired in `ui_menus.py`):
+Implements four menu commands in `export_data.py` (wired in `ui_menus.py`):
 
 - **Export menu → Sweeps section:** `triggerExportSweepsCsv`
 - **Export menu → Output section:** `triggerExportOutputCsv`
@@ -230,7 +230,7 @@ The goal is to produce a standalone, publication-quality figure from ax1 and ax2
 
 ### Step 4.1 — Journal template dataclass
 
-Add `src/lib/ui_output_image.py` (new file). Define:
+Add `src/lib/export_image.py` (new file). Define:
 
 ```python
 from dataclasses import dataclass, field

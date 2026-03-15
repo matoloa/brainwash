@@ -1,4 +1,4 @@
-import ui_output_image
+import export_image
 from PyQt5 import QtWidgets
 
 uistate = None
@@ -44,30 +44,50 @@ class MenuMixin:
 
         self.menuEdit.addSeparator()
 
-        self.actionSweepOpsHeader = QtWidgets.QAction("   — sweep selection —")  # not connected: section header
+        self.actionSweepOpsHeader = QtWidgets.QAction(
+            "   — sweep selection —"
+        )  # not connected: section header
         self.menuEdit.addAction(self.actionSweepOpsHeader)
 
-        self.actionKeepOnlySelectedSweeps = QtWidgets.QAction("   Keep only selected sweeps")
-        self.actionKeepOnlySelectedSweeps.triggered.connect(self.triggerKeepSelectedSweeps)
+        self.actionKeepOnlySelectedSweeps = QtWidgets.QAction(
+            "   Keep only selected sweeps"
+        )
+        self.actionKeepOnlySelectedSweeps.triggered.connect(
+            self.triggerKeepSelectedSweeps
+        )
         self.menuEdit.addAction(self.actionKeepOnlySelectedSweeps)
 
-        self.actionRemoveSelectedSweeps = QtWidgets.QAction("   Discard selected sweeps")
-        self.actionRemoveSelectedSweeps.triggered.connect(self.triggerRemoveSelectedSweeps)
+        self.actionRemoveSelectedSweeps = QtWidgets.QAction(
+            "   Discard selected sweeps"
+        )
+        self.actionRemoveSelectedSweeps.triggered.connect(
+            self.triggerRemoveSelectedSweeps
+        )
         self.menuEdit.addAction(self.actionRemoveSelectedSweeps)
 
-        self.actionSplitBySelectedSweeps = QtWidgets.QAction("   Split recordings by selected sweeps")
-        self.actionSplitBySelectedSweeps.triggered.connect(self.triggerSplitBySelectedSweeps)
+        self.actionSplitBySelectedSweeps = QtWidgets.QAction(
+            "   Split recordings by selected sweeps"
+        )
+        self.actionSplitBySelectedSweeps.triggered.connect(
+            self.triggerSplitBySelectedSweeps
+        )
         self.menuEdit.addAction(self.actionSplitBySelectedSweeps)
 
-        self.actionTimeOpsHeader = QtWidgets.QAction("   — time selection —")  # not connected: section header
+        self.actionTimeOpsHeader = QtWidgets.QAction(
+            "   — time selection —"
+        )  # not connected: section header
         self.menuEdit.addAction(self.actionTimeOpsHeader)
 
-        self.actionKeepOnlySelectedTime = QtWidgets.QAction("   Keep only selected time")
+        self.actionKeepOnlySelectedTime = QtWidgets.QAction(
+            "   Keep only selected time"
+        )
         self.actionKeepOnlySelectedTime.triggered.connect(self.triggerKeepSelectedTime)
         self.menuEdit.addAction(self.actionKeepOnlySelectedTime)
 
         self.actionDiscardSelectedTime = QtWidgets.QAction("   Discard selected time")
-        self.actionDiscardSelectedTime.triggered.connect(self.triggerDiscardSelectedTime)
+        self.actionDiscardSelectedTime.triggered.connect(
+            self.triggerDiscardSelectedTime
+        )
         self.menuEdit.addAction(self.actionDiscardSelectedTime)
 
         self.actionSplitByTime = QtWidgets.QAction("   Split recordings by time")
@@ -105,7 +125,9 @@ class MenuMixin:
             action = QtWidgets.QAction(f"Toggle {text}", self.menuView)
             action.setCheckable(True)
             action.setChecked(initial_state)
-            action.triggered.connect(lambda state, frame=frame: self.toggleViewTool(frame))
+            action.triggered.connect(
+                lambda state, frame=frame: self.toggleViewTool(frame)
+            )
             self.menuView.addAction(action)
 
         # Data menu
@@ -157,7 +179,7 @@ class MenuMixin:
         self.actionResetGroups.triggered.connect(self.triggerEditGroups)
         self.menuGroups.addAction(self.actionResetGroups)
 
-        # Export menu (triggers → ExportMixin in ui_export.py)
+        # Export menu (triggers → ExportMixin in export_data.py)
         # — Copy section —
         self.actionCopyProjectSummary = QtWidgets.QAction("Copy project summary")
         self.actionCopyProjectSummary.triggered.connect(self.triggerCopyProjectSummary)
@@ -190,7 +212,9 @@ class MenuMixin:
         self.menuExport.addSeparator()
 
         # — Image section —
-        for key, template in ui_output_image.JOURNAL_TEMPLATES.items():
+        for key, template in export_image.JOURNAL_TEMPLATES.items():
             action = QtWidgets.QAction(f"Groups to {template.name}", self.menuExport)
-            action.triggered.connect(lambda checked=False, k=key: self.triggerExportOutputImage(k))
+            action.triggered.connect(
+                lambda checked=False, k=key: self.triggerExportOutputImage(k)
+            )
             self.menuExport.addAction(action)
