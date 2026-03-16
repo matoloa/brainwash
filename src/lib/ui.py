@@ -4474,7 +4474,7 @@ class UIsub(
             dfmean = self.get_dfmean(row=prow)
             dict_t_stim = dft_single.iloc[0].to_dict()
             t_stim = dict_t_stim.get("t_stim", 0.0)
-            t_win_start = t_stim - dict_t_stim.get("t_volley_slope_width", 0.0003)
+            t_win_start = t_stim - 0.002
             t_win_end = dict_t_stim.get("t_EPSP_amp", t_stim + 0.01) + dict_t_stim.get(
                 "t_EPSP_amp_width",
                 2 * dict_t_stim.get("t_EPSP_amp_halfwidth", 0.001),
@@ -4675,7 +4675,7 @@ class UIsub(
         if len(dft_temp) > 1:
             dict_t_stim = dft_single.iloc[0].to_dict()
             t_stim = dict_t_stim.get("t_stim", 0.0)
-            t_win_start = t_stim - dict_t_stim.get("t_volley_slope_width", 0.0003)
+            t_win_start = t_stim - 0.002
             t_win_end = dict_t_stim.get("t_EPSP_amp", t_stim + 0.01) + dict_t_stim.get(
                 "t_EPSP_amp_width",
                 2 * dict_t_stim.get("t_EPSP_amp_halfwidth", 0.001),

@@ -645,7 +645,13 @@ def measure_waveform(df_snippet, dict_t: dict, filter: str = "voltage") -> dict:
     """
     result = {}
 
-    amp_zero = dict_t.get("amp_zero", 0.0)
+    t_stim = dict_t.get("t_stim", 0.0)
+    _pre_stim = df_snippet[
+        (df_snippet["time"] >= t_stim - 0.002) & (df_snippet["time"] < t_stim)
+    ]
+    amp_zero = _pre_stim[filter].mean()
+    if pd.isna(amp_zero):
+        amp_zero = dict_t.get("amp_zero", 0.0)
     norm_from = dict_t.get("norm_output_from", None)
     norm_to = dict_t.get("norm_output_to", None)
 
@@ -936,7 +942,7 @@ def build_dfoutput(
 
             # Window: from just before stim to just after EPSP region
             # Use t_EPSP_slope_end as a reasonable right boundary, with fallback
-            t_win_start = t_stim - dict_t.get("t_volley_slope_width", 0.0003)
+            t_win_start = t_stim - 0.002
             t_win_end = dict_t.get("t_EPSP_amp", t_stim + 0.01) + dict_t.get(
                 "t_EPSP_amp_width", 2 * dict_t.get("t_EPSP_amp_halfwidth", 0.001)
             )
@@ -1021,7 +1027,7 @@ def build_dfbinstimoutput(
             stim_nr = dict_t["stim"]
             t_stim = dict_t.get("t_stim", np.nan)
 
-            t_win_start = t_stim - dict_t.get("t_volley_slope_width", 0.0003)
+            t_win_start = t_stim - 0.002
             t_win_end = dict_t.get("t_EPSP_amp", t_stim + 0.01) + dict_t.get(
                 "t_EPSP_amp_width", 2 * dict_t.get("t_EPSP_amp_halfwidth", 0.001)
             )
