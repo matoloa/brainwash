@@ -1,7 +1,9 @@
+import json
 import math
 import os  # TODO: replace use by pathlib?
 import sys
 import tempfile
+import traceback
 from pathlib import Path
 
 import numpy as np
@@ -513,8 +515,6 @@ class ParseDataThread(QtCore.QThread):
                     )
                     self.rows.append(df_proj_new_row)
         except Exception as e:
-            import traceback
-
             logger.exception(
                 f"ParseDataThread.run: EXCEPTION: {e}\n{traceback.format_exc()}"
             )
@@ -578,8 +578,6 @@ class graphPreloadThread(QtCore.QThread):
                 self.i += 1
                 print(f"Preloaded {p_row['recording_name']}")
         except Exception as e:
-            import traceback
-
             logger.exception(
                 f"graphPreloadThread.run: EXCEPTION: {e}\n{traceback.format_exc()}"
             )
@@ -879,7 +877,6 @@ class UIsub(
             self.pushButton_stim_assign_threshold.setVisible(False)
             self.pushButton_stim_detect.setVisible(False)
             self.label_stim_detection_threshold.setVisible(False)
-            self.frameToolBin.setVisible(False)
             self.pushButton_norm_range_set_all.setVisible(False)
 
         logger.debug("Pre-bootstrap")
@@ -1024,20 +1021,33 @@ class UIsub(
         # Populate filter settings
         if len(uistate.list_idx_select_recs) > 0:
             selected_df = df_p.loc[uistate.list_idx_select_recs]
+
+            # 1. Filter Mode (radio buttons)
             filters = selected_df["filter"].unique()
-            if len(filters) == 1:
-                f_mode = filters[0]
-                if pd.isna(f_mode) or f_mode is None or f_mode == "none":
+            # Treat NaN and 'none' as the same mode for uniformity checks
+            filter_modes = set()
+            for f in filters:
+                if pd.isna(f) or f == "none":
+                    filter_modes.add(None)
+                else:
+                    filter_modes.add(f)
+
+            if len(filter_modes) == 1:
+                f_mode = filter_modes.pop()
+                if f_mode is None:
                     uistate.settings["filter"] = None
                     self.radioButton_filter_none.setChecked(True)
-                    print("tableProjSelectionChanged: filter set to none")
                 elif f_mode == "savgol":
                     uistate.settings["filter"] = "savgol"
                     self.radioButton_filter_savgol.setChecked(True)
-                    print("tableProjSelectionChanged: filter set to savgol")
+            else:
+                uistate.settings["filter"] = None
+                self.buttonGroup_filter.setExclusive(False)
+                self.radioButton_filter_none.setChecked(False)
+                self.radioButton_filter_savgol.setChecked(False)
+                self.buttonGroup_filter.setExclusive(True)
 
-            import json
-
+            # 2. Filter Params (lineEdits)
             windows = set()
             polys = set()
             for params_str in selected_df["filter_params"]:
@@ -1047,32 +1057,32 @@ class UIsub(
                         if pd.notna(params_str) and params_str
                         else {}
                     )
-                    windows.add(
-                        params.get(
-                            "window_length", uistate.lineEdit.get("savgol_window", 9)
-                        )
-                    )
-                    polys.add(
-                        params.get("poly_order", uistate.lineEdit.get("savgol_poly", 3))
-                    )
+                    windows.add(int(params.get("window_length", 9)))
+                    polys.add(int(params.get("poly_order", 3)))
                 except Exception:
-                    pass
+                    windows.add(9)
+                    polys.add(3)
 
             if len(windows) == 1:
-                val = str(windows.pop())
-                uistate.lineEdit["savgol_window"] = int(val)
-                self.lineEdit_savgol_window.setText(val)
-                print(f"tableProjSelectionChanged: savgol_window set to {val}")
+                val = windows.pop()
+                uistate.lineEdit["savgol_window"] = val
+                self.lineEdit_savgol_window.setText(str(val))
             else:
                 self.lineEdit_savgol_window.setText("")
 
             if len(polys) == 1:
-                val = str(polys.pop())
-                uistate.lineEdit["savgol_poly"] = int(val)
-                self.lineEdit_savgol_poly.setText(val)
-                print(f"tableProjSelectionChanged: savgol_poly set to {val}")
+                val = polys.pop()
+                uistate.lineEdit["savgol_poly"] = val
+                self.lineEdit_savgol_poly.setText(str(val))
             else:
                 self.lineEdit_savgol_poly.setText("")
+        else:
+            self.buttonGroup_filter.setExclusive(False)
+            self.radioButton_filter_none.setChecked(False)
+            self.radioButton_filter_savgol.setChecked(False)
+            self.buttonGroup_filter.setExclusive(True)
+            self.lineEdit_savgol_window.setText("")
+            self.lineEdit_savgol_poly.setText("")
 
         self.connectUIstate()
 
@@ -1649,8 +1659,6 @@ class UIsub(
         if "filter_params" in df_p.columns and df_p["filter_params"].dtype != object:
             df_p["filter_params"] = df_p["filter_params"].astype(object)
         selected_idx = uistate.list_idx_select_recs
-
-        import json
 
         if len(selected_idx) > 0:
             for idx in selected_idx:

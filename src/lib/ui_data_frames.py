@@ -73,8 +73,6 @@ class DataFrameMixin:
             for group_ID in affected_group_IDs:
                 uiplot.unPlotGroup(group_ID)
 
-        import json
-
         for _, p_row in rows.iterrows():
             rec = p_row["recording_name"]
 
