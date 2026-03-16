@@ -25,8 +25,11 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+import pyarrow.parquet as pq
 import yaml
 from PyQt5 import QtCore, QtWidgets
+
+import lib.parse as parse
 
 # ---------------------------------------------------------------------------
 # Project DataFrame schema
@@ -425,10 +428,6 @@ class ProjectMixin:
         parquet contains enough timing information to derive it.  This runs
         once per project load and only touches recordings that need it.
         """
-        import pyarrow.parquet as pq
-
-        import lib.parse as parse
-
         df_p = self.df_project
         missing = df_p["sweep_hz"].isna()
         if not missing.any():

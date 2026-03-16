@@ -821,6 +821,7 @@ ui_sweep_ops.uistate = uistate
 ui_sweep_ops.config = config
 ui_sweep_ops.uiplot = uiplot
 ui_sweep_ops.confirm = confirm
+ui_sweep_ops.InputDialogPopup = InputDialogPopup
 
 ui_project.uistate = uistate
 ui_project.config = config
