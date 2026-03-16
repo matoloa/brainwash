@@ -146,7 +146,7 @@ class UIstate:
             "event_start": -0.005,  # in relation to current t_stim
             "event_end": 0.05,
             "precision": 4,  # TODO: fix hardcoded precision
-            "filter": None,  # filter to show in event graph; None uses 'voltage' column
+            "filter": "voltage",  # filter to show in event graph; default 'voltage' column
             # colors and alpha
             "rgb_EPSP_amp": (0.2, 0.2, 1),
             "rgb_EPSP_slope": (0.5, 0.5, 1),

@@ -823,8 +823,6 @@ class UIplot:
         rec_ID = p_row["ID"]
         rec_name = p_row["recording_name"]
         rec_filter = p_row["filter"]  # the filter currently used for this recording
-        if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
-            rec_filter = "voltage"
         n_stims = len(dft)
         if rec_filter != "voltage":
             label = f"{rec_name} ({rec_filter})"
@@ -1279,8 +1277,6 @@ class UIplot:
         norm = self.uistate.checkBox["norm_EPSP"]
         stim_offset = trow["t_stim"]
         rec_filter = prow.get("filter")
-        if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
-            rec_filter = "voltage"
         rec_name = prow["recording_name"]
         if rec_filter != "voltage":
             label_core = f"{rec_name} ({rec_filter}) - stim {trow['stim']} {aspect}"

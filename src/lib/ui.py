@@ -1027,21 +1027,21 @@ class UIsub(
             # Treat NaN and 'none' as the same mode for uniformity checks
             filter_modes = set()
             for f in filters:
-                if pd.isna(f) or f == "none":
-                    filter_modes.add(None)
+                if pd.isna(f) or f == "none" or f == "voltage":
+                    filter_modes.add("voltage")
                 else:
                     filter_modes.add(f)
 
             if len(filter_modes) == 1:
                 f_mode = filter_modes.pop()
-                if f_mode is None:
-                    uistate.settings["filter"] = None
+                if f_mode == "voltage":
+                    uistate.settings["filter"] = "voltage"
                     self.radioButton_filter_none.setChecked(True)
                 elif f_mode == "savgol":
                     uistate.settings["filter"] = "savgol"
                     self.radioButton_filter_savgol.setChecked(True)
             else:
-                uistate.settings["filter"] = None
+                uistate.settings["filter"] = "voltage"
                 self.buttonGroup_filter.setExclusive(False)
                 self.radioButton_filter_none.setChecked(False)
                 self.radioButton_filter_savgol.setChecked(False)
@@ -1627,7 +1627,7 @@ class UIsub(
     def filter_mode_changed(self, button):
         """Handler for buttonGroup_filter.buttonClicked signal."""
         mode_str = button.objectName().replace("radioButton_filter_", "")
-        mode = mode_str if mode_str != "none" else None
+        mode = mode_str if mode_str != "none" else "voltage"
 
         self.usage(f"filter_mode_changed → {mode}")
         uistate.settings["filter"] = mode
@@ -1640,6 +1640,7 @@ class UIsub(
         if len(selected_idx) > 0:
             for idx in selected_idx:
                 df_p.at[idx, "filter"] = mode
+            self.set_df_project(df_p)
             self.recalculate(selection=selected_idx)
             self.update_show()
 
@@ -1679,6 +1680,7 @@ class UIsub(
 
                 df_p.at[idx, "filter_params"] = json.dumps(params)
 
+            self.set_df_project(df_p)
             self.recalculate(selection=selected_idx)
             self.update_show()
 
@@ -3576,8 +3578,6 @@ class UIsub(
             uistate.dft_temp = self.get_dft(prow).copy()
             trow = uistate.dft_temp.loc[uistate.list_idx_select_stims[0]]
             rec_filter = prow["filter"]
-            if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
-                rec_filter = "voltage"
             rec_name = prow["recording_name"]
             if rec_filter != "voltage":
                 label_core = f"{rec_name} ({rec_filter})"
@@ -3687,8 +3687,6 @@ class UIsub(
             return
         rec_name = f"{prow['recording_name']}"
         rec_filter = prow["filter"]  # the filter currently used for this recording
-        if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
-            rec_filter = "voltage"
         if rec_filter != "voltage":
             label_core = f"{rec_name} ({rec_filter})"
         else:
@@ -3910,8 +3908,6 @@ class UIsub(
         p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
         df_t = self.get_dft(p_row)
         rec_filter = p_row["filter"]
-        if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
-            rec_filter = "voltage"
         settings = uistate.settings
 
         if uistate.x_axis == "stim":
@@ -4465,7 +4461,9 @@ class UIsub(
         dft_single = uistate.dft_temp.iloc[[stim_idx]].copy()
         dft_single.update(pd.DataFrame([dict_t]))
 
-        if uistate.x_axis == "stim":
+        rec_filter = prow.get("filter")
+
+        if uistate.x_axis == "stim" and len(uistate.df_rec_select_time) > 1:
             # In stim mode the output x-axis is stim-numbered.  The per-sweep
             # build_dfoutput result has sweep-space x-values which are meaningless
             # here.  Instead, re-measure dfmean around the stim window — exactly
@@ -4486,7 +4484,7 @@ class UIsub(
                 .reset_index(drop=True)
             )
             measured = analysis.measure_waveform(
-                snippet, dict_t_stim, filter=prow.get("filter", "voltage")
+                snippet, dict_t_stim, filter=rec_filter
             )
             stim_num = int(dict_t_stim["stim"])
             drag_x = np.array([stim_num])
@@ -4499,6 +4497,7 @@ class UIsub(
                 dfmean=self.get_dfmean(row=prow),
                 dft=dft_single,
                 quick=True,
+                filter=rec_filter,
             )
             # norm handling for EPSP
             if aspect in ["EPSP_amp", "EPSP_slope"]:
@@ -4637,10 +4636,16 @@ class UIsub(
         stim_num = trow_temp["stim"]
         dft_single = uistate.dft_temp.iloc[[stim_idx]].copy()
         dft_single.update(pd.DataFrame([dict_t_updates]))
+
+        rec_filter = prow.get("filter")
+        if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
+            rec_filter = "voltage"
+
         new_dfoutput = analysis.build_dfoutput(
             dffilter=dffilter,
             dfmean=dfmean,
             dft=dft_single,
+            filter=rec_filter,
         )
         # print(f"dfoutput: {dfoutput}")
         # update volley means
@@ -4721,9 +4726,7 @@ class UIsub(
         )
 
         def update_amp_marker(trow, aspect, prow, dfmean, dfoutput):
-            rec_filter = prow["filter"]
-            if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
-                rec_filter = "voltage"
+            rec_filter = prow.get("filter")
             if rec_filter != "voltage":
                 label_core = f"{rec_name} ({rec_filter})"
             else:
@@ -4734,10 +4737,7 @@ class UIsub(
             t_aspect = f"t_{column_name}"
             stim_offset = trow["t_stim"]
             x = trow[t_aspect] - stim_offset
-            rec_filter = prow["filter"]
-            if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
-                rec_filter = "voltage"
-            y = dfmean.loc[dfmean["time"] == trow[t_aspect], rec_filter].values[0]
+            y = dfmean.loc[(dfmean["time"] - trow[t_aspect]).abs().idxmin(), rec_filter]
             amp = (
                 dfoutput.loc[dfoutput["stim"] == trow["stim"]][column_name].mean()
                 / 1000
@@ -4747,7 +4747,40 @@ class UIsub(
                 t_amp - trow[f"{t_aspect}_halfwidth"],
                 t_amp + trow[f"{t_aspect}_halfwidth"],
             )
-            uiplot.updateAmpMarker(labelamp, x, y, amp_x, trow["amp_zero"], amp=amp)
+
+            _pre_stim = dfmean[
+                (dfmean["time"] >= stim_offset - 0.002) & (dfmean["time"] < stim_offset)
+            ]
+            amp_zero_plot = (
+                _pre_stim[rec_filter].mean()
+                if not _pre_stim.empty
+                else dfmean.loc[
+                    (dfmean["time"] - stim_offset).abs().idxmin(), rec_filter
+                ]
+            )
+            uiplot.updateAmpMarker(labelamp, x, y, amp_x, amp_zero_plot, amp=amp)
+            _pre_stim = dfmean[
+                (dfmean["time"] >= stim_offset - 0.002) & (dfmean["time"] < stim_offset)
+            ]
+            amp_zero_plot = (
+                _pre_stim[rec_filter].mean()
+                if not _pre_stim.empty
+                else dfmean.loc[
+                    (dfmean["time"] - stim_offset).abs().idxmin(), rec_filter
+                ]
+            )
+            uiplot.updateAmpMarker(labelamp, x, y, amp_x, amp_zero_plot, amp=amp)
+            _pre_stim = dfmean[
+                (dfmean["time"] >= stim_offset - 0.002) & (dfmean["time"] < stim_offset)
+            ]
+            amp_zero_plot = (
+                _pre_stim[rec_filter].mean()
+                if not _pre_stim.empty
+                else dfmean.loc[
+                    (dfmean["time"] - stim_offset).abs().idxmin(), rec_filter
+                ]
+            )
+            uiplot.updateAmpMarker(labelamp, x, y, amp_x, amp_zero_plot, amp=amp)
 
         if aspect in ["EPSP amp", "volley amp"]:
             # print(f" - {aspect} updated")

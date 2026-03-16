@@ -404,6 +404,14 @@ class ProjectMixin:
                 object
             )
 
+        # Ensure filter column defaults to "voltage" instead of NaN, None, or "none"
+        if "filter" in self.df_project.columns:
+            self.df_project["filter"] = self.df_project["filter"].fillna("voltage")
+            self.df_project.loc[self.df_project["filter"] == "none", "filter"] = (
+                "voltage"
+            )
+            self.df_project.loc[self.df_project["filter"] == "", "filter"] = "voltage"
+
         self._backfill_sweep_hz()
         uistate.load_cfg(self.dict_folders["project"], config.version)
         self.tableFormat()
