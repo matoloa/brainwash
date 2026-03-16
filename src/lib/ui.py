@@ -4717,6 +4717,22 @@ class UIsub(
             )
             self.mouseoverUpdate()
             return
+
+        if aspect not in ["EPSP amp", "EPSP slope", "volley amp", "volley slope"]:
+            self.mouseoverUpdate()
+            return
+
+        stim_offset = trow["t_stim"]
+        rec_filter = prow.get("filter", "voltage")
+        _pre_stim = dfmean[
+            (dfmean["time"] >= stim_offset - 0.002) & (dfmean["time"] < stim_offset)
+        ]
+        amp_zero_plot = (
+            _pre_stim[rec_filter].mean()
+            if not _pre_stim.empty
+            else dfmean.loc[(dfmean["time"] - stim_offset).abs().idxmin(), rec_filter]
+        )
+
         uiplot.update(
             prow=prow,
             trow=trow,
@@ -4724,10 +4740,11 @@ class UIsub(
             data_x=data_x,
             data_y=data_y,
             dfoutput=dfoutput,
+            amp_zero_plot=amp_zero_plot,
         )
 
         def update_amp_marker(trow, aspect, prow, dfmean, dfoutput):
-            rec_filter = prow.get("filter")
+            rec_filter = prow.get("filter", "voltage")
             if rec_filter != "voltage":
                 label_core = f"{rec_name} ({rec_filter})"
             else:
@@ -4749,28 +4766,6 @@ class UIsub(
                 t_amp + trow[f"{t_aspect}_halfwidth"],
             )
 
-            _pre_stim = dfmean[
-                (dfmean["time"] >= stim_offset - 0.002) & (dfmean["time"] < stim_offset)
-            ]
-            amp_zero_plot = (
-                _pre_stim[rec_filter].mean()
-                if not _pre_stim.empty
-                else dfmean.loc[
-                    (dfmean["time"] - stim_offset).abs().idxmin(), rec_filter
-                ]
-            )
-            uiplot.updateAmpMarker(labelamp, x, y, amp_x, amp_zero_plot, amp=amp)
-            _pre_stim = dfmean[
-                (dfmean["time"] >= stim_offset - 0.002) & (dfmean["time"] < stim_offset)
-            ]
-            amp_zero_plot = (
-                _pre_stim[rec_filter].mean()
-                if not _pre_stim.empty
-                else dfmean.loc[
-                    (dfmean["time"] - stim_offset).abs().idxmin(), rec_filter
-                ]
-            )
-            uiplot.updateAmpMarker(labelamp, x, y, amp_x, amp_zero_plot, amp=amp)
             _pre_stim = dfmean[
                 (dfmean["time"] >= stim_offset - 0.002) & (dfmean["time"] < stim_offset)
             ]

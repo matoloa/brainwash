@@ -120,9 +120,21 @@ def addFilterSavgol(df, window_length: int = 9, poly_order: int = 3) -> pd.Serie
     """
     Compute a Savitzky-Golay smoothed column from df['voltage'] and return it.
     """
-    df["savgol"] = savgol_filter(
-        df.voltage, window_length=window_length, polyorder=poly_order
-    )
+    wl_target = window_length if window_length % 2 == 1 else window_length + 1
+
+    def _apply_savgol(x):
+        n = len(x)
+        if n <= poly_order:
+            return x
+        wl = min(wl_target, n if n % 2 == 1 else n - 1)
+        if wl <= poly_order:
+            return x
+        return savgol_filter(x, window_length=wl, polyorder=poly_order)
+
+    if "sweep" in df.columns:
+        df["savgol"] = df.groupby("sweep")["voltage"].transform(_apply_savgol)
+    else:
+        df["savgol"] = _apply_savgol(df["voltage"])
     return df["savgol"]
 
 
@@ -212,9 +224,7 @@ def find_timepoints(
                                       ('t_volley_slope_width',
                                        't_EPSP_slope_width').
         filter:                       Voltage column name; must match the
-                                      column displayed in axe so that
-                                      amp_zero aligns with the plotted
-                                      waveform.
+                                      column displayed in axe.
         stim_amp:                     Minimum artefact amplitude for stim
                                       detection (V).
         volley_slope_n_points:        Number of consecutive samples in the
@@ -299,8 +309,8 @@ def find_timepoints(
         else float(times[0])
     )
 
-    # amp_zero placeholder (pre-stim baseline in volts)
-    amp_zero = float(baseline)
+    # amp_zero placeholder (pre-stim baseline in raw volts)
+    amp_zero = float(np.mean(df_snippet["voltage"].values[:baseline_end]))
 
     # ------------------------------------------------------------------
     # 2. Volley (M-shape)
@@ -540,8 +550,7 @@ def find_events(
         default_dict_t:               Default timepoint dict; width keys are
                                       forwarded to find_timepoints.
         filter:                       Voltage column name; forwarded to
-                                      find_timepoints so amp_zero is computed
-                                      from the same column shown in axe.
+                                      find_timepoints.
         i_stims:                      Pre-computed stim indices; auto-detected
                                       from 'prim' if None.
         stim_amp:                     Forwarded to find_timepoints.
@@ -555,8 +564,8 @@ def find_events(
 
     Note:
         find_i_stims still uses 'prim' for stim detection (unaffected by
-        filter).  Only the amp_zero baseline computation inside
-        find_timepoints uses <filter>.
+        filter).  The amp_zero baseline computation inside
+        find_timepoints always uses raw 'voltage'.
 
     Returns:
         DataFrame with one row per stim, columns matching default_dict_t plus
@@ -649,7 +658,7 @@ def measure_waveform(df_snippet, dict_t: dict, filter: str = "voltage") -> dict:
     _pre_stim = df_snippet[
         (df_snippet["time"] >= t_stim - 0.002) & (df_snippet["time"] < t_stim)
     ]
-    amp_zero = _pre_stim[filter].mean()
+    amp_zero = _pre_stim["voltage"].mean()
     if pd.isna(amp_zero):
         amp_zero = dict_t.get("amp_zero", 0.0)
     norm_from = dict_t.get("norm_output_from", None)
@@ -763,7 +772,7 @@ def _measure_amp_at_time_per_sweep(
 
 def _compute_amp_zero_per_sweep(dffilter, t_stim: float, filter: str) -> pd.Series:
     """
-    Compute per-sweep amp_zero as the mean of <filter> in the 2 ms window
+    Compute per-sweep amp_zero as the mean of raw voltage in the 2 ms window
     immediately before t_stim for each sweep.
 
     Returns a Series indexed by sweep value.  Falls back to 0.0 for any sweep
@@ -772,7 +781,7 @@ def _compute_amp_zero_per_sweep(dffilter, t_stim: float, filter: str) -> pd.Seri
     t_start = t_stim - _AMP_ZERO_WINDOW
     t_end = t_stim
     pre_stim = dffilter[(dffilter["time"] >= t_start) & (dffilter["time"] < t_end)]
-    per_sweep = pre_stim.groupby("sweep")[filter].mean()
+    per_sweep = pre_stim.groupby("sweep")["voltage"].mean()
     # Fill missing sweeps with 0.0 so downstream arithmetic never sees NaN
     all_sweeps = pd.Series(dffilter["sweep"].unique())
     result = per_sweep.reindex(all_sweeps.values).fillna(0.0)
@@ -827,7 +836,7 @@ def build_dfoutput(
         sweeps = dffilter["sweep"].unique()
         dfblock = pd.DataFrame({"sweep": sweeps, "stim": stim_nr})
 
-        # Per-sweep amp_zero: mean of dffilter[filter] in the 2 ms before t_stim.
+        # Per-sweep amp_zero: mean of raw voltage in the 2 ms before t_stim.
         # Indexed by sweep value in the same order as dfblock["sweep"].
         amp_zero_per_sweep = _compute_amp_zero_per_sweep(dffilter, t_stim, filter)
 

@@ -865,8 +865,8 @@ class UIplot:
                 _t_idx, rec_filter
             ]  # nearest-time lookup (float-safe)
             # amp_zero_plot: mean of rec_filter in the 2 ms before t_stim on dfmean.
-            # Used only for visual positioning on axe; must match the plotted column
-            # and the local baseline, not the dft scalar (which was always 0 in v2).
+            # Used for visual positioning on axe; matches the plotted local baseline.
+
             _pre_stim = dfmean[
                 (dfmean["time"] >= t_stim - 0.002) & (dfmean["time"] < t_stim)
             ]
@@ -1214,7 +1214,17 @@ class UIplot:
         if df_groupmean["EPSP_slope_mean"].notna().any():
             self.plot_group_lines("ax2", group_ID, dict_group, df_groupmean)
 
-    def update(self, prow, trow, aspect, data_x, data_y, amp=None, dfoutput=None):
+    def update(
+        self,
+        prow,
+        trow,
+        aspect,
+        data_x,
+        data_y,
+        amp=None,
+        dfoutput=None,
+        amp_zero_plot=None,
+    ):
         """
         Updates the existing plotted artists stored in `self.uistate.dict_rec_labels`.
         Parameters
@@ -1311,12 +1321,13 @@ class UIplot:
             # data_x is already shifted so t_stim = 0, data_y is raw voltage.
             # This matches exactly what axe displays, regardless of filter column
             # or DC offset — and is consistent with addRow's amp_zero_plot.
-            pre_stim_mask = data_x < 0
-            amp_zero_plot = (
-                float(data_y[pre_stim_mask].mean())
-                if pre_stim_mask.any()
-                else float(data_y[0])
-            )
+            if amp_zero_plot is None:
+                pre_stim_mask = (data_x >= -0.002) & (data_x < 0)
+                amp_zero_plot = (
+                    float(data_y[pre_stim_mask].mean())
+                    if pre_stim_mask.any()
+                    else y_position
+                )
             self.updateAmpMarker(
                 label_core, t_amp, y_position, amp_x, amp_zero_plot, amp=amp
             )
