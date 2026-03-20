@@ -212,9 +212,64 @@ class MenuMixin:
         self.menuExport.addSeparator()
 
         # — Image section —
+        self.actionExportToHeader = QtWidgets.QAction(
+            "   — Export to... —", self.menuExport
+        )
+        self.menuExport.addAction(self.actionExportToHeader)
+
+        self.journalActionGroup = QtWidgets.QActionGroup(self.menuExport)
+        self.journalActionGroup.setExclusive(True)
+
+        journals = {}
         for key, template in export_image.JOURNAL_TEMPLATES.items():
-            action = QtWidgets.QAction(f"Groups to {template.name}", self.menuExport)
-            action.triggered.connect(
-                lambda checked=False, k=key: self.triggerExportOutputImage(k)
-            )
+            if "_" in key:
+                j_key = key.split("_")[0]
+                if j_key not in journals:
+                    j_name = template.name.split(" (")[0]
+                    if j_key == "jneurosci":
+                        j_name = "Neuroscience"
+                    journals[j_key] = j_name
+
+        for j_key, j_name in journals.items():
+            action = QtWidgets.QAction(f"   {j_name}", self.menuExport)
+            action.setCheckable(True)
+            action.setData(j_key)
+            if uistate.settings.get("journal_export", "jneurosci") == j_key:
+                action.setChecked(True)
+            action.triggered.connect(lambda checked, k=j_key: self.setJournalExport(k))
+            self.journalActionGroup.addAction(action)
             self.menuExport.addAction(action)
+
+        self.menuExport.addSeparator()
+
+        self.actionExport1Col = QtWidgets.QAction(
+            "Groups to 1 column image", self.menuExport
+        )
+        self.actionExport1Col.triggered.connect(self.triggerExport1Col)
+        self.menuExport.addAction(self.actionExport1Col)
+
+        self.actionExport2Col = QtWidgets.QAction(
+            "Groups to 2 column image", self.menuExport
+        )
+        self.actionExport2Col.triggered.connect(self.triggerExport2Col)
+        self.menuExport.addAction(self.actionExport2Col)
+
+    def syncJournalExportMenu(self):
+        journal = uistate.settings.get("journal_export", "jneurosci")
+        for action in self.journalActionGroup.actions():
+            if action.data() == journal:
+                action.setChecked(True)
+                break
+
+    def setJournalExport(self, journal_key):
+        uistate.settings["journal_export"] = journal_key
+        if hasattr(self, "dict_folders") and "project" in self.dict_folders:
+            uistate.save_cfg(projectfolder=self.dict_folders["project"])
+
+    def triggerExport1Col(self, checked=False):
+        journal = uistate.settings.get("journal_export", "jneurosci")
+        self.triggerExportOutputImage(f"{journal}_1col")
+
+    def triggerExport2Col(self, checked=False):
+        journal = uistate.settings.get("journal_export", "jneurosci")
+        self.triggerExportOutputImage(f"{journal}_2col")

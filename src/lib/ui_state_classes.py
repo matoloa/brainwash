@@ -154,6 +154,7 @@ class UIstate:
             "rgb_volley_slope": (1, 0.5, 1),
             "alpha_mark": 0.4,
             "alpha_line": 1,
+            "journal_export": "jneurosci",
         }
         self.zoom = {
             "mean_xlim": (0, 1),
@@ -596,7 +597,11 @@ class UIstate:
         self.lineEdit = {
             k: v for k, v in loaded_line_edits.items() if k in valid_line_edits
         }
-        self.settings = state.get("settings")
+        valid_settings = self.settings.copy()  # from reset()
+        loaded_settings = state.get("settings") or {}
+        self.settings = {
+            k: loaded_settings.get(k, valid_settings[k]) for k in valid_settings
+        }
         # Rebuild zoom defensively: start from known-good defaults, overlay any
         # persisted values that are type-compatible, and silently discard
         # stale/corrupt entries (e.g. strings stored by older versions).

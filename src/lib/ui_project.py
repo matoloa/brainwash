@@ -386,6 +386,7 @@ class ProjectMixin:
         self.resetCacheDicts()  # clear internal caches
         path_projectfolder = Path(str_projectfolder)
         self.projectname = str(path_projectfolder.stem)
+        self.projects_folder = path_projectfolder.parent
         print(f"load_df_project: {self.projectname}")
         self.dict_folders = self.build_dict_folders()
         self.df_project = pd.read_csv(
@@ -417,6 +418,7 @@ class ProjectMixin:
 
         self._backfill_sweep_hz()
         uistate.load_cfg(self.dict_folders["project"], config.version)
+        self.syncJournalExportMenu()
         self.tableFormat()
         self.write_bw_cfg()
 

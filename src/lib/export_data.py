@@ -185,6 +185,15 @@ class ExportMixin:
             uistate, uiplot, template, selected_groups, group_names
         )
 
+        if not figures:
+            QtWidgets.QMessageBox.warning(
+                None,
+                "Export Error",
+                "No valid data available to render for the selected template.\n"
+                "Ensure that group means for amplitude or slope are visible.",
+            )
+            return
+
         export_dir = self.projects_folder / "Export"
         export_dir.mkdir(parents=True, exist_ok=True)
 
