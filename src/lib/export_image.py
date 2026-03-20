@@ -210,3 +210,59 @@ def render_publication_figure(
                 figures[panel_key] = fig
 
     return figures
+
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    class MockUIState:
+        def __init__(self):
+            self.checkBox = {"norm_EPSP": False}
+            self.settings = {
+                "rgb_EPSP_amp": (0, 0, 1),
+                "rgb_EPSP_slope": (1, 0, 0),
+            }
+            self.dict_group_labels = {}
+            self.dict_group_show = {}
+
+        def x_axis_xlabel(self):
+            return "Time (s)"
+
+    mock_uistate = MockUIState()
+
+    fig, ax = plt.subplots()
+    x = [1, 2, 3]
+    y = [2, 3, 4]
+    yerr = [0.1, 0.2, 0.1]
+    (line,) = ax.plot(x, y)
+    fill = ax.fill_between(
+        x,
+        [yi - ye for yi, ye in zip(y, yerr)],
+        [yi + ye for yi, ye in zip(y, yerr)],
+    )
+
+    mock_uistate.dict_group_labels["Group 1 EPSP amp mean"] = {
+        "group_ID": 1,
+        "axis": "ax1",
+        "line": line,
+        "fill": fill,
+    }
+    mock_uistate.dict_group_show["Group 1 EPSP amp mean"] = (
+        mock_uistate.dict_group_labels["Group 1 EPSP amp mean"]
+    )
+
+    template = JOURNAL_TEMPLATES["jneurosci_1col"]
+    try:
+        figures = render_publication_figure(mock_uistate, None, template, ["1"])
+        print(f"Success! Returned figures: {list(figures.keys())}")
+
+        from pathlib import Path
+
+        export_dir = Path.home() / "Documents" / "Brainwash Projects" / "Export"
+        export_dir.mkdir(exist_ok=True)
+        for name, fig in figures.items():
+            out_path = export_dir / f"test_jneurosci_1col_{name}.png"
+            fig.savefig(out_path, dpi=template.dpi, bbox_inches="tight")
+            print(f"Saved {out_path}")
+    except Exception as e:
+        print(f"Error: {e}")
