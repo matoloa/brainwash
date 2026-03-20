@@ -868,7 +868,7 @@ class UIplot:
             # Used for visual positioning on axe; matches the plotted local baseline.
 
             _pre_stim = dfmean[
-                (dfmean["time"] >= t_stim - 0.002) & (dfmean["time"] < t_stim)
+                (dfmean["time"] >= t_stim - 0.002) & (dfmean["time"] < t_stim - 0.001)
             ]
             amp_zero_plot = (
                 _pre_stim[rec_filter].mean()
@@ -1322,7 +1322,7 @@ class UIplot:
             # This matches exactly what axe displays, regardless of filter column
             # or DC offset — and is consistent with addRow's amp_zero_plot.
             if amp_zero_plot is None:
-                pre_stim_mask = (data_x >= -0.002) & (data_x < 0)
+                pre_stim_mask = (data_x >= -0.002) & (data_x < -0.001)
                 amp_zero_plot = (
                     float(data_y[pre_stim_mask].mean())
                     if pre_stim_mask.any()

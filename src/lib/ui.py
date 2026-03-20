@@ -4725,7 +4725,8 @@ class UIsub(
         stim_offset = trow["t_stim"]
         rec_filter = prow.get("filter", "voltage")
         _pre_stim = dfmean[
-            (dfmean["time"] >= stim_offset - 0.002) & (dfmean["time"] < stim_offset)
+            (dfmean["time"] >= stim_offset - 0.002)
+            & (dfmean["time"] < stim_offset - 0.001)
         ]
         amp_zero_plot = (
             _pre_stim[rec_filter].mean()
@@ -4767,7 +4768,8 @@ class UIsub(
             )
 
             _pre_stim = dfmean[
-                (dfmean["time"] >= stim_offset - 0.002) & (dfmean["time"] < stim_offset)
+                (dfmean["time"] >= stim_offset - 0.002)
+                & (dfmean["time"] < stim_offset - 0.001)
             ]
             amp_zero_plot = (
                 _pre_stim[rec_filter].mean()
