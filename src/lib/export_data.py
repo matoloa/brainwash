@@ -95,11 +95,7 @@ class ExportMixin:
             df_data = self.get_dfdata(p_row)
             if df_data is not None and not df_data.empty:
                 out_path = export_dir / f"{rec_name}_sweeps.csv"
-                cols_to_export = [
-                    c
-                    for c in ["sweep", "time", "voltage_raw", "t0", "datetime"]
-                    if c in df_data.columns
-                ]
+                cols_to_export = [c for c in ["sweep", "time", "voltage_raw", "t0", "datetime"] if c in df_data.columns]
                 df_export = df_data[cols_to_export] if cols_to_export else df_data
                 df_export.to_csv(out_path, index=False)
                 count += 1
@@ -155,9 +151,7 @@ class ExportMixin:
 
         self.usage(f"triggerExportOutputImage: {template_key}")
 
-        selected_groups = list(
-            set(str(info["group_ID"]) for info in uistate.dict_group_show.values())
-        )
+        selected_groups = list(set(str(info["group_ID"]) for info in uistate.dict_group_show.values()))
 
         if not selected_groups:
             QtWidgets.QMessageBox.warning(
@@ -176,21 +170,15 @@ class ExportMixin:
             )
             return
 
-        group_names = {
-            str(gid): ginfo.get("group_name", str(gid))
-            for gid, ginfo in getattr(self, "dd_groups", {}).items()
-        }
+        group_names = {str(gid): ginfo.get("group_name", str(gid)) for gid, ginfo in getattr(self, "dd_groups", {}).items()}
 
-        figures = export_image.render_publication_figure(
-            uistate, uiplot, template, selected_groups, group_names
-        )
+        figures = export_image.render_publication_figure(uistate, uiplot, template, selected_groups, group_names)
 
         if not figures:
             QtWidgets.QMessageBox.warning(
                 None,
                 "Export Error",
-                "No valid data available to render for the selected template.\n"
-                "Ensure that group means for amplitude or slope are visible.",
+                "No valid data available to render for the selected template.\n" "Ensure that group means for amplitude or slope are visible.",
             )
             return
 
@@ -198,12 +186,8 @@ class ExportMixin:
         export_dir.mkdir(parents=True, exist_ok=True)
 
         for panel_name, fig in figures.items():
-            out_path_png = (
-                export_dir / f"{self.projectname}_{template_key}_{panel_name}.png"
-            )
+            out_path_png = export_dir / f"{self.projectname}_{template_key}_{panel_name}.png"
             print(f"Saved image: {out_path_png}")
             fig.savefig(out_path_png, dpi=template.dpi, bbox_inches="tight")
 
-        self._export_status(
-            f"Exported {len(figures)} {template.name} figures to {export_dir}"
-        )
+        self._export_status(f"Exported {len(figures)} {template.name} figures to {export_dir}")

@@ -63,13 +63,7 @@ class DataFrameMixin:
         else:
             for _, p_row in rows.iterrows():
                 uiplot.unPlot(p_row["ID"])
-            affected_group_IDs = list(
-                {
-                    g
-                    for _, p_row in rows.iterrows()
-                    for g in self.get_groupsOfRec(p_row["ID"])
-                }
-            )
+            affected_group_IDs = list({g for _, p_row in rows.iterrows() for g in self.get_groupsOfRec(p_row["ID"])})
             for group_ID in affected_group_IDs:
                 uiplot.unPlotGroup(group_ID)
 
@@ -79,33 +73,23 @@ class DataFrameMixin:
             if p_row["filter"] == "savgol":
                 try:
                     params_str = p_row["filter_params"]
-                    params = (
-                        json.loads(params_str)
-                        if pd.notna(params_str) and params_str
-                        else {}
-                    )
+                    params = json.loads(params_str) if pd.notna(params_str) and params_str else {}
                 except Exception:
                     params = {}
                 wl = int(params.get("window_length", 9))
                 po = int(params.get("poly_order", 3))
 
                 df_mean = self.get_dfmean(p_row)
-                df_mean["savgol"] = analysis.addFilterSavgol(
-                    df_mean, window_length=wl, poly_order=po
-                )
+                df_mean["savgol"] = analysis.addFilterSavgol(df_mean, window_length=wl, poly_order=po)
                 self.df2file(df=df_mean, rec=rec, key="mean")
 
                 df_filter = self.get_dffilter(p_row)
-                df_filter["savgol"] = analysis.addFilterSavgol(
-                    df_filter, window_length=wl, poly_order=po
-                )
+                df_filter["savgol"] = analysis.addFilterSavgol(df_filter, window_length=wl, poly_order=po)
                 self.df2file(df=df_filter, rec=rec, key="filter")
 
                 if pd.notna(p_row["bin_size"]):
                     df_bin = self.get_dfbin(p_row)
-                    df_bin["savgol"] = analysis.addFilterSavgol(
-                        df_bin, window_length=wl, poly_order=po
-                    )
+                    df_bin["savgol"] = analysis.addFilterSavgol(df_bin, window_length=wl, poly_order=po)
                     self.df2file(df=df_bin, rec=rec, key="bin")
 
             df_t = self.get_dft(p_row)
@@ -153,9 +137,7 @@ class DataFrameMixin:
         if recording_name in self.dict_means:  # 1: Return cached
             dfmean = self.dict_means[recording_name]
         else:
-            str_mean_path = (
-                f"{self.dict_folders['cache']}/{recording_name}_mean.parquet"
-            )
+            str_mean_path = f"{self.dict_folders['cache']}/{recording_name}_mean.parquet"
             if Path(str_mean_path).exists():  # 2: Read from file
                 dfmean = pd.read_parquet(str_mean_path)
             else:  # 3: Create file
@@ -172,18 +154,12 @@ class DataFrameMixin:
             if "savgol" not in dfmean.columns:
                 try:
                     params_str = row["filter_params"]
-                    params = (
-                        json.loads(params_str)
-                        if pd.notna(params_str) and params_str
-                        else {}
-                    )
+                    params = json.loads(params_str) if pd.notna(params_str) and params_str else {}
                 except Exception:
                     params = {}
                 window_length = int(params.get("window_length", 9))
                 poly_order = int(params.get("poly_order", 3))
-                dfmean["savgol"] = analysis.addFilterSavgol(
-                    df=dfmean, window_length=window_length, poly_order=poly_order
-                )
+                dfmean["savgol"] = analysis.addFilterSavgol(df=dfmean, window_length=window_length, poly_order=poly_order)
                 persist = True
         if persist:
             self.df2file(df=dfmean, rec=recording_name, key="mean")
@@ -213,9 +189,7 @@ class DataFrameMixin:
                     },
                     inplace=True,
                 )
-                self.df2file(
-                    df=dft, rec=rec, key="timepoints"
-                )  # re-persist with corrected names
+                self.df2file(df=dft, rec=rec, key="timepoints")  # re-persist with corrected names
             for col in dft.columns:
                 if col != "stim" and dft[col].dtype in ["int64", "int32", "float32"]:
                     dft[col] = dft[col].astype("float64")
@@ -279,9 +253,7 @@ class DataFrameMixin:
             if "index" in dfoutput.columns:
                 dfoutput.drop(columns=["index"], inplace=True)
                 dfoutput.reset_index(drop=True, inplace=True)
-                self.df2file(
-                    df=dfoutput, rec=rec, key=cache_key
-                )  # re-persist clean version
+                self.df2file(df=dfoutput, rec=rec, key=cache_key)  # re-persist clean version
             else:
                 dfoutput.reset_index(drop=True, inplace=True)
         else:  # 3: Create from scratch and persist
@@ -294,11 +266,7 @@ class DataFrameMixin:
             else:
                 dfinput = self.get_dffilter(row)
             filter_val = row.get("filter")
-            filter_col = (
-                filter_val
-                if pd.notna(filter_val) and filter_val and filter_val != "none"
-                else "voltage"
-            )
+            filter_col = filter_val if pd.notna(filter_val) and filter_val and filter_val != "none" else "voltage"
             dfoutput = analysis.build_dfoutput(
                 dffilter=dfinput,
                 dfmean=dfmean,
@@ -308,9 +276,7 @@ class DataFrameMixin:
             # Back-fill volley means into dft from the sweep-mode rows
             for i, t_row in dft.iterrows():
                 stim_nr = t_row["stim"]
-                sweep_rows = dfoutput[
-                    (dfoutput["stim"] == stim_nr) & dfoutput["sweep"].notna()
-                ]
+                sweep_rows = dfoutput[(dfoutput["stim"] == stim_nr) & dfoutput["sweep"].notna()]
                 dft.at[i, "volley_amp_mean"] = sweep_rows["volley_amp"].mean()
                 dft.at[i, "volley_slope_mean"] = sweep_rows["volley_slope"].mean()
             self.set_dft(rec, dft)
@@ -351,9 +317,7 @@ class DataFrameMixin:
         if recording_name in self.dict_filters:  # 1: Return cached
             dffilter = self.dict_filters[recording_name]
         else:
-            path_filter = Path(
-                f"{self.dict_folders['cache']}/{recording_name}_filter.parquet"
-            )
+            path_filter = Path(f"{self.dict_folders['cache']}/{recording_name}_filter.parquet")
             if Path(path_filter).exists():  # 2: Read from file
                 dffilter = pd.read_parquet(path_filter)
             else:  # 3: Create file
@@ -362,27 +326,19 @@ class DataFrameMixin:
                 if gain != 1.0:
                     dfdata = dfdata.copy()
                     dfdata["voltage_raw"] = dfdata["voltage_raw"] * gain
-                dffilter = parse.zeroSweeps(
-                    dfdata=dfdata, dfmean=self.get_dfmean(row=row)
-                )
+                dffilter = parse.zeroSweeps(dfdata=dfdata, dfmean=self.get_dfmean(row=row))
                 persist = True
 
         if row["filter"] == "savgol":
             if "savgol" not in dffilter.columns:
                 try:
                     params_str = row["filter_params"]
-                    params = (
-                        json.loads(params_str)
-                        if pd.notna(params_str) and params_str
-                        else {}
-                    )
+                    params = json.loads(params_str) if pd.notna(params_str) and params_str else {}
                 except Exception:
                     params = {}
                 window_length = int(params.get("window_length", 9))
                 poly_order = int(params.get("poly_order", 3))
-                dffilter["savgol"] = analysis.addFilterSavgol(
-                    df=dffilter, window_length=window_length, poly_order=poly_order
-                )
+                dffilter["savgol"] = analysis.addFilterSavgol(df=dffilter, window_length=window_length, poly_order=poly_order)
                 persist = True
 
         if persist:
@@ -400,10 +356,7 @@ class DataFrameMixin:
         # returns an internal df_bin for the selected recording_name. If it does not exist, read it from file first.
         rec = p_row["recording_name"]
         if pd.isna(p_row["bin_size"]):
-            raise ValueError(
-                f"get_dfbin called for '{rec}' but bin_size is NaN — "
-                "callers must not reach get_dfbin when binning is off."
-            )
+            raise ValueError(f"get_dfbin called for '{rec}' but bin_size is NaN — " "callers must not reach get_dfbin when binning is off.")
         persist = False
 
         if rec in self.dict_bins:
@@ -421,48 +374,29 @@ class DataFrameMixin:
                 for bin_num in range(num_bins):
                     sweep_start = bin_num * bin_size
                     sweep_end = sweep_start + bin_size
-                    df_bin = df_filter[
-                        (df_filter["sweep"] >= sweep_start)
-                        & (df_filter["sweep"] < sweep_end)
-                    ]
+                    df_bin = df_filter[(df_filter["sweep"] >= sweep_start) & (df_filter["sweep"] < sweep_end)]
                     if df_bin.empty:
                         continue
-                    agg_funcs = {
-                        col: "mean"
-                        for col in df_bin.columns
-                        if col not in ["sweep", "time"]
-                    }
-                    agg_funcs["time"] = (
-                        "first"  # Keep the first time value as representative
-                    )
-                    df_bin_grouped = df_bin.groupby("time", as_index=False).agg(
-                        agg_funcs
-                    )
+                    agg_funcs = {col: "mean" for col in df_bin.columns if col not in ["sweep", "time"]}
+                    agg_funcs["time"] = "first"  # Keep the first time value as representative
+                    df_bin_grouped = df_bin.groupby("time", as_index=False).agg(agg_funcs)
                     # Assign the bin number as the new sweep value
                     df_bin_grouped["sweep"] = bin_num
                     binned_data.append(df_bin_grouped)
                 df_bins = pd.concat(binned_data, ignore_index=True)
                 persist = True
-                print(
-                    f"recalculate: {rec}, binned {df_filter['sweep'].nunique()} sweeps into {len(df_bins['sweep'].unique())} bins"
-                )
+                print(f"recalculate: {rec}, binned {df_filter['sweep'].nunique()} sweeps into {len(df_bins['sweep'].unique())} bins")
 
         if p_row["filter"] == "savgol":
             if "savgol" not in df_bins.columns:
                 try:
                     params_str = p_row["filter_params"]
-                    params = (
-                        json.loads(params_str)
-                        if pd.notna(params_str) and params_str
-                        else {}
-                    )
+                    params = json.loads(params_str) if pd.notna(params_str) and params_str else {}
                 except Exception:
                     params = {}
                 window_length = int(params.get("window_length", 9))
                 poly_order = int(params.get("poly_order", 3))
-                df_bins["savgol"] = analysis.addFilterSavgol(
-                    df=df_bins, window_length=window_length, poly_order=poly_order
-                )
+                df_bins["savgol"] = analysis.addFilterSavgol(df=df_bins, window_length=window_length, poly_order=poly_order)
                 persist = True
 
         if persist:
@@ -481,17 +415,13 @@ class DataFrameMixin:
         # TODO: check if row has a paired recording
         # Otherwise, find the paired recording
         rec_paired = None
-        key_pair = rec_select[
-            :-2
-        ]  # remove stim id ("_a" or "_b") from selected recording_name
+        key_pair = rec_select[:-2]  # remove stim id ("_a" or "_b") from selected recording_name
         # 1: check for cached diff
         if key_pair in self.dict_diffs:
             return self.dict_diffs[key_pair]
         # 2: check for file
         if Path(f"{self.dict_folders['cache']}/{key_pair}_diff.parquet").exists():
-            dfdiff = pd.read_parquet(
-                f"{self.dict_folders['cache']}/{key_pair}_diff.parquet"
-            )
+            dfdiff = pd.read_parquet(f"{self.dict_folders['cache']}/{key_pair}_diff.parquet")
             self.dict_diffs[key_pair] = dfdiff
             return dfdiff
         # 3: build a new diff
@@ -501,14 +431,9 @@ class DataFrameMixin:
             if row["paired_recording"] in dfp["recording_name"].values:
                 rec_paired = row["paired_recording"]
         # 3.2: if not, find a recording with a matching name
-        if (
-            rec_paired is None
-        ):  # set rec_paired to the first recording_name that starts with rec_paired, but isn't rec_select
+        if rec_paired is None:  # set rec_paired to the first recording_name that starts with rec_paired, but isn't rec_select
             for i, row_check in dfp.iterrows():
-                if (
-                    row_check["recording_name"].startswith(key_pair)
-                    and row_check["recording_name"] != rec_select
-                ):
+                if row_check["recording_name"].startswith(key_pair) and row_check["recording_name"] != rec_select:
                     rec_paired = row_check["recording_name"]
                     break
         if rec_paired is None:  # if still None, return
@@ -527,22 +452,14 @@ class DataFrameMixin:
             print("Tx is NaN - loop should trigger!")
             row["Tx"] = False
             # default: assume Tx has the highest max EPSP_amp, or EPSP_slope if there is no EPSP_amp
-            if any(
-                (
-                    dfout_select[col].max() > dfout_paired[col].max()
-                    for col in ["EPSP_amp", "EPSP_slope"]
-                    if col in dfout_select.columns
-                )
-            ):
+            if any((dfout_select[col].max() > dfout_paired[col].max() for col in ["EPSP_amp", "EPSP_slope"] if col in dfout_select.columns)):
                 row["Tx"] = True
                 row_paired["Tx"] = False
                 dfp.loc[row.name, "Tx"] = row["Tx"]
                 dfp.loc[row_paired.name, "Tx"] = row_paired["Tx"]
                 print(f"{rec_select} is Tx, {rec_paired} is control. Saving df_p...")
                 self.set_df_project(dfp)
-            elif not any(
-                col in dfout_select.columns for col in ["EPSP_amp", "EPSP_slope"]
-            ):
+            elif not any(col in dfout_select.columns for col in ["EPSP_amp", "EPSP_slope"]):
                 print("Selected recording has no measurements.")
                 return
         else:
@@ -622,12 +539,7 @@ class DataFrameMixin:
                     )
                     .reset_index()
                 )
-            group_mean.columns = [
-                col[0]
-                if col[0] == "sweep"
-                else "_".join(col).strip().replace("sem", "SEM")
-                for col in group_mean.columns.values
-            ]
+            group_mean.columns = [col[0] if col[0] == "sweep" else "_".join(col).strip().replace("sem", "SEM") for col in group_mean.columns.values]
             print(f"Group mean columns: {group_mean.columns}")
             print(f"Group mean: {group_mean}")
             self.df2file(df=group_mean, rec=f"group_{group_ID}", key="mean")
@@ -638,9 +550,7 @@ class DataFrameMixin:
     # Uniform timepoints across stims
     # ------------------------------------------------------------------
 
-    def set_uniformTimepoints(
-        self, p_row=None, dft=None, dfoutput=None
-    ):  # NB: requires both dfoutput and df_t to be present!
+    def set_uniformTimepoints(self, p_row=None, dft=None, dfoutput=None):  # NB: requires both dfoutput and df_t to be present!
         variables = [
             "t_volley_amp",
             "t_volley_slope_start",
@@ -676,17 +586,13 @@ class DataFrameMixin:
                 print(f"t_template_row: {t_template_row}")
                 t_stim = round(t_template_row["t_stim"].values[0], precision)
                 for var in variables:
-                    t_template_row[var] = round(
-                        t_template_row[var].values[0] - t_stim, precision
-                    )
+                    t_template_row[var] = round(t_template_row[var].values[0] - t_stim, precision)
                 if "stim" not in df_t.columns:
                     df_t["stim"] = None
                 for i, row_t in df_t.iterrows():
                     df_t.at[i, "stim"] = i + 1  # stims numbered from 1
                     for var in variables:
-                        df_t.at[i, var] = round(
-                            t_template_row[var].values[0] + row_t["t_stim"], precision
-                        )
+                        df_t.at[i, var] = round(t_template_row[var].values[0] + row_t["t_stim"], precision)
                     for method in methods:
                         df_t.at[i, method] = f"=stim_{stim_max}"
                     for param in params:
