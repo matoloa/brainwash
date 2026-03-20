@@ -24,6 +24,7 @@ if getattr(sys, "frozen", False):
     )
 
 # TODO: kick these out to ui_plot.py
+import matplotlib.collections as mcoll
 from matplotlib import use as matplotlib_use
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
@@ -1436,7 +1437,6 @@ class UIsub(
 
     @staticmethod
     def _xlim_from_artists(axis, pad=0.05, min_span=1.0):
-        import matplotlib.collections as mcoll
 
         all_x = []
         for line in axis.get_lines():
@@ -1506,8 +1506,6 @@ class UIsub(
             if finite.size < 2:  # skip markers / degenerate artists
                 continue
             all_y.append(finite)
-
-        import matplotlib.collections as mcoll
 
         for coll in axis.collections:
             if not coll.get_visible():

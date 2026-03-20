@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal, Optional
 
 import matplotlib
 import matplotlib.figure
+import matplotlib.pyplot as plt
 
 
 @dataclass
@@ -251,7 +253,6 @@ def render_publication_figure(
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
 
     class MockUIState:
         def __init__(self):
@@ -293,8 +294,6 @@ if __name__ == "__main__":
     try:
         figures = render_publication_figure(mock_uistate, None, template, ["1"])
         print(f"Success! Returned figures: {list(figures.keys())}")
-
-        from pathlib import Path
 
         export_dir = Path.home() / "Documents" / "Brainwash Projects" / "Export"
         export_dir.mkdir(exist_ok=True)
