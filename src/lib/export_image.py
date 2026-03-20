@@ -48,6 +48,42 @@ JOURNAL_TEMPLATES: dict[str, JournalTemplate] = {
 }
 
 
+JOURNAL_COLOR_PALETTES: dict[str, list[str]] = {
+    "jneurosci": [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+    ],
+    "jphysiol": [
+        "#003366",
+        "#0066CC",
+        "#00CCFF",
+        "#66CC99",
+        "#339966",
+        "#99CC00",
+        "#CC9900",
+        "#FF6600",
+        "#990000",
+    ],
+    "nature": [
+        "#999999",
+        "#E69F00",
+        "#56B4E9",
+        "#009E73",
+        "#F0E442",
+        "#0072B2",
+        "#D55E00",
+        "#CC79A7",
+    ],
+}
+
+
 def render_publication_figure(
     uistate,
     uiplot,

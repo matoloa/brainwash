@@ -263,6 +263,33 @@ class MenuMixin:
 
     def setJournalExport(self, journal_key):
         uistate.settings["journal_export"] = journal_key
+        if journal_key in export_image.JOURNAL_COLOR_PALETTES:
+            palette = export_image.JOURNAL_COLOR_PALETTES[journal_key]
+            uistate.colors = palette[:]
+            if hasattr(self, "dd_groups") and self.dd_groups:
+                for gid in sorted(self.dd_groups.keys()):
+                    idx = (gid - 1) % len(palette) if isinstance(gid, int) else 0
+                    self.dd_groups[gid]["color"] = palette[idx]
+                if hasattr(self, "group_save_dd"):
+                    self.group_save_dd()
+            if hasattr(uistate, "dict_group_labels") and hasattr(self, "dd_groups"):
+                for info in list(uistate.dict_group_labels.values()):
+                    gid = info.get("group_ID")
+                    if gid is not None:
+                        gid_key = int(gid) if str(gid).isdigit() else gid
+                        if gid_key in self.dd_groups:
+                            new_color = self.dd_groups[gid_key]["color"]
+                            for k in ("line", "fill"):
+                                artist = info.get(k)
+                                if artist is not None:
+                                    artist.set_color(new_color)
+            if hasattr(self, "group_cache_purge"):
+                self.group_cache_purge()
+            if hasattr(self, "groupControlsRefresh"):
+                self.groupControlsRefresh()
+        self.syncJournalExportMenu()
+        if hasattr(self, "triggerRefresh"):
+            self.triggerRefresh()
         if hasattr(self, "dict_folders") and "project" in self.dict_folders:
             uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
