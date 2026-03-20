@@ -1,4 +1,4 @@
-name: Release
+name: Release (Windows only)
 
 on:
   push:
@@ -10,39 +10,9 @@ permissions:
   contents: write
 
 jobs:
-  build-linux:
-    name: Build Linux AppImage
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          version: "latest"
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: uv sync --frozen --group build
-
-      - name: Install patchelf (Linux)
-        run: sudo apt-get update && sudo apt-get install -y patchelf
-
-      - name: Build with cx_Freeze
-        working-directory: ./src
-        run: uv run python build_with_cxfreeze_multiarch_setup.py bdist_appimage
-
-      - name: Upload Linux artefact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-appimage
-          path: src/dist/*.AppImage
-          compression-level: 0
-
-  build-windows:
-    name: Build Windows Portable
+  build-and-release:
     runs-on: windows-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -55,45 +25,48 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --frozen --group build
+
+      - name: Extract version from pyproject.toml
+        shell: pwsh
+        run: |
+          $version = uv run python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])"
+          echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Output "Extracted version: $version"
 
       - name: Build with cx_Freeze
         working-directory: ./src
         run: uv run python build_with_cxfreeze_multiarch_setup.py build_exe
         shell: cmd
 
-      - name: Upload Windows artefact
+      - name: Find exe directory
+        working-directory: ./src
+        shell: pwsh
+        run: |
+          $exe_dir = Get-ChildItem -Recurse -Path build -Directory | Where-Object { Test-Path (Join-Path $_.FullName "brainwash.exe") } | Select-Object -ExpandProperty FullName -First 1
+          if (-not $exe_dir) { Write-Error "Executable directory not found in build/"; exit 1 }
+          $rel = $exe_dir.Substring("$env:GITHUB_WORKSPACE\".Length)
+          Write-Output "EXE_DIR=$rel" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Output "Found exe directory (repo-relative): $rel"
+
+      - name: Upload Windows portable
         uses: actions/upload-artifact@v4
         with:
-          name: windows-portable
-          path: src/build
+          name: brainwash-${{ env.VERSION }}-windows-portable
+          path: ${{ env.EXE_DIR }}
           compression-level: 6
 
-  release:
-    name: Create GitHub Release
-    needs: [build-linux, build-windows]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download all artefacts
+      - name: Download artefact for release
         uses: actions/download-artifact@v4
         with:
-          path: artefacts
-          merge-multiple: true
-
-      - name: List artefacts (debug)
-        run: ls -R artefacts
+          name: brainwash-${{ env.VERSION }}-windows-portable
+          path: release-assets
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          files: |
-            artefacts/**/*.AppImage
-            artefacts/**/brainwash.exe
-            artefacts/**/*
+          files: release-assets/**
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
           generate_release_notes: true
