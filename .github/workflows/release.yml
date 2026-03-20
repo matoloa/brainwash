@@ -31,12 +31,20 @@ jobs:
         run: uv run python build_with_cxfreeze_multiarch_setup.py build_exe
         shell: cmd
 
+      - name: Zip build directory
+        working-directory: ./src
+        shell: pwsh
+        run: |
+          $exe_dir = Get-ChildItem -Recurse -Path build -Directory | Where-Object { Test-Path (Join-Path $_.FullName "brainwash.exe") } | Select-Object -ExpandProperty FullName -First 1
+          if (-not $exe_dir) { Write-Error "Executable directory not found in build/"; exit 1 }
+          Compress-Archive -Path $exe_dir -DestinationPath "brainwash-windows-portable.zip"
+
       - name: Upload Windows artefact
         uses: actions/upload-artifact@v4
         with:
           name: windows-portable
-          path: src/build
-          compression-level: 6
+          path: src/brainwash-windows-portable.zip
+          compression-level: 0
 
   release:
     name: Create GitHub Release
@@ -61,8 +69,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           files: |
-            artefacts/**/brainwash.exe
-            artefacts/**/*
+            artefacts/brainwash-windows-portable.zip
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
           generate_release_notes: true
