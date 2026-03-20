@@ -1,4 +1,4 @@
-import ui_output_image
+import export_image
 from PyQt5 import QtWidgets
 
 uistate = None
@@ -157,7 +157,7 @@ class MenuMixin:
         self.actionResetGroups.triggered.connect(self.triggerEditGroups)
         self.menuGroups.addAction(self.actionResetGroups)
 
-        # Export menu (triggers → ExportMixin in ui_export.py)
+        # Export menu (triggers → ExportMixin in export_data.py)
         # — Copy section —
         self.actionCopyProjectSummary = QtWidgets.QAction("Copy project summary")
         self.actionCopyProjectSummary.triggered.connect(self.triggerCopyProjectSummary)
@@ -190,7 +190,85 @@ class MenuMixin:
         self.menuExport.addSeparator()
 
         # — Image section —
-        for key, template in ui_output_image.JOURNAL_TEMPLATES.items():
-            action = QtWidgets.QAction(f"Groups to {template.name}", self.menuExport)
-            action.triggered.connect(lambda checked=False, k=key: self.triggerExportOutputImage(k))
+        self.actionExportToHeader = QtWidgets.QAction("   — Export to... —", self.menuExport)
+        self.menuExport.addAction(self.actionExportToHeader)
+
+        self.journalActionGroup = QtWidgets.QActionGroup(self.menuExport)
+        self.journalActionGroup.setExclusive(True)
+
+        journals = {}
+        for key, template in export_image.JOURNAL_TEMPLATES.items():
+            if "_" in key:
+                j_key = key.split("_")[0]
+                if j_key not in journals:
+                    j_name = template.name.split(" (")[0]
+                    if j_key == "jneurosci":
+                        j_name = "Neuroscience"
+                    journals[j_key] = j_name
+
+        for j_key, j_name in journals.items():
+            action = QtWidgets.QAction(f"   {j_name}", self.menuExport)
+            action.setCheckable(True)
+            action.setData(j_key)
+            if uistate.settings.get("journal_export", "jneurosci") == j_key:
+                action.setChecked(True)
+            action.triggered.connect(lambda checked, k=j_key: self.setJournalExport(k))
+            self.journalActionGroup.addAction(action)
             self.menuExport.addAction(action)
+
+        self.menuExport.addSeparator()
+
+        self.actionExport1Col = QtWidgets.QAction("Groups to 1 column image", self.menuExport)
+        self.actionExport1Col.triggered.connect(self.triggerExport1Col)
+        self.menuExport.addAction(self.actionExport1Col)
+
+        self.actionExport2Col = QtWidgets.QAction("Groups to 2 column image", self.menuExport)
+        self.actionExport2Col.triggered.connect(self.triggerExport2Col)
+        self.menuExport.addAction(self.actionExport2Col)
+
+    def syncJournalExportMenu(self):
+        journal = uistate.settings.get("journal_export", "jneurosci")
+        for action in self.journalActionGroup.actions():
+            if action.data() == journal:
+                action.setChecked(True)
+                break
+
+    def setJournalExport(self, journal_key):
+        uistate.settings["journal_export"] = journal_key
+        if journal_key in export_image.JOURNAL_COLOR_PALETTES:
+            palette = export_image.JOURNAL_COLOR_PALETTES[journal_key]
+            uistate.colors = palette[:]
+            if hasattr(self, "dd_groups") and self.dd_groups:
+                for gid in sorted(self.dd_groups.keys()):
+                    idx = (gid - 1) % len(palette) if isinstance(gid, int) else 0
+                    self.dd_groups[gid]["color"] = palette[idx]
+                if hasattr(self, "group_save_dd"):
+                    self.group_save_dd()
+            if hasattr(uistate, "dict_group_labels") and hasattr(self, "dd_groups"):
+                for info in list(uistate.dict_group_labels.values()):
+                    gid = info.get("group_ID")
+                    if gid is not None:
+                        gid_key = int(gid) if str(gid).isdigit() else gid
+                        if gid_key in self.dd_groups:
+                            new_color = self.dd_groups[gid_key]["color"]
+                            for k in ("line", "fill"):
+                                artist = info.get(k)
+                                if artist is not None:
+                                    artist.set_color(new_color)
+            if hasattr(self, "group_cache_purge"):
+                self.group_cache_purge()
+            if hasattr(self, "groupControlsRefresh"):
+                self.groupControlsRefresh()
+        self.syncJournalExportMenu()
+        if hasattr(self, "triggerRefresh"):
+            self.triggerRefresh()
+        if hasattr(self, "dict_folders") and "project" in self.dict_folders:
+            uistate.save_cfg(projectfolder=self.dict_folders["project"])
+
+    def triggerExport1Col(self, checked=False):
+        journal = uistate.settings.get("journal_export", "jneurosci")
+        self.triggerExportOutputImage(f"{journal}_1col")
+
+    def triggerExport2Col(self, checked=False):
+        journal = uistate.settings.get("journal_export", "jneurosci")
+        self.triggerExportOutputImage(f"{journal}_2col")

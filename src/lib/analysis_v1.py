@@ -72,6 +72,7 @@ SKALL HELST LETAS UPP D'R VOLLEY 'R SLUT
 """
 
 import time
+from pathlib import Path
 
 import numpy as np  # numeric calculations module
 import pandas as pd  # dataframe module, think excel, but good
@@ -763,8 +764,6 @@ if __name__ == "__main__":
         "norm_output_from": 0,
         "norm_output_to": 0,
     }
-
-    from pathlib import Path
 
     # path_filterfile = Path.home() / ("Documents/Brainwash Projects/standalone_test/cache/KO_02_Ch1_a_filter.csv")
     # dffilter = pd.read_csv(str(path_filterfile)) # a persisted csv-form of the data file

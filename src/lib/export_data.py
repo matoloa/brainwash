@@ -1,4 +1,4 @@
-# ui_export.py
+# export_data.py
 # ExportMixin — export menu setup and trigger methods for UIsub.
 # Owns both the Export menu item wiring (previously in ui_menus.py) and
 # the trigger/implementation methods for all export actions.
@@ -7,15 +7,15 @@
 # singletons and widget classes are created but before any UIsub instance
 # is constructed):
 #
-#   import ui_export
-#   ui_export.uistate = uistate
-#   ui_export.config  = config
-#   ui_export.uiplot  = uiplot
+#   import export_data
+#   export_data.uistate = uistate
+#   export_data.config  = config
+#   export_data.uiplot  = uiplot
 
 from __future__ import annotations
 
+import export_image
 import pandas as pd
-import ui_output_image
 from PyQt5 import QtCore, QtWidgets
 
 # ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ class ExportMixin:
             )
             return
 
-        template = ui_output_image.JOURNAL_TEMPLATES.get(template_key)
+        template = export_image.JOURNAL_TEMPLATES.get(template_key)
         if not template:
             QtWidgets.QMessageBox.warning(
                 None,
@@ -170,13 +170,24 @@ class ExportMixin:
             )
             return
 
-        figures = ui_output_image.render_publication_figure(uistate, uiplot, template, selected_groups)
+        group_names = {str(gid): ginfo.get("group_name", str(gid)) for gid, ginfo in getattr(self, "dd_groups", {}).items()}
+
+        figures = export_image.render_publication_figure(uistate, uiplot, template, selected_groups, group_names)
+
+        if not figures:
+            QtWidgets.QMessageBox.warning(
+                None,
+                "Export Error",
+                "No valid data available to render for the selected template.\n" "Ensure that group means for amplitude or slope are visible.",
+            )
+            return
 
         export_dir = self.projects_folder / "Export"
         export_dir.mkdir(parents=True, exist_ok=True)
 
         for panel_name, fig in figures.items():
             out_path_png = export_dir / f"{self.projectname}_{template_key}_{panel_name}.png"
+            print(f"Saved image: {out_path_png}")
             fig.savefig(out_path_png, dpi=template.dpi, bbox_inches="tight")
 
-        self._export_status(f"Exported {template.name} figures to {export_dir}")
+        self._export_status(f"Exported {len(figures)} {template.name} figures to {export_dir}")

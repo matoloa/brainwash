@@ -246,7 +246,8 @@ class GroupMixin:
             list_rec_in_groups = []
             for group_ID, group_v in self.dd_groups.items():
                 if rec_ID in group_v["rec_IDs"]:
-                    list_rec_in_groups.append(group_v["group_name"])
+                    name = group_v.get("group_name")
+                    list_rec_in_groups.append(str(name) if name is not None else str(group_ID))
             return list_rec_in_groups
 
         df_p = self.get_df_project()

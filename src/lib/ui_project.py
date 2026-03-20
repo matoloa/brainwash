@@ -25,8 +25,11 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+import pyarrow.parquet as pq
 import yaml
 from PyQt5 import QtCore, QtWidgets
+
+import lib.parse as parse
 
 # ---------------------------------------------------------------------------
 # Project DataFrame schema
@@ -357,6 +360,7 @@ class ProjectMixin:
         self.resetCacheDicts()  # clear internal caches
         path_projectfolder = Path(str_projectfolder)
         self.projectname = str(path_projectfolder.stem)
+        self.projects_folder = path_projectfolder.parent
         print(f"load_df_project: {self.projectname}")
         self.dict_folders = self.build_dict_folders()
         self.df_project = pd.read_csv(str(path_projectfolder / "project.brainwash"), dtype={"group_IDs": str})
@@ -369,8 +373,20 @@ class ProjectMixin:
         for col in _INT_COLUMNS:
             if col in self.df_project.columns:
                 self.df_project[col] = self.df_project[col].astype(pd.Int64Dtype())
+
+        # Ensure filter_params is an object column to accept dicts/json
+        if "filter_params" in self.df_project.columns:
+            self.df_project["filter_params"] = self.df_project["filter_params"].astype(object)
+
+        # Ensure filter column defaults to "voltage" instead of NaN, None, or "none"
+        if "filter" in self.df_project.columns:
+            self.df_project["filter"] = self.df_project["filter"].fillna("voltage")
+            self.df_project.loc[self.df_project["filter"] == "none", "filter"] = "voltage"
+            self.df_project.loc[self.df_project["filter"] == "", "filter"] = "voltage"
+
         self._backfill_sweep_hz()
         uistate.load_cfg(self.dict_folders["project"], config.version)
+        self.syncJournalExportMenu()
         self.tableFormat()
         self.write_bw_cfg()
 
@@ -382,10 +398,6 @@ class ProjectMixin:
         parquet contains enough timing information to derive it.  This runs
         once per project load and only touches recordings that need it.
         """
-        import pyarrow.parquet as pq
-
-        import lib.parse as parse
-
         df_p = self.df_project
         missing = df_p["sweep_hz"].isna()
         if not missing.any():

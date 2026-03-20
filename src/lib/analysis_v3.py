@@ -117,9 +117,22 @@ def ttest_df(d_group_ndf, norm=False, amp=False, slope=False) -> pd.DataFrame:
 def addFilterSavgol(df, window_length: int = 9, poly_order: int = 3) -> pd.Series:
     """
     Compute a Savitzky-Golay smoothed column from df['voltage'] and return it.
-    The result is also written into df['savgol'] in place.
     """
-    df["savgol"] = savgol_filter(df.voltage, window_length=window_length, polyorder=poly_order)
+    wl_target = window_length if window_length % 2 == 1 else window_length + 1
+
+    def _apply_savgol(x):
+        n = len(x)
+        if n <= poly_order:
+            return x
+        wl = min(wl_target, n if n % 2 == 1 else n - 1)
+        if wl <= poly_order:
+            return x
+        return savgol_filter(x, window_length=wl, polyorder=poly_order)
+
+    if "sweep" in df.columns:
+        df["savgol"] = df.groupby("sweep")["voltage"].transform(_apply_savgol)
+    else:
+        df["savgol"] = _apply_savgol(df["voltage"])
     return df["savgol"]
 
 
@@ -204,7 +217,8 @@ def find_timepoints(
         df_snippet:                   DataFrame slice around one stim with
                                       'time' and <filter> columns.
         default_dict_t:               Dict carrying width defaults
-                                      ('t_volley_slope_width',
+                                      ('t_EPSP_amp_width',
+                                       't_volley_slope_width',
                                        't_EPSP_slope_width').
         filter:                       Voltage column name; must match the
                                       column displayed in axe so that
@@ -278,13 +292,15 @@ def find_timepoints(
     if not stim_detected:
         _log("stim: not detected, using index-based fallbacks")
 
-    # Baseline (pre-stim mean)
-    baseline_end = (int(i_stim_neg) - 2) if stim_detected and i_stim_neg is not None else int(0.1 * n)
-    baseline_end = max(baseline_end, 1)
-    baseline = np.mean(voltage[:baseline_end])
-
     # t_stim: time of the negative artefact peak, or time[0] as fallback
     t_stim = float(times[int(i_stim_neg)]) if stim_detected and i_stim_neg is not None else float(times[0])
+
+    # Baseline (pre-stim mean)
+    baseline_start_idx = np.abs(times - (t_stim - 0.002)).argmin()
+    baseline_end_idx = np.abs(times - (t_stim - 0.001)).argmin()
+    if baseline_end_idx <= baseline_start_idx:
+        baseline_end_idx = baseline_start_idx + 1
+    baseline = np.mean(voltage[baseline_start_idx:baseline_end_idx])
 
     # amp_zero placeholder (pre-stim baseline in volts)
     amp_zero = float(baseline)
@@ -616,7 +632,11 @@ def measure_waveform(df_snippet, dict_t: dict, filter: str = "voltage") -> dict:
     """
     result = {}
 
-    amp_zero = dict_t.get("amp_zero", 0.0)
+    t_stim = dict_t.get("t_stim", 0.0)
+    _pre_stim = df_snippet[(df_snippet["time"] >= t_stim - 0.002) & (df_snippet["time"] < t_stim - 0.001)]
+    amp_zero = _pre_stim[filter].mean()
+    if pd.isna(amp_zero):
+        amp_zero = dict_t.get("amp_zero", 0.0)
     norm_from = dict_t.get("norm_output_from", None)
     norm_to = dict_t.get("norm_output_to", None)
 
@@ -677,8 +697,9 @@ def _normalize_column(series: pd.Series, norm_from, norm_to) -> pd.Series:
     (index-based, inclusive).  Returns a Series of NaN if the baseline mean
     is zero or the range is invalid.
     """
-    if norm_from is None or norm_to is None:
+    if norm_from is None or norm_to is None or pd.isna(norm_from) or pd.isna(norm_to):
         return pd.Series(np.nan, index=series.index)
+    norm_from, norm_to = int(norm_from), int(norm_to)
     selected = series.iloc[norm_from : norm_to + 1]
     norm_mean = selected.mean()
     if norm_mean == 0 or np.isnan(norm_mean):
@@ -711,26 +732,24 @@ def _measure_amp_at_time_per_sweep(
     dffilter.
     """
     sweeps = dffilter["sweep"].unique()
-    values = np.empty(len(sweeps))
-    for idx, sw in enumerate(sweeps):
-        sw_df = dffilter[dffilter["sweep"] == sw]
-        nearest_idx = (sw_df["time"] - t_target).abs().idxmin()
-        v = sw_df.loc[nearest_idx, filter]
-        az = amp_zero_per_sweep.get(sw, 0.0)
-        values[idx] = (v - az) * -1000
+    idx = (dffilter["time"] - t_target).abs().groupby(dffilter["sweep"]).idxmin()
+    idx = idx.loc[sweeps]
+    v = dffilter.loc[idx, filter].values
+    az = amp_zero_per_sweep.loc[sweeps].values
+    values = (v - az) * -1000
     return pd.Series(values, index=range(len(sweeps)))
 
 
 def _compute_amp_zero_per_sweep(dffilter, t_stim: float, filter: str) -> pd.Series:
     """
-    Compute per-sweep amp_zero as the mean of <filter> in the 2 ms window
-    immediately before t_stim for each sweep.
+    Compute per-sweep amp_zero as the mean of <filter> in the window
+    [-0.002, -0.001] relative to t_stim for each sweep.
 
     Returns a Series indexed by sweep value.  Falls back to 0.0 for any sweep
     where the pre-stim window contains no samples.
     """
-    t_start = t_stim - _AMP_ZERO_WINDOW
-    t_end = t_stim
+    t_start = t_stim - 0.002
+    t_end = t_stim - 0.001
     pre_stim = dffilter[(dffilter["time"] >= t_start) & (dffilter["time"] < t_end)]
     per_sweep = pre_stim.groupby("sweep")[filter].mean()
     # Fill missing sweeps with 0.0 so downstream arithmetic never sees NaN
@@ -784,7 +803,7 @@ def build_dfoutput(
         sweeps = dffilter["sweep"].unique()
         dfblock = pd.DataFrame({"sweep": sweeps, "stim": stim_nr})
 
-        # Per-sweep amp_zero: mean of dffilter[filter] in the 2 ms before t_stim.
+        # Per-sweep amp_zero: mean of dffilter[filter] in the [-0.002, -0.001] window before t_stim.
         # Indexed by sweep value in the same order as dfblock["sweep"].
         amp_zero_per_sweep = _compute_amp_zero_per_sweep(dffilter, t_stim, filter)
 
@@ -876,7 +895,7 @@ def build_dfoutput(
 
             # Window: from just before stim to just after EPSP region
             # Use t_EPSP_slope_end as a reasonable right boundary, with fallback
-            t_win_start = t_stim - dict_t.get("t_volley_slope_width", 0.0003)
+            t_win_start = t_stim - 0.002
             t_win_end = dict_t.get("t_EPSP_amp", t_stim + 0.01) + dict_t.get("t_EPSP_amp_width", 2 * dict_t.get("t_EPSP_amp_halfwidth", 0.001))
             snippet = dfmean[(dfmean["time"] >= t_win_start) & (dfmean["time"] <= t_win_end)].copy().reset_index(drop=True)
 
@@ -949,7 +968,7 @@ def build_dfbinstimoutput(
             stim_nr = dict_t["stim"]
             t_stim = dict_t.get("t_stim", np.nan)
 
-            t_win_start = t_stim - dict_t.get("t_volley_slope_width", 0.0003)
+            t_win_start = t_stim - 0.002
             t_win_end = dict_t.get("t_EPSP_amp", t_stim + 0.01) + dict_t.get("t_EPSP_amp_width", 2 * dict_t.get("t_EPSP_amp_halfwidth", 0.001))
             snippet = bin_df[(bin_df["time"] >= t_win_start) & (bin_df["time"] <= t_win_end)].copy().reset_index(drop=True)
 

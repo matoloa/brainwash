@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
-from typing import Literal
+from pathlib import Path
+from typing import Literal, Optional
 
 import matplotlib
 import matplotlib.figure
+import matplotlib.pyplot as plt
 
 
 @dataclass
@@ -19,6 +21,7 @@ class JournalTemplate:
     # Line widths in points
     linewidth_data: float = 0.75
     linewidth_axes: float = 0.5
+    linewidth_error: float = 0.5
     # DPI for raster outputs
     dpi: int = 600
     # Which panels to include
@@ -37,7 +40,49 @@ JOURNAL_TEMPLATES: dict[str, JournalTemplate] = {
 }
 
 
-def render_publication_figure(uistate, uiplot, template: JournalTemplate, selected_groups: list[str]) -> dict[str, matplotlib.figure.Figure]:
+JOURNAL_COLOR_PALETTES: dict[str, list[str]] = {
+    "jneurosci": [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+    ],
+    "jphysiol": [
+        "#003366",
+        "#0066CC",
+        "#00CCFF",
+        "#66CC99",
+        "#339966",
+        "#99CC00",
+        "#CC9900",
+        "#FF6600",
+        "#990000",
+    ],
+    "nature": [
+        "#999999",
+        "#E69F00",
+        "#56B4E9",
+        "#009E73",
+        "#F0E442",
+        "#0072B2",
+        "#D55E00",
+        "#CC79A7",
+    ],
+}
+
+
+def render_publication_figure(
+    uistate,
+    uiplot,
+    template: JournalTemplate,
+    selected_groups: list[str],
+    group_names: Optional[dict[str, str]] = None,
+) -> dict[str, matplotlib.figure.Figure]:
     """
     Render a standalone, publication-quality figure from ax1 and ax2 of selected groups.
     Returns a dictionary mapping panel names (e.g. 'amplitude', 'slope') to their respective matplotlib Figure.
@@ -50,6 +95,15 @@ def render_publication_figure(uistate, uiplot, template: JournalTemplate, select
         "legend.fontsize": template.font_size_legend,
         "lines.linewidth": template.linewidth_data,
         "axes.linewidth": template.linewidth_axes,
+        "figure.facecolor": "white",
+        "axes.facecolor": "white",
+        "axes.edgecolor": "black",
+        "text.color": "black",
+        "xtick.color": "black",
+        "ytick.color": "black",
+        "axes.labelcolor": "black",
+        "savefig.facecolor": "white",
+        "savefig.edgecolor": "white",
     }
 
     figures = {}
@@ -119,33 +173,49 @@ def render_publication_figure(uistate, uiplot, template: JournalTemplate, select
                     continue
 
                 has_data = True
-                # Plot the line
                 xdata = line.get_xdata()
                 ydata = line.get_ydata()
                 color = line.get_color()
 
-                ax.plot(
-                    xdata,
-                    ydata,
-                    label=label,
-                    color=color,
-                    linestyle=line.get_linestyle(),
-                    marker=line.get_marker(),
-                )
+                plot_label = group_names.get(group_id_str, label) if group_names else label
 
-                if fill:
-                    # Fill is a PolyCollection
-                    for path in fill.get_paths():
-                        verts = path.vertices
-                        ax.fill(
-                            verts[:, 0],
-                            verts[:, 1],
-                            alpha=0.3,
-                            color=color,
-                            edgecolor="none",
-                        )
+                yerr = None
+                if fill and len(fill.get_paths()) > 0:
+                    verts = fill.get_paths()[0].vertices
+                    yerr = []
+                    for xi in xdata:
+                        y_vals = [v[1] for v in verts if abs(v[0] - xi) < 1e-5]
+                        if y_vals:
+                            yerr.append((max(y_vals) - min(y_vals)) / 2)
+                        else:
+                            yerr.append(0)
+
+                if yerr is not None:
+                    ax.errorbar(
+                        xdata,
+                        ydata,
+                        yerr=yerr,
+                        label=plot_label,
+                        color=color,
+                        fmt="o",
+                        markersize=3,
+                        linewidth=template.linewidth_data,
+                        elinewidth=template.linewidth_error,
+                        capsize=0,
+                    )
+                else:
+                    ax.plot(
+                        xdata,
+                        ydata,
+                        label=plot_label,
+                        color=color,
+                        linestyle="none",
+                        marker="o",
+                        markersize=3,
+                    )
 
             if has_data:
+                ax.set_ylim(bottom=0)
                 ax.set_xlabel(uistate.x_axis_xlabel() if hasattr(uistate, "x_axis_xlabel") else "Time")
 
                 if ax.get_legend_handles_labels()[1]:
@@ -156,3 +226,54 @@ def render_publication_figure(uistate, uiplot, template: JournalTemplate, select
                 figures[panel_key] = fig
 
     return figures
+
+
+if __name__ == "__main__":
+
+    class MockUIState:
+        def __init__(self):
+            self.checkBox = {"norm_EPSP": False}
+            self.settings = {
+                "rgb_EPSP_amp": (0, 0, 1),
+                "rgb_EPSP_slope": (1, 0, 0),
+            }
+            self.dict_group_labels = {}
+            self.dict_group_show = {}
+
+        def x_axis_xlabel(self):
+            return "Time (s)"
+
+    mock_uistate = MockUIState()
+
+    fig, ax = plt.subplots()
+    x = [1, 2, 3]
+    y = [2, 3, 4]
+    yerr = [0.1, 0.2, 0.1]
+    (line,) = ax.plot(x, y)
+    fill = ax.fill_between(
+        x,
+        [yi - ye for yi, ye in zip(y, yerr)],
+        [yi + ye for yi, ye in zip(y, yerr)],
+    )
+
+    mock_uistate.dict_group_labels["Group 1 EPSP amp mean"] = {
+        "group_ID": 1,
+        "axis": "ax1",
+        "line": line,
+        "fill": fill,
+    }
+    mock_uistate.dict_group_show["Group 1 EPSP amp mean"] = mock_uistate.dict_group_labels["Group 1 EPSP amp mean"]
+
+    template = JOURNAL_TEMPLATES["jneurosci_1col"]
+    try:
+        figures = render_publication_figure(mock_uistate, None, template, ["1"])
+        print(f"Success! Returned figures: {list(figures.keys())}")
+
+        export_dir = Path.home() / "Documents" / "Brainwash Projects" / "Export"
+        export_dir.mkdir(exist_ok=True)
+        for name, fig in figures.items():
+            out_path = export_dir / f"test_jneurosci_1col_{name}.png"
+            fig.savefig(out_path, dpi=template.dpi, bbox_inches="tight")
+            print(f"Saved {out_path}")
+    except Exception as e:
+        print(f"Error: {e}")

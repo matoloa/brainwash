@@ -707,10 +707,10 @@ class UIplot:
         x = df_groupmean.sweep
         label_mean = f"{group_name} {str_aspect} mean"
         label_norm = f"{group_name} {str_aspect} norm"
-        y_mean = df_groupmean[f"{aspect}_mean"].fillna(0)
-        y_mean_SEM = df_groupmean[f"{aspect}_SEM"].fillna(0)
-        y_norm = df_groupmean[f"{aspect}_norm_mean"].fillna(0)
-        y_norm_SEM = df_groupmean[f"{aspect}_norm_SEM"].fillna(0)
+        y_mean = df_groupmean[f"{aspect}_mean"]
+        y_mean_SEM = df_groupmean[f"{aspect}_SEM"]
+        y_norm = df_groupmean[f"{aspect}_norm_mean"]
+        y_norm_SEM = df_groupmean[f"{aspect}_norm_SEM"]
 
         print(f"y_mean: {y_mean}")
         print(f"y_mean_SEM: {y_mean_SEM}")
@@ -802,9 +802,9 @@ class UIplot:
             _t_idx = (dfmean["time"] - t_stim).abs().idxmin()
             y_position = dfmean.loc[_t_idx, rec_filter]  # nearest-time lookup (float-safe)
             # amp_zero_plot: mean of rec_filter in the 2 ms before t_stim on dfmean.
-            # Used only for visual positioning on axe; must match the plotted column
-            # and the local baseline, not the dft scalar (which was always 0 in v2).
-            _pre_stim = dfmean[(dfmean["time"] >= t_stim - 0.002) & (dfmean["time"] < t_stim)]
+            # Used for visual positioning on axe; matches the plotted local baseline.
+
+            _pre_stim = dfmean[(dfmean["time"] >= t_stim - 0.002) & (dfmean["time"] < t_stim - 0.001)]
             amp_zero_plot = _pre_stim[rec_filter].mean() if not _pre_stim.empty else dfmean.loc[_t_idx, rec_filter]
             for var in variables:  # Convert all variables except t_stim to stim-specific time
                 t_row[var] -= t_stim
@@ -1125,7 +1125,17 @@ class UIplot:
         if df_groupmean["EPSP_slope_mean"].notna().any():
             self.plot_group_lines("ax2", group_ID, dict_group, df_groupmean)
 
-    def update(self, prow, trow, aspect, data_x, data_y, amp=None, dfoutput=None):
+    def update(
+        self,
+        prow,
+        trow,
+        aspect,
+        data_x,
+        data_y,
+        amp=None,
+        dfoutput=None,
+        amp_zero_plot=None,
+    ):
         """
         Updates the existing plotted artists stored in `self.uistate.dict_rec_labels`.
         Parameters
@@ -1179,7 +1189,12 @@ class UIplot:
         # TODO: unspaghetti this mess
         norm = self.uistate.checkBox["norm_EPSP"]
         stim_offset = trow["t_stim"]
-        label_core = f"{prow['recording_name']} - stim {trow['stim']} {aspect}"
+        rec_filter = prow.get("filter")
+        rec_name = prow["recording_name"]
+        if rec_filter != "voltage":
+            label_core = f"{rec_name} ({rec_filter}) - stim {trow['stim']} {aspect}"
+        else:
+            label_core = f"{rec_name} - stim {trow['stim']} {aspect}"
 
         if aspect in ["EPSP slope", "volley slope"]:
             x_start = trow[f"t_{aspect.replace(' ', '_')}_start"] - stim_offset
@@ -1209,8 +1224,9 @@ class UIplot:
             # data_x is already shifted so t_stim = 0, data_y is raw voltage.
             # This matches exactly what axe displays, regardless of filter column
             # or DC offset — and is consistent with addRow's amp_zero_plot.
-            pre_stim_mask = data_x < 0
-            amp_zero_plot = float(data_y[pre_stim_mask].mean()) if pre_stim_mask.any() else float(data_y[0])
+            if amp_zero_plot is None:
+                pre_stim_mask = (data_x >= -0.002) & (data_x < -0.001)
+                amp_zero_plot = float(data_y[pre_stim_mask].mean()) if pre_stim_mask.any() else y_position
             self.updateAmpMarker(label_core, t_amp, y_position, amp_x, amp_zero_plot, amp=amp)
             if aspect == "volley amp":
                 volley_amp_mean = trow.get("volley_amp_mean")

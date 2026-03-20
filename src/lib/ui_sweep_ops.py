@@ -11,6 +11,7 @@
 #   ui_sweep_ops.config  = config
 #   ui_sweep_ops.uiplot  = uiplot
 #   ui_sweep_ops.confirm = confirm
+#   ui_sweep_ops.InputDialogPopup = InputDialogPopup
 
 from __future__ import annotations
 
@@ -551,10 +552,6 @@ class SweepOpsMixin:
             split_s = float(mean_start)
             print(f"sweep_split_by_time: using mean_start = {split_s} s")
         else:
-            from ui import (
-                InputDialogPopup,  # local import avoids circular at module level
-            )
-
             dlg = InputDialogPopup()
             raw = dlg.showInputDialog(
                 title="Split recording by time",

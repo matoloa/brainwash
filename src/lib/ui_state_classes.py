@@ -139,12 +139,14 @@ class UIstate:
             "norm_EPSP_to": 0,
             "EPSP_amp_halfwidth_ms": 0,  # in ms here (visible to user). NB: in s in df_t!
             "volley_amp_halfwidth_ms": 0,  # in ms here (visible to user). NB: in s in df_t!
+            "savgol_window": 9,
+            "savgol_poly": 3,
         }
         self.settings = {
             "event_start": -0.005,  # in relation to current t_stim
             "event_end": 0.05,
             "precision": 4,  # TODO: fix hardcoded precision
-            "filter": None,  # filter to show in event graph; None uses 'voltage' column
+            "filter": "voltage",  # filter to show in event graph; default 'voltage' column
             # colors and alpha
             "rgb_EPSP_amp": (0.2, 0.2, 1),
             "rgb_EPSP_slope": (0.5, 0.5, 1),
@@ -152,6 +154,7 @@ class UIstate:
             "rgb_volley_slope": (1, 0.5, 1),
             "alpha_mark": 0.4,
             "alpha_line": 1,
+            "journal_export": "jneurosci",
         }
         self.zoom = {
             "mean_xlim": (0, 1),
@@ -185,33 +188,33 @@ class UIstate:
             # example: dict_param = {volley_slope-width: 3}
             # example: dict_values = {volley_slope-value: -0.3254}
             "stim": 0,
-            "t_stim": 0,
+            "t_stim": 0.0,
             "t_stim_method": "max prim",
             "t_stim_params": "NA",
-            "amp_zero": 0,
+            "amp_zero": 0.0,
             "t_volley_slope_width": t_volley_slope_width,
             "t_volley_slope_halfwidth": t_volley_slope_halfwidth,
-            "t_volley_slope_start": 0,
-            "t_volley_slope_end": 0,
+            "t_volley_slope_start": 0.0,
+            "t_volley_slope_end": 0.0,
             "t_volley_slope_method": "default",
             "t_volley_slope_params": "NA",
             "volley_slope_mean": 0.0,
-            "t_volley_amp": 0,
-            "t_volley_amp_halfwidth": 0,
+            "t_volley_amp": 0.0,
+            "t_volley_amp_halfwidth": 0.0,
             "t_volley_amp_method": "default",
             "t_volley_amp_params": "NA",
             "volley_amp_mean": 0.0,
-            "t_VEB": 0,  # Deprecated
+            "t_VEB": 0.0,  # Deprecated
             "t_VEB_method": 0,  # Deprecated
             "t_VEB_params": 0,  # Deprecated
             "t_EPSP_slope_width": t_EPSP_slope_width,
             "t_EPSP_slope_halfwidth": t_EPSP_slope_halfwidth,
-            "t_EPSP_slope_start": 0,
-            "t_EPSP_slope_end": 0,
+            "t_EPSP_slope_start": 0.0,
+            "t_EPSP_slope_end": 0.0,
             "t_EPSP_slope_method": "default",
             "t_EPSP_slope_params": "NA",
-            "t_EPSP_amp": 0,
-            "t_EPSP_amp_halfwidth": 0,
+            "t_EPSP_amp": 0.0,
+            "t_EPSP_amp_halfwidth": 0.0,
             "t_EPSP_amp_method": "default",
             "t_EPSP_amp_params": "NA",
             "norm_output_from": 0,
@@ -557,7 +560,9 @@ class UIstate:
         valid_line_edits = set(self.lineEdit.keys())
         loaded_line_edits = state.get("lineEdit") or {}
         self.lineEdit = {k: v for k, v in loaded_line_edits.items() if k in valid_line_edits}
-        self.settings = state.get("settings")
+        valid_settings = self.settings.copy()  # from reset()
+        loaded_settings = state.get("settings") or {}
+        self.settings = {k: loaded_settings.get(k, valid_settings[k]) for k in valid_settings}
         # Rebuild zoom defensively: start from known-good defaults, overlay any
         # persisted values that are type-compatible, and silently discard
         # stale/corrupt entries (e.g. strings stored by older versions).

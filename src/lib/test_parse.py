@@ -18,6 +18,7 @@
 # and the file-I/O tests will run automatically.
 
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -810,8 +811,6 @@ class TestParseCsv(unittest.TestCase):
         self.tmpdir = tempfile.mkdtemp()
 
     def tearDown(self):
-        import shutil
-
         shutil.rmtree(self.tmpdir)
 
     def test_returns_dict_with_key_zero(self):
@@ -882,8 +881,6 @@ class TestParseCsvFolder(unittest.TestCase):
         self.tmpdir = tempfile.mkdtemp()
 
     def tearDown(self):
-        import shutil
-
         shutil.rmtree(self.tmpdir)
 
     def _populate(self, names, n_sweeps=3, bad=False):
@@ -959,8 +956,6 @@ class TestParseAtf(unittest.TestCase):
         )
 
     def tearDown(self):
-        import shutil
-
         shutil.rmtree(self.tmpdir)
 
     def test_returns_dataframe(self):
@@ -1027,8 +1022,6 @@ class TestParseAtfFolder(unittest.TestCase):
         _write_synthetic_atf(Path(self.tmpdir) / "rec2.atf", n_sweeps=3, n_timepoints=10, n_channels=1)
 
     def tearDown(self):
-        import shutil
-
         shutil.rmtree(self.tmpdir)
 
     def test_returns_dataframe(self):
@@ -1058,8 +1051,6 @@ class TestSampleAtf(unittest.TestCase):
         )
 
     def tearDown(self):
-        import shutil
-
         shutil.rmtree(self.tmpdir)
 
     def test_returns_dict_with_required_keys(self):
@@ -1097,8 +1088,6 @@ class TestSource2dfsAtf(unittest.TestCase):
         _write_synthetic_atf(self.atf_folder / "b.atf", n_sweeps=2, n_timepoints=10, n_channels=1)
 
     def tearDown(self):
-        import shutil
-
         shutil.rmtree(self.tmpdir)
 
     def test_single_atf_returns_dict(self):
@@ -1144,8 +1133,6 @@ class TestCsvRoundTrip(unittest.TestCase):
         self.tmpdir = tempfile.mkdtemp()
 
     def tearDown(self):
-        import shutil
-
         shutil.rmtree(self.tmpdir)
 
     def test_round_trip_preserves_sweep_count(self):
