@@ -201,6 +201,9 @@ class ExportMixin:
             out_path_png = (
                 export_dir / f"{self.projectname}_{template_key}_{panel_name}.png"
             )
+            print(f"Saved image: {out_path_png}")
             fig.savefig(out_path_png, dpi=template.dpi, bbox_inches="tight")
 
-        self._export_status(f"Exported {template.name} figures to {export_dir}")
+        self._export_status(
+            f"Exported {len(figures)} {template.name} figures to {export_dir}"
+        )

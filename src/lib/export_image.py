@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, Optional
 
 import matplotlib
 import matplotlib.figure
@@ -19,6 +19,7 @@ class JournalTemplate:
     # Line widths in points
     linewidth_data: float = 0.75
     linewidth_axes: float = 0.5
+    linewidth_error: float = 0.5
     # DPI for raster outputs
     dpi: int = 600
     # Which panels to include
@@ -52,7 +53,7 @@ def render_publication_figure(
     uiplot,
     template: JournalTemplate,
     selected_groups: list[str],
-    group_names: dict[str, str] = None,
+    group_names: Optional[dict[str, str]] = None,
 ) -> dict[str, matplotlib.figure.Figure]:
     """
     Render a standalone, publication-quality figure from ax1 and ax2 of selected groups.
@@ -181,6 +182,7 @@ def render_publication_figure(
                         fmt="o",
                         markersize=3,
                         linewidth=template.linewidth_data,
+                        elinewidth=template.linewidth_error,
                         capsize=0,
                     )
                 else:
