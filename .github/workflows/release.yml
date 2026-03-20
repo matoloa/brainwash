@@ -26,6 +26,13 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --group build
 
+      - name: Extract version from pyproject.toml
+        shell: pwsh
+        run: |
+          $version = uv run python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])"
+          echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Output "Extracted version: $version"
+
       - name: Build with cx_Freeze
         working-directory: ./src
         run: uv run python build_with_cxfreeze_multiarch_setup.py build_exe
@@ -40,10 +47,19 @@ jobs:
           $rel = $exe_dir.Substring("$env:GITHUB_WORKSPACE\".Length)
           Write-Output "EXE_DIR=$rel" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Set artifact name
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "ARTIFACT_NAME=brainwash-${{ github.ref_name }}-windows-portable" >> $GITHUB_ENV
+          else
+            echo "ARTIFACT_NAME=brainwash-main-v${{ env.VERSION }}-windows-portable" >> $GITHUB_ENV
+          fi
+
       - name: Upload Windows artefact
         uses: actions/upload-artifact@v4
         with:
-          name: brainwash-${{ github.ref_name }}-windows-portable
+          name: ${{ env.ARTIFACT_NAME }}
           path: ${{ env.EXE_DIR }}
           compression-level: 6
 
@@ -55,21 +71,42 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          python-version: "3.12"
+
+      - name: Extract version from pyproject.toml
+        run: |
+          VERSION=$(uv run python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Extracted version: $VERSION"
+
+      - name: Set artifact name
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "ARTIFACT_NAME=brainwash-${{ github.ref_name }}-windows-portable" >> $GITHUB_ENV
+          else
+            echo "ARTIFACT_NAME=brainwash-main-v${{ env.VERSION }}-windows-portable" >> $GITHUB_ENV
+          fi
+
       - name: Download all artefacts
         uses: actions/download-artifact@v4
         with:
-          name: brainwash-${{ github.ref_name }}-windows-portable
+          name: ${{ env.ARTIFACT_NAME }}
           path: brainwash
 
       - name: Zip for release
-        run: zip -r brainwash-${{ github.ref_name }}-windows-portable.zip brainwash/
+        run: zip -r ${{ env.ARTIFACT_NAME }}.zip brainwash/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          files: brainwash-${{ github.ref_name }}-windows-portable.zip
+          files: ${{ env.ARTIFACT_NAME }}.zip
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
           generate_release_notes: true
