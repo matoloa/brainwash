@@ -923,6 +923,7 @@ class UIsub(
             print("No parsed recordings selected.")
             uistate.list_idx_select_stims = []
             self.update_show()
+            self.zoomAuto()
             self.graphRefresh()
             return
 
@@ -1434,6 +1435,44 @@ class UIsub(
         self.graphRefresh()
 
     @staticmethod
+    def _xlim_from_artists(axis, pad=0.05, min_span=1.0):
+        import matplotlib.collections as mcoll
+
+        all_x = []
+        for line in axis.get_lines():
+            if not line.get_visible():
+                continue
+            xdata = np.asarray(line.get_xdata(), dtype=float).ravel()
+            mask = np.isfinite(xdata)
+            if mask.any():
+                all_x.append(xdata[mask])
+
+        for coll in axis.collections:
+            if not coll.get_visible():
+                continue
+            if isinstance(coll, mcoll.PolyCollection):
+                for path in coll.get_paths():
+                    vertices = path.vertices
+                    if vertices.size == 0:
+                        continue
+                    xdata = vertices[:, 0]
+                    mask = np.isfinite(xdata)
+                    if mask.any():
+                        all_x.append(xdata[mask])
+
+        if not all_x:
+            return None
+        xall = np.concatenate(all_x)
+        lo, hi = float(xall.min()), float(xall.max())
+        span = hi - lo
+        if span < min_span:
+            span = max(abs(hi), min_span)
+            lo, hi = hi - span, hi + span
+        lo = lo - pad * span
+        hi = hi + pad * span
+        return (lo, hi)
+
+    @staticmethod
     def _ylim_from_artists(
         axis, pad=0.10, min_span=1e-9, x_min=None, x_max=None, ymin=None
     ):
@@ -1467,6 +1506,28 @@ class UIsub(
             if finite.size < 2:  # skip markers / degenerate artists
                 continue
             all_y.append(finite)
+
+        import matplotlib.collections as mcoll
+
+        for coll in axis.collections:
+            if not coll.get_visible():
+                continue
+            if isinstance(coll, mcoll.PolyCollection):
+                for path in coll.get_paths():
+                    vertices = path.vertices
+                    if vertices.size == 0:
+                        continue
+                    xdata = vertices[:, 0]
+                    ydata = vertices[:, 1]
+                    mask = np.isfinite(ydata)
+                    if x_min is not None:
+                        mask &= xdata >= x_min
+                    if x_max is not None:
+                        mask &= xdata <= x_max
+                    finite = ydata[mask]
+                    if finite.size > 0:
+                        all_y.append(finite)
+
         if not all_y:
             return None
         yall = np.concatenate(all_y)
@@ -1518,9 +1579,35 @@ class UIsub(
         # set and apply Auto-zoom parameters for all axes
         self.usage("zoomAuto")
         prow = self.get_prow()
+
+        ymin_clamp = 0 if uistate.checkBox["output_ymin0"] else None
+
         if prow is None:
-            logger.debug("zoomAuto: no recording selected, skipping")
+            logger.debug("zoomAuto: no recording selected, fitting to visible groups")
+            # For output axes, determine xlim from visible artists across both axes
+            xlim1 = self._xlim_from_artists(uistate.ax1)
+            xlim2 = self._xlim_from_artists(uistate.ax2)
+
+            if xlim1 and xlim2:
+                out_xmin, out_xmax = min(xlim1[0], xlim2[0]), max(xlim1[1], xlim2[1])
+            elif xlim1:
+                out_xmin, out_xmax = xlim1
+            elif xlim2:
+                out_xmin, out_xmax = xlim2
+            else:
+                out_xmin, out_xmax = (0, 1)
+
+            uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
+            uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(
+                uistate.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
+            ) or (0, 1.5)
+            uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(
+                uistate.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
+            ) or (0, 1.5)
+            self.zoomReset(uistate.ax1)
+            self.zoomReset(uistate.ax2)
             return
+
         # axm: derive from raw mean voltage data with fractional padding.
         # _ylim_from_artists is intentionally not used here: axm also contains
         # axvline artists (stim selection markers) whose y-data spans [0, 1] in
@@ -1548,21 +1635,23 @@ class UIsub(
         )
         # ax1 / ax2: fit to plotted output artists; fall back to (0, 1.5).
         # Clamp bottom to zero only when output_ymin0 is checked.
-        ymin_clamp = 0 if uistate.checkBox["output_ymin0"] else None
+
+        dft = self.get_dft(row=prow)
+        uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow, dft=dft)
+        out_xmin, out_xmax = uistate.zoom["output_xlim"]
+
         uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(
-            uistate.ax1, ymin=ymin_clamp
+            uistate.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
         ) or (
             0,
             1.5,
         )
         uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(
-            uistate.ax2, ymin=ymin_clamp
+            uistate.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
         ) or (
             0,
             1.5,
         )
-        dft = self.get_dft(row=prow)
-        uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow, dft=dft)
         self.zoomReset()
         self._recalc_axe_drag_zones()
         self._recalc_axm_detection_zones()

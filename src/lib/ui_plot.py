@@ -762,10 +762,10 @@ class UIplot:
         x = df_groupmean.sweep
         label_mean = f"{group_name} {str_aspect} mean"
         label_norm = f"{group_name} {str_aspect} norm"
-        y_mean = df_groupmean[f"{aspect}_mean"].fillna(0)
-        y_mean_SEM = df_groupmean[f"{aspect}_SEM"].fillna(0)
-        y_norm = df_groupmean[f"{aspect}_norm_mean"].fillna(0)
-        y_norm_SEM = df_groupmean[f"{aspect}_norm_SEM"].fillna(0)
+        y_mean = df_groupmean[f"{aspect}_mean"]
+        y_mean_SEM = df_groupmean[f"{aspect}_SEM"]
+        y_norm = df_groupmean[f"{aspect}_norm_mean"]
+        y_norm_SEM = df_groupmean[f"{aspect}_norm_SEM"]
 
         print(f"y_mean: {y_mean}")
         print(f"y_mean_SEM: {y_mean_SEM}")
