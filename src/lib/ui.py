@@ -1555,6 +1555,7 @@ class UIsub(
         self.usage(f"filter_mode_changed → {mode}")
         uistate.settings["filter"] = mode
         print(f"filter_mode_changed: uistate.settings['filter'] set to {mode}")
+        self.frameToolFilterSavgol.setVisible(mode == "savgol")
 
         df_p = self.get_df_project()
         if "filter" in df_p.columns and df_p["filter"].dtype != object:
@@ -1677,13 +1678,7 @@ class UIsub(
         self.usage(f"viewSettingsChanged {key}, {state == 2}")
         if key in uistate.checkBox.keys():
             uistate.checkBox[key] = state == 2
-            if key == "norm_EPSP":
-                self.label_norm_on_sweep.setVisible(state == 2)
-                self.label_relative_to.setVisible(state == 2)
-                self.lineEdit_norm_EPSP_start.setVisible(state == 2)
-                self.lineEdit_norm_EPSP_end.setVisible(state == 2)
-                self.zoomAuto()
-            elif key == "splitOddEven":
+            if key == "splitOddEven":
                 self.checkBox_splitOddEven_changed(state)
             elif key == "timepoints_per_stim":
                 self.checkBox_timepoints_per_stim_changed(state)
@@ -1909,6 +1904,7 @@ class UIsub(
         # apply viewstates for tool frames in the toolbar
         for frame, (text, state) in uistate.viewTools.items():
             getattr(self, frame).setVisible(state)
+        self.frameToolFilterSavgol.setVisible(uistate.settings.get("filter", "voltage") == "savgol")
 
     def build_dict_folders(self):
         dict_folders = {
@@ -2061,11 +2057,6 @@ class UIsub(
         self.lineEdit_savgol_window.setText(str(uistate.lineEdit.get("savgol_window", 9)))
         self.lineEdit_savgol_poly.setText(str(uistate.lineEdit.get("savgol_poly", 3)))
 
-        norm = uistate.checkBox["norm_EPSP"]
-        self.label_norm_on_sweep.setVisible(norm)
-        self.label_relative_to.setVisible(norm)
-        self.lineEdit_norm_EPSP_start.setVisible(norm)
-        self.lineEdit_norm_EPSP_end.setVisible(norm)
         self.lineEdit_norm_EPSP_start.setText(f"{uistate.lineEdit['norm_EPSP_from']}")
         self.lineEdit_norm_EPSP_end.setText(f"{uistate.lineEdit['norm_EPSP_to']}")
         self.lineEdit_split_at_time.setText(f"{uistate.lineEdit['split_at_time'] * 1000:g}")
@@ -2096,13 +2087,13 @@ class UIsub(
         new_group_name = RenameDialog.showInputDialog(title="Rename group", query="")
         self.group_rename(group_ID, new_group_name)
 
-    def triggerStimAssignThreshold(self):
-        self.usage("triggerStimAssignThreshold")
-        print("Placeholder: triggerStimAssignThreshold")
+    def triggerStimAdd(self):
+        self.usage("triggerStimAdd")
+        print("Placeholder: triggerStimAdd")
 
-    def triggerStimDetect(self):
-        self.usage("triggerStimDetect")
-        self.stimDetect()
+    def triggerStimRemove(self):
+        self.usage("triggerStimRemove")
+        print("Placeholder: triggerStimRemove")
 
     def trigger_set_sweeps_even(self):
         self.usage("trigger_set_sweeps_even")

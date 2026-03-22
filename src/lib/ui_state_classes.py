@@ -111,10 +111,11 @@ class UIstate:
         self.viewTools = {  # these are cycled by uisub.connectUIstate; framename: [title, visible]
             "frameToolStim": ["Stim detection", True],
             "frameToolSweeps": ["Sweep selection", True],
-            "frameToolAspect": ["Aspect toggles", True],
             "frameToolBin": ["Binning", True],
+            "frameToolFilter": ["Filter", True],
             "frameToolXscale": ["X axis", True],
             "frameToolYscale": ["Y scaling", True],
+            "frameToolAspect": ["Aspect toggles", True],
             "frameToolPairedStim": ["Paired stims", False],
         }
         self.checkBox = {  # these are cycled by uisub.connectUIstate; maintain format!
@@ -125,7 +126,6 @@ class UIstate:
             "volley_slope": False,
             "volley_slope_mean": True,  # display mean of volley_slope in output
             "splitOddEven": False,  # split parsed file into odd _1 and even _2 recordings
-            "show_all_events": False,  # show ghosts of non-selected events in eventgraph output graph
             "timepoints_per_stim": False,  # allow setting (non-uniform) timepoints per stim
             "output_ymin0": True,  # set output y-axis minimum to 0
             # break these out to separate mod-class?
@@ -224,15 +224,14 @@ class UIstate:
         # Do NOT persist these
         self.pushButtons = {  # these are cycled by uisub.connectUIstate; buttonname: methodname
             # stim detection
-            "pushButton_stim_assign_threshold": "triggerStimAssignThreshold",
-            "pushButton_stim_detect": "triggerStimDetect",
+            "pushButton_stim_add": "triggerStimAdd",
+            "pushButton_stim_remove": "triggerStimRemove",
             # sweep selection
             "pushButton_sweeps_even": "trigger_set_sweeps_even",
             "pushButton_sweeps_odd": "trigger_set_sweeps_odd",
             # aspect toggles
             "pushButton_paired_data_flip": "pushButton_paired_data_flip_pressed",
             # output scaling
-            "pushButton_norm_range_set_all": "trigger_set_norm_range_all",
         }
         self.x_select = {  # selected ranges on mean- and output graphs
             # start and end: current drag operation; None if not dragging
