@@ -23,4 +23,5 @@
   "python": {
     "defaultFormatter": "ruff",
   },
+  "format_on_save": "on",
 }

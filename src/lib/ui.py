@@ -119,7 +119,7 @@ class Config:
 
         toml_path = _find_file("pyproject.toml")
         if toml_path is None:
-            raise FileNotFoundError("pyproject.toml not found. Searched relative to executable, " "source file, and all sys.path entries.")
+            raise FileNotFoundError("pyproject.toml not found. Searched relative to executable, source file, and all sys.path entries.")
         logger.debug("Config: loading pyproject.toml from %s", toml_path)
 
         bwcfg_path = _find_file("bw_cfg.yaml")
@@ -771,13 +771,7 @@ class UIsub(
         self.progressBar.setValue(0)
 
         if config.hide_experimental:
-            self.checkBox_show_all_events.setVisible(False)
-            self.checkBox_paired_stims.setVisible(False)
-            self.checkBox_timepoints_per_stim.setVisible(False)
-            self.pushButton_stim_assign_threshold.setVisible(False)
-            self.pushButton_stim_detect.setVisible(False)
-            self.label_stim_detection_threshold.setVisible(False)
-            self.pushButton_norm_range_set_all.setVisible(False)
+            self.frameToolPairedStim.setVisible(False)
 
         logger.debug("Pre-bootstrap")
         self.bootstrap(mainwindow)  # set up general UI
@@ -1915,11 +1909,6 @@ class UIsub(
         # apply viewstates for tool frames in the toolbar
         for frame, (text, state) in uistate.viewTools.items():
             getattr(self, frame).setVisible(state)
-        # TODO:
-        # connect paired stim checkbox and flip button to local functions
-        # self.checkBox_paired_stims.setChecked(uistate.checkBox['paired_stims'])
-        # self.checkBox_paired_stims.stateChanged.connect(lambda state: self.checkBox_paired_stims_changed(state))
-        # self.pushButton_paired_data_flip.pressed.connect(self.pushButton_paired_data_flip_pressed)
 
     def build_dict_folders(self):
         dict_folders = {
@@ -2101,17 +2090,15 @@ class UIsub(
         self.update_show()
         self.mouseoverUpdate()
 
-    def checkBox_paired_stims_changed(self, state):
-        self.usage("checkBox_paired_stims_changed")
-        uistate.checkBox["paired_stims"] = bool(state)
-        print(f"checkBox_paired_stims_changed: {uistate.checkBox['paired_stims']}")
-        # TODO: reconnect this
-
     def triggerGroupRename(self, group_ID):
         self.usage("triggerGroupRename")
         RenameDialog = InputDialogPopup()
         new_group_name = RenameDialog.showInputDialog(title="Rename group", query="")
         self.group_rename(group_ID, new_group_name)
+
+    def triggerStimAssignThreshold(self):
+        self.usage("triggerStimAssignThreshold")
+        print("Placeholder: triggerStimAssignThreshold")
 
     def triggerStimDetect(self):
         self.usage("triggerStimDetect")
@@ -2928,7 +2915,7 @@ class UIsub(
             thread.status_update.connect(self.updateStatusBar)
             thread.finished.connect(self.onParseDataFinished)
             thread.finished.connect(thread.deleteLater)  # Auto-cleanup when done
-            thread.finished.connect(lambda: (self._threads.remove(thread) if thread in self._threads else None))
+            thread.finished.connect(lambda: self._threads.remove(thread) if thread in self._threads else None)
             thread.finished.connect(lambda: setattr(self, "_current_parse_thread", None))
             self._threads.append(thread)
             thread.start()

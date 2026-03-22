@@ -224,11 +224,13 @@ class UIstate:
         # Do NOT persist these
         self.pushButtons = {  # these are cycled by uisub.connectUIstate; buttonname: methodname
             # stim detection
+            "pushButton_stim_assign_threshold": "triggerStimAssignThreshold",
             "pushButton_stim_detect": "triggerStimDetect",
             # sweep selection
             "pushButton_sweeps_even": "trigger_set_sweeps_even",
             "pushButton_sweeps_odd": "trigger_set_sweeps_odd",
             # aspect toggles
+            "pushButton_paired_data_flip": "pushButton_paired_data_flip_pressed",
             # output scaling
             "pushButton_norm_range_set_all": "trigger_set_norm_range_all",
         }
@@ -470,7 +472,7 @@ class UIstate:
             else:
                 stims = prow["stims"]
                 if pd.isna(stims):
-                    raise ValueError("x_axis_xlim called in stim mode but prow['stims'] is NaN " "and no dft was provided")
+                    raise ValueError("x_axis_xlim called in stim mode but prow['stims'] is NaN and no dft was provided")
                 n = int(stims)
                 stim_min = 1
                 stim_max = n
@@ -588,12 +590,12 @@ class UIstate:
                 continue
             # Each zoom value must be a 2-tuple of numbers (or None for open bounds).
             if not isinstance(persisted, (tuple, list)) or len(persisted) != 2:
-                print(f"set_state: discarding zoom[{key!r}] = {persisted!r} " f"(expected 2-tuple, got {type(persisted).__name__})")
+                print(f"set_state: discarding zoom[{key!r}] = {persisted!r} (expected 2-tuple, got {type(persisted).__name__})")
                 validated_zoom[key] = default_val
                 continue
             lo, hi = persisted
             if not (_ok(lo) and _ok(hi)):
-                print(f"set_state: discarding zoom[{key!r}] = {persisted!r} " f"(tuple elements must be numeric or None)")
+                print(f"set_state: discarding zoom[{key!r}] = {persisted!r} (tuple elements must be numeric or None)")
                 validated_zoom[key] = default_val
                 continue
             validated_zoom[key] = tuple(persisted)
