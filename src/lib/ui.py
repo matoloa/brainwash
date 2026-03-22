@@ -1684,6 +1684,10 @@ class UIsub(
                 self.checkBox_timepoints_per_stim_changed(state)
             elif key == "output_ymin0":
                 self.zoomAuto()
+            elif key in ["EPSP_amp", "volley_amp"]:
+                self.frameToolAspectAmp.setVisible(uistate.checkBox["EPSP_amp"] or uistate.checkBox["volley_amp"])
+            elif key in ["EPSP_slope", "volley_slope"]:
+                self.frameToolAspectAmp_2.setVisible(uistate.checkBox["EPSP_slope"] or uistate.checkBox["volley_slope"])
 
         self.update_show()
         self.mouseoverUpdate()
@@ -1905,6 +1909,8 @@ class UIsub(
         for frame, (text, state) in uistate.viewTools.items():
             getattr(self, frame).setVisible(state)
         self.frameToolFilterSavgol.setVisible(uistate.settings.get("filter", "voltage") == "savgol")
+        self.frameToolAspectAmp.setVisible(uistate.checkBox.get("EPSP_amp", False) or uistate.checkBox.get("volley_amp", False))
+        self.frameToolAspectAmp_2.setVisible(uistate.checkBox.get("EPSP_slope", False) or uistate.checkBox.get("volley_slope", False))
 
     def build_dict_folders(self):
         dict_folders = {
