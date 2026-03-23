@@ -1005,10 +1005,13 @@ class UIsub(
 
         # build the list uistate.list_idx_select_stims with indices
         uistate.list_idx_select_stims = [index.row() for index in selected_indexes]
+        
+        self.update_stim_buttons()
         self.update_show()
         self.zoomAuto()
         self.update_amp_lineEdits()
         self.update_slope_lineEdits()
+        self.update_stim_buttons()
         self.mouseoverUpdate()
 
     def _is_rec_visible(self, v: dict, selected_ids: set, selected_stims: set) -> bool:
@@ -1299,10 +1302,14 @@ class UIsub(
             """
             self.tableProj.setStyleSheet(table_style)
             self.tableStim.setStyleSheet(table_style)
+            if hasattr(self, "tableTimetable"):
+                self.tableTimetable.setStyleSheet(table_style)
         else:
             self.mainwindow.setStyleSheet("")
             self.tableProj.setStyleSheet("")
             self.tableStim.setStyleSheet("")
+            if hasattr(self, "tableTimetable"):
+                self.tableTimetable.setStyleSheet("")
             self.progressBar.setStyleSheet(
                 "QProgressBar { text-align: center; color: #000; font-weight: bold; background-color: #e0e0e0; border: 1px solid #bbb; border-radius: 3px; }"
                 "QProgressBar::chunk { background-color: #4caf50; border-radius: 3px; }"
@@ -1714,6 +1721,7 @@ class UIsub(
             elif key in ["EPSP_slope", "volley_slope"]:
                 self.frameToolAspectSlope.setVisible(uistate.checkBox["EPSP_slope"] or uistate.checkBox["volley_slope"])
 
+        self.update_stim_buttons()
         self.update_show()
         self.mouseoverUpdate()
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
@@ -2138,6 +2146,7 @@ class UIsub(
         print(f"groupCheckboxChanged: {str(group_ID)} = {state}")
         self.dd_groups[group_ID]["show"] = state == 2
         self.group_save_dd()
+        self.update_stim_buttons()
         self.update_show()
         self.mouseoverUpdate()
 
@@ -2149,11 +2158,132 @@ class UIsub(
 
     def triggerStimAdd(self):
         self.usage("triggerStimAdd")
-        print("Placeholder: triggerStimAdd")
+        if not uistate.list_idx_select_recs:
+            print("triggerStimAdd: No files selected.")
+            return
+            
+        t_start = uistate.x_select["mean_start"]
+        if t_start is None:
+            print("triggerStimAdd: No selection in axm.")
+            return
+
+        df_p = self.get_df_project()
+
+        for index in uistate.list_idx_select_recs:
+            p_row = df_p.loc[index]
+            rec_name = p_row["recording_name"]
+            rec_ID = p_row["ID"]
+
+            df_t = self.get_dft(p_row)
+            
+            new_row = uistate.default_dict_t.copy()
+            new_row["t_stim"] = t_start
+            
+            df_new = pd.DataFrame([new_row])
+            
+            df_t = pd.concat([df_t, df_new], ignore_index=True)
+            df_t = df_t.sort_values("t_stim").reset_index(drop=True)
+            df_t["stim"] = range(1, len(df_t) + 1)
+            
+            self.set_dft(rec_name, df_t)
+            df_p.loc[p_row["ID"] == df_p["ID"], "stims"] = len(df_t)
+            
+            self.dict_outputs.pop(rec_name, None)
+            path_output = self.dict_folders["cache"] / f"{rec_name}_output.parquet"
+            if path_output.exists():
+                path_output.unlink()
+                
+            dfoutput = self.get_dfoutput(p_row)
+            
+            uiplot.unPlot(rec_ID)
+            dfmean = self.get_dfmean(p_row)
+            uiplot.addRow(p_row, df_t, dfmean, dfoutput)
+
+        self.set_df_project(df_p)
+
+        uistate.x_select["mean_start"] = None
+        uistate.x_select["mean_end"] = None
+        self.lineEdit_mean_selection_start.setText("")
+        self.lineEdit_mean_selection_end.setText("")
+
+        uistate.list_idx_select_stims = [0]
+        p_row = df_p.loc[uistate.list_idx_select_recs[0]]
+        df_t = self.get_dft(p_row)
+        self.tableStimModel.setData(df_t)
+        if len(df_t) > 0:
+            self.tableStim.selectRow(0)
+
+        self.update_show(reset=True)
+        self.zoomAuto()
+        self.update_amp_lineEdits()
+        self.update_slope_lineEdits()
+        self.update_stim_buttons()
+        self.mouseoverUpdate()
 
     def triggerStimRemove(self):
         self.usage("triggerStimRemove")
-        print("Placeholder: triggerStimRemove")
+        if not uistate.list_idx_select_recs:
+            print("triggerStimRemove: No files selected.")
+            return
+        if not uistate.list_idx_select_stims:
+            print("triggerStimRemove: No stims selected to remove.")
+            return
+        if self.tableStimModel and self.tableStimModel.rowCount(None) <= 1:
+            print("triggerStimRemove: Cannot remove the last stim.")
+            return
+
+        df_p = self.get_df_project()
+        
+        for index in uistate.list_idx_select_recs:
+            p_row = df_p.loc[index]
+            rec_name = p_row["recording_name"]
+            rec_ID = p_row["ID"]
+            
+            df_t = self.get_dft(p_row)
+            dfoutput = self.get_dfoutput(p_row)
+            
+            stims_to_remove = sorted(uistate.list_idx_select_stims, reverse=True)
+            for idx_stim in stims_to_remove:
+                if idx_stim < len(df_t):
+                    stim_id = df_t.iloc[idx_stim]["stim"]
+                    # Drop from dft
+                    df_t = df_t.drop(idx_stim).reset_index(drop=True)
+                    # Drop from dfoutput
+                    dfoutput = dfoutput[dfoutput["stim"] != stim_id].reset_index(drop=True)
+
+            # Re-index remaining stims starting from 1
+            if not df_t.empty:
+                df_t["stim"] = range(1, len(df_t) + 1)
+                # Remap the output stim IDs as well
+                stim_mapping = {old: new for new, old in enumerate(dfoutput["stim"].unique(), 1)}
+                dfoutput["stim"] = dfoutput["stim"].map(stim_mapping)
+            
+            # Save changes
+            self.set_dft(rec_name, df_t)
+            df_p.loc[p_row["ID"] == df_p["ID"], "stims"] = len(df_t)
+            self.persistOutput(rec_name, dfoutput, p_row=p_row)
+            
+            # Unplot and replot to update visuals
+            uiplot.unPlot(rec_ID)
+            dfmean = self.get_dfmean(p_row)
+            uiplot.addRow(p_row, df_t, dfmean, dfoutput)
+
+        self.set_df_project(df_p)
+        
+        # Reset selection to first stim (or empty if none left)
+        uistate.list_idx_select_stims = [0] if len(df_t) > 0 else []
+        p_row = df_p.loc[uistate.list_idx_select_recs[0]]
+        df_t = self.get_dft(p_row)
+        self.tableStimModel.setData(df_t)
+        if len(df_t) > 0:
+            self.tableStim.selectRow(0)
+            
+        self.update_show(reset=True)
+        self.zoomAuto()
+        self.update_amp_lineEdits()
+        self.update_slope_lineEdits()
+        self.update_stim_buttons()
+        self.mouseoverUpdate()
 
     def trigger_set_sweeps_even(self):
         self.usage("trigger_set_sweeps_even")
@@ -2582,6 +2712,24 @@ class UIsub(
             self.lineEdit_volley_amp_halfwidth.setText("")
 
         self.connectUIstate(disconnect=False)
+
+    def update_stim_buttons(self):
+        if hasattr(self, "pushButton_stim_add"):
+            has_selection = uistate.x_select.get("mean_start") is not None
+            self.pushButton_stim_add.setEnabled(has_selection)
+            # Optional visual styling cue for disabled state if generic qt css doesn't apply well
+            if has_selection:
+                self.pushButton_stim_add.setStyleSheet("")
+            else:
+                self.pushButton_stim_add.setStyleSheet("color: gray;")
+            
+        if hasattr(self, "pushButton_stim_remove"):
+            if self.tableStimModel and self.tableStimModel.rowCount(None) <= 1:
+                self.pushButton_stim_remove.setEnabled(False)
+                self.pushButton_stim_remove.setStyleSheet("color: gray;")
+            else:
+                self.pushButton_stim_remove.setEnabled(True)
+                self.pushButton_stim_remove.setStyleSheet("")
 
     def update_slope_lineEdits(self):
         if not uistate.list_idx_select_recs:
