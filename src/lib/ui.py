@@ -964,6 +964,7 @@ class UIsub(
         self.update_show()
         self.zoomAuto()
         self.update_amp_lineEdits()
+        self.update_slope_lineEdits()
 
         t0 = time.time()
         self.mouseoverUpdate()  # always ends with a single graphRefresh()
@@ -984,6 +985,7 @@ class UIsub(
         self.update_show()
         self.zoomAuto()
         self.update_amp_lineEdits()
+        self.update_slope_lineEdits()
         self.mouseoverUpdate()
 
     def _is_rec_visible(self, v: dict, selected_ids: set, selected_stims: set) -> bool:
@@ -2511,12 +2513,12 @@ class UIsub(
         if len(selected_EPSP_hws) == 1:
             self.lineEdit_EPSP_amp_halfwidth.setText(f"{selected_EPSP_hws.pop():g}")
         else:
-            self.lineEdit_EPSP_amp_halfwidth.setText("-")
+            self.lineEdit_EPSP_amp_halfwidth.setText("")
 
         if len(selected_volley_hws) == 1:
             self.lineEdit_volley_amp_halfwidth.setText(f"{selected_volley_hws.pop():g}")
         else:
-            self.lineEdit_volley_amp_halfwidth.setText("-")
+            self.lineEdit_volley_amp_halfwidth.setText("")
 
         self.connectUIstate(disconnect=False)
 
@@ -2543,12 +2545,12 @@ class UIsub(
         if len(selected_EPSP_ws) == 1:
             self.lineEdit_EPSP_slope_width.setText(f"{selected_EPSP_ws.pop():g}")
         else:
-            self.lineEdit_EPSP_slope_width.setText("-")
+            self.lineEdit_EPSP_slope_width.setText("")
 
         if len(selected_volley_ws) == 1:
             self.lineEdit_volley_slope_width.setText(f"{selected_volley_ws.pop():g}")
         else:
-            self.lineEdit_volley_slope_width.setText("-")
+            self.lineEdit_volley_slope_width.setText("")
 
         self.connectUIstate(disconnect=False)
 
@@ -2568,17 +2570,31 @@ class UIsub(
             df_t = self.get_dft(prow)
             stims_to_edit = uistate.list_idx_select_stims if uistate.list_idx_select_stims else [0]
 
-            if lineEditName == "lineEdit_EPSP_slope_width" and df_t["t_EPSP_slope_width"].dtype != "float64":
-                df_t["t_EPSP_slope_width"] = df_t["t_EPSP_slope_width"].astype("float64")
-            elif lineEditName == "lineEdit_volley_slope_width" and df_t["t_volley_slope_width"].dtype != "float64":
-                df_t["t_volley_slope_width"] = df_t["t_volley_slope_width"].astype("float64")
+            if lineEditName == "lineEdit_EPSP_slope_width":
+                if df_t["t_EPSP_slope_width"].dtype != "float64":
+                    df_t["t_EPSP_slope_width"] = df_t["t_EPSP_slope_width"].astype("float64")
+                if "t_EPSP_slope_end" in df_t.columns and df_t["t_EPSP_slope_end"].dtype != "float64":
+                    df_t["t_EPSP_slope_end"] = df_t["t_EPSP_slope_end"].astype("float64")
+                if "t_EPSP_slope_halfwidth" in df_t.columns and df_t["t_EPSP_slope_halfwidth"].dtype != "float64":
+                    df_t["t_EPSP_slope_halfwidth"] = df_t["t_EPSP_slope_halfwidth"].astype("float64")
+            elif lineEditName == "lineEdit_volley_slope_width":
+                if df_t["t_volley_slope_width"].dtype != "float64":
+                    df_t["t_volley_slope_width"] = df_t["t_volley_slope_width"].astype("float64")
+                if "t_volley_slope_end" in df_t.columns and df_t["t_volley_slope_end"].dtype != "float64":
+                    df_t["t_volley_slope_end"] = df_t["t_volley_slope_end"].astype("float64")
+                if "t_volley_slope_halfwidth" in df_t.columns and df_t["t_volley_slope_halfwidth"].dtype != "float64":
+                    df_t["t_volley_slope_halfwidth"] = df_t["t_volley_slope_halfwidth"].astype("float64")
 
             for idx_stim in stims_to_edit:
                 if idx_stim < len(df_t):
                     if lineEditName == "lineEdit_EPSP_slope_width":
                         df_t.at[idx_stim, "t_EPSP_slope_width"] = val_in_seconds
+                        df_t.at[idx_stim, "t_EPSP_slope_end"] = df_t.at[idx_stim, "t_EPSP_slope_start"] + val_in_seconds
+                        df_t.at[idx_stim, "t_EPSP_slope_halfwidth"] = val_in_seconds / 2.0
                     elif lineEditName == "lineEdit_volley_slope_width":
                         df_t.at[idx_stim, "t_volley_slope_width"] = val_in_seconds
+                        df_t.at[idx_stim, "t_volley_slope_end"] = df_t.at[idx_stim, "t_volley_slope_start"] + val_in_seconds
+                        df_t.at[idx_stim, "t_volley_slope_halfwidth"] = val_in_seconds / 2.0
 
             self.set_dft(prow["recording_name"], df_t)
 
@@ -4427,6 +4443,8 @@ class UIsub(
             df_groupmean = self.get_dfgroupmean(group_ID)
             uiplot.addGroup(group_ID, self.dd_groups[group_ID], df_groupmean)
         self.mouseoverUpdate()
+        self.update_amp_lineEdits()
+        self.update_slope_lineEdits()
 
         if config.talkback:
             self.talkback()
