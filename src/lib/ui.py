@@ -987,10 +987,11 @@ class UIsub(
 
             uistate.mean_mouseover_stim_select = None
             
-            # Let the signal trigger a recursive call to stimSelectionChanged
-            # which will skip this block and update the rest of the UI naturally
+            # We temporarily unhook the signal, make the table change, and continue through THIS function.
+            # (Otherwise, recursive calls might skip parts of the setup or create feedback loops)
+            self.tableStim.selectionModel().blockSignals(True)
             self.tableStim.selectionModel().select(model_index, flag)
-            return
+            self.tableStim.selectionModel().blockSignals(False)
 
         selected_indexes = self.tableStim.selectionModel().selectedRows()
 
@@ -2107,6 +2108,11 @@ class UIsub(
 
         if hasattr(self, "actionToggleTimetable"):
             self.actionToggleTimetable.setChecked(getattr(uistate, "detailedTimetable", False))
+            
+        if hasattr(self, "actionTimetable"):
+            self.actionTimetable.setChecked(uistate.showTimetable)
+            
+        self.setTableStimVisibility(uistate.showTimetable)
 
         # Disconnect signals to prevent editingFinished from triggering from .setText
         self.connectUIstate(disconnect=True)
@@ -2363,13 +2369,21 @@ class UIsub(
         self.usage("triggerShowHeatmap")
         self.toggleHeatmap()
 
-    def triggerShowTimetable(self):
+    def triggerShowTimetable(self, checked=None):
         self.usage("triggerShowTimetable")
-        uistate.showTimetable = not uistate.showTimetable
+        if type(checked) == bool:
+            uistate.showTimetable = checked
+        else:
+            uistate.showTimetable = not uistate.showTimetable
+            
+        if hasattr(self, "actionTimetable"):
+            self.actionTimetable.setChecked(uistate.showTimetable)
+            
+        self.setTableStimVisibility(uistate.showTimetable)
+        
         if uistate.dict_rec_show:
             self.tableProjSelectionChanged()
         self.write_bw_cfg()
-        self.setTableStimVisibility(uistate.showTimetable)
 
     # triggerCopyTimepoints, triggerCopyOutput, triggerCopyProjectSummary,
     # triggerExportSweepsCsv, triggerExportSweepsXls,

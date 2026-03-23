@@ -539,6 +539,7 @@ class UIstate:
                 "zoom": self.zoom,
                 "default_dict_t": self.default_dict_t,
                 "x_axis_mode": self.x_axis_mode,
+                "showTimetable": self.showTimetable,
                 "detailedProjectTable": getattr(self, "detailedProjectTable", False),
                 "detailedTimetable": getattr(self, "detailedTimetable", False),
             }
@@ -553,6 +554,7 @@ class UIstate:
         self.colors = state.get("colors")
         self.splitter = state.get("splitter")
         self.x_axis_mode = state.get("x_axis_mode", "time")
+        self.showTimetable = state.get("showTimetable", False)
         self.detailedProjectTable = state.get("detailedProjectTable", False)
         self.detailedTimetable = state.get("detailedTimetable", False)
         # Filter out any keys saved in old configs that no longer exist as widgets.
