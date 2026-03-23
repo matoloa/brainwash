@@ -266,11 +266,15 @@ class UIstate:
         self.df_recs2plot = None  # df_project copy, filtered to selected AND parsed recordings (or all parsed, if none are selected)
 
         # Plotted lines and fills
-        self.dict_rec_labels = {}  # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, variant: str ("raw"|"norm"|None), axis: str, line: 2DlineObject}}
+        self.dict_rec_labels = (
+            {}
+        )  # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, variant: str ("raw"|"norm"|None), axis: str, line: 2DlineObject}}
         self.dict_rec_show = {}  # subset of dict_rec_labels containing only currently visible entries
 
         # Groups (mean of recs)
-        self.dict_group_labels = {}  # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, variant: str ("raw"|"norm"), axis: str, line: 2DlineObject, fill: 2DfillObject}}
+        self.dict_group_labels = (
+            {}
+        )  # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, variant: str ("raw"|"norm"), axis: str, line: 2DlineObject, fill: 2DfillObject}}
         self.dict_group_show = {}  # subset of dict_group_labels containing only currently visible entries
 
         # Mouseover variables
@@ -535,6 +539,8 @@ class UIstate:
                 "zoom": self.zoom,
                 "default_dict_t": self.default_dict_t,
                 "x_axis_mode": self.x_axis_mode,
+                "detailedProjectTable": getattr(self, "detailedProjectTable", False),
+                "detailedTimetable": getattr(self, "detailedTimetable", False),
             }
         except AttributeError:
             # One or more attributes are missing (e.g. loading a stale pickle).
@@ -547,6 +553,8 @@ class UIstate:
         self.colors = state.get("colors")
         self.splitter = state.get("splitter")
         self.x_axis_mode = state.get("x_axis_mode", "time")
+        self.detailedProjectTable = state.get("detailedProjectTable", False)
+        self.detailedTimetable = state.get("detailedTimetable", False)
         # Filter out any keys saved in old configs that no longer exist as widgets.
         # This lets us remove keys from these dicts without old cfg.pkl files
         # re-introducing stale keys on next load.

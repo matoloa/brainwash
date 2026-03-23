@@ -974,11 +974,11 @@ class UIsub(
         self.usage("stimSelectionChanged")
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableStim.clearSelection()
-            
+
         if uistate.mean_mouseover_stim_select is not None:  # clicked graph
             row = uistate.mean_mouseover_stim_select - 1
             model_index = self.tableStimModel.index(row, 0)
-            
+
             modifiers = QtWidgets.QApplication.keyboardModifiers()
             if modifiers & QtCore.Qt.ControlModifier:
                 flag = QtCore.QItemSelectionModel.Toggle | QtCore.QItemSelectionModel.Rows
@@ -991,8 +991,8 @@ class UIsub(
             uistate.mean_mouseover_stim_select = None
 
         selected_indexes = self.tableStim.selectionModel().selectedRows()
-        
-        if hasattr(self, 'tableTimetable') and self.tableTimetable is not None:
+
+        if hasattr(self, "tableTimetable") and self.tableTimetable is not None:
             if self.tableTimetable.model() is not None:
                 self.tableTimetable.selectionModel().blockSignals(True)
                 self.tableTimetable.clearSelection()
@@ -1867,7 +1867,12 @@ class UIsub(
         if uistate.checkBox["paired_stims"]:
             column_order.append("Tx")
 
-        col_indices = [df_p.columns.get_loc(name) for name in column_order]
+        if getattr(uistate, "detailedProjectTable", False):
+            for col_name in df_p.columns:
+                if col_name not in column_order:
+                    column_order.append(col_name)
+
+        col_indices = [df_p.columns.get_loc(name) for name in column_order if name in df_p.columns]
 
         # Show/hide columns and set resize behavior
         num_columns = df_p.shape[1]
@@ -1900,6 +1905,11 @@ class UIsub(
             "t_volley_amp",
             "t_volley_amp_method",
         ]
+        if getattr(uistate, "detailedTimetable", False):
+            for col_name in dft.columns:
+                if col_name not in column_order:
+                    column_order.append(col_name)
+
         col_indices = [dft.columns.get_loc(col) for col in column_order if col in dft.columns]
         num_columns = dft.shape[1]
         for col in range(num_columns):
@@ -2084,6 +2094,12 @@ class UIsub(
                 splitter.splitterMoved.connect(lambda pos, index, sn=splitter_name: self.onSplitterMoved(sn, pos, index))
 
     def applyConfigStates(self):
+        if hasattr(self, "actionToggleProjectTable"):
+            self.actionToggleProjectTable.setChecked(getattr(uistate, "detailedProjectTable", False))
+
+        if hasattr(self, "actionToggleTimetable"):
+            self.actionToggleTimetable.setChecked(getattr(uistate, "detailedTimetable", False))
+
         # Disconnect signals to prevent editingFinished from triggering from .setText
         self.connectUIstate(disconnect=True)
 
@@ -2178,6 +2194,28 @@ class UIsub(
         display = "0" if pd.isna(derived) else str(derived)
         self.lineEdit_bin_size.setText(display)
         self.recalculate()
+
+    def triggerToggleProjectTable(self):
+        self.usage("triggerToggleProjectTable")
+        if hasattr(self, "tableProj"):
+            uistate.detailedProjectTable = not getattr(uistate, "detailedProjectTable", False)
+            self.formatTableLayout()
+            if hasattr(self, "actionToggleProjectTable"):
+                self.actionToggleProjectTable.setChecked(uistate.detailedProjectTable)
+            uistate.save_cfg(projectfolder=self.dict_folders.get("project"))
+
+    def triggerToggleTimetable(self):
+        self.usage("triggerToggleTimetable")
+        if hasattr(self, "tableStim"):
+            uistate.detailedTimetable = not getattr(uistate, "detailedTimetable", False)
+            if uistate.list_idx_select_recs:
+                prow = self.get_prow(uistate.list_idx_select_recs[0])
+                if prow is not None:
+                    dft = self.get_dft(prow)
+                    self.formatTableStimLayout(dft)
+            if hasattr(self, "actionToggleTimetable"):
+                self.actionToggleTimetable.setChecked(uistate.detailedTimetable)
+            uistate.save_cfg(projectfolder=self.dict_folders.get("project"))
 
     def triggerRefresh(self):
         self.usage("refresh graphs")

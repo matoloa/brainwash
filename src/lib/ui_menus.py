@@ -75,6 +75,20 @@ class MenuMixin:
         self.menuEdit.addAction(self.actionSplitByTime)
 
         # View menu
+        self.actionToggleProjectTable = QtWidgets.QAction("Project detailed list")
+        self.actionToggleProjectTable.setCheckable(True)
+        self.actionToggleProjectTable.setChecked(True)
+        self.actionToggleProjectTable.triggered.connect(self.triggerToggleProjectTable)
+        self.menuView.addAction(self.actionToggleProjectTable)
+
+        self.actionToggleTimetable = QtWidgets.QAction("Timetable detailed list")
+        self.actionToggleTimetable.setCheckable(True)
+        self.actionToggleTimetable.setChecked(True)
+        self.actionToggleTimetable.triggered.connect(self.triggerToggleTimetable)
+        self.menuView.addAction(self.actionToggleTimetable)
+
+        self.menuView.addSeparator()
+
         self.actionRefresh = QtWidgets.QAction("Refresh Graphs")
         self.actionRefresh.triggered.connect(self.triggerRefresh)
         self.actionRefresh.setShortcut("F5")
