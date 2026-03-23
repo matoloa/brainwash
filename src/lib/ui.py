@@ -1687,7 +1687,7 @@ class UIsub(
             elif key in ["EPSP_amp", "volley_amp"]:
                 self.frameToolAspectAmp.setVisible(uistate.checkBox["EPSP_amp"] or uistate.checkBox["volley_amp"])
             elif key in ["EPSP_slope", "volley_slope"]:
-                self.frameToolAspectAmp_2.setVisible(uistate.checkBox["EPSP_slope"] or uistate.checkBox["volley_slope"])
+                self.frameToolAspectSlope.setVisible(uistate.checkBox["EPSP_slope"] or uistate.checkBox["volley_slope"])
 
         self.update_show()
         self.mouseoverUpdate()
@@ -1910,7 +1910,7 @@ class UIsub(
             getattr(self, frame).setVisible(state)
         self.frameToolFilterSavgol.setVisible(uistate.settings.get("filter", "voltage") == "savgol")
         self.frameToolAspectAmp.setVisible(uistate.checkBox.get("EPSP_amp", False) or uistate.checkBox.get("volley_amp", False))
-        self.frameToolAspectAmp_2.setVisible(uistate.checkBox.get("EPSP_slope", False) or uistate.checkBox.get("volley_slope", False))
+        self.frameToolAspectSlope.setVisible(uistate.checkBox.get("EPSP_slope", False) or uistate.checkBox.get("volley_slope", False))
 
     def build_dict_folders(self):
         dict_folders = {
@@ -2005,6 +2005,17 @@ class UIsub(
             else:
                 lineEdit.editingFinished.connect(lambda le=lineEdit: self.editAmpHalfwidth(le))
         for lineEdit in [
+            self.lineEdit_EPSP_slope_width,
+            self.lineEdit_volley_slope_width,
+        ]:
+            if disconnect:
+                try:
+                    lineEdit.editingFinished.disconnect()
+                except TypeError:
+                    pass
+            else:
+                lineEdit.editingFinished.connect(lambda le=lineEdit: self.editSlopeWidth(le))
+        for lineEdit in [
             self.lineEdit_bin_size,
         ]:
             if disconnect:
@@ -2068,6 +2079,8 @@ class UIsub(
         self.lineEdit_split_at_time.setText(f"{uistate.lineEdit['split_at_time'] * 1000:g}")
         self.lineEdit_EPSP_amp_halfwidth.setText(f"{uistate.lineEdit['EPSP_amp_halfwidth_ms']}")
         self.lineEdit_volley_amp_halfwidth.setText(f"{uistate.lineEdit['volley_amp_halfwidth_ms']}")
+        self.lineEdit_EPSP_slope_width.setText(f"{uistate.lineEdit.get('EPSP_slope_width_ms', 0)}")
+        self.lineEdit_volley_slope_width.setText(f"{uistate.lineEdit.get('volley_slope_width_ms', 0)}")
 
         # apply x-axis radio button selection from config
         radio_name = self._MODE_TO_RADIO.get(uistate.x_axis_mode, "radioButton_xscale_sweep")
@@ -2506,6 +2519,71 @@ class UIsub(
             self.lineEdit_volley_amp_halfwidth.setText("-")
 
         self.connectUIstate(disconnect=False)
+
+    def update_slope_lineEdits(self):
+        if not uistate.list_idx_select_recs:
+            return
+
+        selected_EPSP_ws = set()
+        selected_volley_ws = set()
+
+        for idx_rec in uistate.list_idx_select_recs:
+            prow = self.get_prow(idx_rec)
+            df_t = self.get_dft(prow)
+
+            stims_to_check = uistate.list_idx_select_stims if uistate.list_idx_select_stims else [0]
+
+            for idx_stim in stims_to_check:
+                if idx_stim < len(df_t):
+                    selected_EPSP_ws.add(df_t.iloc[idx_stim]["t_EPSP_slope_width"] * 1000)
+                    selected_volley_ws.add(df_t.iloc[idx_stim]["t_volley_slope_width"] * 1000)
+
+        self.connectUIstate(disconnect=True)
+
+        if len(selected_EPSP_ws) == 1:
+            self.lineEdit_EPSP_slope_width.setText(f"{selected_EPSP_ws.pop():g}")
+        else:
+            self.lineEdit_EPSP_slope_width.setText("-")
+
+        if len(selected_volley_ws) == 1:
+            self.lineEdit_volley_slope_width.setText(f"{selected_volley_ws.pop():g}")
+        else:
+            self.lineEdit_volley_slope_width.setText("-")
+
+        self.connectUIstate(disconnect=False)
+
+    def editSlopeWidth(self, lineEdit):
+        lineEditName = lineEdit.objectName()
+        self.usage(f"editSlopeWidth {lineEditName}")
+        try:
+            num = max(0, float(lineEdit.text().replace(",", ".")))
+        except ValueError:
+            self.update_slope_lineEdits()
+            return
+
+        val_in_seconds = num / 1000
+
+        for idx_rec in uistate.list_idx_select_recs:
+            prow = self.get_prow(idx_rec)
+            df_t = self.get_dft(prow)
+            stims_to_edit = uistate.list_idx_select_stims if uistate.list_idx_select_stims else [0]
+
+            if lineEditName == "lineEdit_EPSP_slope_width" and df_t["t_EPSP_slope_width"].dtype != "float64":
+                df_t["t_EPSP_slope_width"] = df_t["t_EPSP_slope_width"].astype("float64")
+            elif lineEditName == "lineEdit_volley_slope_width" and df_t["t_volley_slope_width"].dtype != "float64":
+                df_t["t_volley_slope_width"] = df_t["t_volley_slope_width"].astype("float64")
+
+            for idx_stim in stims_to_edit:
+                if idx_stim < len(df_t):
+                    if lineEditName == "lineEdit_EPSP_slope_width":
+                        df_t.at[idx_stim, "t_EPSP_slope_width"] = val_in_seconds
+                    elif lineEditName == "lineEdit_volley_slope_width":
+                        df_t.at[idx_stim, "t_volley_slope_width"] = val_in_seconds
+
+            self.set_dft(prow["recording_name"], df_t)
+
+        self.recalculate(selection=uistate.list_idx_select_recs)
+        self.update_slope_lineEdits()
 
     def editAmpHalfwidth(self, lineEdit):
         lineEditName = lineEdit.objectName()

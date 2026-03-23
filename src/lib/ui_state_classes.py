@@ -139,6 +139,8 @@ class UIstate:
             "norm_EPSP_to": 0,
             "EPSP_amp_halfwidth_ms": 0,  # in ms here (visible to user). NB: in s in df_t!
             "volley_amp_halfwidth_ms": 0,  # in ms here (visible to user). NB: in s in df_t!
+            "EPSP_slope_width_ms": 0,  # in ms here (visible to user). NB: in s in df_t!
+            "volley_slope_width_ms": 0,  # in ms here (visible to user). NB: in s in df_t!
             "savgol_window": 9,
             "savgol_poly": 3,
         }
@@ -264,15 +266,11 @@ class UIstate:
         self.df_recs2plot = None  # df_project copy, filtered to selected AND parsed recordings (or all parsed, if none are selected)
 
         # Plotted lines and fills
-        self.dict_rec_labels = (
-            {}
-        )  # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, variant: str ("raw"|"norm"|None), axis: str, line: 2DlineObject}}
+        self.dict_rec_labels = {}  # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, variant: str ("raw"|"norm"|None), axis: str, line: 2DlineObject}}
         self.dict_rec_show = {}  # subset of dict_rec_labels containing only currently visible entries
 
         # Groups (mean of recs)
-        self.dict_group_labels = (
-            {}
-        )  # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, variant: str ("raw"|"norm"), axis: str, line: 2DlineObject, fill: 2DfillObject}}
+        self.dict_group_labels = {}  # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, variant: str ("raw"|"norm"), axis: str, line: 2DlineObject, fill: 2DfillObject}}
         self.dict_group_show = {}  # subset of dict_group_labels containing only currently visible entries
 
         # Mouseover variables
