@@ -161,6 +161,8 @@ class UIplot:
         if canvas == self.uistate.axm.figure.canvas:
             ax = self.uistate.axm
             self.xDeselect(ax, draw=False)
+            if self.uistate.x_select["mean_start"] is None:
+                return
             if self.uistate.x_select["mean_end"] is None:
                 # print(f"Selected x: {self.uistate.x_select['mean_start']}")
                 ax.axvline(
@@ -201,8 +203,9 @@ class UIplot:
                 ax.axvline(x=start, color="blue", label="xSelect_start")
                 ax.axvline(x=end, color="blue", label="xSelect_end")
                 ax.axvspan(start, end, color="blue", alpha=0.1, label="xSelect_span")
-            if draw:
-                canvas.draw()
+        
+        if draw:
+            canvas.draw()
 
     def clear_axe_mean(self):
         # if uistate.dict_rec_labels exists and contains keys that start with "axe mean selected sweeps", remove their lines and del the items

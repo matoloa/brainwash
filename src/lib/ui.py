@@ -2228,9 +2228,6 @@ class UIsub(
         if not uistate.list_idx_select_stims:
             print("triggerStimRemove: No stims selected to remove.")
             return
-        if self.tableStimModel and self.tableStimModel.rowCount(None) <= 1:
-            print("triggerStimRemove: Cannot remove the last stim.")
-            return
 
         df_p = self.get_df_project()
         
@@ -2724,7 +2721,7 @@ class UIsub(
                 self.pushButton_stim_add.setStyleSheet("color: gray;")
             
         if hasattr(self, "pushButton_stim_remove"):
-            if self.tableStimModel and self.tableStimModel.rowCount(None) <= 1:
+            if self.tableStimModel and self.tableStimModel.rowCount(None) == 0:
                 self.pushButton_stim_remove.setEnabled(False)
                 self.pushButton_stim_remove.setStyleSheet("color: gray;")
             else:
@@ -3673,6 +3670,7 @@ class UIsub(
         y = event.ydata
         if x is None or y is None:
             return
+        uistate.mean_mouseover_stim_select = None  # Always clear on movement initially
         dft = uistate.df_rec_select_time
         if dft is None or dft.empty:
             # print("No single recording selected with timepoints to mouseover.")
@@ -3991,15 +3989,11 @@ class UIsub(
         if event.xdata is None:
             return
         x = event.xdata  # mouse x position
-        x_drag = np.abs(x_data - x).argmin()  # index closest to x
-        if x_drag == uistate.x_drag_last:  # return if the pointer hasn't moved a full idx since last update
+        x_drag_val = x_range[np.abs(x_range - x).argmin()]
+        if x_drag_val == uistate.x_drag_last:  # return if the pointer hasn't moved enough
             return
-        if x_drag < 0:
-            x_drag = 0
-        elif x_drag >= len(x_data):
-            x_drag = len(x_data) - 1
-        uistate.x_drag = x_range[np.abs(x_range - x).argmin()]
-        uistate.x_drag_last = uistate.x_drag
+        uistate.x_drag = x_drag_val
+        uistate.x_drag_last = x_drag_val
         if canvas == self.canvasMean:
             uistate.x_select["mean_end"] = uistate.x_drag
             self.lineEdit_mean_selection_end.setText(f"{uistate.x_drag * 1000:g}")
