@@ -3676,7 +3676,7 @@ class UIsub(
             # print("No single recording selected with timepoints to mouseover.")
             return
         n_stims = len(dft)
-        if n_stims < 2:
+        if n_stims < 1:
             # print("Not enough stims to mouseover.")
             return
         # One recording selected, with 2 or more stims, define mouseover zones
