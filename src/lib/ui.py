@@ -970,16 +970,39 @@ class UIsub(
         self.mouseoverUpdate()  # always ends with a single graphRefresh()
         print(f" - - mouseoverUpdate: {round((time.time() - t0) * 1000)} ms")
 
-    def stimSelectionChanged(self):
+    def stimSelectionChanged(self, *args):
         self.usage("stimSelectionChanged")
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableStim.clearSelection()
-        if uistate.mean_mouseover_stim_select is None:  # clicked table
-            selected_indexes = self.tableStim.selectionModel().selectedRows()
-        else:  # clicked graph
+            
+        if uistate.mean_mouseover_stim_select is not None:  # clicked graph
             row = uistate.mean_mouseover_stim_select - 1
-            selected_indexes = [self.tableStimModel.index(row, 0)]
-        uistate.mean_mouseover_stim_select = None
+            model_index = self.tableStimModel.index(row, 0)
+            
+            modifiers = QtWidgets.QApplication.keyboardModifiers()
+            if modifiers & QtCore.Qt.ControlModifier:
+                flag = QtCore.QItemSelectionModel.Toggle | QtCore.QItemSelectionModel.Rows
+            else:
+                flag = QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows
+
+            self.tableStim.selectionModel().blockSignals(True)
+            self.tableStim.selectionModel().select(model_index, flag)
+            self.tableStim.selectionModel().blockSignals(False)
+            uistate.mean_mouseover_stim_select = None
+
+        selected_indexes = self.tableStim.selectionModel().selectedRows()
+        
+        if hasattr(self, 'tableTimetable') and self.tableTimetable is not None:
+            if self.tableTimetable.model() is not None:
+                self.tableTimetable.selectionModel().blockSignals(True)
+                self.tableTimetable.clearSelection()
+                selection = QtCore.QItemSelection()
+                for idx in selected_indexes:
+                    tt_idx = self.tableTimetable.model().index(idx.row(), 0)
+                    selection.select(tt_idx, tt_idx)
+                self.tableTimetable.selectionModel().select(selection, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
+                self.tableTimetable.selectionModel().blockSignals(False)
+
         # build the list uistate.list_idx_select_stims with indices
         uistate.list_idx_select_stims = [index.row() for index in selected_indexes]
         self.update_show()
