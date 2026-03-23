@@ -985,23 +985,23 @@ class UIsub(
             else:
                 flag = QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows
 
-            self.tableStim.selectionModel().blockSignals(True)
-            self.tableStim.selectionModel().select(model_index, flag)
-            self.tableStim.selectionModel().blockSignals(False)
             uistate.mean_mouseover_stim_select = None
+            
+            # Let the signal trigger a recursive call to stimSelectionChanged
+            # which will skip this block and update the rest of the UI naturally
+            self.tableStim.selectionModel().select(model_index, flag)
+            return
 
         selected_indexes = self.tableStim.selectionModel().selectedRows()
 
         if hasattr(self, "tableTimetable") and self.tableTimetable is not None:
             if self.tableTimetable.model() is not None:
-                self.tableTimetable.selectionModel().blockSignals(True)
                 self.tableTimetable.clearSelection()
                 selection = QtCore.QItemSelection()
                 for idx in selected_indexes:
                     tt_idx = self.tableTimetable.model().index(idx.row(), 0)
                     selection.select(tt_idx, tt_idx)
                 self.tableTimetable.selectionModel().select(selection, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
-                self.tableTimetable.selectionModel().blockSignals(False)
 
         # build the list uistate.list_idx_select_stims with indices
         uistate.list_idx_select_stims = [index.row() for index in selected_indexes]
