@@ -1841,10 +1841,12 @@ class UIsub(
             print(f"Error setting up tableProj: {e}")
 
     def setupTableStim(self):
-        self.tableStimModel = TableModel(pd.DataFrame([uistate.default_dict_t]))
+        dft_init = pd.DataFrame([uistate.default_dict_t])
+        self.tableStimModel = TableModel(dft_init)
         self.tableStim.setModel(self.tableStimModel)
         self.tableStim.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.tableStim.verticalHeader().hide()
+        self.formatTableStimLayout(dft_init)
         tableStim_selectionModel = self.tableStim.selectionModel()
         tableStim_selectionModel.selectionChanged.connect(self.stimSelectionChanged)
 
@@ -1893,6 +1895,10 @@ class UIsub(
             header.moveSection(header.visualIndex(col_index), i)
 
     def formatTableStimLayout(self, dft):
+        if dft is None:
+            import pandas as pd
+            dft = pd.DataFrame([uistate.default_dict_t])
+            
         header = self.tableStim.horizontalHeader()
         column_order = [
             "stim",
@@ -1915,6 +1921,7 @@ class UIsub(
 
         col_indices = [dft.columns.get_loc(col) for col in column_order if col in dft.columns]
         num_columns = dft.shape[1]
+
         for col in range(num_columns):
             if col in col_indices:
                 header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
@@ -2210,6 +2217,7 @@ class UIsub(
         p_row = df_p.loc[uistate.list_idx_select_recs[0]]
         df_t = self.get_dft(p_row)
         self.tableStimModel.setData(df_t)
+        self.formatTableStimLayout(df_t)
         if len(df_t) > 0:
             self.tableStim.selectRow(0)
 
@@ -2273,6 +2281,7 @@ class UIsub(
         p_row = df_p.loc[uistate.list_idx_select_recs[0]]
         df_t = self.get_dft(p_row)
         self.tableStimModel.setData(df_t)
+        self.formatTableStimLayout(df_t)
         if len(df_t) > 0:
             self.tableStim.selectRow(0)
             
@@ -2324,24 +2333,38 @@ class UIsub(
         self.lineEdit_bin_size.setText(display)
         self.recalculate()
 
-    def triggerToggleProjectTable(self):
+    def triggerToggleProjectTable(self, checked=None):
         self.usage("triggerToggleProjectTable")
         if hasattr(self, "tableProj"):
-            uistate.detailedProjectTable = not getattr(uistate, "detailedProjectTable", False)
+            if type(checked) == bool:
+                uistate.detailedProjectTable = checked
+            else:
+                uistate.detailedProjectTable = not getattr(uistate, "detailedProjectTable", False)
             self.formatTableLayout()
             if hasattr(self, "actionToggleProjectTable"):
                 self.actionToggleProjectTable.setChecked(uistate.detailedProjectTable)
             uistate.save_cfg(projectfolder=self.dict_folders.get("project"))
 
-    def triggerToggleTimetable(self):
+    def triggerToggleTimetable(self, checked=None):
         self.usage("triggerToggleTimetable")
         if hasattr(self, "tableStim"):
-            uistate.detailedTimetable = not getattr(uistate, "detailedTimetable", False)
+            if type(checked) == bool:
+                uistate.detailedTimetable = checked
+            else:
+                uistate.detailedTimetable = not getattr(uistate, "detailedTimetable", False)
+            
+            import pandas as pd
+            dft = None
             if uistate.list_idx_select_recs:
                 prow = self.get_prow(uistate.list_idx_select_recs[0])
                 if prow is not None:
                     dft = self.get_dft(prow)
-                    self.formatTableStimLayout(dft)
+            
+            if dft is None:
+                dft = pd.DataFrame([uistate.default_dict_t])
+                
+            self.formatTableStimLayout(dft)
+                
             if hasattr(self, "actionToggleTimetable"):
                 self.actionToggleTimetable.setChecked(uistate.detailedTimetable)
             uistate.save_cfg(projectfolder=self.dict_folders.get("project"))
@@ -3051,6 +3074,7 @@ class UIsub(
         p_row = df_p.loc[uistate.list_idx_select_recs[0]]
         df_t = self.get_dft(p_row)
         self.tableStimModel.setData(df_t)
+        self.formatTableStimLayout(df_t)
         self.tableStim.selectRow(0)
         # unplot and replot all affected recordings
         self.update_show(reset=True)
@@ -3355,6 +3379,7 @@ class UIsub(
         selected_rows = self.tableProj.selectionModel().selectedRows()
         # Update data
         self.tablemodel.setData(self.get_df_project())
+        self.formatTableLayout()
         # Restore selection
         selection = QtCore.QItemSelection()
         for index in selected_rows:
@@ -3370,6 +3395,7 @@ class UIsub(
         # Update data
         df_project = self.get_df_project()
         self.tablemodel.setData(df_project)
+        self.formatTableLayout()
         self.tableProj.resizeColumnsToContents()
         # Restore selection
         selection_model = self.tableProj.selectionModel()
@@ -4587,7 +4613,9 @@ class UIsub(
         uiplot.updateStimLines(rec_name=rec_name, dfoutput=dfoutput)
 
         self.set_dft(rec_name, dft_temp)
-        self.tableStimModel.setData(self.get_dft(prow))
+        new_dft = self.get_dft(prow)
+        self.tableStimModel.setData(new_dft)
+        self.formatTableStimLayout(new_dft)
         self.set_rec_status(rec_name=rec_name)
         trow = self.get_trow()
         if trow is None:
