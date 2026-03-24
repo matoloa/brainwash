@@ -1081,7 +1081,8 @@ class UIsub(
                     v["line"].set_visible(False)
                     v["fill"].set_visible(False)
                 uistate.dict_group_show = {}
-            return
+            # Important: Don't return here! Keep processing the rest of the method
+            # so the currently selected recordings/stims/groups get turned back on.
 
         if uistate.df_recs2plot is None:
             # No recordings selected — hide all rec lines but keep checkbox-ticked
@@ -2212,6 +2213,7 @@ class UIsub(
         if len(df_t) > 0:
             self.tableStim.selectRow(0)
 
+        self.graphRefresh()
         self.update_show(reset=True)
         self.zoomAuto()
         self.update_amp_lineEdits()
@@ -2274,6 +2276,7 @@ class UIsub(
         if len(df_t) > 0:
             self.tableStim.selectRow(0)
             
+        self.graphRefresh()
         self.update_show(reset=True)
         self.zoomAuto()
         self.update_amp_lineEdits()
