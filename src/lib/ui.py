@@ -987,22 +987,17 @@ class UIsub(
 
             uistate.mean_mouseover_stim_select = None
             
-            # We temporarily unhook the signal, make the table change, and continue through THIS function.
-            # (Otherwise, recursive calls might skip parts of the setup or create feedback loops)
-            self.tableStim.selectionModel().blockSignals(True)
+            # Safely disconnect if connected to prevent a recursive loop
+            try:
+                self.tableStim.selectionModel().selectionChanged.disconnect(self.stimSelectionChanged)
+            except TypeError:
+                pass
             self.tableStim.selectionModel().select(model_index, flag)
-            self.tableStim.selectionModel().blockSignals(False)
+            self.tableStim.selectionModel().selectionChanged.connect(self.stimSelectionChanged)
 
         selected_indexes = self.tableStim.selectionModel().selectedRows()
 
-        if hasattr(self, "tableTimetable") and self.tableTimetable is not None:
-            if self.tableTimetable.model() is not None:
-                self.tableTimetable.clearSelection()
-                selection = QtCore.QItemSelection()
-                for idx in selected_indexes:
-                    tt_idx = self.tableTimetable.model().index(idx.row(), 0)
-                    selection.select(tt_idx, tt_idx)
-                self.tableTimetable.selectionModel().select(selection, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
+
 
         # build the list uistate.list_idx_select_stims with indices
         uistate.list_idx_select_stims = [index.row() for index in selected_indexes]
@@ -1303,14 +1298,12 @@ class UIsub(
             """
             self.tableProj.setStyleSheet(table_style)
             self.tableStim.setStyleSheet(table_style)
-            if hasattr(self, "tableTimetable"):
-                self.tableTimetable.setStyleSheet(table_style)
+
         else:
             self.mainwindow.setStyleSheet("")
             self.tableProj.setStyleSheet("")
             self.tableStim.setStyleSheet("")
-            if hasattr(self, "tableTimetable"):
-                self.tableTimetable.setStyleSheet("")
+
             self.progressBar.setStyleSheet(
                 "QProgressBar { text-align: center; color: #000; font-weight: bold; background-color: #e0e0e0; border: 1px solid #bbb; border-radius: 3px; }"
                 "QProgressBar::chunk { background-color: #4caf50; border-radius: 3px; }"
