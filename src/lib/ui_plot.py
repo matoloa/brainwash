@@ -203,7 +203,7 @@ class UIplot:
                 ax.axvline(x=start, color="blue", label="xSelect_start")
                 ax.axvline(x=end, color="blue", label="xSelect_end")
                 ax.axvspan(start, end, color="blue", alpha=0.1, label="xSelect_span")
-        
+
         if draw:
             canvas.draw()
 
@@ -359,8 +359,8 @@ class UIplot:
         # Set recordings and group legends
         dd_recs = uistate.dict_rec_show
         dd_groups = uistate.dict_group_show
-        axids = ["axm", "axe", "ax1", "ax2"]
-        legend_loc = ["upper right", "upper right", "upper right", "lower right"]
+        axids = ["ax1", "ax2"]
+        legend_loc = ["upper right", "lower right"]
         for axid, loc in zip(axids, legend_loc):
             recs_on_axis = {key: value for key, value in dd_recs.items() if value["axis"] == axid and not key.endswith(" marker")}
             axis_legend = {key: value["line"] for key, value in recs_on_axis.items()}
@@ -369,6 +369,12 @@ class UIplot:
                 axis_legend.update({key: value["line"] for key, value in groups_on_axis.items()})
             axis = getattr(uistate, axid)
             axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)
+
+        for axid in ["axm", "axe"]:
+            axis = getattr(uistate, axid)
+            if axis.get_legend():
+                axis.get_legend().remove()
+
         print(f" - - graphRefresh: legends: {round((time.time() - t0) * 1000)} ms")
         t1 = time.time()
 
