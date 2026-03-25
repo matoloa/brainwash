@@ -843,7 +843,7 @@ class UIplot:
 
             if not np.isnan(t_row["t_EPSP_amp"]):
                 x_position = t_row["t_EPSP_amp"]
-                y_position = df_event.loc[df_event.time == x_position, rec_filter]
+                y_position = df_event.loc[(df_event["time"] - x_position).abs().idxmin(), rec_filter] if not df_event.empty else 0
                 self.plot_marker(
                     f"{label} {stim_str} EPSP amp marker",
                     "axe",
@@ -952,7 +952,7 @@ class UIplot:
 
             if not np.isnan(t_row["t_volley_amp"]):
                 x_position = t_row["t_volley_amp"]
-                y_position = df_event.loc[df_event.time == t_row["t_volley_amp"], rec_filter]
+                y_position = df_event.loc[(df_event["time"] - x_position).abs().idxmin(), rec_filter] if not df_event.empty else 0
                 color = settings["rgb_volley_amp"]
                 self.plot_marker(
                     f"{label} {stim_str} volley amp marker",

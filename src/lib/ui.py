@@ -999,6 +999,14 @@ class UIsub(
 
         # build the list uistate.list_idx_select_stims with indices
         uistate.list_idx_select_stims = [index.row() for index in selected_indexes]
+        
+        # update single-recording reference dataframe if applicable
+        if len(uistate.list_idx_select_recs) == 1:
+            prow = self.get_prow()
+            if prow is not None:
+                uistate.df_rec_select_time = self.get_dft(row=prow)
+        else:
+            uistate.df_rec_select_time = None
 
         self.update_stim_buttons()
         self.update_show()
@@ -2183,8 +2191,14 @@ class UIsub(
             new_row = uistate.default_dict_t.copy()
             new_row["t_stim"] = t_start
 
+            # Make sure it's constructed securely as a 1D Series converting to DataFrame
+            # so Pandas won't treat shape as (1,) arrays internally
             df_new = pd.DataFrame([new_row])
-
+            
+            # Type cast to safely concat without dimensionality glitches 
+            if "t_stim" in df_t.columns and df_new["t_stim"].dtype != df_t["t_stim"].dtype:
+                df_new["t_stim"] = df_new["t_stim"].astype(df_t["t_stim"].dtype)
+                
             df_t = pd.concat([df_t, df_new], ignore_index=True)
             df_t = df_t.sort_values("t_stim").reset_index(drop=True)
             df_t["stim"] = range(1, len(df_t) + 1)
@@ -2217,6 +2231,8 @@ class UIsub(
         self.formatTableStimLayout(df_t)
         if len(df_t) > 0:
             self.tableStim.selectRow(0)
+        else:
+            self.stimSelectionChanged()
 
         self.graphRefresh()
         self.update_show(reset=True)
@@ -2281,6 +2297,9 @@ class UIsub(
         self.formatTableStimLayout(df_t)
         if len(df_t) > 0:
             self.tableStim.selectRow(0)
+        else:
+            # Let stimSelectionChanged run its cleanup manually since we can't trigger it via selectRow
+            self.stimSelectionChanged()
 
         self.graphRefresh()
         self.update_show(reset=True)
@@ -3613,6 +3632,7 @@ class UIsub(
                 uiplot.xDeselect(ax=uistate.ax1, reset=True)
                 self.lineEdit_sweeps_range_from.setText("")
                 self.lineEdit_sweeps_range_to.setText("")
+            self.update_stim_buttons()
             return
 
         # left clicked on a graph
@@ -3688,6 +3708,7 @@ class UIsub(
             uistate.x_on_click = time_values[np.abs(time_values - x).argmin()]
             uistate.x_select["mean_start"] = uistate.x_on_click
             self.lineEdit_mean_selection_start.setText(f"{uistate.x_select['mean_start'] * 1000:g}")
+            self.update_stim_buttons()
             self.connectDragRelease(x_range=time_values, rec_ID=prow["ID"], graph="mean")
         elif canvas == self.canvasOutput:  # Output canvas (bottom graph) left-clicked: click and drag to select specific sweeps
             sweep_numbers = list(range(0, int(prow["sweeps"])))
