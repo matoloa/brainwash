@@ -1753,16 +1753,15 @@ class UIsub(
                 self.checkBox_splitOddEven_changed(state)
             elif key == "timepoints_per_stim":
                 self.checkBox_timepoints_per_stim_changed(state)
-            elif key == "output_ymin0":
-                self.zoomAuto()
             elif key in ["EPSP_amp", "volley_amp"]:
                 self.frameToolAspectAmp.setVisible(uistate.checkBox["EPSP_amp"] or uistate.checkBox["volley_amp"])
             elif key in ["EPSP_slope", "volley_slope"]:
                 self.frameToolAspectSlope.setVisible(uistate.checkBox["EPSP_slope"] or uistate.checkBox["volley_slope"])
-
-        self.update_stim_buttons()
+        # print(f"viewSettingsChanged: {key} = {state == 2}")
         self.update_show()
-        self.mouseoverUpdate()
+        if key in ["output_ymin0", "norm_EPSP"]:
+            self.zoomAuto()
+        self.graphRefresh()
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
     def groupControlsRefresh(self):

@@ -404,14 +404,9 @@ class UIplot:
         ax1.set_ylim(uistate.zoom["output_ax1_ylim"])
         ax2.set_ylim(uistate.zoom["output_ax2_ylim"])
         ax1.set_xlim(uistate.zoom["output_xlim"])
-        ax2.set_xlim(uistate.zoom["output_xlim"])
         ax1.set_xlabel(uistate.x_axis_xlabel())
-        ax2.set_xlabel(uistate.x_axis_xlabel())
         ax1.xaxis.set_major_locator(uistate.x_axis_locator())
-        ax2.xaxis.set_major_locator(uistate.x_axis_locator())
-        fmt = uistate.x_axis_formatter()
-        ax1.xaxis.set_major_formatter(fmt)
-        ax2.xaxis.set_major_formatter(fmt)
+        ax1.xaxis.set_major_formatter(uistate.x_axis_formatter())
         print(f"output_xlim: {uistate.zoom['output_xlim']}")
         ax1.figure.subplots_adjust(bottom=0.2)
         self.oneAxisLeft()
@@ -493,9 +488,23 @@ class UIplot:
         ax1, ax2 = self.uistate.ax1, self.uistate.ax2
         uistate = self.uistate
         # sets ax1 and ax2 visibility and position
-        ax1.set_visible(uistate.ampView())
-        ax2.set_visible(uistate.slopeView())
-        # print(f"oneAxisLeft - uistate.ampView: {uistate.ampView()}, uistate.slopeView: {uistate.slopeView()}, uistate.slopeOnly: {uistate.slopeOnly()}")
+        ax1.set_visible(True)
+        ax2.set_visible(True)
+        ax1.xaxis.set_visible(True)
+        ax2.xaxis.set_visible(False)
+
+        amp_view = uistate.ampView()
+        slope_view = uistate.slopeView()
+
+        if not amp_view and not slope_view:
+            # Fallback for no slope/amp view
+            ax1.yaxis.set_visible(False)
+            ax2.yaxis.set_visible(False)
+        else:
+            ax1.yaxis.set_visible(amp_view)
+            ax2.yaxis.set_visible(slope_view)
+
+        # print(f"oneAxisLeft - uistate.ampView: {amp_view}, uistate.slopeView: {slope_view}, uistate.slopeOnly: {uistate.slopeOnly()}")
         if uistate.slopeOnly():
             ax2.yaxis.set_label_position("left")
             ax2.yaxis.set_ticks_position("left")

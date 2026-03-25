@@ -172,6 +172,7 @@ class UIstate:
         self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
         self._time_unit_label = "s"  # set by x_axis_xlim when mode == "time"
         self._time_sweep_hz = 1.0  # set by x_axis_xlim when mode == "time"
+        self._time_bin_size = 1.0  # set by x_axis_xlim when mode == "time"
         self._stim_tick_locs: list[int] = []  # set by x_axis_xlim when mode == "stim"
         self.showTimetable = False
         self.showHeatmap = False
@@ -456,10 +457,14 @@ class UIstate:
             if pd.isna(prow["sweep_hz"]):
                 raise ValueError("x_axis_xlim called in time mode but sweep_hz is NaN")
             n = prow["sweeps"]
-            if pd.notna(prow.get("bin_size")):
-                n = ceil(n / prow["bin_size"])
+            bin_size = prow.get("bin_size")
+            if pd.notna(bin_size):
+                n = ceil(n / bin_size)
+            else:
+                bin_size = 1.0
             self._time_sweep_hz = prow["sweep_hz"]
-            max_seconds = n / self._time_sweep_hz
+            self._time_bin_size = bin_size
+            max_seconds = (n * bin_size) / self._time_sweep_hz
             self._time_divisor, self._time_unit_label = self.time_axis_unit(max_seconds)
             # Return sweep-space limits; tick labels are converted by x_axis_formatter.
             return (0, n)
@@ -481,7 +486,7 @@ class UIstate:
     def x_axis_locator(self):
         """Return a Locator that places ticks at nice intervals in the current mode."""
         if self.x_axis_mode == "time":
-            return TimeModeLocator(self._time_sweep_hz, self._time_divisor)
+            return TimeModeLocator(self._time_sweep_hz / self._time_bin_size, self._time_divisor)
         if self.x_axis_mode == "stim":
             return FixedLocator(self._stim_tick_locs)
         return AutoLocator()
@@ -498,9 +503,10 @@ class UIstate:
         if self.x_axis_mode == "time":
             sweep_hz = self._time_sweep_hz
             divisor = self._time_divisor
+            bin_size = self._time_bin_size
 
             def _fmt(val, _pos):
-                t = val / sweep_hz / divisor
+                t = (val * bin_size) / sweep_hz / divisor
                 # Drop trailing zeros: "2.5" not "2.500", "3" not "3.0"
                 return f"{t:g}"
 
