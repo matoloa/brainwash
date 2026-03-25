@@ -105,7 +105,7 @@ class UIstate:
             "#0000FF",
         ]
         self.splitter = {
-            "h_splitterMaster": [0.105, 0.04, 0.765, 0.09],
+            "h_splitterMaster": [0.105, 0.04, 0.855, 200],
             "v_splitterGraphs": [0.2, 0.5, 0.3],
         }
         self.viewTools = {  # these are cycled by uisub.connectUIstate; framename: [title, visible]

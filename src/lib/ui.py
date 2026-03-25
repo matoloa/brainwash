@@ -1242,14 +1242,33 @@ class UIsub(
 
         total_size = sum(sizes)
         if total_size > 0:
-            uistate.splitter["h_splitterMaster"] = [s / total_size for s in sizes]
+            old_proportions = uistate.splitter.get("h_splitterMaster", [])
+            unbounded_px = sum(size for i, size in enumerate(sizes) if i >= len(old_proportions) or type(old_proportions[i]) == float)
+            proportions = []
+            for i, size in enumerate(sizes):
+                if i < len(old_proportions) and type(old_proportions[i]) != float:
+                    proportions.append(int(size))
+                else:
+                    proportions.append(float(size / unbounded_px if unbounded_px > 0 else 0.0))
+            uistate.splitter["h_splitterMaster"] = proportions
 
     def onSplitterMoved(self, splitter_name, pos, index):
         splitter = getattr(self, splitter_name)
         total_size = sum(splitter.sizes())
         if total_size == 0:
             return
-        proportions = [size / total_size for size in splitter.sizes()]
+
+        old_proportions = uistate.splitter.get(splitter_name, [])
+        sizes = splitter.sizes()
+        unbounded_px = sum(size for i, size in enumerate(sizes) if i >= len(old_proportions) or type(old_proportions[i]) == float)
+
+        proportions = []
+        for i, size in enumerate(sizes):
+            if i < len(old_proportions) and type(old_proportions[i]) != float:
+                proportions.append(int(size))  # Keep as fixed pixel value
+            else:
+                proportions.append(float(size / unbounded_px if unbounded_px > 0 else 0.0))
+
         # print(f"{splitter_name}, total_size: {total_size}, Proportions: {proportions}")
         uistate.splitter[splitter_name] = proportions
         if splitter_name == "h_splitterMaster" and self.h_splitterMaster.widget(1).isVisible():
@@ -1811,13 +1830,34 @@ class UIsub(
             widgets = [splitter.widget(i) for i in range(splitter.count())]
             if len(proportions) != len(widgets):
                 continue
+
+            is_horizontal = splitter.orientation() == QtCore.Qt.Horizontal
+            total_size = splitter.window().width() if is_horizontal else splitter.window().height()
+
+            if total_size < 100:
+                total_size = 1580 if is_horizontal else 1205
+
+            unbounded_prop = sum(p for p in proportions if type(p) == float)
+            fixed_px = sum(p for p in proportions if type(p) != float)
+            remaining_px = max(0, total_size - fixed_px)
+
             # Store the original size policies of the widgets, and set their size policy to QtWidgets.QSizePolicy.Ignored
             original_policies = []
             sizes = []
-            for widget in widgets:
+            for i, widget in enumerate(widgets):
                 original_policies.append(widget.sizePolicy())
                 widget.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
-                sizes.append(int(proportions[widgets.index(widget)] * 100000))
+
+                p = proportions[i]
+                if type(p) != float:
+                    sizes.append(int((p / total_size) * 100000))
+                else:
+                    if unbounded_prop > 0:
+                        target_px = (p / unbounded_prop) * remaining_px
+                        sizes.append(int((target_px / total_size) * 100000))
+                    else:
+                        sizes.append(0)
+
             splitter.setSizes(sizes)
             for widget, policy in zip(widgets, original_policies):
                 widget.setSizePolicy(policy)
@@ -2163,6 +2203,11 @@ class UIsub(
         # apply x-axis radio button selection from config
         radio_name = self._MODE_TO_RADIO.get(uistate.x_axis_mode, "radioButton_xscale_sweep")
         getattr(self, radio_name).setChecked(True)
+
+        # Ensure tools column is treated as fixed pixels
+        if len(uistate.splitter.get("h_splitterMaster", [])) == 4:
+            if type(uistate.splitter["h_splitterMaster"][3]) == float:
+                uistate.splitter["h_splitterMaster"][3] = 200
 
         # apply splitter proportions from project config
         self.setSplitterSizes(*uistate.splitter.keys())
