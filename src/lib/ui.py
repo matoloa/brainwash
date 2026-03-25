@@ -986,7 +986,7 @@ class UIsub(
                 flag = QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows
 
             uistate.mean_mouseover_stim_select = None
-            
+
             # Safely disconnect if connected to prevent a recursive loop
             try:
                 self.tableStim.selectionModel().selectionChanged.disconnect(self.stimSelectionChanged)
@@ -997,11 +997,9 @@ class UIsub(
 
         selected_indexes = self.tableStim.selectionModel().selectedRows()
 
-
-
         # build the list uistate.list_idx_select_stims with indices
         uistate.list_idx_select_stims = [index.row() for index in selected_indexes]
-        
+
         self.update_stim_buttons()
         self.update_show()
         self.zoomAuto()
@@ -1896,9 +1894,8 @@ class UIsub(
 
     def formatTableStimLayout(self, dft):
         if dft is None:
-            import pandas as pd
             dft = pd.DataFrame([uistate.default_dict_t])
-            
+
         header = self.tableStim.horizontalHeader()
         column_order = [
             "stim",
@@ -2109,10 +2106,10 @@ class UIsub(
 
         if hasattr(self, "actionToggleTimetable"):
             self.actionToggleTimetable.setChecked(getattr(uistate, "detailedTimetable", False))
-            
+
         if hasattr(self, "actionTimetable"):
             self.actionTimetable.setChecked(uistate.showTimetable)
-            
+
         self.setTableStimVisibility(uistate.showTimetable)
 
         # Disconnect signals to prevent editingFinished from triggering from .setText
@@ -2168,7 +2165,7 @@ class UIsub(
         if not uistate.list_idx_select_recs:
             print("triggerStimAdd: No files selected.")
             return
-            
+
         t_start = uistate.x_select["mean_start"]
         if t_start is None:
             print("triggerStimAdd: No selection in axm.")
@@ -2182,26 +2179,26 @@ class UIsub(
             rec_ID = p_row["ID"]
 
             df_t = self.get_dft(p_row)
-            
+
             new_row = uistate.default_dict_t.copy()
             new_row["t_stim"] = t_start
-            
+
             df_new = pd.DataFrame([new_row])
-            
+
             df_t = pd.concat([df_t, df_new], ignore_index=True)
             df_t = df_t.sort_values("t_stim").reset_index(drop=True)
             df_t["stim"] = range(1, len(df_t) + 1)
-            
+
             self.set_dft(rec_name, df_t)
             df_p.loc[p_row["ID"] == df_p["ID"], "stims"] = len(df_t)
-            
+
             self.dict_outputs.pop(rec_name, None)
             path_output = self.dict_folders["cache"] / f"{rec_name}_output.parquet"
             if path_output.exists():
                 path_output.unlink()
-                
+
             dfoutput = self.get_dfoutput(p_row)
-            
+
             uiplot.unPlot(rec_ID)
             dfmean = self.get_dfmean(p_row)
             uiplot.addRow(p_row, df_t, dfmean, dfoutput)
@@ -2239,15 +2236,15 @@ class UIsub(
             return
 
         df_p = self.get_df_project()
-        
+
         for index in uistate.list_idx_select_recs:
             p_row = df_p.loc[index]
             rec_name = p_row["recording_name"]
             rec_ID = p_row["ID"]
-            
+
             df_t = self.get_dft(p_row)
             dfoutput = self.get_dfoutput(p_row)
-            
+
             stims_to_remove = sorted(uistate.list_idx_select_stims, reverse=True)
             for idx_stim in stims_to_remove:
                 if idx_stim < len(df_t):
@@ -2263,19 +2260,19 @@ class UIsub(
                 # Remap the output stim IDs as well
                 stim_mapping = {old: new for new, old in enumerate(dfoutput["stim"].unique(), 1)}
                 dfoutput["stim"] = dfoutput["stim"].map(stim_mapping)
-            
+
             # Save changes
             self.set_dft(rec_name, df_t)
             df_p.loc[p_row["ID"] == df_p["ID"], "stims"] = len(df_t)
             self.persistOutput(rec_name, dfoutput, p_row=p_row)
-            
+
             # Unplot and replot to update visuals
             uiplot.unPlot(rec_ID)
             dfmean = self.get_dfmean(p_row)
             uiplot.addRow(p_row, df_t, dfmean, dfoutput)
 
         self.set_df_project(df_p)
-        
+
         # Reset selection to first stim (or empty if none left)
         uistate.list_idx_select_stims = [0] if len(df_t) > 0 else []
         p_row = df_p.loc[uistate.list_idx_select_recs[0]]
@@ -2284,7 +2281,7 @@ class UIsub(
         self.formatTableStimLayout(df_t)
         if len(df_t) > 0:
             self.tableStim.selectRow(0)
-            
+
         self.graphRefresh()
         self.update_show(reset=True)
         self.zoomAuto()
@@ -2352,19 +2349,17 @@ class UIsub(
                 uistate.detailedTimetable = checked
             else:
                 uistate.detailedTimetable = not getattr(uistate, "detailedTimetable", False)
-            
-            import pandas as pd
             dft = None
             if uistate.list_idx_select_recs:
                 prow = self.get_prow(uistate.list_idx_select_recs[0])
                 if prow is not None:
                     dft = self.get_dft(prow)
-            
+
             if dft is None:
                 dft = pd.DataFrame([uistate.default_dict_t])
-                
+
             self.formatTableStimLayout(dft)
-                
+
             if hasattr(self, "actionToggleTimetable"):
                 self.actionToggleTimetable.setChecked(uistate.detailedTimetable)
             uistate.save_cfg(projectfolder=self.dict_folders.get("project"))
@@ -2394,12 +2389,12 @@ class UIsub(
             uistate.showTimetable = checked
         else:
             uistate.showTimetable = not uistate.showTimetable
-            
+
         if hasattr(self, "actionTimetable"):
             self.actionTimetable.setChecked(uistate.showTimetable)
-            
+
         self.setTableStimVisibility(uistate.showTimetable)
-        
+
         if uistate.dict_rec_show:
             self.tableProjSelectionChanged()
         self.write_bw_cfg()
@@ -2752,7 +2747,7 @@ class UIsub(
                 self.pushButton_stim_add.setStyleSheet("")
             else:
                 self.pushButton_stim_add.setStyleSheet("color: gray;")
-            
+
         if hasattr(self, "pushButton_stim_remove"):
             if self.tableStimModel and self.tableStimModel.rowCount(None) == 0:
                 self.pushButton_stim_remove.setEnabled(False)
