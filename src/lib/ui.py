@@ -999,7 +999,7 @@ class UIsub(
 
         # build the list uistate.list_idx_select_stims with indices
         uistate.list_idx_select_stims = [index.row() for index in selected_indexes]
-        
+
         # update single-recording reference dataframe if applicable
         if len(uistate.list_idx_select_recs) == 1:
             prow = self.get_prow()
@@ -1216,28 +1216,47 @@ class UIsub(
             print("t-test currently only available between exactly 2 shown groups")
         print(f"Heatmap: {round((time.time() - t0) * 1000)} ms")
 
-    def setTableStimVisibility(self, state):
+    def setTableStimVisibility(self, state, initialize=False):
         widget = self.h_splitterMaster.widget(1)  # Get the second widget in the splitter
-        widget.setVisible(state)
+
+        if initialize:
+            widget.setVisible(state)
+            return
+
+        if state == widget.isVisible():
+            return
+
+        sizes = self.h_splitterMaster.sizes()
         if state:
-            # Ensure the timetable panel gets at least 20% of window width
-            # (floored to a minimum of 100 px).
-            sizes = self.h_splitterMaster.sizes()
-            total = sum(sizes)
-            min_width = max(100, int(total * 0.20))
-            if sizes[1] < min_width:
-                deficit = min_width - sizes[1]
-                # Steal space from the graphs panel (widget 2) preferentially.
-                sizes[2] = max(0, sizes[2] - deficit)
-                sizes[1] = min_width
-                self.h_splitterMaster.setSizes(sizes)
+            prop = uistate.settings.get("dft_width_proportion", 0.2)
+            total = sizes[1] + sizes[2]
+            sizes[1] = min(total, max(100, int(total * prop)))
+            sizes[2] = total - sizes[1]
+            widget.setVisible(True)
+            self.h_splitterMaster.setSizes(sizes)
+        else:
+            sizes[2] += sizes[1]
+            sizes[1] = 0
+            widget.setVisible(False)
+            self.h_splitterMaster.setSizes(sizes)
+
+        total_size = sum(sizes)
+        if total_size > 0:
+            uistate.splitter["h_splitterMaster"] = [s / total_size for s in sizes]
 
     def onSplitterMoved(self, splitter_name, pos, index):
         splitter = getattr(self, splitter_name)
         total_size = sum(splitter.sizes())
+        if total_size == 0:
+            return
         proportions = [size / total_size for size in splitter.sizes()]
         # print(f"{splitter_name}, total_size: {total_size}, Proportions: {proportions}")
         uistate.splitter[splitter_name] = proportions
+        if splitter_name == "h_splitterMaster" and self.h_splitterMaster.widget(1).isVisible():
+            sizes = splitter.sizes()
+            combined = sizes[1] + sizes[2]
+            if combined > 0:
+                uistate.settings["dft_width_proportion"] = sizes[1] / combined
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
     def toggleViewTool(self, frame):
@@ -1788,20 +1807,20 @@ class UIsub(
     def setSplitterSizes(self, *splitter_names):
         for splitter_name in splitter_names:
             splitter = getattr(self, splitter_name)
-            proportions = uistate.splitter[splitter_name]
+            proportions = uistate.splitter.get(splitter_name, [])
             widgets = [splitter.widget(i) for i in range(splitter.count())]
+            if len(proportions) != len(widgets):
+                continue
             # Store the original size policies of the widgets, and set their size policy to QtWidgets.QSizePolicy.Ignored
-            # Set width/height depending on splitter orientation
+            original_policies = []
             sizes = []
             for widget in widgets:
-                # original_size_policy = widget.sizePolicy()
+                original_policies.append(widget.sizePolicy())
                 widget.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
-                if splitter.orientation() == QtCore.Qt.Horizontal:
-                    sizes.append(int(proportions[widgets.index(widget)] * splitter.sizeHint().width()))
-                else:
-                    sizes.append(int(proportions[widgets.index(widget)] * splitter.sizeHint().height()))
-                # widget.setSizePolicy(original_size_policy)
+                sizes.append(int(proportions[widgets.index(widget)] * 100000))
             splitter.setSizes(sizes)
+            for widget, policy in zip(widgets, original_policies):
+                widget.setSizePolicy(policy)
 
     def setupCanvases(self):
         def setup_graph(graph):
@@ -2098,7 +2117,7 @@ class UIsub(
             else:
                 button.pressed.connect(func)
         # SplitterMoved
-        for splitter_name in ["h_splitterMaster", "v_splitterGraphs"]:
+        for splitter_name in uistate.splitter.keys():
             splitter = getattr(self, splitter_name)
             if disconnect:
                 try:
@@ -2117,8 +2136,6 @@ class UIsub(
 
         if hasattr(self, "actionTimetable"):
             self.actionTimetable.setChecked(uistate.showTimetable)
-
-        self.setTableStimVisibility(uistate.showTimetable)
 
         # Disconnect signals to prevent editingFinished from triggering from .setText
         self.connectUIstate(disconnect=True)
@@ -2148,7 +2165,8 @@ class UIsub(
         getattr(self, radio_name).setChecked(True)
 
         # apply splitter proportions from project config
-        self.setSplitterSizes("h_splitterMaster", "v_splitterGraphs")
+        self.setSplitterSizes(*uistate.splitter.keys())
+        self.setTableStimVisibility(uistate.showTimetable, initialize=True)
         self.connectUIstate()
 
     # trigger functions TODO: break out the big ones to separate functions!
@@ -2194,11 +2212,11 @@ class UIsub(
             # Make sure it's constructed securely as a 1D Series converting to DataFrame
             # so Pandas won't treat shape as (1,) arrays internally
             df_new = pd.DataFrame([new_row])
-            
-            # Type cast to safely concat without dimensionality glitches 
+
+            # Type cast to safely concat without dimensionality glitches
             if "t_stim" in df_t.columns and df_new["t_stim"].dtype != df_t["t_stim"].dtype:
                 df_new["t_stim"] = df_new["t_stim"].astype(df_t["t_stim"].dtype)
-                
+
             df_t = pd.concat([df_t, df_new], ignore_index=True)
             df_t = df_t.sort_values("t_stim").reset_index(drop=True)
             df_t["stim"] = range(1, len(df_t) + 1)
@@ -2416,6 +2434,7 @@ class UIsub(
 
         if uistate.dict_rec_show:
             self.tableProjSelectionChanged()
+        uistate.save_cfg(projectfolder=self.dict_folders["project"])
         self.write_bw_cfg()
 
     # triggerCopyTimepoints, triggerCopyOutput, triggerCopyProjectSummary,

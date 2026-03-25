@@ -105,7 +105,7 @@ class UIstate:
             "#0000FF",
         ]
         self.splitter = {
-            "h_splitterMaster": [0.105, 0.04, 0.795, 0.09],
+            "h_splitterMaster": [0.105, 0.04, 0.765, 0.09],
             "v_splitterGraphs": [0.2, 0.5, 0.3],
         }
         self.viewTools = {  # these are cycled by uisub.connectUIstate; framename: [title, visible]
@@ -148,6 +148,7 @@ class UIstate:
             "event_start": -0.005,  # in relation to current t_stim
             "event_end": 0.05,
             "precision": 4,  # TODO: fix hardcoded precision
+            "dft_width_proportion": 0.2,
             "filter": "voltage",  # filter to show in event graph; default 'voltage' column
             # colors and alpha
             "rgb_EPSP_amp": (0.2, 0.2, 1),
@@ -266,15 +267,11 @@ class UIstate:
         self.df_recs2plot = None  # df_project copy, filtered to selected AND parsed recordings (or all parsed, if none are selected)
 
         # Plotted lines and fills
-        self.dict_rec_labels = (
-            {}
-        )  # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, variant: str ("raw"|"norm"|None), axis: str, line: 2DlineObject}}
+        self.dict_rec_labels = {}  # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, variant: str ("raw"|"norm"|None), axis: str, line: 2DlineObject}}
         self.dict_rec_show = {}  # subset of dict_rec_labels containing only currently visible entries
 
         # Groups (mean of recs)
-        self.dict_group_labels = (
-            {}
-        )  # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, variant: str ("raw"|"norm"), axis: str, line: 2DlineObject, fill: 2DfillObject}}
+        self.dict_group_labels = {}  # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, variant: str ("raw"|"norm"), axis: str, line: 2DlineObject, fill: 2DfillObject}}
         self.dict_group_show = {}  # subset of dict_group_labels containing only currently visible entries
 
         # Mouseover variables
@@ -552,7 +549,17 @@ class UIstate:
     def set_state(self, state):
         self.version = state.get("version")
         self.colors = state.get("colors")
-        self.splitter = state.get("splitter")
+
+        valid_splitters = self.splitter.copy()
+        loaded_splitters = state.get("splitter") or {}
+        self.splitter = {}
+        for k, v in valid_splitters.items():
+            loaded_v = loaded_splitters.get(k)
+            if isinstance(loaded_v, list) and len(loaded_v) == len(v):
+                self.splitter[k] = loaded_v
+            else:
+                self.splitter[k] = v
+
         self.x_axis_mode = state.get("x_axis_mode", "time")
         self.showTimetable = state.get("showTimetable", False)
         self.detailedProjectTable = state.get("detailedProjectTable", False)
