@@ -800,7 +800,7 @@ class UIsub(
     #                     Selection changers                             #
     ######################################################################
 
-    def tableProjSelectionChanged(self):
+    def tableProjSelectionChanged(self, selected=None, deselected=None):
         if self.updating_tableProj:
             return
         self.usage("tableProjSelectionChanged")
