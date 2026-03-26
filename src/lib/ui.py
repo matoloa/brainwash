@@ -3978,7 +3978,9 @@ class UIsub(
             return
         # find a visible line
         dict_out = {
-            key: value for key, value in uistate.dict_rec_show.items() if value["axis"] == str_ax and (value["aspect"] in ["EPSP_amp", "EPSP_slope"])
+            key: value
+            for key, value in uistate.dict_rec_show.items()
+            if value["axis"] == str_ax and (value["aspect"] in ["EPSP_amp", "EPSP_slope"]) and hasattr(value["line"], "get_xdata")
         }
         if not dict_out:
             return
@@ -4631,8 +4633,15 @@ class UIsub(
         dfoutput = self.get_dfoutput(row=prow)
         dffilter = self.get_dffilter(row=prow)
         stim_num = trow_temp["stim"]
-        dft_single = uistate.dft_temp.iloc[[stim_idx]].copy()
-        dft_single.update(pd.DataFrame([dict_t_updates]))
+
+        n_stims = prow["stims"]
+        if not uistate.checkBox["timepoints_per_stim"] and n_stims > 1:
+            dft_to_update = uistate.dft_temp.copy()
+            if method_field in dict_t_updates:
+                dft_to_update[method_field] = dict_t_updates[method_field]
+        else:
+            dft_to_update = uistate.dft_temp.iloc[[stim_idx]].copy()
+            dft_to_update.update(pd.DataFrame([dict_t_updates]))
 
         rec_filter = prow.get("filter")
         if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
@@ -4641,17 +4650,27 @@ class UIsub(
         new_dfoutput = analysis.build_dfoutput(
             dffilter=dffilter,
             dfmean=dfmean,
-            dft=dft_single,
+            dft=dft_to_update,
             filter=rec_filter,
         )
         # print(f"dfoutput: {dfoutput}")
         # update volley means
         if aspect == "volley amp":
-            dft_temp.loc[dft_temp.index[stim_idx], "volley_amp_mean"] = new_dfoutput["volley_amp"].mean()
+            if not uistate.checkBox["timepoints_per_stim"] and n_stims > 1:
+                for s in new_dfoutput["stim"].unique():
+                    dft_temp.loc[dft_temp["stim"] == s, "volley_amp_mean"] = new_dfoutput[new_dfoutput["stim"] == s]["volley_amp"].mean()
+            else:
+                dft_temp.loc[dft_temp.index[stim_idx], "volley_amp_mean"] = new_dfoutput["volley_amp"].mean()
         elif aspect == "volley slope":
-            dft_temp.loc[dft_temp.index[stim_idx], "volley_slope_mean"] = new_dfoutput["volley_slope"].mean()
+            if not uistate.checkBox["timepoints_per_stim"] and n_stims > 1:
+                for s in new_dfoutput["stim"].unique():
+                    dft_temp.loc[dft_temp["stim"] == s, "volley_slope_mean"] = new_dfoutput[new_dfoutput["stim"] == s]["volley_slope"].mean()
+            else:
+                dft_temp.loc[dft_temp.index[stim_idx], "volley_slope_mean"] = new_dfoutput["volley_slope"].mean()
 
-        new_dfoutput["stim"] = int(stim_num)
+        if uistate.checkBox["timepoints_per_stim"] or n_stims == 1:
+            new_dfoutput["stim"] = int(stim_num)
+
         dfoutput.set_index(["stim", "sweep"], inplace=True)
         new_dfoutput.set_index(["stim", "sweep"], inplace=True)
         dfoutput = dfoutput.astype(float)
@@ -4665,28 +4684,30 @@ class UIsub(
         # Re-measure dfmean around the stim window so the stim-mode aggregate
         # reflects the new timepoints after the drag.
         if len(dft_temp) > 1:
-            dict_t_stim = dft_single.iloc[0].to_dict()
-            t_stim = dict_t_stim.get("t_stim", 0.0)
-            t_win_start = t_stim - 0.002
-            t_win_end = dict_t_stim.get("t_EPSP_amp", t_stim + 0.01) + dict_t_stim.get(
-                "t_EPSP_amp_width",
-                2 * dict_t_stim.get("t_EPSP_amp_halfwidth", 0.001),
-            )
-            snippet = dfmean[(dfmean["time"] >= t_win_start) & (dfmean["time"] <= t_win_end)].copy().reset_index(drop=True)
-            measured = analysis.measure_waveform(snippet, dict_t_stim, filter=prow.get("filter", "voltage"))
-            # Update the stim-mode row in dfoutput
-            stim_mask = (dfoutput["stim"] == int(stim_num)) & dfoutput["sweep"].isna()
-            if stim_mask.any():
-                for col, val in measured.items():
-                    if col in dfoutput.columns:
-                        dfoutput.loc[stim_mask, col] = val
-            else:
-                # Stim-mode row doesn't exist yet (shouldn't happen, but be safe)
-                stim_row = {"stim": int(stim_num), "sweep": np.nan}
-                stim_row.update(measured)
-                stim_row["EPSP_amp_norm"] = np.nan
-                stim_row["EPSP_slope_norm"] = np.nan
-                dfoutput = pd.concat([dfoutput, pd.DataFrame([stim_row])], ignore_index=True)
+            stims_to_update = dft_to_update["stim"].tolist()
+            for s_num in stims_to_update:
+                dict_t_stim = dft_to_update[dft_to_update["stim"] == s_num].iloc[0].to_dict()
+                t_stim = dict_t_stim.get("t_stim", 0.0)
+                t_win_start = t_stim - 0.002
+                t_win_end = dict_t_stim.get("t_EPSP_amp", t_stim + 0.01) + dict_t_stim.get(
+                    "t_EPSP_amp_width",
+                    2 * dict_t_stim.get("t_EPSP_amp_halfwidth", 0.001),
+                )
+                snippet = dfmean[(dfmean["time"] >= t_win_start) & (dfmean["time"] <= t_win_end)].copy().reset_index(drop=True)
+                measured = analysis.measure_waveform(snippet, dict_t_stim, filter=prow.get("filter", "voltage"))
+                # Update the stim-mode row in dfoutput
+                stim_mask = (dfoutput["stim"] == int(s_num)) & dfoutput["sweep"].isna()
+                if stim_mask.any():
+                    for col, val in measured.items():
+                        if col in dfoutput.columns:
+                            dfoutput.loc[stim_mask, col] = val
+                else:
+                    # Stim-mode row doesn't exist yet (shouldn't happen, but be safe)
+                    stim_row = {"stim": int(s_num), "sweep": np.nan}
+                    stim_row.update(measured)
+                    stim_row["EPSP_amp_norm"] = np.nan
+                    stim_row["EPSP_slope_norm"] = np.nan
+                    dfoutput = pd.concat([dfoutput, pd.DataFrame([stim_row])], ignore_index=True)
 
         self.persistOutput(rec_name=rec_name, dfoutput=dfoutput, p_row=prow)
         uiplot.updateStimLines(rec_name=rec_name, dfoutput=dfoutput)
@@ -4765,6 +4786,7 @@ class UIsub(
         self.mouseoverUpdate()
         self.update_amp_lineEdits()
         self.update_slope_lineEdits()
+        self.zoomAuto()
 
         if config.talkback:
             self.talkback()

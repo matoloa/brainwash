@@ -333,8 +333,6 @@ class UIstate:
             aspect = self.mouseover_action
             x = self.mouseover_plot[0].get_xdata()
             y = self.mouseover_plot[0].get_ydata()
-        else:
-            self.mouseover_action = aspect
 
         # Use the local `aspect` variable — self.mouseover_action may still be None
         # if the no-args path was taken and mouseover_action had not been set yet.
@@ -351,8 +349,6 @@ class UIstate:
             assert self.mouseover_blob is not None, "updatePointDragZone: called with no x/y and mouseover_blob is not set"
             aspect = self.mouseover_action
             x, y = self.mouseover_blob.get_offsets()[0].tolist()  # type: ignore[index, union-attr]
-        else:
-            self.mouseover_action = aspect  # was: self.mouseoverAction (typo)
 
         if aspect == "EPSP amp move":
             self.updateAmpZone("EPSP", x, y)

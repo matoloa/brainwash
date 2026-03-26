@@ -559,6 +559,33 @@ class UIplot:
             "x_mode": x_mode,
         }
 
+    def plot_shade(
+        self,
+        label,
+        axid,
+        x,
+        y_mean,
+        sem,
+        color,
+        rec_ID,
+        aspect=None,
+        stim=None,
+        variant="raw",
+        x_mode="stim",
+    ):
+        alpha = self.uistate.settings.get("alpha_shade", 0.3)
+        fill = self.get_axis(axid).fill_between(x, y_mean - sem, y_mean + sem, alpha=alpha, color=color, zorder=0)
+        fill.set_visible(False)
+        self.uistate.dict_rec_labels[label] = {
+            "rec_ID": rec_ID,
+            "aspect": aspect,
+            "variant": variant,
+            "stim": stim,
+            "line": fill,
+            "axis": axid,
+            "x_mode": x_mode,
+        }
+
     def plot_marker(
         self,
         label,
@@ -1069,72 +1096,48 @@ class UIplot:
         # visibility controlled by x_mode filtering in _is_rec_visible).
         out_stim = dfoutput[dfoutput["sweep"].isna()]
         if not out_stim.empty:
-            self.plot_line(
-                f"{label} EPSP amp",
-                "ax1",
-                out_stim["stim"],
-                out_stim["EPSP_amp"],
-                settings["rgb_EPSP_amp"],
-                rec_ID,
-                aspect="EPSP_amp",
-                variant="raw",
-                x_mode="stim",
-            )
-            self.plot_line(
-                f"{label} EPSP amp norm",
-                "ax1",
-                out_stim["stim"],
-                out_stim["EPSP_amp_norm"],
-                settings["rgb_EPSP_amp"],
-                rec_ID,
-                aspect="EPSP_amp",
-                variant="norm",
-                x_mode="stim",
-            )
-            self.plot_line(
-                f"{label} EPSP slope",
-                "ax2",
-                out_stim["stim"],
-                out_stim["EPSP_slope"],
-                settings["rgb_EPSP_slope"],
-                rec_ID,
-                aspect="EPSP_slope",
-                variant="raw",
-                x_mode="stim",
-            )
-            self.plot_line(
-                f"{label} EPSP slope norm",
-                "ax2",
-                out_stim["stim"],
-                out_stim["EPSP_slope_norm"],
-                settings["rgb_EPSP_slope"],
-                rec_ID,
-                aspect="EPSP_slope",
-                variant="norm",
-                x_mode="stim",
-            )
-            self.plot_line(
-                f"{label} volley amp",
-                "ax1",
-                out_stim["stim"],
-                out_stim["volley_amp"],
-                settings["rgb_volley_amp"],
-                rec_ID,
-                aspect="volley_amp",
-                variant="raw",
-                x_mode="stim",
-            )
-            self.plot_line(
-                f"{label} volley slope",
-                "ax2",
-                out_stim["stim"],
-                out_stim["volley_slope"],
-                settings["rgb_volley_slope"],
-                rec_ID,
-                aspect="volley_slope",
-                variant="raw",
-                x_mode="stim",
-            )
+            df_sweeps = dfoutput[dfoutput["sweep"].notna()]
+            df_sem = df_sweeps.groupby("stim").sem(numeric_only=True)
+
+            configs = [
+                ("EPSP amp", "ax1", "EPSP_amp", settings["rgb_EPSP_amp"], "raw"),
+                ("EPSP amp norm", "ax1", "EPSP_amp_norm", settings["rgb_EPSP_amp"], "norm"),
+                ("EPSP slope", "ax2", "EPSP_slope", settings["rgb_EPSP_slope"], "raw"),
+                ("EPSP slope norm", "ax2", "EPSP_slope_norm", settings["rgb_EPSP_slope"], "norm"),
+                ("volley amp", "ax1", "volley_amp", settings["rgb_volley_amp"], "raw"),
+                ("volley slope", "ax2", "volley_slope", settings["rgb_volley_slope"], "raw"),
+            ]
+
+            stims = out_stim["stim"].values
+
+            for suffix, axid, col, color, variant in configs:
+                if col in out_stim.columns:
+                    aspect = col.replace("_norm", "")
+                    self.plot_line(
+                        f"{label} {suffix}",
+                        axid,
+                        stims,
+                        out_stim[col].values,
+                        color,
+                        rec_ID,
+                        aspect=aspect,
+                        variant=variant,
+                        x_mode="stim",
+                    )
+                    if col in df_sem.columns:
+                        sem_vals = df_sem[col].reindex(out_stim["stim"]).values
+                        self.plot_shade(
+                            f"{label} {suffix} shade",
+                            axid,
+                            stims,
+                            out_stim[col].values,
+                            sem_vals,
+                            color,
+                            rec_ID,
+                            aspect=aspect,
+                            variant=variant,
+                            x_mode="stim",
+                        )
 
     def addGroup(self, group_ID, dict_group, df_groupmean):
         # plot group meanlines and SEMs
@@ -1333,6 +1336,9 @@ class UIplot:
             "volley slope": "volley_slope",
         }
 
+        df_sweeps = dfoutput[dfoutput["sweep"].notna()]
+        df_sem = df_sweeps.groupby("stim").sem(numeric_only=True)
+
         for suffix, col in suffix_to_col.items():
             label = f"{rec_name} {suffix}"
             if label not in self.uistate.dict_rec_labels:
@@ -1343,6 +1349,36 @@ class UIplot:
             linedict["line"].set_xdata(out_stim["stim"].values)
             linedict["line"].set_ydata(out_stim[col].values)
             print(f"updateStimLines: refreshed '{label}'")
+
+            shade_label = f"{label} shade"
+            if shade_label in self.uistate.dict_rec_labels and col in df_sem.columns:
+                old_shade_dict = self.uistate.dict_rec_labels[shade_label]
+                try:
+                    old_shade_dict["line"].remove()
+                except Exception:
+                    pass
+
+                axid = old_shade_dict["axis"]
+                rec_ID = old_shade_dict["rec_ID"]
+                aspect = old_shade_dict["aspect"]
+                variant = old_shade_dict["variant"]
+                color_setting_key = f"rgb_{aspect}"
+                color = self.uistate.settings.get(color_setting_key, "black")
+
+                self.plot_shade(
+                    shade_label,
+                    axid,
+                    out_stim["stim"].values,
+                    out_stim[col].values,
+                    df_sem[col].reindex(out_stim["stim"]).values,
+                    color,
+                    rec_ID,
+                    aspect=aspect,
+                    variant=variant,
+                    x_mode="stim",
+                )
+
+                self.uistate.dict_rec_labels[shade_label]["line"].set_visible(linedict["line"].get_visible())
 
     def updateOutLineFromDf(self, label, dfoutput, stim_num, column, x_axis=None):
         """Populate an output line directly from a dfoutput DataFrame.
