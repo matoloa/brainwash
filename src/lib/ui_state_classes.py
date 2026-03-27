@@ -120,6 +120,8 @@ class UIstate:
             "frameToolXscale": ["X axis", True],
             "frameToolYscale": ["Y scaling", True],
             "frameToolAspect": ["Aspect toggles", True],
+            "frameToolAspectSlope": ["Slope width", False],
+            "frameToolAspectAmp": ["Amplitude width", False],
             "frameToolPairedStim": ["Paired stims", False],
         }
         self.checkBox = {  # these are cycled by uisub.connectUIstate; maintain format!

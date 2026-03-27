@@ -94,19 +94,19 @@ class MenuMixin:
         self.actionRefresh.setShortcut("F5")
         self.menuView.addAction(self.actionRefresh)
 
-        self.actionHeatmap = QtWidgets.QAction("Toggle Heatmap")
+        self.actionHeatmap = QtWidgets.QAction("Heatmap")
         self.actionHeatmap.setCheckable(True)
         self.actionHeatmap.setChecked(uistate.showHeatmap)
         self.actionHeatmap.setShortcut("H")
         self.actionHeatmap.triggered.connect(self.triggerShowHeatmap)
         self.menuView.addAction(self.actionHeatmap)
 
-        self.actionDarkmode = QtWidgets.QAction("Toggle Darkmode")
+        self.actionDarkmode = QtWidgets.QAction("Darkmode")
         self.actionDarkmode.triggered.connect(self.triggerDarkmode)
         self.actionDarkmode.setShortcut("Alt+D")
         self.menuView.addAction(self.actionDarkmode)
 
-        self.actionTimetable = QtWidgets.QAction("Toggle Timetable")
+        self.actionTimetable = QtWidgets.QAction("Timetable")
         self.actionTimetable.setCheckable(True)
         self.actionTimetable.setChecked(uistate.showTimetable)
         self.actionTimetable.setShortcut("Alt+T")
@@ -116,10 +116,10 @@ class MenuMixin:
         # Dynamically add a checkable toggle per toolbar panel (frame name → [title, visible])
         # lambda captures frame by default arg to avoid closure-over-loop-variable bug
         for frame, (text, initial_state) in uistate.viewTools.items():
-            action = QtWidgets.QAction(f"Toggle {text}", self.menuView)
+            action = QtWidgets.QAction(text, self.menuView)
             action.setCheckable(True)
             action.setChecked(initial_state)
-            action.triggered.connect(lambda state, frame=frame: self.toggleViewTool(frame))
+            action.triggered.connect(lambda checked, frame=frame: self.setViewToolVisible(frame, visible=checked))
             self.menuView.addAction(action)
 
         # Data menu

@@ -1278,10 +1278,27 @@ class UIsub(
                 uistate.settings["dft_width_proportion"] = sizes[1] / combined
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
-    def toggleViewTool(self, frame):
-        self.usage(f"toggleViewTool {frame}")
-        uistate.viewTools[frame][1] = not uistate.viewTools[frame][1]
-        getattr(self, frame).setVisible(uistate.viewTools[frame][1])
+    def setViewToolVisible(self, frame, visible=None):
+        self.usage(f"setViewToolVisible {frame} {visible}")
+        if frame in uistate.viewTools:
+            if visible is None:
+                visible = not uistate.viewTools[frame][1]
+            uistate.viewTools[frame][1] = visible
+            getattr(self, frame).setVisible(visible)
+
+            # Sync the menu action if it exists
+            text = uistate.viewTools[frame][0]
+            if hasattr(self, "menuView"):
+                for action in self.menuView.actions():
+                    if action.text() == text:
+                        if action.isChecked() != visible:
+                            action.setChecked(visible)
+                        break
+        else:
+            if visible is None:
+                visible = not getattr(self, frame).isVisible()
+            getattr(self, frame).setVisible(visible)
+
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
     def talkback(self):
@@ -2073,6 +2090,29 @@ class UIsub(
                 pass
         else:
             self.buttonGroup_filter.buttonClicked.connect(self.filter_mode_changed)
+        # hide buttons
+        hide_buttons = {
+            "pushButton_hide_stim": "frameToolStim",
+            "pushButton_hide_sweeps": "frameToolSweeps",
+            "pushButton_hide_bin": "frameToolBin",
+            "pushButton_hide_type": "frameToolType",
+            "pushButton_hide_filter": "frameToolFilter",
+            "pushButton_hide_x_axis": "frameToolXscale",
+            "pushButton_hide_y_axis": "frameToolYscale",
+            "pushButton_hide_aspect": "frameToolAspect",
+            "pushButton_hide_slope_width": "frameToolAspectSlope",
+            "pushButton_hide_slope_width_2": "frameToolAspectAmp",
+        }
+        for btn_name, frame_name in hide_buttons.items():
+            if hasattr(self, btn_name):
+                btn = getattr(self, btn_name)
+                if disconnect:
+                    try:
+                        btn.clicked.disconnect()
+                    except TypeError:
+                        pass
+                else:
+                    btn.clicked.connect(lambda checked, f=frame_name: self.setViewToolVisible(f, visible=False))
         # checkBoxes
         for key, value in uistate.checkBox.items():
             checkBox = getattr(self, f"checkBox_{key}")
@@ -2202,6 +2242,13 @@ class UIsub(
 
         if hasattr(self, "actionTimetable"):
             self.actionTimetable.setChecked(uistate.showTimetable)
+
+        if hasattr(self, "menuView"):
+            for frame, (text, state) in uistate.viewTools.items():
+                for action in self.menuView.actions():
+                    if action.text() == text:
+                        action.setChecked(state)
+                        break
 
         # Disconnect signals to prevent editingFinished from triggering from .setText
         self.connectUIstate(disconnect=True)
