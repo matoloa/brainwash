@@ -881,6 +881,7 @@ class UIsub(
         # Mixed (differing bin_size values): show "" so editBinSize treats it as a no-op.
         self.connectUIstate(disconnect=True)
         self.update_x_axis_radio_buttons()
+        self.update_experiment_type_radio_buttons()
         df_p = self.get_df_project()
         if uistate.list_idx_select_recs:
             bin_values = {df_p.loc[i, "bin_size"] for i in uistate.list_idx_select_recs}
@@ -1707,6 +1708,9 @@ class UIsub(
             return
         self.usage(f"experiment_type_changed → {exp_type}")
         uistate.experiment_type = exp_type
+        if exp_type == "train":
+            self.radioButton_xscale_stim.setChecked(True)
+            self.x_axis_mode_changed(self.radioButton_xscale_stim)
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
     def x_axis_mode_changed(self, button):
@@ -1778,6 +1782,16 @@ class UIsub(
         # Select the correct radio button (signals are disconnected by caller).
         radio_name = self._MODE_TO_RADIO.get(mode, "radioButton_xscale_sweep")
         getattr(self, radio_name).setChecked(True)
+
+    def update_experiment_type_radio_buttons(self):
+        """Enable/disable and select experiment type radio buttons for the current selection."""
+        if not hasattr(self, "buttonGroup_type"):
+            return
+
+        mode = getattr(uistate, "experiment_type", "time")
+        radio_name = self._TYPE_TO_RADIO.get(mode, "radioButton_type_time")
+        if hasattr(self, radio_name):
+            getattr(self, radio_name).setChecked(True)
 
     def viewSettingsChanged(self, key, state):
         self.usage(f"viewSettingsChanged {key}, {state == 2}")
