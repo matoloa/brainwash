@@ -833,11 +833,12 @@ class UIplot:
 
             df_sweeps = dfoutput[dfoutput["sweep"].notna()]
             if x_col in df_sweeps.columns and y_col in df_sweeps.columns:
+                df_clean = df_sweeps.dropna(subset=[x_col, y_col])
                 axid = "ax1"
                 color = self.uistate.settings.get(f"rgb_{y_col}", "black")
                 scatter = self.get_axis(axid).scatter(
-                    df_sweeps[x_col].values,
-                    df_sweeps[y_col].values,
+                    df_clean[x_col].values,
+                    df_clean[y_col].values,
                     c=[color],
                     alpha=0.8,
                     label=f"{label} IO scatter",
@@ -854,6 +855,40 @@ class UIplot:
                     "axis": axid,
                     "x_mode": "io",
                 }
+
+                if self.uistate.checkBox.get("io_trendline", False) and len(df_clean) > 1:
+                    x_vals = df_clean[x_col].values
+                    y_vals = df_clean[y_col].values
+
+                    if self.uistate.checkBox.get("io_force0", False):
+                        x_sq_sum = np.sum(x_vals**2)
+                        m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
+                        c = 0
+                    else:
+                        m, c = np.polyfit(x_vals, y_vals, 1)
+
+                    x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
+                    y_line = m * x_line + c
+
+                    (trendline,) = self.get_axis(axid).plot(
+                        x_line,
+                        y_line,
+                        color=color,
+                        linestyle="--",
+                        alpha=0.8,
+                        label=f"{label} IO trendline",
+                        zorder=1,
+                    )
+                    trendline.set_visible(False)
+                    self.uistate.dict_rec_labels[f"{label} IO trendline"] = {
+                        "rec_ID": rec_ID,
+                        "aspect": y_col,
+                        "variant": "raw",
+                        "stim": None,
+                        "line": trendline,
+                        "axis": axid,
+                        "x_mode": "io",
+                    }
 
         # Add meanline to Mean
         self.plot_line(
@@ -1396,6 +1431,29 @@ class UIplot:
                     df_sweeps_clean = df_sweeps.dropna(subset=[x_col, y_col])
                     linedict["line"].set_offsets(np.c_[df_sweeps_clean[x_col].values, df_sweeps_clean[y_col].values])
                     print(f"updateStimLines: refreshed IO scatter '{key}'")
+
+            elif key.startswith(rec_name) and key.endswith(" IO trendline") and linedict.get("x_mode") == "io":
+                io_input = getattr(self.uistate, "io_input", "vamp")
+                io_output = getattr(self.uistate, "io_output", "EPSPamp")
+                x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
+                y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+                df_sweeps = dfoutput[dfoutput["sweep"].notna()]
+                if x_col in df_sweeps.columns and y_col in df_sweeps.columns:
+                    df_clean = df_sweeps.dropna(subset=[x_col, y_col])
+                    if len(df_clean) > 1:
+                        x_vals = df_clean[x_col].values
+                        y_vals = df_clean[y_col].values
+                        if self.uistate.checkBox.get("io_force0", False):
+                            x_sq_sum = np.sum(x_vals**2)
+                            m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
+                            c = 0
+                        else:
+                            m, c = np.polyfit(x_vals, y_vals, 1)
+
+                        x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
+                        y_line = m * x_line + c
+                        linedict["line"].set_data(x_line, y_line)
+                        print(f"updateStimLines: refreshed IO trendline '{key}'")
 
         out_stim = dfoutput[dfoutput["sweep"].isna()]
         if out_stim.empty:

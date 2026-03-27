@@ -779,6 +779,19 @@ class UIsub(
         self.loadProject()  # load project data
         logger.debug("loadProject done")
 
+    def _cleanup_threads(self):
+        # Stop and wait for all running threads
+        for thread in getattr(self, "_threads", []):
+            if isinstance(thread, QtCore.QThread) and thread.isRunning():
+                thread.quit()
+                thread.wait()
+        self._threads = []
+
+    def closeEvent(self, event):
+        # Ensure all threads are stopped on window close
+        self._cleanup_threads()
+        super().closeEvent(event)
+
     # Debugging tools
 
     def checkFocus(self):
@@ -1913,12 +1926,11 @@ class UIsub(
             elif key in ["EPSP_slope", "volley_slope"]:
                 self.frameToolAspectSlope.setVisible(uistate.checkBox["EPSP_slope"] or uistate.checkBox["volley_slope"])
             elif key in ["io_trendline", "io_force0"]:
+                print(f"Checkbox {key} clicked, state: {state == 2}")
                 if getattr(uistate, "experiment_type", "time") == "io":
                     self.exorcise()
                     uiplot.unPlot()
                     self.graphUpdate()
-                    uistate.save_cfg(projectfolder=self.dict_folders["project"])
-                    return
         # print(f"viewSettingsChanged: {key} = {state == 2}")
         self.update_show()
         if key in ["output_ymin0", "norm_EPSP"]:
