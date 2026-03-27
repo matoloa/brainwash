@@ -1675,6 +1675,23 @@ class UIsub(
             self.recalculate(selection=selected_idx)
             self.update_show()
 
+    _RADIO_TO_TYPE = {
+        "radioButton_type_time": "time",
+        "radioButton_type_train": "train",
+        "radioButton_type_IO": "IO",
+        "radioButton_type_PP": "PP",
+    }
+    _TYPE_TO_RADIO = {v: k for k, v in _RADIO_TO_TYPE.items()}
+
+    def experiment_type_changed(self, button):
+        """Handler for buttonGroup_type.buttonClicked signal."""
+        exp_type = self._RADIO_TO_TYPE.get(button.objectName())
+        if exp_type is None or exp_type == getattr(uistate, "experiment_type", "time"):
+            return
+        self.usage(f"experiment_type_changed → {exp_type}")
+        uistate.experiment_type = exp_type
+        uistate.save_cfg(projectfolder=self.dict_folders["project"])
+
     def x_axis_mode_changed(self, button):
         """Handler for buttonGroup_x_axis.buttonClicked signal."""
         mode = self._RADIO_TO_MODE.get(button.objectName())
@@ -2039,6 +2056,15 @@ class UIsub(
                 pass  # no connections yet
         else:
             self.buttonGroup_x_axis.buttonClicked.connect(self.x_axis_mode_changed)
+        # experiment type radio button group
+        if hasattr(self, "buttonGroup_type"):
+            if disconnect:
+                try:
+                    self.buttonGroup_type.buttonClicked.disconnect()
+                except TypeError:
+                    pass
+            else:
+                self.buttonGroup_type.buttonClicked.connect(self.experiment_type_changed)
         # filter radio button group
         if disconnect:
             try:
@@ -2203,6 +2229,12 @@ class UIsub(
         # apply x-axis radio button selection from config
         radio_name = self._MODE_TO_RADIO.get(uistate.x_axis_mode, "radioButton_xscale_sweep")
         getattr(self, radio_name).setChecked(True)
+
+        # apply experiment type radio button selection from config
+        if hasattr(self, "buttonGroup_type"):
+            type_radio_name = self._TYPE_TO_RADIO.get(getattr(uistate, "experiment_type", "time"), "radioButton_type_time")
+            if hasattr(self, type_radio_name):
+                getattr(self, type_radio_name).setChecked(True)
 
         # Ensure tools column is treated as fixed pixels
         if len(uistate.splitter.get("h_splitterMaster", [])) == 4:

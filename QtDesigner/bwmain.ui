@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1951</width>
+    <width>1633</width>
     <height>1250</height>
    </rect>
   </property>
@@ -273,7 +273,7 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-8</y>
+          <y>0</y>
           <width>191</width>
           <height>1170</height>
          </rect>
@@ -423,14 +423,14 @@
            <widget class="QPushButton" name="pushButton_hide_stim">
             <property name="geometry">
              <rect>
-              <x>140</x>
+              <x>150</x>
               <y>10</y>
               <width>21</width>
               <height>21</height>
              </rect>
             </property>
             <property name="text">
-             <string>X</string>
+             <string>-</string>
             </property>
             <property name="flat">
              <bool>true</bool>
@@ -568,14 +568,14 @@
            <widget class="QPushButton" name="pushButton_hide_sweeps">
             <property name="geometry">
              <rect>
-              <x>140</x>
+              <x>150</x>
               <y>10</y>
               <width>21</width>
               <height>21</height>
              </rect>
             </property>
             <property name="text">
-             <string>X</string>
+             <string>-</string>
             </property>
             <property name="flat">
              <bool>true</bool>
@@ -659,6 +659,22 @@
             </property>
             <property name="text">
              <string>0 = no binning</string>
+            </property>
+           </widget>
+           <widget class="QPushButton" name="pushButton_hide_bin">
+            <property name="geometry">
+             <rect>
+              <x>150</x>
+              <y>10</y>
+              <width>21</width>
+              <height>21</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>-</string>
+            </property>
+            <property name="flat">
+             <bool>true</bool>
             </property>
            </widget>
           </widget>
@@ -761,6 +777,22 @@
              <string notr="true">buttonGroup_type</string>
             </attribute>
            </widget>
+           <widget class="QPushButton" name="pushButton_hide_type">
+            <property name="geometry">
+             <rect>
+              <x>150</x>
+              <y>10</y>
+              <width>21</width>
+              <height>21</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>-</string>
+            </property>
+            <property name="flat">
+             <bool>true</bool>
+            </property>
+           </widget>
           </widget>
          </item>
          <item>
@@ -828,6 +860,22 @@
             <attribute name="buttonGroup">
              <string notr="true">buttonGroup_filter</string>
             </attribute>
+           </widget>
+           <widget class="QPushButton" name="pushButton_hide_filter">
+            <property name="geometry">
+             <rect>
+              <x>150</x>
+              <y>10</y>
+              <width>21</width>
+              <height>21</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>-</string>
+            </property>
+            <property name="flat">
+             <bool>true</bool>
+            </property>
            </widget>
           </widget>
          </item>
@@ -1023,6 +1071,22 @@
              <string notr="true">buttonGroup_x_axis</string>
             </attribute>
            </widget>
+           <widget class="QPushButton" name="pushButton_hide_x_axis">
+            <property name="geometry">
+             <rect>
+              <x>150</x>
+              <y>10</y>
+              <width>21</width>
+              <height>21</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>-</string>
+            </property>
+            <property name="flat">
+             <bool>true</bool>
+            </property>
+           </widget>
           </widget>
          </item>
          <item>
@@ -1143,6 +1207,22 @@
              <string>output Ymin 0</string>
             </property>
            </widget>
+           <widget class="QPushButton" name="pushButton_hide_y_axis">
+            <property name="geometry">
+             <rect>
+              <x>150</x>
+              <y>10</y>
+              <width>21</width>
+              <height>21</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>-</string>
+            </property>
+            <property name="flat">
+             <bool>true</bool>
+            </property>
+           </widget>
            <zorder>label_norm_on_sweep</zorder>
            <zorder>checkBox_norm_EPSP</zorder>
            <zorder>label_relative_to</zorder>
@@ -1150,6 +1230,7 @@
            <zorder>checkBox_output_ymin0</zorder>
            <zorder>lineEdit_norm_EPSP_end</zorder>
            <zorder>lineEdit_norm_EPSP_start</zorder>
+           <zorder>pushButton_hide_y_axis</zorder>
           </widget>
          </item>
          <item>
@@ -1270,6 +1351,22 @@
              <string>mean</string>
             </property>
            </widget>
+           <widget class="QPushButton" name="pushButton_hide_aspect">
+            <property name="geometry">
+             <rect>
+              <x>150</x>
+              <y>10</y>
+              <width>21</width>
+              <height>21</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>-</string>
+            </property>
+            <property name="flat">
+             <bool>true</bool>
+            </property>
+           </widget>
           </widget>
          </item>
          <item>
@@ -1364,6 +1461,22 @@
              <string>Slope width (ms)</string>
             </property>
            </widget>
+           <widget class="QPushButton" name="pushButton_hide_slope_width">
+            <property name="geometry">
+             <rect>
+              <x>150</x>
+              <y>10</y>
+              <width>21</width>
+              <height>21</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>-</string>
+            </property>
+            <property name="flat">
+             <bool>true</bool>
+            </property>
+           </widget>
           </widget>
          </item>
          <item>
@@ -1456,6 +1569,22 @@
             </property>
             <property name="text">
              <string>Amplitude width (± ms)</string>
+            </property>
+           </widget>
+           <widget class="QPushButton" name="pushButton_hide_slope_width_2">
+            <property name="geometry">
+             <rect>
+              <x>150</x>
+              <y>10</y>
+              <width>21</width>
+              <height>21</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>-</string>
+            </property>
+            <property name="flat">
+             <bool>true</bool>
             </property>
            </widget>
           </widget>
@@ -1563,7 +1692,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1951</width>
+     <width>1633</width>
      <height>21</height>
     </rect>
    </property>
@@ -1610,7 +1739,7 @@
  <connections/>
  <buttongroups>
   <buttongroup name="buttonGroup_filter"/>
-  <buttongroup name="buttonGroup_type"/>
   <buttongroup name="buttonGroup_x_axis"/>
+  <buttongroup name="buttonGroup_type"/>
  </buttongroups>
 </ui>

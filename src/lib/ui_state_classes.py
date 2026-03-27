@@ -84,6 +84,9 @@ class UIstate:
     # --- X-axis mode (persisted) ---
     x_axis_mode: str  # "sweep", "time", or "stim"
 
+    # --- Experiment type (persisted) ---
+    experiment_type: str  # "time", "train", "IO", "PP"
+
     # --- Global bw_cfg (not persisted in project cfg.pkl) ---
     darkmode: bool
 
@@ -166,10 +169,11 @@ class UIstate:
             "event_xlim": (-0.0012, 0.030),
             "event_ylim": (-0.001, 0.0002),
             "output_xlim": (0, None),
-            "output_ax1_ylim": (0, 1.2),
+            "output_ax1_ylim": (0, 3.2),
             "output_ax2_ylim": (0, 1.2),
         }
         self.x_axis_mode = "time"  # "sweep", "time", or "stim"
+        self.experiment_type = "time"  # "time", "train", "IO", "PP"
         self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
         self._time_unit_label = "s"  # set by x_axis_xlim when mode == "time"
         self._time_sweep_hz = 1.0  # set by x_axis_xlim when mode == "time"
@@ -539,6 +543,7 @@ class UIstate:
                 "zoom": self.zoom,
                 "default_dict_t": self.default_dict_t,
                 "x_axis_mode": self.x_axis_mode,
+                "experiment_type": getattr(self, "experiment_type", "time"),
                 "showTimetable": self.showTimetable,
                 "detailedProjectTable": getattr(self, "detailedProjectTable", False),
                 "detailedTimetable": getattr(self, "detailedTimetable", False),
@@ -564,6 +569,7 @@ class UIstate:
                 self.splitter[k] = v
 
         self.x_axis_mode = state.get("x_axis_mode", "time")
+        self.experiment_type = state.get("experiment_type", "time")
         self.showTimetable = state.get("showTimetable", False)
         self.detailedProjectTable = state.get("detailedProjectTable", False)
         self.detailedTimetable = state.get("detailedTimetable", False)
