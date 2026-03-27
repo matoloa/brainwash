@@ -81,11 +81,8 @@ class UIstate:
     ghost_sweep: Optional[matplotlib.lines.Line2D]
     ghost_label: Optional[matplotlib.text.Text]
 
-    # --- X-axis mode (persisted) ---
-    x_axis_mode: str  # "sweep", "time", or "stim"
-
     # --- Experiment type (persisted) ---
-    experiment_type: str  # "time", "train", "IO", "PP"
+    experiment_type: str  # "time", "sweep", "timestamp", "train", "io", "PP"
 
     # --- Global bw_cfg (not persisted in project cfg.pkl) ---
     darkmode: bool
@@ -117,7 +114,6 @@ class UIstate:
             "frameToolBin": ["Binning", True],
             "frameToolType": ["Experiment type", True],
             "frameToolFilter": ["Filter", True],
-            "frameToolXscale": ["X axis", True],
             "frameToolYscale": ["Y scaling", True],
             "frameToolAspect": ["Aspect toggles", True],
             "frameToolAspectSlope": ["Slope width", False],
@@ -174,8 +170,7 @@ class UIstate:
             "output_ax1_ylim": (0, 3.2),
             "output_ax2_ylim": (0, 1.2),
         }
-        self.x_axis_mode = "time"  # "sweep", "time", or "stim"
-        self.experiment_type = "time"  # "time", "train", "IO", "PP"
+        self.experiment_type = "time"  # "time", "sweep", "timestamp", "train", "io", "PP"
         self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
         self._time_unit_label = "s"  # set by x_axis_xlim when mode == "time"
         self._time_sweep_hz = 1.0  # set by x_axis_xlim when mode == "time"
@@ -412,8 +407,16 @@ class UIstate:
 
     @property
     def x_axis(self) -> str:
-        """Single call site for all plot-layer x-axis decisions."""
-        return self.x_axis_mode
+        """Single call site for all plot-layer x-axis decisions.
+        Maps the experiment type to the underlying plot mode."""
+        if self.experiment_type in ["time", "timestamp"]:
+            return "time"
+        elif self.experiment_type == "sweep":
+            return "sweep"
+        elif self.experiment_type == "train":
+            return "stim"
+        # io and PP modes will likely use stim or a custom mode later
+        return "sweep"
 
     @staticmethod
     def time_axis_unit(max_seconds: float) -> tuple:
@@ -438,9 +441,10 @@ class UIstate:
 
         In time mode, uses the cached unit label set by x_axis_xlim.
         """
-        if self.x_axis_mode == "time":
+        mode = self.x_axis
+        if mode == "time":
             return f"Time ({self._time_unit_label})"
-        return {"sweep": "Sweep", "stim": "Stim"}[self.x_axis_mode]
+        return {"sweep": "Sweep", "stim": "Stim"}.get(mode, "Sweep")
 
     def x_axis_xlim(self, prow, dft=None) -> tuple:
         """Return (xmin, xmax) for the output graph given the current mode.
@@ -450,7 +454,7 @@ class UIstate:
         are always in sweep-space (same coordinates as the line x-data);
         the FuncFormatter converts tick labels to the chosen time unit.
         """
-        mode = self.x_axis_mode
+        mode = self.x_axis
         if mode == "sweep":
             n = prow["sweeps"]
             if pd.notna(prow.get("bin_size")):
@@ -484,13 +488,14 @@ class UIstate:
                 stim_max = n
             self._stim_tick_locs = list(range(stim_min, stim_max + 1))
             return (stim_min - 0.5, stim_max + 0.5)
-        raise ValueError(f"Unknown x_axis_mode: {mode!r}")
+        raise ValueError(f"Unknown x_axis mode: {mode!r}")
 
     def x_axis_locator(self):
         """Return a Locator that places ticks at nice intervals in the current mode."""
-        if self.x_axis_mode == "time":
+        mode = self.x_axis
+        if mode == "time":
             return TimeModeLocator(self._time_sweep_hz / self._time_bin_size, self._time_divisor)
-        if self.x_axis_mode == "stim":
+        if mode == "stim":
             return FixedLocator(self._stim_tick_locs)
         return AutoLocator()
 
@@ -503,7 +508,7 @@ class UIstate:
         Must be called after x_axis_xlim (which caches _time_sweep_hz and
         _time_divisor).
         """
-        if self.x_axis_mode == "time":
+        if self.x_axis == "time":
             sweep_hz = self._time_sweep_hz
             divisor = self._time_divisor
             bin_size = self._time_bin_size
@@ -523,14 +528,14 @@ class UIstate:
         Time mode returns sweep numbers (same as sweep mode); the
         FuncFormatter on the axis handles display conversion.
         """
-        mode = self.x_axis_mode
+        mode = self.x_axis
         if mode == "sweep" or mode == "time":
             mask = dfoutput["sweep"].notna()
             return dfoutput.loc[mask, "sweep"]
         elif mode == "stim":
             mask = dfoutput["sweep"].isna()
             return dfoutput.loc[mask, "stim"]
-        raise ValueError(f"Unknown x_axis_mode: {mode!r}")
+        raise ValueError(f"Unknown x_axis mode: {mode!r}")
 
     def get_state(self):
         try:
@@ -544,7 +549,6 @@ class UIstate:
                 "settings": self.settings,
                 "zoom": self.zoom,
                 "default_dict_t": self.default_dict_t,
-                "x_axis_mode": self.x_axis_mode,
                 "experiment_type": getattr(self, "experiment_type", "time"),
                 "showTimetable": self.showTimetable,
                 "detailedProjectTable": getattr(self, "detailedProjectTable", False),
@@ -570,26 +574,26 @@ class UIstate:
             else:
                 self.splitter[k] = v
 
-        self.x_axis_mode = state.get("x_axis_mode", "time")
-        self.experiment_type = state.get("experiment_type", "time")
+        # Read experiment type. Fallback to old x_axis_mode if experiment_type is missing,
+        # otherwise default to "time".
+        self.experiment_type = state.get("experiment_type", state.get("x_axis_mode", "time"))
+
         self.showTimetable = state.get("showTimetable", False)
         self.detailedProjectTable = state.get("detailedProjectTable", False)
         self.detailedTimetable = state.get("detailedTimetable", False)
+
         # Filter out any keys saved in old configs that no longer exist as widgets.
         # This lets us remove keys from these dicts without old cfg.pkl files
-        # re-introducing stale keys on next load.
-        valid_view_tools = set(self.viewTools.keys())  # from reset()
-        loaded_view_tools = state.get("viewTools") or {}
-        self.viewTools = {k: v for k, v in loaded_view_tools.items() if k in valid_view_tools}
-        valid_checkboxes = set(self.checkBox.keys())
-        loaded_checkboxes = state.get("checkBox") or {}
-        self.checkBox = {k: v for k, v in loaded_checkboxes.items() if k in valid_checkboxes}
-        valid_line_edits = set(self.lineEdit.keys())
-        loaded_line_edits = state.get("lineEdit") or {}
-        self.lineEdit = {k: v for k, v in loaded_line_edits.items() if k in valid_line_edits}
-        valid_settings = self.settings.copy()  # from reset()
-        loaded_settings = state.get("settings") or {}
-        self.settings = {k: loaded_settings.get(k, valid_settings[k]) for k in valid_settings}
+        # re-introducing stale keys on next load, while also preserving defaults
+        # for newly added features that don't exist in the old cfg.pkl.
+        def merge_dict(default_dict, loaded_dict):
+            return {k: loaded_dict.get(k, default_dict[k]) for k in default_dict}
+
+        self.viewTools = merge_dict(self.viewTools, state.get("viewTools") or {})
+        self.checkBox = merge_dict(self.checkBox, state.get("checkBox") or {})
+        self.lineEdit = merge_dict(self.lineEdit, state.get("lineEdit") or {})
+        self.settings = merge_dict(self.settings, state.get("settings") or {})
+
         # Rebuild zoom defensively: start from known-good defaults, overlay any
         # persisted values that are type-compatible, and silently discard
         # stale/corrupt entries (e.g. strings stored by older versions).

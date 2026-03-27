@@ -880,7 +880,6 @@ class UIsub(
         # Single or uniform multi-selection: show "0" (off) or the int value.
         # Mixed (differing bin_size values): show "" so editBinSize treats it as a no-op.
         self.connectUIstate(disconnect=True)
-        self.update_x_axis_radio_buttons()
         self.update_experiment_type_radio_buttons()
         df_p = self.get_df_project()
         if uistate.list_idx_select_recs:
@@ -1032,8 +1031,8 @@ class UIsub(
         # numbers — with a FuncFormatter converting tick labels to time units),
         # so x_mode="sweep" lines are visible in both "sweep" and "time" modes.
         x_mode = v.get("x_mode")
-        if x_mode is not None and x_mode != uistate.x_axis_mode:
-            if not (x_mode == "sweep" and uistate.x_axis_mode == "time"):
+        if x_mode is not None and x_mode != uistate.x_axis:
+            if not (x_mode == "sweep" and uistate.x_axis == "time"):
                 return False
         aspect = v.get("aspect")
         if aspect and not uistate.checkBox.get(aspect, True):
@@ -1062,8 +1061,8 @@ class UIsub(
         # x_mode filtering: group lines tagged with a specific x_mode are only
         # visible when that mode is active.
         x_mode = v.get("x_mode")
-        if x_mode is not None and x_mode != uistate.x_axis_mode:
-            if not (x_mode == "sweep" and uistate.x_axis_mode == "time"):
+        if x_mode is not None and x_mode != uistate.x_axis:
+            if not (x_mode == "sweep" and uistate.x_axis == "time"):
                 return False
         aspect = v.get("aspect")
         if aspect and not uistate.checkBox.get(aspect, True):
@@ -1161,8 +1160,9 @@ class UIsub(
         for key, _ in uistate.checkBox.items():
             checkBox = getattr(self, f"checkBox_{key}")
             checkBox.setEnabled(False)
-        for radio_name in self._RADIO_TO_MODE:
-            getattr(self, radio_name).setEnabled(False)
+        for radio_name in self._RADIO_TO_TYPE:
+            if hasattr(self, radio_name):
+                getattr(self, radio_name).setEnabled(False)
 
     def uiThaw(self):  # Enable selection changes and checkboxes
         if not uistate.frozen:
@@ -1177,7 +1177,8 @@ class UIsub(
         # via tableProjSelectionChanged (called after uiThaw) will set them
         # correctly.  Here we just re-enable sweep (always valid) so the
         # group is not left fully disabled.
-        self.radioButton_xscale_sweep.setEnabled(True)
+        if hasattr(self, "radioButton_type_sweep"):
+            self.radioButton_type_sweep.setEnabled(True)
         uistate.frozen = False
 
     def toggleHeatmap(self):
@@ -1696,8 +1697,10 @@ class UIsub(
     _RADIO_TO_TYPE = {
         "radioButton_type_time": "time",
         "radioButton_type_train": "train",
-        "radioButton_type_IO": "IO",
+        "radioButton_type_io": "io",
         "radioButton_type_PP": "PP",
+        "radioButton_type_sweep": "sweep",
+        "radioButton_type_timestamp": "timestamp",
     }
     _TYPE_TO_RADIO = {v: k for k, v in _RADIO_TO_TYPE.items()}
 
@@ -1708,35 +1711,18 @@ class UIsub(
             return
         self.usage(f"experiment_type_changed → {exp_type}")
         uistate.experiment_type = exp_type
-        if exp_type == "train":
-            self.radioButton_xscale_stim.setChecked(True)
-            self.x_axis_mode_changed(self.radioButton_xscale_stim)
+        if hasattr(self, "frameToolType_io"):
+            self.frameToolType_io.setVisible(exp_type == "io")
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
-
-    def x_axis_mode_changed(self, button):
-        """Handler for buttonGroup_x_axis.buttonClicked signal."""
-        mode = self._RADIO_TO_MODE.get(button.objectName())
-        if mode is None or mode == uistate.x_axis_mode:
-            return
-        self.usage(f"x_axis_mode_changed → {mode}")
-        uistate.x_axis_mode = mode
-        uistate.save_cfg(projectfolder=self.dict_folders["project"])
-        # Both sweep-mode and stim-mode artists are pre-created in addRow;
-        # toggling is just a visibility + zoom update — no rebuild needed.
         self.update_show()
         self.zoomAuto()
         self.graphRefresh()
 
-    def update_x_axis_radio_buttons(self):
-        """Enable/disable and select x-axis radio buttons for the current selection.
+    def update_experiment_type_radio_buttons(self):
+        """Enable/disable and select experiment type radio buttons for the current selection."""
+        if not hasattr(self, "buttonGroup_type"):
+            return
 
-        Called from tableProjSelectionChanged after df_project is available.
-        Falls back to "sweep" when the persisted mode is unavailable.
-        """
-        # Determine capabilities from the selected recording(s).
-        # Note: df_project["stims"] is not reliably populated (get_dft
-        # computes stim count but never writes it back to df_project).
-        # Use the cached dft (dict_ts) which is the source of truth.
         has_stims = False
         has_sweep_hz = False
         if uistate.list_idx_select_recs:
@@ -1750,45 +1736,41 @@ class UIsub(
                 if pd.notna(row.get("sweep_hz")):
                     has_sweep_hz = True
 
-        # Enable/disable buttons.  Sweep is always enabled.
-        self.radioButton_xscale_sweep.setEnabled(True)
-        self.radioButton_xscale_stim.setEnabled(has_stims)
-        self.radioButton_xscale_time.setEnabled(has_sweep_hz)
-        self.radioButton_xscale_timestamp.setEnabled(False)  # future
+        if hasattr(self, "radioButton_type_sweep"):
+            self.radioButton_type_sweep.setEnabled(True)
+        if hasattr(self, "radioButton_type_train"):
+            self.radioButton_type_train.setEnabled(has_stims)
+        if hasattr(self, "radioButton_type_time"):
+            self.radioButton_type_time.setEnabled(has_sweep_hz)
+        if hasattr(self, "radioButton_type_timestamp"):
+            self.radioButton_type_timestamp.setEnabled(False)  # future
+        if hasattr(self, "radioButton_type_io"):
+            self.radioButton_type_io.setEnabled(True)
+        if hasattr(self, "radioButton_type_PP"):
+            self.radioButton_type_PP.setEnabled(True)
 
-        # Make disabled state visually obvious.  The mainwindow stylesheet
-        # sets a blanket "color: #fff" (darkmode) which overrides Qt's
-        # built-in disabled palette.  Per-widget stylesheets take priority,
-        # so we apply greyed-out color explicitly on disabled buttons.
         disabled_color = "#666" if uistate.darkmode else "#aaa"
-        for radio_name in self._RADIO_TO_MODE:
-            radio = getattr(self, radio_name)
-            if radio.isEnabled():
-                radio.setStyleSheet("")  # inherit from parent
-            else:
-                radio.setStyleSheet(f"color: {disabled_color};")
+        for radio_name in self._RADIO_TO_TYPE:
+            if hasattr(self, radio_name):
+                radio = getattr(self, radio_name)
+                if radio.isEnabled():
+                    radio.setStyleSheet("")
+                else:
+                    radio.setStyleSheet(f"color: {disabled_color};")
 
-        # If the persisted mode is no longer available, fall back to time or sweep.
-        mode = uistate.x_axis_mode
-        if mode == "stim" and not has_stims:
+        mode = getattr(uistate, "experiment_type", "time")
+        if mode in ["train", "io", "PP"] and not has_stims:
             mode = "time" if has_sweep_hz else "sweep"
         elif mode == "time" and not has_sweep_hz:
             mode = "sweep"
         elif mode == "timestamp":
             mode = "time" if has_sweep_hz else "sweep"
-        if mode != uistate.x_axis_mode:
-            uistate.x_axis_mode = mode
 
-        # Select the correct radio button (signals are disconnected by caller).
-        radio_name = self._MODE_TO_RADIO.get(mode, "radioButton_xscale_sweep")
-        getattr(self, radio_name).setChecked(True)
+        if mode != getattr(uistate, "experiment_type", "time"):
+            uistate.experiment_type = mode
+            if hasattr(self, "frameToolType_io"):
+                self.frameToolType_io.setVisible(mode == "io")
 
-    def update_experiment_type_radio_buttons(self):
-        """Enable/disable and select experiment type radio buttons for the current selection."""
-        if not hasattr(self, "buttonGroup_type"):
-            return
-
-        mode = getattr(uistate, "experiment_type", "time")
         radio_name = self._TYPE_TO_RADIO.get(mode, "radioButton_type_time")
         if hasattr(self, radio_name):
             getattr(self, radio_name).setChecked(True)
@@ -2068,6 +2050,8 @@ class UIsub(
         self.frameToolFilterSavgol.setVisible(uistate.settings.get("filter", "voltage") == "savgol")
         self.frameToolAspectAmp.setVisible(uistate.checkBox.get("EPSP_amp", False) or uistate.checkBox.get("volley_amp", False))
         self.frameToolAspectSlope.setVisible(uistate.checkBox.get("EPSP_slope", False) or uistate.checkBox.get("volley_slope", False))
+        if hasattr(self, "frameToolType_io"):
+            self.frameToolType_io.setVisible(getattr(uistate, "experiment_type", "time") == "io")
 
     def build_dict_folders(self):
         dict_folders = {
@@ -2079,14 +2063,6 @@ class UIsub(
         return dict_folders
 
     def connectUIstate(self, disconnect=False):  # ternary (dis)connect of UI elements
-        # x-axis radio button group
-        if disconnect:
-            try:
-                self.buttonGroup_x_axis.buttonClicked.disconnect()
-            except TypeError:
-                pass  # no connections yet
-        else:
-            self.buttonGroup_x_axis.buttonClicked.connect(self.x_axis_mode_changed)
         # experiment type radio button group
         if hasattr(self, "buttonGroup_type"):
             if disconnect:
@@ -2111,7 +2087,6 @@ class UIsub(
             "pushButton_hide_bin": "frameToolBin",
             "pushButton_hide_type": "frameToolType",
             "pushButton_hide_filter": "frameToolFilter",
-            "pushButton_hide_x_axis": "frameToolXscale",
             "pushButton_hide_y_axis": "frameToolYscale",
             "pushButton_hide_aspect": "frameToolAspect",
             "pushButton_hide_slope_width": "frameToolAspectSlope",
@@ -2286,10 +2261,6 @@ class UIsub(
         self.lineEdit_volley_amp_halfwidth.setText(f"{uistate.lineEdit['volley_amp_halfwidth_ms']}")
         self.lineEdit_EPSP_slope_width.setText(f"{uistate.lineEdit.get('EPSP_slope_width_ms', 0)}")
         self.lineEdit_volley_slope_width.setText(f"{uistate.lineEdit.get('volley_slope_width_ms', 0)}")
-
-        # apply x-axis radio button selection from config
-        radio_name = self._MODE_TO_RADIO.get(uistate.x_axis_mode, "radioButton_xscale_sweep")
-        getattr(self, radio_name).setChecked(True)
 
         # apply experiment type radio button selection from config
         if hasattr(self, "buttonGroup_type"):
@@ -2788,7 +2759,7 @@ class UIsub(
             df_p.at[idx, "status"] = "|".join(flags)
         self.set_df_project(df_p)
         print(f"SetSweepHz: set sweep_hz={new_hz} on {n} {noun}.")
-        self.update_x_axis_radio_buttons()
+        self.update_experiment_type_radio_buttons()
         for idx in selection:
             uiplot.unPlot(rec_ID=df_p.loc[idx, "ID"])
         self.graphUpdate()

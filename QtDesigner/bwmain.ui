@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1633</width>
-    <height>1250</height>
+    <width>1460</width>
+    <height>857</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -273,9 +273,9 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>0</y>
+          <y>-155</y>
           <width>191</width>
-          <height>1170</height>
+          <height>1210</height>
          </rect>
         </property>
         <property name="minimumSize">
@@ -684,7 +684,7 @@
            <property name="minimumSize">
             <size>
              <width>201</width>
-             <height>81</height>
+             <height>101</height>
             </size>
            </property>
            <property name="frameShape">
@@ -718,7 +718,7 @@
              <rect>
               <x>10</x>
               <y>30</y>
-              <width>82</width>
+              <width>91</width>
               <height>17</height>
              </rect>
             </property>
@@ -732,7 +732,7 @@
            <widget class="QRadioButton" name="radioButton_type_train">
             <property name="geometry">
              <rect>
-              <x>110</x>
+              <x>100</x>
               <y>30</y>
               <width>82</width>
               <height>17</height>
@@ -745,33 +745,17 @@
              <string notr="true">buttonGroup_type</string>
             </attribute>
            </widget>
-           <widget class="QRadioButton" name="radioButton_type_IO">
+           <widget class="QRadioButton" name="radioButton_type_io">
             <property name="geometry">
              <rect>
-              <x>10</x>
+              <x>100</x>
               <y>50</y>
               <width>82</width>
               <height>17</height>
              </rect>
             </property>
             <property name="text">
-             <string>Input-Output</string>
-            </property>
-            <attribute name="buttonGroup">
-             <string notr="true">buttonGroup_type</string>
-            </attribute>
-           </widget>
-           <widget class="QRadioButton" name="radioButton_type_PP">
-            <property name="geometry">
-             <rect>
-              <x>110</x>
-              <y>50</y>
-              <width>82</width>
-              <height>17</height>
-             </rect>
-            </property>
-            <property name="text">
-             <string>PP</string>
+             <string>I-O</string>
             </property>
             <attribute name="buttonGroup">
              <string notr="true">buttonGroup_type</string>
@@ -791,6 +775,190 @@
             </property>
             <property name="flat">
              <bool>true</bool>
+            </property>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_type_sweep">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>50</y>
+              <width>91</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Sweep Count</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_type</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_type_timestamp">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>70</y>
+              <width>91</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Timestamp</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_type</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_type_pp">
+            <property name="geometry">
+             <rect>
+              <x>100</x>
+              <y>70</y>
+              <width>82</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>PP</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_type</string>
+            </attribute>
+           </widget>
+          </widget>
+         </item>
+         <item>
+          <widget class="QFrame" name="frameToolType_io">
+           <property name="minimumSize">
+            <size>
+             <width>201</width>
+             <height>101</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Raised</enum>
+           </property>
+           <widget class="QLabel" name="label_io_input">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>10</y>
+              <width>101</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="font">
+             <font>
+              <family>DejaVu Sans</family>
+              <weight>75</weight>
+              <bold>true</bold>
+             </font>
+            </property>
+            <property name="text">
+             <string>Input</string>
+            </property>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_io_vamp">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>30</y>
+              <width>91</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>volley amp.</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_io_i</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_io_EPSPamp">
+            <property name="geometry">
+             <rect>
+              <x>100</x>
+              <y>30</y>
+              <width>82</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>ESPS amp.</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_io_o</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_io_EPSPslope">
+            <property name="geometry">
+             <rect>
+              <x>100</x>
+              <y>50</y>
+              <width>82</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>EPSP slope</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_io_o</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_io_vslope">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>50</y>
+              <width>91</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>volley slope</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_io_i</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_io_stim">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>70</y>
+              <width>91</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Stim</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_io_i</string>
+            </attribute>
+           </widget>
+           <widget class="QLabel" name="label_io_output">
+            <property name="geometry">
+             <rect>
+              <x>100</x>
+              <y>10</y>
+              <width>101</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="font">
+             <font>
+              <family>DejaVu Sans</family>
+              <weight>75</weight>
+              <bold>true</bold>
+             </font>
+            </property>
+            <property name="text">
+             <string>Output</string>
             </property>
            </widget>
           </widget>
@@ -963,128 +1131,6 @@
               <width>21</width>
               <height>25</height>
              </rect>
-            </property>
-           </widget>
-          </widget>
-         </item>
-         <item>
-          <widget class="QFrame" name="frameToolXscale">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="minimumSize">
-            <size>
-             <width>201</width>
-             <height>81</height>
-            </size>
-           </property>
-           <property name="frameShape">
-            <enum>QFrame::StyledPanel</enum>
-           </property>
-           <property name="frameShadow">
-            <enum>QFrame::Raised</enum>
-           </property>
-           <widget class="QLabel" name="label_x_axis">
-            <property name="geometry">
-             <rect>
-              <x>10</x>
-              <y>10</y>
-              <width>81</width>
-              <height>17</height>
-             </rect>
-            </property>
-            <property name="font">
-             <font>
-              <family>DejaVu Sans</family>
-              <weight>75</weight>
-              <bold>true</bold>
-             </font>
-            </property>
-            <property name="text">
-             <string>X axis</string>
-            </property>
-           </widget>
-           <widget class="QRadioButton" name="radioButton_xscale_sweep">
-            <property name="geometry">
-             <rect>
-              <x>10</x>
-              <y>50</y>
-              <width>82</width>
-              <height>17</height>
-             </rect>
-            </property>
-            <property name="text">
-             <string>Sweep</string>
-            </property>
-            <attribute name="buttonGroup">
-             <string notr="true">buttonGroup_x_axis</string>
-            </attribute>
-           </widget>
-           <widget class="QRadioButton" name="radioButton_xscale_time">
-            <property name="geometry">
-             <rect>
-              <x>10</x>
-              <y>30</y>
-              <width>82</width>
-              <height>17</height>
-             </rect>
-            </property>
-            <property name="text">
-             <string>Time</string>
-            </property>
-            <attribute name="buttonGroup">
-             <string notr="true">buttonGroup_x_axis</string>
-            </attribute>
-           </widget>
-           <widget class="QRadioButton" name="radioButton_xscale_timestamp">
-            <property name="geometry">
-             <rect>
-              <x>100</x>
-              <y>30</y>
-              <width>82</width>
-              <height>17</height>
-             </rect>
-            </property>
-            <property name="text">
-             <string>Timestamp</string>
-            </property>
-            <attribute name="buttonGroup">
-             <string notr="true">buttonGroup_x_axis</string>
-            </attribute>
-           </widget>
-           <widget class="QRadioButton" name="radioButton_xscale_stim">
-            <property name="geometry">
-             <rect>
-              <x>100</x>
-              <y>50</y>
-              <width>82</width>
-              <height>17</height>
-             </rect>
-            </property>
-            <property name="text">
-             <string>Stim</string>
-            </property>
-            <attribute name="buttonGroup">
-             <string notr="true">buttonGroup_x_axis</string>
-            </attribute>
-           </widget>
-           <widget class="QPushButton" name="pushButton_hide_x_axis">
-            <property name="geometry">
-             <rect>
-              <x>150</x>
-              <y>10</y>
-              <width>21</width>
-              <height>21</height>
-             </rect>
-            </property>
-            <property name="text">
-             <string>-</string>
-            </property>
-            <property name="flat">
-             <bool>true</bool>
             </property>
            </widget>
           </widget>
@@ -1692,7 +1738,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1633</width>
+     <width>1460</width>
      <height>21</height>
     </rect>
    </property>
@@ -1739,7 +1785,8 @@
  <connections/>
  <buttongroups>
   <buttongroup name="buttonGroup_filter"/>
-  <buttongroup name="buttonGroup_x_axis"/>
   <buttongroup name="buttonGroup_type"/>
+  <buttongroup name="buttonGroup_io_i"/>
+  <buttongroup name="buttonGroup_io_o"/>
  </buttongroups>
 </ui>
