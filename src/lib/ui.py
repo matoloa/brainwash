@@ -2014,8 +2014,9 @@ class UIsub(
 
     def setupToolBar(self):
         # apply viewstates for tool frames in the toolbar
-        for frame, (text, state) in uistate.viewTools.items():
-            getattr(self, frame).setVisible(state)
+        for frame, (text, state) in list(uistate.viewTools.items()):
+            if hasattr(self, frame):
+                getattr(self, frame).setVisible(state)
         self.frameToolFilterSavgol.setVisible(uistate.settings.get("filter", "voltage") == "savgol")
         self.frameToolAspectAmp.setVisible(uistate.checkBox.get("EPSP_amp", False) or uistate.checkBox.get("volley_amp", False))
         self.frameToolAspectSlope.setVisible(uistate.checkBox.get("EPSP_slope", False) or uistate.checkBox.get("volley_slope", False))
@@ -3052,7 +3053,12 @@ class UIsub(
             p_row = df_p.loc[idx]
             rec = p_row["recording_name"]
             old = p_row["bin_size"]
-            changed = not (math.isnan(derived) and pd.isna(old)) and old != derived
+            if pd.isna(derived) and pd.isna(old):
+                changed = False
+            elif pd.isna(derived) or pd.isna(old):
+                changed = True
+            else:
+                changed = old != derived
             if changed:
                 self.dict_bins.pop(rec, None)
                 self.dict_outputs.pop(rec, None)

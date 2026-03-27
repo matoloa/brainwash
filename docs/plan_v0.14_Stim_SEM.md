@@ -38,3 +38,10 @@ To adhere to "When 'stim' is not selected, clean it out", we leverage the existi
 - **Shade Replacement:** `PolyCollection` objects (the shades from `fill_between`) cannot have their Y-data updated in place as easily as `Line2D` objects.
 - Modify `updateStimLines` to recalculate the SEM from the newly passed `dfoutput`.
 - Locate the old fill artist in `uistate.dict_rec_labels`, call `.remove()` to clear it from the canvas, generate a new `fill_between` artist, and slot the new artist back into `uistate.dict_rec_labels`.
+
+## 5. Debugging Note: Large UI Fonts / DPI Scaling
+
+If the application text (labels, buttons) suddenly appears unusually large, it is likely a transient OS-level DPI scaling glitch (common on Windows).
+
+- **Attempted Fixes:** Hardcoding `QT_AUTO_SCREEN_SCALE_FACTOR="0"` in `main.py` might not solve it.
+- **Actual Solution:** A simple computer restart has been shown to clear the cached scaling error and restore the correct text sizes without requiring any code changes.

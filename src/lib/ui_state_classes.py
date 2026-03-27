@@ -112,6 +112,7 @@ class UIstate:
             "frameToolStim": ["Stim detection", True],
             "frameToolSweeps": ["Sweep selection", True],
             "frameToolBin": ["Binning", True],
+            "frameToolType": ["Experiment type", True],
             "frameToolFilter": ["Filter", True],
             "frameToolXscale": ["X axis", True],
             "frameToolYscale": ["Y scaling", True],
