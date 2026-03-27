@@ -1704,6 +1704,39 @@ class UIsub(
     }
     _TYPE_TO_RADIO = {v: k for k, v in _RADIO_TO_TYPE.items()}
 
+    _RADIO_TO_IO_I = {
+        "radioButton_io_vamp": "vamp",
+        "radioButton_io_vslope": "vslope",
+        "radioButton_io_stim": "stim",
+    }
+    _IO_I_TO_RADIO = {v: k for k, v in _RADIO_TO_IO_I.items()}
+
+    _RADIO_TO_IO_O = {
+        "radioButton_io_EPSPamp": "EPSPamp",
+        "radioButton_io_EPSPslope": "EPSPslope",
+    }
+    _IO_O_TO_RADIO = {v: k for k, v in _RADIO_TO_IO_O.items()}
+
+    def io_input_changed(self, button):
+        """Handler for buttonGroup_io_i.buttonClicked signal."""
+        io_input = self._RADIO_TO_IO_I.get(button.objectName())
+        if io_input is None or io_input == getattr(uistate, "io_input", "vamp"):
+            return
+        self.usage(f"io_input_changed → {io_input}")
+        uistate.io_input = io_input
+        uistate.save_cfg(projectfolder=self.dict_folders["project"])
+        self.graphRefresh()
+
+    def io_output_changed(self, button):
+        """Handler for buttonGroup_io_o.buttonClicked signal."""
+        io_output = self._RADIO_TO_IO_O.get(button.objectName())
+        if io_output is None or io_output == getattr(uistate, "io_output", "EPSPamp"):
+            return
+        self.usage(f"io_output_changed → {io_output}")
+        uistate.io_output = io_output
+        uistate.save_cfg(projectfolder=self.dict_folders["project"])
+        self.graphRefresh()
+
     def experiment_type_changed(self, button):
         """Handler for buttonGroup_type.buttonClicked signal."""
         exp_type = self._RADIO_TO_TYPE.get(button.objectName())
@@ -2072,6 +2105,24 @@ class UIsub(
                     pass
             else:
                 self.buttonGroup_type.buttonClicked.connect(self.experiment_type_changed)
+        # IO input radio button group
+        if hasattr(self, "buttonGroup_io_i"):
+            if disconnect:
+                try:
+                    self.buttonGroup_io_i.buttonClicked.disconnect()
+                except TypeError:
+                    pass
+            else:
+                self.buttonGroup_io_i.buttonClicked.connect(self.io_input_changed)
+        # IO output radio button group
+        if hasattr(self, "buttonGroup_io_o"):
+            if disconnect:
+                try:
+                    self.buttonGroup_io_o.buttonClicked.disconnect()
+                except TypeError:
+                    pass
+            else:
+                self.buttonGroup_io_o.buttonClicked.connect(self.io_output_changed)
         # filter radio button group
         if disconnect:
             try:
@@ -2267,6 +2318,17 @@ class UIsub(
             type_radio_name = self._TYPE_TO_RADIO.get(getattr(uistate, "experiment_type", "time"), "radioButton_type_time")
             if hasattr(self, type_radio_name):
                 getattr(self, type_radio_name).setChecked(True)
+
+        # apply IO input/output radio button selection from config
+        if hasattr(self, "buttonGroup_io_i"):
+            io_i_name = self._IO_I_TO_RADIO.get(getattr(uistate, "io_input", "vamp"), "radioButton_io_vamp")
+            if hasattr(self, io_i_name):
+                getattr(self, io_i_name).setChecked(True)
+
+        if hasattr(self, "buttonGroup_io_o"):
+            io_o_name = self._IO_O_TO_RADIO.get(getattr(uistate, "io_output", "EPSPamp"), "radioButton_io_EPSPamp")
+            if hasattr(self, io_o_name):
+                getattr(self, io_o_name).setChecked(True)
 
         # Ensure tools column is treated as fixed pixels
         if len(uistate.splitter.get("h_splitterMaster", [])) == 4:

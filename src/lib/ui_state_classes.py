@@ -83,6 +83,8 @@ class UIstate:
 
     # --- Experiment type (persisted) ---
     experiment_type: str  # "time", "sweep", "timestamp", "train", "io", "PP"
+    io_input: str
+    io_output: str
 
     # --- Global bw_cfg (not persisted in project cfg.pkl) ---
     darkmode: bool
@@ -171,6 +173,8 @@ class UIstate:
             "output_ax2_ylim": (0, 1.2),
         }
         self.experiment_type = "time"  # "time", "sweep", "timestamp", "train", "io", "PP"
+        self.io_input = "vamp"
+        self.io_output = "EPSPamp"
         self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
         self._time_unit_label = "s"  # set by x_axis_xlim when mode == "time"
         self._time_sweep_hz = 1.0  # set by x_axis_xlim when mode == "time"
@@ -550,6 +554,8 @@ class UIstate:
                 "zoom": self.zoom,
                 "default_dict_t": self.default_dict_t,
                 "experiment_type": getattr(self, "experiment_type", "time"),
+                "io_input": getattr(self, "io_input", "vamp"),
+                "io_output": getattr(self, "io_output", "EPSPamp"),
                 "showTimetable": self.showTimetable,
                 "detailedProjectTable": getattr(self, "detailedProjectTable", False),
                 "detailedTimetable": getattr(self, "detailedTimetable", False),
@@ -577,6 +583,8 @@ class UIstate:
         # Read experiment type. Fallback to old x_axis_mode if experiment_type is missing,
         # otherwise default to "time".
         self.experiment_type = state.get("experiment_type", state.get("x_axis_mode", "time"))
+        self.io_input = state.get("io_input", "vamp")
+        self.io_output = state.get("io_output", "EPSPamp")
 
         self.showTimetable = state.get("showTimetable", False)
         self.detailedProjectTable = state.get("detailedProjectTable", False)
