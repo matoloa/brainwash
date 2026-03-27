@@ -960,6 +960,8 @@ class UIsub(
 
         self.connectUIstate()
 
+        self.graphUpdate()
+
         # update_show now runs with a correct, clamped uistate.list_idx_select_stims
         self.update_show()
         self.zoomAuto()
@@ -1464,6 +1466,20 @@ class UIsub(
                     finite = ydata[mask]
                     if finite.size > 0:
                         all_y.append(finite)
+            elif isinstance(coll, mcoll.PathCollection):
+                offsets = coll.get_offsets()
+                if len(offsets) == 0:
+                    continue
+                xdata = offsets[:, 0]
+                ydata = offsets[:, 1]
+                mask = np.isfinite(ydata)
+                if x_min is not None:
+                    mask &= xdata >= x_min
+                if x_max is not None:
+                    mask &= xdata <= x_max
+                finite = ydata[mask]
+                if finite.size > 0:
+                    all_y.append(finite)
 
         if not all_y:
             return None
@@ -1517,7 +1533,10 @@ class UIsub(
         self.usage("zoomAuto")
         prow = self.get_prow()
 
-        ymin_clamp = 0 if uistate.checkBox["output_ymin0"] else None
+        if getattr(uistate, "experiment_type", "time") == "io":
+            ymin_clamp = 0
+        else:
+            ymin_clamp = 0 if uistate.checkBox["output_ymin0"] else None
 
         if prow is None:
             logger.debug("zoomAuto: no recording selected, fitting to visible groups")
@@ -1725,7 +1744,8 @@ class UIsub(
         self.usage(f"io_input_changed → {io_input}")
         uistate.io_input = io_input
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
-        self.graphRefresh()
+        uiplot.unPlot()
+        self.graphUpdate()
 
     def io_output_changed(self, button):
         """Handler for buttonGroup_io_o.buttonClicked signal."""
@@ -1735,21 +1755,27 @@ class UIsub(
         self.usage(f"io_output_changed → {io_output}")
         uistate.io_output = io_output
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
-        self.graphRefresh()
+        uiplot.unPlot()
+        self.graphUpdate()
 
     def experiment_type_changed(self, button):
         """Handler for buttonGroup_type.buttonClicked signal."""
         exp_type = self._RADIO_TO_TYPE.get(button.objectName())
-        if exp_type is None or exp_type == getattr(uistate, "experiment_type", "time"):
+        old_type = getattr(uistate, "experiment_type", "time")
+        if exp_type is None or exp_type == old_type:
             return
         self.usage(f"experiment_type_changed → {exp_type}")
         uistate.experiment_type = exp_type
         if hasattr(self, "frameToolType_io"):
             self.frameToolType_io.setVisible(exp_type == "io")
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
-        self.update_show()
-        self.zoomAuto()
-        self.graphRefresh()
+        if exp_type == "io" or old_type == "io":
+            uiplot.unPlot()
+            self.graphUpdate()
+        else:
+            self.update_show()
+            self.zoomAuto()
+            self.graphRefresh()
 
     def update_experiment_type_radio_buttons(self):
         """Enable/disable and select experiment type radio buttons for the current selection."""
@@ -3782,18 +3808,19 @@ class UIsub(
                 uiplot.addRow(p_row=row, dft=dft, dfmean=dfmean, dfoutput=dfoutput)
 
         def processDataFrame(df):
-            list_to_plot = [rec for rec in df["recording_name"].tolist() if rec not in uistate.get_recSet()]
-            for rec in list_to_plot:
-                row = df[df["recording_name"] == rec].iloc[0]
+            list_to_plot = [rec_id for rec_id in df["ID"].tolist() if rec_id not in uistate.get_recSet()]
+            for rec_id in list_to_plot:
+                row = df[df["ID"] == rec_id].iloc[0]
                 processRow(row)
 
         self.graphGroups()
         if row is not None:
             processRow(row)
         else:
-            df = df or uistate.df_recs2plot
+            df = df if df is not None else uistate.df_recs2plot
             if df is not None and not df.empty:
                 processDataFrame(df)
+        self.update_show()
         self.zoomAuto()
         print("graphUpdate calls self.graphRefresh()")
         self.graphRefresh()
@@ -4097,6 +4124,9 @@ class UIsub(
             axe.figure.canvas.draw()
 
     def outputMouseover(self, event):  # determine which event is being mouseovered
+        if getattr(uistate, "experiment_type", "time") == "io":
+            self.exorcise()
+            return
         x, y = event.xdata, event.ydata
         str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
         ax = getattr(uistate, str_ax)

@@ -419,7 +419,9 @@ class UIstate:
             return "sweep"
         elif self.experiment_type == "train":
             return "stim"
-        # io and PP modes will likely use stim or a custom mode later
+        elif self.experiment_type == "io":
+            return "io"
+        # PP modes will likely use stim or a custom mode later
         return "sweep"
 
     @staticmethod
@@ -448,6 +450,13 @@ class UIstate:
         mode = self.x_axis
         if mode == "time":
             return f"Time ({self._time_unit_label})"
+        elif mode == "io":
+            io_input = getattr(self, "io_input", "vamp")
+            if io_input == "vamp":
+                return "Volley Amplitude (mV)"
+            elif io_input == "vslope":
+                return "Volley Slope (mV/ms)"
+            return "Stimulus"
         return {"sweep": "Sweep", "stim": "Stim"}.get(mode, "Sweep")
 
     def x_axis_xlim(self, prow, dft=None) -> tuple:
@@ -489,9 +498,41 @@ class UIstate:
                     raise ValueError("x_axis_xlim called in stim mode but prow['stims'] is NaN and no dft was provided")
                 n = int(stims)
                 stim_min = 1
-                stim_max = n
+                if stim_min > stim_max:
+                    stim_max = n
             self._stim_tick_locs = list(range(stim_min, stim_max + 1))
             return (stim_min - 0.5, stim_max + 0.5)
+        elif mode == "io":
+            import numpy as np
+
+            x_min, x_max = float("inf"), float("-inf")
+            lines_to_check = list(self.dict_rec_labels.values())
+            if hasattr(self, "dict_group_labels"):
+                lines_to_check.extend(self.dict_group_labels.values())
+
+            for info in lines_to_check:
+                if info.get("x_mode") == "io" and info.get("line") is not None:
+                    try:
+                        line = info["line"]
+                        if hasattr(line, "get_offsets"):
+                            offsets = line.get_offsets()
+                            if len(offsets) > 0:
+                                x_data = offsets[:, 0]
+                                x_min = min(x_min, np.nanmin(x_data))
+                                x_max = max(x_max, np.nanmax(x_data))
+                        elif hasattr(line, "get_xdata"):
+                            x_data = line.get_xdata()
+                            if len(x_data) > 0:
+                                x_min = min(x_min, np.nanmin(x_data))
+                                x_max = max(x_max, np.nanmax(x_data))
+                    except Exception:
+                        pass
+            if x_min != float("inf") and x_max != float("-inf"):
+                pad = (x_max - x_min) * 0.05
+                if pad == 0:
+                    pad = 0.1
+                return (0, x_max + pad)
+            return (0, 1)
         raise ValueError(f"Unknown x_axis mode: {mode!r}")
 
     def x_axis_locator(self):
@@ -539,6 +580,13 @@ class UIstate:
         elif mode == "stim":
             mask = dfoutput["sweep"].isna()
             return dfoutput.loc[mask, "stim"]
+        elif mode == "io":
+            mask = dfoutput["sweep"].notna()
+            io_input = getattr(self, "io_input", "vamp")
+            col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
+            if col in dfoutput.columns:
+                return dfoutput.loc[mask, col]
+            return pd.Series(dtype=float)
         raise ValueError(f"Unknown x_axis mode: {mode!r}")
 
     def get_state(self):
@@ -676,18 +724,26 @@ class UIstate:
             pickle.dump(data, f)
 
     def ampView(self):
+        if getattr(self, "experiment_type", "time") == "io":
+            return True
         show = self.checkBox
         return show["EPSP_amp"]
 
     def slopeView(self):
+        if getattr(self, "experiment_type", "time") == "io":
+            return False
         show = self.checkBox
         return show["EPSP_slope"]
 
     def slopeOnly(self):
+        if getattr(self, "experiment_type", "time") == "io":
+            return False
         show = self.checkBox
         return show["EPSP_slope"] and not show["EPSP_amp"]
 
     def anyView(self):
+        if getattr(self, "experiment_type", "time") == "io":
+            return True
         show = self.checkBox
         return any(show.values())
 

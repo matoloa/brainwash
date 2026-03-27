@@ -395,12 +395,19 @@ class UIplot:
         axe.xaxis.set_major_formatter(FuncFormatter(lambda t, _: f"{t * 1e3:.1f}"))
         axe.set_xlabel("Time (ms)")
 
-        if uistate.checkBox["norm_EPSP"]:
-            ax1.set_ylabel("Amplitude %")
-            ax2.set_ylabel("Slope %")
+        if getattr(uistate, "experiment_type", "time") == "io":
+            io_out = getattr(uistate, "io_output", "EPSPamp")
+            if "slope" in io_out.lower():
+                ax1.set_ylabel("Slope %" if uistate.checkBox["norm_EPSP"] else "Slope (mV/ms)")
+            else:
+                ax1.set_ylabel("Amplitude %" if uistate.checkBox["norm_EPSP"] else "Amplitude (mV)")
         else:
-            ax1.set_ylabel("Amplitude (mV)")
-            ax2.set_ylabel("Slope (mV/ms)")
+            if uistate.checkBox["norm_EPSP"]:
+                ax1.set_ylabel("Amplitude %")
+                ax2.set_ylabel("Slope %")
+            else:
+                ax1.set_ylabel("Amplitude (mV)")
+                ax2.set_ylabel("Slope (mV/ms)")
         ax1.set_ylim(uistate.zoom["output_ax1_ylim"])
         ax2.set_ylim(uistate.zoom["output_ax2_ylim"])
         ax1.set_xlim(uistate.zoom["output_xlim"])
@@ -814,6 +821,37 @@ class UIplot:
             label = f"{rec_name} ({rec_filter})"
         else:
             label = rec_name
+
+        if getattr(self.uistate, "experiment_type", "time") == "io":
+            io_input = getattr(self.uistate, "io_input", "vamp")
+            io_output = getattr(self.uistate, "io_output", "EPSPamp")
+
+            x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
+            y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+
+            df_sweeps = dfoutput[dfoutput["sweep"].notna()]
+            if x_col in df_sweeps.columns and y_col in df_sweeps.columns:
+                axid = "ax1"
+                color = self.uistate.settings.get(f"rgb_{y_col}", "black")
+                scatter = self.get_axis(axid).scatter(
+                    df_sweeps[x_col].values,
+                    df_sweeps[y_col].values,
+                    c=[color],
+                    alpha=0.8,
+                    label=f"{label} IO scatter",
+                    s=20,
+                    zorder=2,
+                )
+                scatter.set_visible(False)
+                self.uistate.dict_rec_labels[f"{label} IO scatter"] = {
+                    "rec_ID": rec_ID,
+                    "aspect": y_col,
+                    "variant": "raw",
+                    "stim": None,
+                    "line": scatter,
+                    "axis": axid,
+                    "x_mode": "io",
+                }
 
         # Add meanline to Mean
         self.plot_line(
