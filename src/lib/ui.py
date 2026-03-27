@@ -1033,11 +1033,12 @@ class UIsub(
         # numbers — with a FuncFormatter converting tick labels to time units),
         # so x_mode="sweep" lines are visible in both "sweep" and "time" modes.
         x_mode = v.get("x_mode")
+        is_io = getattr(uistate, "experiment_type", "time") == "io"
         if x_mode is not None and x_mode != uistate.x_axis:
             if not (x_mode == "sweep" and uistate.x_axis == "time"):
                 return False
         aspect = v.get("aspect")
-        if aspect and not uistate.checkBox.get(aspect, True):
+        if aspect and not uistate.checkBox.get(aspect, True) and not is_io:
             return False
         # norm/raw switch: only EPSP amp/slope have a norm variant.
         # Only applies to ax1/ax2 output lines — markers on axe represent physical
@@ -1045,7 +1046,7 @@ class UIsub(
         variant = v.get("variant")
         norm_active = uistate.checkBox["norm_EPSP"]
         axis = v.get("axis")
-        if axis in ("ax1", "ax2"):
+        if axis in ("ax1", "ax2") and not is_io:
             if variant == "norm" and not norm_active:
                 return False
             if variant == "raw" and norm_active and aspect in ("EPSP_amp", "EPSP_slope"):
@@ -4124,14 +4125,27 @@ class UIsub(
             axe.figure.canvas.draw()
 
     def outputMouseover(self, event):  # determine which event is being mouseovered
-        if getattr(uistate, "experiment_type", "time") == "io":
-            self.exorcise()
+        is_io = getattr(uistate, "experiment_type", "time") == "io"
+        if is_io:
+            str_ax = "ax1"
+        else:
+            str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
+
+        ax = getattr(uistate, str_ax) if str_ax else None
+
+        if event.inaxes not in (uistate.ax1, uistate.ax2) or str_ax is None:
+            if uistate.ghost_sweep is not None:
+                self.exorcise()
             return
-        x, y = event.xdata, event.ydata
-        str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
-        ax = getattr(uistate, str_ax)
-        # print(f"outputMouseover: x={x}, y={y}, str_ax={str_ax}")
-        if str_ax is None or x is None or y is None or not event.inaxes == ax or not (uistate.slopeView() or uistate.ampView()):
+
+        # Ensure x,y are in the coordinates of the target axis (ax1 or ax2)
+        # because twinx() puts ax2 on top, intercepting events with ax2's y-scale.
+        if event.inaxes != ax:
+            x, y = ax.transData.inverted().transform((event.x, event.y))
+        else:
+            x, y = event.xdata, event.ydata
+
+        if x is None or y is None or not (uistate.slopeView() or uistate.ampView() or is_io):
             if uistate.ghost_sweep is not None:  # remove ghost sweep if outside output graph
                 self.exorcise()
             return
@@ -4139,22 +4153,50 @@ class UIsub(
             self.exorcise()
             return
         # find a visible line
-        dict_out = {
-            key: value
-            for key, value in uistate.dict_rec_show.items()
-            if value["axis"] == str_ax and (value["aspect"] in ["EPSP_amp", "EPSP_slope"]) and hasattr(value["line"], "get_xdata")
-        }
+        if is_io:
+            dict_out = {
+                key: value
+                for key, value in uistate.dict_rec_show.items()
+                if value["axis"] == str_ax and value.get("x_mode") == "io" and hasattr(value["line"], "get_offsets")
+            }
+        else:
+            dict_out = {
+                key: value
+                for key, value in uistate.dict_rec_show.items()
+                if value["axis"] == str_ax and (value["aspect"] in ["EPSP_amp", "EPSP_slope"]) and hasattr(value["line"], "get_xdata")
+            }
         if not dict_out:
             return
-        dict_pop = dict_out.popitem()[1]  # TODO: ugly random; pick top in df_p?
-        x_data = dict_pop["line"].get_xdata()
-        # find closest x_index
-        out_x_idx = np.nanargmin(np.abs(x_data - x))
-        x_val = x_data[out_x_idx]
+        # dict_out contains exactly the active line/scatter due to rec selection limits
+        dict_pop = list(dict_out.values())[0]
+
+        if is_io:
+            offsets = dict_pop["line"].get_offsets()
+            if len(offsets) == 0:
+                return
+            # Normalize x and y for euclidean distance to avoid aspect ratio squashing
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            x_range = xlim[1] - xlim[0]
+            y_range = ylim[1] - ylim[0]
+            if x_range == 0:
+                x_range = 1
+            if y_range == 0:
+                y_range = 1
+
+            dx = (offsets[:, 0] - x) / x_range
+            dy = (offsets[:, 1] - y) / y_range
+            distances = dx**2 + dy**2
+            out_x_idx = int(np.nanargmin(distances))
+        else:
+            x_data = dict_pop["line"].get_xdata()
+            # find closest x_index
+            out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
+            x_val = x_data[out_x_idx]
 
         # print(f"* * * outputMouseover: out_x_idx={out_x_idx}, sweeps={sweeps}")
 
-        if out_x_idx == uistate.last_out_x_idx:  # prevent update if same x
+        if out_x_idx == getattr(uistate, "last_out_x_idx", None):  # prevent update if same x
             return
 
         rec_ID = dict_pop["rec_ID"]
@@ -4164,7 +4206,7 @@ class UIsub(
         rec_filter = p_row["filter"]
         settings = uistate.settings
 
-        if uistate.x_axis == "stim":
+        if uistate.x_axis == "stim" and not is_io:
             # Ghost waveform: show the dfmean snippet for the hovered stim.
             # out_x_idx is a positional index into x_data; recover actual stim number.
             stim_num = int(x_val)
@@ -4182,8 +4224,15 @@ class UIsub(
             snippet_x = snippet["time"] - t_stim  # shift so t_stim = 0
             snippet_y = snippet[rec_filter]
             ghost_label_text = f"stim {stim_num}"
-        else:  # sweep (or time — same source data)
-            stim = dict_pop["stim"]
+        else:  # sweep (or time or io — same source data)
+            if is_io:
+                dfoutput = self.get_dfdiff(row=p_row) if uistate.checkBox["paired_stims"] else self.get_dfoutput(row=p_row)
+                df_sweeps = dfoutput[dfoutput["sweep"].notna()]
+                x_val = df_sweeps["sweep"].iloc[out_x_idx]
+                stim = df_sweeps["stim"].iloc[out_x_idx]
+            else:
+                stim = dict_pop["stim"]
+
             t_row = df_t[df_t["stim"] == stim].iloc[0]
             offset = t_row["t_stim"]
 
@@ -4195,7 +4244,11 @@ class UIsub(
             dfsweep = dfsource[dfsource["sweep"] == x_val]  # select only rows where sweep == x_val
             snippet_x = dfsweep["time"] - offset
             snippet_y = dfsweep[rec_filter]
-            ghost_label_text = f"sweep {int(x_val)}"
+
+            if pd.notna(p_row["bin_size"]):
+                ghost_label_text = f"bin {int(x_val)}"
+            else:
+                ghost_label_text = f"sweep {int(x_val)}"
 
         if uistate.ghost_sweep is None:
             ghost_color = "white" if uistate.darkmode else "black"
