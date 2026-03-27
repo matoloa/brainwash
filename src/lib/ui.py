@@ -4918,7 +4918,10 @@ class UIsub(
             stim_offset = trow["t_stim"]
             x = trow[t_aspect] - stim_offset
             y = dfmean.loc[(dfmean["time"] - trow[t_aspect]).abs().idxmin(), rec_filter]
-            amp = dfoutput.loc[dfoutput["stim"] == trow["stim"]][column_name].mean() / 1000  # conversion: mV to V
+
+            out_stim = dfoutput.loc[dfoutput["stim"] == trow["stim"]]
+            out_agg = out_stim[out_stim["sweep"].isna()]
+
             t_amp = trow[t_aspect] - stim_offset
             amp_x = (
                 t_amp - trow[f"{t_aspect}_halfwidth"],
@@ -4929,6 +4932,18 @@ class UIsub(
             amp_zero_plot = (
                 _pre_stim[rec_filter].mean() if not _pre_stim.empty else dfmean.loc[(dfmean["time"] - stim_offset).abs().idxmin(), rec_filter]
             )
+
+            if not out_agg.empty:
+                amp = out_agg[column_name].values[0] / 1000
+            else:
+                t_amp_val = trow[t_aspect]
+                half = trow.get(f"{t_aspect}_halfwidth", 0)
+                if half == 0:
+                    amp_val = dfmean.loc[(dfmean["time"] - t_amp_val).abs().idxmin(), rec_filter]
+                else:
+                    amp_val = dfmean.loc[(dfmean["time"] >= t_amp_val - half) & (dfmean["time"] <= t_amp_val + half), rec_filter].mean()
+                amp = -(amp_val - amp_zero_plot)
+
             uiplot.updateAmpMarker(labelamp, x, y, amp_x, amp_zero_plot, amp=amp)
 
         if aspect in ["EPSP amp", "volley amp"]:

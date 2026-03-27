@@ -920,6 +920,7 @@ class UIplot:
 
             # plot markers on axe, output lines on ax1 and ax2
             out = dfoutput[dfoutput["stim"] == stim_num]  # TODO: enable switch to dfdiff?
+            out_stim_row = out[out["sweep"].isna()]
 
             if not np.isnan(t_row["t_EPSP_amp"]):
                 x_position = t_row["t_EPSP_amp"]
@@ -938,9 +939,10 @@ class UIplot:
                     x_position - t_row["t_EPSP_amp_halfwidth"],
                     x_position + t_row["t_EPSP_amp_halfwidth"],
                 )
+                epsp_amp_val = out_stim_row["EPSP_amp"].values[0] if not out_stim_row.empty else out["EPSP_amp"].mean()
                 amp_y = (
                     amp_zero_plot,
-                    amp_zero_plot - (out["EPSP_amp"].mean() / 1000),
+                    amp_zero_plot - (epsp_amp_val / 1000),
                 )  # mV to V
                 self.plot_amp_width(
                     f"{label} {stim_str} EPSP amp",
@@ -1045,8 +1047,8 @@ class UIplot:
                     stim=stim_num,
                 )
                 volley_amp_mean = t_row.get("volley_amp_mean")
-                if volley_amp_mean is None:
-                    volley_amp_mean = out["volley_amp"].mean()
+                if volley_amp_mean is None or pd.isna(volley_amp_mean):
+                    volley_amp_mean = out_stim_row["volley_amp"].values[0] if not out_stim_row.empty else out["volley_amp"].mean()
                 amp_x = (
                     x_position - t_row["t_volley_amp_halfwidth"],
                     x_position + t_row["t_volley_amp_halfwidth"],
@@ -1064,8 +1066,8 @@ class UIplot:
                     stim=stim_num,
                 )
                 volley_amp_mean = t_row.get("volley_amp_mean")
-                if volley_amp_mean is None:
-                    volley_amp_mean = out["volley_amp"].mean()
+                if volley_amp_mean is None or pd.isna(volley_amp_mean):
+                    volley_amp_mean = out_stim_row["volley_amp"].values[0] if not out_stim_row.empty else out["volley_amp"].mean()
                 self.plot_hline(
                     f"{label} {stim_str} volley amp mean",
                     "ax1",
@@ -1106,8 +1108,8 @@ class UIplot:
                     width=5,
                 )
                 volley_slope_mean = t_row.get("volley_slope_mean")
-                if volley_slope_mean is None:
-                    volley_slope_mean = out["volley_slope"].mean()
+                if volley_slope_mean is None or pd.isna(volley_slope_mean):
+                    volley_slope_mean = out_stim_row["volley_slope"].values[0] if not out_stim_row.empty else out["volley_slope"].mean()
                 self.plot_hline(
                     f"{label} {stim_str} volley slope mean",
                     "ax2",
