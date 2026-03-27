@@ -514,6 +514,8 @@ class UIstate:
                 if info.get("x_mode") == "io" and info.get("line") is not None:
                     try:
                         line = info["line"]
+                        if not line.get_visible():
+                            continue
                         if hasattr(line, "get_offsets"):
                             offsets = line.get_offsets()
                             if len(offsets) > 0:
@@ -528,7 +530,7 @@ class UIstate:
                     except Exception:
                         pass
             if x_min != float("inf") and x_max != float("-inf"):
-                pad = (x_max - x_min) * 0.05
+                pad = abs(x_max) * 0.1
                 if pad == 0:
                     pad = 0.1
                 return (0, x_max + pad)

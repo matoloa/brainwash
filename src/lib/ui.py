@@ -1380,11 +1380,13 @@ class UIsub(
         self.graphRefresh()
 
     @staticmethod
-    def _xlim_from_artists(axis, pad=0.05, min_span=1.0):
+    def _xlim_from_artists(axis, pad=0.05, min_span=1e-9):
 
         all_x = []
         for line in axis.get_lines():
             if not line.get_visible():
+                continue
+            if line.get_transform() != axis.transData:
                 continue
             xdata = np.asarray(line.get_xdata(), dtype=float).ravel()
             mask = np.isfinite(xdata)
@@ -1400,6 +1402,13 @@ class UIsub(
                     if vertices.size == 0:
                         continue
                     xdata = vertices[:, 0]
+                    mask = np.isfinite(xdata)
+                    if mask.any():
+                        all_x.append(xdata[mask])
+            elif isinstance(coll, mcoll.PathCollection):
+                offsets = coll.get_offsets()
+                if len(offsets) > 0:
+                    xdata = offsets[:, 0]
                     mask = np.isfinite(xdata)
                     if mask.any():
                         all_x.append(xdata[mask])
@@ -1436,6 +1445,8 @@ class UIsub(
         all_y = []
         for line in axis.get_lines():
             if not line.get_visible():
+                continue
+            if line.get_transform() != axis.transData:
                 continue
             xdata = np.asarray(line.get_xdata(), dtype=float).ravel()
             ydata = np.asarray(line.get_ydata(), dtype=float).ravel()
@@ -1542,21 +1553,41 @@ class UIsub(
         if prow is None:
             logger.debug("zoomAuto: no recording selected, fitting to visible groups")
             # For output axes, determine xlim from visible artists across both axes
-            xlim1 = self._xlim_from_artists(uistate.ax1)
-            xlim2 = self._xlim_from_artists(uistate.ax2)
+            if getattr(uistate, "experiment_type", "time") == "io":
+                xlim1 = self._xlim_from_artists(uistate.ax1, pad=0)
+                xlim2 = self._xlim_from_artists(uistate.ax2, pad=0)
+                if xlim1 and xlim2:
+                    out_xmax = max(xlim1[1], xlim2[1])
+                elif xlim1:
+                    out_xmax = xlim1[1]
+                elif xlim2:
+                    out_xmax = xlim2[1]
+                else:
+                    out_xmax = 1.0
+                out_xmax = out_xmax * 1.15 if out_xmax > 0 else 1.0
+                out_xmin = 0
+                uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
 
-            if xlim1 and xlim2:
-                out_xmin, out_xmax = min(xlim1[0], xlim2[0]), max(xlim1[1], xlim2[1])
-            elif xlim1:
-                out_xmin, out_xmax = xlim1
-            elif xlim2:
-                out_xmin, out_xmax = xlim2
+                y1 = self._ylim_from_artists(uistate.ax1, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
+                y2 = self._ylim_from_artists(uistate.ax2, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
+                uistate.zoom["output_ax1_ylim"] = (0, y1[1] * 1.15 if y1 and y1[1] > 0 else 1.5)
+                uistate.zoom["output_ax2_ylim"] = (0, y2[1] * 1.15 if y2 and y2[1] > 0 else 1.5)
             else:
-                out_xmin, out_xmax = (0, 1)
+                xlim1 = self._xlim_from_artists(uistate.ax1)
+                xlim2 = self._xlim_from_artists(uistate.ax2)
 
-            uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
-            uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
-            uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
+                if xlim1 and xlim2:
+                    out_xmin, out_xmax = min(xlim1[0], xlim2[0]), max(xlim1[1], xlim2[1])
+                elif xlim1:
+                    out_xmin, out_xmax = xlim1
+                elif xlim2:
+                    out_xmin, out_xmax = xlim2
+                else:
+                    out_xmin, out_xmax = (0, 1)
+
+                uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
+                uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
+                uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
             self.zoomReset(uistate.ax1)
             self.zoomReset(uistate.ax2)
             return
@@ -1588,17 +1619,39 @@ class UIsub(
         # Clamp bottom to zero only when output_ymin0 is checked.
 
         dft = self.get_dft(row=prow)
-        uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow, dft=dft)
-        out_xmin, out_xmax = uistate.zoom["output_xlim"]
 
-        uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (
-            0,
-            1.5,
-        )
-        uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (
-            0,
-            1.5,
-        )
+        if getattr(uistate, "experiment_type", "time") == "io":
+            xlim1 = self._xlim_from_artists(uistate.ax1, pad=0)
+            xlim2 = self._xlim_from_artists(uistate.ax2, pad=0)
+            if xlim1 and xlim2:
+                out_xmax = max(xlim1[1], xlim2[1])
+            elif xlim1:
+                out_xmax = xlim1[1]
+            elif xlim2:
+                out_xmax = xlim2[1]
+            else:
+                out_xmax = 1.0
+
+            out_xmax = out_xmax * 1.15 if out_xmax > 0 else 1.0
+            out_xmin = 0
+            uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
+
+            y1 = self._ylim_from_artists(uistate.ax1, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
+            y2 = self._ylim_from_artists(uistate.ax2, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
+            uistate.zoom["output_ax1_ylim"] = (0, y1[1] * 1.15 if y1 and y1[1] > 0 else 1.5)
+            uistate.zoom["output_ax2_ylim"] = (0, y2[1] * 1.15 if y2 and y2[1] > 0 else 1.5)
+        else:
+            uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow, dft=dft)
+            out_xmin, out_xmax = uistate.zoom["output_xlim"]
+
+            uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (
+                0,
+                1.5,
+            )
+            uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (
+                0,
+                1.5,
+            )
         self.zoomReset()
         self._recalc_axe_drag_zones()
         self._recalc_axm_detection_zones()
@@ -1745,6 +1798,7 @@ class UIsub(
         self.usage(f"io_input_changed → {io_input}")
         uistate.io_input = io_input
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
+        self.exorcise()
         uiplot.unPlot()
         self.graphUpdate()
 
@@ -1756,6 +1810,7 @@ class UIsub(
         self.usage(f"io_output_changed → {io_output}")
         uistate.io_output = io_output
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
+        self.exorcise()
         uiplot.unPlot()
         self.graphUpdate()
 
@@ -1771,6 +1826,7 @@ class UIsub(
             self.frameToolType_io.setVisible(exp_type == "io")
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
         if exp_type == "io" or old_type == "io":
+            self.exorcise()
             uiplot.unPlot()
             self.graphUpdate()
         else:
@@ -1809,8 +1865,11 @@ class UIsub(
         if hasattr(self, "radioButton_type_PP"):
             self.radioButton_type_PP.setEnabled(True)
 
+        if hasattr(self, "radioButton_io_stim"):
+            self.radioButton_io_stim.setEnabled(False)
+
         disabled_color = "#666" if uistate.darkmode else "#aaa"
-        for radio_name in self._RADIO_TO_TYPE:
+        for radio_name in list(self._RADIO_TO_TYPE) + list(self._RADIO_TO_IO_I) + list(self._RADIO_TO_IO_O):
             if hasattr(self, radio_name):
                 radio = getattr(self, radio_name)
                 if radio.isEnabled():
@@ -3690,6 +3749,7 @@ class UIsub(
     # Graph interface
 
     def graphWipe(self):  # removes all plots from canvasEvent and canvasOutput
+        self.exorcise()
         uistate.dict_rec_labels = {}
         uistate.dict_rec_show = {}
         uistate.dict_group_labels = {}
@@ -4170,11 +4230,26 @@ class UIsub(
         # dict_out contains exactly the active line/scatter due to rec selection limits
         dict_pop = list(dict_out.values())[0]
 
+        rec_ID = dict_pop["rec_ID"]
+        df_p = self.get_df_project()
+        p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
+
         if is_io:
-            offsets = dict_pop["line"].get_offsets()
-            if len(offsets) == 0:
+            dfoutput = self.get_dfdiff(row=p_row) if uistate.checkBox["paired_stims"] else self.get_dfoutput(row=p_row)
+            df_sweeps = dfoutput[dfoutput["sweep"].notna()].reset_index(drop=True)
+            io_input = getattr(uistate, "io_input", "vamp")
+            io_output = getattr(uistate, "io_output", "EPSPamp")
+            x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
+            y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+
+            if x_col not in df_sweeps.columns or y_col not in df_sweeps.columns:
                 return
-            # Normalize x and y for euclidean distance to avoid aspect ratio squashing
+
+            df_sweeps = df_sweeps.dropna(subset=[x_col, y_col]).reset_index(drop=True)
+
+            x_array = df_sweeps[x_col].values.astype(float)
+            y_array = df_sweeps[y_col].values.astype(float)
+
             xlim = ax.get_xlim()
             ylim = ax.get_ylim()
             x_range = xlim[1] - xlim[0]
@@ -4184,24 +4259,28 @@ class UIsub(
             if y_range == 0:
                 y_range = 1
 
-            dx = (offsets[:, 0] - x) / x_range
-            dy = (offsets[:, 1] - y) / y_range
+            dx = (x_array - x) / x_range
+            dy = (y_array - y) / y_range
             distances = dx**2 + dy**2
+            if np.all(np.isnan(distances)):
+                return
             out_x_idx = int(np.nanargmin(distances))
+            x_val = df_sweeps["sweep"].iloc[out_x_idx]
+            out_x_val = x_array[out_x_idx]
+            out_y_val = y_array[out_x_idx]
         else:
             x_data = dict_pop["line"].get_xdata()
             # find closest x_index
             out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
             x_val = x_data[out_x_idx]
+            out_x_val = x_val
+            out_y_val = dict_pop["line"].get_ydata()[out_x_idx]
 
         # print(f"* * * outputMouseover: out_x_idx={out_x_idx}, sweeps={sweeps}")
 
         if out_x_idx == getattr(uistate, "last_out_x_idx", None):  # prevent update if same x
             return
 
-        rec_ID = dict_pop["rec_ID"]
-        df_p = self.get_df_project()
-        p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
         df_t = self.get_dft(p_row)
         rec_filter = p_row["filter"]
         settings = uistate.settings
@@ -4226,9 +4305,6 @@ class UIsub(
             ghost_label_text = f"stim {stim_num}"
         else:  # sweep (or time or io — same source data)
             if is_io:
-                dfoutput = self.get_dfdiff(row=p_row) if uistate.checkBox["paired_stims"] else self.get_dfoutput(row=p_row)
-                df_sweeps = dfoutput[dfoutput["sweep"].notna()]
-                x_val = df_sweeps["sweep"].iloc[out_x_idx]
                 stim = df_sweeps["stim"].iloc[out_x_idx]
             else:
                 stim = dict_pop["stim"]
@@ -4249,6 +4325,19 @@ class UIsub(
                 ghost_label_text = f"bin {int(x_val)}"
             else:
                 ghost_label_text = f"sweep {int(x_val)}"
+
+        aspect = dict_pop.get("aspect", "EPSP_amp")
+        highlight_color = uistate.settings.get(f"rgb_{aspect}", "red")
+
+        if getattr(uistate, "mouseover_out_blob", None) is None:
+            uistate.mouseover_out_blob = ax.scatter(out_x_val, out_y_val, color=highlight_color, s=150, alpha=0.8, zorder=10)
+        else:
+            if uistate.mouseover_out_blob.axes != ax:
+                uistate.mouseover_out_blob.remove()
+                uistate.mouseover_out_blob = ax.scatter(out_x_val, out_y_val, color=highlight_color, s=150, alpha=0.8, zorder=10)
+            else:
+                uistate.mouseover_out_blob.set_offsets([[out_x_val, out_y_val]])
+                uistate.mouseover_out_blob.set_color(highlight_color)
 
         if uistate.ghost_sweep is None:
             ghost_color = "white" if uistate.darkmode else "black"
@@ -4281,7 +4370,16 @@ class UIsub(
         if uistate.ghost_label is not None:
             uistate.ghost_label.remove()
             uistate.ghost_label = None
-        uistate.axe.figure.canvas.draw()
+        if getattr(uistate, "mouseover_out_blob", None) is not None:
+            try:
+                uistate.mouseover_out_blob.remove()
+            except ValueError:
+                pass
+            uistate.mouseover_out_blob = None
+            if getattr(uistate, "ax1", None) is not None:
+                uistate.ax1.figure.canvas.draw_idle()
+        if getattr(uistate, "axe", None) is not None:
+            uistate.axe.figure.canvas.draw()
 
     def connectDragRelease(self, x_range, rec_ID, graph):
         self.usage("connectDragRelease")
@@ -4558,6 +4656,12 @@ class UIsub(
         if uistate.mouseover_out is not None:
             uistate.mouseover_out[0].remove()
             uistate.mouseover_out = None
+        if getattr(uistate, "mouseover_out_blob", None) is not None:
+            try:
+                uistate.mouseover_out_blob.remove()
+            except ValueError:
+                pass
+            uistate.mouseover_out_blob = None
         uistate.mouseover_action = None
 
     def eventDragSlope(self, event, action, data_x, data_y, prior_slope_start, prior_slope_end):  # graph dragging event
