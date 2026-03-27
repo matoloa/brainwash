@@ -357,7 +357,12 @@ class UIplot:
         t0 = time.time()
 
         # Set recordings and group legends
-        dd_recs = uistate.dict_rec_show
+        io_trendline_active = uistate.checkBox.get("io_trendline", False)
+        for k, v in uistate.dict_rec_labels.items():
+            if k.endswith(" IO trendline"):
+                v["line"].set_visible(io_trendline_active and k in uistate.dict_rec_show)
+
+        dd_recs = {k: v for k, v in uistate.dict_rec_show.items() if not (k.endswith(" IO trendline") and not io_trendline_active)}
         dd_groups = uistate.dict_group_show
         axids = ["ax1", "ax2"]
         legend_loc = ["upper right", "lower right"]
@@ -860,7 +865,7 @@ class UIplot:
                     "x_mode": "io",
                 }
 
-                if self.uistate.checkBox.get("io_trendline", False) and len(df_clean) > 1:
+                if len(df_clean) > 1:
                     x_vals = df_clean[x_col].values
                     y_vals = df_clean[y_col].values
 

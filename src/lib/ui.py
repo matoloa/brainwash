@@ -1050,6 +1050,9 @@ class UIsub(
         if x_mode is not None and x_mode != uistate.x_axis:
             if not (x_mode == "sweep" and uistate.x_axis == "time"):
                 return False
+        if is_io and v.get("line") and v["line"].get_label().endswith(" IO trendline"):
+            if not uistate.checkBox.get("io_trendline", False):
+                return False
         aspect = v.get("aspect")
         if aspect and not uistate.checkBox.get(aspect, True) and not is_io:
             return False
@@ -1925,8 +1928,10 @@ class UIsub(
                 self.frameToolAspectAmp.setVisible(uistate.checkBox["EPSP_amp"] or uistate.checkBox["volley_amp"])
             elif key in ["EPSP_slope", "volley_slope"]:
                 self.frameToolAspectSlope.setVisible(uistate.checkBox["EPSP_slope"] or uistate.checkBox["volley_slope"])
-            elif key in ["io_trendline", "io_force0"]:
-                print(f"Checkbox {key} clicked, state: {state == 2}")
+            elif key == "io_trendline":
+                print(f"Checkbox io_trendline clicked, state: {state == 2}")
+            elif key == "io_force0":
+                print(f"Checkbox io_force0 clicked, state: {state == 2}")
                 if getattr(uistate, "experiment_type", "time") == "io":
                     self.exorcise()
                     uiplot.unPlot()
