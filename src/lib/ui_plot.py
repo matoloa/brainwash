@@ -1382,6 +1382,19 @@ class UIplot:
             "volley amp"          → "volley_amp"
             "volley slope"        → "volley_slope"
         """
+        # Refresh IO scatter plot if it exists for this recording
+        for key, linedict in self.uistate.dict_rec_labels.items():
+            if key.startswith(rec_name) and key.endswith(" IO scatter") and linedict.get("x_mode") == "io":
+                io_input = getattr(self.uistate, "io_input", "vamp")
+                io_output = getattr(self.uistate, "io_output", "EPSPamp")
+                x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
+                y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+                df_sweeps = dfoutput[dfoutput["sweep"].notna()]
+                if x_col in df_sweeps.columns and y_col in df_sweeps.columns:
+                    df_sweeps_clean = df_sweeps.dropna(subset=[x_col, y_col])
+                    linedict["line"].set_offsets(np.c_[df_sweeps_clean[x_col].values, df_sweeps_clean[y_col].values])
+                    print(f"updateStimLines: refreshed IO scatter '{key}'")
+
         out_stim = dfoutput[dfoutput["sweep"].isna()]
         if out_stim.empty:
             return

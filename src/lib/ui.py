@@ -4762,9 +4762,10 @@ class UIsub(
         n_stims = prow["stims"]
         dft_temp = uistate.dft_temp  # set when clicked
         stim_offset = dft_temp.at[stim_idx, "t_stim"]
+        is_io = getattr(uistate, "experiment_type", "time") == "io"
         dict_t = None
         if aspect in ["EPSP_slope", "volley_slope"]:
-            axis = uistate.ax2
+            axis = uistate.ax1 if is_io else uistate.ax2
             dict_t = handle_slope(aspect, x_start, x_end, precision, stim_offset)
         elif aspect in ["EPSP_amp", "volley_amp"]:
             axis = uistate.ax1
@@ -4785,12 +4786,15 @@ class UIsub(
 
         dict_t["stim"] = trow_temp["stim"]
         dict_t["amp_zero"] = trow_temp["amp_zero"]
-        dft_single = uistate.dft_temp.iloc[[stim_idx]].copy()
-        dft_single.update(pd.DataFrame([dict_t]))
+
+        if is_io or (not uistate.checkBox["timepoints_per_stim"] and n_stims > 1):
+            dft_to_update = uistate.dft_temp.copy()
+        else:
+            dft_to_update = uistate.dft_temp.iloc[[stim_idx]].copy()
 
         rec_filter = prow.get("filter")
 
-        if uistate.x_axis == "stim" and len(uistate.df_rec_select_time) > 1:
+        if uistate.x_axis == "stim" and not is_io and len(uistate.df_rec_select_time) > 1:
             # In stim mode the output x-axis is stim-numbered.  The per-sweep
             # build_dfoutput result has sweep-space x-values which are meaningless
             # here.  Instead, re-measure dfmean around the stim window — exactly
@@ -4811,37 +4815,73 @@ class UIsub(
             drag_x = np.array([stim_num])
             drag_y = np.array([measured.get(aspect, np.nan)])
             outkey = aspect  # norm not applied in stim-mode preview
+            marker_style = "o"
+            linestyle = "None"
         else:
-            dffilter = self.get_dffilter(row=prow)
+            if pd.notna(prow.get("bin_size")):
+                dffilter = self.get_dfbin(prow)
+            else:
+                dffilter = self.get_dffilter(row=prow)
             out = analysis.build_dfoutput(
                 dffilter=dffilter,
                 dfmean=self.get_dfmean(row=prow),
-                dft=dft_single,
+                dft=dft_to_update,
                 quick=True,
                 filter=rec_filter,
             )
-            # norm handling for EPSP
-            if aspect in ["EPSP_amp", "EPSP_slope"]:
-                aspect_norm = f"{aspect}_norm"
-                outkey = aspect_norm if uistate.checkBox["norm_EPSP"] else aspect
-            else:
-                outkey = aspect
-            drag_x = out["sweep"]
-            drag_y = out[outkey]
+            if is_io:
+                io_input = getattr(uistate, "io_input", "vamp")
+                io_output = getattr(uistate, "io_output", "EPSPamp")
+                x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
+                y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
 
-        marker_style = "o" if len(drag_x) == 1 else "None"
-        if uistate.mouseover_out is None:
+                out_sweeps = out[out["sweep"].notna()].dropna(subset=[x_col, y_col])
+                drag_x = out_sweeps[x_col].values
+                drag_y = out_sweeps[y_col].values
+                marker_style = "o"
+                linestyle = "None"
+                aspect = y_col
+            else:
+                # norm handling for EPSP
+                if aspect in ["EPSP_amp", "EPSP_slope"]:
+                    aspect_norm = f"{aspect}_norm"
+                    outkey = aspect_norm if uistate.checkBox["norm_EPSP"] else aspect
+                else:
+                    outkey = aspect
+                drag_x = out["sweep"]
+                drag_y = out[outkey]
+                marker_style = "o" if len(drag_x) == 1 else "None"
+                linestyle = "-"
+
+        msize = 10 if is_io else 6
+        if getattr(uistate, "mouseover_out", None) is None:
             uistate.mouseover_out = axis.plot(
                 drag_x,
                 drag_y,
-                color=uistate.settings[f"rgb_{aspect}"],
+                color=uistate.settings.get(f"rgb_{aspect}", "black"),
                 linewidth=3,
+                linestyle=linestyle,
                 marker=marker_style,
-                markersize=6,
+                markersize=msize,
             )
         else:
-            uistate.mouseover_out[0].set_data(drag_x, drag_y)
-            uistate.mouseover_out[0].set_marker(marker_style)
+            if getattr(uistate.mouseover_out[0], "axes", None) != axis:
+                uistate.mouseover_out[0].remove()
+                uistate.mouseover_out = axis.plot(
+                    drag_x,
+                    drag_y,
+                    color=uistate.settings.get(f"rgb_{aspect}", "black"),
+                    linewidth=3,
+                    linestyle=linestyle,
+                    marker=marker_style,
+                    markersize=msize,
+                )
+            else:
+                uistate.mouseover_out[0].set_data(drag_x, drag_y)
+                uistate.mouseover_out[0].set_marker(marker_style)
+                uistate.mouseover_out[0].set_linestyle(linestyle)
+                uistate.mouseover_out[0].set_color(uistate.settings.get(f"rgb_{aspect}", "black"))
+                uistate.mouseover_out[0].set_markersize(msize)
 
         self.canvasOutput.draw()
 
@@ -4951,7 +4991,10 @@ class UIsub(
 
         # update dfoutput; dict and file, with normalized columns if applicable
         dfoutput = self.get_dfoutput(row=prow)
-        dffilter = self.get_dffilter(row=prow)
+        if pd.notna(prow.get("bin_size")):
+            dffilter = self.get_dfbin(prow)
+        else:
+            dffilter = self.get_dffilter(row=prow)
         stim_num = trow_temp["stim"]
 
         n_stims = prow["stims"]
