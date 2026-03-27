@@ -3987,7 +3987,8 @@ class UIsub(
         dict_pop = dict_out.popitem()[1]  # TODO: ugly random; pick top in df_p?
         x_data = dict_pop["line"].get_xdata()
         # find closest x_index
-        out_x_idx = (np.abs(x_data - x)).argmin()
+        out_x_idx = np.nanargmin(np.abs(x_data - x))
+        x_val = x_data[out_x_idx]
 
         # print(f"* * * outputMouseover: out_x_idx={out_x_idx}, sweeps={sweeps}")
 
@@ -4004,7 +4005,7 @@ class UIsub(
         if uistate.x_axis == "stim":
             # Ghost waveform: show the dfmean snippet for the hovered stim.
             # out_x_idx is a positional index into x_data; recover actual stim number.
-            stim_num = int(x_data[out_x_idx])
+            stim_num = int(x_val)
             matching = df_t[df_t["stim"] == stim_num]
             if matching.empty:
                 return
@@ -4029,10 +4030,10 @@ class UIsub(
             else:
                 dfsource = self.get_dffilter(p_row)
 
-            dfsweep = dfsource[dfsource["sweep"] == out_x_idx]  # select only rows where sweep == out_x_idx
+            dfsweep = dfsource[dfsource["sweep"] == x_val]  # select only rows where sweep == x_val
             snippet_x = dfsweep["time"] - offset
             snippet_y = dfsweep[rec_filter]
-            ghost_label_text = f"sweep {out_x_idx}"
+            ghost_label_text = f"sweep {int(x_val)}"
 
         if uistate.ghost_sweep is None:
             ghost_color = "white" if uistate.darkmode else "black"
