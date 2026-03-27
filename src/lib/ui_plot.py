@@ -370,7 +370,11 @@ class UIplot:
                 groups_on_axis = {key: value for key, value in dd_groups.items() if value["axis"] == axid}
                 axis_legend.update({key: value["line"] for key, value in groups_on_axis.items()})
             axis = getattr(uistate, axid)
-            axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)
+            if axis_legend:
+                axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)
+            else:
+                if axis.get_legend():
+                    axis.get_legend().remove()
 
         for axid in ["axm", "axe"]:
             axis = getattr(uistate, axid)
