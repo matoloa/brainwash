@@ -361,6 +361,8 @@ class UIplot:
         dd_groups = uistate.dict_group_show
         axids = ["ax1", "ax2"]
         legend_loc = ["upper right", "lower right"]
+        if getattr(uistate, "experiment_type", "time") == "io":
+            legend_loc = ["lower right", "lower right"]
         for axid, loc in zip(axids, legend_loc):
             recs_on_axis = {key: value for key, value in dd_recs.items() if value["axis"] == axid and not key.endswith(" marker")}
             axis_legend = {key: value["line"] for key, value in recs_on_axis.items()}

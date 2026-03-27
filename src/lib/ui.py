@@ -1408,6 +1408,8 @@ class UIsub(
                     if mask.any():
                         all_x.append(xdata[mask])
             elif isinstance(coll, mcoll.PathCollection):
+                if coll.get_offset_transform() != axis.transData:
+                    continue
                 offsets = coll.get_offsets()
                 if len(offsets) > 0:
                     xdata = offsets[:, 0]
@@ -1481,6 +1483,8 @@ class UIsub(
                     if finite.size > 0:
                         all_y.append(finite)
             elif isinstance(coll, mcoll.PathCollection):
+                if coll.get_offset_transform() != axis.transData:
+                    continue
                 offsets = coll.get_offsets()
                 if len(offsets) == 0:
                     continue
