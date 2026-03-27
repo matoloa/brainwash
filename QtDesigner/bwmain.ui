@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1460</width>
+    <width>1080</width>
     <height>857</height>
    </rect>
   </property>
@@ -275,7 +275,7 @@
           <x>0</x>
           <y>-155</y>
           <width>191</width>
-          <height>1210</height>
+          <height>1230</height>
          </rect>
         </property>
         <property name="minimumSize">
@@ -832,7 +832,7 @@
            <property name="minimumSize">
             <size>
              <width>201</width>
-             <height>101</height>
+             <height>121</height>
             </size>
            </property>
            <property name="frameShape">
@@ -959,6 +959,32 @@
             </property>
             <property name="text">
              <string>Output</string>
+            </property>
+           </widget>
+           <widget class="QCheckBox" name="checkBox_io_trendline">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>90</y>
+              <width>71</width>
+              <height>23</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Trendline</string>
+            </property>
+           </widget>
+           <widget class="QCheckBox" name="checkBox_io_force0">
+            <property name="geometry">
+             <rect>
+              <x>100</x>
+              <y>90</y>
+              <width>71</width>
+              <height>23</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Force 0.0</string>
             </property>
            </widget>
           </widget>
@@ -1738,7 +1764,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1460</width>
+     <width>1080</width>
      <height>21</height>
     </rect>
    </property>

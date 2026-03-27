@@ -135,6 +135,8 @@ class UIstate:
             # break these out to separate mod-class?
             "norm_EPSP": False,  # show normalized EPSPs (they're always calculated)
             "paired_stims": False,  # Recs are paired: output per pair is Intervention / Control
+            "io_trendline": False,
+            "io_force0": False,
         }
         self.lineEdit = {  # storage of user input; used to update df_t
             "split_at_time": 0.0,  # in s (SI). User enters ms; converted at input in editImportOptions.

@@ -1161,8 +1161,9 @@ class UIsub(
         self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.connectUIstate(disconnect=True)
         for key, _ in uistate.checkBox.items():
-            checkBox = getattr(self, f"checkBox_{key}")
-            checkBox.setEnabled(False)
+            if hasattr(self, f"checkBox_{key}"):
+                checkBox = getattr(self, f"checkBox_{key}")
+                checkBox.setEnabled(False)
         for radio_name in self._RADIO_TO_TYPE:
             if hasattr(self, radio_name):
                 getattr(self, radio_name).setEnabled(False)
@@ -1174,8 +1175,9 @@ class UIsub(
         self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.connectUIstate()
         for key, _ in uistate.checkBox.items():
-            checkBox = getattr(self, f"checkBox_{key}")
-            checkBox.setEnabled(True)
+            if hasattr(self, f"checkBox_{key}"):
+                checkBox = getattr(self, f"checkBox_{key}")
+                checkBox.setEnabled(True)
         # Radio button enabled-state is recording-dependent; a full refresh
         # via tableProjSelectionChanged (called after uiThaw) will set them
         # correctly.  Here we just re-enable sweep (always valid) so the
@@ -1906,6 +1908,13 @@ class UIsub(
                 self.frameToolAspectAmp.setVisible(uistate.checkBox["EPSP_amp"] or uistate.checkBox["volley_amp"])
             elif key in ["EPSP_slope", "volley_slope"]:
                 self.frameToolAspectSlope.setVisible(uistate.checkBox["EPSP_slope"] or uistate.checkBox["volley_slope"])
+            elif key in ["io_trendline", "io_force0"]:
+                if getattr(uistate, "experiment_type", "time") == "io":
+                    self.exorcise()
+                    uiplot.unPlot()
+                    self.graphUpdate()
+                    uistate.save_cfg(projectfolder=self.dict_folders["project"])
+                    return
         # print(f"viewSettingsChanged: {key} = {state == 2}")
         self.update_show()
         if key in ["output_ymin0", "norm_EPSP"]:
@@ -2241,6 +2250,8 @@ class UIsub(
                     btn.clicked.connect(lambda checked, f=frame_name: self.setViewToolVisible(f, visible=False))
         # checkBoxes
         for key, value in uistate.checkBox.items():
+            if not hasattr(self, f"checkBox_{key}"):
+                continue
             checkBox = getattr(self, f"checkBox_{key}")
             if disconnect:
                 try:
@@ -2380,8 +2391,9 @@ class UIsub(
         self.connectUIstate(disconnect=True)
 
         for key, value in uistate.checkBox.items():
-            checkBox = getattr(self, f"checkBox_{key}")
-            checkBox.setChecked(value)
+            if hasattr(self, f"checkBox_{key}"):
+                checkBox = getattr(self, f"checkBox_{key}")
+                checkBox.setChecked(value)
 
         if uistate.settings.get("filter") == "savgol":
             self.radioButton_filter_savgol.setChecked(True)
@@ -3994,6 +4006,9 @@ class UIsub(
             self.update_stim_buttons()
             self.connectDragRelease(x_range=time_values, rec_ID=prow["ID"], graph="mean")
         elif canvas == self.canvasOutput:  # Output canvas (bottom graph) left-clicked: click and drag to select specific sweeps
+            if getattr(uistate, "experiment_type", "time") == "io":
+                uistate.dragging = False
+                return
             sweep_numbers = list(range(0, int(prow["sweeps"])))
             uistate.x_on_click = sweep_numbers[np.abs(sweep_numbers - x).argmin()]
             uistate.x_select["output_start"] = uistate.x_on_click
