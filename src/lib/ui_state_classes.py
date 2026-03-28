@@ -19,9 +19,10 @@ class TimeModeLocator(Locator):
     """A matplotlib Locator that calculates ticks based on converted time units
     rather than raw sweep numbers, so that ticks fall on clean time intervals."""
 
-    def __init__(self, sweep_hz: float, divisor: float):
+    def __init__(self, sweep_hz: float, divisor: float, bin_size: float = 1.0):
         self.sweep_hz = sweep_hz
         self.divisor = divisor
+        self.bin_size = bin_size
         self._auto = AutoLocator()
 
     def set_axis(self, axis):
@@ -29,10 +30,10 @@ class TimeModeLocator(Locator):
         super().set_axis(axis)
 
     def tick_values(self, vmin, vmax):
-        tmin = vmin / self.sweep_hz / self.divisor
-        tmax = vmax / self.sweep_hz / self.divisor
+        tmin = (vmin * self.bin_size) / self.sweep_hz / self.divisor
+        tmax = (vmax * self.bin_size) / self.sweep_hz / self.divisor
         time_ticks = self._auto.tick_values(tmin, tmax)
-        return [t * self.divisor * self.sweep_hz for t in time_ticks]
+        return [(t * self.divisor * self.sweep_hz) / self.bin_size for t in time_ticks]
 
     def __call__(self):
         vmin, vmax = self.axis.get_view_interval()
@@ -542,8 +543,8 @@ class UIstate:
         """Return a Locator that places ticks at nice intervals in the current mode."""
         mode = self.x_axis
         if mode == "time":
-            return TimeModeLocator(self._time_sweep_hz / self._time_bin_size, self._time_divisor)
-        if mode == "stim":
+            return TimeModeLocator(self._time_sweep_hz, self._time_divisor, self._time_bin_size)
+        elif mode == "stim":
             return FixedLocator(self._stim_tick_locs)
         return AutoLocator()
 
@@ -562,6 +563,8 @@ class UIstate:
             bin_size = self._time_bin_size
 
             def _fmt(val, _pos):
+                # When data is binned, the x-axis value (val) is the bin index.
+                # So bin index * bin size gives the effective sweep number.
                 t = (val * bin_size) / sweep_hz / divisor
                 # Drop trailing zeros: "2.5" not "2.500", "3" not "3.0"
                 return f"{t:g}"

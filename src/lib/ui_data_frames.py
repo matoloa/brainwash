@@ -38,7 +38,7 @@ class DataFrameMixin:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def SI2m(df: pd.DataFrame) -> pd.DataFrame:
+    def V2mV(df: pd.DataFrame) -> pd.DataFrame:
         """
         Converts SI units to display units for amplitude and slope columns.
         Returns a new DataFrame to avoid mutating the strictly SI cached data.
@@ -117,7 +117,7 @@ class DataFrameMixin:
                 print(dfbin)
             dfoutput = self.get_dfoutput(p_row, reset=True)
             self.persistOutput(rec, dfoutput, p_row=p_row)
-            uiplot.addRow(p_row, df_t, self.get_dfmean(p_row), self.SI2m(dfoutput))
+            uiplot.addRow(p_row, df_t, self.get_dfmean(p_row), self.V2mV(dfoutput))
         self.tableFormat()
 
         # group handling
