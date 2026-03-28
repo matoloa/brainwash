@@ -115,7 +115,10 @@ def render_publication_figure(
     }
 
     with matplotlib.rc_context(rc_params):
-        for panel in template.panels:
+        is_io_mode = getattr(uistate, "experiment_type", "time") == "io"
+        panels_to_render = ["io"] if is_io_mode else template.panels
+
+        for panel in panels_to_render:
             # Create a fresh figure for each panel using the provided template dimensions
             fig = matplotlib.figure.Figure(
                 figsize=(template.width_mm / 25.4, template.height_mm / 25.4),
@@ -132,14 +135,23 @@ def render_publication_figure(
                         100,
                         linestyle="dotted",
                         alpha=0.3,
-                        color=uistate.settings["rgb_EPSP_amp"],
+                        color=uistate.settings.get("rgb_EPSP_amp", "black"),
                     )
                 elif panel == "slope":
                     ax.axhline(
                         100,
                         linestyle="dotted",
                         alpha=0.3,
-                        color=uistate.settings["rgb_EPSP_slope"],
+                        color=uistate.settings.get("rgb_EPSP_slope", "black"),
+                    )
+                elif panel == "io":
+                    io_output = getattr(uistate, "io_output", "EPSPamp")
+                    y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+                    ax.axhline(
+                        100,
+                        linestyle="dotted",
+                        alpha=0.3,
+                        color=uistate.settings.get(f"rgb_{y_col_base}", "black"),
                     )
 
             # Re-plot data by identifying relevant lines from the existing interactive axes
@@ -162,18 +174,29 @@ def render_publication_figure(
                 if not line:
                     continue
 
-                # Check if this line corresponds to the current panel
-                if panel == "amp" and axis_src == "ax1":
-                    ax.set_ylabel("Amplitude %" if uistate.checkBox.get("norm_EPSP") else "Amplitude (mV)")
-                elif panel == "slope" and axis_src == "ax2":
-                    ax.set_ylabel("Slope %" if uistate.checkBox.get("norm_EPSP") else "Slope (mV/ms)")
-                else:
-                    # Ignore event/mean panels for now unless they match the source axis
-                    # Future expansion could handle axm/axe
-                    continue
-
                 has_data = True
                 is_io = info.get("x_mode") == "io"
+
+                # Check if this line corresponds to the current panel
+                if is_io:
+                    # In IO mode, all groups are on ax1.  Use the aspect to determine panel.
+                    if panel == "io":
+                        aspect = info.get("aspect", "")
+                        if "slope" in aspect.lower():
+                            ax.set_ylabel(f"EPSP Slope %" if uistate.checkBox.get("norm_EPSP") else f"EPSP Slope (mV/ms)")
+                        else:
+                            ax.set_ylabel(f"EPSP Amplitude %" if uistate.checkBox.get("norm_EPSP") else f"EPSP Amplitude (mV)")
+                    else:
+                        continue
+                else:
+                    if panel == "amp" and axis_src == "ax1":
+                        ax.set_ylabel("Amplitude %" if uistate.checkBox.get("norm_EPSP") else "Amplitude (mV)")
+                    elif panel == "slope" and axis_src == "ax2":
+                        ax.set_ylabel("Slope %" if uistate.checkBox.get("norm_EPSP") else "Slope (mV/ms)")
+                    else:
+                        # Ignore event/mean panels for now unless they match the source axis
+                        # Future expansion could handle axm/axe
+                        continue
 
                 if hasattr(line, "get_offsets"):
                     offsets = line.get_offsets()
@@ -264,7 +287,12 @@ def render_publication_figure(
                     ax.legend(by_label.values(), by_label.keys(), frameon=False)
 
                 fig.tight_layout()
-                panel_key = panel_name_map.get(panel, panel)
+                if panel == "io":
+                    io_input = getattr(uistate, "io_input", "vamp")
+                    io_output = getattr(uistate, "io_output", "EPSPamp")
+                    panel_key = f"{io_input}-{io_output}"
+                else:
+                    panel_key = panel_name_map.get(panel, panel)
                 figures[panel_key] = fig
 
     return figures
@@ -281,6 +309,9 @@ if __name__ == "__main__":
             }
             self.dict_group_labels = {}
             self.dict_group_show = {}
+            self.experiment_type = "io"
+            self.io_input = "vamp"
+            self.io_output = "EPSPamp"
 
         def x_axis_xlabel(self):
             return "Time (s)"
