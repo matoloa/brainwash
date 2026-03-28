@@ -173,14 +173,31 @@ def render_publication_figure(
                     continue
 
                 has_data = True
-                xdata = line.get_xdata()
-                ydata = line.get_ydata()
-                color = line.get_color()
+                is_io = info.get("x_mode") == "io"
+
+                if hasattr(line, "get_offsets"):
+                    offsets = line.get_offsets()
+                    if len(offsets) == 0:
+                        continue
+                    xdata = offsets[:, 0]
+                    ydata = offsets[:, 1]
+                else:
+                    xdata = line.get_xdata()
+                    ydata = line.get_ydata()
+
+                if hasattr(line, "get_color"):
+                    color = line.get_color()
+                elif hasattr(line, "get_facecolors") and len(line.get_facecolors()) > 0:
+                    color = line.get_facecolors()[0]
+                    if len(color) == 4:
+                        color = color[:3]
+                else:
+                    color = "black"
 
                 plot_label = group_names.get(group_id_str, label) if group_names else label
 
                 yerr = None
-                if fill and len(fill.get_paths()) > 0:
+                if not is_io and fill and len(fill.get_paths()) > 0:
                     verts = fill.get_paths()[0].vertices
                     yerr = []
                     for xi in xdata:
@@ -203,6 +220,28 @@ def render_publication_figure(
                         elinewidth=template.linewidth_error,
                         capsize=0,
                     )
+                elif is_io:
+                    if "scatter" in label:
+                        ax.plot(
+                            xdata,
+                            ydata,
+                            label=plot_label,
+                            color=color,
+                            linestyle="none",
+                            marker="o",
+                            markersize=3,
+                            alpha=0.3,
+                        )
+                    else:
+                        ax.plot(
+                            xdata,
+                            ydata,
+                            label=plot_label,
+                            color=color,
+                            linestyle="-",
+                            linewidth=template.linewidth_data * 2,
+                            alpha=0.9,
+                        )
                 else:
                     ax.plot(
                         xdata,
@@ -218,8 +257,10 @@ def render_publication_figure(
                 ax.set_ylim(bottom=0)
                 ax.set_xlabel(uistate.x_axis_xlabel() if hasattr(uistate, "x_axis_xlabel") else "Time")
 
-                if ax.get_legend_handles_labels()[1]:
-                    ax.legend(frameon=False)
+                handles, labels = ax.get_legend_handles_labels()
+                if labels:
+                    by_label = dict(zip(labels, handles))
+                    ax.legend(by_label.values(), by_label.keys(), frameon=False)
 
                 fig.tight_layout()
                 panel_key = panel_name_map.get(panel, panel)
@@ -264,9 +305,18 @@ if __name__ == "__main__":
     }
     mock_uistate.dict_group_show["Group 1 EPSP amp mean"] = mock_uistate.dict_group_labels["Group 1 EPSP amp mean"]
 
+    scatter = ax.scatter([1, 2, 3], [1.5, 2.5, 3.5], color="red")
+    (trendline,) = ax.plot([1, 3], [1.5, 3.5], color="red", linestyle="--")
+
+    mock_uistate.dict_group_labels["Group 2 raw IO scatter"] = {"group_ID": 2, "axis": "ax2", "line": scatter, "fill": None, "x_mode": "io"}
+    mock_uistate.dict_group_show["Group 2 raw IO scatter"] = mock_uistate.dict_group_labels["Group 2 raw IO scatter"]
+
+    mock_uistate.dict_group_labels["Group 2 raw IO trendline"] = {"group_ID": 2, "axis": "ax2", "line": trendline, "fill": None, "x_mode": "io"}
+    mock_uistate.dict_group_show["Group 2 raw IO trendline"] = mock_uistate.dict_group_labels["Group 2 raw IO trendline"]
+
     template = JOURNAL_TEMPLATES["jneurosci_1col"]
     try:
-        figures = render_publication_figure(mock_uistate, None, template, ["1"])
+        figures = render_publication_figure(mock_uistate, None, template, ["1", "2"])
         print(f"Success! Returned figures: {list(figures.keys())}")
 
         export_dir = Path.home() / "Documents" / "Brainwash Projects" / "Export"

@@ -1080,11 +1080,15 @@ class UIsub(
         # x_mode filtering: group lines tagged with a specific x_mode are only
         # visible when that mode is active.
         x_mode = v.get("x_mode")
+        is_io = getattr(uistate, "experiment_type", "time") == "io"
         if x_mode is not None and x_mode != uistate.x_axis:
             if not (x_mode == "sweep" and uistate.x_axis == "time"):
                 return False
+        if is_io and v.get("line") and v["line"].get_label().endswith(" IO trendline"):
+            if not uistate.checkBox.get("io_trendline", False):
+                return False
         aspect = v.get("aspect")
-        if aspect and not uistate.checkBox.get(aspect, True):
+        if aspect and not uistate.checkBox.get(aspect, True) and not is_io:
             return False
         variant = v.get("variant")
         norm_active = uistate.checkBox["norm_EPSP"]
@@ -1821,8 +1825,7 @@ class UIsub(
         uistate.io_input = io_input
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
         self.exorcise()
-        uiplot.unPlot()
-        self.graphUpdate()
+        self.triggerRefresh()
 
     def io_output_changed(self, button):
         """Handler for buttonGroup_io_o.buttonClicked signal."""
@@ -1833,8 +1836,7 @@ class UIsub(
         uistate.io_output = io_output
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
         self.exorcise()
-        uiplot.unPlot()
-        self.graphUpdate()
+        self.triggerRefresh()
 
     def experiment_type_changed(self, button):
         """Handler for buttonGroup_type.buttonClicked signal."""
@@ -1849,8 +1851,7 @@ class UIsub(
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
         if exp_type == "io" or old_type == "io":
             self.exorcise()
-            uiplot.unPlot()
-            self.graphUpdate()
+            self.triggerRefresh()
         else:
             self.update_show()
             self.zoomAuto()
@@ -1934,8 +1935,7 @@ class UIsub(
                 print(f"Checkbox io_force0 clicked, state: {state == 2}")
                 if getattr(uistate, "experiment_type", "time") == "io":
                     self.exorcise()
-                    uiplot.unPlot()
-                    self.graphUpdate()
+                    self.triggerRefresh()
         # print(f"viewSettingsChanged: {key} = {state == 2}")
         self.update_show()
         if key in ["output_ymin0", "norm_EPSP"]:
@@ -3744,7 +3744,6 @@ class UIsub(
             row = dfp.loc[dfp_idx]
             return row
         if not uistate.list_idx_select_recs:
-            print("get_prow: No recording selected.")
             return None
         dfp = self.get_df_project()
         row = dfp.loc[uistate.list_idx_select_recs[0]]
@@ -3907,13 +3906,13 @@ class UIsub(
                 row = df[df["ID"] == rec_id].iloc[0]
                 processRow(row)
 
-        self.graphGroups()
         if row is not None:
             processRow(row)
         else:
-            df = df if df is not None else uistate.df_recs2plot
+            df = df if df is not None else self.get_df_project()
             if df is not None and not df.empty:
                 processDataFrame(df)
+        self.graphGroups()
         self.update_show()
         self.zoomAuto()
         print("graphUpdate calls self.graphRefresh()")

@@ -3,10 +3,12 @@ import time  # counting time for functions
 import matplotlib.pyplot as plt  # for the scatterplot
 import numpy as np
 import pandas as pd
-import seaborn as sns
+
+# import seaborn as sns
 from matplotlib import style
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.lines import Line2D  # for custom legend; TODO: still used?
+
+# from matplotlib.lines import Line2D  # for custom legend; TODO: still used?
 from matplotlib.ticker import FuncFormatter
 
 STIM_MARKER_SIZE = 10  # diameter in points; drives both rendering and hit-zone calculation
@@ -320,7 +322,10 @@ class UIplot:
         else:
             keys_to_remove = [key for key, value in dict_rec.items() if rec_ID == value["rec_ID"]]
         for key in keys_to_remove:
-            dict_rec[key]["line"].remove()
+            try:
+                dict_rec[key]["line"].remove()
+            except Exception:
+                pass
             del dict_rec[key]
             if key in dict_show:
                 del dict_show[key]
@@ -341,8 +346,15 @@ class UIplot:
         else:
             keys_to_remove = [key for key, value in dict_group.items() if group_ID == value["group_ID"]]
         for key in keys_to_remove:
-            dict_group[key]["fill"].remove()
-            dict_group[key]["line"].remove()
+            try:
+                dict_group[key]["fill"].remove()
+            except Exception:
+                pass
+            if dict_group[key].get("line") is not dict_group[key].get("fill"):
+                try:
+                    dict_group[key]["line"].remove()
+                except Exception:
+                    pass
             del dict_group[key]
             if key in dict_group_show:
                 del dict_group_show[key]
@@ -357,12 +369,7 @@ class UIplot:
         t0 = time.time()
 
         # Set recordings and group legends
-        io_trendline_active = uistate.checkBox.get("io_trendline", False)
-        for k, v in uistate.dict_rec_labels.items():
-            if k.endswith(" IO trendline"):
-                v["line"].set_visible(io_trendline_active and k in uistate.dict_rec_show)
-
-        dd_recs = {k: v for k, v in uistate.dict_rec_show.items() if not (k.endswith(" IO trendline") and not io_trendline_active)}
+        dd_recs = uistate.dict_rec_show
         dd_groups = uistate.dict_group_show
         axids = ["ax1", "ax2"]
         legend_loc = ["upper right", "lower right"]
@@ -409,9 +416,11 @@ class UIplot:
         if getattr(uistate, "experiment_type", "time") == "io":
             io_out = getattr(uistate, "io_output", "EPSPamp")
             if "slope" in io_out.lower():
-                ax1.set_ylabel("Slope %" if uistate.checkBox["norm_EPSP"] else "Slope (mV/ms)")
+                ax1.set_ylabel("")
+                ax2.set_ylabel("EPSP Slope %" if uistate.checkBox["norm_EPSP"] else "EPSP Slope (mV/ms)")
             else:
-                ax1.set_ylabel("Amplitude %" if uistate.checkBox["norm_EPSP"] else "Amplitude (mV)")
+                ax1.set_ylabel("EPSP Amplitude %" if uistate.checkBox["norm_EPSP"] else "EPSP Amplitude (mV)")
+                ax2.set_ylabel("")
         else:
             if uistate.checkBox["norm_EPSP"]:
                 ax1.set_ylabel("Amplitude %")
@@ -838,66 +847,74 @@ class UIplot:
             io_output = getattr(self.uistate, "io_output", "EPSPamp")
 
             x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
-            y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+            y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+
+            axid = "ax2" if y_col_base == "EPSP_slope" else "ax1"
+            color = self.uistate.settings.get(f"rgb_{y_col_base}", "black")
 
             df_sweeps = dfoutput[dfoutput["sweep"].notna()]
-            if x_col in df_sweeps.columns and y_col in df_sweeps.columns:
-                df_clean = df_sweeps.dropna(subset=[x_col, y_col])
-                axid = "ax1"
-                color = self.uistate.settings.get(f"rgb_{y_col}", "black")
-                scatter = self.get_axis(axid).scatter(
-                    df_clean[x_col].values,
-                    df_clean[y_col].values,
-                    c=[color],
-                    alpha=0.8,
-                    label=f"{label} IO scatter",
-                    s=20,
-                    zorder=2,
-                )
-                scatter.set_visible(False)
-                self.uistate.dict_rec_labels[f"{label} IO scatter"] = {
-                    "rec_ID": rec_ID,
-                    "aspect": y_col,
-                    "variant": "raw",
-                    "stim": None,
-                    "line": scatter,
-                    "axis": axid,
-                    "x_mode": "io",
-                }
+            for variant in ["raw", "norm"]:
+                y_col = f"{y_col_base}_norm" if variant == "norm" else y_col_base
+                if x_col in df_sweeps.columns and y_col in df_sweeps.columns:
+                    df_clean = df_sweeps.dropna(subset=[x_col, y_col])
 
-                if len(df_clean) > 1:
-                    x_vals = df_clean[x_col].values
-                    y_vals = df_clean[y_col].values
-
-                    if self.uistate.checkBox.get("io_force0", False):
-                        x_sq_sum = np.sum(x_vals**2)
-                        m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
-                        c = 0
-                    else:
-                        m, c = np.polyfit(x_vals, y_vals, 1)
-
-                    x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
-                    y_line = m * x_line + c
-
-                    (trendline,) = self.get_axis(axid).plot(
-                        x_line,
-                        y_line,
-                        color=color,
-                        linestyle="--",
+                    scatter = self.get_axis(axid).scatter(
+                        df_clean[x_col].values,
+                        df_clean[y_col].values,
+                        c=[color],
                         alpha=0.8,
-                        label=f"{label} IO trendline",
-                        zorder=1,
+                        label=f"{label} {variant} IO scatter",
+                        s=20,
+                        zorder=2,
                     )
-                    trendline.set_visible(False)
-                    self.uistate.dict_rec_labels[f"{label} IO trendline"] = {
+                    scatter.set_visible(False)
+                    self.uistate.dict_rec_labels[f"{label} {variant} IO scatter"] = {
                         "rec_ID": rec_ID,
-                        "aspect": y_col,
-                        "variant": "raw",
+                        "aspect": y_col_base,
+                        "variant": variant,
                         "stim": None,
-                        "line": trendline,
+                        "line": scatter,
                         "axis": axid,
                         "x_mode": "io",
                     }
+
+                    if len(df_clean) > 1:
+                        x_vals = df_clean[x_col].values
+                        y_vals = df_clean[y_col].values
+
+                        if self.uistate.checkBox.get("io_force0", False):
+                            x_sq_sum = np.sum(x_vals**2)
+                            m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
+                            c = 0
+                        else:
+                            if x_vals.max() - x_vals.min() < 1e-9:
+                                m = 0
+                                c = np.mean(y_vals)
+                            else:
+                                m, c = np.polyfit(x_vals, y_vals, 1)
+
+                        x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
+                        y_line = m * x_line + c
+
+                        (trendline,) = self.get_axis(axid).plot(
+                            x_line,
+                            y_line,
+                            color=color,
+                            linestyle="--",
+                            alpha=0.8,
+                            label=f"{label} {variant} IO trendline",
+                            zorder=1,
+                        )
+                        trendline.set_visible(False)
+                        self.uistate.dict_rec_labels[f"{label} {variant} IO trendline"] = {
+                            "rec_ID": rec_ID,
+                            "aspect": y_col_base,
+                            "variant": variant,
+                            "stim": None,
+                            "line": trendline,
+                            "axis": axid,
+                            "x_mode": "io",
+                        }
 
         # Add meanline to Mean
         self.plot_line(
@@ -1246,6 +1263,92 @@ class UIplot:
 
     def addGroup(self, group_ID, dict_group, df_groupmean):
         # plot group meanlines and SEMs
+        if getattr(self.uistate, "experiment_type", "time") == "io":
+            io_input = getattr(self.uistate, "io_input", "vamp")
+            io_output = getattr(self.uistate, "io_output", "EPSPamp")
+
+            y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+            axid = "ax2" if y_col_base == "EPSP_slope" else "ax1"
+            color = dict_group["color"]
+            group_name = dict_group["group_name"]
+
+            for variant in ["raw", "norm"]:
+                all_x = []
+                all_y = []
+
+                # find scatters in uistate.dict_rec_labels
+                for key, linedict in self.uistate.dict_rec_labels.items():
+                    if linedict.get("x_mode") == "io" and linedict.get("rec_ID") in dict_group["rec_IDs"]:
+                        if key.endswith(f"{variant} IO scatter"):
+                            scatter = linedict["line"]
+                            offsets = scatter.get_offsets()
+                            if len(offsets) > 0:
+                                all_x.append(offsets[:, 0])
+                                all_y.append(offsets[:, 1])
+
+                if all_x and all_y:
+                    x_vals = np.concatenate(all_x)
+                    y_vals = np.concatenate(all_y)
+
+                    scatter = self.get_axis(axid).scatter(
+                        x_vals,
+                        y_vals,
+                        c=[color],
+                        alpha=0.3,
+                        label=f"{group_name} {variant} IO scatter",
+                        s=20,
+                        zorder=2,
+                    )
+                    scatter.set_visible(False)
+                    self.uistate.dict_group_labels[f"{group_name} {variant} IO scatter"] = {
+                        "group_ID": group_ID,
+                        "aspect": y_col_base,
+                        "variant": variant,
+                        "stim": None,
+                        "line": scatter,
+                        "fill": scatter,
+                        "axis": axid,
+                        "x_mode": "io",
+                    }
+
+                    if len(x_vals) > 1:
+                        if self.uistate.checkBox.get("io_force0", False):
+                            x_sq_sum = np.sum(x_vals**2)
+                            m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
+                            c = 0
+                        else:
+                            if x_vals.max() - x_vals.min() < 1e-9:
+                                m = 0
+                                c = np.mean(y_vals)
+                            else:
+                                m, c = np.polyfit(x_vals, y_vals, 1)
+
+                        x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
+                        y_line = m * x_line + c
+
+                        (trendline,) = self.get_axis(axid).plot(
+                            x_line,
+                            y_line,
+                            color=color,
+                            linestyle="-",
+                            linewidth=2,
+                            alpha=0.9,
+                            label=f"{group_name} {variant} IO trendline",
+                            zorder=3,
+                        )
+                        trendline.set_visible(False)
+                        self.uistate.dict_group_labels[f"{group_name} {variant} IO trendline"] = {
+                            "group_ID": group_ID,
+                            "aspect": y_col_base,
+                            "variant": variant,
+                            "stim": None,
+                            "line": trendline,
+                            "fill": trendline,
+                            "axis": axid,
+                            "x_mode": "io",
+                        }
+            return
+
         if df_groupmean["EPSP_amp_mean"].notna().any():
             self.plot_group_lines("ax1", group_ID, dict_group, df_groupmean)
         if df_groupmean["EPSP_slope_mean"].notna().any():
@@ -1434,7 +1537,9 @@ class UIplot:
                 io_input = getattr(self.uistate, "io_input", "vamp")
                 io_output = getattr(self.uistate, "io_output", "EPSPamp")
                 x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
-                y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+                y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+                variant = linedict.get("variant", "raw")
+                y_col = f"{y_col_base}_norm" if variant == "norm" else y_col_base
                 df_sweeps = dfoutput[dfoutput["sweep"].notna()]
                 if x_col in df_sweeps.columns and y_col in df_sweeps.columns:
                     df_sweeps_clean = df_sweeps.dropna(subset=[x_col, y_col])
@@ -1445,7 +1550,9 @@ class UIplot:
                 io_input = getattr(self.uistate, "io_input", "vamp")
                 io_output = getattr(self.uistate, "io_output", "EPSPamp")
                 x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
-                y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+                y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+                variant = linedict.get("variant", "raw")
+                y_col = f"{y_col_base}_norm" if variant == "norm" else y_col_base
                 df_sweeps = dfoutput[dfoutput["sweep"].notna()]
                 if x_col in df_sweeps.columns and y_col in df_sweeps.columns:
                     df_clean = df_sweeps.dropna(subset=[x_col, y_col])
@@ -1457,7 +1564,11 @@ class UIplot:
                             m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
                             c = 0
                         else:
-                            m, c = np.polyfit(x_vals, y_vals, 1)
+                            if x_vals.max() - x_vals.min() < 1e-9:
+                                m = 0
+                                c = np.mean(y_vals)
+                            else:
+                                m, c = np.polyfit(x_vals, y_vals, 1)
 
                         x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
                         y_line = m * x_line + c

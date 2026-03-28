@@ -151,6 +151,9 @@ class ExportMixin:
 
         self.usage(f"triggerExportOutputImage: {template_key}")
 
+        if hasattr(self, "tableProj"):
+            self.tableProj.clearSelection()
+
         selected_groups = list(set(str(info["group_ID"]) for info in uistate.dict_group_show.values()))
 
         if not selected_groups:
@@ -178,7 +181,7 @@ class ExportMixin:
             QtWidgets.QMessageBox.warning(
                 None,
                 "Export Error",
-                "No valid data available to render for the selected template.\n" "Ensure that group means for amplitude or slope are visible.",
+                "No valid data available to render for the selected template.\nEnsure that group means for amplitude or slope are visible.",
             )
             return
 

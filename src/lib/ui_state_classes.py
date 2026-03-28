@@ -4,6 +4,7 @@ import pickle
 from math import ceil, floor
 from typing import TYPE_CHECKING, Optional
 
+import numpy as np
 import pandas as pd
 from matplotlib.ticker import AutoLocator, FixedLocator, FuncFormatter, Locator
 
@@ -505,8 +506,6 @@ class UIstate:
             self._stim_tick_locs = list(range(stim_min, stim_max + 1))
             return (stim_min - 0.5, stim_max + 0.5)
         elif mode == "io":
-            import numpy as np
-
             x_min, x_max = float("inf"), float("-inf")
             lines_to_check = list(self.dict_rec_labels.values())
             if hasattr(self, "dict_group_labels"):
