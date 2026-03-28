@@ -471,6 +471,9 @@ class UIstate:
         are always in sweep-space (same coordinates as the line x-data);
         the FuncFormatter converts tick labels to the chosen time unit.
         """
+        if self.experiment_type == "PP":
+            return (0.5, 1.5)
+        
         mode = self.x_axis
         if mode == "sweep":
             n = prow["sweeps"]

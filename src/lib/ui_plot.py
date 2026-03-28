@@ -1,3 +1,4 @@
+import warnings
 import time  # counting time for functions
 
 import matplotlib.pyplot as plt  # for the scatterplot
@@ -375,6 +376,7 @@ class UIplot:
         legend_loc = ["upper right", "lower right"]
         if getattr(uistate, "experiment_type", "time") == "io":
             legend_loc = ["lower right", "lower right"]
+        is_pp = getattr(uistate, "experiment_type", "time") == "PP"
         for axid, loc in zip(axids, legend_loc):
             recs_on_axis = {key: value for key, value in dd_recs.items() if value["axis"] == axid and not key.endswith(" marker")}
             axis_legend = {key: value["line"] for key, value in recs_on_axis.items()}
@@ -382,7 +384,7 @@ class UIplot:
                 groups_on_axis = {key: value for key, value in dd_groups.items() if value["axis"] == axid}
                 axis_legend.update({key: value["line"] for key, value in groups_on_axis.items()})
             axis = getattr(uistate, axid)
-            if axis_legend:
+            if axis_legend and not is_pp:
                 axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)
             else:
                 if axis.get_legend():
@@ -413,7 +415,8 @@ class UIplot:
         axe.xaxis.set_major_formatter(FuncFormatter(lambda t, _: f"{t * 1e3:.1f}"))
         axe.set_xlabel("Time (ms)")
 
-        if getattr(uistate, "experiment_type", "time") == "io":
+        exp_type = getattr(uistate, "experiment_type", "time")
+        if exp_type == "io":
             io_out = getattr(uistate, "io_output", "EPSPamp")
             ax2.set_ylabel("")
             if "slope" in io_out.lower():
@@ -425,6 +428,13 @@ class UIplot:
             ax1.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax2.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+        elif exp_type == "PP":
+            ax1.set_ylabel("PPR Amp (%)")
+            ax2.set_ylabel("PPR Slope (%)")
+            
+            ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+            ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+            ax1.xaxis.set_major_formatter(uistate.x_axis_formatter())
         else:
             if uistate.checkBox["norm_EPSP"]:
                 ax1.set_ylabel("Amplitude %")
@@ -442,6 +452,9 @@ class UIplot:
         ax2.set_ylim(uistate.zoom["output_ax2_ylim"])
         ax1.set_xlim(uistate.zoom["output_xlim"])
         ax2.set_xlim(uistate.zoom["output_xlim"])
+        if exp_type == "PP":
+            ax1.set_xticks([1])
+            ax2.set_xticks([1])
         ax1.set_xlabel(uistate.x_axis_xlabel())
         ax1.xaxis.set_major_locator(uistate.x_axis_locator())
         ax2.xaxis.set_major_locator(uistate.x_axis_locator())
@@ -582,10 +595,20 @@ class UIplot:
         alpha=None,
         variant="raw",
         x_mode=None,
+        marker=None,
+        markersize=None,
     ):
+        is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
+        if is_pp and axid in ("ax1", "ax2") and "PPR" not in label:
+            return
         zorder = 0 if width > 1 else 1
         alpha = alpha if alpha is not None else self.uistate.settings["alpha_line"]
-        (line,) = self.get_axis(axid).plot(x, y, color=color, label=label, alpha=alpha, linewidth=width, zorder=zorder)
+        kwargs = {"color": color, "label": label, "alpha": alpha, "linewidth": width, "zorder": zorder}
+        if marker is not None:
+            kwargs["marker"] = marker
+        if markersize is not None:
+            kwargs["markersize"] = markersize
+        (line,) = self.get_axis(axid).plot(x, y, **kwargs)
         line.set_visible(False)
         self.uistate.dict_rec_labels[label] = {
             "rec_ID": rec_ID,
@@ -758,6 +781,9 @@ class UIplot:
         variant="raw",
         x_mode=None,
     ):
+        is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
+        if is_pp and axid in ("ax1", "ax2") and "PPR" not in label:
+            return
         hline = self.get_axis(axid).axhline(
             y=y,
             color=color,
@@ -861,6 +887,8 @@ class UIplot:
         rec_name = p_row["recording_name"]
         rec_filter = p_row["filter"]  # the filter currently used for this recording
         n_stims = len(dft)
+        is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
+        skip_output = is_pp and n_stims != 2
         if rec_filter != "voltage":
             label = f"{rec_name} ({rec_filter})"
         else:
@@ -1241,6 +1269,51 @@ class UIplot:
                     x_mode="sweep",
                 )
 
+
+        if is_pp and not skip_output:
+            out_sweeps = dfoutput[dfoutput["sweep"].notna()]
+            out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
+            out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
+            
+            common_sweeps = out1.index.intersection(out2.index).dropna()
+            if not common_sweeps.empty:
+                o1 = out1.loc[common_sweeps]
+                o2 = out2.loc[common_sweeps]
+                
+                configs = [
+                    ("EPSP_amp", "ax1", settings.get("rgb_EPSP_amp", "blue")),
+                    ("EPSP_slope", "ax2", settings.get("rgb_EPSP_slope", "red")),
+                    ("volley_amp", "ax1", settings.get("rgb_volley_amp", "green")),
+                    ("volley_slope", "ax2", settings.get("rgb_volley_slope", "orange")),
+                ]
+                
+                for aspect, axid, color in configs:
+                    if aspect in o1.columns and aspect in o2.columns:
+                        v1 = o1[aspect].values.astype(float)
+                        v2 = o2[aspect].values.astype(float)
+                        
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore")
+                            ppr = (v2 / v1) * 100
+                            # replace inf and -inf with nan
+                            ppr[~np.isfinite(ppr)] = np.nan
+                        
+                        print(f"DEBUG PP: aspect={aspect}, len(common_sweeps)={len(common_sweeps)}, v1={v1}, v2={v2}, ppr={ppr}")
+                        for variant in ["raw", "norm"]:
+                            self.plot_line(
+                                f"{label} PPR {aspect} {variant}",
+                                axid,
+                                np.ones(len(common_sweeps)),
+                                ppr,
+                                color,
+                                rec_ID,
+                                aspect=aspect,
+                                stim=None,
+                                variant=variant,
+                                x_mode="sweep",
+                                marker="o"
+                            )
+
         # Stim-mode aggregate lines (always created when stim-mode rows exist;
         # visibility controlled by x_mode filtering in _is_rec_visible).
         out_stim = dfoutput[dfoutput["sweep"].isna()]
@@ -1538,6 +1611,8 @@ class UIplot:
         if mouseover_out is None:
             print(f"updateOutLine: mouseover_out is None, skipping update for '{label}'")
             return
+        if label not in self.uistate.dict_rec_labels:
+            return
         linedict = self.uistate.dict_rec_labels[label]
         linedict["line"].set_xdata(mouseover_out[0].get_xdata())
         linedict["line"].set_ydata(mouseover_out[0].get_ydata())
@@ -1685,6 +1760,36 @@ class UIplot:
             print(f"updateOutLineFromDf: no data for stim={stim_num} col={column}, falling back to updateOutLine")
             self.updateOutLine(label)
             return
+            
+        if label not in self.uistate.dict_rec_labels:
+            is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
+            if is_pp:
+                rec_label = label.split(" - stim ")[0]
+                aspect = column.replace("_norm", "")
+                out_sweeps = dfoutput[dfoutput["sweep"].notna()]
+                out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
+                out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
+                common_sweeps = out1.index.intersection(out2.index).dropna()
+                if not common_sweeps.empty:
+                    o1 = out1.loc[common_sweeps]
+                    o2 = out2.loc[common_sweeps]
+                    if aspect in o1.columns and aspect in o2.columns:
+                        v1 = o1[aspect].values.astype(float)
+                        v2 = o2[aspect].values.astype(float)
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore")
+                            ppr = (v2 / v1) * 100
+                            ppr[~np.isfinite(ppr)] = np.nan
+                        
+                        for variant in ["raw", "norm"]:
+                            ppr_label = f"{rec_label} PPR {aspect} {variant}"
+                            if ppr_label in self.uistate.dict_rec_labels:
+                                linedict = self.uistate.dict_rec_labels[ppr_label]
+                                line = linedict["line"]
+                                line.set_xdata(common_sweeps)
+                                line.set_ydata(ppr)
+            return
+            
         linedict = self.uistate.dict_rec_labels[label]
         x_col = linedict.get("x_mode", "sweep")
         if x_col not in df_stim.columns:
@@ -1697,6 +1802,8 @@ class UIplot:
         mouseover_out = self.uistate.mouseover_out
         if mouseover_out is None:
             print(f"updateOutMean: mouseover_out is None, skipping update for '{label}'")
+            return
+        if label not in self.uistate.dict_rec_labels:
             return
         linedict = self.uistate.dict_rec_labels[label]
         linedict["line"].set_xdata(mouseover_out[0].get_xdata())

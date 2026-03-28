@@ -1,0 +1,9 @@
+with open("src/lib/ui.py", "r") as f:
+    lines = f.readlines()
+start = -1
+for i, line in enumerate(lines):
+    if "def experiment_type_changed(" in line:
+        start = i
+        break
+for i in range(start, min(start+20, len(lines))):
+    print(lines[i], end="")

@@ -1,3 +1,4 @@
+import warnings
 import json
 import math
 import os  # TODO: replace use by pathlib?
@@ -477,7 +478,8 @@ class graphPreloadThread(QtCore.QThread):
                 print("graphPreloadThread.run: calling get_dffilter")
                 _ = self.uisub.get_dffilter(row=p_row)
                 print("graphPreloadThread.run: calling get_dfoutput")
-                if self.uistate.checkBox["paired_stims"]:
+                is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
+                if self.uistate.checkBox["paired_stims"] and not is_pp:
                     dfoutput = self.uisub.get_dfdiff(row=p_row)
                 else:
                     dfoutput = self.uisub.get_dfoutput(row=p_row)
@@ -1045,6 +1047,8 @@ class UIsub(
         is_pp = getattr(uistate, "experiment_type", "time") == "PP"
         if is_pp and axis in ("ax1", "ax2"):
             if valid_pp_ids is not None and v["rec_ID"] not in valid_pp_ids:
+                if "PPR" in v.get("line").get_label():
+                    print(f"PPR HIDDEN BY PP GUARD: {v['rec_ID']} not in {valid_pp_ids}")
                 return False
         # x_mode filtering: lines tagged with a specific x_mode are only visible
         # when that mode is active.  Lines with x_mode=None (mean, event, axe
@@ -1056,6 +1060,8 @@ class UIsub(
         is_io = getattr(uistate, "experiment_type", "time") == "io"
         if x_mode is not None and x_mode != uistate.x_axis:
             if not (x_mode == "sweep" and uistate.x_axis == "time"):
+                if "PPR" in v.get("line").get_label():
+                    print(f"PPR HIDDEN BY x_mode: {x_mode} != {uistate.x_axis}")
                 return False
         if is_io and v.get("line") and v["line"].get_label().endswith(" IO trendline"):
             if not uistate.checkBox.get("io_trendline", False):
@@ -1064,6 +1070,8 @@ class UIsub(
         axis = v.get("axis")
         if aspect and not uistate.checkBox.get(aspect, True):
             if axis == "axe" or not is_io:
+                if "PPR" in v.get("line").get_label():
+                    print(f"PPR HIDDEN BY aspect checkbox: {aspect} is unchecked")
                 return False
         # norm/raw switch: only EPSP amp/slope have a norm variant.
         # Only applies to ax1/ax2 output lines — markers on axe represent physical
@@ -1091,6 +1099,8 @@ class UIsub(
         is_io = getattr(uistate, "experiment_type", "time") == "io"
         if x_mode is not None and x_mode != uistate.x_axis:
             if not (x_mode == "sweep" and uistate.x_axis == "time"):
+                if "PPR" in v.get("line").get_label():
+                    print(f"PPR HIDDEN BY x_mode: {x_mode} != {uistate.x_axis}")
                 return False
         if is_io and v.get("line") and v["line"].get_label().endswith(" IO trendline"):
             if not uistate.checkBox.get("io_trendline", False):
@@ -1099,6 +1109,8 @@ class UIsub(
         axis = v.get("axis")
         if aspect and not uistate.checkBox.get(aspect, True):
             if axis == "axe" or not is_io:
+                if "PPR" in v.get("line").get_label():
+                    print(f"PPR HIDDEN BY aspect checkbox: {aspect} is unchecked")
                 return False
         variant = v.get("variant")
         norm_active = uistate.checkBox["norm_EPSP"]
@@ -1149,8 +1161,9 @@ class UIsub(
         if is_pp:
             df_p = self.get_df_project()
             for rec_id in selected_ids:
-                if rec_id in df_p.index:
-                    rec_name = df_p.loc[rec_id, "recording_name"]
+                matches = df_p[df_p["ID"] == rec_id]
+                if not matches.empty:
+                    rec_name = matches.iloc[0]["recording_name"]
                     dft = self.dict_ts.get(rec_name)
                     if dft is not None and len(dft) == 2:
                         valid_pp_ids.add(rec_id)
@@ -1501,8 +1514,12 @@ class UIsub(
             if x_max is not None:
                 mask &= xdata <= x_max
             finite = ydata[mask]
-            if finite.size < 2:  # skip markers / degenerate artists
+            if finite.size == 0:
                 continue
+            if finite.size == 1 and "marker" in line.get_label():  # skip physical point markers on axe/axm
+                continue
+            if "PPR" in line.get_label():
+                print(f"DEBUG YLIM PPR: {line.get_label()} size={finite.size} val={finite} mask={mask} x={xdata} y={ydata}")
             all_y.append(finite)
 
         for coll in axis.collections:
@@ -1870,9 +1887,11 @@ class UIsub(
         if hasattr(self, "frameToolType_io"):
             self.frameToolType_io.setVisible(exp_type == "io")
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
-        if exp_type == "io" or old_type == "io":
+        if exp_type in ["io", "PP"] or old_type in ["io", "PP"]:
             self.exorcise()
             self.triggerRefresh()
+            self.zoomAuto()
+            self.graphRefresh()
         else:
             self.update_show()
             self.zoomAuto()
@@ -3364,12 +3383,44 @@ class UIsub(
             print("copy_output: nothing selected.")
             return
         selected_outputs = pd.DataFrame()
+        is_pp = getattr(uistate, "experiment_type", "time") == "PP"
+        
         for rec in uistate.list_idx_select_recs:
             p_row = self.get_df_project().loc[rec]
             output = self.get_dfoutput(p_row).copy()
             output.insert(0, "recording_name", p_row["recording_name"])
             output.insert(1, "gain", p_row["gain"])
-            selected_outputs = pd.concat([selected_outputs, output], ignore_index=True)
+            
+            if is_pp:
+                out_sweeps = output[output["sweep"].notna()]
+                out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
+                out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
+                common_sweeps = out1.index.intersection(out2.index).dropna()
+                
+                if not common_sweeps.empty:
+                    o1 = out1.loc[common_sweeps]
+                    o2 = out2.loc[common_sweeps]
+                    
+                    pp_df = pd.DataFrame()
+                    pp_df["recording_name"] = o1["recording_name"]
+                    pp_df["gain"] = o1["gain"]
+                    pp_df["sweep"] = common_sweeps
+                    
+                    aspects = ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
+                    for aspect in aspects:
+                        if aspect in o1.columns and aspect in o2.columns:
+                            v1 = o1[aspect].values.astype(float)
+                            v2 = o2[aspect].values.astype(float)
+                            with warnings.catch_warnings():
+                                warnings.simplefilter("ignore")
+                                ppr = (v2 / v1) * 100
+                                ppr[~np.isfinite(ppr)] = np.nan
+                            pp_df[f"PPR_{aspect}"] = ppr
+                            
+                    selected_outputs = pd.concat([selected_outputs, pp_df], ignore_index=True)
+            else:
+                selected_outputs = pd.concat([selected_outputs, output], ignore_index=True)
+                
         selected_outputs.to_clipboard(index=False)
 
     def stimDetect(self):
@@ -3926,7 +3977,8 @@ class UIsub(
             dfmean = self.get_dfmean(row=row)
             dft = self.get_dft(row=row)
             print(f"graphUpdate dft: {dft}")
-            dfoutput = self.get_dfdiff(row=row) if uistate.checkBox["paired_stims"] else self.get_dfoutput(row=row)
+            is_pp = getattr(uistate, "experiment_type", "time") == "PP"
+            dfoutput = self.get_dfdiff(row=row) if (uistate.checkBox["paired_stims"] and not is_pp) else self.get_dfoutput(row=row)
             if dfoutput is not None:
                 uiplot.addRow(p_row=row, dft=dft, dfmean=dfmean, dfoutput=self.V2mV(dfoutput))
 
@@ -4250,6 +4302,8 @@ class UIsub(
             axe.figure.canvas.draw()
 
     def outputMouseover(self, event):  # determine which event is being mouseovered
+        if getattr(uistate, "experiment_type", "time") == "PP":
+            return
         is_io = getattr(uistate, "experiment_type", "time") == "io"
         if is_io:
             str_ax = "ax1"
