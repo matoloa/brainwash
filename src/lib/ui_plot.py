@@ -898,11 +898,13 @@ class UIplot:
                             m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
                             c = 0
                         else:
-                            if x_vals.max() - x_vals.min() < 1e-9:
+                            if x_vals.max() - x_vals.min() < 1e-5:
                                 m = 0
                                 c = np.mean(y_vals)
                             else:
-                                m, c = np.polyfit(x_vals, y_vals, 1)
+                                x_mean = np.mean(x_vals)
+                                m, c_cent = np.polyfit(x_vals - x_mean, y_vals, 1)
+                                c = c_cent - m * x_mean
                         x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
                         y_line = m * x_line + c
 
@@ -1327,11 +1329,13 @@ class UIplot:
                             m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
                             c = 0
                         else:
-                            if x_vals.max() - x_vals.min() < 1e-9:
+                            if x_vals.max() - x_vals.min() < 1e-5:
                                 m = 0
                                 c = np.mean(y_vals)
                             else:
-                                m, c = np.polyfit(x_vals, y_vals, 1)
+                                x_mean = np.mean(x_vals)
+                                m, c_cent = np.polyfit(x_vals - x_mean, y_vals, 1)
+                                c = c_cent - m * x_mean
                         x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
                         y_line = m * x_line + c
 
@@ -1574,11 +1578,13 @@ class UIplot:
                             m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
                             c = 0
                         else:
-                            if x_vals.max() - x_vals.min() < 1e-9:
+                            if x_vals.max() - x_vals.min() < 1e-5:
                                 m = 0
                                 c = np.mean(y_vals)
                             else:
-                                m, c = np.polyfit(x_vals, y_vals, 1)
+                                x_mean = np.mean(x_vals)
+                                m, c_cent = np.polyfit(x_vals - x_mean, y_vals, 1)
+                                c = c_cent - m * x_mean
                         x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
                         y_line = m * x_line + c
                         linedict["line"].set_data(x_line, y_line)
