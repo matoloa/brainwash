@@ -1135,7 +1135,9 @@ class UIplot:
                     x_position + t_row["t_volley_amp_halfwidth"],
                 )
                 volley_amp_mean = t_row.get("volley_amp_mean")
-                if volley_amp_mean is None or pd.isna(volley_amp_mean):
+                if volley_amp_mean is not None and not pd.isna(volley_amp_mean):
+                    volley_amp_mean *= 1000.0  # Convert SI backend value to mV for display
+                else:
                     if not out_stim_row.empty:
                         volley_amp_mean = out_stim_row["volley_amp"].values[0]
                     else:

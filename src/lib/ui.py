@@ -486,7 +486,7 @@ class graphPreloadThread(QtCore.QThread):
                     print("graphPreloadThread.run: dfoutput is None, skipping this recording")
                     continue
                 print(f"graphPreloadThread, {p_row['recording_name']} calls uiplot.addRow() dfoutput columns: {dfoutput.columns}")
-                self.uiplot.addRow(p_row=p_row.to_dict(), dft=dft, dfmean=dfmean, dfoutput=dfoutput)
+                self.uiplot.addRow(p_row=p_row.to_dict(), dft=dft, dfmean=dfmean, dfoutput=self.uisub.SI2m(dfoutput))
                 self.progress.emit(i)
                 self.i += 1
                 print(f"Preloaded {p_row['recording_name']}")
@@ -5172,7 +5172,7 @@ class UIsub(
             )
 
             if not out_agg.empty:
-                amp = out_agg[column_name].values[0] / 1000
+                amp = out_agg[column_name].values[0] / 1000.0
             else:
                 t_amp_val = trow[t_aspect]
                 half = trow.get(f"{t_aspect}_halfwidth", 0)

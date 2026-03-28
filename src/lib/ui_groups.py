@@ -127,7 +127,7 @@ class GroupMixin:
             dict_group["rec_IDs"].append(rec_ID)
             self.group_cache_purge([group_ID])
             df_groupmean = self.get_dfgroupmean(group_ID)
-            uiplot.addGroup(group_ID, dict_group, df_groupmean)
+            uiplot.addGroup(group_ID, dict_group, self.V2mV(df_groupmean))
 
     def group_rec_ungroup(self, rec_ID, group_ID):
         if rec_ID in self.dd_groups[group_ID]["rec_IDs"]:
@@ -136,7 +136,7 @@ class GroupMixin:
             self.group_cache_purge([group_ID])
             df_groupmean = self.get_dfgroupmean(group_ID)
             if self.dd_groups[group_ID]["rec_IDs"]:
-                uiplot.addGroup(group_ID, dict_group, df_groupmean)
+                uiplot.addGroup(group_ID, dict_group, self.V2mV(df_groupmean))
 
     def group_selection(self, group_ID):
         dfp = self.get_df_project()
@@ -181,7 +181,7 @@ class GroupMixin:
                     print("...but NOT when attempting to unlink.")
             uiplot.unPlotGroup(group_ID)
             if group_ID in self.dd_groups and self.dd_groups[group_ID]["rec_IDs"]:
-                uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.get_dfgroupmean(group_ID))
+                uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.V2mV(self.get_dfgroupmean(group_ID)))
 
     # ------------------------------------------------------------------
     # Qt widget controls
