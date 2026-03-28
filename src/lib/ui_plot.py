@@ -415,28 +415,24 @@ class UIplot:
 
         if getattr(uistate, "experiment_type", "time") == "io":
             io_out = getattr(uistate, "io_output", "EPSPamp")
+            ax2.set_ylabel("")
             if "slope" in io_out.lower():
-                ax1.set_ylabel("")
-                ax2.set_ylabel("EPSP Slope %" if uistate.checkBox["norm_EPSP"] else "EPSP Slope (mV/ms)")
-                if uistate.checkBox["norm_EPSP"]:
-                    ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
-                else:
-                    ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:g}"))
+                ax1.set_ylabel("EPSP Slope %" if uistate.checkBox["norm_EPSP"] else "EPSP Slope (mV/ms)")
+                ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             else:
                 ax1.set_ylabel("EPSP Amplitude %" if uistate.checkBox["norm_EPSP"] else "EPSP Amplitude (mV)")
-                ax2.set_ylabel("")
                 if uistate.checkBox["norm_EPSP"]:
                     ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
                 else:
                     ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:g}"))
 
             io_input = getattr(uistate, "io_input", "vamp")
-            if io_input in ["vamp", "vslope"]:
+            if io_input == "vamp":
                 ax1.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:g}"))
-                ax2.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:g}"))
             else:
                 ax1.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
-                ax2.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+            ax2.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+            ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
         else:
             if uistate.checkBox["norm_EPSP"]:
                 ax1.set_ylabel("Amplitude %")
@@ -447,7 +443,7 @@ class UIplot:
                 ax1.set_ylabel("Amplitude (mV)")
                 ax2.set_ylabel("Slope (mV/ms)")
                 ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:g}"))
-                ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:g}"))
+                ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax1.xaxis.set_major_formatter(uistate.x_axis_formatter())
             ax2.xaxis.set_major_formatter(uistate.x_axis_formatter())
 
@@ -873,7 +869,7 @@ class UIplot:
             x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
             y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
 
-            axid = "ax2" if y_col_base == "EPSP_slope" else "ax1"
+            axid = "ax1"
             color = self.uistate.settings.get(f"rgb_{y_col_base}", "black")
 
             df_sweeps = dfoutput[dfoutput["sweep"].notna()]
@@ -906,17 +902,20 @@ class UIplot:
                         x_vals = df_clean[x_col].values
                         y_vals = df_clean[y_col].values
 
+                        # Scale to avoid polyfit instability on tiny SI values
+                        xs = x_vals * 1000
+                        ys = y_vals * 1000
                         if self.uistate.checkBox.get("io_force0", False):
-                            x_sq_sum = np.sum(x_vals**2)
-                            m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
+                            x_sq_sum = np.sum(xs**2)
+                            m = np.sum(xs * ys) / x_sq_sum if x_sq_sum != 0 else 0
                             c = 0
                         else:
-                            if x_vals.max() - x_vals.min() < 1e-9:
+                            if xs.max() - xs.min() < 1e-6:
                                 m = 0
-                                c = np.mean(y_vals)
+                                c_scaled = np.mean(ys)
                             else:
-                                m, c = np.polyfit(x_vals, y_vals, 1)
-
+                                m, c_scaled = np.polyfit(xs, ys, 1)
+                            c = c_scaled / 1000
                         x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
                         y_line = m * x_line + c
 
@@ -1292,7 +1291,7 @@ class UIplot:
             io_output = getattr(self.uistate, "io_output", "EPSPamp")
 
             y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
-            axid = "ax2" if y_col_base == "EPSP_slope" else "ax1"
+            axid = "ax1"
             color = dict_group["color"]
             group_name = dict_group["group_name"]
 
@@ -1336,17 +1335,19 @@ class UIplot:
                     }
 
                     if len(x_vals) > 1:
+                        xs = x_vals * 1000
+                        ys = y_vals * 1000
                         if self.uistate.checkBox.get("io_force0", False):
-                            x_sq_sum = np.sum(x_vals**2)
-                            m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
+                            x_sq_sum = np.sum(xs**2)
+                            m = np.sum(xs * ys) / x_sq_sum if x_sq_sum != 0 else 0
                             c = 0
                         else:
-                            if x_vals.max() - x_vals.min() < 1e-9:
+                            if xs.max() - xs.min() < 1e-6:
                                 m = 0
-                                c = np.mean(y_vals)
+                                c_scaled = np.mean(ys)
                             else:
-                                m, c = np.polyfit(x_vals, y_vals, 1)
-
+                                m, c_scaled = np.polyfit(xs, ys, 1)
+                            c = c_scaled / 1000
                         x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
                         y_line = m * x_line + c
 
@@ -1583,17 +1584,20 @@ class UIplot:
                     if len(df_clean) > 1:
                         x_vals = df_clean[x_col].values
                         y_vals = df_clean[y_col].values
+
+                        xs = x_vals * 1000
+                        ys = y_vals * 1000
                         if self.uistate.checkBox.get("io_force0", False):
-                            x_sq_sum = np.sum(x_vals**2)
-                            m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
+                            x_sq_sum = np.sum(xs**2)
+                            m = np.sum(xs * ys) / x_sq_sum if x_sq_sum != 0 else 0
                             c = 0
                         else:
-                            if x_vals.max() - x_vals.min() < 1e-9:
+                            if xs.max() - xs.min() < 1e-6:
                                 m = 0
-                                c = np.mean(y_vals)
+                                c_scaled = np.mean(ys)
                             else:
-                                m, c = np.polyfit(x_vals, y_vals, 1)
-
+                                m, c_scaled = np.polyfit(xs, ys, 1)
+                            c = c_scaled / 1000
                         x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
                         y_line = m * x_line + c
                         linedict["line"].set_data(x_line, y_line)
