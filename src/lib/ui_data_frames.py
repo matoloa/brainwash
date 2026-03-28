@@ -47,8 +47,8 @@ class DataFrameMixin:
             return df
 
         df_disp = df.copy()
-        for col in df_disp.columns:
-            if "amp" in col and "norm" not in col and not col.startswith("t_"):
+        for col in ["EPSP_amp", "volley_amp"]:
+            if col in df_disp.columns:
                 df_disp[col] = df_disp[col] * 1000.0
 
         return df_disp

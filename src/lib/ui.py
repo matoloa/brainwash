@@ -483,10 +483,10 @@ class graphPreloadThread(QtCore.QThread):
                     dfoutput = self.uisub.get_dfoutput(row=p_row)
                 print(f"graphPreloadThread.run: get_dfoutput returned {type(dfoutput)}")
                 if dfoutput is None:
-                    print("graphPreloadThread.run: dfoutput is None, skipping this recording")
+                    print(f"graphPreloadThread.run: dfoutput is None, skipping this recording")
                     continue
                 print(f"graphPreloadThread, {p_row['recording_name']} calls uiplot.addRow() dfoutput columns: {dfoutput.columns}")
-                self.uiplot.addRow(p_row=p_row.to_dict(), dft=dft, dfmean=dfmean, dfoutput=self.uisub.SI2m(dfoutput))
+                self.uiplot.addRow(p_row=p_row.to_dict(), dft=dft, dfmean=dfmean, dfoutput=self.uisub.V2mV(dfoutput))
                 self.progress.emit(i)
                 self.i += 1
                 print(f"Preloaded {p_row['recording_name']}")
@@ -1089,8 +1089,10 @@ class UIsub(
             if not uistate.checkBox.get("io_trendline", False):
                 return False
         aspect = v.get("aspect")
-        if aspect and not uistate.checkBox.get(aspect, True) and not is_io:
-            return False
+        axis = v.get("axis")
+        if aspect and not uistate.checkBox.get(aspect, True):
+            if axis == "axe" or not is_io:
+                return False
         variant = v.get("variant")
         norm_active = uistate.checkBox["norm_EPSP"]
         if variant == "norm" and not norm_active:
