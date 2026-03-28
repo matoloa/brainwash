@@ -1054,14 +1054,15 @@ class UIsub(
             if not uistate.checkBox.get("io_trendline", False):
                 return False
         aspect = v.get("aspect")
-        if aspect and not uistate.checkBox.get(aspect, True) and not is_io:
-            return False
+        axis = v.get("axis")
+        if aspect and not uistate.checkBox.get(aspect, True):
+            if axis == "axe" or not is_io:
+                return False
         # norm/raw switch: only EPSP amp/slope have a norm variant.
         # Only applies to ax1/ax2 output lines — markers on axe represent physical
         # measurement positions and are always shown regardless of normalisation.
         variant = v.get("variant")
         norm_active = uistate.checkBox["norm_EPSP"]
-        axis = v.get("axis")
         if axis in ("ax1", "ax2"):
             if variant == "norm" and not norm_active:
                 return False
@@ -5172,7 +5173,7 @@ class UIsub(
             )
 
             if not out_agg.empty:
-                amp = out_agg[column_name].values[0] / 1000.0
+                amp = out_agg[column_name].values[0]
             else:
                 t_amp_val = trow[t_aspect]
                 half = trow.get(f"{t_aspect}_halfwidth", 0)

@@ -1022,11 +1022,11 @@ class UIplot:
                         amp_val = df_event.loc[(df_event["time"] - x_position).abs().idxmin(), rec_filter] if not df_event.empty else amp_zero_plot
                     else:
                         amp_val = df_event.loc[(df_event["time"] >= x_position - half) & (df_event["time"] <= x_position + half), rec_filter].mean()
-                    epsp_amp_val = -(amp_val - amp_zero_plot) * 1000.0
+                    epsp_amp_val = -(amp_val - amp_zero_plot)
 
                 amp_y = (
                     amp_zero_plot,
-                    amp_zero_plot - (epsp_amp_val / 1000.0),
+                    amp_zero_plot - epsp_amp_val,
                 )
                 self.plot_amp_width(
                     f"{label} {stim_str} EPSP amp",
@@ -1136,7 +1136,7 @@ class UIplot:
                 )
                 volley_amp_mean = t_row.get("volley_amp_mean")
                 if volley_amp_mean is not None and not pd.isna(volley_amp_mean):
-                    volley_amp_mean *= 1000.0  # Convert SI backend value to mV for display
+                    pass  # Values natively map back to SI inside the plotting bounds
                 else:
                     if not out_stim_row.empty:
                         volley_amp_mean = out_stim_row["volley_amp"].values[0]
@@ -1150,9 +1150,9 @@ class UIplot:
                             amp_val = df_event.loc[
                                 (df_event["time"] >= x_position - half) & (df_event["time"] <= x_position + half), rec_filter
                             ].mean()
-                        volley_amp_mean = -(amp_val - amp_zero_plot) * 1000.0
+                        volley_amp_mean = -(amp_val - amp_zero_plot)
 
-                amp_y = amp_zero_plot, amp_zero_plot - (volley_amp_mean / 1000.0)
+                amp_y = amp_zero_plot, amp_zero_plot - volley_amp_mean
                 self.plot_amp_width(
                     f"{label} {stim_str} volley amp",
                     "axe",
