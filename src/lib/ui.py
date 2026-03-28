@@ -1062,7 +1062,7 @@ class UIsub(
         variant = v.get("variant")
         norm_active = uistate.checkBox["norm_EPSP"]
         axis = v.get("axis")
-        if axis in ("ax1", "ax2") and not is_io:
+        if axis in ("ax1", "ax2"):
             if variant == "norm" and not norm_active:
                 return False
             if variant == "raw" and norm_active and aspect in ("EPSP_amp", "EPSP_slope"):
@@ -2523,7 +2523,7 @@ class UIsub(
 
             uiplot.unPlot(rec_ID)
             dfmean = self.get_dfmean(p_row)
-            uiplot.addRow(p_row, df_t, dfmean, dfoutput)
+            uiplot.addRow(p_row, df_t, dfmean, self.SI2m(dfoutput))
 
         self.set_df_project(df_p)
 
@@ -2589,11 +2589,12 @@ class UIsub(
             self.set_dft(rec_name, df_t)
             df_p.loc[p_row["ID"] == df_p["ID"], "stims"] = len(df_t)
             self.persistOutput(rec_name, dfoutput, p_row=p_row)
+            dfoutput = self.get_dfoutput(p_row)
 
             # Unplot and replot to update visuals
             uiplot.unPlot(rec_ID)
             dfmean = self.get_dfmean(p_row)
-            uiplot.addRow(p_row, df_t, dfmean, dfoutput)
+            uiplot.addRow(p_row, df_t, dfmean, self.SI2m(dfoutput))
 
         self.set_df_project(df_p)
 
@@ -3397,7 +3398,7 @@ class UIsub(
             uiplot.unPlot(rec_ID)
             dfoutput = self.get_dfoutput(p_row)
             self.persistOutput(p_row["recording_name"], dfoutput, p_row=p_row)
-            uiplot.addRow(p_row, new_df_t, dfmean, dfoutput)
+            uiplot.addRow(p_row, new_df_t, dfmean, self.SI2m(dfoutput))
         uistate.list_idx_select_stims = [0]
         p_row = df_p.loc[uistate.list_idx_select_recs[0]]
         df_t = self.get_dft(p_row)
@@ -3889,7 +3890,7 @@ class UIsub(
                 dict_group = self.dd_groups[group_ID]
                 group_mean_data = self.get_dfgroupmean(group_ID)
                 # print(f"graphGroups: Adding group {group_ID} to plot: {group_mean_data}")
-                uiplot.addGroup(group_ID, dict_group, group_mean_data)
+                uiplot.addGroup(group_ID, dict_group, self.SI2m(group_mean_data))
 
     def graphUpdate(self, df=None, row=None):
         def processRow(row):
@@ -3898,7 +3899,7 @@ class UIsub(
             print(f"graphUpdate dft: {dft}")
             dfoutput = self.get_dfdiff(row=row) if uistate.checkBox["paired_stims"] else self.get_dfoutput(row=row)
             if dfoutput is not None:
-                uiplot.addRow(p_row=row, dft=dft, dfmean=dfmean, dfoutput=dfoutput)
+                uiplot.addRow(p_row=row, dft=dft, dfmean=dfmean, dfoutput=self.SI2m(dfoutput))
 
         def processDataFrame(df):
             list_to_plot = [rec_id for rec_id in df["ID"].tolist() if rec_id not in uistate.get_recSet()]
@@ -4271,6 +4272,7 @@ class UIsub(
 
         if is_io:
             dfoutput = self.get_dfdiff(row=p_row) if uistate.checkBox["paired_stims"] else self.get_dfoutput(row=p_row)
+            dfoutput = self.SI2m(dfoutput)
             df_sweeps = dfoutput[dfoutput["sweep"].notna()].reset_index(drop=True)
             io_input = getattr(uistate, "io_input", "vamp")
             io_output = getattr(uistate, "io_output", "EPSPamp")
@@ -4864,6 +4866,7 @@ class UIsub(
                 quick=True,
                 filter=rec_filter,
             )
+            out = self.SI2m(out)
             if is_io:
                 io_input = getattr(uistate, "io_input", "vamp")
                 io_output = getattr(uistate, "io_output", "EPSPamp")
@@ -5108,7 +5111,7 @@ class UIsub(
                     dfoutput = pd.concat([dfoutput, pd.DataFrame([stim_row])], ignore_index=True)
 
         self.persistOutput(rec_name=rec_name, dfoutput=dfoutput, p_row=prow)
-        uiplot.updateStimLines(rec_name=rec_name, dfoutput=dfoutput)
+        uiplot.updateStimLines(rec_name=rec_name, dfoutput=self.SI2m(dfoutput))
 
         self.set_dft(rec_name, dft_temp)
         new_dft = self.get_dft(prow)
@@ -5136,7 +5139,7 @@ class UIsub(
             aspect=aspect,
             data_x=data_x,
             data_y=data_y,
-            dfoutput=dfoutput,
+            dfoutput=self.SI2m(dfoutput),
             amp_zero_plot=amp_zero_plot,
         )
 
@@ -5195,7 +5198,7 @@ class UIsub(
         self.group_cache_purge(affected_groups)
         for group_ID in affected_groups:
             df_groupmean = self.get_dfgroupmean(group_ID)
-            uiplot.addGroup(group_ID, self.dd_groups[group_ID], df_groupmean)
+            uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.SI2m(df_groupmean))
         self.mouseoverUpdate()
         self.update_amp_lineEdits()
         self.update_slope_lineEdits()

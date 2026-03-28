@@ -37,6 +37,22 @@ class DataFrameMixin:
     # Stub / trivial helpers
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def SI2m(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Converts SI units to display units for amplitude and slope columns.
+        Returns a new DataFrame to avoid mutating the strictly SI cached data.
+        """
+        if df is None or df.empty:
+            return df
+
+        df_disp = df.copy()
+        for col in df_disp.columns:
+            if "amp" in col and "norm" not in col and not col.startswith("t_"):
+                df_disp[col] = df_disp[col] * 1000.0
+
+        return df_disp
+
     # ------------------------------------------------------------------
     # Recalculate all outputs
     # ------------------------------------------------------------------
@@ -101,7 +117,7 @@ class DataFrameMixin:
                 print(dfbin)
             dfoutput = self.get_dfoutput(p_row, reset=True)
             self.persistOutput(rec, dfoutput, p_row=p_row)
-            uiplot.addRow(p_row, df_t, self.get_dfmean(p_row), dfoutput)
+            uiplot.addRow(p_row, df_t, self.get_dfmean(p_row), self.SI2m(dfoutput))
         self.tableFormat()
 
         # group handling
@@ -356,7 +372,7 @@ class DataFrameMixin:
         # returns an internal df_bin for the selected recording_name. If it does not exist, read it from file first.
         rec = p_row["recording_name"]
         if pd.isna(p_row["bin_size"]):
-            raise ValueError(f"get_dfbin called for '{rec}' but bin_size is NaN — " "callers must not reach get_dfbin when binning is off.")
+            raise ValueError(f"get_dfbin called for '{rec}' but bin_size is NaN — callers must not reach get_dfbin when binning is off.")
         persist = False
 
         if rec in self.dict_bins:

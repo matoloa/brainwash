@@ -118,7 +118,7 @@ class ExportMixin:
         count = 0
         for i, p_row in enumerate(rows):
             rec_name = p_row["recording_name"]
-            df_out = self.get_dfoutput(p_row)
+            df_out = self.SI2m(self.get_dfoutput(p_row))
             if df_out is not None and not df_out.empty:
                 out_path = export_dir / f"{rec_name}_output.csv"
                 cols_to_export = [
@@ -136,12 +136,6 @@ class ExportMixin:
                     if c in df_out.columns
                 ]
                 df_export = df_out[cols_to_export].copy() if cols_to_export else df_out.copy()
-
-                # Convert amplitudes and slopes to display units for export
-                for col in ["EPSP_amp", "volley_amp", "EPSP_slope", "volley_slope"]:
-                    if col in df_export.columns:
-                        df_export[col] = df_export[col] * 1000
-
                 df_export.to_csv(out_path, index=False)
                 count += 1
 
