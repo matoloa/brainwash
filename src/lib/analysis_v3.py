@@ -646,11 +646,11 @@ def measure_waveform(df_snippet, dict_t: dict, filter: str = "voltage") -> dict:
     if valid(t_EPSP_amp):
         if t_EPSP_w == 0:
             row = df_snippet[df_snippet["time"] == t_EPSP_amp]
-            val = (row[filter].iloc[0] - amp_zero) * -1000 if not row.empty else np.nan
+            val = -(row[filter].iloc[0] - amp_zero) if not row.empty else np.nan
         else:
             mask = (df_snippet["time"] >= t_EPSP_amp - t_EPSP_w / 2) & (df_snippet["time"] <= t_EPSP_amp + t_EPSP_w / 2)
             mean_v = df_snippet.loc[mask, filter].mean()
-            val = (mean_v - amp_zero) * -1000 if not np.isnan(mean_v) else np.nan
+            val = -(mean_v - amp_zero) if not np.isnan(mean_v) else np.nan
         result["EPSP_amp"] = val
     else:
         result["EPSP_amp"] = np.nan
@@ -670,11 +670,11 @@ def measure_waveform(df_snippet, dict_t: dict, filter: str = "voltage") -> dict:
     if valid(t_volley_amp):
         if t_volley_w == 0:
             row = df_snippet[df_snippet["time"] == t_volley_amp]
-            val = (row[filter].iloc[0] - amp_zero) * -1000 if not row.empty else np.nan
+            val = -(row[filter].iloc[0] - amp_zero) if not row.empty else np.nan
         else:
             mask = (df_snippet["time"] >= t_volley_amp - t_volley_w / 2) & (df_snippet["time"] <= t_volley_amp + t_volley_w / 2)
             mean_v = df_snippet.loc[mask, filter].mean()
-            val = (mean_v - amp_zero) * -1000 if not np.isnan(mean_v) else np.nan
+            val = -(mean_v - amp_zero) if not np.isnan(mean_v) else np.nan
         result["volley_amp"] = val
     else:
         result["volley_amp"] = np.nan
@@ -724,7 +724,7 @@ def _measure_amp_at_time_per_sweep(
 ) -> pd.Series:
     """
     For each sweep, find the single sample nearest to t_target and return
-    (voltage - amp_zero) * -1000 (mV, positive = depolarisation).
+    -(voltage - amp_zero) (V, positive = depolarisation).
 
     Uses nearest-sample lookup instead of exact equality so that sources
     with floating-point time accumulation (ATF, IBW) never produce an
@@ -736,7 +736,7 @@ def _measure_amp_at_time_per_sweep(
     idx = idx.loc[sweeps]
     v = dffilter.loc[idx, filter].values
     az = amp_zero_per_sweep.loc[sweeps].values
-    values = (v - az) * -1000
+    values = -(v - az)
     return pd.Series(values, index=range(len(sweeps)))
 
 
@@ -786,7 +786,7 @@ def build_dfoutput(
         Stim-mode rows have sweep=NaN.
     """
     t0 = time.time()
-    print(f"build_dfoutput: entered, dffilter.shape={dffilter.shape}, " f"nsweeps={dffilter['sweep'].nunique()}, nstims={len(dft)}")
+    print(f"build_dfoutput: entered, dffilter.shape={dffilter.shape}, nsweeps={dffilter['sweep'].nunique()}, nstims={len(dft)}")
 
     all_rows = []
 
@@ -818,14 +818,13 @@ def build_dfoutput(
                 half = float(t_EPSP_w) / 2
                 amp_by_sweep = dffilter.groupby("sweep").apply(
                     lambda s: (
-                        (
+                        -(
                             s.loc[
                                 (s["time"] >= t_EPSP_amp_f - half) & (s["time"] <= t_EPSP_amp_f + half),
                                 filter,
                             ].mean()
                             - amp_zero_per_sweep.get(s.name, 0.0)
                         )
-                        * -1000
                     )
                 )
                 dfblock["EPSP_amp"] = pd.Series(amp_by_sweep.values, index=dfblock.index)
@@ -856,14 +855,13 @@ def build_dfoutput(
                 half = float(t_volley_w) / 2
                 volley_by_sweep = dffilter.groupby("sweep").apply(
                     lambda s: (
-                        (
+                        -(
                             s.loc[
                                 (s["time"] >= t_volley_amp_f - half) & (s["time"] <= t_volley_amp_f + half),
                                 filter,
                             ].mean()
                             - amp_zero_per_sweep.get(s.name, 0.0)
                         )
-                        * -1000
                     )
                 )
                 dfblock["volley_amp"] = pd.Series(volley_by_sweep.values, index=dfblock.index)
@@ -880,7 +878,7 @@ def build_dfoutput(
             dfblock["volley_slope"] = np.nan
 
         all_rows.append(dfblock)
-        print(f"build_dfoutput: stim {stim_nr} sweep-mode done " f"({round((time.time() - t0) * 1000)}ms)")
+        print(f"build_dfoutput: stim {stim_nr} sweep-mode done ({round((time.time() - t0) * 1000)}ms)")
 
     # ------------------------------------------------------------------
     # Stim-mode rows: measure dfmean sliced around each stim window
@@ -908,7 +906,7 @@ def build_dfoutput(
             stim_rows.append(stim_row)
 
         all_rows.append(pd.DataFrame(stim_rows))
-        print(f"build_dfoutput: stim-mode rows done " f"({round((time.time() - t0) * 1000)}ms)")
+        print(f"build_dfoutput: stim-mode rows done ({round((time.time() - t0) * 1000)}ms)")
 
     # ------------------------------------------------------------------
     # Assemble and enforce column order
@@ -929,7 +927,7 @@ def build_dfoutput(
             dfoutput[col] = np.nan
     dfoutput = dfoutput[col_order]  # type: ignore[assignment]
 
-    print(f"build_dfoutput: done {round((time.time() - t0) * 1000)}ms, " f"shape={dfoutput.shape}")
+    print(f"build_dfoutput: done {round((time.time() - t0) * 1000)}ms, shape={dfoutput.shape}")
     return dfoutput
 
 

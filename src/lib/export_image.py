@@ -179,11 +179,18 @@ def render_publication_figure(
                     offsets = line.get_offsets()
                     if len(offsets) == 0:
                         continue
-                    xdata = offsets[:, 0]
-                    ydata = offsets[:, 1]
+                    xdata = offsets[:, 0].copy()
+                    ydata = offsets[:, 1].copy()
                 else:
-                    xdata = line.get_xdata()
-                    ydata = line.get_ydata()
+                    xdata = line.get_xdata().copy()
+                    ydata = line.get_ydata().copy()
+
+                if axis_src in ["ax1", "ax2"] and not uistate.checkBox.get("norm_EPSP"):
+                    ydata = ydata * 1000
+
+                if getattr(uistate, "experiment_type", "time") == "io":
+                    if getattr(uistate, "io_input", "vamp") in ["vamp", "vslope"]:
+                        xdata = xdata * 1000
 
                 if hasattr(line, "get_color"):
                     color = line.get_color()
@@ -203,7 +210,10 @@ def render_publication_figure(
                     for xi in xdata:
                         y_vals = [v[1] for v in verts if abs(v[0] - xi) < 1e-5]
                         if y_vals:
-                            yerr.append((max(y_vals) - min(y_vals)) / 2)
+                            err_val = (max(y_vals) - min(y_vals)) / 2
+                            if axis_src in ["ax1", "ax2"] and not uistate.checkBox.get("norm_EPSP"):
+                                err_val *= 1000
+                            yerr.append(err_val)
                         else:
                             yerr.append(0)
 

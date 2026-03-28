@@ -135,7 +135,13 @@ class ExportMixin:
                     ]
                     if c in df_out.columns
                 ]
-                df_export = df_out[cols_to_export] if cols_to_export else df_out
+                df_export = df_out[cols_to_export].copy() if cols_to_export else df_out.copy()
+
+                # Convert amplitudes and slopes to display units for export
+                for col in ["EPSP_amp", "volley_amp", "EPSP_slope", "volley_slope"]:
+                    if col in df_export.columns:
+                        df_export[col] = df_export[col] * 1000
+
                 df_export.to_csv(out_path, index=False)
                 count += 1
 

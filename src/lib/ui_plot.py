@@ -418,22 +418,46 @@ class UIplot:
             if "slope" in io_out.lower():
                 ax1.set_ylabel("")
                 ax2.set_ylabel("EPSP Slope %" if uistate.checkBox["norm_EPSP"] else "EPSP Slope (mV/ms)")
+                if uistate.checkBox["norm_EPSP"]:
+                    ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+                else:
+                    ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:g}"))
             else:
                 ax1.set_ylabel("EPSP Amplitude %" if uistate.checkBox["norm_EPSP"] else "EPSP Amplitude (mV)")
                 ax2.set_ylabel("")
+                if uistate.checkBox["norm_EPSP"]:
+                    ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+                else:
+                    ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:g}"))
+
+            io_input = getattr(uistate, "io_input", "vamp")
+            if io_input in ["vamp", "vslope"]:
+                ax1.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:g}"))
+                ax2.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:g}"))
+            else:
+                ax1.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+                ax2.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
         else:
             if uistate.checkBox["norm_EPSP"]:
                 ax1.set_ylabel("Amplitude %")
                 ax2.set_ylabel("Slope %")
+                ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+                ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             else:
                 ax1.set_ylabel("Amplitude (mV)")
                 ax2.set_ylabel("Slope (mV/ms)")
+                ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:g}"))
+                ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:g}"))
+            ax1.xaxis.set_major_formatter(uistate.x_axis_formatter())
+            ax2.xaxis.set_major_formatter(uistate.x_axis_formatter())
+
         ax1.set_ylim(uistate.zoom["output_ax1_ylim"])
         ax2.set_ylim(uistate.zoom["output_ax2_ylim"])
         ax1.set_xlim(uistate.zoom["output_xlim"])
+        ax2.set_xlim(uistate.zoom["output_xlim"])
         ax1.set_xlabel(uistate.x_axis_xlabel())
         ax1.xaxis.set_major_locator(uistate.x_axis_locator())
-        ax1.xaxis.set_major_formatter(uistate.x_axis_formatter())
+        ax2.xaxis.set_major_locator(uistate.x_axis_locator())
         print(f"output_xlim: {uistate.zoom['output_xlim']}")
         ax1.figure.subplots_adjust(bottom=0.2)
         self.oneAxisLeft()
@@ -1010,12 +1034,12 @@ class UIplot:
                         amp_val = df_event.loc[(df_event["time"] - x_position).abs().idxmin(), rec_filter] if not df_event.empty else amp_zero_plot
                     else:
                         amp_val = df_event.loc[(df_event["time"] >= x_position - half) & (df_event["time"] <= x_position + half), rec_filter].mean()
-                    epsp_amp_val = -(amp_val - amp_zero_plot) * 1000
+                    epsp_amp_val = -(amp_val - amp_zero_plot)
 
                 amp_y = (
                     amp_zero_plot,
-                    amp_zero_plot - (epsp_amp_val / 1000),
-                )  # mV to V
+                    amp_zero_plot - epsp_amp_val,
+                )
                 self.plot_amp_width(
                     f"{label} {stim_str} EPSP amp",
                     "axe",
@@ -1136,9 +1160,9 @@ class UIplot:
                             amp_val = df_event.loc[
                                 (df_event["time"] >= x_position - half) & (df_event["time"] <= x_position + half), rec_filter
                             ].mean()
-                        volley_amp_mean = -(amp_val - amp_zero_plot) * 1000
+                        volley_amp_mean = -(amp_val - amp_zero_plot)
 
-                amp_y = amp_zero_plot, amp_zero_plot - volley_amp_mean / 1000  # mV to V
+                amp_y = amp_zero_plot, amp_zero_plot - volley_amp_mean
                 self.plot_amp_width(
                     f"{label} {stim_str} volley amp",
                     "axe",
