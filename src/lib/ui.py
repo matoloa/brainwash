@@ -1031,7 +1031,7 @@ class UIsub(
         self.update_stim_buttons()
         self.mouseoverUpdate()
 
-    def _is_rec_visible(self, v: dict, selected_ids: set, selected_stims: set) -> bool:
+    def _is_rec_visible(self, v: dict, selected_ids: set, selected_stims: set, valid_pp_ids: set | None = None) -> bool:
         """Predicate: should this rec-label entry be visible given current UI state."""
         if v.get("is_zero_width"):
             return False
@@ -1039,6 +1039,13 @@ class UIsub(
             return False
         if v["stim"] is not None and v["stim"] not in selected_stims:
             return False
+        
+        # Phase 0 PP mode display guard
+        axis = v.get("axis")
+        is_pp = getattr(uistate, "experiment_type", "time") == "PP"
+        if is_pp and axis in ("ax1", "ax2"):
+            if valid_pp_ids is not None and v["rec_ID"] not in valid_pp_ids:
+                return False
         # x_mode filtering: lines tagged with a specific x_mode are only visible
         # when that mode is active.  Lines with x_mode=None (mean, event, axe
         # markers) are always eligible.
@@ -1137,10 +1144,21 @@ class UIsub(
         selected_stims = {stim + 1 for stim in uistate.list_idx_select_stims}  # stim_select is 0-based (indices) - convert to stims
         print(f"update_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}")
 
+        is_pp = getattr(uistate, "experiment_type", "time") == "PP"
+        valid_pp_ids = set()
+        if is_pp:
+            df_p = self.get_df_project()
+            for rec_id in selected_ids:
+                if rec_id in df_p.index:
+                    rec_name = df_p.loc[rec_id, "recording_name"]
+                    dft = self.dict_ts.get(rec_name)
+                    if dft is not None and len(dft) == 2:
+                        valid_pp_ids.add(rec_id)
+
         # rec lines
         new_rec_show = {}
         for k, v in uistate.dict_rec_labels.items():
-            visible = self._is_rec_visible(v, selected_ids, selected_stims)
+            visible = self._is_rec_visible(v, selected_ids, selected_stims, valid_pp_ids)
             v["line"].set_visible(visible)
             if visible:
                 new_rec_show[k] = v
@@ -1800,7 +1818,7 @@ class UIsub(
         "radioButton_type_time": "time",
         "radioButton_type_train": "train",
         "radioButton_type_io": "io",
-        "radioButton_type_PP": "PP",
+        "radioButton_type_pp": "PP",
         "radioButton_type_sweep": "sweep",
         "radioButton_type_timestamp": "timestamp",
     }
@@ -1867,16 +1885,24 @@ class UIsub(
 
         has_stims = False
         has_sweep_hz = False
+        has_exactly_two_stims = True
         if uistate.list_idx_select_recs:
             df_p = self.get_df_project()
             for idx in uistate.list_idx_select_recs:
                 row = df_p.loc[idx]
                 rec = row["recording_name"]
                 dft = self.dict_ts.get(rec)
-                if dft is not None and len(dft) >= 1:
-                    has_stims = True
+                if dft is not None:
+                    if len(dft) >= 1:
+                        has_stims = True
+                    if len(dft) != 2:
+                        has_exactly_two_stims = False
+                else:
+                    has_exactly_two_stims = False
                 if pd.notna(row.get("sweep_hz")):
                     has_sweep_hz = True
+        else:
+            has_exactly_two_stims = False
 
         if hasattr(self, "radioButton_type_sweep"):
             self.radioButton_type_sweep.setEnabled(True)
@@ -1888,8 +1914,8 @@ class UIsub(
             self.radioButton_type_timestamp.setEnabled(False)  # future
         if hasattr(self, "radioButton_type_io"):
             self.radioButton_type_io.setEnabled(True)
-        if hasattr(self, "radioButton_type_PP"):
-            self.radioButton_type_PP.setEnabled(True)
+        if hasattr(self, "radioButton_type_pp"):
+            self.radioButton_type_pp.setEnabled(has_exactly_two_stims)
 
         if hasattr(self, "radioButton_io_stim"):
             self.radioButton_io_stim.setEnabled(False)
