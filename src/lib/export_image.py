@@ -206,41 +206,39 @@ def render_publication_figure(
                     ax.set_ylabel(f"PPR ({aspect_str})")
                     has_data = True
                     
+                    # Calculate offset to center elements back on their base integer group tick
+                    shift = 0
+                    bar_label = f"{label.split(' PPR')[0]} PPR {info.get('aspect')} bar"
+                    bar_info = uistate.dict_group_labels.get(bar_label)
+                    if bar_info and hasattr(bar_info.get('line'), 'patches') and len(bar_info['line'].patches) > 0:
+                        p = bar_info['line'].patches[0]
+                        orig_base_x = p.get_x() + p.get_width() / 2
+                        shift = round(orig_base_x) - orig_base_x
+
                     if hasattr(line, "patches"):  # BarContainer
-                        xdata = [p.get_x() + p.get_width()/2 for p in line.patches]
+                        xdata = [round(p.get_x() + p.get_width()/2) for p in line.patches]
                         ydata = [p.get_height() for p in line.patches]
-                        width = line.patches[0].get_width()
+                        width = 0.8  # Standard width
                         color = line.patches[0].get_facecolor()
                         ax.bar(xdata, ydata, width=width, color=color, edgecolor="black", alpha=1.0, linewidth=template.linewidth_data)
                     elif hasattr(line, "lines"):  # ErrorbarContainer
-                        # Find the vertical line segments for error
                         if len(line.lines) > 2 and line.lines[2]:
-                            # line.lines[2] is a LineCollection for the error bars
                             segments = line.lines[2][0].get_segments()
                             for seg in segments:
-                                x_err = [seg[0][0], seg[1][0]]
+                                x_err = [seg[0][0] + shift, seg[1][0] + shift]
                                 y_err = [seg[0][1], seg[1][1]]
                                 ax.plot(x_err, y_err, color="black", linewidth=template.linewidth_error)
                     elif hasattr(line, "get_offsets"):  # Scatter points
                         offsets = line.get_offsets()
                         if len(offsets) == 0:
                             continue
-                        xdata = offsets[:, 0]
+                        xdata = offsets[:, 0] + shift
                         ydata = offsets[:, 1]
                         
-                        # The user requested: "Do NOT bring aspect color to the blobs in export"
-                        # We will use the group color or white with group color edge.
-                        # Let's get the group color from the template or the object.
-                        # Usually group colors are stored in dd_groups or dict_group_show.
-                        # For now, let's just use white facecolor with black edgecolor to keep it clean.
-                        # Use group color for edge or face? Let's use group color for face, black for edge.
-                        # Extracting the correct group color from the parent bar (since points currently hold aspect color)
-                        # We find the bar for this group/aspect to steal its color
-                        bar_label = f"{label.split(' PPR')[0]} PPR {info.get('aspect')} bar"
-                        bar_info = uistate.dict_group_labels.get(bar_label)
-                        if bar_info and hasattr(bar_info.get('line'), 'patches'):
+                        group_color = "black"
+                        if bar_info and hasattr(bar_info.get('line'), 'patches') and len(bar_info['line'].patches) > 0:
                             group_color = bar_info['line'].patches[0].get_facecolor()
-                            
+
                         ax.scatter(xdata, ydata, color="white", edgecolor="black", s=15, linewidth=template.linewidth_data, zorder=3)
 
                     continue
@@ -370,7 +368,10 @@ def render_publication_figure(
                     if x_ticks:
                         ax.set_xticks(x_ticks)
                         ax.set_xticklabels(x_ticklabels)
-                        ax.set_xlim(min(x_ticks) - 0.5, max(x_ticks) + 0.5)
+                        
+                        # Add a 0.6 pad on each side to create a clean visual boundary
+                        # around the centered bars (since bars have width 0.8)
+                        ax.set_xlim(min(x_ticks) - 0.6, max(x_ticks) + 0.6)
                         ax.tick_params(axis="x", bottom=False, labelbottom=True)
                 else:
                     ax.set_xlabel(uistate.x_axis_xlabel() if hasattr(uistate, "x_axis_xlabel") else "Time")
