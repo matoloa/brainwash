@@ -116,7 +116,13 @@ def render_publication_figure(
 
     with matplotlib.rc_context(rc_params):
         is_io_mode = getattr(uistate, "experiment_type", "time") == "io"
-        panels_to_render = ["io"] if is_io_mode else template.panels
+        is_pp_mode = getattr(uistate, "experiment_type", "time") == "PP"
+        if is_pp_mode:
+            panels_to_render = [asp for asp in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"] if uistate.checkBox.get(asp, True)]
+        elif is_io_mode:
+            panels_to_render = ["io"]
+        else:
+            panels_to_render = template.panels
 
         for panel in panels_to_render:
             # Create a fresh figure for each panel using the provided template dimensions
@@ -129,7 +135,10 @@ def render_publication_figure(
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
 
-            if uistate.checkBox.get("norm_EPSP"):
+            if is_pp_mode:
+                for y_val in [1.0, 2.0, 3.0]:
+                    ax.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
+            elif uistate.checkBox.get("norm_EPSP"):
                 if panel == "amp":
                     ax.axhline(
                         100,
@@ -174,10 +183,68 @@ def render_publication_figure(
                 if not line:
                     continue
 
-                has_data = True
                 is_io = info.get("x_mode") == "io"
 
                 # Check if this line corresponds to the current panel
+                
+                # Pre-extract color safely so PP mode can use it
+                if hasattr(line, "patches") and len(line.patches) > 0:
+                    group_color = line.patches[0].get_facecolor()
+                elif hasattr(line, "get_color"):
+                    group_color = line.get_color()
+                elif hasattr(line, "get_facecolors") and len(line.get_facecolors()) > 0:
+                    group_color = line.get_facecolors()[0]
+                else:
+                    group_color = "black"
+
+                if is_pp_mode:
+                    if info.get("aspect") != panel:
+                        continue
+                    if "overlay" in label:
+                        continue  # Do not export overlays
+                    aspect_str = panel.replace('_', ' ').replace('amp', 'amplitude')
+                    ax.set_ylabel(f"PPR ({aspect_str})")
+                    has_data = True
+                    
+                    if hasattr(line, "patches"):  # BarContainer
+                        xdata = [p.get_x() + p.get_width()/2 for p in line.patches]
+                        ydata = [p.get_height() for p in line.patches]
+                        width = line.patches[0].get_width()
+                        color = line.patches[0].get_facecolor()
+                        ax.bar(xdata, ydata, width=width, color=color, edgecolor="black", alpha=1.0, linewidth=template.linewidth_data)
+                    elif hasattr(line, "lines"):  # ErrorbarContainer
+                        # Find the vertical line segments for error
+                        if len(line.lines) > 2 and line.lines[2]:
+                            # line.lines[2] is a LineCollection for the error bars
+                            segments = line.lines[2][0].get_segments()
+                            for seg in segments:
+                                x_err = [seg[0][0], seg[1][0]]
+                                y_err = [seg[0][1], seg[1][1]]
+                                ax.plot(x_err, y_err, color="black", linewidth=template.linewidth_error)
+                    elif hasattr(line, "get_offsets"):  # Scatter points
+                        offsets = line.get_offsets()
+                        if len(offsets) == 0:
+                            continue
+                        xdata = offsets[:, 0]
+                        ydata = offsets[:, 1]
+                        
+                        # The user requested: "Do NOT bring aspect color to the blobs in export"
+                        # We will use the group color or white with group color edge.
+                        # Let's get the group color from the template or the object.
+                        # Usually group colors are stored in dd_groups or dict_group_show.
+                        # For now, let's just use white facecolor with black edgecolor to keep it clean.
+                        # Use group color for edge or face? Let's use group color for face, black for edge.
+                        # Extracting the correct group color from the parent bar (since points currently hold aspect color)
+                        # We find the bar for this group/aspect to steal its color
+                        bar_label = f"{label.split(' PPR')[0]} PPR {info.get('aspect')} bar"
+                        bar_info = uistate.dict_group_labels.get(bar_label)
+                        if bar_info and hasattr(bar_info.get('line'), 'patches'):
+                            group_color = bar_info['line'].patches[0].get_facecolor()
+                            
+                        ax.scatter(xdata, ydata, color="white", edgecolor="black", s=15, linewidth=template.linewidth_data, zorder=3)
+
+                    continue
+
                 if is_io:
                     # In IO mode, all groups are on ax1.  Use the aspect to determine panel.
                     if panel == "io":
@@ -186,13 +253,16 @@ def render_publication_figure(
                             ax.set_ylabel(f"EPSP Slope %" if uistate.checkBox.get("norm_EPSP") else f"EPSP Slope (mV/ms)")
                         else:
                             ax.set_ylabel(f"EPSP Amplitude %" if uistate.checkBox.get("norm_EPSP") else f"EPSP Amplitude (mV)")
+                        has_data = True
                     else:
                         continue
                 else:
                     if panel == "amp" and axis_src == "ax1":
                         ax.set_ylabel("Amplitude %" if uistate.checkBox.get("norm_EPSP") else "Amplitude (mV)")
+                        has_data = True
                     elif panel == "slope" and axis_src == "ax2":
                         ax.set_ylabel("Slope %" if uistate.checkBox.get("norm_EPSP") else "Slope (mV/ms)")
+                        has_data = True
                     else:
                         # Ignore event/mean panels for now unless they match the source axis
                         # Future expansion could handle axm/axe
@@ -279,7 +349,31 @@ def render_publication_figure(
 
             if has_data:
                 ax.set_ylim(bottom=0)
-                ax.set_xlabel(uistate.x_axis_xlabel() if hasattr(uistate, "x_axis_xlabel") else "Time")
+                
+                if is_pp_mode:
+                    ax.set_xlabel("")
+                    group_name_to_x = {}
+                    for label, info in uistate.dict_group_labels.items():
+                        if info.get("aspect") == panel and hasattr(info.get("line"), "patches"):
+                            if "overlay" in label or info.get("is_overlay"):
+                                continue
+                            try:
+                                patches = info["line"].patches
+                                if patches:
+                                    x_pos_float = patches[0].get_x() + patches[0].get_width() / 2
+                                    x_pos_int = round(x_pos_float)
+                                    group_name = label.split(" PPR")[0]
+                                    group_name_to_x[x_pos_int] = group_name
+                            except: pass
+                    x_ticks = sorted(list(group_name_to_x.keys()))
+                    x_ticklabels = [group_name_to_x[x] for x in x_ticks]
+                    if x_ticks:
+                        ax.set_xticks(x_ticks)
+                        ax.set_xticklabels(x_ticklabels)
+                        ax.set_xlim(min(x_ticks) - 0.5, max(x_ticks) + 0.5)
+                        ax.tick_params(axis="x", bottom=False, labelbottom=True)
+                else:
+                    ax.set_xlabel(uistate.x_axis_xlabel() if hasattr(uistate, "x_axis_xlabel") else "Time")
 
                 handles, labels = ax.get_legend_handles_labels()
                 if labels:
