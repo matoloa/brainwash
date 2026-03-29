@@ -1221,6 +1221,8 @@ class UIsub(
                     elif hasattr(obj, "patches"):
                         for p in obj.patches:
                             p.set_visible(visible)
+                        if "bar" in k:
+                            print(f"DEBUG BAR: set visible={visible} on {len(obj.patches)} patches for {k}")
                     elif hasattr(obj, "lines"):
                         for l in obj.lines:
                             if l is not None:

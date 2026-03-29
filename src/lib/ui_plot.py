@@ -1515,7 +1515,7 @@ class UIplot:
 
                     # 1. Plot the bar
                     bar_artist = self.get_axis(axid).bar(
-                        [bar_x], [mean_val], width=bar_w, color=color, edgecolor="black", alpha=1.0, zorder=1, label=f"{group_name} PPR {aspect} bar"
+                        [bar_x], [mean_val], width=bar_w, color=color, edgecolor="black", alpha=1.0, zorder=2, label=f"{group_name} PPR {aspect} bar"
                     )
                     # 2. Plot error bars
                     err_artist = self.get_axis(axid).errorbar(
@@ -1527,7 +1527,7 @@ class UIplot:
                         elinewidth=1.5,
                         capsize=5,
                         capthick=1.5,
-                        zorder=2,
+                        zorder=3,
                         label=f"{group_name} PPR {aspect} err",
                     )
                     # 3. Plot individual points
@@ -1535,28 +1535,25 @@ class UIplot:
                     jitter = np.random.uniform(-0.06, 0.06, size=len(vals)) if len(vals) > 1 else np.array([0])
                     x_jittered = [bar_x] * len(vals) + jitter
                     scat_artist = self.get_axis(axid).scatter(
-                        x_jittered, vals, color="white", edgecolor="black", zorder=3, s=40, label=f"{group_name} PPR {aspect} points"
+                        x_jittered, vals, color="white", edgecolor="black", zorder=4, s=40, label=f"{group_name} PPR {aspect} points"
                     )
 
                     # Store artists so they can be hidden/shown or cleared
                     for artist, suffix in [(bar_artist, "bar"), (err_artist, "err"), (scat_artist, "points")]:
-                        artist_obj = artist[0] if isinstance(artist, tuple) or isinstance(artist, list) else artist
-                        if hasattr(artist_obj, "set_visible"):
-                            artist_obj.set_visible(False)
-                        else:
-                            # bar_artist is a BarContainer, err_artist is an ErrorbarContainer
-                            if hasattr(artist, "patches"):
-                                for p in artist.patches:
-                                    p.set_visible(False)
-                            elif hasattr(artist, "lines"):
-                                for l in artist.lines:
-                                    if l is not None:
-                                        if isinstance(l, (list, tuple)):
-                                            for sub_l in l:
-                                                if sub_l is not None:
-                                                    sub_l.set_visible(False)
-                                        else:
-                                            l.set_visible(False)
+                        if hasattr(artist, "set_visible"):
+                            artist.set_visible(False)
+                        elif hasattr(artist, "patches"):
+                            for p in artist.patches:
+                                p.set_visible(False)
+                        elif hasattr(artist, "lines"):
+                            for l in artist.lines:
+                                if l is not None:
+                                    if isinstance(l, (list, tuple)):
+                                        for sub_l in l:
+                                            if sub_l is not None:
+                                                sub_l.set_visible(False)
+                                    else:
+                                        l.set_visible(False)
 
                         self.uistate.dict_group_labels[f"{group_name} PPR {aspect} {suffix}"] = {
                             "group_ID": group_ID,
