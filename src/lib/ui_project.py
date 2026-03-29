@@ -131,7 +131,7 @@ class ProjectMixin:
         self.mainwindow.setGeometry(
             0,
             0,
-            int(screen.width() * 0.999),
+            int(screen.width() * 0.999) - getattr(config, "work_space", 0),
             int(screen.height()) - config.terminal_space,
         )
 

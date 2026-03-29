@@ -1,10 +1,10 @@
-import warnings
 import json
 import math
 import os  # TODO: replace use by pathlib?
 import sys
 import tempfile
 import traceback
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -85,6 +85,7 @@ class Config:
         self.hide_experimental = not self.dev_mode
         self.track_widget_focus = False
         self.terminal_space = 372 if self.dev_mode else 100  # pixels reserved for viewing prints
+        self.work_space = 646 if self.dev_mode else 0  # pixels reserved for working area
 
         # get project_name and version number from pyproject.toml
         #
@@ -1041,7 +1042,7 @@ class UIsub(
             return False
         if v["stim"] is not None and v["stim"] not in selected_stims:
             return False
-        
+
         # Phase 0 PP mode display guard
         axis = v.get("axis")
         is_pp = getattr(uistate, "experiment_type", "time") == "PP"
@@ -1121,20 +1122,24 @@ class UIsub(
                 for v in uistate.dict_group_labels.values():
                     for key in ["line", "fill"]:
                         obj = v[key]
-                        if hasattr(obj, "set_visible"): obj.set_visible(False)
+                        if hasattr(obj, "set_visible"):
+                            obj.set_visible(False)
                         elif hasattr(obj, "patches"):
-                            for p in obj.patches: p.set_visible(False)
+                            for p in obj.patches:
+                                p.set_visible(False)
                         elif hasattr(obj, "lines"):
                             for l in obj.lines:
                                 if l is not None:
                                     if isinstance(l, (list, tuple)):
                                         for sub_l in l:
-                                            if sub_l is not None: sub_l.set_visible(False)
+                                            if sub_l is not None:
+                                                sub_l.set_visible(False)
                                     else:
                                         l.set_visible(False)
                         elif hasattr(obj, "get_children"):
                             for c in obj.get_children():
-                                if c is not None: c.set_visible(False)
+                                if c is not None:
+                                    c.set_visible(False)
                 uistate.dict_group_show = {}
             # Important: Don't return here! Keep processing the rest of the method
             # so the currently selected recordings/stims/groups get turned back on.
@@ -1151,19 +1156,23 @@ class UIsub(
                     visible = self._is_group_visible(v, selected_groups=None)
                     for key in ["line", "fill"]:
                         obj = v[key]
-                        if hasattr(obj, "set_visible"): obj.set_visible(visible)
+                        if hasattr(obj, "set_visible"):
+                            obj.set_visible(visible)
                         elif hasattr(obj, "patches"):
-                            for p in obj.patches: p.set_visible(visible)
+                            for p in obj.patches:
+                                p.set_visible(visible)
                         elif hasattr(obj, "lines"):
                             for l in obj.lines:
                                 if l is not None:
                                     if isinstance(l, (list, tuple)):
                                         for sub_l in l:
-                                            if sub_l is not None: sub_l.set_visible(visible)
+                                            if sub_l is not None:
+                                                sub_l.set_visible(visible)
                                     else:
                                         l.set_visible(visible)
                         elif hasattr(obj, "get_children"):
-                            for c in obj.get_children(): c.set_visible(visible)
+                            for c in obj.get_children():
+                                c.set_visible(visible)
                     if visible:
                         new_group_show[k] = v
                 uistate.dict_group_show = new_group_show
@@ -1210,18 +1219,21 @@ class UIsub(
                     if hasattr(obj, "set_visible"):
                         obj.set_visible(visible)
                     elif hasattr(obj, "patches"):
-                        for p in obj.patches: p.set_visible(visible)
+                        for p in obj.patches:
+                            p.set_visible(visible)
                     elif hasattr(obj, "lines"):
                         for l in obj.lines:
                             if l is not None:
                                 if isinstance(l, (list, tuple)):
                                     for sub_l in l:
-                                        if sub_l is not None: sub_l.set_visible(visible)
+                                        if sub_l is not None:
+                                            sub_l.set_visible(visible)
                                 else:
                                     l.set_visible(visible)
                     elif hasattr(obj, "get_children"):
                         for c in obj.get_children():
-                            if c is not None: c.set_visible(visible)
+                            if c is not None:
+                                c.set_visible(visible)
                 if visible:
                     new_group_show[k] = v
             uistate.dict_group_show = new_group_show
@@ -1743,17 +1755,18 @@ class UIsub(
             uistate.zoom["output_ax2_ylim"] = (0, y2[1] * 1.15 if y2 and y2[1] > 0 else 1.5)
         elif getattr(uistate, "experiment_type", "time") == "PP":
             uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow, dft=dft)
-            # In PP mode, lock the Y-axis to dynamically start at 0 and scale up to include all active data, 
+            # In PP mode, lock the Y-axis to dynamically start at 0 and scale up to include all active data,
             # snapping to clean multiples of 100 if possible.
             out_xmin, out_xmax = uistate.zoom["output_xlim"]
-            
+
             y1 = self._ylim_from_artists(uistate.ax1, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
             y2 = self._ylim_from_artists(uistate.ax2, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
-            
+
             def snap_pp_max(y_bounds):
-                if not y_bounds: return 3.0
+                if not y_bounds:
+                    return 3.0
                 return max(3.0, (int(y_bounds[1] / 1.0) + 1) * 1.0)
-                
+
             # Unify the PP mode axes so they always share identical Y-axis boundaries
             uistate.zoom["output_ax1_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
             uistate.zoom["output_ax2_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
@@ -3437,28 +3450,28 @@ class UIsub(
             return
         selected_outputs = pd.DataFrame()
         is_pp = getattr(uistate, "experiment_type", "time") == "PP"
-        
+
         for rec in uistate.list_idx_select_recs:
             p_row = self.get_df_project().loc[rec]
             output = self.get_dfoutput(p_row).copy()
             output.insert(0, "recording_name", p_row["recording_name"])
             output.insert(1, "gain", p_row["gain"])
-            
+
             if is_pp:
                 out_sweeps = output[output["sweep"].notna()]
                 out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
                 out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
                 common_sweeps = out1.index.intersection(out2.index).dropna()
-                
+
                 if not common_sweeps.empty:
                     o1 = out1.loc[common_sweeps]
                     o2 = out2.loc[common_sweeps]
-                    
+
                     pp_df = pd.DataFrame()
                     pp_df["recording_name"] = o1["recording_name"]
                     pp_df["gain"] = o1["gain"]
                     pp_df["sweep"] = common_sweeps
-                    
+
                     aspects = ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
                     for aspect in aspects:
                         if aspect in o1.columns and aspect in o2.columns:
@@ -3469,11 +3482,11 @@ class UIsub(
                                 ppr = (v2 / v1) * 100
                                 ppr[~np.isfinite(ppr)] = np.nan
                             pp_df[f"PPR_{aspect}"] = ppr
-                            
+
                     selected_outputs = pd.concat([selected_outputs, pp_df], ignore_index=True)
             else:
                 selected_outputs = pd.concat([selected_outputs, output], ignore_index=True)
-                
+
         selected_outputs.to_clipboard(index=False)
 
     def stimDetect(self):
@@ -4686,7 +4699,7 @@ class UIsub(
             for key, value in uistate.dict_rec_labels.items()
             if key.endswith(" marker") and value["rec_ID"] == rec_ID and value["axis"] == "axe" and value["stim"] == stim_num
         }
-        
+
         # When in PP mode, "mouseoverUpdate" correctly drops all group lines (since we only show recording data).
         # We need to explicitly clear dict_group_show to hide the groups properly before the final graphRefresh!
         if getattr(uistate, "experiment_type", "time") == "PP":
@@ -5040,11 +5053,13 @@ class UIsub(
                         o2 = out2.loc[common_sweeps]
                         v1 = o1[aspect].values.astype(float)
                         v2 = o2[aspect].values.astype(float)
-                        import numpy as np
                         import warnings
+
+                        import numpy as np
+
                         with warnings.catch_warnings():
                             warnings.simplefilter("ignore")
-                            ppr = (v2 / v1)
+                            ppr = v2 / v1
                             ppr[~np.isfinite(ppr)] = np.nan
                         x_val_map = {"EPSP_amp": 1, "EPSP_slope": 2, "volley_amp": 3, "volley_slope": 4}
                         x_val = x_val_map.get(aspect, 1)
