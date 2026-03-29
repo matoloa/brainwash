@@ -1438,14 +1438,26 @@ class UIplot:
                             if len(y_data) > 0 and np.isfinite(y_data[0]):
                                 ppr_data[aspect].append(y_data[0])
             
-            configs = [
-                ("EPSP_amp", "ax1", -0.15),
-                ("EPSP_slope", "ax2", -0.15),
-                ("volley_amp", "ax1", 0.15),
-                ("volley_slope", "ax2", 0.15),
+            aspect_list = [
+                ("EPSP_amp", "ax1"),
+                ("EPSP_slope", "ax2"),
+                ("volley_amp", "ax1"),
+                ("volley_slope", "ax2"),
             ]
+            
+            # Dynamically calculate spacing offsets for only the enabled aspects
+            active_aspects = [item for item in aspect_list if self.uistate.checkBox.get(item[0], True)]
+            n_active = len(active_aspects)
+            
+            configs = []
+            if n_active > 0:
+                bar_width = 0.8 / max(1, n_active) # Max total cluster width is 0.8 to leave 0.2 spacing between groups
+                start_offset = -0.4 + (bar_width / 2)
+                for i, (asp, axid) in enumerate(active_aspects):
+                    offset = start_offset + (i * bar_width)
+                    configs.append((asp, axid, offset, bar_width * 0.9)) # 10% gap between bars within cluster
 
-            for aspect, axid, offset in configs:
+            for aspect, axid, offset, bar_w in configs:
                 vals = ppr_data[aspect]
                 print(f"DEBUG ADDGROUP PP: {group_name}, aspect={aspect}, vals={vals}, axid={axid}")
                 if vals:
@@ -1456,7 +1468,7 @@ class UIplot:
 
                     # 1. Plot the bar
                     bar_artist = self.get_axis(axid).bar(
-                        [bar_x], [mean_val], width=0.25, color=color, edgecolor="black", alpha=1.0, zorder=1, label=f"{group_name} PPR {aspect} bar"
+                        [bar_x], [mean_val], width=bar_w, color=color, edgecolor="black", alpha=1.0, zorder=1, label=f"{group_name} PPR {aspect} bar"
                     )
                     # 2. Plot error bars
                     err_artist = self.get_axis(axid).errorbar(
