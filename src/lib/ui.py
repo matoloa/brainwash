@@ -1206,14 +1206,21 @@ class UIsub(
         # group lines
         if self.dd_groups is not None:
             is_pp = getattr(uistate, "experiment_type", "time") == "PP"
-            if is_pp and selected_ids:
-                selected_groups = set()
-            else:
-                selected_groups = {group for rec_ID in selected_ids for group in self.get_groupsOfRec(rec_ID)}
+            selected_groups = {group for rec_ID in selected_ids for group in self.get_groupsOfRec(rec_ID)}
             new_group_show = {}
             for k, v in uistate.dict_group_labels.items():
                 visible = self._is_group_visible(v, selected_groups)
-                # Check if it's a generic Line2D/PolyCollection, or a container
+                
+                if is_pp:
+                    if selected_ids:
+                        # Rec view: hide normal group artists, show overlay
+                        if not v.get("is_overlay"):
+                            visible = False
+                    else:
+                        # Group view: show normal group artists, hide overlay
+                        if v.get("is_overlay"):
+                            visible = False
+
                 for key in ["line", "fill"]:
                     obj = v[key]
                     if hasattr(obj, "set_visible"):
@@ -1221,8 +1228,6 @@ class UIsub(
                     elif hasattr(obj, "patches"):
                         for p in obj.patches:
                             p.set_visible(visible)
-                        if "bar" in k:
-                            print(f"DEBUG BAR: set visible={visible} on {len(obj.patches)} patches for {k}")
                     elif hasattr(obj, "lines"):
                         for l in obj.lines:
                             if l is not None:
@@ -4719,10 +4724,7 @@ class UIsub(
             if key.endswith(" marker") and value["rec_ID"] == rec_ID and value["axis"] == "axe" and value["stim"] == stim_num
         }
 
-        # When in PP mode, "mouseoverUpdate" correctly drops all group lines (since we only show recording data).
-        # We need to explicitly clear dict_group_show to hide the groups properly before the final graphRefresh!
-        if getattr(uistate, "experiment_type", "time") == "PP":
-            uistate.dict_group_show.clear()
+
         if not dict_labels:
             print("(no labels) mouseoverUpdate calls self.graphRefresh()")
             self.graphRefresh()
@@ -5407,11 +5409,21 @@ class UIsub(
         # update groups
         affected_groups = self.get_groupsOfRec(prow["ID"])
         self.group_cache_purge(affected_groups)
+        
+        # We MUST run update_show BEFORE rebuilding the groups so that
+        # the dict_rec_labels (which dict_group_show relies on for PPR data gathering)
+        # matches the visible state expectations.
+        self.mouseoverUpdate()
+        self.update_show()
+        
         for group_ID in affected_groups:
+            uiplot.unPlotGroup(group_ID=group_ID)
             df_groupmean = self.get_dfgroupmean(group_ID)
             x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
             uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.V2mV(df_groupmean), x_pos=x_pos)
-        self.mouseoverUpdate()
+            
+        self.update_show() # Re-apply visibility rules to the newly added group artists
+        self.graphRefresh() # Refresh the canvas to draw the new groups
         self.update_amp_lineEdits()
         self.update_slope_lineEdits()
         self.zoomAuto()

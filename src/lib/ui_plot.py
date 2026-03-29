@@ -347,15 +347,41 @@ class UIplot:
         else:
             keys_to_remove = [key for key, value in dict_group.items() if group_ID == value["group_ID"]]
         for key in keys_to_remove:
-            try:
-                dict_group[key]["fill"].remove()
-            except Exception:
-                pass
-            if dict_group[key].get("line") is not dict_group[key].get("fill"):
-                try:
-                    dict_group[key]["line"].remove()
-                except Exception:
-                    pass
+            artist = dict_group[key].get("line")
+            if artist is not None:
+                if hasattr(artist, "remove"):
+                    try:
+                        artist.remove()
+                    except Exception:
+                        pass
+                elif isinstance(artist, tuple) or isinstance(artist, list):
+                    for a in artist:
+                        try:
+                            a.remove()
+                        except:
+                            pass
+                elif hasattr(artist, "patches"):
+                    for p in artist.patches:
+                        try:
+                            p.remove()
+                        except:
+                            pass
+                elif hasattr(artist, "lines"):
+                    for l in artist.lines:
+                        if l is not None:
+                            if isinstance(l, (list, tuple)):
+                                for sub_l in l:
+                                    if sub_l is not None:
+                                        try:
+                                            sub_l.remove()
+                                        except:
+                                            pass
+                            else:
+                                try:
+                                    l.remove()
+                                except:
+                                    pass
+
             del dict_group[key]
             if key in dict_group_show:
                 del dict_group_show[key]
@@ -475,7 +501,7 @@ class UIplot:
             group_name_to_x = {}
             if hasattr(uistate, "dict_group_show"):
                 for key, val in uistate.dict_group_show.items():
-                    if "PPR" in key and hasattr(val["line"], "patches"):
+                    if "PPR" in key and hasattr(val["line"], "patches") and not val.get("is_overlay"):
                         try:
                             # The original x_pos is an integer (1.0, 2.0, etc), so we round the fractional bar position back to the nearest integer
                             x_pos_float = val["line"].patches[0].get_x() + val["line"].patches[0].get_width() / 2
@@ -1476,14 +1502,18 @@ class UIplot:
 
             # Find all PPR lines for recordings in this group
             ppr_data = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
+            rec_id_order = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
             for rec_id in dict_group["rec_IDs"]:
                 for key, linedict in self.uistate.dict_rec_labels.items():
                     if linedict.get("rec_ID") == rec_id and "PPR" in key and linedict.get("variant") == "raw":
                         aspect = linedict.get("aspect")
                         if aspect in ppr_data:
                             y_data = linedict["line"].get_ydata()
-                            if len(y_data) > 0 and np.isfinite(y_data[0]):
-                                ppr_data[aspect].append(y_data[0])
+                            if len(y_data) > 0:
+                                valid_y = [y for y in y_data if np.isfinite(y)]
+                                if valid_y:
+                                    ppr_data[aspect].append(np.mean(valid_y))
+                                    rec_id_order[aspect].append(rec_id)
 
             aspect_list = [
                 ("EPSP_amp", "ax1"),
@@ -1506,67 +1536,130 @@ class UIplot:
 
             for aspect, axid, offset, bar_w in configs:
                 vals = ppr_data[aspect]
-                print(f"DEBUG ADDGROUP PP: {group_name}, aspect={aspect}, vals={vals}, axid={axid}")
                 if vals:
-                    mean_val = np.mean(vals)
-                    sem_val = np.std(vals, ddof=1) / np.sqrt(len(vals)) if len(vals) > 1 else 0
+                    try:
+                        mean_val = np.mean(vals)
+                        sem_val = np.std(vals, ddof=1) / np.sqrt(len(vals)) if len(vals) > 1 else 0
+                        bar_x = x_pos + offset
+                    except Exception as e:
+                        print(f"DEBUG: addGroup error in math loop: {e}")
+                        continue
 
-                    bar_x = x_pos + offset
+                    try:
+                        # 1. Plot the bar
+                        bar_artist = self.get_axis(axid).bar(
+                            [bar_x],
+                            [mean_val],
+                            width=bar_w,
+                            color=color,
+                            edgecolor="black",
+                            alpha=1.0,
+                            zorder=2,
+                            label=f"{group_name} PPR {aspect} bar",
+                        )
+                        # 2. Plot error bars
+                        err_artist = self.get_axis(axid).errorbar(
+                            [bar_x],
+                            [mean_val],
+                            yerr=[sem_val],
+                            fmt="none",
+                            ecolor="black",
+                            elinewidth=1.5,
+                            capsize=5,
+                            capthick=1.5,
+                            zorder=3,
+                            label=f"{group_name} PPR {aspect} err",
+                        )
+                        # 3. Plot individual points
+                        # Jitter the points slightly along the X axis so they don't overlap perfectly
+                        jitter = np.random.uniform(-0.06, 0.06, size=len(vals)) if len(vals) > 1 else np.array([0])
+                        x_jittered = [bar_x] * len(vals) + jitter
+                        aspect_color = self.uistate.settings.get(f"rgb_{aspect}", "white")
 
-                    # 1. Plot the bar
-                    bar_artist = self.get_axis(axid).bar(
-                        [bar_x], [mean_val], width=bar_w, color=color, edgecolor="black", alpha=1.0, zorder=2, label=f"{group_name} PPR {aspect} bar"
-                    )
-                    # 2. Plot error bars
-                    err_artist = self.get_axis(axid).errorbar(
-                        [bar_x],
-                        [mean_val],
-                        yerr=[sem_val],
-                        fmt="none",
-                        ecolor="black",
-                        elinewidth=1.5,
-                        capsize=5,
-                        capthick=1.5,
-                        zorder=3,
-                        label=f"{group_name} PPR {aspect} err",
-                    )
-                    # 3. Plot individual points
-                    # Jitter the points slightly along the X axis so they don't overlap perfectly
-                    jitter = np.random.uniform(-0.06, 0.06, size=len(vals)) if len(vals) > 1 else np.array([0])
-                    x_jittered = [bar_x] * len(vals) + jitter
-                    aspect_color = self.uistate.settings.get(f"rgb_{aspect}", "white")
-                    scat_artist = self.get_axis(axid).scatter(
-                        x_jittered, vals, color=aspect_color, edgecolor="black", zorder=4, s=40, label=f"{group_name} PPR {aspect} points"
-                    )
+                        scat_artists = []
+                        for j, (val, rid) in enumerate(zip(vals, rec_id_order[aspect])):
+                            xj = x_jittered[j]
+                            scat_art = self.get_axis(axid).scatter(
+                                [xj], [val], color=aspect_color, edgecolor="black", zorder=4, s=40, label=f"{group_name} PPR {aspect} {rid} point"
+                            )
+                            scat_artists.append((scat_art, rid))
 
-                    # Store artists so they can be hidden/shown or cleared
-                    for artist, suffix in [(bar_artist, "bar"), (err_artist, "err"), (scat_artist, "points")]:
-                        if hasattr(artist, "set_visible"):
-                            artist.set_visible(False)
-                        elif hasattr(artist, "patches"):
-                            for p in artist.patches:
-                                p.set_visible(False)
-                        elif hasattr(artist, "lines"):
-                            for l in artist.lines:
-                                if l is not None:
-                                    if isinstance(l, (list, tuple)):
-                                        for sub_l in l:
-                                            if sub_l is not None:
-                                                sub_l.set_visible(False)
-                                    else:
-                                        l.set_visible(False)
+                        # 4. Create overlay artists for Rec View
+                        x_val_map = {}
+                        idx = 1
+                        for key in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]:
+                            if self.uistate.checkBox.get(key, True):
+                                x_val_map[key] = idx
+                                idx += 1
+                        overlay_x = x_val_map.get(aspect, 1)
 
-                        self.uistate.dict_group_labels[f"{group_name} PPR {aspect} {suffix}"] = {
-                            "group_ID": group_ID,
-                            "aspect": aspect,
-                            "variant": "raw",  # we'll just map everything to raw for groups in PP
-                            "stim": None,
-                            "line": artist,  # we use "line" as the generic container key
-                            "fill": artist,  # and "fill" to avoid exceptions in update_show
-                            "axis": axid,
-                            "x_mode": "sweep",  # so it shows up
-                            "is_container": True,
-                        }
+                        overlay_bar_artist = self.get_axis(axid).bar(
+                            [overlay_x],
+                            [mean_val],
+                            width=0.4,
+                            color=color,
+                            edgecolor="black",
+                            alpha=0.2,
+                            zorder=2,
+                            label=f"{group_name} PPR {aspect} overlay_bar",
+                        )
+                        overlay_err_artist = self.get_axis(axid).errorbar(
+                            [overlay_x],
+                            [mean_val],
+                            yerr=[sem_val],
+                            fmt="none",
+                            ecolor="black",
+                            elinewidth=1.5,
+                            capsize=5,
+                            capthick=1.5,
+                            zorder=3,
+                            label=f"{group_name} PPR {aspect} overlay_err",
+                        )
+
+                        # Store artists so they can be hidden/shown or cleared
+                        items_to_store = [
+                            (bar_artist, "bar", None, False),
+                            (err_artist, "err", None, False),
+                            (overlay_bar_artist, "overlay_bar", None, True),
+                            (overlay_err_artist, "overlay_err", None, True),
+                        ]
+                        for art, rid in scat_artists:
+                            items_to_store.append((art, f"{rid} point", rid, False))
+
+                        for artist, suffix, rec_id_val, is_overlay in items_to_store:
+                            if hasattr(artist, "set_visible"):
+                                artist.set_visible(False)
+                            elif hasattr(artist, "patches"):
+                                for p in artist.patches:
+                                    p.set_visible(False)
+                            elif hasattr(artist, "lines"):
+                                for l in artist.lines:
+                                    if l is not None:
+                                        if isinstance(l, (list, tuple)):
+                                            for sub_l in l:
+                                                if sub_l is not None:
+                                                    sub_l.set_visible(False)
+                                        else:
+                                            l.set_visible(False)
+
+                            d = {
+                                "group_ID": group_ID,
+                                "aspect": aspect,
+                                "variant": "raw",
+                                "stim": None,
+                                "line": artist,
+                                "fill": artist,
+                                "axis": axid,
+                                "x_mode": "sweep",
+                                "is_container": True,
+                                "is_overlay": is_overlay,
+                            }
+                            if rec_id_val is not None:
+                                d["rec_ID"] = rec_id_val
+                            self.uistate.dict_group_labels[f"{group_name} PPR {aspect} {suffix}"] = d
+                    except Exception as e:
+                        print(f"DEBUG: addGroup error in drawing loop: {e}")
+                        continue
             return
 
         if exp_type == "io":
