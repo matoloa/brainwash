@@ -716,6 +716,8 @@ class UIplot:
         if is_pp and axid in ("ax1", "ax2") and "PPR" not in label:
             return
         zorder = 0 if width > 1 else 1
+        if is_pp and axid in ("ax1", "ax2") and "PPR" in label:
+            zorder = 4  # Ensure rec blobs paint OVER the group overlays
         alpha = alpha if alpha is not None else self.uistate.settings["alpha_line"]
         kwargs = {"color": color, "label": label, "alpha": alpha, "linewidth": width, "zorder": zorder, "linestyle": linestyle}
         if marker is not None:
@@ -1506,11 +1508,13 @@ class UIplot:
             ppr_data = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
             rec_id_order = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
             for rec_id in dict_group["rec_IDs"]:
+                print(f"DEBUG addGroup parsing rec_id: {rec_id}")
                 for key, linedict in self.uistate.dict_rec_labels.items():
                     if linedict.get("rec_ID") == rec_id and "PPR" in key and linedict.get("variant") == "raw":
                         aspect = linedict.get("aspect")
                         if aspect in ppr_data:
                             y_data = linedict["line"].get_ydata()
+                            print(f"DEBUG addGroup found {key}: len y_data = {len(y_data)}")
                             if len(y_data) > 0:
                                 valid_y = [y for y in y_data if np.isfinite(y)]
                                 if valid_y:
@@ -2108,9 +2112,14 @@ class UIplot:
                             if ppr_label in self.uistate.dict_rec_labels:
                                 linedict = self.uistate.dict_rec_labels[ppr_label]
                                 line = linedict["line"]
-                                line.set_xdata(
-                                    np.full(len(common_sweeps), {"EPSP_amp": 1, "EPSP_slope": 2, "volley_amp": 3, "volley_slope": 4}.get(aspect, 1))
-                                )
+                                x_val_map = {}
+                                idx = 1
+                                for key in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]:
+                                    if self.uistate.checkBox.get(key, True):
+                                        x_val_map[key] = idx
+                                        idx += 1
+                                overlay_x = x_val_map.get(aspect, 1)
+                                line.set_xdata(np.full(len(common_sweeps), overlay_x))
                                 line.set_ydata(ppr)
             return
 

@@ -288,7 +288,7 @@ class MenuMixin:
                                                     rgba = mcolors.to_rgba(new_color, current_alpha)
                                                     p.set_color(rgba)
                                             except Exception as e:
-                                                pass
+                                                print(f"DEBUG setJournalExport: {e}")
                                     elif hasattr(artist, "lines"):
                                         for l in artist.lines:
                                             if l is not None:

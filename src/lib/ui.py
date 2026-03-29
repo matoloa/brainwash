@@ -1105,10 +1105,12 @@ class UIsub(
                 return False
         variant = v.get("variant")
         norm_active = uistate.checkBox["norm_EPSP"]
-        if variant == "norm" and not norm_active:
-            return False
-        if variant == "raw" and norm_active:
-            return False
+        is_pp = getattr(uistate, "experiment_type", "time") == "PP"
+        if not is_pp:
+            if variant == "norm" and not norm_active:
+                return False
+            if variant == "raw" and norm_active:
+                return False
         if not self.dd_groups[v["group_ID"]]["show"]:
             return False
         return True
