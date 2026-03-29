@@ -1534,8 +1534,9 @@ class UIplot:
                     # Jitter the points slightly along the X axis so they don't overlap perfectly
                     jitter = np.random.uniform(-0.06, 0.06, size=len(vals)) if len(vals) > 1 else np.array([0])
                     x_jittered = [bar_x] * len(vals) + jitter
+                    aspect_color = self.uistate.settings.get(f"rgb_{aspect}", "white")
                     scat_artist = self.get_axis(axid).scatter(
-                        x_jittered, vals, color="white", edgecolor="black", zorder=4, s=40, label=f"{group_name} PPR {aspect} points"
+                        x_jittered, vals, color=aspect_color, edgecolor="black", zorder=4, s=40, label=f"{group_name} PPR {aspect} points"
                     )
 
                     # Store artists so they can be hidden/shown or cleared
