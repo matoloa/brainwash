@@ -472,6 +472,38 @@ class UIstate:
         the FuncFormatter converts tick labels to the chosen time unit.
         """
         if self.experiment_type == "PP":
+            has_groups = False
+            max_x = 1.5
+            if hasattr(self, "dict_group_show"):
+                x_positions = []
+                for key, val in self.dict_group_show.items():
+                    if "PPR" in key and hasattr(val["line"], "patches"):
+                        has_groups = True
+                        try:
+                            x_positions.append(val["line"].patches[0].get_x() + val["line"].patches[0].get_width()/2)
+                        except: pass
+                if x_positions:
+                    max_x = max(x_positions) + 0.5
+            if has_groups:
+                return (0.5, max_x)
+            
+            # Check if we have recordings
+            has_recs = False
+            rec_x_positions = []
+            if hasattr(self, "dict_rec_show"):
+                for key, val in self.dict_rec_show.items():
+                    if "PPR" in key and "marker" not in key and val.get("line") and val["line"].get_visible():
+                        has_recs = True
+                        try:
+                            x_data = val["line"].get_xdata()
+                            if len(x_data) > 0:
+                                rec_x_positions.extend(x_data)
+                        except: pass
+            if has_recs:
+                if rec_x_positions:
+                    return (min(rec_x_positions) - 0.5, max(rec_x_positions) + 0.5)
+                return (0.5, 4.5) # Default 1 to 4 span
+                
             return (0.5, 1.5)
         
         mode = self.x_axis

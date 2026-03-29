@@ -1047,8 +1047,6 @@ class UIsub(
         is_pp = getattr(uistate, "experiment_type", "time") == "PP"
         if is_pp and axis in ("ax1", "ax2"):
             if valid_pp_ids is not None and v["rec_ID"] not in valid_pp_ids:
-                if "PPR" in v.get("line").get_label():
-                    print(f"PPR HIDDEN BY PP GUARD: {v['rec_ID']} not in {valid_pp_ids}")
                 return False
         # x_mode filtering: lines tagged with a specific x_mode are only visible
         # when that mode is active.  Lines with x_mode=None (mean, event, axe
@@ -1060,8 +1058,6 @@ class UIsub(
         is_io = getattr(uistate, "experiment_type", "time") == "io"
         if x_mode is not None and x_mode != uistate.x_axis:
             if not (x_mode == "sweep" and uistate.x_axis == "time"):
-                if "PPR" in v.get("line").get_label():
-                    print(f"PPR HIDDEN BY x_mode: {x_mode} != {uistate.x_axis}")
                 return False
         if is_io and v.get("line") and v["line"].get_label().endswith(" IO trendline"):
             if not uistate.checkBox.get("io_trendline", False):
@@ -1070,8 +1066,6 @@ class UIsub(
         axis = v.get("axis")
         if aspect and not uistate.checkBox.get(aspect, True):
             if axis == "axe" or not is_io:
-                if "PPR" in v.get("line").get_label():
-                    print(f"PPR HIDDEN BY aspect checkbox: {aspect} is unchecked")
                 return False
         # norm/raw switch: only EPSP amp/slope have a norm variant.
         # Only applies to ax1/ax2 output lines — markers on axe represent physical
@@ -1099,8 +1093,6 @@ class UIsub(
         is_io = getattr(uistate, "experiment_type", "time") == "io"
         if x_mode is not None and x_mode != uistate.x_axis:
             if not (x_mode == "sweep" and uistate.x_axis == "time"):
-                if "PPR" in v.get("line").get_label():
-                    print(f"PPR HIDDEN BY x_mode: {x_mode} != {uistate.x_axis}")
                 return False
         if is_io and v.get("line") and v["line"].get_label().endswith(" IO trendline"):
             if not uistate.checkBox.get("io_trendline", False):
@@ -1109,8 +1101,6 @@ class UIsub(
         axis = v.get("axis")
         if aspect and not uistate.checkBox.get(aspect, True):
             if axis == "axe" or not is_io:
-                if "PPR" in v.get("line").get_label():
-                    print(f"PPR HIDDEN BY aspect checkbox: {aspect} is unchecked")
                 return False
         variant = v.get("variant")
         norm_active = uistate.checkBox["norm_EPSP"]
@@ -1129,8 +1119,22 @@ class UIsub(
             uistate.dict_rec_show = {}
             if self.dd_groups is not None:
                 for v in uistate.dict_group_labels.values():
-                    v["line"].set_visible(False)
-                    v["fill"].set_visible(False)
+                    for key in ["line", "fill"]:
+                        obj = v[key]
+                        if hasattr(obj, "set_visible"): obj.set_visible(False)
+                        elif hasattr(obj, "patches"):
+                            for p in obj.patches: p.set_visible(False)
+                        elif hasattr(obj, "lines"):
+                            for l in obj.lines:
+                                if l is not None:
+                                    if isinstance(l, (list, tuple)):
+                                        for sub_l in l:
+                                            if sub_l is not None: sub_l.set_visible(False)
+                                    else:
+                                        l.set_visible(False)
+                        elif hasattr(obj, "get_children"):
+                            for c in obj.get_children():
+                                if c is not None: c.set_visible(False)
                 uistate.dict_group_show = {}
             # Important: Don't return here! Keep processing the rest of the method
             # so the currently selected recordings/stims/groups get turned back on.
@@ -1145,8 +1149,21 @@ class UIsub(
                 new_group_show = {}
                 for k, v in uistate.dict_group_labels.items():
                     visible = self._is_group_visible(v, selected_groups=None)
-                    v["line"].set_visible(visible)
-                    v["fill"].set_visible(visible)
+                    for key in ["line", "fill"]:
+                        obj = v[key]
+                        if hasattr(obj, "set_visible"): obj.set_visible(visible)
+                        elif hasattr(obj, "patches"):
+                            for p in obj.patches: p.set_visible(visible)
+                        elif hasattr(obj, "lines"):
+                            for l in obj.lines:
+                                if l is not None:
+                                    if isinstance(l, (list, tuple)):
+                                        for sub_l in l:
+                                            if sub_l is not None: sub_l.set_visible(visible)
+                                    else:
+                                        l.set_visible(visible)
+                        elif hasattr(obj, "get_children"):
+                            for c in obj.get_children(): c.set_visible(visible)
                     if visible:
                         new_group_show[k] = v
                 uistate.dict_group_show = new_group_show
@@ -1179,12 +1196,32 @@ class UIsub(
 
         # group lines
         if self.dd_groups is not None:
-            selected_groups = {group for rec_ID in selected_ids for group in self.get_groupsOfRec(rec_ID)}
+            is_pp = getattr(uistate, "experiment_type", "time") == "PP"
+            if is_pp and selected_ids:
+                selected_groups = set()
+            else:
+                selected_groups = {group for rec_ID in selected_ids for group in self.get_groupsOfRec(rec_ID)}
             new_group_show = {}
             for k, v in uistate.dict_group_labels.items():
                 visible = self._is_group_visible(v, selected_groups)
-                v["line"].set_visible(visible)
-                v["fill"].set_visible(visible)
+                # Check if it's a generic Line2D/PolyCollection, or a container
+                for key in ["line", "fill"]:
+                    obj = v[key]
+                    if hasattr(obj, "set_visible"):
+                        obj.set_visible(visible)
+                    elif hasattr(obj, "patches"):
+                        for p in obj.patches: p.set_visible(visible)
+                    elif hasattr(obj, "lines"):
+                        for l in obj.lines:
+                            if l is not None:
+                                if isinstance(l, (list, tuple)):
+                                    for sub_l in l:
+                                        if sub_l is not None: sub_l.set_visible(visible)
+                                else:
+                                    l.set_visible(visible)
+                    elif hasattr(obj, "get_children"):
+                        for c in obj.get_children():
+                            if c is not None: c.set_visible(visible)
                 if visible:
                     new_group_show[k] = v
             uistate.dict_group_show = new_group_show
@@ -1704,6 +1741,22 @@ class UIsub(
             y2 = self._ylim_from_artists(uistate.ax2, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
             uistate.zoom["output_ax1_ylim"] = (0, y1[1] * 1.15 if y1 and y1[1] > 0 else 1.5)
             uistate.zoom["output_ax2_ylim"] = (0, y2[1] * 1.15 if y2 and y2[1] > 0 else 1.5)
+        elif getattr(uistate, "experiment_type", "time") == "PP":
+            uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow, dft=dft)
+            # In PP mode, lock the Y-axis to dynamically start at 0 and scale up to include all active data, 
+            # snapping to clean multiples of 100 if possible.
+            out_xmin, out_xmax = uistate.zoom["output_xlim"]
+            
+            y1 = self._ylim_from_artists(uistate.ax1, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
+            y2 = self._ylim_from_artists(uistate.ax2, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
+            
+            def snap_pp_max(y_bounds):
+                if not y_bounds: return 3.0
+                return max(3.0, (int(y_bounds[1] / 1.0) + 1) * 1.0)
+                
+            # Unify the PP mode axes so they always share identical Y-axis boundaries
+            uistate.zoom["output_ax1_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
+            uistate.zoom["output_ax2_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
         else:
             uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow, dft=dft)
             out_xmin, out_xmax = uistate.zoom["output_xlim"]
@@ -3970,7 +4023,8 @@ class UIsub(
                 dict_group = self.dd_groups[group_ID]
                 group_mean_data = self.get_dfgroupmean(group_ID)
                 # print(f"graphGroups: Adding group {group_ID} to plot: {group_mean_data}")
-                uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data))
+                x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
+                uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data), x_pos=x_pos)
 
     def graphUpdate(self, df=None, row=None):
         def processRow(row):
@@ -4632,6 +4686,11 @@ class UIsub(
             for key, value in uistate.dict_rec_labels.items()
             if key.endswith(" marker") and value["rec_ID"] == rec_ID and value["axis"] == "axe" and value["stim"] == stim_num
         }
+        
+        # When in PP mode, "mouseoverUpdate" correctly drops all group lines (since we only show recording data).
+        # We need to explicitly clear dict_group_show to hide the groups properly before the final graphRefresh!
+        if getattr(uistate, "experiment_type", "time") == "PP":
+            uistate.dict_group_show.clear()
         if not dict_labels:
             print("(no labels) mouseoverUpdate calls self.graphRefresh()")
             self.graphRefresh()
@@ -4969,10 +5028,40 @@ class UIsub(
                     outkey = aspect_norm if uistate.checkBox["norm_EPSP"] else aspect
                 else:
                     outkey = aspect
-                drag_x = out["sweep"]
-                drag_y = out[outkey]
-                marker_style = "o" if len(drag_x) == 1 else "None"
-                linestyle = "-"
+
+                is_pp = getattr(uistate, "experiment_type", "time") == "PP"
+                if is_pp:
+                    out_sweeps = out[out["sweep"].notna()]
+                    out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
+                    out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
+                    common_sweeps = out1.index.intersection(out2.index).dropna()
+                    if not common_sweeps.empty:
+                        o1 = out1.loc[common_sweeps]
+                        o2 = out2.loc[common_sweeps]
+                        v1 = o1[aspect].values.astype(float)
+                        v2 = o2[aspect].values.astype(float)
+                        import numpy as np
+                        import warnings
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore")
+                            ppr = (v2 / v1)
+                            ppr[~np.isfinite(ppr)] = np.nan
+                        x_val_map = {"EPSP_amp": 1, "EPSP_slope": 2, "volley_amp": 3, "volley_slope": 4}
+                        x_val = x_val_map.get(aspect, 1)
+                        drag_x = np.full(len(common_sweeps), x_val)
+                        drag_y = ppr
+                        marker_style = "o"
+                        linestyle = "None"
+                    else:
+                        drag_x = out["sweep"]
+                        drag_y = out[outkey]
+                        marker_style = "o" if len(drag_x) == 1 else "None"
+                        linestyle = "-"
+                else:
+                    drag_x = out["sweep"]
+                    drag_y = out[outkey]
+                    marker_style = "o" if len(drag_x) == 1 else "None"
+                    linestyle = "-"
 
         msize = 10 if is_io else 6
         if getattr(uistate, "mouseover_out", None) is None:
@@ -5281,7 +5370,8 @@ class UIsub(
         self.group_cache_purge(affected_groups)
         for group_ID in affected_groups:
             df_groupmean = self.get_dfgroupmean(group_ID)
-            uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.V2mV(df_groupmean))
+            x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
+            uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.V2mV(df_groupmean), x_pos=x_pos)
         self.mouseoverUpdate()
         self.update_amp_lineEdits()
         self.update_slope_lineEdits()
