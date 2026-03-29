@@ -443,8 +443,6 @@ class UIplot:
 
         axm.axis("off")
 
-        axe.set_xlim(uistate.zoom["event_xlim"])
-        axe.set_ylim(uistate.zoom["event_ylim"])
         axe.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:.1f}"))
         axe.set_ylabel("Voltage (mV)")
         axe.xaxis.set_major_formatter(FuncFormatter(lambda t, _: f"{t * 1e3:.1f}"))
@@ -482,11 +480,6 @@ class UIplot:
             ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax2.xaxis.set_major_formatter(uistate.x_axis_formatter())
-
-        ax1.set_ylim(uistate.zoom["output_ax1_ylim"])
-        ax2.set_ylim(uistate.zoom["output_ax2_ylim"])
-        ax1.set_xlim(uistate.zoom["output_xlim"])
-        ax2.set_xlim(uistate.zoom["output_xlim"])
 
         # Add horizontal dotted grid lines at 100%, 200%, 300% for PPR
         if exp_type == "PP":
