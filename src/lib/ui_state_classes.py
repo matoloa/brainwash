@@ -165,7 +165,7 @@ class UIstate:
             "rgb_volley_slope": (1, 0.5, 1),
             "alpha_mark": 0.4,
             "alpha_line": 1,
-            "journal_export": "jneurosci",
+            "journal_export": None,
         }
         self.zoom = {
             "mean_xlim": (0, 1),
@@ -480,13 +480,14 @@ class UIstate:
                     if "PPR" in key and hasattr(val["line"], "patches"):
                         has_groups = True
                         try:
-                            x_positions.append(val["line"].patches[0].get_x() + val["line"].patches[0].get_width()/2)
-                        except: pass
+                            x_positions.append(val["line"].patches[0].get_x() + val["line"].patches[0].get_width() / 2)
+                        except:
+                            pass
                 if x_positions:
                     max_x = max(x_positions) + 0.5
             if has_groups:
                 return (0.5, max_x)
-            
+
             # Check if we have recordings
             has_recs = False
             rec_x_positions = []
@@ -498,14 +499,15 @@ class UIstate:
                             x_data = val["line"].get_xdata()
                             if len(x_data) > 0:
                                 rec_x_positions.extend(x_data)
-                        except: pass
+                        except:
+                            pass
             if has_recs:
                 if rec_x_positions:
                     return (min(rec_x_positions) - 0.5, max(rec_x_positions) + 0.5)
-                return (0.5, 4.5) # Default 1 to 4 span
-                
+                return (0.5, 4.5)  # Default 1 to 4 span
+
             return (0.5, 1.5)
-        
+
         mode = self.x_axis
         if mode == "sweep":
             n = prow["sweeps"]
