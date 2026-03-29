@@ -499,6 +499,44 @@ class UIplot:
                 ax1.tick_params(axis='x', bottom=False, labelbottom=True)
                 ax2.tick_params(axis='x', bottom=False, labelbottom=True)
         
+        # Check if recordings are visible instead of groups
+        pp_has_recs = False
+        if exp_type == "PP" and hasattr(uistate, "dict_rec_show"):
+            for key, val in uistate.dict_rec_show.items():
+                if "PPR" in key and "marker" not in key:
+                    pp_has_recs = True
+                    break
+
+        if exp_type == "PP" and pp_has_recs and not group_name_to_x:
+            x_ticks = []
+            x_ticklabels = []
+            if uistate.checkBox.get("EPSP_amp", True):
+                x_ticks.append(1)
+                x_ticklabels.append("EPSP Amp")
+            if uistate.checkBox.get("EPSP_slope", True):
+                x_ticks.append(2)
+                x_ticklabels.append("EPSP Slope")
+            if uistate.checkBox.get("volley_amp", True):
+                x_ticks.append(3)
+                x_ticklabels.append("Volley Amp")
+            if uistate.checkBox.get("volley_slope", True):
+                x_ticks.append(4)
+                x_ticklabels.append("Volley Slope")
+
+            if not x_ticks:
+                ax1.set_xlabel("No aspect selected")
+                ax1.tick_params(axis='x', bottom=False, labelbottom=False)
+                ax2.tick_params(axis='x', bottom=False, labelbottom=False)
+            else:
+                ax1.set_xlabel("")
+                ax2.set_xlabel("")
+                ax1.set_xticks(x_ticks)
+                ax1.set_xticklabels(x_ticklabels)
+                ax2.set_xticks(x_ticks)
+                ax2.set_xticklabels(x_ticklabels)
+                ax1.tick_params(axis='x', bottom=False, labelbottom=True)
+                ax2.tick_params(axis='x', bottom=False, labelbottom=True)
+
         if exp_type != "PP":
             ax1.set_xlabel(uistate.x_axis_xlabel())
             ax1.xaxis.set_major_locator(uistate.x_axis_locator())
