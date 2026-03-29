@@ -2054,6 +2054,8 @@ class UIsub(
         self.update_show()
         if key in ["output_ymin0", "norm_EPSP"]:
             self.zoomAuto()
+        elif getattr(uistate, "experiment_type", "time") == "PP" and key in ["EPSP_amp", "volley_amp", "EPSP_slope", "volley_slope"]:
+            self.zoomAuto()
         self.graphRefresh()
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
@@ -5061,7 +5063,12 @@ class UIsub(
                             warnings.simplefilter("ignore")
                             ppr = v2 / v1
                             ppr[~np.isfinite(ppr)] = np.nan
-                        x_val_map = {"EPSP_amp": 1, "EPSP_slope": 2, "volley_amp": 3, "volley_slope": 4}
+                        x_val_map = {}
+                        i = 1
+                        for key in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]:
+                            if uistate.checkBox.get(key, True):
+                                x_val_map[key] = i
+                                i += 1
                         x_val = x_val_map.get(aspect, 1)
                         drag_x = np.full(len(common_sweeps), x_val)
                         drag_y = ppr

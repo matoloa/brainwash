@@ -1348,7 +1348,12 @@ class UIplot:
                             ppr[~np.isfinite(ppr)] = np.nan
                         
                         # Assign discrete x-values to group the blobs side-by-side
-                        x_val_map = {"EPSP_amp": 1, "EPSP_slope": 2, "volley_amp": 3, "volley_slope": 4}
+                        x_val_map = {}
+                        i = 1
+                        for key in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]:
+                            if self.uistate.checkBox.get(key, True):
+                                x_val_map[key] = i
+                                i += 1
                         x_val = x_val_map.get(aspect, 1)
 
                         for variant in ["raw", "norm"]:
