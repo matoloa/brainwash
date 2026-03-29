@@ -645,8 +645,11 @@ def measure_waveform(df_snippet, dict_t: dict, filter: str = "voltage") -> dict:
     t_EPSP_w = dict_t.get("t_EPSP_amp_width", 2 * dict_t.get("t_EPSP_amp_halfwidth", 0))
     if valid(t_EPSP_amp):
         if t_EPSP_w == 0:
-            row = df_snippet[df_snippet["time"] == t_EPSP_amp]
-            val = -(row[filter].iloc[0] - amp_zero) if not row.empty else np.nan
+            if df_snippet.empty:
+                val = np.nan
+            else:
+                idx = (df_snippet["time"] - t_EPSP_amp).abs().idxmin()
+                val = -(df_snippet.loc[idx, filter] - amp_zero)
         else:
             mask = (df_snippet["time"] >= t_EPSP_amp - t_EPSP_w / 2) & (df_snippet["time"] <= t_EPSP_amp + t_EPSP_w / 2)
             mean_v = df_snippet.loc[mask, filter].mean()
@@ -669,8 +672,11 @@ def measure_waveform(df_snippet, dict_t: dict, filter: str = "voltage") -> dict:
     t_volley_w = dict_t.get("t_volley_amp_width", 2 * dict_t.get("t_volley_amp_halfwidth", 0))
     if valid(t_volley_amp):
         if t_volley_w == 0:
-            row = df_snippet[df_snippet["time"] == t_volley_amp]
-            val = -(row[filter].iloc[0] - amp_zero) if not row.empty else np.nan
+            if df_snippet.empty:
+                val = np.nan
+            else:
+                idx = (df_snippet["time"] - t_volley_amp).abs().idxmin()
+                val = -(df_snippet.loc[idx, filter] - amp_zero)
         else:
             mask = (df_snippet["time"] >= t_volley_amp - t_volley_w / 2) & (df_snippet["time"] <= t_volley_amp + t_volley_w / 2)
             mean_v = df_snippet.loc[mask, filter].mean()

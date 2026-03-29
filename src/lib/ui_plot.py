@@ -1,5 +1,5 @@
-import warnings
 import time  # counting time for functions
+import warnings
 
 import matplotlib.pyplot as plt  # for the scatterplot
 import numpy as np
@@ -431,12 +431,12 @@ class UIplot:
         elif exp_type == "PP":
             ax1.set_ylabel("PPR Amp (%)")
             ax2.set_ylabel("PPR Slope (%)")
-            
+
             ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
         else:
-            ax1.tick_params(axis='x', bottom=True, length=3.5) # restore matplotlib default tick marks
-            ax2.tick_params(axis='x', bottom=True, length=3.5)
+            ax1.tick_params(axis="x", bottom=True, length=3.5)  # restore matplotlib default tick marks
+            ax2.tick_params(axis="x", bottom=True, length=3.5)
             if uistate.checkBox["norm_EPSP"]:
                 ax1.set_ylabel("Amplitude %")
                 ax2.set_ylabel("Slope %")
@@ -452,7 +452,7 @@ class UIplot:
         ax2.set_ylim(uistate.zoom["output_ax2_ylim"])
         ax1.set_xlim(uistate.zoom["output_xlim"])
         ax2.set_xlim(uistate.zoom["output_xlim"])
-        
+
         # Add horizontal dotted grid lines at 100%, 200%, 300% for PPR
         if exp_type == "PP":
             # clear previous dashed lines if we didn't just exorcise
@@ -461,15 +461,16 @@ class UIplot:
                 for line in lines_to_remove:
                     try:
                         line.remove()
-                    except: pass
-                    
+                    except:
+                        pass
+
             for y_val in [1.0, 2.0, 3.0]:
                 ax1.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
                 ax2.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
         if exp_type == "PP":
             ax1.set_xlabel("")
             ax2.set_xlabel("")
-            
+
             # Re-collect the true integer X positions for group labels, ignoring the sub-offsets used for the individual bars
             group_name_to_x = {}
             if hasattr(uistate, "dict_group_show"):
@@ -477,18 +478,19 @@ class UIplot:
                     if "PPR" in key and hasattr(val["line"], "patches"):
                         try:
                             # The original x_pos is an integer (1.0, 2.0, etc), so we round the fractional bar position back to the nearest integer
-                            x_pos_float = val["line"].patches[0].get_x() + val["line"].patches[0].get_width()/2
+                            x_pos_float = val["line"].patches[0].get_x() + val["line"].patches[0].get_width() / 2
                             x_pos_int = round(x_pos_float)
                             group_name = key.split(" PPR")[0]
                             group_name_to_x[x_pos_int] = group_name
-                        except: pass
-            
+                        except:
+                            pass
+
             x_ticks = sorted(list(group_name_to_x.keys()))
             x_ticklabels = [group_name_to_x[x] for x in x_ticks]
-            
+
             if not x_ticks:
-                ax1.tick_params(axis='x', bottom=False, labelbottom=False)
-                ax2.tick_params(axis='x', bottom=False, labelbottom=False)
+                ax1.tick_params(axis="x", bottom=False, labelbottom=False)
+                ax2.tick_params(axis="x", bottom=False, labelbottom=False)
             else:
                 ax1.set_xticks(x_ticks)
                 ax1.set_xticklabels(x_ticklabels)
@@ -496,9 +498,9 @@ class UIplot:
                 ax2.set_xticklabels(x_ticklabels)
 
                 # Turn off the tick *marks* (the physical lines), leaving just the labels
-                ax1.tick_params(axis='x', bottom=False, labelbottom=True)
-                ax2.tick_params(axis='x', bottom=False, labelbottom=True)
-        
+                ax1.tick_params(axis="x", bottom=False, labelbottom=True)
+                ax2.tick_params(axis="x", bottom=False, labelbottom=True)
+
         # Check if recordings are visible instead of groups
         pp_has_recs = False
         if exp_type == "PP" and hasattr(uistate, "dict_rec_show"):
@@ -525,8 +527,8 @@ class UIplot:
 
             if not x_ticks:
                 ax1.set_xlabel("No aspect selected")
-                ax1.tick_params(axis='x', bottom=False, labelbottom=False)
-                ax2.tick_params(axis='x', bottom=False, labelbottom=False)
+                ax1.tick_params(axis="x", bottom=False, labelbottom=False)
+                ax2.tick_params(axis="x", bottom=False, labelbottom=False)
             else:
                 ax1.set_xlabel("")
                 ax2.set_xlabel("")
@@ -534,8 +536,8 @@ class UIplot:
                 ax1.set_xticklabels(x_ticklabels)
                 ax2.set_xticks(x_ticks)
                 ax2.set_xticklabels(x_ticklabels)
-                ax1.tick_params(axis='x', bottom=False, labelbottom=True)
-                ax2.tick_params(axis='x', bottom=False, labelbottom=True)
+                ax1.tick_params(axis="x", bottom=False, labelbottom=True)
+                ax2.tick_params(axis="x", bottom=False, labelbottom=True)
 
         if exp_type != "PP":
             ax1.set_xlabel(uistate.x_axis_xlabel())
@@ -790,7 +792,8 @@ class UIplot:
             color=color,
             label=f"{label} x",
             alpha=self.uistate.settings["alpha_line"],
-            zorder=0,
+            zorder=2,
+            linewidth=2,
         )
         (yline,) = self.get_axis(axid).plot(
             [x, x],
@@ -798,7 +801,8 @@ class UIplot:
             color=color,
             label=f"{label} y",
             alpha=self.uistate.settings["alpha_line"],
-            zorder=0,
+            zorder=2,
+            linewidth=2,
         )
         xline.set_visible(False)
         yline.set_visible(False)
@@ -1143,8 +1147,11 @@ class UIplot:
                     x_position + t_row["t_EPSP_amp_halfwidth"],
                 )
                 if not out_stim_row.empty:
-                    epsp_amp_val = out_stim_row["EPSP_amp"].values[0]
+                    epsp_amp_val = out_stim_row["EPSP_amp"].values[0] / 1000.0
                 else:
+                    epsp_amp_val = np.nan
+
+                if pd.isna(epsp_amp_val):
                     half = t_row.get("t_EPSP_amp_halfwidth", 0)
                     if half == 0:
                         amp_val = df_event.loc[(df_event["time"] - x_position).abs().idxmin(), rec_filter] if not df_event.empty else amp_zero_plot
@@ -1267,8 +1274,11 @@ class UIplot:
                     pass  # Values natively map back to SI inside the plotting bounds
                 else:
                     if not out_stim_row.empty:
-                        volley_amp_mean = out_stim_row["volley_amp"].values[0]
+                        volley_amp_mean = out_stim_row["volley_amp"].values[0] / 1000.0
                     else:
+                        volley_amp_mean = np.nan
+
+                    if pd.isna(volley_amp_mean):
                         half = t_row.get("t_volley_amp_halfwidth", 0)
                         if half == 0:
                             amp_val = (
@@ -1356,35 +1366,34 @@ class UIplot:
                     x_mode="sweep",
                 )
 
-
         if is_pp and not skip_output:
             out_sweeps = dfoutput[dfoutput["sweep"].notna()]
             out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
             out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
-            
+
             common_sweeps = out1.index.intersection(out2.index).dropna()
             if not common_sweeps.empty:
                 o1 = out1.loc[common_sweeps]
                 o2 = out2.loc[common_sweeps]
-                
+
                 configs = [
                     ("EPSP_amp", "ax1", settings.get("rgb_EPSP_amp", "blue")),
                     ("EPSP_slope", "ax2", settings.get("rgb_EPSP_slope", "red")),
                     ("volley_amp", "ax1", settings.get("rgb_volley_amp", "green")),
                     ("volley_slope", "ax2", settings.get("rgb_volley_slope", "orange")),
                 ]
-                
+
                 for aspect, axid, color in configs:
                     if aspect in o1.columns and aspect in o2.columns:
                         v1 = o1[aspect].values.astype(float)
                         v2 = o2[aspect].values.astype(float)
-                        
+
                         with warnings.catch_warnings():
                             warnings.simplefilter("ignore")
-                            ppr = (v2 / v1)
+                            ppr = v2 / v1
                             # replace inf and -inf with nan
                             ppr[~np.isfinite(ppr)] = np.nan
-                        
+
                         # Assign discrete x-values to group the blobs side-by-side
                         x_val_map = {}
                         i = 1
@@ -1408,7 +1417,7 @@ class UIplot:
                                 x_mode="sweep",
                                 marker="o",
                                 markersize=10,
-                                linestyle="None"
+                                linestyle="None",
                             )
 
         # Stim-mode aggregate lines (always created when stim-mode rows exist;
@@ -1464,7 +1473,7 @@ class UIplot:
         if exp_type == "PP":
             group_name = dict_group["group_name"]
             color = dict_group["color"]
-            
+
             # Find all PPR lines for recordings in this group
             ppr_data = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
             for rec_id in dict_group["rec_IDs"]:
@@ -1475,25 +1484,25 @@ class UIplot:
                             y_data = linedict["line"].get_ydata()
                             if len(y_data) > 0 and np.isfinite(y_data[0]):
                                 ppr_data[aspect].append(y_data[0])
-            
+
             aspect_list = [
                 ("EPSP_amp", "ax1"),
                 ("EPSP_slope", "ax2"),
                 ("volley_amp", "ax1"),
                 ("volley_slope", "ax2"),
             ]
-            
+
             # Dynamically calculate spacing offsets for only the enabled aspects
             active_aspects = [item for item in aspect_list if self.uistate.checkBox.get(item[0], True)]
             n_active = len(active_aspects)
-            
+
             configs = []
             if n_active > 0:
-                bar_width = 0.8 / max(1, n_active) # Max total cluster width is 0.8 to leave 0.2 spacing between groups
+                bar_width = 0.8 / max(1, n_active)  # Max total cluster width is 0.8 to leave 0.2 spacing between groups
                 start_offset = -0.4 + (bar_width / 2)
                 for i, (asp, axid) in enumerate(active_aspects):
                     offset = start_offset + (i * bar_width)
-                    configs.append((asp, axid, offset, bar_width * 0.9)) # 10% gap between bars within cluster
+                    configs.append((asp, axid, offset, bar_width * 0.9))  # 10% gap between bars within cluster
 
             for aspect, axid, offset, bar_w in configs:
                 vals = ppr_data[aspect]
@@ -1501,7 +1510,7 @@ class UIplot:
                 if vals:
                     mean_val = np.mean(vals)
                     sem_val = np.std(vals, ddof=1) / np.sqrt(len(vals)) if len(vals) > 1 else 0
-                    
+
                     bar_x = x_pos + offset
 
                     # 1. Plot the bar
@@ -1510,7 +1519,16 @@ class UIplot:
                     )
                     # 2. Plot error bars
                     err_artist = self.get_axis(axid).errorbar(
-                        [bar_x], [mean_val], yerr=[sem_val], fmt="none", ecolor="black", elinewidth=1.5, capsize=5, capthick=1.5, zorder=2, label=f"{group_name} PPR {aspect} err"
+                        [bar_x],
+                        [mean_val],
+                        yerr=[sem_val],
+                        fmt="none",
+                        ecolor="black",
+                        elinewidth=1.5,
+                        capsize=5,
+                        capthick=1.5,
+                        zorder=2,
+                        label=f"{group_name} PPR {aspect} err",
                     )
                     # 3. Plot individual points
                     # Jitter the points slightly along the X axis so they don't overlap perfectly
@@ -1519,7 +1537,7 @@ class UIplot:
                     scat_artist = self.get_axis(axid).scatter(
                         x_jittered, vals, color="white", edgecolor="black", zorder=3, s=40, label=f"{group_name} PPR {aspect} points"
                     )
-                    
+
                     # Store artists so they can be hidden/shown or cleared
                     for artist, suffix in [(bar_artist, "bar"), (err_artist, "err"), (scat_artist, "points")]:
                         artist_obj = artist[0] if isinstance(artist, tuple) or isinstance(artist, list) else artist
@@ -1528,7 +1546,8 @@ class UIplot:
                         else:
                             # bar_artist is a BarContainer, err_artist is an ErrorbarContainer
                             if hasattr(artist, "patches"):
-                                for p in artist.patches: p.set_visible(False)
+                                for p in artist.patches:
+                                    p.set_visible(False)
                             elif hasattr(artist, "lines"):
                                 for l in artist.lines:
                                     if l is not None:
@@ -1538,17 +1557,17 @@ class UIplot:
                                                     sub_l.set_visible(False)
                                         else:
                                             l.set_visible(False)
-                        
+
                         self.uistate.dict_group_labels[f"{group_name} PPR {aspect} {suffix}"] = {
                             "group_ID": group_ID,
                             "aspect": aspect,
-                            "variant": "raw", # we'll just map everything to raw for groups in PP
+                            "variant": "raw",  # we'll just map everything to raw for groups in PP
                             "stim": None,
-                            "line": artist, # we use "line" as the generic container key
-                            "fill": artist, # and "fill" to avoid exceptions in update_show
+                            "line": artist,  # we use "line" as the generic container key
+                            "fill": artist,  # and "fill" to avoid exceptions in update_show
                             "axis": axid,
-                            "x_mode": "sweep", # so it shows up
-                            "is_container": True
+                            "x_mode": "sweep",  # so it shows up
+                            "is_container": True,
                         }
             return
 
@@ -1725,15 +1744,15 @@ class UIplot:
             y_start = data_y[np.abs(data_x - x_start).argmin()]
             y_end = data_y[np.abs(data_x - x_end).argmin()]
             self.updateLine(f"{label_core} marker", [x_start, x_end], [y_start, y_end])
-            
+
             is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
-            
+
             if aspect == "volley slope":
                 volley_slope_mean = trow.get("volley_slope_mean")
                 if is_pp:
                     stim_num = trow["stim"]
                     if dfoutput is not None:
-                        self.updateOutLineFromDf(label_core, dfoutput, stim_num, aspect.replace(' ', '_'))
+                        self.updateOutLineFromDf(label_core, dfoutput, stim_num, aspect.replace(" ", "_"))
                 else:
                     self.updateOutMean(f"{label_core} mean", volley_slope_mean)
             else:  # EPSP slope
@@ -1788,7 +1807,16 @@ class UIplot:
         y = np.atleast_1d(y)
         print(f"updateAmpMarker: {labelbase}, x: {x}, y: {y}, amp_x: {amp_x}, amp_zero: {amp_zero}, amp: {amp}")
         self.uistate.dict_rec_labels[f"{labelbase} marker"]["line"].set_data(x, y)
-        if amp is not None:
+        if amp is None or pd.isna(amp):
+            amp = -(y[0] - amp_zero)
+
+        if amp is not None and not pd.isna(amp):
+            expected_amp = -(y[0] - amp_zero)
+            if abs(expected_amp) > 1e-6 and abs(amp / expected_amp) > 50:
+                amp = amp / 1000.0
+            elif abs(expected_amp) <= 1e-6 and abs(amp) > 1e-3:
+                amp = amp / 1000.0
+
             is_zero_width = amp_x[0] == amp_x[1]
             amp_y = amp_zero, (0 - amp) + amp_zero
             self.uistate.dict_rec_labels[f"{labelbase} x marker"]["line"].set_data(amp_x, [amp_y[1], amp_y[1]])
@@ -1960,7 +1988,7 @@ class UIplot:
             print(f"updateOutLineFromDf: no data for stim={stim_num} col={column}, falling back to updateOutLine")
             self.updateOutLine(label)
             return
-            
+
         if label not in self.uistate.dict_rec_labels:
             is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
             if is_pp:
@@ -1978,18 +2006,20 @@ class UIplot:
                         v2 = o2[aspect].values.astype(float)
                         with warnings.catch_warnings():
                             warnings.simplefilter("ignore")
-                            ppr = (v2 / v1)
+                            ppr = v2 / v1
                             ppr[~np.isfinite(ppr)] = np.nan
-                        
+
                         for variant in ["raw", "norm"]:
                             ppr_label = f"{rec_label} PPR {aspect} {variant}"
                             if ppr_label in self.uistate.dict_rec_labels:
                                 linedict = self.uistate.dict_rec_labels[ppr_label]
                                 line = linedict["line"]
-                                line.set_xdata(np.full(len(common_sweeps), {"EPSP_amp": 1, "EPSP_slope": 2, "volley_amp": 3, "volley_slope": 4}.get(aspect, 1)))
+                                line.set_xdata(
+                                    np.full(len(common_sweeps), {"EPSP_amp": 1, "EPSP_slope": 2, "volley_amp": 3, "volley_slope": 4}.get(aspect, 1))
+                                )
                                 line.set_ydata(ppr)
             return
-            
+
         linedict = self.uistate.dict_rec_labels[label]
         x_col = linedict.get("x_mode", "sweep")
         if x_col not in df_stim.columns:
