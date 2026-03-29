@@ -1746,10 +1746,39 @@ class UIsub(
         # 0.5 ms after t=0 (the stim); x-axis on axe is already shifted so t=0 is
         # the stim, so the offset is absolute, not relative to event_start.
         artefact_offset = 0.0005  # seconds after t_stim=0 — clears the artefact spike
-        uistate.zoom["event_ylim"] = self._ylim_from_artists(uistate.axe, x_min=artefact_offset) or (
-            -0.0015,
-            0.0002,
-        )
+        artist_ylim = self._ylim_from_artists(uistate.axe, x_min=artefact_offset)
+        ymax = artist_ylim[1] if artist_ylim else 0.0002
+        ymin = artist_ylim[0] if artist_ylim else -0.0015
+
+        # Calibrate ymin from the visible dfmeans in the 1ms to 9ms window
+        # to ensure immunity against single-sweep noise and large artefacts.
+        visible_df_mins = []
+        dfp = self.get_df_project()
+        visible_rec_ids = {v["rec_ID"] for v in uistate.dict_rec_show.values() if "rec_ID" in v and v.get("axis") == "axe"}
+        if not visible_rec_ids and prow is not None:
+            visible_rec_ids = {prow["ID"]}
+
+        for rec_id in visible_rec_ids:
+            matching_rows = dfp[dfp["ID"] == rec_id]
+            if matching_rows.empty:
+                continue
+            r = matching_rows.iloc[0]
+            rec_dfmean = self.get_dfmean(r)
+            rec_dft = self.get_dft(r)
+
+            for _, t_row in rec_dft.iterrows():
+                t_stim = t_row.get("t_stim", 0.0)
+                mask = (rec_dfmean["time"] >= t_stim + 0.001) & (rec_dfmean["time"] <= t_stim + 0.009)
+                dfmean_window = rec_dfmean[mask]
+                if not dfmean_window.empty:
+                    visible_df_mins.append(float(dfmean_window["voltage"].min()))
+
+        if visible_df_mins:
+            df_min = min(visible_df_mins)
+            span = ymax - df_min if ymax > df_min else abs(df_min)
+            ymin = df_min - 0.10 * span
+
+        uistate.zoom["event_ylim"] = (ymin, ymax)
         uistate.zoom["event_xlim"] = (
             uistate.settings["event_start"],
             uistate.settings["event_end"],
