@@ -309,7 +309,7 @@ class UIplot:
                 patches = list(ax.patches)
                 if len(patches) > 0:
                     for patch in patches:
-                        patch.remove()
+                        patch.set_visible(False)
                 legend = ax.get_legend()
                 if legend is not None:
                     legend.remove()
