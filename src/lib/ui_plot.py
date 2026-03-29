@@ -354,19 +354,19 @@ class UIplot:
                         artist.remove()
                     except Exception:
                         pass
-                elif isinstance(artist, tuple) or isinstance(artist, list):
+                if isinstance(artist, tuple) or isinstance(artist, list):
                     for a in artist:
                         try:
                             a.remove()
                         except:
                             pass
-                elif hasattr(artist, "patches"):
+                if hasattr(artist, "patches"):
                     for p in artist.patches:
                         try:
                             p.remove()
                         except:
                             pass
-                elif hasattr(artist, "lines"):
+                if hasattr(artist, "lines"):
                     for l in artist.lines:
                         if l is not None:
                             if isinstance(l, (list, tuple)):
@@ -381,6 +381,15 @@ class UIplot:
                                     l.remove()
                                 except:
                                     pass
+
+            # Some containers might be stored under "fill" instead of "line" depending on legacy structure
+            artist = dict_group[key].get("fill")
+            if artist is not None and artist is not dict_group[key].get("line"):
+                if hasattr(artist, "remove"):
+                    try:
+                        artist.remove()
+                    except Exception:
+                        pass
 
             del dict_group[key]
             if key in dict_group_show:
@@ -1534,6 +1543,7 @@ class UIplot:
                     offset = start_offset + (i * bar_width)
                     configs.append((asp, axid, offset, bar_width * 0.9))  # 10% gap between bars within cluster
 
+            print(f"DEBUG addGroup called for {group_name}")
             for aspect, axid, offset, bar_w in configs:
                 vals = ppr_data[aspect]
                 if vals:

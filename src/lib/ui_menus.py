@@ -268,14 +268,49 @@ class MenuMixin:
                             for k in ("line", "fill"):
                                 artist = info.get(k)
                                 if artist is not None:
-                                    artist.set_color(new_color)
+                                    if hasattr(artist, "patches"):
+                                        for p in artist.patches:
+                                            import matplotlib.colors as mcolors
+                                            try:
+                                                current_alpha = p.get_alpha()
+                                                if current_alpha is None:
+                                                    if hasattr(p, "get_facecolor"):
+                                                        fc = p.get_facecolor()
+                                                        if isinstance(fc, tuple) and len(fc) == 4:
+                                                            current_alpha = fc[3]
+
+                                                if hasattr(p, "set_facecolor"):
+                                                    rgba = mcolors.to_rgba(new_color, current_alpha)
+                                                    p.set_facecolor(rgba)
+                                                    if hasattr(p, "set_edgecolor"):
+                                                        p.set_edgecolor("black")
+                                                elif hasattr(p, "set_color"):
+                                                    rgba = mcolors.to_rgba(new_color, current_alpha)
+                                                    p.set_color(rgba)
+                                            except Exception as e:
+                                                pass
+                                    elif hasattr(artist, "lines"):
+                                        for l in artist.lines:
+                                            if l is not None:
+                                                if isinstance(l, (list, tuple)):
+                                                    for sub_l in l:
+                                                        if hasattr(sub_l, "set_color"):
+                                                            sub_l.set_color(new_color)
+                                                elif hasattr(l, "set_color"):
+                                                    l.set_color(new_color)
+                                    elif hasattr(artist, "set_color"):
+                                        artist.set_color(new_color)
+                                    elif hasattr(artist, "set_facecolor"):
+                                        artist.set_facecolor(new_color)
             if hasattr(self, "group_cache_purge"):
                 self.group_cache_purge()
             if hasattr(self, "groupControlsRefresh"):
                 self.groupControlsRefresh()
         self.syncJournalExportMenu()
-        if hasattr(self, "triggerRefresh"):
-            self.triggerRefresh()
+        if hasattr(self, "update_show"):
+            self.update_show()
+        if hasattr(self, "graphRefresh"):
+            self.graphRefresh()
         if hasattr(self, "dict_folders") and "project" in self.dict_folders:
             uistate.save_cfg(projectfolder=self.dict_folders["project"])
 

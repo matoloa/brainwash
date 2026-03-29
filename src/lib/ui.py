@@ -1152,8 +1152,11 @@ class UIsub(
             uistate.dict_rec_show = {}
             if self.dd_groups is not None:
                 new_group_show = {}
+                is_pp = getattr(uistate, "experiment_type", "time") == "PP"
                 for k, v in uistate.dict_group_labels.items():
                     visible = self._is_group_visible(v, selected_groups=None)
+                    if is_pp and v.get("is_overlay"):
+                        visible = False
                     for key in ["line", "fill"]:
                         obj = v[key]
                         if hasattr(obj, "set_visible"):
@@ -1210,7 +1213,7 @@ class UIsub(
             new_group_show = {}
             for k, v in uistate.dict_group_labels.items():
                 visible = self._is_group_visible(v, selected_groups)
-                
+
                 if is_pp:
                     if selected_ids:
                         # Rec view: hide normal group artists, show overlay
@@ -1701,7 +1704,8 @@ class UIsub(
                 y2 = self._ylim_from_artists(uistate.ax2, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
 
                 def snap_pp_max(y_bounds):
-                    if not y_bounds: return 3.0
+                    if not y_bounds:
+                        return 3.0
                     return max(3.0, (int(y_bounds[1] / 1.0) + 1) * 1.0)
 
                 # Unify the PP mode axes so they always share identical Y-axis boundaries
@@ -2831,6 +2835,7 @@ class UIsub(
             uistate.save_cfg(projectfolder=self.dict_folders.get("project"))
 
     def triggerRefresh(self):
+        print("DEBUG: triggerRefresh CALLED!")
         self.usage("refresh graphs")
         selection = uistate.list_idx_select_recs
         self.tableProj.clearSelection()
@@ -4724,7 +4729,6 @@ class UIsub(
             if key.endswith(" marker") and value["rec_ID"] == rec_ID and value["axis"] == "axe" and value["stim"] == stim_num
         }
 
-
         if not dict_labels:
             print("(no labels) mouseoverUpdate calls self.graphRefresh()")
             self.graphRefresh()
@@ -5409,21 +5413,21 @@ class UIsub(
         # update groups
         affected_groups = self.get_groupsOfRec(prow["ID"])
         self.group_cache_purge(affected_groups)
-        
+
         # We MUST run update_show BEFORE rebuilding the groups so that
         # the dict_rec_labels (which dict_group_show relies on for PPR data gathering)
         # matches the visible state expectations.
         self.mouseoverUpdate()
         self.update_show()
-        
+
         for group_ID in affected_groups:
             uiplot.unPlotGroup(group_ID=group_ID)
             df_groupmean = self.get_dfgroupmean(group_ID)
             x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
             uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.V2mV(df_groupmean), x_pos=x_pos)
-            
-        self.update_show() # Re-apply visibility rules to the newly added group artists
-        self.graphRefresh() # Refresh the canvas to draw the new groups
+
+        self.update_show()  # Re-apply visibility rules to the newly added group artists
+        self.graphRefresh()  # Refresh the canvas to draw the new groups
         self.update_amp_lineEdits()
         self.update_slope_lineEdits()
         self.zoomAuto()

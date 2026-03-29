@@ -79,7 +79,8 @@ class DataFrameMixin:
         else:
             for _, p_row in rows.iterrows():
                 uiplot.unPlot(p_row["ID"])
-            affected_group_IDs = list({g for _, p_row in rows.iterrows() for g in self.get_groupsOfRec(p_row["ID"])})
+            # Ensure unique group IDs and convert to list correctly
+            affected_group_IDs = list(set([g for _, p_row in rows.iterrows() for g in self.get_groupsOfRec(p_row["ID"])]))
             for group_ID in affected_group_IDs:
                 uiplot.unPlotGroup(group_ID)
 
