@@ -4435,9 +4435,9 @@ class UIsub(
             axe.figure.canvas.draw()
 
     def outputMouseover(self, event):  # determine which event is being mouseovered
-        if getattr(uistate, "experiment_type", "time") == "PP":
-            return
-        is_io = getattr(uistate, "experiment_type", "time") == "io"
+        experiment_type = getattr(uistate, "experiment_type", "time")
+        is_io = experiment_type == "io"
+        is_pp = experiment_type == "PP"
         if is_io:
             str_ax = "ax1"
         else:
@@ -4523,11 +4523,39 @@ class UIsub(
             out_y_val = y_array[out_x_idx]
         else:
             x_data = dict_pop["line"].get_xdata()
-            # find closest x_index
-            out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
+            y_data = dict_pop["line"].get_ydata()
+            if is_pp:
+                xlim = ax.get_xlim()
+                ylim = ax.get_ylim()
+                x_range = xlim[1] - xlim[0]
+                y_range = ylim[1] - ylim[0]
+                if x_range == 0:
+                    x_range = 1
+                if y_range == 0:
+                    y_range = 1
+                dx = (x_data - x) / x_range
+                dy = (y_data - y) / y_range
+                distances = dx**2 + dy**2
+                if np.all(np.isnan(distances)):
+                    return
+                out_x_idx = int(np.nanargmin(distances))
+            else:
+                # find closest x_index
+                out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
+
             x_val = x_data[out_x_idx]
             out_x_val = x_val
-            out_y_val = dict_pop["line"].get_ydata()[out_x_idx]
+            out_y_val = y_data[out_x_idx]
+
+            if is_pp:
+                dfoutput = self.get_dfdiff(row=p_row) if uistate.checkBox.get("paired_stims", False) else self.get_dfoutput(row=p_row)
+                out_sweeps = dfoutput[dfoutput["sweep"].notna()]
+                out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
+                out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
+                common_sweeps = out1.index.intersection(out2.index).dropna()
+                if len(common_sweeps) > 0:
+                    safe_idx = min(out_x_idx, len(common_sweeps) - 1)
+                    x_val = common_sweeps[safe_idx]
 
         # print(f"* * * outputMouseover: out_x_idx={out_x_idx}, sweeps={sweeps}")
 
@@ -4560,7 +4588,9 @@ class UIsub(
             if is_io:
                 stim = df_sweeps["stim"].iloc[out_x_idx]
             else:
-                stim = dict_pop["stim"]
+                stim = dict_pop.get("stim")
+                if stim is None:
+                    stim = 1
 
             t_row = df_t[df_t["stim"] == stim].iloc[0]
             offset = t_row["t_stim"]
@@ -4582,15 +4612,23 @@ class UIsub(
         aspect = dict_pop.get("aspect", "EPSP_amp")
         highlight_color = uistate.settings.get(f"rgb_{aspect}", "red")
 
-        if getattr(uistate, "mouseover_out_blob", None) is None:
-            uistate.mouseover_out_blob = ax.scatter(out_x_val, out_y_val, color=highlight_color, s=150, alpha=0.8, zorder=10)
-        else:
-            if uistate.mouseover_out_blob.axes != ax:
-                uistate.mouseover_out_blob.remove()
+        if is_io or is_pp:
+            if getattr(uistate, "mouseover_out_blob", None) is None:
                 uistate.mouseover_out_blob = ax.scatter(out_x_val, out_y_val, color=highlight_color, s=150, alpha=0.8, zorder=10)
             else:
-                uistate.mouseover_out_blob.set_offsets([[out_x_val, out_y_val]])
-                uistate.mouseover_out_blob.set_color(highlight_color)
+                if uistate.mouseover_out_blob.axes != ax:
+                    uistate.mouseover_out_blob.remove()
+                    uistate.mouseover_out_blob = ax.scatter(out_x_val, out_y_val, color=highlight_color, s=150, alpha=0.8, zorder=10)
+                else:
+                    uistate.mouseover_out_blob.set_offsets([[out_x_val, out_y_val]])
+                    uistate.mouseover_out_blob.set_color(highlight_color)
+        else:
+            if getattr(uistate, "mouseover_out_blob", None) is not None:
+                try:
+                    uistate.mouseover_out_blob.remove()
+                except ValueError:
+                    pass
+                uistate.mouseover_out_blob = None
 
         if uistate.ghost_sweep is None:
             ghost_color = "white" if uistate.darkmode else "black"
