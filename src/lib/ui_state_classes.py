@@ -115,6 +115,7 @@ class UIstate:
         self.viewTools = {  # these are cycled by uisub.connectUIstate; framename: [title, visible]
             "frameToolStim": ["Stim detection", True],
             "frameToolSweeps": ["Sweep selection", True],
+            "frameToolTag": ["Tag selection", True],
             "frameToolBin": ["Binning", True],
             "frameToolType": ["Experiment type", True],
             "frameToolFilter": ["Filter", True],

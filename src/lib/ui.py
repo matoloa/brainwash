@@ -2427,6 +2427,7 @@ class UIsub(
         hide_buttons = {
             "pushButton_hide_stim": "frameToolStim",
             "pushButton_hide_sweeps": "frameToolSweeps",
+            "pushButton_hide_tag": "frameToolTag",
             "pushButton_hide_bin": "frameToolBin",
             "pushButton_hide_type": "frameToolType",
             "pushButton_hide_filter": "frameToolFilter",
