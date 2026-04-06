@@ -773,9 +773,6 @@ class UIsub(
         self.progressBar.setVisible(False)
         self.progressBar.setValue(0)
 
-        if config.hide_experimental:
-            self.frameToolPairedStim.setVisible(False)
-
         logger.debug("Pre-bootstrap")
         self.bootstrap(mainwindow)  # set up general UI
         logger.debug("bootstrap done, calling loadProject...")
@@ -2913,10 +2910,6 @@ class UIsub(
     # triggerExportOutputCsv, triggerExportOutputXls, triggerExportOutputImage
     # → ExportMixin (export_data.py)
 
-    def pushButton_paired_data_flip_pressed(self):
-        self.usage("pushButton_paired_data_flip_pressed")
-        self.flipCI()
-
     def triggerRenameRecording(self):
         self.usage("triggerRenameRecording")
         self.renameRecording()
@@ -3818,40 +3811,6 @@ class UIsub(
         self.progressBarManager.__exit__(None, None, None)
         print("onParseDataFinished: calling graphPreload")
         self.graphPreload()
-
-    def flipCI(self):
-        # Inverse Control/Intervention flags of currently selected and paired recordings
-        if uistate.list_idx_select_recs:
-            df_p = self.get_df_project()
-            already_flipped = []
-            for index in uistate.list_idx_select_recs:
-                row = df_p.loc[index]
-                name_rec = row["recording_name"]
-                name_pair = row["paired_recording"]
-                index_pair = df_p[df_p["recording_name"] == name_pair].index[0]
-                if index in already_flipped:
-                    print(f"Already flipped {index}")
-                    continue
-                # if row_pair doesn't exist:
-                if pd.isna(name_pair):
-                    print(f"{name_rec} has no paired recording.")
-                    return
-                print(f"Flipping C-I for {name_rec} and {name_pair}...")
-                df_p.at[index, "Tx"] = not df_p.at[index, "Tx"]
-                df_p.at[index_pair, "Tx"] = not df_p.at[index, "Tx"]
-                # clear caches and diff files
-                key_pair = name_rec[:-2]
-                self.dict_diffs.pop(key_pair, None)
-                path_diff = Path(f"{self.dict_folders['cache']}/{key_pair}_diff.parquet")
-                if path_diff.exists():
-                    path_diff.unlink()
-                # TODO: clear group cache
-                already_flipped.append(index_pair)
-                self.set_df_project(df_p)
-                self.tableUpdate()
-            self.mouseoverUpdate()
-        else:
-            print("No files selected.")
 
     # Data Group handling functions → GroupMixin (ui_groups.py)
     # Writer / project functions → ProjectMixin (ui_project.py)

@@ -122,7 +122,6 @@ class UIstate:
             "frameToolAspect": ["Aspect toggles", True],
             "frameToolAspectSlope": ["Slope width", False],
             "frameToolAspectAmp": ["Amplitude width", False],
-            "frameToolPairedStim": ["Paired stims", False],
         }
         self.checkBox = {  # these are cycled by uisub.connectUIstate; maintain format!
             "EPSP_amp": True,
@@ -243,8 +242,6 @@ class UIstate:
             # sweep selection
             "pushButton_sweeps_even": "trigger_set_sweeps_even",
             "pushButton_sweeps_odd": "trigger_set_sweeps_odd",
-            # aspect toggles
-            "pushButton_paired_data_flip": "pushButton_paired_data_flip_pressed",
             # output scaling
         }
         self.x_select = {  # selected ranges on mean- and output graphs
