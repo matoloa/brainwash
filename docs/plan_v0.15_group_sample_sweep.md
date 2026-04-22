@@ -165,11 +165,10 @@ Modeled **exactly** on the Group controls pattern in `ui_groups.py:214-261` (`gr
 
 **Phase 3 – Sample feature**
 
-- Replace pushButton with `checkBox_is_group_sample`; update `tableProjSelectionChanged()` (~822-992) to set checkbox state (enabled only on exactly one recording that is member of ≥1 group via `df_project["groups"]` column; checked only if it is the sample for _all_ its groups).
-- Implement `sample_selected()` (in `GroupMixin`) to toggle sample pointer _only_ in relevant `dd_groups[group_ID]["sample"] = (rec_ID: str, sweep: int) | None` (or clear it); a group has at most one sample (shared by all Test Sets); calls `group_save_dd()` + `sample_overlay()` (no `df_project` changes, no cache purge on clear).
-- Add separate `sample_overlay()` function in `ui_plot.py` (reuses plotted line from `axe`, overlays it in upper-left corner of output graph ax1/ax2 using group color, y-axis only; supports all samples).
-- No `plot_sample_trace`; integrate overlay with `graphRefresh` / export. Sample state lives _exclusively_ in `dd_groups`.
-- Hook into export routines so samples appear in final figures. Allow samples to be linked to specific Test Sets (v0.16).
+- 3.1 Implement `set_group_sample()` (in `GroupMixin`) to toggle sample key _only_ in relevant `dd_groups[group_ID]["sample"] = rec_ID: str | None` (or clear it); a group has at most one sample (shared by all Test Sets). This also calls `group_save_dd()` to persist the changes.
+- 3.2 Make ui.py def tableProjSelectionChanged update the checkbox to appropriate state.
+- 3.3 Add separate `sample_overlay()` function in `ui_plot.py` (reuses plotted line from `axe`, overlays it in upper-left corner of output graph ax1/ax2 using group color, y-axis only; supports all samples). Sample state lives _exclusively_ in `dd_groups`.
+- 3.4 Hook into export routines so samples appear in final figures.
 
 **Phase 4 – Polish & UI feedback**
 
