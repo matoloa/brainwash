@@ -166,7 +166,9 @@ Modeled **exactly** on the Group controls pattern in `ui_groups.py:214-261` (`gr
 **Phase 3 – Sample feature**
 
 - 3.1 Implement `set_group_sample()` (in `GroupMixin`) to toggle sample key _only_ in relevant `dd_groups[group_ID]["sample"] = rec_ID: str | None` (or clear it); a group has at most one sample (shared by all Test Sets). This also calls `group_save_dd()` to persist the changes.
-- 3.2 Make ui.py def tableProjSelectionChanged update the checkbox to appropriate state.
+- 3.2 Make ui.py def tableProjSelectionChanged update checkBox_is_group_sample to appropriate state.
+  - tableProjSelectionChanged already checks if exactly one rec is selected. If not, set checkBox_is_group_sample unchecked and visibly disable it.
+  - If one rec is selected, enable checkBox_is_group_sample and set it to the return of is_sample_rec(). This function returns True only if the selected rec_ID is the sample of all groups that it is a member of.
 - 3.3 Add separate `sample_overlay()` function in `ui_plot.py` (reuses plotted line from `axe`, overlays it in upper-left corner of output graph ax1/ax2 using group color, y-axis only; supports all samples). Sample state lives _exclusively_ in `dd_groups`.
 - 3.4 Hook into export routines so samples appear in final figures.
 

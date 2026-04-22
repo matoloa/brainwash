@@ -830,6 +830,7 @@ class UIsub(
         uistate.list_idx_select_recs = [index.row() for index in selected_indexes]
         # print(f" - rec_select: {uistate.list_idx_select_recs}")
         self.update_recs2plot()
+        self.update_sample_checkbox()
 
         if uistate.df_recs2plot is None:
             print("No parsed recordings selected.")
@@ -3917,6 +3918,39 @@ class UIsub(
         uistate.checkBox["is_group_sample"] = state == 2
         logger.debug("checkBox_is_group_sample_changed: %s", state)
         print(f"checkBox_is_group_sample_changed: {state}")
+        if len(uistate.list_idx_select_recs) != 1:
+            return
+        prow = self.get_prow()
+        if prow is None:
+            return
+        rec_ID = prow["ID"]
+        rec_str = str(rec_ID)
+        target = rec_str if (state == 2) else None
+        self.set_group_sample(target)
+        self.update_sample_checkbox()
+
+    def update_sample_checkbox(self):
+        """Updates checkBox_is_group_sample enabled/checked state. Called from tableProjSelectionChanged"""
+        if len(uistate.list_idx_select_recs) != 1 or not hasattr(self, "checkBox_is_group_sample"):
+            self.checkBox_is_group_sample.setEnabled(False)
+            self.checkBox_is_group_sample.setChecked(False)
+            return
+        prow = self.get_prow()
+        if prow is None:
+            self.checkBox_is_group_sample.setEnabled(False)
+            self.checkBox_is_group_sample.setChecked(False)
+            return
+        rec_ID = prow["ID"]
+        rec_str = str(rec_ID)
+        groups = self.get_groupsOfRec(rec_ID)
+        enabled = len(groups) > 0
+        checked = enabled and all(str(self.dd_groups.get(g, {}).get("sample")) == rec_str for g in groups)
+        uistate.checkBox["is_group_sample"] = checked
+        checkbox = self.checkBox_is_group_sample
+        checkbox.blockSignals(True)
+        checkbox.setEnabled(enabled)
+        checkbox.setChecked(checked)
+        checkbox.blockSignals(False)
 
     def tableFormat(self):
         logger.debug("tableFormat")

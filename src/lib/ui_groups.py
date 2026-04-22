@@ -50,6 +50,8 @@ class GroupMixin:
             for g in dict_groups.values():
                 if "sample" not in g:
                     g["sample"] = None
+                elif g["sample"] is not None:
+                    g["sample"] = str(g["sample"])  # normalize rec_ID to str
             return dict_groups
         return {}
 
@@ -84,7 +86,10 @@ class GroupMixin:
             pickle.dump(dd_testsets, f)
 
     def get_groupsOfRec(self, rec_ID):  # returns a set of all 'group ID' that have rec_ID in their 'rec_IDs' list
-        return list([key for key, value in self.dd_groups.items() if rec_ID in value["rec_IDs"]])
+        if rec_ID is None:
+            return []
+        rec_str = str(rec_ID)
+        return [key for key, value in self.dd_groups.items() if any(rec_str == str(r) for r in value.get("rec_IDs", []))]
 
     # ------------------------------------------------------------------
     # Create / remove
@@ -266,6 +271,35 @@ class GroupMixin:
             print("No sweeps selected. Drag on output graph or use sweep range controls first.")
             return
         self.testset_new()
+
+    # ------------------------------------------------------------------
+    # Sample designation (Phase 3.1)
+    # ------------------------------------------------------------------
+    def set_group_sample(self, rec_ID: str | None = None):
+        if rec_ID is None:
+            if len(getattr(uistate, "list_idx_select_recs", [])) != 1:
+                return
+            df_p = self.get_df_project()
+            idx = uistate.list_idx_select_recs[0]
+            rec_ID = str(df_p.iloc[idx]["ID"]) if not df_p.empty else None
+            if rec_ID is None:
+                return
+            for g in self.get_groupsOfRec(rec_ID):
+                self.dd_groups[g]["sample"] = None
+            self.group_save_dd()
+            return
+        rec_str = str(rec_ID)
+        group_IDs = self.get_groupsOfRec(rec_ID)
+        if not group_IDs:
+            return
+        is_current_for_all = all(str(self.dd_groups.get(g, {}).get("sample")) == rec_str for g in group_IDs)
+        if is_current_for_all:
+            for g in group_IDs:
+                self.dd_groups[g]["sample"] = None
+        else:
+            for g in group_IDs:
+                self.dd_groups[g]["sample"] = rec_str
+        self.group_save_dd()
 
     # ------------------------------------------------------------------
     # Cache
