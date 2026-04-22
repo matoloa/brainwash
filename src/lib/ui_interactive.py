@@ -1,15 +1,18 @@
 import logging
+
 import numpy as np
 import pandas as pd
+from PyQt5 import QtCore, QtGui, QtWidgets
+
 from lib import analysis_v3 as analysis
 from lib import ui_plot
-from PyQt5 import QtCore, QtGui, QtWidgets
 
 logger = logging.getLogger(__name__)
 
 uistate = None
 config = None
 uiplot = None
+
 
 class InteractivePlotMixin:
     #####################################################
@@ -315,6 +318,45 @@ class InteractivePlotMixin:
 
             axe.figure.canvas.draw()
 
+    @staticmethod
+    def _get_nearest_point(x, y, x_array, y_array, x_range, y_range):
+        dx = (x_array - x) / x_range
+        dy = (y_array - y) / y_range
+        distances = dx**2 + dy**2
+        if np.all(np.isnan(distances)):
+            return None
+        return int(np.nanargmin(distances))
+
+    def _draw_ghost_sweep(self, snippet_x, snippet_y, label_text):
+        if uistate.ghost_sweep is None:
+            ghost_color = "white" if uistate.darkmode else "black"
+            (uistate.ghost_sweep,) = uistate.axe.plot(snippet_x, snippet_y, color=ghost_color, alpha=0.5, zorder=0)
+            if uistate.ghost_label is None:
+                uistate.ghost_label = uistate.axe.text(
+                    1,
+                    1,
+                    label_text,
+                    transform=uistate.axe.transAxes,
+                    ha="left",
+                    va="bottom",
+                )
+            else:
+                uistate.ghost_label.set_text(label_text)
+        else:
+            uistate.ghost_sweep.set_data(snippet_x, snippet_y)
+            uistate.ghost_label.set_text(label_text)
+
+    def _draw_mouseover_blob(self, ax, x, y, color):
+        if getattr(uistate, "mouseover_out_blob", None) is None:
+            uistate.mouseover_out_blob = ax.scatter(x, y, color=color, s=150, alpha=0.8, zorder=10)
+        else:
+            if uistate.mouseover_out_blob.axes != ax:
+                uistate.mouseover_out_blob.remove()
+                uistate.mouseover_out_blob = ax.scatter(x, y, color=color, s=150, alpha=0.8, zorder=10)
+            else:
+                uistate.mouseover_out_blob.set_offsets([[x, y]])
+                uistate.mouseover_out_blob.set_color(color)
+
     def outputMouseover(self, event):  # determine which event is being mouseovered
         experiment_type = getattr(uistate, "experiment_type", "time")
         is_io = experiment_type == "io"
@@ -393,12 +435,9 @@ class InteractivePlotMixin:
             if y_range == 0:
                 y_range = 1
 
-            dx = (x_array - x) / x_range
-            dy = (y_array - y) / y_range
-            distances = dx**2 + dy**2
-            if np.all(np.isnan(distances)):
+            out_x_idx = self._get_nearest_point(x, y, x_array, y_array, x_range, y_range)
+            if out_x_idx is None:
                 return
-            out_x_idx = int(np.nanargmin(distances))
             x_val = df_sweeps["sweep"].iloc[out_x_idx]
             out_x_val = x_array[out_x_idx]
             out_y_val = y_array[out_x_idx]
@@ -414,12 +453,9 @@ class InteractivePlotMixin:
                     x_range = 1
                 if y_range == 0:
                     y_range = 1
-                dx = (x_data - x) / x_range
-                dy = (y_data - y) / y_range
-                distances = dx**2 + dy**2
-                if np.all(np.isnan(distances)):
+                out_x_idx = self._get_nearest_point(x, y, x_data, y_data, x_range, y_range)
+                if out_x_idx is None:
                     return
-                out_x_idx = int(np.nanargmin(distances))
             else:
                 # find closest x_index
                 out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
@@ -494,15 +530,7 @@ class InteractivePlotMixin:
         highlight_color = uistate.settings.get(f"rgb_{aspect}", "red")
 
         if is_io or is_pp:
-            if getattr(uistate, "mouseover_out_blob", None) is None:
-                uistate.mouseover_out_blob = ax.scatter(out_x_val, out_y_val, color=highlight_color, s=150, alpha=0.8, zorder=10)
-            else:
-                if uistate.mouseover_out_blob.axes != ax:
-                    uistate.mouseover_out_blob.remove()
-                    uistate.mouseover_out_blob = ax.scatter(out_x_val, out_y_val, color=highlight_color, s=150, alpha=0.8, zorder=10)
-                else:
-                    uistate.mouseover_out_blob.set_offsets([[out_x_val, out_y_val]])
-                    uistate.mouseover_out_blob.set_color(highlight_color)
+            self._draw_mouseover_blob(ax, out_x_val, out_y_val, highlight_color)
         else:
             if getattr(uistate, "mouseover_out_blob", None) is not None:
                 try:
@@ -511,23 +539,7 @@ class InteractivePlotMixin:
                     pass
                 uistate.mouseover_out_blob = None
 
-        if uistate.ghost_sweep is None:
-            ghost_color = "white" if uistate.darkmode else "black"
-            (uistate.ghost_sweep,) = uistate.axe.plot(snippet_x, snippet_y, color=ghost_color, alpha=0.5, zorder=0)
-            if uistate.ghost_label is None:
-                uistate.ghost_label = uistate.axe.text(
-                    1,
-                    1,
-                    ghost_label_text,
-                    transform=uistate.axe.transAxes,
-                    ha="left",
-                    va="bottom",
-                )
-            else:
-                uistate.ghost_label.set_text(ghost_label_text)
-        else:
-            uistate.ghost_sweep.set_data(snippet_x, snippet_y)
-            uistate.ghost_label.set_text(ghost_label_text)
+        self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
         uistate.axe.figure.canvas.draw()
         uistate.last_out_x_idx = out_x_idx
         ax.figure.canvas.draw()
@@ -655,7 +667,7 @@ class InteractivePlotMixin:
         self.mouseoverDisconnect()
         # if only one item is selected, make a new mouseover event connection
         if uistate.list_idx_select_recs and uistate.list_idx_select_stims:
-            self.mouseoverUpdateMarkers()
+            self._update_marker_data()
 
         if len(uistate.list_idx_select_recs) != 1:
             print("(multi-rec-selection) mouseoverUpdate calls self.graphRefresh()")
@@ -712,107 +724,48 @@ class InteractivePlotMixin:
         # print("mouseoverUpdate calls self.graphRefresh()")
         self.graphRefresh()
 
-    def mouseoverUpdateMarkers(self):
-        self.usage("mouseoverUpdateMarkers")
+    def _update_marker_data(self):
+        self.usage("_update_marker_data")
         # update xy data of shown markers
         df_p = self.get_df_project()
         precision = uistate.settings["precision"]
 
-        EPSP_slope_markers = {k: v for k, v in uistate.dict_rec_show.items() if k.endswith(" EPSP slope marker")}
-        # print(f"mouseoverUpdateMarkers: {EPSP_slope_markers.keys()}")
-        for marker in EPSP_slope_markers.values():
-            p_row = df_p.loc[df_p["ID"] == marker["rec_ID"]].squeeze()
-            dfmean = self.get_dfmean(row=p_row)
-            df_t = self.get_dft(row=p_row)
-            stim_num = marker["stim"]
-            t_row = df_t.loc[df_t["stim"] == stim_num].squeeze()
-            t_stim = round(t_row["t_stim"], precision)
-            # x: location on dfmean['time'], for acquiring y-values
-            x_start, x_end = (
-                round(t_row["t_EPSP_slope_start"], precision),
-                round(t_row["t_EPSP_slope_end"], precision),
-            )
-            # event_x: location on event graph, for drawing event markers
-            if not analysis.valid(x_start, x_end):
-                print("ERROR - EPSP_slope_markers: invalid x_start or x_end in mouseoverUpdateMarkers")
-                print(type(x_start), x_start)
-                print(type(x_end), x_end)
-                return
-            event_x_start, event_x_end = (
-                round(t_row["t_EPSP_slope_start"] - t_stim, precision),
-                round(t_row["t_EPSP_slope_end"] - t_stim, precision),
-            )
-            y_start = dfmean.loc[(dfmean["time"] - x_start).abs().idxmin(), "voltage"]
-            y_end = dfmean.loc[(dfmean["time"] - x_end).abs().idxmin(), "voltage"]
-            marker["line"].set_data([event_x_start, event_x_end], [y_start, y_end])
+        aspects = [
+            ("EPSP_slope", " EPSP slope marker", True),
+            ("EPSP_amp", " EPSP amp marker", False),
+            ("volley_slope", " volley slope marker", True),
+            ("volley_amp", " volley amp marker", False),
+        ]
 
-        EPSP_amp_markers = {k: v for k, v in uistate.dict_rec_show.items() if k.endswith(" EPSP amp marker")}
-        # print(f"mouseoverUpdateMarkers: {EPSP_amp_markers.keys()}")
-        for marker in EPSP_amp_markers.values():
-            p_row = df_p.loc[df_p["ID"] == marker["rec_ID"]].squeeze()
-            dfmean = self.get_dfmean(row=p_row)
-            df_t = self.get_dft(row=p_row)
-            stim_num = marker["stim"]
-            t_row = df_t.loc[df_t["stim"] == stim_num].squeeze()
-            t_stim = round(t_row["t_stim"], precision)
-            # x: location on dfmean['time'], for acquiring y-values
-            x_start = round(t_row["t_EPSP_amp"], precision)
-            # event_x: location on event graph, for drawing event markers
-            if not analysis.valid(x_start):
-                print("ERROR - EPSP_amp_markers: invalid x_start or x_end in mouseoverUpdateMarkers")
-                print(type(x_start), x_start)
-                return
-            event_x_start = round(t_row["t_EPSP_amp"] - t_stim, precision)
-            y_start = dfmean.loc[(dfmean["time"] - x_start).abs().idxmin(), "voltage"]
-            marker["line"].set_data([event_x_start, event_x_start], [y_start, y_start])
+        for aspect_prefix, marker_suffix, is_slope in aspects:
+            markers = {k: v for k, v in uistate.dict_rec_show.items() if k.endswith(marker_suffix)}
+            for marker in markers.values():
+                p_row = df_p.loc[df_p["ID"] == marker["rec_ID"]].squeeze()
+                dfmean = self.get_dfmean(row=p_row)
+                df_t = self.get_dft(row=p_row)
+                stim_num = marker["stim"]
+                t_row = df_t.loc[df_t["stim"] == stim_num].squeeze()
+                t_stim = round(t_row["t_stim"], precision)
 
-        volley_slope_markers = {k: v for k, v in uistate.dict_rec_show.items() if k.endswith(" volley slope marker")}
-        # print(f"mouseoverUpdateMarkers: {volley_slope_markers.keys()}")
-        for marker in volley_slope_markers.values():
-            p_row = df_p.loc[df_p["ID"] == marker["rec_ID"]].squeeze()
-            dfmean = self.get_dfmean(row=p_row)
-            df_t = self.get_dft(row=p_row)
-            stim_num = marker["stim"]
-            t_row = df_t.loc[df_t["stim"] == stim_num].squeeze()
-            t_stim = round(t_row["t_stim"], precision)
-            # x: location on dfmean['time'], for acquiring y-values
-            x_start, x_end = (
-                round(t_row["t_volley_slope_start"], precision),
-                round(t_row["t_volley_slope_end"], precision),
-            )
-            # event_x: location on event graph, for drawing event markers
-            if not analysis.valid(x_start, x_end):
-                print("ERROR - volley_slope_markers: invalid x_start or x_end in mouseoverUpdateMarkers")
-                print(type(x_start), x_start)
-                print(type(x_end), x_end)
-                return
-            event_x_start, event_x_end = (
-                round(t_row["t_volley_slope_start"] - t_stim, precision),
-                round(t_row["t_volley_slope_end"] - t_stim, precision),
-            )
-            y_start = dfmean.loc[(dfmean["time"] - x_start).abs().idxmin(), "voltage"]
-            y_end = dfmean.loc[(dfmean["time"] - x_end).abs().idxmin(), "voltage"]
-            marker["line"].set_data([event_x_start, event_x_end], [y_start, y_end])
-
-        volley_amp_markers = {k: v for k, v in uistate.dict_rec_show.items() if k.endswith(" volley amp marker")}
-        # print(f"mouseoverUpdateMarkers: {volley_amp_markers.keys()}")
-        for marker in volley_amp_markers.values():
-            p_row = df_p.loc[df_p["ID"] == marker["rec_ID"]].squeeze()
-            dfmean = self.get_dfmean(row=p_row)
-            df_t = self.get_dft(row=p_row)
-            stim_num = marker["stim"]
-            t_row = df_t.loc[df_t["stim"] == stim_num].squeeze()
-            t_stim = round(t_row["t_stim"], precision)
-            # x: location on dfmean['time'], for acquiring y-values
-            x_start = round(t_row["t_volley_amp"], precision)
-            # event_x: location on event graph, for drawing event markers
-            if not analysis.valid(x_start):
-                print("ERROR - volley_amp_markers: invalid x_start or x_end in mouseoverUpdateMarkers")
-                print(type(x_start), x_start)
-                return
-            event_x_start = round(t_row["t_volley_amp"] - t_stim, precision)
-            y_start = dfmean.loc[(dfmean["time"] - x_start).abs().idxmin(), "voltage"]
-            marker["line"].set_data([event_x_start, event_x_start], [y_start, y_start])
+                if is_slope:
+                    x_start = round(t_row[f"t_{aspect_prefix}_start"], precision)
+                    x_end = round(t_row[f"t_{aspect_prefix}_end"], precision)
+                    if not analysis.valid(x_start, x_end):
+                        print(f"ERROR - {aspect_prefix}_markers: invalid x_start or x_end in _update_marker_data")
+                        return
+                    event_x_start = round(t_row[f"t_{aspect_prefix}_start"] - t_stim, precision)
+                    event_x_end = round(t_row[f"t_{aspect_prefix}_end"] - t_stim, precision)
+                    y_start = dfmean.loc[(dfmean["time"] - x_start).abs().idxmin(), "voltage"]
+                    y_end = dfmean.loc[(dfmean["time"] - x_end).abs().idxmin(), "voltage"]
+                    marker["line"].set_data([event_x_start, event_x_end], [y_start, y_end])
+                else:
+                    x_start = round(t_row[f"t_{aspect_prefix}"], precision)
+                    if not analysis.valid(x_start):
+                        print(f"ERROR - {aspect_prefix}_markers: invalid x_start in _update_marker_data")
+                        return
+                    event_x_start = round(t_row[f"t_{aspect_prefix}"] - t_stim, precision)
+                    y_start = dfmean.loc[(dfmean["time"] - x_start).abs().idxmin(), "voltage"]
+                    marker["line"].set_data([event_x_start, event_x_start], [y_start, y_start])
 
     def mouseoverDisconnect(self):
         self.usage("mouseoverDisconnect")
