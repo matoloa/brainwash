@@ -175,10 +175,13 @@ class ProjectMixin:
         # Load group data
         self.dd_groups = self.group_get_dd()
         self.group_update_dfp()
+        # Load test set data (integer set_ID based, defaults "set 1", "set 2", ...; persisted in test_sets.pkl)
+        self.dd_testsets = self.testset_get_dd()
         if config.talkback:
             self.setupTalkback()
         # Set up canvases and graphs
         self.groupControlsRefresh()  # add group controls to UI
+        self.testsetControlsRefresh()  # add test set controls to verticalLayoutTestSet (mirrors group pattern)
         self.connectUIstate()  # connect UI elements to uistate
         self.applyConfigStates()  # apply config states to UI elements
         self.graphAxes()

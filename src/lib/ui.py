@@ -2130,6 +2130,11 @@ class UIsub(
         for group_ID in self.dd_groups.keys():
             self.group_controls_add(group_ID)
 
+    def testsetControlsRefresh(self):
+        self.testset_controls_remove()
+        for set_ID in getattr(self, "dd_testsets", {}).keys():
+            self.testset_controls_add(set_ID)
+
     def usage(self, ui_component):  # Talkback function
         logger.debug("usage: %s", ui_component)
         print(f"usage: {ui_component}")
@@ -2138,6 +2143,8 @@ class UIsub(
         if ui_component not in self.dict_usage.keys():
             self.dict_usage[ui_component] = 0
         self.dict_usage[ui_component] += 1
+        if config.talkback and ui_component in self.dict_usage:
+            self.statusBar().showMessage(f"Used {ui_component} {self.dict_usage[ui_component]} times")
         self.write_usage()
 
     def write_usage(self):
@@ -2160,6 +2167,7 @@ class UIsub(
         self.dict_ts = {}  # all timepoints
         self.dict_outputs = {}  # all outputs, x per sweep
         self.dict_group_means = {}  # means of all group outputs
+        self.dd_testsets = {}  # test/sweep sets for group comparisons
         self.dict_diffs = {}  # all diffs (for paired stim)
 
     # uisub init refactoring (bootstrap and loadProject live in ProjectMixin)
@@ -2658,6 +2666,23 @@ class UIsub(
         RenameDialog = InputDialogPopup()
         new_group_name = RenameDialog.showInputDialog(title="Rename group", query="")
         self.group_rename(group_ID, new_group_name)
+
+    def testsetCheckboxChanged(self, state, set_ID):
+        self.usage("testsetCheckboxChanged")
+        logger.debug("testsetCheckboxChanged: %s = %s", set_ID, state)
+        print(f"testsetCheckboxChanged: {str(set_ID)} = {state}")
+        self.dd_testsets[set_ID]["show"] = bool(state == 2)
+        self.testset_save_dd()
+        self.testsetControlsRefresh()
+        self.update_show()
+        self.mouseoverUpdate()
+
+    def triggerTestSetRename(self, set_ID):
+        self.usage("triggerTestSetRename")
+        RenameDialog = InputDialogPopup()
+        new_set_name = RenameDialog.showInputDialog(title="Rename test set", query="")
+        if new_set_name:
+            self.testset_rename(set_ID, new_set_name)
 
     def triggerStimAdd(self):
         self.usage("triggerStimAdd")

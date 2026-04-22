@@ -30,7 +30,10 @@ CustomCheckBox = None  # type: ignore[assignment]
 
 
 class GroupMixin:
-    """Mixin that provides all group-management behaviour for UIsub."""
+    """Mixin that provides all group-management behaviour for UIsub.
+
+    Also manages dd_testsets (loaded in loadProject() via testset_get_dd()).
+    """
 
     # ------------------------------------------------------------------
     # Persistence helpers
@@ -55,6 +58,26 @@ class GroupMixin:
         path_dd_groups = Path(self.dict_folders["project"] / "groups.pkl")
         with open(path_dd_groups, "wb") as f:
             pickle.dump(dd_groups, f)
+
+    # ------------------------------------------------------------------
+    # Test set persistence (parallel to groups, uses test_sets.pkl and integer set_ID)
+    # ------------------------------------------------------------------
+
+    def testset_get_dd(self):
+        # dd_testsets: {set_ID (int): {"set_name": str, "color": str, "show": bool, "sweeps": [int], "description": str}}
+        path_dd_testsets = Path(self.dict_folders["project"] / "test_sets.pkl")
+        if path_dd_testsets.exists():
+            with open(path_dd_testsets, "rb") as f:
+                dict_testsets = pickle.load(f)
+            return dict_testsets
+        return {}
+
+    def testset_save_dd(self, dd_testsets=None):
+        if dd_testsets is None:
+            dd_testsets = self.dd_testsets
+        path_dd_testsets = Path(self.dict_folders["project"] / "test_sets.pkl")
+        with open(path_dd_testsets, "wb") as f:
+            pickle.dump(dd_testsets, f)
 
     def get_groupsOfRec(self, rec_ID):  # returns a set of all 'group ID' that have rec_ID in their 'rec_IDs' list
         return list([key for key, value in self.dd_groups.items() if rec_ID in value["rec_IDs"]])
@@ -118,6 +141,69 @@ class GroupMixin:
             print(f"Group name {new_group_name} is not a valid name.")
 
     # ------------------------------------------------------------------
+    # Test Set Create / remove / rename (modeled exactly on groups but using set_ID and default names 'set N')
+    # ------------------------------------------------------------------
+
+    def testset_new(self):
+        print(f"Adding new test set to dd_testsets: {self.dd_testsets}")
+        if len(self.dd_testsets) > 8:  # TODO: hardcoded max nr of sets: move to bw cfg
+            print("Maximum of 9 test sets allowed for now.")
+            return
+        set_ID = 1  # start at 1; no set_0
+        if self.dd_testsets:
+            while set_ID in self.dd_testsets.keys():
+                set_ID += 1
+        selected_sweeps = sorted(uistate.x_select.get("output", set()))
+        if not selected_sweeps:
+            print("No sweeps selected for test set.")
+            return
+        self.dd_testsets[set_ID] = {
+            "set_name": f"set {set_ID}",
+            "color": uistate.colors[set_ID - 1 % len(uistate.colors)],
+            "show": True,
+            "sweeps": selected_sweeps,
+            "description": f"Test set {set_ID} created from selection",
+        }
+        self.testset_save_dd()
+        self.testset_controls_add(set_ID)
+        print(f"Created test set {set_ID} with {len(selected_sweeps)} sweeps: {selected_sweeps}")
+
+    def testset_remove_last_empty(self):
+        if not self.dd_testsets:
+            print("No test sets to remove.")
+            return
+        last_set_ID = max(self.dd_testsets.keys())
+        if self.dd_testsets[last_set_ID]["sweeps"]:
+            print(f"{last_set_ID} is not empty.")
+            return
+        self.testset_remove(last_set_ID)
+
+    def testset_remove_last(self):
+        if self.dd_testsets:
+            last_set_ID = max(self.dd_testsets.keys())
+            self.testset_remove(last_set_ID)
+
+    def testset_remove(self, set_ID=None):
+        if set_ID is None:
+            self.dd_testsets = {}
+            self.testset_controls_remove()
+        else:
+            if set_ID in self.dd_testsets:
+                del self.dd_testsets[set_ID]
+            self.testset_controls_remove(set_ID)
+        self.testset_save_dd()
+
+    def testset_rename(self, set_ID, new_set_name):
+        if new_set_name in [s["set_name"] for s in self.dd_testsets.values()]:
+            print(f"Test set name {new_set_name} already exists.")
+        elif re.match(r"^[a-zA-Z0-9_ -]+$", str(new_set_name)) is not None:  # True if valid filename
+            self.dd_testsets[set_ID]["set_name"] = new_set_name
+            self.testset_save_dd()
+            self.testsetControlsRefresh()
+        else:
+            print(f"Test set name {new_set_name} is not a valid name.")
+
+    # ------------------------------------------------------------------
     # Recording ↔ group assignment
     # ------------------------------------------------------------------
 
@@ -160,19 +246,17 @@ class GroupMixin:
         self.graphRefresh()
 
     # ------------------------------------------------------------------
-    # Tagged for compare
+    # Test Set tagging (Phase 1)
     # ------------------------------------------------------------------
     def add_to_data_set(self):
+        """Replaces previous compare stub. Captures current sweep selection and creates a new Test Set (set_ID + default name 'set N')."""
         if not uistate.list_idx_select_recs:
-            print("No recording selected for compare.")
+            print("No recording selected for test set.")
             return
-        selected_sweeps = sorted(uistate.x_select.get("output", set()))
-        prow = self.get_prow()
-        rec_ID = prow["ID"] if prow is not None and "ID" in prow else "N/A"
-        groups = self.get_groupsOfRec(rec_ID) if prow is not None else []
-        print(f"Selected sweeps: {selected_sweeps}")
-        print(f"Selected recording ID: {rec_ID}")
-        print(f"Groups for this recording: {groups}")
+        if not uistate.x_select.get("output"):
+            print("No sweeps selected. Drag on output graph or use sweep range controls first.")
+            return
+        self.testset_new()
 
     def sample_selected(self):
         if not uistate.list_idx_select_recs:
@@ -259,6 +343,52 @@ class GroupMixin:
             if action:
                 self.menuGroups.removeAction(action)
                 delattr(self, f"actionAddTo_{str_ID}")
+
+    # ------------------------------------------------------------------
+    # Test Set controls (mirrors group_controls_* but targets verticalLayoutTestSet,
+    # uses set_ID, set_name, checkBox_testset_{ID}, and calls triggerTestSetRename)
+    # ------------------------------------------------------------------
+
+    def testsetControlsRefresh(self):
+        self.testset_controls_remove()
+        for set_ID in self.dd_testsets.keys():
+            self.testset_controls_add(set_ID)
+
+    def testset_controls_add(self, set_ID):  # Create checkbox for test set (modeled on group_controls_add)
+        dict_set = self.dd_testsets.get(set_ID)
+        if not dict_set:
+            print(f" - {set_ID} not found in self.dd_testsets:")
+            print(self.dd_testsets)
+            return
+        set_name = dict_set["set_name"]
+        color = dict_set["color"]
+        str_ID = str(set_ID)
+        self.new_testset_checkbox = CustomCheckBox(set_ID)
+        self.new_testset_checkbox.rightClicked.connect(self.triggerTestSetRename)  # set_ID is passed by CustomCheckBox
+        self.new_testset_checkbox.setObjectName(f"checkBox_testset_{str_ID}")
+        self.new_testset_checkbox.setText(f"{str_ID}. {set_name}")
+        self.new_testset_checkbox.setStyleSheet(f"background-color: {color};")  # Set the background color
+        self.new_testset_checkbox.setMaximumWidth(100)  # Set the maximum width
+        self.new_testset_checkbox.setChecked(bool(dict_set.get("show", True)))
+        self.new_testset_checkbox.stateChanged.connect(lambda state, set_ID=set_ID: self.testsetCheckboxChanged(state, set_ID))
+        self.verticalLayoutTestSet.addWidget(self.new_testset_checkbox)
+        setattr(self, f"checkBox_testset_{str_ID}", self.new_testset_checkbox)
+
+    def testset_controls_remove(self, set_ID=None):
+        if set_ID is None:  # if set_ID is not provided, remove all test set controls
+            for i in range(1, 10):  # clear test set controls 1-9
+                self.testset_controls_remove(i)
+        else:
+            str_ID = str(set_ID)
+            # Correctly identify the widget by its full object name used during creation
+            widget_name = f"checkBox_testset_{str_ID}"
+            widget = self.centralwidget.findChild(QtWidgets.QWidget, widget_name)
+            if widget:
+                print(f"Removing widget {widget_name}")
+                widget.deleteLater()
+            attr_name = f"checkBox_testset_{str_ID}"
+            if hasattr(self, attr_name):
+                delattr(self, attr_name)
 
     # ------------------------------------------------------------------
     # df_project sync
