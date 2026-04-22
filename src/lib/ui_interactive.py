@@ -1345,6 +1345,41 @@ class InteractivePlotMixin:
             self.talkback()
 
 
+    # --- Phase 3: Loaders (Dispatchers) ---
+
+    def mouseover_loader(self):
+        experiment_type = getattr(uistate, "experiment_type", "time")
+        if experiment_type == "io":
+            return self._mouseover_output_io
+        elif experiment_type == "PP":
+            return self._mouseover_output_pp
+        elif getattr(uistate, "x_axis", "time") == "stim":
+            return self._mouseover_output_stim
+        else:
+            return self._mouseover_output_time
+
+    def drag_update_loader(self):
+        experiment_type = getattr(uistate, "experiment_type", "time")
+        if experiment_type == "io":
+            return self._drag_update_io
+        elif experiment_type == "PP":
+            return self._drag_update_pp
+        elif getattr(uistate, "x_axis", "time") == "stim":
+            return self._drag_update_time
+        else:
+            return self._drag_update_time
+
+    def drag_release_loader(self):
+        experiment_type = getattr(uistate, "experiment_type", "time")
+        if experiment_type == "io":
+            return self._drag_release_io
+        elif experiment_type == "PP":
+            return self._drag_release_pp
+        elif getattr(uistate, "x_axis", "time") == "stim":
+            return self._drag_release_time
+        else:
+            return self._drag_release_time
+
     # --- Phase 2: Specialized Mouseover Strategies ---
 
     def _mouseover_output_time(self, event):
