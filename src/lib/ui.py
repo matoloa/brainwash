@@ -2950,9 +2950,9 @@ class UIsub(
         self.usage("triggerRemoveLastEmptyGroup")
         self.group_remove_last_empty()
 
-    def triggerCompare(self):
-        self.usage("triggerCompare")
-        self.add_compare()
+    def triggerAddToSet(self):
+        self.usage("triggerAddToSet")
+        self.add_to_data_set()
 
     def triggerSample(self):
         self.usage("triggerSample")

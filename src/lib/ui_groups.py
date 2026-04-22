@@ -162,7 +162,7 @@ class GroupMixin:
     # ------------------------------------------------------------------
     # Tagged for compare
     # ------------------------------------------------------------------
-    def add_compare(self):
+    def add_to_data_set(self):
         if not uistate.list_idx_select_recs:
             print("No recording selected for compare.")
             return

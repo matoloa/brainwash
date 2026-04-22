@@ -273,7 +273,7 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-499</y>
+          <y>0</y>
           <width>191</width>
           <height>1268</height>
          </rect>
@@ -611,7 +611,7 @@
            <property name="frameShadow">
             <enum>QFrame::Raised</enum>
            </property>
-           <widget class="QPushButton" name="pushButton_compare">
+           <widget class="QPushButton" name="pushButton_add_to_set">
             <property name="geometry">
              <rect>
               <x>20</x>
@@ -621,7 +621,7 @@
              </rect>
             </property>
             <property name="text">
-             <string>Compare means</string>
+             <string>Add to Test Set</string>
             </property>
            </widget>
            <widget class="QLabel" name="label_tag">
@@ -654,7 +654,7 @@
              </rect>
             </property>
             <property name="text">
-             <string>Sample sweep</string>
+             <string>Sample Sweep</string>
             </property>
            </widget>
            <widget class="QPushButton" name="pushButton_hide_tag">
@@ -676,7 +676,7 @@
           </widget>
          </item>
          <item>
-          <layout class="QVBoxLayout" name="verticalLayoutComparison"/>
+          <layout class="QVBoxLayout" name="verticalLayoutTestSet"/>
          </item>
          <item>
           <widget class="QFrame" name="frameToolBin">
@@ -1829,9 +1829,9 @@
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="buttonGroup_filter"/>
   <buttongroup name="buttonGroup_io_o"/>
-  <buttongroup name="buttonGroup_type"/>
   <buttongroup name="buttonGroup_io_i"/>
+  <buttongroup name="buttonGroup_type"/>
+  <buttongroup name="buttonGroup_filter"/>
  </buttongroups>
 </ui>
