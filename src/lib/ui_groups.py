@@ -140,6 +140,7 @@ class GroupMixin:
             self.group_cache_purge([group_ID])
             self.group_controls_remove(group_ID)
         self.group_save_dd()
+        self.refresh_samples()  # 3.4.3: group removal must trigger sample refresh
 
     def group_rename(self, group_ID, new_group_name):
         if new_group_name in [group["group_name"] for group in self.dd_groups.values()]:
@@ -205,6 +206,7 @@ class GroupMixin:
             self.testset_controls_remove(set_ID)
         self.testset_save_dd()
         self.graphRefresh()
+        self.refresh_samples()  # 3.4.3: testset CRUD must trigger sample refresh
 
     def testset_rename(self, set_ID, new_set_name):
         if new_set_name in [s["set_name"] for s in self.dd_testsets.values()]:
@@ -214,6 +216,7 @@ class GroupMixin:
             self.testset_save_dd()
             self.testsetControlsRefresh()
             self.graphRefresh()
+            self.refresh_samples()  # 3.4.3: testset CRUD must trigger sample refresh
         else:
             print(f"Test set name {new_set_name} is not a valid name.")
 
@@ -271,6 +274,7 @@ class GroupMixin:
             print("No sweeps selected. Drag on output graph or use sweep range controls first.")
             return
         self.testset_new()
+        self.refresh_samples()  # 3.4.3: testset CRUD must trigger sample refresh
 
     # ------------------------------------------------------------------
     # Sample designation (Phase 3.1)
@@ -325,20 +329,30 @@ class GroupMixin:
                 del self.dict_group_means[group_ID]
 
     # ------------------------------------------------------------------
-    # Sample refresh (Phase 3.3)
+    # Sample refresh (Phase 3.4.3 - full implementation)
     # ------------------------------------------------------------------
     def refresh_samples(self):
-        """Dedicated refresh for samples (per updated plan). Rebuilds dd_group_samples
-        via get_ddgroup_sample for groups that have a sample pointer, then calls
-        uiplot.sample_overlay if available. Stub for now.
+        """Dedicated refresh for samples (per updated plan 3.4.3). Loops over
+        groups with non-None "sample" key, calls self.get_ddgroup_sample(g)
+        for each (this triggers build/persist of <group_name>_sample.parquet
+        with 'stim' column + t=0 per update_axe_mean lines 320-340), then
+        calls uiplot.sample_overlay(self.dd_group_samples, self.dd_groups).
+        Made robust: always rebuilds cache and calls overlay (even if stubbed).
         """
         if not hasattr(self, "dd_group_samples"):
             self.dd_group_samples = {}
-        # TODO: for each group with sample, self.get_ddgroup_sample(group_ID)
-        if uiplot and hasattr(uiplot, "sample_overlay"):
-            uiplot.sample_overlay(self.dd_group_samples)
+
+        # 1) always rebuild dd_group_samples for groups with sample pointer
+        # (this triggers parquet write via get_ddgroup_sample)
+        for group_ID, gdict in self.dd_groups.items():
+            if gdict.get("sample") is not None:
+                self.get_ddgroup_sample(group_ID)
+
+        # 2) call uiplot.sample_overlay even if the method is stubbed
+        if uiplot is not None:
+            uiplot.sample_overlay(self.dd_group_samples, self.dd_groups)
         else:
-            print("refresh_samples: uiplot.sample_overlay not yet available (stub)")
+            print("refresh_samples: uiplot not available")
 
     # ------------------------------------------------------------------
     # Qt widget controls

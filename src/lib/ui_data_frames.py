@@ -632,8 +632,10 @@ class DataFrameMixin:
             return self.dd_group_samples[group_ID]
         p_row = matching.iloc[0]
 
-        df = self.get_dfoutput(row=p_row)  # or uistate.df_rec_select_data equivalent
+        df = self.get_dffilter(p_row)  # must use filter DF (has 'time' column); matches update_axe_mean + uistate.df_rec_select_data
         col = uistate.settings.get("filter") or "voltage"
+        if col not in df.columns:
+            col = "voltage"  # fallback to ensure column exists in df_sweeps
         df_sweeps = df[df["sweep"].isin(selected_sweeps)]
         df_mean = df_sweeps.groupby("time", as_index=False)[col].mean()
 
@@ -654,7 +656,7 @@ class DataFrameMixin:
         full_mean_df = pd.concat(mean_dfs.values(), ignore_index=True) if mean_dfs else pd.DataFrame()
         if not full_mean_df.empty and "stim" not in full_mean_df.columns:
             full_mean_df["stim"] = 1
-        self.df2file(df=full_mean_df, filename=group_name)
+        self.df2file(df=full_mean_df, filename=f"{group_name}_sample")
         self.dd_group_samples[group_ID] = mean_dfs
         return self.dd_group_samples[group_ID]
 

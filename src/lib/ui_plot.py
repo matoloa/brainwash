@@ -236,42 +236,66 @@ class UIplot:
         if draw and self.uistate.ax1 is not None:
             self.uistate.ax1.figure.canvas.draw()
 
-    def sample_overlay(self, dd_group_samples, dd_groups=None):
-        """Phase 3.3: overlays sample means in upper-left of output graph (ax1/ax2).
-        Clears prior artists from uistate.sample_artists. Reuses plotted line logic
-        from axe (mean of testset sweeps on sample rec, same xSelect range constraints).
-        Places each at 1/3 height/width using group color; superimposed, y-aligned only.
-        Supports single testset for now. Stubbed with TODOs for inset coords/transform,
-        artist storage in uistate.sample_artists, zorder/alpha, light/dark handling.
-        Updated signature accepts dd_groups for color/sample pointer access.
-        """
-        if not hasattr(self.uistate, "sample_artists"):
-            self.uistate.sample_artists = {}
-        # clear previous sample artists
+    def clear_sample_artists(self, draw=True):
+        """Clear all sample overlay artists (3.4.2 helper modeled on clear_testset_spans)."""
+        if not hasattr(self.uistate, "sample_artists") or not self.uistate.sample_artists:
+            if draw and self.uistate.ax1 is not None:
+                self.uistate.ax1.figure.canvas.draw()
+            return
         for artist in self.uistate.sample_artists.values():
             try:
                 artist.remove()
             except Exception:
                 pass
         self.uistate.sample_artists = {}
+        if draw and self.uistate.ax1 is not None:
+            self.uistate.ax1.figure.canvas.draw()
 
-        if not dd_group_samples or self.uistate.ax1 is None:
+    def sample_overlay(self, dd_group_samples, dd_groups=None):
+        """Fixed 3.4.2 implementation: uses single shared inset (created in graphRefresh).
+        Plots the ready df (with 'stim' column and t=0 per update_axe_mean 320-340)
+        using plot_line on the inset with group colors. Simpler, avoids inset+plot_line
+        conflict. Single canvas.draw() at end.
+        """
+        self.clear_sample_artists(draw=False)
+
+        if not dd_group_samples or self.uistate.ax1 is None or not hasattr(self.uistate, "sample_inset"):
             if self.uistate.ax1 is not None:
                 self.uistate.ax1.figure.canvas.draw()
             return
 
-        # TODO: resolve single active testset (first checked?); compute inset bounds
-        # (e.g. transform=ax.transAxes, bbox=[0.02, 0.75, 0.33, 0.33]); y-only align
+        if not hasattr(self.uistate, "sample_artists"):
+            self.uistate.sample_artists = {}
+
+        inset = self.uistate.sample_inset
         for group_ID, inner in dd_group_samples.items():
             if not inner or group_ID not in (dd_groups or {}):
                 continue
             group_dict = (dd_groups or {}).get(group_ID, {})
             color = group_dict.get("color", "#0000ff")
-            # TODO: reuse update_axe_mean / plot_line logic here for sample df mean
-            # for ax_name in ("ax1", "ax2"):
-            #     ax = getattr(self.uistate, ax_name)
-            #     ...
-            print(f"sample_overlay: stub for group {group_ID} color {color} (TODO: 1/3 inset)")
+            test_id = next(iter(inner.keys()))  # single testset for now
+            df = inner[test_id]
+            col = self.uistate.settings.get("filter") or "voltage"
+            if col not in df.columns:
+                col = df.columns[-1]  # safe fallback to last numeric column
+            # Reuse update_axe_mean per-stim logic on the ready df (has 'stim' + t=0)
+            for stim_num in sorted(df["stim"].unique() if "stim" in df.columns else [1]):
+                df_event = df[df["stim"] == stim_num].copy() if "stim" in df.columns else df.copy()
+                # plot on shared inset (y-aligned; zorder above testset spans)
+                line = self.plot_line(
+                    f"sample_overlay_g{group_ID}_t{test_id}_s{stim_num}",
+                    "ax1",  # plot_line uses main axis name; we rely on inset transform
+                    df_event["time"],
+                    df_event[col],
+                    color,
+                    None,
+                    stim=stim_num,
+                    alpha=self.uistate.settings.get("alpha_line", 0.5) / 2,
+                )
+                # move artist to inset
+                if hasattr(line, "set_transform"):
+                    line.set_transform(inset.transData)
+                self.uistate.sample_artists[(group_ID, test_id, stim_num)] = line
 
         if self.uistate.ax1 is not None:
             self.uistate.ax1.figure.canvas.draw()
@@ -376,6 +400,13 @@ class UIplot:
                 ax.yaxis.label.set_color("black")
                 ax.tick_params(colors="black")
             # print("Default mode activated")
+
+        # 3.4.2: refresh sample overlays after style change (light/dark compatibility)
+        if hasattr(self.uistate, "dd_group_samples") and self.uistate.dd_group_samples:
+            if hasattr(self.uistate, "refresh_samples"):
+                self.uistate.refresh_samples()
+            else:
+                self.sample_overlay(self.uistate.dd_group_samples, getattr(self, "dd_groups", None))
 
     def hideAll(self):
         axm, axe, ax1, ax2 = (
@@ -672,7 +703,11 @@ class UIplot:
         # visualize test sets (Phase 2) - spans persist independently of xSelect
         self.visualize_test_sets(dd_testsets or {}, draw=False)
 
-        # refresh samples (Phase 3.3) - reach UIsub method via uistate if available
+        # refresh samples (Phase 3.4.3) - create shared inset once if needed, then call refresh
+        if not hasattr(self.uistate, "sample_inset"):
+            if self.uistate.ax1 is not None:
+                self.uistate.sample_inset = self.uistate.ax1.inset_axes([0.02, 0.68, 0.33, 0.30])
+                self.uistate.sample_inset.set_facecolor((1, 1, 1, 0.7) if not self.uistate.darkmode else (0, 0, 0, 0.7))
         if hasattr(self.uistate, "refresh_samples"):
             self.uistate.refresh_samples()
         elif hasattr(self, "uisub") and hasattr(self.uisub, "refresh_samples"):

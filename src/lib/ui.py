@@ -2680,7 +2680,6 @@ class UIsub(
         self.dd_testsets[set_ID]["show"] = bool(state == 2)
         self.testset_save_dd()
         self.testsetControlsRefresh()
-        # call graphRefresh for test set span visualization (Phase 2); spans cleared only on full output reset in xDeselect
         self.graphRefresh()
 
     def triggerTestSetRename(self, set_ID):
