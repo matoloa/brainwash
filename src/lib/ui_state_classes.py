@@ -256,6 +256,8 @@ class UIstate:
             "output_end": None,
         }
 
+        self.testset_spans = {}  # runtime artists only: {set_ID: {"ax1": patch_obj, "ax2": patch_obj}} for Phase 2 gray test-set axvspans (not persisted to cfg.pkl)
+
         # darkmode is owned by bw_cfg.yaml, not the project cfg.pkl; set by get_bw_cfg()
         self.axm = None  # axis of mean graph (top)
         self.axe = None  # axis of event graph (middle)

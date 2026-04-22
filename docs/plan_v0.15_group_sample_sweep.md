@@ -157,10 +157,10 @@ Modeled **exactly** on the Group controls pattern in `ui_groups.py:214-261` (`gr
 
 **Phase 2 – Visualizing Test Sets (next)**
 
-- When a user drags to select sweeps on the output graph, a blue background (`axvspan`) is drawn via `uiplot.xSelect()`.
-- All ticked (`show=True`) Test Sets should appear as gray `axvspan` backgrounds on the output graph (and optionally the mean graph), similar to the current selection highlight.
+- Existing model for reference: When a user drags to select sweeps on the output graph, a blue background (`axvspan`) is drawn via `uiplot.xSelect()`.
+- Similarly, all ticked (`show=True`) Test Sets should appear as gray `axvspan` backgrounds on the output graph (and optionally the mean graph).
 - Hook into `testsetCheckboxChanged`, `testsetControlsRefresh`, `graphRefresh()`, and checkbox state changes in `verticalLayoutTestSet`.
-- New helper `visualizeTestSets()` (or extension of `xSelect()` / `graphRefresh()`) that iterates over `dd_testsets`, draws gray spans for active sets using their stored `sweeps` ranges, manages artist cleanup on changes, and respects `set_ID` ordering.
+- New helper `visualizeTestSets()` / `graphRefresh()`) that iterates over `dd_testsets`, draws gray spans for active sets using their stored `sweeps` ranges, manages artist cleanup on changes, and respects `set_ID` ordering.
 - Update `InteractivePlotMixin` or `UIplot` to support multiple persistent spans (store in `uistate` or a dict of test set artists).
 - Call visualization on load, test set creation/rename/toggle, and sweep selection changes for immediate feedback.
 - Gray color should be configurable (e.g. via `uistate.colors` or a muted default) and not interfere with the blue current-selection span.

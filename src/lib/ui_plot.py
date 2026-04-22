@@ -141,6 +141,7 @@ class UIplot:
                 self.uistate.x_select["output"] = set()
                 self.uistate.x_select["output_start"] = None
                 self.uistate.x_select["output_end"] = None
+                self.clear_testset_spans(draw=False)  # clear on full output reset per Phase 2
         else:  # axm
             axlines = list(ax.get_lines())
             axpatches = list(ax.patches)
@@ -218,6 +219,49 @@ class UIplot:
                 del self.uistate.dict_rec_labels[key]
         else:
             print(" - - - - No dict_rec_labels to clear mean sweeps from")
+
+    def clear_testset_spans(self, draw=True):
+        """Clear all test set axvspan patches (labeled testset_span_*) from output graph (ax1/ax2 only)."""
+        if not hasattr(self.uistate, "testset_spans") or not self.uistate.testset_spans:
+            if draw and self.uistate.ax1 is not None:
+                self.uistate.ax1.figure.canvas.draw()
+            return
+        for spans in self.uistate.testset_spans.values():
+            for patch in spans.values():
+                try:
+                    patch.remove()
+                except Exception:
+                    pass
+        self.uistate.testset_spans = {}
+        if draw and self.uistate.ax1 is not None:
+            self.uistate.ax1.figure.canvas.draw()
+
+    def visualize_test_sets(self, dd_testsets, draw=True):
+        """Draw gray axvspan for each shown test set on ax1/ax2 (twinx) only.
+        Uses min/max of sweeps (assumes continuous/sorted per clarifications).
+        Gray with low alpha, no legend entry, stores artists in uistate.testset_spans.
+        """
+        self.clear_testset_spans(draw=False)
+        if not dd_testsets or self.uistate.ax1 is None:
+            if draw and self.uistate.ax1 is not None:
+                self.uistate.ax1.figure.canvas.draw()
+            return
+        alpha = 0.08
+        for set_ID, dset in sorted(dd_testsets.items()):
+            if not dset.get("show", False) or not dset.get("sweeps"):
+                continue
+            sweeps = dset["sweeps"]
+            start = min(sweeps)
+            end = max(sweeps) + 1
+            color = dset.get("color", "#a0a0a0")
+            for ax_name in ("ax1", "ax2"):
+                ax = getattr(self.uistate, ax_name, None)
+                if ax is None:
+                    continue
+                span = ax.axvspan(start, end, color=color, alpha=alpha, label=f"testset_span_{set_ID}", zorder=1)
+                self.uistate.testset_spans.setdefault(set_ID, {})[ax_name] = span
+        if draw and self.uistate.ax1 is not None:
+            self.uistate.ax1.figure.canvas.draw()
 
     def update_axe_mean(self, draw=True):
         """
@@ -395,7 +439,7 @@ class UIplot:
             if key in dict_group_show:
                 del dict_group_show[key]
 
-    def graphRefresh(self, dd_groups):
+    def graphRefresh(self, dd_groups, dd_testsets=None):
         # show only selected and imported lines, only appropriate aspects
         print("graphRefresh")
         uistate = self.uistate
@@ -585,6 +629,9 @@ class UIplot:
                 self.xSelect(canvas=ax2.figure.canvas, draw=False)
             else:
                 self.xSelect(canvas=ax1.figure.canvas, draw=False)
+
+        # visualize test sets (Phase 2) - spans persist independently of xSelect
+        self.visualize_test_sets(dd_testsets or {}, draw=False)
 
         # 0-hline for Events
         if not "Events y zero marker" in self.uistate.dict_rec_labels:

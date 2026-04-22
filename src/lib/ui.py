@@ -1259,7 +1259,7 @@ class UIsub(
 
     def graphRefresh(self):
         self.usage("graphRefresh")
-        uiplot.graphRefresh(self.dd_groups)
+        uiplot.graphRefresh(self.dd_groups, getattr(self, "dd_testsets", {}))
 
     def deleteFolder(self, dir_path):
         if os.path.exists(dir_path):
@@ -2169,6 +2169,8 @@ class UIsub(
         self.dict_group_means = {}  # means of all group outputs
         self.dd_testsets = {}  # test/sweep sets for group comparisons
         self.dict_diffs = {}  # all diffs (for paired stim)
+        if hasattr(self, "uistate") and hasattr(self.uistate, "testset_spans"):
+            self.uistate.testset_spans = {}  # clear testset spans on cache reset (Phase 2)
 
     # uisub init refactoring (bootstrap and loadProject live in ProjectMixin)
 
@@ -2674,8 +2676,8 @@ class UIsub(
         self.dd_testsets[set_ID]["show"] = bool(state == 2)
         self.testset_save_dd()
         self.testsetControlsRefresh()
-        self.update_show()
-        self.mouseoverUpdate()
+        # call graphRefresh for test set span visualization (Phase 2); spans cleared only on full output reset in xDeselect
+        self.graphRefresh()
 
     def triggerTestSetRename(self, set_ID):
         self.usage("triggerTestSetRename")

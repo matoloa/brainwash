@@ -167,6 +167,7 @@ class GroupMixin:
         self.testset_save_dd()
         self.testset_controls_add(set_ID)
         print(f"Created test set {set_ID} with {len(selected_sweeps)} sweeps: {selected_sweeps}")
+        self.graphRefresh()
 
     def testset_remove_last_empty(self):
         if not self.dd_testsets:
@@ -192,6 +193,7 @@ class GroupMixin:
                 del self.dd_testsets[set_ID]
             self.testset_controls_remove(set_ID)
         self.testset_save_dd()
+        self.graphRefresh()
 
     def testset_rename(self, set_ID, new_set_name):
         if new_set_name in [s["set_name"] for s in self.dd_testsets.values()]:
@@ -200,6 +202,7 @@ class GroupMixin:
             self.dd_testsets[set_ID]["set_name"] = new_set_name
             self.testset_save_dd()
             self.testsetControlsRefresh()
+            self.graphRefresh()
         else:
             print(f"Test set name {new_set_name} is not a valid name.")
 
