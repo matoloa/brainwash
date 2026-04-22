@@ -98,16 +98,16 @@ class DataFrameMixin:
 
                 df_mean = self.get_dfmean(p_row)
                 df_mean["savgol"] = analysis.addFilterSavgol(df_mean, window_length=wl, poly_order=po)
-                self.df2file(df=df_mean, rec=rec, key="mean")
+                self.df2file(df=df_mean, filename=rec, key="mean")
 
                 df_filter = self.get_dffilter(p_row)
                 df_filter["savgol"] = analysis.addFilterSavgol(df_filter, window_length=wl, poly_order=po)
-                self.df2file(df=df_filter, rec=rec, key="filter")
+                self.df2file(df=df_filter, filename=rec, key="filter")
 
                 if pd.notna(p_row["bin_size"]):
                     df_bin = self.get_dfbin(p_row)
                     df_bin["savgol"] = analysis.addFilterSavgol(df_bin, window_length=wl, poly_order=po)
-                    self.df2file(df=df_bin, rec=rec, key="bin")
+                    self.df2file(df=df_bin, filename=rec, key="bin")
 
             df_t = self.get_dft(p_row)
             df_t["norm_output_from"] = dt["norm_output_from"]
@@ -126,6 +126,9 @@ class DataFrameMixin:
             self.group_cache_purge()
         else:
             self.group_cache_purge(affected_group_IDs)
+        # 3.4.1: invalidate sample cache on group changes (sample or testset sweeps may be affected)
+        if hasattr(self, "dd_group_samples"):
+            self.dd_group_samples = {}
 
         uiplot.hideAll()
         self.update_show(reset=(selection is None))
@@ -140,7 +143,7 @@ class DataFrameMixin:
         # print(f"type: {type(df)}")
         print(f"set_dft of {rec_name}: {df}")
         self.dict_ts[rec_name] = df
-        self.df2file(df=df, rec=rec_name, key="timepoints")
+        self.df2file(df=df, filename=rec_name, key="timepoints")
 
     # ------------------------------------------------------------------
     # Mean DataFrame
@@ -179,7 +182,7 @@ class DataFrameMixin:
                 dfmean["savgol"] = analysis.addFilterSavgol(df=dfmean, window_length=window_length, poly_order=poly_order)
                 persist = True
         if persist:
-            self.df2file(df=dfmean, rec=recording_name, key="mean")
+            self.df2file(df=dfmean, filename=recording_name, key="mean")
         self.dict_means[recording_name] = dfmean
         return self.dict_means[recording_name]
 
@@ -206,7 +209,7 @@ class DataFrameMixin:
                     },
                     inplace=True,
                 )
-                self.df2file(df=dft, rec=rec, key="timepoints")  # re-persist with corrected names
+                self.df2file(df=dft, filename=rec, key="timepoints")  # re-persist with corrected names
             for col in dft.columns:
                 if col != "stim" and dft[col].dtype in ["int64", "int32", "float32"]:
                     dft[col] = dft[col].astype("float64")
@@ -247,7 +250,7 @@ class DataFrameMixin:
                 if col != "stim" and dft[col].dtype in ["int64", "int32", "float32"]:
                     dft[col] = dft[col].astype("float64")
             self.dict_ts[rec] = dft
-            self.df2file(df=dft, rec=rec, key="timepoints")  # persist dft as parquet
+            self.df2file(df=dft, filename=rec, key="timepoints")  # persist dft as parquet
             self.set_rec_status(rec)  # update status in df_project
             return dft
 
@@ -270,7 +273,7 @@ class DataFrameMixin:
             if "index" in dfoutput.columns:
                 dfoutput.drop(columns=["index"], inplace=True)
                 dfoutput.reset_index(drop=True, inplace=True)
-                self.df2file(df=dfoutput, rec=rec, key=cache_key)  # re-persist clean version
+                self.df2file(df=dfoutput, filename=rec, key=cache_key)  # re-persist clean version
             else:
                 dfoutput.reset_index(drop=True, inplace=True)
         else:  # 3: Create from scratch and persist
@@ -300,7 +303,7 @@ class DataFrameMixin:
             print(f"get_dfoutput: done, dfoutput.shape={dfoutput.shape}")
             dfoutput.reset_index(drop=True, inplace=True)
             # Persist the clean version to disk.
-            self.df2file(df=dfoutput, rec=rec, key=cache_key)
+            self.df2file(df=dfoutput, filename=rec, key=cache_key)
         # Cache and return
         self.dict_outputs[rec] = dfoutput
         return dfoutput
@@ -359,7 +362,7 @@ class DataFrameMixin:
                 persist = True
 
         if persist:
-            self.df2file(df=dffilter, rec=recording_name, key="filter")
+            self.df2file(df=dffilter, filename=recording_name, key="filter")
 
         # Cache and return
         self.dict_filters[recording_name] = dffilter
@@ -417,7 +420,7 @@ class DataFrameMixin:
                 persist = True
 
         if persist:
-            self.df2file(df=df_bins, rec=rec, key="bin")
+            self.df2file(df=df_bins, filename=rec, key="bin")
 
         self.dict_bins[rec] = df_bins
         return df_bins
@@ -494,7 +497,7 @@ class DataFrameMixin:
             dfdiff["EPSP_amp"] = dfi.EPSP_amp / dfc.EPSP_amp
         if "EPSP_slope" in dfi.columns:
             dfdiff["EPSP_slope"] = dfi.EPSP_slope / dfc.EPSP_slope
-        self.df2file(df=dfdiff, rec=key_pair, key="diff")
+        self.df2file(df=dfdiff, filename=key_pair, key="diff")
         self.dict_diffs[key_pair] = dfdiff
         return dfdiff
 
@@ -559,19 +562,24 @@ class DataFrameMixin:
             group_mean.columns = [col[0] if col[0] == "sweep" else "_".join(col).strip().replace("sem", "SEM") for col in group_mean.columns.values]
             print(f"Group mean columns: {group_mean.columns}")
             print(f"Group mean: {group_mean}")
-            self.df2file(df=group_mean, rec=f"group_{group_ID}", key="mean")
+            self.df2file(df=group_mean, filename=f"group_{group_ID}", key="mean")
         self.dict_group_means[group_ID] = group_mean
         return group_mean
 
     # ------------------------------------------------------------------
-    # Group sample DataFrame (phase 3.3)
+    # Group sample DataFrame
     # ------------------------------------------------------------------
 
     def get_ddgroup_sample(self, group_ID):
         """Returns inner dict {test_ID: df} for group's sample means.
         Follows exact get_dfgroupmean pattern: (1) memory, (2) parquet cache, (3) build.
-        For now returns empty dict until full sample-rec + testset-sweeps + xSelect-range logic is added.
-        Persisted as <group_name>_sample.parquet.
+        Mirrors update_axe_mean (ui_plot.py:306-352) exactly for mean computation:
+        - uses uistate.x_select["output"] or first active testset sweeps
+        - df_sweeps groupby("time") on filter column
+        - df_t loop for per-stim event windows
+        - shift time so each stim starts at t=0
+        - retains 'stim' column for easy extraction/superimposition.
+        Persisted as <group_name>_sample.parquet (key="sample").
         """
         if not hasattr(self, "dd_group_samples"):
             self.dd_group_samples = {}
@@ -579,21 +587,75 @@ class DataFrameMixin:
             if config.verbose:
                 print(f"Returning cached group sample for group {group_ID}")
             return self.dd_group_samples[group_ID]
+
+        # 2: Read from file if exists
         group_name = self.dd_groups.get(group_ID, {}).get("group_name", f"group_{group_ID}")
         sample_path = Path(f"{self.dict_folders['cache']}/{group_name}_sample.parquet")
-        if sample_path.exists():  # 2: Read from file
+        if sample_path.exists():
             if config.verbose:
                 print(f"Loading stored group sample for group {group_ID}")
-            # TODO: load and convert to dict-of-DFs
-            pass
-        else:  # 3: Create/build from scratch (TODO)
-            if config.verbose:
-                print(f"Building new group sample for group {group_ID}")
-            # TODO: locate sample rec from dd_groups[group_ID]["sample"],
-            # use active testset sweeps + xSelect range constraints to compute mean
-            pass
-        # stub for now
-        self.dd_group_samples[group_ID] = {}
+            sample_df = pd.read_parquet(str(sample_path))
+            # TODO: convert back to dict-of-DFs if multi-test; for now treat as single
+            self.dd_group_samples[group_ID] = {"0": sample_df}
+            return self.dd_group_samples[group_ID]
+
+        # 3: Build from scratch (full logic mirroring update_axe_mean)
+        if config.verbose:
+            print(f"Building new group sample for group {group_ID}")
+
+        sample_rec = self.dd_groups.get(group_ID, {}).get("sample")
+        if not sample_rec:
+            self.dd_group_samples[group_ID] = {}
+            return self.dd_group_samples[group_ID]
+
+        # Resolve active testset (first checked for now; see plan 3.4.1)
+        active_test_id = "0"
+        selected_sweeps = None
+        if hasattr(self, "dd_testsets") and self.dd_testsets:
+            for tid, tset in self.dd_testsets.items():
+                if tset.get("show", False) and tset.get("sweeps"):
+                    active_test_id = str(tid)
+                    selected_sweeps = tset.get("sweeps")
+                    break
+        if not selected_sweeps and uistate.x_select.get("output"):
+            selected_sweeps = list(uistate.x_select["output"])
+
+        if not selected_sweeps:
+            self.dd_group_samples[group_ID] = {}
+            return self.dd_group_samples[group_ID]
+
+        # Locate sample recording row and build df (reuse DataFrameMixin helpers)
+        df_p = self.get_df_project()
+        matching = df_p.loc[df_p["ID"] == sample_rec]
+        if matching.empty:
+            self.dd_group_samples[group_ID] = {}
+            return self.dd_group_samples[group_ID]
+        p_row = matching.iloc[0]
+
+        df = self.get_dfoutput(row=p_row)  # or uistate.df_rec_select_data equivalent
+        col = uistate.settings.get("filter") or "voltage"
+        df_sweeps = df[df["sweep"].isin(selected_sweeps)]
+        df_mean = df_sweeps.groupby("time", as_index=False)[col].mean()
+
+        # df_t loop for per-stim event windows + time shift to t=0 (exact mirror of update_axe_mean:320-340)
+        df_t = self.get_dft(row=p_row)
+        settings = uistate.settings
+        mean_dfs = {}
+        for i_stim, t_row in df_t.iterrows():
+            stim_num = i_stim + 1
+            t_stim = t_row["t_stim"]
+            window_start = t_stim + settings.get("event_start", 0)
+            window_end = t_stim + settings.get("event_end", 0.05)
+            df_event = df_mean[(df_mean["time"] >= window_start) & (df_mean["time"] <= window_end)].copy()
+            df_event["time"] = df_event["time"] - t_stim  # all times now start at 0 per stim
+            df_event["stim"] = stim_num  # retain 'stim' column as required
+            mean_dfs[active_test_id] = df_event  # inner dict uses test_ID
+
+        full_mean_df = pd.concat(mean_dfs.values(), ignore_index=True) if mean_dfs else pd.DataFrame()
+        if not full_mean_df.empty and "stim" not in full_mean_df.columns:
+            full_mean_df["stim"] = 1
+        self.df2file(df=full_mean_df, filename=group_name)
+        self.dd_group_samples[group_ID] = mean_dfs
         return self.dd_group_samples[group_ID]
 
     # ------------------------------------------------------------------

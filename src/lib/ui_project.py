@@ -118,7 +118,7 @@ class ProjectMixin:
             cache_key = "output_bin"
         else:
             cache_key = "output"
-        self.df2file(df=dfoutput, rec=rec_name, key=cache_key)
+        self.df2file(df=dfoutput, filename=rec_name, key=cache_key)
 
     # ------------------------------------------------------------------
     # Bootstrapping — general (non-project-specific) UI init
@@ -242,21 +242,21 @@ class ProjectMixin:
     # File write helpers
     # ------------------------------------------------------------------
 
-    def df2file(self, df, rec, key=None):
-        # writes dict[rec] to <rec>_{dict}.parquet TODO: better description; replace "rec"
+    def df2file(self, df, filename, key=None):
+        print(f"df2file: filename={filename}, key={key}")
         if config.transient:
             return
         self.dict_folders["cache"].mkdir(exist_ok=True)
         filetype = "parquet"
         if key is None:
-            filepath = f"{self.dict_folders['cache']}/{rec}.{filetype}"
+            filepath = f"{self.dict_folders['cache']}/{filename}.{filetype}"
         elif key == "timepoints":
-            filepath = f"{self.dict_folders['timepoints']}/{rec}.{filetype}"
+            filepath = f"{self.dict_folders['timepoints']}/{filename}.{filetype}"
         elif key == "data":
-            filepath = f"{self.dict_folders['data']}/{rec}.{filetype}"
+            filepath = f"{self.dict_folders['data']}/{filename}.{filetype}"
             self.dict_folders["data"].mkdir(exist_ok=True)
         else:
-            filepath = f"{self.dict_folders['cache']}/{rec}_{key}.{filetype}"
+            filepath = f"{self.dict_folders['cache']}/{filename}_{key}.{filetype}"
 
         df.to_parquet(filepath, index=False)
         print(f"saved {filepath}")
