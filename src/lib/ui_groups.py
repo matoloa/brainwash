@@ -346,12 +346,14 @@ class GroupMixin:
         # (this triggers parquet write via get_ddgroup_sample)
         for group_ID, gdict in self.dd_groups.items():
             if gdict.get("sample") is not None:
+                if config.verbose:
+                    print(f"refresh_samples: rebuilding sample for group_ID={group_ID}")
                 self.get_ddgroup_sample(group_ID)
 
         # 2) call uiplot.sample_overlay even if the method is stubbed
         if uiplot is not None:
             uiplot.sample_overlay(self.dd_group_samples, self.dd_groups)
-        else:
+        elif config.verbose:
             print("refresh_samples: uiplot not available")
 
     # ------------------------------------------------------------------

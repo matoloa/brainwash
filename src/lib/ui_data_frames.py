@@ -560,8 +560,8 @@ class DataFrameMixin:
                     .reset_index()
                 )
             group_mean.columns = [col[0] if col[0] == "sweep" else "_".join(col).strip().replace("sem", "SEM") for col in group_mean.columns.values]
-            print(f"Group mean columns: {group_mean.columns}")
-            print(f"Group mean: {group_mean}")
+            # print(f"Group mean columns: {group_mean.columns}")
+            # print(f"Group mean: {group_mean}")
             self.df2file(df=group_mean, filename=f"group_{group_ID}", key="mean")
         self.dict_group_means[group_ID] = group_mean
         return group_mean
