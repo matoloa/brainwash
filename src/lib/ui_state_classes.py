@@ -243,7 +243,9 @@ class UIstate:
             # sweep selection
             "pushButton_sweeps_even": "trigger_set_sweeps_even",
             "pushButton_sweeps_odd": "trigger_set_sweeps_odd",
-            # output scaling
+            # sweep comparison
+            "pushButton_compare": "triggerCompare",
+            "pushButton_sample": "triggerSample",
         }
         self.x_select = {  # selected ranges on mean- and output graphs
             # start and end: current drag operation; None if not dragging

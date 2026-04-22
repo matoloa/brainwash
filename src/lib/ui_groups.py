@@ -160,6 +160,27 @@ class GroupMixin:
         self.graphRefresh()
 
     # ------------------------------------------------------------------
+    # Tagged for compare
+    # ------------------------------------------------------------------
+    def add_compare(self):
+        if not uistate.list_idx_select_recs:
+            print("No recording selected for compare.")
+            return
+        selected_sweeps = sorted(uistate.x_select.get("output", set()))
+        prow = self.get_prow()
+        rec_ID = prow["ID"] if prow is not None and "ID" in prow else "N/A"
+        groups = self.get_groupsOfRec(rec_ID) if prow is not None else []
+        print(f"Selected sweeps: {selected_sweeps}")
+        print(f"Selected recording ID: {rec_ID}")
+        print(f"Groups for this recording: {groups}")
+
+    def sample_selected(self):
+        if not uistate.list_idx_select_recs:
+            print("No recording selected for sampling.")
+            return
+        print("sample_selected: ", uistate.list_idx_select_recs)
+
+    # ------------------------------------------------------------------
     # Cache
     # ------------------------------------------------------------------
 

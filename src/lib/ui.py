@@ -2950,6 +2950,14 @@ class UIsub(
         self.usage("triggerRemoveLastEmptyGroup")
         self.group_remove_last_empty()
 
+    def triggerCompare(self):
+        self.usage("triggerCompare")
+        self.add_compare()
+
+    def triggerSample(self):
+        self.usage("triggerSample")
+        self.sample_selected()
+
     def triggerDelete(self):
         self.usage("triggerDelete")
         self.deleteSelectedRows()
