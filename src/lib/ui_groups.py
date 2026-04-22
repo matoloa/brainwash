@@ -46,6 +46,10 @@ class GroupMixin:
         if path_dd_groups.exists():
             with open(path_dd_groups, "rb") as f:
                 dict_groups = pickle.load(f)
+            # migration for v0.15 sample feature: ensure every group dict has "sample": None (fixes persistence for old groups.pkl so checkbox re-checks correctly)
+            for g in dict_groups.values():
+                if "sample" not in g:
+                    g["sample"] = None
             return dict_groups
         return {}
 
@@ -100,6 +104,7 @@ class GroupMixin:
             "color": uistate.colors[group_ID - 1],
             "show": "True",
             "rec_IDs": [],
+            "sample": None,
         }
         self.group_save_dd()
         self.group_controls_add(group_ID)
@@ -125,7 +130,8 @@ class GroupMixin:
             self.group_cache_purge()
             self.group_controls_remove()
         else:
-            del self.dd_groups[group_ID]
+            if group_ID in self.dd_groups:
+                del self.dd_groups[group_ID]
             self.group_cache_purge([group_ID])
             self.group_controls_remove(group_ID)
         self.group_save_dd()
@@ -260,12 +266,6 @@ class GroupMixin:
             print("No sweeps selected. Drag on output graph or use sweep range controls first.")
             return
         self.testset_new()
-
-    def sample_selected(self):
-        if not uistate.list_idx_select_recs:
-            print("No recording selected for sampling.")
-            return
-        print("sample_selected: ", uistate.list_idx_select_recs)
 
     # ------------------------------------------------------------------
     # Cache

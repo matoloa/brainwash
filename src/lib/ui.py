@@ -2116,6 +2116,8 @@ class UIsub(
                 if getattr(uistate, "experiment_type", "time") == "io":
                     self.exorcise()
                     self.triggerRefresh()
+            elif key == "is_group_sample":
+                self.checkBox_is_group_sample_changed(state)
         # print(f"viewSettingsChanged: {key} = {state == 2}")
         self.update_show()
         if key in ["output_ymin0", "norm_EPSP"]:
@@ -2980,10 +2982,6 @@ class UIsub(
     def triggerAddToSet(self):
         self.usage("triggerAddToSet")
         self.add_to_data_set()
-
-    def triggerSample(self):
-        self.usage("triggerSample")
-        self.sample_selected()
 
     def triggerDelete(self):
         self.usage("triggerDelete")
@@ -3914,6 +3912,11 @@ class UIsub(
         print(f"checkBox_timepoints_per_stim_changed: {state}")
         if state == 0:
             self.set_uniformTimepoints()
+
+    def checkBox_is_group_sample_changed(self, state):
+        uistate.checkBox["is_group_sample"] = state == 2
+        logger.debug("checkBox_is_group_sample_changed: %s", state)
+        print(f"checkBox_is_group_sample_changed: {state}")
 
     def tableFormat(self):
         logger.debug("tableFormat")

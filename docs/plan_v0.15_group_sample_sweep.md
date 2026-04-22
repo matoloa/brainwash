@@ -106,36 +106,35 @@ Modeled **exactly** on the Group controls pattern in `ui_groups.py:214-261` (`gr
 
 ### 4. Sample Designation for Visual Overlay
 
-- **UI**: `pushButton_sample` ("Sample sweep") in the same `frameToolTag`.
-- **Wiring**: Already points to `triggerSample()` → `sample_selected()`.
-- **Storage**: Add a column `is_sample` (bool) to `df_project` and/or a separate `samples.pkl` list of `(rec_ID, sweep_idx)` tuples. Test Sets may reference sample sweeps.
+- **UI**: `checkBox_is_group_sample` (replaces previous pushButton_sample) in the `frameToolTag`.
+- **Wiring**: Handled inside `tableProjSelectionChanged()` (lines ~822-992); updates checkbox state and connects toggles to `sample_selected()`.
+- **Storage**: Sample pointer lives _only_ inside `dd_groups[group_ID]["sample"] = (rec_ID: str, sweep: int) | None` (no `df_project` flag/column, no `is_sample`, no `samples.pkl`). A group has no or one sample; that sample is shared across all Test Sets.
 - **Behaviour**:
-  - When clicked with a recording + sweep selection active, mark the first selected sweep (or all in range) of that recording as a sample.
-  - `sample_selected()` should:
-    - Update storage.
-    - Add a "sample" entry to `uistate.dict_sample_lines`.
-    - Call `uiplot.plot_sample_trace()` (new method) that draws a faint colored line on the mean graph.
+  - Checkbox enabled only on exactly one recording that belongs to at least one group (groups listed in `df_project["groups"]` column); otherwise disabled.
+  - Checked only if the single selected recording _is_ the sample for **all** groups it belongs to.
+  - Clicking toggles: sets/clears the sample pointer (using current `x_select["output"]` sweep) in relevant group dicts only.
+  - `sample_selected()` updates the group dict(s), calls `group_save_dd()`, then triggers `sample_overlay()` (no full cache purge).
+  - New `sample_overlay()` (preferred name; in `ui_plot.py`) reuses the plotted line from `axe`, overlays it (group color, y-axis only, thin) in the upper-left corner of the output graph (ax1/ax2); supports multiple samples. Clearing updates only the overlay and the sample key in `dd_groups`.
 - **Export integration**: When exporting mean graphs (`menuExport`), overlay the sample trace(s) with a legend entry "Example sweep".
-- **Future**: Allow multiple samples per group or per Test Set; auto-pick "most representative" sweep by correlation to group mean.
+- **Future** (v0.16): Allow multiple samples per group or per Test Set; auto-pick "most representative" sweep by correlation to group mean; unit tests.
 
 ### 5. UI Integration Points
 
-- **Tag frame** (`frameToolTag`): contains renamed `pushButton_compare` (now triggers `add_to_set`), `pushButton_sample`, `pushButton_hide_tag`.
+- **Tag frame** (`frameToolTag`): contains renamed `pushButton_compare` (now triggers `add_to_set`), `checkBox_is_group_sample`, `pushButton_hide_tag`.
 - **Test Set panel**: `verticalLayoutTestSet` — will host dynamic widgets mirroring the Group checkbox pattern (integer `set_ID`, default "set N" label, right-click rename, objectName-based cleanup, self-expanding list).
 - **Comparison panel**: `verticalLayoutComparison` — remains the home for statistical result tables (populated after selecting a Test Set + groups).
 - **Groups panel**: `verticalLayoutGroups` with colored `CustomCheckBox` widgets (already fully functional).
 - **Menu**: `menuGroups` (extend with Test Set actions using `set_ID`); shortcuts preserved where possible.
-- **Graph**: Group means + future Test Set indicators; samples overlaid on top.
-- **Project table**: Show `groups` and (optionally) `testsets` columns — updated via `group_update_dfp()` style helpers.
+- **Graph**: Group means + future Test Set indicators; samples overlaid (via `sample_overlay()`) on output graph (upper-left, y-axis only, group color).
+- **Project table**: Show `groups` and (optionally) `testsets` columns — updated via `group_update_dfp()` style helpers (no sample column; sample state lives _only_ in `dd_groups`).
 
 ### 6. Storage & Cache
 
-- `project/groups.pkl` — pickled `dd_groups`.
-- `project/test_sets.pkl` — new (underscore); pickled `dd_testsets` using integer `set_ID` keys (exactly like groups).
+- `project/groups.pkl` — pickled `dd_groups` (now includes optional `"sample": (rec_ID, sweep) | None` per group; at most one sample per group, shared by all Test Sets).
+- `project/test_sets.pkl` — pickled `dd_testsets` using integer `set_ID` keys (exactly like groups).
 - `cache/group_{N}_mean.parquet` — per-group aggregated DataFrame (invalidated by `group_cache_purge`).
-- `df_project["groups"]` (and future `testsets`) column for quick lookup.
-- New: `project/samples.pkl` or `df_project["sample_sweeps"]`.
-- All changes call appropriate save methods (`testset_save_dd()`, `group_save_dd()`) and `self.set_df_project(...)`. Test set changes should also trigger cache purge / graph refresh where relevant.
+- `df_project["groups"]` (and future `testsets`) column for quick lookup (no `is_sample`, no `sample_sweeps` column, no `samples.pkl`; groups column used for checkbox enable/disable checks).
+- All changes call appropriate save methods (`testset_save_dd()`, `group_save_dd()`) and refresh signals. Clearing/setting a sample updates only the sample key in `dd_groups` and calls `sample_overlay()`.
 
 ### 7. Phased Implementation Steps
 
@@ -155,33 +154,24 @@ Modeled **exactly** on the Group controls pattern in `ui_groups.py:214-261` (`gr
 - Initialized `self.dd_testsets = self.testset_get_dd()` in `loadProject()` (after groups) and `self.dd_testsets = {}` in `resetCacheDicts()`.
 - `testset_rename()` is implemented (valid name check, save, refresh). Full menu integration, `group_update_dfp()` extension for testsets column, visualization (new Phase 2), and comparison logic remain for next phases.
 
-**Phase 2 – Visualizing Test Sets (next)**
+**Phase 2 – Visualizing Test Sets (completed)**
 
-- Existing model for reference: When a user drags to select sweeps on the output graph, a blue background (`axvspan`) is drawn via `uiplot.xSelect()`.
-- Similarly, all ticked (`show=True`) Test Sets should appear as gray `axvspan` backgrounds on the output graph (and optionally the mean graph).
-- Hook into `testsetCheckboxChanged`, `testsetControlsRefresh`, `graphRefresh()`, and checkbox state changes in `verticalLayoutTestSet`.
-- New helper `visualizeTestSets()` / `graphRefresh()`) that iterates over `dd_testsets`, draws gray spans for active sets using their stored `sweeps` ranges, manages artist cleanup on changes, and respects `set_ID` ordering.
-- Update `InteractivePlotMixin` or `UIplot` to support multiple persistent spans (store in `uistate` or a dict of test set artists).
-- Call visualization on load, test set creation/rename/toggle, and sweep selection changes for immediate feedback.
-- Gray color should be configurable (e.g. via `uistate.colors` or a muted default) and not interfere with the blue current-selection span.
+- Implemented `clear_testset_spans()` and `visualize_test_sets(dd_testsets)` in `UIplot` (after `xSelect`/`xDeselect`).
+- Gray per-set colored `axvspan` (using each set's own `dd_testsets[...]["color"]`, alpha=0.08, zorder=1, label=`"testset_span_{ID}"`) on output graph **only** (ax1 + ax2 twinx; no mean graph).
+- Uses min/max of stored `"sweeps"` list (assumes continuous/sorted for now; overlaps stack alpha).
+- Hooks: `graphRefresh(self.dd_groups, self.dd_testsets)` (calls visualize after drag maintenance), `testsetCheckboxChanged` now calls `graphRefresh()`, CRUD in `GroupMixin` (`testset_new`/`rename`/`remove`) trigger refresh, `uistate.testset_spans = {}` for artist management, cleared safely on output reset.
+- No legend entry; works in light/dark; persisted visibility via existing `"show"` flag.
+- Matches plan clarifications; no changes to `ui_designer.py`.
 
-**Phase 3 – Group-based Comparison using Test Sets**
+**Phase 3 – Sample feature**
 
-- Add `compare_using_testset(set_ID)` that:
-  - Loads selected Test Set by `set_ID`.
-  - Subsets each active group's mean DataFrame using the stored sweep list.
-  - Calls `analysis_v3.ttest_df(...)`.
-  - Populates `verticalLayoutComparison` with results table.
-- Add `display_comparison(...)` helper (clear prior widgets first).
-- Integrate with status bar and `graphRefresh()` / `tableUpdate()`.
+- Replace pushButton with `checkBox_is_group_sample`; update `tableProjSelectionChanged()` (~822-992) to set checkbox state (enabled only on exactly one recording that is member of ≥1 group via `df_project["groups"]` column; checked only if it is the sample for _all_ its groups).
+- Implement `sample_selected()` (in `GroupMixin`) to toggle sample pointer _only_ in relevant `dd_groups[group_ID]["sample"] = (rec_ID: str, sweep: int) | None` (or clear it); a group has at most one sample (shared by all Test Sets); calls `group_save_dd()` + `sample_overlay()` (no `df_project` changes, no cache purge on clear).
+- Add separate `sample_overlay()` function in `ui_plot.py` (reuses plotted line from `axe`, overlays it in upper-left corner of output graph ax1/ax2 using group color, y-axis only; supports all samples).
+- No `plot_sample_trace`; integrate overlay with `graphRefresh` / export. Sample state lives _exclusively_ in `dd_groups`.
+- Hook into export routines so samples appear in final figures. Allow samples to be linked to specific Test Sets (v0.16).
 
-**Phase 4 – Sample feature**
-
-- Implement `sample_selected()` to store sample metadata.
-- Add `plot_sample_trace(rec_ID, sweep)` in `UIplot` (reuse existing trace plotting but with distinct style: dashed, thinner, labeled).
-- Hook into export routines so samples appear in final figures. Allow samples to be linked to specific Test Sets.
-
-**Phase 5 – Polish & UI feedback**
+**Phase 4 – Polish & UI feedback**
 
 - Add "New Test Set", "Rename", "Delete" controls in `verticalLayoutTestSet` (leveraging integer `set_ID`).
 - Status bar messages ("Added sweeps 110-119 to Test Set 2 (set 2)").
@@ -190,15 +180,6 @@ Modeled **exactly** on the Group controls pattern in `ui_groups.py:214-261` (`gr
 - Update `groupCheckboxChanged`, test set state changes (including visualization refresh), and refresh signals.
 - Support >2 groups (pairwise or ANOVA using selected Test Set).
 
-**Phase 6 – Testing & Release**
-
-- Test with real electrophysiology projects (varying sweep counts, cache behavior).
-- Verify both groups and test_sets survive project close/re-open.
-- Add unit tests in `analysis_evaluation.py`.
-- Update README, changelog, and expand this plan with discovered details.
-- Add screenshots to `docs/`.
-- Tag release v0.15 once grouping, Test Sets (with visualization), comparison, and samples are cohesive.
-
 ## Open Questions / TODOs in Plan
 
 - Exact widget type for Test Sets (reuse `CustomCheckBox` with `set_ID` vs new `TestSetWidget` class)?
@@ -206,18 +187,19 @@ Modeled **exactly** on the Group controls pattern in `ui_groups.py:214-261` (`gr
 - How to handle overlapping Test Set spans in visualization (layering, alpha, legend)?
 - Automatic vs explicit comparison after creating/choosing a Test Set by `set_ID`?
 - UI for selecting which Test Set (`set_ID`) to use for a comparison (combo box in comparison panel?)?
-- Visual design consistency between `verticalLayoutGroups` and `verticalLayoutTestSet`, and between blue current selection vs gray Test Set spans?
+- Visual design consistency between `verticalLayoutGroups` and `verticalLayoutTestSet`, between blue current selection vs gray Test Set spans, and for `checkBox_is_group_sample` + sample overlay (upper-left on output graph)?
 - Integration with existing `build_dfoutput` pipelines and paired vs unpaired tests?
 - Where to store "comparison configuration" (metrics, normalization flags)?
+- Details of `sample_overlay()` placement, y-axis scaling, and multi-sample handling on ax1/ax2.
 
 ## Success Criteria
 
 - User can create groups and Test Sets (`add_to_set` button captures selected sweeps into integer `set_ID` entries with default names "set 1", "set 2", … shown dynamically in `verticalLayoutTestSet` with full rename/delete support matching the group pattern).
 - Ticked Test Sets render as gray `axvspan` backgrounds on the output graph (via new visualization logic similar to `xSelect()`), updating on checkbox changes and refresh.
 - Selecting a Test Set (`set_ID`) + groups produces statistical table in `verticalLayoutComparison` with correct p-values from `ttest_df` on the tagged sweep means.
-- Sample button marks traces that appear overlaid on exported graphs.
-- All data (`dd_groups`, `dd_testsets` in `test_sets.pkl`, samples) persists across project close/re-open via pickles.
+- `checkBox_is_group_sample` correctly reflects/sets sample state (only on single grouped recording; toggles `dd_groups[...]["sample"]`); `sample_overlay()` draws axe-based trace (group color, y-only) in upper-left of output graph.
+- All data (`dd_groups` with sample pointers, `dd_testsets` in `test_sets.pkl`) persists across project close/re-open via pickles. Clearing sample updates only overlay + dict key.
 - No modifications to `ui_designer.py`; all dynamic controls follow the proven Group pattern using integer IDs and default names.
 - Code stays inside `GroupMixin` where it belongs for cohesion.
 
-This plan provides a concrete, phased roadmap that builds directly on the existing architecture (`GroupMixin`, `get_dfgroupmean`, `uistate.x_select`, `verticalLayoutTestSet`, `verticalLayoutComparison`, `analysis_v3.ttest_df`) while respecting all coding constraints and the new `set_ID` + `test_sets.pkl` conventions. Visualization of Test Sets is now explicitly part of the v0.15 pillars.
+This plan provides a concrete, phased roadmap that builds directly on the existing architecture (`GroupMixin`, `get_dfgroupmean`, `uistate.x_select`, `verticalLayoutTestSet`, `verticalLayoutComparison`) while respecting all coding constraints and the new `set_ID` + `test_sets.pkl` conventions. Visualization of Test Sets is now explicitly part of the v0.15 pillars.

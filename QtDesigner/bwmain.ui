@@ -644,19 +644,6 @@
              <string>Tag selection</string>
             </property>
            </widget>
-           <widget class="QPushButton" name="pushButton_sample">
-            <property name="geometry">
-             <rect>
-              <x>20</x>
-              <y>60</y>
-              <width>101</width>
-              <height>25</height>
-             </rect>
-            </property>
-            <property name="text">
-             <string>Sample Sweep</string>
-            </property>
-           </widget>
            <widget class="QPushButton" name="pushButton_hide_tag">
             <property name="geometry">
              <rect>
@@ -671,6 +658,19 @@
             </property>
             <property name="flat">
              <bool>true</bool>
+            </property>
+           </widget>
+           <widget class="QCheckBox" name="checkBox_is_group_sample">
+            <property name="geometry">
+             <rect>
+              <x>20</x>
+              <y>60</y>
+              <width>141</width>
+              <height>23</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Use recording as sample</string>
             </property>
            </widget>
           </widget>

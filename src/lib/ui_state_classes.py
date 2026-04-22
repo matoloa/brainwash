@@ -139,6 +139,7 @@ class UIstate:
             "paired_stims": False,  # Recs are paired: output per pair is Intervention / Control
             "io_trendline": False,
             "io_force0": False,
+            "is_group_sample": False,
         }
         self.lineEdit = {  # storage of user input; used to update df_t
             "split_at_time": 0.0,  # in s (SI). User enters ms; converted at input in editImportOptions.
@@ -245,7 +246,6 @@ class UIstate:
             "pushButton_sweeps_odd": "trigger_set_sweeps_odd",
             # data set assignment
             "pushButton_add_to_set": "triggerAddToSet",
-            "pushButton_sample": "triggerSample",
         }
         self.x_select = {  # selected ranges on mean- and output graphs
             # start and end: current drag operation; None if not dragging
