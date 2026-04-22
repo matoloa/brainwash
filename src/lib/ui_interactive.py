@@ -1344,7 +1344,688 @@ class InteractivePlotMixin:
         if config.talkback:
             self.talkback()
 
-    def zoomOnScroll(self, event, graph):
+
+    # --- Phase 2: Specialized Mouseover Strategies ---
+
+    def _mouseover_output_time(self, event):
+        str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
+        ax = getattr(uistate, str_ax) if str_ax else None
+        if event.inaxes not in (uistate.ax1, uistate.ax2) or str_ax is None:
+            if uistate.ghost_sweep is not None:
+                self.exorcise()
+            return
+        if event.inaxes != ax:
+            x, y = ax.transData.inverted().transform((event.x, event.y))
+        else:
+            x, y = event.xdata, event.ydata
+        if x is None or y is None or not (uistate.slopeView() or uistate.ampView()):
+            if uistate.ghost_sweep is not None:
+                self.exorcise()
+            return
+        if len(uistate.list_idx_select_recs) != 1:
+            self.exorcise()
+            return
+
+        dict_out = {
+            key: value
+            for key, value in uistate.dict_rec_show.items()
+            if value["axis"] == str_ax and (value["aspect"] in ["EPSP_amp", "EPSP_slope"]) and hasattr(value["line"], "get_xdata")
+        }
+        if not dict_out:
+            return
+
+        dict_pop = list(dict_out.values())[0]
+        x_data = dict_pop["line"].get_xdata()
+        y_data = dict_pop["line"].get_ydata()
+
+        import numpy as np
+        import pandas as pd
+
+        out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
+        x_val = x_data[out_x_idx]
+        out_x_val = x_val
+        out_y_val = y_data[out_x_idx]
+
+        if out_x_idx == getattr(uistate, "last_out_x_idx", None):
+            return
+
+        rec_ID = dict_pop["rec_ID"]
+        df_p = self.get_df_project()
+        p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
+        df_t = self.get_dft(p_row)
+        rec_filter = p_row["filter"]
+
+        stim = dict_pop.get("stim")
+        if stim is None:
+            stim = 1
+
+        t_row = df_t[df_t["stim"] == stim].iloc[0]
+        offset = t_row["t_stim"]
+
+        if pd.notna(p_row["bin_size"]):
+            dfsource = self.get_dfbin(p_row)
+            ghost_label_text = f"bin {int(x_val)}"
+        else:
+            dfsource = self.get_dffilter(p_row)
+            ghost_label_text = f"sweep {int(x_val)}"
+
+        dfsweep = dfsource[dfsource["sweep"] == x_val]
+        snippet_x = dfsweep["time"] - offset
+        snippet_y = dfsweep[rec_filter]
+
+        if getattr(uistate, "mouseover_out_blob", None) is not None:
+            try:
+                uistate.mouseover_out_blob.remove()
+            except ValueError:
+                pass
+            uistate.mouseover_out_blob = None
+
+        self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
+        uistate.axe.figure.canvas.draw()
+        uistate.last_out_x_idx = out_x_idx
+        ax.figure.canvas.draw()
+
+    def _mouseover_output_stim(self, event):
+        str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
+        ax = getattr(uistate, str_ax) if str_ax else None
+        if event.inaxes not in (uistate.ax1, uistate.ax2) or str_ax is None:
+            if uistate.ghost_sweep is not None:
+                self.exorcise()
+            return
+        if event.inaxes != ax:
+            x, y = ax.transData.inverted().transform((event.x, event.y))
+        else:
+            x, y = event.xdata, event.ydata
+        if x is None or y is None or not (uistate.slopeView() or uistate.ampView()):
+            if uistate.ghost_sweep is not None:
+                self.exorcise()
+            return
+        if len(uistate.list_idx_select_recs) != 1:
+            self.exorcise()
+            return
+
+        dict_out = {
+            key: value
+            for key, value in uistate.dict_rec_show.items()
+            if value["axis"] == str_ax and (value["aspect"] in ["EPSP_amp", "EPSP_slope"]) and hasattr(value["line"], "get_xdata")
+        }
+        if not dict_out:
+            return
+
+        dict_pop = list(dict_out.values())[0]
+        x_data = dict_pop["line"].get_xdata()
+        y_data = dict_pop["line"].get_ydata()
+
+        import numpy as np
+
+        out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
+        x_val = x_data[out_x_idx]
+
+        if out_x_idx == getattr(uistate, "last_out_x_idx", None):
+            return
+
+        rec_ID = dict_pop["rec_ID"]
+        df_p = self.get_df_project()
+        p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
+        df_t = self.get_dft(p_row)
+        rec_filter = p_row["filter"]
+        settings = uistate.settings
+
+        stim_num = int(x_val)
+        matching = df_t[df_t["stim"] == stim_num]
+        if matching.empty:
+            return
+        t_row = matching.iloc[0]
+        t_stim = t_row["t_stim"]
+
+        dfmean = self.get_dfmean(row=p_row)
+        window_start = t_stim + settings["event_start"]
+        window_end = t_stim + settings["event_end"]
+        snippet = dfmean[(dfmean["time"] >= window_start) & (dfmean["time"] <= window_end)].copy()
+        snippet_x = snippet["time"] - t_stim
+        snippet_y = snippet[rec_filter]
+        ghost_label_text = f"stim {stim_num}"
+
+        if getattr(uistate, "mouseover_out_blob", None) is not None:
+            try:
+                uistate.mouseover_out_blob.remove()
+            except ValueError:
+                pass
+            uistate.mouseover_out_blob = None
+
+        self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
+        uistate.axe.figure.canvas.draw()
+        uistate.last_out_x_idx = out_x_idx
+        ax.figure.canvas.draw()
+
+    def _mouseover_output_pp(self, event):
+        str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
+        ax = getattr(uistate, str_ax) if str_ax else None
+        if event.inaxes not in (uistate.ax1, uistate.ax2) or str_ax is None:
+            if uistate.ghost_sweep is not None:
+                self.exorcise()
+            return
+        if event.inaxes != ax:
+            x, y = ax.transData.inverted().transform((event.x, event.y))
+        else:
+            x, y = event.xdata, event.ydata
+        if x is None or y is None or not (uistate.slopeView() or uistate.ampView()):
+            if uistate.ghost_sweep is not None:
+                self.exorcise()
+            return
+        if len(uistate.list_idx_select_recs) != 1:
+            self.exorcise()
+            return
+
+        dict_out = {
+            key: value
+            for key, value in uistate.dict_rec_show.items()
+            if value["axis"] == str_ax and (value["aspect"] in ["EPSP_amp", "EPSP_slope"]) and hasattr(value["line"], "get_xdata")
+        }
+        if not dict_out:
+            return
+
+        dict_pop = list(dict_out.values())[0]
+        x_data = dict_pop["line"].get_xdata()
+        y_data = dict_pop["line"].get_ydata()
+
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        x_range = xlim[1] - xlim[0]
+        y_range = ylim[1] - ylim[0]
+        if x_range == 0:
+            x_range = 1
+        if y_range == 0:
+            y_range = 1
+
+        out_x_idx = self._get_nearest_point(x, y, x_data, y_data, x_range, y_range)
+        if out_x_idx is None:
+            return
+
+        x_val = x_data[out_x_idx]
+        out_x_val = x_val
+        out_y_val = y_data[out_x_idx]
+
+        rec_ID = dict_pop["rec_ID"]
+        df_p = self.get_df_project()
+        p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
+
+        dfoutput = self.get_dfdiff(row=p_row) if uistate.checkBox.get("paired_stims", False) else self.get_dfoutput(row=p_row)
+        out_sweeps = dfoutput[dfoutput["sweep"].notna()]
+        out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
+        out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
+        common_sweeps = out1.index.intersection(out2.index).dropna()
+        if len(common_sweeps) > 0:
+            safe_idx = min(out_x_idx, len(common_sweeps) - 1)
+            x_val = common_sweeps[safe_idx]
+
+        if out_x_idx == getattr(uistate, "last_out_x_idx", None):
+            return
+
+        df_t = self.get_dft(p_row)
+        rec_filter = p_row["filter"]
+        import pandas as pd
+
+        stim = dict_pop.get("stim")
+        if stim is None:
+            stim = 1
+
+        t_row = df_t[df_t["stim"] == stim].iloc[0]
+        offset = t_row["t_stim"]
+
+        if pd.notna(p_row["bin_size"]):
+            dfsource = self.get_dfbin(p_row)
+            ghost_label_text = f"bin {int(x_val)}"
+        else:
+            dfsource = self.get_dffilter(p_row)
+            ghost_label_text = f"sweep {int(x_val)}"
+
+        dfsweep = dfsource[dfsource["sweep"] == x_val]
+        snippet_x = dfsweep["time"] - offset
+        snippet_y = dfsweep[rec_filter]
+
+        aspect = dict_pop.get("aspect", "EPSP_amp")
+        highlight_color = uistate.settings.get(f"rgb_{aspect}", "red")
+
+        self._draw_mouseover_blob(ax, out_x_val, out_y_val, highlight_color)
+        self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
+        uistate.axe.figure.canvas.draw()
+        uistate.last_out_x_idx = out_x_idx
+        ax.figure.canvas.draw()
+
+    def _mouseover_output_io(self, event):
+        str_ax = "ax1"
+        ax = getattr(uistate, str_ax) if str_ax else None
+        if event.inaxes not in (uistate.ax1, uistate.ax2) or str_ax is None:
+            if uistate.ghost_sweep is not None:
+                self.exorcise()
+            return
+        if event.inaxes != ax:
+            x, y = ax.transData.inverted().transform((event.x, event.y))
+        else:
+            x, y = event.xdata, event.ydata
+        if x is None or y is None:
+            if uistate.ghost_sweep is not None:
+                self.exorcise()
+            return
+        if len(uistate.list_idx_select_recs) != 1:
+            self.exorcise()
+            return
+
+        dict_out = {
+            key: value
+            for key, value in uistate.dict_rec_show.items()
+            if value["axis"] == str_ax and value.get("x_mode") == "io" and hasattr(value["line"], "get_offsets")
+        }
+        if not dict_out:
+            return
+
+        dict_pop = list(dict_out.values())[0]
+        rec_ID = dict_pop["rec_ID"]
+        df_p = self.get_df_project()
+        p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
+
+        dfoutput = self.get_dfdiff(row=p_row) if uistate.checkBox["paired_stims"] else self.get_dfoutput(row=p_row)
+        dfoutput = self.V2mV(dfoutput)
+        df_sweeps = dfoutput[dfoutput["sweep"].notna()].reset_index(drop=True)
+        io_input = getattr(uistate, "io_input", "vamp")
+        io_output = getattr(uistate, "io_output", "EPSPamp")
+        x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
+        y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+
+        if x_col not in df_sweeps.columns or y_col not in df_sweeps.columns:
+            return
+
+        df_sweeps = df_sweeps.dropna(subset=[x_col, y_col]).reset_index(drop=True)
+
+        x_array = df_sweeps[x_col].values.astype(float)
+        y_array = df_sweeps[y_col].values.astype(float)
+
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        x_range = xlim[1] - xlim[0]
+        y_range = ylim[1] - ylim[0]
+        if x_range == 0:
+            x_range = 1
+        if y_range == 0:
+            y_range = 1
+
+        out_x_idx = self._get_nearest_point(x, y, x_array, y_array, x_range, y_range)
+        if out_x_idx is None:
+            return
+
+        x_val = df_sweeps["sweep"].iloc[out_x_idx]
+        out_x_val = x_array[out_x_idx]
+        out_y_val = y_array[out_x_idx]
+
+        if out_x_idx == getattr(uistate, "last_out_x_idx", None):
+            return
+
+        import pandas as pd
+        df_t = self.get_dft(p_row)
+        rec_filter = p_row["filter"]
+        stim = df_sweeps["stim"].iloc[out_x_idx]
+
+        t_row = df_t[df_t["stim"] == stim].iloc[0]
+        offset = t_row["t_stim"]
+
+        if pd.notna(p_row["bin_size"]):
+            dfsource = self.get_dfbin(p_row)
+            ghost_label_text = f"bin {int(x_val)}"
+        else:
+            dfsource = self.get_dffilter(p_row)
+            ghost_label_text = f"sweep {int(x_val)}"
+
+        dfsweep = dfsource[dfsource["sweep"] == x_val]
+        snippet_x = dfsweep["time"] - offset
+        snippet_y = dfsweep[rec_filter]
+
+        aspect = dict_pop.get("aspect", "EPSP_amp")
+        highlight_color = uistate.settings.get(f"rgb_{aspect}", "red")
+
+        self._draw_mouseover_blob(ax, out_x_val, out_y_val, highlight_color)
+        self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
+        uistate.axe.figure.canvas.draw()
+        uistate.last_out_x_idx = out_x_idx
+        ax.figure.canvas.draw()
+
+    # --- Phase 2: Specialized Drag Update Strategies ---
+
+    def _drag_update_time(self, x_start, x_end, precision):
+        action = uistate.mouseover_action
+        if action is None:
+            return
+        aspect = "_".join(action.split()[:2])
+        stim_idx = uistate.list_idx_select_stims[0]
+        prow = self.get_prow()
+        n_stims = prow["stims"]
+        dft_temp = uistate.dft_temp
+        stim_offset = dft_temp.at[stim_idx, "t_stim"]
+        dict_t = {}
+
+        if aspect in ["EPSP_slope", "volley_slope"]:
+            axis = uistate.ax2
+            slope_width = round(x_end - x_start, precision)
+            dict_t = {
+                f"t_{aspect}_start": round(x_start + stim_offset, precision),
+                f"t_{aspect}_end": round(x_end + stim_offset, precision),
+                f"t_{aspect}_width": round(slope_width, precision),
+            }
+        elif aspect in ["EPSP_amp", "volley_amp"]:
+            axis = uistate.ax1
+            dict_t = {
+                "t_stim": stim_offset,
+                f"t_{aspect}": round(x_start + stim_offset, precision),
+            }
+
+        for key, value in dict_t.items():
+            dft_temp.at[stim_idx, key] = value
+            if not uistate.checkBox["timepoints_per_stim"] and n_stims > 1:
+                offset = dft_temp.at[stim_idx, "t_stim"] - dft_temp.at[stim_idx, key]
+                for i, i_trow in dft_temp.iterrows():
+                    dft_temp.at[i, key] = round(i_trow["t_stim"] - offset, precision)
+
+        trow_temp = dft_temp.iloc[stim_idx]
+        dict_t["t_EPSP_amp_halfwidth"] = trow_temp["t_EPSP_amp_halfwidth"]
+        dict_t["t_volley_amp_halfwidth"] = trow_temp["t_volley_amp_halfwidth"]
+        dict_t["norm_output_from"] = trow_temp["norm_output_from"]
+        dict_t["norm_output_to"] = trow_temp["norm_output_to"]
+        dict_t["stim"] = trow_temp["stim"]
+        dict_t["amp_zero"] = trow_temp["amp_zero"]
+
+        if not uistate.checkBox["timepoints_per_stim"] and n_stims > 1:
+            dft_to_update = uistate.dft_temp.copy()
+        else:
+            dft_to_update = uistate.dft_temp.iloc[[stim_idx]].copy()
+
+        rec_filter = prow.get("filter")
+
+        import numpy as np
+        import pandas as pd
+
+        if uistate.x_axis == "stim" and len(uistate.df_rec_select_time) > 1:
+            dfmean = self.get_dfmean(row=prow)
+            dict_t_stim = dft_to_update.iloc[0].to_dict()
+            t_stim = dict_t_stim.get("t_stim", 0.0)
+            t_win_start = t_stim - 0.002
+            t_win_end = dict_t_stim.get("t_EPSP_amp", t_stim + 0.01) + dict_t_stim.get(
+                "t_EPSP_amp_width",
+                2 * dict_t_stim.get("t_EPSP_amp_halfwidth", 0.001),
+            )
+            snippet = dfmean[(dfmean["time"] >= t_win_start) & (dfmean["time"] <= t_win_end)].copy().reset_index(drop=True)
+            measured = analysis.measure_waveform(snippet, dict_t_stim, filter=rec_filter)
+            stim_num = int(dict_t_stim["stim"])
+            drag_x = np.array([stim_num])
+            drag_y = np.array([measured.get(aspect, np.nan)])
+            outkey = aspect
+            marker_style = "o"
+            linestyle = "None"
+        else:
+            if pd.notna(prow.get("bin_size")):
+                dffilter = self.get_dfbin(prow)
+            else:
+                dffilter = self.get_dffilter(row=prow)
+            out = analysis.build_dfoutput(
+                dffilter=dffilter,
+                dfmean=self.get_dfmean(row=prow),
+                dft=dft_to_update,
+                quick=True,
+                filter=rec_filter,
+            )
+            out = self.V2mV(out)
+            if aspect in ["EPSP_amp", "EPSP_slope"]:
+                aspect_norm = f"{aspect}_norm"
+                outkey = aspect_norm if uistate.checkBox["norm_EPSP"] else aspect
+            else:
+                outkey = aspect
+
+            drag_x = out["sweep"]
+            drag_y = out[outkey]
+            marker_style = "o" if len(drag_x) == 1 else "None"
+            linestyle = "-"
+
+        msize = 6
+        if getattr(uistate, "mouseover_out", None) is None:
+            uistate.mouseover_out = axis.plot(
+                drag_x, drag_y, color=uistate.settings.get(f"rgb_{aspect}", "black"),
+                linewidth=3, linestyle=linestyle, marker=marker_style, markersize=msize,
+            )
+        else:
+            if getattr(uistate.mouseover_out[0], "axes", None) != axis:
+                uistate.mouseover_out[0].remove()
+                uistate.mouseover_out = axis.plot(
+                    drag_x, drag_y, color=uistate.settings.get(f"rgb_{aspect}", "black"),
+                    linewidth=3, linestyle=linestyle, marker=marker_style, markersize=msize,
+                )
+            else:
+                uistate.mouseover_out[0].set_data(drag_x, drag_y)
+                uistate.mouseover_out[0].set_marker(marker_style)
+                uistate.mouseover_out[0].set_linestyle(linestyle)
+                uistate.mouseover_out[0].set_color(uistate.settings.get(f"rgb_{aspect}", "black"))
+                uistate.mouseover_out[0].set_markersize(msize)
+
+        self.canvasOutput.draw()
+
+    def _drag_update_pp(self, x_start, x_end, precision):
+        action = uistate.mouseover_action
+        if action is None:
+            return
+        aspect = "_".join(action.split()[:2])
+        stim_idx = uistate.list_idx_select_stims[0]
+        prow = self.get_prow()
+        n_stims = prow["stims"]
+        dft_temp = uistate.dft_temp
+        stim_offset = dft_temp.at[stim_idx, "t_stim"]
+        dict_t = {}
+
+        if aspect in ["EPSP_slope", "volley_slope"]:
+            axis = uistate.ax2
+            slope_width = round(x_end - x_start, precision)
+            dict_t = {
+                f"t_{aspect}_start": round(x_start + stim_offset, precision),
+                f"t_{aspect}_end": round(x_end + stim_offset, precision),
+                f"t_{aspect}_width": round(slope_width, precision),
+            }
+        elif aspect in ["EPSP_amp", "volley_amp"]:
+            axis = uistate.ax1
+            dict_t = {
+                "t_stim": stim_offset,
+                f"t_{aspect}": round(x_start + stim_offset, precision),
+            }
+
+        for key, value in dict_t.items():
+            dft_temp.at[stim_idx, key] = value
+            if not uistate.checkBox["timepoints_per_stim"] and n_stims > 1:
+                offset = dft_temp.at[stim_idx, "t_stim"] - dft_temp.at[stim_idx, key]
+                for i, i_trow in dft_temp.iterrows():
+                    dft_temp.at[i, key] = round(i_trow["t_stim"] - offset, precision)
+
+        trow_temp = dft_temp.iloc[stim_idx]
+        dict_t["t_EPSP_amp_halfwidth"] = trow_temp["t_EPSP_amp_halfwidth"]
+        dict_t["t_volley_amp_halfwidth"] = trow_temp["t_volley_amp_halfwidth"]
+        dict_t["norm_output_from"] = trow_temp["norm_output_from"]
+        dict_t["norm_output_to"] = trow_temp["norm_output_to"]
+        dict_t["stim"] = trow_temp["stim"]
+        dict_t["amp_zero"] = trow_temp["amp_zero"]
+
+        if not uistate.checkBox["timepoints_per_stim"] and n_stims > 1:
+            dft_to_update = uistate.dft_temp.copy()
+        else:
+            dft_to_update = uistate.dft_temp.iloc[[stim_idx]].copy()
+
+        rec_filter = prow.get("filter")
+        import pandas as pd
+
+        if pd.notna(prow.get("bin_size")):
+            dffilter = self.get_dfbin(prow)
+        else:
+            dffilter = self.get_dffilter(row=prow)
+        out = analysis.build_dfoutput(
+            dffilter=dffilter,
+            dfmean=self.get_dfmean(row=prow),
+            dft=dft_to_update,
+            quick=True,
+            filter=rec_filter,
+        )
+        out = self.V2mV(out)
+
+        out_sweeps = out[out["sweep"].notna()]
+        out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
+        out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
+        common_sweeps = out1.index.intersection(out2.index).dropna()
+        if not common_sweeps.empty:
+            o1 = out1.loc[common_sweeps]
+            o2 = out2.loc[common_sweeps]
+            v1 = o1[aspect].values.astype(float)
+            v2 = o2[aspect].values.astype(float)
+            import warnings
+            import numpy as np
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                ppr = v2 / v1
+                ppr[~np.isfinite(ppr)] = np.nan
+            x_val_map = {}
+            i = 1
+            for key in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]:
+                if uistate.checkBox.get(key, True):
+                    x_val_map[key] = i
+                    i += 1
+            x_val = x_val_map.get(aspect, 1)
+            drag_x = np.full(len(common_sweeps), x_val)
+            drag_y = ppr
+            marker_style = "o"
+            linestyle = "None"
+        else:
+            if aspect in ["EPSP_amp", "EPSP_slope"]:
+                aspect_norm = f"{aspect}_norm"
+                outkey = aspect_norm if uistate.checkBox["norm_EPSP"] else aspect
+            else:
+                outkey = aspect
+            drag_x = out["sweep"]
+            drag_y = out[outkey]
+            marker_style = "o" if len(drag_x) == 1 else "None"
+            linestyle = "-"
+
+        msize = 6
+        if getattr(uistate, "mouseover_out", None) is None:
+            uistate.mouseover_out = axis.plot(
+                drag_x, drag_y, color=uistate.settings.get(f"rgb_{aspect}", "black"),
+                linewidth=3, linestyle=linestyle, marker=marker_style, markersize=msize,
+            )
+        else:
+            if getattr(uistate.mouseover_out[0], "axes", None) != axis:
+                uistate.mouseover_out[0].remove()
+                uistate.mouseover_out = axis.plot(
+                    drag_x, drag_y, color=uistate.settings.get(f"rgb_{aspect}", "black"),
+                    linewidth=3, linestyle=linestyle, marker=marker_style, markersize=msize,
+                )
+            else:
+                uistate.mouseover_out[0].set_data(drag_x, drag_y)
+                uistate.mouseover_out[0].set_marker(marker_style)
+                uistate.mouseover_out[0].set_linestyle(linestyle)
+                uistate.mouseover_out[0].set_color(uistate.settings.get(f"rgb_{aspect}", "black"))
+                uistate.mouseover_out[0].set_markersize(msize)
+
+        self.canvasOutput.draw()
+
+    def _drag_update_io(self, x_start, x_end, precision):
+        action = uistate.mouseover_action
+        if action is None:
+            return
+        aspect = "_".join(action.split()[:2])
+        stim_idx = uistate.list_idx_select_stims[0]
+        prow = self.get_prow()
+        dft_temp = uistate.dft_temp
+        stim_offset = dft_temp.at[stim_idx, "t_stim"]
+        dict_t = {}
+        axis = uistate.ax1
+
+        if aspect in ["EPSP_slope", "volley_slope"]:
+            slope_width = round(x_end - x_start, precision)
+            dict_t = {
+                f"t_{aspect}_start": round(x_start + stim_offset, precision),
+                f"t_{aspect}_end": round(x_end + stim_offset, precision),
+                f"t_{aspect}_width": round(slope_width, precision),
+            }
+        elif aspect in ["EPSP_amp", "volley_amp"]:
+            dict_t = {
+                "t_stim": stim_offset,
+                f"t_{aspect}": round(x_start + stim_offset, precision),
+            }
+
+        for key, value in dict_t.items():
+            dft_temp.at[stim_idx, key] = value
+
+        trow_temp = dft_temp.iloc[stim_idx]
+        dict_t["t_EPSP_amp_halfwidth"] = trow_temp["t_EPSP_amp_halfwidth"]
+        dict_t["t_volley_amp_halfwidth"] = trow_temp["t_volley_amp_halfwidth"]
+        dict_t["norm_output_from"] = trow_temp["norm_output_from"]
+        dict_t["norm_output_to"] = trow_temp["norm_output_to"]
+        dict_t["stim"] = trow_temp["stim"]
+        dict_t["amp_zero"] = trow_temp["amp_zero"]
+
+        dft_to_update = uistate.dft_temp.copy()
+        rec_filter = prow.get("filter")
+        import pandas as pd
+
+        if pd.notna(prow.get("bin_size")):
+            dffilter = self.get_dfbin(prow)
+        else:
+            dffilter = self.get_dffilter(row=prow)
+        out = analysis.build_dfoutput(
+            dffilter=dffilter,
+            dfmean=self.get_dfmean(row=prow),
+            dft=dft_to_update,
+            quick=True,
+            filter=rec_filter,
+        )
+        out = self.V2mV(out)
+
+        io_input = getattr(uistate, "io_input", "vamp")
+        io_output = getattr(uistate, "io_output", "EPSPamp")
+        x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
+        y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+
+        out_sweeps = out[out["sweep"].notna()].dropna(subset=[x_col, y_col])
+        drag_x = out_sweeps[x_col].values
+        drag_y = out_sweeps[y_col].values
+        marker_style = "o"
+        linestyle = "None"
+        aspect = y_col
+
+        msize = 10
+        if getattr(uistate, "mouseover_out", None) is None:
+            uistate.mouseover_out = axis.plot(
+                drag_x, drag_y, color=uistate.settings.get(f"rgb_{aspect}", "black"),
+                linewidth=3, linestyle=linestyle, marker=marker_style, markersize=msize,
+            )
+        else:
+            if getattr(uistate.mouseover_out[0], "axes", None) != axis:
+                uistate.mouseover_out[0].remove()
+                uistate.mouseover_out = axis.plot(
+                    drag_x, drag_y, color=uistate.settings.get(f"rgb_{aspect}", "black"),
+                    linewidth=3, linestyle=linestyle, marker=marker_style, markersize=msize,
+                )
+            else:
+                uistate.mouseover_out[0].set_data(drag_x, drag_y)
+                uistate.mouseover_out[0].set_marker(marker_style)
+                uistate.mouseover_out[0].set_linestyle(linestyle)
+                uistate.mouseover_out[0].set_color(uistate.settings.get(f"rgb_{aspect}", "black"))
+                uistate.mouseover_out[0].set_markersize(msize)
+
+        self.canvasOutput.draw()
+
+    # --- Phase 2: Specialized Drag Release Strategies ---
+
+    def _drag_release_time(self, event, data_x, data_y):
+        return self.eventDragReleased(event, data_x, data_y)
+
+    def _drag_release_pp(self, event, data_x, data_y):
+        return self.eventDragReleased(event, data_x, data_y)
+
+    def _drag_release_io(self, event, data_x, data_y):
+        return self.eventDragReleased(event, data_x, data_y)
+\n    def zoomOnScroll(self, event, graph):
         if graph == "mean":
             canvas = self.canvasMean
             ax = uistate.axm
