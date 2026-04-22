@@ -106,17 +106,13 @@ Modeled **exactly** on the Group controls pattern in `ui_groups.py:214-261` (`gr
 
 ### 4. Sample Designation for Visual Overlay
 
-- **UI**: `checkBox_is_group_sample` (replaces previous pushButton_sample) in the `frameToolTag`.
-- **Wiring**: Handled inside `tableProjSelectionChanged()` (lines ~822-992); updates checkbox state and connects toggles to `sample_selected()`.
-- **Storage**: Sample pointer lives _only_ inside `dd_groups[group_ID]["sample"] = (rec_ID: str, sweep: int) | None` (no `df_project` flag/column, no `is_sample`, no `samples.pkl`). A group has no or one sample; that sample is shared across all Test Sets.
-- **Behaviour**:
-  - Checkbox enabled only on exactly one recording that belongs to at least one group (groups listed in `df_project["groups"]` column); otherwise disabled.
-  - Checked only if the single selected recording _is_ the sample for **all** groups it belongs to.
-  - Clicking toggles: sets/clears the sample pointer (using current `x_select["output"]` sweep) in relevant group dicts only.
-  - `sample_selected()` updates the group dict(s), calls `group_save_dd()`, then triggers `sample_overlay()` (no full cache purge).
-  - New `sample_overlay()` (preferred name; in `ui_plot.py`) reuses the plotted line from `axe`, overlays it (group color, y-axis only, thin) in the upper-left corner of the output graph (ax1/ax2); supports multiple samples. Clearing updates only the overlay and the sample key in `dd_groups`.
-- **Export integration**: When exporting mean graphs (`menuExport`), overlay the sample trace(s) with a legend entry "Example sweep".
-- **Future** (v0.16): Allow multiple samples per group or per Test Set; auto-pick "most representative" sweep by correlation to group mean; unit tests.
+- **Core Semantics**: `<rec>` is the group's one and only sample recording. The test sets explain which sweeps from that rec are to be used for samples.
+- **Data Structure**: `dd_group_samples` lives in `UIsub` (`self.dd_group_samples`). Outer dict is `group_ID: inner_dict`; inner dict is `test_ID: df`.
+- **Data Access**: `get_ddgroup_sample(group_ID)` (new in `DataFrameMixin`) returns the inner dict if it exists in memory, otherwise reads it from the cache file (`<group_name>_sample.parquet`), if no file: build from scratch (modeled exactly on `get_dfgroupmean` / `get_dfmean` pattern, using sample rec + testset sweeps + same xSelect range constraints).
+- **Computation & Visualization**: Compile a mean of the sweeps listed in the (single active) testset, on the same range constraints as in xSelect. New `sample_overlay()` in `ui_plot.py` reuses the plotted line logic from `axe`; places each sample in upper-left corner of output graph `ax1`/`ax2`, occupying one third of the height and width. Groups use their group colors; traces are superimposed. (For now, resolve a single test set only.)
+- **Checkbox logic**: `is_sample_rec()` and `update_sample_checkbox()` only set correct state on the checkbox. The function that toggles the state (`set_group_sample()`) must also trigger refresh at some point.
+- **Deletion**: Deleting a recording cascades into a group refresh, which should also trigger a sample refresh.
+- **Export**: Hook into export routines so samples appear in final figures with suitable legend.
 
 ### 5. UI Integration Points
 
@@ -169,8 +165,21 @@ Modeled **exactly** on the Group controls pattern in `ui_groups.py:214-261` (`gr
 - 3.2 Make ui.py def tableProjSelectionChanged update checkBox_is_group_sample to appropriate state.
   - tableProjSelectionChanged already checks if exactly one rec is selected. If not, set checkBox_is_group_sample unchecked and visibly disable it.
   - If one rec is selected, enable checkBox_is_group_sample and set it to the return of is_sample_rec(). This function returns True only if the selected rec_ID is the sample of all groups that it is a member of.
-- 3.3 Add separate `sample_overlay()` function in `ui_plot.py` (reuses plotted line from `axe`, overlays it in upper-left corner of output graph ax1/ax2 using group color, y-axis only; supports all samples). Sample state lives _exclusively_ in `dd_groups`.
-- 3.4 Hook into export routines so samples appear in final figures.
+- 3.3 (now fully actionable):
+  - In `DataFrameMixin` (`ui_data_frames.py`): add `self.dd_group_samples = {}` to `loadProject()` and `resetCacheDicts()`. Implement `get_ddgroup_sample(group_ID)` exactly mirroring `get_dfgroupmean`: (1) return from `self.dd_group_samples` if present, (2) read parquet cache file if exists, (3) else build (locate sample rec from `dd_groups[group_ID]["sample"]`, take sweeps from active testset, compute mean using identical xSelect range constraints, persist parquet, cache and return the inner dict `{test_ID: df}`).
+  - In `UIplot` (`ui_plot.py`): implement `sample_overlay(self, dd_group_samples)`: clear prior sample artists (`uistate.sample_artists`), for each group with data reuse `axe`-style line plotting, position in upper-left of `ax1`/`ax2` (1/3 height/width, group color from `dd_groups`, superimposed, y-aligned, zorder/alpha compatible with light/dark mode and testset spans). Store artists for management.
+  - Add dedicated `refresh_samples(self)` (see new section below) that populates `dd_group_samples` via the getter then calls `uiplot.sample_overlay(...)`.
+- 3.4 Hook `refresh_samples()` into all locations listed in the Sample Refresh Behavior section; update export routines (`menuExport` etc.) to include sample artists/legend.
+
+### Sample Refresh Behavior (new dedicated section)
+
+- Dedicated `refresh_samples(self)` method (added to `UIsub`/`GroupMixin`; per clarification 4). It rebuilds `self.dd_group_samples` (via `get_ddgroup_sample` for every group that has a sample pointer) then calls `uiplot.sample_overlay(self.dd_group_samples)`.
+- Triggers (per clarifications 4-6):
+  - `set_group_sample()` (after `group_save_dd()`).
+  - Test set CRUD (`testset_new()`, `testset_remove()`, rename) — sweeps used for mean may change.
+  - Group removal, recording deletion (cascades into group refresh which must also call sample refresh).
+  - `graphRefresh()`, `checkBox_is_group_sample_changed()`, and any other state change affecting samples.
+- Keeps sample computation lazy/isolated; mirrors `graphRefresh(dd_groups, dd_testsets)` pattern. No full cache purge on every toggle.
 
 **Phase 4 – Polish & UI feedback**
 
@@ -188,19 +197,19 @@ Modeled **exactly** on the Group controls pattern in `ui_groups.py:214-261` (`gr
 - How to handle overlapping Test Set spans in visualization (layering, alpha, legend)?
 - Automatic vs explicit comparison after creating/choosing a Test Set by `set_ID`?
 - UI for selecting which Test Set (`set_ID`) to use for a comparison (combo box in comparison panel?)?
-- Visual design consistency between `verticalLayoutGroups` and `verticalLayoutTestSet`, between blue current selection vs gray Test Set spans, and for `checkBox_is_group_sample` + sample overlay (upper-left on output graph)?
+- Visual design consistency between `verticalLayoutGroups` and `verticalLayoutTestSet`, between blue current selection vs gray Test Set spans, and for `checkBox_is_group_sample` + sample overlay (1/3 size, upper-left on output graph)?
 - Integration with existing `build_dfoutput` pipelines and paired vs unpaired tests?
 - Where to store "comparison configuration" (metrics, normalization flags)?
-- Details of `sample_overlay()` placement, y-axis scaling, and multi-sample handling on ax1/ax2.
 
 ## Success Criteria
 
 - User can create groups and Test Sets (`add_to_set` button captures selected sweeps into integer `set_ID` entries with default names "set 1", "set 2", … shown dynamically in `verticalLayoutTestSet` with full rename/delete support matching the group pattern).
 - Ticked Test Sets render as gray `axvspan` backgrounds on the output graph (via new visualization logic similar to `xSelect()`), updating on checkbox changes and refresh.
 - Selecting a Test Set (`set_ID`) + groups produces statistical table in `verticalLayoutComparison` with correct p-values from `ttest_df` on the tagged sweep means.
-- `checkBox_is_group_sample` correctly reflects/sets sample state (only on single grouped recording; toggles `dd_groups[...]["sample"]`); `sample_overlay()` draws axe-based trace (group color, y-only) in upper-left of output graph.
-- All data (`dd_groups` with sample pointers, `dd_testsets` in `test_sets.pkl`) persists across project close/re-open via pickles. Clearing sample updates only overlay + dict key.
-- No modifications to `ui_designer.py`; all dynamic controls follow the proven Group pattern using integer IDs and default names.
-- Code stays inside `GroupMixin` where it belongs for cohesion.
+- `<rec>` is the group's one and only sample; test sets define which of its sweeps are averaged. `dd_group_samples` (in `UIsub`) uses `group_ID: {test_ID: df}` structure, persisted as `<group_name>_sample.parquet`. `get_ddgroup_sample(group_ID)` (in `DataFrameMixin`, mirroring `get_dfgroupmean`) returns from memory/cache or builds using sample rec + testset sweeps + xSelect range constraints.
+- `checkBox_is_group_sample` / `update_sample_checkbox()` / `is_sample_rec()` correctly reflect/set state (only on single grouped recording; `set_group_sample()` updates `dd_groups[...]["sample"]` and triggers `refresh_samples()`). `refresh_samples()` (new dedicated method) populates `dd_group_samples` then calls `uiplot.sample_overlay()`.
+- `sample_overlay()` in `ui_plot.py` reuses `axe` line logic, places superimposed group-color traces in upper-left of `ax1`/`ax2` (occupying 1/3 height/width, y-aligned only; single testset for now), with proper artist management, zorder/alpha for light/dark mode and testset spans.
+- Deletion of recording/group and testset CRUD all trigger `refresh_samples()`. Samples appear in exported figures. All data (`dd_groups` with sample pointers, `dd_testsets`, parquet caches) persists across reloads. No modifications to `ui_designer.py`.
+- Code stays inside `GroupMixin`/`DataFrameMixin`/`UIplot` where it belongs for cohesion.
 
 This plan provides a concrete, phased roadmap that builds directly on the existing architecture (`GroupMixin`, `get_dfgroupmean`, `uistate.x_select`, `verticalLayoutTestSet`, `verticalLayoutComparison`) while respecting all coding constraints and the new `set_ID` + `test_sets.pkl` conventions. Visualization of Test Sets is now explicitly part of the v0.15 pillars.
