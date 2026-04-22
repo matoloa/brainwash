@@ -169,7 +169,8 @@ Modeled **exactly** on the Group controls pattern in `ui_groups.py:214-261` (`gr
   - In `DataFrameMixin` (`ui_data_frames.py`): add `self.dd_group_samples = {}` to `loadProject()` and `resetCacheDicts()`. Implement `get_ddgroup_sample(group_ID)` exactly mirroring `get_dfgroupmean`: (1) return from `self.dd_group_samples` if present, (2) read parquet cache file if exists, (3) else build (locate sample rec from `dd_groups[group_ID]["sample"]`, take sweeps from active testset, compute mean using identical xSelect range constraints, persist parquet, cache and return the inner dict `{test_ID: df}`).
   - In `UIplot` (`ui_plot.py`): implement `sample_overlay(self, dd_group_samples)`: clear prior sample artists (`uistate.sample_artists`), for each group with data reuse `axe`-style line plotting, position in upper-left of `ax1`/`ax2` (1/3 height/width, group color from `dd_groups`, superimposed, y-aligned, zorder/alpha compatible with light/dark mode and testset spans). Store artists for management.
   - Add dedicated `refresh_samples(self)` (see new section below) that populates `dd_group_samples` via the getter then calls `uiplot.sample_overlay(...)`.
-- 3.4 Hook `refresh_samples()` into all locations listed in the Sample Refresh Behavior section; update export routines (`menuExport` etc.) to include sample artists/legend.
+- 3.4 Hook `refresh_samples()` into all locations listed in the Sample Refresh Behavior section
+- 3.5 update export routines (`menuExport` etc.) to include sample artists/legend.
 
 ### Sample Refresh Behavior (new dedicated section)
 
@@ -181,14 +182,10 @@ Modeled **exactly** on the Group controls pattern in `ui_groups.py:214-261` (`gr
   - `graphRefresh()`, `checkBox_is_group_sample_changed()`, and any other state change affecting samples.
 - Keeps sample computation lazy/isolated; mirrors `graphRefresh(dd_groups, dd_testsets)` pattern. No full cache purge on every toggle.
 
-**Phase 4 – Polish & UI feedback**
-
 - Add "New Test Set", "Rename", "Delete" controls in `verticalLayoutTestSet` (leveraging integer `set_ID`).
 - Status bar messages ("Added sweeps 110-119 to Test Set 2 (set 2)").
-- Make comparison table sortable/exportable; add "Clear comparison" button.
 - Persist last-used Test Set.
 - Update `groupCheckboxChanged`, test set state changes (including visualization refresh), and refresh signals.
-- Support >2 groups (pairwise or ANOVA using selected Test Set).
 
 ## Open Questions / TODOs in Plan
 

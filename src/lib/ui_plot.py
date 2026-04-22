@@ -236,6 +236,46 @@ class UIplot:
         if draw and self.uistate.ax1 is not None:
             self.uistate.ax1.figure.canvas.draw()
 
+    def sample_overlay(self, dd_group_samples, dd_groups=None):
+        """Phase 3.3: overlays sample means in upper-left of output graph (ax1/ax2).
+        Clears prior artists from uistate.sample_artists. Reuses plotted line logic
+        from axe (mean of testset sweeps on sample rec, same xSelect range constraints).
+        Places each at 1/3 height/width using group color; superimposed, y-aligned only.
+        Supports single testset for now. Stubbed with TODOs for inset coords/transform,
+        artist storage in uistate.sample_artists, zorder/alpha, light/dark handling.
+        Updated signature accepts dd_groups for color/sample pointer access.
+        """
+        if not hasattr(self.uistate, "sample_artists"):
+            self.uistate.sample_artists = {}
+        # clear previous sample artists
+        for artist in self.uistate.sample_artists.values():
+            try:
+                artist.remove()
+            except Exception:
+                pass
+        self.uistate.sample_artists = {}
+
+        if not dd_group_samples or self.uistate.ax1 is None:
+            if self.uistate.ax1 is not None:
+                self.uistate.ax1.figure.canvas.draw()
+            return
+
+        # TODO: resolve single active testset (first checked?); compute inset bounds
+        # (e.g. transform=ax.transAxes, bbox=[0.02, 0.75, 0.33, 0.33]); y-only align
+        for group_ID, inner in dd_group_samples.items():
+            if not inner or group_ID not in (dd_groups or {}):
+                continue
+            group_dict = (dd_groups or {}).get(group_ID, {})
+            color = group_dict.get("color", "#0000ff")
+            # TODO: reuse update_axe_mean / plot_line logic here for sample df mean
+            # for ax_name in ("ax1", "ax2"):
+            #     ax = getattr(self.uistate, ax_name)
+            #     ...
+            print(f"sample_overlay: stub for group {group_ID} color {color} (TODO: 1/3 inset)")
+
+        if self.uistate.ax1 is not None:
+            self.uistate.ax1.figure.canvas.draw()
+
     def visualize_test_sets(self, dd_testsets, draw=True):
         """Draw gray axvspan for each shown test set on ax1/ax2 (twinx) only.
         Uses min/max of sweeps (assumes continuous/sorted per clarifications).
@@ -631,6 +671,12 @@ class UIplot:
 
         # visualize test sets (Phase 2) - spans persist independently of xSelect
         self.visualize_test_sets(dd_testsets or {}, draw=False)
+
+        # refresh samples (Phase 3.3) - reach UIsub method via uistate if available
+        if hasattr(self.uistate, "refresh_samples"):
+            self.uistate.refresh_samples()
+        elif hasattr(self, "uisub") and hasattr(self.uisub, "refresh_samples"):
+            self.uisub.refresh_samples()
 
         # 0-hline for Events
         if not "Events y zero marker" in self.uistate.dict_rec_labels:

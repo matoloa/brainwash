@@ -2171,6 +2171,7 @@ class UIsub(
         self.dict_outputs = {}  # all outputs, x per sweep
         self.dict_group_means = {}  # means of all group outputs
         self.dd_testsets = {}  # test/sweep sets for group comparisons
+        self.dd_group_samples = {}  # group sample means (phase 3.3: group_ID -> {test_ID: df})
         self.dict_diffs = {}  # all diffs (for paired stim)
         if hasattr(self, "uistate") and hasattr(self.uistate, "testset_spans"):
             self.uistate.testset_spans = {}  # clear testset spans on cache reset (Phase 2)

@@ -287,6 +287,7 @@ class GroupMixin:
             for g in self.get_groupsOfRec(rec_ID):
                 self.dd_groups[g]["sample"] = None
             self.group_save_dd()
+            self.refresh_samples()
             return
         rec_str = str(rec_ID)
         group_IDs = self.get_groupsOfRec(rec_ID)
@@ -300,6 +301,7 @@ class GroupMixin:
             for g in group_IDs:
                 self.dd_groups[g]["sample"] = rec_str
         self.group_save_dd()
+        self.refresh_samples()
 
     # ------------------------------------------------------------------
     # Cache
@@ -318,15 +320,25 @@ class GroupMixin:
             path_group_mean_cache = Path(f"{self.dict_folders['cache']}/group_{group_ID}_mean.parquet")
             if path_group_mean_cache.exists:  # TODO: Upon adding a group, both of these conditions trigger. How?
                 print(f"{path_group_mean_cache} found when checking for existence...")
-                try:
-                    path_group_mean_cache.unlink()
-                    print("...and was successfully unlinked.")
-                except FileNotFoundError:
-                    print("...but NOT when attempting to unlink.")
-            uiplot.unPlotGroup(group_ID)
-            if group_ID in self.dd_groups and self.dd_groups[group_ID]["rec_IDs"]:
-                x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
-                uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.V2mV(self.get_dfgroupmean(group_ID)), x_pos=x_pos)
+                path_group_mean_cache.unlink()
+            if group_ID in self.dict_group_means:
+                del self.dict_group_means[group_ID]
+
+    # ------------------------------------------------------------------
+    # Sample refresh (Phase 3.3)
+    # ------------------------------------------------------------------
+    def refresh_samples(self):
+        """Dedicated refresh for samples (per updated plan). Rebuilds dd_group_samples
+        via get_ddgroup_sample for groups that have a sample pointer, then calls
+        uiplot.sample_overlay if available. Stub for now.
+        """
+        if not hasattr(self, "dd_group_samples"):
+            self.dd_group_samples = {}
+        # TODO: for each group with sample, self.get_ddgroup_sample(group_ID)
+        if uiplot and hasattr(uiplot, "sample_overlay"):
+            uiplot.sample_overlay(self.dd_group_samples)
+        else:
+            print("refresh_samples: uiplot.sample_overlay not yet available (stub)")
 
     # ------------------------------------------------------------------
     # Qt widget controls

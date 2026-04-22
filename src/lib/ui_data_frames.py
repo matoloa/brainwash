@@ -564,6 +564,39 @@ class DataFrameMixin:
         return group_mean
 
     # ------------------------------------------------------------------
+    # Group sample DataFrame (phase 3.3)
+    # ------------------------------------------------------------------
+
+    def get_ddgroup_sample(self, group_ID):
+        """Returns inner dict {test_ID: df} for group's sample means.
+        Follows exact get_dfgroupmean pattern: (1) memory, (2) parquet cache, (3) build.
+        For now returns empty dict until full sample-rec + testset-sweeps + xSelect-range logic is added.
+        Persisted as <group_name>_sample.parquet.
+        """
+        if not hasattr(self, "dd_group_samples"):
+            self.dd_group_samples = {}
+        if group_ID in self.dd_group_samples:  # 1: Return cached
+            if config.verbose:
+                print(f"Returning cached group sample for group {group_ID}")
+            return self.dd_group_samples[group_ID]
+        group_name = self.dd_groups.get(group_ID, {}).get("group_name", f"group_{group_ID}")
+        sample_path = Path(f"{self.dict_folders['cache']}/{group_name}_sample.parquet")
+        if sample_path.exists():  # 2: Read from file
+            if config.verbose:
+                print(f"Loading stored group sample for group {group_ID}")
+            # TODO: load and convert to dict-of-DFs
+            pass
+        else:  # 3: Create/build from scratch (TODO)
+            if config.verbose:
+                print(f"Building new group sample for group {group_ID}")
+            # TODO: locate sample rec from dd_groups[group_ID]["sample"],
+            # use active testset sweeps + xSelect range constraints to compute mean
+            pass
+        # stub for now
+        self.dd_group_samples[group_ID] = {}
+        return self.dd_group_samples[group_ID]
+
+    # ------------------------------------------------------------------
     # Uniform timepoints across stims
     # ------------------------------------------------------------------
 

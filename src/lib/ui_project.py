@@ -177,6 +177,7 @@ class ProjectMixin:
         self.group_update_dfp()
         # Load test set data (integer set_ID based, defaults "set 1", "set 2", ...; persisted in test_sets.pkl)
         self.dd_testsets = self.testset_get_dd()
+        self.dd_group_samples = {}  # phase 3.3: group_ID -> {test_ID: df}; populated lazily via get_ddgroup_sample()
         if config.talkback:
             self.setupTalkback()
         # Set up canvases and graphs
