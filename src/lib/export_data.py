@@ -118,7 +118,7 @@ class ExportMixin:
         count = 0
         for i, p_row in enumerate(rows):
             rec_name = p_row["recording_name"]
-            df_out = self.SI2m(self.get_dfoutput(p_row))
+            df_out = self.V2mV(self.get_dfoutput(p_row))
             if df_out is not None and not df_out.empty:
                 out_path = export_dir / f"{rec_name}_output.csv"
                 cols_to_export = [
@@ -140,6 +140,53 @@ class ExportMixin:
                 count += 1
 
         self._export_status(f"Exported output for {count} recording(s) to {export_dir}")
+
+    # ------------------------------------------------------------------
+    # Group means export triggers
+    # ------------------------------------------------------------------
+
+    def triggerExportGroupMeansCsv(self):
+        self.usage("triggerExportGroupMeansCsv")
+
+        dd_groups = getattr(self, "dd_groups", {})
+        if not dd_groups:
+            QtWidgets.QMessageBox.warning(
+                None,
+                "Export Error",
+                "No groups available to export.",
+            )
+            return
+
+        export_dir = self.projects_folder / "Export"
+        export_dir.mkdir(parents=True, exist_ok=True)
+
+        out_path = export_dir / f"{self.projectname}_group_means.csv"
+
+        dfs = []
+        for gid, ginfo in dd_groups.items():
+            group_name = ginfo.get("group_name", str(gid))
+            df_mean = self.get_dfgroupmean(gid)
+            if df_mean is not None and not df_mean.empty:
+                df_mean = self.V2mV(df_mean.copy())
+                # Extra scaling for _mean/_SEM columns (V2mV only handles base amp cols; backend is SI units)
+                for col in list(df_mean.columns):
+                    if ("EPSP_amp" in col or "volley_amp" in col) and "norm" not in col and any(s in col for s in ["_mean", "_SEM", "SEM"]):
+                        df_mean[col] *= 1000.0
+                df_mean.insert(0, "group_name", group_name)
+                dfs.append(df_mean)
+
+        if not dfs:
+            QtWidgets.QMessageBox.warning(
+                None,
+                "Export Error",
+                "No valid group mean data to export.",
+            )
+            return
+
+        df_all = pd.concat(dfs, ignore_index=True)
+        df_all.to_csv(out_path, index=False)
+
+        self._export_status(f"Exported group means for {len(dfs)} group(s) to {out_path}")
 
     # ------------------------------------------------------------------
     # Image export triggers

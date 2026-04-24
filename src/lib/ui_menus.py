@@ -203,6 +203,13 @@ class MenuMixin:
 
         self.menuExport.addSeparator()
 
+        # — Group means section —
+        self.actionExportGroupMeansCsv = QtWidgets.QAction("Export group means to .csv")
+        self.actionExportGroupMeansCsv.triggered.connect(self.triggerExportGroupMeansCsv)
+        self.menuExport.addAction(self.actionExportGroupMeansCsv)
+
+        self.menuExport.addSeparator()
+
         # — Image section —
         self.actionExportToHeader = QtWidgets.QAction("   — Export to... —", self.menuExport)
         self.menuExport.addAction(self.actionExportToHeader)
@@ -271,6 +278,7 @@ class MenuMixin:
                                     if hasattr(artist, "patches"):
                                         for p in artist.patches:
                                             import matplotlib.colors as mcolors
+
                                             try:
                                                 current_alpha = p.get_alpha()
                                                 if current_alpha is None:
