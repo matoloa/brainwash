@@ -47,7 +47,7 @@ class DataFrameMixin:
             return df
 
         df_disp = df.copy()
-        for col in ["EPSP_amp", "volley_amp"]:
+        for col in ["EPSP_amp", "volley_amp", "EPSP_amp_mean", "volley_amp_mean"]:
             if col in df_disp.columns:
                 df_disp[col] = df_disp[col] * 1000.0
 
