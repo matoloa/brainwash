@@ -586,7 +586,7 @@ class InteractivePlotMixin:
                     marker["line"].set_data([event_x_start, event_x_start], [y_start, y_start])
 
     def mouseoverDisconnect(self):
-        self.usage("mouseoverDisconnect")
+        # self.usage("mouseoverDisconnect")
         # drop any prior mouseover event connections and plots
         if hasattr(self, "mouseover"):
             self.canvasEvent.mpl_disconnect(self.mouseoverEvent)

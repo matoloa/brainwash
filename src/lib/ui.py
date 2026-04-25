@@ -916,7 +916,27 @@ class UIsub(
         else:
             self.lineEdit_bin_size.setText("")
 
-        # Populate filter settings
+        self.update_filter_settings(df_p)
+        self.connectUIstate()
+        self.graphUpdate()
+
+        # update_show now runs with a correct, clamped uistate.list_idx_select_stims
+        self.update_show()
+        self.zoomAuto()
+        self.update_amp_lineEdits()
+        self.update_slope_lineEdits()
+
+        t0 = time.time()
+        self.mouseoverUpdate()  # always ends with a single graphRefresh()
+        print(f" - mouseoverUpdate: {round((time.time() - t0) * 1000)} ms")
+
+    def update_filter_settings(self, df_p=None):
+        """Helper for filter-settings population. Handles uniform/mixed selection
+        logic for radio buttons (filter mode) and savgol lineEdits exactly as before.
+        """
+        if df_p is None:
+            df_p = self.get_df_project()
+
         if len(uistate.list_idx_select_recs) > 0:
             selected_df = df_p.loc[uistate.list_idx_select_recs]
 
@@ -977,20 +997,6 @@ class UIsub(
             self.buttonGroup_filter.setExclusive(True)
             self.lineEdit_savgol_window.setText("")
             self.lineEdit_savgol_poly.setText("")
-
-        self.connectUIstate()
-
-        self.graphUpdate()
-
-        # update_show now runs with a correct, clamped uistate.list_idx_select_stims
-        self.update_show()
-        self.zoomAuto()
-        self.update_amp_lineEdits()
-        self.update_slope_lineEdits()
-
-        t0 = time.time()
-        self.mouseoverUpdate()  # always ends with a single graphRefresh()
-        print(f" - - mouseoverUpdate: {round((time.time() - t0) * 1000)} ms")
 
     def stimSelectionChanged(self, *args):
         self.usage("stimSelectionChanged")
@@ -1189,7 +1195,7 @@ class UIsub(
 
         selected_ids = set(uistate.df_recs2plot["ID"])
         selected_stims = {stim + 1 for stim in uistate.list_idx_select_stims}  # stim_select is 0-based (indices) - convert to stims
-        print(f"update_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}")
+        # print(f"update_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}")
 
         is_pp = getattr(uistate, "experiment_type", "time") == "PP"
         valid_pp_ids = set()
@@ -1260,7 +1266,45 @@ class UIsub(
 
     def graphRefresh(self):
         self.usage("graphRefresh")
-        uiplot.graphRefresh(self.dd_groups, getattr(self, "dd_testsets", {}))
+        dd_groups = self.group_get_dd()
+        dd_testset = self.testset_get_dd()
+        dd_shown_samples = {}
+
+        # First check if ANY test set has show == True
+        any_test_shown = any(t.get("show", False) is True or str(t.get("show", False)).lower() in ("true", "1", "t") for t in dd_testset.values())
+
+        if not any_test_shown:
+            # uiplot.graphRefresh will always need dd_groups; no testsets → pass only that
+            uiplot.graphRefresh(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples)
+            return
+
+        # Any test is shown → we will pass dd_testset as second argument.
+        # Check if any group is shown (accounting for legacy string "True" artefact). TODO: Address legacy string issue
+        any_group_shown = any(g.get("show") in (True, "True", "true", 1, "1") for g in dd_groups.values())
+
+        if any_group_shown:
+            # Check if any shown group has samples to display. If not, skip building and passing dd_shown_samples
+            has_shown_sample = any(g.get("sample") is not None for g in dd_groups.values() if g.get("show") in (True, "True", "true", 1, "1"))
+            if not has_shown_sample:
+                uiplot.graphRefresh(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples)
+                return
+
+            # Build dd_shown_samples = {group_ID: inner_dict_from_get_ddgroup_sample}
+            # (only for groups that are both shown *and* have a sample)
+            dd_shown_samples = {}
+            for group_ID, gdict in dd_groups.items():
+                if gdict.get("show") in (True, "True", "true", 1, "1") and gdict.get("sample") is not None:
+                    inner = self.get_ddgroup_sample(group_ID)
+                    if inner:
+                        dd_shown_samples[group_ID] = inner
+
+            uiplot.graphRefresh(
+                dd_groups=dd_groups,
+                dd_testset=dd_testset,
+                dd_shown_samples=dd_shown_samples,
+            )
+        else:
+            uiplot.graphRefresh(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples)
 
     def deleteFolder(self, dir_path):
         if os.path.exists(dir_path):
@@ -1867,20 +1911,20 @@ class UIsub(
             return
         if axis == uistate.axm:
             logger.debug("zoomReset: axm")
-            print("zoomReset: axm")
+            # print("zoomReset: axm")
             axis.axes.set_xlim(uistate.zoom["mean_xlim"])
             axis.axes.set_ylim(uistate.zoom["mean_ylim"])
             self._recalc_axm_detection_zones()
             axis.figure.canvas.draw_idle()
         elif axis == uistate.axe:
             logger.debug("zoomReset: axe")
-            print("zoomReset: axe")
+            # print("zoomReset: axe")
             axis.axes.set_xlim(uistate.zoom["event_xlim"])
             axis.axes.set_ylim(uistate.zoom["event_ylim"])
             axis.figure.canvas.draw_idle()
         elif axis == uistate.ax1 or axis == uistate.ax2:
             logger.debug("zoomReset: ax1/ax2")
-            print("zoomReset: ax1/ax2")
+            # print("zoomReset: ax1/ax2")
             uistate.ax1.axes.set_xlim(uistate.zoom["output_xlim"])
             uistate.ax2.axes.set_xlim(uistate.zoom["output_xlim"])
             uistate.ax1.axes.set_ylim(uistate.zoom["output_ax1_ylim"])
@@ -2663,6 +2707,7 @@ class UIsub(
         print(f"groupCheckboxChanged: {str(group_ID)} = {state}")
         self.dd_groups[group_ID]["show"] = state == 2
         self.group_save_dd()
+        self.refresh_samples()
         self.update_stim_buttons()
         self.update_show()
         self.mouseoverUpdate()
@@ -2679,8 +2724,8 @@ class UIsub(
         print(f"testsetCheckboxChanged: {str(set_ID)} = {state}")
         self.dd_testsets[set_ID]["show"] = bool(state == 2)
         self.testset_save_dd()
-        self.testsetControlsRefresh()
         self.graphRefresh()
+        self.refresh_samples()
 
     def triggerTestSetRename(self, set_ID):
         self.usage("triggerTestSetRename")
@@ -3782,6 +3827,7 @@ class UIsub(
                 print(f"purgeRecordingData: post {self.dd_groups[group_ID]['rec_IDs']}")
             self.group_save_dd()
             self.group_cache_purge(groups2purge)
+            self.refresh_samples()
         # clear recording caches
         for cache_name in [
             "dict_datas",
@@ -3927,6 +3973,7 @@ class UIsub(
         rec_str = str(rec_ID)
         target = rec_str if (state == 2) else None
         self.set_group_sample(target)
+        self.graphRefresh()
         self.update_sample_checkbox()
 
     def update_sample_checkbox(self):

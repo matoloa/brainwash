@@ -85,6 +85,14 @@ class GroupMixin:
         with open(path_dd_testsets, "wb") as f:
             pickle.dump(dd_testsets, f)
 
+    def group_samples_get_dd(self):
+        """Returns the full dd_group_samples dict (shape: {group_ID: {test_ID: df}, ...}).
+        If not yet populated, triggers get_ddgroup_sample(None) which builds/purges
+        all groups that have a "sample" pointer (per refresh_samples() pattern).
+        Mirrors testset_get_dd / group_get_dd helpers for consistency with ui.py:graphRefresh.
+        """
+        return self.get_ddgroup_sample(None)
+
     def get_groupsOfRec(self, rec_ID):  # returns a set of all 'group ID' that have rec_ID in their 'rec_IDs' list
         if rec_ID is None:
             return []
@@ -332,29 +340,23 @@ class GroupMixin:
     # Sample refresh (Phase 3.4.3 - full implementation)
     # ------------------------------------------------------------------
     def refresh_samples(self):
-        """Dedicated refresh for samples (per updated plan 3.4.3). Loops over
-        groups with non-None "sample" key, calls self.get_ddgroup_sample(g)
-        for each (this triggers build/persist of <group_name>_sample.parquet
-        with 'stim' column + t=0 per update_axe_mean lines 320-340), then
-        calls uiplot.sample_overlay(self.dd_group_samples, self.dd_groups).
-        Made robust: always rebuilds cache and calls overlay (even if stubbed).
+        """Dedicated refresh for samples. Loops over groups with non-None "sample"
+        key and calls self.get_ddgroup_sample(g) (this triggers build/persist
+        of <group_name>_sample.parquet with 'stim' column + t=0). Sets
+        uiplot.uistate.sample_dirty=True so next graphRefresh (which receives
+        dd_shown_samples from ui.py) will redraw the overlay via sample_overlay.
         """
         if not hasattr(self, "dd_group_samples"):
             self.dd_group_samples = {}
-
-        # 1) always rebuild dd_group_samples for groups with sample pointer
-        # (this triggers parquet write via get_ddgroup_sample)
         for group_ID, gdict in self.dd_groups.items():
             if gdict.get("sample") is not None:
                 if config.verbose:
                     print(f"refresh_samples: rebuilding sample for group_ID={group_ID}")
                 self.get_ddgroup_sample(group_ID)
 
-        # 2) call uiplot.sample_overlay even if the method is stubbed
-        if uiplot is not None:
-            uiplot.sample_overlay(self.dd_group_samples, self.dd_groups)
-        elif config.verbose:
-            print("refresh_samples: uiplot not available")
+        # ensure redraw on next graphRefresh
+        if hasattr(uiplot, "uistate"):
+            uiplot.uistate.sample_dirty = True
 
     # ------------------------------------------------------------------
     # Qt widget controls

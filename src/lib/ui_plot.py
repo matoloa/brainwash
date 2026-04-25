@@ -236,109 +236,147 @@ class UIplot:
         if draw and self.uistate.ax1 is not None:
             self.uistate.ax1.figure.canvas.draw()
 
-    def clear_sample_artists(self, draw=True):
-        """Clear all sample overlay artists (3.4.2 helper modeled on clear_testset_spans)."""
-        if not hasattr(self.uistate, "sample_artists") or not self.uistate.sample_artists:
+    def clear_sample_artists(self, draw=True, hide=False):
+        """Clear or hide sample overlay artists/inset. hide=True reuses objects for perf (no remove/clear)."""
+        if not hasattr(self.uistate, "sample_artists") or self.uistate.sample_artists is None:
+            self.uistate.sample_artists = {}
             if draw and self.uistate.ax1 is not None:
                 self.uistate.ax1.figure.canvas.draw()
             return
-        for artist in self.uistate.sample_artists.values():
-            try:
-                artist.remove()
-            except Exception:
-                pass
-        self.uistate.sample_artists = {}
-        if hasattr(self.uistate, "sample_inset") and self.uistate.sample_inset is not None:
+        if hide and hasattr(self.uistate, "sample_inset") and self.uistate.sample_inset is not None:
+            for artist in self.uistate.sample_artists.values():
+                try:
+                    artist.set_visible(False)
+                except Exception:
+                    pass
+            self.uistate.sample_inset.set_visible(False)
             self.uistate.sample_inset.set_axis_off()
+        else:
+            for artist in self.uistate.sample_artists.values():
+                try:
+                    artist.remove()
+                except Exception:
+                    pass
+            self.uistate.sample_artists = {}
+            if hasattr(self.uistate, "sample_inset") and self.uistate.sample_inset is not None:
+                try:
+                    self.uistate.sample_inset.remove()
+                except Exception:
+                    pass
+                self.uistate.sample_inset = None
         if draw and self.uistate.ax1 is not None:
             self.uistate.ax1.figure.canvas.draw()
 
-    def sample_overlay(self, dd_group_samples, dd_groups=None):
-        """Phase 3.4.2: overlay sample traces (per-stim, t=0 aligned) from each group
-        in shared inset (upper-left of ax1/ax2). Inset box + axis (spines/ticks/labels)
-        shown ONLY if >=1 group with sample AND >=1 testset selected; bg always fully
-        transparent. Uses exact group colors + small vertical offset.
-        """
-        self.clear_sample_artists(draw=False)
-
-        # Only display if at least one group and one test set is actually shown
-        if not dd_group_samples or self.uistate.ax1 is None or not hasattr(self.uistate, "sample_inset"):
-            if hasattr(self.uistate, "sample_inset") and self.uistate.sample_inset is not None:
-                self.uistate.sample_inset.set_axis_off()
-            if self.uistate.ax1 is not None:
-                self.uistate.ax1.figure.canvas.draw()
-            return
-        any_group_shown = any(g.get("show", False) for g in getattr(self.uistate, "dict_group_show", {}).values())
-        any_test_shown = any(t.get("show", False) for t in getattr(self, "dd_testsets", {}).values()) or bool(
-            getattr(self.uistate, "testset_spans", {})
-        )
-        if not any_group_shown or not any_test_shown:
-            if hasattr(self.uistate, "sample_inset") and self.uistate.sample_inset is not None:
-                self.uistate.sample_inset.set_axis_off()
-            if self.uistate.ax1 is not None:
-                self.uistate.ax1.figure.canvas.draw()
-            return
-
+    def sample_overlay(self, dd_groups, dd_testset, dd_shown_samples):
+        """Only (re)draw inset+traces when sample_dirty or visibility changed.
+        Inset created once and reused (visibility + set_data); clear/hide on toggle.
+        No debug prints/timing; callers set dirty flag on group/sample changes."""
+        if not hasattr(self.uistate, "sample_dirty"):
+            self.uistate.sample_dirty = True
+        if not hasattr(self.uistate, "sample_inset"):
+            self.uistate.sample_inset = None
         if not hasattr(self.uistate, "sample_artists"):
             self.uistate.sample_artists = {}
 
-        if not hasattr(self.uistate, "sample_inset") or self.uistate.sample_inset is None:
-            return
+        should_show = bool(dd_shown_samples)
+
+        if self.uistate.sample_inset is None:
+            if self.uistate.ax1 is None or not should_show:
+                return
+            self.uistate.sample_inset = self.uistate.ax1.inset_axes([0.02, 0.68, 0.33, 0.30])
+            self.uistate.sample_inset.set_zorder(10)
+            inset = self.uistate.sample_inset
+            inset.set_facecolor((0, 0, 0, 0))
+            inset.patch.set_alpha(0.0)
+            for spine in inset.spines.values():
+                spine.set_visible(True)
+            inset.tick_params(axis="both", which="both", bottom=True, left=True, labelbottom=True, labelleft=True)
+            inset.set_axis_off()
+
         inset = self.uistate.sample_inset
-        # bg always fully transparent; show box+axis (spines/ticks/labels) only on valid selection
+
+        if not should_show:
+            if inset.get_visible():
+                self.clear_sample_artists(draw=False, hide=True)
+                self.uistate.sample_dirty = False
+            return
+
+        if not self.uistate.sample_dirty and inset.get_visible():
+            return
+
+        self.clear_sample_artists(draw=False, hide=True)
+        inset.set_visible(True)
+        inset.set_zorder(10)
         inset.set_axis_on()
-        for spine in inset.spines.values():
-            spine.set_visible(True)
-        inset.tick_params(axis="both", which="both", bottom=True, left=True, labelbottom=True, labelleft=True)
-        inset.patch.set_alpha(0.0)
-        inset.set_facecolor((0, 0, 0, 0))
-        for g_idx, (group_ID, inner) in enumerate(dd_group_samples.items()):
+        inset.clear()
+
+        if dd_shown_samples is None or not bool(dd_shown_samples):
+            self.uistate.sample_dirty = False
+            return
+
+        all_ys = []
+        for g_idx, (group_ID, inner) in enumerate(dd_shown_samples.items()):
             if not inner or group_ID not in (dd_groups or {}):
                 continue
             group_dict = (dd_groups or {}).get(group_ID, {})
+            if not group_dict.get("show", True):
+                continue
             color = group_dict.get("color", "#0000ff")
             test_id = next(iter(inner.keys()))  # single testset for now
+            if test_id not in inner:
+                continue
             df = inner[test_id]
+            if df.empty:
+                continue
             col = self.uistate.settings.get("filter") or "voltage"
             if col not in df.columns:
-                col = df.columns[-1]  # safe fallback to last numeric column
-            y_offset = g_idx * 0.05  # small vertical offset per group to prevent perfect overlap
-            # Reuse update_axe_mean per-stim logic on the ready df (has 'stim' + t=0)
-            for stim_num in sorted(df["stim"].unique() if "stim" in df.columns else [1]):
+                col = df.columns[-1]  # safe fallback
+            y_offset = g_idx * 0.25  # larger offset for visibility on inset
+            for stim_num in sorted(df.get("stim", pd.Series([1])).unique()):
                 df_event = df[df["stim"] == stim_num].copy() if "stim" in df.columns else df.copy()
-                # plot with group color (ensured via group_dict lookup), thicker line for visibility
-                (line,) = inset.plot(
-                    df_event["time"],
-                    df_event[col] + y_offset,
-                    color=color,
-                    alpha=self.uistate.settings.get("alpha_line", 0.5) / 2,
-                    linewidth=2.5,
-                    label=f"sample_g{group_ID}_t{test_id}_s{stim_num}",
-                )
-                self.uistate.sample_artists[(group_ID, test_id, stim_num)] = line
+                y_data = df_event[col].values + y_offset
+                all_ys.extend(y_data)
+                key = (group_ID, test_id, stim_num)
+                if key in self.uistate.sample_artists:
+                    line = self.uistate.sample_artists[key]
+                    line.set_data(df_event["time"].values, y_data)
+                    line.set_zorder(11)
+                    line.set_visible(True)
+                else:
+                    (line,) = inset.plot(
+                        df_event["time"].values,
+                        y_data,
+                        color=color,
+                        alpha=0.75,
+                        linewidth=2.0,
+                        label=f"sample_g{group_ID}_t{test_id}_s{stim_num}",
+                        zorder=11,
+                    )
+                    self.uistate.sample_artists[key] = line
 
-            # force autoscaling of the inset to the actual data range of the full sample df
-            if not df.empty:
-                inset.set_xlim(df["time"].min() - 0.001, df["time"].max() + 0.001)
-                inset.set_ylim(df[col].min() * 1.1, df[col].max() * 1.1)
-            inset.relim()
-            inset.autoscale_view()
+        if all_ys:
+            ymin, ymax = min(all_ys), max(all_ys)
+            inset.set_ylim(ymin * 1.1, ymax * 1.1)
+        inset.set_xlim(-0.005, 0.055)  # typical aligned event window
+        inset.relim()
+        inset.autoscale_view(scalex=False)
 
+        self.uistate.sample_dirty = False
         if self.uistate.ax1 is not None:
-            self.uistate.ax1.figure.canvas.draw()
+            self.uistate.ax1.figure.canvas.draw_idle()
 
-    def visualize_test_sets(self, dd_testsets, draw=True):
+    def visualize_test_sets(self, dd_testset, draw=True):
         """Draw gray axvspan for each shown test set on ax1/ax2 (twinx) only.
         Uses min/max of sweeps (assumes continuous/sorted per clarifications).
         Gray with low alpha, no legend entry, stores artists in uistate.testset_spans.
         """
         self.clear_testset_spans(draw=False)
-        if not dd_testsets or self.uistate.ax1 is None:
+        if not dd_testset or self.uistate.ax1 is None:
             if draw and self.uistate.ax1 is not None:
                 self.uistate.ax1.figure.canvas.draw()
             return
         alpha = 0.08
-        for set_ID, dset in sorted(dd_testsets.items()):
+        for set_ID, dset in sorted(dd_testset.items()):
             if not dset.get("show", False) or not dset.get("sweeps"):
                 continue
             sweeps = dset["sweeps"]
@@ -433,7 +471,8 @@ class UIplot:
             if hasattr(self.uistate, "refresh_samples"):
                 self.uistate.refresh_samples()
             else:
-                self.sample_overlay(self.uistate.dd_group_samples, getattr(self, "dd_groups", None))
+                self.sample_overlay(getattr(self, "dd_groups", None), None, self.uistate.dd_group_samples)
+            self.uistate.sample_dirty = True
 
     def hideAll(self):
         axm, axe, ax1, ax2 = (
@@ -537,7 +576,7 @@ class UIplot:
             if key in dict_group_show:
                 del dict_group_show[key]
 
-    def graphRefresh(self, dd_groups, dd_testsets=None):
+    def graphRefresh(self, dd_groups, dd_testset=None, dd_shown_samples=None):
         # show only selected and imported lines, only appropriate aspects
         uistate = self.uistate
         if uistate.axm is None:
@@ -712,7 +751,7 @@ class UIplot:
             ax1.set_xlabel(uistate.x_axis_xlabel())
             ax1.xaxis.set_major_locator(uistate.x_axis_locator())
             ax2.xaxis.set_major_locator(uistate.x_axis_locator())
-        print(f"output_xlim: {uistate.zoom['output_xlim']}")
+        # print(f"output_xlim: {uistate.zoom['output_xlim']}")
         ax1.figure.subplots_adjust(bottom=0.2)
         self.oneAxisLeft()
         # print(f" - - graphRefresh: axis setup: {round((time.time() - t1) * 1000)} ms")
@@ -728,13 +767,19 @@ class UIplot:
                 self.xSelect(canvas=ax1.figure.canvas, draw=False)
 
         # visualize test sets (Phase 2) - spans persist independently of xSelect
-        self.visualize_test_sets(dd_testsets or {}, draw=False)
+        if dd_testset is not None:
+            self.visualize_test_sets(dd_testset=dd_testset, draw=False)
+            self.uistate.sample_dirty = True
+            self.sample_overlay(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples or {})
 
-        # refresh samples (Phase 3.4.3) - create shared inset (bg always transparent; axis visibility controlled in sample_overlay)
+        # refresh samples (Phase 3.4.3) - create inset (transparent bg; axis visibility + traces controlled in sample_overlay; no sharex/sharey)
         if not hasattr(self.uistate, "sample_inset"):
             if self.uistate.ax1 is not None:
-                self.uistate.sample_inset = self.uistate.ax1.inset_axes([0.02, 0.68, 0.33, 0.30], sharex=self.uistate.ax1, sharey=self.uistate.ax1)
+                self.uistate.sample_inset = self.uistate.ax1.inset_axes([0.02, 0.68, 0.33, 0.30])
+                self.uistate.sample_inset.set_zorder(10)
                 self.uistate.sample_inset.set_facecolor((0, 0, 0, 0))
+                self.uistate.sample_inset.set_axis_off()
+                self.uistate.sample_dirty = True
         if hasattr(self.uistate, "refresh_samples"):
             self.uistate.refresh_samples()
         elif hasattr(self, "uisub") and hasattr(self.uisub, "refresh_samples"):
@@ -1101,10 +1146,10 @@ class UIplot:
             y_norm = None
             y_norm_SEM = None
 
-        print(f"y_mean: {y_mean}")
-        print(f"y_mean_SEM: {y_mean_SEM}")
-        print(f"y_mean - y_mean_SEM: {y_mean - y_mean_SEM}")
-        print(f"y_mean + y_mean_SEM: {y_mean + y_mean_SEM}")
+        # print(f"y_mean: {y_mean}")
+        # print(f"y_mean_SEM: {y_mean_SEM}")
+        # print(f"y_mean - y_mean_SEM: {y_mean - y_mean_SEM}")
+        # print(f"y_mean + y_mean_SEM: {y_mean + y_mean_SEM}")
 
         (meanline,) = axis.plot(
             x,

@@ -573,16 +573,17 @@ class DataFrameMixin:
     def get_ddgroup_sample(self, group_ID):
         """Returns inner dict {test_ID: df} for group's sample means.
         Follows exact get_dfgroupmean pattern: (1) memory, (2) parquet cache, (3) build.
-        Mirrors update_axe_mean (ui_plot.py:306-352) exactly for mean computation:
-        - uses uistate.x_select["output"] or first active testset sweeps
+        Mirrors update_axe_mean exactly for mean computation:
+        - uses active testset sweeps
         - df_sweeps groupby("time") on filter column
         - df_t loop for per-stim event windows
         - shift time so each stim starts at t=0
-        - retains 'stim' column for easy extraction/superimposition.
+        - retains 'stim' column for extraction/superimposition.
         Persisted as <group_name>_sample.parquet (key="sample").
         """
         if not hasattr(self, "dd_group_samples"):
             self.dd_group_samples = {}
+
         if group_ID in self.dd_group_samples:  # 1: Return cached
             if config.verbose:
                 print(f"Returning cached group sample for group {group_ID}")
@@ -617,8 +618,6 @@ class DataFrameMixin:
                     active_test_id = str(tid)
                     selected_sweeps = tset.get("sweeps")
                     break
-        if not selected_sweeps and uistate.x_select.get("output"):
-            selected_sweeps = list(uistate.x_select["output"])
 
         if not selected_sweeps:
             self.dd_group_samples[group_ID] = {}
@@ -640,9 +639,11 @@ class DataFrameMixin:
         df_mean = df_sweeps.groupby("time", as_index=False)[col].mean()
 
         # df_t loop for per-stim event windows + time shift to t=0 (exact mirror of update_axe_mean:320-340)
+        # Fixed: collect ALL events per test_ID into ONE concatenated DF (instead of overwriting key)
         df_t = self.get_dft(row=p_row)
         settings = uistate.settings
         mean_dfs = {}
+        events = []
         for i_stim, t_row in df_t.iterrows():
             stim_num = i_stim + 1
             t_stim = t_row["t_stim"]
@@ -651,8 +652,12 @@ class DataFrameMixin:
             df_event = df_mean[(df_mean["time"] >= window_start) & (df_mean["time"] <= window_end)].copy()
             df_event["time"] = df_event["time"] - t_stim  # all times now start at 0 per stim
             df_event["stim"] = stim_num  # retain 'stim' column as required
-            mean_dfs[active_test_id] = df_event  # inner dict uses test_ID
+            events.append(df_event)
 
+        if events:
+            mean_dfs[active_test_id] = pd.concat(events, ignore_index=True)
+        else:
+            mean_dfs[active_test_id] = pd.DataFrame()
         full_mean_df = pd.concat(mean_dfs.values(), ignore_index=True) if mean_dfs else pd.DataFrame()
         if not full_mean_df.empty and "stim" not in full_mean_df.columns:
             full_mean_df["stim"] = 1
