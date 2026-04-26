@@ -237,7 +237,7 @@ class UIplot:
             self.uistate.ax1.figure.canvas.draw()
 
     def clear_sample_artists(self, draw=True, hide=False):
-        """Clear or hide sample overlay artists/inset. hide=True reuses objects for perf (no remove/clear)."""
+        """Clear or hide sample overlay artists/inset. hide=True clears the dict (explicit reset on every redraw)."""
         if not hasattr(self.uistate, "sample_artists") or self.uistate.sample_artists is None:
             self.uistate.sample_artists = {}
             if draw and self.uistate.ax1 is not None:
@@ -251,6 +251,7 @@ class UIplot:
                     pass
             self.uistate.sample_inset.set_visible(False)
             self.uistate.sample_inset.set_axis_off()
+            self.uistate.sample_artists = {}
         else:
             for artist in self.uistate.sample_artists.values():
                 try:
@@ -283,14 +284,14 @@ class UIplot:
         if self.uistate.sample_inset is None:
             if self.uistate.ax1 is None or not should_show:
                 return
-            self.uistate.sample_inset = self.uistate.ax1.inset_axes([0.02, 0.68, 0.33, 0.30])
+            self.uistate.sample_inset = self.uistate.ax1.inset_axes([0.02, 0.68, 0.20, 0.30])
             self.uistate.sample_inset.set_zorder(10)
             inset = self.uistate.sample_inset
             inset.set_facecolor((0, 0, 0, 0))
             inset.patch.set_alpha(0.0)
             for spine in inset.spines.values():
-                spine.set_visible(True)
-            inset.tick_params(axis="both", which="both", bottom=True, left=True, labelbottom=True, labelleft=True)
+                spine.set_visible(False)
+            inset.tick_params(axis="both", which="both", bottom=False, left=False, labelbottom=False, labelleft=False)
             inset.set_axis_off()
 
         inset = self.uistate.sample_inset
@@ -299,43 +300,56 @@ class UIplot:
             if inset.get_visible():
                 self.clear_sample_artists(draw=False, hide=True)
                 self.uistate.sample_dirty = False
+            print("if not should_show == True")
             return
-
         if not self.uistate.sample_dirty and inset.get_visible():
+            print("if not self.uistate.sample_dirty and inset.get_visible() == True")
             return
 
         self.clear_sample_artists(draw=False, hide=True)
         inset.set_visible(True)
         inset.set_zorder(10)
-        inset.set_axis_on()
+        inset.set_axis_off()
         inset.clear()
+        for spine in inset.spines.values():
+            spine.set_visible(False)
+        inset.tick_params(axis="both", which="both", bottom=False, left=False, labelbottom=False, labelleft=False)
+        self.uistate.sample_artists = {}
 
         if dd_shown_samples is None or not bool(dd_shown_samples):
             self.uistate.sample_dirty = False
+            print("if dd_shown_samples is None or not bool(dd_shown_samples): == True")
             return
 
         all_ys = []
         for g_idx, (group_ID, inner) in enumerate(dd_shown_samples.items()):
-            if not inner or group_ID not in (dd_groups or {}):
+            # Robust lookup for group_ID (int vs str keys are a common silent-continue source
+            # in this codebase; dd_shown_samples uses int keys from dict construction while
+            # dd_groups often normalizes to str)
+            if not inner or str(group_ID) not in {str(k) for k in (dd_groups or {})}:
                 continue
-            group_dict = (dd_groups or {}).get(group_ID, {})
+            group_dict = (dd_groups or {}).get(str(group_ID), (dd_groups or {}).get(group_ID, {}))
             if not group_dict.get("show", True):
                 continue
             color = group_dict.get("color", "#0000ff")
-            test_id = next(iter(inner.keys()))  # single testset for now
-            if test_id not in inner:
+            test_id_raw = next(iter(inner.keys()))  # single testset for now
+            test_id = str(test_id_raw)  # ensure robust to int vs str keys (common in dd_* structures)
+            if test_id not in {str(k) for k in inner.keys()}:
                 continue
-            df = inner[test_id]
+            df = inner[test_id_raw]
             if df.empty:
                 continue
             col = self.uistate.settings.get("filter") or "voltage"
             if col not in df.columns:
                 col = df.columns[-1]  # safe fallback
-            y_offset = g_idx * 0.25  # larger offset for visibility on inset
+            # y_offset = g_idx * 0.25  # larger offset for visibility on inset
+            print(f"Gets to the inner loop for group_ID={group_ID}, test_id={test_id}")
             for stim_num in sorted(df.get("stim", pd.Series([1])).unique()):
                 df_event = df[df["stim"] == stim_num].copy() if "stim" in df.columns else df.copy()
-                y_data = df_event[col].values + y_offset
-                all_ys.extend(y_data)
+                y_data = df_event[col].values  # + y_offset
+                # Only use data after the artefact for ylim calculation
+                mask = df_event["time"].values > 0.001
+                all_ys.extend(y_data[mask])
                 key = (group_ID, test_id, stim_num)
                 if key in self.uistate.sample_artists:
                     line = self.uistate.sample_artists[key]
@@ -352,12 +366,14 @@ class UIplot:
                         label=f"sample_g{group_ID}_t{test_id}_s{stim_num}",
                         zorder=11,
                     )
+                    print(f"Adding sample artist: {key}")
+                    print(f"*** DF: {df_event}")
                     self.uistate.sample_artists[key] = line
 
         if all_ys:
             ymin, ymax = min(all_ys), max(all_ys)
-            inset.set_ylim(ymin * 1.1, ymax * 1.1)
-        inset.set_xlim(-0.005, 0.055)  # typical aligned event window
+            inset.set_ylim(ymin * 1.1, ymax + 0.0001)
+        inset.set_xlim(-0.005, 0.035)  # typical aligned event window
         inset.relim()
         inset.autoscale_view(scalex=False)
 
@@ -471,7 +487,7 @@ class UIplot:
             if hasattr(self.uistate, "refresh_samples"):
                 self.uistate.refresh_samples()
             else:
-                self.sample_overlay(getattr(self, "dd_groups", None), None, self.uistate.dd_group_samples)
+                self.sample_overlay(dd_groups=getattr(self, "dd_groups", None), dd_testset=None, dd_shown_samples=self.uistate.dd_group_samples)
             self.uistate.sample_dirty = True
 
     def hideAll(self):
@@ -586,7 +602,7 @@ class UIplot:
 
         # Set recordings and group legends
         dd_recs = uistate.dict_rec_show
-        dd_groups = uistate.dict_group_show
+        dd_group_show = uistate.dict_group_show
         axids = ["ax1", "ax2"]
         legend_loc = ["upper right", "lower right"]
         if getattr(uistate, "experiment_type", "time") == "io":
@@ -596,7 +612,7 @@ class UIplot:
             recs_on_axis = {key: value for key, value in dd_recs.items() if value["axis"] == axid and not key.endswith(" marker")}
             axis_legend = {key: value["line"] for key, value in recs_on_axis.items()}
             if axid in ["ax1", "ax2"]:
-                groups_on_axis = {key: value for key, value in dd_groups.items() if value["axis"] == axid}
+                groups_on_axis = {key: value for key, value in dd_group_show.items() if value["axis"] == axid}
                 axis_legend.update({key: value["line"] for key, value in groups_on_axis.items()})
             axis = getattr(uistate, axid)
             if axis_legend and not is_pp:
