@@ -1270,6 +1270,13 @@ class UIsub(
         dd_testset = self.testset_get_dd()
         dd_shown_samples = {}
 
+        if hasattr(self, "dd_group_samples"):
+            self.dd_group_samples = {}
+        if hasattr(uiplot, "uistate"):
+            uiplot.uistate.sample_dirty = True
+        if hasattr(uiplot, "clear_sample_artists"):
+            uiplot.clear_sample_artists(draw=False)
+
         # First check if ANY test set has show == True
         any_test_shown = any(t.get("show", False) is True or str(t.get("show", False)).lower() in ("true", "1", "t") for t in dd_testset.values())
 
@@ -2724,8 +2731,11 @@ class UIsub(
         print(f"testsetCheckboxChanged: {str(set_ID)} = {state}")
         self.dd_testsets[set_ID]["show"] = bool(state == 2)
         self.testset_save_dd()
-        self.graphRefresh()
+        if hasattr(self, "dd_group_samples"):
+            self.dd_group_samples = {}
         self.refresh_samples()
+        uiplot.clear_sample_artists(draw=False)
+        self.graphRefresh()
 
     def triggerTestSetRename(self, set_ID):
         self.usage("triggerTestSetRename")

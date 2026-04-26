@@ -336,6 +336,23 @@ class GroupMixin:
             if group_ID in self.dict_group_means:
                 del self.dict_group_means[group_ID]
 
+            # also purge all per-test sample parquet files matching the new pattern
+            # {group_name}_sample_{test_id}.parquet so cache is fully invalidated
+            # when test sets or sample pointers change
+            group_name = self.dd_groups.get(group_ID, {}).get("group_name", f"group_{group_ID}")
+            self.group_sample_cache_purge(group_ID)
+            if hasattr(self, "dd_group_samples") and group_ID in self.dd_group_samples:
+                del self.dd_group_samples[group_ID]
+
+    def group_sample_cache_purge(self, group_ID=None):
+        list_group_IDs_to_purge = [group_ID] if group_ID is not None else list(self.dd_groups.keys())
+        cache_dir = Path(self.dict_folders["cache"])
+        for group_ID in list_group_IDs_to_purge:
+            group_name = self.dd_groups.get(group_ID, {}).get("group_name", f"group_{group_ID}")
+            for sample_file in cache_dir.glob(f"{group_name}_sample_*.parquet"):
+                if sample_file.exists():
+                    sample_file.unlink()
+
     # ------------------------------------------------------------------
     # Sample refresh (Phase 3.4.3 - full implementation)
     # ------------------------------------------------------------------
@@ -350,9 +367,16 @@ class GroupMixin:
             self.dd_group_samples = {}
         for group_ID, gdict in self.dd_groups.items():
             if gdict.get("sample") is not None:
+                # always clear in-memory cache to avoid stale dd_group_samples
+                # when new test sets are added (forces rebuild from per-test
+                # parquet or fresh computation using current shown testsets)
+                if group_ID in self.dd_group_samples:
+                    del self.dd_group_samples[group_ID]
+
                 if config.verbose:
                     print(f"refresh_samples: rebuilding sample for group_ID={group_ID}")
                 self.get_ddgroup_sample(group_ID)
+                self.group_sample_cache_purge(group_ID)
 
         # ensure redraw on next graphRefresh
         if hasattr(uiplot, "uistate"):
@@ -419,6 +443,7 @@ class GroupMixin:
     def testsetControlsRefresh(self):
         self.testset_controls_remove()
         for set_ID in self.dd_testsets.keys():
+            print(f"testsetControlsRefresh, adding set_ID: {set_ID}")
             self.testset_controls_add(set_ID)
 
     def testset_controls_add(self, set_ID):  # Create checkbox for test set (modeled on group_controls_add)

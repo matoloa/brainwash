@@ -271,7 +271,9 @@ class UIplot:
     def sample_overlay(self, dd_groups, dd_testset, dd_shown_samples):
         """Only (re)draw inset+traces when sample_dirty or visibility changed.
         Inset created once and reused (visibility + set_data); clear/hide on toggle.
-        No debug prints/timing; callers set dirty flag on group/sample changes."""
+        Supports multiple test sets (solid for first, dashed for second, dotted beyond).
+        Callers set dirty flag on group/sample changes."""
+
         if not hasattr(self.uistate, "sample_dirty"):
             self.uistate.sample_dirty = True
         if not hasattr(self.uistate, "sample_inset"):
@@ -318,7 +320,23 @@ class UIplot:
             self.uistate.sample_dirty = False
             return
 
+        # Force full artist clear (hide=True) on every redraw. This resets the inset
+        # completely when visible_test_list changes (adding a testset or toggling any set).
+        # This eliminates the "must toggle first set first" quirk.
+        self.clear_sample_artists(draw=False, hide=True)
+
+        # Also reset sample_inset visibility and zorder after the full clear.
+        # This ensures the inset is always in a clean state when the number of
+        # visible test sets changes. Combine with the per-test cache and
+        # graphRefresh clears for robust multi-testset sample overlay.
+        inset.set_visible(True)
+        inset.set_zorder(10)
+        inset.set_axis_off()
+
         all_ys = []
+        # Get ordered list of *shown* test sets (from dd_testset) once; used for
+        # consistent line styles (solid/dashed/dotted) across groups.
+        visible_test_list = [tid for tid, tset in sorted((dd_testset or {}).items()) if tset.get("show", False)]
         for g_idx, (group_ID, inner) in enumerate(dd_shown_samples.items()):
             # Robust lookup for group_ID (int vs str keys are a common silent-continue source
             # in this codebase; dd_shown_samples uses int keys from dict construction while
@@ -329,41 +347,44 @@ class UIplot:
             if not group_dict.get("show", True):
                 continue
             color = group_dict.get("color", "#0000ff")
-            test_id_raw = next(iter(inner.keys()))  # single testset for now
-            test_id = str(test_id_raw)  # ensure robust to int vs str keys (common in dd_* structures)
-            if test_id not in {str(k) for k in inner.keys()}:
-                continue
-            df = inner[test_id_raw]
-            if df.empty:
-                continue
-            col = self.uistate.settings.get("filter") or "voltage"
-            if col not in df.columns:
-                col = df.columns[-1]  # safe fallback
-            # y_offset = g_idx * 0.25  # larger offset for visibility on inset
-            for stim_num in sorted(df.get("stim", pd.Series([1])).unique()):
-                df_event = df[df["stim"] == stim_num].copy() if "stim" in df.columns else df.copy()
-                y_data = df_event[col].values  # + y_offset
-                # Only use data after the artefact for ylim calculation
-                mask = df_event["time"].values > 0.001
-                all_ys.extend(y_data[mask])
-                key = (group_ID, test_id, stim_num)
-                if key in self.uistate.sample_artists:
-                    line = self.uistate.sample_artists[key]
-                    line.set_data(df_event["time"].values, y_data)
-                    line.set_zorder(11)
-                    line.set_visible(True)
-                else:
-                    (line,) = inset.plot(
-                        df_event["time"].values,
-                        y_data,
-                        color=color,
-                        alpha=0.75,
-                        linewidth=2.0,
-                        label=f"sample_g{group_ID}_t{test_id}_s{stim_num}",
-                        zorder=11,
-                    )
-                    # print(f"*** DF: {df_event}")
-                    self.uistate.sample_artists[key] = line
+            for t_idx, test_id_raw in enumerate(visible_test_list):
+                if str(test_id_raw) not in {str(k) for k in inner.keys()}:
+                    continue
+                test_id = str(test_id_raw)
+                df = inner.get(test_id_raw) or inner.get(test_id)
+                if df is None or df.empty:
+                    continue
+                col = self.uistate.settings.get("filter") or "voltage"
+                if col not in df.columns:
+                    col = df.columns[-1]  # safe fallback
+                linestyle = "-" if t_idx == 0 else "--" if t_idx == 1 else ":"
+                # y_offset = g_idx * 0.25  # larger offset for visibility on inset
+                for stim_num in sorted(df.get("stim", pd.Series([1])).unique()):
+                    df_event = df[df["stim"] == stim_num].copy() if "stim" in df.columns else df.copy()
+                    y_data = df_event[col].values  # + y_offset
+                    # Only use data after the artefact for ylim calculation
+                    mask = df_event["time"].values > 0.001
+                    all_ys.extend(y_data[mask])
+                    key = (group_ID, test_id, stim_num)
+                    if key in self.uistate.sample_artists:
+                        line = self.uistate.sample_artists[key]
+                        line.set_data(df_event["time"].values, y_data)
+                        line.set_linestyle(linestyle)
+                        line.set_zorder(11)
+                        line.set_visible(True)
+                    else:
+                        (line,) = inset.plot(
+                            df_event["time"].values,
+                            y_data,
+                            color=color,
+                            alpha=0.75,
+                            linewidth=1.0,
+                            linestyle=linestyle,
+                            label=f"sample_g{group_ID}_t{test_id}_s{stim_num}",
+                            zorder=11,
+                        )
+                        # print(f"*** DF: {df_event}")
+                        self.uistate.sample_artists[key] = line
 
         if all_ys:
             ymin, ymax = min(all_ys), max(all_ys)

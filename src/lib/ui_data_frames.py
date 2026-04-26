@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
 
 import analysis_v3 as analysis
@@ -571,15 +570,11 @@ class DataFrameMixin:
     # ------------------------------------------------------------------
 
     def get_ddgroup_sample(self, group_ID):
-        """Returns inner dict {test_ID: df} for group's sample means.
+        """Returns inner dict {test_ID: df} for group's sample means (one entry per shown testset).
         Follows exact get_dfgroupmean pattern: (1) memory, (2) parquet cache, (3) build.
-        Mirrors update_axe_mean exactly for mean computation:
-        - uses active testset sweeps
-        - df_sweeps groupby("time") on filter column
-        - df_t loop for per-stim event windows
-        - shift time so each stim starts at t=0
-        - retains 'stim' column for extraction/superimposition.
-        Persisted as <group_name>_sample.parquet (key="sample").
+        Now builds/returns dict for EVERY shown testset using real tid as key.
+        Saves/loads a separate parquet per (group, test_id) so each testset uses its own sweeps.
+        Mirrors update_axe_mean for mean computation per testset (different sweeps produce different means).
         """
         if not hasattr(self, "dd_group_samples"):
             self.dd_group_samples = {}
@@ -589,18 +584,28 @@ class DataFrameMixin:
                 print(f"Returning cached group sample for group {group_ID}")
             return self.dd_group_samples[group_ID]
 
-        # 2: Read from file if exists
+        # 2: Read per-test parquet files for currently-shown testsets
         group_name = self.dd_groups.get(group_ID, {}).get("group_name", f"group_{group_ID}")
-        sample_path = Path(f"{self.dict_folders['cache']}/{group_name}_sample.parquet")
-        if sample_path.exists():
-            if config.verbose:
-                print(f"Loading stored group sample for group {group_ID}")
-            sample_df = pd.read_parquet(str(sample_path))
-            # TODO: convert back to dict-of-DFs if multi-test; for now treat as single
-            self.dd_group_samples[group_ID] = {"0": sample_df}
+        inner = {}
+        shown_testsets = {}
+        if hasattr(self, "dd_testsets") and self.dd_testsets:
+            for tid, tset in self.dd_testsets.items():
+                print(f"tid: {tid}, tset: {tset}")
+                if tset.get("show", False) and tset.get("sweeps"):
+                    shown_testsets[str(tid)] = tset.get("sweeps")
+
+        for test_id in shown_testsets:
+            sample_path = Path(f"{self.dict_folders['cache']}/{group_name}_sample_{test_id}.parquet")
+            if sample_path.exists():
+                if config.verbose:
+                    print(f"Loading stored group sample for group {group_ID} test {test_id}")
+                df = pd.read_parquet(str(sample_path))
+                inner[test_id] = df
+        if inner:
+            self.dd_group_samples[group_ID] = inner
             return self.dd_group_samples[group_ID]
 
-        # 3: Build from scratch (full logic mirroring update_axe_mean)
+        # 3: Build from scratch for EVERY shown testset (real tid keys)
         if config.verbose:
             print(f"Building new group sample for group {group_ID}")
 
@@ -609,17 +614,7 @@ class DataFrameMixin:
             self.dd_group_samples[group_ID] = {}
             return self.dd_group_samples[group_ID]
 
-        # Resolve active testset (first checked for now; see plan 3.4.1)
-        active_test_id = "0"
-        selected_sweeps = None
-        if hasattr(self, "dd_testsets") and self.dd_testsets:
-            for tid, tset in self.dd_testsets.items():
-                if tset.get("show", False) and tset.get("sweeps"):
-                    active_test_id = str(tid)
-                    selected_sweeps = tset.get("sweeps")
-                    break
-
-        if not selected_sweeps:
+        if not shown_testsets:
             self.dd_group_samples[group_ID] = {}
             return self.dd_group_samples[group_ID]
 
@@ -635,33 +630,35 @@ class DataFrameMixin:
         col = uistate.settings.get("filter") or "voltage"
         if col not in df.columns:
             col = "voltage"  # fallback to ensure column exists in df_sweeps
-        df_sweeps = df[df["sweep"].isin(selected_sweeps)]
-        df_mean = df_sweeps.groupby("time", as_index=False)[col].mean()
-
-        # df_t loop for per-stim event windows + time shift to t=0 (exact mirror of update_axe_mean:320-340)
-        # Fixed: collect ALL events per test_ID into ONE concatenated DF (instead of overwriting key)
         df_t = self.get_dft(row=p_row)
         settings = uistate.settings
         mean_dfs = {}
-        events = []
-        for i_stim, t_row in df_t.iterrows():
-            stim_num = i_stim + 1
-            t_stim = t_row["t_stim"]
-            window_start = t_stim + settings.get("event_start", 0)
-            window_end = t_stim + settings.get("event_end", 0.05)
-            df_event = df_mean[(df_mean["time"] >= window_start) & (df_mean["time"] <= window_end)].copy()
-            df_event["time"] = df_event["time"] - t_stim  # all times now start at 0 per stim
-            df_event["stim"] = stim_num  # retain 'stim' column as required
-            events.append(df_event)
 
-        if events:
-            mean_dfs[active_test_id] = pd.concat(events, ignore_index=True)
-        else:
-            mean_dfs[active_test_id] = pd.DataFrame()
-        full_mean_df = pd.concat(mean_dfs.values(), ignore_index=True) if mean_dfs else pd.DataFrame()
-        if not full_mean_df.empty and "stim" not in full_mean_df.columns:
-            full_mean_df["stim"] = 1
-        self.df2file(df=full_mean_df, filename=f"{group_name}_sample")
+        # Build one mean DF per shown testset (different sweeps per testset) + save per-test parquet
+        for test_id, selected_sweeps in shown_testsets.items():
+            df_sweeps = df[df["sweep"].isin(selected_sweeps)]
+            df_mean = df_sweeps.groupby("time", as_index=False)[col].mean()
+
+            # df_t loop for per-stim event windows + time shift to t=0 (exact mirror of update_axe_mean:320-340)
+            events = []
+            for i_stim, t_row in df_t.iterrows():
+                stim_num = i_stim + 1
+                t_stim = t_row["t_stim"]
+                window_start = t_stim + settings.get("event_start", 0)
+                window_end = t_stim + settings.get("event_end", 0.05)
+                df_event = df_mean[(df_mean["time"] >= window_start) & (df_mean["time"] <= window_end)].copy()
+                df_event["time"] = df_event["time"] - t_stim  # all times now start at 0 per stim
+                df_event["stim"] = stim_num  # retain 'stim' column as required
+                events.append(df_event)
+
+            if events:
+                test_df = pd.concat(events, ignore_index=True)
+                mean_dfs[test_id] = test_df
+                # save separate parquet per (group, test_id)
+                self.df2file(df=test_df, filename=f"{group_name}_sample_{test_id}")
+            else:
+                mean_dfs[test_id] = pd.DataFrame()
+
         self.dd_group_samples[group_ID] = mean_dfs
         return self.dd_group_samples[group_ID]
 
