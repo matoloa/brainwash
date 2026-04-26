@@ -300,10 +300,8 @@ class UIplot:
             if inset.get_visible():
                 self.clear_sample_artists(draw=False, hide=True)
                 self.uistate.sample_dirty = False
-            print("if not should_show == True")
             return
         if not self.uistate.sample_dirty and inset.get_visible():
-            print("if not self.uistate.sample_dirty and inset.get_visible() == True")
             return
 
         self.clear_sample_artists(draw=False, hide=True)
@@ -318,7 +316,6 @@ class UIplot:
 
         if dd_shown_samples is None or not bool(dd_shown_samples):
             self.uistate.sample_dirty = False
-            print("if dd_shown_samples is None or not bool(dd_shown_samples): == True")
             return
 
         all_ys = []
@@ -343,7 +340,6 @@ class UIplot:
             if col not in df.columns:
                 col = df.columns[-1]  # safe fallback
             # y_offset = g_idx * 0.25  # larger offset for visibility on inset
-            print(f"Gets to the inner loop for group_ID={group_ID}, test_id={test_id}")
             for stim_num in sorted(df.get("stim", pd.Series([1])).unique()):
                 df_event = df[df["stim"] == stim_num].copy() if "stim" in df.columns else df.copy()
                 y_data = df_event[col].values  # + y_offset
@@ -366,14 +362,13 @@ class UIplot:
                         label=f"sample_g{group_ID}_t{test_id}_s{stim_num}",
                         zorder=11,
                     )
-                    print(f"Adding sample artist: {key}")
-                    print(f"*** DF: {df_event}")
+                    # print(f"*** DF: {df_event}")
                     self.uistate.sample_artists[key] = line
 
         if all_ys:
             ymin, ymax = min(all_ys), max(all_ys)
             inset.set_ylim(ymin * 1.1, ymax + 0.0001)
-        inset.set_xlim(-0.005, 0.035)  # typical aligned event window
+        inset.set_xlim(-0.005, 0.035)  # aligned event window
         inset.relim()
         inset.autoscale_view(scalex=False)
 
