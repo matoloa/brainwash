@@ -186,7 +186,7 @@ def render_publication_figure(
                 is_io = info.get("x_mode") == "io"
 
                 # Check if this line corresponds to the current panel
-                
+
                 # Pre-extract color safely so PP mode can use it
                 if hasattr(line, "patches") and len(line.patches) > 0:
                     group_color = line.patches[0].get_facecolor()
@@ -202,21 +202,21 @@ def render_publication_figure(
                         continue
                     if "overlay" in label:
                         continue  # Do not export overlays
-                    aspect_str = panel.replace('_', ' ').replace('amp', 'amplitude')
+                    aspect_str = panel.replace("_", " ").replace("amp", "amplitude")
                     ax.set_ylabel(f"PPR ({aspect_str})")
                     has_data = True
-                    
+
                     # Calculate offset to center elements back on their base integer group tick
                     shift = 0
                     bar_label = f"{label.split(' PPR')[0]} PPR {info.get('aspect')} bar"
                     bar_info = uistate.dict_group_labels.get(bar_label)
-                    if bar_info and hasattr(bar_info.get('line'), 'patches') and len(bar_info['line'].patches) > 0:
-                        p = bar_info['line'].patches[0]
+                    if bar_info and hasattr(bar_info.get("line"), "patches") and len(bar_info["line"].patches) > 0:
+                        p = bar_info["line"].patches[0]
                         orig_base_x = p.get_x() + p.get_width() / 2
                         shift = round(orig_base_x) - orig_base_x
 
                     if hasattr(line, "patches"):  # BarContainer
-                        xdata = [round(p.get_x() + p.get_width()/2) for p in line.patches]
+                        xdata = [round(p.get_x() + p.get_width() / 2) for p in line.patches]
                         ydata = [p.get_height() for p in line.patches]
                         width = 0.8  # Standard width
                         color = line.patches[0].get_facecolor()
@@ -234,10 +234,10 @@ def render_publication_figure(
                             continue
                         xdata = offsets[:, 0] + shift
                         ydata = offsets[:, 1]
-                        
+
                         group_color = "black"
-                        if bar_info and hasattr(bar_info.get('line'), 'patches') and len(bar_info['line'].patches) > 0:
-                            group_color = bar_info['line'].patches[0].get_facecolor()
+                        if bar_info and hasattr(bar_info.get("line"), "patches") and len(bar_info["line"].patches) > 0:
+                            group_color = bar_info["line"].patches[0].get_facecolor()
 
                         ax.scatter(xdata, ydata, color="white", edgecolor="black", s=15, linewidth=template.linewidth_data, zorder=3)
 
@@ -347,7 +347,7 @@ def render_publication_figure(
 
             if has_data:
                 ax.set_ylim(bottom=0)
-                
+
                 if is_pp_mode:
                     ax.set_xlabel("")
                     group_name_to_x = {}
@@ -362,13 +362,14 @@ def render_publication_figure(
                                     x_pos_int = round(x_pos_float)
                                     group_name = label.split(" PPR")[0]
                                     group_name_to_x[x_pos_int] = group_name
-                            except: pass
+                            except:
+                                pass
                     x_ticks = sorted(list(group_name_to_x.keys()))
                     x_ticklabels = [group_name_to_x[x] for x in x_ticks]
                     if x_ticks:
                         ax.set_xticks(x_ticks)
                         ax.set_xticklabels(x_ticklabels)
-                        
+
                         # Add a 0.6 pad on each side to create a clean visual boundary
                         # around the centered bars (since bars have width 0.8)
                         ax.set_xlim(min(x_ticks) - 0.6, max(x_ticks) + 0.6)
@@ -380,6 +381,51 @@ def render_publication_figure(
                 if labels:
                     by_label = dict(zip(labels, handles))
                     ax.legend(by_label.values(), by_label.keys(), frameon=False)
+
+                show_inset = (is_io_mode and panel == "io") or (not is_io_mode and panel in ["amp", "slope"])
+                if show_inset and hasattr(uistate, "sample_inset") and uistate.sample_inset is not None and uistate.sample_inset.get_visible():
+                    export_inset = ax.inset_axes([0.02, 0.68, 0.20, 0.30])
+                    export_inset.set_zorder(10)
+                    export_inset.set_facecolor((0, 0, 0, 0))
+                    export_inset.patch.set_alpha(0.0)
+                    for spine in export_inset.spines.values():
+                        spine.set_visible(False)
+                    export_inset.tick_params(axis="both", which="both", bottom=False, left=False, labelbottom=False, labelleft=False)
+                    export_inset.set_axis_off()
+
+                    all_ys = []
+                    for key, line in getattr(uistate, "sample_artists", {}).items():
+                        if len(key) == 3:
+                            group_ID, test_id, stim_num = key
+                        else:
+                            continue
+
+                        if str(group_ID) not in [str(g) for g in selected_groups]:
+                            continue
+                        if not line.get_visible():
+                            continue
+
+                        x_data = line.get_xdata()
+                        y_data = line.get_ydata()
+                        y_filtered = [y for x, y in zip(x_data, y_data) if x > 0.001]
+                        all_ys.extend(y_filtered)
+
+                        export_inset.plot(
+                            x_data,
+                            y_data,
+                            color=line.get_color(),
+                            alpha=0.75,
+                            linewidth=template.linewidth_data,
+                            linestyle=line.get_linestyle(),
+                            zorder=11,
+                        )
+
+                    if all_ys:
+                        ymin, ymax = min(all_ys), max(all_ys)
+                        export_inset.set_ylim(ymin * 1.1, ymax + 0.0001)
+                    export_inset.set_xlim(-0.005, 0.035)
+                    export_inset.relim()
+                    export_inset.autoscale_view(scalex=False)
 
                 fig.tight_layout()
                 if panel == "io":
