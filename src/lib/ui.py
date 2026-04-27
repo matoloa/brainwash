@@ -3106,6 +3106,19 @@ class UIsub(
         self.tableUpdate()
         self.tableProjSelectionChanged()
 
+    def triggerAddSelectionToTestSet(self):
+        self.usage("triggerAddSelectionToTestSet")
+        self.testset_new()
+
+    def triggerRemoveLastTestSet(self):
+        self.usage("triggerRemoveLastTestSet")
+        self.testset_remove_last()
+
+    def triggerClearTestSets(self):
+        self.usage("triggerClearTestSets")
+        while self.dd_testsets:
+            self.testset_remove_last()
+
     def triggerSetGain(self):
         self.usage("triggerSetGain")
         selection = uistate.list_idx_select_recs

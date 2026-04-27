@@ -147,6 +147,18 @@ class MenuMixin:
         self.actionReAnalyzeRecordings.setShortcut("A")
         self.menuData.addAction(self.actionReAnalyzeRecordings)
 
+        self.actionAddSelectionToTestSet = QtWidgets.QAction("Add selection to test set")
+        self.actionAddSelectionToTestSet.triggered.connect(self.triggerAddSelectionToTestSet)
+        self.menuData.addAction(self.actionAddSelectionToTestSet)
+
+        self.actionRemoveLastTestSet = QtWidgets.QAction("Remove last test set")
+        self.actionRemoveLastTestSet.triggered.connect(self.triggerRemoveLastTestSet)
+        self.menuData.addAction(self.actionRemoveLastTestSet)
+
+        self.actionClearTestSets = QtWidgets.QAction("Clear test sets")
+        self.actionClearTestSets.triggered.connect(self.triggerClearTestSets)
+        self.menuData.addAction(self.actionClearTestSets)
+
         # Group menu
         self.actionNewGroup = QtWidgets.QAction("Add a group")
         self.actionNewGroup.triggered.connect(self.triggerNewGroup)

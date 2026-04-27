@@ -189,16 +189,6 @@ class GroupMixin:
         print(f"Created test set {set_ID} with {len(selected_sweeps)} sweeps: {selected_sweeps}")
         self.graphRefresh()
 
-    def testset_remove_last_empty(self):
-        if not self.dd_testsets:
-            print("No test sets to remove.")
-            return
-        last_set_ID = max(self.dd_testsets.keys())
-        if self.dd_testsets[last_set_ID]["sweeps"]:
-            print(f"{last_set_ID} is not empty.")
-            return
-        self.testset_remove(last_set_ID)
-
     def testset_remove_last(self):
         if self.dd_testsets:
             last_set_ID = max(self.dd_testsets.keys())
@@ -214,7 +204,6 @@ class GroupMixin:
             self.testset_controls_remove(set_ID)
         self.testset_save_dd()
         self.graphRefresh()
-        self.refresh_samples()  # 3.4.3: testset CRUD must trigger sample refresh
 
     def testset_rename(self, set_ID, new_set_name):
         if new_set_name in [s["set_name"] for s in self.dd_testsets.values()]:
@@ -224,7 +213,6 @@ class GroupMixin:
             self.testset_save_dd()
             self.testsetControlsRefresh()
             self.graphRefresh()
-            self.refresh_samples()  # 3.4.3: testset CRUD must trigger sample refresh
         else:
             print(f"Test set name {new_set_name} is not a valid name.")
 
