@@ -2198,7 +2198,7 @@ class UIsub(
             self.dict_usage[ui_component] = 0
         self.dict_usage[ui_component] += 1
         if config.talkback and ui_component in self.dict_usage:
-            self.statusBar().showMessage(f"Used {ui_component} {self.dict_usage[ui_component]} times")
+            self.statusbar.showMessage(f"Used {ui_component} {self.dict_usage[ui_component]} times")
         self.write_usage()
 
     def write_usage(self):

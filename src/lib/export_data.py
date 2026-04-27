@@ -31,8 +31,8 @@ class ExportMixin:
     Menu item wiring lives in MenuMixin (ui_menus.py)."""
 
     def _export_status(self, msg: str):
-        if hasattr(self, "statusBar"):
-            self.statusBar().showMessage(msg, 5000)
+        if hasattr(self, "statusbar"):
+            self.statusbar.showMessage(msg, 5000)
         print(msg)
 
     def _require_selection(self) -> list[pd.Series] | None:
