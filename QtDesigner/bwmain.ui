@@ -273,9 +273,9 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>0</y>
+          <y>-733</y>
           <width>191</width>
-          <height>1268</height>
+          <height>1502</height>
          </rect>
         </property>
         <property name="minimumSize">
@@ -1749,6 +1749,295 @@
           </widget>
          </item>
          <item>
+          <widget class="QFrame" name="frameToolTest">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>201</width>
+             <height>111</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Raised</enum>
+           </property>
+           <widget class="QLabel" name="label_test">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>10</y>
+              <width>101</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="font">
+             <font>
+              <family>DejaVu Sans</family>
+              <weight>75</weight>
+              <bold>true</bold>
+             </font>
+            </property>
+            <property name="text">
+             <string>Statistical test</string>
+            </property>
+           </widget>
+           <widget class="QPushButton" name="pushButton_hide_test">
+            <property name="geometry">
+             <rect>
+              <x>150</x>
+              <y>10</y>
+              <width>21</width>
+              <height>21</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>-</string>
+            </property>
+            <property name="flat">
+             <bool>true</bool>
+            </property>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_t">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>30</y>
+              <width>101</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>t-test</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_anova">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>50</y>
+              <width>91</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>ANOVA</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_wilcoxon">
+            <property name="geometry">
+             <rect>
+              <x>80</x>
+              <y>30</y>
+              <width>91</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Wilcoxon</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_friedman">
+            <property name="geometry">
+             <rect>
+              <x>80</x>
+              <y>50</y>
+              <width>91</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Friedman</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_cluster">
+            <property name="geometry">
+             <rect>
+              <x>80</x>
+              <y>70</y>
+              <width>141</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Cluster perm.</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test</string>
+            </attribute>
+           </widget>
+           <widget class="QCheckBox" name="checkBox_test_fdr">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>90</y>
+              <width>141</width>
+              <height>23</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>False Discovery Rate</string>
+            </property>
+           </widget>
+          </widget>
+         </item>
+         <item>
+          <widget class="QFrame" name="frameToolTest_t">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>201</width>
+             <height>91</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Raised</enum>
+           </property>
+           <widget class="QLabel" name="label_test_t">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>10</y>
+              <width>101</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="font">
+             <font>
+              <family>DejaVu Sans</family>
+              <weight>75</weight>
+              <bold>true</bold>
+             </font>
+            </property>
+            <property name="text">
+             <string>Student's t-test</string>
+            </property>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_t_variant_one">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>30</y>
+              <width>81</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>One-sample</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test_t_variant</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_t_variant_paired">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>70</y>
+              <width>81</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Paired</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test_t_variant</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_t_variant_unpaired">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>50</y>
+              <width>81</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Unpaired</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test_t_variant</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_t_tails_two">
+            <property name="geometry">
+             <rect>
+              <x>100</x>
+              <y>30</y>
+              <width>81</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Two-sided</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test_t_tails</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_t_tails_greater">
+            <property name="geometry">
+             <rect>
+              <x>100</x>
+              <y>50</y>
+              <width>81</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Greater</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test_t_tails</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_t_tails_less">
+            <property name="geometry">
+             <rect>
+              <x>100</x>
+              <y>70</y>
+              <width>81</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Less</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test_t_tails</string>
+            </attribute>
+           </widget>
+          </widget>
+         </item>
+         <item>
           <layout class="QVBoxLayout" name="verticalLayoutGroups"/>
          </item>
          <item>
@@ -1830,8 +2119,11 @@
  <connections/>
  <buttongroups>
   <buttongroup name="buttonGroup_io_o"/>
-  <buttongroup name="buttonGroup_io_i"/>
   <buttongroup name="buttonGroup_type"/>
+  <buttongroup name="buttonGroup_io_i"/>
   <buttongroup name="buttonGroup_filter"/>
+  <buttongroup name="buttonGroup_test"/>
+  <buttongroup name="buttonGroup_test_t_variant"/>
+  <buttongroup name="buttonGroup_test_t_tails"/>
  </buttongroups>
 </ui>
