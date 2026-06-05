@@ -1334,7 +1334,9 @@ class UIsub(
             if hasattr(self, f"checkBox_{key}"):
                 checkBox = getattr(self, f"checkBox_{key}")
                 checkBox.setEnabled(False)
-        for radio_name in self._RADIO_TO_TYPE:
+        for radio_name in (
+            list(self._RADIO_TO_TYPE) + list(self._RADIO_TO_TEST) + list(self._RADIO_TO_TEST_T_VARIANT) + list(self._RADIO_TO_TEST_T_TAILS)
+        ):
             if hasattr(self, radio_name):
                 getattr(self, radio_name).setEnabled(False)
 
@@ -1348,6 +1350,11 @@ class UIsub(
             if hasattr(self, f"checkBox_{key}"):
                 checkBox = getattr(self, f"checkBox_{key}")
                 checkBox.setEnabled(True)
+        for radio_name in (
+            list(self._RADIO_TO_TYPE) + list(self._RADIO_TO_TEST) + list(self._RADIO_TO_TEST_T_VARIANT) + list(self._RADIO_TO_TEST_T_TAILS)
+        ):
+            if hasattr(self, radio_name):
+                getattr(self, radio_name).setEnabled(True)
         # Radio button enabled-state is recording-dependent; a full refresh
         # via tableProjSelectionChanged (called after uiThaw) will set them
         # correctly.  Here we just re-enable sweep (always valid) so the
@@ -2038,6 +2045,29 @@ class UIsub(
     }
     _IO_O_TO_RADIO = {v: k for k, v in _RADIO_TO_IO_O.items()}
 
+    _RADIO_TO_TEST = {
+        "radioButton_test_t": "t-test",
+        "radioButton_test_anova": "ANOVA",
+        "radioButton_test_wilcoxon": "Wilcoxon",
+        "radioButton_test_friedman": "Friedman",
+        "radioButton_test_cluster": "Cluster perm.",
+    }
+    _TEST_TO_RADIO = {v: k for k, v in _RADIO_TO_TEST.items()}
+
+    _RADIO_TO_TEST_T_VARIANT = {
+        "radioButton_test_t_variant_one": "one-sample",
+        "radioButton_test_t_variant_paired": "paired",
+        "radioButton_test_t_variant_unpaired": "unpaired",
+    }
+    _TEST_T_VARIANT_TO_RADIO = {v: k for k, v in _RADIO_TO_TEST_T_VARIANT.items()}
+
+    _RADIO_TO_TEST_T_TAILS = {
+        "radioButton_test_t_tails_two": "two-sided",
+        "radioButton_test_t_tails_greater": "greater",
+        "radioButton_test_t_tails_less": "less",
+    }
+    _TEST_T_TAILS_TO_RADIO = {v: k for k, v in _RADIO_TO_TEST_T_TAILS.items()}
+
     def io_input_changed(self, button):
         """Handler for buttonGroup_io_i.buttonClicked signal."""
         io_input = self._RADIO_TO_IO_I.get(button.objectName())
@@ -2080,6 +2110,33 @@ class UIsub(
             self.update_show()
             self.zoomAuto()
             self.graphRefresh()
+
+    def test_type_changed(self, button):
+        """Handler for buttonGroup_test.buttonClicked signal."""
+        test_type = self._RADIO_TO_TEST.get(button.objectName(), button.text())
+        old_type = getattr(uistate, "test_type", "t-test")
+        if test_type is None or test_type == old_type:
+            return
+        self.usage(f"test_type_changed → {test_type}")
+        print(f"Selected statistical test: {test_type}")
+        uistate.test_type = test_type
+        if hasattr(self, "frameToolTest_t"):
+            self.frameToolTest_t.setVisible(test_type == "t-test")
+        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+
+    def test_t_variant_changed(self, button):
+        """Placeholder wiring for buttonGroup_test_t_variant.buttonClicked."""
+        variant = self._RADIO_TO_TEST_T_VARIANT.get(button.objectName(), button.text())
+        print(f"Selected t-test variant: {variant}")
+        uistate.test_t_variant = variant
+        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+
+    def test_t_tails_changed(self, button):
+        """Placeholder wiring for buttonGroup_test_t_tails.buttonClicked."""
+        tails = self._RADIO_TO_TEST_T_TAILS.get(button.objectName(), button.text())
+        print(f"Selected t-test tails: {tails}")
+        uistate.test_t_tails = tails
+        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
 
     def update_experiment_type_radio_buttons(self):
         """Enable/disable and select experiment type radio buttons for the current selection."""
@@ -2124,7 +2181,14 @@ class UIsub(
             self.radioButton_io_stim.setEnabled(False)
 
         disabled_color = "#666" if uistate.darkmode else "#aaa"
-        for radio_name in list(self._RADIO_TO_TYPE) + list(self._RADIO_TO_IO_I) + list(self._RADIO_TO_IO_O):
+        for radio_name in (
+            list(self._RADIO_TO_TYPE)
+            + list(self._RADIO_TO_IO_I)
+            + list(self._RADIO_TO_IO_O)
+            + list(self._RADIO_TO_TEST)
+            + list(self._RADIO_TO_TEST_T_VARIANT)
+            + list(self._RADIO_TO_TEST_T_TAILS)
+        ):
             if hasattr(self, radio_name):
                 radio = getattr(self, radio_name)
                 if radio.isEnabled():
@@ -2170,6 +2234,9 @@ class UIsub(
                     self.triggerRefresh()
             elif key == "is_group_sample":
                 self.checkBox_is_group_sample_changed(state)
+            elif key == "test_fdr":
+                print(f"FDR checkbox changed to: {state == 2}")
+                uistate.test_fdr = state == 2
         # print(f"viewSettingsChanged: {key} = {state == 2}")
         self.update_show()
         if key in ["output_ymin0", "norm_EPSP"]:
@@ -2448,6 +2515,8 @@ class UIsub(
         self.frameToolAspectSlope.setVisible(uistate.checkBox.get("EPSP_slope", False) or uistate.checkBox.get("volley_slope", False))
         if hasattr(self, "frameToolType_io"):
             self.frameToolType_io.setVisible(getattr(uistate, "experiment_type", "time") == "io")
+        if hasattr(self, "frameToolTest_t"):
+            self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "t-test") == "t-test")
 
     def build_dict_folders(self):
         dict_folders = {
@@ -2494,6 +2563,33 @@ class UIsub(
                 pass
         else:
             self.buttonGroup_filter.buttonClicked.connect(self.filter_mode_changed)
+        # test type radio button group
+        if hasattr(self, "buttonGroup_test"):
+            if disconnect:
+                try:
+                    self.buttonGroup_test.buttonClicked.disconnect()
+                except TypeError:
+                    pass
+            else:
+                self.buttonGroup_test.buttonClicked.connect(self.test_type_changed)
+        # test t variant radio button group
+        if hasattr(self, "buttonGroup_test_t_variant"):
+            if disconnect:
+                try:
+                    self.buttonGroup_test_t_variant.buttonClicked.disconnect()
+                except TypeError:
+                    pass
+            else:
+                self.buttonGroup_test_t_variant.buttonClicked.connect(self.test_t_variant_changed)
+        # test t tails radio button group
+        if hasattr(self, "buttonGroup_test_t_tails"):
+            if disconnect:
+                try:
+                    self.buttonGroup_test_t_tails.buttonClicked.disconnect()
+                except TypeError:
+                    pass
+            else:
+                self.buttonGroup_test_t_tails.buttonClicked.connect(self.test_t_tails_changed)
         # hide buttons
         hide_buttons = {
             "pushButton_hide_stim": "frameToolStim",
@@ -2506,6 +2602,7 @@ class UIsub(
             "pushButton_hide_aspect": "frameToolAspect",
             "pushButton_hide_slope_width": "frameToolAspectSlope",
             "pushButton_hide_slope_width_2": "frameToolAspectAmp",
+            "pushButton_hide_test": "frameToolTest",
         }
         for btn_name, frame_name in hide_buttons.items():
             if hasattr(self, btn_name):
@@ -2696,6 +2793,22 @@ class UIsub(
             io_o_name = self._IO_O_TO_RADIO.get(getattr(uistate, "io_output", "EPSPamp"), "radioButton_io_EPSPamp")
             if hasattr(self, io_o_name):
                 getattr(self, io_o_name).setChecked(True)
+
+        # apply test radio button selections from config
+        if hasattr(self, "buttonGroup_test"):
+            test_radio_name = self._TEST_TO_RADIO.get(getattr(uistate, "test_type", "t-test"), "radioButton_test_t")
+            if hasattr(self, test_radio_name):
+                getattr(self, test_radio_name).setChecked(True)
+        if hasattr(self, "buttonGroup_test_t_variant"):
+            variant_name = self._TEST_T_VARIANT_TO_RADIO.get(getattr(uistate, "test_t_variant", "unpaired"), "radioButton_test_t_variant_unpaired")
+            if hasattr(self, variant_name):
+                getattr(self, variant_name).setChecked(True)
+        if hasattr(self, "buttonGroup_test_t_tails"):
+            tails_name = self._TEST_T_TAILS_TO_RADIO.get(getattr(uistate, "test_t_tails", "two-sided"), "radioButton_test_t_tails_two")
+            if hasattr(self, tails_name):
+                getattr(self, tails_name).setChecked(True)
+        if hasattr(self, "frameToolTest_t"):
+            self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "t-test") == "t-test")
 
         # Ensure tools column is treated as fixed pixels
         if len(uistate.splitter.get("h_splitterMaster", [])) == 4:

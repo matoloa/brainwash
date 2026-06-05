@@ -123,6 +123,8 @@ class UIstate:
             "frameToolAspect": ["Aspect toggles", True],
             "frameToolAspectSlope": ["Slope width", False],
             "frameToolAspectAmp": ["Amplitude width", False],
+            "frameToolTest": ["Statistical test", True],
+            "frameToolTest_t": ["t-test options", False],
         }
         self.checkBox = {  # these are cycled by uisub.connectUIstate; maintain format!
             "EPSP_amp": True,
@@ -140,6 +142,7 @@ class UIstate:
             "io_trendline": False,
             "io_force0": False,
             "is_group_sample": False,
+            "test_fdr": False,
         }
         self.lineEdit = {  # storage of user input; used to update df_t
             "split_at_time": 0.0,  # in s (SI). User enters ms; converted at input in editImportOptions.
@@ -180,6 +183,10 @@ class UIstate:
         self.experiment_type = "time"  # "time", "sweep", "timestamp", "train", "io", "PP"
         self.io_input = "vamp"
         self.io_output = "EPSPamp"
+        self.test_type = "t-test"
+        self.test_t_variant = "unpaired"
+        self.test_t_tails = "two-sided"
+        self.test_fdr = False
         self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
         self._time_unit_label = "s"  # set by x_axis_xlim when mode == "time"
         self._time_sweep_hz = 1.0  # set by x_axis_xlim when mode == "time"
@@ -649,6 +656,10 @@ class UIstate:
                 "experiment_type": getattr(self, "experiment_type", "time"),
                 "io_input": getattr(self, "io_input", "vamp"),
                 "io_output": getattr(self, "io_output", "EPSPamp"),
+                "test_type": getattr(self, "test_type", "t-test"),
+                "test_t_variant": getattr(self, "test_t_variant", "unpaired"),
+                "test_t_tails": getattr(self, "test_t_tails", "two-sided"),
+                "test_fdr": getattr(self, "test_fdr", False),
                 "showTimetable": self.showTimetable,
                 "detailedProjectTable": getattr(self, "detailedProjectTable", False),
                 "detailedTimetable": getattr(self, "detailedTimetable", False),
@@ -678,6 +689,10 @@ class UIstate:
         self.experiment_type = state.get("experiment_type", state.get("x_axis_mode", "time"))
         self.io_input = state.get("io_input", "vamp")
         self.io_output = state.get("io_output", "EPSPamp")
+        self.test_type = state.get("test_type", "t-test")
+        self.test_t_variant = state.get("test_t_variant", "unpaired")
+        self.test_t_tails = state.get("test_t_tails", "two-sided")
+        self.test_fdr = state.get("test_fdr", False)
 
         self.showTimetable = state.get("showTimetable", False)
         self.detailedProjectTable = state.get("detailedProjectTable", False)
