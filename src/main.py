@@ -56,6 +56,14 @@ if __name__ == "__main__":
 
     logger.info(f"Brainwash starting — platform={sys.platform}, frozen={getattr(sys, 'frozen', False)}, argv={sys.argv}, py={sys.version[:50]}")
 
+    # On Wayland, Qt 5 + PyQt5 can exhibit severe input lag and repaint stalls.
+    # Force the X11 (xcb) backend automatically unless the user has explicitly
+    # chosen a platform plugin via the environment.
+    if os.environ.get("QT_QPA_PLATFORM") is None:
+        if os.environ.get("WAYLAND_DISPLAY") or os.environ.get("XDG_SESSION_TYPE") == "wayland":
+            os.environ["QT_QPA_PLATFORM"] = "xcb"
+            logger.info("Wayland session detected; forcing X11 (xcb) backend for responsiveness")
+
     # pandas 3.0 changed the default string dtype to Arrow-backed string[pyarrow],
     # which rejects assignment of non-string values (int, float, etc.).
     # The project DataFrame mixes strings, ints and floats in the same CSV-loaded
@@ -103,11 +111,6 @@ if __name__ == "__main__":
     try:
         app = QtWidgets.QApplication(sys.argv)
         logger.info(f"QApplication created, platformName='{app.platformName()}'")
-        if app.platformName() == "wayland":
-            logger.info(
-                "Running on Wayland. If you see 'Wayland connection broke' during interactive "
-                "sweep/selection drags, try forcing X11: QT_QPA_PLATFORM=xcb python -m src.main"
-            )
 
         MainWindow = QtWidgets.QMainWindow()
         logger.info("QMainWindow created, instantiating UIsub...")

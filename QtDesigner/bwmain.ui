@@ -87,7 +87,7 @@
               <rect>
                <x>10</x>
                <y>10</y>
-               <width>131</width>
+               <width>201</width>
                <height>17</height>
               </rect>
              </property>
@@ -98,7 +98,7 @@
             <widget class="QLineEdit" name="lineEdit_split_at_time">
              <property name="geometry">
               <rect>
-               <x>80</x>
+               <x>110</x>
                <y>40</y>
                <width>41</width>
                <height>25</height>
@@ -110,7 +110,7 @@
               <rect>
                <x>10</x>
                <y>40</y>
-               <width>61</width>
+               <width>101</width>
                <height>20</height>
               </rect>
              </property>
@@ -126,7 +126,7 @@
               <rect>
                <x>10</x>
                <y>70</y>
-               <width>61</width>
+               <width>101</width>
                <height>20</height>
               </rect>
              </property>
@@ -140,7 +140,7 @@
             <widget class="QLineEdit" name="lineEdit_import_gain">
              <property name="geometry">
               <rect>
-               <x>80</x>
+               <x>110</x>
                <y>70</y>
                <width>41</width>
                <height>25</height>
@@ -262,7 +262,7 @@
        </property>
        <property name="maximumSize">
         <size>
-         <width>210</width>
+         <width>300</width>
          <height>16777215</height>
         </size>
        </property>
@@ -273,7 +273,7 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-559</y>
+          <y>-569</y>
           <width>284</width>
           <height>1492</height>
          </rect>
@@ -1960,7 +1960,7 @@
              <rect>
               <x>10</x>
               <y>30</y>
-              <width>81</width>
+              <width>121</width>
               <height>17</height>
              </rect>
             </property>
@@ -1976,7 +1976,7 @@
              <rect>
               <x>10</x>
               <y>70</y>
-              <width>81</width>
+              <width>121</width>
               <height>17</height>
              </rect>
             </property>
@@ -1992,7 +1992,7 @@
              <rect>
               <x>10</x>
               <y>50</y>
-              <width>81</width>
+              <width>121</width>
               <height>17</height>
              </rect>
             </property>
@@ -2006,9 +2006,9 @@
            <widget class="QRadioButton" name="radioButton_test_t_tails_two">
             <property name="geometry">
              <rect>
-              <x>100</x>
+              <x>140</x>
               <y>30</y>
-              <width>81</width>
+              <width>121</width>
               <height>17</height>
              </rect>
             </property>
@@ -2022,9 +2022,9 @@
            <widget class="QRadioButton" name="radioButton_test_t_tails_greater">
             <property name="geometry">
              <rect>
-              <x>100</x>
+              <x>140</x>
               <y>50</y>
-              <width>81</width>
+              <width>121</width>
               <height>17</height>
              </rect>
             </property>
@@ -2038,9 +2038,9 @@
            <widget class="QRadioButton" name="radioButton_test_t_tails_less">
             <property name="geometry">
              <rect>
-              <x>100</x>
+              <x>140</x>
               <y>70</y>
-              <width>81</width>
+              <width>111</width>
               <height>17</height>
              </rect>
             </property>
@@ -2135,11 +2135,11 @@
  <connections/>
  <buttongroups>
   <buttongroup name="buttonGroup_test_t_variant"/>
+  <buttongroup name="buttonGroup_io_o"/>
+  <buttongroup name="buttonGroup_test"/>
+  <buttongroup name="buttonGroup_test_t_tails"/>
   <buttongroup name="buttonGroup_io_i"/>
   <buttongroup name="buttonGroup_filter"/>
-  <buttongroup name="buttonGroup_io_o"/>
   <buttongroup name="buttonGroup_type"/>
-  <buttongroup name="buttonGroup_test_t_tails"/>
-  <buttongroup name="buttonGroup_test"/>
  </buttongroups>
 </ui>

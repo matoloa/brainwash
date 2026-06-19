@@ -779,6 +779,19 @@ class UIsub(
         self.progressBar.setVisible(False)
         self.progressBar.setValue(0)
 
+        # Performance fixes for live splitter dragging on h_splitterMaster (esp. handle
+        # between fields 0 and 1). These panels contain tables whose layouts/headers
+        # were causing excessive work (and Wayland starvation) during continuous resizes.
+        if hasattr(self, "verticalLayoutProj"):
+            # The generated SetMinimumSize constraint causes extra layout iterations
+            # when the splitter forces horizontal geometry changes on widgetProj.
+            self.verticalLayoutProj.setSizeConstraint(QtWidgets.QLayout.SetDefaultConstraint)
+        if hasattr(self, "h_splitterMaster"):
+            # Disable live child resizing during drag. Children (tables) only resize
+            # on handle release. This prevents a storm of resizeEvents, header size
+            # calculations, and repaints on every mouse move while dragging.
+            self.h_splitterMaster.setOpaqueResize(False)
+
         # Add a reliable stretchable centered label to the statusbar.
         # Using addWidget + our own QLabel gives us full control over alignment
         # (the QStatusBar's internal temporary message label from showMessage is
@@ -836,6 +849,12 @@ class UIsub(
         self.loadProject()  # load project data
         logger.debug("loadProject done")
 
+        # Debounced config saver: used by onSplitterMoved so continuous drag
+        # does not spam disk I/O (which kills responsiveness and can crash Wayland).
+        self._save_cfg_timer = QtCore.QTimer(self.mainwindow)
+        self._save_cfg_timer.setSingleShot(True)
+        self._save_cfg_timer.timeout.connect(self._debounced_save_cfg)
+
     def _cleanup_threads(self):
         # Stop and wait for all running threads
         for thread in getattr(self, "_threads", []):
@@ -847,7 +866,23 @@ class UIsub(
     def closeEvent(self, event):
         # Ensure all threads are stopped on window close
         self._cleanup_threads()
+        # Persist UI state (incl. current splitter sizes) on close.
+        # We deliberately do not save on every splitterMoved (see onSplitterMoved).
+        self._save_cfg_now()
+
         super().closeEvent(event)
+
+    def _save_cfg_now(self):
+        """Immediate persist of cfg (used on close and after debounce)."""
+        try:
+            if hasattr(self, "dict_folders") and "project" in getattr(self, "dict_folders", {}):
+                uistate.save_cfg(projectfolder=self.dict_folders["project"])
+        except Exception:
+            pass
+
+    def _debounced_save_cfg(self):
+        """Persist cfg after idle; called via timer from onSplitterMoved etc."""
+        self._save_cfg_now()
 
     # Debugging tools
 
@@ -1820,7 +1855,11 @@ class UIsub(
             combined = sizes[1] + sizes[2]
             if combined > 0:
                 uistate.settings["dft_width_proportion"] = sizes[1] / combined
-        uistate.save_cfg(projectfolder=self.dict_folders["project"])
+        # Debounce the save: drag produces a flood of splitterMoved signals.
+        # Direct save_cfg on every event was causing the "impossibly slow" drag
+        # and Wayland connection crashes.
+        if hasattr(self, "_save_cfg_timer"):
+            self._save_cfg_timer.start(300)
 
     def setViewToolVisible(self, frame, visible=None):
         self.usage(f"setViewToolVisible {frame} {visible}")
@@ -2821,11 +2860,14 @@ class UIsub(
 
         col_indices = [df_p.columns.get_loc(name) for name in column_order if name in df_p.columns]
 
-        # Show/hide columns and set resize behavior
+        # Show/hide columns. Set to Interactive (not ResizeToContents) so that
+        # container resizes (splitter drags) do not repeatedly recompute column
+        # widths by scanning table contents. We force a one-time contents-based
+        # size below.
         num_columns = df_p.shape[1]
         for col in range(num_columns):
             if col in col_indices:
-                header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+                header.setSectionResizeMode(col, QtWidgets.QHeaderView.Interactive)
                 self.tableProj.setColumnHidden(col, False)
             else:
                 self.tableProj.setColumnHidden(col, True)
@@ -2863,9 +2905,10 @@ class UIsub(
         col_indices = [dft.columns.get_loc(col) for col in column_order if col in dft.columns]
         num_columns = dft.shape[1]
 
+        # Show/hide + Interactive (see formatTableLayout comment for rationale)
         for col in range(num_columns):
             if col in col_indices:
-                header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+                header.setSectionResizeMode(col, QtWidgets.QHeaderView.Interactive)
                 self.tableStim.setColumnHidden(col, False)
             else:
                 self.tableStim.setColumnHidden(col, True)
@@ -3198,7 +3241,7 @@ class UIsub(
         # Ensure tools column is treated as fixed pixels
         if len(uistate.splitter.get("h_splitterMaster", [])) == 4:
             if type(uistate.splitter["h_splitterMaster"][3]) == float:
-                uistate.splitter["h_splitterMaster"][3] = 200
+                uistate.splitter["h_splitterMaster"][3] = 300
 
         # apply splitter proportions from project config
         self.setSplitterSizes(*uistate.splitter.keys())

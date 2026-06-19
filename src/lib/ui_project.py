@@ -143,7 +143,7 @@ class ProjectMixin:
 
         # debug mode; for printing widget focus every 1000ms
         if config.track_widget_focus:
-            self.timer = QtCore.QTimer(self)
+            self.timer = QtCore.QTimer(self.mainwindow)
             self.timer.timeout.connect(self.checkFocus)
             self.timer.start(1000)
 
