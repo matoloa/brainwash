@@ -7,11 +7,11 @@ Version 0.16 completes the "scientific methods" functionality so that users can:
 1. Tag specific sweep ranges (e.g., sweeps 10-19) as reusable **Test Sets**.
 2. Assign recordings to named **Groups**.
 3. Configure a statistical test via the **Statistical test** panel (frameToolTest + frameToolTest_t).
-4. Execute a comparison that respects the chosen test type/options **and** the tagged sweeps in the active Test Set(s).
+4. Have the comparison applied automatically (when a non-None test type is selected) and kept up to date as groups and test sets change, using the chosen test type/options **and** the tagged sweeps in the active Test Set(s).
 
 The result is a properly configured statistical test (initially t-test with variant/tails/FDR support) comparing group means computed only over the user-tagged sweeps.
 
-**User example flow**: Drag or type range 10-19 on the output graph → click "Add to Test Set" (in frameToolTag) → create Group(s) → choose "t-test", "unpaired", "two-sided", enable FDR if desired → invoke the statistical test (via dedicated menu action) → obtain p-value(s) computed on the mean of the tagged sweeps (or per-sweep within the tag) between the shown groups.
+**User example flow**: Drag or type range 10-19 on the output graph → click "Add to Test Set" (in frameToolTag) → create Group(s) → choose "t-test", "unpaired", "two-sided", enable FDR if desired. As soon as a non-None test type is selected, the comparison is applied automatically using the shown groups and active test sets. Results update live whenever the composition of the groups (or shown test sets, or test config) changes.
 
 **Core Constraint** (carried from v0.15): NEVER alter `ui_designer.py` or run `puic`. All button wiring must be performed via the dynamic `self.pushButtons` dictionary in `UIstate.reset()` (consumed by `UIsub.connectUIstate()`) or by connecting to existing Qt signals (buttonGroups, stateChanged, etc.) that are already present in the compiled UI.
 
@@ -20,7 +20,7 @@ The result is a properly configured statistical test (initially t-test with vari
 ### States of the test buttons are tracked in `src/lib/ui_state_classes.py`
 
 - Direct attributes on `UIstate` (persisted in `cfg.pkl`):
-  - `test_type` (default "t-test")
+  - `test_type` (default "None")
   - `test_t_variant` (default "unpaired")
   - `test_t_tails` (default "two-sided")
   - `test_fdr` (also mirrored in `checkBox["test_fdr"]`)
@@ -75,7 +75,7 @@ The elements to be tested are tagged by the user here:
     - `uistate.test_t_variant`, `test_t_tails`, `test_fdr`
     - `self.dd_testsets` (and shown test sets)
   - It hardcodes a two-group, full-sweep, independent two-sample t-test using `get_dfgroupmean(key)` (all sweeps) + `analysis.ttest_df`.
-  - Radio button apply logic in `applyConfigStates` and enable/disable logic in `uiFreeze`/`uiThaw` + `update_experiment_type_radio_buttons` were added, but there is no dedicated "run" path yet that consumes the full test configuration + test sets for the formal statistical test.
+  - Radio button apply logic in `applyConfigStates` and enable/disable logic in `uiFreeze`/`uiThaw` + `update_experiment_type_radio_buttons` were added, but selecting a test type (other than "None") currently does nothing beyond showing the sub-panel. There is no automatic computation or display that reacts to `test_type`, group composition, or test sets.
   - `checkBox_test_fdr` is observed in `viewSettingsChanged`, but nothing uses `uistate.test_fdr` for the scientific test.
 
 - **analysis_v3.py**:
@@ -88,7 +88,7 @@ The elements to be tested are tagged by the user here:
   - There is no first-class helper to obtain a group mean (or per-aspect scalars) restricted to an arbitrary list of sweeps from a Test Set.
   - Test sets are used for visualization and per-testset samples, but not yet for statistical comparison inputs.
 
-- Result display for the _old_ full-range path lives in `uiplot.heatmap` (red scatter dots) + console print. The formal statistical test will use a parallel (but separate) display path for its markers. The v0.15 plan referenced a `verticalLayoutComparison` that does not exist in the compiled UI (and cannot be added without touching designer files).
+- Result display for the _old_ full-range path lives in `uiplot.heatmap` (red scatter dots) + console print. The formal statistical test (when a non-None type is selected) will drive its own markers via a parallel path. Markers must appear and update automatically. The v0.15 plan referenced a `verticalLayoutComparison` that does not exist in the compiled UI (and cannot be added without touching designer files).
 
 ## Detailed Requirements for v0.16
 
@@ -117,29 +117,35 @@ This matches the v0.15 intent: "use mean of sweeps 110-119 when comparing groups
 
 ### 3. Groups remain the units of comparison
 
-Shown groups (`dd_groups[g]["show"]`) supply the sets of recordings whose measurements are aggregated (within the test-set sweep filter) and then statistically compared.
+Shown groups (`dd_groups[g]["show"]`) determine which groups participate, but the actual recordings that belong to each group (the group _components_ / membership) are what get filtered by test sets and compared. Changes to either participation or membership must trigger re-application of an active test.
 
 For t-test a pragmatic starting constraint is exactly two shown groups (other tests such as ANOVA naturally support >2). The old `toggleHeatmap` implementation had this limitation; the new path is free to choose its rule (first two, require two, or error) and document it.
 
-### 4. Execution trigger
+### 4. Automatic application (no explicit "run" command)
 
-The formal statistical test must use its own execution path, separate from Heatmap. Because `ui_designer.py` cannot be modified, the trigger will be a menu action (following the existing pattern used for "Add selection to test set" etc. in `ui_menus.py`).
+There is no "Run test" action, menu item, or separate toggle for the formal statistical test. Selecting a test type other than "None" in the Statistical test panel **applies** the test immediately. The test remains applied and is **re-applied automatically** every time the components of the groups change.
 
-Proposed trigger:
+"Components of the groups change" means any mutation to the actual membership or participation of recordings in groups, including:
 
-- Add a menu entry (e.g. under Data or a lightweight Test section): "Run statistical test" (or "Compare groups using Test Sets").
-- This action calls a new dedicated function (e.g. `run_statistical_test()` in ui.py or a mixin) that:
-  - Reads current `uistate.test_*` values + shown groups + shown test sets.
-  - Builds inputs filtered to the shown test-set sweeps.
-  - Dispatches by `test_type`.
-  - For t-test: respects variant, tails, and FDR.
-  - Produces visual feedback (restricted markers on the output graph) and a textual results table.
+- Adding or removing recordings from groups
+- Creating, deleting, or renaming groups that affect membership
+- Toggling a group's show state (which groups are included in the comparison)
+- Changes to shown test sets (since they filter the data used for each group)
+- Changes to the test configuration itself (type/variant/tails/FDR/aspect)
 
-Results should also be invalidated and optionally re-computed when relevant state changes while results are visible (test config, shown test sets, shown groups). A lightweight `test_results_dirty` flag (or equivalent) plus hooks from `testsetCheckboxChanged`, group checkbox handlers, the `test_*_changed` handlers, and `graphRefresh` are appropriate. The old Heatmap path is **not** used for this.
+Implementation approach:
+
+- In `test_type_changed`, `test_t_variant_changed`, `test_t_tails_changed`, and the FDR checkbox handler: if the selected test is not "None", call an applicator that computes results using the current shown groups + shown test sets (filtered to test-set sweeps) and displays them.
+- When `test_type` is changed to "None", clear formal test results/markers.
+- Find and hook into the actual group mutation paths (e.g. after adding/removing recs to groups, after testset modifications) so that a currently-selected test is re-applied.
+- Leverage or extend existing refresh points (`groupCheckboxChanged`, testset checkbox handlers, `graphRefresh`, data reload paths) to trigger re-application when a test is active.
+- A simple dirty flag (`test_results_dirty`) or direct call to an `apply_statistical_test_if_active()` helper can be used. The goal is automatic, live updating without any user "run" step.
+
+The Heatmap ("H") path is completely independent and untouched by this logic. Formal test results use their own display path.
 
 ### 5. Analysis layer
 
-- Extend or wrap `ttest_df` (or introduce `run_statistical_test(...)`) in `analysis_v3.py` (or a small new helper) so it can be called with the UI configuration.
+- Extend or wrap `ttest_df` (or introduce a clear `compute_statistical_comparison(...)` or `apply_test(...)` entry point) in `analysis_v3.py` (or a small new helper) so it can be called with the UI configuration.
 - Implement the three t variants using the appropriate scipy functions:
   - unpaired → `ttest_ind_from_stats` (or `ttest_ind`)
   - paired → `ttest_rel` (requires aligned observations; see pairing notes)
@@ -161,20 +167,29 @@ One-sample does not require pairing.
 
 ### 7. Result presentation (no designer changes)
 
-- Visual: Reuse the existing red-dot marker machinery on ax1/ax2 (currently in `uiplot.heatmap`) but drive it from formal test results (via a separate path or wrapper). When test sets are active for the test, markers are restricted to (or labeled by) the sweeps belonging to shown test sets. Clear prior formal-test markers when configuration changes.
+- Visual: Reuse the existing red-dot marker machinery on ax1/ax2 (currently in `uiplot.heatmap`) but drive it from formal test results (via a separate path or wrapper). Markers appear automatically when a non-None test is selected. When test sets are active for the test, markers are restricted to (or labeled by) the sweeps belonging to shown test sets. Markers are cleared when the test is set to None or when configuration makes results invalid.
 - Textual: Print a clear table (test set name, group names, N, statistic, p, corrected p if FDR). Use `print` + optionally the status bar.
 - Management of formal test markers can reuse or lightly extend structures like `dict_heatmap`, but clearing and visibility must be independent of the Heatmap toggle.
 - The old full-range behavior lives only in the separate Heatmap tool.
 
-### 8. Refresh & invalidation
+### 8. Refresh & invalidation (automatic re-application)
 
-- Formal test results must be invalidated when:
-  - Shown test sets change (add/remove/rename/toggle show, sweep contents)
-  - Shown groups change
-  - Test configuration changes (type/variant/tails/fdr, or amp/slope/norm checkboxes)
-  - Underlying data or group membership changes
-- Hooks similar to `refresh_samples()` (added in v0.15) are appropriate: call from `testsetCheckboxChanged`, `groupCheckboxChanged`, the `test_*_changed` handlers (when formal results visible), `graphRefresh`, etc.
-- `uistate` can hold a lightweight `test_results_dirty` or the results themselves for re-display. The Heatmap dirty state remains separate.
+Because the test is applied as soon as a non-None type is selected and must re-apply automatically, results are invalidated and recomputed on:
+
+- Any change to the _components_ of groups (recordings added to or removed from groups, group create/delete/rename that affects membership)
+- Toggling shown groups or shown test sets
+- Test set add/remove/rename or sweep content changes
+- Test configuration changes (type, variant, tails, FDR, aspects)
+- Underlying data changes that affect the filtered group data
+
+Key hooks:
+
+- After the actual group membership mutation functions (the points that modify `dd_groups[...]["rec_IDs"]` etc.).
+- `groupCheckboxChanged`, testset checkbox handlers, `testset_new`/`testset_remove`, etc.
+- `test_*_changed` handlers and FDR checkbox (when a test is active).
+- `graphRefresh` and data reload paths as a safety net.
+
+Use a dirty flag or direct applicator call. When `test_type == "None"`, results are cleared rather than updated. Heatmap state is independent.
 
 ### 9. Persistence
 
@@ -199,18 +214,18 @@ One-sample does not require pairing.
 - State storage, radio maps, basic handlers, checkbox wiring, hide button, apply/restore logic, enable/disable on freeze.
 - Tagging flow (Test Sets) fully functional from v0.15.
 
-**Phase 1 – Make test configuration drive execution (ui.py)**
+**Phase 1 – Make test configuration drive automatic application (ui.py)**
 
-- Flesh out `test_t_variant_changed` and `test_t_tails_changed` (they already save; ensure they mark results dirty and trigger re-computation of the formal test results when visible).
-- Implement a dedicated runner (new function `run_statistical_test()` or similar, **not** `toggleHeatmap`). Invoked from a new menu action:
-  - Read the full test config (`uistate.test_*` + FDR + amp/slope/norm).
-  - Collect shown groups + shown test sets.
-  - For each shown test set, build filtered group data using only that set's sweeps.
-  - Call the analysis layer.
-  - Display via restricted markers + printed table.
-- Add a `test_results_dirty` (or equivalent) invalidation flag and a visibility flag for the formal results (distinct from `showHeatmap`).
-- Wire calls from relevant checkbox changed handlers (`testsetCheckboxChanged`, group changes) and the test radio/FDR handlers (when formal results are visible).
-- Decide and document fallback when no test sets are shown (e.g., require at least one shown test set, or fall back to all sweeps for the new path — the old Heatmap behavior is separate).
+- Flesh out `test_t_variant_changed`, `test_t_tails_changed`, and the FDR handler so they save state and, when `test_type != "None"`, immediately trigger computation + display of results.
+- Implement the core applicator (e.g. `apply_statistical_test()` or `update_test_results_if_active()`). It is **not** invoked from any menu; it is called:
+  - From the test config change handlers (when a real test is selected).
+  - From group membership mutation points (after recs are added/removed from groups).
+  - From test set change paths (add/remove/rename/toggle show).
+  - From `groupCheckboxChanged` and equivalent testset handlers when a test is active.
+  - Opportunistically from `graphRefresh` / data update paths if a test is currently selected.
+- When `test_type` becomes "None", clear any active formal test markers/results.
+- Introduce a simple dirty / active-test check so that relevant changes automatically cause re-application without user intervention.
+- Decide/document behavior when no shown test sets (e.g. use all sweeps for the groups, or require at least one — the Heatmap full-range tool is unaffected either way).
 
 **Phase 2 – Data helpers for test-set-filtered means (ui_data_frames.py + ui_groups.py)**
 
@@ -236,22 +251,22 @@ Alternative (simpler start): after calling the existing `get_dfgroupmean`, do `d
 
 **Phase 4 – Display & feedback (ui_plot.py + ui.py)**
 
-- Add or extend result display (e.g. `show_test_results(results)`) that reuses the existing red-dot marker placement on ax1/ax2 but is driven by the formal test results, not by `showHeatmap`:
+- Add or extend result display (e.g. `show_test_results(results)`) that reuses the existing red-dot marker placement on ax1/ax2 but is driven by the formal test results independently of `showHeatmap`:
   - Markers appear only for sweeps belonging to the active (shown) test set(s).
   - Multiple test sets can be distinguished (different colors/alpha or labels).
+  - Markers/results are shown automatically whenever a non-None test is selected; they are cleared when test type is set to "None".
   - Clearing of formal test markers is independent of `heatunmap`.
 - Improve the printed table to include test set name, chosen configuration (type/variant/tails/FDR), and corrected p-values.
-- Hook clearing on configuration changes and when the formal test results are dismissed.
-- Optional: surface a one-line summary in the status bar.
+- Ensure display updates (or is refreshed) as part of the automatic re-application on group component changes.
 
 **Phase 5 – Polish, wiring, and edge cases**
 
-- Ensure all paths that should invalidate results do so (`testset_new/remove/rename`, group CRUD, relevant checkbox changes, data re-parse, etc.).
-- Make the radio buttons and FDR checkbox trigger the right refreshes.
-- Handle 0/1/N groups and 0/1/N test sets gracefully.
-- Add usage logging for the new test execution.
-- Do not alter the body or callers of the existing `toggleHeatmap` for the new formal test (it remains the separate full-range tool). If `ttest_df` signature changes for the generalized analysis, update only the new `run_statistical_test` path and any internal helpers.
-- Manual test with real data: tag 10-19 and 170-179 or similar, two groups, run t-test with different options, verify p-values change appropriately and are restricted to the tagged range.
+- Ensure that group membership mutations, testset changes, shown-group toggles, and test config changes all cause automatic re-application when a test is active.
+- Make the radio buttons and FDR checkbox directly trigger (or dirty + refresh) the test results.
+- Handle 0/1/N groups and 0/1/N test sets gracefully (clear or message appropriately).
+- Add usage logging when a test is applied or re-applied.
+- Do not alter the body or callers of the existing `toggleHeatmap` (it remains the separate full-range tool).
+- Manual test with real data: tag 10-19 and 170-179 or similar, create two groups, select t-test / unpaired / two-sided (FDR optional). Verify that results appear immediately, use only the tagged sweeps, and automatically update when you add/remove recordings from the groups.
 - Verify persistence across project close/reopen.
 - Verify no changes were made to designer files.
 
@@ -264,25 +279,25 @@ Alternative (simpler start): after calling the existing `get_dfgroupmean`, do `d
 ## Open Questions / Decisions Recorded in This Plan
 
 - Exact semantics of "mean of sweeps 10-19": the plan allows starting with row-filter on the existing group-mean df (simple) and upgrading to a dedicated filtered aggregation if SEM or degrees-of-freedom calculations must be recomputed only over the selected sweeps.
-- The formal test results are driven by a dedicated visibility flag / menu action. Heatmap remains an independent toggle and should never be required to view the statistical test output.
+- Because application is automatic on test selection + group component changes, we do not need (and should not have) a separate visibility toggle or menu action for the formal test. Results are shown while a non-None test is selected and cleared when set to None. Heatmap remains completely independent.
 - FDR scope: across sweeps within one comparison, or also across multiple active test sets? Pragmatic first implementation is fine.
 - One-sample reference value: default to 0 for v0.16.
 - If >2 groups are shown for a t-test: either take the first two, require exactly two, or error. Document the chosen rule.
 
 ## Success Criteria
 
-- User can reproduce the classic example: select sweeps 10-19 (via range controls or drag), "Add to Test Set", create two groups containing different recordings, select t-test / unpaired / two-sided (FDR optional), invoke "Run statistical test" (menu action).
+- User can reproduce the classic example: select sweeps 10-19 (via range controls or drag), "Add to Test Set", create two groups containing different recordings, select t-test / unpaired / two-sided (FDR optional). Results appear automatically (no "run" step).
 - The computation uses only the tagged sweeps for the group aggregates passed to the test.
 - The chosen variant and tails affect the scipy call and p-value.
 - When FDR is enabled, corrected p-values appear in output.
 - Results appear as red markers (restricted to the relevant sweep range) on the output graph + a readable printed table.
-- Selecting a different test set, toggling its show state, or changing radio buttons while formal test results are visible produces updated results on next computation (or on re-invoking the menu action).
+- Adding or removing recordings from a group, toggling group or test-set show states, or changing test options causes the results to be automatically re-computed and updated.
 - Non-t-test selections produce a polite "not implemented" without side effects.
 - All state round-trips in cfg.pkl; test sets continue to work exactly as in v0.15 for visualization and samples.
 - No modifications to `ui_designer.py` or generated designer code.
 - Code remains inside the existing mixin structure (`GroupMixin`, `DataFrameMixin`, `UIplot`, etc.) and follows the dynamic wiring pattern.
 
-This plan provides a concrete, minimal-UI-change path to turn the partially wired "Statistical test" panel + existing Test Set tagging into a working scientific comparison tool for v0.16.
+This plan provides a concrete, minimal-UI-change path to turn the partially wired "Statistical test" panel + existing Test Set tagging into a working scientific comparison tool for v0.16, with automatic application on test selection and live re-application on group component changes.
 
 ## Heatmap
 
