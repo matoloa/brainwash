@@ -1283,6 +1283,8 @@ class UIsub(
         if not any_test_shown:
             # uiplot.graphRefresh will always need dd_groups; no testsets → pass only that
             uiplot.graphRefresh(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples)
+            # v0.16: always run apply (safety net) even on early return paths
+            self.apply_statistical_test_if_active()
             return
 
         # Any test is shown → we will pass dd_testset as second argument.
@@ -1294,6 +1296,8 @@ class UIsub(
             has_shown_sample = any(g.get("sample") is not None for g in dd_groups.values() if g.get("show") in (True, "True", "true", 1, "1"))
             if not has_shown_sample:
                 uiplot.graphRefresh(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples)
+                # v0.16: always run apply (safety net) even on early return paths
+                self.apply_statistical_test_if_active()
                 return
 
             # Build dd_shown_samples = {group_ID: inner_dict_from_get_ddgroup_sample}
@@ -1454,8 +1458,11 @@ class UIsub(
                 return
 
             # --- Early applicability checks (abort cleanly if tests cannot run) ---
+            had_results = bool(getattr(uistate, "formal_test_results", None))
+
             if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
-                print("Statistical test: no groups defined.")
+                if had_results:
+                    print("Statistical test: no groups defined.")
                 self.clear_formal_test_results()
                 return
 
@@ -1466,7 +1473,8 @@ class UIsub(
             variant_for_check = getattr(uistate, "test_t_variant", "unpaired")
             min_groups = 1 if variant_for_check == "one-sample" else 2
             if len(shown_groups) < min_groups:
-                print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
+                if had_results:
+                    print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
                 self.clear_formal_test_results()
                 return
 
@@ -1475,13 +1483,15 @@ class UIsub(
                 n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
                 n2 = len(self.dd_groups.get(shown_groups[1], {}).get("rec_IDs", []))
                 if n1 != n2 or n1 < 2:
-                    print("Statistical test: paired requires two groups with equal number of recordings (>=2).")
+                    if had_results:
+                        print("Statistical test: paired requires two groups with equal number of recordings (>=2).")
                     self.clear_formal_test_results()
                     return
 
             shown_ts = self._get_shown_testsets()
             if not shown_ts:
-                print("Statistical test: no shown test sets. Tag sweeps and show at least one test set.")
+                if had_results:
+                    print("Statistical test: no shown test sets. Tag sweeps and show at least one test set.")
                 self.clear_formal_test_results()
                 return
 
@@ -1498,13 +1508,14 @@ class UIsub(
             n1 = len(self.dd_groups.get(g1, {}).get("rec_IDs", []))
             n2 = len(self.dd_groups.get(g2, {}).get("rec_IDs", [])) if g2 else 0
 
-            # Build results using analysis layer (handles filtering + summary stats for unpaired/one-sample)
+            # Build results using analysis layer.
+            # Each n = average of aspect over sweeps in the test set for one recording.
             try:
                 comp = analysis.compute_statistical_comparison(
                     groups=shown_groups,
                     dd_groups=self.dd_groups,
                     dd_testsets=self.dd_testsets,
-                    get_dfgroupmean_fn=self.get_dfgroupmean,
+                    get_group_testset_means_fn=self.get_group_testset_means,
                     test_type=test_type,
                     variant=variant,
                     tails=tails,
@@ -1517,56 +1528,6 @@ class UIsub(
             except Exception as ex:
                 print(f"apply_statistical_test compute error: {ex}")
                 results = []
-
-            # Paired post-process: if variant=paired and N match, recompute using per-rec aligned observations (by sorted rec_ID)
-            if variant == "paired" and results and n1 == n2 and n1 >= 2:
-                alt = {"two-sided": "two-sided", "greater": "greater", "less": "less"}.get(tails, "two-sided")
-                for r in results:
-                    sweeps = r.get("sweeps", [])
-                    dfp = r.get("df_p")
-                    if dfp is None or dfp.empty or not sweeps:
-                        continue
-                    try:
-                        # Build obs per relevant aspect for this pcol (amp vs slope, respecting norm)
-                        for pcol in [c for c in dfp.columns if c.startswith("p_")]:
-                            aspect = (
-                                "EPSP_amp_norm"
-                                if ("amp" in pcol and norm)
-                                else "EPSP_amp"
-                                if "amp" in pcol
-                                else ("EPSP_slope_norm" if ("slope" in pcol and norm) else "EPSP_slope")
-                            )
-                            obs1 = self.get_group_obs_for_sweeps(g1, sweeps, aspect=aspect)
-                            obs2 = self.get_group_obs_for_sweeps(g2, sweeps, aspect=aspect)
-                            if len(obs1) == n1 and len(obs2) == n1 and not obs1.empty:
-                                obs1 = obs1.sort_values("rec_ID").reset_index(drop=True)
-                                obs2 = obs2.sort_values("rec_ID").reset_index(drop=True)
-                                new_ps = []
-                                for sw in dfp["sweep"].values:
-                                    cn = str(int(sw))
-                                    if cn in obs1.columns and cn in obs2.columns:
-                                        v1 = pd.to_numeric(obs1[cn], errors="coerce").values
-                                        v2 = pd.to_numeric(obs2[cn], errors="coerce").values
-                                        msk = np.isfinite(v1) & np.isfinite(v2)
-                                        if msk.sum() >= 2:
-                                            _, pv = analysis.ttest_rel(v1[msk], v2[msk], alternative=alt)
-                                            new_ps.append(float(pv))
-                                        else:
-                                            new_ps.append(np.nan)
-                                    else:
-                                        new_ps.append(np.nan)
-                                dfp[pcol] = new_ps
-                            else:
-                                # leave existing (nan) p values from summary path
-                                pass
-                        if fdr:
-                            for pcol in [c for c in dfp.columns if c.startswith("p_")]:
-                                try:
-                                    dfp["q_" + pcol[2:]] = analysis._bh_fdr(dfp[pcol].values)
-                                except Exception:
-                                    pass
-                    except Exception as e:
-                        print(f"paired post-process warning for set {r.get('set_name')}: {e}")
 
             if not results:
                 self.clear_formal_test_results()
@@ -1588,28 +1549,31 @@ class UIsub(
     def _print_statistical_test_table(self, results, variant, tails, fdr, norm):
         print("\n=== Statistical test (v0.16) ===")
         print(f"variant={variant}  tails={tails}  fdr={fdr}  norm={norm}")
+        print("Note: each n = mean of aspect over sweeps in the test set, per recording.")
         for r in results:
-            print(f"\nTest set: {r['set_name']} (ID {r['set_id']})  sweeps={r['sweeps']}")
+            print(f"\nTest set: {r.get('set_name', '?')} (ID {r.get('set_id')})  sweeps={r.get('sweeps')}")
             g1 = r.get("group1")
             g2 = r.get("group2")
-            n1 = r.get("n1")
-            n2 = r.get("n2")
+            n1 = r.get("n1", 0)
+            n2 = r.get("n2", 0)
             if variant == "one-sample":
                 print(f"  One-sample on group: {g1}   N={n1}   (reference = 0)")
             else:
                 print(f"  Groups: {g1} vs {g2}   N1={n1} N2={n2}")
-            dfp = r.get("df_p")
-            if dfp is None or dfp.empty:
-                print("  (no p-values)")
-                continue
-            # Show a compact view: sweep, relevant p (and q if present)
-            pcols = [c for c in dfp.columns if c.startswith("p_")]
-            qcols = [c for c in dfp.columns if c.startswith("q_")]
-            cols_to_show = ["sweep"] + pcols + qcols
-            try:
-                print(dfp[cols_to_show].to_string(index=False))
-            except Exception:
-                print(dfp.head(20).to_string(index=False))
+            # Print one line per computed aspect (p and optional q)
+            for key in sorted(k for k in r.keys() if k.startswith("p_")):
+                pval = r.get(key)
+                sval = r.get("stat_" + key[2:], np.nan)
+                qval = r.get("q_" + key[2:], None)
+                aspect = key[2:]
+                pstr = f"{pval:.4g}" if isinstance(pval, (int, float)) and np.isfinite(pval) else str(pval)
+                if isinstance(sval, (int, float)) and np.isfinite(sval):
+                    line = f"  {aspect}: p={pstr}  stat={sval:.4g}  n1={n1} n2={n2}"
+                else:
+                    line = f"  {aspect}: p={pstr}  n1={n1} n2={n2}"
+                if qval is not None and isinstance(qval, (int, float)) and np.isfinite(qval):
+                    line += f"  q={qval:.4g}"
+                print(line)
         print("=== end test ===\n")
 
     def setTableStimVisibility(self, state, initialize=False):
@@ -2461,6 +2425,9 @@ class UIsub(
             self.zoomAuto()
         elif getattr(uistate, "experiment_type", "time") == "PP" and key in ["EPSP_amp", "volley_amp", "EPSP_slope", "volley_slope"]:
             self.zoomAuto()
+        # norm/amp/slope affect the statistical test inputs; ensure no stale markers from cached results
+        if key in ["norm_EPSP", "EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope", "test_fdr"]:
+            self.clear_formal_test_results()
         self.graphRefresh()
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
@@ -3067,8 +3034,10 @@ class UIsub(
             self.dd_group_samples = {}
         self.refresh_samples()
         uiplot.clear_sample_artists(draw=False)
+        # Changing shown test sets requires fresh statistical markers (not stale cached results)
+        self.clear_formal_test_results()
         self.graphRefresh()
-        self.apply_statistical_test_if_active()
+        # graphRefresh wrapper applies the test (recomputes + show_test_markers) after draw
 
     def triggerTestSetRename(self, set_ID):
         self.usage("triggerTestSetRename")
@@ -3441,7 +3410,7 @@ class UIsub(
 
     def triggerAddSelectionToTestSet(self):
         self.usage("triggerAddSelectionToTestSet")
-        self.testset_new()
+        self.add_to_data_set()
 
     def triggerRemoveLastTestSet(self):
         self.usage("triggerRemoveLastTestSet")

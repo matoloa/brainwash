@@ -124,7 +124,6 @@ class UIstate:
             "frameToolAspectSlope": ["Slope width", False],
             "frameToolAspectAmp": ["Amplitude width", False],
             "frameToolTest": ["Statistical test", True],
-            "frameToolTest_t": ["t-test options", False],
         }
         self.checkBox = {  # these are cycled by uisub.connectUIstate; maintain format!
             "EPSP_amp": True,

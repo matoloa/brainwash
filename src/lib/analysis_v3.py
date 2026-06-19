@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy.signal import find_peaks, savgol_filter
-from scipy.stats import ttest_1samp, ttest_ind_from_stats, ttest_rel
+from scipy.stats import ttest_1samp, ttest_ind, ttest_ind_from_stats, ttest_rel
 
 # ---------------------------------------------------------------------------
 # Utilities
@@ -1162,7 +1162,7 @@ def compute_statistical_comparison(
     groups: list,
     dd_groups: dict,
     dd_testsets: dict,
-    get_dfgroupmean_fn,
+    get_group_testset_means_fn,
     test_type: str = "t-test",
     variant: str = "unpaired",
     tails: str = "two-sided",
@@ -1173,13 +1173,20 @@ def compute_statistical_comparison(
     ref: float = 0.0,
 ) -> dict:
     """
-    High-level entry point used by UI.
+    High-level entry point used by UI for formal statistical tests on Test Sets.
+
+    Semantics (per user clarification):
+      - Each "n" is the average of the chosen aspect (amp/slope) over all sweeps
+        belonging to ONE recording inside the selected test set.
+      - For each shown test set we obtain one scalar per recording (the test-set average).
+      - We then compare the vectors of per-recording averages between groups
+        (unpaired), within rec_IDs (paired), or vs ref (one-sample).
 
     groups: list of shown group_IDs (order matters for pairing).
+    get_group_testset_means_fn(group_ID, sweeps, aspect) -> DataFrame[['rec_ID', 'value']]
     Returns a dict with:
-      "results": list of per-testset result dicts (set_id, set_name, sweeps, df_p, ...)
+      "results": list of per-testset result dicts with scalar p_*/stat_* (no per-sweep df_p)
       "config": snapshot of options
-    For v0.16 only t-test is implemented; others return not_implemented flag.
     """
     if test_type != "t-test":
         return {"not_implemented": test_type, "results": []}
@@ -1190,32 +1197,37 @@ def compute_statistical_comparison(
         groups = []
 
     shown_groups = [g for g in groups if dd_groups.get(g, {}).get("show") in (True, "True", 1, "1", True)]
-    # Only consider groups that actually have recordings
     shown_groups = [g for g in shown_groups if len(dd_groups.get(g, {}).get("rec_IDs", [])) > 0]
     if not shown_groups:
         return {"error": "no shown groups", "results": []}
 
-    # one-sample only needs 1 group; others need 2 (we use first two shown)
     if variant == "one-sample":
         g1 = shown_groups[0]
         g2 = None
-        n1 = len(dd_groups.get(g1, {}).get("rec_IDs", []))
-        n2 = 0
     else:
         if len(shown_groups) < 2:
             return {"error": "need at least two shown groups", "results": []}
         g1, g2 = shown_groups[0], shown_groups[1]
-        n1 = len(dd_groups.get(g1, {}).get("rec_IDs", []))
-        n2 = len(dd_groups.get(g2, {}).get("rec_IDs", []))
-
-    if variant != "one-sample" and g2 is None:
-        return {"error": "need at least two shown groups", "results": []}
 
     shown_sets = [(sid, info) for sid, info in (dd_testsets or {}).items() if info.get("show", False) and info.get("sweeps")]
-
     if not shown_sets:
-        # Fallback decision documented in plan: for formal test we require shown test sets.
         return {"error": "no shown test sets", "results": []}
+
+    if get_group_testset_means_fn is None:
+        return {"error": "no data accessor for testset means", "results": []}
+
+    alt = {"two-sided": "two-sided", "greater": "greater", "less": "less"}.get(tails, "two-sided")
+
+    def _aspect_name(use_amp: bool, use_norm: bool) -> str | None:
+        if use_amp:
+            return "EPSP_amp_norm" if use_norm else "EPSP_amp"
+        else:
+            return "EPSP_slope_norm" if use_norm else "EPSP_slope"
+
+    # Collect raw p values per family for possible FDR
+    raw_p_amp = []
+    raw_p_slope = []
+    result_templates = []  # to attach q later: (idx_in_out, which_pcol)
 
     out_results = []
 
@@ -1223,57 +1235,129 @@ def compute_statistical_comparison(
         sweeps = list(tset.get("sweeps", []))
         if not sweeps:
             continue
-        try:
-            df1_full = get_dfgroupmean_fn(g1)
-            df2_full = get_dfgroupmean_fn(g2) if g2 is not None else None
-        except Exception:
-            df1_full = df2_full = None
 
-        if df1_full is None or df1_full.empty:
+        # Resolve which aspects we actually compute for this set
+        aspects = []
+        if amp:
+            aspects.append(("amp", _aspect_name(True, norm)))
+        if slope:
+            aspects.append(("slope", _aspect_name(False, norm)))
+
+        if not aspects:
             continue
-        if variant != "one-sample":
-            if df2_full is None or df2_full.empty:
+
+        set_result = {
+            "set_id": sid,
+            "set_name": tset.get("set_name", f"set {sid}"),
+            "sweeps": sweeps,
+            "group1": g1,
+            "group2": g2,
+            "n1": 0,
+            "n2": 0,
+        }
+
+        for short, col in aspects:
+            try:
+                obs1_df = get_group_testset_means_fn(g1, sweeps, aspect=col)
+                obs1 = obs1_df["value"].to_numpy(dtype=float) if not obs1_df.empty else np.array([], dtype=float)
+                recs1 = obs1_df["rec_ID"].tolist() if not obs1_df.empty else []
+            except Exception:
+                obs1 = np.array([], dtype=float)
+                recs1 = []
+
+            obs2 = np.array([], dtype=float)
+            recs2 = []
+            if variant != "one-sample" and g2 is not None:
+                try:
+                    obs2_df = get_group_testset_means_fn(g2, sweeps, aspect=col)
+                    obs2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
+                    recs2 = obs2_df["rec_ID"].tolist() if not obs2_df.empty else []
+                except Exception:
+                    obs2 = np.array([], dtype=float)
+                    recs2 = []
+
+            p = np.nan
+            stat = np.nan
+            eff_n1 = 0
+            eff_n2 = 0
+
+            try:
+                if variant == "one-sample":
+                    vals = obs1[np.isfinite(obs1)]
+                    eff_n1 = int(vals.size)
+                    if eff_n1 >= 1:
+                        res = ttest_1samp(vals, popmean=ref, alternative=alt)
+                        stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
+                        p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
+                elif variant == "paired":
+                    # Align by rec_ID intersection, in order of appearance in g1/g2
+                    if len(recs1) == 0 or len(recs2) == 0:
+                        pass
+                    else:
+                        # Use order from shown groups: keep only common recs, preserve relative order from g1 list
+                        # But for correctness we match on rec_ID values
+                        set1 = {str(r): v for r, v in zip(recs1, obs1) if np.isfinite(v)}
+                        set2 = {str(r): v for r, v in zip(recs2, obs2) if np.isfinite(v)}
+                        common = [r for r in recs1 if str(r) in set2]  # preserve g1 encounter order
+                        v1 = np.array([set1[str(r)] for r in common], dtype=float)
+                        v2 = np.array([set2[str(r)] for r in common], dtype=float)
+                        eff_n1 = int(v1.size)
+                        eff_n2 = int(v2.size)
+                        if eff_n1 >= 2 and eff_n1 == eff_n2:
+                            res = ttest_rel(v1, v2, alternative=alt)
+                            stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
+                            p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
+                else:
+                    # unpaired
+                    v1 = obs1[np.isfinite(obs1)]
+                    v2 = obs2[np.isfinite(obs2)]
+                    eff_n1 = int(v1.size)
+                    eff_n2 = int(v2.size)
+                    if eff_n1 >= 1 and eff_n2 >= 1:
+                        res = ttest_ind(v1, v2, alternative=alt, equal_var=False)
+                        stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
+                        p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
+            except Exception:
+                p = np.nan
+                stat = np.nan
+
+            p_key = f"p_{short}" + ("_norm" if norm else "")
+            s_key = f"stat_{short}" + ("_norm" if norm else "")
+            set_result[p_key] = float(p) if np.isfinite(p) else np.nan
+            set_result[s_key] = float(stat) if np.isfinite(stat) else np.nan
+
+            # Track for FDR (per aspect family)
+            if short == "amp":
+                raw_p_amp.append((len(out_results), p_key))  # (result_index, pcol)
+            else:
+                raw_p_slope.append((len(out_results), p_key))
+
+            # Store effective n (use max seen across aspects for the set; fine for display)
+            if eff_n1:
+                set_result["n1"] = max(int(set_result.get("n1", 0)), eff_n1)
+            if eff_n2:
+                set_result["n2"] = max(int(set_result.get("n2", 0)), eff_n2)
+
+        # If we computed at least one aspect for this set, keep it
+        has_any_p = any(k.startswith("p_") for k in set_result.keys())
+        if has_any_p:
+            out_results.append(set_result)
+
+    # FDR across test sets for each aspect family (if requested)
+    if fdr and out_results:
+        for family in (raw_p_amp, raw_p_slope):
+            if not family:
                 continue
-
-        df1 = df1_full[df1_full["sweep"].isin(sweeps)].reset_index(drop=True).copy()
-        df2 = None
-        if variant != "one-sample" and df2_full is not None:
-            df2 = df2_full[df2_full["sweep"].isin(sweeps)].reset_index(drop=True).copy()
-
-        if df1.empty or (variant != "one-sample" and (df2 is None or df2.empty)):
-            continue
-
-        df_p = ttest_per_sweep(
-            df1,
-            df2,
-            n1,
-            n2 if variant != "one-sample" else None,
-            variant=variant,
-            tails=tails,
-            norm=norm,
-            amp=amp,
-            slope=slope,
-            ref=ref,
-        )
-
-        # Apply FDR per comparison (across the p columns for this testset)
-        if fdr and not df_p.empty:
-            for pcol in [c for c in df_p.columns if c.startswith("p_")]:
-                qs = _bh_fdr(df_p[pcol].values)
-                df_p["q_" + pcol[2:]] = qs
-
-        out_results.append(
-            {
-                "set_id": sid,
-                "set_name": tset.get("set_name", f"set {sid}"),
-                "sweeps": sweeps,
-                "df_p": df_p,
-                "n1": n1,
-                "n2": n2,
-                "group1": g1,
-                "group2": g2,
-            }
-        )
+            ps = []
+            idxs = []
+            for res_idx, pcol in family:
+                if res_idx < len(out_results):
+                    val = out_results[res_idx].get(pcol, np.nan)
+                    ps.append(val if np.isfinite(val) else np.nan)
+                    idxs.append((res_idx, pcol))
+            qs = _bh_fdr(np.asarray(ps, dtype=float))
+            for (res_idx, pcol), q in zip(idxs, qs):
+                out_results[res_idx]["q_" + pcol[2:]] = float(q) if np.isfinite(q) else np.nan
 
     return {
         "results": out_results,

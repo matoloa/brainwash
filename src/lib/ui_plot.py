@@ -11,6 +11,7 @@ from matplotlib.colors import LinearSegmentedColormap
 
 # from matplotlib.lines import Line2D  # for custom legend; TODO: still used?
 from matplotlib.ticker import FuncFormatter
+from matplotlib.transforms import blended_transform_factory
 
 STIM_MARKER_SIZE = 10  # diameter in points; drives both rendering and hit-zone calculation
 
@@ -71,9 +72,16 @@ class UIplot:
     # ------------------------------------------------------------------
 
     def show_test_markers(self, results):
-        """Draw red (or styled) markers for formal test results.
-        results: list of dicts with 'df_p' (per-sweep p cols), 'sweeps'.
-        Uses separate storage uistate.dict_test_markers.
+        """Draw significance markers for formal t-test results on Test Sets.
+        - x-position: center (mean) of the test set sweeps.
+        - ax1 (amp): text placed low (near bottom of plot area).
+        - ax2 (slope): text placed high (near top of plot area).
+        - By convention: "*" for p/q < 0.05, "**" < 0.01, "***" < 0.001; "ns" otherwise.
+          Uses the q-value for the level if FDR was applied, else the raw p-value.
+        - Marker is white in darkmode, black otherwise (bare text, no box/background).
+        - "ns" uses a muted gray appropriate for the current mode.
+        Always shows a label per computed aspect per shown test set.
+        Uses uistate.dict_test_markers for storage (values are Text artists).
         """
         ax1 = self.uistate.ax1
         ax2 = self.uistate.ax2
@@ -84,37 +92,79 @@ class UIplot:
             self.uistate.dict_test_markers = {}
 
         d = self.uistate.dict_test_markers
-        # clear any previous
         self.clear_test_markers(draw=False)
 
+        dark = bool(getattr(self.uistate, "darkmode", False))
+
         for res in results or []:
-            df_p = res.get("df_p")
-            if df_p is None or df_p.empty:
+            sweeps = res.get("sweeps", []) or []
+            if not sweeps:
                 continue
-            sweeps = df_p["sweep"].values if "sweep" in df_p.columns else []
-            pcols = [c for c in df_p.columns if c.startswith("p_") or c.startswith("q_")]
+            try:
+                x = float(np.mean(sweeps))
+            except Exception:
+                continue
 
-            for col in pcols:
-                ps = df_p[col].values
-                sig = ps < 0.05
-                xs = sweeps[sig]
+            # Collect p/q for amp aspects -> ax1 (low)
+            # and slope aspects -> ax2 (high)
+            amp_pcols = [k for k in res.keys() if k.startswith("p_") and "amp" in k]
+            slope_pcols = [k for k in res.keys() if k.startswith("p_") and "slope" in k]
 
-                if "amp" in col:
-                    ax = ax1
-                elif "slope" in col:
-                    ax = ax2
-                else:
+            placements = []
+            for pcol in amp_pcols:
+                placements.append((pcol, ax1, 0.06, "bottom"))
+            for pcol in slope_pcols:
+                placements.append((pcol, ax2, 0.94, "top"))
+
+            for pcol, target_ax, y_frac, va in placements:
+                if not pcol:
                     continue
+                qcol = "q_" + pcol[2:]
+                pval = res.get(pcol)
+                qval = res.get(qcol)
 
-                color = "red"
-                if col.startswith("q_"):
-                    color = "#ff8800"  # orange for FDR-corrected
-                for x in xs:
-                    try:
-                        sc = ax.scatter([x], [0], marker="o", color=color, s=28, zorder=5, alpha=0.85)
-                        d.setdefault(col, {})[float(x)] = sc
-                    except Exception:
-                        pass
+                # Use q for significance decision if present and finite, else p
+                val = qval if (isinstance(qval, (int, float)) and np.isfinite(qval)) else pval
+
+                # Conventional graduated significance markers
+                if isinstance(val, (int, float)) and np.isfinite(val):
+                    if val < 0.001:
+                        label = "***"
+                    elif val < 0.01:
+                        label = "**"
+                    elif val < 0.05:
+                        label = "*"
+                    else:
+                        label = "ns"
+                else:
+                    label = "ns"
+
+                is_sig = label != "ns"
+
+                # Significance markers use high-contrast black/white (bare, no bbox).
+                # "ns" uses a muted gray suited to the mode.
+                if is_sig:
+                    color = "white" if dark else "black"
+                else:
+                    color = "#aaaaaa" if dark else "#555555"
+
+                try:
+                    trans = blended_transform_factory(target_ax.transData, target_ax.transAxes)
+                    txt = target_ax.text(
+                        x,
+                        y_frac,
+                        label,
+                        transform=trans,
+                        ha="center",
+                        va=va,
+                        fontsize=13,
+                        fontweight="bold",
+                        color=color,
+                        zorder=12,
+                    )
+                    d.setdefault(pcol, {})[x] = txt
+                except Exception:
+                    pass
 
         try:
             ax1.figure.canvas.draw_idle()
@@ -977,6 +1027,15 @@ class UIplot:
         # t1 = time.time()
         ax1.figure.canvas.draw_idle()  # ax2 should be on the same canvas
         # print(f" - - graphRefresh: draw ax1/ax2: {round((time.time() - t1) * 1000)} ms")
+
+        # Re-apply formal test * / ns labels after full refresh (they attach to ax1/ax2 and
+        # should normally survive, but this guarantees they reappear if any clear happened).
+        if getattr(uistate, "formal_test_results", None):
+            try:
+                self.show_test_markers(uistate.formal_test_results)
+            except Exception:
+                pass
+
         print(f" - - graphRefresh total: {round((time.time() - t0) * 1000)} ms")
 
     def oneAxisLeft(self):

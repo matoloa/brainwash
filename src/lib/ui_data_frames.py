@@ -624,6 +624,27 @@ class DataFrameMixin:
         cols = ["rec_ID"] + [str(s) for s in all_sweeps]
         return pd.DataFrame(data, columns=cols)
 
+    def get_group_testset_means(self, group_ID, sweeps, aspect="EPSP_amp"):
+        """Return DataFrame with ['rec_ID', 'value'] — one row per recording in the group.
+        'value' is the mean of the aspect across all the listed sweeps for that recording.
+        Recordings with no valid values for the sweeps are omitted.
+        Re-uses get_group_obs_for_sweeps for the per-sweep matrix then averages.
+        """
+        if not group_ID or not sweeps:
+            return pd.DataFrame(columns=["rec_ID", "value"])
+        obs = self.get_group_obs_for_sweeps(group_ID, sweeps, aspect=aspect)
+        if obs is None or obs.empty or "rec_ID" not in obs.columns:
+            return pd.DataFrame(columns=["rec_ID", "value"])
+        sweep_cols = [c for c in obs.columns if c != "rec_ID"]
+        if not sweep_cols:
+            return pd.DataFrame(columns=["rec_ID", "value"])
+        # mean across the testset sweeps for this rec (skipna so partial coverage still yields a value)
+        mean_vals = obs[sweep_cols].mean(axis=1, skipna=True)
+        out = pd.DataFrame({"rec_ID": obs["rec_ID"].values, "value": mean_vals.values})
+        out = out[pd.to_numeric(out["value"], errors="coerce").notna()].copy()
+        out["value"] = pd.to_numeric(out["value"], errors="coerce")
+        return out.reset_index(drop=True)
+
     # ------------------------------------------------------------------
     # Group sample DataFrame
     # ------------------------------------------------------------------

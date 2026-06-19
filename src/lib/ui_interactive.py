@@ -1035,6 +1035,9 @@ class InteractivePlotMixin:
             uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.V2mV(df_groupmean), x_pos=x_pos)
 
         self.update_show()  # Re-apply visibility rules to the newly added group artists
+        # Group membership change can affect formal test results; clear cached so safeguard won't redraw stale
+        if hasattr(self, "clear_formal_test_results"):
+            self.clear_formal_test_results()
         self.graphRefresh()  # Refresh the canvas to draw the new groups
         self.update_amp_lineEdits()
         self.update_slope_lineEdits()
