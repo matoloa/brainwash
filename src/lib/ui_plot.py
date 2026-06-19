@@ -46,8 +46,8 @@ class UIplot:
                 sc = ax.scatter([x], [0], marker="o", color="red")
                 self.uistate.dict_heatmap.setdefault(col, {})[x] = sc
 
-        ax1.figure.canvas.draw()
-        ax2.figure.canvas.draw()
+        ax1.figure.canvas.draw_idle()
+        ax2.figure.canvas.draw_idle()
 
     def heatunmap(self):
         d = getattr(self.uistate, "dict_heatmap", None)
@@ -64,7 +64,82 @@ class UIplot:
             d[col].clear()
 
         d.clear()
-        ax.figure.canvas.draw()
+        ax.figure.canvas.draw_idle()
+
+    # ------------------------------------------------------------------
+    # Formal statistical test markers (v0.16) — independent of Heatmap
+    # ------------------------------------------------------------------
+
+    def show_test_markers(self, results):
+        """Draw red (or styled) markers for formal test results.
+        results: list of dicts with 'df_p' (per-sweep p cols), 'sweeps'.
+        Uses separate storage uistate.dict_test_markers.
+        """
+        ax1 = self.uistate.ax1
+        ax2 = self.uistate.ax2
+        if ax1 is None or ax2 is None:
+            return
+
+        if not hasattr(self.uistate, "dict_test_markers"):
+            self.uistate.dict_test_markers = {}
+
+        d = self.uistate.dict_test_markers
+        # clear any previous
+        self.clear_test_markers(draw=False)
+
+        for res in results or []:
+            df_p = res.get("df_p")
+            if df_p is None or df_p.empty:
+                continue
+            sweeps = df_p["sweep"].values if "sweep" in df_p.columns else []
+            pcols = [c for c in df_p.columns if c.startswith("p_") or c.startswith("q_")]
+
+            for col in pcols:
+                ps = df_p[col].values
+                sig = ps < 0.05
+                xs = sweeps[sig]
+
+                if "amp" in col:
+                    ax = ax1
+                elif "slope" in col:
+                    ax = ax2
+                else:
+                    continue
+
+                color = "red"
+                if col.startswith("q_"):
+                    color = "#ff8800"  # orange for FDR-corrected
+                for x in xs:
+                    try:
+                        sc = ax.scatter([x], [0], marker="o", color=color, s=28, zorder=5, alpha=0.85)
+                        d.setdefault(col, {})[float(x)] = sc
+                    except Exception:
+                        pass
+
+        try:
+            ax1.figure.canvas.draw_idle()
+            ax2.figure.canvas.draw_idle()
+        except Exception:
+            pass
+
+    def clear_test_markers(self, draw=True):
+        d = getattr(self.uistate, "dict_test_markers", None)
+        if not d:
+            return
+        for col in list(d.keys()):
+            for x, sc in list(d[col].items()):
+                try:
+                    sc.remove()
+                except Exception:
+                    pass
+            d[col].clear()
+        d.clear()
+        if draw:
+            try:
+                self.uistate.ax1.figure.canvas.draw_idle()
+                self.uistate.ax2.figure.canvas.draw_idle()
+            except Exception:
+                pass
 
     def create_barplot(self, dict_group_color_ratio_SEM, str_aspect, output_path):
         plt.figure(figsize=(6, 6))
@@ -151,14 +226,28 @@ class UIplot:
 
         for line in axlines:
             if line.get_label().startswith("xSelect"):
-                line.remove()
+                try:
+                    line.remove()
+                except Exception:
+                    pass
         for patch in axpatches:
             if patch.get_label().startswith("xSelect"):
-                patch.remove()
+                try:
+                    patch.remove()
+                except Exception:
+                    pass
         if reset:
             self.clear_axe_mean()
+            # axe mean artists live on the event canvas (uistate.axe), not necessarily
+            # the canvas of the ax that was passed (e.g. right-click deselect on output graph).
+            # Force a redraw of axe so removal becomes visible.
+            if draw and getattr(self.uistate, "axe", None) is not None:
+                try:
+                    self.uistate.axe.figure.canvas.draw_idle()
+                except Exception:
+                    pass
         if draw:
-            ax.figure.canvas.draw()
+            ax.figure.canvas.draw_idle()
 
     def xSelect(self, canvas, draw=True):
         # draws a selected range of x values on <canvas>
@@ -209,14 +298,20 @@ class UIplot:
                 ax.axvspan(start, end, color="blue", alpha=0.1, label="xSelect_span")
 
         if draw:
-            canvas.draw()
+            canvas.draw_idle()
 
     def clear_axe_mean(self):
         # if uistate.dict_rec_labels exists and contains keys that start with "axe mean selected sweeps", remove their lines and del the items
         if self.uistate.dict_rec_labels:
             for key in [k for k in self.uistate.dict_rec_labels if k.startswith("axe mean selected sweeps")]:
-                self.uistate.dict_rec_labels[key]["line"].remove()
-                del self.uistate.dict_rec_labels[key]
+                try:
+                    self.uistate.dict_rec_labels[key]["line"].remove()
+                except Exception:
+                    pass
+                try:
+                    del self.uistate.dict_rec_labels[key]
+                except Exception:
+                    pass
         else:
             print(" - - - - No dict_rec_labels to clear mean sweeps from")
 
@@ -224,7 +319,7 @@ class UIplot:
         """Clear all test set axvspan patches (labeled testset_span_*) from output graph (ax1/ax2 only)."""
         if not hasattr(self.uistate, "testset_spans") or not self.uistate.testset_spans:
             if draw and self.uistate.ax1 is not None:
-                self.uistate.ax1.figure.canvas.draw()
+                self.uistate.ax1.figure.canvas.draw_idle()
             return
         for spans in self.uistate.testset_spans.values():
             for patch in spans.values():
@@ -234,14 +329,14 @@ class UIplot:
                     pass
         self.uistate.testset_spans = {}
         if draw and self.uistate.ax1 is not None:
-            self.uistate.ax1.figure.canvas.draw()
+            self.uistate.ax1.figure.canvas.draw_idle()
 
     def clear_sample_artists(self, draw=True, hide=False):
         """Clear or hide sample overlay artists/inset. hide=True clears the dict (explicit reset on every redraw)."""
         if not hasattr(self.uistate, "sample_artists") or self.uistate.sample_artists is None:
             self.uistate.sample_artists = {}
             if draw and self.uistate.ax1 is not None:
-                self.uistate.ax1.figure.canvas.draw()
+                self.uistate.ax1.figure.canvas.draw_idle()
             return
         if hide and hasattr(self.uistate, "sample_inset") and self.uistate.sample_inset is not None:
             for artist in self.uistate.sample_artists.values():
@@ -266,7 +361,7 @@ class UIplot:
                     pass
                 self.uistate.sample_inset = None
         if draw and self.uistate.ax1 is not None:
-            self.uistate.ax1.figure.canvas.draw()
+            self.uistate.ax1.figure.canvas.draw_idle()
 
     def sample_overlay(self, dd_groups, dd_testset, dd_shown_samples):
         """Only (re)draw inset+traces when sample_dirty or visibility changed.
@@ -405,7 +500,7 @@ class UIplot:
         self.clear_testset_spans(draw=False)
         if not dd_testset or self.uistate.ax1 is None:
             if draw and self.uistate.ax1 is not None:
-                self.uistate.ax1.figure.canvas.draw()
+                self.uistate.ax1.figure.canvas.draw_idle()
             return
         alpha = 0.08
         for set_ID, dset in sorted(dd_testset.items()):
@@ -422,7 +517,7 @@ class UIplot:
                 span = ax.axvspan(start, end, color=color, alpha=alpha, label=f"testset_span_{set_ID}", zorder=1)
                 self.uistate.testset_spans.setdefault(set_ID, {})[ax_name] = span
         if draw and self.uistate.ax1 is not None:
-            self.uistate.ax1.figure.canvas.draw()
+            self.uistate.ax1.figure.canvas.draw_idle()
 
     def update_axe_mean(self, draw=True):
         """
@@ -470,7 +565,7 @@ class UIplot:
                 )
                 self.uistate.dict_rec_labels[f"axe mean selected sweeps {stim_str}"]["line"].set_visible(True)
         if draw:
-            self.uistate.axe.figure.canvas.draw()
+            self.uistate.axe.figure.canvas.draw_idle()
 
     def styleUpdate(self):
         axm, axe, ax1, ax2 = (
@@ -549,6 +644,9 @@ class UIplot:
             uis.mouseover_blob = None
             uis.mouseover_out = None
             uis.mouseover_action = None
+            # Clear formal test markers on full rec clear (test will re-apply on next graphRefresh if active)
+            if hasattr(self, "clear_test_markers"):
+                self.clear_test_markers(draw=False)
             uis.ghost_sweep = None
             uis.ghost_label = None
 
@@ -557,6 +655,8 @@ class UIplot:
         dict_group_show = self.uistate.dict_group_show
         if group_ID is None:
             keys_to_remove = list(dict_group.keys())  # Remove all if group_ID is None
+            if hasattr(self, "clear_test_markers"):
+                self.clear_test_markers(draw=False)
         else:
             keys_to_remove = [key for key, value in dict_group.items() if group_ID == value["group_ID"]]
         for key in keys_to_remove:
@@ -869,13 +969,13 @@ class UIplot:
         # t1 = time.time()
 
         # redraw
-        axm.figure.canvas.draw()
+        axm.figure.canvas.draw_idle()
         # print(f" - - graphRefresh: draw axm: {round((time.time() - t1) * 1000)} ms")
         # t1 = time.time()
-        axe.figure.canvas.draw()
+        axe.figure.canvas.draw_idle()
         # print(f" - - graphRefresh: draw axe: {round((time.time() - t1) * 1000)} ms")
         # t1 = time.time()
-        ax1.figure.canvas.draw()  # ax2 should be on the same canvas
+        ax1.figure.canvas.draw_idle()  # ax2 should be on the same canvas
         # print(f" - - graphRefresh: draw ax1/ax2: {round((time.time() - t1) * 1000)} ms")
         print(f" - - graphRefresh total: {round((time.time() - t0) * 1000)} ms")
 
@@ -2153,14 +2253,14 @@ class UIplot:
             self.uistate.dict_rec_labels[f"{labelbase} x marker"]["is_zero_width"] = is_zero_width
             self.uistate.dict_rec_labels[f"{labelbase} y marker"]["is_zero_width"] = False
         if draw:
-            axe.figure.canvas.draw()
+            axe.figure.canvas.draw_idle()
 
     def updateLine(self, plot_to_update, x_data, y_data, draw=False):
         axe = self.uistate.axe
         dict_line = self.uistate.dict_rec_labels[plot_to_update]
         dict_line["line"].set_data(x_data, y_data)
         if draw:
-            axe.figure.canvas.draw()
+            axe.figure.canvas.draw_idle()
 
     def updateOutLine(self, label):
         print(f"updateOutLine: {label}")
@@ -2386,10 +2486,10 @@ class UIplot:
                 line.set_ydata(out["EPSP_amp"])
             if line.get_label() == f"{rec_name} EPSP amp norm":
                 line.set_ydata(out["EPSP_amp_norm"])
-                ax1.figure.canvas.draw()
+                ax1.figure.canvas.draw_idle()
         for line in ax2.get_lines():
             if line.get_label() == f"{rec_name} EPSP slope":
                 line.set_ydata(out["EPSP_slope"])
             if line.get_label() == f"{rec_name} EPSP slope norm":
                 line.set_ydata(out["EPSP_slope_norm"])
-                ax2.figure.canvas.draw()
+                ax2.figure.canvas.draw_idle()

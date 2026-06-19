@@ -18,6 +18,7 @@ import json
 from pathlib import Path
 
 import analysis_v3 as analysis
+import numpy as np
 import pandas as pd
 import parse
 
@@ -506,6 +507,8 @@ class DataFrameMixin:
 
     def get_dfgroupmean(self, group_ID):
         # returns an internal df output average of <group>. If it does not exist, create it
+        if not group_ID:
+            return pd.DataFrame()
         if group_ID in self.dict_group_means:  # 1: Return cached
             if config.verbose:
                 print(f"Returning cached group mean for group {group_ID}")
@@ -518,7 +521,7 @@ class DataFrameMixin:
         else:  # 3: Create file
             if config.verbose:
                 print(f"Building new group mean for group {group_ID}")
-            recs_in_group = self.dd_groups[group_ID]["rec_IDs"]
+            recs_in_group = self.dd_groups.get(group_ID, {}).get("rec_IDs", [])
             # print(f"recs_in_group: {recs_in_group}")
             dfs = []
             df_p = self.get_df_project()
@@ -564,6 +567,62 @@ class DataFrameMixin:
             self.df2file(df=group_mean, filename=f"group_{group_ID}", key="mean")
         self.dict_group_means[group_ID] = group_mean
         return group_mean
+
+    def get_dfgroupmean_for_sweeps(self, group_ID, sweeps):
+        """Return group mean df filtered to the given list of sweep indices.
+        Simple row filter on the existing aggregated mean (acceptable for v0.16 per plan).
+        Re-uses cache of full get_dfgroupmean.
+        """
+        if not group_ID:
+            return pd.DataFrame()
+        df = self.get_dfgroupmean(group_ID)
+        if df is None or df.empty or not sweeps:
+            return df if df is not None else pd.DataFrame()
+        mask = df["sweep"].isin(sweeps)
+        return df.loc[mask].reset_index(drop=True).copy()
+
+    def get_group_obs_for_sweeps(self, group_ID, sweeps, aspect="EPSP_amp"):
+        """Return a DataFrame with one row per rec in the group, columns for the requested sweeps.
+        Used for paired t-test alignment by rec order.
+        aspect: 'EPSP_amp' | 'EPSP_amp_norm' | 'EPSP_slope' | ...
+        """
+        recs = self.dd_groups.get(group_ID, {}).get("rec_IDs", [])
+        if not recs or not sweeps:
+            return pd.DataFrame()
+        df_p = self.get_df_project()
+        rows = []
+        for rec_ID in recs:
+            match = df_p.loc[df_p["ID"] == rec_ID]
+            if match.empty:
+                continue
+            p_row = match.iloc[0]
+            try:
+                dfo = self.get_dfoutput(row=p_row)
+            except Exception:
+                continue
+            if dfo is None or dfo.empty or "sweep" not in dfo.columns:
+                continue
+            dff = dfo[dfo["sweep"].isin(sweeps)]
+            if dff.empty:
+                continue
+            # pivot-ish: one value per sweep for this rec
+            val_col = aspect if aspect in dff.columns else ("EPSP_amp" if "EPSP_amp" in dff.columns else None)
+            if val_col is None:
+                continue
+            rec_vals = {int(s): float(v) for s, v in zip(dff["sweep"], dff[val_col]) if pd.notna(v)}
+            rows.append({"rec_ID": str(rec_ID), "vals": rec_vals})
+        if not rows:
+            return pd.DataFrame()
+        # Build aligned matrix: index=rec order, columns=sweeps (only those present in all? no, caller handles)
+        all_sweeps = sorted(sweeps)
+        data = []
+        for r in rows:
+            row = [r["rec_ID"]]
+            for sw in all_sweeps:
+                row.append(r["vals"].get(int(sw), np.nan))
+            data.append(row)
+        cols = ["rec_ID"] + [str(s) for s in all_sweeps]
+        return pd.DataFrame(data, columns=cols)
 
     # ------------------------------------------------------------------
     # Group sample DataFrame

@@ -121,6 +121,8 @@ class GroupMixin:
         }
         self.group_save_dd()
         self.group_controls_add(group_ID)
+        if hasattr(self, "apply_statistical_test_if_active"):
+            self.apply_statistical_test_if_active()
 
     def group_remove_last_empty(self):
         if not self.dd_groups:
@@ -149,6 +151,8 @@ class GroupMixin:
             self.group_controls_remove(group_ID)
         self.group_save_dd()
         self.refresh_samples()  # 3.4.3: group removal must trigger sample refresh
+        if hasattr(self, "apply_statistical_test_if_active"):
+            self.apply_statistical_test_if_active()
 
     def group_rename(self, group_ID, new_group_name):
         if new_group_name in [group["group_name"] for group in self.dd_groups.values()]:
@@ -228,6 +232,9 @@ class GroupMixin:
             df_groupmean = self.get_dfgroupmean(group_ID)
             x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
             uiplot.addGroup(group_ID, dict_group, self.V2mV(df_groupmean), x_pos=x_pos)
+            # v0.16: membership change may affect active statistical test
+            if hasattr(self, "apply_statistical_test_if_active"):
+                self.apply_statistical_test_if_active()
 
     def group_rec_ungroup(self, rec_ID, group_ID):
         if rec_ID in self.dd_groups[group_ID]["rec_IDs"]:
@@ -238,6 +245,9 @@ class GroupMixin:
             if self.dd_groups[group_ID]["rec_IDs"]:
                 x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
                 uiplot.addGroup(group_ID, dict_group, self.V2mV(df_groupmean), x_pos=x_pos)
+            # v0.16: membership change may affect active statistical test
+            if hasattr(self, "apply_statistical_test_if_active"):
+                self.apply_statistical_test_if_active()
 
     def group_selection(self, group_ID):
         dfp = self.get_df_project()

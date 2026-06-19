@@ -1313,6 +1313,10 @@ class UIsub(
         else:
             uiplot.graphRefresh(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples)
 
+        # v0.16: opportunistic re-apply of active formal test (safety net for data/group changes)
+        # This does not affect the independent Heatmap (H) path.
+        self.apply_statistical_test_if_active()
+
     def deleteFolder(self, dir_path):
         if os.path.exists(dir_path):
             for filename in os.listdir(dir_path):
@@ -1399,6 +1403,214 @@ class UIsub(
         else:
             print("t-test currently only available between exactly 2 shown groups")
         print(f"Heatmap: {round((time.time() - t0) * 1000)} ms")
+
+    # ------------------------------------------------------------------
+    # v0.16 Formal statistical test (Test Sets + groups) — automatic
+    # Separate from toggleHeatmap (which remains the full-range crude tool)
+    # ------------------------------------------------------------------
+
+    def _get_shown_group_ids(self):
+        if not hasattr(self, "dd_groups") or not self.dd_groups:
+            return []
+        shown = []
+        for gid, g in self.dd_groups.items():
+            if g.get("show") in (True, "True", "true", 1, "1"):
+                shown.append(gid)
+        return shown
+
+    def _get_shown_testsets(self):
+        if not hasattr(self, "dd_testsets") or not self.dd_testsets:
+            return []
+        out = []
+        for sid, ts in self.dd_testsets.items():
+            if ts.get("show", False) and ts.get("sweeps"):
+                out.append((sid, ts))
+        return out
+
+    def clear_formal_test_results(self):
+        """Clear any formal test markers and stored results. Independent of heatmap."""
+        try:
+            if uiplot is not None:
+                uiplot.clear_test_markers(draw=True)
+        except Exception:
+            pass
+        if hasattr(uistate, "formal_test_results"):
+            uistate.formal_test_results = None
+        # leave printed console output as-is (user can scroll)
+
+    def apply_statistical_test_if_active(self):
+        """Core applicator. Called automatically from config changes and mutations.
+        Only acts when test_type != "None". Clears when None or invalid.
+        """
+        try:
+            test_type = getattr(uistate, "test_type", "None")
+            if test_type == "None" or test_type is None:
+                self.clear_formal_test_results()
+                return
+
+            if test_type != "t-test":
+                print(f"Statistical test '{test_type}' is not yet implemented for v0.16 (t-test only).")
+                self.clear_formal_test_results()
+                return
+
+            # --- Early applicability checks (abort cleanly if tests cannot run) ---
+            if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
+                print("Statistical test: no groups defined.")
+                self.clear_formal_test_results()
+                return
+
+            shown_groups = self._get_shown_group_ids()
+            # Only groups that have at least one recording can participate in a test
+            shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
+
+            variant_for_check = getattr(uistate, "test_t_variant", "unpaired")
+            min_groups = 1 if variant_for_check == "one-sample" else 2
+            if len(shown_groups) < min_groups:
+                print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
+                self.clear_formal_test_results()
+                return
+
+            # For paired we need matching sizes; check early using current shown groups
+            if variant_for_check == "paired":
+                n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
+                n2 = len(self.dd_groups.get(shown_groups[1], {}).get("rec_IDs", []))
+                if n1 != n2 or n1 < 2:
+                    print("Statistical test: paired requires two groups with equal number of recordings (>=2).")
+                    self.clear_formal_test_results()
+                    return
+
+            shown_ts = self._get_shown_testsets()
+            if not shown_ts:
+                print("Statistical test: no shown test sets. Tag sweeps and show at least one test set.")
+                self.clear_formal_test_results()
+                return
+
+            # Snapshot config
+            variant = getattr(uistate, "test_t_variant", "unpaired")
+            tails = getattr(uistate, "test_t_tails", "two-sided")
+            fdr = bool(uistate.checkBox.get("test_fdr", False))
+            norm = bool(uistate.checkBox.get("norm_EPSP", False))
+            amp = bool(uistate.checkBox.get("EPSP_amp", True))
+            slope = bool(uistate.checkBox.get("EPSP_slope", True))
+
+            g1 = shown_groups[0]
+            g2 = shown_groups[1] if len(shown_groups) > 1 else None
+            n1 = len(self.dd_groups.get(g1, {}).get("rec_IDs", []))
+            n2 = len(self.dd_groups.get(g2, {}).get("rec_IDs", [])) if g2 else 0
+
+            # Build results using analysis layer (handles filtering + summary stats for unpaired/one-sample)
+            try:
+                comp = analysis.compute_statistical_comparison(
+                    groups=shown_groups,
+                    dd_groups=self.dd_groups,
+                    dd_testsets=self.dd_testsets,
+                    get_dfgroupmean_fn=self.get_dfgroupmean,
+                    test_type=test_type,
+                    variant=variant,
+                    tails=tails,
+                    fdr=fdr,
+                    norm=norm,
+                    amp=amp,
+                    slope=slope,
+                )
+                results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
+            except Exception as ex:
+                print(f"apply_statistical_test compute error: {ex}")
+                results = []
+
+            # Paired post-process: if variant=paired and N match, recompute using per-rec aligned observations (by sorted rec_ID)
+            if variant == "paired" and results and n1 == n2 and n1 >= 2:
+                alt = {"two-sided": "two-sided", "greater": "greater", "less": "less"}.get(tails, "two-sided")
+                for r in results:
+                    sweeps = r.get("sweeps", [])
+                    dfp = r.get("df_p")
+                    if dfp is None or dfp.empty or not sweeps:
+                        continue
+                    try:
+                        # Build obs per relevant aspect for this pcol (amp vs slope, respecting norm)
+                        for pcol in [c for c in dfp.columns if c.startswith("p_")]:
+                            aspect = (
+                                "EPSP_amp_norm"
+                                if ("amp" in pcol and norm)
+                                else "EPSP_amp"
+                                if "amp" in pcol
+                                else ("EPSP_slope_norm" if ("slope" in pcol and norm) else "EPSP_slope")
+                            )
+                            obs1 = self.get_group_obs_for_sweeps(g1, sweeps, aspect=aspect)
+                            obs2 = self.get_group_obs_for_sweeps(g2, sweeps, aspect=aspect)
+                            if len(obs1) == n1 and len(obs2) == n1 and not obs1.empty:
+                                obs1 = obs1.sort_values("rec_ID").reset_index(drop=True)
+                                obs2 = obs2.sort_values("rec_ID").reset_index(drop=True)
+                                new_ps = []
+                                for sw in dfp["sweep"].values:
+                                    cn = str(int(sw))
+                                    if cn in obs1.columns and cn in obs2.columns:
+                                        v1 = pd.to_numeric(obs1[cn], errors="coerce").values
+                                        v2 = pd.to_numeric(obs2[cn], errors="coerce").values
+                                        msk = np.isfinite(v1) & np.isfinite(v2)
+                                        if msk.sum() >= 2:
+                                            _, pv = analysis.ttest_rel(v1[msk], v2[msk], alternative=alt)
+                                            new_ps.append(float(pv))
+                                        else:
+                                            new_ps.append(np.nan)
+                                    else:
+                                        new_ps.append(np.nan)
+                                dfp[pcol] = new_ps
+                            else:
+                                # leave existing (nan) p values from summary path
+                                pass
+                        if fdr:
+                            for pcol in [c for c in dfp.columns if c.startswith("p_")]:
+                                try:
+                                    dfp["q_" + pcol[2:]] = analysis._bh_fdr(dfp[pcol].values)
+                                except Exception:
+                                    pass
+                    except Exception as e:
+                        print(f"paired post-process warning for set {r.get('set_name')}: {e}")
+
+            if not results:
+                self.clear_formal_test_results()
+                return
+
+            # Store + display
+            uistate.formal_test_results = results
+            uiplot.show_test_markers(results)
+            self._print_statistical_test_table(results, variant=variant, tails=tails, fdr=fdr, norm=norm)
+            set_names = ", ".join(r.get("set_name", "?") for r in results)
+            self.usage(f"stat_test applied: {test_type} {variant} {tails} on {set_names} (fdr={fdr})")
+        except Exception as ex:
+            print(f"Statistical test: aborted (not applicable or internal issue): {ex}")
+            try:
+                self.clear_formal_test_results()
+            except Exception:
+                pass
+
+    def _print_statistical_test_table(self, results, variant, tails, fdr, norm):
+        print("\n=== Statistical test (v0.16) ===")
+        print(f"variant={variant}  tails={tails}  fdr={fdr}  norm={norm}")
+        for r in results:
+            print(f"\nTest set: {r['set_name']} (ID {r['set_id']})  sweeps={r['sweeps']}")
+            g1 = r.get("group1")
+            g2 = r.get("group2")
+            n1 = r.get("n1")
+            n2 = r.get("n2")
+            if variant == "one-sample":
+                print(f"  One-sample on group: {g1}   N={n1}   (reference = 0)")
+            else:
+                print(f"  Groups: {g1} vs {g2}   N1={n1} N2={n2}")
+            dfp = r.get("df_p")
+            if dfp is None or dfp.empty:
+                print("  (no p-values)")
+                continue
+            # Show a compact view: sweep, relevant p (and q if present)
+            pcols = [c for c in dfp.columns if c.startswith("p_")]
+            qcols = [c for c in dfp.columns if c.startswith("q_")]
+            cols_to_show = ["sweep"] + pcols + qcols
+            try:
+                print(dfp[cols_to_show].to_string(index=False))
+            except Exception:
+                print(dfp.head(20).to_string(index=False))
+        print("=== end test ===\n")
 
     def setTableStimVisibility(self, state, initialize=False):
         widget = self.h_splitterMaster.widget(1)  # Get the second widget in the splitter
@@ -2124,20 +2336,24 @@ class UIsub(
         if hasattr(self, "frameToolTest_t"):
             self.frameToolTest_t.setVisible(test_type == "t-test")
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        # Automatic application (v0.16): apply when non-None, clear when None
+        self.apply_statistical_test_if_active()
 
     def test_t_variant_changed(self, button):
-        """Placeholder wiring for buttonGroup_test_t_variant.buttonClicked."""
+        """Wiring for buttonGroup_test_t_variant (v0.16)."""
         variant = self._RADIO_TO_TEST_T_VARIANT.get(button.objectName(), button.text())
         print(f"Selected t-test variant: {variant}")
         uistate.test_t_variant = variant
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.apply_statistical_test_if_active()
 
     def test_t_tails_changed(self, button):
-        """Placeholder wiring for buttonGroup_test_t_tails.buttonClicked."""
+        """Wiring for buttonGroup_test_t_tails (v0.16)."""
         tails = self._RADIO_TO_TEST_T_TAILS.get(button.objectName(), button.text())
         print(f"Selected t-test tails: {tails}")
         uistate.test_t_tails = tails
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.apply_statistical_test_if_active()
 
     def update_experiment_type_radio_buttons(self):
         """Enable/disable and select experiment type radio buttons for the current selection."""
@@ -2238,6 +2454,7 @@ class UIsub(
             elif key == "test_fdr":
                 print(f"FDR checkbox changed to: {state == 2}")
                 uistate.test_fdr = state == 2
+                self.apply_statistical_test_if_active()
         # print(f"viewSettingsChanged: {key} = {state == 2}")
         self.update_show()
         if key in ["output_ymin0", "norm_EPSP"]:
@@ -2832,6 +3049,7 @@ class UIsub(
         self.update_stim_buttons()
         self.update_show()
         self.mouseoverUpdate()
+        self.apply_statistical_test_if_active()
 
     def triggerGroupRename(self, group_ID):
         self.usage("triggerGroupRename")
@@ -2850,6 +3068,7 @@ class UIsub(
         self.refresh_samples()
         uiplot.clear_sample_artists(draw=False)
         self.graphRefresh()
+        self.apply_statistical_test_if_active()
 
     def triggerTestSetRename(self, set_ID):
         self.usage("triggerTestSetRename")
@@ -4224,16 +4443,16 @@ class UIsub(
         if hasattr(self, "canvasMean"):
             self.canvasMean.figure.legends.clear()
             self.canvasMean.axes.cla()
-            self.canvasMean.draw()
+            self.canvasMean.draw_idle()
         if hasattr(self, "canvasEvent"):
             self.canvasEvent.figure.legends.clear()
             self.canvasEvent.axes.cla()
-            self.canvasEvent.draw()
+            self.canvasEvent.draw_idle()
         if hasattr(self, "canvasOutput"):
             for ax in self.canvasOutput.figure.axes:
                 ax.cla()
                 ax.legend_ = None
-            self.canvasOutput.draw()
+            self.canvasOutput.draw_idle()
 
     def graphAxes(self):  # plot selected row(s), or clear graph if empty
         print("graphAxes")

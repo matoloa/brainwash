@@ -36,15 +36,21 @@ class InteractivePlotMixin:
             self.mouse_drag = None
             self.mouse_release = None
             uistate.x_drag = None
+            # Clear texts + selection state immediately (lightweight) for responsive feel and
+            # so that any immediate readers (tagging etc.) see the cleared range.
+            # Defer the artist removes (xDeselect + clear_axe + testset spans) + stim buttons + draws.
             if canvas == self.canvasMean:
-                uiplot.xDeselect(ax=uistate.axm, reset=True)
                 self.lineEdit_mean_selection_start.setText("")
                 self.lineEdit_mean_selection_end.setText("")
+                uistate.x_select["mean_start"] = None
+                uistate.x_select["mean_end"] = None
             else:
-                uiplot.xDeselect(ax=uistate.ax1, reset=True)
                 self.lineEdit_sweeps_range_from.setText("")
                 self.lineEdit_sweeps_range_to.setText("")
-            self.update_stim_buttons()
+                uistate.x_select["output"] = set()
+                uistate.x_select["output_start"] = None
+                uistate.x_select["output_end"] = None
+            QtCore.QTimer.singleShot(0, lambda c=canvas: self._finalize_deselect(c))
             return
 
         # left clicked on a graph
@@ -203,7 +209,7 @@ class InteractivePlotMixin:
                     stim_marker_line.set_zorder(0)
                     stim_marker_line.set_alpha(0.4)
 
-        axm.figure.canvas.draw()
+        axm.figure.canvas.draw_idle()
 
     def eventMouseover(self, event):  # determine which event is being mouseovered
         if uistate.df_rec_select_data is None:  # no single recording/stim combo selected
@@ -316,7 +322,7 @@ class InteractivePlotMixin:
                 if uistate.mouseover_plot is not None:
                     uistate.mouseover_plot[0].set_linewidth(0)
 
-            axe.figure.canvas.draw()
+            axe.figure.canvas.draw_idle()
 
     @staticmethod
     def _get_nearest_point(x, y, x_array, y_array, x_range, y_range):
@@ -381,7 +387,7 @@ class InteractivePlotMixin:
             if getattr(uistate, "ax1", None) is not None:
                 uistate.ax1.figure.canvas.draw_idle()
         if getattr(uistate, "axe", None) is not None:
-            uistate.axe.figure.canvas.draw()
+            uistate.axe.figure.canvas.draw_idle()
 
     def connectDragRelease(self, x_range, rec_ID, graph):
         self.usage("connectDragRelease")
@@ -446,39 +452,106 @@ class InteractivePlotMixin:
         is_mean = canvas is self.canvasMean
         is_output = canvas is self.canvasOutput
 
+        # Fallback: if motions did not populate x_drag (possible on some platforms/Wayland),
+        # use the release event position (snapped) when it differs from the press point.
+        # This prevents drags from being mis-treated as click-only single-sweep selections.
+        if uistate.x_drag is None and event is not None and event.xdata is not None:
+            try:
+                if is_output:
+                    prow = self.get_prow()
+                    if prow is not None:
+                        n = int(prow.get("sweeps", 0))
+                        if n > 0:
+                            cands = list(range(0, n))
+                            arr = np.asarray(cands)
+                            rx = cands[int(np.argmin(np.abs(arr - event.xdata)))]
+                            if rx != uistate.x_on_click:
+                                uistate.x_drag = rx
+                else:
+                    # mean graph: x is time (float)
+                    if uistate.x_on_click is not None and abs(event.xdata - uistate.x_on_click) > 1e-9:
+                        uistate.x_drag = event.xdata
+            except Exception:
+                pass
+
+        # Compute final selection state immediately (no heavy artist work yet)
         if uistate.x_drag is None:  # click only
             if is_mean:
-                self.lineEdit_mean_selection_end.setText("")
                 uistate.x_select["mean_end"] = None
-                self.lineEdit_mean_selection_start.setText(f"{uistate.x_select['mean_start'] * 1000:g}")
             elif is_output:
-                self.lineEdit_sweeps_range_to.setText("")
                 uistate.x_select["output_end"] = None
                 uistate.x_select["output"] = {uistate.x_on_click}  # ensure set type
-                uiplot.update_axe_mean()
         else:  # click and drag
             start, end = sorted((uistate.x_on_click, uistate.x_drag))
             if is_mean:
                 uistate.x_select["mean_start"] = start
                 uistate.x_select["mean_end"] = end
-                self.lineEdit_mean_selection_start.setText(f"{start * 1000:g}")
-                self.lineEdit_mean_selection_end.setText(f"{end * 1000:g}")
             elif is_output:
                 uistate.x_select["output_start"] = start
                 uistate.x_select["output_end"] = end
                 uistate.x_select["output"] = set(range(start, end + 1))
-                self.lineEdit_sweeps_range_from.setText(str(start))
-                self.lineEdit_sweeps_range_to.setText(str(end))
-                uiplot.update_axe_mean()
-        # cleanup
-        canvas.mpl_disconnect(self.mouse_drag)
-        canvas.mpl_disconnect(self.mouse_release)
+
+        # Set the text fields synchronously for immediate user feedback (lightweight).
+        # The more expensive canvas artist work is still deferred.
+        if is_mean:
+            if uistate.x_select.get("mean_end") is None:
+                self.lineEdit_mean_selection_end.setText("")
+                if uistate.x_select.get("mean_start") is not None:
+                    self.lineEdit_mean_selection_start.setText(f"{uistate.x_select['mean_start'] * 1000:g}")
+            else:
+                self.lineEdit_mean_selection_start.setText(f"{uistate.x_select.get('mean_start', 0) * 1000:g}")
+                self.lineEdit_mean_selection_end.setText(f"{uistate.x_select.get('mean_end', 0) * 1000:g}")
+        elif is_output:
+            if uistate.x_select.get("output_end") is None:
+                self.lineEdit_sweeps_range_to.setText("")
+                if uistate.x_select.get("output_start") is not None:
+                    self.lineEdit_sweeps_range_from.setText(str(uistate.x_select["output_start"]))
+            else:
+                self.lineEdit_sweeps_range_from.setText(str(uistate.x_select.get("output_start", "")))
+                self.lineEdit_sweeps_range_to.setText(str(uistate.x_select.get("output_end", "")))
+
+        # Cleanup event bindings immediately; release the handler fast
+        for cid in (self.mouse_drag, self.mouse_release):
+            if cid is not None:
+                try:
+                    canvas.mpl_disconnect(cid)
+                except Exception:
+                    pass
         self.mouse_drag = None
         self.mouse_release = None
         uistate.x_drag = None
         uistate.dragging = False
 
-        uiplot.xSelect(canvas=canvas)
+        # Defer only the matplotlib artist changes + draw_idle (update_axe_mean/xSelect).
+        # Widget text has already been set above. Doing remove/plot/axv + draw from inside
+        # the button_release handler can break the Wayland connection.
+        QtCore.QTimer.singleShot(0, lambda c=canvas, m=is_mean, o=is_output: self._finalize_drag_release(c, m, o))
+
+    def _finalize_drag_release(self, canvas, is_mean, is_output):
+        """Deferred canvas work only (after texts were set sync in drag_released).
+        We still defer the artist mutations + draw_idle for Wayland safety.
+        """
+        try:
+            if is_mean:
+                uiplot.xSelect(canvas=canvas)
+            elif is_output:
+                uiplot.update_axe_mean()
+                uiplot.xSelect(canvas=canvas)
+        except Exception as ex:
+            print(f"_finalize_drag_release error: {ex}")
+
+    def _finalize_deselect(self, canvas):
+        """Deferred handler for right-click deselect (artists + stim buttons).
+        Text fields were already cleared synchronously for responsiveness.
+        """
+        try:
+            if canvas == self.canvasMean:
+                uiplot.xDeselect(ax=uistate.axm, reset=True)
+            else:
+                uiplot.xDeselect(ax=uistate.ax1, reset=True)
+            self.update_stim_buttons()
+        except Exception as ex:
+            print(f"_finalize_deselect error: {ex}")
 
     def mouseoverUpdate(self):
         self.usage("mouseoverUpdate")
@@ -640,7 +713,7 @@ class InteractivePlotMixin:
         uistate.mouseover_plot[0].set_data([x_start, x_end], [y_start, y_end])
         if blob:
             uistate.mouseover_blob.set_offsets([x_end, y_end])
-        self.canvasEvent.draw()
+        self.canvasEvent.draw_idle()
         self.eventDragUpdate(x_start, x_end, precision)
 
     def eventDragPoint(self, event, data_x, data_y, prior_amp):  # maingraph dragging event
@@ -662,7 +735,7 @@ class InteractivePlotMixin:
         uistate.x_drag_last = uistate.x_drag
         # update the mouseover plot
         uistate.mouseover_blob.set_offsets([x_point, y_point])
-        self.canvasEvent.draw()
+        self.canvasEvent.draw_idle()
         self.eventDragUpdate(x_point, x_point, precision)
 
     def eventDragUpdate(self, x_start, x_end, precision):
@@ -1081,9 +1154,9 @@ class InteractivePlotMixin:
             uistate.mouseover_out_blob = None
 
         self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
-        uistate.axe.figure.canvas.draw()
+        uistate.axe.figure.canvas.draw_idle()
         uistate.last_out_x_idx = out_x_idx
-        ax.figure.canvas.draw()
+        ax.figure.canvas.draw_idle()
 
     def _mouseover_output_stim(self, event):
         str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
@@ -1154,9 +1227,9 @@ class InteractivePlotMixin:
             uistate.mouseover_out_blob = None
 
         self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
-        uistate.axe.figure.canvas.draw()
+        uistate.axe.figure.canvas.draw_idle()
         uistate.last_out_x_idx = out_x_idx
-        ax.figure.canvas.draw()
+        ax.figure.canvas.draw_idle()
 
     def _mouseover_output_pp(self, event):
         str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
@@ -1249,9 +1322,9 @@ class InteractivePlotMixin:
 
         self._draw_mouseover_blob(ax, out_x_val, out_y_val, highlight_color)
         self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
-        uistate.axe.figure.canvas.draw()
+        uistate.axe.figure.canvas.draw_idle()
         uistate.last_out_x_idx = out_x_idx
-        ax.figure.canvas.draw()
+        ax.figure.canvas.draw_idle()
 
     def _mouseover_output_io(self, event):
         str_ax = "ax1"
@@ -1346,9 +1419,9 @@ class InteractivePlotMixin:
 
         self._draw_mouseover_blob(ax, out_x_val, out_y_val, highlight_color)
         self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
-        uistate.axe.figure.canvas.draw()
+        uistate.axe.figure.canvas.draw_idle()
         uistate.last_out_x_idx = out_x_idx
-        ax.figure.canvas.draw()
+        ax.figure.canvas.draw_idle()
 
     # --- Phase 2: Specialized Drag Update Strategies ---
 
@@ -1475,7 +1548,7 @@ class InteractivePlotMixin:
                 uistate.mouseover_out[0].set_color(uistate.settings.get(f"rgb_{aspect}", "black"))
                 uistate.mouseover_out[0].set_markersize(msize)
 
-        self.canvasOutput.draw()
+        self.canvasOutput.draw_idle()
 
     def _drag_update_pp(self, x_start, x_end, precision):
         action = uistate.mouseover_action
@@ -1609,7 +1682,7 @@ class InteractivePlotMixin:
                 uistate.mouseover_out[0].set_color(uistate.settings.get(f"rgb_{aspect}", "black"))
                 uistate.mouseover_out[0].set_markersize(msize)
 
-        self.canvasOutput.draw()
+        self.canvasOutput.draw_idle()
 
     def _drag_update_io(self, x_start, x_end, precision):
         action = uistate.mouseover_action
@@ -1706,7 +1779,7 @@ class InteractivePlotMixin:
                 uistate.mouseover_out[0].set_color(uistate.settings.get(f"rgb_{aspect}", "black"))
                 uistate.mouseover_out[0].set_markersize(msize)
 
-        self.canvasOutput.draw()
+        self.canvasOutput.draw_idle()
 
     # --- Phase 2: Specialized Drag Release Strategies ---
 
@@ -1790,7 +1863,7 @@ class InteractivePlotMixin:
             else:  # Otherwise, create a new line
                 ax.hline = ax.axhline(y=bottom, color="r", linestyle="--")
 
-        canvas.draw()
+        canvas.draw_idle()
 
         # After zooming, the pixel→data scale has changed, so the
         # mouseover detection zones must be recalculated against the new limits.

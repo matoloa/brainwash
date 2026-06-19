@@ -54,9 +54,7 @@ if __name__ == "__main__":
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
     logging.getLogger("matplotlib.font_manager").setLevel(logging.WARNING)
 
-    logger.info(
-        f"Brainwash starting — platform={sys.platform}, " f"frozen={getattr(sys, 'frozen', False)}, " f"argv={sys.argv}, py={sys.version[:50]}"
-    )
+    logger.info(f"Brainwash starting — platform={sys.platform}, frozen={getattr(sys, 'frozen', False)}, argv={sys.argv}, py={sys.version[:50]}")
 
     # pandas 3.0 changed the default string dtype to Arrow-backed string[pyarrow],
     # which rejects assignment of non-string values (int, float, etc.).
@@ -105,6 +103,11 @@ if __name__ == "__main__":
     try:
         app = QtWidgets.QApplication(sys.argv)
         logger.info(f"QApplication created, platformName='{app.platformName()}'")
+        if app.platformName() == "wayland":
+            logger.info(
+                "Running on Wayland. If you see 'Wayland connection broke' during interactive "
+                "sweep/selection drags, try forcing X11: QT_QPA_PLATFORM=xcb python -m src.main"
+            )
 
         MainWindow = QtWidgets.QMainWindow()
         logger.info("QMainWindow created, instantiating UIsub...")
