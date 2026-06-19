@@ -779,6 +779,57 @@ class UIsub(
         self.progressBar.setVisible(False)
         self.progressBar.setValue(0)
 
+        # Add a reliable stretchable centered label to the statusbar.
+        # Using addWidget + our own QLabel gives us full control over alignment
+        # (the QStatusBar's internal temporary message label from showMessage is
+        # always left-aligned and hard to influence).
+        self.statusbar_label = QtWidgets.QLabel()
+        self.statusbar_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.statusbar_label.setText("")
+        self.statusbar_label.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        self.statusbar.addWidget(self.statusbar_label, 1)
+
+        # Statusbar is always present. Warnings force red; everything else uses the
+        # default color so it is sensitive to darkmode toggles.
+        try:
+
+            def _initial_center():
+                if hasattr(self, "statusbar_label") and self.statusbar_label:
+                    self.statusbar_label.setAlignment(QtCore.Qt.AlignCenter)
+                for lbl in self.statusbar.findChildren(QtWidgets.QLabel):
+                    lbl.setAlignment(QtCore.Qt.AlignCenter)
+
+            _initial_center()
+            QtCore.QTimer.singleShot(0, _initial_center)
+        except Exception:
+            pass
+
+        # Wire statusbar message restoration for test warnings after transient messages
+        try:
+            self.statusbar.messageChanged.connect(self._on_statusbar_message_cleared)
+        except Exception:
+            pass
+
+        # Always force centered text for anything shown on the statusbar (warnings, loading, future messages, toasts)
+        def _force_statusbar_text_centered(_text=None):
+            try:
+
+                def _do():
+                    if hasattr(self, "statusbar_label") and self.statusbar_label:
+                        self.statusbar_label.setAlignment(QtCore.Qt.AlignCenter)
+                    for lbl in self.statusbar.findChildren(QtWidgets.QLabel):
+                        lbl.setAlignment(QtCore.Qt.AlignCenter)
+
+                _do()
+                QtCore.QTimer.singleShot(0, _do)
+            except Exception:
+                pass
+
+        try:
+            self.statusbar.messageChanged.connect(_force_statusbar_text_centered)
+        except Exception:
+            pass
+
         logger.debug("Pre-bootstrap")
         self.bootstrap(mainwindow)  # set up general UI
         logger.debug("bootstrap done, calling loadProject...")
@@ -1442,6 +1493,130 @@ class UIsub(
             uistate.formal_test_results = None
         # leave printed console output as-is (user can scroll)
 
+    def _is_loading_active(self):
+        """True while parsing or preloading is using the progressBar."""
+        try:
+            return bool(self.progressBar.isVisible())
+        except Exception:
+            return False
+
+    def _set_statusbar_appearance(
+        self, bg_color: str = None, text_color: str = None, bold: bool = False, text: str | None = None, clear: bool = False
+    ):
+        """Set statusbar appearance.
+        - If bg_color is provided (e.g. red for warnings), force that background.
+        - Otherwise (non-error states), do not force a background color so the
+          statusbar uses its default appearance (sensitive to darkmode()).
+        Text on the internal statusbar_label is always centered.
+        """
+        # Only force a background for error/warning states. For everything else
+        # leave the statusbar's background as the theme default.
+        if bg_color:
+            style = f"QStatusBar {{ background-color: {bg_color}; }}"
+        else:
+            style = ""
+
+        # Choose a sensible text color for non-error states if none supplied.
+        if text_color is None and not bg_color:
+            text_color = "#ddd" if getattr(uistate, "darkmode", False) else "#333"
+
+        lbl = " QStatusBar QLabel { qproperty-alignment: AlignCenter;"
+        if text_color:
+            lbl += f" color: {text_color};"
+        if bold:
+            lbl += " font-weight: bold;"
+        lbl += " }"
+        self.statusbar.setStyleSheet(style + lbl)
+
+        # Our own controlled label (created in __init__ after setupUi).
+        # We style it directly + via the statusbar stylesheet for maximum reliability.
+        label = getattr(self, "statusbar_label", None)
+        if label is not None:
+            label.setAlignment(QtCore.Qt.AlignCenter)
+            parts = []
+            if text_color:
+                parts.append(f"color: {text_color};")
+            if bold:
+                parts.append("font-weight: bold;")
+            label.setStyleSheet(" ".join(parts))
+            if clear or text in (None, ""):
+                label.setText("")
+            elif text is not None:
+                label.setText(text)
+
+        # Clear any temporary message so the added label widget (our centered one) is visible.
+        # (showMessage would hide added widgets and show the internal left-aligned temp label.)
+        try:
+            self.statusbar.clearMessage()
+        except Exception:
+            pass
+
+    def _get_stat_test_warning(self):
+        """Return a warning string if the selected test cannot be applied, else None."""
+        test_type = getattr(uistate, "test_type", "None")
+        if test_type == "None" or test_type is None:
+            return None
+        if test_type != "t-test":
+            return f"Statistical test '{test_type}' is not implemented"
+        # Groups with data
+        if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
+            return "Create groups to use t-test"
+        shown_groups = self._get_shown_group_ids()
+        shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
+        variant = getattr(uistate, "test_t_variant", "unpaired")
+        if variant == "one-sample":
+            if len(shown_groups) != 1:
+                return "t-test (one-sample) requires exactly 1 group with data"
+        else:
+            if len(shown_groups) != 2:
+                return "t-test requires exactly 2 groups with data"
+            if variant == "paired":
+                n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
+                n2 = len(self.dd_groups.get(shown_groups[1], {}).get("rec_IDs", []))
+                if n1 != n2 or n1 < 2:
+                    return "t-test (paired) requires two groups with equal N ≥ 2"
+        # Must have at least one shown test set
+        shown_ts = self._get_shown_testsets()
+        if not shown_ts:
+            return "Show at least one test set to run the test"
+        return None
+
+    def _refresh_test_statusbar(self):
+        """Update statusbar for current test conditions.
+        - Warning present: red bg + white centered text (error state)
+        - No warning and not loading: use default statusbar color (theme / darkmode sensitive) + cleared text
+        Loading takes precedence (it sets its own messages while active).
+        """
+        if self._is_loading_active():
+            return
+        warning = self._get_stat_test_warning()
+        if warning:
+            self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=warning)
+        else:
+            # Non-error: default color (no forced bg)
+            self._set_statusbar_appearance(clear=True)
+
+    def _on_statusbar_message_cleared(self, text):
+        """After a transient message (e.g. export toast) clears, restore warning or default (non-error) state."""
+        if text:
+            return
+        if self._is_loading_active():
+            return
+        warning = self._get_stat_test_warning()
+        if warning:
+            self.statusbar.blockSignals(True)
+            try:
+                self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=warning)
+            finally:
+                self.statusbar.blockSignals(False)
+        else:
+            self.statusbar.blockSignals(True)
+            try:
+                # Non-error: default color (sensitive to current darkmode)
+                self._set_statusbar_appearance(clear=True)
+            finally:
+                self.statusbar.blockSignals(False)
+
     def apply_statistical_test_if_active(self):
         """Core applicator. Called automatically from config changes and mutations.
         Only acts when test_type != "None". Clears when None or invalid.
@@ -1450,11 +1625,13 @@ class UIsub(
             test_type = getattr(uistate, "test_type", "None")
             if test_type == "None" or test_type is None:
                 self.clear_formal_test_results()
+                self._refresh_test_statusbar()
                 return
 
             if test_type != "t-test":
                 print(f"Statistical test '{test_type}' is not yet implemented for v0.16 (t-test only).")
                 self.clear_formal_test_results()
+                self._refresh_test_statusbar()
                 return
 
             # --- Early applicability checks (abort cleanly if tests cannot run) ---
@@ -1464,6 +1641,7 @@ class UIsub(
                 if had_results:
                     print("Statistical test: no groups defined.")
                 self.clear_formal_test_results()
+                self._refresh_test_statusbar()
                 return
 
             shown_groups = self._get_shown_group_ids()
@@ -1476,6 +1654,7 @@ class UIsub(
                 if had_results:
                     print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
                 self.clear_formal_test_results()
+                self._refresh_test_statusbar()
                 return
 
             # For paired we need matching sizes; check early using current shown groups
@@ -1486,6 +1665,7 @@ class UIsub(
                     if had_results:
                         print("Statistical test: paired requires two groups with equal number of recordings (>=2).")
                     self.clear_formal_test_results()
+                    self._refresh_test_statusbar()
                     return
 
             shown_ts = self._get_shown_testsets()
@@ -1493,6 +1673,7 @@ class UIsub(
                 if had_results:
                     print("Statistical test: no shown test sets. Tag sweeps and show at least one test set.")
                 self.clear_formal_test_results()
+                self._refresh_test_statusbar()
                 return
 
             # Snapshot config
@@ -1531,6 +1712,7 @@ class UIsub(
 
             if not results:
                 self.clear_formal_test_results()
+                self._refresh_test_statusbar()
                 return
 
             # Store + display
@@ -1539,12 +1721,14 @@ class UIsub(
             self._print_statistical_test_table(results, variant=variant, tails=tails, fdr=fdr, norm=norm)
             set_names = ", ".join(r.get("set_name", "?") for r in results)
             self.usage(f"stat_test applied: {test_type} {variant} {tails} on {set_names} (fdr={fdr})")
+            self._refresh_test_statusbar()
         except Exception as ex:
             print(f"Statistical test: aborted (not applicable or internal issue): {ex}")
             try:
                 self.clear_formal_test_results()
             except Exception:
                 pass
+            self._refresh_test_statusbar()
 
     def _print_statistical_test_table(self, results, variant, tails, fdr, norm):
         print("\n=== Statistical test (v0.16) ===")
@@ -1733,6 +1917,19 @@ class UIsub(
 
         uiplot.styleUpdate()
         self.graphRefresh()
+
+        # Re-apply statusbar state. Warnings stay red; non-error states now use
+        # the appropriate default color for the current (dark)mode.
+        try:
+            default_text = "#ddd" if uistate.darkmode else "#333"
+            if hasattr(self, "statusbar_label") and self.statusbar_label:
+                # If we're in a warning the _set below will override; otherwise ensure sensible color.
+                if "#c0392b" not in (self.statusbar.styleSheet() or ""):
+                    self.statusbar_label.setStyleSheet(f"color: {default_text};")
+            if not self._is_loading_active():
+                self._refresh_test_statusbar()
+        except Exception:
+            pass
 
     @staticmethod
     def _xlim_from_artists(axis, pad=0.05, min_span=1e-9):
@@ -2450,7 +2647,10 @@ class UIsub(
             self.dict_usage[ui_component] = 0
         self.dict_usage[ui_component] += 1
         if config.talkback and ui_component in self.dict_usage:
-            self.statusbar.showMessage(f"Used {ui_component} {self.dict_usage[ui_component]} times")
+            # Do not clobber an active test warning (red statusbar)
+            if "#c0392b" not in (self.statusbar.styleSheet() or ""):
+                # Show as centered text using the current default (theme/darkmode) color
+                self._set_statusbar_appearance(text=f"Used {ui_component} {self.dict_usage[ui_component]} times")
         self.write_usage()
 
     def write_usage(self):
@@ -3004,6 +3204,8 @@ class UIsub(
         self.setSplitterSizes(*uistate.splitter.keys())
         self.setTableStimVisibility(uistate.showTimetable, initialize=True)
         self.connectUIstate()
+        # Initial evaluation of test condition warnings on the statusbar (after config/test radios restored)
+        self._refresh_test_statusbar()
 
     # trigger functions TODO: break out the big ones to separate functions!
 
@@ -4198,15 +4400,25 @@ class UIsub(
             thread.start()
             self.progressBarManager = ProgressBarManager(self.progressBar, len(df_p_to_update))
             self.progressBarManager.__enter__()
+            # Loading takes control of statusbar (messages pushed via update* callbacks).
+            # Non-error state: use default color (darkmode sensitive).
+            self._set_statusbar_appearance(text="Parsing files...")
 
     def updateProgressBar(self, i):
         self.progressBarManager.update(i, "Parsing file ")
+        if self.progressBar.isVisible():
+            # Non-error: push text using default statusbar color (darkmode sensitive)
+            self._set_statusbar_appearance(text=self.progressBar.text())
 
     def updateSubProgressBar(self, idx, total):
         self.progressBarManager.update_sub(idx, total)
+        if self.progressBar.isVisible():
+            self._set_statusbar_appearance(text=self.progressBar.text())
 
     def updateStatusBar(self, text):
         self.progressBarManager.set_status(text)
+        if self.progressBar.isVisible():
+            self._set_statusbar_appearance(text=text)
 
     def onParseDataFinished(self):
         print("onParseDataFinished: entered")
@@ -4221,6 +4433,8 @@ class UIsub(
                 # Get the indices of the new rows, as they are in df_p
                 uistate.list_idx_recs2preload = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
         self.progressBarManager.__exit__(None, None, None)
+        # Return control to test warnings (graphPreload will take over again if needed)
+        self._refresh_test_statusbar()
         print("onParseDataFinished: calling graphPreload")
         self.graphPreload()
 
@@ -4468,6 +4682,7 @@ class UIsub(
         if not uistate.list_idx_recs2preload:
             print("graphPreload: nothing to preload, returning early")
             self.uiThaw()
+            self._refresh_test_statusbar()
             return
         print(f"graphPreload: starting thread for {len(uistate.list_idx_recs2preload)} recordings: {uistate.list_idx_recs2preload}")
         self.progressBar.setValue(0)
@@ -4480,10 +4695,18 @@ class UIsub(
         # Create ProgressBarManager and connect progress signal
         if len(uistate.list_idx_recs2preload) > 0:
             self.progressBarManager = ProgressBarManager(self.progressBar, len(uistate.list_idx_recs2preload))
-            thread.progress.connect(lambda i: self.progressBarManager.update(i, "Preloading recording"))
+
+            def _preload_progress(i):
+                self.progressBarManager.update(i, "Preloading recording")
+                if self.progressBar.isVisible():
+                    self._set_statusbar_appearance(text=self.progressBar.text())
+
+            thread.progress.connect(_preload_progress)
 
             thread.start()
             self.progressBarManager.__enter__()  # Show progress bar
+            # Loading takes control of statusbar (text using default color, darkmode sensitive)
+            self._set_statusbar_appearance(text="Preloading recordings...")
         else:
             print("No new recordings to preload.")
 
@@ -4493,6 +4716,8 @@ class UIsub(
         # Do NOT call graphRefresh() here — tableProjSelectionChanged() below ends
         # with mouseoverUpdate() → graphRefresh(), so calling it here would double-draw.
         self.progressBarManager.__exit__(None, None, None)  # Hide progress bar
+        # Return control to test warnings
+        self._refresh_test_statusbar()
         self.tableFormat()
         self.uiThaw()
         self.tableProjSelectionChanged()
