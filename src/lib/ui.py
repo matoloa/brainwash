@@ -2046,6 +2046,7 @@ class UIsub(
     _IO_O_TO_RADIO = {v: k for k, v in _RADIO_TO_IO_O.items()}
 
     _RADIO_TO_TEST = {
+        "radioButton_test_none": "None",
         "radioButton_test_t": "t-test",
         "radioButton_test_anova": "ANOVA",
         "radioButton_test_wilcoxon": "Wilcoxon",
@@ -2114,7 +2115,7 @@ class UIsub(
     def test_type_changed(self, button):
         """Handler for buttonGroup_test.buttonClicked signal."""
         test_type = self._RADIO_TO_TEST.get(button.objectName(), button.text())
-        old_type = getattr(uistate, "test_type", "t-test")
+        old_type = getattr(uistate, "test_type", "None")
         if test_type is None or test_type == old_type:
             return
         self.usage(f"test_type_changed → {test_type}")
@@ -2516,7 +2517,7 @@ class UIsub(
         if hasattr(self, "frameToolType_io"):
             self.frameToolType_io.setVisible(getattr(uistate, "experiment_type", "time") == "io")
         if hasattr(self, "frameToolTest_t"):
-            self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "t-test") == "t-test")
+            self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
 
     def build_dict_folders(self):
         dict_folders = {
@@ -2796,7 +2797,7 @@ class UIsub(
 
         # apply test radio button selections from config
         if hasattr(self, "buttonGroup_test"):
-            test_radio_name = self._TEST_TO_RADIO.get(getattr(uistate, "test_type", "t-test"), "radioButton_test_t")
+            test_radio_name = self._TEST_TO_RADIO.get(getattr(uistate, "test_type", "None"), "radioButton_test_none")
             if hasattr(self, test_radio_name):
                 getattr(self, test_radio_name).setChecked(True)
         if hasattr(self, "buttonGroup_test_t_variant"):
@@ -2808,7 +2809,7 @@ class UIsub(
             if hasattr(self, tails_name):
                 getattr(self, tails_name).setChecked(True)
         if hasattr(self, "frameToolTest_t"):
-            self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "t-test") == "t-test")
+            self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
 
         # Ensure tools column is treated as fixed pixels
         if len(uistate.splitter.get("h_splitterMaster", [])) == 4:

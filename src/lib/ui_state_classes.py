@@ -183,7 +183,7 @@ class UIstate:
         self.experiment_type = "time"  # "time", "sweep", "timestamp", "train", "io", "PP"
         self.io_input = "vamp"
         self.io_output = "EPSPamp"
-        self.test_type = "t-test"
+        self.test_type = "None"
         self.test_t_variant = "unpaired"
         self.test_t_tails = "two-sided"
         self.test_fdr = False
@@ -656,7 +656,7 @@ class UIstate:
                 "experiment_type": getattr(self, "experiment_type", "time"),
                 "io_input": getattr(self, "io_input", "vamp"),
                 "io_output": getattr(self, "io_output", "EPSPamp"),
-                "test_type": getattr(self, "test_type", "t-test"),
+                "test_type": getattr(self, "test_type", "None"),
                 "test_t_variant": getattr(self, "test_t_variant", "unpaired"),
                 "test_t_tails": getattr(self, "test_t_tails", "two-sided"),
                 "test_fdr": getattr(self, "test_fdr", False),
@@ -689,7 +689,7 @@ class UIstate:
         self.experiment_type = state.get("experiment_type", state.get("x_axis_mode", "time"))
         self.io_input = state.get("io_input", "vamp")
         self.io_output = state.get("io_output", "EPSPamp")
-        self.test_type = state.get("test_type", "t-test")
+        self.test_type = state.get("test_type", "None")
         self.test_t_variant = state.get("test_t_variant", "unpaired")
         self.test_t_tails = state.get("test_t_tails", "two-sided")
         self.test_fdr = state.get("test_fdr", False)
