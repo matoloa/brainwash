@@ -121,6 +121,8 @@ class GroupMixin:
         }
         self.group_save_dd()
         self.group_controls_add(group_ID)
+        if hasattr(self, "turn_heatmap_off"):
+            self.turn_heatmap_off()
         if hasattr(self, "apply_statistical_test_if_active"):
             self.apply_statistical_test_if_active()
 
@@ -331,6 +333,8 @@ class GroupMixin:
     # ------------------------------------------------------------------
 
     def group_cache_purge(self, group_IDs=None):  # clear cache so that a new group mean is calculated
+        if hasattr(self, "turn_heatmap_off"):
+            self.turn_heatmap_off()
         if not self.dict_group_means:
             print("No groups to purge.")
             return

@@ -33,8 +33,6 @@ class UIplot:
 
         for col in pcols:
             ps = df[col].values
-            sig = ps < 0.05
-            xs = sweeps[sig]
 
             if "amp" in col:
                 ax = ax1
@@ -43,12 +41,37 @@ class UIplot:
             else:
                 continue
 
-            for x in xs:
-                sc = ax.scatter([x], [0], marker="o", color="red")
+            ymin, ymax = ax.get_ylim()
+            if "amp" in col:
+                # amplitudes along the TOP of the graph
+                y = ymin + (ymax - ymin) * 0.92
+            else:
+                # slopes along the BOTTOM of the graph
+                y = ymin + (ymax - ymin) * 0.08
+
+            for x, p in zip(sweeps, ps):
+                if not np.isfinite(p) or p > 0.05:
+                    continue
+                color, alpha = self._p_color_alpha(p)
+                sc = ax.scatter([x], [y], marker="o", color=[color], alpha=alpha)
                 self.uistate.dict_heatmap.setdefault(col, {})[x] = sc
 
         ax1.figure.canvas.draw_idle()
         ax2.figure.canvas.draw_idle()
+
+    @staticmethod
+    def _p_color_alpha(p):
+        """Return (rgb_color, alpha) for significant p-values (p <= 0.05).
+        Alpha always 0.5. Yellow at 0.05, red at p < 0.005.
+        """
+        alpha = 0.5
+        if p < 0.005:
+            color = (1.0, 0.0, 0.0)  # red
+        else:
+            t = (0.05 - p) / 0.045
+            g = 1.0 - t
+            color = (1.0, g, 0.0)  # yellow -> red
+        return color, alpha
 
     def heatunmap(self):
         d = getattr(self.uistate, "dict_heatmap", None)

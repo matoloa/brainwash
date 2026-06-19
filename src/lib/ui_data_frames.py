@@ -62,6 +62,9 @@ class DataFrameMixin:
         # selection: list of df_project row indices to recalculate, or None to recalculate all.
         self.usage("recalculate")
         self.uiFreeze()
+        # Any recalc that can alter groupmeans must disable the heatmap
+        if hasattr(self, "turn_heatmap_off"):
+            self.turn_heatmap_off()
 
         norm_from = uistate.lineEdit["norm_EPSP_from"]
         norm_to = uistate.lineEdit["norm_EPSP_to"]

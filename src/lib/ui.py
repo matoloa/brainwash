@@ -1462,10 +1462,12 @@ class UIsub(
         print(f"Heatmap is {uistate.showHeatmap}")
         if not uistate.showHeatmap:
             uiplot.heatunmap()
+            self._refresh_test_statusbar()
             return
         t0 = time.time()
         d_group_ndf = {}
         list_l = []
+        n_sig = 0
         for key, sub_dict in self.dd_groups.items():
             if sub_dict["show"]:
                 n = len(sub_dict["rec_IDs"])
@@ -1487,12 +1489,41 @@ class UIsub(
                 df_ttest = analysis.ttest_df(d_group_ndf, norm=norm, amp=amp, slope=slope)
                 if not df_ttest.empty:
                     uiplot.heatmap(df_ttest)
+                    pcols = [c for c in df_ttest.columns if c.startswith("p_")]
+                    if pcols:
+                        try:
+                            n_sig = int((df_ttest[pcols] < 0.05).any(axis=1).sum())
+                        except Exception:
+                            n_sig = 0
                 print(df_ttest)
             else:
                 print("t-test requires number of sweeps to match")
         else:
             print("t-test currently only available between exactly 2 shown groups")
         print(f"Heatmap: {round((time.time() - t0) * 1000)} ms")
+        if n_sig == 1:
+            msg = "Heatmap: 1 data point is significantly different"
+        else:
+            msg = f"Heatmap: {n_sig} data points are significantly different"
+        self._set_statusbar_appearance(text=msg)
+
+    def turn_heatmap_off(self):
+        """Turn off heatmap (if on), remove any dots, sync menu, and restore normal statusbar."""
+        if getattr(uistate, "showHeatmap", False):
+            uistate.showHeatmap = False
+            try:
+                uiplot.heatunmap()
+            except Exception:
+                pass
+            try:
+                if hasattr(self, "actionHeatmap") and self.actionHeatmap is not None:
+                    self.actionHeatmap.setChecked(False)
+            except Exception:
+                pass
+            try:
+                self._refresh_test_statusbar()
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------
     # v0.16 Formal statistical test (Test Sets + groups) — automatic
@@ -2669,9 +2700,13 @@ class UIsub(
             self.zoomAuto()
         elif getattr(uistate, "experiment_type", "time") == "PP" and key in ["EPSP_amp", "volley_amp", "EPSP_slope", "volley_slope"]:
             self.zoomAuto()
-        # norm/amp/slope affect the statistical test inputs; ensure no stale markers from cached results
-        if key in ["norm_EPSP", "EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope", "test_fdr"]:
+        # norm/amp/slope (visible aspects) affect heatmap and statistical test inputs;
+        # clear stale heatmap dots and formal test markers when they change.
+        aspect_keys = ["norm_EPSP", "EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
+        if key in aspect_keys or key == "test_fdr":
             self.clear_formal_test_results()
+        if key in aspect_keys:
+            self.turn_heatmap_off()
         self.graphRefresh()
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
