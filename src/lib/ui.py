@@ -2151,58 +2151,7 @@ class UIsub(
 
         if prow is None:
             logger.debug("zoomAuto: no recording selected, fitting to visible groups")
-            # For output axes, determine xlim from visible artists across both axes
-            if getattr(uistate, "experiment_type", "time") == "io":
-                xlim1 = self._xlim_from_artists(uistate.ax1, pad=0)
-                xlim2 = self._xlim_from_artists(uistate.ax2, pad=0)
-                if xlim1 and xlim2:
-                    out_xmax = max(xlim1[1], xlim2[1])
-                elif xlim1:
-                    out_xmax = xlim1[1]
-                elif xlim2:
-                    out_xmax = xlim2[1]
-                else:
-                    out_xmax = 1.0
-                out_xmax = out_xmax * 1.15 if out_xmax > 0 else 1.0
-                out_xmin = 0
-                uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
-
-                y1 = self._ylim_from_artists(uistate.ax1, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
-                y2 = self._ylim_from_artists(uistate.ax2, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
-                uistate.zoom["output_ax1_ylim"] = (0, y1[1] * 1.15 if y1 and y1[1] > 0 else 1.5)
-                uistate.zoom["output_ax2_ylim"] = (0, y2[1] * 1.15 if y2 and y2[1] > 0 else 1.5)
-            elif getattr(uistate, "experiment_type", "time") == "PP":
-                # Groups PP zoom
-                uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow=None, dft=None)
-                out_xmin, out_xmax = uistate.zoom["output_xlim"]
-
-                y1 = self._ylim_from_artists(uistate.ax1, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
-                y2 = self._ylim_from_artists(uistate.ax2, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
-
-                def snap_pp_max(y_bounds):
-                    if not y_bounds:
-                        return 3.0
-                    return max(3.0, (int(y_bounds[1] / 1.0) + 1) * 1.0)
-
-                # Unify the PP mode axes so they always share identical Y-axis boundaries
-                uistate.zoom["output_ax1_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
-                uistate.zoom["output_ax2_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
-            else:
-                xlim1 = self._xlim_from_artists(uistate.ax1)
-                xlim2 = self._xlim_from_artists(uistate.ax2)
-
-                if xlim1 and xlim2:
-                    out_xmin, out_xmax = min(xlim1[0], xlim2[0]), max(xlim1[1], xlim2[1])
-                elif xlim1:
-                    out_xmin, out_xmax = xlim1
-                elif xlim2:
-                    out_xmin, out_xmax = xlim2
-                else:
-                    out_xmin, out_xmax = (0, 1)
-
-                uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
-                uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
-                uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
+            self._fit_output_zoom_to_groups()
             self.zoomReset(uistate.ax1)
             self.zoomReset(uistate.ax2)
             return
@@ -2322,6 +2271,65 @@ class UIsub(
             self.zoomReset()
         self._recalc_axe_drag_zones()
         self._recalc_axm_detection_zones()
+
+    def _fit_output_zoom_to_groups(self):
+        """Compute output xlim/ylim from currently visible artists (groups) and store in uistate.zoom.
+        Used when no single recording is selected.
+        """
+        if getattr(uistate, "experiment_type", "time") == "io":
+            ymin_clamp = 0
+        else:
+            ymin_clamp = 0 if uistate.checkBox["output_ymin0"] else None
+
+        if getattr(uistate, "experiment_type", "time") == "io":
+            xlim1 = self._xlim_from_artists(uistate.ax1, pad=0)
+            xlim2 = self._xlim_from_artists(uistate.ax2, pad=0)
+            if xlim1 and xlim2:
+                out_xmax = max(xlim1[1], xlim2[1])
+            elif xlim1:
+                out_xmax = xlim1[1]
+            elif xlim2:
+                out_xmax = xlim2[1]
+            else:
+                out_xmax = 1.0
+            out_xmax = out_xmax * 1.15 if out_xmax > 0 else 1.0
+            out_xmin = 0
+            uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
+
+            y1 = self._ylim_from_artists(uistate.ax1, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
+            y2 = self._ylim_from_artists(uistate.ax2, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
+            uistate.zoom["output_ax1_ylim"] = (0, y1[1] * 1.15 if y1 and y1[1] > 0 else 1.5)
+            uistate.zoom["output_ax2_ylim"] = (0, y2[1] * 1.15 if y2 and y2[1] > 0 else 1.5)
+        elif getattr(uistate, "experiment_type", "time") == "PP":
+            uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow=None, dft=None)
+            out_xmin, out_xmax = uistate.zoom["output_xlim"]
+
+            y1 = self._ylim_from_artists(uistate.ax1, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
+            y2 = self._ylim_from_artists(uistate.ax2, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
+
+            def snap_pp_max(y_bounds):
+                if not y_bounds:
+                    return 3.0
+                return max(3.0, (int(y_bounds[1] / 1.0) + 1) * 1.0)
+
+            uistate.zoom["output_ax1_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
+            uistate.zoom["output_ax2_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
+        else:
+            xlim1 = self._xlim_from_artists(uistate.ax1)
+            xlim2 = self._xlim_from_artists(uistate.ax2)
+
+            if xlim1 and xlim2:
+                out_xmin, out_xmax = min(xlim1[0], xlim2[0]), max(xlim1[1], xlim2[1])
+            elif xlim1:
+                out_xmin, out_xmax = xlim1
+            elif xlim2:
+                out_xmin, out_xmax = xlim2
+            else:
+                out_xmin, out_xmax = (0, 1)
+
+            uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
+            uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
+            uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
 
     def zoomReset(self, axis=None):
         # self.usage("zoomReset")

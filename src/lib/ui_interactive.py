@@ -20,16 +20,24 @@ class InteractivePlotMixin:
     #####################################################
 
     def graphClicked(self, event, canvas):  # graph click event
-        if not uistate.list_idx_select_recs:  # no recording selected; do nothing
+        if event.button == 2:  # middle click, reset zoom on the clicked graph
+            if canvas == self.canvasOutput and getattr(uistate, "ax1", None) is not None:
+                if not uistate.list_idx_select_recs:
+                    # Groups visible on ax1/ax2 with no single recording selected: fit from current groups
+                    self._fit_output_zoom_to_groups()
+                self.zoomReset(uistate.ax1)
+            elif uistate.list_idx_select_recs:
+                if canvas == self.canvasMean and getattr(uistate, "axm", None) is not None:
+                    self.zoomReset(uistate.axm)
+                elif canvas == self.canvasEvent and getattr(uistate, "axe", None) is not None:
+                    self.zoomReset(uistate.axe)
+            return
+        if not uistate.list_idx_select_recs:  # no recording selected; do nothing for other interactions
             return
         x = event.xdata
         if x is None:  # clicked outside graph; do nothing
             return
         self.usage("graphClicked")
-        if event.button == 2:  # middle click, reset zoom
-            # print(f"axis: {axis}, type {type(axis)}")
-            self.zoomAuto()
-            return
         if event.button == 3:  # right click, deselect
             if uistate.dragging:
                 return
