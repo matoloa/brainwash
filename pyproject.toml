@@ -42,6 +42,10 @@ dependencies = [
     "igor2",
     "pyarrow",
 ]
+# Optional for neuroscience features (cluster permutation test in v0.16+)
+# pip install ".[neuroscience]" or `pip install mne`
+[project.optional-dependencies]
+neuroscience = ["mne>=1.8"]
 
 [dependency-groups]
 dev = [

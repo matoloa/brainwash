@@ -1743,6 +1743,23 @@ class UIsub(
             if not shown_ts:
                 uistate.statusbar_state = "warning"
                 return "Show at least one test set to run the test"
+        elif test_type == "Cluster perm.":
+            shown_ts = self._get_shown_testsets()
+            if len(shown_groups) >= 2:
+                # Between-subjects: ok (uses first 2 groups)
+                pass
+            elif len(shown_groups) == 1 and len(shown_ts) == 2:
+                # Paired: check sweeps >=2 per set
+                for _, tset in shown_ts:
+                    if len(tset.get("sweeps", [])) < 2:
+                        uistate.statusbar_state = "warning"
+                        return "Cluster perm. requires each test set to have >=2 sweeps (for adjacency)"
+            else:
+                uistate.statusbar_state = "warning"
+                return "Cluster perm. requires either >=2 groups (between-subjects) or exactly 1 group + exactly 2 test sets (within-subjects/paired)"
+            if not shown_ts:
+                uistate.statusbar_state = "warning"
+                return "Cluster perm. requires at least one shown test set (to define sweep windows)"
         else:
             # Must have at least one shown test set (for t-test)
             shown_ts = self._get_shown_testsets()
@@ -1777,6 +1794,8 @@ class UIsub(
                 global_notes.append("(simplified; RM-ANOVA+post-hoc deferred)")
             elif test_type == "Friedman" and any(r.get("set_id") == "__friedman_rm_omnibus__" for r in uistate.formal_test_results):
                 global_notes.append("(repeated-measures omnibus)")
+            elif test_type == "Cluster perm.":
+                global_notes.append("(cluster)")
             prefix = test_type
             if global_notes:
                 prefix = f"{test_type} {' '.join(global_notes)}"
@@ -1787,6 +1806,9 @@ class UIsub(
                 results_to_report = results_to_report[:1]
             for r in results_to_report:
                 name = r.get("set_name", f"set {r.get('set_id', '?')}")
+                if test_type == "Cluster perm." and "_" in str(r.get("set_id", "")):
+                    # Paired cluster uses combined set_id; name already includes "paired ..."
+                    name = r.get("set_name", name)
                 subparts = []
                 for aspect, prefix_key in [("amp", "amp"), ("slope", "slope")]:
                     if (aspect == "amp" and not amp_enabled) or (aspect == "slope" and not slope_enabled):
@@ -1908,8 +1930,10 @@ class UIsub(
                 self._refresh_test_statusbar()
                 return
 
-            if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman"):
-                print(f"Statistical test '{test_type}' is not yet implemented for v0.16 (t-test, ANOVA, Wilcoxon, Friedman supported).")
+            if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
+                print(
+                    f"Statistical test '{test_type}' is not yet implemented for v0.16 (t-test, ANOVA, Wilcoxon, Friedman, Cluster perm. supported)."
+                )
                 self.clear_formal_test_results()
                 uistate.statusbar_state = "warning"
                 self._refresh_test_statusbar()
@@ -1938,8 +1962,11 @@ class UIsub(
             shown_ts = self._get_shown_testsets()
             # For ANOVA/Friedman: allow 1 group if sufficient test sets (repeated-measures omnibus); otherwise require >=2 groups.
             # Paired t-test/Wilcoxon: exactly 1 group + exactly 2 test sets (per pairing model in plan_v0.16_scitest.md).
+            # Cluster perm. guard is handled in _get_stat_test_warning (between or 1g+2ts); no min_groups adjustment here.
             if test_type in ("ANOVA", "Friedman"):
                 min_groups = 1
+            elif test_type == "Cluster perm.":
+                min_groups = 1  # detailed check in warning function
             else:
                 min_groups = 1 if variant_for_check in ("one-sample", "paired") else 2
             if len(shown_groups) < min_groups:

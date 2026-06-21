@@ -312,6 +312,7 @@ Alternative (simpler start): after calling the existing `get_dfgroupmean`, do `d
 - Results appear as red markers (restricted to the relevant sweep range) on the output graph + a readable printed table.
 - Adding or removing recordings from a group, toggling group or test-set show states, or changing test options causes the results to be automatically re-computed and updated.
 - Non-t-test selections produce a polite "not implemented" without side effects.
+- Cluster perm. (v2 extension) is active: guards accept valid configs (≥2 groups or 1g+2 testsets with ≥2 sweeps), uses MNE permutation*cluster*\* on per-sweep matrices (optional dep), statusbar shows cluster p-values + "(cluster)" note, markers on test-set spans, FDR supported. MNE-not-installed handled gracefully. (Implemented per plan_v0.16_scitest_CLUSTER_PERM_v2.md)
 - ANOVA (including 1-group repeated-measures omnibus via test sets) is active: guards accept valid configurations, computation runs (`f_oneway`), statusbar shows p/η² + limitation note, usage logs include FDR/SW/Levene flags. Full subject-aligned RM-ANOVA + post-hoc + sphericity remain deferred (Tier 0 delivered).
 - All state round-trips in cfg.pkl; test sets continue to work exactly as in v0.15 for visualization and samples.
 - No modifications to `ui_designer.py` or generated designer code.

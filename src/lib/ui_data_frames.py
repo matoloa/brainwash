@@ -628,17 +628,29 @@ class DataFrameMixin:
         cols = ["rec_ID"] + [str(s) for s in all_sweeps]
         return pd.DataFrame(data, columns=cols)
 
-    def get_group_testset_means(self, group_ID, sweeps, aspect="EPSP_amp"):
-        """Return DataFrame with ['rec_ID', 'value'] — one row per recording in the group.
-        'value' is the mean of the aspect across all the listed sweeps for that recording.
-        Recordings with no valid values for the sweeps are omitted.
-        Re-uses get_group_obs_for_sweeps for the per-sweep matrix then averages.
+    def get_group_testset_means(self, group_ID, sweeps, aspect="EPSP_amp", per_sweep: bool = False):
+        """Return DataFrame with ['rec_ID', 'value'] — one row per recording in the group (default).
+        If per_sweep=True (for cluster permutation test): returns wide DataFrame with
+        columns=['rec_ID', '0', '1', ..., 'N'] containing per-sweep raw values (n_recs rows).
+        Rows are sorted by rec_ID order. NaNs preserved for missing sweeps/recs.
+        Re-uses get_group_obs_for_sweeps internally.
         """
         if not group_ID or not sweeps:
-            return pd.DataFrame(columns=["rec_ID", "value"])
+            return pd.DataFrame(columns=["rec_ID", "value"] if not per_sweep else ["rec_ID"] + [str(s) for s in sorted(sweeps)])
+
         obs = self.get_group_obs_for_sweeps(group_ID, sweeps, aspect=aspect)
         if obs is None or obs.empty or "rec_ID" not in obs.columns:
+            if per_sweep:
+                return pd.DataFrame(columns=["rec_ID"] + [str(s) for s in sorted(sweeps)])
             return pd.DataFrame(columns=["rec_ID", "value"])
+
+        if per_sweep:
+            # Return wide matrix form exactly as built by get_group_obs_for_sweeps
+            # (rec_ID + one column per sweep). Caller can .drop(columns=['rec_ID']).to_numpy()
+            # or use directly. Preserves rec_ID order for pairing/alignment.
+            return obs.copy()  # already in desired wide format
+
+        # Original scalar mean path (unchanged, backward compatible)
         sweep_cols = [c for c in obs.columns if c != "rec_ID"]
         if not sweep_cols:
             return pd.DataFrame(columns=["rec_ID", "value"])
