@@ -5,6 +5,7 @@ from typing import Literal, Optional
 import matplotlib
 import matplotlib.figure
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 @dataclass
@@ -74,6 +75,156 @@ JOURNAL_COLOR_PALETTES: dict[str, list[str]] = {
         "#CC79A7",
     ],
 }
+
+
+def _add_significance_markers(
+    ax: matplotlib.axes.Axes,
+    panel: str,
+    template: JournalTemplate,
+    results: list[dict],
+    is_pp_mode: bool,
+    is_io_mode: bool,
+    io_output: Optional[str],
+    amp_view: bool,
+    slope_view: bool,
+    dark: bool,
+    variant: str,
+    fdr: bool,
+) -> None:
+    """
+    Draw significance markers (*, **, ***, ns) on an export Axes.
+    Mirrors the logic in ui_plot.py::show_test_markers but operates on a plain Axes
+    and JournalTemplate (no live interactive axes or blended transforms).
+    """
+    if not results:
+        return
+
+    # Determine if this is a single-marker variant (paired/one-sample)
+    is_single_marker = variant in ("paired", "one-sample") and len(results) >= 2
+
+    # Sweep-range bracket (journal convention): horizontal line + short vertical ticks
+    # at min(sweeps) to max(sweeps). Sits ~1-2 pt below marker. Uses linewidth_axes.
+
+    for idx, res in enumerate(results):
+        sweeps = res.get("sweeps", []) or []
+        if not sweeps:
+            continue
+        try:
+            x = float(np.mean(sweeps))
+        except Exception:
+            continue
+
+        # Paired/one-sample: single centered marker between first and second set
+        if is_single_marker:
+            if idx != 0:
+                continue
+            try:
+                sweeps2 = results[1].get("sweeps", []) or []
+                x2 = float(np.mean(sweeps2))
+                x = (x + x2) / 2.0
+            except Exception:
+                pass
+
+        # Determine which p/q columns apply to this panel
+        amp_pcols = [k for k in res.keys() if k.startswith("p_") and "amp" in k]
+        slope_pcols = [k for k in res.keys() if k.startswith("p_") and "slope" in k]
+
+        # For IO mode, map io_output to amp/slope semantics
+        if is_io_mode:
+            if io_output and "slope" in io_output.lower():
+                amp_pcols, slope_pcols = [], slope_pcols
+            else:
+                amp_pcols, slope_pcols = amp_pcols, []
+
+        # Compute placements
+        placements: list[tuple[str, float, str]] = []
+        if amp_view and slope_view:
+            for pcol in amp_pcols:
+                placements.append((pcol, 0.06, "bottom"))
+            for pcol in slope_pcols:
+                placements.append((pcol, 0.94, "top"))
+        elif amp_view:
+            for pcol in amp_pcols:
+                placements.append((pcol, 0.94, "top"))
+        elif slope_view:
+            for pcol in slope_pcols:
+                placements.append((pcol, 0.94, "top"))
+
+        for pcol, y_frac, va in placements:
+            if not pcol:
+                continue
+            qcol = "q_" + pcol[2:]
+            pval = res.get(pcol)
+            qval = res.get(qcol)
+            val = qval if (isinstance(qval, (int, float)) and np.isfinite(qval)) else pval
+
+            if isinstance(val, (int, float)) and np.isfinite(val):
+                if val < 0.001:
+                    label = "***"
+                elif val < 0.01:
+                    label = "**"
+                elif val < 0.05:
+                    label = "*"
+                else:
+                    label = "ns"
+            else:
+                label = "ns"
+
+            is_sig = label != "ns"
+            # Journal export always uses white/light background; never use white text.
+            # Significant = black; ns = medium gray. Ignore 'dark' param for color.
+            color = "black" if is_sig else "#555555"
+
+            # Compute y position in data coordinates
+            ymin, ymax = ax.get_ylim()
+            if va == "bottom":
+                y = ymin + (ymax - ymin) * y_frac
+            else:
+                y = ymin + (ymax - ymin) * y_frac
+
+            # PP vertical offset: place near top of current y-range (above bars)
+            if is_pp_mode:
+                ymin2, ymax2 = ax.get_ylim()
+                y = ymax2 * 0.92
+
+            try:
+                # Journal font scaling (clamped for 1-col vs 2-col templates)
+                if template.width_mm < 90:
+                    fontsize = max(template.font_size_axis_label * 1.5, 7.0)
+                    fontsize = min(fontsize, 9.0)
+                else:
+                    fontsize = max(template.font_size_axis_label * 1.7, 8.0)
+                    fontsize = min(fontsize, 11.0)
+                ax.text(
+                    x,
+                    y,
+                    label,
+                    ha="center",
+                    va=va,
+                    fontsize=fontsize,
+                    fontweight="bold",
+                    color=color,
+                    zorder=12,
+                )
+
+                # Draw sweep-range bracket (journal convention: underline + end ticks)
+                # Many neuroscience journals (JNeurosci, JPhysiol, Nature) use this for test-set ranges
+                # or error-bar groups; marker text sits above. Lowered offset avoids overlap with "*"/"ns".
+                if sweeps and len(sweeps) >= 2:
+                    x_min = float(min(sweeps))
+                    x_max = float(max(sweeps))
+                    # 1-col templates are tighter (smaller height_mm, denser y-scale); use larger relative offset.
+                    offset_frac = 0.065 if template.width_mm < 90 else 0.04
+                    bracket_y = y - (ymax - ymin) * offset_frac
+                    lw = template.linewidth_axes * 1.5
+                    # main horizontal underline
+                    ax.plot([x_min, x_max], [bracket_y, bracket_y], color="black", linewidth=lw, zorder=11)
+                    # short vertical ticks at ends (downward)
+                    tick_len = (ymax - ymin) * 0.025
+                    ax.plot([x_min, x_min], [bracket_y, bracket_y - tick_len], color="black", linewidth=lw, zorder=11)
+                    ax.plot([x_max, x_max], [bracket_y, bracket_y - tick_len], color="black", linewidth=lw, zorder=11)
+            except Exception:
+                pass
 
 
 def render_publication_figure(
@@ -426,6 +577,34 @@ def render_publication_figure(
                     export_inset.set_xlim(-0.005, 0.035)
                     export_inset.relim()
                     export_inset.autoscale_view(scalex=False)
+
+                # Add significance markers if formal test results are present
+                formal_results = getattr(uistate, "formal_test_results", None)
+                if formal_results:
+                    test_type = getattr(uistate, "test_type", "None")
+                    if test_type == "Wilcoxon":
+                        variant = getattr(uistate, "test_wilcox_variant", "paired")
+                    else:
+                        variant = getattr(uistate, "test_t_variant", "unpaired")
+                    fdr_flag = bool(getattr(uistate, "test_fdr", False))
+                    dark_flag = bool(getattr(uistate, "darkmode", False))
+                    amp_v = bool(getattr(uistate, "checkBox", {}).get("EPSP_amp", True))
+                    slope_v = bool(getattr(uistate, "checkBox", {}).get("EPSP_slope", True))
+                    io_out = getattr(uistate, "io_output", None) if is_io_mode else None
+                    _add_significance_markers(
+                        ax=ax,
+                        panel=panel,
+                        template=template,
+                        results=formal_results,
+                        is_pp_mode=is_pp_mode,
+                        is_io_mode=is_io_mode,
+                        io_output=io_out,
+                        amp_view=amp_v,
+                        slope_view=slope_v,
+                        dark=dark_flag,
+                        variant=variant,
+                        fdr=fdr_flag,
+                    )
 
                 fig.tight_layout()
                 if panel == "io":
