@@ -97,8 +97,8 @@ class UIplot:
     def show_test_markers(self, results):
         """Draw significance markers for formal t-test results on Test Sets.
         - x-position: center (mean) of the test set sweeps.
-        - ax1 (amp): text placed low (near bottom of plot area).
-        - ax2 (slope): text placed high (near top of plot area).
+        - Convention (matches legend): amp high (top), slope low (bottom) when both shown;
+          single-aspect view places that aspect high (top-right).
         - By convention: "*" for p/q < 0.05, "**" < 0.01, "***" < 0.001; "ns" otherwise.
           Uses the q-value for the level if FDR was applied, else the raw p-value.
         - Marker is white in darkmode, black otherwise (bare text, no box/background).
@@ -152,11 +152,11 @@ class UIplot:
                 except Exception:
                     pass  # fallback to first-set x
 
-            # Collect p/q for amp aspects -> ax1 (low) and slope aspects -> ax2 (high).
-            # Respect legend placement convention (top-right when only one aspect shown):
-            #   - both shown: amp low (bottom), slope high (top)
-            #   - only amp:   amp top-right
-            #   - only slope: slope top-right
+            # Collect p/q for amp aspects -> ax1, slope aspects -> ax2.
+            # Legend/significance convention:
+            #   - both shown: amp high (top-right on ax1), slope low (bottom-right on ax2)
+            #   - only amp:   amp high (top-right on ax1)
+            #   - only slope: slope high (top-right on ax2)
             amp_pcols = [k for k in res.keys() if k.startswith("p_") and "amp" in k]
             slope_pcols = [k for k in res.keys() if k.startswith("p_") and "slope" in k]
             amp_view = bool(getattr(self.uistate, "ampView", lambda: True)())
@@ -164,11 +164,11 @@ class UIplot:
 
             placements = []
             if amp_view and slope_view:
-                # both: amp bottom, slope top (matches current legend convention)
+                # both: amp high, slope low (matches legend convention)
                 for pcol in amp_pcols:
-                    placements.append((pcol, ax1, 0.06, "bottom"))
+                    placements.append((pcol, ax1, 0.94, "top"))
                 for pcol in slope_pcols:
-                    placements.append((pcol, ax2, 0.94, "top"))
+                    placements.append((pcol, ax2, 0.06, "bottom"))
             elif amp_view:
                 # only amp: place at top-right on ax1
                 for pcol in amp_pcols:

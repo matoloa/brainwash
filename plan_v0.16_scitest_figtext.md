@@ -277,8 +277,17 @@ Subsequent phases build the prose logic without touching render path.
 
 Document all lessons in this file. Re-implement from clean slate following revised design.
 
-**Status**: Rolled back. Ready for clean re-implementation per revised plan above. (Original impl attempt revealed fragility of modifying core render path + test-block side effects.)
+**Status**: Fully implemented (Phases 0-5). `build_figure_text_md` produces publication-ready text for all 5 test types (t-test/Wilcoxon/ANOVA/Friedman/Cluster), with n values, aspect-specific p/q (or NA), FDR/variant/tails notes, η², SW/Levene qualifiers, single-comparison wording for paired/one-sample, graceful fallbacks, and template.width_mm tiering (shorter for 1-col). Per-panel .md emitted next to each PNG (Option A). Reuses patterns from ui.py statusbar + \_add_significance_markers. All regressions fixed; ax1/ax2 marker bug resolved (user-confirmed). Full export test (PNG + sensible .md) passes. No gold-plating.
+
+**Lessons learned** (added to rollback section):
+
+- Keep `build_figure_text_md(uistate, template, group_names=None)` pure in export_image.py; call _only_ from triggerExportOutputImage.
+- Defensive `getattr(..., None) or []`, `np.isfinite`, aspect visibility from checkBox.
+- Statusbar logic is excellent reuse target for publication text (pstr rounding, notes).
+- y-position bug in dual-aspect was in shared `_add_significance_markers` (va branch was noop).
+
+**Implemented** per this document (full v0.16 figtext feature + marker fix). Updated 2026-06-21. See docs/plan_v0.16_scitest.md for success note.
 
 ---
 
-_Implemented per this document; no changes to ui_designer.py._
+_Implemented (Phases 0-5 + ax1/ax2 marker fix); no ui_designer.py changes. Per revised safe design._

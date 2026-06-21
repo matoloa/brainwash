@@ -314,6 +314,7 @@ Alternative (simpler start): after calling the existing `get_dfgroupmean`, do `d
 - Non-t-test selections produce a polite "not implemented" without side effects.
 - Cluster perm. (v2 extension) is active: guards accept valid configs (≥2 groups or 1g+2 testsets with ≥2 sweeps), uses MNE permutation*cluster*\* on per-sweep matrices (optional dep), statusbar shows cluster p-values + "(cluster)" note, markers on test-set spans, FDR supported. MNE-not-installed handled gracefully. (Implemented per plan_v0.16_scitest_CLUSTER_PERM_v2.md)
 - ANOVA (including 1-group repeated-measures omnibus via test sets) is active: guards accept valid configurations, computation runs (`f_oneway`), statusbar shows p/η² + limitation note, usage logs include FDR/SW/Levene flags. Full subject-aligned RM-ANOVA + post-hoc + sphericity remain deferred (Tier 0 delivered).
+- Figure text companion `.md` files are emitted on every journal PNG export (per `plan_v0.16_scitest_figtext.md` — realistic prose with n, p-values, test details, tiered for journal column width; per-panel strategy).
 - All state round-trips in cfg.pkl; test sets continue to work exactly as in v0.15 for visualization and samples.
 - No modifications to `ui_designer.py` or generated designer code.
 - Code remains inside the existing mixin structure (`GroupMixin`, `DataFrameMixin`, `UIplot`, etc.) and follows the dynamic wiring pattern.

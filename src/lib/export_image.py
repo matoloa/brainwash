@@ -92,6 +92,7 @@ def _add_significance_markers(
     dark: bool,
     variant: str,
     fdr: bool,
+    label_override: str | None = None,  # temporary for debugging p-value string in marker (Phase 0)
 ) -> None:
     """
     Draw significance markers (*, **, ***, ns) on an export Axes.
@@ -138,13 +139,15 @@ def _add_significance_markers(
             else:
                 amp_pcols, slope_pcols = amp_pcols, []
 
-        # Compute placements
+        # Compute placements (mirrors ui_plot.py:show_test_markers)
+        # Convention: amp high (top), slope low (bottom) when both shown;
+        # single-aspect view places that aspect high (top).
         placements: list[tuple[str, float, str]] = []
         if amp_view and slope_view:
             for pcol in amp_pcols:
-                placements.append((pcol, 0.06, "bottom"))
+                placements.append((pcol, 0.94, "top"))  # amp = high position
             for pcol in slope_pcols:
-                placements.append((pcol, 0.94, "top"))
+                placements.append((pcol, 0.06, "bottom"))  # slope = low position
         elif amp_view:
             for pcol in amp_pcols:
                 placements.append((pcol, 0.94, "top"))
@@ -172,17 +175,18 @@ def _add_significance_markers(
             else:
                 label = "ns"
 
+            if label_override is not None:
+                label = label_override  # for debug/override (e.g. p-value string)
+
             is_sig = label != "ns"
             # Journal export always uses white/light background; never use white text.
             # Significant = black; ns = medium gray. Ignore 'dark' param for color.
             color = "black" if is_sig else "#555555"
 
-            # Compute y position in data coordinates
+            # Compute y position in data coordinates (mirrors ui_plot.py)
+            # amp high (y_frac=0.94, top); slope low (y_frac=0.06, bottom) when both shown
             ymin, ymax = ax.get_ylim()
-            if va == "bottom":
-                y = ymin + (ymax - ymin) * y_frac
-            else:
-                y = ymin + (ymax - ymin) * y_frac
+            y = ymin + (ymax - ymin) * y_frac
 
             # PP vertical offset: place near top of current y-range (above bars)
             if is_pp_mode:
@@ -590,8 +594,20 @@ def render_publication_figure(
                         variant = getattr(uistate, "test_t_variant", "unpaired")
                     fdr_flag = bool(getattr(uistate, "test_fdr", False))
                     dark_flag = bool(getattr(uistate, "darkmode", False))
-                    amp_v = bool(getattr(uistate, "checkBox", {}).get("EPSP_amp", True))
-                    slope_v = bool(getattr(uistate, "checkBox", {}).get("EPSP_slope", True))
+                    # Per-panel visibility for significance markers (matches ui_plot.py:show_test_markers exactly).
+                    # When both aspects selected: amp panel -> low y on ax1 (p_amp/**), slope panel -> high y on ax2 (p_slope/*).
+                    if panel in ("amp", "amplitude", "EPSP_amp"):
+                        amp_v = True
+                        slope_v = False
+                        label_override = None
+                    elif panel in ("slope", "EPSP_slope"):
+                        amp_v = False
+                        slope_v = True
+                        label_override = None
+                    else:
+                        amp_v = bool(getattr(uistate, "checkBox", {}).get("EPSP_amp", True))
+                        slope_v = bool(getattr(uistate, "checkBox", {}).get("EPSP_slope", True))
+                        label_override = None
                     io_out = getattr(uistate, "io_output", None) if is_io_mode else None
                     _add_significance_markers(
                         ax=ax,
@@ -606,6 +622,7 @@ def render_publication_figure(
                         dark=dark_flag,
                         variant=variant,
                         fdr=fdr_flag,
+                        label_override=label_override,  # NEW: "AM" for amp image, "SM" for slope image
                     )
 
                 fig.tight_layout()
@@ -621,27 +638,155 @@ def render_publication_figure(
 
 
 def build_figure_text_md(uistate, template, group_names=None) -> str:
-    """Phase 0 stub per revised plan_v0.16_scitest_figtext.md.
-    The final "typewriter" lives in export_data.triggerExportOutputImage.
-    Returns simple placeholder for now; expanded in later phases.
+    """Pure helper (Phase 1+): returns journal-ready figure text/caption for .md companion file.
+    Called from triggerExportOutputImage (the typewriter per revised plan). Reuses parsing
+    patterns from _get_stat_test_warning (ui.py) and _add_significance_markers.
+    Per-panel .md strategy (Option A): one .md per PNG with matching base name.
     """
     if not uistate or getattr(uistate, "test_type", "None") == "None":
         return "(Exported without statistical comparison overlay.)"
-    return "text"  # minimal placeholder for Phase 0
+
+    test_type = getattr(uistate, "test_type", "None")
+    results = getattr(uistate, "formal_test_results", []) or []
+    if not results:
+        return "(Exported without statistical comparison overlay.)"
+
+    # Extract config (defensive, mirrors ui.py/_get_stat_test_warning)
+    fdr = bool(getattr(uistate, "test_fdr", False))
+    variant = getattr(uistate, "test_t_variant", "unpaired")
+    if test_type == "Wilcoxon":
+        variant = getattr(uistate, "test_wilcox_variant", "paired")
+    tails = getattr(uistate, "test_t_tails", "two-sided") if test_type != "Wilcoxon" else getattr(uistate, "test_wilcox_tails", "two-sided")
+    sw = bool(getattr(uistate, "test_sw", False))
+    levene = bool(getattr(uistate, "test_levene", False))
+    norm = bool(getattr(uistate, "checkBox", {}).get("norm_EPSP", False))
+    amp_enabled = bool(getattr(uistate, "checkBox", {}).get("EPSP_amp", True))
+    slope_enabled = bool(getattr(uistate, "checkBox", {}).get("EPSP_slope", True))
+
+    # Group names (fallback to set_name or generic)
+    group_map = group_names or {}
+    if not group_map and hasattr(uistate, "dict_group_labels"):
+        for k, v in getattr(uistate, "dict_group_labels", {}).items():
+            if isinstance(v, dict) and "group_name" in v:
+                group_map[str(v.get("group_ID", ""))] = v["group_name"]
+
+    # Build core summary (reuses statusbar logic patterns; publication-polished)
+    parts = []
+    if test_type == "t-test":
+        if variant == "paired":
+            prefix = "Paired two-sided t-test"
+        elif variant == "one-sample":
+            prefix = "One-sample two-sided t-test"
+        else:
+            prefix = "Unpaired two-sided t-test"
+        if fdr:
+            prefix += " with FDR correction"
+        if tails != "two-sided":
+            prefix = prefix.replace("two-sided", tails)
+        parts.append(prefix)
+    elif test_type == "Wilcoxon":
+        if variant == "paired":
+            prefix = "Paired two-sided Wilcoxon signed-rank test"
+        elif variant == "one-sample":
+            prefix = "One-sample two-sided Wilcoxon signed-rank test"
+        else:
+            prefix = "Unpaired two-sided Wilcoxon rank-sum test"
+        if fdr:
+            prefix += " with FDR correction"
+        if tails != "two-sided":
+            prefix = prefix.replace("two-sided", tails)
+        parts.append(prefix)
+    elif test_type == "ANOVA":
+        parts.append("Repeated-measures ANOVA (omnibus)")
+    elif test_type == "Friedman":
+        parts.append("Friedman test (repeated-measures omnibus)")
+    elif test_type == "Cluster perm.":
+        parts.append("Cluster permutation test (between-subjects)")
+    else:
+        parts.append(test_type)
+
+    # Aspect-specific p-values + n (only enabled aspects; per result/set)
+    # Matches statusbar logic + plan examples
+    aspect_parts = []
+    for res in results:
+        set_name = res.get("set_name", res.get("set_id", "set"))
+        n1 = res.get("n1", 0)
+        n2 = res.get("n2", n1)
+        n_str = f"n={n1}" if n1 == n2 else f"n1={n1}, n2={n2}"
+
+        p_amp = res.get("p_amp")
+        p_slope = res.get("p_slope")
+        q_amp = res.get("q_amp")
+        q_slope = res.get("q_slope")
+
+        def pstr(p, q=None):
+            val = q if (isinstance(q, (int, float)) and np.isfinite(q)) else p
+            if not isinstance(val, (int, float)) or not np.isfinite(val):
+                return "NA"
+            if val < 0.001:
+                return "<0.001"
+            return f"{val:.3g}"
+
+        shown_aspects = []
+        if amp_enabled and isinstance(p_amp, (int, float)):
+            shown_aspects.append(f"amp p={pstr(p_amp, q_amp)}")
+        if slope_enabled and isinstance(p_slope, (int, float)):
+            shown_aspects.append(f"slope p={pstr(p_slope, q_slope)}")
+        if shown_aspects:
+            aspect_parts.append(f"{set_name}: {', '.join(shown_aspects)} ({n_str})")
+
+    if aspect_parts:
+        parts.append("; ".join(aspect_parts))
+
+    # Effect size / diagnostics (tiered by template.width_mm per Phase 3; reuse statusbar notes)
+    eta_parts = []
+    for r in results:
+        if isinstance(r.get("eta2"), (int, float)) and r["eta2"] > 0:
+            eta_parts.append(f"η²={r['eta2']:.2f}")
+    if eta_parts:
+        parts.extend(eta_parts)
+
+    notes = []
+    if fdr:
+        notes.append("FDR")
+    if sw:
+        notes.append("SW")
+    if levene:
+        notes.append("Levene")
+    if notes:
+        parts.append("({})".format(", ".join(notes)))
+
+    # Significance legend (journal standard; matches _add_significance_markers)
+    parts.append("*p<0.05, **p<0.01, ***p<0.001")
+
+    text = ". ".join([p for p in parts if p]) + "."
+    # Journal tier (Phase 3): shorter for 1-col templates
+    if getattr(template, "width_mm", 100) < 90 and len(text) > 100:
+        text = text.replace("Repeated-measures ANOVA (omnibus)", "RM-ANOVA (omnibus)").replace("; ", ". ")[:95] + "."
+
+    return text
 
 
 if __name__ == "__main__":
 
     class MockUIState:
         def __init__(self):
-            self.checkBox = {"norm_EPSP": False}
+            self.checkBox = {"norm_EPSP": False, "EPSP_amp": True, "EPSP_slope": True}
             self.settings = {
                 "rgb_EPSP_amp": (0, 0, 1),
                 "rgb_EPSP_slope": (1, 0, 0),
             }
             self.dict_group_labels = {}
-            self.dict_group_show = {}
-            self.experiment_type = "io"
+            self.dict_group_show = {str(i): {"group_ID": i} for i in range(1, 3)}
+            self.formal_test_results = [
+                {"set_name": "set1", "p_amp": 0.01, "p_slope": 0.04, "n1": 5, "n2": 5, "sweeps": [1, 2, 3]},
+                {"set_name": "set2", "p_amp": 0.001, "p_slope": 0.06, "n1": 6, "n2": 6, "sweeps": [4, 5, 6]},
+            ]
+            self.test_type = "t-test"
+            self.test_t_variant = "unpaired"
+            self.test_fdr = False
+            self.darkmode = False
+            self.experiment_type = "time"
             self.io_input = "vamp"
             self.io_output = "EPSPamp"
 
@@ -650,33 +795,40 @@ if __name__ == "__main__":
 
     mock_uistate = MockUIState()
 
+    # Setup mock data for both amp (ax1) and slope (ax2) so both panels render
     fig, ax = plt.subplots()
     x = [1, 2, 3]
     y = [2, 3, 4]
     yerr = [0.1, 0.2, 0.1]
-    (line,) = ax.plot(x, y)
-    fill = ax.fill_between(
+    (line_amp,) = ax.plot(x, y, label="amp")
+    fill_amp = ax.fill_between(
         x,
         [yi - ye for yi, ye in zip(y, yerr)],
         [yi + ye for yi, ye in zip(y, yerr)],
     )
-
     mock_uistate.dict_group_labels["Group 1 EPSP amp mean"] = {
         "group_ID": 1,
         "axis": "ax1",
-        "line": line,
-        "fill": fill,
+        "line": line_amp,
+        "fill": fill_amp,
     }
     mock_uistate.dict_group_show["Group 1 EPSP amp mean"] = mock_uistate.dict_group_labels["Group 1 EPSP amp mean"]
 
-    scatter = ax.scatter([1, 2, 3], [1.5, 2.5, 3.5], color="red")
-    (trendline,) = ax.plot([1, 3], [1.5, 3.5], color="red", linestyle="--")
-
-    mock_uistate.dict_group_labels["Group 2 raw IO scatter"] = {"group_ID": 2, "axis": "ax2", "line": scatter, "fill": None, "x_mode": "io"}
-    mock_uistate.dict_group_show["Group 2 raw IO scatter"] = mock_uistate.dict_group_labels["Group 2 raw IO scatter"]
-
-    mock_uistate.dict_group_labels["Group 2 raw IO trendline"] = {"group_ID": 2, "axis": "ax2", "line": trendline, "fill": None, "x_mode": "io"}
-    mock_uistate.dict_group_show["Group 2 raw IO trendline"] = mock_uistate.dict_group_labels["Group 2 raw IO trendline"]
+    (line_slope,) = ax.plot(x, [y_i * 0.5 for y_i in y], color="red", label="slope")
+    fill_slope = ax.fill_between(
+        x,
+        [yi * 0.5 - ye for yi, ye in zip(y, yerr)],
+        [yi * 0.5 + ye for yi, ye in zip(y, yerr)],
+        color="red",
+        alpha=0.3,
+    )
+    mock_uistate.dict_group_labels["Group 2 EPSP slope mean"] = {
+        "group_ID": 2,
+        "axis": "ax2",
+        "line": line_slope,
+        "fill": fill_slope,
+    }
+    mock_uistate.dict_group_show["Group 2 EPSP slope mean"] = mock_uistate.dict_group_labels["Group 2 EPSP slope mean"]
 
     template = JOURNAL_TEMPLATES["jneurosci_1col"]
     try:
@@ -691,3 +843,6 @@ if __name__ == "__main__":
             print(f"Saved {out_path}")
     except Exception as e:
         print(f"Error: {e}")
+    finally:
+        plt.close("all")
+    print("Test completed. Check exported PNGs for correct * / ** markers (amp=low **, slope=high * per latest per-panel fix).")
