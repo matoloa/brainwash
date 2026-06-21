@@ -15,7 +15,7 @@ import warnings
 import numpy as np
 import pandas as pd
 from scipy import stats  # for t.cdf in one-sample approximation
-from scipy.stats import f_oneway, levene, shapiro, ttest_1samp, ttest_ind, ttest_ind_from_stats, ttest_rel
+from scipy.stats import f_oneway, levene, shapiro, ttest_1samp, ttest_ind, ttest_ind_from_stats, ttest_rel, wilcoxon
 
 # ---------------------------------------------------------------------------
 # FDR and per-sweep test helpers
@@ -204,7 +204,7 @@ def compute_statistical_comparison(
       "results": list of per-testset result dicts with scalar p_*/stat_* (no per-sweep df_p)
       "config": snapshot of options
     """
-    if test_type not in ("t-test", "ANOVA"):
+    if test_type not in ("t-test", "ANOVA", "Wilcoxon"):
         return {"not_implemented": test_type, "results": []}
 
     if not isinstance(dd_groups, dict):
@@ -319,6 +319,201 @@ def compute_statistical_comparison(
             except Exception:
                 pass
         return {"results": rm_results, "config": {"test_type": test_type, "variant": "repeated", "fdr": fdr, "norm": norm}}
+
+    # --- Wilcoxon signed-rank path (paired or one-sample) ---
+    if test_type == "Wilcoxon":
+        variant = variant if variant in ("paired", "one-sample") else "paired"
+        alt = {"two-sided": "two-sided", "greater": "greater", "less": "less"}.get(tails, "two-sided")
+        shown_sets = [(sid, info) for sid, info in (dd_testsets or {}).items() if info.get("show", False) and info.get("sweeps")]
+        if not shown_sets:
+            return {"error": "no shown test sets", "results": []}
+        aspects = []
+        if amp:
+            aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
+        if slope:
+            aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
+        if not aspects:
+            return {"error": "no aspects selected", "results": []}
+        raw_p_amp = []
+        raw_p_slope = []
+        out_results = []
+        if variant == "paired":
+            # Paired: exactly 1 group + exactly 2 test sets; align by rec_ID
+            if len(shown_groups) != 1 or len(shown_sets) != 2:
+                return {"error": "Wilcoxon (paired) requires exactly 1 group and exactly 2 test sets", "results": []}
+            g = shown_groups[0]
+            sid1, tset1 = shown_sets[0]
+            sid2, tset2 = shown_sets[1]
+            sweeps1 = list(tset1.get("sweeps", []))
+            sweeps2 = list(tset2.get("sweeps", []))
+            set_result = {
+                "set_id": sid1,
+                "set_name": tset1.get("set_name", f"set {sid1}"),
+                "sweeps": sweeps1,
+                "group1": g,
+                "n1": 0,
+                "n2": 0,
+            }
+            for short, col in aspects:
+                try:
+                    obs1_df = get_group_testset_means_fn(g, sweeps1, aspect=col)
+                    obs2_df = get_group_testset_means_fn(g, sweeps2, aspect=col)
+                except Exception:
+                    obs1_df = obs2_df = pd.DataFrame({"rec_ID": [], "value": []})
+                recs1 = obs1_df["rec_ID"].tolist() if not obs1_df.empty else []
+                vals1 = obs1_df["value"].to_numpy(dtype=float) if not obs1_df.empty else np.array([], dtype=float)
+                recs2 = obs2_df["rec_ID"].tolist() if not obs2_df.empty else []
+                vals2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
+                set1 = {str(r): v for r, v in zip(recs1, vals1) if np.isfinite(v)}
+                set2 = {str(r): v for r, v in zip(recs2, vals2) if np.isfinite(v)}
+                common = [r for r in recs1 if str(r) in set2]
+                v1 = np.array([set1[str(r)] for r in common], dtype=float)
+                v2 = np.array([set2[str(r)] for r in common], dtype=float)
+                eff_n = int(v1.size)
+                p = np.nan
+                stat = np.nan
+                if eff_n >= 2:
+                    try:
+                        # wilcoxon(x, y) tests x - y; for alternative we pass d = v1 - v2 for greater/less
+                        d = v1 - v2
+                        if alt == "two-sided":
+                            res = wilcoxon(d, alternative="two-sided", zero_method="wilcox", correction=False)
+                        else:
+                            res = wilcoxon(d, alternative=alt, zero_method="wilcox", correction=False)
+                        stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
+                        p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
+                    except Exception:
+                        p = np.nan
+                        stat = np.nan
+                p_key = f"p_{short}" + ("_norm" if norm else "")
+                s_key = f"stat_{short}" + ("_norm" if norm else "")
+                set_result[p_key] = float(p) if np.isfinite(p) else np.nan
+                set_result[s_key] = float(stat) if np.isfinite(stat) else np.nan
+                set_result["n1"] = max(int(set_result.get("n1", 0)), eff_n)
+                set_result["n2"] = set_result["n1"]
+                if short == "amp":
+                    raw_p_amp.append((len(out_results), p_key))
+                else:
+                    raw_p_slope.append((len(out_results), p_key))
+            has_any_p = any(k.startswith("p_") for k in set_result.keys())
+            if has_any_p:
+                out_results.append(set_result)
+            # FDR (operates on first result row for paired)
+            if fdr and out_results:
+                for family in (raw_p_amp, raw_p_slope):
+                    if not family:
+                        continue
+                    ps = []
+                    idxs = []
+                    for res_idx, pcol in family:
+                        if res_idx < len(out_results):
+                            val = out_results[res_idx].get(pcol, np.nan)
+                            ps.append(val if np.isfinite(val) else np.nan)
+                            idxs.append((res_idx, pcol))
+                    try:
+                        from statsmodels.stats.multitest import multipletests
+
+                        qs = multipletests([p if np.isfinite(p) else 1.0 for p in ps], alpha=0.05, method="fdr_bh")[1]
+                        for (res_idx, pcol), q in zip(idxs, qs):
+                            out_results[res_idx]["q_" + pcol[2:]] = float(q) if np.isfinite(q) else np.nan
+                    except Exception:
+                        pass
+            return {
+                "results": out_results,
+                "config": {
+                    "type": test_type,
+                    "variant": variant,
+                    "tails": tails,
+                    "fdr": fdr,
+                    "norm": norm,
+                    "amp": amp,
+                    "slope": slope,
+                },
+            }
+        else:
+            # one-sample Wilcoxon: 1 group, compare each test set vs ref
+            if len(shown_groups) != 1:
+                return {"error": "Wilcoxon (one-sample) requires exactly 1 group", "results": []}
+            g = shown_groups[0]
+            for sid, tset in shown_sets:
+                sweeps = list(tset.get("sweeps", []))
+                if not sweeps:
+                    continue
+                set_result = {
+                    "set_id": sid,
+                    "set_name": tset.get("set_name", f"set {sid}"),
+                    "sweeps": sweeps,
+                    "group1": g,
+                    "n1": 0,
+                    "n2": 0,
+                }
+                for short, col in aspects:
+                    try:
+                        obs_df = get_group_testset_means_fn(g, sweeps, aspect=col)
+                        recs = obs_df["rec_ID"].tolist() if not obs_df.empty else []
+                        vals = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
+                    except Exception:
+                        recs, vals = [], np.array([], dtype=float)
+                    v = vals[np.isfinite(vals)]
+                    eff_n = int(v.size)
+                    p = np.nan
+                    stat = np.nan
+                    if eff_n >= 1:
+                        try:
+                            d = v - float(ref)
+                            if alt == "two-sided":
+                                res = wilcoxon(d, alternative="two-sided", zero_method="wilcox", correction=False)
+                            else:
+                                res = wilcoxon(d, alternative=alt, zero_method="wilcox", correction=False)
+                            stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
+                            p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
+                        except Exception:
+                            p = np.nan
+                            stat = np.nan
+                    p_key = f"p_{short}" + ("_norm" if norm else "")
+                    s_key = f"stat_{short}" + ("_norm" if norm else "")
+                    set_result[p_key] = float(p) if np.isfinite(p) else np.nan
+                    set_result[s_key] = float(stat) if np.isfinite(stat) else np.nan
+                    set_result["n1"] = max(int(set_result.get("n1", 0)), eff_n)
+                    if short == "amp":
+                        raw_p_amp.append((len(out_results), p_key))
+                    else:
+                        raw_p_slope.append((len(out_results), p_key))
+                has_any_p = any(k.startswith("p_") for k in set_result.keys())
+                if has_any_p:
+                    out_results.append(set_result)
+            # FDR across test sets
+            if fdr and out_results:
+                for family in (raw_p_amp, raw_p_slope):
+                    if not family:
+                        continue
+                    ps = []
+                    idxs = []
+                    for res_idx, pcol in family:
+                        if res_idx < len(out_results):
+                            val = out_results[res_idx].get(pcol, np.nan)
+                            ps.append(val if np.isfinite(val) else np.nan)
+                            idxs.append((res_idx, pcol))
+                    try:
+                        from statsmodels.stats.multitest import multipletests
+
+                        qs = multipletests([p if np.isfinite(p) else 1.0 for p in ps], alpha=0.05, method="fdr_bh")[1]
+                        for (res_idx, pcol), q in zip(idxs, qs):
+                            out_results[res_idx]["q_" + pcol[2:]] = float(q) if np.isfinite(q) else np.nan
+                    except Exception:
+                        pass
+            return {
+                "results": out_results,
+                "config": {
+                    "type": test_type,
+                    "variant": variant,
+                    "tails": tails,
+                    "fdr": fdr,
+                    "norm": norm,
+                    "amp": amp,
+                    "slope": slope,
+                },
+            }
 
     alt = {"two-sided": "two-sided", "greater": "greater", "less": "less"}.get(tails, "two-sided")
 

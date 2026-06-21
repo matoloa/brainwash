@@ -120,11 +120,15 @@ class UIplot:
 
         dark = bool(getattr(self.uistate, "darkmode", False))
 
-        # Paired t-test (per latest request): place ONLY one */na marker, horizontally
+        # Paired (t-test or Wilcoxon): place ONLY one */na marker, horizontally
         # centered between the x-positions of the first and second test set.
         # Legend-matching y-placement (amp/slope top-right rules) is unchanged.
-        variant = getattr(self.uistate, "test_t_variant", "unpaired")
-        is_paired = variant == "paired" and len(results or []) >= 2
+        test_type = getattr(self.uistate, "test_type", "None")
+        if test_type == "Wilcoxon":
+            variant = getattr(self.uistate, "test_wilcox_variant", "paired")
+        else:
+            variant = getattr(self.uistate, "test_t_variant", "unpaired")
+        is_single_marker = variant in ("paired", "one-sample") and len(results or []) >= 2
 
         for res in results or []:
             sweeps = res.get("sweeps", []) or []
@@ -135,12 +139,12 @@ class UIplot:
             except Exception:
                 continue
 
-            # For paired: override x to midpoint between first and second test set
+            # For paired/one-sample: override x to midpoint between first and second test set
             # (res[0] and res[1] correspond to the two test sets). Only process
             # the first result (single marker, per user request).
-            if is_paired:
+            if is_single_marker:
                 if results.index(res) != 0:
-                    continue  # skip second result for paired
+                    continue  # skip second result for single-marker variant
                 try:
                     sweeps2 = results[1].get("sweeps", []) or []
                     x2 = float(np.mean(sweeps2))

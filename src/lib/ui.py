@@ -1677,7 +1677,9 @@ class UIsub(
         if test_type == "None" or test_type is None:
             uistate.statusbar_state = None
             return None
-        if test_type not in ("t-test", "ANOVA"):
+        ref_attr = "label_test_wilcox_one_sample_value" if test_type == "Wilcoxon" else "label_test_t_one_sample_value"
+        ref_value = getattr(uistate, ref_attr, 0.0)
+        if test_type not in ("t-test", "ANOVA", "Wilcoxon"):
             uistate.statusbar_state = "warning"
             return f"Statistical test '{test_type}' is not implemented"
         # Groups with data
@@ -1714,6 +1716,25 @@ class UIsub(
             if not shown_ts:
                 uistate.statusbar_state = "warning"
                 return "Show at least one test set to run the test"
+        elif test_type == "Wilcoxon":
+            shown_ts = self._get_shown_testsets()
+            variant = getattr(uistate, "test_wilcox_variant", "paired")
+            if variant == "paired":
+                if len(shown_groups) != 1 or len(shown_ts) != 2:
+                    uistate.statusbar_state = "warning"
+                    return "Wilcoxon (paired) requires exactly 1 group and exactly 2 test sets"
+                n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
+                if n1 < 2:
+                    uistate.statusbar_state = "warning"
+                    return "Wilcoxon (paired) requires N ≥ 2 recordings per group"
+            else:
+                # one-sample
+                if len(shown_groups) != 1:
+                    uistate.statusbar_state = "warning"
+                    return "Wilcoxon (one-sample) requires exactly 1 group with data"
+            if not shown_ts:
+                uistate.statusbar_state = "warning"
+                return "Show at least one test set to run the test"
         else:
             # Must have at least one shown test set (for t-test)
             shown_ts = self._get_shown_testsets()
@@ -1736,6 +1757,14 @@ class UIsub(
                     global_notes.append(f"({variant})")
                 if tails != "two-sided":
                     global_notes.append(f"({tails})")
+            elif test_type == "Wilcoxon":
+                tails = getattr(uistate, "test_wilcox_tails", "two-sided")
+                if variant != "paired":
+                    global_notes.append(f"({variant})")
+                if tails != "two-sided":
+                    global_notes.append(f"({tails})")
+                if variant == "one-sample" and ref_value != 0.0:
+                    global_notes.append(f"(vs {ref_value})")
             elif test_type == "ANOVA" and any(r.get("set_id") == "__anova_rm_omnibus__" for r in uistate.formal_test_results):
                 global_notes.append("(simplified; RM-ANOVA+post-hoc deferred)")
             prefix = test_type
@@ -1744,7 +1773,7 @@ class UIsub(
             parts = []
             # Special handling for t-test (paired): use ONLY first result (set 1), no set name prefix
             results_to_report = uistate.formal_test_results
-            if test_type == "t-test" and variant == "paired" and results_to_report:
+            if (test_type == "t-test" or test_type == "Wilcoxon") and variant in ("paired", "one-sample") and results_to_report:
                 results_to_report = results_to_report[:1]
             for r in results_to_report:
                 name = r.get("set_name", f"set {r.get('set_id', '?')}")
@@ -1770,7 +1799,7 @@ class UIsub(
                     if isinstance(eta, (int, float)) and np.isfinite(eta):
                         subparts.append(f"η²={eta:.3f}")
                 if subparts:  # only show test set if at least one aspect is enabled
-                    if test_type == "t-test" and variant == "paired":
+                    if (test_type == "t-test" or test_type == "Wilcoxon") and variant in ("paired", "one-sample"):
                         parts.append(", ".join(subparts))  # no set name
                     else:
                         parts.append(f"{name}: {', '.join(subparts)}")
@@ -1866,13 +1895,12 @@ class UIsub(
                 self._refresh_test_statusbar()
                 return
 
-            if test_type not in ("t-test", "ANOVA"):
-                print(f"Statistical test '{test_type}' is not yet implemented for v0.16 (t-test and ANOVA supported).")
+            if test_type not in ("t-test", "ANOVA", "Wilcoxon"):
+                print(f"Statistical test '{test_type}' is not yet implemented for v0.16 (t-test, ANOVA, Wilcoxon supported).")
                 self.clear_formal_test_results()
                 uistate.statusbar_state = "warning"
                 self._refresh_test_statusbar()
                 return
-
             # --- Early applicability checks (abort cleanly if tests cannot run) ---
             had_results = bool(getattr(uistate, "formal_test_results", None))
 
@@ -1888,7 +1916,12 @@ class UIsub(
             # Only groups that have at least one recording can participate in a test
             shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
 
-            variant_for_check = getattr(uistate, "test_t_variant", "unpaired")
+            ref_attr = "label_test_t_one_sample_value"
+            if test_type == "Wilcoxon":
+                variant_for_check = getattr(uistate, "test_wilcox_variant", "paired")
+                ref_attr = "label_test_wilcox_one_sample_value"
+            else:
+                variant_for_check = getattr(uistate, "test_t_variant", "unpaired")
             shown_ts = self._get_shown_testsets()
             # For ANOVA: allow 1 group if >=2 test sets (repeated-measures); otherwise require >=2 groups.
             # Paired t-test: exactly 1 group + exactly 2 test sets (per pairing model in plan_v0.16_scitest.md).
@@ -1933,13 +1966,17 @@ class UIsub(
                 return
 
             # Snapshot config
-            variant = getattr(uistate, "test_t_variant", "unpaired")
-            tails = getattr(uistate, "test_t_tails", "two-sided")
+            if test_type == "Wilcoxon":
+                variant = getattr(uistate, "test_wilcox_variant", "paired")
+                tails = getattr(uistate, "test_wilcox_tails", "two-sided")
+            else:
+                variant = getattr(uistate, "test_t_variant", "unpaired")
+                tails = getattr(uistate, "test_t_tails", "two-sided")
+            ref_value = getattr(uistate, ref_attr, 0.0)
             fdr = bool(getattr(uistate, "test_fdr", False))
             norm = bool(uistate.checkBox.get("norm_EPSP", False))
             amp = bool(uistate.checkBox.get("EPSP_amp", True))
             slope = bool(uistate.checkBox.get("EPSP_slope", True))
-            ref_value = getattr(uistate, "label_test_t_one_sample_value", 0.0)
 
             g1 = shown_groups[0]
             g2 = shown_groups[1] if len(shown_groups) > 1 else None
@@ -2728,15 +2765,15 @@ class UIsub(
     _TEST_T_TAILS_TO_RADIO = {v: k for k, v in _RADIO_TO_TEST_T_TAILS.items()}
 
     _RADIO_TO_TEST_WILCOX_VARIANT = {
-        "radioButton_test_wilcox_variant_paired": "paired",
-        "radioButton_test_wilcox_variant_one": "one-sample",
+        "radioButton_wilcoxon_variant_paired": "paired",
+        "radioButton_wilcoxon_variant_one": "one-sample",
     }
     _TEST_WILCOX_VARIANT_TO_RADIO = {v: k for k, v in _RADIO_TO_TEST_WILCOX_VARIANT.items()}
 
     _RADIO_TO_TEST_WILCOX_TAILS = {
-        "radioButton_test_wilcox_tails_two": "two-sided",
-        "radioButton_test_wilcox_tails_greater": "greater",
-        "radioButton_test_wilcox_tails_less": "less",
+        "radioButton_wilcoxon_tails_two": "two-sided",
+        "radioButton_wilcoxon_tails_greater": "greater",
+        "radioButton_wilcoxon_tails_less": "less",
     }
     _TEST_WILCOX_TAILS_TO_RADIO = {v: k for k, v in _RADIO_TO_TEST_WILCOX_TAILS.items()}
 
@@ -2802,11 +2839,11 @@ class UIsub(
             self.frameToolTest_ANOVA.setVisible(test_type == "ANOVA")
             if test_type == "ANOVA":
                 self.update_anova_label()
-        if hasattr(self, "frameToolTest_Wilcoxon"):
-            self.frameToolTest_Wilcoxon.setVisible(test_type == "Wilcoxon")
-            if test_type == "Wilcoxon" and hasattr(self, "lineEdit_test_wilcox_one_sample_value"):
+        if hasattr(self, "frameToolTest_wilcoxon"):
+            self.frameToolTest_wilcoxon.setVisible(test_type == "Wilcoxon")
+            if test_type == "Wilcoxon" and hasattr(self, "lineEdit_wilcoxon_one_sample_value"):
                 val = getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)
-                self.lineEdit_test_wilcox_one_sample_value.setText(str(val))
+                self.lineEdit_wilcoxon_one_sample_value.setText(str(val))
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         # Automatic application (v0.16): apply when non-None, clear when None
         self.apply_statistical_test_if_active()
@@ -3360,23 +3397,23 @@ class UIsub(
             else:
                 self.buttonGroup_test_t_tails.buttonClicked.connect(self.test_t_tails_changed)
         # test wilcox variant radio button group
-        if hasattr(self, "buttonGroup_test_wilcox_variant"):
+        if hasattr(self, "buttonGroup_wilcoxon_variant"):
             if disconnect:
                 try:
-                    self.buttonGroup_test_wilcox_variant.buttonClicked.disconnect()
+                    self.buttonGroup_wilcoxon_variant.buttonClicked.disconnect()
                 except TypeError:
                     pass
             else:
-                self.buttonGroup_test_wilcox_variant.buttonClicked.connect(self.test_wilcox_variant_changed)
+                self.buttonGroup_wilcoxon_variant.buttonClicked.connect(self.test_wilcox_variant_changed)
         # test wilcox tails radio button group
-        if hasattr(self, "buttonGroup_test_wilcox_tails"):
+        if hasattr(self, "buttonGroup_wilcoxon_tails"):
             if disconnect:
                 try:
-                    self.buttonGroup_test_wilcox_tails.buttonClicked.disconnect()
+                    self.buttonGroup_wilcoxon_tails.buttonClicked.disconnect()
                 except TypeError:
                     pass
             else:
-                self.buttonGroup_test_wilcox_tails.buttonClicked.connect(self.test_wilcox_tails_changed)
+                self.buttonGroup_wilcoxon_tails.buttonClicked.connect(self.test_wilcox_tails_changed)
         # hide buttons
         hide_buttons = {
             "pushButton_hide_stim": "frameToolStim",
@@ -3513,15 +3550,15 @@ class UIsub(
                     lambda le=self.lineEdit_test_t_one_sample_value: self.editTestTOneSampleValue(le)
                 )
         # one-sample wilcoxon value
-        if hasattr(self, "lineEdit_test_wilcox_one_sample_value"):
+        if hasattr(self, "lineEdit_wilcoxon_one_sample_value"):
             if disconnect:
                 try:
-                    self.lineEdit_test_wilcox_one_sample_value.editingFinished.disconnect()
+                    self.lineEdit_wilcoxon_one_sample_value.editingFinished.disconnect()
                 except TypeError:
                     pass
             else:
-                self.lineEdit_test_wilcox_one_sample_value.editingFinished.connect(
-                    lambda le=self.lineEdit_test_wilcox_one_sample_value: self.editTestWilcoxOneSampleValue(le)
+                self.lineEdit_wilcoxon_one_sample_value.editingFinished.connect(
+                    lambda le=self.lineEdit_wilcoxon_one_sample_value: self.editTestWilcoxOneSampleValue(le)
                 )
 
         # pushButtons
@@ -3616,15 +3653,15 @@ class UIsub(
             tails_name = self._TEST_T_TAILS_TO_RADIO.get(getattr(uistate, "test_t_tails", "two-sided"), "radioButton_test_t_tails_two")
             if hasattr(self, tails_name):
                 getattr(self, tails_name).setChecked(True)
-        if hasattr(self, "buttonGroup_test_wilcox_variant"):
+        if hasattr(self, "buttonGroup_wilcoxon_variant"):
             wilcox_variant_name = self._TEST_WILCOX_VARIANT_TO_RADIO.get(
-                getattr(uistate, "test_wilcox_variant", "paired"), "radioButton_test_wilcox_variant_paired"
+                getattr(uistate, "test_wilcox_variant", "paired"), "radioButton_wilcoxon_variant_paired"
             )
             if hasattr(self, wilcox_variant_name):
                 getattr(self, wilcox_variant_name).setChecked(True)
-        if hasattr(self, "buttonGroup_test_wilcox_tails"):
+        if hasattr(self, "buttonGroup_wilcoxon_tails"):
             wilcox_tails_name = self._TEST_WILCOX_TAILS_TO_RADIO.get(
-                getattr(uistate, "test_wilcox_tails", "two-sided"), "radioButton_test_wilcox_tails_two"
+                getattr(uistate, "test_wilcox_tails", "two-sided"), "radioButton_wilcoxon_tails_two"
             )
             if hasattr(self, wilcox_tails_name):
                 getattr(self, wilcox_tails_name).setChecked(True)
@@ -3638,11 +3675,11 @@ class UIsub(
             self.frameToolTest_ANOVA.setVisible(getattr(uistate, "test_type", "None") == "ANOVA")
             if getattr(uistate, "test_type", "None") == "ANOVA":
                 self.update_anova_label()
-        if hasattr(self, "frameToolTest_Wilcoxon"):
-            self.frameToolTest_Wilcoxon.setVisible(getattr(uistate, "test_type", "None") == "Wilcoxon")
-            if getattr(uistate, "test_type", "None") == "Wilcoxon" and hasattr(self, "lineEdit_test_wilcox_one_sample_value"):
+        if hasattr(self, "frameToolTest_wilcoxon"):
+            self.frameToolTest_wilcoxon.setVisible(getattr(uistate, "test_type", "None") == "Wilcoxon")
+            if getattr(uistate, "test_type", "None") == "Wilcoxon" and hasattr(self, "lineEdit_wilcoxon_one_sample_value"):
                 val = getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)
-                self.lineEdit_test_wilcox_one_sample_value.setText(str(val))
+                self.lineEdit_wilcoxon_one_sample_value.setText(str(val))
 
         # Ensure tools column is treated as fixed pixels
         if len(uistate.splitter.get("h_splitterMaster", [])) == 4:
