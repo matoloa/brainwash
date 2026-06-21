@@ -1618,7 +1618,10 @@ class UIsub(
             pass
 
     def _get_stat_test_warning(self):
-        """Return a warning string if the selected test cannot be applied, else None."""
+        """Return a warning string if the selected test cannot be applied, else None.
+        When successful (no warning), also builds a concise p-value summary for statusbar
+        (e.g. "set 1: p=0.034  set 2: p=0.12"). Uses scientific rounding via :.3g
+        (common convention: 0.034, 0.123, 1.23e-4, <0.001)."""
         test_type = getattr(uistate, "test_type", "None")
         if test_type == "None" or test_type is None:
             return None
@@ -1645,6 +1648,35 @@ class UIsub(
         shown_ts = self._get_shown_testsets()
         if not shown_ts:
             return "Show at least one test set to run the test"
+
+        # Success path: build p-value summary for statusbar (uses uistate.formal_test_results)
+        # Only includes aspects that are currently shown (EPSP_amp / EPSP_slope checkboxes).
+        if hasattr(uistate, "formal_test_results") and uistate.formal_test_results:
+            amp_enabled = bool(getattr(uistate, "checkBox", {}).get("EPSP_amp", True))
+            slope_enabled = bool(getattr(uistate, "checkBox", {}).get("EPSP_slope", True))
+            parts = []
+            for r in uistate.formal_test_results:
+                name = r.get("set_name", f"set {r.get('set_id', '?')}")
+                subparts = []
+                for aspect, prefix in [("amp", "amp"), ("slope", "slope")]:
+                    if (aspect == "amp" and not amp_enabled) or (aspect == "slope" and not slope_enabled):
+                        continue
+                    # Prefer q_* (FDR) then p_* for this aspect
+                    pkey = next((k for k in r.keys() if k.startswith(f"q_{prefix}")), None)
+                    if not pkey:
+                        pkey = next((k for k in r.keys() if k.startswith(f"p_{prefix}")), None)
+                    pval = r.get(pkey) if pkey else None
+                    if isinstance(pval, (int, float)) and np.isfinite(pval):
+                        pstr = f"{pval:.3g}"
+                        if pval < 0.001:
+                            pstr = "<0.001"
+                        subparts.append(f"{aspect} p={pstr}")
+                    else:
+                        subparts.append(f"{aspect} p=NA")
+                if subparts:  # only show test set if at least one aspect is enabled
+                    parts.append(f"{name}: {', '.join(subparts)}")
+            if parts:
+                return " | ".join(parts)
         return None
 
     def _refresh_test_statusbar(self):
