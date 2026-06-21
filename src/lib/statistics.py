@@ -218,6 +218,10 @@ def compute_statistical_comparison(
     if variant == "one-sample":
         g1 = shown_groups[0]
         g2 = None
+    elif test_type == "ANOVA" and len(shown_groups) == 1:
+        # Repeated-measures path: 1 group, compare across test sets (within-subjects)
+        g1 = shown_groups[0]
+        g2 = None
     else:
         if len(shown_groups) < 2:
             return {"error": "need at least two shown groups", "results": []}
@@ -229,6 +233,84 @@ def compute_statistical_comparison(
 
     if get_group_testset_means_fn is None:
         return {"error": "no data accessor for testset means", "results": []}
+
+    # --- Repeated-measures ANOVA path (1 group, >=2 test sets) ---
+    # Computes omnibus one-way ANOVA across test sets within the single group.
+    # Full subject-aligned RM-ANOVA (with subject factor) is deferred.
+    if test_type == "ANOVA" and len(shown_groups) == 1 and len(shown_sets) >= 2:
+        g = shown_groups[0]
+        rm_res = {
+            "set_id": "__anova_rm_omnibus__",
+            "set_name": "ANOVA (repeated, omnibus)",
+            "sweeps": [],
+            "group1": shown_groups,
+            "n1": 0,
+            "n2": 0,
+        }
+        raw_p_amp = []
+        raw_p_slope = []
+        aspects = []
+        if amp:
+            aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
+        if slope:
+            aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
+        for short, col in aspects:
+            vals_list = []
+            for sid2, tset2 in shown_sets:
+                sweeps2 = list(tset2.get("sweeps", []))
+                if not sweeps2:
+                    continue
+                try:
+                    obs_df = get_group_testset_means_fn(g, sweeps2, aspect=col)
+                    obs = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
+                    valid = obs[np.isfinite(obs)]
+                except Exception:
+                    valid = np.array([], dtype=float)
+                vals_list.append(valid)
+            if len(vals_list) >= 2 and all(len(v) > 0 for v in vals_list):
+                try:
+                    res = f_oneway(*vals_list)
+                    p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
+                    stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
+                    eff_n = max((len(v) for v in vals_list), default=0)
+                    rm_res[f"p_{short}"] = float(p) if np.isfinite(p) else np.nan
+                    rm_res[f"stat_{short}"] = float(stat) if np.isfinite(stat) else np.nan
+                    rm_res["n1"] = max(rm_res.get("n1", 0), eff_n)
+                    if hasattr(res, "statistic") and np.isfinite(res.statistic) and eff_n > 0:
+                        df_between = len(vals_list) - 1
+                        df_within = sum(len(v) for v in vals_list) - len(vals_list)
+                        if df_within > 0:
+                            eta2 = (df_between * res.statistic) / (df_between * res.statistic + df_within)
+                            rm_res["eta2"] = float(eta2)
+                    if short == "amp":
+                        raw_p_amp.append(f"p_{short}")
+                    else:
+                        raw_p_slope.append(f"p_{short}")
+                except Exception:
+                    pass
+        rm_results = [rm_res] if ("p_amp" in rm_res or "p_slope" in rm_res) else []
+        # FDR (if requested) on the omnibus results (single row)
+        if fdr and raw_p_amp:
+            try:
+                from statsmodels.stats.multitest import multipletests
+
+                ps = [rm_res.get(k, np.nan) for k in raw_p_amp]
+                qs = multipletests([p if np.isfinite(p) else 1.0 for p in ps], alpha=0.05, method="fdr_bh")[1]
+                for k, q in zip(raw_p_amp, qs):
+                    rm_res["q_" + k[2:]] = float(q)
+            except Exception:
+                pass
+        if fdr and raw_p_slope:
+            try:
+                from statsmodels.stats.multitest import multipletests
+
+                ps = [rm_res.get(k, np.nan) for k in raw_p_slope]
+                qs = multipletests([p if np.isfinite(p) else 1.0 for p in ps], alpha=0.05, method="fdr_bh")[1]
+                for k, q in zip(raw_p_slope, qs):
+                    rm_res["q_" + k[2:]] = float(q)
+            except Exception:
+                pass
+        return {"results": rm_results, "config": {"test_type": test_type, "variant": "repeated", "fdr": fdr, "norm": norm}}
 
     alt = {"two-sided": "two-sided", "greater": "greater", "less": "less"}.get(tails, "two-sided")
 
@@ -347,6 +429,9 @@ def compute_statistical_comparison(
                         except Exception:
                             stat = np.nan
                             p = np.nan
+                    else:
+                        # Insufficient groups for between-subjects ANOVA (may be repeated-measures case with 1 group + N test sets)
+                        set_result["anova_note"] = "need >=2 groups for one-way; RM-ANOVA deferred"
                     eff_n1 = eff_n
                     eff_n2 = eff_n
                 else:

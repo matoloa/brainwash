@@ -1673,12 +1673,17 @@ class UIsub(
                     if n1 != n2 or n1 < 2:
                         return "t-test (paired) requires two groups with equal N ≥ 2"
         elif test_type == "ANOVA":
-            if len(shown_groups) < 2:
-                return "ANOVA requires at least 2 groups with data"
-        # Must have at least one shown test set
-        shown_ts = self._get_shown_testsets()
-        if not shown_ts:
-            return "Show at least one test set to run the test"
+            shown_ts = self._get_shown_testsets()
+            # ANOVA allows: >=2 groups (between-subjects), or 1 group + >=2 test sets (repeated-measures)
+            if len(shown_groups) < 2 and len(shown_ts) < 2:
+                return "ANOVA requires either >=2 groups with data, or 1 group with >=2 test sets (repeated-measures)"
+            if not shown_ts:
+                return "Show at least one test set to run the test"
+        else:
+            # Must have at least one shown test set (for t-test)
+            shown_ts = self._get_shown_testsets()
+            if not shown_ts:
+                return "Show at least one test set to run the test"
 
         # Success path: build p-value summary for statusbar (uses uistate.formal_test_results)
         # Only includes aspects that are currently shown (EPSP_amp / EPSP_slope checkboxes).
@@ -1689,6 +1694,7 @@ class UIsub(
             for r in uistate.formal_test_results:
                 name = r.get("set_name", f"set {r.get('set_id', '?')}")
                 subparts = []
+                notes = []
                 for aspect, prefix in [("amp", "amp"), ("slope", "slope")]:
                     if (aspect == "amp" and not amp_enabled) or (aspect == "slope" and not slope_enabled):
                         continue
@@ -1709,8 +1715,14 @@ class UIsub(
                     eta = r.get("eta2")
                     if isinstance(eta, (int, float)) and np.isfinite(eta):
                         subparts.append(f"η²={eta:.3f}")
+                # Note for repeated-measures omnibus (simplified one-way; full RM-ANOVA + post-hoc + sphericity deferred)
+                if test_type == "ANOVA" and r.get("set_id") == "__anova_rm_omnibus__":
+                    notes.append("(simplified; RM-ANOVA+post-hoc deferred)")
+                label = name
+                if notes:
+                    label = f"{name} {' '.join(notes)}"
                 if subparts:  # only show test set if at least one aspect is enabled
-                    parts.append(f"{name}: {', '.join(subparts)}")
+                    parts.append(f"{label}: {', '.join(subparts)}")
             if parts:
                 return " | ".join(parts)
         return None
@@ -1786,10 +1798,18 @@ class UIsub(
             shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
 
             variant_for_check = getattr(uistate, "test_t_variant", "unpaired")
-            min_groups = 1 if variant_for_check == "one-sample" else 2
+            shown_ts = self._get_shown_testsets()
+            # For ANOVA: allow 1 group if >=2 test sets (repeated-measures); otherwise require >=2 groups
+            if test_type == "ANOVA":
+                min_groups = 1 if len(shown_ts) >= 2 else 2
+            else:
+                min_groups = 1 if variant_for_check == "one-sample" else 2
             if len(shown_groups) < min_groups:
                 if had_results:
-                    print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
+                    if test_type == "ANOVA":
+                        print(f"Statistical test: ANOVA requires either >=2 groups, or 1 group with >=2 test sets (repeated-measures).")
+                    else:
+                        print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
                 self.clear_formal_test_results()
                 self._refresh_test_statusbar()
                 return
