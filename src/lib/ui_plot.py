@@ -1748,7 +1748,7 @@ class UIplot:
                 self.plot_hline(
                     f"{label} {stim_str} volley amp mean",
                     "ax1",
-                    volley_amp_mean,
+                    volley_amp_mean * 1000.0,  # dft stores SI (V); ax1 expects mV for display
                     settings["rgb_volley_amp"],
                     rec_ID,
                     aspect="volley_amp_mean",

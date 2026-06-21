@@ -800,19 +800,23 @@ class UIstate:
         if getattr(self, "experiment_type", "time") == "io":
             return True
         show = self.checkBox
-        return show["EPSP_amp"]
+        # volley_amp_mean can be shown independently of volley_amp line (per latest requirement)
+        return show.get("EPSP_amp", False) or show.get("volley_amp", False) or show.get("volley_amp_mean", False)
 
     def slopeView(self):
         if getattr(self, "experiment_type", "time") == "io":
             return False
         show = self.checkBox
-        return show["EPSP_slope"]
+        # volley_slope_mean can be shown independently of volley_slope line
+        return show.get("EPSP_slope", False) or show.get("volley_slope", False) or show.get("volley_slope_mean", False)
 
     def slopeOnly(self):
         if getattr(self, "experiment_type", "time") == "io":
             return False
         show = self.checkBox
-        return show["EPSP_slope"] and not show["EPSP_amp"]
+        has_slope = show.get("EPSP_slope", False) or show.get("volley_slope", False) or show.get("volley_slope_mean", False)
+        has_amp = show.get("EPSP_amp", False) or show.get("volley_amp", False) or show.get("volley_amp_mean", False)
+        return has_slope and not has_amp
 
     def anyView(self):
         if getattr(self, "experiment_type", "time") == "io":

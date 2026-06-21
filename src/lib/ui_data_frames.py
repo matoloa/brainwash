@@ -300,7 +300,8 @@ class DataFrameMixin:
             for i, t_row in dft.iterrows():
                 stim_nr = t_row["stim"]
                 sweep_rows = dfoutput[(dfoutput["stim"] == stim_nr) & dfoutput["sweep"].notna()]
-                dft.at[i, "volley_amp_mean"] = sweep_rows["volley_amp"].mean()
+                volley_amp_mean = sweep_rows["volley_amp"].mean()
+                dft.at[i, "volley_amp_mean"] = volley_amp_mean
                 dft.at[i, "volley_slope_mean"] = sweep_rows["volley_slope"].mean()
             self.set_dft(rec, dft)
             print(f"get_dfoutput: done, dfoutput.shape={dfoutput.shape}")

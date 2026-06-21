@@ -1166,6 +1166,12 @@ class UIsub(
         if aspect and not uistate.checkBox.get(aspect, True):
             if axis == "axe" or not is_io:
                 return False
+        # special case for *_mean aspects (volley_amp_mean, volley_slope_mean): independent of parent volley per requirement
+        if aspect in ("volley_amp_mean", "volley_slope_mean"):
+            return uistate.checkBox.get(aspect, False)
+        if aspect and aspect.endswith("_mean") and not uistate.checkBox.get(aspect.replace("_mean", ""), True):
+            if axis == "axe" or not is_io:
+                return False
         # norm/raw switch: only EPSP amp/slope have a norm variant.
         # Only applies to ax1/ax2 output lines — markers on axe represent physical
         # measurement positions and are always shown regardless of normalisation.
@@ -1199,6 +1205,12 @@ class UIsub(
         aspect = v.get("aspect")
         axis = v.get("axis")
         if aspect and not uistate.checkBox.get(aspect, True):
+            if axis == "axe" or not is_io:
+                return False
+        # special case for *_mean aspects (volley_amp_mean, volley_slope_mean): independent of parent volley per requirement
+        if aspect in ("volley_amp_mean", "volley_slope_mean"):
+            return uistate.checkBox.get(aspect, False)
+        if aspect and aspect.endswith("_mean") and not uistate.checkBox.get(aspect.replace("_mean", ""), True):
             if axis == "axe" or not is_io:
                 return False
         variant = v.get("variant")
@@ -2894,7 +2906,7 @@ class UIsub(
             self.zoomAuto()
         # norm/amp/slope (visible aspects) affect heatmap and statistical test inputs;
         # clear stale heatmap dots and formal test markers when they change.
-        aspect_keys = ["norm_EPSP", "EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
+        aspect_keys = ["norm_EPSP", "EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope", "volley_amp_mean", "volley_slope_mean"]
         if key in aspect_keys or key in ("test_fdr", "test_sw", "test_levene"):
             self.clear_formal_test_results()
         if key in aspect_keys:
