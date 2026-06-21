@@ -1737,10 +1737,9 @@ class UIsub(
                 return "Show at least one test set to run the test"
         elif test_type == "Friedman":
             shown_ts = self._get_shown_testsets()
-            print(f"Friedman guard: shown_groups={len(shown_groups)}, shown_ts={len(shown_ts)}")
             if len(shown_groups) != 1 or len(shown_ts) < 3:
                 uistate.statusbar_state = "warning"
-                return "Friedman requires exactly 1 group and at least 3 test sets (repeated-measures omnibus)"
+                return f"Friedman requires exactly 1 group and at least 3 test sets (repeated-measures omnibus) (shown_groups={len(shown_groups)}, shown_ts={len(shown_ts)})"
             if not shown_ts:
                 uistate.statusbar_state = "warning"
                 return "Show at least one test set to run the test"
@@ -1812,6 +1811,9 @@ class UIsub(
                 if subparts:  # only show test set if at least one aspect is enabled
                     if (test_type == "t-test" or test_type == "Wilcoxon") and variant in ("paired", "one-sample"):
                         parts.append(", ".join(subparts))  # no set name
+                    elif name == "Friedman (repeated, omnibus)":
+                        # Special case for Friedman omnibus: omit redundant set_name (it's already in prefix/global_notes)
+                        parts.append(", ".join(subparts))
                     else:
                         parts.append(f"{name}: {', '.join(subparts)}")
             if parts:
@@ -1992,10 +1994,6 @@ class UIsub(
             norm = bool(uistate.checkBox.get("norm_EPSP", False))
             amp = bool(uistate.checkBox.get("EPSP_amp", True))
             slope = bool(uistate.checkBox.get("EPSP_slope", True))
-            print(
-                f"apply_stat: calling compute for {test_type} with shown_groups={len(shown_groups)}, shown_ts={len(shown_ts)}, amp={amp}, slope={slope}, norm={norm}, fdr={fdr}"
-            )
-
             g1 = shown_groups[0]
             g2 = shown_groups[1] if len(shown_groups) > 1 else None
             n1 = len(self.dd_groups.get(g1, {}).get("rec_IDs", []))
@@ -2004,7 +2002,6 @@ class UIsub(
             # Build results using analysis layer.
             # Each n = average of aspect over sweeps in the test set for one recording.
             try:
-                print("apply_stat: about to call compute_statistical_comparison...")
                 comp = stats.compute_statistical_comparison(
                     groups=shown_groups,
                     dd_groups=self.dd_groups,
@@ -2019,17 +2016,12 @@ class UIsub(
                     slope=slope,
                     ref=ref_value,
                 )
-                print(
-                    f"apply_stat: compute returned keys={list(comp.keys()) if isinstance(comp, dict) else type(comp)}, results_len={len(comp.get('results', [])) if isinstance(comp, dict) else 0}"
-                )
                 results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
             except Exception as ex:
                 print(f"apply_statistical_test compute error: {ex}")
                 results = []
 
             if not results:
-                if test_type == "Friedman":
-                    print("Friedman: compute returned no results (check debug prints above for alignment/N issues)")
                 self.clear_formal_test_results()
                 uistate.statusbar_state = None
                 self._refresh_test_statusbar()

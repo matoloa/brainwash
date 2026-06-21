@@ -207,8 +207,6 @@ def compute_statistical_comparison(
     if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman"):
         return {"not_implemented": test_type, "results": []}
 
-    print(f"compute_statistical_comparison ENTER: test_type={test_type}, shown_groups={len(groups or [])}, testsets={len(dd_testsets or {})}")
-
     if not isinstance(dd_groups, dict):
         return {"error": "no groups defined", "results": []}
     if groups is None:
@@ -242,7 +240,6 @@ def compute_statistical_comparison(
         g1, g2 = shown_groups[0], shown_groups[1]
 
     shown_sets = [(sid, info) for sid, info in (dd_testsets or {}).items() if info.get("show", False) and info.get("sweeps")]
-    print(f"compute_statistical_comparison: after filter shown_sets={len(shown_sets)}, shown_groups={len(shown_groups)}")
     if not shown_sets:
         return {"error": "no shown test sets", "results": []}
 
@@ -329,8 +326,6 @@ def compute_statistical_comparison(
 
     # --- Friedman chi-square repeated-measures omnibus (1 group, >=3 test sets) ---
     # Non-parametric omnibus test parallel to RM-ANOVA; uses scipy.stats.friedmanchisquare on aligned per-recording means (k vectors).
-    if test_type == "Friedman":
-        print(f"Friedman branch reached: shown_groups={len(shown_groups)}, shown_sets={len(shown_sets)}")
     if test_type == "Friedman" and len(shown_groups) == 1 and len(shown_sets) >= 3:
         g = shown_groups[0]
         fm_res = {
@@ -353,27 +348,20 @@ def compute_statistical_comparison(
             for sid2, tset2 in shown_sets:
                 sweeps2 = list(tset2.get("sweeps", []))
                 if not sweeps2:
-                    print(f"Friedman debug: testset {sid2} has no sweeps, skipping")
                     continue
                 try:
                     obs_df = get_group_testset_means_fn(g, sweeps2, aspect=col)
-                    print(f"Friedman debug: get_means({col}) for {sid2} returned {len(obs_df)} rows")
                     obs = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
                     valid = obs[np.isfinite(obs)]
-                    print(f"Friedman debug: testset {sid2} -> {len(valid)} valid finite values (mean={valid.mean() if len(valid) > 0 else 'nan'})")
                     vals_list.append(valid)
-                except Exception as e:
-                    print(f"Friedman debug: error getting means for {sid2} {col}: {e}")
+                except Exception:
                     valid = np.array([], dtype=float)
                     vals_list.append(valid)
-            print(f"Friedman debug: {short} vals_list lengths: {[len(v) for v in vals_list]}")
             if len(vals_list) >= 3 and all(len(v) > 0 for v in vals_list):
                 try:
                     # Align by taking common length (per-rec means from get_group_testset_means_fn are in rec_ID order for single group)
                     min_len = min(len(v) for v in vals_list)
-                    print(f"Friedman debug: min_len={min_len} for {short}")
                     if min_len < 2:
-                        print(f"Friedman debug: min_len < 2 for {short}, skipping")
                         continue
                     aligned = [v[:min_len] for v in vals_list]
                     res = friedmanchisquare(*aligned)
@@ -388,16 +376,12 @@ def compute_statistical_comparison(
                         raw_p_amp.append(p_key)
                     else:
                         raw_p_slope.append(p_key)
-                    print(f"Friedman debug: {short} p={fm_res[p_key]:.4g} n={eff_n}")
-                except Exception as e:
-                    print(f"Friedman computation error for {short}: {e}")
+                except Exception:
                     pass
             else:
-                print(f"Friedman debug: {short} skipped - vals_list len={len(vals_list)}, all_nonempty={all(len(v) > 0 for v in vals_list)}")
+                pass
         has_p = any(k.startswith("p_") for k in fm_res if isinstance(k, str))
         fm_results = [fm_res] if has_p else []
-        print(f"Friedman debug: has_p={has_p}, keys with p_ = {[k for k in fm_res.keys() if isinstance(k, str) and k.startswith('p_')]}")
-        print(f"Friedman debug: final results len={len(fm_results)}, returning config with fdr={fdr} norm={norm}")
         # FDR on the omnibus row (single row, same pattern as RM-ANOVA)
         if fdr and raw_p_amp:
             try:
