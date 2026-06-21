@@ -13,7 +13,7 @@ The original v0.16 plan (docs/plan_v0.16_scitest.md) left ANOVA as a future exte
   - Repeated-measures omnibus (`f_oneway` across test sets within the single group) for 1 group + ≥2 test sets, returning a single result row (`set_id="__anova_rm_omnibus__"`).
 - Statusbar summary extended to show omnibus p-values, η², and a limitation note: `"(simplified; RM-ANOVA+post-hoc deferred)"`.
 - Dynamic label already implemented (`update_anova_label()`): shows "ANOVA (repeated)" when >1 test set, else "ANOVA (one-way)".
-- FDR, Shapiro-Wilk, and Levene checkboxes moved to the shared all-test toolbox (`checkBox_test_fdr`, `checkBox_test_sw_p`, `checkBox_test_levene_p`) and wired in `viewSettingsChanged` to trigger re-application + usage logging (`stat_test applied: ... (fdr=..., sw=..., levene=...)`).
+- FDR, Shapiro-Wilk, and Levene checkboxes moved to the shared all-test toolbox (`checkBox_test_fdr`, `checkBox_test_sw`, `checkBox_test_levene`) and wired in `viewSettingsChanged` to trigger re-application + usage logging (`stat_test applied: ... (fdr=..., sw=..., levene=...)`).
 - Persistence of the new checkbox states added to `UIstate` (reset, get/set_state, cfg load/save).
 
 The session plan file was repeatedly crashing on `exit_plan_mode`; per user instruction we are now working exclusively from this stable copy in `docs/plan_v0.16_scitest_ANOVA.md`.
@@ -25,7 +25,7 @@ The session plan file was repeatedly crashing on `exit_plan_mode`; per user inst
 - `src/lib/ui.py`:
   - `_get_stat_test_warning()`: relaxed ANOVA guard (1 group + ≥2 test sets allowed).
   - `apply_statistical_test_if_active()`: made `min_groups` ANOVA-aware.
-  - `viewSettingsChanged()`: handlers + clear logic for `test_sw_p`, `test_levene_p` (mirrors `test_fdr`).
+  - `viewSettingsChanged()`: handlers + clear logic for `test_sw`, `test_levene` (mirrors `test_fdr`).
   - Usage log extended to include `sw` and `levene` flags.
   - Statusbar summary structured as `<Test><notes> : [<aspect results>...]`.
 - `src/lib/statistics.py`:
@@ -33,7 +33,7 @@ The session plan file was repeatedly crashing on `exit_plan_mode`; per user inst
   - New RM-ANOVA omnibus block (single result row, FDR-capable, η²).
   - Between-subjects path unchanged.
 - `src/lib/ui_state_classes.py`:
-  - Added `test_sw_p`, `test_levene_p` to `checkBox` dict, direct attributes, get/set_state, cfg persistence.
+  - Added `test_sw`, `test_levene` to `checkBox` dict, direct attributes, get/set_state, cfg persistence.
 
 **Behavior:**
 

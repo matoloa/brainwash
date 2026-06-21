@@ -10,10 +10,12 @@
 # build_dfoutput, measure_waveform, timepoint detection, etc.).
 # ---------------------------------------------------------------------------
 
+import warnings
+
 import numpy as np
 import pandas as pd
 from scipy import stats  # for t.cdf in one-sample approximation
-from scipy.stats import f_oneway, ttest_1samp, ttest_ind, ttest_ind_from_stats, ttest_rel
+from scipy.stats import f_oneway, levene, shapiro, ttest_1samp, ttest_ind, ttest_ind_from_stats, ttest_rel
 
 # ---------------------------------------------------------------------------
 # FDR and per-sweep test helpers
@@ -456,6 +458,49 @@ def compute_statistical_comparison(
             if "eta2" in set_result:
                 set_result["eta2"] = set_result.get("eta2", np.nan)
 
+            # Assumption tests (Shapiro-Wilk normality per group/aspect, Levene homogeneity across groups)
+            # SW requires n>=3 (scipy shapiro constraint); Levene works for n>=2.
+            valid_obs1 = obs1[np.isfinite(obs1)]
+            n_obs1 = len(valid_obs1)
+            if (short == "amp" or short == "slope") and n_obs1 >= 3:
+                # Shapiro-Wilk on group 1 (or test-set values in RM-ANOVA case)
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        sw_stat, sw_p = shapiro(valid_obs1)
+                    set_result[f"sw_stat_{short}"] = float(sw_stat)
+                    set_result[f"sw_p_{short}"] = float(sw_p)
+                except Exception:
+                    set_result[f"sw_stat_{short}"] = np.nan
+                    set_result[f"sw_p_{short}"] = np.nan
+                # Levene across groups (or test sets in RM case); skip if <2 groups
+                if len(shown_groups) >= 2 or (test_type == "ANOVA" and len(shown_sets) >= 2):
+                    try:
+                        groups_for_lev = [valid_obs1]
+                        if g2 is not None:
+                            groups_for_lev.append(obs2[np.isfinite(obs2)])
+                        elif test_type == "ANOVA" and len(shown_groups) == 1:
+                            # RM case: collect from all test sets for this aspect
+                            for sid2, tset2 in shown_sets:
+                                if sid2 == sid:
+                                    continue  # already have obs1
+                                try:
+                                    o_df = get_group_testset_means_fn(shown_groups[0], tset2.get("sweeps", []), aspect=col)
+                                    o_vals = o_df["value"].to_numpy(dtype=float)
+                                    groups_for_lev.append(o_vals[np.isfinite(o_vals)])
+                                except Exception:
+                                    pass
+                        if len(groups_for_lev) >= 2:
+                            lev_stat, lev_p = levene(*groups_for_lev, center="mean")
+                            set_result[f"levene_stat_{short}"] = float(lev_stat)
+                            set_result[f"levene_p_{short}"] = float(lev_p)
+                        else:
+                            set_result[f"levene_stat_{short}"] = np.nan
+                            set_result[f"levene_p_{short}"] = np.nan
+                    except Exception:
+                        set_result[f"levene_stat_{short}"] = np.nan
+                        set_result[f"levene_p_{short}"] = np.nan
+
             # Track for FDR (per aspect family) - append *before* possible out_results.append
             if short == "amp":
                 raw_p_amp.append((len(out_results), p_key))  # index into final list
@@ -468,8 +513,8 @@ def compute_statistical_comparison(
             if eff_n2:
                 set_result["n2"] = max(int(set_result.get("n2", 0)), eff_n2)
 
-        # If we computed at least one aspect for this set, keep it
-        has_any_p = any(k.startswith("p_") for k in set_result.keys())
+        # If we computed at least one aspect for this set, keep it (assumption tests alone are sufficient to keep the result)
+        has_any_p = any(k.startswith("p_") for k in set_result.keys()) or any(k.startswith(("sw_", "levene_")) for k in set_result.keys())
         if has_any_p:
             out_results.append(set_result)
 

@@ -1576,6 +1576,7 @@ class UIsub(
             pass
         if hasattr(uistate, "formal_test_results"):
             uistate.formal_test_results = None
+        uistate.statusbar_state = None  # reset non-persisted state on clear
         # leave printed console output as-is (user can scroll)
 
     def _is_loading_active(self):
@@ -1648,14 +1649,18 @@ class UIsub(
         """Return a warning string if the selected test cannot be applied, else None.
         When successful (no warning), also builds a concise p-value summary for statusbar
         (e.g. "set 1: p=0.034  set 2: p=0.12"). Uses scientific rounding via :.3g
-        (common convention: 0.034, 0.123, 1.23e-4, <0.001)."""
+        (common convention: 0.034, 0.123, 1.23e-4, <0.001).
+        Sets uistate.statusbar_state = "warning" on SW/Levene violation (p<0.05) or "info" on success (per proposal)."""
         test_type = getattr(uistate, "test_type", "None")
         if test_type == "None" or test_type is None:
+            uistate.statusbar_state = None
             return None
         if test_type not in ("t-test", "ANOVA"):
+            uistate.statusbar_state = "warning"
             return f"Statistical test '{test_type}' is not implemented"
         # Groups with data
         if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
+            uistate.statusbar_state = "warning"
             return "Create groups to use statistical test"
         shown_groups = self._get_shown_group_ids()
         shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
@@ -1663,26 +1668,32 @@ class UIsub(
         if test_type == "t-test":
             if variant == "one-sample":
                 if len(shown_groups) != 1:
+                    uistate.statusbar_state = "warning"
                     return "t-test (one-sample) requires exactly 1 group with data"
             else:
                 if len(shown_groups) != 2:
+                    uistate.statusbar_state = "warning"
                     return "t-test requires exactly 2 groups with data"
                 if variant == "paired":
                     n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
                     n2 = len(self.dd_groups.get(shown_groups[1], {}).get("rec_IDs", []))
                     if n1 != n2 or n1 < 2:
+                        uistate.statusbar_state = "warning"
                         return "t-test (paired) requires two groups with equal N ≥ 2"
         elif test_type == "ANOVA":
             shown_ts = self._get_shown_testsets()
             # ANOVA allows: >=2 groups (between-subjects), or 1 group + >=2 test sets (repeated-measures)
             if len(shown_groups) < 2 and len(shown_ts) < 2:
+                uistate.statusbar_state = "warning"
                 return "ANOVA requires either >=2 groups with data, or 1 group with >=2 test sets (repeated-measures)"
             if not shown_ts:
+                uistate.statusbar_state = "warning"
                 return "Show at least one test set to run the test"
         else:
             # Must have at least one shown test set (for t-test)
             shown_ts = self._get_shown_testsets()
             if not shown_ts:
+                uistate.statusbar_state = "warning"
                 return "Show at least one test set to run the test"
 
         # Success path: build p-value summary for statusbar (uses uistate.formal_test_results)
@@ -1732,47 +1743,84 @@ class UIsub(
                 if subparts:  # only show test set if at least one aspect is enabled
                     parts.append(f"{name}: {', '.join(subparts)}")
             if parts:
-                return f"{prefix}: {' | '.join(parts)}"
+                status = f"{prefix}: {' | '.join(parts)}"
+            else:
+                status = f"{prefix}"
+            # Add SW/Levene assumption test summary if enabled (per v0.16 request + proposed compact format).
+            # Moved outside `if parts` so SW always reports (even if no main p-values).
+            sw = bool(getattr(uistate, "test_sw", False))
+            lev = bool(getattr(uistate, "test_levene", False))
+            assumption_parts = []
+            if sw or lev:
+                for r in uistate.formal_test_results:
+                    for aspect in ["amp", "slope"]:
+                        # SW (Shapiro-Wilk) per aspect per set - proposed compact: SW ✓ 0.97 (0.21) or SW ✗ 0.91 (0.01)
+                        if sw:
+                            w_key = f"sw_stat_{aspect}"
+                            p_key = f"sw_p_{aspect}"
+                            w = r.get(w_key)
+                            p = r.get(p_key)
+                            if isinstance(w, (int, float)) and np.isfinite(w) and isinstance(p, (int, float)) and np.isfinite(p):
+                                pstr = f"{p:.3g}" if p >= 0.001 else "<0.001"
+                                symbol = "✓" if p >= 0.05 else "✗"
+                                assumption_parts.append(f"SW {symbol} {w:.2f} ({pstr})")
+                                if p < 0.05:
+                                    assumption_parts.append("Distribution NOT normal")
+                        # Levene per aspect - proposed compact: Lev ✓ F=1.80 (0.22) or Lev ✗ F=3.40 (0.03)
+                        if lev:
+                            w_key = f"levene_stat_{aspect}"
+                            p_key = f"levene_p_{aspect}"
+                            w = r.get(w_key)
+                            p = r.get(p_key)
+                            if isinstance(w, (int, float)) and np.isfinite(w) and isinstance(p, (int, float)) and np.isfinite(p):
+                                pstr = f"{p:.3g}" if p >= 0.001 else "<0.001"
+                                symbol = "✓" if p >= 0.05 else "✗"
+                                assumption_parts.append(f"Lev {symbol} F={w:.2g} ({pstr})")
+                                if p < 0.05:
+                                    assumption_parts.append("Variances NOT equal")
+            if assumption_parts:
+                if not parts:
+                    status = f"{prefix}:"
+                status += " | " + " | ".join(assumption_parts)
+            elif sw:
+                # SW requested but no valid results (e.g., n<3 per group)
+                if not parts:
+                    status = f"{prefix}:"
+                status += " | SW n<3"
+            # Violation notes were appended above; promote state here (results always shown per prior request).
+            if any(note in part for part in assumption_parts for note in ("NOT normal", "NOT equal")):
+                uistate.statusbar_state = "warning"
+            else:
+                uistate.statusbar_state = "info"
+            return status
+        uistate.statusbar_state = None
         return None
 
     def _refresh_test_statusbar(self):
-        """Update statusbar for current test conditions.
-        - Warning/error present: red bg + white centered text (error state)
-        - Successful statistical test report (p-values/effect size): default theme color, no background, bold text
-        - No content and not loading: use default statusbar color (theme / darkmode sensitive) + cleared text
-        Loading takes precedence (it sets its own messages while active).
+        """Update statusbar for current test conditions using uistate.statusbar_state (None = default/cleared, "info" = success report bold/default color, "warning" = red/white/bold).
+        No magic strings. State is set by _get_stat_test_warning (reset to None on error paths or test_type=None).
         """
         if self._is_loading_active():
             return
         warning = self._get_stat_test_warning()
-        if warning:
-            if any(x in warning for x in ("p=", "η²=", "NA", " | ")):
-                # Successful statistical test report (p-values, effect size, or NA) — default appearance (no bg), bold
-                self._set_statusbar_appearance(bg_color=None, bold=True, text=warning)
-            else:
-                # True error/warning (e.g. "requires ...", "not implemented", "no groups...")
-                self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=warning)
+        state = getattr(uistate, "statusbar_state", None)
+        if state == "warning":
+            # Explicit warning (Levene/SW violation or guard error) — red/white/bold
+            self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=warning)
+        elif state == "info" or warning:
+            # Successful test report (p-values, effect size, NA, SW/Levene summary) — default theme, bold
+            self._set_statusbar_appearance(bg_color=None, bold=True, text=warning or "")
         else:
-            # No warning or report: default color (no forced bg)
+            # No content: default color (theme / darkmode sensitive) + cleared text
             self._set_statusbar_appearance(clear=True)
 
     def _on_statusbar_message_cleared(self, text):
-        """After a transient message (e.g. export toast) clears, restore warning or default (non-error) state."""
+        """After a transient message (e.g. export toast) clears, restore via _refresh_test_statusbar (which now uses uistate.statusbar_state)."""
         if text:
             return
         if self._is_loading_active():
             return
-        warning = self._get_stat_test_warning()
-        if warning:
-            if any(x in warning for x in ("p=", "η²=", "NA", " | ")):
-                # Successful statistical test report (p-values, effect size, or NA) — default appearance (no bg), bold
-                self._set_statusbar_appearance(bg_color=None, bold=True, text=warning)
-            else:
-                # True error/warning (e.g. "requires ...", "not implemented", "no groups...")
-                self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=warning)
-        else:
-            # Non-error: default color (sensitive to current darkmode)
-            self._set_statusbar_appearance(clear=True)
+        self._refresh_test_statusbar()
 
     def apply_statistical_test_if_active(self):
         """Core applicator. Called automatically from config changes and mutations.
@@ -1782,12 +1830,14 @@ class UIsub(
             test_type = getattr(uistate, "test_type", "None")
             if test_type == "None" or test_type is None:
                 self.clear_formal_test_results()
+                uistate.statusbar_state = None
                 self._refresh_test_statusbar()
                 return
 
             if test_type not in ("t-test", "ANOVA"):
                 print(f"Statistical test '{test_type}' is not yet implemented for v0.16 (t-test and ANOVA supported).")
                 self.clear_formal_test_results()
+                uistate.statusbar_state = "warning"
                 self._refresh_test_statusbar()
                 return
 
@@ -1798,6 +1848,7 @@ class UIsub(
                 if had_results:
                     print("Statistical test: no groups defined.")
                 self.clear_formal_test_results()
+                uistate.statusbar_state = "warning"
                 self._refresh_test_statusbar()
                 return
 
@@ -1819,6 +1870,7 @@ class UIsub(
                     else:
                         print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
                 self.clear_formal_test_results()
+                uistate.statusbar_state = "warning"
                 self._refresh_test_statusbar()
                 return
 
@@ -1838,13 +1890,14 @@ class UIsub(
                 if had_results:
                     print("Statistical test: no shown test sets. Tag sweeps and show at least one test set.")
                 self.clear_formal_test_results()
+                uistate.statusbar_state = "warning"
                 self._refresh_test_statusbar()
                 return
 
             # Snapshot config
             variant = getattr(uistate, "test_t_variant", "unpaired")
             tails = getattr(uistate, "test_t_tails", "two-sided")
-            fdr = bool(uistate.checkBox.get("test_fdr", False))
+            fdr = bool(getattr(uistate, "test_fdr", False))
             norm = bool(uistate.checkBox.get("norm_EPSP", False))
             amp = bool(uistate.checkBox.get("EPSP_amp", True))
             slope = bool(uistate.checkBox.get("EPSP_slope", True))
@@ -1877,6 +1930,7 @@ class UIsub(
 
             if not results:
                 self.clear_formal_test_results()
+                uistate.statusbar_state = None
                 self._refresh_test_statusbar()
                 return
 
@@ -2861,7 +2915,7 @@ class UIsub(
         self.dict_usage[ui_component] += 1
         if config.talkback and ui_component in self.dict_usage:
             # Do not clobber an active test warning (red statusbar)
-            if "#c0392b" not in (self.statusbar.styleSheet() or ""):
+            if getattr(uistate, "statusbar_state", None) != "warning":
                 # Show as centered text using the current default (theme/darkmode) color
                 self._set_statusbar_appearance(text=f"Used {ui_component} {self.dict_usage[ui_component]} times", bold=False)
         self.write_usage()

@@ -201,6 +201,7 @@ class UIstate:
         self.dict_heatmap = {}
         self.dict_test_markers = {}
         self.formal_test_results = None
+        self.statusbar_state = None  # "info" | "warning" (non-persisted; reset on recalc; drives distinct warning vs default styling)
 
         # default_dict_t is used to store timepoints and their parameters
         # only assign full width as we normally use odd length in discrete index for clarity

@@ -311,3 +311,14 @@ This plan provides a concrete, minimal-UI-change path to turn the partially wire
 ## Heatmap
 
 Heatmap is a separate and crude tool to see where data differs. Contrary to the tests, it runs on the full range of all group samples, and shows the x-points where the groups are significantly different. It is a purely prospective tool; not intended as an independently meaningful analysis. It overlaps with the statistical test, but it's not integrated.
+
+## Assumption Test Statusbar (SW + Levene)
+
+- Statusbar shows concise results for SW/Levene when checkboxes enabled.
+- **New proposed/approved format** (per latest request):
+  - `SW ✓ 0.97 (0.21)` / `SW ✗ 0.91 (0.01)`
+  - `Lev ✓ F=1.8 (0.22)` / `Lev ✗ F=3.4 (0.03)`
+- Results always included (whether or not warning triggered); `statusbar_state` drives red/white/bold (violation) vs default/bold (success). Updated `_get_stat_test_warning()` (uses ✓/✗, W:.2f, F=.2f, p:.3g or <0.001; appends violation notes; unconditional SW/Lev blocks + pstr for Lev).
+- Non-persisted `uistate.statusbar_state = None` (reset on clear/recalc), "info" on success, "warning" on p<0.05.
+- `_refresh_test_statusbar()` uses state (no magic strings).
+- Plans updated to reflect new compact format (matches examples exactly; keeps prior violation handling and state machine). F precision fixed to exactly two decimals. SW now reliably outputs results+warnings.
