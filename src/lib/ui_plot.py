@@ -831,6 +831,9 @@ class UIplot:
         legend_loc = ["upper right", "lower right"]
         if getattr(uistate, "experiment_type", "time") == "io":
             legend_loc = ["lower right", "lower right"]
+        elif uistate.slopeOnly():
+            # slope-only: legend on ax2 (top-right) to match significance markers
+            legend_loc = ["upper right", "upper right"]
         is_pp = getattr(uistate, "experiment_type", "time") == "PP"
         for axid, loc in zip(axids, legend_loc):
             recs_on_axis = {key: value for key, value in dd_recs.items() if value["axis"] == axid and not key.endswith(" marker")}
@@ -840,7 +843,11 @@ class UIplot:
                 axis_legend.update({key: value["line"] for key, value in groups_on_axis.items()})
             axis = getattr(uistate, axid)
             if axis_legend and not is_pp:
-                axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)
+                try:
+                    axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)
+                except TypeError:
+                    # Fallback if zorder was passed from ui.py wrapper (matplotlib version issue)
+                    axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)
             else:
                 if axis.get_legend():
                     axis.get_legend().remove()
