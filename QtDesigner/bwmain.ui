@@ -1913,7 +1913,7 @@
              <string notr="true">buttonGroup_test</string>
             </attribute>
            </widget>
-           <widget class="QCheckBox" name="checkBox_test_sw_p">
+           <widget class="QCheckBox" name="checkBox_test_levene">
             <property name="geometry">
              <rect>
               <x>10</x>
@@ -1929,7 +1929,7 @@
              <bool>true</bool>
             </property>
            </widget>
-           <widget class="QCheckBox" name="checkBox_test_levene_p">
+           <widget class="QCheckBox" name="checkBox_test_sw">
             <property name="geometry">
              <rect>
               <x>10</x>

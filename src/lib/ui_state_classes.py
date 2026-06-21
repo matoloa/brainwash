@@ -142,8 +142,8 @@ class UIstate:
             "io_force0": False,
             "is_group_sample": False,
             "test_fdr": False,
-            "test_sw_p": False,
-            "test_levene_p": False,
+            "test_sw": False,
+            "test_levene": False,
         }
         self.lineEdit = {  # storage of user input; used to update df_t
             "split_at_time": 0.0,  # in s (SI). User enters ms; converted at input in editImportOptions.
@@ -188,8 +188,8 @@ class UIstate:
         self.test_t_variant = "unpaired"
         self.test_t_tails = "two-sided"
         self.test_fdr = False
-        self.test_sw_p = False
-        self.test_levene_p = False
+        self.test_sw = False
+        self.test_levene = False
         self.anova_label = "ANOVA (one-way)"  # updated dynamically based on # of shown test sets
         self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
         self._time_unit_label = "s"  # set by x_axis_xlim when mode == "time"
@@ -666,8 +666,8 @@ class UIstate:
                 "test_t_variant": getattr(self, "test_t_variant", "unpaired"),
                 "test_t_tails": getattr(self, "test_t_tails", "two-sided"),
                 "test_fdr": getattr(self, "test_fdr", False),
-                "test_sw_p": getattr(self, "test_sw_p", False),
-                "test_levene_p": getattr(self, "test_levene_p", False),
+                "test_sw": getattr(self, "test_sw", False),
+                "test_levene": getattr(self, "test_levene", False),
                 "anova_label": getattr(self, "anova_label", "ANOVA (one-way)"),
                 "showTimetable": self.showTimetable,
                 "detailedProjectTable": getattr(self, "detailedProjectTable", False),
@@ -702,8 +702,8 @@ class UIstate:
         self.test_t_variant = state.get("test_t_variant", "unpaired")
         self.test_t_tails = state.get("test_t_tails", "two-sided")
         self.test_fdr = state.get("test_fdr", False)
-        self.test_sw_p = state.get("test_sw_p", False)
-        self.test_levene_p = state.get("test_levene_p", False)
+        self.test_sw = state.get("test_sw", False)
+        self.test_levene = state.get("test_levene", False)
         self.anova_label = state.get("anova_label", "ANOVA (one-way)")
 
         self.showTimetable = state.get("showTimetable", False)
