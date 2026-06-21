@@ -1670,16 +1670,19 @@ class UIsub(
                 if len(shown_groups) != 1:
                     uistate.statusbar_state = "warning"
                     return "t-test (one-sample) requires exactly 1 group with data"
+            elif variant == "paired":
+                shown_ts = self._get_shown_testsets()
+                if len(shown_groups) != 1 or len(shown_ts) != 2:
+                    uistate.statusbar_state = "warning"
+                    return "t-test (paired) requires exactly 1 group and exactly 2 test sets"
+                n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
+                if n1 < 2:
+                    uistate.statusbar_state = "warning"
+                    return "t-test (paired) requires N ≥ 2 recordings per group"
             else:
                 if len(shown_groups) != 2:
                     uistate.statusbar_state = "warning"
                     return "t-test requires exactly 2 groups with data"
-                if variant == "paired":
-                    n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
-                    n2 = len(self.dd_groups.get(shown_groups[1], {}).get("rec_IDs", []))
-                    if n1 != n2 or n1 < 2:
-                        uistate.statusbar_state = "warning"
-                        return "t-test (paired) requires two groups with equal N ≥ 2"
         elif test_type == "ANOVA":
             shown_ts = self._get_shown_testsets()
             # ANOVA allows: >=2 groups (between-subjects), or 1 group + >=2 test sets (repeated-measures)
@@ -1858,11 +1861,12 @@ class UIsub(
 
             variant_for_check = getattr(uistate, "test_t_variant", "unpaired")
             shown_ts = self._get_shown_testsets()
-            # For ANOVA: allow 1 group if >=2 test sets (repeated-measures); otherwise require >=2 groups
+            # For ANOVA: allow 1 group if >=2 test sets (repeated-measures); otherwise require >=2 groups.
+            # Paired t-test: exactly 1 group + exactly 2 test sets (per pairing model in plan_v0.16_scitest.md).
             if test_type == "ANOVA":
                 min_groups = 1 if len(shown_ts) >= 2 else 2
             else:
-                min_groups = 1 if variant_for_check == "one-sample" else 2
+                min_groups = 1 if variant_for_check in ("one-sample", "paired") else 2
             if len(shown_groups) < min_groups:
                 if had_results:
                     if test_type == "ANOVA":
@@ -1874,18 +1878,23 @@ class UIsub(
                 self._refresh_test_statusbar()
                 return
 
-            # For paired we need matching sizes; check early using current shown groups
+            # Paired t-test additionally requires exactly 2 test sets (the pairing model uses 2 test sets within 1 group)
             if variant_for_check == "paired":
-                n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
-                n2 = len(self.dd_groups.get(shown_groups[1], {}).get("rec_IDs", []))
-                if n1 != n2 or n1 < 2:
+                if len(shown_ts) != 2:
                     if had_results:
-                        print("Statistical test: paired requires two groups with equal number of recordings (>=2).")
+                        print("Statistical test: paired requires exactly 2 shown test sets (with 1 group).")
+                    self.clear_formal_test_results()
+                    uistate.statusbar_state = "warning"
+                    self._refresh_test_statusbar()
+                    return
+                n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
+                if n1 < 2:
+                    if had_results:
+                        print("Statistical test: paired requires N ≥ 2 recordings.")
                     self.clear_formal_test_results()
                     self._refresh_test_statusbar()
                     return
 
-            shown_ts = self._get_shown_testsets()
             if not shown_ts:
                 if had_results:
                     print("Statistical test: no shown test sets. Tag sweeps and show at least one test set.")
