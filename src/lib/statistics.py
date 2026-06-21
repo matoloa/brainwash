@@ -224,6 +224,12 @@ def compute_statistical_comparison(
         # Repeated-measures path: 1 group, compare across test sets (within-subjects)
         g1 = shown_groups[0]
         g2 = None
+    elif variant == "paired":
+        # Paired t-test (v0.16): exactly 1 group + 2 test sets; pair observations by rec_ID within the single group
+        if len(shown_groups) != 1:
+            return {"error": "paired t-test requires exactly 1 group", "results": []}
+        g1 = shown_groups[0]
+        g2 = None  # not used; pairing handled inside ttest_rel branch using 2 test sets
     else:
         if len(shown_groups) < 2:
             return {"error": "need at least two shown groups", "results": []}
@@ -373,6 +379,19 @@ def compute_statistical_comparison(
                 except Exception:
                     obs2 = np.array([], dtype=float)
                     recs2 = []
+            elif variant == "paired":
+                # For paired t-test (1 group + 2 test sets): obs1 from first testset, obs2 from second testset (both within same g1)
+                try:
+                    # obs1 already fetched from first test set (sweeps from first shown_ts)
+                    # Fetch obs2 from the *second* shown test set using same group
+                    if len(shown_sets) >= 2:
+                        sid2, tset2 = shown_sets[1]
+                        obs2_df = get_group_testset_means_fn(g1, tset2.get("sweeps", []), aspect=col)
+                        obs2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
+                        recs2 = obs2_df["rec_ID"].tolist() if not obs2_df.empty else []
+                except Exception:
+                    obs2 = np.array([], dtype=float)
+                    recs2 = []
 
             p = np.nan
             stat = np.nan
@@ -388,7 +407,7 @@ def compute_statistical_comparison(
                         stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
                         p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
                 elif variant == "paired":
-                    # Align by rec_ID intersection, in order of appearance in g1/g2
+                    # Align by rec_ID intersection (pairing model per plan_v0.16_scitest.md: 1 group + 2 test sets)
                     if len(recs1) == 0 or len(recs2) == 0:
                         pass
                     else:
