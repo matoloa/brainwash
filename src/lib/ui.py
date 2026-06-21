@@ -59,6 +59,8 @@ import ui_sweep_ops
 import yaml  # used by talkback
 from ui_project import df_projectTemplate
 
+from . import statistics as stats  # our statistical testing layer (not the built-in stdlib module)
+
 logger = logging.getLogger(__name__)
 logger.debug("ui.py: os.getcwd(): %s", os.getcwd())
 
@@ -1548,6 +1550,23 @@ class UIsub(
                 out.append((sid, ts))
         return out
 
+    def update_anova_label(self):
+        """Update label_test_ANOVA and uistate.anova_label based on number of shown test sets.
+        Called whenever test sets are created, shown/hidden, or test_type changes to ANOVA.
+        """
+        if not hasattr(self, "label_test_ANOVA"):
+            return
+        n = len(self._get_shown_testsets())
+        if n > 1:
+            label_text = "ANOVA (repeated)"
+        else:
+            label_text = "ANOVA (one-way)"
+        uistate.anova_label = label_text
+        self.label_test_ANOVA.setText(label_text)
+        # Persist immediately (mirrors other test cfg changes)
+        if hasattr(self, "dict_folders") and "project" in self.dict_folders:
+            uistate.save_cfg(projectfolder=self.dict_folders["project"])
+
     def clear_formal_test_results(self):
         """Clear any formal test markers and stored results. Independent of heatmap."""
         try:
@@ -1625,25 +1644,29 @@ class UIsub(
         test_type = getattr(uistate, "test_type", "None")
         if test_type == "None" or test_type is None:
             return None
-        if test_type != "t-test":
+        if test_type not in ("t-test", "ANOVA"):
             return f"Statistical test '{test_type}' is not implemented"
         # Groups with data
         if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
-            return "Create groups to use t-test"
+            return "Create groups to use statistical test"
         shown_groups = self._get_shown_group_ids()
         shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
         variant = getattr(uistate, "test_t_variant", "unpaired")
-        if variant == "one-sample":
-            if len(shown_groups) != 1:
-                return "t-test (one-sample) requires exactly 1 group with data"
-        else:
-            if len(shown_groups) != 2:
-                return "t-test requires exactly 2 groups with data"
-            if variant == "paired":
-                n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
-                n2 = len(self.dd_groups.get(shown_groups[1], {}).get("rec_IDs", []))
-                if n1 != n2 or n1 < 2:
-                    return "t-test (paired) requires two groups with equal N ≥ 2"
+        if test_type == "t-test":
+            if variant == "one-sample":
+                if len(shown_groups) != 1:
+                    return "t-test (one-sample) requires exactly 1 group with data"
+            else:
+                if len(shown_groups) != 2:
+                    return "t-test requires exactly 2 groups with data"
+                if variant == "paired":
+                    n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
+                    n2 = len(self.dd_groups.get(shown_groups[1], {}).get("rec_IDs", []))
+                    if n1 != n2 or n1 < 2:
+                        return "t-test (paired) requires two groups with equal N ≥ 2"
+        elif test_type == "ANOVA":
+            if len(shown_groups) < 2:
+                return "ANOVA requires at least 2 groups with data"
         # Must have at least one shown test set
         shown_ts = self._get_shown_testsets()
         if not shown_ts:
@@ -1673,6 +1696,11 @@ class UIsub(
                         subparts.append(f"{aspect} p={pstr}")
                     else:
                         subparts.append(f"{aspect} p=NA")
+                # Add effect size for ANOVA (eta2 from compute_statistical_comparison)
+                if test_type == "ANOVA" and "eta2" in r:
+                    eta = r.get("eta2")
+                    if isinstance(eta, (int, float)) and np.isfinite(eta):
+                        subparts.append(f"η²={eta:.3f}")
                 if subparts:  # only show test set if at least one aspect is enabled
                     parts.append(f"{name}: {', '.join(subparts)}")
             if parts:
@@ -1726,8 +1754,8 @@ class UIsub(
                 self._refresh_test_statusbar()
                 return
 
-            if test_type != "t-test":
-                print(f"Statistical test '{test_type}' is not yet implemented for v0.16 (t-test only).")
+            if test_type not in ("t-test", "ANOVA"):
+                print(f"Statistical test '{test_type}' is not yet implemented for v0.16 (t-test and ANOVA supported).")
                 self.clear_formal_test_results()
                 self._refresh_test_statusbar()
                 return
@@ -1790,7 +1818,7 @@ class UIsub(
             # Build results using analysis layer.
             # Each n = average of aspect over sweeps in the test set for one recording.
             try:
-                comp = analysis.compute_statistical_comparison(
+                comp = stats.compute_statistical_comparison(
                     groups=shown_groups,
                     dd_groups=self.dd_groups,
                     dd_testsets=self.dd_testsets,
@@ -2606,6 +2634,10 @@ class UIsub(
         uistate.test_type = test_type
         if hasattr(self, "frameToolTest_t"):
             self.frameToolTest_t.setVisible(test_type == "t-test")
+        if hasattr(self, "frameToolTest_ANOVA"):
+            self.frameToolTest_ANOVA.setVisible(test_type == "ANOVA")
+            if test_type == "ANOVA":
+                self.update_anova_label()
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         # Automatic application (v0.16): apply when non-None, clear when None
         self.apply_statistical_test_if_active()
@@ -2739,6 +2771,7 @@ class UIsub(
             self.clear_formal_test_results()
         if key in aspect_keys:
             self.turn_heatmap_off()
+        self.update_anova_label()  # sync if test sets changed indirectly
         self.graphRefresh()
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
@@ -2751,6 +2784,7 @@ class UIsub(
         self.testset_controls_remove()
         for set_ID in getattr(self, "dd_testsets", {}).keys():
             self.testset_controls_add(set_ID)
+        self.update_anova_label()  # sync label after test set UI refresh
 
     def usage(self, ui_component):  # Talkback function
         logger.debug("usage: %s", ui_component)
@@ -3020,6 +3054,10 @@ class UIsub(
             self.frameToolType_io.setVisible(getattr(uistate, "experiment_type", "time") == "io")
         if hasattr(self, "frameToolTest_t"):
             self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
+        if hasattr(self, "frameToolTest_ANOVA"):
+            self.frameToolTest_ANOVA.setVisible(getattr(uistate, "test_type", "None") == "ANOVA")
+            if getattr(uistate, "test_type", "None") == "ANOVA":
+                self.update_anova_label()
 
     def build_dict_folders(self):
         dict_folders = {
@@ -3312,6 +3350,10 @@ class UIsub(
                 getattr(self, tails_name).setChecked(True)
         if hasattr(self, "frameToolTest_t"):
             self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
+        if hasattr(self, "frameToolTest_ANOVA"):
+            self.frameToolTest_ANOVA.setVisible(getattr(uistate, "test_type", "None") == "ANOVA")
+            if getattr(uistate, "test_type", "None") == "ANOVA":
+                self.update_anova_label()
 
         # Ensure tools column is treated as fixed pixels
         if len(uistate.splitter.get("h_splitterMaster", [])) == 4:
@@ -3356,6 +3398,7 @@ class UIsub(
         uiplot.clear_sample_artists(draw=False)
         # Changing shown test sets requires fresh statistical markers (not stale cached results)
         self.clear_formal_test_results()
+        self.update_anova_label()  # update ANOVA label if visible
         self.graphRefresh()
         # graphRefresh wrapper applies the test (recomputes + show_test_markers) after draw
 

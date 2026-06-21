@@ -273,9 +273,9 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-569</y>
+          <y>-666</y>
           <width>284</width>
-          <height>1492</height>
+          <height>1589</height>
          </rect>
         </property>
         <property name="minimumSize">
@@ -1916,6 +1916,80 @@
           </widget>
          </item>
          <item>
+          <widget class="QFrame" name="frameToolTest_ANOVA">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>201</width>
+             <height>81</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Raised</enum>
+           </property>
+           <widget class="QLabel" name="label_test_ANOVA">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>10</y>
+              <width>231</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="font">
+             <font>
+              <family>DejaVu Sans</family>
+              <weight>75</weight>
+              <bold>true</bold>
+             </font>
+            </property>
+            <property name="text">
+             <string>ANOVA (repeated)</string>
+            </property>
+           </widget>
+           <widget class="QCheckBox" name="checkBox_test_ANOVA_levene_p">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>30</y>
+              <width>241</width>
+              <height>23</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Test normality (Shapiro-Wilk)</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+           <widget class="QCheckBox" name="checkBox_test_ANOVA_sw_p">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>50</y>
+              <width>241</width>
+              <height>23</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Test homogeneity (Levene)</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </widget>
+         </item>
+         <item>
           <widget class="QFrame" name="frameToolTest_t">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
@@ -2135,11 +2209,11 @@
  <connections/>
  <buttongroups>
   <buttongroup name="buttonGroup_test_t_variant"/>
+  <buttongroup name="buttonGroup_filter"/>
   <buttongroup name="buttonGroup_io_o"/>
+  <buttongroup name="buttonGroup_io_i"/>
+  <buttongroup name="buttonGroup_type"/>
   <buttongroup name="buttonGroup_test"/>
   <buttongroup name="buttonGroup_test_t_tails"/>
-  <buttongroup name="buttonGroup_io_i"/>
-  <buttongroup name="buttonGroup_filter"/>
-  <buttongroup name="buttonGroup_type"/>
  </buttongroups>
 </ui>

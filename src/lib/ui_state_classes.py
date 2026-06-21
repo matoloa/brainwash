@@ -186,6 +186,7 @@ class UIstate:
         self.test_t_variant = "unpaired"
         self.test_t_tails = "two-sided"
         self.test_fdr = False
+        self.anova_label = "ANOVA (one-way)"  # updated dynamically based on # of shown test sets
         self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
         self._time_unit_label = "s"  # set by x_axis_xlim when mode == "time"
         self._time_sweep_hz = 1.0  # set by x_axis_xlim when mode == "time"
@@ -661,6 +662,7 @@ class UIstate:
                 "test_t_variant": getattr(self, "test_t_variant", "unpaired"),
                 "test_t_tails": getattr(self, "test_t_tails", "two-sided"),
                 "test_fdr": getattr(self, "test_fdr", False),
+                "anova_label": getattr(self, "anova_label", "ANOVA (one-way)"),
                 "showTimetable": self.showTimetable,
                 "detailedProjectTable": getattr(self, "detailedProjectTable", False),
                 "detailedTimetable": getattr(self, "detailedTimetable", False),
@@ -694,6 +696,7 @@ class UIstate:
         self.test_t_variant = state.get("test_t_variant", "unpaired")
         self.test_t_tails = state.get("test_t_tails", "two-sided")
         self.test_fdr = state.get("test_fdr", False)
+        self.anova_label = state.get("anova_label", "ANOVA (one-way)")
 
         self.showTimetable = state.get("showTimetable", False)
         self.detailedProjectTable = state.get("detailedProjectTable", False)
