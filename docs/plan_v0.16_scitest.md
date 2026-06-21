@@ -98,6 +98,13 @@ The elements to be tested are tagged by the user here:
 - FDR, Shapiro-Wilk, and Levene checkboxes are shared across all test types (`checkBox_test_fdr`, `checkBox_test_sw_p`, `checkBox_test_levene_p`) and trigger re-application + usage logging.
 - Full subject-aligned RM-ANOVA, sphericity correction, and post-hoc pairwise contrasts remain deferred (statusbar note makes this explicit).
 
+### Friedman activation (implemented per plan_v0.16_scitest_FRIEDMAN.md, 2026)
+
+- Friedman radio now fully functional as non-parametric repeated-measures omnibus (1 group + ≥3 test sets).
+- Uses `scipy.stats.friedmanchisquare` on aligned per-recording means (parallel to RM-ANOVA path).
+- Single omnibus row (`__friedman_rm_omnibus__`), statusbar summary, graph markers (`*`/`**`/etc.), FDR support, SW/Levene diagnostics all work.
+- Guards, UI wiring, and shared checkboxes unchanged from plan; no breakage to t-test/ANOVA/Wilcoxon.
+
 ## Detailed Requirements for v0.16
 
 ### 1. Test Configuration (already mostly stored)

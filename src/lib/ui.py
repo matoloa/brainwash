@@ -1679,7 +1679,7 @@ class UIsub(
             return None
         ref_attr = "label_test_wilcox_one_sample_value" if test_type == "Wilcoxon" else "label_test_t_one_sample_value"
         ref_value = getattr(uistate, ref_attr, 0.0)
-        if test_type not in ("t-test", "ANOVA", "Wilcoxon"):
+        if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman"):
             uistate.statusbar_state = "warning"
             return f"Statistical test '{test_type}' is not implemented"
         # Groups with data
@@ -1735,6 +1735,15 @@ class UIsub(
             if not shown_ts:
                 uistate.statusbar_state = "warning"
                 return "Show at least one test set to run the test"
+        elif test_type == "Friedman":
+            shown_ts = self._get_shown_testsets()
+            print(f"Friedman guard: shown_groups={len(shown_groups)}, shown_ts={len(shown_ts)}")
+            if len(shown_groups) != 1 or len(shown_ts) < 3:
+                uistate.statusbar_state = "warning"
+                return "Friedman requires exactly 1 group and at least 3 test sets (repeated-measures omnibus)"
+            if not shown_ts:
+                uistate.statusbar_state = "warning"
+                return "Show at least one test set to run the test"
         else:
             # Must have at least one shown test set (for t-test)
             shown_ts = self._get_shown_testsets()
@@ -1767,6 +1776,8 @@ class UIsub(
                     global_notes.append(f"(vs {ref_value})")
             elif test_type == "ANOVA" and any(r.get("set_id") == "__anova_rm_omnibus__" for r in uistate.formal_test_results):
                 global_notes.append("(simplified; RM-ANOVA+post-hoc deferred)")
+            elif test_type == "Friedman" and any(r.get("set_id") == "__friedman_rm_omnibus__" for r in uistate.formal_test_results):
+                global_notes.append("(repeated-measures omnibus)")
             prefix = test_type
             if global_notes:
                 prefix = f"{test_type} {' '.join(global_notes)}"
@@ -1895,8 +1906,8 @@ class UIsub(
                 self._refresh_test_statusbar()
                 return
 
-            if test_type not in ("t-test", "ANOVA", "Wilcoxon"):
-                print(f"Statistical test '{test_type}' is not yet implemented for v0.16 (t-test, ANOVA, Wilcoxon supported).")
+            if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman"):
+                print(f"Statistical test '{test_type}' is not yet implemented for v0.16 (t-test, ANOVA, Wilcoxon, Friedman supported).")
                 self.clear_formal_test_results()
                 uistate.statusbar_state = "warning"
                 self._refresh_test_statusbar()
@@ -1923,16 +1934,20 @@ class UIsub(
             else:
                 variant_for_check = getattr(uistate, "test_t_variant", "unpaired")
             shown_ts = self._get_shown_testsets()
-            # For ANOVA: allow 1 group if >=2 test sets (repeated-measures); otherwise require >=2 groups.
-            # Paired t-test: exactly 1 group + exactly 2 test sets (per pairing model in plan_v0.16_scitest.md).
-            if test_type == "ANOVA":
-                min_groups = 1 if len(shown_ts) >= 2 else 2
+            # For ANOVA/Friedman: allow 1 group if sufficient test sets (repeated-measures omnibus); otherwise require >=2 groups.
+            # Paired t-test/Wilcoxon: exactly 1 group + exactly 2 test sets (per pairing model in plan_v0.16_scitest.md).
+            if test_type in ("ANOVA", "Friedman"):
+                min_groups = 1
             else:
                 min_groups = 1 if variant_for_check in ("one-sample", "paired") else 2
             if len(shown_groups) < min_groups:
-                if had_results:
+                if had_results or test_type == "Friedman":
                     if test_type == "ANOVA":
                         print(f"Statistical test: ANOVA requires either >=2 groups, or 1 group with >=2 test sets (repeated-measures).")
+                    elif test_type == "Friedman":
+                        print(
+                            f"Statistical test: Friedman min_groups guard: shown_groups={len(shown_groups)} (need >=1), min_groups={min_groups}, shown_ts={len(shown_ts)} (need >=3)"
+                        )
                     else:
                         print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
                 self.clear_formal_test_results()
@@ -1941,7 +1956,7 @@ class UIsub(
                 return
 
             # Paired t-test additionally requires exactly 2 test sets (the pairing model uses 2 test sets within 1 group)
-            if variant_for_check == "paired":
+            if variant_for_check == "paired" and test_type != "Friedman":
                 if len(shown_ts) != 2:
                     if had_results:
                         print("Statistical test: paired requires exactly 2 shown test sets (with 1 group).")
@@ -1957,15 +1972,15 @@ class UIsub(
                     self._refresh_test_statusbar()
                     return
 
-            if not shown_ts:
-                if had_results:
-                    print("Statistical test: no shown test sets. Tag sweeps and show at least one test set.")
+            if not shown_ts and test_type != "Friedman":
+                if had_results or test_type == "Friedman":
+                    print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
                 self.clear_formal_test_results()
                 uistate.statusbar_state = "warning"
                 self._refresh_test_statusbar()
                 return
 
-            # Snapshot config
+            # Snapshot config (Friedman uses no variant/tails but we still snapshot for logging + compute call)
             if test_type == "Wilcoxon":
                 variant = getattr(uistate, "test_wilcox_variant", "paired")
                 tails = getattr(uistate, "test_wilcox_tails", "two-sided")
@@ -1977,6 +1992,9 @@ class UIsub(
             norm = bool(uistate.checkBox.get("norm_EPSP", False))
             amp = bool(uistate.checkBox.get("EPSP_amp", True))
             slope = bool(uistate.checkBox.get("EPSP_slope", True))
+            print(
+                f"apply_stat: calling compute for {test_type} with shown_groups={len(shown_groups)}, shown_ts={len(shown_ts)}, amp={amp}, slope={slope}, norm={norm}, fdr={fdr}"
+            )
 
             g1 = shown_groups[0]
             g2 = shown_groups[1] if len(shown_groups) > 1 else None
@@ -1986,6 +2004,7 @@ class UIsub(
             # Build results using analysis layer.
             # Each n = average of aspect over sweeps in the test set for one recording.
             try:
+                print("apply_stat: about to call compute_statistical_comparison...")
                 comp = stats.compute_statistical_comparison(
                     groups=shown_groups,
                     dd_groups=self.dd_groups,
@@ -2000,12 +2019,17 @@ class UIsub(
                     slope=slope,
                     ref=ref_value,
                 )
+                print(
+                    f"apply_stat: compute returned keys={list(comp.keys()) if isinstance(comp, dict) else type(comp)}, results_len={len(comp.get('results', [])) if isinstance(comp, dict) else 0}"
+                )
                 results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
             except Exception as ex:
                 print(f"apply_statistical_test compute error: {ex}")
                 results = []
 
             if not results:
+                if test_type == "Friedman":
+                    print("Friedman: compute returned no results (check debug prints above for alignment/N issues)")
                 self.clear_formal_test_results()
                 uistate.statusbar_state = None
                 self._refresh_test_statusbar()
