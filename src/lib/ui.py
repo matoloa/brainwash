@@ -1679,7 +1679,7 @@ class UIsub(
             return None
         ref_attr = "label_test_wilcox_one_sample_value" if test_type == "Wilcoxon" else "label_test_t_one_sample_value"
         ref_value = getattr(uistate, ref_attr, 0.0)
-        if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman"):
+        if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
             uistate.statusbar_state = "warning"
             return f"Statistical test '{test_type}' is not implemented"
         # Groups with data
@@ -1745,6 +1745,7 @@ class UIsub(
                 return "Show at least one test set to run the test"
         elif test_type == "Cluster perm.":
             shown_ts = self._get_shown_testsets()
+            print(f"DEBUG _get_stat_test_warning Cluster: shown_groups={len(shown_groups)} ({shown_groups}), shown_ts={len(shown_ts)}")
             if len(shown_groups) >= 2:
                 # Between-subjects: ok (uses first 2 groups)
                 pass
@@ -1796,14 +1797,20 @@ class UIsub(
                 global_notes.append("(repeated-measures omnibus)")
             elif test_type == "Cluster perm.":
                 global_notes.append("(cluster)")
+                if variant == "paired" and len(shown_groups or []) == 1:
+                    global_notes.append("(paired)")
             prefix = test_type
             if global_notes:
                 prefix = f"{test_type} {' '.join(global_notes)}"
             parts = []
             # Special handling for t-test (paired): use ONLY first result (set 1), no set name prefix
             results_to_report = uistate.formal_test_results
-            if (test_type == "t-test" or test_type == "Wilcoxon") and variant in ("paired", "one-sample") and results_to_report:
-                results_to_report = results_to_report[:1]
+            if (test_type in ("t-test", "Wilcoxon") and variant in ("paired", "one-sample") or test_type == "Cluster perm.") and results_to_report:
+                # For Cluster with multiple test sets (between-subjects), report all; paired-cluster would have 1 combined row.
+                if test_type == "Cluster perm." and len(results_to_report) > 1:
+                    pass  # keep all
+                else:
+                    results_to_report = results_to_report[:1]
             for r in results_to_report:
                 name = r.get("set_name", f"set {r.get('set_id', '?')}")
                 if test_type == "Cluster perm." and "_" in str(r.get("set_id", "")):
@@ -1888,6 +1895,7 @@ class UIsub(
                 uistate.statusbar_state = "warning"
             else:
                 uistate.statusbar_state = "info"
+            print(f"DEBUG: _get_stat_test_warning setting statusbar_state='{uistate.statusbar_state}', returning status='{status}'")
             return status
         uistate.statusbar_state = None
         return None
@@ -1900,14 +1908,22 @@ class UIsub(
             return
         warning = self._get_stat_test_warning()
         state = getattr(uistate, "statusbar_state", None)
+        print(
+            f"DEBUG _refresh_test_statusbar: warning='{warning}', state='{state}', has_formal_results={bool(getattr(uistate, 'formal_test_results', None))}"
+        )
+        if warning:
+            print(f"DEBUG: _get_stat_test_warning returned non-empty text: '{warning}' (will set state to info or warning)")
         if state == "warning":
             # Explicit warning (Levene/SW violation or guard error) — red/white/bold
+            print(f"DEBUG: setting statusbar (warning) to: '{warning}'")
             self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=warning)
         elif state == "info" or warning:
             # Successful test report (p-values, effect size, NA, SW/Levene summary) — default theme, bold
+            print(f"DEBUG: setting statusbar (info/success) to: '{warning or ''}'")
             self._set_statusbar_appearance(bg_color=None, bold=True, text=warning or "")
         else:
             # No content: default color (theme / darkmode sensitive) + cleared text
+            print("DEBUG: setting statusbar to clear (no content)")
             self._set_statusbar_appearance(clear=True)
 
     def _on_statusbar_message_cleared(self, text):
@@ -1952,6 +1968,7 @@ class UIsub(
             shown_groups = self._get_shown_group_ids()
             # Only groups that have at least one recording can participate in a test
             shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
+            print(f"DEBUG apply_stat: test_type={test_type}, shown_groups={shown_groups}, shown_ts={len(self._get_shown_testsets())}")
 
             ref_attr = "label_test_t_one_sample_value"
             if test_type == "Wilcoxon":
@@ -1959,6 +1976,8 @@ class UIsub(
                 ref_attr = "label_test_wilcox_one_sample_value"
             else:
                 variant_for_check = getattr(uistate, "test_t_variant", "unpaired")
+            if test_type == "Cluster perm.":
+                variant_for_check = "unpaired"  # avoid triggering paired t-test guard for Cluster (2 groups case)
             shown_ts = self._get_shown_testsets()
             # For ANOVA/Friedman: allow 1 group if sufficient test sets (repeated-measures omnibus); otherwise require >=2 groups.
             # Paired t-test/Wilcoxon: exactly 1 group + exactly 2 test sets (per pairing model in plan_v0.16_scitest.md).
@@ -2021,9 +2040,9 @@ class UIsub(
             norm = bool(uistate.checkBox.get("norm_EPSP", False))
             amp = bool(uistate.checkBox.get("EPSP_amp", True))
             slope = bool(uistate.checkBox.get("EPSP_slope", True))
-            g1 = shown_groups[0]
+            g1 = shown_groups[0] if shown_groups else None
             g2 = shown_groups[1] if len(shown_groups) > 1 else None
-            n1 = len(self.dd_groups.get(g1, {}).get("rec_IDs", []))
+            n1 = len(self.dd_groups.get(g1, {}).get("rec_IDs", [])) if g1 else 0
             n2 = len(self.dd_groups.get(g2, {}).get("rec_IDs", [])) if g2 else 0
 
             # Build results using analysis layer.
@@ -2049,6 +2068,9 @@ class UIsub(
                 results = []
 
             if not results:
+                print(
+                    f"DEBUG: no results from compute (error={comp.get('error') if 'comp' in locals() else 'N/A'}, not_implemented={comp.get('not_implemented') if 'comp' in locals() else 'N/A'})"
+                )
                 self.clear_formal_test_results()
                 uistate.statusbar_state = None
                 self._refresh_test_statusbar()
@@ -2057,44 +2079,70 @@ class UIsub(
             # Store + display
             uistate.formal_test_results = results
             uiplot.show_test_markers(results)
-            self._print_statistical_test_table(results, variant=variant, tails=tails, fdr=fdr, norm=norm)
+            self._print_statistical_test_table(results, variant=variant, tails=tails, fdr=fdr, norm=norm, test_type=test_type)
             set_names = ", ".join(r.get("set_name", "?") for r in results)
             sw = bool(getattr(uistate, "test_sw", False))
             lev = bool(getattr(uistate, "test_levene", False))
-            self.usage(f"stat_test applied: {test_type} {variant} {tails} on {set_names} (fdr={fdr}, sw={sw}, levene={lev})")
+            effective_variant = "unpaired" if test_type == "Cluster perm." else variant
+            self.usage(f"stat_test applied: {test_type} {effective_variant} {tails} on {set_names} (fdr={fdr}, sw={sw}, levene={lev})")
             self._refresh_test_statusbar()
         except Exception as ex:
             print(f"Statistical test: aborted (not applicable or internal issue): {ex}")
+            import traceback
+
+            traceback.print_exc()
             try:
                 self.clear_formal_test_results()
             except Exception:
                 pass
             self._refresh_test_statusbar()
 
-    def _print_statistical_test_table(self, results, variant, tails, fdr, norm):
+    def _print_statistical_test_table(self, results, variant, tails, fdr, norm, test_type=None):
         if not results:
             return
         print("\n=== Statistical test (v0.16) ===")
-        print(f"variant={variant}  tails={tails}  fdr={fdr}  norm={norm}")
+        effective_variant = "unpaired" if (test_type or variant) == "Cluster perm." else variant
+        print(f"variant={effective_variant}  tails={tails}  fdr={fdr}  norm={norm}")
         print("Note: each n = mean of aspect over sweeps in the test set, per recording.")
-        # Report ONLY the first result (first test set); skip "set 1"/"Test set:" label and any further sets
-        r = results[0]
-        n1 = r.get("n1", 0)
-        n2 = r.get("n2", 0)
-        # Print one line per computed aspect (p and optional q)
-        for key in sorted(k for k in r.keys() if k.startswith("p_")):
-            pval = r.get(key)
-            sval = r.get("stat_" + key[2:], np.nan)
-            qval = r.get("q_" + key[2:], None)
-            aspect = key[2:]
-            pstr = f"{pval:.4g}" if isinstance(pval, (int, float)) and np.isfinite(pval) else str(pval)
-            if isinstance(sval, (int, float)) and np.isfinite(sval):
-                line = f"  {aspect}: p={pstr}  stat={sval:.4g}  n1={n1} n2={n2}"
-            else:
-                line = f"  {aspect}: p={pstr}  n1={n1} n2={n2}"
-            if qval is not None and isinstance(qval, (int, float)) and np.isfinite(qval):
-                line += f"  q={qval:.4g}"
-            print(line)
+        # Report all results for Cluster perm. (multiple test sets); first-only for paired t/Wilcoxon
+        if test_type == "Cluster perm.":
+            for r_idx, r in enumerate(results):
+                n1 = r.get("n1", 0)
+                n2 = r.get("n2", 0)
+                set_name = r.get("set_name", f"set {r.get('set_id', '?')}")
+                print(f"  {set_name}:")
+                for key in sorted(k for k in r.keys() if k.startswith("p_")):
+                    pval = r.get(key)
+                    sval = r.get("stat_" + key[2:], np.nan)
+                    qval = r.get("q_" + key[2:], None)
+                    aspect = key[2:]
+                    pstr = f"{pval:.4g}" if isinstance(pval, (int, float)) and np.isfinite(pval) else str(pval)
+                    if isinstance(sval, (int, float)) and np.isfinite(sval):
+                        line = f"    {aspect}: p={pstr}  stat={sval:.4g}  n1={n1} n2={n2}"
+                    else:
+                        line = f"    {aspect}: p={pstr}  n1={n1} n2={n2}"
+                    if qval is not None and isinstance(qval, (int, float)) and np.isfinite(qval):
+                        line += f"  q={qval:.4g}"
+                    print(line)
+        else:
+            # Original first-only logic for other tests
+            r = results[0]
+            n1 = r.get("n1", 0)
+            n2 = r.get("n2", 0)
+            # Print one line per computed aspect (p and optional q)
+            for key in sorted(k for k in r.keys() if k.startswith("p_")):
+                pval = r.get(key)
+                sval = r.get("stat_" + key[2:], np.nan)
+                qval = r.get("q_" + key[2:], None)
+                aspect = key[2:]
+                pstr = f"{pval:.4g}" if isinstance(pval, (int, float)) and np.isfinite(pval) else str(pval)
+                if isinstance(sval, (int, float)) and np.isfinite(sval):
+                    line = f"  {aspect}: p={pstr}  stat={sval:.4g}  n1={n1} n2={n2}"
+                else:
+                    line = f"  {aspect}: p={pstr}  n1={n1} n2={n2}"
+                if qval is not None and isinstance(qval, (int, float)) and np.isfinite(qval):
+                    line += f"  q={qval:.4g}"
+                print(line)
         print("=== end test ===\n")
 
     def setTableStimVisibility(self, state, initialize=False):

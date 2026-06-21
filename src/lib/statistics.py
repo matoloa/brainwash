@@ -229,6 +229,10 @@ def compute_statistical_comparison(
         # Repeated-measures Friedman omnibus: 1 group, compare across >=3 test sets
         g1 = shown_groups[0]
         g2 = None
+    elif test_type == "Cluster perm.":
+        # Cluster perm. (v0.16): supports >=2 groups (between-subjects via permutation_cluster_test) or 1-group + exactly 2 test sets (paired via permutation_cluster_1samp_test).
+        # Must come before the paired t-test guard and the default 2-group requirement.
+        pass
     elif variant == "paired":
         # Paired t-test (v0.16): exactly 1 group + 2 test sets; pair observations by rec_ID within the single group
         if len(shown_groups) != 1:
@@ -411,12 +415,27 @@ def compute_statistical_comparison(
     # Between-subjects: permutation_cluster_test on two group matrices per test set.
     # Paired (1 group + 2 test sets): permutation_cluster_1samp_test on difference matrix.
     if test_type == "Cluster perm.":
+        print(f"DEBUG compute_statistical_comparison: entered Cluster perm. branch with {len(groups) if groups else 0} groups, test_type={test_type}")
         try:
             from mne.stats import permutation_cluster_1samp_test, permutation_cluster_test
-        except Exception:
-            return {"error": "MNE-Python not installed; cluster permutation requires `pip install mne`", "results": []}
+
+            print("DEBUG: MNE imported successfully")
+        except ImportError:
+            print("DEBUG: MNE ImportError")
+            return {
+                "error": "MNE-Python not installed; cluster permutation requires `pip install mne` (or `pip install .[neuroscience]`)",
+                "results": [],
+            }
+        except Exception as e:
+            print(f"DEBUG: MNE import failed: {e}")
+            warnings.warn(f"MNE import failed: {e}")
+            return {
+                "error": "MNE-Python not installed; cluster permutation requires `pip install mne` (or `pip install .[neuroscience]`)",
+                "results": [],
+            }
 
         shown_sets = [(sid, info) for sid, info in (dd_testsets or {}).items() if info.get("show", False) and info.get("sweeps")]
+        print(f"DEBUG compute: shown_sets={len(shown_sets)}, shown_groups={len(shown_groups) if 'shown_groups' in locals() else 'N/A'}")
         if not shown_sets:
             return {"error": "Cluster perm. requires at least one shown test set (to define sweep windows)", "results": []}
 
@@ -430,6 +449,7 @@ def compute_statistical_comparison(
             aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
         if not aspects:
             return {"error": "no aspects selected", "results": []}
+        print(f"DEBUG Cluster aspects: {aspects} (norm={norm})")
 
         def _extract_cluster_p(res):
             """Helper: extract min cluster p-value (or 1.0 if none). res is tuple from MNE."""
@@ -476,10 +496,15 @@ def compute_statistical_comparison(
                         n2 = X2.shape[0]
                         if n1 < 2 or n2 < 2:
                             continue
-                        res = permutation_cluster_test([X1, X2], n_permutations=1000, threshold=None, tail=0)
+                        import warnings
+
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore", category=RuntimeWarning)
+                            res = permutation_cluster_test([X1, X2], n_permutations=1000, threshold=None, tail=0)
                         cluster_p = _extract_cluster_p(res)
                         # Max stat from first element of return (T_obs or equivalent)
                         cluster_stat = float(np.max(res[0])) if hasattr(res[0], "__len__") and len(res[0]) > 0 else np.nan
+                        print(f"DEBUG cluster between {short}: p={cluster_p:.4f}, stat={cluster_stat:.3f}, n1={n1}, n2={n2}")
                         res_row[f"p_{short}"] = cluster_p
                         res_row[f"stat_{short}"] = cluster_stat
                         res_row["n1"] = n1
@@ -530,7 +555,11 @@ def compute_statistical_comparison(
                     if n_common < 2:
                         continue
                     Xdiff = X2[:n_common] - X1[:n_common]
-                    res = permutation_cluster_1samp_test(Xdiff, n_permutations=1000, threshold=None, tail=0)
+                    import warnings
+
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", category=RuntimeWarning)
+                        res = permutation_cluster_1samp_test(Xdiff, n_permutations=1000, threshold=None, tail=0)
                     cluster_p = _extract_cluster_p(res)
                     cluster_stat = float(np.max(res[0])) if hasattr(res[0], "__len__") and len(res[0]) > 0 else np.nan
                     res_row[f"p_{short}"] = cluster_p
@@ -589,6 +618,7 @@ def compute_statistical_comparison(
             aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
         if not aspects:
             return {"error": "no aspects selected", "results": []}
+        print(f"DEBUG Cluster aspects: {aspects} (norm={norm})")
         raw_p_amp = []
         raw_p_slope = []
         out_results = []

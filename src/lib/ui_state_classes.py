@@ -195,6 +195,8 @@ class UIstate:
         self.test_wilcox_tails = "two-sided"
         self.label_test_wilcox_one_sample_value = 0.0
         self.anova_label = "ANOVA (one-way)"  # updated dynamically based on # of shown test sets
+        # v0.16 Cluster perm. support
+        self.test_cluster = False
         self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
         self._time_unit_label = "s"  # set by x_axis_xlim when mode == "time"
         self._time_sweep_hz = 1.0  # set by x_axis_xlim when mode == "time"
@@ -678,6 +680,7 @@ class UIstate:
                 "test_wilcox_tails": getattr(self, "test_wilcox_tails", "two-sided"),
                 "label_test_wilcox_one_sample_value": getattr(self, "label_test_wilcox_one_sample_value", 0.0),
                 "anova_label": getattr(self, "anova_label", "ANOVA (one-way)"),
+                "test_cluster": getattr(self, "test_cluster", False),
                 "showTimetable": self.showTimetable,
                 "detailedProjectTable": getattr(self, "detailedProjectTable", False),
                 "detailedTimetable": getattr(self, "detailedTimetable", False),
@@ -722,6 +725,10 @@ class UIstate:
         self.showTimetable = state.get("showTimetable", False)
         self.detailedProjectTable = state.get("detailedProjectTable", False)
         self.detailedTimetable = state.get("detailedTimetable", False)
+        # v0.16 Cluster perm. support (persist the radio selection)
+        if "test_type" in state and state["test_type"] == "Cluster perm.":
+            self.test_type = "Cluster perm."
+        self.test_cluster = state.get("test_cluster", False)
 
         # Filter out any keys saved in old configs that no longer exist as widgets.
         # This lets us remove keys from these dicts without old cfg.pkl files
