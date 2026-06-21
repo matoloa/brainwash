@@ -1877,7 +1877,9 @@ class UIsub(
             uiplot.show_test_markers(results)
             self._print_statistical_test_table(results, variant=variant, tails=tails, fdr=fdr, norm=norm)
             set_names = ", ".join(r.get("set_name", "?") for r in results)
-            self.usage(f"stat_test applied: {test_type} {variant} {tails} on {set_names} (fdr={fdr})")
+            sw = bool(getattr(uistate, "test_sw_p", False))
+            lev = bool(getattr(uistate, "test_levene_p", False))
+            self.usage(f"stat_test applied: {test_type} {variant} {tails} on {set_names} (fdr={fdr}, sw={sw}, levene={lev})")
             self._refresh_test_statusbar()
         except Exception as ex:
             print(f"Statistical test: aborted (not applicable or internal issue): {ex}")
@@ -2805,6 +2807,14 @@ class UIsub(
                 print(f"FDR checkbox changed to: {state == 2}")
                 uistate.test_fdr = state == 2
                 self.apply_statistical_test_if_active()
+            elif key == "test_sw_p":
+                print(f"SW checkbox changed to: {state == 2}")
+                uistate.test_sw_p = state == 2
+                self.apply_statistical_test_if_active()
+            elif key == "test_levene_p":
+                print(f"Levene checkbox changed to: {state == 2}")
+                uistate.test_levene_p = state == 2
+                self.apply_statistical_test_if_active()
         # print(f"viewSettingsChanged: {key} = {state == 2}")
         self.update_show()
         if key in ["output_ymin0", "norm_EPSP"]:
@@ -2814,7 +2824,7 @@ class UIsub(
         # norm/amp/slope (visible aspects) affect heatmap and statistical test inputs;
         # clear stale heatmap dots and formal test markers when they change.
         aspect_keys = ["norm_EPSP", "EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
-        if key in aspect_keys or key == "test_fdr":
+        if key in aspect_keys or key in ("test_fdr", "test_sw_p", "test_levene_p"):
             self.clear_formal_test_results()
         if key in aspect_keys:
             self.turn_heatmap_off()

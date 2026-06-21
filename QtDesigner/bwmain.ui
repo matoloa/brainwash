@@ -275,7 +275,7 @@
           <x>0</x>
           <y>-666</y>
           <width>284</width>
-          <height>1589</height>
+          <height>1629</height>
          </rect>
         </property>
         <property name="minimumSize">
@@ -1759,7 +1759,7 @@
            <property name="minimumSize">
             <size>
              <width>201</width>
-             <height>111</height>
+             <height>151</height>
             </size>
            </property>
            <property name="frameShape">
@@ -1913,6 +1913,38 @@
              <string notr="true">buttonGroup_test</string>
             </attribute>
            </widget>
+           <widget class="QCheckBox" name="checkBox_test_sw_p">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>130</y>
+              <width>241</width>
+              <height>23</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Test homogeneity (Levene)</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+           <widget class="QCheckBox" name="checkBox_test_levene_p">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>110</y>
+              <width>241</width>
+              <height>23</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Test normality (Shapiro-Wilk)</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
           </widget>
          </item>
          <item>
@@ -1926,7 +1958,7 @@
            <property name="minimumSize">
             <size>
              <width>201</width>
-             <height>81</height>
+             <height>41</height>
             </size>
            </property>
            <property name="frameShape">
@@ -1953,38 +1985,6 @@
             </property>
             <property name="text">
              <string>ANOVA (repeated)</string>
-            </property>
-           </widget>
-           <widget class="QCheckBox" name="checkBox_test_ANOVA_levene_p">
-            <property name="geometry">
-             <rect>
-              <x>10</x>
-              <y>30</y>
-              <width>241</width>
-              <height>23</height>
-             </rect>
-            </property>
-            <property name="text">
-             <string>Test normality (Shapiro-Wilk)</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
-           </widget>
-           <widget class="QCheckBox" name="checkBox_test_ANOVA_sw_p">
-            <property name="geometry">
-             <rect>
-              <x>10</x>
-              <y>50</y>
-              <width>241</width>
-              <height>23</height>
-             </rect>
-            </property>
-            <property name="text">
-             <string>Test homogeneity (Levene)</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
             </property>
            </widget>
           </widget>
