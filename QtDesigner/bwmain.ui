@@ -273,9 +273,9 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-706</y>
+          <y>-813</y>
           <width>284</width>
-          <height>1659</height>
+          <height>1736</height>
          </rect>
         </property>
         <property name="minimumSize">
@@ -1948,48 +1948,6 @@
           </widget>
          </item>
          <item>
-          <widget class="QFrame" name="frameToolTest_ANOVA">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="minimumSize">
-            <size>
-             <width>201</width>
-             <height>41</height>
-            </size>
-           </property>
-           <property name="frameShape">
-            <enum>QFrame::StyledPanel</enum>
-           </property>
-           <property name="frameShadow">
-            <enum>QFrame::Raised</enum>
-           </property>
-           <widget class="QLabel" name="label_test_ANOVA">
-            <property name="geometry">
-             <rect>
-              <x>10</x>
-              <y>10</y>
-              <width>231</width>
-              <height>17</height>
-             </rect>
-            </property>
-            <property name="font">
-             <font>
-              <family>DejaVu Sans</family>
-              <weight>75</weight>
-              <bold>true</bold>
-             </font>
-            </property>
-            <property name="text">
-             <string>ANOVA (repeated)</string>
-            </property>
-           </widget>
-          </widget>
-         </item>
-         <item>
           <widget class="QFrame" name="frameToolTest_t">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
@@ -2157,6 +2115,196 @@
           <layout class="QVBoxLayout" name="verticalLayoutGroups"/>
          </item>
          <item>
+          <widget class="QFrame" name="frameToolTest_ANOVA">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>201</width>
+             <height>41</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Raised</enum>
+           </property>
+           <widget class="QLabel" name="label_test_ANOVA">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>10</y>
+              <width>231</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="font">
+             <font>
+              <family>DejaVu Sans</family>
+              <weight>75</weight>
+              <bold>true</bold>
+             </font>
+            </property>
+            <property name="text">
+             <string>ANOVA ()</string>
+            </property>
+           </widget>
+          </widget>
+         </item>
+         <item>
+          <widget class="QFrame" name="frameToolTest_wilcoxon">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>201</width>
+             <height>121</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Raised</enum>
+           </property>
+           <widget class="QLabel" name="label_test_wilcoxon">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>10</y>
+              <width>231</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="font">
+             <font>
+              <family>DejaVu Sans</family>
+              <weight>75</weight>
+              <bold>true</bold>
+             </font>
+            </property>
+            <property name="text">
+             <string>Wilcoxon Signed Rank</string>
+            </property>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_wilcoxon_variant_one">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>50</y>
+              <width>121</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>One-sample</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_wilcoxon_variant</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_wilcoxon_variant_paired">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>30</y>
+              <width>121</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Paired</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_wilcoxon_variant</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_wilcoxon_tails_two">
+            <property name="geometry">
+             <rect>
+              <x>140</x>
+              <y>30</y>
+              <width>121</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Two-sided</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_wilcoxon_tails</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_wilcoxon_tails_greater">
+            <property name="geometry">
+             <rect>
+              <x>140</x>
+              <y>50</y>
+              <width>121</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Greater</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_wilcoxon_tails</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_wilcoxon_tails_less">
+            <property name="geometry">
+             <rect>
+              <x>140</x>
+              <y>70</y>
+              <width>111</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Less</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_wilcoxon_tails</string>
+            </attribute>
+           </widget>
+           <widget class="QLabel" name="label_test_wilcoxon_one_sample_value">
+            <property name="geometry">
+             <rect>
+              <x>30</x>
+              <y>70</y>
+              <width>41</width>
+              <height>20</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>value</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+            </property>
+           </widget>
+           <widget class="QLineEdit" name="lineEdit_wilcoxon_one_sample_value">
+            <property name="geometry">
+             <rect>
+              <x>80</x>
+              <y>70</y>
+              <width>41</width>
+              <height>25</height>
+             </rect>
+            </property>
+           </widget>
+          </widget>
+         </item>
+         <item>
           <spacer name="verticalSpacer">
            <property name="orientation">
             <enum>Qt::Vertical</enum>
@@ -2241,5 +2389,7 @@
   <buttongroup name="buttonGroup_type"/>
   <buttongroup name="buttonGroup_test"/>
   <buttongroup name="buttonGroup_test_t_tails"/>
+  <buttongroup name="buttonGroup_wilcoxon_variant"/>
+  <buttongroup name="buttonGroup_wilcoxon_tails"/>
  </buttongroups>
 </ui>
