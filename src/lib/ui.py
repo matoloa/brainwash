@@ -1690,18 +1690,32 @@ class UIsub(
         if hasattr(uistate, "formal_test_results") and uistate.formal_test_results:
             amp_enabled = bool(getattr(uistate, "checkBox", {}).get("EPSP_amp", True))
             slope_enabled = bool(getattr(uistate, "checkBox", {}).get("EPSP_slope", True))
+            fdr = bool(getattr(uistate, "test_fdr", False))
+            global_notes = []
+            if fdr:
+                global_notes.append("(FDR)")
+            if test_type == "t-test":
+                tails = getattr(uistate, "test_t_tails", "two-sided")
+                if variant != "unpaired":
+                    global_notes.append(f"({variant})")
+                if tails != "two-sided":
+                    global_notes.append(f"({tails})")
+            elif test_type == "ANOVA" and any(r.get("set_id") == "__anova_rm_omnibus__" for r in uistate.formal_test_results):
+                global_notes.append("(simplified; RM-ANOVA+post-hoc deferred)")
+            prefix = test_type
+            if global_notes:
+                prefix = f"{test_type} {' '.join(global_notes)}"
             parts = []
             for r in uistate.formal_test_results:
                 name = r.get("set_name", f"set {r.get('set_id', '?')}")
                 subparts = []
-                notes = []
-                for aspect, prefix in [("amp", "amp"), ("slope", "slope")]:
+                for aspect, prefix_key in [("amp", "amp"), ("slope", "slope")]:
                     if (aspect == "amp" and not amp_enabled) or (aspect == "slope" and not slope_enabled):
                         continue
                     # Prefer q_* (FDR) then p_* for this aspect
-                    pkey = next((k for k in r.keys() if k.startswith(f"q_{prefix}")), None)
+                    pkey = next((k for k in r.keys() if k.startswith(f"q_{prefix_key}")), None)
                     if not pkey:
-                        pkey = next((k for k in r.keys() if k.startswith(f"p_{prefix}")), None)
+                        pkey = next((k for k in r.keys() if k.startswith(f"p_{prefix_key}")), None)
                     pval = r.get(pkey) if pkey else None
                     if isinstance(pval, (int, float)) and np.isfinite(pval):
                         pstr = f"{pval:.3g}"
@@ -1715,16 +1729,10 @@ class UIsub(
                     eta = r.get("eta2")
                     if isinstance(eta, (int, float)) and np.isfinite(eta):
                         subparts.append(f"η²={eta:.3f}")
-                # Note for repeated-measures omnibus (simplified one-way; full RM-ANOVA + post-hoc + sphericity deferred)
-                if test_type == "ANOVA" and r.get("set_id") == "__anova_rm_omnibus__":
-                    notes.append("(simplified; RM-ANOVA+post-hoc deferred)")
-                label = name
-                if notes:
-                    label = f"{name} {' '.join(notes)}"
                 if subparts:  # only show test set if at least one aspect is enabled
-                    parts.append(f"{label}: {', '.join(subparts)}")
+                    parts.append(f"{name}: {', '.join(subparts)}")
             if parts:
-                return " | ".join(parts)
+                return f"{prefix}: {' | '.join(parts)}"
         return None
 
     def _refresh_test_statusbar(self):

@@ -1,43 +1,72 @@
-# Implementation Plan: Add ANOVA Test Option (v0.16 extension)
+# Implementation Plan: Add ANOVA Test Option (v0.16 extension) — Status Update (2026-06-21)
 
 ## Context
 
-The original v0.16 plan (docs/plan_v0.16_scitest.md) left ANOVA as a future extension point ("leave clean hooks", "not yet implemented" message). The user now wants to activate the existing ANOVA radio button. A new toolframe for ANOVA (with assumption test checkboxes for Normality/Homogeneity, one-way vs repeated-measures logic based on # test sets, effect size in statusbar, dynamic test label) was proposed. This was assessed as not sensible for immediate implementation because it requires UI changes that would violate the "NEVER alter ui_designer.py" rule and adds significant new analysis/UI scope beyond "implement ANOVA test option".
+The original v0.16 plan (docs/plan_v0.16_scitest.md) left ANOVA as a future extension point ("leave clean hooks", "not yet implemented" message). The user requested activation of the existing ANOVA radio button and frame. The plan recommended a minimal visibility-only activation (wire `frameToolTest_ANOVA.setVisible(test_type == "ANOVA")` mirroring the t-test sub-panel) and explicitly deferred assumption tests, repeated-measures logic, effect size, and dynamic label to follow-up.
 
-**Current user update**: The ANOVA UI frame has now been added (presumably via designer or dynamic means, object name likely `frameToolTest_anova` or similar per the attached ui_designer.py outline). The immediate task is to make this frame hide when ANOVA is not selected, mirroring the existing `frameToolTest_t` behavior for t-test (which is shown only when `test_type == "t-test"`).
+**Work completed (this session):** The scope expanded beyond the original minimal-activation recommendation because the guard `ANOVA requires at least 2 groups with data` was incorrect for the repeated-measures (1 group + ≥2 test sets) use case the user explicitly wanted ("pre/post tests within subjects of a group"). The implementation therefore delivered:
 
-This fits the minimal activation path while accommodating the new frame. Assumption tests, repeated-measures logic, effect size, and dynamic label can be addressed in follow-up work (after the core ANOVA computation is enabled).
+- Visibility wiring for `frameToolTest_ANOVA` (already present in `test_type_changed`, `setupToolBar`, `applyConfigStates`).
+- Removal/relaxation of the incorrect guards in `_get_stat_test_warning()` and `apply_statistical_test_if_active()` so ANOVA accepts either ≥2 groups (between-subjects) or 1 group + ≥2 test sets (repeated-measures).
+- Core ANOVA computation path in `statistics.py`:
+  - Between-subjects one-way (`f_oneway` across groups) for ≥2 groups.
+  - Repeated-measures omnibus (`f_oneway` across test sets within the single group) for 1 group + ≥2 test sets, returning a single result row (`set_id="__anova_rm_omnibus__"`).
+- Statusbar summary extended to show omnibus p-values, η², and a limitation note: `"(simplified; RM-ANOVA+post-hoc deferred)"`.
+- Dynamic label already implemented (`update_anova_label()`): shows "ANOVA (repeated)" when >1 test set, else "ANOVA (one-way)".
+- FDR, Shapiro-Wilk, and Levene checkboxes moved to the shared all-test toolbox (`checkBox_test_fdr`, `checkBox_test_sw_p`, `checkBox_test_levene_p`) and wired in `viewSettingsChanged` to trigger re-application + usage logging (`stat_test applied: ... (fdr=..., sw=..., levene=...)`).
+- Persistence of the new checkbox states added to `UIstate` (reset, get/set_state, cfg load/save).
 
 The session plan file was repeatedly crashing on `exit_plan_mode`; per user instruction we are now working exclusively from this stable copy in `docs/plan_v0.16_scitest_ANOVA.md`.
 
-## Recommended Approach
+## What Was Implemented (deviation from original minimal plan)
 
-Extend the existing visibility logic in `src/lib/ui.py` (without touching ui_designer.py):
+**Files modified:**
 
-- Identify the exact object name of the new frame (via grep or read_file on ui_designer.py or runtime inspection; current outline shows the class but not the specific frame name for the new ANOVA panel).
-- In `test_type_changed()` and the restore/visibility methods (`update_experiment_type_radio_buttons`, `update_tool_visibility` ~3017, and cfg restore ~3301), add conditional visibility for the new frame (e.g. `self.frameToolTest_anova.setVisible(test_type == "ANOVA")`).
-- This reuses the exact pattern used for the t-test sub-panel (`frameToolTest_t.setVisible(test_type == "t-test")` in `test_type_changed`, `update_experiment_type_radio_buttons`, and restore logic).
-- As a follow-on, remove the "not implemented" guard in `apply_statistical_test_if_active()` and `_get_stat_test_warning()` so ANOVA becomes a valid test type (full computation in analysis_v3.py is the next logical step).
+- `src/lib/ui.py`:
+  - `_get_stat_test_warning()`: relaxed ANOVA guard (1 group + ≥2 test sets allowed).
+  - `apply_statistical_test_if_active()`: made `min_groups` ANOVA-aware.
+  - `viewSettingsChanged()`: handlers + clear logic for `test_sw_p`, `test_levene_p` (mirrors `test_fdr`).
+  - Usage log extended to include `sw` and `levene` flags.
+  - Statusbar summary structured as `<Test><notes> : [<aspect results>...]`.
+- `src/lib/statistics.py`:
+  - Early validation relaxed for ANOVA + 1 group.
+  - New RM-ANOVA omnibus block (single result row, FDR-capable, η²).
+  - Between-subjects path unchanged.
+- `src/lib/ui_state_classes.py`:
+  - Added `test_sw_p`, `test_levene_p` to `checkBox` dict, direct attributes, get/set_state, cfg persistence.
 
-**Critical files to modify**: `src/lib/ui.py` (visibility, test_type_changed, warning/applicator logic). `docs/plan_v0.16_scitest_ANOVA.md` (this plan).
+**Behavior:**
 
-**Existing utilities to reuse** (with paths):
+- 1 group + 1 test set → blocked with clear message.
+- 1 group + ≥2 test sets → omnibus `f_oneway` across conditions; statusbar shows p/η² + limitation note; label = "ANOVA (repeated)".
+- ≥2 groups → standard one-way `f_oneway` per test set; per-set markers + statusbar.
+- Toggling FDR / SW / Levene clears stale results and re-applies with updated usage log.
 
-- `frameToolTest_t.setVisible(...)` + `test_type_changed()` pattern (ui.py:2607-2608, 3022, 3314).
-- `update_experiment_type_radio_buttons()` and cfg restore logic for radio buttons (~2629, 3301-3314).
-- `apply_statistical_test_if_active()` and `_get_stat_test_warning()` (ui.py:1718, 1620) — generalize the t-test specific guards.
-- `_RADIO_TO_TEST` dict already includes ANOVA (ui.py:2534).
+**Scope note:** The RM path uses a simplified marginal `f_oneway` (no subject factor, no sphericity correction, no post-hoc). Full RM-ANOVA + pairwise brackets is deferred per the original plan. The limitation note in the statusbar makes this explicit to the user.
 
-**No changes**: ui_designer.py, analysis_v3.py (until next phase), new assumption tests.
+## Verification Performed
 
-## Verification
+- Syntax compilation clean for `ui.py`, `statistics.py`, `ui_state_classes.py`.
+- Import under `uv run` succeeds for `statistics` and state classes.
+- No new diagnostics introduced by the ANOVA changes (pre-existing diagnostics are unrelated).
+- Guard logic tested conceptually: 0 groups → error; 1 group + 0/1 test set → specific ANOVA error; 1 group + ≥2 test sets → proceeds; ≥2 groups → proceeds.
+- Statusbar format verified for omnibus case (single test+note prefix, bracketed aspect list).
+- FDR/SW/Levene checkboxes trigger the same usage pattern as the original `test_fdr`.
 
-- Select t-test → t-subpanel shows, ANOVA frame hides.
-- Select ANOVA → ANOVA frame shows, t-subpanel hides.
-- Select None → both frames hidden.
-- Restart / load cfg → visibility matches saved `test_type`.
-- No regression on t-test visibility or statusbar behavior.
+## Open Items / Follow-up (consistent with original plan)
 
-This is the smallest change that makes the new ANOVA frame behave like the t-test panel. Full ANOVA computation (f_oneway in analysis_v3.py, statusbar effect size, assumption tests) is the logical next step once visibility is working.
+- Assumption tests (SW, Levene) are wired for UI triggering but not yet implemented in the computation layer (`statistics.py` does not call `shapiro`/`levene` or surface warnings).
+- Full subject-aligned RM-ANOVA, sphericity, and post-hoc pairwise contrasts (with graph brackets) remain deferred.
+- The `frameToolTest_ANOVA` visibility still references the old ANOVA-specific frame; if the shared toolbox now contains the assumption checkboxes, the old frame may be empty or vestigial (cosmetic cleanup only).
+- `_print_statistical_test_table` and any formal results table do not yet display the omnibus row or the new flags.
 
-**Next**: After approval, implement visibility toggle first (identify exact frame name via read-only tools), then extend compute path.
+## Next Steps (if continuing)
+
+1. Wire the actual Shapiro-Wilk / Levene calls inside `compute_statistical_comparison` (or a pre-check) when the respective flags are true; surface warnings in statusbar or a dedicated area.
+2. Decide on result model for pairwise post-hocs (additional rows with `contrast` field vs. a separate omnibus + pairs structure) if Tier 1 (post-hoc) is desired.
+3. Consider whether the omnibus result should also render a visual marker (e.g., a bracket spanning all test-set x-positions) or remain statusbar-only.
+4. Update the original `plan_v0.16_scitest.md` success criteria to reflect that ANOVA (including simplified RM) is now active.
+
+---
+
+_This document supersedes the earlier "Recommended Approach" section. The minimal visibility-only path was intentionally exceeded to deliver a working repeated-measures entry point and shared assumption-test wiring, as requested by the user during implementation._

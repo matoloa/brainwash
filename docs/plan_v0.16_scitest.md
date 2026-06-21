@@ -90,6 +90,14 @@ The elements to be tested are tagged by the user here:
 
 - Result display for the _old_ full-range path lives in `uiplot.heatmap` (red scatter dots) + console print. The formal statistical test (when a non-None type is selected) will drive its own markers via a parallel path. Markers must appear and update automatically. The v0.15 plan referenced a `verticalLayoutComparison` that does not exist in the compiled UI (and cannot be added without touching designer files).
 
+### ANOVA activation (implemented post-plan, 2026-06-21)
+
+- ANOVA radio button and `frameToolTest_ANOVA` visibility are wired.
+- Guard logic accepts either ≥2 groups (between-subjects one-way) or 1 group + ≥2 test sets (repeated-measures omnibus).
+- `statistics.py` provides `f_oneway` for both paths; RM case returns a single omnibus result (`__anova_rm_omnibus__`) with p/eta2 and a limitation note in the statusbar.
+- FDR, Shapiro-Wilk, and Levene checkboxes are shared across all test types (`checkBox_test_fdr`, `checkBox_test_sw_p`, `checkBox_test_levene_p`) and trigger re-application + usage logging.
+- Full subject-aligned RM-ANOVA, sphericity correction, and post-hoc pairwise contrasts remain deferred (statusbar note makes this explicit).
+
 ## Detailed Requirements for v0.16
 
 ### 1. Test Configuration (already mostly stored)
@@ -293,6 +301,7 @@ Alternative (simpler start): after calling the existing `get_dfgroupmean`, do `d
 - Results appear as red markers (restricted to the relevant sweep range) on the output graph + a readable printed table.
 - Adding or removing recordings from a group, toggling group or test-set show states, or changing test options causes the results to be automatically re-computed and updated.
 - Non-t-test selections produce a polite "not implemented" without side effects.
+- ANOVA (including 1-group repeated-measures omnibus via test sets) is active: guards accept valid configurations, computation runs (`f_oneway`), statusbar shows p/η² + limitation note, usage logs include FDR/SW/Levene flags. Full subject-aligned RM-ANOVA + post-hoc + sphericity remain deferred (Tier 0 delivered).
 - All state round-trips in cfg.pkl; test sets continue to work exactly as in v0.15 for visualization and samples.
 - No modifications to `ui_designer.py` or generated designer code.
 - Code remains inside the existing mixin structure (`GroupMixin`, `DataFrameMixin`, `UIplot`, etc.) and follows the dynamic wiring pattern.
