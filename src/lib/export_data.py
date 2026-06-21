@@ -240,4 +240,10 @@ class ExportMixin:
             print(f"Saved image: {out_path_png}")
             fig.savefig(out_path_png, dpi=template.dpi, bbox_inches="tight")
 
-        self._export_status(f"Exported {len(figures)} {template.name} figures to {export_dir}")
+            # Phase 0: minimal .md with "text" (final typewriter in export_data per plan)
+            figure_text_md = export_image.build_figure_text_md(uistate, template, group_names)
+            out_path_md = out_path_png.with_suffix(".md")
+            out_path_md.write_text(figure_text_md, encoding="utf-8")
+            print(f"Saved figure text: {out_path_md}")
+
+        self._export_status(f"Exported {len(figures)} {template.name} figures + .md to {export_dir}")

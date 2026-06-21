@@ -1745,7 +1745,6 @@ class UIsub(
                 return "Show at least one test set to run the test"
         elif test_type == "Cluster perm.":
             shown_ts = self._get_shown_testsets()
-            print(f"DEBUG _get_stat_test_warning Cluster: shown_groups={len(shown_groups)} ({shown_groups}), shown_ts={len(shown_ts)}")
             if len(shown_groups) >= 2:
                 # Between-subjects: ok (uses first 2 groups)
                 pass
@@ -1895,7 +1894,6 @@ class UIsub(
                 uistate.statusbar_state = "warning"
             else:
                 uistate.statusbar_state = "info"
-            print(f"DEBUG: _get_stat_test_warning setting statusbar_state='{uistate.statusbar_state}', returning status='{status}'")
             return status
         uistate.statusbar_state = None
         return None
@@ -1908,22 +1906,16 @@ class UIsub(
             return
         warning = self._get_stat_test_warning()
         state = getattr(uistate, "statusbar_state", None)
-        print(
-            f"DEBUG _refresh_test_statusbar: warning='{warning}', state='{state}', has_formal_results={bool(getattr(uistate, 'formal_test_results', None))}"
-        )
         if warning:
-            print(f"DEBUG: _get_stat_test_warning returned non-empty text: '{warning}' (will set state to info or warning)")
+            pass  # was debug
         if state == "warning":
             # Explicit warning (Levene/SW violation or guard error) — red/white/bold
-            print(f"DEBUG: setting statusbar (warning) to: '{warning}'")
             self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=warning)
         elif state == "info" or warning:
             # Successful test report (p-values, effect size, NA, SW/Levene summary) — default theme, bold
-            print(f"DEBUG: setting statusbar (info/success) to: '{warning or ''}'")
             self._set_statusbar_appearance(bg_color=None, bold=True, text=warning or "")
         else:
             # No content: default color (theme / darkmode sensitive) + cleared text
-            print("DEBUG: setting statusbar to clear (no content)")
             self._set_statusbar_appearance(clear=True)
 
     def _on_statusbar_message_cleared(self, text):
@@ -1968,7 +1960,6 @@ class UIsub(
             shown_groups = self._get_shown_group_ids()
             # Only groups that have at least one recording can participate in a test
             shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
-            print(f"DEBUG apply_stat: test_type={test_type}, shown_groups={shown_groups}, shown_ts={len(self._get_shown_testsets())}")
 
             ref_attr = "label_test_t_one_sample_value"
             if test_type == "Wilcoxon":
@@ -2068,9 +2059,6 @@ class UIsub(
                 results = []
 
             if not results:
-                print(
-                    f"DEBUG: no results from compute (error={comp.get('error') if 'comp' in locals() else 'N/A'}, not_implemented={comp.get('not_implemented') if 'comp' in locals() else 'N/A'})"
-                )
                 self.clear_formal_test_results()
                 uistate.statusbar_state = None
                 self._refresh_test_statusbar()
@@ -2419,8 +2407,6 @@ class UIsub(
                 continue
             if finite.size == 1 and "marker" in line.get_label():  # skip physical point markers on axe/axm
                 continue
-            if "PPR" in line.get_label():
-                print(f"DEBUG YLIM PPR: {line.get_label()} size={finite.size} val={finite} mask={mask} x={xdata} y={ydata}")
             all_y.append(finite)
 
         for coll in axis.collections:
@@ -4043,7 +4029,6 @@ class UIsub(
             uistate.save_cfg(projectfolder=self.dict_folders.get("project"))
 
     def triggerRefresh(self):
-        print("DEBUG: triggerRefresh CALLED!")
         self.usage("refresh graphs")
         selection = uistate.list_idx_select_recs
         self.tableProj.clearSelection()

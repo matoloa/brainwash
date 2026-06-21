@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 import matplotlib
 import matplotlib.figure
@@ -15,7 +17,7 @@ class JournalTemplate:
     width_mm: float
     height_mm: float
     # Font
-    font_family: str = "Arial"
+    font_family: str = "sans-serif"  # Arial not available on Linux; sans-serif is reliable cross-platform
     font_size_axis_label: float = 7.0
     font_size_tick_label: float = 6.0
     font_size_legend: float = 6.0
@@ -32,12 +34,12 @@ class JournalTemplate:
 
 
 JOURNAL_TEMPLATES: dict[str, JournalTemplate] = {
-    "jneurosci_1col": JournalTemplate(name="JNeurosci (1 col)", width_mm=85, height_mm=60),
-    "jneurosci_2col": JournalTemplate(name="JNeurosci (2 col)", width_mm=174, height_mm=120),
-    "jphysiol_1col": JournalTemplate(name="JPhysiol (1 col)", width_mm=85, height_mm=65),
-    "jphysiol_2col": JournalTemplate(name="JPhysiol (2 col)", width_mm=174, height_mm=130),
-    "nature_1col": JournalTemplate(name="Nature (1 col)", width_mm=89, height_mm=65),
-    "nature_2col": JournalTemplate(name="Nature (2 col)", width_mm=183, height_mm=130),
+    "jneurosci_1col": JournalTemplate(name="JNeurosci (1 col)", width_mm=85, height_mm=60, font_family="sans-serif"),
+    "jneurosci_2col": JournalTemplate(name="JNeurosci (2 col)", width_mm=174, height_mm=120, font_family="sans-serif"),
+    "jphysiol_1col": JournalTemplate(name="JPhysiol (1 col)", width_mm=85, height_mm=65, font_family="sans-serif"),
+    "jphysiol_2col": JournalTemplate(name="JPhysiol (2 col)", width_mm=174, height_mm=130, font_family="sans-serif"),
+    "nature_1col": JournalTemplate(name="Nature (1 col)", width_mm=89, height_mm=65, font_family="sans-serif"),
+    "nature_2col": JournalTemplate(name="Nature (2 col)", width_mm=183, height_mm=130, font_family="sans-serif"),
 }
 
 
@@ -616,6 +618,16 @@ def render_publication_figure(
                 figures[panel_key] = fig
 
     return figures
+
+
+def build_figure_text_md(uistate, template, group_names=None) -> str:
+    """Phase 0 stub per revised plan_v0.16_scitest_figtext.md.
+    The final "typewriter" lives in export_data.triggerExportOutputImage.
+    Returns simple placeholder for now; expanded in later phases.
+    """
+    if not uistate or getattr(uistate, "test_type", "None") == "None":
+        return "(Exported without statistical comparison overlay.)"
+    return "text"  # minimal placeholder for Phase 0
 
 
 if __name__ == "__main__":
