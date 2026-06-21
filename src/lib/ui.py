@@ -1929,6 +1929,7 @@ class UIsub(
             norm = bool(uistate.checkBox.get("norm_EPSP", False))
             amp = bool(uistate.checkBox.get("EPSP_amp", True))
             slope = bool(uistate.checkBox.get("EPSP_slope", True))
+            ref_value = getattr(uistate, "label_test_t_one_sample_value", 0.0)
 
             g1 = shown_groups[0]
             g2 = shown_groups[1] if len(shown_groups) > 1 else None
@@ -1950,6 +1951,7 @@ class UIsub(
                     norm=norm,
                     amp=amp,
                     slope=slope,
+                    ref=ref_value,
                 )
                 results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
             except Exception as ex:
@@ -2769,6 +2771,10 @@ class UIsub(
         uistate.test_type = test_type
         if hasattr(self, "frameToolTest_t"):
             self.frameToolTest_t.setVisible(test_type == "t-test")
+            # hook the one-sample value lineEdit (default 0.0 from UIState)
+            if hasattr(self, "lineEdit_test_t_one_sample_value"):
+                val = getattr(uistate, "label_test_t_one_sample_value", 0.0)
+                self.lineEdit_test_t_one_sample_value.setText(str(val))
         if hasattr(self, "frameToolTest_ANOVA"):
             self.frameToolTest_ANOVA.setVisible(test_type == "ANOVA")
             if test_type == "ANOVA":
@@ -2790,6 +2796,19 @@ class UIsub(
         tails = self._RADIO_TO_TEST_T_TAILS.get(button.objectName(), button.text())
         print(f"Selected t-test tails: {tails}")
         uistate.test_t_tails = tails
+        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.apply_statistical_test_if_active()
+
+    def editTestTOneSampleValue(self, lineEdit):
+        """Handler for lineEdit_test_t_one_sample_value (v0.16 one-sample t-test)."""
+        self.usage("editTestTOneSampleValue")
+        try:
+            val = float(lineEdit.text().replace(",", "."))
+        except ValueError:
+            lineEdit.setText(str(getattr(uistate, "label_test_t_one_sample_value", 0.0)))
+            return
+        uistate.label_test_t_one_sample_value = val
+        print(f"editTestTOneSampleValue: uistate.label_test_t_one_sample_value set to {val}")
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.apply_statistical_test_if_active()
 
@@ -2901,6 +2920,9 @@ class UIsub(
                 print(f"Levene checkbox changed to: {state == 2}")
                 uistate.test_levene = state == 2
                 self.apply_statistical_test_if_active()
+            elif key == "label_test_t_one_sample_value":
+                # handled via dedicated editTestTOneSampleValue; this is for completeness if ever routed here
+                pass
         # print(f"viewSettingsChanged: {key} = {state == 2}")
         self.update_show()
         if key in ["output_ymin0", "norm_EPSP"]:
@@ -3197,6 +3219,10 @@ class UIsub(
             self.frameToolType_io.setVisible(getattr(uistate, "experiment_type", "time") == "io")
         if hasattr(self, "frameToolTest_t"):
             self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
+            # hook the one-sample value lineEdit (default 0.0 from UIState)
+            if hasattr(self, "lineEdit_test_t_one_sample_value"):
+                val = getattr(uistate, "label_test_t_one_sample_value", 0.0)
+                self.lineEdit_test_t_one_sample_value.setText(str(val))
         if hasattr(self, "frameToolTest_ANOVA"):
             self.frameToolTest_ANOVA.setVisible(getattr(uistate, "test_type", "None") == "ANOVA")
             if getattr(uistate, "test_type", "None") == "ANOVA":
@@ -3398,6 +3424,17 @@ class UIsub(
                     pass
             else:
                 lineEdit.editingFinished.connect(lambda le=lineEdit: self.editSavgolParams(le))
+        # one-sample t-test value (new in v0.16 science_test)
+        if hasattr(self, "lineEdit_test_t_one_sample_value"):
+            if disconnect:
+                try:
+                    self.lineEdit_test_t_one_sample_value.editingFinished.disconnect()
+                except TypeError:
+                    pass
+            else:
+                self.lineEdit_test_t_one_sample_value.editingFinished.connect(
+                    lambda le=self.lineEdit_test_t_one_sample_value: self.editTestTOneSampleValue(le)
+                )
 
         # pushButtons
         for str_button, str_function in uistate.pushButtons.items():
@@ -3493,6 +3530,10 @@ class UIsub(
                 getattr(self, tails_name).setChecked(True)
         if hasattr(self, "frameToolTest_t"):
             self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
+            # hook the one-sample value lineEdit (default 0.0 from UIState)
+            if hasattr(self, "lineEdit_test_t_one_sample_value"):
+                val = getattr(uistate, "label_test_t_one_sample_value", 0.0)
+                self.lineEdit_test_t_one_sample_value.setText(str(val))
         if hasattr(self, "frameToolTest_ANOVA"):
             self.frameToolTest_ANOVA.setVisible(getattr(uistate, "test_type", "None") == "ANOVA")
             if getattr(uistate, "test_type", "None") == "ANOVA":
