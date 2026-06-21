@@ -1443,7 +1443,12 @@ class UIsub(
                 checkBox = getattr(self, f"checkBox_{key}")
                 checkBox.setEnabled(False)
         for radio_name in (
-            list(self._RADIO_TO_TYPE) + list(self._RADIO_TO_TEST) + list(self._RADIO_TO_TEST_T_VARIANT) + list(self._RADIO_TO_TEST_T_TAILS)
+            list(self._RADIO_TO_TYPE)
+            + list(self._RADIO_TO_TEST)
+            + list(self._RADIO_TO_TEST_T_VARIANT)
+            + list(self._RADIO_TO_TEST_T_TAILS)
+            + list(self._RADIO_TO_TEST_WILCOX_VARIANT)
+            + list(self._RADIO_TO_TEST_WILCOX_TAILS)
         ):
             if hasattr(self, radio_name):
                 getattr(self, radio_name).setEnabled(False)
@@ -1459,7 +1464,12 @@ class UIsub(
                 checkBox = getattr(self, f"checkBox_{key}")
                 checkBox.setEnabled(True)
         for radio_name in (
-            list(self._RADIO_TO_TYPE) + list(self._RADIO_TO_TEST) + list(self._RADIO_TO_TEST_T_VARIANT) + list(self._RADIO_TO_TEST_T_TAILS)
+            list(self._RADIO_TO_TYPE)
+            + list(self._RADIO_TO_TEST)
+            + list(self._RADIO_TO_TEST_T_VARIANT)
+            + list(self._RADIO_TO_TEST_T_TAILS)
+            + list(self._RADIO_TO_TEST_WILCOX_VARIANT)
+            + list(self._RADIO_TO_TEST_WILCOX_TAILS)
         ):
             if hasattr(self, radio_name):
                 getattr(self, radio_name).setEnabled(True)
@@ -2717,6 +2727,19 @@ class UIsub(
     }
     _TEST_T_TAILS_TO_RADIO = {v: k for k, v in _RADIO_TO_TEST_T_TAILS.items()}
 
+    _RADIO_TO_TEST_WILCOX_VARIANT = {
+        "radioButton_test_wilcox_variant_paired": "paired",
+        "radioButton_test_wilcox_variant_one": "one-sample",
+    }
+    _TEST_WILCOX_VARIANT_TO_RADIO = {v: k for k, v in _RADIO_TO_TEST_WILCOX_VARIANT.items()}
+
+    _RADIO_TO_TEST_WILCOX_TAILS = {
+        "radioButton_test_wilcox_tails_two": "two-sided",
+        "radioButton_test_wilcox_tails_greater": "greater",
+        "radioButton_test_wilcox_tails_less": "less",
+    }
+    _TEST_WILCOX_TAILS_TO_RADIO = {v: k for k, v in _RADIO_TO_TEST_WILCOX_TAILS.items()}
+
     def io_input_changed(self, button):
         """Handler for buttonGroup_io_i.buttonClicked signal."""
         io_input = self._RADIO_TO_IO_I.get(button.objectName())
@@ -2779,6 +2802,11 @@ class UIsub(
             self.frameToolTest_ANOVA.setVisible(test_type == "ANOVA")
             if test_type == "ANOVA":
                 self.update_anova_label()
+        if hasattr(self, "frameToolTest_Wilcoxon"):
+            self.frameToolTest_Wilcoxon.setVisible(test_type == "Wilcoxon")
+            if test_type == "Wilcoxon" and hasattr(self, "lineEdit_test_wilcox_one_sample_value"):
+                val = getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)
+                self.lineEdit_test_wilcox_one_sample_value.setText(str(val))
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         # Automatic application (v0.16): apply when non-None, clear when None
         self.apply_statistical_test_if_active()
@@ -2809,6 +2837,35 @@ class UIsub(
             return
         uistate.label_test_t_one_sample_value = val
         print(f"editTestTOneSampleValue: uistate.label_test_t_one_sample_value set to {val}")
+        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.apply_statistical_test_if_active()
+
+    def test_wilcox_variant_changed(self, button):
+        """Wiring for buttonGroup_test_wilcox_variant."""
+        variant = self._RADIO_TO_TEST_WILCOX_VARIANT.get(button.objectName(), button.text())
+        print(f"Selected Wilcoxon variant: {variant}")
+        uistate.test_wilcox_variant = variant
+        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.apply_statistical_test_if_active()
+
+    def test_wilcox_tails_changed(self, button):
+        """Wiring for buttonGroup_test_wilcox_tails."""
+        tails = self._RADIO_TO_TEST_WILCOX_TAILS.get(button.objectName(), button.text())
+        print(f"Selected Wilcoxon tails: {tails}")
+        uistate.test_wilcox_tails = tails
+        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.apply_statistical_test_if_active()
+
+    def editTestWilcoxOneSampleValue(self, lineEdit):
+        """Handler for lineEdit_test_wilcox_one_sample_value."""
+        self.usage("editTestWilcoxOneSampleValue")
+        try:
+            val = float(lineEdit.text().replace(",", "."))
+        except ValueError:
+            lineEdit.setText(str(getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)))
+            return
+        uistate.label_test_wilcox_one_sample_value = val
+        print(f"editTestWilcoxOneSampleValue: uistate.label_test_wilcox_one_sample_value set to {val}")
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.apply_statistical_test_if_active()
 
@@ -2862,6 +2919,8 @@ class UIsub(
             + list(self._RADIO_TO_TEST)
             + list(self._RADIO_TO_TEST_T_VARIANT)
             + list(self._RADIO_TO_TEST_T_TAILS)
+            + list(self._RADIO_TO_TEST_WILCOX_VARIANT)
+            + list(self._RADIO_TO_TEST_WILCOX_TAILS)
         ):
             if hasattr(self, radio_name):
                 radio = getattr(self, radio_name)
@@ -3300,6 +3359,24 @@ class UIsub(
                     pass
             else:
                 self.buttonGroup_test_t_tails.buttonClicked.connect(self.test_t_tails_changed)
+        # test wilcox variant radio button group
+        if hasattr(self, "buttonGroup_test_wilcox_variant"):
+            if disconnect:
+                try:
+                    self.buttonGroup_test_wilcox_variant.buttonClicked.disconnect()
+                except TypeError:
+                    pass
+            else:
+                self.buttonGroup_test_wilcox_variant.buttonClicked.connect(self.test_wilcox_variant_changed)
+        # test wilcox tails radio button group
+        if hasattr(self, "buttonGroup_test_wilcox_tails"):
+            if disconnect:
+                try:
+                    self.buttonGroup_test_wilcox_tails.buttonClicked.disconnect()
+                except TypeError:
+                    pass
+            else:
+                self.buttonGroup_test_wilcox_tails.buttonClicked.connect(self.test_wilcox_tails_changed)
         # hide buttons
         hide_buttons = {
             "pushButton_hide_stim": "frameToolStim",
@@ -3435,6 +3512,17 @@ class UIsub(
                 self.lineEdit_test_t_one_sample_value.editingFinished.connect(
                     lambda le=self.lineEdit_test_t_one_sample_value: self.editTestTOneSampleValue(le)
                 )
+        # one-sample wilcoxon value
+        if hasattr(self, "lineEdit_test_wilcox_one_sample_value"):
+            if disconnect:
+                try:
+                    self.lineEdit_test_wilcox_one_sample_value.editingFinished.disconnect()
+                except TypeError:
+                    pass
+            else:
+                self.lineEdit_test_wilcox_one_sample_value.editingFinished.connect(
+                    lambda le=self.lineEdit_test_wilcox_one_sample_value: self.editTestWilcoxOneSampleValue(le)
+                )
 
         # pushButtons
         for str_button, str_function in uistate.pushButtons.items():
@@ -3528,6 +3616,18 @@ class UIsub(
             tails_name = self._TEST_T_TAILS_TO_RADIO.get(getattr(uistate, "test_t_tails", "two-sided"), "radioButton_test_t_tails_two")
             if hasattr(self, tails_name):
                 getattr(self, tails_name).setChecked(True)
+        if hasattr(self, "buttonGroup_test_wilcox_variant"):
+            wilcox_variant_name = self._TEST_WILCOX_VARIANT_TO_RADIO.get(
+                getattr(uistate, "test_wilcox_variant", "paired"), "radioButton_test_wilcox_variant_paired"
+            )
+            if hasattr(self, wilcox_variant_name):
+                getattr(self, wilcox_variant_name).setChecked(True)
+        if hasattr(self, "buttonGroup_test_wilcox_tails"):
+            wilcox_tails_name = self._TEST_WILCOX_TAILS_TO_RADIO.get(
+                getattr(uistate, "test_wilcox_tails", "two-sided"), "radioButton_test_wilcox_tails_two"
+            )
+            if hasattr(self, wilcox_tails_name):
+                getattr(self, wilcox_tails_name).setChecked(True)
         if hasattr(self, "frameToolTest_t"):
             self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
             # hook the one-sample value lineEdit (default 0.0 from UIState)
@@ -3538,6 +3638,11 @@ class UIsub(
             self.frameToolTest_ANOVA.setVisible(getattr(uistate, "test_type", "None") == "ANOVA")
             if getattr(uistate, "test_type", "None") == "ANOVA":
                 self.update_anova_label()
+        if hasattr(self, "frameToolTest_Wilcoxon"):
+            self.frameToolTest_Wilcoxon.setVisible(getattr(uistate, "test_type", "None") == "Wilcoxon")
+            if getattr(uistate, "test_type", "None") == "Wilcoxon" and hasattr(self, "lineEdit_test_wilcox_one_sample_value"):
+                val = getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)
+                self.lineEdit_test_wilcox_one_sample_value.setText(str(val))
 
         # Ensure tools column is treated as fixed pixels
         if len(uistate.splitter.get("h_splitterMaster", [])) == 4:

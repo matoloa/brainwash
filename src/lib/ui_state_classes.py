@@ -191,6 +191,9 @@ class UIstate:
         self.test_sw = False
         self.test_levene = False
         self.label_test_t_one_sample_value = 0.0
+        self.test_wilcox_variant = "paired"
+        self.test_wilcox_tails = "two-sided"
+        self.label_test_wilcox_one_sample_value = 0.0
         self.anova_label = "ANOVA (one-way)"  # updated dynamically based on # of shown test sets
         self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
         self._time_unit_label = "s"  # set by x_axis_xlim when mode == "time"
@@ -671,6 +674,9 @@ class UIstate:
                 "test_sw": getattr(self, "test_sw", False),
                 "test_levene": getattr(self, "test_levene", False),
                 "label_test_t_one_sample_value": getattr(self, "label_test_t_one_sample_value", 0.0),
+                "test_wilcox_variant": getattr(self, "test_wilcox_variant", "paired"),
+                "test_wilcox_tails": getattr(self, "test_wilcox_tails", "two-sided"),
+                "label_test_wilcox_one_sample_value": getattr(self, "label_test_wilcox_one_sample_value", 0.0),
                 "anova_label": getattr(self, "anova_label", "ANOVA (one-way)"),
                 "showTimetable": self.showTimetable,
                 "detailedProjectTable": getattr(self, "detailedProjectTable", False),
@@ -708,6 +714,9 @@ class UIstate:
         self.test_sw = state.get("test_sw", False)
         self.test_levene = state.get("test_levene", False)
         self.label_test_t_one_sample_value = state.get("label_test_t_one_sample_value", 0.0)
+        self.test_wilcox_variant = state.get("test_wilcox_variant", "paired")
+        self.test_wilcox_tails = state.get("test_wilcox_tails", "two-sided")
+        self.label_test_wilcox_one_sample_value = state.get("label_test_wilcox_one_sample_value", 0.0)
         self.anova_label = state.get("anova_label", "ANOVA (one-way)")
 
         self.showTimetable = state.get("showTimetable", False)
