@@ -1969,7 +1969,7 @@ class UIsub(
                 min_groups = 1  # detailed check in warning function
             else:
                 min_groups = 1 if variant_for_check in ("one-sample", "paired") else 2
-            if len(shown_groups) < min_groups:
+            if len(shown_groups) < min_groups and test_type != "Cluster perm.":
                 if had_results or test_type == "Friedman":
                     if test_type == "ANOVA":
                         print(f"Statistical test: ANOVA requires either >=2 groups, or 1 group with >=2 test sets (repeated-measures).")
@@ -2001,7 +2001,7 @@ class UIsub(
                     self._refresh_test_statusbar()
                     return
 
-            if not shown_ts and test_type != "Friedman":
+            if not shown_ts and test_type not in ("Friedman", "Cluster perm."):
                 if had_results or test_type == "Friedman":
                     print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
                 self.clear_formal_test_results()
