@@ -103,7 +103,8 @@ class UIplot:
           Uses the q-value for the level if FDR was applied, else the raw p-value.
         - Marker is white in darkmode, black otherwise (bare text, no box/background).
         - "ns" uses a muted gray appropriate for the current mode.
-        Always shows a label per computed aspect per shown test set.
+        For paired t-test: shows exactly one marker (centered between the two test sets).
+        Otherwise shows one label per computed aspect per shown test set.
         Uses uistate.dict_test_markers for storage (values are Text artists).
         """
         ax1 = self.uistate.ax1
@@ -119,6 +120,12 @@ class UIplot:
 
         dark = bool(getattr(self.uistate, "darkmode", False))
 
+        # Paired t-test (per latest request): place ONLY one */na marker, horizontally
+        # centered between the x-positions of the first and second test set.
+        # Legend-matching y-placement (amp/slope top-right rules) is unchanged.
+        variant = getattr(self.uistate, "test_t_variant", "unpaired")
+        is_paired = variant == "paired" and len(results or []) >= 2
+
         for res in results or []:
             sweeps = res.get("sweeps", []) or []
             if not sweeps:
@@ -128,16 +135,44 @@ class UIplot:
             except Exception:
                 continue
 
-            # Collect p/q for amp aspects -> ax1 (low)
-            # and slope aspects -> ax2 (high)
+            # For paired: override x to midpoint between first and second test set
+            # (res[0] and res[1] correspond to the two test sets). Only process
+            # the first result (single marker, per user request).
+            if is_paired:
+                if results.index(res) != 0:
+                    continue  # skip second result for paired
+                try:
+                    sweeps2 = results[1].get("sweeps", []) or []
+                    x2 = float(np.mean(sweeps2))
+                    x = (x + x2) / 2.0
+                except Exception:
+                    pass  # fallback to first-set x
+
+            # Collect p/q for amp aspects -> ax1 (low) and slope aspects -> ax2 (high).
+            # Respect legend placement convention (top-right when only one aspect shown):
+            #   - both shown: amp low (bottom), slope high (top)
+            #   - only amp:   amp top-right
+            #   - only slope: slope top-right
             amp_pcols = [k for k in res.keys() if k.startswith("p_") and "amp" in k]
             slope_pcols = [k for k in res.keys() if k.startswith("p_") and "slope" in k]
+            amp_view = bool(getattr(self.uistate, "ampView", lambda: True)())
+            slope_view = bool(getattr(self.uistate, "slopeView", lambda: True)())
 
             placements = []
-            for pcol in amp_pcols:
-                placements.append((pcol, ax1, 0.06, "bottom"))
-            for pcol in slope_pcols:
-                placements.append((pcol, ax2, 0.94, "top"))
+            if amp_view and slope_view:
+                # both: amp bottom, slope top (matches current legend convention)
+                for pcol in amp_pcols:
+                    placements.append((pcol, ax1, 0.06, "bottom"))
+                for pcol in slope_pcols:
+                    placements.append((pcol, ax2, 0.94, "top"))
+            elif amp_view:
+                # only amp: place at top-right on ax1
+                for pcol in amp_pcols:
+                    placements.append((pcol, ax1, 0.94, "top"))
+            elif slope_view:
+                # only slope: place at top-right on ax2
+                for pcol in slope_pcols:
+                    placements.append((pcol, ax2, 0.94, "top"))
 
             for pcol, target_ax, y_frac, va in placements:
                 if not pcol:
