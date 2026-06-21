@@ -804,8 +804,8 @@ class UIsub(
         self.statusbar_label.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
         self.statusbar.addWidget(self.statusbar_label, 1)
 
-        # Statusbar is always present. Warnings force red; everything else uses the
-        # default color so it is sensitive to darkmode toggles.
+        # Statusbar is always present. Errors/warnings force red; successful stat test reports
+        # and everything else use the default color so it is sensitive to darkmode toggles.
         try:
 
             def _initial_center():
@@ -1589,23 +1589,25 @@ class UIsub(
         self, bg_color: str = None, text_color: str = None, bold: bool = False, text: str | None = None, clear: bool = False
     ):
         """Set statusbar appearance.
-        - If bg_color is provided (e.g. red for warnings), force that background.
-        - Otherwise (non-error states), do not force a background color so the
+        - If bg_color is provided (e.g. red #c0392b for errors/warnings), force that background.
+        - Otherwise (non-error states or successful stat test reports), do not force a background color so the
           statusbar uses its default appearance (sensitive to darkmode()).
         Text on the internal statusbar_label is always centered.
         """
         # Only force a background for error/warning states. For everything else
-        # leave the statusbar's background as the theme default.
+        # (including successful statistical test p-value reports) leave the
+        # statusbar's background as the theme default.
         if bg_color:
             style = f"QStatusBar {{ background-color: {bg_color}; }}"
         else:
             style = ""
 
         # Choose a sensible text color for non-error states if none supplied.
-        if text_color is None and not bg_color:
+        # For successful stat test reports (and other non-bg cases) we pass bold=True but no bg_color.
+        if text_color is None and bg_color is None:
             text_color = "#ddd" if getattr(uistate, "darkmode", False) else "#333"
 
-        lbl = " QStatusBar QLabel { qproperty-alignment: AlignCenter;"
+        lbl = "QStatusBar QLabel { qproperty-alignment: AlignCenter; background-color: transparent;"
         if text_color:
             lbl += f" color: {text_color};"
         if bold:
@@ -1618,16 +1620,22 @@ class UIsub(
         label = getattr(self, "statusbar_label", None)
         if label is not None:
             label.setAlignment(QtCore.Qt.AlignCenter)
-            parts = []
+            parts = ["background-color: transparent;"]
             if text_color:
                 parts.append(f"color: {text_color};")
             if bold:
                 parts.append("font-weight: bold;")
-            label.setStyleSheet(" ".join(parts))
+            label.setStyleSheet("; ".join(parts))
             if clear or text in (None, ""):
                 label.setText("")
             elif text is not None:
                 label.setText(text)
+            else:
+                # Force update of stylesheet even if text unchanged (e.g. after usage toasts or darkmode)
+                current_text = label.text()
+                if current_text:
+                    label.setText(current_text)
+            # No extra " " fallback — let caller control text (success reports always pass explicit text)
 
         # Clear any temporary message so the added label widget (our centered one) is visible.
         # (showMessage would hide added widgets and show the internal left-aligned temp label.)
@@ -1709,17 +1717,23 @@ class UIsub(
 
     def _refresh_test_statusbar(self):
         """Update statusbar for current test conditions.
-        - Warning present: red bg + white centered text (error state)
-        - No warning and not loading: use default statusbar color (theme / darkmode sensitive) + cleared text
+        - Warning/error present: red bg + white centered text (error state)
+        - Successful statistical test report (p-values/effect size): default theme color, no background, bold text
+        - No content and not loading: use default statusbar color (theme / darkmode sensitive) + cleared text
         Loading takes precedence (it sets its own messages while active).
         """
         if self._is_loading_active():
             return
         warning = self._get_stat_test_warning()
         if warning:
-            self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=warning)
+            if any(x in warning for x in ("p=", "η²=", "NA", " | ")):
+                # Successful statistical test report (p-values, effect size, or NA) — default appearance (no bg), bold
+                self._set_statusbar_appearance(bg_color=None, bold=True, text=warning)
+            else:
+                # True error/warning (e.g. "requires ...", "not implemented", "no groups...")
+                self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=warning)
         else:
-            # Non-error: default color (no forced bg)
+            # No warning or report: default color (no forced bg)
             self._set_statusbar_appearance(clear=True)
 
     def _on_statusbar_message_cleared(self, text):
@@ -1730,18 +1744,15 @@ class UIsub(
             return
         warning = self._get_stat_test_warning()
         if warning:
-            self.statusbar.blockSignals(True)
-            try:
+            if any(x in warning for x in ("p=", "η²=", "NA", " | ")):
+                # Successful statistical test report (p-values, effect size, or NA) — default appearance (no bg), bold
+                self._set_statusbar_appearance(bg_color=None, bold=True, text=warning)
+            else:
+                # True error/warning (e.g. "requires ...", "not implemented", "no groups...")
                 self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=warning)
-            finally:
-                self.statusbar.blockSignals(False)
         else:
-            self.statusbar.blockSignals(True)
-            try:
-                # Non-error: default color (sensitive to current darkmode)
-                self._set_statusbar_appearance(clear=True)
-            finally:
-                self.statusbar.blockSignals(False)
+            # Non-error: default color (sensitive to current darkmode)
+            self._set_statusbar_appearance(clear=True)
 
     def apply_statistical_test_if_active(self):
         """Core applicator. Called automatically from config changes and mutations.
@@ -2035,6 +2046,18 @@ class UIsub(
             self.tableProj.setStyleSheet(table_style)
             self.tableStim.setStyleSheet(table_style)
 
+            # Explicit statusbar dark theme (matches mainwindow; avoids default grey)
+            self.statusbar.setStyleSheet("""
+                QStatusBar {
+                    background-color: #2A2A2A;
+                    color: #ddd;
+                }
+                QStatusBar QLabel {
+                    background-color: transparent;
+                    color: #ddd;
+                }
+            """)
+
         else:
             self.mainwindow.setStyleSheet("")
             self.tableProj.setStyleSheet("")
@@ -2045,17 +2068,21 @@ class UIsub(
                 "QProgressBar::chunk { background-color: #4caf50; border-radius: 3px; }"
             )
 
+            # Reset statusbar to Qt default (light theme, transparent label)
+            self.statusbar.setStyleSheet("""
+                QStatusBar {
+                    background-color: transparent;
+                }
+                QStatusBar QLabel {
+                    background-color: transparent;
+                }
+            """)
+
         uiplot.styleUpdate()
         self.graphRefresh()
 
-        # Re-apply statusbar state. Warnings stay red; non-error states now use
-        # the appropriate default color for the current (dark)mode.
+        # Re-apply statusbar state (after darkmode stylesheet reset). Warnings stay red; reports use theme default.
         try:
-            default_text = "#ddd" if uistate.darkmode else "#333"
-            if hasattr(self, "statusbar_label") and self.statusbar_label:
-                # If we're in a warning the _set below will override; otherwise ensure sensible color.
-                if "#c0392b" not in (self.statusbar.styleSheet() or ""):
-                    self.statusbar_label.setStyleSheet(f"color: {default_text};")
             if not self._is_loading_active():
                 self._refresh_test_statusbar()
         except Exception:
@@ -2798,7 +2825,7 @@ class UIsub(
             # Do not clobber an active test warning (red statusbar)
             if "#c0392b" not in (self.statusbar.styleSheet() or ""):
                 # Show as centered text using the current default (theme/darkmode) color
-                self._set_statusbar_appearance(text=f"Used {ui_component} {self.dict_usage[ui_component]} times")
+                self._set_statusbar_appearance(text=f"Used {ui_component} {self.dict_usage[ui_component]} times", bold=False)
         self.write_usage()
 
     def write_usage(self):
