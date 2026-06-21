@@ -42,7 +42,9 @@ The session plan file was repeatedly crashing on `exit_plan_mode`; per user inst
 - ≥2 groups → standard one-way `f_oneway` per test set; per-set markers + statusbar.
 - Toggling FDR / SW / Levene clears stale results and re-applies with updated usage log.
 
-**Scope note:** The RM path uses a simplified marginal `f_oneway` (no subject factor, no sphericity correction, no post-hoc). Full RM-ANOVA + pairwise brackets is deferred per the original plan. The limitation note in the statusbar makes this explicit to the user.
+  **Scope note:** The RM path uses a simplified marginal `f_oneway` (no subject factor, no sphericity correction, no post-hoc). Full RM-ANOVA + pairwise brackets is deferred per the original plan. The limitation note in the statusbar makes this explicit to the user.
+
+  **t-test "Paired" semantics (post-clarification):** The v0.16 implementation initially inherited a "2 groups with equal N" requirement for paired. This was incorrect for the within-subject use case (1 group, Pre/Post on same slices). Per user decision 2026-06-21, "Paired" is now exclusively 1 group + exactly 2 test sets and must error otherwise; the guard logic and plan have been updated accordingly.
 
 ## Verification Performed
 
@@ -53,9 +55,10 @@ The session plan file was repeatedly crashing on `exit_plan_mode`; per user inst
 - Statusbar format verified for omnibus case (single test+note prefix, bracketed aspect list).
 - FDR/SW/Levene checkboxes trigger the same usage pattern as the original `test_fdr`.
 
-## Open Items / Follow-up (consistent with original plan)
+  ## Open Items / Follow-up (consistent with original plan) — updated 2026-06-21
 
-- Assumption tests (SW, Levene) are wired for UI triggering but not yet implemented in the computation layer (`statistics.py` does not call `shapiro`/`levene` or surface warnings).
+- **t-test variant semantics clarified:** "Paired" is now strictly 1 group + exactly 2 test sets (within-subject Pre/Post). Guards in `_get_stat_test_warning()`, `apply_statistical_test_if_active()`, and `compute_statistical_comparison()` must enforce this and error otherwise. "Unpaired" remains 2 groups; "One-sample" remains 1 group vs ref.
+- Assumption tests (SW, Levene) implementation is complete; display formatting fixes applied (F uses `:.2g`; SW n<3 fallback). SW requires n≥3 (scipy constraint); n=2 shows "SW n<3".
 - Full subject-aligned RM-ANOVA, sphericity, and post-hoc pairwise contrasts (with graph brackets) remain deferred.
 - The `frameToolTest_ANOVA` visibility still references the old ANOVA-specific frame; if the shared toolbox now contains the assumption checkboxes, the old frame may be empty or vestigial (cosmetic cleanup only).
 - `_print_statistical_test_table` and any formal results table do not yet display the omnibus row or the new flags.

@@ -163,15 +163,19 @@ The Heatmap ("H") path is completely independent and untouched by this logic. Fo
 - For amp vs. slope vs. norm: continue to respect `uistate.checkBox["EPSP_amp"]`, `["EPSP_slope"]`, `["norm_EPSP"]`.
 - Non-t-test selections: emit a clear "not yet implemented for v0.16" message (and do not crash or corrupt state). The radios remain enabled for future work.
 
-### 6. Pairing model (for "paired" variant)
+  ### 6. Pairing model (for "paired" variant) — clarified 2026-06-21
 
-Groups are independent collections of rec_IDs today. A pragmatic v0.16 approach:
+  "Paired" (repeated-measures t-test) is exclusively for the within-subject design:
+  - Exactly **1 group** with **exactly 2 test sets** shown (e.g., Pre vs Post sweeps tagged on the same recordings/slices).
+  - The two test sets supply the paired observations for each rec_ID; alignment is by rec_ID within the single group.
+  - Computation: per-recording paired values → `scipy.stats.ttest_rel` (or equivalently one-sample t-test on differences vs ref=0).
 
-- If exactly two groups are shown and they contain the same number of recordings, attempt to pair by sorted rec_ID order (or exact rec_ID overlap if the same IDs appear in both groups for a within-subject design).
-- If pairing cannot be established, fall back to unpaired with a warning, or error and tell the user.
-- Full "define pairs explicitly" UI is future work.
+  Guards (must error with a clear message if violated):
+  - "Paired" selected → require exactly 1 group + exactly 2 test sets; any other count → error ("Paired t-test requires one group with exactly two test sets").
+  - "Unpaired" selected → require exactly 2 groups (between-subjects).
+  - "One-sample" selected → require exactly 1 group; tests that group's per-recording means against a reference (default 0).
 
-One-sample does not require pairing.
+  The previous plan text ("two groups with equal N") is superseded. One-sample does not require pairing; its reference (`ref`) defaults to 0.0 and is not user-configurable in v0.16.
 
 ### 7. Result presentation (no designer changes)
 
