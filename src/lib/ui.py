@@ -1732,7 +1732,11 @@ class UIsub(
             if global_notes:
                 prefix = f"{test_type} {' '.join(global_notes)}"
             parts = []
-            for r in uistate.formal_test_results:
+            # Special handling for t-test (paired): use ONLY first result (set 1), no set name prefix
+            results_to_report = uistate.formal_test_results
+            if test_type == "t-test" and variant == "paired" and results_to_report:
+                results_to_report = results_to_report[:1]
+            for r in results_to_report:
                 name = r.get("set_name", f"set {r.get('set_id', '?')}")
                 subparts = []
                 for aspect, prefix_key in [("amp", "amp"), ("slope", "slope")]:
@@ -1756,7 +1760,10 @@ class UIsub(
                     if isinstance(eta, (int, float)) and np.isfinite(eta):
                         subparts.append(f"η²={eta:.3f}")
                 if subparts:  # only show test set if at least one aspect is enabled
-                    parts.append(f"{name}: {', '.join(subparts)}")
+                    if test_type == "t-test" and variant == "paired":
+                        parts.append(", ".join(subparts))  # no set name
+                    else:
+                        parts.append(f"{name}: {', '.join(subparts)}")
             if parts:
                 status = f"{prefix}: {' | '.join(parts)}"
             else:
@@ -1973,33 +1980,29 @@ class UIsub(
             self._refresh_test_statusbar()
 
     def _print_statistical_test_table(self, results, variant, tails, fdr, norm):
+        if not results:
+            return
         print("\n=== Statistical test (v0.16) ===")
         print(f"variant={variant}  tails={tails}  fdr={fdr}  norm={norm}")
         print("Note: each n = mean of aspect over sweeps in the test set, per recording.")
-        for r in results:
-            print(f"\nTest set: {r.get('set_name', '?')} (ID {r.get('set_id')})  sweeps={r.get('sweeps')}")
-            g1 = r.get("group1")
-            g2 = r.get("group2")
-            n1 = r.get("n1", 0)
-            n2 = r.get("n2", 0)
-            if variant == "one-sample":
-                print(f"  One-sample on group: {g1}   N={n1}   (reference = 0)")
+        # Report ONLY the first result (first test set); skip "set 1"/"Test set:" label and any further sets
+        r = results[0]
+        n1 = r.get("n1", 0)
+        n2 = r.get("n2", 0)
+        # Print one line per computed aspect (p and optional q)
+        for key in sorted(k for k in r.keys() if k.startswith("p_")):
+            pval = r.get(key)
+            sval = r.get("stat_" + key[2:], np.nan)
+            qval = r.get("q_" + key[2:], None)
+            aspect = key[2:]
+            pstr = f"{pval:.4g}" if isinstance(pval, (int, float)) and np.isfinite(pval) else str(pval)
+            if isinstance(sval, (int, float)) and np.isfinite(sval):
+                line = f"  {aspect}: p={pstr}  stat={sval:.4g}  n1={n1} n2={n2}"
             else:
-                print(f"  Groups: {g1} vs {g2}   N1={n1} N2={n2}")
-            # Print one line per computed aspect (p and optional q)
-            for key in sorted(k for k in r.keys() if k.startswith("p_")):
-                pval = r.get(key)
-                sval = r.get("stat_" + key[2:], np.nan)
-                qval = r.get("q_" + key[2:], None)
-                aspect = key[2:]
-                pstr = f"{pval:.4g}" if isinstance(pval, (int, float)) and np.isfinite(pval) else str(pval)
-                if isinstance(sval, (int, float)) and np.isfinite(sval):
-                    line = f"  {aspect}: p={pstr}  stat={sval:.4g}  n1={n1} n2={n2}"
-                else:
-                    line = f"  {aspect}: p={pstr}  n1={n1} n2={n2}"
-                if qval is not None and isinstance(qval, (int, float)) and np.isfinite(qval):
-                    line += f"  q={qval:.4g}"
-                print(line)
+                line = f"  {aspect}: p={pstr}  n1={n1} n2={n2}"
+            if qval is not None and isinstance(qval, (int, float)) and np.isfinite(qval):
+                line += f"  q={qval:.4g}"
+            print(line)
         print("=== end test ===\n")
 
     def setTableStimVisibility(self, state, initialize=False):
