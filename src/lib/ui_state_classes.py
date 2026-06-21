@@ -276,7 +276,9 @@ class UIstate:
             "output_end": None,
         }
 
-        self.testset_spans = {}  # runtime artists only: {set_ID: {"ax1": patch_obj, "ax2": patch_obj}} for Phase 2 gray test-set axvspans (not persisted to cfg.pkl)
+        self.testset_spans = (
+            {}
+        )  # runtime artists only: {set_ID: {"ax1": patch_obj, "ax2": patch_obj}} for Phase 2 gray test-set axvspans (not persisted to cfg.pkl)
 
         # darkmode is owned by bw_cfg.yaml, not the project cfg.pkl; set by get_bw_cfg()
         self.axm = None  # axis of mean graph (top)
@@ -300,11 +302,15 @@ class UIstate:
         self.df_recs2plot = None  # df_project copy, filtered to selected AND parsed recordings (or all parsed, if none are selected)
 
         # Plotted lines and fills
-        self.dict_rec_labels = {}  # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, variant: str ("raw"|"norm"|None), axis: str, line: 2DlineObject}}
+        self.dict_rec_labels = (
+            {}
+        )  # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, variant: str ("raw"|"norm"|None), axis: str, line: 2DlineObject}}
         self.dict_rec_show = {}  # subset of dict_rec_labels containing only currently visible entries
 
         # Groups (mean of recs)
-        self.dict_group_labels = {}  # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, variant: str ("raw"|"norm"), axis: str, line: 2DlineObject, fill: 2DfillObject}}
+        self.dict_group_labels = (
+            {}
+        )  # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, variant: str ("raw"|"norm"), axis: str, line: 2DlineObject, fill: 2DfillObject}}
         self.dict_group_show = {}  # subset of dict_group_labels containing only currently visible entries
 
         # Mouseover variables
