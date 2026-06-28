@@ -124,6 +124,7 @@ class UIstate:
             "frameToolAspectSlope": ["Slope width", False],
             "frameToolAspectAmp": ["Amplitude width", False],
             "frameToolTest": ["Statistical test", True],
+            "frameToolHierarchy": ["Hierarchy", True],  # v0.16_n: subject/slice inspector (statistical protocol)
         }
         self.checkBox = {  # these are cycled by uisub.connectUIstate; maintain format!
             "EPSP_amp": True,
@@ -144,6 +145,7 @@ class UIstate:
             "test_fdr": False,
             "test_sw": False,
             "test_levene": False,
+            "hierarchy_dd_is_subject": False,  # v0.16_n: persisted flag for drag-drop semantics (placeholder)
         }
         self.lineEdit = {  # storage of user input; used to update df_t
             "split_at_time": 0.0,  # in s (SI). User enters ms; converted at input in editImportOptions.
@@ -266,6 +268,8 @@ class UIstate:
             "pushButton_sweeps_odd": "trigger_set_sweeps_odd",
             # data set assignment
             "pushButton_add_to_set": "triggerAddToSet",
+            # v0.16_n hierarchy (Phase 0)
+            "pushButton_hide_hierarchy": "triggerHideHierarchy",
         }
         self.x_select = {  # selected ranges on mean- and output graphs
             # start and end: current drag operation; None if not dragging
@@ -276,9 +280,7 @@ class UIstate:
             "output_end": None,
         }
 
-        self.testset_spans = (
-            {}
-        )  # runtime artists only: {set_ID: {"ax1": patch_obj, "ax2": patch_obj}} for Phase 2 gray test-set axvspans (not persisted to cfg.pkl)
+        self.testset_spans = {}  # runtime artists only: {set_ID: {"ax1": patch_obj, "ax2": patch_obj}} for Phase 2 gray test-set axvspans (not persisted to cfg.pkl)
 
         # darkmode is owned by bw_cfg.yaml, not the project cfg.pkl; set by get_bw_cfg()
         self.axm = None  # axis of mean graph (top)
@@ -302,15 +304,11 @@ class UIstate:
         self.df_recs2plot = None  # df_project copy, filtered to selected AND parsed recordings (or all parsed, if none are selected)
 
         # Plotted lines and fills
-        self.dict_rec_labels = (
-            {}
-        )  # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, variant: str ("raw"|"norm"|None), axis: str, line: 2DlineObject}}
+        self.dict_rec_labels = {}  # dict of dicts of all plotted recordings. {key:label(str): {rec_ID: str, stim: int, aspect: str, variant: str ("raw"|"norm"|None), axis: str, line: 2DlineObject}}
         self.dict_rec_show = {}  # subset of dict_rec_labels containing only currently visible entries
 
         # Groups (mean of recs)
-        self.dict_group_labels = (
-            {}
-        )  # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, variant: str ("raw"|"norm"), axis: str, line: 2DlineObject, fill: 2DfillObject}}
+        self.dict_group_labels = {}  # dict of dicts of all plotted groups: {key:label(str): {group_ID: int, stim: int, aspect: str, variant: str ("raw"|"norm"), axis: str, line: 2DlineObject, fill: 2DfillObject}}
         self.dict_group_show = {}  # subset of dict_group_labels containing only currently visible entries
 
         # Mouseover variables

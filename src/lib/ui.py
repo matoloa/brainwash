@@ -663,6 +663,7 @@ class TableProjSub(QtWidgets.QTableView):
                 return
             dfAdd = dfAdd.drop(dfAdd[dfAdd["path"].isin(duplicates)].index)
             dfAdd["recording_name"] = names
+            # v0.16_n: _migrate_hierarchy called inside parent.addData() -> set_df_project()
             self.parent.addData(dfAdd)
             event.acceptProposedAction()
         else:
@@ -717,6 +718,7 @@ class Filetreesub(Ui_Dialog):
         for i in paths:
             names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
         dfAdd["recording_name"] = names
+        # v0.16_n note: hierarchy migration happens downstream in set_df_project() via addData
         self.dfAdd = dfAdd
         # TODO: Add a loop that prevents duplicate names by adding a number until it becomes unique
         # format tableView
@@ -1036,6 +1038,7 @@ class UIsub(
         self.zoomAuto()
         self.update_amp_lineEdits()
         self.update_slope_lineEdits()
+        self.refreshHierarchyLineEdits(df_p)  # v0.16_n Phase 1: selection → line-edits (after disconnect block)
 
         t0 = time.time()
         self.mouseoverUpdate()  # always ends with a single graphRefresh()
@@ -3287,6 +3290,9 @@ class UIsub(
             self.tableProj.setSelectionBehavior(TableProjSub.SelectRows)
             tableProj_selectionModel = self.tableProj.selectionModel()
             tableProj_selectionModel.selectionChanged.connect(self.tableProjSelectionChanged)
+            # v0.16_n: tab order for hierarchy line-edits (Phase 0)
+            if hasattr(self, "lineEdit_hierarchy_subject") and hasattr(self, "lineEdit_hierarchy_slice"):
+                self.setTabOrder(self.lineEdit_hierarchy_subject, self.lineEdit_hierarchy_slice)
             self.formatTableLayout()
         except Exception as e:
             print(f"Error setting up tableProj: {e}")
@@ -3315,6 +3321,8 @@ class UIsub(
         column_order = [
             "status",
             "recording_name",
+            "subject",  # v0.16_n: always visible immediately after recording_name (per updated requirement)
+            "slice",
             "groups",
             "stims",
             "sweeps",
@@ -3327,6 +3335,7 @@ class UIsub(
             for col_name in df_p.columns:
                 if col_name not in column_order:
                     column_order.append(col_name)
+        # v0.16_n: subject/slice now always shown (right of recording_name); detailed view surfaces remaining columns. Compact view simplified.
 
         col_indices = [df_p.columns.get_loc(name) for name in column_order if name in df_p.columns]
 
@@ -3414,6 +3423,7 @@ class UIsub(
         if hasattr(self, "frameToolType_io"):
             self.frameToolType_io.setVisible(getattr(uistate, "experiment_type", "time") == "io")
         if hasattr(self, "frameToolTest_t"):
+            # v0.16_n: hierarchy frame now included via viewTools loop (Phase 0)
             self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
             # hook the one-sample value lineEdit (default 0.0 from UIState)
             if hasattr(self, "lineEdit_test_t_one_sample_value"):
@@ -3595,6 +3605,25 @@ class UIsub(
                     pass
             else:
                 lineEdit.editingFinished.connect(lambda le=lineEdit: self.editNormRange(le))
+        # v0.16_n: hierarchy line-edits (Phase 1 two-way binding)
+        if hasattr(self, "lineEdit_hierarchy_subject"):
+            le = self.lineEdit_hierarchy_subject
+            if disconnect:
+                try:
+                    le.editingFinished.disconnect()
+                except TypeError:
+                    pass
+            else:
+                le.editingFinished.connect(lambda: self.applyHierarchyToSelection("subject"))
+        if hasattr(self, "lineEdit_hierarchy_slice"):
+            le = self.lineEdit_hierarchy_slice
+            if disconnect:
+                try:
+                    le.editingFinished.disconnect()
+                except TypeError:
+                    pass
+            else:
+                le.editingFinished.connect(lambda: self.applyHierarchyToSelection("slice"))
         for lineEdit in [
             self.lineEdit_EPSP_amp_halfwidth,
             self.lineEdit_volley_amp_halfwidth,
@@ -4028,6 +4057,54 @@ class UIsub(
             if hasattr(self, "actionToggleProjectTable"):
                 self.actionToggleProjectTable.setChecked(uistate.detailedProjectTable)
             uistate.save_cfg(projectfolder=self.dict_folders.get("project"))
+
+    # v0.16_n Phase 0: hierarchy hide button (reuses setViewToolVisible)
+    def triggerHideHierarchy(self):
+        self.usage("triggerHideHierarchy")
+        self.setViewToolVisible("frameToolHierarchy", False)
+
+    # v0.16_n Phase 1: selection → hierarchy line-edits (uniform/mixed logic like update_amp_lineEdits)
+    def refreshHierarchyLineEdits(self, df_p=None):
+        if df_p is None:
+            df_p = self.get_df_project()
+        if not hasattr(self, "lineEdit_hierarchy_subject"):
+            return
+        # prevent recursive editingFinished during setText
+        self.connectUIstate(disconnect=True)
+        idxs = uistate.list_idx_select_recs or []
+        if not idxs:
+            self.lineEdit_hierarchy_subject.setText("")
+            self.lineEdit_hierarchy_slice.setText("")
+            self.connectUIstate()
+            return
+        subs = [str(df_p.at[i, "subject"]) for i in idxs if pd.notna(df_p.at[i, "subject"])]
+        slices_list = [str(df_p.at[i, "slice"]) for i in idxs if pd.notna(df_p.at[i, "slice"])]
+        subj_val = subs[0] if len(set(subs)) == 1 else ""
+        slice_val = slices_list[0] if len(set(slices_list)) == 1 else ""
+        self.lineEdit_hierarchy_subject.setText(subj_val)
+        self.lineEdit_hierarchy_slice.setText(slice_val)
+        self.connectUIstate()
+
+    # v0.16_n Phase 1: line-edit edit → selected rows (immediate bulk assign)
+    def applyHierarchyToSelection(self, col):
+        self.usage(f"applyHierarchyToSelection({col})")
+        le_name = f"lineEdit_hierarchy_{col}"
+        if not hasattr(self, le_name):
+            return
+        text = getattr(self, le_name).text().strip()
+        idxs = uistate.list_idx_select_recs
+        if not idxs:
+            return
+        df_p = self.get_df_project().copy()
+        if text:
+            # Sanitize: ensure string (prevents LossySetitemError / int64 coercion when column inferred numeric)
+            df_p.loc[idxs, col] = str(text)
+        else:
+            df_p.loc[idxs, col] = pd.NA  # explicit NA; displays as blank
+        self.set_df_project(
+            df_p
+        )  # persists + calls tableUpdate() (tablemodel.setData + formatTableLayout + selection restore); updates visual table cells
+        self.refreshHierarchyLineEdits(df_p)  # refresh line-edits after table update (prevents feedback via disconnect guard)
 
     def triggerToggleTimetable(self, checked=None):
         self.usage("triggerToggleTimetable")
@@ -4840,6 +4917,7 @@ class UIsub(
         df_p.reset_index(drop=True, inplace=True)
         df_p["groups"] = df_p["groups"].fillna(" ")
         df_p["sweeps"] = df_p["sweeps"].fillna("...")
+        # v0.16_n: migration will be called inside set_df_project (hierarchy defaults)
         self.set_df_project(df_p)
         self.tableFormat()
         logger.debug("addData: %s", self.get_df_project())

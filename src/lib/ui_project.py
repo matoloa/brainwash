@@ -45,6 +45,9 @@ _INT_COLUMNS = ["stims", "sampling_rate", "bin_size"]
 
 
 def df_projectTemplate():
+    """Return empty DataFrame with current schema (v0.16_n includes subject/slice hierarchy per statistical_protocol.md).
+    New columns default to NaN; _migrate_hierarchy fills sensible defaults on first load/import.
+    """
     df = pd.DataFrame(
         columns=[
             "ID",  # str: unique identifier for recording
@@ -52,6 +55,8 @@ def df_projectTemplate():
             "path",  # str: path of original source file
             "status",  # str: blank if ok, 'default' is default recordings. TODO: add more states
             "recording_name",  # str: name of recording
+            "subject",  # str: biological subject/animal ID (defines n per statistical_protocol.md)
+            "slice",  # str: slice within subject; default "1" (nested repeated measure per statistical_protocol.md)
             "gain",  # float: gain of recording, applied at cache-build time; defaults to 1.0
             "stims",  # int: number of stims in recording
             "sweeps",  # int: number of sweeps in recording
@@ -65,8 +70,8 @@ def df_projectTemplate():
             "groups",  # str: group name(s); maintained by uisub.dfgroups and its functions
             "parsetimestamp",  # str: timestamp of parsing of original source file
             "channel",  # str: this recording is only from this channel
-            "paired_recording",  # str: unique ID of paired recording
-            "Tx",  # Boolean: Treatment / Control, for paired recordings
+            "paired_recording",  # DEPRECATED (paired-stimulus workflow). str: unique ID of paired recording
+            "Tx",  # DEPRECATED (paired-stimulus workflow). Boolean: Treatment / Control, for paired recordings
             "exclude",  # Boolean: If True, exclude this recording from analysis
             "comment",  # str: user comment
         ]
@@ -199,7 +204,7 @@ class ProjectMixin:
         self.setupToolBar()
         # set focus to TableProj, so that arrows work immediately
         self.tableProj.setFocus()
-        self.updating_tableProj = False
+        self.updating_tableProj = False  # v0.16_n: init guard used by tableUpdate() (called from set_df_project)
 
     # ------------------------------------------------------------------
     # Global config (bw_cfg.yaml)
@@ -373,8 +378,14 @@ class ProjectMixin:
                         return v
 
                 df["sweeps"] = df["sweeps"].apply(_coerce_sweeps)
+
+            # v0.16_n: enforce hierarchy defaults (new projects, imports, bulk edits)
+            df = self._migrate_hierarchy(df)
             self.df_project = df
         self.save_df_project()
+        if hasattr(self, "tableUpdate"):
+            self.tableUpdate()  # v0.16_n: always refresh table on set_df_project (fixes lineEdit → table staleness; tableUpdate guards against recursion via updating_tableProj flag)
+        # Note: full table refresh (tableUpdate/tableFormat) is performed by the calling UIsub methods (e.g. applyHierarchyToSelection, addData, trigger*).
 
     def load_df_project(self, str_projectfolder):  # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
         self.graphWipe()
@@ -404,6 +415,9 @@ class ProjectMixin:
             self.df_project["filter"] = self.df_project["filter"].fillna("voltage")
             self.df_project.loc[self.df_project["filter"] == "none", "filter"] = "voltage"
             self.df_project.loc[self.df_project["filter"] == "", "filter"] = "voltage"
+
+        # v0.16_n: enforce statistical_protocol defaults (subject/slice hierarchy)
+        self.df_project = self._migrate_hierarchy(self.df_project)
 
         self._backfill_sweep_hz()
         uistate.load_cfg(self.dict_folders["project"], config.version)
@@ -452,5 +466,41 @@ class ProjectMixin:
             print(f"_backfill_sweep_hz: computed sweep_hz for {updated} recording(s)")
             self.save_df_project()
 
+    def _migrate_hierarchy(self, df: pd.DataFrame) -> pd.DataFrame:
+        """v0.16_n: Apply statistical_protocol defaults on load/import.
+
+        - Adds 'subject'/'slice' columns if missing (backcompat).
+        - Lowest-unique-integer subjects (respects manual values; fills gaps).
+        - Default slice="1" (one-slice-per-animal assumption).
+        - Uses string dtype for both (flexible labels; Option A from plan).
+        - Called from load_df_project, set_df_project, and import paths.
+        """
+        if "subject" not in df.columns:
+            df["subject"] = None
+        if "slice" not in df.columns:
+            df["slice"] = None
+
+        # Force string dtype (prevents int64 inference from numeric defaults like "1"/"2")
+        for col in ("subject", "slice"):
+            if df[col].dtype != "object" and not pd.api.types.is_string_dtype(df[col]):
+                df[col] = df[col].astype("object")
+
+        # Lowest-unique-integer subjects (string)
+        existing_subs = set(df["subject"].dropna().astype(str).unique())
+        next_id = 1
+        for i, row in df.iterrows():
+            subj = row.get("subject")
+            if pd.isna(subj) or str(subj).strip() == "":
+                while str(next_id) in existing_subs:
+                    next_id += 1
+                df.at[i, "subject"] = str(next_id)
+                existing_subs.add(str(next_id))
+                next_id += 1
+            slc = row.get("slice")
+            if pd.isna(slc) or str(slc).strip() == "":
+                df.at[i, "slice"] = "1"
+        return df
+
     def save_df_project(self):  # writes df_project to .csv
-        self.df_project.to_csv(str(self.dict_folders["project"] / "project.brainwash"), index=False)
+        path = self.dict_folders["project"] / "project.brainwash"
+        self.df_project.to_csv(str(path), index=False)
