@@ -1,187 +1,119 @@
 # Plan v0.16: Significance Markers for IO and PP Tests
 
 ## Goal
-Apply significance markers (`*`, `**`, `***`, `ns`) to Input/Output (IO) and Paired Pulse (PP) formal statistical tests, first in the live UI (`ui_plot.py`) and then in the exported figure PNG (`export_image.py`).
 
-## Current State
+Apply significance markers (`*`, `**`, `***`, `ns`) (and journal brackets in export) to IO and PP formal statistical tests. First enable in live UI (`ui_plot.py::show_test_markers`), then verify in exported PNG (`export_image.py`). **Optimized for agentic efficiency**: minimal changes via heavy reuse of existing logic (p/q extraction, single-marker paired handling, visibility, x-positioning, storage, transforms).
+
+## Current State (Updated from Code Inspection)
 
 ### `ui_plot.py::show_test_markers` (L97-235)
-- Works for **time-course** test sets only.
-- Uses `uistate.dict_test_markers` to store `Text` artists.
-- Detects paired/one-sample via `test_t_variant`/`test_wilcox_variant`.
-- Places markers using **blended transforms** (`transData` x, `transAxes` y).
-- Y-placement convention:
-  - Both aspects: amp at y=0.94 (top), slope at y=0.06 (bottom).
-  - Single aspect: high position (0.94).
-- Uses `p_amp`/`p_slope` (or `q_*` if FDR) from `results` list of dicts.
-- Skips if `ax1`/`ax2` are None (IO/PP guard).
 
-### `export_image.py::_add_significance_markers` (L82-233)
-- Already **partially IO/PP aware** via `is_io_mode`/`is_pp_mode`.
-- For IO: maps `io_output` → amp/slope semantics (L136-140):
-  ```python
-  if is_io_mode:
-      if io_output and "slope" in io_output.lower():
-          amp_pcols, slope_pcols = [], slope_pcols
-      else:
-          amp_pcols, slope_pcols = amp_pcols, []
-  ```
-- For PP: vertical offset override (L192-194):
-  ```python
-  if is_pp_mode:
-      y = ymax2 * 0.92
-  ```
-- Draws sweep-range bracket (underline + end ticks) — absent in `show_test_markers`.
-- Uses **data coordinates** (not blended transforms) for y.
-- Called from `render_publication_figure` (L612) only when `formal_results` present.
-- Panel routing (L599-610): `EPSP_amp`/`EPSP_slope` panels set single-aspect visibility.
+- Works for **time-course** only (early `if ax1 is None or ax2 is None` guard L112; time-centric `ampView`/`slopeView` + fixed ax1/ax2 mapping L162).
+- **High reuse**: paired/one-sample (`is_single_marker` L126-131), p/q extraction + labels (L184-202), blended transforms (L214 `transData`+`transAxes`), `dict_test_markers` storage/clear (L115-119, L237), darkmode colors, y-convention (0.94/0.06). `graphRefresh` already calls unconditionally (L1104).
 
-### `render_publication_figure` (L274-637)
-- Detects modes (L275-276):
-  ```python
-  is_io_mode = getattr(uistate, "experiment_type", "time") == "io"
-  is_pp_mode = getattr(uistate, "experiment_type", "time") == "PP"
-  ```
-- For IO: `panels_to_render = ["io"]`.
-- For PP: `panels_to_render = ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]` (filtered by checkboxes).
-- Calls `_add_significance_markers` (L612-626) per panel with correct `amp_v`/`slope_v`.
+### `export_image.py::_add_significance_markers` (L82-233) + `render_publication_figure` (L274+)
 
-### Statistical Results (`statistics.py`)
-- `p_amp`/`p_slope` (or `p_amp_norm`/`p_slope_norm` when `norm=True`).
-- `q_amp`/`q_slope` for FDR-adjusted.
-- `sweeps` list per result row (used for x-positioning and bracket).
-- Works identically for time/IO/PP because `get_group_testset_means` is agnostic.
+- **Strongly IO/PP-aware already** (~80%): modes (L275 `is_io_mode`/`is_pp_mode`), IO `io_output`→pcol remap (L136-140), PP y-offset (L192-194 `ymax2*0.92`), per-panel routing/visibility (L597-610 exactly mirrors planned UI logic; L278 volley checkbox filter), brackets (L219-231 data-coords), guarded call (L588 `formal_results`).
+- PP bar x-logic in `graphRefresh` (L934-961 patches) and export (L511-522) reusable for marker positioning.
 
-### UI State
-- `uistate.experiment_type` → `"time" | "io" | "PP"`.
-- `uistate.io_output` → `"vamp" | "EPSPamp" | "EPSPslope" | "vslope" | "stim"`.
-- `uistate.formal_test_results` stores the list of dicts.
-- Test markers only shown when `test_type != "None"`.
+### Stats, State & Callers (`statistics.py`, `ui.py:1952`, `ui_plot.py:823`)
 
-## Gaps / Why It Doesn't Work Yet for IO/PP in UI
+- `apply_statistical_test_if_active` + `compute_statistical_comparison` fully support IO/PP (`experiment_type`, `checkBox["EPSP_*"|"volley_*"]`, `io_output`, `test_type`/`variant`/`fdr`/`norm`).
+- Results dicts consistent (`sweeps` for x, `p_*`/`q_*`/`*_norm` keys). `get_group_testset_means` agnostic.
 
-1. **`show_test_markers` early return**: `if ax1 is None or ax2 is None: return` (L112-113). IO/PP use `ax1`/`ax2` as output axes, but they are created; this guard may still pass. However:
-   - IO/PP place data on `ax1`/`ax2` with different coordinate semantics (stim amp on x for IO; integer indices on x for PP bars).
-   - The blended-transform placement assumes time-course sweep numbers on x.
+### Gaps (Narrowed)
 
-2. **No IO/PP-specific y placement**: IO single-panel (`io`) and PP multi-panel (`EPSP_amp` vs `volley_amp`) need aspect-to-axis mapping analogous to `render_publication_figure` panel routing.
+1. `show_test_markers` guard + axis/view mapping (primary ~60 LOC fix).
+2. PP x for markers (bars at integer centers; reuse patch lookup).
+3. Minor export verification (volley routing, IO single-panel).
+4. No live bracket (intentional).
 
-3. **No sweep-range bracket** in live UI (by design; bracket is journal-export only).
+**Insight**: One focused UI edit + verification leverages existing mirrored logic across files. Enables fast, low-risk implementation.
 
-4. **`graphRefresh`** calls `show_test_markers` unconditionally on `formal_test_results` (L1103-1106); this will be a no-op for IO/PP until the function handles those modes.
+## Plan (Optimized for Agentic Efficiency)
 
-## Plan
+### Optimized Phases (Minimal Changes, High Reuse)
 
-### Phase 1 — Live UI (`ui_plot.py`)
+#### Phase 0: Quick Validation (Do First — Low Cost, High Signal)
 
-#### 1.1 Extend `show_test_markers` signature and early detection
-- Add parameters (or infer from `uistate`):
-  - `is_io_mode: bool`
-  - `is_pp_mode: bool`
-  - `io_output: str | None`
-- Detect mode inside the function (same pattern as export):
-  ```python
-  is_io_mode = getattr(self.uistate, "experiment_type", "time") == "io"
-  is_pp_mode = getattr(self.uistate, "experiment_type", "time") == "PP"
-  io_out = getattr(self.uistate, "io_output", None) if is_io_mode else None
-  ```
+- Confirm `formal_test_results` structure for IO/PP (via `uistate.formal_test_results` after `apply_statistical_test_if_active`): verify `sweeps` holds stimulus amps (IO) or bar indices (PP), `p_amp`/`p_slope` (or `_norm`/`q_*`) keys present. (Parallel: `grep`/`read_file` on `ui.py:1952`, `statistics.py`, `ui_plot.py:1477`).
+- Inspect PP bar x-positions in `graphRefresh` (L934-961, `dict_group_show` patches) vs test-set `sweeps` — if mismatch, add lightweight x-remap (1-2 lines).
+- **Agentic win**: Parallel subagents for exploration. No code changes yet.
 
-#### 1.2 Guard / axis selection
-- For IO: target single `ax1` (or whichever hosts the IO plot); `ax2` may be unused or hidden.
-- For PP: target `ax1`/`ax2` per aspect (`EPSP_amp` → `ax1`, `EPSP_slope` → `ax2`, volley same pattern).
-- Remove or relax the `ax1 is None or ax2 is None` early return; instead check the relevant target axis per panel/aspect.
+#### Phase 1: Live UI (`ui_plot.py::show_test_markers`) — Core Focused Change
 
-#### 1.3 Aspect-to-axis mapping for IO/PP
-- Mirror the export logic (L599-610) inside `show_test_markers`:
-  - If IO single-output: `io_output` containing `"slope"` → slope semantics on `ax1`; else amp semantics on `ax1`.
-  - If PP multi-aspect: route `EPSP_amp`/`volley_amp` → high y on `ax1`; `EPSP_slope`/`volley_slope` → high y on `ax2` (or bottom if both).
-- Re-use existing `amp_view`/`slope_view` derived from checkboxes:
-  ```python
-  amp_view = bool(getattr(self.uistate, "checkBox", {}).get("EPSP_amp", True))
-  slope_view = bool(getattr(self.uistate, "checkBox", {}).get("EPSP_slope", True))
-  ```
-  Extend for volley if needed (`volley_amp`, `volley_slope`).
+Update **only** this function (L97-235; ~40-60 LOC added). Keep original signature `def show_test_markers(self, results):`. Infer modes, visibility, axes from `self.uistate` (reuse `checkBox`, `io_output`, `experiment_type`).
 
-#### 1.4 X-positioning for IO/PP
-- For IO: x is **stimulus amplitude** (from `sweeps` list which, in IO context, holds the IO input values).
-- For PP: x is **bar index** (integer); center of the bar group for that test set.
-- Current mean-of-sweeps logic (L138) works for both if `sweeps` are populated correctly by the test result row. Validate/adjust in caller if IO/PP use different x-scale.
+**Targeted Edits** (reuse existing p/q extraction, single-marker, placements, storage, transforms, colors):
 
-#### 1.5 Y-placement (live UI)
-- Keep the existing y_frac convention (0.94 top, 0.06 bottom) for single-aspect vs dual-aspect.
-- For IO single-panel: always high (0.94) on `ax1`.
-- For PP: same high/low rules, but note that PP bars sit on a discrete integer x-grid; the marker x will land between bars or at bar centers depending on how `sweeps` are coded.
+1. **Mode Detection** (after `ax1/ax2` fetch, before early return):
 
-#### 1.6 Color / text style
-- Unchanged (white/black for significance, muted gray for `ns`; respects `darkmode`).
+   ```python
+   exp_type = getattr(self.uistate, "experiment_type", "time")
+   is_io_mode = exp_type == "io"
+   is_pp_mode = exp_type == "PP"
+   io_output = getattr(self.uistate, "io_output", None) if is_io_mode else None
+   ```
+   - Relax guard: `if ax1 is None: return` (ax2 optional for IO/slope-only). Select `target_ax` dynamically per aspect.
 
-#### 1.7 Storage
-- Store in `uistate.dict_test_markers` as before (keyed by `pcol` and x).
-- `clear_test_markers` already iterates the dict; no change needed.
+2. **Aspect-to-Axis + Visibility Mapping** (replace L162-179):
+   - Mirror `render_publication_figure` (L597-610) + `graphRefresh` PP logic (L974-985) + ui.py checkbox handling.
+   - Use `uistate.checkBox.get("EPSP_amp", True)`, `get("volley_amp", True)`, etc. (already in file).
+   - IO: single `ax1` (amp/slope via `io_output` containing "slope").
+   - PP: `EPSP_amp`/`volley_amp` → `ax1` (high y=0.94), `EPSP_slope`/`volley_slope` → `ax2` (high/low per both/single rule).
+   - Reuse `placements` list + `is_single_marker` logic (L123-153 unchanged).
 
-#### 1.8 Call site (`graphRefresh`)
-- No change: it already passes `uistate.formal_test_results`.
-- Ensure `apply_statistical_test_if_active` in `ui.py` is callable in IO/PP contexts (it is; `experiment_type` is read-only metadata).
+3. **X-Positioning** (enhance L134-153 if needed):
+   - Current `x = float(np.mean(sweeps))` + paired midpoint works for IO/time.
+   - PP: optional `if is_pp_mode: x = round(x)` or lookup from `dict_group_show` patches (reuse pattern from L935-961 / export L511). Validate in Phase 0.
 
-### Phase 2 — Export (`export_image.py`)
+4. **Y-Placement & Rest**:
+   - IO: always `0.94` (top) on `ax1`.
+   - PP: reuse dual-aspect convention (0.94/0.06).
+   - Blended transform, colors (`darkmode`), storage (`dict_test_markers` by `pcol`+`x`), `clear_test_markers` unchanged.
+   - Callsite (`graphRefresh` L1104) unchanged.
 
-#### 2.1 Verify `_add_significance_markers` IO handling
-- Current code (L136-140) already collapses to slope-only or amp-only for IO based on `io_output`.
-- Confirm that when `io_output` is `"EPSPslope"` or `"vslope"`, the `p_slope` column is used.
-- Confirm that `"vamp"` / `"EPSPamp"` route to `p_amp`.
+**Files**: Only `src/lib/ui_plot.py` (one function; minimal).
 
-#### 2.2 Verify PP panel routing
-- `render_publication_figure` (L278) already filters `panels_to_render` by checkbox for PP aspects.
-- Per-panel call to `_add_significance_markers` (L612) sets `amp_v`/`slope_v` correctly for `EPSP_amp`/`EPSP_slope` (L599-606).
-- **Gap**: volley panels (`volley_amp`, `volley_slope`) fall into the `else` branch (L607-610) which uses `checkBox["EPSP_amp"]` etc. — this may be acceptable if volley follows the same visibility, but verify.
+#### Phase 2: Export (`export_image.py`) — Verification Only (Minimal/No Edits)
 
-#### 2.3 PP y-offset
-- Current PP offset (L192-194) uses `ymax2 * 0.92`; this places the marker near the top of the current data range.
-- Ensure this is above the tallest bar/errorbar for volley and EPSP aspects.
+- Already ~80% ready: mode detection (L275-282), IO remap (L136-140), per-panel `amp_v`/`slope_v` routing (L599-610, L278 volley filter), PP y-offset (L192-194 `ymax2*0.92`), brackets (L219-231), call guarded by `formal_results` (L588).
+- **Tasks** (no structural changes):
+  - Confirm IO `io_output="EPSPslope"` routes to `slope_pcols`/`p_slope`.
+  - Volley panels hit correct branch (L607-610 uses EPSP checkboxes — acceptable).
+  - Bracket collision/span OK (data coords; sweeps correct per Phase 0).
+- If tiny gap (volley visibility), add 1-2 lines. Update docstring only.
 
-#### 2.4 Bracket rendering
-- Already implemented (L219-231). Confirm it doesn't collide with PP bar labels or IO x-tick labels.
-- IO x-scale is continuous (stim amps); bracket span should be correct if `sweeps` contains the actual IO input values used in the test set.
+**Files**: `src/lib/export_image.py` (comments/verification; avoid edits if tests pass).
 
-#### 2.5 Call in `render_publication_figure`
-- Already guarded by `if formal_results:` (L589).
-- For IO panel `"io"`, the `amp_v`/`slope_v` logic (L607-610) will use the checkbox values; this is correct when both are visible.
-- No structural change required unless new edge cases surface during testing.
+#### Phase 3: Testing & Validation (Minimal, Reuse Existing)
 
-### Phase 3 — Testing & Validation
+- **Live UI**: Time-course (no regression); IO (ax1, stim x, high y, io_output); PP (per-aspect panels/checkboxes, bar centers, single/multi-group).
+- **Export**: IO (marker+bracket); PP (per-aspect PNGs, above bars).
+- **Cross-cutting**: FDR (`q_*`), norm (`*_norm`), Wilcoxon/paired/one-sample (`is_single_marker`), edges (single-aspect, no sweeps).
+- **Agentic efficiency**: Post-Phase 1, run `check-work` skill + targeted tests via existing `apply_statistical_test_if_active` + test sets. No new harness.
 
-1. **Live UI**:
-   - Time-course: no regression.
-   - IO (single aspect): markers appear on `ax1` at correct x (stim amp) and y (high).
-   - PP (single group, 2 test sets, paired t-test): single centered marker per aspect panel.
-   - PP (multi-group, unpaired): per-test-set markers on the relevant aspect panels.
+### Non-Goals / Out of Scope (Unchanged)
 
-2. **Export PNG**:
-   - IO figure: marker present, correct label, bracket spans the tested IO range.
-   - PP figure: per-aspect PNGs show correct markers above the corresponding bar groups; volley panels included when checked.
-
-3. **FDR, norm, Wilcoxon**: same paths as time-course; verify q-value usage and norm-suffixed p-keys (`p_amp_norm`).
-
-4. **Edge cases**:
-   - IO with only slope selected (`io_output = "EPSPslope"`): `amp_pcols` empty → no marker or slope marker on `ax1`.
-   - PP with only `volley_amp` checked: marker only on that panel.
-   - Paired one-sample vs ref: single marker (already handled by `is_single_marker`).
-
-### Non-Goals / Out of Scope
-- Adding new statistical tests.
-- Changing how test results are computed for IO/PP (they already flow through the same `compute_statistical_comparison`).
+- New statistical tests.
+- Changing test result computation for IO/PP (`compute_statistical_comparison` already agnostic).
 - Modifying `ui_designer.py` (per project rule).
 - Bracket rendering in live UI (journal-only).
 
 ## Files to Edit
-- `src/lib/ui_plot.py` — extend `show_test_markers`.
-- `src/lib/export_image.py` — minor guard / verification in `_add_significance_markers` and `render_publication_figure` (likely none or tiny).
 
-## Risks / Unknowns
-- IO/PP x-scale semantics: confirm that `sweeps` in result rows for IO contain the actual stimulus amplitudes (not sweep indices). If not, the caller building `formal_test_results` for IO may need adjustment.
-- PP bar positioning: if PP bars are centered at integer x but test-set sweeps are sweep indices, the marker x may need mapping from sweep → bar center. Inspect `get_group_testset_means` usage in IO/PP context.
+- `src/lib/ui_plot.py` (main: `show_test_markers`; optional x-remap in `graphRefresh`).
+- `src/lib/export_image.py` (optional: 0-5 LOC comments/guards).
 
-## Acceptance Criteria
+## Risks / Unknowns (Mitigated by Phase 0)
+
+- **X-semantics**: `sweeps` for IO (stim amps) / PP (indices vs bar centers). Validate first; reuse existing patch lookup from `graphRefresh`/`export` (L935, L511).
+- **Axis availability**: IO hides ax2; PP unified y — dynamic `target_ax` + relaxed guard.
+- **Volley**: Parallel to EPSP via checkboxes; current routing sufficient.
+- Performance/storage: Existing Text artists + clear logic already robust.
+
+## Acceptance Criteria (Unchanged)
+
 - Significance markers visible and correctly placed for IO and PP formal tests in both live UI and exported PNGs.
 - No regression for time-course tests.
 - Markers respect aspect checkboxes, FDR, norm, and paired/one-sample variants.
