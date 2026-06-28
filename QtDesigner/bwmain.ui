@@ -273,9 +273,9 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-813</y>
+          <y>0</y>
           <width>284</width>
-          <height>1736</height>
+          <height>1863</height>
          </rect>
         </property>
         <property name="minimumSize">
@@ -285,6 +285,129 @@
          </size>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_2">
+         <item>
+          <widget class="QFrame" name="frameToolHierarchy">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>201</width>
+             <height>121</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Raised</enum>
+           </property>
+           <widget class="QLabel" name="label_hierarchy">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>10</y>
+              <width>151</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="font">
+             <font>
+              <family>DejaVu Sans</family>
+              <weight>75</weight>
+              <bold>true</bold>
+             </font>
+            </property>
+            <property name="text">
+             <string>Hierarchy</string>
+            </property>
+           </widget>
+           <widget class="QLineEdit" name="lineEdit_hierarchy_slice">
+            <property name="geometry">
+             <rect>
+              <x>90</x>
+              <y>60</y>
+              <width>41</width>
+              <height>25</height>
+             </rect>
+            </property>
+           </widget>
+           <widget class="QLabel" name="label_hierarchy_subject">
+            <property name="geometry">
+             <rect>
+              <x>20</x>
+              <y>30</y>
+              <width>71</width>
+              <height>20</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Subject</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+            </property>
+           </widget>
+           <widget class="QLineEdit" name="lineEdit_hierarchy_subject">
+            <property name="geometry">
+             <rect>
+              <x>90</x>
+              <y>30</y>
+              <width>41</width>
+              <height>25</height>
+             </rect>
+            </property>
+           </widget>
+           <widget class="QPushButton" name="pushButton_hide_hierarchy">
+            <property name="geometry">
+             <rect>
+              <x>240</x>
+              <y>0</y>
+              <width>21</width>
+              <height>21</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>-</string>
+            </property>
+            <property name="flat">
+             <bool>true</bool>
+            </property>
+           </widget>
+           <widget class="QLabel" name="label_hierarchy_slice">
+            <property name="geometry">
+             <rect>
+              <x>20</x>
+              <y>60</y>
+              <width>71</width>
+              <height>20</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Slice</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+            </property>
+           </widget>
+           <widget class="QCheckBox" name="checkBox_hierarchy_dd_is_subject">
+            <property name="geometry">
+             <rect>
+              <x>20</x>
+              <y>90</y>
+              <width>231</width>
+              <height>23</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Each drag/drop is a Subject</string>
+            </property>
+           </widget>
+          </widget>
+         </item>
          <item>
           <widget class="QFrame" name="frameToolStim">
            <property name="sizePolicy">
@@ -2383,13 +2506,13 @@
  <connections/>
  <buttongroups>
   <buttongroup name="buttonGroup_test_t_variant"/>
-  <buttongroup name="buttonGroup_filter"/>
-  <buttongroup name="buttonGroup_io_o"/>
-  <buttongroup name="buttonGroup_io_i"/>
-  <buttongroup name="buttonGroup_type"/>
   <buttongroup name="buttonGroup_test"/>
+  <buttongroup name="buttonGroup_type"/>
+  <buttongroup name="buttonGroup_wilcoxon_tails"/>
+  <buttongroup name="buttonGroup_filter"/>
+  <buttongroup name="buttonGroup_io_i"/>
   <buttongroup name="buttonGroup_test_t_tails"/>
   <buttongroup name="buttonGroup_wilcoxon_variant"/>
-  <buttongroup name="buttonGroup_wilcoxon_tails"/>
+  <buttongroup name="buttonGroup_io_o"/>
  </buttongroups>
 </ui>
