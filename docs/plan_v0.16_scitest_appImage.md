@@ -20,13 +20,19 @@ The AppImage runtime extracts the payload to a temporary mount; any write to tha
 
 Make `bw_cfg.yaml` (darkmode, projects_folder, last project, etc.) **writable and persistent** for AppImage users. Preserve **exact** current behavior for `python -m brainwash`, normal installs, and non-frozen runs. Single source of truth in `Config`.
 
-## Required Changes (Optimized for Agentic Implementation)
+## Required Changes (Optimized for Agentic Implementation) — IMPLEMENTED
 
-### 1. `src/lib/ui.py` — `Config` class (centralize location logic, ~35 LOC)
+### 1. `src/lib/ui.py` — `Config` class (centralize location logic, ~40 LOC)
 
-**Update `Config.__init__` and `_find_file` (now clearly readonly-only for `pyproject.toml` + initial lookup).**
+**Updated `Config.__init__` and `_find_file` (now clearly readonly-only for `pyproject.toml` + initial lookup).** (lines ~94-170)
 
-After the existing `_find_file("bw_cfg.yaml")` block and fallback (around lines 129-136, after `logger.debug("Config: bw_cfg.yaml found at...")`), **replace the bwcfg_path assignment** with frozen-aware logic that sets the _final writable_ path:
+- Enhanced leading docstring for `_find_file` (readonly probe only).
+- Updated search order comment.
+- Added frozen-aware logic **after** the `_find_file("bw_cfg.yaml")` block (replaces old bwcfg_path fallback logic for frozen case).
+- Fixed reference to `self.program_name` (now set _after_ the if-block; hardcoded "brainwash" for XDG dir).
+- Uses `logger.info` for portable/XDG paths on first run (user-visible).
+
+Exact implemented code closely matches the plan snippet.
 
 ```python
 # After toml_path resolution and initial bwcfg_path lookup (~lines 124-136)
@@ -58,11 +64,16 @@ self.bw_cfg_yaml = str(bwcfg_path)  # remains str for ui_project.py compatibilit
 
 This makes `Config` the **single source of truth** (agent-friendly: all priorities in one method).
 
-### 2. `src/lib/ui_project.py` — `ProjectMixin.write_bw_cfg` (robust writes, ~10 LOC)
+### 2. `src/lib/ui_project.py` — `ProjectMixin` (robust writes + docs, ~25 LOC)
 
-**Add directory creation + improved logging (keep `self.bw_cfg_yaml` as Path where possible).**
+**Updated `write_bw_cfg`, `get_bw_cfg` docstring, and class docstring.**
 
-Update `write_bw_cfg` (lines 226-239):
+- Added `import logging` + `logger = ...` at module level.
+- `write_bw_cfg`: Path conversion, `parent.mkdir(parents=True, exist_ok=True)`, rich `logger.info(...)`.
+- Docstrings reference new single-source Config policy.
+- `get_bw_cfg`: no functional change (benefits from new writable path from Config).
+
+Exact implemented code matches plan.
 
 ```python
 def write_bw_cfg(self):  # Save global program settings
@@ -81,13 +92,11 @@ def write_bw_cfg(self):  # Save global program settings
 - `get_bw_cfg` (lines 200-224): **No functional change**. It already handles missing files by setting defaults and assigns `self.bw_cfg_yaml = Path(config.bw_cfg_yaml)`. New path from `Config` makes it writable.
 - Minor: Prefer `Path` internally for `self.bw_cfg_yaml` (string remains on `config`).
 
-### 3. Documentation & Build (docs only)
+### 3. Documentation & Build (docs only) — DONE
 
-- **Update `docs/build.md`** (add "**AppImage Configuration (v0.16+)**" section):
-  - Document supported locations, how to enable portable mode (create `.config` sibling), default XDG behavior.
-  - Reference the build command.
-- **Update `.github/workflows/build_linux_appimage.yml`** (comments only): Note config expectations post-v0.16.
-- Update this plan file with the refined version above.
+- Updated `docs/build.md` with "**AppImage Configuration (v0.16+)**" section (locations, portable mode via sibling `.config` dir, XDG default, references to code).
+- Updated `.github/workflows/build_linux_appimage.yml` (comments only).
+- Updated this plan file with implementation notes and exact changes.
 - No changes to `build_with_cxfreeze_multiarch_setup.py`, `.desktop`, or icons.
 
 ### 4. Testing Checklist (agent-verifiable)
@@ -115,4 +124,4 @@ Use after implementation (run via terminal or `/check-work`):
 - `docs/build.md`, GitHub workflow.
 - Original plan attached for context.
 
-**Why Actionable for Agents**: Single source of truth in `Config`, minimal changes (localized methods), explicit code snippets with line numbers, clear test commands, no new abstractions, defensive `mkdir`/logging. Ready for precise `search_replace` + verification. Do not implement yet.
+**Implementation complete** (v0.16). Single source of truth in `Config`, minimal targeted changes, defensive mkdir/logging, full backwards compatibility. See updated docs/build.md and test checklist below. Verified via dev runs; full AppImage test next.

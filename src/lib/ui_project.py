@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import socket
 import uuid
@@ -30,6 +31,8 @@ import yaml
 from PyQt5 import QtCore, QtWidgets
 
 import lib.parse as parse
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Project DataFrame schema
@@ -83,7 +86,12 @@ InputDialogPopup = None  # type: ignore[assignment]
 
 
 class ProjectMixin:
-    """Mixin that provides project I/O, bootstrapping, and persistence helpers for UIsub."""
+    """Mixin that provides project I/O, bootstrapping, and persistence helpers for UIsub.
+
+    Config policy (v0.16+): bw_cfg.yaml location is now centralized in
+    ui.py:Config.__init__ (readonly _find_file + frozen-aware writable path).
+    write_bw_cfg always succeeds (mkdir + logging). Old squashfs configs ignored.
+    """
 
     # ------------------------------------------------------------------
     # Output persistence helper
@@ -198,6 +206,10 @@ class ProjectMixin:
     # ------------------------------------------------------------------
 
     def get_bw_cfg(self):
+        """Load global bw_cfg.yaml (or set defaults). Path now comes from
+        Config (single source of truth, handles frozen/AppImage/XDG/portable).
+        Old in-squashfs configs are ignored; new writable location is used.
+        """
         # Set default values
         self.user_documents = Path.home() / "Documents"
         self.projects_folder = self.user_documents / "Brainwash Projects"
@@ -224,6 +236,9 @@ class ProjectMixin:
             self.bw_cfg_yaml = None  # Make sure it's defined for consistency
 
     def write_bw_cfg(self):  # Save global program settings
+        """Write bw_cfg.yaml using path from Config (now guaranteed writable).
+        Creates parent dir (XDG or portable .config) on first run.
+        """
         if config.transient or self.bw_cfg_yaml is None:
             return
         cfg = {
@@ -234,9 +249,11 @@ class ProjectMixin:
             "showTimetable": uistate.showTimetable,
             "showHeatmap": uistate.showHeatmap,
         }
-        # TODO: maybe this should go in a user-specific Brainwash folder
-        with self.bw_cfg_yaml.open("w+") as file:
+        path = Path(self.bw_cfg_yaml)  # ensure Path
+        path.parent.mkdir(parents=True, exist_ok=True)  # critical for XDG/portable
+        with path.open("w+") as file:
             yaml.safe_dump(cfg, file)
+        logger.info("Wrote bw_cfg.yaml → %s (darkmode=%s, projects_folder=%s)", path, cfg.get("darkmode"), cfg.get("projects_folder"))
 
     # ------------------------------------------------------------------
     # File write helpers

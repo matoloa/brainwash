@@ -91,6 +91,10 @@ class Config:
 
         # get project_name and version number from pyproject.toml
         #
+        # _find_file is READONLY-ONLY: used for pyproject.toml (version) and
+        # initial probe of bw_cfg.yaml.  The final *writable* bw_cfg_yaml for
+        # frozen/AppImage builds is computed below (never inside squashfs).
+        #
         # Search order (most-specific first):
         #   1. Frozen build: the exe lives in build/exe.*/ and we copy
         #      pyproject.toml to lib/pyproject.toml next to it, so look
@@ -129,11 +133,30 @@ class Config:
         bwcfg_path = _find_file("bw_cfg.yaml")
         if bwcfg_path is None:
             # File doesn't exist yet — place it next to pyproject.toml so it
-            # will be found on the next launch and write_bw_cfg can create it.
+            # will be found on the next launch (dev/normal case).
             bwcfg_path = toml_path.parent / "bw_cfg.yaml"
             logger.debug("Config: bw_cfg.yaml not found, will create at %s", bwcfg_path)
         else:
             logger.debug("Config: bw_cfg.yaml found at %s", bwcfg_path)
+
+        # Final writable path. For frozen/AppImage: NEVER write inside the
+        # read-only squashfs. Priority order matches AppImage spec + XDG:
+        #   1. Portable: <AppImage>.config/ sibling directory (if it exists).
+        #   2. XDG: ~/.config/brainwash/ (or $XDG_CONFIG_HOME/brainwash/).
+        # Non-frozen/dev keeps the _find_file / toml_path.parent location.
+        if getattr(sys, "frozen", False):
+            appimage_exe = Path(sys.executable)
+            portable_dir = appimage_exe.with_name(appimage_exe.name + ".config")
+            if portable_dir.is_dir():
+                cfg_dir = portable_dir
+                logger.info("Config: using portable .config sibling: %s", cfg_dir)
+            else:
+                xdg_base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+                cfg_dir = xdg_base / "brainwash"
+                logger.info("Config: using XDG config dir (will create on write): %s", cfg_dir)
+            bwcfg_path = cfg_dir / "bw_cfg.yaml"
+            logger.debug("Config: frozen – final writable bw_cfg_yaml=%s", bwcfg_path)
+        # else: dev/normal keeps existing location (unchanged)
 
         pyproject = toml.load(toml_path)
         self.bw_cfg_yaml = str(bwcfg_path)
