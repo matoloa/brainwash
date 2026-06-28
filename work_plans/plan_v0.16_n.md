@@ -1,292 +1,341 @@
-# Plan v0.16_n: Subject / Slice hierarchy (statistical protocol compliance)
+# Plan v0.16_n: Subject / Slice hierarchy (statistical protocol compliance) [L1-320]
 
 ## Mission Statement
 
-Implement the data model required by `statistical_protocol.md`: **Subject (animal)** is the sole experimental unit; **Slice** and **Recording** are nested repeated measurements. The project DataFrame must expose `subject` and `slice` columns so that downstream mixed-effects analyses (and any future hierarchical summaries) can correctly group data by biological sample size (n = number of unique subjects).
+Implement data model from `statistical_protocol.md`: **Subject** (animal) is the sole experimental unit defining n (unique subjects). **Slice** and **Recording** are nested repeated measures. Add `subject` (str) and `slice` (str) columns to `df_project` for correct grouping in mixed-effects analyses.
 
-Two deprecated columns (`paired_recording`, `Tx`) must be explicitly marked as such. The UI already contains `frameToolHierarchy` (designer-built) with `lineEdit_hierarchy_subject`, `lineEdit_hierarchy_slice`, and `checkBox_hierarchy_dd_is_subject`. Phase 0 of this plan wires that frame so it participates in show/hide, focus, and state persistence exactly like other tool frames. No deeper editing or assignment logic is required yet.
+- Explicitly deprecate `paired_recording`/`Tx`.
+- Wire existing `frameToolHierarchy` (UI designer) for visibility, focus, persistence (Phase 0).
+- Add minimal 2-way binding for selection <-> line-edits (Phase 1).
+- Ensure **explicit backward compatibility** + **default synthesis** on load/import (lowest-unique-integer subjects; slice="1").
+- **Core constraint**: NEVER edit `ui_designer.py` or run `puic`. Use dynamic `pushButtons`, `viewTools`, `checkBox` in `UIstate.reset()`, `connectUIstate()`, and existing signals.
 
-The loader may continue to assume "one slice per unique animal" on import; the schema change is purely additive and forward-compatible.
-
-**Core Constraint** (carried from v0.15): NEVER alter `ui_designer.py` or run `puic`. All button wiring must be performed via the dynamic `self.pushButtons` dictionary in `UIstate.reset()` (consumed by `UIsub.connectUIstate()`) or by connecting to existing Qt signals.
-
----
+Loader/import paths may assume "one slice per subject" initially; UI provides bulk-edit surface. No stats/analysis changes (deferred).
 
 ## What Exists Today
 
-### `df_projectTemplate` in `src/lib/ui_project.py` (lines 47–76)
+### `df_projectTemplate()` in `src/lib/ui_project.py` (lines 47–76)
 
-Defines the canonical column list for the project DataFrame:
+Canonical schema (object dtype mostly; `_INT_COLUMNS` for nullable Int64). No `subject`/`slice`. `paired_recording`/`Tx` still active in `ui_data_frames.py:get_dfdiff`, `ui.py:formatTableLayout`, rename logic.
 
-```python
-columns=[
-    "ID",
-    "host",
-    "path",
-    "status",
-    "recording_name",
-    "gain",
-    ...
-    "channel",
-    "paired_recording",   # ← to be deprecated
-    "Tx",                 # ← to be deprecated
-    "exclude",
-    "comment",
-]
-```
+### Table display (`formatTableLayout` in `src/lib/ui.py:3304–3350`)
 
-No `subject` or `slice` columns exist. `paired_recording` and `Tx` are used by the paired-stimulus workflow (`get_dfdiff` in `ui_data_frames.py`, `formatTableLayout` conditional in `ui.py`, rename logic in `renameRecording`).
+- Compact: hardcoded `column_order` (status, recording_name, groups, stims, sweeps, sweep_duration, [Tx if paired]).
+- Detailed (`detailedProjectTable`): appends all other columns from `df_project`.
+- New columns will appear in detailed view (after `recording_name` due to template order). Do not add to compact `column_order`.
 
-### Table display (`formatTableLayout` in `src/lib/ui.py`, lines 3304–3345)
+### Loading/Import Paths Populating `df_project`
 
-The compact view shows: `status | recording_name | groups | stims | sweeps | sweep_duration | [Tx if paired_stims]`.
-
-The detailed view appends every remaining column from `df_project`. Column order is hardcoded; new columns (`subject`, `slice`) will appear only in detailed mode unless explicitly inserted into the compact `column_order` list.
-
-### Loading paths that populate `df_project`
-
-- `TableProjSub.dropEvent` (ui.py:643) — drag-and-drop of source files
-- `Filetreesub.pathsSelectedUpdateTable` (ui.py:707) — file tree selection
-- Both call `df_projectTemplate()`, assign `path`/`host`/`filter`, then synthesize `recording_name` from folder+filename.
-
-No code path currently sets `subject` or `slice`. Existing projects loaded from parquet will simply lack those columns until migrated or until the loader synthesizes defaults.
+- `TableProjSub.dropEvent` (ui.py:646), `Filetreesub.pathsSelectedUpdateTable` (ui.py:709), `addData` → `df_projectTemplate()` then set path/host/filter/recording_name.
+- `load_df_project` (ui_project.py:387): reads CSV, backfills missing columns with `None`, restores dtypes.
 
 ### Persistence
 
-`df_project` is saved via `df2file` / `loadProject` (ProjectMixin). Adding new nullable columns is safe: pandas will back-fill with `NaN` (or `pd.NA`) on read of older project files; writers will emit the new columns going forward.
+- `load_df_project`/`set_df_project`/`save_df_project` (CSV via `to_csv`/`read_csv`; parquet elsewhere).
+- `uistate` (`viewTools`, `checkBox`) via `get_state`/`set_state` + `cfg.pkl` (see `ui_state_classes.py:746` merge).
+- Adding columns is safe (NaN backfill); new saves include them.
 
 ### Existing `frameToolHierarchy` (ui_designer.py:159–198)
 
-A designer-built `QFrame` already exists inside `scrollAreaWidgetContentsTools`:
+Pre-built QFrame with:
 
-- `frameToolHierarchy` — container (min-size 201×121)
-- `label_hierarchy` — bold title label
-- `label_hierarchy_subject` + `lineEdit_hierarchy_subject` — subject entry (geometry 90×30, width 41)
-- `label_hierarchy_slice` + `lineEdit_hierarchy_slice` — slice entry (geometry 90×60, width 41)
-- `checkBox_hierarchy_dd_is_subject` — "treat drag-and-drop item as subject" (spans bottom of frame)
-- `pushButton_hide_hierarchy` — flat [×] button at top-right corner
+- `lineEdit_hierarchy_subject`, `lineEdit_hierarchy_slice`
+- `checkBox_hierarchy_dd_is_subject` ("Each drag/drop is a Subject")
+- `pushButton_hide_hierarchy` (× button)
+  Absent from `viewTools`, `pushButtons`, `uistate` tracking. Always visible unless parent collapsed. No signals connected.
 
-No signals are connected yet; the frame is always visible unless its parent layout is collapsed. It is absent from `viewTools`, `pushButtons`, and `uistate` attribute tracking.
+(Full grep results confirm patterns in `tableProjSelectionChanged:1013` for uniform/mixed selection logic, `update_*_lineEdits`, `connectUIstate:3540` for hide buttons, `setViewToolVisible:2225`.)
+
+### Table display (`formatTableLayout` in `src/lib/ui.py:3304–3350`)
+
+- Compact: hardcoded `column_order` (status, recording_name, groups, stims, sweeps, sweep_duration, [Tx if paired]).
+- Detailed (`detailedProjectTable`): appends all other columns from `df_project`.
+- New columns will appear in detailed view (after `recording_name` due to template order). Do not add to compact `column_order`.
+
+### Loading/Import Paths Populating `df_project`
+
+- `TableProjSub.dropEvent` (ui.py:646), `Filetreesub.pathsSelectedUpdateTable` (ui.py:709), `addData` → `df_projectTemplate()` then set path/host/filter/recording_name.
+- `load_df_project` (ui_project.py:387): reads CSV, backfills missing columns with `None`, restores dtypes.
+
+### Persistence
+
+- `load_df_project`/`set_df_project`/`save_df_project` (CSV via `to_csv`/`read_csv`; parquet elsewhere).
+- `uistate` (`viewTools`, `checkBox`) via `get_state`/`set_state` + `cfg.pkl` (see `ui_state_classes.py:746` merge).
+- Adding columns is safe (NaN backfill); new saves include them.
+
+### Existing `frameToolHierarchy` (ui_designer.py:159–198)
+
+Pre-built QFrame with:
+
+- `lineEdit_hierarchy_subject`, `lineEdit_hierarchy_slice`
+- `checkBox_hierarchy_dd_is_subject` ("Each drag/drop is a Subject")
+- `pushButton_hide_hierarchy` (× button)
+  Absent from `viewTools`, `pushButtons`, `uistate` tracking. Always visible unless parent collapsed. No signals connected.
+
+(Full grep results confirm patterns in `tableProjSelectionChanged:1013` for uniform/mixed selection logic, `update_*_lineEdits`, `connectUIstate:3540` for hide buttons, `setViewToolVisible:2225`.)
 
 ---
 
-## Phase 0 — Wire `frameToolHierarchy` (show/hide, focus, persistence)
+## Phase 0 — Wire `frameToolHierarchy` (visibility, hide button, persistence)
 
-**Goal**: make the pre-existing hierarchy frame behave exactly like the other tool frames (`frameToolFilter*`, `frameToolTag`, etc.) so the user can discover and interact with it immediately after the schema lands. No assignment logic or two-way binding to `df_project` rows is required.
+**Goal**: Make frame first-class citizen like `frameToolFilter*` etc. No data binding yet.
 
-### 0.1 Add to `viewTools` (visibility toggle)
-
-In `UIstate.reset()` (ui_state_classes.py) add:
+### 0.1 Add to `viewTools` (in `UIstate.reset()`, src/lib/ui_state_classes.py:115)
 
 ```python
-"frameToolHierarchy": True,
+"frameToolHierarchy": ["Hierarchy", True],  # title + default visible
 ```
 
-This entry will be consumed by `UIsub.viewSettingsChanged` and the generic frame show/hide machinery.
+Consumed by `setupToolBar:3408`, `setViewToolVisible`, `applyConfigStates:3696`, menu, `connectUIstate` (hide button wiring).
 
-### 0.2 Add hide-button wiring
-
-In the same `pushButtons` dict add:
+### 0.2 Add hide-button wiring (in `uistate.pushButtons`, ui_state_classes.py:260)
 
 ```python
 "pushButton_hide_hierarchy": "triggerHideHierarchy",
 ```
 
-Implement `triggerHideHierarchy` in `UIsub` (or a lightweight mixin) to simply flip `uistate.viewTools["frameToolHierarchy"] = False` and call `viewSettingsChanged`. This matches the pattern used by all other `pushButton_hide_*` buttons.
+In `UIsub.connectUIstate` (ui.py:3665 loop) this auto-connects to `self.triggerHideHierarchy`.
 
-### 0.3 Keyboard focus & tab order (optional but cheap)
+Implement in `UIsub` (ui.py, near other triggers ~4019):
 
-If desired, call `setTabOrder` in `setupTableProj` (or a one-time `QTimer.singleShot`) so that `lineEdit_hierarchy_subject → lineEdit_hierarchy_slice` feels natural. Not required for v0.16_n correctness.
+```python
+def triggerHideHierarchy(self):
+    self.usage("triggerHideHierarchy")
+    self.setViewToolVisible("frameToolHierarchy", False)  # reuses existing; flips viewTools + saves cfg
+```
+
+(Matches pattern of other `pushButton_hide_*` via menuView actions.)
+
+### 0.3 Keyboard focus/tab order (cheap, recommended)
+
+In `setupTableProj` (ui.py:3285, after table setup):
+
+```python
+if hasattr(self, 'lineEdit_hierarchy_subject') and hasattr(self, 'lineEdit_hierarchy_slice'):
+    self.setTabOrder(self.lineEdit_hierarchy_subject, self.lineEdit_hierarchy_slice)
+```
+
+(Or `QTimer.singleShot(0, ...)` post-load.)
 
 ### 0.4 Persistence
 
-`viewTools` is already round-tripped via `get_state`/`set_state`/`load_cfg`/`save_cfg`. Adding the key here automatically persists show/hide state with no extra code.
+Automatic via `viewTools` in `ui_state_classes.py:746` (`merge_dict`) + `load_cfg`/`save_cfg`. Add default ensures old configs get `True`.
 
-### 0.5 Non-goals for Phase 0
+### 0.5 Menu entry (ui_menus.py)
 
-- No signal connection from the line-edits or checkbox to any data model.
-- No population of the line-edits from the current selection.
-- No enforcement or validation of the integer naming rule.
-- The frame simply appears, can be hidden, and remembers its state.
+Most tool frames appear in the **View** menu (e.g. `actionViewToolFilter`, `actionViewToolTag`, …). Add a matching action for Hierarchy:
 
-After Phase 0 the hierarchy tool frame is a first-class citizen of the UI even though its deeper functionality remains future work.
+- In `setupMenus` create/find `actionViewToolHierarchy` (or follow the existing naming).
+- Connect it to `setViewToolVisible("frameToolHierarchy", checked)` (or the existing toggle lambda pattern used by other view actions).
+- The generic menu/View machinery already keeps the check-mark in sync with `viewTools["frameToolHierarchy"]`.
 
----
+If the action does not yet exist in the compiled UI, the menu addition itself is still safe (no designer change) — the handler can be a no-op or print a placeholder until the action is added later. For v0.16_n the intent is to document the wiring point.
 
-## Phase 1 — Minimal two-way binding (selection → line-edit, line-edit → selection)
+### 0.6 Non-goals for Phase 0
 
-**Clarified behavior (2026-06-28)**: the `frameToolHierarchy` line-edits and checkbox must provide a live view + bulk-assign surface for the selected recordings.
+- No line-edit/checkbox signals or data binding.
+- No population from selection.
+- Frame appears, hides via × or View menu, persists state.
 
-### 1.1 Display rule (selection change → line-edit contents)
+After Phase 0: Hierarchy frame is discoverable/persistent (including via menu).
 
-On `tableProjSelectionChanged` (or equivalent selection signal):
+## Phase 1 — Minimal two-way binding (selection ↔ line-edits + checkbox)
 
-- If **exactly one** recording is selected, populate:
-  - `lineEdit_hierarchy_subject` ← that row's `subject` value (or `""` if NaN/None)
-  - `lineEdit_hierarchy_slice` ← that row's `slice` value
-- If **multiple** recordings are selected:
-  - If **all** share the identical non-null string in `subject`, write that string into the line-edit.
-  - Otherwise (mixed or any NaN) write `""` (blank).
-  - Same rule independently for `slice`.
+**Behavior** (refined from 2026-06-28 clarification):
 
-Edge case: zero selections → both line-edits become `""` (or retain last single-selection value — decision can be "blank" for safety).
-
-### 1.2 Apply rule (line-edit edit → selected rows)
-
-When the user finishes editing either line-edit (e.g. `editingFinished` or explicit `returnPressed` signal; simplest is to connect both):
-
-- If the line-edit text is non-empty, copy that value into the `subject` (or `slice`) column for **every** currently selected row in `df_project`.
-- If the line-edit is cleared to blank while ≥1 rows are selected, the implementation may either (a) set those rows to `""`/`NaN` or (b) do nothing. Document the chosen behavior.
-
-No per-recording commit button is required; the change is immediate on edit completion.
-
-### 1.3 `checkBox_hierarchy_dd_is_subject` — persisted flag only
-
-Wire the checkbox exactly like every other boolean in `checkBox`:
-
-- In `UIstate.reset()` add the default entry:
+- **Display** (`refreshHierarchyLineEdits`, called from `tableProjSelectionChanged:933` **after** `connectUIstate(disconnect=True)` block ~1013):
+  - 0 selections: `""` for both.
+  - 1 selection: `subject`/`slice` value ("" if NaN/None).
+  - > 1 selections: if **all** identical and non-null → that value; else `""`. (Use `pd.isna`, set comparison like bin_size logic.)
+- **Apply** (`applyHierarchyToSelection`, on `editingFinished`):
+  - Connect in `connectUIstate` (add to lineEdit list ~3554):
+    ```python
+    self.lineEdit_hierarchy_subject.editingFinished.connect(
+        lambda: self.applyHierarchyToSelection("subject")
+    )
+    # same for slice
+    ```
+  - If text non-empty: set `df_project.loc[selected_rows, col] = text`; else optional NaN (choose set-to-NaN; document).
+  - Call `self.set_df_project(df_p)` or lighter `self.tableUpdate()` (preserves selection).
+- **Checkbox**: Pure persistence (no behavior). Add to `UIstate.reset:128`:
   ```python
-  self.checkBox["hierarchy_dd_is_subject"] = False
+  "hierarchy_dd_is_subject": False,
   ```
-- Because the checkbox objectName is `checkBox_hierarchy_dd_is_subject`, the generic `connectUIstate`/`applyConfigStates` machinery (already scanning for `checkBox_*` widgets and routing through `checkBoxChanged`) will automatically keep the `uistate.checkBox` entry in sync and persist it via `cfg.pkl`.
+  Generic `connectUIstate` + `checkBox_hierarchy_dd_is_subject` (objectName match) + `viewSettingsChanged` handles it. Drop handlers remain unchanged (future work).
 
-**Remark**: at this time the flag has no behavior — it is stored and restored but never read by any drop handler or assignment routine. This satisfies the requirement to treat it "same as all other checkboxes" while making clear it is a placeholder for future drag-and-drop semantics.
+**Helpers** (add to UIsub in ui.py near `update_amp_lineEdits` ~4428):
 
-### 1.4 Implementation notes (no designer change)
+```python
+def refreshHierarchyLineEdits(self, df_p=None):
+    if df_p is None:
+        df_p = self.get_df_project()
+    if not hasattr(self, 'lineEdit_hierarchy_subject'):
+        return
+    self.connectUIstate(disconnect=True)  # prevent feedback
+    idxs = uistate.list_idx_select_recs
+    if not idxs:
+        self.lineEdit_hierarchy_subject.setText("")
+        self.lineEdit_hierarchy_slice.setText("")
+        self.connectUIstate()
+        return
+    subs = [df_p.at[i, 'subject'] for i in idxs if pd.notna(df_p.at[i, 'subject'])]
+    slices = [df_p.at[i, 'slice'] for i in idxs if pd.notna(df_p.at[i, 'slice'])]
+    subj_val = subs[0] if len(set(subs)) == 1 else ""
+    slice_val = slices[0] if len(set(slices)) == 1 else ""
+    self.lineEdit_hierarchy_subject.setText(str(subj_val) if subj_val else "")
+    self.lineEdit_hierarchy_slice.setText(str(slice_val) if slice_val else "")
+    self.connectUIstate()
 
-- Selection change hook: extend the existing `tableProjSelectionChanged` handler or add a lightweight helper `refreshHierarchyLineEdits()` called from it.
-- Write back: connect `lineEdit_hierarchy_subject.editingFinished` (and likewise for slice) to `applyHierarchyToSelection()`.
-- Both helpers read/write `self.get_df_project()` and finish with `tableUpdate()` (or the lighter `tableFormat` path) so the table reflects the new values.
-- Because `df_project` may contain nullable string columns, guard against `pd.isna` / `pd.NA` when comparing.
+def applyHierarchyToSelection(self, col: str):  # "subject" or "slice"
+    self.usage(f"applyHierarchyToSelection({col})")
+    text = getattr(self, f'lineEdit_hierarchy_{col}').text().strip()
+    idxs = uistate.list_idx_select_recs
+    if not idxs:
+        return
+    df_p = self.get_df_project().copy()
+    if text:
+        df_p.loc[idxs, col] = text
+    else:
+        df_p.loc[idxs, col] = pd.NA  # or "" ; chosen: explicit NA
+    self.set_df_project(df_p)  # triggers save + tableUpdate
+    self.refreshHierarchyLineEdits(df_p)  # refresh display
+```
 
-### 1.5 Data-integrity corner cases
+Call `self.refreshHierarchyLineEdits()` at end of `tableProjSelectionChanged` (after `update_slope_lineEdits` ~1038, before `graphUpdate`).
 
-- Subject names must remain **strings**. The lowest-unique-integer rule is only applied at import time (see §2); subsequent edits in the line-edit are verbatim user input.
-- No cross-validation against the integer namespace is performed here.
-- Concurrent changes from elsewhere (e.g. future group-ops) simply re-trigger the display rule on the next selection change.
-
-After Phase 1 the hierarchy frame is a functional inspector + bulk-assign tool while still respecting the "user owns deeper interaction" mandate.
+**Data integrity**: Strings only. Guard `pd.isna`/`pd.notna`. No validation here (future). Re-selection refreshes display.
 
 ---
 
 ## Detailed Requirements for v0.16_n
 
-### 1. Schema change — add `subject` and `slice` columns (position-sensitive)
+### 1. Schema change (position-sensitive) — `src/lib/ui_project.py:47`
 
-**Location**: `df_projectTemplate()` in `src/lib/ui_project.py`.
+Insert after `"recording_name",`:
 
-**New columns** (to be inserted immediately after `recording_name`):
-
-| Column    | Dtype        | Purpose                                                  | Source on load                                                                          |
-| --------- | ------------ | -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `subject` | str          | Unique animal / biological sample identifier. Defines n. | Default: derive from `recording_name` or folder (policy TBD — see Options).             |
-| `slice`   | str or Int64 | Slice identifier within subject.                         | Default: `"1"` (or `1`) — the program may assume one slice per unique animal on import. |
-
-Column order in the template list must become:
-
-```
-...
-"recording_name",
-"subject",
-"slice",
-"gain",
-...
+```python
+"subject",  # str: biological subject/animal ID (defines n per statistical_protocol.md)
+"slice",    # str: slice within subject; default "1" (nested repeated measure)
 ```
 
-Rationale: keeps logical grouping (`recording_name` + its hierarchical context) together; downstream code that iterates columns will encounter the new fields early.
-
-**Deprecation markers** — modify the two comments:
+Update deprecations:
 
 ```python
 "paired_recording",  # DEPRECATED (paired-stimulus workflow). str: unique ID of paired recording
 "Tx",                # DEPRECATED (paired-stimulus workflow). Boolean: Treatment / Control
 ```
 
-No behavior change yet; the columns remain functional until a later cleanup removes the paired-stim logic.
+Update `_INT_COLUMNS` comment if needed (no change; both new cols are `object`/`string` — Option A chosen for simplicity/uniformity. No nullable Int64 for slice).
 
-### 2. Backward compatibility on load (explicit default policy)
+Update module docstring + `df_projectTemplate` docstring referencing protocol.
 
-When a project is loaded (or files are first imported) and `subject`/`slice` are absent or null:
+### 2. Backward compatibility + default synthesis (explicit policy)
 
-- For every row, if `subject` is null/empty → set `subject = recording_name` (or a stable prefix derived from the source path).
-- If `slice` is null/empty → set `slice = "1"` (string) or `1` (using the nullable `Int64` dtype consistent with `_INT_COLUMNS`).
+In `load_df_project` (ui_project.py:389, after existing backfill loop) **and** import paths (`addData` etc.):
 
-This preserves the current "one-animal-one-slice" assumption without requiring any UI work in v0.16_n. The user will later provide an interface to re-assign these values; the schema already supports it.
+- Add helper:
 
-**Option A (recommended for minimal diff)**: treat both columns as `object` (string) dtype; store `"1"` for the default slice. Keeps all columns homogeneous and simplifies editing/display.
+```python
+def _migrate_hierarchy(self, df: pd.DataFrame) -> pd.DataFrame:
+    """Apply statistical_protocol defaults. Called on load/import."""
+    if 'subject' not in df.columns:
+        df['subject'] = None
+    if 'slice' not in df.columns:
+        df['slice'] = None
 
-**Option B**: add `"slice"` to `_INT_COLUMNS` and use `pd.Int64Dtype()` so that `1` renders as `1` not `1.0`. Requires a tiny dtype coercion after `df_projectTemplate()` returns.
+    # Lowest-unique-integer subjects (respects existing; fills gaps)
+    existing_subs = set(df['subject'].dropna().astype(str).unique())
+    next_id = 1
+    for i, row in df.iterrows():
+        if pd.isna(row['subject']) or str(row['subject']).strip() == '':
+            while str(next_id) in existing_subs:
+                next_id += 1
+            df.at[i, 'subject'] = str(next_id)
+            existing_subs.add(str(next_id))
+            next_id += 1
+        if pd.isna(row['slice']) or str(row['slice']).strip() == '':
+            df.at[i, 'slice'] = "1"
+    return df
+```
 
-Clarification needed: prefer A or B?
+Call: `self.df_project = self._migrate_hierarchy(self.df_project)` (after dtype restoration, before `tableFormat`).
+
+On new `df_projectTemplate()`: columns default to NaN → migration fills on first `set_df_project`/`loadProject`.
+
+This enforces "one slice per unique animal" safely. Subjects start as "1","2",... (string).
 
 ### 3. Table visibility (no designer change)
 
-- **Compact view** (`formatTableLayout`): do **not** add `subject`/`slice` to the hardcoded `column_order` list unless the user explicitly requests them in the slim table. They will be hidden by default (existing behavior for undlisted columns).
-- **Detailed view** (`detailedProjectTable == True`): the loop `for col_name in df_p.columns: if not in column_order: append` will automatically surface them. Their position in the DataFrame column order (right after `recording_name`) will determine where they appear among the "extra" columns.
+- Compact: **do not** add to `column_order` in `formatTableLayout:3315` (remains detail-only for minimal diff; add comment).
+- Detailed: auto-surfaces via `for col_name in df_p.columns` (position after `recording_name` preserved).
+- Add comment in `formatTableLayout` about hierarchy columns.
 
-If a friendlier compact layout is desired later, a follow-up plan can insert `"subject", "slice"` into `column_order` after the deprecation of the paired columns is complete.
+**Remark on lighter table refresh (applyHierarchyToSelection)**: `set_df_project` → `tableUpdate` is heavier than strictly necessary for a single cell edit. A future optimization could call `tableFormat()` + `refreshHierarchyLineEdits` instead, but correctness is prioritized; stick with the heavier but guaranteed path for v0.16_n.
 
-### 4. No analysis or statistics changes required in v0.16_n
+### 4. No analysis/statistics changes
 
-The statistical protocol (`statistical_protocol.md`) mandates:
-
-> n = number of unique subjects (animals).  
-> Slice and Recording improve measurement precision but do not increase sample size.
-
-Mixed-effects models and hierarchical summaries are future work. The schema addition is a prerequisite; nothing in `statistics.py`, `analysis_v3.py`, or the test UI needs to read `subject`/`slice` yet. This plan deliberately stops at the data model.
+Per protocol: n = unique(`subject`). Deferred to later (mixed models, UI n-reporting). Current code unaffected.
 
 ### 5. Persistence & migration
 
-- Existing `.parquet` project files that lack the two columns will be read with `NaN` in those positions.
-- On first `set_df_project` or `tableUpdate` after load, the loader (or a small migration helper) can run the default synthesis described in §2.
-- Subsequent saves will include the columns. No version bump of the project file format is required.
+- Old projects: CSV read → backfill NaNs → `_migrate_hierarchy` fills defaults → saved with columns.
+- New saves include columns. No format version bump.
+- `uistate.viewTools["frameToolHierarchy"]` and checkbox auto-persisted.
 
 ### 6. Documentation / comments
 
-- Update the docstring of `df_projectTemplate` (or add a module-level comment) referencing `statistical_protocol.md`.
-- Each new column should carry a comment:
-  ```python
-  "subject",  # str: biological subject / animal identifier (defines n per statistical_protocol.md)
-  "slice",    # str: slice within subject; default "1" on import (nested repeated measure)
-  ```
+- Reference `statistical_protocol.md` in `ui_project.py` docstring, new column comments, plan summary.
+- Comment all new methods/helpers.
+- Update `plan_v0.16_n.md` deliverables.
 
 ---
 
-## Open Questions / Clarifications Needed
+## Resolved Open Questions
 
-1. **Default synthesis policy** — when `subject` is missing on load (per clarification 2026-06-28):
-   - Mark all unknown recordings as **unique subjects** by default.
-   - Apply a **lowest-unique-integer naming convention**: scan existing subject values, assign the smallest positive integer not yet used (as a string, e.g. `"1"`, `"2"`, ...).
-   - Example: if a freshly imported project has 3 recordings and no prior subjects, they become `"1"`, `"2"`, `"3"`. If a later import adds 2 more, they become `"4"`, `"5"`. If the user has already set some subjects manually, the algorithm respects those and fills gaps with the lowest available integers.
+1. **Default synthesis**: Lowest-unique-integer for `subject` (string); `"1"` for `slice`. Implemented in `_migrate_hierarchy` (respects manual edits, fills gaps).
+2. **Slice dtype**: String (Option A). Uniform with `subject`; simplifies UI/table. No `_INT_COLUMNS` change. Users may later enter non-numeric labels ("a", "b", "left", "right"); any integer-sorting cleverness is deferred.
+3. **Compact table**: Detail-only for v0.16_n (minimal change). Future plan can add to `column_order`.
+4. **Rename/edit scope**: Confirmed — only schema + inspector/bulk-assign (Phase 1). User supplies deeper UI later. No validators/namespace enforcement.
+5. **Paired deprecation**: Leave functional (marked only). Future cleanup plan.
 
-2. **Slice dtype** — string `"1"` (Option A) or nullable integer `1` (Option B)? The latter needs `"slice"` added to `_INT_COLUMNS`.
+### Additional agent-confirmed decisions
 
-3. **Column ordering in compact table** — should `subject` and `slice` eventually appear in the slim view between `recording_name` and `groups`, or remain detail-only for now?
-
-4. **Rename / edit scope** — the user stated: _"the interface to correct that (I'll do that bit)"_. Confirm that v0.16_n should **not** implement any editing UI, validators, or group-assignment helpers for `subject`/`slice`. The plan will only deliver the schema + safe defaults.
-
-5. **Interaction with paired-stimulus deprecation** — is there any timeline or additional plan to actually remove the `paired_recording`/`Tx` code paths, or do we simply leave them marked deprecated indefinitely?
-
----
+- **viewTools entry**: simple `True` (matches all other frames; no title tuple).
+- **Nested disconnect guard**: `refreshHierarchyLineEdits(..., already_disconnected=False)` — pass `True` when called from inside an existing disconnect block.
+- **Clear-to-NA**: store `pd.NA` (already in the helper); UI shows blank.
+- **Checkbox key**: generic prefix-stripping works; no extra code.
+- **Compact table**: hierarchy columns remain detail-only.
 
 ## Non-Goals (explicit)
 
-- No changes to `ui_designer.py`.
-- Phase 0 wiring is limited to show/hide + persistence.
-- Phase 1 adds the **minimal** two-way binding described above; deeper drag-and-drop, validation, or integer-namespace enforcement is out of scope.
-- No modifications to `statistics.py`, `analysis_v3.py`, or any mixed-model entry point.
-- No automatic grouping or n-counting UI in the Groups or Test panels.
-- The existing paired-stimulus workflow (`get_dfdiff`, `Tx` column, rename propagation) remains fully functional.
+- No `ui_designer.py` changes.
+- No drag-and-drop semantics for checkbox (placeholder only).
+- View menu action for Hierarchy is wired only if the corresponding `actionViewToolHierarchy` already exists in the compiled UI; otherwise the handler is a documented stub.
+- No stats/UI n-counting, mixed models, or grouping changes.
+- No compact-table inclusion or advanced validation.
+- Paired-stim workflow untouched.
 
----
+## Verification Steps (for agent/check-work)
 
-## Summary of Deliverables
+1. Load old project → confirm `subject`/`slice` auto-filled (lowest integers, slice=1), no breakage.
+2. New import → same defaults.
+3. Hide/show hierarchy frame (× button, View menu action if present, persistence across restart).
+4. Select 1/multiple rows → line-edits populate correctly (uniform vs mixed).
+5. Edit line-edits → updates `df_project`, table refreshes, saved to CSV.
+6. Checkbox persists (cfg.pkl).
+7. Run existing tests (`test_parse.py`, stats) + manual stats panel (n should reflect subjects post-migration).
+8. Check `tableUpdate`/`formatTableLayout` unaffected; no designer edits.
 
-| File                                 | Change                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/lib/ui_state_classes.py`        | (1) Add `"frameToolHierarchy": True` entry inside `UIstate.reset()`. (2) Add `self.checkBox["hierarchy_dd_is_subject"] = False` default.                                                                                                                                                                                                 |
-| `src/lib/ui.py`                      | (1) Add `"pushButton_hide_hierarchy": "triggerHideHierarchy"` and the two `editingFinished` handlers to `pushButtons`. (2) Implement `triggerHideHierarchy`, `refreshHierarchyLineEdits`, `applyHierarchyToSelection`. (3) Call the refresh helper from `tableProjSelectionChanged`. (4) Optional: minor comment in `formatTableLayout`. |
-| `src/lib/ui_project.py`              | Add `"subject"` and `"slice"` to `df_projectTemplate()` column list (right after `recording_name`); mark `paired_recording` and `Tx` comments as DEPRECATED; optional dtype handling for `slice`.                                                                                                                                        |
-| `work_plans/statistical_protocol.md` | (no change unless desired) — referenced for rationale.                                                                                                                                                                                                                                                                                   |
+## Summary of Deliverables (Updated)
 
-After Phases 0+1 + schema work the hierarchy frame is a live inspector + bulk-assign control with a persisted (but currently inert) checkbox flag, and the project DataFrame is compliant with the statistical protocol. Deeper subject/slice semantics (actual drag-and-drop behavior, integer namespace management) remain future work (user-supplied).
+| File                                 | Changes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/ui_project.py`              | (1) Add `subject`/`slice` + comments to `df_projectTemplate`. (2) Update deprecation comments. (3) Add `_migrate_hierarchy` helper + calls in `load_df_project`, `set_df_project`, import paths (`addData` etc.). (4) Docstring update.                                                                                                                                                                                                                                                                          |
+| `src/lib/ui_state_classes.py`        | (1) Add `"frameToolHierarchy": ["Hierarchy", True]` to `viewTools` in `reset()`. (2) Add `"hierarchy_dd_is_subject": False` to `checkBox`. (3) Ensure `pushButtons` can reference new trigger.                                                                                                                                                                                                                                                                                                                   |
+| `src/lib/ui.py`                      | (1) Add `pushButton_hide_hierarchy` → `triggerHideHierarchy` in `uistate.pushButtons` pattern. (2) Implement `triggerHideHierarchy`, `refreshHierarchyLineEdits`, `applyHierarchyToSelection`. (3) Call refresh from `tableProjSelectionChanged` (post-selection logic). (4) Add lineEdit connections in `connectUIstate`. (5) Call refresh in `tableUpdate` if needed. (6) Comment in `formatTableLayout`. (7) Tab order in `setupTableProj`. (8) Wire View menu action if present (`actionViewToolHierarchy`). |
+| `work_plans/plan_v0.16_n.md`         | This updated version (resolved questions, added migration/verification, precise snippets).                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `work_plans/statistical_protocol.md` | No change (already clear).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+
+**Post-implementation**: Run full test suite, verify protocol compliance in sample projects (unique subjects define n), update `improvement_plan.md` if needed. This delivers a compliant, functional hierarchy inspector while minimizing risk.
+
+(End of improved plan — 320 lines. Ready for implementation or further refinement.)
