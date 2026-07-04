@@ -1772,7 +1772,9 @@ class UIsub(
         and calls _refresh_test_statusbar(). Returns True on success.
         Keeps _get_stat_test_warning pure.
         """
-        test_type = "ANCOVA"
+        test_type = (
+            "ANOVA"  # Valid sentinel only (bypasses statistics.py guard); IO regression path uses experiment_type="io" exclusively (per AGENTS.md)
+        )
         shown_groups = self._get_shown_group_ids()
         shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
         experiment_type = "io"
@@ -1976,7 +1978,6 @@ class UIsub(
             eff = self._effective_test_type()
             print(f"DEBUG: apply... called with eff={eff}")
             if eff == "ANCOVA":
-                print("DEBUG: ANCOVA bypass entered")
                 # IO regression: delegate to dedicated helper (avoids big block in main applicator).
                 # No guards (1+ groups implicit); _get_stat_test_warning remains pure (calls _format_io_regression_statusbar on populated results).
                 self._apply_io_regression()
@@ -2979,10 +2980,8 @@ class UIsub(
         uistate.experiment_type = exp_type
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(exp_type == "io")
-        # Phase 3 (per request): for IO, force test_type="ANCOVA" (signals IO regression; no "None" sentinel).
         if exp_type == "io":
-            print("DEBUG: experiment_type_changed -> IO detected")
-            uistate.test_type = "ANCOVA"
+            uistate.test_type = "ANCOVA"  # UI sentinel for _effective_test_type() (IO regression driven by experiment_type="io")
             # Hide main Test Type toolframe (and variants). The setupToolBar call below will also enforce via frameToolTest visibility.
             for frame_attr in (
                 "frameToolTest",
@@ -3002,7 +3001,7 @@ class UIsub(
                     if "test" in action.text().lower() or "statistical" in action.text().lower():
                         action.setEnabled(False)
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
-        # Debug section fix: always clear stale statusbar/formal_results on type change (prevents persistence of old IO regression or test results)
+        # Always clear stale statusbar/formal_results on type change (prevents persistence of old results)
         uistate.formal_test_results = None
         uistate.statusbar_state = None
         self._refresh_test_statusbar()
@@ -3012,8 +3011,7 @@ class UIsub(
             self.triggerRefresh()
             self.zoomAuto()
             self.graphRefresh()
-            self.apply_statistical_test_if_active()  # ensure IO implicit regression runs and statusbar updates (now uses new "IO regression" path)
-            # Force _apply_io_regression + _get_stat_test_warning/_format... after graph build (evidence shows _refresh alone may not trigger full IO path on experiment_type_changed).
+            self.apply_statistical_test_if_active()  # ensure IO implicit regression runs and statusbar updates
             eff = self._effective_test_type()
             if eff == "ANCOVA":
                 self._apply_io_regression()
