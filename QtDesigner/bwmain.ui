@@ -273,9 +273,9 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>0</y>
+          <y>-783</y>
           <width>284</width>
-          <height>1863</height>
+          <height>1903</height>
          </rect>
         </property>
         <property name="minimumSize">
@@ -1882,7 +1882,7 @@
            <property name="minimumSize">
             <size>
              <width>201</width>
-             <height>151</height>
+             <height>191</height>
             </size>
            </property>
            <property name="frameShape">
@@ -2067,6 +2067,70 @@
             <property name="checked">
              <bool>true</bool>
             </property>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_n_subject">
+            <property name="geometry">
+             <rect>
+              <x>50</x>
+              <y>160</y>
+              <width>81</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Subject</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test_n</string>
+            </attribute>
+           </widget>
+           <widget class="QLabel" name="label_test_n">
+            <property name="geometry">
+             <rect>
+              <x>20</x>
+              <y>160</y>
+              <width>31</width>
+              <height>20</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>n =</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+            </property>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_n_slice">
+            <property name="geometry">
+             <rect>
+              <x>130</x>
+              <y>160</y>
+              <width>81</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Slice</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test_n</string>
+            </attribute>
+           </widget>
+           <widget class="QRadioButton" name="radioButton_test_n_rec">
+            <property name="geometry">
+             <rect>
+              <x>190</x>
+              <y>160</y>
+              <width>81</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Rec</string>
+            </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_test_n</string>
+            </attribute>
            </widget>
           </widget>
          </item>
@@ -2505,14 +2569,15 @@
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="buttonGroup_test_t_variant"/>
-  <buttongroup name="buttonGroup_test"/>
   <buttongroup name="buttonGroup_type"/>
-  <buttongroup name="buttonGroup_wilcoxon_tails"/>
-  <buttongroup name="buttonGroup_filter"/>
-  <buttongroup name="buttonGroup_io_i"/>
   <buttongroup name="buttonGroup_test_t_tails"/>
   <buttongroup name="buttonGroup_wilcoxon_variant"/>
+  <buttongroup name="buttonGroup_io_i"/>
+  <buttongroup name="buttonGroup_wilcoxon_tails"/>
+  <buttongroup name="buttonGroup_test_t_variant"/>
+  <buttongroup name="buttonGroup_test"/>
+  <buttongroup name="buttonGroup_filter"/>
   <buttongroup name="buttonGroup_io_o"/>
+  <buttongroup name="buttonGroup_test_n"/>
  </buttongroups>
 </ui>
