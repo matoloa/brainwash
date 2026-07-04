@@ -2895,7 +2895,7 @@ class UIsub(
         self.usage(f"filter_mode_changed → {mode}")
         uistate.settings["filter"] = mode
         print(f"filter_mode_changed: uistate.settings['filter'] set to {mode}")
-        self.frameToolFilterSavgol.setVisible(mode == "savgol")
+        self.frameToolFilter_sub_Savgol.setVisible(mode == "savgol")
 
         df_p = self.get_df_project()
         if "filter" in df_p.columns and df_p["filter"].dtype != object:
@@ -3043,17 +3043,17 @@ class UIsub(
             return
         self.usage(f"experiment_type_changed → {exp_type}")
         uistate.experiment_type = exp_type
-        if hasattr(self, "frameToolType_io"):
-            self.frameToolType_io.setVisible(exp_type == "io")
+        if hasattr(self, "frameToolType_sub_io"):
+            self.frameToolType_sub_io.setVisible(exp_type == "io")
         # Phase 3 (per request): for IO, force test_type="None" + hide the Test Type toolframe (no radios disabled; n_unit/None remain enabled; triggers implicit regression via apply_...).
         if exp_type == "io":
             uistate.test_type = "None"
             # Hide main Test Type toolframe (and variants). The setupToolBar call below will also enforce via frameToolTest visibility.
             for frame_attr in (
                 "frameToolTest",
-                "frameToolTest_t",
-                "frameToolTest_ANOVA",
-                "frameToolTest_wilcoxon",
+                "frameToolTest_sub_t",
+                "frameToolTest_sub_ANOVA",
+                "frameToolTest_sub_wilcoxon",
                 "frameToolTest_friedman",
                 "frameToolTest_cluster",
             ):
@@ -3067,12 +3067,25 @@ class UIsub(
                     if "test" in action.text().lower() or "statistical" in action.text().lower():
                         action.setEnabled(False)
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
-        if exp_type in ["io", "PP"] or old_type in ["io", "PP"]:
+        if exp_type == "io":
+            # IO path already handled above (hides frameToolTest + disables menu)
             self.exorcise()
             self.triggerRefresh()
             self.zoomAuto()
             self.graphRefresh()
             self.apply_statistical_test_if_active()  # ensure IO implicit regression runs and statusbar updates (now uses new "IO regression" path)
+        elif old_type == "io":
+            # Re-show the Statistical test frame (and re-enable View menu) when leaving IO.
+            # Mirrors the hide logic; setupToolBar will also enforce on future calls.
+            if hasattr(self, "frameToolTest"):
+                self.frameToolTest.setVisible(True)
+            if hasattr(self, "menuView"):
+                for action in self.menuView.actions():
+                    if "test" in action.text().lower() or "statistical" in action.text().lower():
+                        action.setEnabled(True)
+            self.update_show()
+            self.zoomAuto()
+            self.graphRefresh()
         else:
             self.update_show()
             self.zoomAuto()
@@ -3087,18 +3100,18 @@ class UIsub(
         self.usage(f"test_type_changed → {test_type}")
         print(f"Selected statistical test: {test_type}")
         uistate.test_type = test_type
-        if hasattr(self, "frameToolTest_t"):
-            self.frameToolTest_t.setVisible(test_type == "t-test")
+        if hasattr(self, "frameToolTest_sub_t"):
+            self.frameToolTest_sub_t.setVisible(test_type == "t-test")
             # hook the one-sample value lineEdit (default 0.0 from UIState)
             if hasattr(self, "lineEdit_test_t_one_sample_value"):
                 val = getattr(uistate, "label_test_t_one_sample_value", 0.0)
                 self.lineEdit_test_t_one_sample_value.setText(str(val))
-        if hasattr(self, "frameToolTest_ANOVA"):
-            self.frameToolTest_ANOVA.setVisible(test_type == "ANOVA")
+        if hasattr(self, "frameToolTest_sub_ANOVA"):
+            self.frameToolTest_sub_ANOVA.setVisible(test_type == "ANOVA")
             if test_type == "ANOVA":
                 self.update_anova_label()
-        if hasattr(self, "frameToolTest_wilcoxon"):
-            self.frameToolTest_wilcoxon.setVisible(test_type == "Wilcoxon")
+        if hasattr(self, "frameToolTest_sub_wilcoxon"):
+            self.frameToolTest_sub_wilcoxon.setVisible(test_type == "Wilcoxon")
             if test_type == "Wilcoxon" and hasattr(self, "lineEdit_wilcoxon_one_sample_value"):
                 val = getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)
                 self.lineEdit_wilcoxon_one_sample_value.setText(str(val))
@@ -3249,8 +3262,8 @@ class UIsub(
 
         if mode != getattr(uistate, "experiment_type", "time"):
             uistate.experiment_type = mode
-            if hasattr(self, "frameToolType_io"):
-                self.frameToolType_io.setVisible(mode == "io")
+            if hasattr(self, "frameToolType_sub_io"):
+                self.frameToolType_sub_io.setVisible(mode == "io")
 
         radio_name = self._TYPE_TO_RADIO.get(mode, "radioButton_type_time")
         if hasattr(self, radio_name):
@@ -3587,11 +3600,11 @@ class UIsub(
         for frame, (text, state) in list(uistate.viewTools.items()):
             if hasattr(self, frame):
                 getattr(self, frame).setVisible(state)
-        self.frameToolFilterSavgol.setVisible(uistate.settings.get("filter", "voltage") == "savgol")
+        self.frameToolFilter_sub_Savgol.setVisible(uistate.settings.get("filter", "voltage") == "savgol")
         self.frameToolAspectAmp.setVisible(uistate.checkBox.get("EPSP_amp", False) or uistate.checkBox.get("volley_amp", False))
         self.frameToolAspectSlope.setVisible(uistate.checkBox.get("EPSP_slope", False) or uistate.checkBox.get("volley_slope", False))
-        if hasattr(self, "frameToolType_io"):
-            self.frameToolType_io.setVisible(getattr(uistate, "experiment_type", "time") == "io")
+        if hasattr(self, "frameToolType_sub_io"):
+            self.frameToolType_sub_io.setVisible(getattr(uistate, "experiment_type", "time") == "io")
         # Phase 3 (per request): hide the main Test Type toolframe (frameToolTest) for IO; show for all other experiment types. Individual variant frames remain controlled by test_type.
         is_io = getattr(uistate, "experiment_type", "time") == "io"
         if hasattr(self, "frameToolTest"):
@@ -3974,18 +3987,18 @@ class UIsub(
             radio_name = self._TEST_N_TO_RADIO.get(default_n, "radioButton_test_n_subject")
             if hasattr(self, radio_name):
                 getattr(self, radio_name).setChecked(True)
-        if hasattr(self, "frameToolTest_t"):
-            self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
+        if hasattr(self, "frameToolTest_sub_t"):
+            self.frameToolTest_sub_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
             # hook the one-sample value lineEdit (default 0.0 from UIState)
             if hasattr(self, "lineEdit_test_t_one_sample_value"):
                 val = getattr(uistate, "label_test_t_one_sample_value", 0.0)
                 self.lineEdit_test_t_one_sample_value.setText(str(val))
-        if hasattr(self, "frameToolTest_ANOVA"):
-            self.frameToolTest_ANOVA.setVisible(getattr(uistate, "test_type", "None") == "ANOVA")
+        if hasattr(self, "frameToolTest_sub_ANOVA"):
+            self.frameToolTest_sub_ANOVA.setVisible(getattr(uistate, "test_type", "None") == "ANOVA")
             if getattr(uistate, "test_type", "None") == "ANOVA":
                 self.update_anova_label()
-        if hasattr(self, "frameToolTest_wilcoxon"):
-            self.frameToolTest_wilcoxon.setVisible(getattr(uistate, "test_type", "None") == "Wilcoxon")
+        if hasattr(self, "frameToolTest_sub_wilcoxon"):
+            self.frameToolTest_sub_wilcoxon.setVisible(getattr(uistate, "test_type", "None") == "Wilcoxon")
             if getattr(uistate, "test_type", "None") == "Wilcoxon" and hasattr(self, "lineEdit_wilcoxon_one_sample_value"):
                 val = getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)
                 self.lineEdit_wilcoxon_one_sample_value.setText(str(val))
