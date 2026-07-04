@@ -1761,9 +1761,57 @@ class UIsub(
                     prefix = f"{prefix} ({' '.join(global_notes)})"
                 uistate.statusbar_state = "info"
                 return prefix
-        # No formal_results yet (initial switch) or not matching config: benign hint, not an error.
-        uistate.statusbar_state = None
-        return "IO regression: select ≥2 groups to compute slope comparison"
+            # No formal_results yet (initial switch) or not matching config: benign hint, not an error.
+            uistate.statusbar_state = None
+            return "IO regression: select ≥2 groups to compute slope comparison"
+
+    def _apply_io_regression(self) -> bool:
+        """Helper for IO/ANCOVA path in apply_statistical_test_if_active.
+        Runs compute_statistical_comparison (with implicit all-sweeps support),
+        populates uistate.formal_test_results + markers, sets statusbar_state="info",
+        and calls _refresh_test_statusbar(). Returns True on success.
+        Called only when eff == "ANCOVA". Keeps _get_stat_test_warning pure.
+        """
+        test_type = "ANCOVA"
+        shown_groups = self._get_shown_group_ids()
+        shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
+        experiment_type = "io"
+        try:
+            comp = stats.compute_statistical_comparison(
+                groups=shown_groups,
+                dd_groups=self.dd_groups,
+                dd_testsets=self.dd_testsets,
+                get_group_testset_means_fn=self.get_group_testset_means,
+                test_type=test_type,
+                variant="unpaired",  # unused for regression
+                tails="two-sided",  # unused
+                fdr=False,
+                norm=False,
+                amp=True,
+                slope=True,
+                ref=0.0,
+                n_unit=getattr(uistate, "buttonGroup_test_n", "subject"),
+                experiment_type=experiment_type,
+            )
+            results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
+            if comp.get("config"):
+                if not isinstance(results, list) or len(results) == 0:
+                    results = [comp["config"].copy()]
+                else:
+                    for r in results:
+                        if isinstance(r, dict):
+                            r.setdefault("config", comp["config"])
+            uistate.formal_test_results = results
+            uiplot.show_test_markers(results)
+            uistate.statusbar_state = "info"
+            self._refresh_test_statusbar()
+            return True
+        except Exception as ex:
+            print(f"IO regression compute error: {ex}")
+            self.clear_formal_test_results()
+            uistate.statusbar_state = None
+            self._refresh_test_statusbar()
+            return False
 
     def _check_ttest_applicability(self, variant: str) -> str | None:
         """Guard for t-test (and similar). Returns warning string or None (no side effects or recursion)."""
@@ -1862,6 +1910,7 @@ class UIsub(
 
         if eff == "ANCOVA":
             # IO regression: always short-circuit here. Never reaches ANOVA/Friedman/Cluster guards.
+            # (apply_statistical_test_if_active now returns early with statusbar_state="info")
             return self._format_io_regression_statusbar(getattr(uistate, "formal_test_results", None))
 
         if eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm.", "ANCOVA"):
@@ -1896,6 +1945,7 @@ class UIsub(
         No magic strings. _get_stat_test_warning is now pure (no refresh inside) to prevent recursion.
         State is set by _get_stat_test_warning (or callers); warning string drives display when present.
         """
+        print(f"_refresh_test_statusbar: statusbar_state={uistate.statusbar_state}, _is_loading_active={self._is_loading_active()}")
         if self._is_loading_active():
             return
         warning = self._get_stat_test_warning()
@@ -1924,21 +1974,20 @@ class UIsub(
         """
         try:
             eff = self._effective_test_type()
-            test_type = eff  # backward compat for rest of function
+            print(f"DEBUG: apply... called with eff={eff}")
+            if eff == "ANCOVA":
+                print("DEBUG: ANCOVA bypass entered")
+                # IO regression: delegate to dedicated helper (avoids big block in main applicator).
+                # No guards (1+ groups implicit); _get_stat_test_warning remains pure (calls _format_io_regression_statusbar on populated results).
+                self._apply_io_regression()
+                return
             if eff == "None":
                 self.clear_formal_test_results()
                 uistate.statusbar_state = None
                 self._refresh_test_statusbar()
                 return
-
-            if eff == "ANCOVA":
-                # IO regression: bypass *all* applicability guards, variant_for_check, min_groups, paired/testset checks.
-                # (1+ groups implicitly supported via stats.compute_statistical_comparison + _format_io_regression_statusbar)
-                had_results = bool(getattr(uistate, "formal_test_results", None))
-                # Set safe defaults so later code (paired check, snapshot) never sees unbound locals
-                variant_for_check = "unpaired"
-                ref_attr = "label_test_t_one_sample_value"
-            elif eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
+            test_type = eff  # backward compat for rest of (non-IO) function only
+            if eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
                 print(
                     f"Statistical test '{eff}' is not yet implemented for v0.16 (t-test, ANOVA, Wilcoxon, Friedman, Cluster perm., ANCOVA for IO supported)."
                 )
@@ -1962,48 +2011,40 @@ class UIsub(
             # Only groups that have at least one recording can participate in a test
             shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
 
-            shown_groups = self._get_shown_group_ids()
-            # Only groups that have at least one recording can participate in a test
-            shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
-
-            # IO/ANCOVA bypass (early after had_results; sets safe defaults for variant_for_check/ref_attr to prevent UnboundLocalError)
-            if test_type == "ANCOVA" or eff == "ANCOVA":
-                # IO regression: implicit all-sweeps; 1+ groups supported. No min_groups/paired/testset guards.
-                shown_ts = self._get_shown_testsets()
-                # (variant_for_check/ref_attr already initialized in ANCOVA block above)
+            # (ANCOVA path returned above — this block is non-IO only; variant_for_check always set here)
+            ref_attr = "label_test_t_one_sample_value"
+            if test_type == "Wilcoxon":
+                variant_for_check = getattr(uistate, "test_wilcox_variant", "paired")
+                ref_attr = "label_test_wilcox_one_sample_value"
             else:
-                ref_attr = "label_test_t_one_sample_value"
-                if test_type == "Wilcoxon":
-                    variant_for_check = getattr(uistate, "test_wilcox_variant", "paired")
-                    ref_attr = "label_test_wilcox_one_sample_value"
-                else:
-                    variant_for_check = getattr(uistate, "test_t_variant", "unpaired")
-                if test_type == "Cluster perm.":
-                    variant_for_check = "unpaired"  # avoid triggering paired t-test guard for Cluster (2 groups case)
-                shown_ts = self._get_shown_testsets()
-                # For ANOVA/Friedman: allow 1 group if sufficient test sets (repeated-measures omnibus); otherwise require >=2 groups.
-                # Paired t-test/Wilcoxon: exactly 1 group + exactly 2 test sets (per pairing model in plan_v0.16_scitest.md).
-                # Cluster perm. guard is handled in _get_stat_test_warning (between or 1g+2ts); no min_groups adjustment here.
-                if test_type in ("ANOVA", "Friedman"):
-                    min_groups = 1
-                elif test_type == "Cluster perm.":
-                    min_groups = 1  # detailed check in warning function
-                else:
-                    min_groups = 1 if variant_for_check in ("one-sample", "paired") else 2
-                if len(shown_groups) < min_groups and test_type != "Cluster perm.":
-                    if had_results or test_type == "Friedman":
-                        if test_type == "ANOVA":
-                            print(f"Statistical test: ANOVA requires either >=2 groups, or 1 group with >=2 test sets (repeated-measures).")
-                        elif test_type == "Friedman":
-                            print(
-                                f"Statistical test: Friedman min_groups guard: shown_groups={len(shown_groups)} (need >=1), min_groups={min_groups}, shown_ts={len(shown_ts)} (need >=3)"
-                            )
-                        else:
-                            print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
-                    self.clear_formal_test_results()
-                    uistate.statusbar_state = "warning"
-                    self._refresh_test_statusbar()
-                    return
+                variant_for_check = getattr(uistate, "test_t_variant", "unpaired")
+            if test_type == "Cluster perm.":
+                variant_for_check = "unpaired"  # avoid triggering paired t-test guard for Cluster (2 groups case)
+            shown_ts = self._get_shown_testsets()
+            # For ANOVA/Friedman: allow 1 group if sufficient test sets (repeated-measures omnibus); otherwise require >=2 groups.
+            # Paired t-test/Wilcoxon: exactly 1 group + exactly 2 test sets (per pairing model in plan_v0.16_scitest.md).
+            # Cluster perm. guard is handled in _get_stat_test_warning (between or 1g+2ts); no min_groups adjustment here.
+            if test_type in ("ANOVA", "Friedman"):
+                min_groups = 1
+            elif test_type == "Cluster perm.":
+                min_groups = 1  # detailed check in warning function
+            else:
+                min_groups = 1 if variant_for_check in ("one-sample", "paired") else 2
+            if len(shown_groups) < min_groups and test_type != "Cluster perm.":
+                print(f"DEBUG: min_groups check reached! groups={len(shown_groups)}, min={min_groups}")
+                if had_results or test_type == "Friedman":
+                    if test_type == "ANOVA":
+                        print(f"Statistical test: ANOVA requires either >=2 groups, or 1 group with >=2 test sets (repeated-measures).")
+                    elif test_type == "Friedman":
+                        print(
+                            f"Statistical test: Friedman min_groups guard: shown_groups={len(shown_groups)} (need >=1), min_groups={min_groups}, shown_ts={len(shown_ts)} (need >=3)"
+                        )
+                    else:
+                        print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
+                self.clear_formal_test_results()
+                uistate.statusbar_state = "warning"
+                self._refresh_test_statusbar()
+                return
 
             # Paired t-test additionally requires exactly 2 test sets (the pairing model uses 2 test sets within 1 group)
             if variant_for_check == "paired" and test_type != "Friedman":
@@ -2023,6 +2064,7 @@ class UIsub(
                     return
 
             # v0.16_n_stats_IO + Phase 2 (helpers): use _effective_test_type(); IO (ANCOVA) implicitly allowed (no test sets).
+            # Note: ANCOVA test_type check here is now unreachable (bypass above uses eff only).
             if not shown_ts and test_type not in ("Friedman", "Cluster perm.", "ANCOVA"):
                 if had_results or test_type == "Friedman":
                     print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
@@ -2032,7 +2074,7 @@ class UIsub(
                 return
 
             # Snapshot config (Friedman uses no variant/tails but we still snapshot for logging + compute call).
-            # For ANCOVA/IO: variant_for_check/ref_attr are now always initialized (in top ANCOVA block).
+            # ANCOVA bypass is absolute at top (eff-based); this block is non-IO only. variant_for_check/ref_attr always initialized above.
             if test_type == "Wilcoxon":
                 variant = getattr(uistate, "test_wilcox_variant", "paired")
                 tails = getattr(uistate, "test_wilcox_tails", "two-sided")
@@ -2937,6 +2979,7 @@ class UIsub(
             self.frameToolType_sub_io.setVisible(exp_type == "io")
         # Phase 3 (per request): for IO, force test_type="ANCOVA" (signals IO regression; no "None" sentinel).
         if exp_type == "io":
+            print("DEBUG: experiment_type_changed -> IO detected")
             uistate.test_type = "ANCOVA"
             # Hide main Test Type toolframe (and variants). The setupToolBar call below will also enforce via frameToolTest visibility.
             for frame_attr in (
@@ -2968,6 +3011,10 @@ class UIsub(
             self.zoomAuto()
             self.graphRefresh()
             self.apply_statistical_test_if_active()  # ensure IO implicit regression runs and statusbar updates (now uses new "IO regression" path)
+            # Force _apply_io_regression + _get_stat_test_warning/_format... after graph build (evidence shows _refresh alone may not trigger full IO path on experiment_type_changed).
+            eff = self._effective_test_type()
+            if eff == "ANCOVA":
+                self._apply_io_regression()
         elif old_type == "io":
             # Re-show the Statistical test frame (and re-enable View menu) when leaving IO.
             # Mirrors the hide logic; setupToolBar + _should_show_stat_test_frame() will enforce.
