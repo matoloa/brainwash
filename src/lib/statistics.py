@@ -197,15 +197,15 @@ def compute_statistical_comparison(
     """
     High-level entry point used by UI for formal statistical tests on Test Sets.
 
-    v0.16_n_stats: n_unit selects statistical unit (subject default per protocol.md).
-    Aggregates observations to one value per unit via _aggregate_to_unit_level.
+    v0.16_n_stats Phase 1 (updated per slice clarification): n_unit selects statistical unit (default="subject" per protocol).
+    Uses _aggregate_to_unit_level (composite key for slice: each unique (subject,slice) = 1 n; no special slice merging).
     Old projects (no hierarchy columns) → statusbar warning + recording fallback.
-    Cluster perm. always forces recording-level n.
+    Cluster perm. always forces recording-level n (note in config).
 
     Semantics:
       - One scalar per unit (mean of aspect over sweeps in test set).
-      - Compare unit-level vectors (unpaired/paired/one-sample).
-      - n1/n2 = count of unique units after aggregation.
+      - Compare unit-level vectors (unpaired/paired/one-sample; simple length alignment for paired).
+      - n1/n2 = count of unique units after aggregation (reflects n_unit).
 
     groups: list of shown group_IDs (order matters for pairing).
     get_group_testset_means_fn(...) now returns subject/slice columns (see ui_data_frames.py).
@@ -257,18 +257,19 @@ def compute_statistical_comparison(
     if get_group_testset_means_fn is None:
         return {"error": "no data accessor for testset means", "results": []}
 
-    # v0.16_n_stats Phase 0: normalize n_unit + define aggregator (used in all paths below)
+    # v0.16_n_stats Phase 1 (builds on Phase 0 aggregator): normalize n_unit + define helper.
+    # Default "subject" per protocol/clarifications (unique (subject,slice) for slice mode; no lab-specific slice merging).
     if n_unit not in ("subject", "slice", "recording"):
         n_unit = "subject"  # safe default per protocol
 
-    # Cluster always forces recording-level n (per clarification 3 + plan)
+    # Cluster always forces recording-level n (per clarification + plan; no aggregation on wide per-sweep)
     is_cluster = test_type == "Cluster perm."
     if is_cluster and n_unit != "recording":
         n_unit = "recording"
         # note passed via config/results for statusbar (Phase 2)
 
-    # Phase 0 hierarchy check for statusbar warning (exact string per clarification 5)
-    # Done once per call (before first testset fetch)
+    # Phase 0/1 hierarchy check for statusbar warning (exact string per clarification 5)
+    # Done once per call (before first testset fetch). Uses composite key for slice (unique combinations).
     if n_unit in ("subject", "slice"):
         # Sample one testset to check hierarchy presence (efficient; df_project join already done in accessor)
         sample_sid, sample_tset = shown_sets[0] if shown_sets else (None, None)
@@ -285,10 +286,10 @@ def compute_statistical_comparison(
                 pass  # fallback gracefully
 
     def _aggregate_to_unit_level(obs_df: pd.DataFrame, n_unit: str = "subject") -> pd.DataFrame:
-        """Phase 0 helper: aggregate to one value per statistical unit (mean over recs).
+        """Phase 0/1 helper (updated per slice discussion): aggregate to one value per statistical unit (mean over recs).
         Returns DataFrame with unit key(s) + 'value'. Used by all test branches.
         - 'subject': group by subject (n = unique subjects)
-        - 'slice': group by (subject, slice) composite (asserts slices independent)
+        - 'slice': group by (subject, slice) — each *unique combination* counts as 1 n (composite key; slice numbering may vary by lab, no special merging)
         - 'recording': pass-through (current behavior, n = recordings)
         Old projects (missing columns): return as-is (caller emits statusbar warning with exact string).
         """
@@ -316,7 +317,7 @@ def compute_statistical_comparison(
 
     # --- Repeated-measures ANOVA path (1 group, >=2 test sets) ---
     # Computes omnibus one-way ANOVA across test sets within the single group.
-    # Full subject-aligned RM-ANOVA (with subject factor) is deferred.
+    # Full subject-aligned RM-ANOVA (with subject factor + sphericity) is deferred (Phase 2+).
     if test_type == "ANOVA" and len(shown_groups) == 1 and len(shown_sets) >= 2:
         g = shown_groups[0]
         rm_res = {
@@ -395,7 +396,7 @@ def compute_statistical_comparison(
         return {"results": rm_results, "config": {"test_type": test_type, "variant": "repeated", "fdr": fdr, "norm": norm}}
 
     # --- Friedman chi-square repeated-measures omnibus (1 group, >=3 test sets) ---
-    # Non-parametric omnibus test parallel to RM-ANOVA; uses scipy.stats.friedmanchisquare on aligned per-recording means (k vectors).
+    # Non-parametric omnibus test (Phase 1); uses scipy.stats.friedmanchisquare on unit-aligned vectors (min_len across test sets).
     if test_type == "Friedman" and len(shown_groups) == 1 and len(shown_sets) >= 3:
         g = shown_groups[0]
         fm_res = {
@@ -515,7 +516,8 @@ def compute_statistical_comparison(
             aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
         if not aspects:
             return {"error": "no aspects selected", "results": []}
-        print(f"DEBUG Cluster aspects: {aspects} (norm={norm})")
+        # Phase 1: recording-level only (n_unit overridden above; no aggregator on per-sweep wide data)
+        # Note added to final config below for statusbar ("Cluster permutation uses recording-level n")
 
         def _extract_cluster_p(res):
             """Helper: extract min cluster p-value (or 1.0 if none). res is tuple from MNE."""
@@ -668,9 +670,18 @@ def compute_statistical_comparison(
             except Exception:
                 pass
 
-        return {"results": results, "config": {"test_type": test_type, "variant": "cluster", "fdr": fdr, "norm": norm}}
+        config = {
+            "test_type": test_type,
+            "variant": "cluster",
+            "fdr": fdr,
+            "norm": norm,
+            "n_unit": n_unit,
+            "note": "Cluster permutation uses recording-level n (subject/slice deferred)",
+        }
+        return {"results": results, "config": config}
 
     # --- Wilcoxon signed-rank path (paired or one-sample) ---
+    # Phase 1: aggregator applied; paired uses unit-level vectors (length-based intersection).
     if test_type == "Wilcoxon":
         variant = variant if variant in ("paired", "one-sample") else "paired"
         alt = {"two-sided": "two-sided", "greater": "greater", "less": "less"}.get(tails, "two-sided")
@@ -684,7 +695,6 @@ def compute_statistical_comparison(
             aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
         if not aspects:
             return {"error": "no aspects selected", "results": []}
-        print(f"DEBUG Cluster aspects: {aspects} (norm={norm})")
         raw_p_amp = []
         raw_p_slope = []
         out_results = []
@@ -709,7 +719,7 @@ def compute_statistical_comparison(
                 try:
                     obs1_df = get_group_testset_means_fn(g, sweeps1, aspect=col)
                     obs2_df = get_group_testset_means_fn(g, sweeps2, aspect=col)
-                    # v0.16_n_stats Phase 0: aggregate to unit level + align by unit key (not rec_ID)
+                    # v0.16_n_stats Phase 1: aggregate to unit level + align by unit key (not rec_ID)
                     obs1_df = _aggregate_to_unit_level(obs1_df, n_unit)
                     obs2_df = _aggregate_to_unit_level(obs2_df, n_unit)
                 except Exception:
@@ -718,7 +728,8 @@ def compute_statistical_comparison(
                 vals2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
                 v1 = vals1[np.isfinite(vals1)]
                 v2 = vals2[np.isfinite(vals2)]
-                # For paired: take intersection size (common units); simple min for now (full align later)
+                # Phase 1: after aggregation to unit level, use length-based intersection (common units).
+                # Full key-based alignment (by subject or (subject,slice)) deferred to later phase.
                 eff_n = min(len(v1), len(v2))
                 p = np.nan
                 stat = np.nan
@@ -946,14 +957,14 @@ def compute_statistical_comparison(
                         stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
                         p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
                 elif variant == "paired":
-                    # v0.16_n_stats: align by unit (subject or (subject,slice)) after aggregation
-                    # Simple intersection size for now (full key-based align in later phases)
+                    # v0.16_n_stats Phase 1: align by unit (subject or (subject,slice)) after aggregation.
+                    # Simple length-based intersection for now (full key-based align by unit keys deferred).
                     v1 = obs1[np.isfinite(obs1)]
                     v2 = obs2[np.isfinite(obs2)]
                     eff_n1 = min(len(v1), len(v2))  # common units
                     eff_n2 = eff_n1
                     if eff_n1 >= 2:
-                        # Take first N for simplicity (order from accessor is stable per group)
+                        # Take first N for simplicity (order from accessor/groupby is stable)
                         v1 = v1[:eff_n1]
                         v2 = v2[:eff_n1]
                         res = ttest_rel(v1, v2, alternative=alt)

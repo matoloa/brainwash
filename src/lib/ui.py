@@ -1833,10 +1833,13 @@ class UIsub(
                 global_notes.append("(cluster)")
                 if variant == "paired" and len(shown_groups or []) == 1:
                     global_notes.append("(paired)")
+                # Phase 1/2: check for cluster recording-level note from config
+                if first_res.get("config", {}).get("note"):
+                    global_notes.append("(recording-level n)")
             # v0.16_n_stats: n1/n2 must be bound unconditionally before use (Phase 0 regression fix). Use n from results.
             n1 = first_res.get("n1") or first_res.get("n") or getattr(uistate, "n1", None) or "?"
             n2 = first_res.get("n2") or getattr(uistate, "n2", None) or "?"
-            n_unit = first_res.get("n_unit") or getattr(uistate, "buttonGroup_test_n", "subject")
+            n_unit = first_res.get("n_unit") or first_res.get("config", {}).get("n_unit") or getattr(uistate, "buttonGroup_test_n", "subject")
             if n_unit == "subject":
                 unit_str = "subjects"
             elif n_unit == "slice":
