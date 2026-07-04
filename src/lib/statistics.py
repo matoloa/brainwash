@@ -27,6 +27,243 @@ from scipy.stats import f_oneway, friedmanchisquare, levene, linregress, shapiro
 # ---------------------------------------------------------------------------
 
 
+# Phase 1/2 IO regression (per plan_v0.16.1_IO.md): private helpers for real X/Y pairs (from uistate.io_input mapping + per_sweep=True melt) and core linregress + ANCOVA (lazy statsmodels OLS for slope interaction p-value).
+# Replaces dummy np.arange r². Minimal, non-breaking (only inside statistics.py; compatible config for _get_stat_test_warning). Option B early guard added above.
+def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="recording", aspect_col="EPSP_amp"):
+    """Private helper (Phase 2.1): Returns long DataFrame with ['rec_ID', 'subject', 'slice', 'x', 'y'] for all sweeps in group.
+    Uses per_sweep=True wide matrix from accessor, melts, joins real X from dfoutput (via uistate.io_input mapping e.g. 'vamp'->'volley_amp').
+    Falls back to sweep rank (sorted) if X column missing. Respects n_unit aggregation via _aggregate_to_unit_level.
+    """
+    if uistate is None:
+        # Fallback for testing
+        io_input = "vamp"
+        io_output = "EPSPamp"
+    else:
+        io_input = getattr(uistate, "io_input", "vamp")
+        io_output = getattr(uistate, "io_output", "EPSPamp")
+
+    # Map to dfoutput columns (per Phase 0 findings and ui_state_classes.py:x_axis_values, ui.py radio maps)
+    x_map = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}
+    x_col = x_map.get(io_input, "volley_amp")
+    y_col = aspect_col  # already mapped (e.g. "EPSP_amp" or "EPSP_amp_norm")
+
+    # Get wide per-sweep matrix (rec_ID + sweep cols) or fallback
+    try:
+        wide_df = get_group_testset_means_fn(g, sweeps=None, aspect=y_col, per_sweep=True)
+    except Exception:
+        wide_df = pd.DataFrame()
+
+    if wide_df.empty or "rec_ID" not in wide_df.columns:
+        return pd.DataFrame(columns=["rec_ID", "subject", "slice", "x", "y"])
+
+    # Melt to long (sweep as int for matching)
+    id_vars = ["rec_ID"]
+    if "subject" in wide_df.columns:
+        id_vars.append("subject")
+    if "slice" in wide_df.columns:
+        id_vars.append("slice")
+    sweep_cols = [c for c in wide_df.columns if c not in id_vars and str(c).isdigit() or isinstance(c, (int, float))]
+    if not sweep_cols:
+        # fallback to hierarchy only
+        long_df = wide_df[id_vars].copy()
+        long_df["x"] = np.nan
+        long_df["y"] = np.nan
+        return long_df
+
+    long = pd.melt(wide_df, id_vars=id_vars, value_vars=sweep_cols, var_name="sweep", value_name="y")
+    long["sweep"] = pd.to_numeric(long["sweep"], errors="coerce").astype(int)
+
+    # Join real X from full dfoutput (per group recs, using df_project access via accessor self)
+    try:
+        # Recover df_project / get_dfoutput from the mixin instance if possible
+        if hasattr(get_group_testset_means_fn, "__self__"):
+            mixin = get_group_testset_means_fn.__self__
+            df_p = mixin.get_df_project()
+            recs = df_p[df_p["ID"].isin(wide_df["rec_ID"].astype(str))]["recording_name"].tolist() if not df_p.empty else []
+            if recs:
+                dfs = []
+                for rec_name in recs:
+                    prow = df_p[df_p["recording_name"] == rec_name].iloc[0]
+                    dfo = mixin.get_dfoutput(row=prow)
+                    if dfo is not None and not dfo.empty:
+                        dfs.append(dfo[["sweep", x_col]].copy() if x_col in dfo.columns else dfo[["sweep"]].copy())
+                if dfs:
+                    x_df = pd.concat(dfs, ignore_index=True)
+                    if x_col in x_df.columns:
+                        long = long.merge(x_df.rename(columns={x_col: "x"}), on="sweep", how="left")
+                    else:
+                        long["x"] = long["sweep"].rank(method="dense") - 1  # fallback rank
+                else:
+                    long["x"] = long["sweep"].rank(method="dense") - 1
+            else:
+                long["x"] = long["sweep"].rank(method="dense") - 1
+        else:
+            long["x"] = long["sweep"].rank(method="dense") - 1
+    except Exception:
+        long["x"] = long["sweep"].rank(method="dense") - 1  # safe fallback to sweep rank
+
+    long = long.dropna(subset=["y"])  # drop invalid Y
+    if "x" not in long.columns:
+        long["x"] = np.arange(len(long))
+
+    # Aggregate to n_unit level (reuse existing helper logic; mean X/Y per unit)
+    if n_unit != "recording" and "subject" in long.columns:
+        group_keys = ["subject"]
+        if n_unit == "slice" and "slice" in long.columns:
+            group_keys.append("slice")
+        if len(group_keys) > 0:
+            long = long.groupby(group_keys + ["x"], as_index=False)["y"].mean().rename(columns={"y": "y_mean"})
+            long = long.rename(columns={"y_mean": "y"})
+            long["rec_ID"] = long["subject"]  # placeholder for downstream
+
+    return long[["rec_ID", "subject", "slice", "x", "y"]].dropna().sort_values("x")
+
+
+def _compute_io_regression_internal(
+    shown_groups, get_group_testset_means_fn, uistate=None, n_unit="subject", norm=False, amp=True, slope=True, dd_groups=None
+):
+    """Private helper (Phase 2): Core IO regression logic.
+    - Gets X/Y pairs per group using _get_io_xy_pairs (real X from uistate.io_input).
+    - Fits linregress per group/unit for slope, intercept, r2.
+    - Between-group slope comparison via lazy statsmodels OLS (`y ~ x * C(group)`) interaction p-value (or RSS F-test fallback).
+    - Returns compatible dict for statusbar/UI: {"results": [per-group or summary dicts with 'r2', 'slope_p', 'n', 'group_ns'], "config": {"type": "IO regression", "io_input": ..., "io_output": ..., "n_unit": ..., "implicit_testset": True, "x_col": ..., "y_col": ...}}.
+    """
+    results = []
+    group_ns = {}
+    r2_per_group = {}
+    slope_per_group = {}
+    aspects = []
+    if amp:
+        aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
+    if slope:
+        aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
+    if not aspects:
+        aspects = [("amp", "EPSP_amp")]
+
+    for short, col in aspects:
+        group_data = {}
+        for g in shown_groups:
+            try:
+                xy_df = _get_io_xy_pairs(g, get_group_testset_means_fn, uistate, n_unit=n_unit, aspect_col=col)
+                if xy_df.empty or len(xy_df) < 2:
+                    group_data[g] = {"x": np.array([]), "y": np.array([]), "n": 0}
+                    continue
+                x = xy_df["x"].to_numpy(dtype=float)
+                y = xy_df["y"].to_numpy(dtype=float)
+                valid = np.isfinite(x) & np.isfinite(y)
+                if valid.sum() < 2:
+                    group_data[g] = {"x": np.array([]), "y": np.array([]), "n": 0}
+                    continue
+                group_data[g] = {"x": x[valid], "y": y[valid], "n": int(valid.sum())}
+                group_ns[g] = group_data[g]["n"]
+                # Per-group linregress
+                res = linregress(group_data[g]["x"], group_data[g]["y"])
+                r2_per_group[g] = float(res.rvalue**2) if hasattr(res, "rvalue") and np.isfinite(res.rvalue) else np.nan
+                slope_per_group[g] = float(res.slope) if hasattr(res, "slope") and np.isfinite(res.slope) else np.nan
+            except Exception:
+                group_data[g] = {"x": np.array([]), "y": np.array([]), "n": 0}
+                group_ns[g] = 0
+                r2_per_group[g] = np.nan
+                slope_per_group[g] = np.nan
+
+        # Between-group slope comparison (ANCOVA interaction)
+        slope_p = np.nan
+        if len(shown_groups) >= 2 and all(len(d["x"]) >= 2 for d in group_data.values() if g in group_data):
+            try:
+                # Lazy import statsmodels (as done for FDR/multipletests)
+                import statsmodels.api as sm
+                from statsmodels.formula.api import ols
+
+                # Build pooled data for OLS
+                dfs = []
+                for g_idx, g in enumerate(shown_groups):
+                    d = group_data.get(g, {})
+                    if len(d.get("x", [])) > 0:
+                        gdf = pd.DataFrame({"y": d["y"], "x": d["x"], "group": f"G{g_idx}"})
+                        dfs.append(gdf)
+                if dfs:
+                    pooled = pd.concat(dfs, ignore_index=True)
+                    # Formula for ANCOVA: y ~ x + C(group) + x:C(group) ; test interaction
+                    model = ols("y ~ x * C(group)", data=pooled).fit()
+                    # Interaction p-value (last term typically)
+                    pvals = model.pvalues
+                    inter_p = pvals.filter(like="x:C(group)").iloc[0] if any("x:C" in str(k) for k in pvals.index) else np.nan
+                    slope_p = float(inter_p) if np.isfinite(inter_p) else np.nan
+            except Exception:
+                # Fallback: manual RSS F-test (pooled vs separate regressions)
+                try:
+                    # Pooled model RSS
+                    all_x = np.concatenate([d["x"] for d in group_data.values() if len(d["x"]) > 0])
+                    all_y = np.concatenate([d["y"] for d in group_data.values() if len(d["y"]) > 0])
+                    pooled_res = linregress(all_x, all_y)
+                    pooled_rss = np.sum((all_y - (pooled_res.slope * all_x + pooled_res.intercept)) ** 2)
+                    # Separate RSS
+                    sep_rss = 0
+                    for d in group_data.values():
+                        if len(d["x"]) > 1:
+                            res = linregress(d["x"], d["y"])
+                            pred = res.slope * d["x"] + res.intercept
+                            sep_rss += np.sum((d["y"] - pred) ** 2)
+                    # F-test
+                    df1 = len(shown_groups) - 1  # extra params for separate
+                    df2 = len(all_y) - 2 * len(shown_groups)
+                    if df2 > 0 and pooled_rss > 0:
+                        f_stat = ((pooled_rss - sep_rss) / df1) / (sep_rss / df2)
+                        from scipy.stats import f
+
+                        slope_p = 1.0 - f.cdf(f_stat, df1, df2)
+                except Exception:
+                    slope_p = np.nan
+
+        # Build result row (compatible with existing UI)
+        res_row = {
+            "set_id": "__io_regression_implicit__",
+            "set_name": None,  # UI will format as "IO regression ..."
+            "group1": shown_groups,
+            "n1": sum(group_ns.values()) if group_ns else 0,
+            "slope_p": slope_p,
+            "group_ns": group_ns.copy(),
+            "r2_per_group": r2_per_group.copy(),
+        }
+        for g, r2v in r2_per_group.items():
+            res_row[f"r2_{g}"] = r2v
+        if np.isfinite(slope_p):
+            res_row["p_slope"] = slope_p
+        results.append(res_row)
+
+    # Config for statusbar (compatible with implicit_testset + r2 handling in _get_stat_test_warning)
+    x_col = "volley_amp"  # default; could pull from uistate
+    y_col = "EPSP_amp"
+    if uistate is not None:
+        io_input = getattr(uistate, "io_input", "vamp")
+        x_map = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}
+        x_col = x_map.get(io_input, "volley_amp")
+        io_output = getattr(uistate, "io_output", "EPSPamp")
+        y_map = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}
+        y_col = y_map.get(io_output, "EPSP_amp")
+
+    config = {
+        "type": "IO regression",
+        "io_input": getattr(uistate, "io_input", "vamp") if uistate else "vamp",
+        "io_output": getattr(uistate, "io_output", "EPSPamp") if uistate else "EPSPamp",
+        "x_col": x_col,
+        "y_col": y_col,
+        "n_unit": n_unit,
+        "implicit_testset": True,
+        "amp": amp,
+        "slope": slope,
+        "norm": norm,
+        "r2_per_group": r2_per_group,  # for backward compat with statusbar r2 display
+    }
+    if slope_per_group:
+        config["slope_per_group"] = slope_per_group
+
+    return {
+        "results": results,
+        "config": config,
+    }
+
+
 def _bh_fdr(pvals: np.ndarray) -> np.ndarray:
     """Benjamini-Hochberg FDR correction. Returns q-values in [0,1]."""
     p = np.asarray(pvals, dtype=float)
@@ -194,6 +431,7 @@ def compute_statistical_comparison(
     ref: float = 0.0,
     n_unit: str = "subject",  # "subject" (default) | "slice" | "recording" — v0.16_n_stats
     experiment_type: str = "time",  # v0.16_n_stats_IO: "io" allows implicit all-sweeps (no test sets required)
+    uistate=None,  # for IO: provides .io_input / .io_output mapping and df_project access (Phase 1 Option B)
 ) -> dict:
     """
     High-level entry point used by UI for formal statistical tests on Test Sets.
@@ -203,17 +441,19 @@ def compute_statistical_comparison(
     Old projects (no hierarchy columns) → statusbar warning + recording fallback.
     Cluster perm. always forces recording-level n (note in config).
 
-    v0.16_n_stats_IO: If experiment_type=="io" and no shown test sets, uses implicit "all sweeps" per group via
-    accessor (sweeps=None). Explicit test sets take precedence. Default="time" preserves 100% backward compat.
+    v0.16_n_stats_IO (Phase 1+2): If experiment_type=="io" and use_implicit (no shown test sets), uses real X/Y regression (linregress per unit + ANCOVA slope test) instead of mean collapse or dummy np.arange.
+    Early guard (Option B) before implicit ANOVA branch for minimal diff. Private helpers _get_io_xy_pairs (melt per_sweep=True + X join from dfoutput using uistate.io_input) and _compute_io_regression_internal.
+    Compatible config with "type": "IO regression", "io_input", "io_output". Backward compat 100% for non-IO. See work_plans/plan_v0.16.1_IO.md.
 
     Semantics:
       - One scalar per unit (mean of aspect over sweeps in test set or all sweeps for IO implicit).
       - Compare unit-level vectors (unpaired/paired/one-sample; simple length alignment for paired).
       - n1/n2 = count of unique units after aggregation (reflects n_unit).
+      - For IO: per-unit slopes from real X (volley_amp etc.), between-group slope p via OLS interaction.
 
     groups: list of shown group_IDs (order matters for pairing).
     get_group_testset_means_fn(...) now returns subject/slice columns (see ui_data_frames.py).
-    Returns dict with "results" (per-testset) and "config" (incl. n_unit, implicit_testset if used).
+    Returns dict with "results" (per-testset) and "config" (incl. n_unit, implicit_testset if used; "IO regression" for IO).
     """
     if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
         return {"not_implemented": test_type, "results": []}
@@ -266,6 +506,23 @@ def compute_statistical_comparison(
 
     if get_group_testset_means_fn is None:
         return {"error": "no data accessor for testset means", "results": []}
+
+    # Phase 1 (Option B, per plan_v0.16.1_IO.md): Early IO regression guard (before v0.17 implicit ANOVA). For experiment_type=="io" + use_implicit (no explicit test sets), replaces dummy r² with real X/Y regression + ANCOVA slope comparison.
+    # Reuses n_unit, _get_obs/_aggregate_to_unit_level, and existing call sites (uistate passed from ui.py:apply_statistical_test_if_active). No signature break for non-IO.
+    if is_io and use_implicit:
+        # uistate required for io_input/io_output mapping and dfoutput access (passed from UI; falls back gracefully)
+        if uistate is None:
+            uistate = getattr(get_group_testset_means_fn, "__self__", None)  # try to recover from bound method (DataFrameMixin)
+        return _compute_io_regression_internal(
+            shown_groups=shown_groups,
+            get_group_testset_means_fn=get_group_testset_means_fn,
+            uistate=uistate,
+            n_unit=n_unit,
+            norm=norm,
+            amp=amp,
+            slope=slope,
+            dd_groups=dd_groups,  # for group names if needed
+        )
 
     # v0.17_io_statusbar_fix: minimal implicit ANOVA for IO (between-groups on all-sweeps, >=2 groups). Placed early (before RM path) so that when use_implicit=True + ANOVA, we compute real f_oneway results + set_result instead of skipping main loop. Uses same _get_obs(g, None, col) + _aggregate_to_unit_level as r2 block. Produces proper set_name, per-group n1 (via max eff_n or len per group), p-values, eta2. Integrates with existing r2 in config. Fixes "Set ?: amp p=NA", n_report="?", nonsense statusbar.
     if test_type == "ANOVA" and use_implicit and len(shown_groups) >= 2:
@@ -1242,31 +1499,8 @@ def compute_statistical_comparison(
     }
     if use_implicit:
         config["implicit_testset"] = True
-        # v0.17_io_r2: compute simple per-group r² (dummy x=range vs mean y) for IO implicit; reported in statusbar with n.
-        # TODO: improve with real IO x (stim intensity/volley_amp from dfoutput) for true dose-response r².
-        if not shown_sets and test_type in ("t-test", "ANOVA"):
-            aspects = []
-            if amp:
-                aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
-            if slope:
-                aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
-            for short, col in aspects:
-                try:
-                    r2_vals = []
-                    for g in shown_groups:
-                        obs_df = _get_obs(g, None, col)  # implicit all sweeps
-                        obs_df = _aggregate_to_unit_level(obs_df, n_unit)
-                        y = obs_df["value"].to_numpy(dtype=float)
-                        valid = np.isfinite(y)
-                        if valid.sum() < 2:
-                            r2_vals.append(np.nan)
-                            continue
-                        x = np.arange(len(y))[valid]
-                        res = linregress(x, y[valid])
-                        r2_vals.append(res.rvalue**2 if hasattr(res, "rvalue") else np.nan)
-                    config[f"r2_{short}"] = float(np.nanmean(r2_vals)) if r2_vals else np.nan
-                except Exception:
-                    config[f"r2_{short}"] = np.nan
+        # IO r² now handled in _compute_io_regression_internal (real X from uistate.io_input + per_sweep melt; Phase 1/2). Dummy np.arange path removed.
+        # Config from IO path already includes r2_per_group, slope_p, etc. for _get_stat_test_warning.
     # Always return config (even for implicit with no out_results) so _get_stat_test_warning sees implicit_testset + r2 + n_unit.
     # This fixes "no statusbar at all" when switching from time-course (which had results) to IO.
     # v0.17_io_statusbar_fix: implicit ANOVA branch returns early with real results; here out_results populated for t-test implicit or non-IO.

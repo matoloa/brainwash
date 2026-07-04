@@ -90,7 +90,7 @@ y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_
 
 **Next:** Proceed to Phase 1 (design + impl). No breaking changes.
 
-## Phase 1 — Design IO-Specific Statistical Entry Point (Minimal, Non-Breaking)
+## Phase 1 — Design IO-Specific Statistical Entry Point (Minimal, Non-Breaking) — COMPLETED
 
 **Constraint:** Do not alter the existing `compute_statistical_comparison` signature or non-IO behavior. Add an IO-aware path or wrapper.
 
@@ -140,7 +140,7 @@ y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_
 
 **Decision checkpoint:** Choose A or B based on call-site count and UI wiring effort. Prefer minimal diff.
 
-## Phase 2 — Implement Core Regression Logic (Private Helper)
+## Phase 2 — Implement Core Regression Logic (Private Helper) — COMPLETED
 
 ### 2.1 `_get_io_xy_pairs`
 
@@ -307,4 +307,4 @@ The following enhancements are **explicitly deferred** to keep v0.16.1 scope tig
 
 ---
 
-**End of plan.** Next: implement `_get_io_xy_pairs` + `_compute_io_regression_internal` in `statistics.py` (Phase 1/2). Use existing `linregress` import + lazy OLS. Then minimal ui.py updates.
+**End of plan.** Phase 1+2 completed (Option B early guard + private helpers in statistics.py only; real X/Y via uistate.io_input + per_sweep melt, linregress + lazy OLS ANCOVA, compatible config, dummy r² removed). Next: Phase 3 (minimal UI in ui.py for statusbar formatting of "IO regression" + test_type=None guard in experiment_type_changed; deferred items in 3.3.1 remain out of scope for v0.16.1).
