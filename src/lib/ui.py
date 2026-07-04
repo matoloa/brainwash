@@ -1770,31 +1770,26 @@ class UIsub(
         When successful (no warning), also builds a concise p-value summary for statusbar.
         Uses central helpers (_effective_test_type, _is_io_mode) for dispatch.
         IO regression is handled exclusively by _format_io_regression_statusbar.
+        Non-IO logic is restored via helpers in a subsequent phase.
         """
         eff = self._effective_test_type()
-        print(
-            f"DEBUG _get_stat_test_warning: eff={eff}, test_type={getattr(uistate, 'test_type', None)}, experiment_type={getattr(uistate, 'experiment_type', None)}"
-        )
         if eff == "None":
-            self.clear_formal_test_results()
             uistate.statusbar_state = None
-            self._refresh_test_statusbar()
-            return
+            return None
 
         if eff == "ANCOVA":
-            # IO regression: bypass all min_groups / shown_ts guards.
-            # Statusbar is handled by _get_stat_test_warning / _format_io_regression_statusbar.
-            return
+            # IO regression: always short-circuit here. Never reaches ANOVA/Friedman/Cluster guards.
+            return self._format_io_regression_statusbar(getattr(uistate, "formal_test_results", None))
 
-        print("DEBUG: Reached past ANCOVA block (should not happen)")
         if eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm.", "ANCOVA"):
             uistate.statusbar_state = "warning"
             return f"Statistical test '{eff}' is not implemented"
 
-        # --- Non-IO explicit test paths (existing logic preserved) ---
-        # ... (the original non-IO guard logic for t-test/ANOVA/Wilcoxon/Friedman/Cluster perm.
-        #      remains exactly as it was before the monster was torn out; only the IO/ANCOVA
-        #      dispatch above is new) ...
+        # --- Non-IO explicit test paths ---
+        # Placeholder: The original non-IO guard logic (t-test, ANOVA, etc.) will be
+        # restored here in a subsequent phase using dedicated helper methods
+        # (_check_ttest_applicability, etc.) to keep this function short.
+        return None
 
     def _refresh_test_statusbar(self):
         """Update statusbar for current test conditions using uistate.statusbar_state (None = default/cleared, "info" = success report bold/default color, "warning" = red/white/bold).
