@@ -269,7 +269,7 @@ def compute_statistical_comparison(
 
     # v0.17_io_statusbar_fix: minimal implicit ANOVA for IO (between-groups on all-sweeps, >=2 groups). Placed early (before RM path) so that when use_implicit=True + ANOVA, we compute real f_oneway results + set_result instead of skipping main loop. Uses same _get_obs(g, None, col) + _aggregate_to_unit_level as r2 block. Produces proper set_name, per-group n1 (via max eff_n or len per group), p-values, eta2. Integrates with existing r2 in config. Fixes "Set ?: amp p=NA", n_report="?", nonsense statusbar.
     if test_type == "ANOVA" and use_implicit and len(shown_groups) >= 2:
-        # Minimal implicit ANOVA branch (v0.17): between-groups one-way on all-sweeps per group (no testsets). 
+        # Minimal implicit ANOVA branch (v0.17): between-groups one-way on all-sweeps per group (no testsets).
         # Computes real f_oneway(*group_vals) per aspect using _get_obs(g, None, col) + aggregation (respects n_unit).
         # Builds proper set_result (set_name="IO all sweeps", group1=shown_groups list, p_*/stat_*/eta2, n1 from max eff_n).
         # group_ns dict for UI n_report (avoids ?). r² integrated via later config block. Matches RM-ANOVA style for statusbar.
@@ -307,7 +307,13 @@ def compute_statistical_comparison(
             for g in shown_groups:
                 try:
                     obs_df = _get_obs(g, None, col)
-                    obs_df = _aggregate_to_unit_level(obs_df, n_unit)
+                    # Inline aggregation (subject/slice) — avoids NameError since _aggregate_to_unit_level is defined later.
+                    if n_unit != "recording" and not obs_df.empty and "value" in obs_df.columns:
+                        gkeys = ["subject", "slice"] if n_unit == "slice" else ["subject"]
+                        if all(k in obs_df.columns for k in gkeys):
+                            v = obs_df[gkeys + ["value"]].dropna()
+                            if not v.empty:
+                                obs_df = v.groupby(gkeys, as_index=False)["value"].mean()
                     obs = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
                     valid = obs[np.isfinite(obs)]
                     vals_list.append(valid)
@@ -353,6 +359,7 @@ def compute_statistical_comparison(
         if fdr and raw_p_amp:
             try:
                 from statsmodels.stats.multitest import multipletests
+
                 ps = [set_result.get(k, np.nan) for k in raw_p_amp]
                 qs = multipletests([p if np.isfinite(p) else 1.0 for p in ps], alpha=0.05, method="fdr_bh")[1]
                 for k, q in zip(raw_p_amp, qs):
@@ -362,6 +369,7 @@ def compute_statistical_comparison(
         if fdr and raw_p_slope:
             try:
                 from statsmodels.stats.multitest import multipletests
+
                 ps = [set_result.get(k, np.nan) for k in raw_p_slope]
                 qs = multipletests([p if np.isfinite(p) else 1.0 for p in ps], alpha=0.05, method="fdr_bh")[1]
                 for k, q in zip(raw_p_slope, qs):
