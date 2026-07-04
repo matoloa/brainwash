@@ -1931,7 +1931,14 @@ class UIsub(
                 self._refresh_test_statusbar()
                 return
 
-            if eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm.", "ANCOVA"):
+            if eff == "ANCOVA":
+                # IO regression: bypass *all* applicability guards, variant_for_check, min_groups, paired/testset checks.
+                # (1+ groups implicitly supported via stats.compute_statistical_comparison + _format_io_regression_statusbar)
+                had_results = bool(getattr(uistate, "formal_test_results", None))
+                # Set safe defaults so later code (paired check, snapshot) never sees unbound locals
+                variant_for_check = "unpaired"
+                ref_attr = "label_test_t_one_sample_value"
+            elif eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
                 print(
                     f"Statistical test '{eff}' is not yet implemented for v0.16 (t-test, ANOVA, Wilcoxon, Friedman, Cluster perm., ANCOVA for IO supported)."
                 )
@@ -1939,8 +1946,9 @@ class UIsub(
                 uistate.statusbar_state = "warning"
                 self._refresh_test_statusbar()
                 return
-            # --- Early applicability checks (abort cleanly if tests cannot run) ---
-            had_results = bool(getattr(uistate, "formal_test_results", None))
+            else:
+                # --- Early applicability checks (abort cleanly if tests cannot run) ---
+                had_results = bool(getattr(uistate, "formal_test_results", None))
 
             if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
                 if had_results:
@@ -1954,38 +1962,48 @@ class UIsub(
             # Only groups that have at least one recording can participate in a test
             shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
 
-            ref_attr = "label_test_t_one_sample_value"
-            if test_type == "Wilcoxon":
-                variant_for_check = getattr(uistate, "test_wilcox_variant", "paired")
-                ref_attr = "label_test_wilcox_one_sample_value"
+            shown_groups = self._get_shown_group_ids()
+            # Only groups that have at least one recording can participate in a test
+            shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
+
+            # IO/ANCOVA bypass (early after had_results; sets safe defaults for variant_for_check/ref_attr to prevent UnboundLocalError)
+            if test_type == "ANCOVA" or eff == "ANCOVA":
+                # IO regression: implicit all-sweeps; 1+ groups supported. No min_groups/paired/testset guards.
+                shown_ts = self._get_shown_testsets()
+                # (variant_for_check/ref_attr already initialized in ANCOVA block above)
             else:
-                variant_for_check = getattr(uistate, "test_t_variant", "unpaired")
-            if test_type == "Cluster perm.":
-                variant_for_check = "unpaired"  # avoid triggering paired t-test guard for Cluster (2 groups case)
-            shown_ts = self._get_shown_testsets()
-            # For ANOVA/Friedman: allow 1 group if sufficient test sets (repeated-measures omnibus); otherwise require >=2 groups.
-            # Paired t-test/Wilcoxon: exactly 1 group + exactly 2 test sets (per pairing model in plan_v0.16_scitest.md).
-            # Cluster perm. guard is handled in _get_stat_test_warning (between or 1g+2ts); no min_groups adjustment here.
-            if test_type in ("ANOVA", "Friedman"):
-                min_groups = 1
-            elif test_type == "Cluster perm.":
-                min_groups = 1  # detailed check in warning function
-            else:
-                min_groups = 1 if variant_for_check in ("one-sample", "paired") else 2
-            if len(shown_groups) < min_groups and test_type != "Cluster perm.":
-                if had_results or test_type == "Friedman":
-                    if test_type == "ANOVA":
-                        print(f"Statistical test: ANOVA requires either >=2 groups, or 1 group with >=2 test sets (repeated-measures).")
-                    elif test_type == "Friedman":
-                        print(
-                            f"Statistical test: Friedman min_groups guard: shown_groups={len(shown_groups)} (need >=1), min_groups={min_groups}, shown_ts={len(shown_ts)} (need >=3)"
-                        )
-                    else:
-                        print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
-                self.clear_formal_test_results()
-                uistate.statusbar_state = "warning"
-                self._refresh_test_statusbar()
-                return
+                ref_attr = "label_test_t_one_sample_value"
+                if test_type == "Wilcoxon":
+                    variant_for_check = getattr(uistate, "test_wilcox_variant", "paired")
+                    ref_attr = "label_test_wilcox_one_sample_value"
+                else:
+                    variant_for_check = getattr(uistate, "test_t_variant", "unpaired")
+                if test_type == "Cluster perm.":
+                    variant_for_check = "unpaired"  # avoid triggering paired t-test guard for Cluster (2 groups case)
+                shown_ts = self._get_shown_testsets()
+                # For ANOVA/Friedman: allow 1 group if sufficient test sets (repeated-measures omnibus); otherwise require >=2 groups.
+                # Paired t-test/Wilcoxon: exactly 1 group + exactly 2 test sets (per pairing model in plan_v0.16_scitest.md).
+                # Cluster perm. guard is handled in _get_stat_test_warning (between or 1g+2ts); no min_groups adjustment here.
+                if test_type in ("ANOVA", "Friedman"):
+                    min_groups = 1
+                elif test_type == "Cluster perm.":
+                    min_groups = 1  # detailed check in warning function
+                else:
+                    min_groups = 1 if variant_for_check in ("one-sample", "paired") else 2
+                if len(shown_groups) < min_groups and test_type != "Cluster perm.":
+                    if had_results or test_type == "Friedman":
+                        if test_type == "ANOVA":
+                            print(f"Statistical test: ANOVA requires either >=2 groups, or 1 group with >=2 test sets (repeated-measures).")
+                        elif test_type == "Friedman":
+                            print(
+                                f"Statistical test: Friedman min_groups guard: shown_groups={len(shown_groups)} (need >=1), min_groups={min_groups}, shown_ts={len(shown_ts)} (need >=3)"
+                            )
+                        else:
+                            print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
+                    self.clear_formal_test_results()
+                    uistate.statusbar_state = "warning"
+                    self._refresh_test_statusbar()
+                    return
 
             # Paired t-test additionally requires exactly 2 test sets (the pairing model uses 2 test sets within 1 group)
             if variant_for_check == "paired" and test_type != "Friedman":
@@ -2013,7 +2031,8 @@ class UIsub(
                 self._refresh_test_statusbar()
                 return
 
-            # Snapshot config (Friedman uses no variant/tails but we still snapshot for logging + compute call)
+            # Snapshot config (Friedman uses no variant/tails but we still snapshot for logging + compute call).
+            # For ANCOVA/IO: variant_for_check/ref_attr are now always initialized (in top ANCOVA block).
             if test_type == "Wilcoxon":
                 variant = getattr(uistate, "test_wilcox_variant", "paired")
                 tails = getattr(uistate, "test_wilcox_tails", "two-sided")
