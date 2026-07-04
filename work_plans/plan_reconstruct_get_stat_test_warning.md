@@ -1,16 +1,36 @@
-# Plan: Reconstruct `_get_stat_test_warning` (Build Server Edition)
+# Plan: Reconstruct `_get_stat_test_warning` (Build Server Edition — Surgical)
 
 **File:** `src/lib/ui.py`  
-**Function:** `_get_stat_test_warning` (L1727+)  
+**Target:** The body of `_get_stat_test_warning` only (NOT the rest of the file).  
 **Goal:** Replace the current degraded function with a clean, readable dispatch structure that delegates IO regression formatting to the new `_format_io_regression_statusbar` helper.
 
 **Prerequisite:** The `_format_io_regression_statusbar` helper must be present and correctly indented (user has already inserted it).
 
+**Critical Safeguard:**
+
+> **Do not delete any lines before `def _get_stat_test_warning(self):` or after the final `return` of that function. The replacement must be a 1:1 swap of the function body only. If you are unsure of the exact line range, stop and ask for clarification.**
+
 ---
 
-## The Replacement
+## Exact `edit_file` Parameters
 
-**Delete** the entire body of `_get_stat_test_warning` from its docstring to the end of the function, and **replace it with** the following exact text:
+**old_text (start of function):**
+
+```python
+    def _get_stat_test_warning(self):
+        """Return a warning string if the selected test cannot be applied, else None.
+```
+
+**old_text (end of function body — the placeholder text that currently exists):**
+
+```python
+        # --- Non-IO explicit test paths (existing logic preserved) ---
+        # ... (the original non-IO guard logic for t-test/ANOVA/Wilcoxon/Friedman/Cluster perm.
+        #      remains exactly as it was before the monster was torn out; only the IO/ANCOVA
+        #      dispatch above is new) ...
+```
+
+**new_text (exact replacement — copy and paste this block):**
 
 ```python
     def _get_stat_test_warning(self):
@@ -40,8 +60,6 @@
         #      dispatch above is new) ...
 ```
 
-**Note for Build Server:** The `... (the original non-IO guard logic ...)` section is a placeholder. The Build Server should **preserve the existing non-IO `if/elif` chain** (the t-test, ANOVA, Wilcoxon, Friedman, and Cluster perm. guards) exactly as it appears in the current file after the monster was removed. Only the early dispatch for `"None"` and `"ANCOVA"` is being added.
-
 ---
 
 ## Verification (Build Server must confirm)
@@ -55,11 +73,11 @@
 
 ## Why This Plan Will Succeed
 
-- It is **one file, one function, one replacement**.
-- It gives the Build Server **exact text** to insert (not prose describing intent).
-- It explicitly tells the Build Server what to **preserve** (the non-IO guards) vs. what to **replace** (the early dispatch).
-- It has a **single, unambiguous success criterion** (the statusbar string appears for IO).
+- It uses **explicit `old_text` / `new_text` markers** instead of ambiguous prose.
+- It adds a **"Critical Safeguard"** box that explicitly forbids file-wide deletion.
+- It is scoped to **one function body only**.
+- It has a **single, unambiguous success criterion**.
 
 ---
 
-*End of plan.*
+_End of plan._

@@ -1724,6 +1724,47 @@ class UIsub(
         # IO/ANCOVA and other tests flow through existing _get_stat_test_warning for now
         return None  # placeholder; real logic stays in _get_stat_test_warning until Phase 3
 
+    def _format_io_regression_statusbar(self, formal):
+        """Single source of truth for IO regression statusbar formatting.
+        Handles all shapes of formal_test_results and bypasses all non-IO guards.
+        Called by _get_stat_test_warning when eff == "ANCOVA".
+        """
+        print(f"DEBUG _format_io_regression_statusbar: formal={formal}")
+        if formal:
+            if isinstance(formal, list) and formal:
+                item = formal[0]
+                if isinstance(item, dict):
+                    cfg = item.get("config") or item
+            elif isinstance(formal, dict):
+                cfg = formal.get("config") or formal
+            else:
+                cfg = None
+            if isinstance(cfg, dict) and cfg.get("type") == "IO regression":
+                prefix = "IO regression"
+                global_notes = []
+                slope_p = cfg.get("slope_p") or (formal[0] if isinstance(formal, list) else formal).get("slope_p")
+                if isinstance(slope_p, (int, float)) and np.isfinite(slope_p):
+                    pstr = f"{slope_p:.3g}" if slope_p >= 0.001 else "<0.001"
+                    global_notes.append(f"slope p={pstr}")
+                for g, r2v in cfg.get("r2_per_group", {}).items():
+                    if isinstance(r2v, (int, float)) and np.isfinite(r2v):
+                        global_notes.append(f"r²({g})={r2v:.2f}")
+                        break
+                n_report = ""
+                group_ns = cfg.get("group_ns") or (formal[0] if isinstance(formal, list) else formal).get("group_ns", {})
+                if group_ns:
+                    ns = [f"{g}={n}" for g, n in group_ns.items()]
+                    n_report = ", ".join(ns)
+                if n_report:
+                    global_notes.append(f"({n_report})")
+                if global_notes:
+                    prefix = f"{prefix} ({' '.join(global_notes)})"
+                uistate.statusbar_state = "info"
+                return prefix
+        # No formal_results yet (initial switch) or not matching config: benign hint, not an error.
+        uistate.statusbar_state = None
+        return "IO regression: select ≥2 groups to compute slope comparison"
+
     def _get_stat_test_warning(self):
         """Return a warning string if the selected test cannot be applied, else None.
         When successful (no warning), also builds a concise p-value summary for statusbar.
@@ -1731,6 +1772,9 @@ class UIsub(
         IO regression is handled exclusively by _format_io_regression_statusbar.
         """
         eff = self._effective_test_type()
+        print(
+            f"DEBUG _get_stat_test_warning: eff={eff}, test_type={getattr(uistate, 'test_type', None)}, experiment_type={getattr(uistate, 'experiment_type', None)}"
+        )
         if eff == "None":
             uistate.statusbar_state = None
             return None
@@ -1738,7 +1782,7 @@ class UIsub(
         if eff == "ANCOVA":
             # IO regression: always short-circuit here. Never reaches ANOVA/Friedman/Cluster guards.
             return self._format_io_regression_statusbar(getattr(uistate, "formal_test_results", None))
-
+        print("DEBUG: Reached past ANCOVA block (should not happen)")
         if eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm.", "ANCOVA"):
             uistate.statusbar_state = "warning"
             return f"Statistical test '{eff}' is not implemented"
