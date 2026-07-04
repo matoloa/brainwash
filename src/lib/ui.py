@@ -1604,12 +1604,12 @@ class UIsub(
         """Update label_test_ANOVA and uistate.anova_label based on number of shown test sets.
         Called whenever test sets are created, shown/hidden, or test_type changes to ANOVA.
         v0.16_n_stats_IO: for experiment_type=="io" (no test sets), label="ANOVA (IO all sweeps)".
+        Uses helper for consistency (Phase 1).
         """
         if not hasattr(self, "label_test_ANOVA"):
             return
         n = len(self._get_shown_testsets())
-        is_io = getattr(uistate, "experiment_type", "time") == "io"
-        if is_io and n == 0:
+        if self._is_io_mode() and n == 0:
             label_text = "ANOVA (IO: all sweeps)"
         elif n > 1:
             label_text = "ANOVA (repeated)"
@@ -1699,16 +1699,85 @@ class UIsub(
         except Exception:
             pass
 
+    def _is_io_mode(self) -> bool:
+        """Central helper per plan_experiment_type_overhaul.md: experiment_type == 'io'."""
+        return getattr(uistate, "experiment_type", "time") == "io"
+
+    def _effective_test_type(self) -> str:
+        """Central helper: returns test_type (or 'ANCOVA' for IO). Guarantees no Python None or invalid sentinel.
+        IO always maps to ANCOVA (effective = IO regression via formal_test_results/config)."""
+        if self._is_io_mode():
+            return getattr(uistate, "test_type", "ANCOVA")
+        return getattr(uistate, "test_type", "None")
+
+    def _should_show_stat_test_frame(self) -> bool:
+        """Central helper: hide Statistical Test frame for IO mode."""
+        return not self._is_io_mode()
+
+    def _get_statusbar_for_current_state(self) -> str | None:
+        """Single source of truth for statusbar (Phase 1). Delegates to existing logic but uses effective_test_type.
+        (Full consolidation in later phases.)"""
+        eff = self._effective_test_type()
+        if eff == "None":
+            uistate.statusbar_state = None
+            return None
+        # IO/ANCOVA and other tests flow through existing _get_stat_test_warning for now
+        return None  # placeholder; real logic stays in _get_stat_test_warning until Phase 3
+
     def _get_stat_test_warning(self):
         """Return a warning string if the selected test cannot be applied, else None.
         When successful (no warning), also builds a concise p-value summary for statusbar
         (e.g. "set 1: p=0.034  set 2: p=0.12"). Uses scientific rounding via :.3g
         (common convention: 0.034, 0.123, 1.23e-4, <0.001).
         Sets uistate.statusbar_state = "warning" on SW/Levene violation (p<0.05) or "info" on success (per proposal)."""
-        test_type = getattr(uistate, "test_type", "None")
-        if test_type == "None" or test_type is None:
+        # Phase 3 migration: use central helpers (eff check first). Config-first IO regression kept as dedicated path.
+        eff = self._effective_test_type()
+        if eff == "None":
             uistate.statusbar_state = None
             return None
+        if eff == "ANCOVA":
+            # Dedicated IO regression path (Phase 3): uses formal_test_results/config (reuses v0.16.4 logic)
+            formal = getattr(uistate, "formal_test_results", None)
+            if not formal:
+                uistate.statusbar_state = None
+                return "Select ≥2 groups for IO regression"
+            # Defensive shape handling (per plan_v0.16.4 Phase 2b): supports [config], [{"config": ...}], bare dict, etc.
+            if isinstance(formal, list) and formal:
+                item = formal[0]
+                if isinstance(item, dict):
+                    cfg = item.get("config") or item
+            elif isinstance(formal, dict):
+                cfg = formal.get("config") or formal
+            else:
+                cfg = None
+            if isinstance(cfg, dict) and cfg.get("type") == "IO regression":
+                prefix = "IO regression"
+                global_notes = []
+                slope_p = cfg.get("slope_p") or (formal[0] if isinstance(formal, list) else formal).get("slope_p")
+                if isinstance(slope_p, (int, float)) and np.isfinite(slope_p):
+                    pstr = f"{slope_p:.3g}" if slope_p >= 0.001 else "<0.001"
+                    global_notes.append(f"slope p={pstr}")
+                for g, r2v in cfg.get("r2_per_group", {}).items():
+                    if isinstance(r2v, (int, float)) and np.isfinite(r2v):
+                        global_notes.append(f"r²({g})={r2v:.2f}")
+                        break
+                n_report = ""
+                group_ns = cfg.get("group_ns") or (formal[0] if isinstance(formal, list) else formal).get("group_ns", {})
+                if group_ns:
+                    ns = [f"{g}={n}" for g, n in group_ns.items()]
+                    n_report = ", ".join(ns)
+                if n_report:
+                    global_notes.append(f"({n_report})")
+                if global_notes:
+                    prefix = f"{prefix} ({' '.join(global_notes)})"
+                uistate.statusbar_state = "info"
+                return prefix
+            # Fallback if not IO regression config
+            uistate.statusbar_state = None
+            return None
+
+        # Non-IO explicit test path
+        test_type = eff
         ref_attr = "label_test_wilcox_one_sample_value" if test_type == "Wilcoxon" else "label_test_t_one_sample_value"
         ref_value = getattr(uistate, ref_attr, 0.0)
         if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
@@ -1743,11 +1812,11 @@ class UIsub(
             shown_ts = self._get_shown_testsets()
             is_io = getattr(uistate, "experiment_type", "time") == "io"
             # ANOVA allows: >=2 groups (between-subjects), or 1 group + >=2 test sets (repeated-measures).
-            # v0.16_n_stats_IO: for IO mode, allow 0 test sets (implicit all-sweeps across groups).
-            if len(shown_groups) < 2 and len(shown_ts) < 2 and not (is_io and len(shown_ts) == 0):
+            # IO (ANCOVA effective) allows 0 test sets (implicit via _effective_test_type).
+            if len(shown_groups) < 2 and len(shown_ts) < 2 and not (self._is_io_mode() and len(shown_ts) == 0):
                 uistate.statusbar_state = "warning"
                 return "ANOVA requires either >=2 groups with data, or 1 group with >=2 test sets (repeated-measures)"
-            if not shown_ts and not is_io:
+            if not shown_ts and not self._is_io_mode():
                 uistate.statusbar_state = "warning"
                 return "Show at least one test set to run the test"
         elif test_type == "Wilcoxon":
@@ -1774,7 +1843,7 @@ class UIsub(
             if len(shown_groups) != 1 or len(shown_ts) < 3:
                 uistate.statusbar_state = "warning"
                 return f"Friedman requires exactly 1 group and at least 3 test sets (repeated-measures omnibus) (shown_groups={len(shown_groups)}, shown_ts={len(shown_ts)})"
-            if not shown_ts:
+            if not shown_ts and not self._is_io_mode():
                 uistate.statusbar_state = "warning"
                 return "Show at least one test set to run the test"
         elif test_type == "Cluster perm.":
@@ -1791,13 +1860,13 @@ class UIsub(
             else:
                 uistate.statusbar_state = "warning"
                 return "Cluster perm. requires either >=2 groups (between-subjects) or exactly 1 group + exactly 2 test sets (within-subjects/paired)"
-            if not shown_ts:
+            if not shown_ts and not self._is_io_mode():
                 uistate.statusbar_state = "warning"
                 return "Cluster perm. requires at least one shown test set (to define sweep windows)"
         else:
             # Must have at least one shown test set (for t-test)
             shown_ts = self._get_shown_testsets()
-            if not shown_ts:
+            if not shown_ts and not self._is_io_mode():
                 uistate.statusbar_state = "warning"
                 return "Show at least one test set to run the test"
 
@@ -2051,19 +2120,20 @@ class UIsub(
 
     def apply_statistical_test_if_active(self):
         """Core applicator. Called automatically from config changes and mutations.
-        Only acts when test_type != "None". Clears when None or invalid.
+        Uses central helpers (Phase 2). Only acts when effective_test_type != "None".
         """
         try:
-            test_type = getattr(uistate, "test_type", "None")
-            if test_type == "None" or test_type is None:
+            eff = self._effective_test_type()
+            test_type = eff  # backward compat for rest of function
+            if eff == "None":
                 self.clear_formal_test_results()
                 uistate.statusbar_state = None
                 self._refresh_test_statusbar()
                 return
 
-            if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
+            if eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm.", "ANCOVA"):
                 print(
-                    f"Statistical test '{test_type}' is not yet implemented for v0.16 (t-test, ANOVA, Wilcoxon, Friedman, Cluster perm. supported)."
+                    f"Statistical test '{eff}' is not yet implemented for v0.16 (t-test, ANOVA, Wilcoxon, Friedman, Cluster perm., ANCOVA for IO supported)."
                 )
                 self.clear_formal_test_results()
                 uistate.statusbar_state = "warning"
@@ -2134,9 +2204,8 @@ class UIsub(
                     self._refresh_test_statusbar()
                     return
 
-            # v0.16_n_stats_IO + Phase 3: allow no test sets for io (implicit regression). For IO, force test_type="None" (bypasses variant frames) but still run via apply_statistical_test_if_active.
-            is_io = getattr(uistate, "experiment_type", "time") == "io"
-            if not shown_ts and test_type not in ("Friedman", "Cluster perm.") and not is_io:
+            # v0.16_n_stats_IO + Phase 2 (helpers): use _effective_test_type(); IO (ANCOVA) implicitly allowed (no test sets).
+            if not shown_ts and test_type not in ("Friedman", "Cluster perm.", "ANCOVA"):
                 if had_results or test_type == "Friedman":
                     print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
                 self.clear_formal_test_results()
@@ -2223,6 +2292,8 @@ class UIsub(
             self.usage(
                 f"stat_test applied: {test_type} {effective_variant} {tails} on {set_names} (fdr={fdr}, sw={sw}, levene={lev}, n_unit={n_unit})"
             )
+            if results and not getattr(uistate, "statusbar_state", None):
+                uistate.statusbar_state = "info"  # Phase 3 (optional belt-and-suspenders): ensure non-IO explicit tests set "info" for bold statusbar
             self._refresh_test_statusbar()
         except Exception as ex:
             print(f"Statistical test: aborted (not applicable or internal issue): {ex}")
@@ -3047,7 +3118,7 @@ class UIsub(
             self.frameToolType_sub_io.setVisible(exp_type == "io")
         # Phase 3 (per request): for IO, force test_type="None" + hide the Test Type toolframe (no radios disabled; n_unit/None remain enabled; triggers implicit regression via apply_...).
         if exp_type == "io":
-            uistate.test_type = "None"
+            uistate.test_type = "ANCOVA"  # Tactical + long-term: ANCOVA signals IO regression (no "None" sentinel)
             # Hide main Test Type toolframe (and variants). The setupToolBar call below will also enforce via frameToolTest visibility.
             for frame_attr in (
                 "frameToolTest",
@@ -3076,7 +3147,7 @@ class UIsub(
             self.apply_statistical_test_if_active()  # ensure IO implicit regression runs and statusbar updates (now uses new "IO regression" path)
         elif old_type == "io":
             # Re-show the Statistical test frame (and re-enable View menu) when leaving IO.
-            # Mirrors the hide logic; setupToolBar will also enforce on future calls.
+            # Mirrors the hide logic; setupToolBar + _should_show_stat_test_frame() will enforce.
             if hasattr(self, "frameToolTest"):
                 self.frameToolTest.setVisible(True)
             if hasattr(self, "menuView"):
@@ -3605,10 +3676,9 @@ class UIsub(
         self.frameToolAspectSlope.setVisible(uistate.checkBox.get("EPSP_slope", False) or uistate.checkBox.get("volley_slope", False))
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(getattr(uistate, "experiment_type", "time") == "io")
-        # Phase 3 (per request): hide the main Test Type toolframe (frameToolTest) for IO; show for all other experiment types. Individual variant frames remain controlled by test_type.
-        is_io = getattr(uistate, "experiment_type", "time") == "io"
+        # Phase 1 (helpers): use central _should_show_stat_test_frame (non-breaking for now).
         if hasattr(self, "frameToolTest"):
-            self.frameToolTest.setVisible(not is_io)
+            self.frameToolTest.setVisible(self._should_show_stat_test_frame())
         if hasattr(self, "frameToolTestOptions"):
             self.frameToolTestOptions.setVisible(True)  # n_unit relevant for regression granularity (always visible)
 
@@ -3987,6 +4057,12 @@ class UIsub(
             radio_name = self._TEST_N_TO_RADIO.get(default_n, "radioButton_test_n_subject")
             if hasattr(self, radio_name):
                 getattr(self, radio_name).setChecked(True)
+
+        # Phase 0/1 migration for old IO projects (test_type="None" with experiment_type="io" -> "ANCOVA")
+        if getattr(uistate, "experiment_type", "time") == "io" and getattr(uistate, "test_type", "None") == "None":
+            uistate.test_type = "ANCOVA"
+            # Note: radio buttons stay on "None" (no ANCOVA radio); visibility handled by setupToolBar + helpers
+
         if hasattr(self, "frameToolTest_sub_t"):
             self.frameToolTest_sub_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
             # hook the one-sample value lineEdit (default 0.0 from UIState)
