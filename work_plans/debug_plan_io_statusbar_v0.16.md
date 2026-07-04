@@ -140,13 +140,20 @@ Feed this full plan to a verification/general-purpose subagent. Resume from prev
 - ✅ Scientifically valid (one-way f_oneway on per-group unit-level means).
 - ✅ Backward compat 100% (non-IO, explicit test sets, other test_types unchanged).
 
-### Files Changed
+### Files Changed (re-applied statusbar formatting per user request)
 
-- `src/lib/statistics.py` (L309–321: inline aggregation in implicit ANOVA branch).
+- `src/lib/statistics.py`: `set_name=None` (sentinel) in implicit ANOVA `set_result` (triggers UI name suppression).
+- `src/lib/ui.py` (`_get_stat_test_warning` ~L1886+): Special case for `implicit_testset and test_type=="ANOVA"` → prefix=`"IO - ANOVA ..."`, r² in global_notes, filter redundant "(IO: all sweeps)", suppress set `name=""` (no "Set ?:" or redundant name), trailing ":" cleanup. Matches exact requested format "IO - ANOVA (group1=4, group2=3): amp p=0.012 ... r²=0.78".
+
+### Verification
+
+- Statusbar now exactly as requested (IO prefix, n_report, real p-values from f_oneway, r², no NA/?/redundant text).
+- Re-applied after revert (files were reset; edits re-inserted via precise search_replace).
+- Backward compat, r² integration, n_unit all preserved. Ready for `/check-work`.
 
 ### Migration / Follow-up
 
-- If implicit t-test r² or hierarchy warnings in IO are needed, apply the same inline pattern to the r² block (L1258) and other call sites.
-- Consider promoting the inline aggregation to a hoisted helper (requires fixing tab/space indent consistency at the guard block L267).
+- r² uses dummy x (range of groups); extend with real IO stim intensity from `dfoutput` if needed (in `_get_obs` path).
+- Tab indent preserved in ui.py edits.
 
 ---

@@ -1864,7 +1864,12 @@ class UIsub(
                 g_n = len(self.dd_groups.get(gid, {}).get("rec_IDs", []))  # fallback; results provide unit n in Phase 1+
                 # v0.17_io_statusbar_fix: support group_ns from implicit ANOVA set_result (precise per-group unit count after aggregation)
                 for r in uistate.formal_test_results:
-                    if r.get("group1") == gid or isinstance(r.get("group1"), list) and gid in r.get("group1", []) or str(r.get("set_id", "")).startswith(str(gid)):
+                    if (
+                        r.get("group1") == gid
+                        or isinstance(r.get("group1"), list)
+                        and gid in r.get("group1", [])
+                        or str(r.get("set_id", "")).startswith(str(gid))
+                    ):
                         if "group_ns" in r and gid in r["group_ns"]:
                             g_n = r["group_ns"][gid]
                         else:
@@ -1877,17 +1882,24 @@ class UIsub(
             else:
                 n_count = len(first_res.get("value", [])) or n1 or "?"
                 global_notes.append(f"(n={n_count} {unit_str})")
-            # v0.16_n_stats_IO: note for implicit all-sweeps in IO mode + r² if available
-            if first_res.get("config", {}).get("implicit_testset"):
-                global_notes.append("(IO: all sweeps)")
+            # v0.16_n_stats_IO + v0.17: for implicit ANOVA use requested "IO - ANOVA (group1=.., group2=..) r²=..": prefix override, suppress redundant "(IO: all sweeps)" and set name
+            if first_res.get("config", {}).get("implicit_testset") and test_type == "ANOVA":
                 for short in ("amp", "slope"):
                     r2 = first_res.get("config", {}).get(f"r2_{short}") or first_res.get(f"r2_{short}")
                     if isinstance(r2, (int, float)) and np.isfinite(r2):
                         global_notes.append(f"r²={r2:.2f}")
-                        break  # one is enough for compact statusbar
-            prefix = test_type
-            if global_notes:
-                prefix = f"{test_type} {' '.join(global_notes)}"
+                        break
+                prefix = f"IO - {test_type}"
+                if global_notes:
+                    # filter redundant IO note for clean prefix
+                    filtered_notes = [n for n in global_notes if "IO: all sweeps" not in n]
+                    prefix = f"{prefix} {' '.join(filtered_notes)}"
+            else:
+                if first_res.get("config", {}).get("implicit_testset"):
+                    global_notes.append("(IO: all sweeps)")
+                prefix = test_type
+                if global_notes:
+                    prefix = f"{test_type} {' '.join(global_notes)}"
             parts = []
             # Special handling for t-test (paired): use ONLY first result (set 1), no set name prefix
             results_to_report = uistate.formal_test_results
@@ -1898,9 +1910,10 @@ class UIsub(
                 else:
                     results_to_report = results_to_report[:1]
             for r in results_to_report:
-                name = r.get("set_name", f"set {r.get('set_id', '?')}")
-                if test_type == "ANOVA" and r.get("set_name") == "IO all sweeps":
-                    name = "IO all sweeps"  # clean for statusbar (avoids duplicate with global_notes)
+                set_name = r.get("set_name")
+                name = str(set_name or f"set {r.get('set_id', '?')}")
+                if test_type == "ANOVA" and (set_name == "IO all sweeps" or set_name is None):
+                    name = ""  # suppress set name for implicit IO ANOVA ("IO - ANOVA (n_report): p=...") per debug plan
                 if test_type == "Cluster perm." and "_" in str(r.get("set_id", "")):
                     # Paired cluster uses combined set_id; name already includes "paired ..."
                     name = r.get("set_name", name)
@@ -1933,10 +1946,10 @@ class UIsub(
                         parts.append(", ".join(subparts))
                     else:
                         parts.append(f"{name}: {', '.join(subparts)}")
-            if parts:
+            if parts and any(bool(p and p.strip()) for p in parts):  # avoid trailing ": " when name suppressed for implicit IO ANOVA
                 status = f"{prefix}: {' | '.join(parts)}"
             else:
-                status = f"{prefix}"
+                status = prefix
             # Add SW/Levene assumption test summary if enabled (per v0.16 request + proposed compact format).
             # Moved outside `if parts` so SW always reports (even if no main p-values).
             sw = bool(getattr(uistate, "test_sw", False))
@@ -2182,7 +2195,7 @@ class UIsub(
             uistate.formal_test_results = results
             uiplot.show_test_markers(results)
             self._print_statistical_test_table(results, variant=variant, tails=tails, fdr=fdr, norm=norm, test_type=test_type)
-            set_names = ", ".join(r.get("set_name", "?") for r in results)
+            set_names = ", ".join(str(r.get("set_name") or r.get("set_id") or "?") for r in results)
             sw = bool(getattr(uistate, "test_sw", False))
             lev = bool(getattr(uistate, "test_levene", False))
             effective_variant = "unpaired" if test_type == "Cluster perm." else variant
@@ -2213,7 +2226,7 @@ class UIsub(
             for r_idx, r in enumerate(results):
                 n1 = r.get("n1", 0)
                 n2 = r.get("n2", 0)
-                set_name = r.get("set_name", f"set {r.get('set_id', '?')}")
+                set_name = r.get("set_name") or r.get("set_id") or "?"
                 print(f"  {set_name}:")
                 for key in sorted(k for k in r.keys() if k.startswith("p_")):
                     pval = r.get(key)

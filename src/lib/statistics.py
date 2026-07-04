@@ -290,7 +290,7 @@ def compute_statistical_comparison(
 
         set_result = {
             "set_id": "__io_anova_implicit__",
-            "set_name": "IO all sweeps",
+            "set_name": None,  # sentinel per debug plan v0.16; UI overrides to suppress name for "IO - ANOVA (n_report): ..." format
             "sweeps": [],
             "group1": shown_groups,  # all groups for ANOVA context (used in n_report)
             "n1": 0,
