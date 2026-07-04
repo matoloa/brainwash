@@ -1776,12 +1776,16 @@ class UIsub(
             f"DEBUG _get_stat_test_warning: eff={eff}, test_type={getattr(uistate, 'test_type', None)}, experiment_type={getattr(uistate, 'experiment_type', None)}"
         )
         if eff == "None":
+            self.clear_formal_test_results()
             uistate.statusbar_state = None
-            return None
+            self._refresh_test_statusbar()
+            return
 
         if eff == "ANCOVA":
-            # IO regression: always short-circuit here. Never reaches ANOVA/Friedman/Cluster guards.
-            return self._format_io_regression_statusbar(getattr(uistate, "formal_test_results", None))
+            # IO regression: bypass all min_groups / shown_ts guards.
+            # Statusbar is handled by _get_stat_test_warning / _format_io_regression_statusbar.
+            return
+
         print("DEBUG: Reached past ANCOVA block (should not happen)")
         if eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm.", "ANCOVA"):
             uistate.statusbar_state = "warning"
