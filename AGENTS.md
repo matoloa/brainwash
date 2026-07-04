@@ -1,6 +1,6 @@
 # AGENTS.md — Guidelines for Grok / AI Agents Working on Brainwash
 
-This file provides instructions for AI agents (Grok, Claude, etc.) and human contributors using agentic tools. It takes precedence for any file in the repository per project instruction rules. It focuses on **agentic efficiency** — minimizing context bloat, reducing repetitive analysis, and enabling fast, autonomous progress.
+This file provides instructions for AI agents (Grok, Claude, etc.) and human contributors using agentic tools.
 
 ## Core Principles for Agentic Efficiency
 
@@ -48,12 +48,3 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
    - `src/lib/ui_state_classes.py`: `uistate` singleton.
    - Plans are in `work_plans/` (move outdated to `History/`).
    - See full layout in CONTRIBUTING.md.
-
-## Outdated Plans
-- All `work_plans/plan_v0.16*.md`, `plan_IO1.md`, `plan_experiment_type_overhaul.md`, etc. represent historical iterations on IO regression + statusbar.
-- Current state (post-v0.16): IO uses `"ANCOVA"` sentinel internally but should be refactored to explicit `experiment_type` path for efficiency.
-- Archive as needed; do not reference in new work.
-
-Follow these rules to keep agent sessions concise, context-light, and high-velocity. Update this file when new patterns emerge (e.g. after successful IO refactor).
-
-Last updated: 2025 (agentic efficiency overhaul).
