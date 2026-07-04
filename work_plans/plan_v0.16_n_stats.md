@@ -215,11 +215,16 @@ comp = stats.compute_statistical_comparison(..., n_unit=n_unit)
 
 All branches now switch on `n_unit` (via helper). Cluster forces recording-level (statusbar note).
 
-### 2.4 Result display / statusbar
+### 2.4 Result display / statusbar (updated per latest proposal)
 
-- Statusbar (via `_refresh_test_statusbar`): include unit ("n=5 subjects", warning for old projects).
-- Console table (`_print_statistical_test_table`): note n semantics.
-- `label_test_n` ("n =") can have tooltip explaining modes.
+- **Proposed format** (Phase 2.4): `<test type> "("[shown group 1...]=[n], ...")": (results as current)`
+  - Example: `t-test (SAL/SAL=5, SAL/KETA=4, DEXA/SAL=4, DEXA/KETA=5): p=0.034 ...`
+  - Uses group names from `dd_groups` / `shown_groups` + per-group `n` (from aggregated unit counts per `n_unit`).
+  - Falls back to current concise style for single-group or when names are unavailable.
+  - Cluster note and hierarchy warnings remain prefixed.
+- Statusbar (via `_get_stat_test_warning` + `_refresh_test_statusbar`): build the n-list in `global_notes` or dedicated string; keep concise to avoid wrapping.
+- Console table (`_print_statistical_test_table`): can retain per-aspect `n1`/`n2` or mirror the new format.
+- `label_test_n` ("n =") can have tooltip explaining modes + `n_unit`.
 
 ### 2.5 Persistence
 
@@ -291,24 +296,24 @@ Use `/check-work` or verification subagent after each phase. Key tests:
 5. Paired t/Wilcoxon: correct unit-based pairing/alignment; n = unique units with data in both sets.
 6. RM-ANOVA/Friedman: unit-aligned vectors; note on incomplete overlap.
 7. Cluster perm. (any `n_unit`) → always recording-level n, with statusbar note (no error).
-8. Statusbar: hierarchy warning (red), successful reports include unit ("t-test: p=0.034, n=5 subjects"), persists across sessions.
+8. Statusbar: hierarchy warning (red), successful reports follow proposed format ("t-test (SAL/SAL=5, SAL/KETA=4...): p=0.034"), persists across sessions. Cluster note and old-project warnings preserved.
 9. `buttonGroup_test_n` wiring: persists via cfg.pkl, `n_unit_changed` triggers re-compute, initial default="subject" radio selected.
 10. No `ui_designer.py` changes; all via existing patterns. Existing tests + manual hierarchy projects pass. `n1`/`n2` always sensible.
 
-**Update plan.md (this file) with slice clarification: n_unit="slice" treats _each unique (subject, slice) combination_ as 1 n (composite key; slice numbering/lab practices may vary — no special-casing of any slice number). statistical_protocol.md already supports the nested structure (no change needed).**
+**Update plan.md (this file) with slice clarification (done) + latest statusbar proposal: `<test type> "("[shown group 1...]=[n], ...")": (results as current)`. Uses group names from `dd_groups` + per-group unit counts from aggregator.**
 
 ---
 
 ## Summary of Deliverables
 
-| File                                 | Changes                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/lib/statistics.py`              | (1) Add `_aggregate_to_unit_level(obs_df, n_unit)` helper. (2) Add `n_unit: str = "subject"` param to `compute_statistical_comparison`. (3) Call aggregator + unit-aware alignment/pairing in all test branches (t-test, ANOVA, Wilcoxon, Friedman). (4) Cluster branch forces `n_unit="recording"` + note. (5) Store `n_unit` + warnings in `"config"`/`results`. (6) Updated docstring, module comment (protocol + clarifications). |
-| `src/lib/ui_data_frames.py`          | Extend `get_group_testset_means` (scalar + per_sweep) to merge `subject`/`slice` from `df_project` (on `rec_ID`). No signature change.                                                                                                                                                                                                                                                                                                |
-| `src/lib/ui.py`                      | (1) Add `_RADIO_TO_TEST_N` + reverse dict. (2) Add `n_unit_changed` handler (mirrors `test_t_variant_changed`). (3) Wire in `connectUIstate` + `applyConfigStates` (set default radio to subject). (4) Pass `n_unit=getattr(uistate, "buttonGroup_test_n", "subject")` to compute call. (5) Enhance `_get_stat_test_warning` / statusbar for `n_unit` + hierarchy warnings.                                                           |
-| `src/lib/ui_state_classes.py`        | Add `"buttonGroup_test_n": "subject"` default in state dict.                                                                                                                                                                                                                                                                                                                                                                          |
-| `work_plans/plan_v0.16_n_stats.md`   | This file (updated with clarifications: subject default, slice/rec assertions, cluster override, statusbar warnings, minimal UI wiring, verification steps).                                                                                                                                                                                                                                                                          |
-| `work_plans/statistical_protocol.md` | No change (reference only).                                                                                                                                                                                                                                                                                                                                                                                                           |
+| File                                 | Changes                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/lib/statistics.py`              | (1) Add `_aggregate_to_unit_level(obs_df, n_unit)` helper. (2) Add `n_unit: str = "subject"` param to `compute_statistical_comparison`. (3) Call aggregator + unit-aware alignment/pairing in all test branches (t-test, ANOVA, Wilcoxon, Friedman). (4) Cluster branch forces `n_unit="recording"` + note. (5) Store `n_unit` + warnings in `"config"`/`results`. (6) Updated docstring, module comment (protocol + clarifications).                                    |
+| `src/lib/ui_data_frames.py`          | Extend `get_group_testset_means` (scalar + per_sweep) to merge `subject`/`slice` from `df_project` (on `rec_ID`). No signature change.                                                                                                                                                                                                                                                                                                                                   |
+| `src/lib/ui.py`                      | (1) Add `_RADIO_TO_TEST_N` + reverse dict. (2) Add `n_unit_changed` handler (mirrors `test_t_variant_changed`). (3) Wire in `connectUIstate` + `applyConfigStates` (set default radio to subject). (4) Pass `n_unit=getattr(uistate, "buttonGroup_test_n", "subject")` to compute call. (5) Enhance `_get_stat_test_warning` to build proposed per-group n string (`<test type> ([group]=[n], ...)` using `dd_groups` + results `n`/`config`) + hierarchy/cluster notes. |
+| `src/lib/ui_state_classes.py`        | Add `"buttonGroup_test_n": "subject"` default in state dict.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `work_plans/plan_v0.16_n_stats.md`   | This file (updated with clarifications: subject default, slice/rec assertions, cluster override, statusbar warnings, minimal UI wiring, verification steps).                                                                                                                                                                                                                                                                                                             |
+| `work_plans/statistical_protocol.md` | No change (reference only).                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 **Dependencies**: v0.16_n (hierarchy columns, migration, table display) must be present.
 

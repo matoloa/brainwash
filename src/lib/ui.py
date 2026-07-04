@@ -1846,8 +1846,23 @@ class UIsub(
                 unit_str = "slices"
             else:
                 unit_str = "recordings"
-            n_count = len(first_res.get("value", [])) or n1 or "?"
-            global_notes.append(f"(n={n_count} {unit_str})")
+            # Phase 2: proposed per-group n format using dd_groups names + aggregated n from results/config
+            # e.g. "t-test (SAL/SAL=5, SAL/KETA=4, DEXA/SAL=4, DEXA/KETA=5): ..."
+            n_report_parts = []
+            for gid in shown_groups:
+                gname = self.dd_groups.get(gid, {}).get("group_name", str(gid))
+                g_n = len(self.dd_groups.get(gid, {}).get("rec_IDs", []))  # fallback; results provide unit n in Phase 1+
+                for r in uistate.formal_test_results:
+                    if r.get("group1") == gid or str(r.get("set_id", "")).startswith(str(gid)):
+                        g_n = r.get("n1") or r.get("n") or g_n
+                        break
+                n_report_parts.append(f"{gname}={g_n}")
+            n_report = ", ".join(n_report_parts)
+            if n_report:
+                global_notes.append(f"({n_report})")
+            else:
+                n_count = len(first_res.get("value", [])) or n1 or "?"
+                global_notes.append(f"(n={n_count} {unit_str})")
             prefix = test_type
             if global_notes:
                 prefix = f"{test_type} {' '.join(global_notes)}"
