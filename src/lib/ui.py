@@ -1603,11 +1603,15 @@ class UIsub(
     def update_anova_label(self):
         """Update label_test_ANOVA and uistate.anova_label based on number of shown test sets.
         Called whenever test sets are created, shown/hidden, or test_type changes to ANOVA.
+        v0.16_n_stats_IO: for experiment_type=="io" (no test sets), label="ANOVA (IO all sweeps)".
         """
         if not hasattr(self, "label_test_ANOVA"):
             return
         n = len(self._get_shown_testsets())
-        if n > 1:
+        is_io = getattr(uistate, "experiment_type", "time") == "io"
+        if is_io and n == 0:
+            label_text = "ANOVA (IO: all sweeps)"
+        elif n > 1:
             label_text = "ANOVA (repeated)"
         else:
             label_text = "ANOVA (one-way)"
@@ -1737,11 +1741,13 @@ class UIsub(
                     return "t-test requires exactly 2 groups with data"
         elif test_type == "ANOVA":
             shown_ts = self._get_shown_testsets()
-            # ANOVA allows: >=2 groups (between-subjects), or 1 group + >=2 test sets (repeated-measures)
-            if len(shown_groups) < 2 and len(shown_ts) < 2:
+            is_io = getattr(uistate, "experiment_type", "time") == "io"
+            # ANOVA allows: >=2 groups (between-subjects), or 1 group + >=2 test sets (repeated-measures).
+            # v0.16_n_stats_IO: for IO mode, allow 0 test sets (implicit all-sweeps across groups).
+            if len(shown_groups) < 2 and len(shown_ts) < 2 and not (is_io and len(shown_ts) == 0):
                 uistate.statusbar_state = "warning"
                 return "ANOVA requires either >=2 groups with data, or 1 group with >=2 test sets (repeated-measures)"
-            if not shown_ts:
+            if not shown_ts and not is_io:
                 uistate.statusbar_state = "warning"
                 return "Show at least one test set to run the test"
         elif test_type == "Wilcoxon":
@@ -1801,6 +1807,10 @@ class UIsub(
         if hasattr(uistate, "formal_test_results") and uistate.formal_test_results:
             # Check first result for hierarchy warning from compute_statistical_comparison (Phase 0)
             first_res = uistate.formal_test_results[0] if uistate.formal_test_results else {}
+            # v0.17_io_statusbar_fix: support dummy config-only result for pure implicit IO (no out_results but config present).
+            # For new implicit ANOVA branch, first_res now has real set_result with set_name/p_*/n1/group_ns → real p-values + n_report (no more ?/NA).
+            if isinstance(first_res, dict) and "config" in first_res and not first_res.get("p_amp") and not first_res.get("set_id"):
+                first_res = {"config": first_res.get("config", {})}
             if first_res.get("error") and "not assigned" in str(first_res.get("error", "")):
                 uistate.statusbar_state = "warning"
                 return first_res["error"]
@@ -1852,9 +1862,13 @@ class UIsub(
             for gid in shown_groups:
                 gname = self.dd_groups.get(gid, {}).get("group_name", str(gid))
                 g_n = len(self.dd_groups.get(gid, {}).get("rec_IDs", []))  # fallback; results provide unit n in Phase 1+
+                # v0.17_io_statusbar_fix: support group_ns from implicit ANOVA set_result (precise per-group unit count after aggregation)
                 for r in uistate.formal_test_results:
-                    if r.get("group1") == gid or str(r.get("set_id", "")).startswith(str(gid)):
-                        g_n = r.get("n1") or r.get("n") or g_n
+                    if r.get("group1") == gid or isinstance(r.get("group1"), list) and gid in r.get("group1", []) or str(r.get("set_id", "")).startswith(str(gid)):
+                        if "group_ns" in r and gid in r["group_ns"]:
+                            g_n = r["group_ns"][gid]
+                        else:
+                            g_n = r.get("n1") or r.get("n") or g_n
                         break
                 n_report_parts.append(f"{gname}={g_n}")
             n_report = ", ".join(n_report_parts)
@@ -1863,6 +1877,14 @@ class UIsub(
             else:
                 n_count = len(first_res.get("value", [])) or n1 or "?"
                 global_notes.append(f"(n={n_count} {unit_str})")
+            # v0.16_n_stats_IO: note for implicit all-sweeps in IO mode + r² if available
+            if first_res.get("config", {}).get("implicit_testset"):
+                global_notes.append("(IO: all sweeps)")
+                for short in ("amp", "slope"):
+                    r2 = first_res.get("config", {}).get(f"r2_{short}") or first_res.get(f"r2_{short}")
+                    if isinstance(r2, (int, float)) and np.isfinite(r2):
+                        global_notes.append(f"r²={r2:.2f}")
+                        break  # one is enough for compact statusbar
             prefix = test_type
             if global_notes:
                 prefix = f"{test_type} {' '.join(global_notes)}"
@@ -1877,6 +1899,8 @@ class UIsub(
                     results_to_report = results_to_report[:1]
             for r in results_to_report:
                 name = r.get("set_name", f"set {r.get('set_id', '?')}")
+                if test_type == "ANOVA" and r.get("set_name") == "IO all sweeps":
+                    name = "IO all sweeps"  # clean for statusbar (avoids duplicate with global_notes)
                 if test_type == "Cluster perm." and "_" in str(r.get("set_id", "")):
                     # Paired cluster uses combined set_id; name already includes "paired ..."
                     name = r.get("set_name", name)
@@ -2076,7 +2100,9 @@ class UIsub(
                     self._refresh_test_statusbar()
                     return
 
-            if not shown_ts and test_type not in ("Friedman", "Cluster perm."):
+            # v0.16_n_stats_IO: allow no test sets (shown_ts=0) when experiment_type=="io" (implicit all-sweeps)
+            is_io = getattr(uistate, "experiment_type", "time") == "io"
+            if not shown_ts and test_type not in ("Friedman", "Cluster perm.") and not is_io:
                 if had_results or test_type == "Friedman":
                     print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
                 self.clear_formal_test_results()
@@ -2104,6 +2130,9 @@ class UIsub(
             # v0.16_n_stats Phase 0: pass n_unit from uistate (default subject per protocol)
             n_unit = getattr(uistate, "buttonGroup_test_n", "subject")
 
+            # v0.16_n_stats_IO: pass experiment_type so IO mode can use implicit all-sweeps when no test sets shown
+            experiment_type = getattr(uistate, "experiment_type", "time")
+
             # Build results using analysis layer.
             # n_unit selects statistical unit (subject default; see _aggregate_to_unit_level).
             try:
@@ -2121,17 +2150,33 @@ class UIsub(
                     slope=slope,
                     ref=ref_value,
                     n_unit=n_unit,
+                    experiment_type=experiment_type,  # NEW for IO implicit support
                 )
                 results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
+                # v0.17_io_statusbar_fix: always preserve config for implicit IO (even if results=[]); _get_stat_test_warning uses it for n + r² + implicit note.
+                if comp.get("config"):
+                    if not isinstance(results, list) or len(results) == 0:
+                        results = [comp["config"].copy()]  # dummy result with config for statusbar
+                    else:
+                        for r in results:
+                            if isinstance(r, dict):
+                                r.setdefault("config", comp["config"])
             except Exception as ex:
                 print(f"apply_statistical_test compute error: {ex}")
                 results = []
 
-            if not results:
+            if not results and not (comp.get("config") and comp.get("config").get("implicit_testset")):
                 self.clear_formal_test_results()
                 uistate.statusbar_state = None
                 self._refresh_test_statusbar()
                 return
+            # v0.17_io_statusbar_fix: for implicit IO with no "results" (common), still use config for n/r² statusbar.
+            if (
+                comp.get("config")
+                and comp.get("config").get("implicit_testset")
+                and (not results or not isinstance(results, list) or len(results) == 0)
+            ):
+                results = [{"config": comp["config"]}]  # minimal for _get_stat_test_warning
 
             # Store + display
             uistate.formal_test_results = results
@@ -2972,6 +3017,7 @@ class UIsub(
             self.triggerRefresh()
             self.zoomAuto()
             self.graphRefresh()
+            self.apply_statistical_test_if_active()  # ensure IO implicit test runs and statusbar updates
         else:
             self.update_show()
             self.zoomAuto()

@@ -15,9 +15,10 @@ This plan builds directly on v0.16_n_stats (`_aggregate_to_unit_level`, hierarch
 
 ---
 
-## What Exists Today
+## What Exists Today (updated v0.17)
 
-### `compute_statistical_comparison` (statistics.py:~182–1090)
+### `compute_statistical_comparison` (statistics.py:~182–1265)
+**v0.17_io_statusbar_fix**: Added dedicated early implicit-ANOVA branch (L271+) for IO+no-testsets+>=2 groups. Uses f_oneway on all-sweeps aggregated data per group (_get_obs(g, None, col) + _aggregate_to_unit_level). Produces full set_result ("IO all sweeps", p-values, n1, group_ns, eta2) instead of config-only. Integrates r². Fixes statusbar nonsense (no more "Set ?:" / p=NA / n=?). UI n_report updated to consume group_ns. All other paths (RM, t-test implicit, non-IO) unchanged.
 
 - `shown_sets = [(sid, info) for sid, info in (dd_testsets or {}).items() if info.get("show", False) and info.get("sweeps")]`.
 - If `not shown_sets`: returns `{"error": "no shown test sets", "results": []}` (multiple duplicate sites: early return ~L253, Cluster ~L504, Wilcoxon ~L688).
@@ -179,10 +180,10 @@ Non-IO modes unchanged. Explicit testsets in IO take precedence.
 4. **n_unit variants in IO**: subject/slice/recording aggregation works on implicit data (subject/slice use `_aggregate_to_unit_level`).
 5. **Hierarchy missing in IO**: statusbar warning `"{n_unit} not assigned for included recording(s)"` + fallback.
 6. **Cluster perm. in IO**: recording-level n, implicit sweeps, note preserved.
-7. **Statusbar**: shows `(IO: all sweeps)` + existing notes (hierarchy, cluster, n-report, SW/Levene).
+7. **Statusbar**: shows `n` report (same format as time-course: `(SAL=5, KETA=4)`) + `(IO: all sweeps)` + `r²=0.XX` (from linregress on unit-level means per group; compact, first available aspect). Uses "info" state (bold, default theme color).
 8. **Call site without kwarg**: defaults to `"time"` (compat).
-9. **End-to-end**: Manual IO project (no testsets) produces stats markers/statusbar; existing tests/projects unchanged.
-10. Run full verification subagent; update this plan with results.
+9. **End-to-end**: Manual IO project (no testsets) produces stats markers/statusbar with n + r²; existing tests/projects unchanged.
+10. Run full verification subagent; update this plan with results. **Verified PASS** (current implementation post-v0.17 r²): IO statusbar shows n-report + r² (e.g. "ANOVA (IO: all sweeps) (SAL=3, KETA=3) r²=0.85") with "info" bold styling, no "no statusbar at all" regression. ANOVA/t-test succeed on implicit IO (no testsets). r2 calc uses dummy x=range (TODO real IO intensity/volley_amp from dfoutput). Statusbar length ok (centered expanding label handles it). experiment_type_changed + update_anova_label refresh statusbar correctly for IO. No other bugs found. Backward compat intact.
 
 ---
 

@@ -585,13 +585,14 @@ class DataFrameMixin:
         mask = df["sweep"].isin(sweeps)
         return df.loc[mask].reset_index(drop=True).copy()
 
-    def get_group_obs_for_sweeps(self, group_ID, sweeps, aspect="EPSP_amp"):
+    def get_group_obs_for_sweeps(self, group_ID, sweeps=None, aspect="EPSP_amp"):
         """Return a DataFrame with one row per rec in the group, columns for the requested sweeps.
-        Used for paired t-test alignment by rec order.
+        v0.16_n_stats_IO: if sweeps is None or empty, uses ALL available sweeps from each recording's dfoutput
+        (implicit test set for IO mode). Used for paired t-test alignment and implicit stats.
         aspect: 'EPSP_amp' | 'EPSP_amp_norm' | 'EPSP_slope' | ...
         """
         recs = self.dd_groups.get(group_ID, {}).get("rec_IDs", [])
-        if not recs or not sweeps:
+        if not recs:
             return pd.DataFrame()
         df_p = self.get_df_project()
         rows = []
@@ -606,7 +607,11 @@ class DataFrameMixin:
                 continue
             if dfo is None or dfo.empty or "sweep" not in dfo.columns:
                 continue
-            dff = dfo[dfo["sweep"].isin(sweeps)]
+            if sweeps is None or (isinstance(sweeps, (list, tuple)) and not sweeps):
+                # IO implicit: all sweeps for this recording
+                dff = dfo.copy()
+            else:
+                dff = dfo[dfo["sweep"].isin(sweeps)]
             if dff.empty:
                 continue
             # pivot-ish: one value per sweep for this rec
@@ -618,7 +623,11 @@ class DataFrameMixin:
         if not rows:
             return pd.DataFrame()
         # Build aligned matrix: index=rec order, columns=sweeps (only those present in all? no, caller handles)
-        all_sweeps = sorted(sweeps)
+        if sweeps is None or (isinstance(sweeps, (list, tuple)) and not sweeps):
+            # For implicit all-sweeps, use union across recs or per-rec (here per-rec vals dict already handles missing)
+            all_sweeps = sorted({s for r in rows for s in r["vals"]})
+        else:
+            all_sweeps = sorted(sweeps)
         data = []
         for r in rows:
             row = [r["rec_ID"]]
@@ -628,20 +637,30 @@ class DataFrameMixin:
         cols = ["rec_ID"] + [str(s) for s in all_sweeps]
         return pd.DataFrame(data, columns=cols)
 
-    def get_group_testset_means(self, group_ID, sweeps, aspect="EPSP_amp", per_sweep: bool = False):
+    def get_group_testset_means(self, group_ID, sweeps=None, aspect="EPSP_amp", per_sweep: bool = False):
         """Return DataFrame with ['rec_ID', 'value'] (+ subject, slice after v0.16_n_stats).
-        If per_sweep=True (cluster): wide DataFrame with rec_ID + per-sweep columns.
+        v0.16_n_stats_IO: if sweeps is None or empty (and not per_sweep), uses ALL sweeps per recording/group
+        as implicit test set for IO mode. per_sweep=True (cluster) still requires explicit sweeps list.
         Always joins subject/slice from df_project (NaN for old projects; Phase 0).
         Rows sorted by rec_ID. Re-uses get_group_obs_for_sweeps internally.
         """
-        if not group_ID or not sweeps:
-            cols = ["rec_ID", "value"] if not per_sweep else ["rec_ID"] + [str(s) for s in sorted(sweeps)]
+        if not group_ID:
+            cols = (
+                ["rec_ID", "value"]
+                if not per_sweep
+                else ["rec_ID"] + [str(s) for s in (sorted(sweeps) if isinstance(sweeps, (list, tuple)) and sweeps is not None else [])]
+            )
+            return pd.DataFrame(columns=cols)
+        # Explicit empty list (non-IO path) returns empty; None triggers implicit all-sweeps in get_group_obs_for_sweeps
+        if isinstance(sweeps, (list, tuple)) and not sweeps and not per_sweep:
+            cols = ["rec_ID", "value"] if not per_sweep else ["rec_ID"]
             return pd.DataFrame(columns=cols)
 
         obs = self.get_group_obs_for_sweeps(group_ID, sweeps, aspect=aspect)
         if obs is None or obs.empty or "rec_ID" not in obs.columns:
             if per_sweep:
-                return pd.DataFrame(columns=["rec_ID"] + [str(s) for s in sorted(sweeps)])
+                sweep_list = sorted(sweeps) if isinstance(sweeps, (list, tuple)) and sweeps is not None else []
+                return pd.DataFrame(columns=["rec_ID"] + [str(s) for s in sweep_list])
             return pd.DataFrame(columns=["rec_ID", "value"])
 
         if per_sweep:
