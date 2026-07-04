@@ -1729,7 +1729,7 @@ class UIsub(
         Handles all shapes of formal_test_results and bypasses all non-IO guards.
         Called by _get_stat_test_warning when eff == "ANCOVA".
         """
-        print(f"DEBUG _format_io_regression_statusbar: formal={formal}")
+        # print(f"DEBUG _format_io_regression_statusbar: formal={formal}")
         if formal:
             if isinstance(formal, list) and formal:
                 item = formal[0]
@@ -1765,12 +1765,95 @@ class UIsub(
         uistate.statusbar_state = None
         return "IO regression: select ≥2 groups to compute slope comparison"
 
+    def _check_ttest_applicability(self, variant: str) -> str | None:
+        """Guard for t-test (and similar). Returns warning string or None (no side effects or recursion)."""
+        had_results = bool(getattr(uistate, "formal_test_results", None))
+        if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
+            if had_results:
+                print("Statistical test: no groups defined.")
+            return "No groups defined for t-test"
+        shown_groups = self._get_shown_group_ids()
+        shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
+        min_groups = 1 if variant in ("one-sample", "paired") else 2
+        if len(shown_groups) < min_groups:
+            if had_results:
+                print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant}.")
+            return f"t-test requires {min_groups} group(s) with data"
+        shown_ts = self._get_shown_testsets()
+        if variant == "paired" and len(shown_ts) != 2:
+            if had_results:
+                print("Statistical test: paired requires exactly 2 shown test sets (with 1 group).")
+            return "Paired t-test requires exactly 2 test sets"
+        if variant == "paired":
+            n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
+            if n1 < 2:
+                if had_results:
+                    print("Statistical test: paired requires N ≥ 2 recordings.")
+                return "Paired t-test requires N ≥ 2 recordings per group"
+        if not shown_ts:
+            if had_results:
+                print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
+            return "No test sets shown for t-test"
+        return None
+
+    def _check_anova_applicability(self) -> str | None:
+        """Guard for ANOVA/Friedman (1+ groups with sufficient test sets). Returns warning or None (no side effects)."""
+        had_results = bool(getattr(uistate, "formal_test_results", None))
+        if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
+            if had_results:
+                print("Statistical test: no groups defined.")
+            return "No groups defined for ANOVA"
+        shown_groups = self._get_shown_group_ids()
+        shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
+        shown_ts = self._get_shown_testsets()
+        if len(shown_groups) < 1 or (len(shown_groups) == 1 and len(shown_ts) < 2):
+            if had_results:
+                print(f"Statistical test: ANOVA requires either >=2 groups, or 1 group with >=2 test sets (repeated-measures).")
+            return "ANOVA requires ≥2 groups or 1 group + ≥2 test sets"
+        if not shown_ts and len(shown_groups) == 1:
+            if had_results:
+                print(f"Statistical test: no shown test sets for repeated-measures ANOVA.")
+            return "Repeated-measures ANOVA requires ≥2 test sets"
+        return None
+
+    def _check_wilcoxon_applicability(self, variant: str) -> str | None:
+        """Guard for Wilcoxon (mirrors t-test logic)."""
+        return self._check_ttest_applicability(variant)  # shared logic (Wilcoxon uses same group/ts rules)
+
+    def _check_friedman_applicability(self) -> str | None:
+        """Guard for Friedman (≥3 test sets for repeated-measures). Returns warning or None (no side effects)."""
+        had_results = bool(getattr(uistate, "formal_test_results", None))
+        shown_ts = self._get_shown_testsets()
+        if len(shown_ts) < 3:
+            if had_results or True:  # always show for Friedman
+                print(f"Statistical test: Friedman requires ≥3 test sets (shown_ts={len(shown_ts)})")
+            return "Friedman requires ≥3 test sets for repeated-measures"
+        return None
+
+    def _check_cluster_applicability(self) -> str | None:
+        """Guard for Cluster perm. (between: ≥2 groups; or 1g+2ts). Returns warning or None (no side effects)."""
+        had_results = bool(getattr(uistate, "formal_test_results", None))
+        if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
+            if had_results:
+                print("Statistical test: no groups defined.")
+            return "No groups defined for Cluster perm."
+        shown_groups = self._get_shown_group_ids()
+        shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
+        shown_ts = self._get_shown_testsets()
+        if len(shown_groups) >= 2:
+            return None  # between-subjects OK
+        if len(shown_groups) == 1 and len(shown_ts) >= 2:
+            return None  # within-subjects (paired-like) OK
+        if had_results:
+            print("Statistical test: Cluster perm. requires ≥2 groups or 1 group + 2 test sets.")
+        return "Cluster permutation test requires ≥2 groups or 1 group + ≥2 test sets"
+
     def _get_stat_test_warning(self):
         """Return a warning string if the selected test cannot be applied, else None.
-        When successful (no warning), also builds a concise p-value summary for statusbar.
-        Uses central helpers (_effective_test_type, _is_io_mode) for dispatch.
-        IO regression is handled exclusively by _format_io_regression_statusbar.
-        Non-IO logic is restored via helpers in a subsequent phase.
+        Pure query: returns str|None only. No calls to _refresh_test_statusbar (avoids recursion).
+        State (statusbar_state), clear_formal_test_results(), and refresh are handled exclusively by callers
+        (apply_statistical_test_if_active, _refresh_test_statusbar, event handlers). IO/ANCOVA uses
+        _format_io_regression_statusbar; non-IO uses the 5 applicability helpers.
         """
         eff = self._effective_test_type()
         if eff == "None":
@@ -1785,27 +1868,43 @@ class UIsub(
             uistate.statusbar_state = "warning"
             return f"Statistical test '{eff}' is not implemented"
 
-        # --- Non-IO explicit test paths ---
-        # Placeholder: The original non-IO guard logic (t-test, ANOVA, etc.) will be
-        # restored here in a subsequent phase using dedicated helper methods
-        # (_check_ttest_applicability, etc.) to keep this function short.
+        # --- Non-IO explicit test paths (modular helpers) ---
+        if eff == "t-test":
+            variant = getattr(uistate, "test_t_variant", "unpaired")
+            warning = self._check_ttest_applicability(variant)
+        elif eff == "ANOVA":
+            warning = self._check_anova_applicability()
+        elif eff == "Wilcoxon":
+            variant = getattr(uistate, "test_wilcox_variant", "paired")
+            warning = self._check_wilcoxon_applicability(variant)
+        elif eff == "Friedman":
+            warning = self._check_friedman_applicability()
+        elif eff == "Cluster perm.":
+            warning = self._check_cluster_applicability()
+        else:
+            warning = None
+
+        if warning:
+            uistate.statusbar_state = "warning"
+            self.clear_formal_test_results()
+            return warning
+        uistate.statusbar_state = "info"  # success path for non-IO tests (used by _refresh_test_statusbar)
         return None
 
     def _refresh_test_statusbar(self):
         """Update statusbar for current test conditions using uistate.statusbar_state (None = default/cleared, "info" = success report bold/default color, "warning" = red/white/bold).
-        No magic strings. State is set by _get_stat_test_warning (reset to None on error paths or test_type=None).
+        No magic strings. _get_stat_test_warning is now pure (no refresh inside) to prevent recursion.
+        State is set by _get_stat_test_warning (or callers); warning string drives display when present.
         """
         if self._is_loading_active():
             return
         warning = self._get_stat_test_warning()
         state = getattr(uistate, "statusbar_state", None)
-        if warning:
-            pass  # was debug
         if state == "warning":
-            # Explicit warning (Levene/SW violation or guard error) — red/white/bold
+            # Explicit guard failure (from helpers or unknown test) — red/white/bold
             self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=warning)
         elif state == "info" or warning:
-            # Successful test report (p-values, effect size, NA, SW/Levene summary) — default theme, bold
+            # Successful test report or IO regression summary — default theme, bold
             self._set_statusbar_appearance(bg_color=None, bold=True, text=warning or "")
         else:
             # No content: default color (theme / darkmode sensitive) + cleared text
