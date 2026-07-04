@@ -273,7 +273,7 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-1046</y>
+          <y>-70</y>
           <width>284</width>
           <height>2090</height>
          </rect>
@@ -1038,7 +1038,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QFrame" name="frameToolType_io">
+          <widget class="QFrame" name="frameToolType_sub_io">
            <property name="minimumSize">
             <size>
              <width>201</width>
@@ -1284,7 +1284,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QFrame" name="frameToolFilterSavgol">
+          <widget class="QFrame" name="frameToolFilter_sub_Savgol">
            <property name="minimumSize">
             <size>
              <width>201</width>
@@ -2193,7 +2193,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QFrame" name="frameToolTest_t">
+          <widget class="QFrame" name="frameToolTest_sub_t">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
              <horstretch>0</horstretch>
@@ -2360,7 +2360,7 @@
           <layout class="QVBoxLayout" name="verticalLayoutGroups"/>
          </item>
          <item>
-          <widget class="QFrame" name="frameToolTest_ANOVA">
+          <widget class="QFrame" name="frameToolTest_sub_ANOVA">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
              <horstretch>0</horstretch>
@@ -2402,7 +2402,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QFrame" name="frameToolTest_wilcoxon">
+          <widget class="QFrame" name="frameToolTest_sub_wilcoxon">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
              <horstretch>0</horstretch>

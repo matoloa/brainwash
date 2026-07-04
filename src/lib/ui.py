@@ -1807,8 +1807,7 @@ class UIsub(
         if hasattr(uistate, "formal_test_results") and uistate.formal_test_results:
             # Check first result for hierarchy warning from compute_statistical_comparison (Phase 0)
             first_res = uistate.formal_test_results[0] if uistate.formal_test_results else {}
-            # v0.17_io_statusbar_fix: support dummy config-only result for pure implicit IO (no out_results but config present).
-            # For new implicit ANOVA branch, first_res now has real set_result with set_name/p_*/n1/group_ns → real p-values + n_report (no more ?/NA).
+            # v0.17_io_statusbar_fix + Phase 3: support config-only or "IO regression" result for implicit IO (no out_results but config with type/slope_p/r2_per_group). For ANOVA implicit, first_res has real set_result.
             if isinstance(first_res, dict) and "config" in first_res and not first_res.get("p_amp") and not first_res.get("set_id"):
                 first_res = {"config": first_res.get("config", {})}
             if first_res.get("error") and "not assigned" in str(first_res.get("error", "")):
@@ -1882,8 +1881,30 @@ class UIsub(
             else:
                 n_count = len(first_res.get("value", [])) or n1 or "?"
                 global_notes.append(f"(n={n_count} {unit_str})")
-            # v0.16_n_stats_IO + v0.17: for implicit ANOVA use requested "IO - ANOVA (group1=.., group2=..) r²=..": prefix override, suppress redundant "(IO: all sweeps)" and set name
-            if first_res.get("config", {}).get("implicit_testset") and test_type == "ANOVA":
+            # v0.16_n_stats_IO + v0.17 + Phase 3: handle "IO regression" config (real slope p + r² from ANCOVA/linregress). Suppress old dummy/mean-collapse language. Reuse implicit_testset + group_ns.
+            config = first_res.get("config", {})
+            if config.get("type") == "IO regression":
+                prefix = "IO regression"
+                # slope p (primary ANCOVA interaction), per-group r², n_report
+                slope_p = config.get("slope_p") or first_res.get("slope_p")
+                if isinstance(slope_p, (int, float)) and np.isfinite(slope_p):
+                    pstr = f"{slope_p:.3g}" if slope_p >= 0.001 else "<0.001"
+                    global_notes.append(f"slope p={pstr}")
+                for g, r2v in config.get("r2_per_group", {}).items():
+                    if isinstance(r2v, (int, float)) and np.isfinite(r2v):
+                        global_notes.append(f"r²({g})={r2v:.2f}")
+                        break
+                # n_report from group_ns or n_unit
+                n_report = ""
+                group_ns = config.get("group_ns") or first_res.get("group_ns", {})
+                if group_ns:
+                    ns = [f"{g}={n}" for g, n in group_ns.items()]
+                    n_report = ", ".join(ns)
+                if n_report:
+                    global_notes.append(f"({n_report})")
+                if global_notes:
+                    prefix = f"{prefix} ({' '.join(global_notes)})"
+            elif first_res.get("config", {}).get("implicit_testset") and test_type == "ANOVA":
                 for short in ("amp", "slope"):
                     r2 = first_res.get("config", {}).get(f"r2_{short}") or first_res.get(f"r2_{short}")
                     if isinstance(r2, (int, float)) and np.isfinite(r2):
@@ -2113,7 +2134,7 @@ class UIsub(
                     self._refresh_test_statusbar()
                     return
 
-            # v0.16_n_stats_IO: allow no test sets (shown_ts=0) when experiment_type=="io" (implicit all-sweeps)
+            # v0.16_n_stats_IO + Phase 3: allow no test sets for io (implicit regression). For IO, force test_type="None" (bypasses variant frames) but still run via apply_statistical_test_if_active.
             is_io = getattr(uistate, "experiment_type", "time") == "io"
             if not shown_ts and test_type not in ("Friedman", "Cluster perm.") and not is_io:
                 if had_results or test_type == "Friedman":
@@ -3024,13 +3045,34 @@ class UIsub(
         uistate.experiment_type = exp_type
         if hasattr(self, "frameToolType_io"):
             self.frameToolType_io.setVisible(exp_type == "io")
+        # Phase 3 (per request): for IO, force test_type="None" + hide the Test Type toolframe (no radios disabled; n_unit/None remain enabled; triggers implicit regression via apply_...).
+        if exp_type == "io":
+            uistate.test_type = "None"
+            # Hide main Test Type toolframe (and variants). The setupToolBar call below will also enforce via frameToolTest visibility.
+            for frame_attr in (
+                "frameToolTest",
+                "frameToolTest_t",
+                "frameToolTest_ANOVA",
+                "frameToolTest_wilcoxon",
+                "frameToolTest_friedman",
+                "frameToolTest_cluster",
+            ):
+                if hasattr(self, frame_attr):
+                    getattr(self, frame_attr).setVisible(False)
+            if hasattr(self, "frameToolTestOptions"):
+                getattr(self, "frameToolTestOptions").setVisible(True)  # n_unit relevant for regression granularity
+            # Gray "Statistical test" menu (reuse existing action if present)
+            if hasattr(self, "menuView"):
+                for action in self.menuView.actions():
+                    if "test" in action.text().lower() or "statistical" in action.text().lower():
+                        action.setEnabled(False)
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
         if exp_type in ["io", "PP"] or old_type in ["io", "PP"]:
             self.exorcise()
             self.triggerRefresh()
             self.zoomAuto()
             self.graphRefresh()
-            self.apply_statistical_test_if_active()  # ensure IO implicit test runs and statusbar updates
+            self.apply_statistical_test_if_active()  # ensure IO implicit regression runs and statusbar updates (now uses new "IO regression" path)
         else:
             self.update_show()
             self.zoomAuto()
@@ -3176,6 +3218,8 @@ class UIsub(
         if hasattr(self, "radioButton_io_stim"):
             self.radioButton_io_stim.setEnabled(False)
 
+        # Phase 3: no radio disabling for IO (per spec). Graying loop left for other disabled states.
+        is_io = getattr(uistate, "experiment_type", "time") == "io"
         disabled_color = "#666" if uistate.darkmode else "#aaa"
         for radio_name in (
             list(self._RADIO_TO_TYPE)
@@ -3548,17 +3592,12 @@ class UIsub(
         self.frameToolAspectSlope.setVisible(uistate.checkBox.get("EPSP_slope", False) or uistate.checkBox.get("volley_slope", False))
         if hasattr(self, "frameToolType_io"):
             self.frameToolType_io.setVisible(getattr(uistate, "experiment_type", "time") == "io")
-        if hasattr(self, "frameToolTest_t"):
-            # v0.16_n: hierarchy frame now included via viewTools loop (Phase 0)
-            self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
-            # hook the one-sample value lineEdit (default 0.0 from UIState)
-            if hasattr(self, "lineEdit_test_t_one_sample_value"):
-                val = getattr(uistate, "label_test_t_one_sample_value", 0.0)
-                self.lineEdit_test_t_one_sample_value.setText(str(val))
-        if hasattr(self, "frameToolTest_ANOVA"):
-            self.frameToolTest_ANOVA.setVisible(getattr(uistate, "test_type", "None") == "ANOVA")
-            if getattr(uistate, "test_type", "None") == "ANOVA":
-                self.update_anova_label()
+        # Phase 3 (per request): hide the main Test Type toolframe (frameToolTest) for IO; show for all other experiment types. Individual variant frames remain controlled by test_type.
+        is_io = getattr(uistate, "experiment_type", "time") == "io"
+        if hasattr(self, "frameToolTest"):
+            self.frameToolTest.setVisible(not is_io)
+        if hasattr(self, "frameToolTestOptions"):
+            self.frameToolTestOptions.setVisible(True)  # n_unit relevant for regression granularity (always visible)
 
     def build_dict_folders(self):
         dict_folders = {

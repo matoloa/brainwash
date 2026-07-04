@@ -175,7 +175,7 @@ y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_
 - Slice mode: same at slice granularity.
 - Recording mode (default for cluster): per-recording slopes, no further aggregation.
 
-## Phase 3 — UI Integration (Statusbar + Persistence, Tight Scope per Discussion)
+## Phase 3 — UI Integration (Statusbar + Persistence, Tight Scope per Discussion) — COMPLETED
 
 **Reassessment (post-update):** Plan is now tight, executable, and agent-friendly (core stats first, ~40 LOC UI total, explicit deferrals in 3.3.1, `test_type=None` sentinel for IO, resolved questions, risks mitigated). Improvements incorporated: lazy OLS for clean ANCOVA, minimal menu graying (reuse existing action), no viewTools bloat, deferred per-rec statusbar. No further changes needed for v0.16.1. Ready for implementation (statistics.py core first).
 
