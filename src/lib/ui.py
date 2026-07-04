@@ -1745,27 +1745,43 @@ class UIsub(
             if isinstance(cfg, dict) and cfg.get("type") == "IO regression":
                 prefix = "IO ANCOVA"
                 global_notes = []
-                slope_p = cfg.get("slope_p") or (formal[0] if isinstance(formal, list) else formal).get("slope_p")
-                if isinstance(slope_p, (int, float)) and np.isfinite(slope_p):
-                    pstr = f"{slope_p:.3g}" if slope_p >= 0.001 else "<0.001"
-                    global_notes.append(f"slope p={pstr}")
-                for g, r2v in cfg.get("r2_per_group", {}).items():
-                    if isinstance(r2v, (int, float)) and np.isfinite(r2v):
-                        global_notes.append(f"r²({g})={r2v:.2f}")
-                        break
+                # n_report first (after prefix per new spec), include "subjects" unit; Y/X labels next; results with : (salvage existing)
                 n_report = ""
                 group_ns = cfg.get("group_ns") or (formal[0] if isinstance(formal, list) else formal).get("group_ns", {})
                 if group_ns:
                     ns = []
                     for g, n in group_ns.items():
-                        # Use group_name if available in dd_groups (per user expectation for "group 1=5"); fallback to ID
-                        g_name = self.dd_groups.get(g, {}).get("group_name", str(g))
+                        g_name = self.dd_groups.get(g, {}).get("group_name", f"group {g}").lower()
                         ns.append(f"{g_name}={n}")
-                    n_report = ", ".join(ns)
-                if n_report:
-                    global_notes.append(n_report)
+                    n_report = f"({', '.join(ns)} subjects)"
+                # human labels (Y first / X; reuse maps from io_*_changed; fallback per config)
+                x_col = cfg.get("x_col", "volley_amp")
+                y_col = cfg.get("y_col", "EPSP_amp")
+                label_map = {
+                    "EPSP_amp": "EPSP amp",
+                    "EPSP_slope": "EPSP slope",
+                    "volley_amp": "volley amp",
+                    "volley_slope": "volley slope",
+                    "stim": "stim",
+                }
+                y_label = label_map.get(y_col, y_col.replace("_", " "))
+                x_label = label_map.get(x_col, x_col.replace("_", " "))
+                xy_label = f"{y_label} / {x_label}"
+                slope_p = cfg.get("slope_p") or (formal[0] if isinstance(formal, list) else formal).get("slope_p")
+                if isinstance(slope_p, (int, float)) and np.isfinite(slope_p):
+                    pstr = f"{slope_p:.3g}" if slope_p >= 0.001 else "<0.001"
+                    # no "slope" for EPSP/volley ratio test (per user; config has io_output)
+                    stat_label = "slope" if str(cfg.get("io_output", "")).endswith(("slope", "Slope")) else "ratio"
+                    global_notes.append(f"{stat_label} p={pstr}")
+                for g, r2v in cfg.get("r2_per_group", {}).items():
+                    if isinstance(r2v, (int, float)) and np.isfinite(r2v):
+                        global_notes.append(f"r²({g})={r2v:.2f}")
+                        break
                 if global_notes:
-                    prefix = f"{prefix} ({' '.join(global_notes)})"
+                    notes_str = " ".join(global_notes)
+                    prefix = f"{prefix} {xy_label} {n_report}, {notes_str}"
+                else:
+                    prefix = f"{prefix} {xy_label} {n_report}"
                 uistate.statusbar_state = "info"
                 return prefix
             # No formal_results yet (initial switch) or not matching config: benign hint, not an error.

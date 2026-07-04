@@ -102,6 +102,9 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
             long = long.groupby(group_keys + ["x"], as_index=False)["y"].mean().rename(columns={"y": "y_mean"})
             long = long.rename(columns={"y_mean": "y"})
             long["rec_ID"] = long["subject"]  # placeholder for downstream
+            # ensure subject/slice columns survive for n_unique in caller
+            if "subject" not in long.columns:
+                long["subject"] = long["rec_ID"]
 
     return long[["rec_ID", "subject", "slice", "x", "y"]].dropna().sort_values("x")
 
@@ -138,7 +141,14 @@ def _compute_io_regression_internal(
                 if valid.sum() < 2:
                     group_data[g] = {"x": np.array([]), "y": np.array([]), "n": 0}
                     continue
-                group_data[g] = {"x": x[valid], "y": y[valid], "n": int(valid.sum())}
+                # n = unique units per AGENTS.md (not XY pairs); nunique on full xy_df before valid mask (ensures n=4 subjects not 0)
+                if n_unit == "subject" and "subject" in xy_df.columns:
+                    n_unique = xy_df["subject"].nunique()
+                elif n_unit == "slice" and {"subject", "slice"}.issubset(xy_df.columns):
+                    n_unique = xy_df[["subject", "slice"]].drop_duplicates().shape[0]
+                else:  # recording or fallback
+                    n_unique = len(xy_df["rec_ID"].unique()) if "rec_ID" in xy_df.columns else int(valid.sum())
+                group_data[g] = {"x": x[valid], "y": y[valid], "n": int(n_unique)}
                 group_ns[g] = group_data[g]["n"]
                 # Per-group linregress
                 res = linregress(group_data[g]["x"], group_data[g]["y"])
