@@ -201,6 +201,105 @@ y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_
 - No automatic X-column detection from `dfoutput` beyond a documented fallback.
 - No changes to `ui_designer.py`.
 
+### 3.4 Test toolframe refactor: split Test Type vs Test Options (UI wiring)
+
+**Design decision:** When `experiment_type == "io"`, the test-type radios (t-test, ANOVA, Wilcoxon, etc.) are meaningless because IO always uses ANCOVA-style regression. However, `n_unit` (subject/slice/recording) and assumption checkboxes (`fdr`, `sw`, `levene`) remain relevant (or at least harmless) for the IO ANCOVA path.
+
+**Refactor:** Split the existing `frameToolTest` into two sibling frames:
+
+- `frameToolTestType` — contains only the test-type radio buttons (`radioButton_test_t`, `radioButton_test_anova`, `radioButton_test_wilcoxon`, `radioButton_test_friedman`, `radioButton_test_cluster`, `radioButton_test_none`).
+- `frameToolTestOptions` — contains `n_unit` radios (`radioButton_test_n_subject`, `radioButton_test_n_slice`, `radioButton_test_n_rec`) plus assumption checkboxes (`checkBox_test_fdr`, `checkBox_test_sw`, `checkBox_test_levene`).
+
+**Wiring requirements (all in `ui.py`):**
+
+1. **New `pushButton_hide_test_options`** (or reuse existing hide pattern):
+   - Placed on `frameToolTestOptions` (consistent with `pushButton_hide_test` on `frameToolTestType`).
+   - Toggles visibility of `frameToolTestOptions`.
+   - Persists state via `uistate.viewTools` (or a dedicated `test_options_visible` flag).
+
+2. **Menu option "Show Test Options"**:
+   - Added to the View / Toolbars menu (or a new "Analysis Options" submenu).
+   - Calls `self.frameToolTestOptions.setVisible(True)` when triggered.
+   - Disabled (grayed out) when `experiment_type == "io"` because `frameToolTestOptions` is the only test-related control visible in IO mode, and hiding it would leave the user with no n_unit control.
+
+3. **Automatic hiding of `frameToolTestType` on IO**:
+   - In `experiment_type_changed` (and `update_experiment_type_radio_buttons`):
+     ```python
+     if exp_type == "io":
+         self.frameToolTestType.setVisible(False)
+         # also disable any menu action that would show it
+         if hasattr(self, "actionShowTestType"):
+             self.actionShowTestType.setEnabled(False)
+     else:
+         # restore previous visibility or default to True
+         self.frameToolTestType.setVisible(uistate.viewTools.get("frameToolTestType", True))
+         if hasattr(self, "actionShowTestType"):
+             self.actionShowTestType.setEnabled(True)
+     ```
+
+4. **Menu option "Show Test Type"** (counterpart to #2):
+   - Exists for non-IO modes.
+   - When `experiment_type == "io"`, this menu entry is disabled (because `frameToolTestType` must remain hidden).
+
+5. **Initial visibility on startup / load**:
+   - `frameToolTestType` visible by default for time-course/PP modes.
+   - `frameToolTestOptions` visible by default (or respects persisted `uistate.viewTools`).
+   - Both frames share the same parent layout container so that hiding `frameToolTestType` does not cause unexpected vertical collapse/expansion.
+
+**IO-specific behavior summary:**
+
+- `frameToolTestType` is **always hidden** when IO is selected (test type is forced to ANCOVA).
+- `frameToolTestOptions` remains **visible and functional** (n_unit still applies to ANCOVA aggregation).
+- The "Show Test Type" menu action is **disabled** in IO mode.
+- The "Show Test Options" menu action remains **enabled** in IO mode (user can still hide/show n_unit controls).
+
+**Naming convention:** `frameToolTestOptions` (preferred) or `frameToolTestParams`. Avoids the ambiguous term "Test params".
+
+### 3.5 Context-aware statusbar for IO (recording selection vs group-level ANCOVA)
+
+**Requirement:** The statusbar must adapt its content based on the current selection context when `experiment_type == "io"`:
+
+- **Single recording selected:** Show that recording's per-recording regression statistics (r², slope, intercept, optionally p-value for the fit) instead of the group-level ANCOVA result.
+- **No recording selected (or multiple/group selection):** Show the group-level ANCOVA results (n per group, slope p-value, intercept p-value, per-group r²) as specified in 3.1.
+
+**Rationale:** When a user clicks a single point or recording in an IO scatter, they typically want to inspect that recording's fit quality (r² of its stimulus-response points) rather than the between-group comparison. When nothing is selected, the global group comparison (ANCOVA) is the appropriate summary.
+
+**Implementation notes:**
+
+1. **Detection of "single recording selected":**
+   - Reuse existing selection state (`uistate.selected_rec` or equivalent from `ui_interactive.py` / graph click handlers).
+   - When `len(selected) == 1` and `experiment_type == "io"`, switch statusbar path.
+
+2. **Per-recording regression data source:**
+   - The recording-level scatter + trendline already exists in `ui_plot.py:addRow` (IO branch, L1477+).
+   - Compute (or retrieve cached) `linregress(x, y)` for that recording's sweeps using the same `io_input`/`io_output` column mapping.
+   - Store per-recording fit results in `dict_rec_labels` (or a lightweight parallel dict) so the statusbar can read `r2`, `slope`, `intercept`, `pval` without re-fitting.
+
+3. **Statusbar formatting (two modes):**
+   - **Recording mode** (example):
+     ```
+     Rec_42 (GroupA): r²=0.94 slope=1.2 intercept=0.3 p=0.001
+     ```
+   - **Group/ANCOVA mode** (no selection):
+     ```
+     IO ANCOVA (Group1 n=5, Group2 n=4): slope p=0.012 | intercept p=0.34 | r²(G1=0.91, G2=0.88)
+     ```
+   - Both modes respect `io_input`/`io_output` labels for the X/Y axis names if space permits.
+
+4. **Fallbacks:**
+   - Recording has <2 points → "r²=N/A (insufficient data)".
+   - No IO regression computed yet → fall back to existing IO plot label or empty.
+   - Multiple recordings selected → treat as "no single selection" and show group ANCOVA.
+
+5. **Integration with existing statusbar machinery:**
+   - Extend `_get_stat_test_warning` or add a parallel `_get_io_status_text` helper.
+   - Called from `graphRefresh` / selection change handlers so the statusbar updates live when the user clicks a point.
+
+**Non-goals:**
+
+- No new per-recording statistics panel or tooltip (statusbar only).
+- No change to the recording-level scatter/trendline rendering (just expose the fit stats for statusbar consumption).
+
 ## Phase 4 — Verification
 
 1. Non-IO paths unchanged (explicit test sets, time-course, all test types).
@@ -208,6 +307,7 @@ y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_
    - Statusbar shows regression-based p-values + per-group r² (real values, not dummy-x).
    - n values reflect effective units after subject/slice aggregation.
    - r² uses actual stimulus intensity (or documented sweep-rank proxy).
+   - Context-aware: single recording selected → shows that recording's r²/slope/intercept; no selection → shows group ANCOVA summary.
 3. Edge cases: single group, <2 points per group, missing X column → graceful error + note in statusbar.
 4. `py_compile` + import test passes; no new runtime exceptions on existing projects.
 5. Manual harness (similar to debug_plan_io_statusbar_v0.16.md Phase 3) confirms correct output shape.
@@ -215,16 +315,19 @@ y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_
 ## Summary of Deliverables
 
 - `src/lib/statistics.py`: new `_get_io_xy_pairs` + `_compute_io_regression_internal` (or `compute_io_regression_comparison`); early guard in `compute_statistical_comparison` if Option B chosen.
-- `src/lib/ui.py`: statusbar formatting update in `_get_stat_test_warning` for IO regression results.
+- `src/lib/ui.py`:
+  - Statusbar formatting update in `_get_stat_test_warning` (or new `_get_io_status_text`) for IO regression results + context-aware switch (single recording vs group ANCOVA).
+  - `frameToolTestType` / `frameToolTestOptions` split + all wiring (hide buttons, menu actions, `experiment_type_changed` guards, IO-specific disabling).
+  - Per-recording fit stats exposed from `addRow` / `dict_rec_labels` for statusbar consumption.
 - `work_plans/plan_v0.16.1_IO.md`: this document (kept up to date with findings and decisions).
 - Optional: update `plan_v0.16_scitest_IO.md` to reference the regression backend now available for legend r² display.
 
 ## Constraints
 
-- **Minimal changes:** Prefer new helpers over refactoring existing non-IO branches.
-- **Backward compat 100%:** Existing time-course + explicit test set behavior unchanged.
+- **Minimal changes:** Prefer new helpers over refactoring existing non-IO branches. The `frameToolTest` split is an explicit, scoped refactor (two new frame names + ~30 LOC of wiring) rather than a deep layout change.
+- **Backward compat 100%:** Existing time-course + explicit test set behavior unchanged. IO mode simply hides `frameToolTestType` and forces ANCOVA.
 - **Scientific validity:** Every p-value reported for IO must answer a regression-based question (slope difference, fit quality, etc.).
-- **No UI designer changes.**
+- **No UI designer changes.** All new frames/actions are created programmatically in `ui.py` (following the existing `frameToolType_io` pattern).
 - **Use uv** for any venv / test commands; Python 3.12.
 
 ## Open Questions (to resolve in Phase 0)
@@ -233,6 +336,7 @@ y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_
 2. **Regression granularity:** Should the regression be performed per-recording (then slopes aggregated by subject/slice per `n_unit`), or pooled across all sweeps in a group? The latter treats sweeps as independent (common in IO literature but statistically debated).
 3. **Stats library:** Is `pingouin` or `statsmodels` available in the environment (check `pyproject.toml` / `uv.lock`), or must we implement ANCOVA with pure `scipy.stats` + manual F-test on RSS? Prefer minimal new dependencies.
 4. **io_input/io_output integration:** The new IO regression path should respect the user's current `uistate.io_input` / `uistate.io_output` selection (vamp→volley_amp, EPSPamp→EPSP_amp, etc.) rather than hard-coding columns.
+5. **Menu action naming:** Exact QAction names for "Show Test Type" / "Show Test Options" (match existing "Show/Hide" patterns in the View menu, or use "Analysis Options" submenu?). Confirm no collision with current menu structure.
 
 ---
 
