@@ -1743,7 +1743,7 @@ class UIsub(
             else:
                 cfg = None
             if isinstance(cfg, dict) and cfg.get("type") == "IO regression":
-                prefix = "IO regression"
+                prefix = "IO ANCOVA"
                 global_notes = []
                 slope_p = cfg.get("slope_p") or (formal[0] if isinstance(formal, list) else formal).get("slope_p")
                 if isinstance(slope_p, (int, float)) and np.isfinite(slope_p):
@@ -1756,10 +1756,14 @@ class UIsub(
                 n_report = ""
                 group_ns = cfg.get("group_ns") or (formal[0] if isinstance(formal, list) else formal).get("group_ns", {})
                 if group_ns:
-                    ns = [f"{g}={n}" for g, n in group_ns.items()]
+                    ns = []
+                    for g, n in group_ns.items():
+                        # Use group_name if available in dd_groups (per user expectation for "group 1=5"); fallback to ID
+                        g_name = self.dd_groups.get(g, {}).get("group_name", str(g))
+                        ns.append(f"{g_name}={n}")
                     n_report = ", ".join(ns)
                 if n_report:
-                    global_notes.append(f"({n_report})")
+                    global_notes.append(n_report)
                 if global_notes:
                     prefix = f"{prefix} ({' '.join(global_notes)})"
                 uistate.statusbar_state = "info"
@@ -1802,6 +1806,10 @@ class UIsub(
                     for r in results:
                         if isinstance(r, dict):
                             r.setdefault("config", comp["config"])
+            # Ensure group_ns from results (for IO regression with n_unit=subject) reaches _format_io_regression_statusbar
+            if results and isinstance(results, list) and len(results) > 0 and "group_ns" in results[0]:
+                if isinstance(results[0], dict) and "config" not in results[0]:
+                    results[0]["config"] = results[0].copy()
             uistate.formal_test_results = results
             uiplot.show_test_markers(results)
             uistate.statusbar_state = "info"
