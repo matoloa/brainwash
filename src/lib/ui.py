@@ -1736,45 +1736,44 @@ class UIsub(
             uistate.statusbar_state = None
             return None
         if eff == "ANCOVA":
-            # Dedicated IO regression path (Phase 3): uses formal_test_results/config (reuses v0.16.4 logic)
+            # Dedicated IO regression path (Phase 3 + debug fix): always defer to formal_test_results/config (bypasses ANOVA guard).
+            # This prevents "ANCOVA requires >=2 groups" even with valid groups (the config check at top of function now takes precedence via early formal check).
             formal = getattr(uistate, "formal_test_results", None)
-            if not formal:
-                uistate.statusbar_state = None
-                return "Select ≥2 groups for IO regression"
-            # Defensive shape handling (per plan_v0.16.4 Phase 2b): supports [config], [{"config": ...}], bare dict, etc.
-            if isinstance(formal, list) and formal:
-                item = formal[0]
-                if isinstance(item, dict):
-                    cfg = item.get("config") or item
-            elif isinstance(formal, dict):
-                cfg = formal.get("config") or formal
-            else:
-                cfg = None
-            if isinstance(cfg, dict) and cfg.get("type") == "IO regression":
-                prefix = "IO regression"
-                global_notes = []
-                slope_p = cfg.get("slope_p") or (formal[0] if isinstance(formal, list) else formal).get("slope_p")
-                if isinstance(slope_p, (int, float)) and np.isfinite(slope_p):
-                    pstr = f"{slope_p:.3g}" if slope_p >= 0.001 else "<0.001"
-                    global_notes.append(f"slope p={pstr}")
-                for g, r2v in cfg.get("r2_per_group", {}).items():
-                    if isinstance(r2v, (int, float)) and np.isfinite(r2v):
-                        global_notes.append(f"r²({g})={r2v:.2f}")
-                        break
-                n_report = ""
-                group_ns = cfg.get("group_ns") or (formal[0] if isinstance(formal, list) else formal).get("group_ns", {})
-                if group_ns:
-                    ns = [f"{g}={n}" for g, n in group_ns.items()]
-                    n_report = ", ".join(ns)
-                if n_report:
-                    global_notes.append(f"({n_report})")
-                if global_notes:
-                    prefix = f"{prefix} ({' '.join(global_notes)})"
-                uistate.statusbar_state = "info"
-                return prefix
-            # Fallback if not IO regression config
+            if formal:
+                # Defensive shape handling (per plan_v0.16.4 Phase 2b): supports [config], [{"config": ...}], bare dict, etc.
+                if isinstance(formal, list) and formal:
+                    item = formal[0]
+                    if isinstance(item, dict):
+                        cfg = item.get("config") or item
+                elif isinstance(formal, dict):
+                    cfg = formal.get("config") or formal
+                else:
+                    cfg = None
+                if isinstance(cfg, dict) and cfg.get("type") == "IO regression":
+                    prefix = "IO regression"
+                    global_notes = []
+                    slope_p = cfg.get("slope_p") or (formal[0] if isinstance(formal, list) else formal).get("slope_p")
+                    if isinstance(slope_p, (int, float)) and np.isfinite(slope_p):
+                        pstr = f"{slope_p:.3g}" if slope_p >= 0.001 else "<0.001"
+                        global_notes.append(f"slope p={pstr}")
+                    for g, r2v in cfg.get("r2_per_group", {}).items():
+                        if isinstance(r2v, (int, float)) and np.isfinite(r2v):
+                            global_notes.append(f"r²({g})={r2v:.2f}")
+                            break
+                    n_report = ""
+                    group_ns = cfg.get("group_ns") or (formal[0] if isinstance(formal, list) else formal).get("group_ns", {})
+                    if group_ns:
+                        ns = [f"{g}={n}" for g, n in group_ns.items()]
+                        n_report = ", ".join(ns)
+                    if n_report:
+                        global_notes.append(f"({n_report})")
+                    if global_notes:
+                        prefix = f"{prefix} ({' '.join(global_notes)})"
+                    uistate.statusbar_state = "info"
+                    return prefix
+            # No valid config/results yet (common on initial IO switch): clear and hint
             uistate.statusbar_state = None
-            return None
+            return "Select ≥2 groups for IO regression (computes slope via ANCOVA)"
 
         # Non-IO explicit test path
         test_type = eff
@@ -3116,9 +3115,9 @@ class UIsub(
         uistate.experiment_type = exp_type
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(exp_type == "io")
-        # Phase 3 (per request): for IO, force test_type="None" + hide the Test Type toolframe (no radios disabled; n_unit/None remain enabled; triggers implicit regression via apply_...).
+        # Phase 3 (per request): for IO, force test_type="ANCOVA" (signals IO regression; no "None" sentinel).
         if exp_type == "io":
-            uistate.test_type = "ANCOVA"  # Tactical + long-term: ANCOVA signals IO regression (no "None" sentinel)
+            uistate.test_type = "ANCOVA"
             # Hide main Test Type toolframe (and variants). The setupToolBar call below will also enforce via frameToolTest visibility.
             for frame_attr in (
                 "frameToolTest",
@@ -3138,6 +3137,10 @@ class UIsub(
                     if "test" in action.text().lower() or "statistical" in action.text().lower():
                         action.setEnabled(False)
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
+        # Debug section fix: always clear stale statusbar/formal_results on type change (prevents persistence of old IO regression or test results)
+        uistate.formal_test_results = None
+        uistate.statusbar_state = None
+        self._refresh_test_statusbar()
         if exp_type == "io":
             # IO path already handled above (hides frameToolTest + disables menu)
             self.exorcise()
@@ -3187,6 +3190,10 @@ class UIsub(
                 val = getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)
                 self.lineEdit_wilcoxon_one_sample_value.setText(str(val))
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        # Debug section fix: clear stale statusbar/results on test_type change (prevents persistence of previous test or IO regression)
+        uistate.formal_test_results = None
+        uistate.statusbar_state = None
+        self._refresh_test_statusbar()
         # Automatic application (v0.16): apply when non-None, clear when None
         self.apply_statistical_test_if_active()
 

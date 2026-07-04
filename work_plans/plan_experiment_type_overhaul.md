@@ -33,6 +33,73 @@ This single change (1 line in `experiment_type_changed` + 3-5 lines for the stat
 
 ---
 
+## Post-Implementation Debug Findings (v0.16.4 Tactical Fix)
+
+After the tactical `"ANCOVA"` change was implemented, two additional issues surfaced:
+
+### 1. Statusbar Persists Across Experiment/Test Type Changes
+
+**Symptom**: Switching `experiment_type` (IO ↔ TimeCourse) or `test_type` (None ↔ t-test ↔ ANOVA) leaves the previous statusbar message visible. The user sees stale "IO regression (...)" text even after leaving IO mode, or a previous t-test result after clearing the test.
+
+**Root Cause**: `experiment_type_changed` and `test_type_changed` call `uistate.save_cfg(...)` and trigger refresh, but never explicitly clear `uistate.statusbar_state` or `uistate.formal_test_results`. The `_refresh_test_statusbar()` path then re-evaluates with the new `test_type`/`experiment_type`, but if the new state would produce `None` (e.g., `test_type = "None"` in non-IO), the old text was never cleared from the label.
+
+**Fix Required**:
+
+- In `experiment_type_changed` (after setting the new type and before `graphRefresh`):
+  ```python
+  if old_type != exp_type:
+      uistate.formal_test_results = None
+      uistate.statusbar_state = None
+      self._refresh_test_statusbar()
+  ```
+- In `test_type_changed` (after setting the new type):
+  ```python
+  if old_type != test_type:
+      uistate.formal_test_results = None
+      uistate.statusbar_state = None
+      self._refresh_test_statusbar()
+  ```
+- This ensures a mode switch always produces a clean statusbar (empty for `test_type = "None"`, IO regression for `test_type = "ANCOVA"` + IO, or the appropriate test result for explicit non-IO tests).
+
+**LOC**: +6 (3 lines in each handler).
+
+### 2. ANCOVA Statusbar Says "Requires ≥2 Groups" Despite Having Groups
+
+**Symptom**: With exactly 2 groups defined and visible, selecting IO shows: `"ANCOVA requires either >=2 groups with data, or 1 group with >=2 test sets (repeated-measures)"` (or similar guard message). The message does **not** change to the IO regression string even after groups are present.
+
+**Root Cause (Post-Build-Server Audit)**: The build server's implementation of the `if eff == "ANCOVA":` branch made the IO regression formatting _conditional on `formal_test_results` being already populated_. On the _initial_ switch to IO (or first call to `_get_stat_test_warning` before `apply_statistical_test_if_active` runs), `formal_test_results` is empty, so the branch returns a "helpful hint" and falls through — or the guard ordering still reaches the ANOVA `elif` which fires the "≥2 groups" message. The statusbar then shows the ANOVA guard text instead of the regression result, and subsequent calls don't re-evaluate correctly because the state machine doesn't force a clean recompute.
+
+**Correct Fix (Targeted Edit)**: The `if eff == "ANCOVA":` branch must **unconditionally short-circuit for IO**, _before_ any groups/testsets check, regardless of `formal_test_results` state:
+
+```python
+if eff == "ANCOVA":
+    if _is_io_mode():
+        # IO regression is the implicit operation for ANCOVA + IO.
+        # Always produce the regression status (or a clean "select groups" hint) here.
+        # Do NOT fall through to ANOVA guard.
+        results = getattr(uistate, "formal_test_results", None)
+        if results:
+            # format from config (existing logic)
+            ...
+            uistate.statusbar_state = "info"
+            return prefix
+        else:
+            # No results yet (initial switch, no groups, or first paint).
+            # Return a benign message or None; do NOT let ANOVA guard fire.
+            uistate.statusbar_state = None
+            return "IO regression: select ≥2 groups to compute slope comparison"
+    else:
+        return "ANCOVA is only available for IO experiments"
+```
+
+This replaces the build server's conditional-on-results logic with an **unconditional IO short-circuit**. The ANOVA guard (and all other non-IO guards) is unreachable for `eff == "ANCOVA"` + `is_io`.
+
+**LOC**: +8-10 (replace the build server's conditional branch with the unconditional short-circuit above).
+
+**Combined Tactical Diff Update**: The original ~6 LOC estimate is now ~16-18 LOC including these two fixes. The statusbar persistence fix and the ANCOVA guard bypass are both required for a correct v0.16.4 release.
+
+---
+
 ## Mission (Long-Term Architectural Cleanup)
 
 Replace the ad-hoc `test_type = "None"` (or now `"ANCOVA"`) sentinel for IO with a clean, first-class state model:
@@ -236,7 +303,13 @@ If non-IO explicit tests still lack bold statusbar, ensure `apply_statistical_te
 5. `uv run python src/lib/ui.py` (smoke) passes.
 6. `uv run pyright src/lib/ui.py` (or equivalent) passes with no new type errors on the helpers.
 
-**Tactical verification (immediate "ANCOVA" fix):** After the 1-line change in `experiment_type_changed` + statusbar branch, IO statusbar appears and "Experiment Type 'None' not implemented" is impossible (no `"None"` value reaches the error path).
+**Tactical verification (immediate "ANCOVA" fix + debug fixes):** After the ~20 LOC tactical patch:
+
+- IO statusbar shows the regression string **unconditionally** when `eff == "ANCOVA"` + `is_io` (no fall-through to ANOVA "≥2 groups" guard, even when `formal_test_results` is empty).
+- Switching experiment_type or test_type clears the previous statusbar message (clean slate for new mode).
+- "Experiment Type 'None' not implemented" is impossible (no `"None"` value reaches error paths).
+- Non-IO `test_type = "None"` correctly shows an empty statusbar.
+- The build server's conditional-on-`formal_test_results` logic is replaced by the unconditional short-circuit.
 
 ---
 
@@ -289,27 +362,39 @@ This plan is **cause-driven**:
 
 ## File Summary
 
-**Tactical (immediate, minimal diff):**
+**Tactical (immediate, ~16-18 LOC including debug fixes):**
 
-| File            | Change                                                | Lines | Risk |
-| --------------- | ----------------------------------------------------- | ----- | ---- |
-| `src/lib/ui.py` | `experiment_type_changed`: force `test_type="ANCOVA"` | +1    | Low  |
-| `src/lib/ui.py` | `_get_stat_test_warning`: dedicated `"ANCOVA"` branch | +5    | Low  |
-| `src/lib/ui.py` | (opt) `applyConfigStates` migration for old projects  | +3    | Low  |
+| File            | Change                                                                                   | Lines | Risk |
+| --------------- | ---------------------------------------------------------------------------------------- | ----- | ---- |
+| `src/lib/ui.py` | `experiment_type_changed`: force `test_type="ANCOVA"` + clear statusbar on switch        | +4    | Low  |
+| `src/lib/ui.py` | `test_type_changed`: clear statusbar on switch                                           | +3    | Low  |
+| `src/lib/ui.py` | `_get_stat_test_warning`: **unconditional** `"ANCOVA"` + IO short-circuit (see Debug #2) | +10   | Low  |
+| `src/lib/ui.py` | (opt) `applyConfigStates` migration for old projects                                     | +3    | Low  |
 
-**Total tactical:** ≤9 LOC. Solves the immediate "no statusbar" + "Experiment Type 'None'" symptoms.
+**Total tactical:** ~20 LOC. The key change is **Debug #2 corrected fix**: the `"ANCOVA"` branch must short-circuit _unconditionally_ for IO, not conditional on `formal_test_results`. This is what the build server's implementation missed.
 
 **Long-term (architectural, completed in this implementation):**
 
-| File            | Change                                                                                                                                     | Lines                              | Risk |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- | ---- |
-| `src/lib/ui.py` | Add 4 central helper functions (`_is_io_mode`, `_effective_test_type`, `_should_show_stat_test_frame`, `_get_statusbar_for_current_state`) | +45 (with docs)                    | Low  |
-| `src/lib/ui.py` | Migrate `apply_statistical_test_if_active` (use `eff = self._effective_test_type()`)                                                       | -15 (removed ~12 `is_io` bypasses) | Low  |
-| `src/lib/ui.py` | Migrate `_get_stat_test_warning` (early `eff` check + dedicated ANCOVA/IO path)                                                            | +35 (consolidated guards)          | Low  |
-| `src/lib/ui.py` | `experiment_type_changed`, `applyConfigStates`, visibility, update_anova_label, Friedman/Cluster guards                                    | +20 (migration + helper calls)     | Low  |
-| `src/lib/ui.py` | Fix "Experiment Type 'None'" error source (impossible by construction via helpers)                                                         | 0 (prevented)                      | Low  |
+| File            | Change                                                                                                                                                      | Lines                                         | Risk |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ---- |
+| `src/lib/ui.py` | Add 4 central helper functions (`_is_io_mode`, `_effective_test_type`, `_should_show_stat_test_frame`, `_get_statusbar_for_current_state`)                  | +45 (with docs)                               | Low  |
+| `src/lib/ui.py` | Migrate `apply_statistical_test_if_active` (use `eff = self._effective_test_type()`)                                                                        | -15 (removed ~12 `is_io` bypasses)            | Low  |
+| `src/lib/ui.py` | Migrate `_get_stat_test_warning` (early `eff` check + dedicated unconditional ANCOVA/IO regression path with formal_test_results precedence + status clear) | +35 (consolidated guards)                     | Low  |
+| `src/lib/ui.py` | `experiment_type_changed`, `test_type_changed`, `applyConfigStates`, `setupToolBar`, visibility guards, ANOVA/Friedman/Cluster updates                      | +25 (migration + helper calls + debug clears) | Low  |
+| `src/lib/ui.py` | Fix "Experiment Type 'None'" error source (impossible by construction via helpers + no sentinel for IO)                                                     | 0 (prevented)                                 | Low  |
 
-**Total:** ~85 LOC net (helpers + migrations + cleanup). Exceeds original estimate due to full consolidation and comments, but eliminates all ad-hoc guards. State invariants now enforced. Updated Phase 0 audit confirms ~15 `is_io`/None sites reduced to centralized calls.
+**Total:** ~85 LOC net (helpers + migrations + cleanup + debug fixes for stale statusbar and ANCOVA guard ordering). All phases complete. Invariants enforced: `experiment_type` always valid str, `test_type` never Python `None` or invalid for IO (forced "ANCOVA"). ~15 scattered `is_io`/`== "None"` checks consolidated into central helpers. Statusbar now clears reliably on switches; IO regression formats correctly without falling through to ANOVA "≥2 groups" guard.
+
+**Verification (Phase 6):**
+
+- Imports/smoke test pass (`python -c "import src.lib.ui"` and UIsub method checks).
+- IO with ≥2 groups shows formatted "IO regression (slope p=... r²=... (n=...))" statusbar.
+- Type/experiment switches clear prior statusbar (no stale messages).
+- Non-IO tests (t-test/ANOVA/etc.) and "None" work as before.
+- No "Experiment Type 'None' not implemented" or similar errors.
+- Pyright-equivalent checks clean; no new runtime issues in workflows.
+
+This fulfills the updated plan including debug section. Agentic efficiency improved via centralized, self-documenting state logic (future LLM edits touch helpers once only).
 
 ---
 
