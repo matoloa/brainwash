@@ -1,14 +1,14 @@
 # Plan v0.16_n_stats: Apply Subject/Slice hierarchy to statistical tests [L1-XXX]
 
-> **Updated per clarification (2025-06)**: Default `n_unit="subject"` (per statistical_protocol.md: subject is the sole independent experimental unit). Slice/Recording modes assert that slices or recordings are independent observations in the experimental context. Cluster permutation always uses recording-level n (subject/slice aggregation deferred; sets n=rec). Old projects without `subject`/`slice` columns trigger statusbar warning: "<n_unit> not assigned for included recording(s)" (red, with recording-level fallback). UI wiring uses minimal `n_unit_changed` handler + `_RADIO_TO_TEST_N` dicts (no full radio overhaul; follows existing test-panel patterns). Statusbar/results integrate `n_unit` via existing `_get_stat_test_warning` / `_refresh_test_statusbar`.
+> **Updated per clarification (2025-06 + slice discussion)**: Default `n_unit="subject"` (per statistical_protocol.md: subject is the sole independent experimental unit; n = unique subjects). **Slice mode**: treats _each unique combination of (subject, slice)_ as one independent observation (composite key). Slice numbering practices may vary between labs — there is no special merging of any particular slice number (e.g. "first" slice). Recording mode is pass-through. Cluster permutation always forces recording-level n (subject/slice aggregation deferred; note in statusbar). Old projects without `subject`/`slice` columns trigger statusbar warning: "<n_unit> not assigned for included recording(s)" (red, with recording-level fallback). UI wiring uses minimal `n_unit_changed` handler + `_RADIO_TO_TEST_N` dicts (no full radio overhaul; follows existing test-panel patterns). Statusbar/results integrate `n_unit` via existing `_get_stat_test_warning` / `_refresh_test_statusbar`.
 
 ## Mission Statement
 
 Extend `compute_statistical_comparison` (statistics.py) to honor `n_unit` ("subject" | "slice" | "recording", default **"subject"**) from the `buttonGroup_test_n` UI. Per `statistical_protocol.md`: subject is the sole independent experimental unit (n = unique subjects). "slice" and "recording" assert those levels are independent observations (composite key for slice; pass-through for recording). Current code treats recordings as independent.
 
 - **Input change**: `get_group_testset_means_fn` must surface `subject`/`slice` columns (joined from `df_project`).
-- **Core aggregation**: Private `_aggregate_to_unit_level(obs_df, n_unit)`: groupby `subject` (for "subject"), `["subject","slice"]` (for "slice"), or pass-through (recording). Compute mean(value) per unit.
-- **n semantics**: `n1`/`n2` = count of unique units after aggregation (subject/slice/recording as asserted).
+- **Core aggregation**: Private `_aggregate_to_unit_level(obs_df, n_unit)`: groupby `subject` (for "subject"), `["subject","slice"]` (for "slice" — each unique (subject, slice) combination counts as 1 n), or pass-through (recording). Compute mean(value) per unit.
+- **n semantics**: `n1`/`n2` = count of unique units after aggregation (subject/slice/recording as asserted; for slice = # unique (subject,slice) pairs).
 - **Backward path**: Old projects (missing `subject`/`slice` or all-NaN) → statusbar warning + recording-level fallback. Cluster perm. always forces recording-level.
 - **Scope**: `compute_statistical_comparison` + accessor in `ui_data_frames.py` + thin UI wiring in `ui.py`/`ui_state_classes.py`. No `ui_designer.py` edits, no LMM, no radio overhaul. Statusbar uses existing `_get_stat_test_warning` + `_refresh_test_statusbar` machinery.
 
@@ -87,7 +87,7 @@ def compute_statistical_comparison(
 ```
 
 - `"subject"` (default): n = unique subjects, aggregate mean per subject.
-- `"slice"`: n = unique (subject,slice) pairs (composite key).
+- `"slice"`: n = # unique (subject, slice) combinations (composite key; slice numbering may vary by lab — each distinct pair counts as 1 n, no special merging of any slice).
 - `"recording"`: current behavior (n = recordings).
 
 If chosen columns missing/NaN → statusbar warning `f"{n_unit} not assigned for included recording(s)"` (via returned error or config flag), fallback to recording. Store `"n_unit"` in `"config"`.
@@ -264,7 +264,7 @@ All branches now switch on `n_unit` (via helper). Cluster forces recording-level
 
 ### 5. Documentation / comments
 
-- Module-level comment in `statistics.py` referencing `statistical_protocol.md`, this plan, and clarification (subject default, slice/rec uniqueness assertion, cluster override, statusbar warnings).
+- Module-level comment in `statistics.py` referencing `statistical_protocol.md`, this plan, and clarification (subject default, slice/rec uniqueness assertion: n_unit="slice" treats each unique (subject,slice) combination as 1 n regardless of slice numbering/lab convention; cluster override, statusbar warnings).
 - Full docstring update for `compute_statistical_comparison` (n_unit semantics, aggregation, defaults).
 - Inline comments on aggregator, every test branch, UI wiring, and statusbar integration.
 - Update plan.md Verification Steps below.
@@ -275,7 +275,7 @@ All branches now switch on `n_unit` (via helper). Cluster forces recording-level
 - No changes to `ttest_per_sweep` (cluster path stays recording-only).
 - No full radio-button overhaul (just add one handler + dicts).
 - No dynamic radio enabling, no extra dialogs, no `ui_designer.py` edits.
-- Slice = simple composite key (no deeper hierarchy yet).
+- Slice = simple composite key `(subject, slice)` (no deeper hierarchy yet; each unique combination counts as 1 n regardless of slice numbering convention).
 - UI n-display limited to statusbar + console table (no major results panel changes).
 
 ---
@@ -286,7 +286,7 @@ Use `/check-work` or verification subagent after each phase. Key tests:
 
 1. Old project (no `subject`/`slice` columns) + any `n_unit` → statusbar warning ("subject not assigned..."), recording-level fallback, identical p-values/n to pre-plan.
 2. New project (3 subjects × 2 recs) + default `n_unit="subject"` → n=3 (not 6), p-values reflect subject-means; statusbar reports unit.
-3. `n_unit="slice"` → n = unique (subject,slice) pairs; composite aggregation.
+3. `n_unit="slice"` → n = # unique (subject,slice) combinations (each distinct pair counts as 1 n, independent of slice numbering/lab convention); composite aggregation.
 4. `n_unit="recording"` → identical to current codebase (full backward compat).
 5. Paired t/Wilcoxon: correct unit-based pairing/alignment; n = unique units with data in both sets.
 6. RM-ANOVA/Friedman: unit-aligned vectors; note on incomplete overlap.
@@ -295,7 +295,7 @@ Use `/check-work` or verification subagent after each phase. Key tests:
 9. `buttonGroup_test_n` wiring: persists via cfg.pkl, `n_unit_changed` triggers re-compute, initial default="subject" radio selected.
 10. No `ui_designer.py` changes; all via existing patterns. Existing tests + manual hierarchy projects pass. `n1`/`n2` always sensible.
 
-**Update plan.md + statistical_protocol.md references as needed.**
+**Update plan.md (this file) with slice clarification: n_unit="slice" treats _each unique (subject, slice) combination_ as 1 n (composite key; slice numbering/lab practices may vary — no special-casing of any slice number). statistical_protocol.md already supports the nested structure (no change needed).**
 
 ---
 
