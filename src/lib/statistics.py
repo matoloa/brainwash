@@ -1,18 +1,8 @@
 # statistics.py
 # ---------------------------------------------------------------------------
-# Statistical testing layer (extracted from analysis_v3.py).
-#
-# v0.16_n_stats (Phase 0+): n_unit="subject" (default per statistical_protocol.md).
-# Subject = independent experimental unit; slice/recording = nested repeated measures.
-# Aggregates to unit level via _aggregate_to_unit_level; old projects warn via statusbar.
-# Cluster always uses recording-level. See work_plans/plan_v0.16_n_stats.md.
-#
-# Focus: formal tests on Test Sets (t-test, one-way ANOVA, FDR correction,
-# effect sizes like partial eta²). Called by UI for statusbar reporting
-# and test markers (_get_stat_test_warning, apply_statistical_test_if_active).
-#
-# Keeps analysis_v3.py focused on raw feature extraction (find_events,
-# build_dfoutput, measure_waveform, timepoint detection, etc.).
+# Statistical testing layer. n_unit="subject" (default); supports slice/recording.
+# Aggregates to unit level; old projects warn via statusbar. Cluster uses recording-level.
+# IO uses implicit all-sweeps + regression. See AGENTS.md for experiment_type/statusbar.
 # ---------------------------------------------------------------------------
 
 import warnings
@@ -27,12 +17,10 @@ from scipy.stats import f_oneway, friedmanchisquare, levene, linregress, shapiro
 # ---------------------------------------------------------------------------
 
 
-# Phase 1/2 IO regression (per plan_v0.16.1_IO.md): private helpers for real X/Y pairs (from uistate.io_input mapping + per_sweep=True melt) and core linregress + ANCOVA (lazy statsmodels OLS for slope interaction p-value).
-# Replaces dummy np.arange r². Minimal, non-breaking (only inside statistics.py; compatible config for _get_stat_test_warning). Option B early guard added above.
 def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="recording", aspect_col="EPSP_amp"):
-    """Private helper (Phase 2.1): Returns long DataFrame with ['rec_ID', 'subject', 'slice', 'x', 'y'] for all sweeps in group.
-    Uses per_sweep=True wide matrix from accessor, melts, joins real X from dfoutput (via uistate.io_input mapping e.g. 'vamp'->'volley_amp').
-    Falls back to sweep rank (sorted) if X column missing. Respects n_unit aggregation via _aggregate_to_unit_level.
+    """Private helper: Returns long DataFrame with ['rec_ID', 'subject', 'slice', 'x', 'y'] for all sweeps in group.
+    Uses per_sweep=True, melts, joins real X from dfoutput via uistate.io_input. Falls back to sweep rank if X missing.
+    Respects n_unit.
     """
     if uistate is None:
         # Fallback for testing
@@ -42,10 +30,9 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
         io_input = getattr(uistate, "io_input", "vamp")
         io_output = getattr(uistate, "io_output", "EPSPamp")
 
-    # Map to dfoutput columns (per Phase 0 findings and ui_state_classes.py:x_axis_values, ui.py radio maps)
     x_map = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}
     x_col = x_map.get(io_input, "volley_amp")
-    y_col = aspect_col  # already mapped (e.g. "EPSP_amp" or "EPSP_amp_norm")
+    y_col = aspect_col
 
     # Get wide per-sweep matrix (rec_ID + sweep cols) or fallback
     try:
@@ -122,11 +109,8 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
 def _compute_io_regression_internal(
     shown_groups, get_group_testset_means_fn, uistate=None, n_unit="subject", norm=False, amp=True, slope=True, dd_groups=None
 ):
-    """Private helper (Phase 2): Core IO regression logic.
-    - Gets X/Y pairs per group using _get_io_xy_pairs (real X from uistate.io_input).
-    - Fits linregress per group/unit for slope, intercept, r2.
-    - Between-group slope comparison via lazy statsmodels OLS (`y ~ x * C(group)`) interaction p-value (or RSS F-test fallback).
-    - Returns compatible dict for statusbar/UI: {"results": [per-group or summary dicts with 'r2', 'slope_p', 'n', 'group_ns'], "config": {"type": "IO regression", "io_input": ..., "io_output": ..., "n_unit": ..., "implicit_testset": True, "x_col": ..., "y_col": ...}}.
+    """Core IO regression: X/Y pairs per group (_get_io_xy_pairs), linregress per group, OLS slope comparison.
+    Returns dict compatible with statusbar (config with "type": "IO regression", r2_per_group, slope_p, group_ns).
     """
     results = []
     group_ns = {}
@@ -429,31 +413,30 @@ def compute_statistical_comparison(
     amp: bool = True,
     slope: bool = True,
     ref: float = 0.0,
-    n_unit: str = "subject",  # "subject" (default) | "slice" | "recording" — v0.16_n_stats
-    experiment_type: str = "time",  # v0.16_n_stats_IO: "io" allows implicit all-sweeps (no test sets required)
-    uistate=None,  # for IO: provides .io_input / .io_output mapping and df_project access (Phase 1 Option B)
+    n_unit: str = "subject",  # "subject" (default) | "slice" | "recording"
+    experiment_type: str = "time",  # "io" for implicit all-sweeps regression (no test sets required)
+    uistate=None,  # for IO: provides .io_input/.io_output and df_project
 ) -> dict:
     """
     High-level entry point used by UI for formal statistical tests on Test Sets.
 
-    v0.16_n_stats Phase 1 (updated per slice clarification): n_unit selects statistical unit (default="subject" per protocol).
-    Uses _aggregate_to_unit_level (composite key for slice: each unique (subject,slice) = 1 n; no special slice merging).
-    Old projects (no hierarchy columns) → statusbar warning + recording fallback.
-    Cluster perm. always forces recording-level n (note in config).
+    n_unit selects statistical unit (default="subject"). Uses _aggregate_to_unit_level.
+    Old projects (no hierarchy) → statusbar warning + recording fallback.
+    Cluster perm. forces recording-level n.
 
-    v0.16_n_stats_IO (Phase 1+2): If experiment_type=="io" and use_implicit (no shown test sets), uses real X/Y regression (linregress per unit + ANCOVA slope test) instead of mean collapse or dummy np.arange.
-    Early guard (Option B) before implicit ANOVA branch for minimal diff. Private helpers _get_io_xy_pairs (melt per_sweep=True + X join from dfoutput using uistate.io_input) and _compute_io_regression_internal.
-    Compatible config with "type": "IO regression", "io_input", "io_output". Backward compat 100% for non-IO. See work_plans/plan_v0.16.1_IO.md.
+    For experiment_type=="io" + no test sets: real X/Y regression via _compute_io_regression_internal
+    (linregress per unit + OLS slope test). Produces config with "type": "IO regression".
+    Early IO guard before implicit ANOVA branch. Backward compatible for non-IO.
+    See AGENTS.md for statusbar and experiment_type rules.
 
     Semantics:
-      - One scalar per unit (mean of aspect over sweeps in test set or all sweeps for IO implicit).
-      - Compare unit-level vectors (unpaired/paired/one-sample; simple length alignment for paired).
-      - n1/n2 = count of unique units after aggregation (reflects n_unit).
-      - For IO: per-unit slopes from real X (volley_amp etc.), between-group slope p via OLS interaction.
+      - One scalar per unit (mean of aspect over sweeps or all sweeps for IO implicit).
+      - Compare unit-level vectors (unpaired/paired/one-sample).
+      - n1/n2 from aggregation (reflects n_unit).
+      - IO: per-unit slopes, between-group slope p.
 
-    groups: list of shown group_IDs (order matters for pairing).
-    get_group_testset_means_fn(...) now returns subject/slice columns (see ui_data_frames.py).
-    Returns dict with "results" (per-testset) and "config" (incl. n_unit, implicit_testset if used; "IO regression" for IO).
+    groups: list of shown group_IDs.
+    Returns dict with "results" and "config" (incl. n_unit, implicit_testset if used).
     """
     if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
         return {"not_implemented": test_type, "results": []}
@@ -494,25 +477,23 @@ def compute_statistical_comparison(
             return {"error": "need at least two shown groups", "results": []}
         g1, g2 = shown_groups[0], shown_groups[1]
 
-    # v0.16_n_stats_IO: centralized guard (replaces 3 duplicate shown_sets blocks). IO allows empty for implicit all-sweeps.
+    # Centralized guard for shown test sets. IO allows empty (implicit all-sweeps).
     shown_sets = [(sid, info) for sid, info in (dd_testsets or {}).items() if info.get("show", False) and info.get("sweeps")]
     is_io = experiment_type == "io"
     use_implicit = False
     if not shown_sets:
         if is_io:
-            use_implicit = True  # implicit "all sweeps" per group via accessor (sweeps=None); n/r² reported in UI
+            use_implicit = True
         else:
             return {"error": "no shown test sets", "results": []}
 
     if get_group_testset_means_fn is None:
         return {"error": "no data accessor for testset means", "results": []}
 
-    # Phase 1 (Option B, per plan_v0.16.1_IO.md): Early IO regression guard (before v0.17 implicit ANOVA). For experiment_type=="io" + use_implicit (no explicit test sets), replaces dummy r² with real X/Y regression + ANCOVA slope comparison.
-    # Reuses n_unit, _get_obs/_aggregate_to_unit_level, and existing call sites (uistate passed from ui.py:apply_statistical_test_if_active). No signature break for non-IO.
+    # Early IO regression guard for experiment_type=="io" + use_implicit. Calls _compute_io_regression_internal.
     if is_io and use_implicit:
-        # uistate required for io_input/io_output mapping and dfoutput access (passed from UI; falls back gracefully)
         if uistate is None:
-            uistate = getattr(get_group_testset_means_fn, "__self__", None)  # try to recover from bound method (DataFrameMixin)
+            uistate = getattr(get_group_testset_means_fn, "__self__", None)
         return _compute_io_regression_internal(
             shown_groups=shown_groups,
             get_group_testset_means_fn=get_group_testset_means_fn,
@@ -521,15 +502,11 @@ def compute_statistical_comparison(
             norm=norm,
             amp=amp,
             slope=slope,
-            dd_groups=dd_groups,  # for group names if needed
+            dd_groups=dd_groups,
         )
 
-    # v0.17_io_statusbar_fix: minimal implicit ANOVA for IO (between-groups on all-sweeps, >=2 groups). Placed early (before RM path) so that when use_implicit=True + ANOVA, we compute real f_oneway results + set_result instead of skipping main loop. Uses same _get_obs(g, None, col) + _aggregate_to_unit_level as r2 block. Produces proper set_name, per-group n1 (via max eff_n or len per group), p-values, eta2. Integrates with existing r2 in config. Fixes "Set ?: amp p=NA", n_report="?", nonsense statusbar.
+    # Implicit ANOVA for IO (between-groups on all-sweeps when >=2 groups). Placed early.
     if test_type == "ANOVA" and use_implicit and len(shown_groups) >= 2:
-        # Minimal implicit ANOVA branch (v0.17): between-groups one-way on all-sweeps per group (no testsets).
-        # Computes real f_oneway(*group_vals) per aspect using _get_obs(g, None, col) + aggregation (respects n_unit).
-        # Builds proper set_result (set_name="IO all sweeps", group1=shown_groups list, p_*/stat_*/eta2, n1 from max eff_n).
-        # group_ns dict for UI n_report (avoids ?). r² integrated via later config block. Matches RM-ANOVA style for statusbar.
         out_results = []
         aspects = []
         if amp:
@@ -537,7 +514,7 @@ def compute_statistical_comparison(
         if slope:
             aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
         if not aspects:
-            aspects = [("amp", "EPSP_amp")]  # fallback
+            aspects = [("amp", "EPSP_amp")]
 
         # Reuse centralized _get_obs (defined in RM path but we hoist it here for implicit branch; it supports tset=None when use_implicit)
         def _get_obs(g, tset, col, per_sweep=False):
@@ -1495,18 +1472,10 @@ def compute_statistical_comparison(
         "norm": norm,
         "amp": amp,
         "slope": slope,
-        "n_unit": n_unit,  # v0.16_n_stats: for statusbar, display, persistence
+        "n_unit": n_unit,
     }
     if use_implicit:
         config["implicit_testset"] = True
-        # IO r² now handled in _compute_io_regression_internal (real X from uistate.io_input + per_sweep melt; Phase 1/2). Dummy np.arange path removed.
-        # Config from IO path already includes r2_per_group, slope_p, etc. for _get_stat_test_warning.
-    # Always return config (even for implicit with no out_results) so _get_stat_test_warning sees implicit_testset + r2 + n_unit.
-    # This fixes "no statusbar at all" when switching from time-course (which had results) to IO.
-    # v0.17_io_statusbar_fix: implicit ANOVA branch returns early with real results; here out_results populated for t-test implicit or non-IO.
-    if use_implicit and test_type == "ANOVA" and not out_results:
-        # fallback (should not reach here)
-        pass
     return {
         "results": out_results,
         "config": config,
