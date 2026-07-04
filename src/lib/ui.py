@@ -1475,6 +1475,7 @@ class UIsub(
             + list(self._RADIO_TO_TEST_T_TAILS)
             + list(self._RADIO_TO_TEST_WILCOX_VARIANT)
             + list(self._RADIO_TO_TEST_WILCOX_TAILS)
+            + list(self._RADIO_TO_TEST_N)  # v0.16_n_stats
         ):
             if hasattr(self, radio_name):
                 getattr(self, radio_name).setEnabled(False)
@@ -1496,6 +1497,7 @@ class UIsub(
             + list(self._RADIO_TO_TEST_T_TAILS)
             + list(self._RADIO_TO_TEST_WILCOX_VARIANT)
             + list(self._RADIO_TO_TEST_WILCOX_TAILS)
+            + list(self._RADIO_TO_TEST_N)  # v0.16_n_stats
         ):
             if hasattr(self, radio_name):
                 getattr(self, radio_name).setEnabled(True)
@@ -1794,8 +1796,15 @@ class UIsub(
                 return "Show at least one test set to run the test"
 
         # Success path: build p-value summary for statusbar (uses uistate.formal_test_results)
-        # Only includes aspects that are currently shown (EPSP_amp / EPSP_slope checkboxes).
+        # v0.16_n_stats: also check comp for n_unit / hierarchy warnings (error key or config["n_unit"]).
+        # Old projects trigger exact statusbar string "<n_unit> not assigned for included recording(s)".
         if hasattr(uistate, "formal_test_results") and uistate.formal_test_results:
+            # Check first result for hierarchy warning from compute_statistical_comparison (Phase 0)
+            first_res = uistate.formal_test_results[0] if uistate.formal_test_results else {}
+            if first_res.get("error") and "not assigned" in str(first_res.get("error", "")):
+                uistate.statusbar_state = "warning"
+                return first_res["error"]
+            n_unit = first_res.get("n_unit") or first_res.get("config", {}).get("n_unit") or getattr(uistate, "buttonGroup_test_n", "subject")
             amp_enabled = bool(getattr(uistate, "checkBox", {}).get("EPSP_amp", True))
             slope_enabled = bool(getattr(uistate, "checkBox", {}).get("EPSP_slope", True))
             fdr = bool(getattr(uistate, "test_fdr", False))
@@ -1824,6 +1833,18 @@ class UIsub(
                 global_notes.append("(cluster)")
                 if variant == "paired" and len(shown_groups or []) == 1:
                     global_notes.append("(paired)")
+            # v0.16_n_stats: n1/n2 must be bound unconditionally before use (Phase 0 regression fix). Use n from results.
+            n1 = first_res.get("n1") or first_res.get("n") or getattr(uistate, "n1", None) or "?"
+            n2 = first_res.get("n2") or getattr(uistate, "n2", None) or "?"
+            n_unit = first_res.get("n_unit") or getattr(uistate, "buttonGroup_test_n", "subject")
+            if n_unit == "subject":
+                unit_str = "subjects"
+            elif n_unit == "slice":
+                unit_str = "slices"
+            else:
+                unit_str = "recordings"
+            n_count = len(first_res.get("value", [])) or n1 or "?"
+            global_notes.append(f"(n={n_count} {unit_str})")
             prefix = test_type
             if global_notes:
                 prefix = f"{test_type} {' '.join(global_notes)}"
@@ -2062,8 +2083,11 @@ class UIsub(
             n1 = len(self.dd_groups.get(g1, {}).get("rec_IDs", [])) if g1 else 0
             n2 = len(self.dd_groups.get(g2, {}).get("rec_IDs", [])) if g2 else 0
 
+            # v0.16_n_stats Phase 0: pass n_unit from uistate (default subject per protocol)
+            n_unit = getattr(uistate, "buttonGroup_test_n", "subject")
+
             # Build results using analysis layer.
-            # Each n = average of aspect over sweeps in the test set for one recording.
+            # n_unit selects statistical unit (subject default; see _aggregate_to_unit_level).
             try:
                 comp = stats.compute_statistical_comparison(
                     groups=shown_groups,
@@ -2078,6 +2102,7 @@ class UIsub(
                     amp=amp,
                     slope=slope,
                     ref=ref_value,
+                    n_unit=n_unit,
                 )
                 results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
             except Exception as ex:
@@ -2098,7 +2123,9 @@ class UIsub(
             sw = bool(getattr(uistate, "test_sw", False))
             lev = bool(getattr(uistate, "test_levene", False))
             effective_variant = "unpaired" if test_type == "Cluster perm." else variant
-            self.usage(f"stat_test applied: {test_type} {effective_variant} {tails} on {set_names} (fdr={fdr}, sw={sw}, levene={lev})")
+            self.usage(
+                f"stat_test applied: {test_type} {effective_variant} {tails} on {set_names} (fdr={fdr}, sw={sw}, levene={lev}, n_unit={n_unit})"
+            )
             self._refresh_test_statusbar()
         except Exception as ex:
             print(f"Statistical test: aborted (not applicable or internal issue): {ex}")
@@ -2880,6 +2907,15 @@ class UIsub(
     }
     _TEST_WILCOX_TAILS_TO_RADIO = {v: k for k, v in _RADIO_TO_TEST_WILCOX_TAILS.items()}
 
+    # v0.16_n_stats: n_unit radios (subject default per statistical_protocol.md + clarifications)
+    # Follows exact existing pattern for test_* groups (no overhaul).
+    _RADIO_TO_TEST_N = {
+        "radioButton_test_n_subject": "subject",
+        "radioButton_test_n_slice": "slice",
+        "radioButton_test_n_rec": "recording",
+    }
+    _TEST_N_TO_RADIO = {v: k for k, v in _RADIO_TO_TEST_N.items()}
+
     def io_input_changed(self, button):
         """Handler for buttonGroup_io_i.buttonClicked signal."""
         io_input = self._RADIO_TO_IO_I.get(button.objectName())
@@ -3009,6 +3045,18 @@ class UIsub(
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.apply_statistical_test_if_active()
 
+    def n_unit_changed(self, button):
+        """v0.16_n_stats: n_unit radio handler (exact match to test_t_variant_changed pattern per clarification/best practice).
+        Updates uistate, saves cfg, triggers re-compute + statusbar. Default subject.
+        """
+        if button is None:
+            return
+        n_unit = self._RADIO_TO_TEST_N.get(button.objectName(), "subject")
+        print(f"Selected n_unit: {n_unit}")
+        uistate.buttonGroup_test_n = n_unit
+        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.apply_statistical_test_if_active()
+
     def update_experiment_type_radio_buttons(self):
         """Enable/disable and select experiment type radio buttons for the current selection."""
         if not hasattr(self, "buttonGroup_type"):
@@ -3061,6 +3109,7 @@ class UIsub(
             + list(self._RADIO_TO_TEST_T_TAILS)
             + list(self._RADIO_TO_TEST_WILCOX_VARIANT)
             + list(self._RADIO_TO_TEST_WILCOX_TAILS)
+            + list(self._RADIO_TO_TEST_N)  # v0.16_n_stats
         ):
             if hasattr(self, radio_name):
                 radio = getattr(self, radio_name)
@@ -3524,6 +3573,15 @@ class UIsub(
                     pass
             else:
                 self.buttonGroup_wilcoxon_tails.buttonClicked.connect(self.test_wilcox_tails_changed)
+        # v0.16_n_stats: n_unit radio group (minimal wiring per clarification; exact match to test_t_variant_changed pattern)
+        if hasattr(self, "buttonGroup_test_n"):
+            if disconnect:
+                try:
+                    self.buttonGroup_test_n.buttonClicked.disconnect()
+                except TypeError:
+                    pass
+            else:
+                self.buttonGroup_test_n.buttonClicked.connect(self.n_unit_changed)
         # hide buttons
         hide_buttons = {
             "pushButton_hide_stim": "frameToolStim",
@@ -3794,6 +3852,12 @@ class UIsub(
             )
             if hasattr(self, wilcox_tails_name):
                 getattr(self, wilcox_tails_name).setChecked(True)
+        # v0.16_n_stats: default n_unit radio to subject (per clarification + plan Phase 0)
+        if hasattr(self, "buttonGroup_test_n"):
+            default_n = getattr(uistate, "buttonGroup_test_n", "subject")
+            radio_name = self._TEST_N_TO_RADIO.get(default_n, "radioButton_test_n_subject")
+            if hasattr(self, radio_name):
+                getattr(self, radio_name).setChecked(True)
         if hasattr(self, "frameToolTest_t"):
             self.frameToolTest_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
             # hook the one-sample value lineEdit (default 0.0 from UIState)

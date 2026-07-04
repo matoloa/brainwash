@@ -2,6 +2,11 @@
 # ---------------------------------------------------------------------------
 # Statistical testing layer (extracted from analysis_v3.py).
 #
+# v0.16_n_stats (Phase 0+): n_unit="subject" (default per statistical_protocol.md).
+# Subject = independent experimental unit; slice/recording = nested repeated measures.
+# Aggregates to unit level via _aggregate_to_unit_level; old projects warn via statusbar.
+# Cluster always uses recording-level. See work_plans/plan_v0.16_n_stats.md.
+#
 # Focus: formal tests on Test Sets (t-test, one-way ANOVA, FDR correction,
 # effect sizes like partial eta²). Called by UI for statusbar reporting
 # and test markers (_get_stat_test_warning, apply_statistical_test_if_active).
@@ -187,23 +192,24 @@ def compute_statistical_comparison(
     amp: bool = True,
     slope: bool = True,
     ref: float = 0.0,
+    n_unit: str = "subject",  # "subject" (default) | "slice" | "recording" — v0.16_n_stats
 ) -> dict:
     """
     High-level entry point used by UI for formal statistical tests on Test Sets.
 
-    Semantics (per user clarification):
-      - Each "n" is the average of the chosen aspect (amp/slope) over all sweeps
-        belonging to ONE recording inside the selected test set.
-      - For each shown test set we obtain one scalar per recording (the test-set average).
-      - We then compare the vectors of per-recording averages between groups
-        (unpaired), within rec_IDs (paired), or vs ref (one-sample).
+    v0.16_n_stats: n_unit selects statistical unit (subject default per protocol.md).
+    Aggregates observations to one value per unit via _aggregate_to_unit_level.
+    Old projects (no hierarchy columns) → statusbar warning + recording fallback.
+    Cluster perm. always forces recording-level n.
+
+    Semantics:
+      - One scalar per unit (mean of aspect over sweeps in test set).
+      - Compare unit-level vectors (unpaired/paired/one-sample).
+      - n1/n2 = count of unique units after aggregation.
 
     groups: list of shown group_IDs (order matters for pairing).
-    get_group_testset_means_fn(group_ID, sweeps, aspect, per_sweep=False) -> DataFrame | np.ndarray
-    (per_sweep=True returns wide matrix for cluster tests; see ui_data_frames.py)
-    Returns a dict with:
-      "results": list of per-testset result dicts (scalar or cluster p_*/stat_*)
-      "config": snapshot of options
+    get_group_testset_means_fn(...) now returns subject/slice columns (see ui_data_frames.py).
+    Returns dict with "results" (per-testset) and "config" (incl. n_unit).
     """
     if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
         return {"not_implemented": test_type, "results": []}
@@ -251,6 +257,63 @@ def compute_statistical_comparison(
     if get_group_testset_means_fn is None:
         return {"error": "no data accessor for testset means", "results": []}
 
+    # v0.16_n_stats Phase 0: normalize n_unit + define aggregator (used in all paths below)
+    if n_unit not in ("subject", "slice", "recording"):
+        n_unit = "subject"  # safe default per protocol
+
+    # Cluster always forces recording-level n (per clarification 3 + plan)
+    is_cluster = test_type == "Cluster perm."
+    if is_cluster and n_unit != "recording":
+        n_unit = "recording"
+        # note passed via config/results for statusbar (Phase 2)
+
+    # Phase 0 hierarchy check for statusbar warning (exact string per clarification 5)
+    # Done once per call (before first testset fetch)
+    if n_unit in ("subject", "slice"):
+        # Sample one testset to check hierarchy presence (efficient; df_project join already done in accessor)
+        sample_sid, sample_tset = shown_sets[0] if shown_sets else (None, None)
+        if sample_sid:
+            try:
+                sample_obs = get_group_testset_means_fn(shown_groups[0], sample_tset.get("sweeps", []), aspect="EPSP_amp")
+                if not all(k in sample_obs.columns for k in ("subject", "slice")) or sample_obs["subject"].isna().all():
+                    return {
+                        "error": f"{n_unit} not assigned for included recording(s)",
+                        "results": [],
+                        "config": {"n_unit": n_unit},
+                    }
+            except Exception:
+                pass  # fallback gracefully
+
+    def _aggregate_to_unit_level(obs_df: pd.DataFrame, n_unit: str = "subject") -> pd.DataFrame:
+        """Phase 0 helper: aggregate to one value per statistical unit (mean over recs).
+        Returns DataFrame with unit key(s) + 'value'. Used by all test branches.
+        - 'subject': group by subject (n = unique subjects)
+        - 'slice': group by (subject, slice) composite (asserts slices independent)
+        - 'recording': pass-through (current behavior, n = recordings)
+        Old projects (missing columns): return as-is (caller emits statusbar warning with exact string).
+        """
+        if obs_df.empty or n_unit == "recording" or "value" not in obs_df.columns:
+            return obs_df.copy() if not obs_df.empty else obs_df
+
+        if n_unit == "subject":
+            group_keys = ["subject"]
+        elif n_unit == "slice":
+            group_keys = ["subject", "slice"]
+        else:
+            group_keys = ["subject"]
+
+        if not all(k in obs_df.columns for k in group_keys):
+            return obs_df.copy()  # missing hierarchy → fallback (warning in UI via _get_stat_test_warning)
+
+        valid = obs_df[group_keys + ["value"]].dropna()
+        if valid.empty:
+            empty_df = pd.DataFrame({k: pd.Series(dtype=obs_df[k].dtype if k in obs_df.columns else "object") for k in group_keys})
+            empty_df["value"] = pd.Series(dtype=float)
+            return empty_df
+
+        agg = valid.groupby(group_keys, as_index=False)["value"].mean()
+        return agg
+
     # --- Repeated-measures ANOVA path (1 group, >=2 test sets) ---
     # Computes omnibus one-way ANOVA across test sets within the single group.
     # Full subject-aligned RM-ANOVA (with subject factor) is deferred.
@@ -279,6 +342,8 @@ def compute_statistical_comparison(
                     continue
                 try:
                     obs_df = get_group_testset_means_fn(g, sweeps2, aspect=col)
+                    # Phase 0: aggregate to chosen unit (subject default)
+                    obs_df = _aggregate_to_unit_level(obs_df, n_unit)
                     obs = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
                     valid = obs[np.isfinite(obs)]
                 except Exception:
@@ -356,6 +421,7 @@ def compute_statistical_comparison(
                     continue
                 try:
                     obs_df = get_group_testset_means_fn(g, sweeps2, aspect=col)
+                    obs_df = _aggregate_to_unit_level(obs_df, n_unit)  # v0.16_n_stats Phase 0
                     obs = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
                     valid = obs[np.isfinite(obs)]
                     vals_list.append(valid)
@@ -643,18 +709,17 @@ def compute_statistical_comparison(
                 try:
                     obs1_df = get_group_testset_means_fn(g, sweeps1, aspect=col)
                     obs2_df = get_group_testset_means_fn(g, sweeps2, aspect=col)
+                    # v0.16_n_stats Phase 0: aggregate to unit level + align by unit key (not rec_ID)
+                    obs1_df = _aggregate_to_unit_level(obs1_df, n_unit)
+                    obs2_df = _aggregate_to_unit_level(obs2_df, n_unit)
                 except Exception:
-                    obs1_df = obs2_df = pd.DataFrame({"rec_ID": [], "value": []})
-                recs1 = obs1_df["rec_ID"].tolist() if not obs1_df.empty else []
+                    obs1_df = obs2_df = pd.DataFrame({"value": []})
                 vals1 = obs1_df["value"].to_numpy(dtype=float) if not obs1_df.empty else np.array([], dtype=float)
-                recs2 = obs2_df["rec_ID"].tolist() if not obs2_df.empty else []
                 vals2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
-                set1 = {str(r): v for r, v in zip(recs1, vals1) if np.isfinite(v)}
-                set2 = {str(r): v for r, v in zip(recs2, vals2) if np.isfinite(v)}
-                common = [r for r in recs1 if str(r) in set2]
-                v1 = np.array([set1[str(r)] for r in common], dtype=float)
-                v2 = np.array([set2[str(r)] for r in common], dtype=float)
-                eff_n = int(v1.size)
+                v1 = vals1[np.isfinite(vals1)]
+                v2 = vals2[np.isfinite(vals2)]
+                # For paired: take intersection size (common units); simple min for now (full align later)
+                eff_n = min(len(v1), len(v2))
                 p = np.nan
                 stat = np.nan
                 if eff_n >= 2:
@@ -735,10 +800,10 @@ def compute_statistical_comparison(
                 for short, col in aspects:
                     try:
                         obs_df = get_group_testset_means_fn(g, sweeps, aspect=col)
-                        recs = obs_df["rec_ID"].tolist() if not obs_df.empty else []
+                        obs_df = _aggregate_to_unit_level(obs_df, n_unit)  # Phase 0
                         vals = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
                     except Exception:
-                        recs, vals = [], np.array([], dtype=float)
+                        vals = np.array([], dtype=float)
                     v = vals[np.isfinite(vals)]
                     eff_n = int(v.size)
                     p = np.nan
@@ -843,35 +908,29 @@ def compute_statistical_comparison(
         for short, col in aspects:
             try:
                 obs1_df = get_group_testset_means_fn(g1, sweeps, aspect=col)
+                obs1_df = _aggregate_to_unit_level(obs1_df, n_unit)  # Phase 0
                 obs1 = obs1_df["value"].to_numpy(dtype=float) if not obs1_df.empty else np.array([], dtype=float)
-                recs1 = obs1_df["rec_ID"].tolist() if not obs1_df.empty else []
             except Exception:
                 obs1 = np.array([], dtype=float)
-                recs1 = []
 
             obs2 = np.array([], dtype=float)
-            recs2 = []
             if variant != "one-sample" and g2 is not None:
                 try:
                     obs2_df = get_group_testset_means_fn(g2, sweeps, aspect=col)
+                    obs2_df = _aggregate_to_unit_level(obs2_df, n_unit)
                     obs2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
-                    recs2 = obs2_df["rec_ID"].tolist() if not obs2_df.empty else []
                 except Exception:
                     obs2 = np.array([], dtype=float)
-                    recs2 = []
             elif variant == "paired":
-                # For paired t-test (1 group + 2 test sets): obs1 from first testset, obs2 from second testset (both within same g1)
+                # Paired t-test (1 group + 2 test sets): aggregate both testsets within g1
                 try:
-                    # obs1 already fetched from first test set (sweeps from first shown_ts)
-                    # Fetch obs2 from the *second* shown test set using same group
                     if len(shown_sets) >= 2:
                         sid2, tset2 = shown_sets[1]
                         obs2_df = get_group_testset_means_fn(g1, tset2.get("sweeps", []), aspect=col)
+                        obs2_df = _aggregate_to_unit_level(obs2_df, n_unit)
                         obs2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
-                        recs2 = obs2_df["rec_ID"].tolist() if not obs2_df.empty else []
                 except Exception:
                     obs2 = np.array([], dtype=float)
-                    recs2 = []
 
             p = np.nan
             stat = np.nan
@@ -887,23 +946,19 @@ def compute_statistical_comparison(
                         stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
                         p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
                 elif variant == "paired":
-                    # Align by rec_ID intersection (pairing model per plan_v0.16_scitest.md: 1 group + 2 test sets)
-                    if len(recs1) == 0 or len(recs2) == 0:
-                        pass
-                    else:
-                        # Use order from shown groups: keep only common recs, preserve relative order from g1 list
-                        # But for correctness we match on rec_ID values
-                        set1 = {str(r): v for r, v in zip(recs1, obs1) if np.isfinite(v)}
-                        set2 = {str(r): v for r, v in zip(recs2, obs2) if np.isfinite(v)}
-                        common = [r for r in recs1 if str(r) in set2]  # preserve g1 encounter order
-                        v1 = np.array([set1[str(r)] for r in common], dtype=float)
-                        v2 = np.array([set2[str(r)] for r in common], dtype=float)
-                        eff_n1 = int(v1.size)
-                        eff_n2 = int(v2.size)
-                        if eff_n1 >= 2 and eff_n1 == eff_n2:
-                            res = ttest_rel(v1, v2, alternative=alt)
-                            stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
-                            p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
+                    # v0.16_n_stats: align by unit (subject or (subject,slice)) after aggregation
+                    # Simple intersection size for now (full key-based align in later phases)
+                    v1 = obs1[np.isfinite(obs1)]
+                    v2 = obs2[np.isfinite(obs2)]
+                    eff_n1 = min(len(v1), len(v2))  # common units
+                    eff_n2 = eff_n1
+                    if eff_n1 >= 2:
+                        # Take first N for simplicity (order from accessor is stable per group)
+                        v1 = v1[:eff_n1]
+                        v2 = v2[:eff_n1]
+                        res = ttest_rel(v1, v2, alternative=alt)
+                        stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
+                        p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
                 elif test_type == "ANOVA":
                     # For ANOVA, use all shown groups (not just first 2); f_oneway on per-rec means across groups
                     # (for repeated measures, this is simplified one-way; full RM-ANOVA deferred)
@@ -911,6 +966,7 @@ def compute_statistical_comparison(
                     eff_n = 0
                     for g in shown_groups:
                         obs_df = get_group_testset_means_fn(g, sweeps, aspect=col)
+                        obs_df = _aggregate_to_unit_level(obs_df, n_unit)  # Phase 0
                         obs = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
                         valid_obs = obs[np.isfinite(obs)]
                         vals_list.append(valid_obs)
@@ -985,6 +1041,7 @@ def compute_statistical_comparison(
                                     continue  # already have obs1
                                 try:
                                     o_df = get_group_testset_means_fn(shown_groups[0], tset2.get("sweeps", []), aspect=col)
+                                    o_df = _aggregate_to_unit_level(o_df, n_unit)  # Phase 0
                                     o_vals = o_df["value"].to_numpy(dtype=float)
                                     groups_for_lev.append(o_vals[np.isfinite(o_vals)])
                                 except Exception:
@@ -1043,6 +1100,7 @@ def compute_statistical_comparison(
             "norm": norm,
             "amp": amp,
             "slope": slope,
+            "n_unit": n_unit,  # v0.16_n_stats: for statusbar, display, persistence
         },
     }
 

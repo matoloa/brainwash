@@ -629,14 +629,14 @@ class DataFrameMixin:
         return pd.DataFrame(data, columns=cols)
 
     def get_group_testset_means(self, group_ID, sweeps, aspect="EPSP_amp", per_sweep: bool = False):
-        """Return DataFrame with ['rec_ID', 'value'] — one row per recording in the group (default).
-        If per_sweep=True (for cluster permutation test): returns wide DataFrame with
-        columns=['rec_ID', '0', '1', ..., 'N'] containing per-sweep raw values (n_recs rows).
-        Rows are sorted by rec_ID order. NaNs preserved for missing sweeps/recs.
-        Re-uses get_group_obs_for_sweeps internally.
+        """Return DataFrame with ['rec_ID', 'value'] (+ subject, slice after v0.16_n_stats).
+        If per_sweep=True (cluster): wide DataFrame with rec_ID + per-sweep columns.
+        Always joins subject/slice from df_project (NaN for old projects; Phase 0).
+        Rows sorted by rec_ID. Re-uses get_group_obs_for_sweeps internally.
         """
         if not group_ID or not sweeps:
-            return pd.DataFrame(columns=["rec_ID", "value"] if not per_sweep else ["rec_ID"] + [str(s) for s in sorted(sweeps)])
+            cols = ["rec_ID", "value"] if not per_sweep else ["rec_ID"] + [str(s) for s in sorted(sweeps)]
+            return pd.DataFrame(columns=cols)
 
         obs = self.get_group_obs_for_sweeps(group_ID, sweeps, aspect=aspect)
         if obs is None or obs.empty or "rec_ID" not in obs.columns:
@@ -645,21 +645,32 @@ class DataFrameMixin:
             return pd.DataFrame(columns=["rec_ID", "value"])
 
         if per_sweep:
-            # Return wide matrix form exactly as built by get_group_obs_for_sweeps
-            # (rec_ID + one column per sweep). Caller can .drop(columns=['rec_ID']).to_numpy()
-            # or use directly. Preserves rec_ID order for pairing/alignment.
-            return obs.copy()  # already in desired wide format
+            # Wide matrix (rec_ID + sweeps). Preserve for caller.
+            out = obs.copy()
+        else:
+            # Scalar mean path (backward compatible)
+            sweep_cols = [c for c in obs.columns if c != "rec_ID"]
+            if not sweep_cols:
+                out = pd.DataFrame(columns=["rec_ID", "value"])
+            else:
+                mean_vals = obs[sweep_cols].mean(axis=1, skipna=True)
+                out = pd.DataFrame({"rec_ID": obs["rec_ID"].values, "value": mean_vals.values})
+                out = out[pd.to_numeric(out["value"], errors="coerce").notna()].copy()
+                out["value"] = pd.to_numeric(out["value"], errors="coerce")
+                out = out.reset_index(drop=True)
 
-        # Original scalar mean path (unchanged, backward compatible)
-        sweep_cols = [c for c in obs.columns if c != "rec_ID"]
-        if not sweep_cols:
-            return pd.DataFrame(columns=["rec_ID", "value"])
-        # mean across the testset sweeps for this rec (skipna so partial coverage still yields a value)
-        mean_vals = obs[sweep_cols].mean(axis=1, skipna=True)
-        out = pd.DataFrame({"rec_ID": obs["rec_ID"].values, "value": mean_vals.values})
-        out = out[pd.to_numeric(out["value"], errors="coerce").notna()].copy()
-        out["value"] = pd.to_numeric(out["value"], errors="coerce")
-        return out.reset_index(drop=True)
+        # Phase 0 (v0.16_n_stats): always join hierarchy columns (non-breaking)
+        # Uses df_project.ID == rec_ID (df_project uses ID as primary key).
+        df_p = self.get_df_project()
+        if not df_p.empty and "subject" in df_p.columns:
+            hierarchy = df_p[["ID", "subject", "slice"]].rename(columns={"ID": "rec_ID"})
+            out = out.merge(hierarchy, on="rec_ID", how="left")
+            # Ensure subject/slice are present even if no match (old projects)
+            for col in ("subject", "slice"):
+                if col not in out.columns:
+                    out[col] = pd.NA
+
+        return out
 
     # ------------------------------------------------------------------
     # Group sample DataFrame

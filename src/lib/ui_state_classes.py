@@ -197,6 +197,7 @@ class UIstate:
         self.test_wilcox_tails = "two-sided"
         self.label_test_wilcox_one_sample_value = 0.0
         self.anova_label = "ANOVA (one-way)"  # updated dynamically based on # of shown test sets
+        self.buttonGroup_test_n = "subject"  # v0.16_n_stats Phase 0 default (per clarification + protocol)
         # v0.16 Cluster perm. support
         self.test_cluster = False
         self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
