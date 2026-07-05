@@ -1,6 +1,6 @@
 # PR-08a: Extract cluster perm (move only)
 
-**Status**: NEXT | **Depends on**: 07 | **Max production diff**: ~205 LOC moved
+**Status**: ✅ DONE | **Depends on**: 07 | **Max production diff**: ~205 LOC moved
 
 ## Goal
 

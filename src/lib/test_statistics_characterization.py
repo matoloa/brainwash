@@ -3,6 +3,8 @@
 Start minimal (5 tests). Expand per work_plans/plan_statistics_refactor.md only when a phase needs it.
 """
 
+import pytest
+
 from load_brainwash_statistics import load_brainwash_statistics_module
 
 brainwash_statistics = load_brainwash_statistics_module()
@@ -100,3 +102,22 @@ def test_not_implemented_test_type():
     )
     assert out.get("not_implemented") == "Kruskal-Wallis"
     assert out.get("results") == []
+
+
+def test_cluster_perm_between_groups_smoke():
+    pytest.importorskip("mne")
+    g1_vals = [("r1", "s1", 1.0), ("r2", "s1", 1.2), ("r3", "s2", 1.1)]
+    g2_vals = [("r4", "s3", 2.5), ("r5", "s3", 2.7), ("r6", "s4", 2.6)]
+    out = compute_statistical_comparison(
+        groups=["G1", "G2"],
+        dd_groups=make_dd_groups("G1", "G2"),
+        dd_testsets=make_dd_testsets("TS1", sweeps=[1, 2, 3]),
+        get_group_testset_means_fn=make_scalar_accessor({"G1": g1_vals, "G2": g2_vals}),
+        test_type="Cluster perm.",
+        amp=True,
+        slope=False,
+        n_unit="subject",
+    )
+    assert "error" not in out
+    assert out.get("config", {}).get("test_type") == "Cluster perm."
+    assert out.get("results")

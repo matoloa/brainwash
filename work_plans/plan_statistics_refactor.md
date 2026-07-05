@@ -20,8 +20,8 @@
 | 05 | [05_extract_friedman.md](statistics_refactor/05_extract_friedman.md) | ✅ done |
 | 06 | [06_extract_rm_anova.md](statistics_refactor/06_extract_rm_anova.md) | ✅ done |
 | 07 | [07_extract_wilcoxon.md](statistics_refactor/07_extract_wilcoxon.md) | ✅ done |
-| 08a | [08a_extract_cluster_perm_move.md](statistics_refactor/08a_extract_cluster_perm_move.md) | **NEXT** |
-| 08b | [08b_extract_cluster_perm_cleanup.md](statistics_refactor/08b_extract_cluster_perm_cleanup.md) | pending |
+| 08a | [08a_extract_cluster_perm_move.md](statistics_refactor/08a_extract_cluster_perm_move.md) | ✅ done |
+| 08b | [08b_extract_cluster_perm_cleanup.md](statistics_refactor/08b_extract_cluster_perm_cleanup.md) | **NEXT** |
 | 09 | [09_extract_ttest_main_loop.md](statistics_refactor/09_extract_ttest_main_loop.md) | pending |
 | 10 | [10_extract_validation_and_implicit_anova.md](statistics_refactor/10_extract_validation_and_implicit_anova.md) | pending |
 | 11 | [11_facade_and_cleanup.md](statistics_refactor/11_facade_and_cleanup.md) | pending |
