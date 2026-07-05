@@ -1,6 +1,6 @@
 # PR-11: Facade + cleanup
 
-**Status**: NEXT | **Depends on**: 10 | **Max production diff**: ~100 LOC
+**Status**: ✅ DONE | **Depends on**: 10 | **Max production diff**: ~100 LOC
 
 ## Goal
 

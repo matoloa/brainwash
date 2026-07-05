@@ -20,7 +20,7 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
 3. **Architectural Guidelines (Especially for UI/Stats Layer)**
    - **Experiment Type & Test Handling**:
      - `experiment_type="io"` is first-class. Use it directly rather than `"ANCOVA"` sentinel leaking into `compute_statistical_comparison`.
-     - IO regression (`_compute_io_regression_internal`) must be reachable without test_type guard bypasses. Hoist IO check early in `statistics.py:compute_statistical_comparison` (before L458 guard).
+     - IO regression (`_compute_io_regression_internal`) must be reachable without test_type guard bypasses. IO guard stays early in `brainwash_stats/dispatcher.py:compute_statistical_comparison` (before implicit ANOVA).
      - `_get_stat_test_warning` and `_refresh_test_statusbar` must remain pure (no side effects, no recursion). Statusbar state lives in `uistate`.
      - Prefer explicit parameter passing over `getattr(uistate, "...")` fallbacks or bound-method `__self__` recovery.
    - **State & Singletons**: `uistate` (from `ui_state_classes.py`) is the source of truth. Module-level injection in mixins is acceptable but document it.
@@ -32,7 +32,7 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
    - Rename **conservatively** when names cause confusion or bugs — especially stdlib collisions, duplicate nested helpers, cryptic abbreviations (`_get_obs`). **One rename family per PR**; keep public API stable unless the user approves.
    - **Stable stats public API**: `compute_statistical_comparison`, `ttest_per_sweep`, `ui.py` import `from . import statistics as stats`.
    - **Tests**: never `from statistics import …` (stdlib); use `load_brainwash_statistics.load_brainwash_statistics_module()`.
-   - Rename map for the active refactor: `.grok/rules/naming-and-stats-refactor.md` and `plan_statistics_refactor.md` START HERE.
+   - Stats package layout: `src/lib/brainwash_stats/`; facade `src/lib/statistics.py`. Naming notes: `.grok/rules/naming-and-stats-refactor.md`.
 
 5. **Code Style & Conventions (Extends CONTRIBUTING.md)**
    - Follow Black (`line-length=150`), isort, flake8.
@@ -42,13 +42,12 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
    - **Comments**: Only for why (not what). Reference plans only if active. Use `file:line` pattern when referencing code.
    - **Security/Quality**: Avoid injection risks. Trust framework guarantees inside boundaries.
 
-6. **Active work: statistics refactor only**
-   - **Index** (~25 lines): `work_plans/plan_statistics_refactor.md` — find **NEXT** PR in table.
-   - **One card per session**: `work_plans/statistics_refactor/NN_*.md` only (~40 lines each). Never read `_archive_full_spec.md` unless stuck.
-   - **Scope**: `statistics.py` → `brainwash_stats/`. **No** `ui.py`. Cancelled: `History/plan_statusbar_ui.md`.
-   - **Forbidden**: `StatContext`, `ComparisonMode`, `MODE_HANDLERS`, guard reordering.
-   - **Verify**: [VERIFY.md](work_plans/statistics_refactor/VERIFY.md) — pytest only unless user asks more.
-   - Naming: `.grok/rules/naming-and-stats-refactor.md`
+6. **Statistics layer** (refactor complete — PRs 00–11)
+   - **Facade**: `src/lib/statistics.py` re-exports `compute_statistical_comparison`, `ttest_per_sweep`, `_bh_fdr`.
+   - **Implementation**: `src/lib/brainwash_stats/` (`dispatcher.py`, `validation.py`, `formal_tests/`, `io/`, etc.).
+   - **Tests**: `uv run pytest src/lib/test_statistics_characterization.py -q`; use `load_brainwash_statistics.py` in tests (never stdlib `statistics`).
+   - **Archived plan**: `work_plans/History/plan_statistics_refactor.md` + `work_plans/History/statistics_refactor/`.
+   - **Forbidden** (still): `StatContext`, `ComparisonMode`, `MODE_HANDLERS`, guard reordering in dispatcher.
 
 7. **Workflow for Common Tasks**
    - **Bug Fix**: `grep` for related code → read key functions → propose minimal change → edit → `check-work` → test.
@@ -66,7 +65,7 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
 
 9. **Project Structure Highlights** (from CONTRIBUTING.md)
    - `src/lib/ui.py`: Largest file (UIsub + mixins). Statusbar, test dispatch, experiment_type logic lives here.
-   - `src/lib/statistics.py`: `compute_statistical_comparison` + IO regression helpers (`_compute_io_regression_internal`, `_get_io_xy_pairs`).
+   - `src/lib/statistics.py`: thin facade; stats logic in `src/lib/brainwash_stats/`.
    - `src/lib/ui_state_classes.py`: `uistate` singleton.
    - Plans are in `work_plans/` (move outdated to `History/`).
    - See full layout in CONTRIBUTING.md.

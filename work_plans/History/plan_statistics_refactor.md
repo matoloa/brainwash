@@ -1,6 +1,6 @@
-# Statistics refactor — agent index
+# Statistics refactor — agent index (COMPLETE — archived)
 
-> **Read this file only** (~25 lines). Then open **one** micro-plan below. Never load the archive spec in the same session.
+> **Status**: All PRs 00–11 done. Plan archived to `work_plans/History/`. Implementation lives in `src/lib/brainwash_stats/`.
 
 ## Active scope
 
@@ -24,7 +24,7 @@
 | 08b | [08b_extract_cluster_perm_cleanup.md](statistics_refactor/08b_extract_cluster_perm_cleanup.md) | ✅ done |
 | 09 | [09_extract_ttest_main_loop.md](statistics_refactor/09_extract_ttest_main_loop.md) | ✅ done |
 | 10 | [10_extract_validation_and_implicit_anova.md](statistics_refactor/10_extract_validation_and_implicit_anova.md) | ✅ done |
-| 11 | [11_facade_and_cleanup.md](statistics_refactor/11_facade_and_cleanup.md) | **NEXT** |
+| 11 | [11_facade_and_cleanup.md](statistics_refactor/11_facade_and_cleanup.md) | ✅ done |
 
 After each PR: mark card ✅ in this table, set **NEXT** on the following row.
 
