@@ -8,19 +8,16 @@
 import numpy as np
 import pandas as pd
 from scipy import stats  # for t.cdf in one-sample approximation
-from scipy.stats import f_oneway, ttest_ind_from_stats
+from scipy.stats import ttest_ind_from_stats
 
-from .brainwash_stats.data import (
-    _aggregate_to_unit_level,
-    _aspect_measurement_columns,
-    _make_group_testset_observation_accessor,
-)
 from .brainwash_stats.formal_tests.anova_rm import run_repeated_measures_anova
 from .brainwash_stats.formal_tests.friedman import run_friedman_omnibus
 from .brainwash_stats.formal_tests.cluster_perm import run_cluster_permutation
 from .brainwash_stats.formal_tests.ttest_and_between import run_main_test_set_loop
 from .brainwash_stats.formal_tests.wilcoxon import run_wilcoxon_tests
+from .brainwash_stats.io.implicit_anova import run_io_implicit_anova
 from .brainwash_stats.io.regression import _compute_io_regression_internal
+from .brainwash_stats.validation import comparison_context, validate_comparison_inputs
 
 # ---------------------------------------------------------------------------
 # Per-sweep test helpers
@@ -198,63 +195,35 @@ def compute_statistical_comparison(
     groups: list of shown group_IDs.
     Returns dict with "results" and "config" (incl. n_unit, implicit_testset if used).
     """
-    if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
-        return {"not_implemented": test_type, "results": []}
-
-    if not isinstance(dd_groups, dict):
-        return {"error": "no groups defined", "results": []}
-    if groups is None:
-        groups = []
-
-    shown_groups = [g for g in groups if dd_groups.get(g, {}).get("show") in (True, "True", 1, "1", True)]
-    shown_groups = [g for g in shown_groups if len(dd_groups.get(g, {}).get("rec_IDs", [])) > 0]
-    if not shown_groups:
-        return {"error": "no shown groups", "results": []}
-
-    if variant == "one-sample":
-        g1 = shown_groups[0]
-        g2 = None
-    elif test_type == "ANOVA" and len(shown_groups) == 1:
-        # Repeated-measures path: 1 group, compare across test sets (within-subjects)
-        g1 = shown_groups[0]
-        g2 = None
-    elif test_type == "Friedman" and len(shown_groups) == 1:
-        # Repeated-measures Friedman omnibus: 1 group, compare across >=3 test sets
-        g1 = shown_groups[0]
-        g2 = None
-    elif test_type == "Cluster perm.":
-        # Cluster perm. (v0.16): supports >=2 groups (between-subjects via permutation_cluster_test) or 1-group + exactly 2 test sets (paired via permutation_cluster_1samp_test).
-        # Must come before the paired t-test guard and the default 2-group requirement.
-        pass
-    elif variant == "paired":
-        # Paired t-test (v0.16): exactly 1 group + 2 test sets; pair observations by rec_ID within the single group
-        if len(shown_groups) != 1:
-            return {"error": "paired t-test requires exactly 1 group", "results": []}
-        g1 = shown_groups[0]
-        g2 = None  # not used; pairing handled inside ttest_rel branch using 2 test sets
-    else:
-        if len(shown_groups) < 2:
-            return {"error": "need at least two shown groups", "results": []}
-        g1, g2 = shown_groups[0], shown_groups[1]
-
-    # Centralized guard for shown test sets. IO allows empty (implicit all-sweeps).
-    shown_sets = [(sid, info) for sid, info in (dd_testsets or {}).items() if info.get("show", False) and info.get("sweeps")]
-    is_io = experiment_type == "io"
-    use_implicit = False
-    if not shown_sets:
-        if is_io:
-            use_implicit = True
-        else:
-            return {"error": "no shown test sets", "results": []}
-
-    if get_group_testset_means_fn is None:
-        return {"error": "no data accessor for testset means", "results": []}
-
-    fetch_group_testset_observations = _make_group_testset_observation_accessor(
-        get_group_testset_means_fn, use_implicit
+    validation_error = validate_comparison_inputs(
+        groups=groups,
+        dd_groups=dd_groups,
+        dd_testsets=dd_testsets,
+        get_group_testset_means_fn=get_group_testset_means_fn,
+        test_type=test_type,
+        variant=variant,
+        experiment_type=experiment_type,
     )
+    if validation_error is not None:
+        return validation_error
 
-    # Early IO regression guard for experiment_type=="io" + use_implicit. Calls _compute_io_regression_internal.
+    ctx = comparison_context(
+        groups=groups,
+        dd_groups=dd_groups,
+        dd_testsets=dd_testsets,
+        get_group_testset_means_fn=get_group_testset_means_fn,
+        test_type=test_type,
+        variant=variant,
+        experiment_type=experiment_type,
+    )
+    shown_groups = ctx["shown_groups"]
+    g1 = ctx["g1"]
+    g2 = ctx["g2"]
+    shown_sets = ctx["shown_sets"]
+    use_implicit = ctx["use_implicit"]
+    is_io = ctx["is_io"]
+    fetch_group_testset_observations = ctx["fetch_group_testset_observations"]
+
     if is_io and use_implicit:
         if uistate is None:
             uistate = getattr(get_group_testset_means_fn, "__self__", None)
@@ -269,113 +238,18 @@ def compute_statistical_comparison(
             dd_groups=dd_groups,
         )
 
-    # Implicit ANOVA for IO (between-groups on all-sweeps when >=2 groups). Placed early.
     if test_type == "ANOVA" and use_implicit and len(shown_groups) >= 2:
-        out_results = []
-        aspects = _aspect_measurement_columns(amp, slope, norm)
-
-        set_result = {
-            "set_id": "__io_anova_implicit__",
-            "set_name": None,  # sentinel per debug plan v0.16; UI overrides to suppress name for "IO - ANOVA (n_report): ..." format
-            "sweeps": [],
-            "group1": shown_groups,  # all groups for ANOVA context (used in n_report)
-            "n1": 0,
-            "n2": 0,
-            "anova_note": "between-groups one-way on all sweeps (implicit IO)",
-        }
-        raw_p_amp = []
-        raw_p_slope = []
-        group_ns = {}  # per-group n for precise n_report (avoids ?)
-
-        for short, col in aspects:
-            vals_list = []
-            n_per_group = []
-            for g in shown_groups:
-                try:
-                    obs_df = fetch_group_testset_observations(g, None, col)
-                    # Inline aggregation (subject/slice) for implicit IO ANOVA branch.
-                    if n_unit != "recording" and not obs_df.empty and "value" in obs_df.columns:
-                        gkeys = ["subject", "slice"] if n_unit == "slice" else ["subject"]
-                        if all(k in obs_df.columns for k in gkeys):
-                            v = obs_df[gkeys + ["value"]].dropna()
-                            if not v.empty:
-                                obs_df = v.groupby(gkeys, as_index=False)["value"].mean()
-                    obs = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
-                    valid = obs[np.isfinite(obs)]
-                    vals_list.append(valid)
-                    n_per_group.append(len(valid))
-                    group_ns[g] = max(group_ns.get(g, 0), len(valid))
-                except Exception:
-                    vals_list.append(np.array([], dtype=float))
-                    n_per_group.append(0)
-            if len(vals_list) >= 2 and all(len(v) > 0 for v in vals_list):
-                try:
-                    res = f_oneway(*vals_list)
-                    p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
-                    stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
-                    set_result[f"p_{short}"] = float(p) if np.isfinite(p) else np.nan
-                    set_result[f"stat_{short}"] = float(stat) if np.isfinite(stat) else np.nan
-                    eff_n = max(n_per_group) if n_per_group else 0
-                    set_result["n1"] = max(set_result.get("n1", 0), eff_n)
-                    set_result["n2"] = set_result["n1"]  # symmetric for one-way
-                    # eta2 (same as RM/main ANOVA path)
-                    if hasattr(res, "statistic") and np.isfinite(res.statistic) and eff_n > 0:
-                        df_between = len(vals_list) - 1
-                        df_within = sum(len(v) for v in vals_list) - len(vals_list)
-                        if df_within > 0:
-                            eta2 = (df_between * res.statistic) / (df_between * res.statistic + df_within)
-                            set_result["eta2"] = float(eta2)
-                    if short == "amp":
-                        raw_p_amp.append(f"p_{short}")
-                    else:
-                        raw_p_slope.append(f"p_{short}")
-                except Exception:
-                    set_result[f"p_{short}"] = np.nan
-                    set_result[f"stat_{short}"] = np.nan
-            else:
-                set_result[f"p_{short}"] = np.nan
-                set_result[f"stat_{short}"] = np.nan
-
-        # Store per-group ns for UI n_report (overrides fallback in _get_stat_test_warning)
-        set_result["group_ns"] = group_ns
-        if any(k.startswith("p_") for k in set_result if isinstance(k, str)):
-            out_results.append(set_result)
-
-        # FDR if requested (single omnibus row)
-        if fdr and raw_p_amp:
-            try:
-                from statsmodels.stats.multitest import multipletests
-
-                ps = [set_result.get(k, np.nan) for k in raw_p_amp]
-                qs = multipletests([p if np.isfinite(p) else 1.0 for p in ps], alpha=0.05, method="fdr_bh")[1]
-                for k, q in zip(raw_p_amp, qs):
-                    set_result["q_" + k[2:]] = float(q) if np.isfinite(q) else np.nan
-            except Exception:
-                pass
-        if fdr and raw_p_slope:
-            try:
-                from statsmodels.stats.multitest import multipletests
-
-                ps = [set_result.get(k, np.nan) for k in raw_p_slope]
-                qs = multipletests([p if np.isfinite(p) else 1.0 for p in ps], alpha=0.05, method="fdr_bh")[1]
-                for k, q in zip(raw_p_slope, qs):
-                    set_result["q_" + k[2:]] = float(q) if np.isfinite(q) else np.nan
-            except Exception:
-                pass
-
-        config = {
-            "type": test_type,
-            "variant": "unpaired",
-            "tails": tails,
-            "fdr": fdr,
-            "norm": norm,
-            "amp": amp,
-            "slope": slope,
-            "n_unit": n_unit,
-            "implicit_testset": True,
-        }
-        # r2 from existing block will be merged below; return early with real results
-        return {"results": out_results, "config": config}
+        return run_io_implicit_anova(
+            shown_groups=shown_groups,
+            fetch_group_testset_observations=fetch_group_testset_observations,
+            n_unit=n_unit,
+            norm=norm,
+            amp=amp,
+            slope=slope,
+            fdr=fdr,
+            test_type=test_type,
+            tails=tails,
+        )
 
     # v0.16_n_stats Phase 1 (builds on Phase 0 aggregator): normalize n_unit + define helper.
     # Default "subject" per protocol/clarifications (unique (subject,slice) for slice mode; no lab-specific slice merging).

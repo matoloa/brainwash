@@ -23,8 +23,8 @@
 | 08a | [08a_extract_cluster_perm_move.md](statistics_refactor/08a_extract_cluster_perm_move.md) | ✅ done |
 | 08b | [08b_extract_cluster_perm_cleanup.md](statistics_refactor/08b_extract_cluster_perm_cleanup.md) | ✅ done |
 | 09 | [09_extract_ttest_main_loop.md](statistics_refactor/09_extract_ttest_main_loop.md) | ✅ done |
-| 10 | [10_extract_validation_and_implicit_anova.md](statistics_refactor/10_extract_validation_and_implicit_anova.md) | **NEXT** |
-| 11 | [11_facade_and_cleanup.md](statistics_refactor/11_facade_and_cleanup.md) | pending |
+| 10 | [10_extract_validation_and_implicit_anova.md](statistics_refactor/10_extract_validation_and_implicit_anova.md) | ✅ done |
+| 11 | [11_facade_and_cleanup.md](statistics_refactor/11_facade_and_cleanup.md) | **NEXT** |
 
 After each PR: mark card ✅ in this table, set **NEXT** on the following row.
 
