@@ -18,8 +18,8 @@
 | 03 | [03_package_data_and_fdr.md](statistics_refactor/03_package_data_and_fdr.md) | ✅ done |
 | 04 | [04_package_io_helpers.md](statistics_refactor/04_package_io_helpers.md) | ✅ done |
 | 05 | [05_extract_friedman.md](statistics_refactor/05_extract_friedman.md) | ✅ done |
-| 06 | [06_extract_rm_anova.md](statistics_refactor/06_extract_rm_anova.md) | **NEXT** |
-| 07 | [07_extract_wilcoxon.md](statistics_refactor/07_extract_wilcoxon.md) | pending |
+| 06 | [06_extract_rm_anova.md](statistics_refactor/06_extract_rm_anova.md) | ✅ done |
+| 07 | [07_extract_wilcoxon.md](statistics_refactor/07_extract_wilcoxon.md) | **NEXT** |
 | 08 | [08_extract_cluster_perm.md](statistics_refactor/08_extract_cluster_perm.md) | pending |
 | 09 | [09_extract_ttest_main_loop.md](statistics_refactor/09_extract_ttest_main_loop.md) | pending |
 | 10 | [10_extract_validation_and_implicit_anova.md](statistics_refactor/10_extract_validation_and_implicit_anova.md) | pending |

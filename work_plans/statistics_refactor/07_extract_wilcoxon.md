@@ -1,6 +1,6 @@
 # PR-07: Extract Wilcoxon branch
 
-**Status**: pending | **Depends on**: 06 | **Max production diff**: ~120 LOC moved
+**Status**: NEXT | **Depends on**: 06 | **Max production diff**: ~120 LOC moved
 
 ## Goal
 
