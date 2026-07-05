@@ -1,6 +1,6 @@
 # PR-05: Extract Friedman branch
 
-**Status**: NEXT | **Depends on**: 04 | **Max production diff**: ~80 LOC moved
+**Status**: ✅ DONE | **Depends on**: 04 | **Max production diff**: ~80 LOC moved
 
 ## Goal
 

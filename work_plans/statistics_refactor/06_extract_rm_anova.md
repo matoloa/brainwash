@@ -1,6 +1,6 @@
 # PR-06: Extract repeated-measures ANOVA branch
 
-**Status**: pending | **Depends on**: 05 | **Max production diff**: ~90 LOC moved
+**Status**: NEXT | **Depends on**: 05 | **Max production diff**: ~90 LOC moved
 
 ## Goal
 

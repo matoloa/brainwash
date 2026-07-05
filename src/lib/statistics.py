@@ -10,7 +10,7 @@ import warnings
 import numpy as np
 import pandas as pd
 from scipy import stats  # for t.cdf in one-sample approximation
-from scipy.stats import f_oneway, friedmanchisquare, levene, linregress, shapiro, ttest_1samp, ttest_ind, ttest_ind_from_stats, ttest_rel, wilcoxon
+from scipy.stats import f_oneway, levene, linregress, shapiro, ttest_1samp, ttest_ind, ttest_ind_from_stats, ttest_rel, wilcoxon
 
 from .brainwash_stats.data import (
     _aggregate_to_unit_level,
@@ -18,6 +18,7 @@ from .brainwash_stats.data import (
     _make_group_testset_observation_accessor,
 )
 from .brainwash_stats.fdr import _bh_fdr
+from .brainwash_stats.formal_tests.friedman import run_friedman_omnibus
 from .brainwash_stats.io.regression import _compute_io_regression_internal
 
 # ---------------------------------------------------------------------------
@@ -478,84 +479,18 @@ def compute_statistical_comparison(
                 pass
         return {"results": rm_results, "config": {"test_type": test_type, "variant": "repeated", "fdr": fdr, "norm": norm}}
 
-    # --- Friedman chi-square repeated-measures omnibus (1 group, >=3 test sets) ---
-    # Non-parametric omnibus test (Phase 1); uses scipy.stats.friedmanchisquare on unit-aligned vectors (min_len across test sets).
     if test_type == "Friedman" and len(shown_groups) == 1 and len(shown_sets) >= 3:
-        g = shown_groups[0]
-        fm_res = {
-            "set_id": "__friedman_rm_omnibus__",
-            "set_name": "Friedman (repeated, omnibus)",
-            "sweeps": [],
-            "group1": shown_groups,
-            "n1": 0,
-            "n2": 0,
-        }
-        raw_p_amp = []
-        raw_p_slope = []
-        aspects = []
-        if amp:
-            aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
-        if slope:
-            aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
-        for short, col in aspects:
-            vals_list = []
-            for sid2, tset2 in shown_sets:
-                try:
-                    obs_df = fetch_group_testset_observations(g, tset2, col)  # uses implicit if use_implicit
-                    obs_df = _aggregate_to_unit_level(obs_df, n_unit)  # v0.16_n_stats Phase 0
-                    obs = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
-                    valid = obs[np.isfinite(obs)]
-                    vals_list.append(valid)
-                except Exception:
-                    valid = np.array([], dtype=float)
-                    vals_list.append(valid)
-            if len(vals_list) >= 3 and all(len(v) > 0 for v in vals_list):
-                try:
-                    # Align by taking common length (per-rec means from get_group_testset_means_fn are in rec_ID order for single group)
-                    min_len = min(len(v) for v in vals_list)
-                    if min_len < 2:
-                        continue
-                    aligned = [v[:min_len] for v in vals_list]
-                    res = friedmanchisquare(*aligned)
-                    p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
-                    stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
-                    eff_n = min_len
-                    p_key = f"p_{short}"
-                    fm_res[p_key] = float(p) if np.isfinite(p) else np.nan
-                    fm_res[f"stat_{short}"] = float(stat) if np.isfinite(stat) else np.nan
-                    fm_res["n1"] = max(fm_res.get("n1", 0), eff_n)
-                    if short == "amp":
-                        raw_p_amp.append(p_key)
-                    else:
-                        raw_p_slope.append(p_key)
-                except Exception:
-                    pass
-            else:
-                pass
-        has_p = any(k.startswith("p_") for k in fm_res if isinstance(k, str))
-        fm_results = [fm_res] if has_p else []
-        # FDR on the omnibus row (single row, same pattern as RM-ANOVA)
-        if fdr and raw_p_amp:
-            try:
-                from statsmodels.stats.multitest import multipletests
-
-                ps = [fm_res.get(k, np.nan) for k in raw_p_amp]
-                qs = multipletests([p if np.isfinite(p) else 1.0 for p in ps], alpha=0.05, method="fdr_bh")[1]
-                for k, q in zip(raw_p_amp, qs):
-                    fm_res["q_" + k[2:]] = float(q)
-            except Exception:
-                pass
-        if fdr and raw_p_slope:
-            try:
-                from statsmodels.stats.multitest import multipletests
-
-                ps = [fm_res.get(k, np.nan) for k in raw_p_slope]
-                qs = multipletests([p if np.isfinite(p) else 1.0 for p in ps], alpha=0.05, method="fdr_bh")[1]
-                for k, q in zip(raw_p_slope, qs):
-                    fm_res["q_" + k[2:]] = float(q)
-            except Exception:
-                pass
-        return {"results": fm_results, "config": {"test_type": test_type, "variant": "repeated", "fdr": fdr, "norm": norm}}
+        return run_friedman_omnibus(
+            shown_groups=shown_groups,
+            shown_sets=shown_sets,
+            fetch_group_testset_observations=fetch_group_testset_observations,
+            n_unit=n_unit,
+            norm=norm,
+            amp=amp,
+            slope=slope,
+            fdr=fdr,
+            test_type=test_type,
+        )
 
     # --- Cluster permutation test (time-series curves) ---
     # After Friedman omnibus; before Wilcoxon. Uses per-sweep matrices (Phase 1 helper).
