@@ -37,22 +37,14 @@ def run_cluster_permutation(
     test_type,
     use_implicit,
 ) -> dict:
-    print(
-        f"DEBUG compute_statistical_comparison: entered Cluster perm. branch with "
-        f"{len(shown_groups) if shown_groups else 0} groups, test_type={test_type}"
-    )
     try:
         from mne.stats import permutation_cluster_1samp_test, permutation_cluster_test
-
-        print("DEBUG: MNE imported successfully")
     except ImportError:
-        print("DEBUG: MNE ImportError")
         return {
             "error": "MNE-Python not installed; cluster permutation requires `pip install mne` (or `pip install .[neuroscience]`)",
             "results": [],
         }
     except Exception as e:
-        print(f"DEBUG: MNE import failed: {e}")
         warnings.warn(f"MNE import failed: {e}")
         return {
             "error": "MNE-Python not installed; cluster permutation requires `pip install mne` (or `pip install .[neuroscience]`)",
@@ -60,7 +52,6 @@ def run_cluster_permutation(
         }
 
     shown_sets = [(sid, info) for sid, info in (dd_testsets or {}).items() if info.get("show", False) and info.get("sweeps")]
-    print(f"DEBUG compute: shown_sets={len(shown_sets)}, shown_groups={len(shown_groups) if shown_groups else 'N/A'}")
     if not shown_sets:
         return {"error": "Cluster perm. requires at least one shown test set (to define sweep windows)", "results": []}
 
@@ -105,7 +96,6 @@ def run_cluster_permutation(
                         res = permutation_cluster_test([X1, X2], n_permutations=1000, threshold=None, tail=0)
                     cluster_p = _extract_cluster_p(res)
                     cluster_stat = float(np.max(res[0])) if hasattr(res[0], "__len__") and len(res[0]) > 0 else np.nan
-                    print(f"DEBUG cluster between {short}: p={cluster_p:.4f}, stat={cluster_stat:.3f}, n1={n1}, n2={n2}")
                     res_row[f"p_{short}"] = cluster_p
                     res_row[f"stat_{short}"] = cluster_stat
                     res_row["n1"] = n1

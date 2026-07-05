@@ -1,6 +1,6 @@
 # PR-08b: Cluster perm — remove DEBUG prints
 
-**Status**: NEXT | **Depends on**: 08a | **Max production diff**: ~10 LOC deleted
+**Status**: ✅ DONE | **Depends on**: 08a | **Max production diff**: ~10 LOC deleted
 
 ## Goal
 

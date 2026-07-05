@@ -1,6 +1,6 @@
 # PR-09: Extract main t-test / between-groups loop
 
-**Status**: pending | **Depends on**: 08b | **Max production diff**: ~250 LOC moved
+**Status**: NEXT | **Depends on**: 08b | **Max production diff**: ~250 LOC moved
 
 ## Goal
 
