@@ -1,6 +1,6 @@
 # PR-08: Extract Cluster permutation branch
 
-**Status**: pending | **Depends on**: 07 | **Max production diff**: ~200 LOC moved
+**Status**: NEXT | **Depends on**: 07 | **Max production diff**: ~200 LOC moved
 
 ## Goal
 
