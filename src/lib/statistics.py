@@ -5,22 +5,20 @@
 # IO uses implicit all-sweeps + regression. See AGENTS.md for experiment_type/statusbar.
 # ---------------------------------------------------------------------------
 
-import warnings
-
 import numpy as np
 import pandas as pd
 from scipy import stats  # for t.cdf in one-sample approximation
-from scipy.stats import f_oneway, levene, linregress, shapiro, ttest_1samp, ttest_ind, ttest_ind_from_stats, ttest_rel
+from scipy.stats import f_oneway, ttest_ind_from_stats
 
 from .brainwash_stats.data import (
     _aggregate_to_unit_level,
     _aspect_measurement_columns,
     _make_group_testset_observation_accessor,
 )
-from .brainwash_stats.fdr import _bh_fdr
 from .brainwash_stats.formal_tests.anova_rm import run_repeated_measures_anova
 from .brainwash_stats.formal_tests.friedman import run_friedman_omnibus
 from .brainwash_stats.formal_tests.cluster_perm import run_cluster_permutation
+from .brainwash_stats.formal_tests.ttest_and_between import run_main_test_set_loop
 from .brainwash_stats.formal_tests.wilcoxon import run_wilcoxon_tests
 from .brainwash_stats.io.regression import _compute_io_regression_internal
 
@@ -464,243 +462,23 @@ def compute_statistical_comparison(
             ref=ref,
         )
 
-    alt = {"two-sided": "two-sided", "greater": "greater", "less": "less"}.get(tails, "two-sided")
-
-    def _aspect_name(use_amp: bool, use_norm: bool) -> str | None:
-        if use_amp:
-            return "EPSP_amp_norm" if use_norm else "EPSP_amp"
-        else:
-            return "EPSP_slope_norm" if use_norm else "EPSP_slope"
-
-    # Collect raw p values per family for possible FDR
-    raw_p_amp = []
-    raw_p_slope = []
-    out_results = []
-
-    for sid, tset in shown_sets:
-        # Resolve which aspects we actually compute for this set
-        aspects = []
-        if amp:
-            aspects.append(("amp", _aspect_name(True, norm)))
-        if slope:
-            aspects.append(("slope", _aspect_name(False, norm)))
-
-        if not aspects:
-            continue
-
-        set_result = {
-            "set_id": sid,
-            "set_name": tset.get("set_name", f"set {sid}"),
-            "sweeps": list(tset.get("sweeps", [])),
-            "group1": g1,
-            "group2": g2,
-            "n1": 0,
-            "n2": 0,
-        }
-        if test_type == "ANOVA":
-            set_result["group1"] = shown_groups  # store all for ANOVA context
-
-        for short, col in aspects:
-            try:
-                obs1_df = fetch_group_testset_observations(g1, tset, col)
-                obs1_df = _aggregate_to_unit_level(obs1_df, n_unit)  # Phase 0
-                obs1 = obs1_df["value"].to_numpy(dtype=float) if not obs1_df.empty else np.array([], dtype=float)
-            except Exception:
-                obs1 = np.array([], dtype=float)
-
-            obs2 = np.array([], dtype=float)
-            if variant != "one-sample" and g2 is not None:
-                try:
-                    obs2_df = fetch_group_testset_observations(g2, tset, col)
-                    obs2_df = _aggregate_to_unit_level(obs2_df, n_unit)
-                    obs2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
-                except Exception:
-                    obs2 = np.array([], dtype=float)
-            elif variant == "paired":
-                # Paired t-test (1 group + 2 test sets): aggregate both testsets within g1
-                try:
-                    if len(shown_sets) >= 2:
-                        sid2, tset2 = shown_sets[1]
-                        obs2_df = fetch_group_testset_observations(g1, tset2, col)
-                        obs2_df = _aggregate_to_unit_level(obs2_df, n_unit)
-                        obs2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
-                except Exception:
-                    obs2 = np.array([], dtype=float)
-
-            p = np.nan
-            stat = np.nan
-            eff_n1 = 0
-            eff_n2 = 0
-
-            try:
-                if variant == "one-sample":
-                    vals = obs1[np.isfinite(obs1)]
-                    eff_n1 = int(vals.size)
-                    if eff_n1 >= 1:
-                        res = ttest_1samp(vals, popmean=ref, alternative=alt)
-                        stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
-                        p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
-                elif variant == "paired":
-                    # v0.16_n_stats Phase 1: align by unit (subject or (subject,slice)) after aggregation.
-                    # Simple length-based intersection for now (full key-based align by unit keys deferred).
-                    v1 = obs1[np.isfinite(obs1)]
-                    v2 = obs2[np.isfinite(obs2)]
-                    eff_n1 = min(len(v1), len(v2))  # common units
-                    eff_n2 = eff_n1
-                    if eff_n1 >= 2:
-                        # Take first N for simplicity (order from accessor/groupby is stable)
-                        v1 = v1[:eff_n1]
-                        v2 = v2[:eff_n1]
-                        res = ttest_rel(v1, v2, alternative=alt)
-                        stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
-                        p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
-                elif test_type == "ANOVA":
-                    # For ANOVA, use all shown groups (not just first 2); f_oneway on per-rec means across groups
-                    # (for repeated measures, this is simplified one-way; full RM-ANOVA deferred)
-                    vals_list = []
-                    eff_n = 0
-                    for g in shown_groups:
-                        obs_df = fetch_group_testset_observations(g, tset, col)
-                        obs_df = _aggregate_to_unit_level(obs_df, n_unit)  # Phase 0
-                        obs = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
-                        valid_obs = obs[np.isfinite(obs)]
-                        vals_list.append(valid_obs)
-                        eff_n = max(eff_n, int(valid_obs.size))
-                    if len(vals_list) >= 2 and all(len(v) > 0 for v in vals_list):
-                        try:
-                            res = f_oneway(*vals_list)
-                            stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
-                            p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
-                            # Store effect size (partial eta^2 approximation for one-way)
-                            if hasattr(res, "statistic") and np.isfinite(res.statistic) and eff_n > 0:
-                                df_between = len(vals_list) - 1
-                                df_within = sum(len(v) for v in vals_list) - len(vals_list)
-                                if df_within > 0:
-                                    eta2 = (df_between * res.statistic) / (df_between * res.statistic + df_within)
-                                    set_result["eta2"] = float(eta2)
-                        except Exception:
-                            stat = np.nan
-                            p = np.nan
-                    else:
-                        # Insufficient groups for between-subjects ANOVA (may be repeated-measures case with 1 group + N test sets)
-                        set_result["anova_note"] = "need >=2 groups for one-way; RM-ANOVA deferred"
-                    eff_n1 = eff_n
-                    eff_n2 = eff_n
-                else:
-                    # unpaired
-                    v1 = obs1[np.isfinite(obs1)]
-                    v2 = obs2[np.isfinite(obs2)]
-                    eff_n1 = int(v1.size)
-                    eff_n2 = int(v2.size)
-                    if eff_n1 >= 1 and eff_n2 >= 1:
-                        res = ttest_ind(v1, v2, alternative=alt, equal_var=False)
-                        stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
-                        p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
-            except Exception:
-                p = np.nan
-                stat = np.nan
-
-            p_key = f"p_{short}" + ("_norm" if norm else "")
-            s_key = f"stat_{short}" + ("_norm" if norm else "")
-            set_result[p_key] = float(p) if np.isfinite(p) else np.nan
-            set_result[s_key] = float(stat) if np.isfinite(stat) else np.nan
-            # For ANOVA, also store effect size (eta2) if computed
-            if "eta2" in set_result:
-                set_result["eta2"] = set_result.get("eta2", np.nan)
-
-            # Assumption tests (Shapiro-Wilk normality per group/aspect, Levene homogeneity across groups)
-            # SW requires n>=3 (scipy shapiro constraint); Levene works for n>=2.
-            valid_obs1 = obs1[np.isfinite(obs1)]
-            n_obs1 = len(valid_obs1)
-            if (short == "amp" or short == "slope") and n_obs1 >= 3:
-                # Shapiro-Wilk on group 1 (or test-set values in RM-ANOVA case)
-                try:
-                    with warnings.catch_warnings():
-                        warnings.simplefilter("ignore")
-                        sw_stat, sw_p = shapiro(valid_obs1)
-                    set_result[f"sw_stat_{short}"] = float(sw_stat)
-                    set_result[f"sw_p_{short}"] = float(sw_p)
-                except Exception:
-                    set_result[f"sw_stat_{short}"] = np.nan
-                    set_result[f"sw_p_{short}"] = np.nan
-                # Levene across groups (or test sets in RM case); skip if <2 groups
-                if len(shown_groups) >= 2 or (test_type == "ANOVA" and len(shown_sets) >= 2):
-                    try:
-                        groups_for_lev = [valid_obs1]
-                        if g2 is not None:
-                            groups_for_lev.append(obs2[np.isfinite(obs2)])
-                        elif test_type == "ANOVA" and len(shown_groups) == 1:
-                            # RM case: collect from all test sets for this aspect
-                            for sid2, tset2 in shown_sets:
-                                if sid2 == sid:
-                                    continue  # already have obs1
-                                try:
-                                    o_df = fetch_group_testset_observations(shown_groups[0], tset2, col)
-                                    o_df = _aggregate_to_unit_level(o_df, n_unit)  # Phase 0
-                                    o_vals = o_df["value"].to_numpy(dtype=float)
-                                    groups_for_lev.append(o_vals[np.isfinite(o_vals)])
-                                except Exception:
-                                    pass
-                        if len(groups_for_lev) >= 2:
-                            lev_stat, lev_p = levene(*groups_for_lev, center="mean")
-                            set_result[f"levene_stat_{short}"] = float(lev_stat)
-                            set_result[f"levene_p_{short}"] = float(lev_p)
-                        else:
-                            set_result[f"levene_stat_{short}"] = np.nan
-                            set_result[f"levene_p_{short}"] = np.nan
-                    except Exception:
-                        set_result[f"levene_stat_{short}"] = np.nan
-                        set_result[f"levene_p_{short}"] = np.nan
-
-            # Track for FDR (per aspect family) - append *before* possible out_results.append
-            if short == "amp":
-                raw_p_amp.append((len(out_results), p_key))  # index into final list
-            else:
-                raw_p_slope.append((len(out_results), p_key))
-
-            # Store effective n (use max seen across aspects for the set; fine for display)
-            if eff_n1:
-                set_result["n1"] = max(int(set_result.get("n1", 0)), eff_n1)
-            if eff_n2:
-                set_result["n2"] = max(int(set_result.get("n2", 0)), eff_n2)
-
-        # If we computed at least one aspect for this set, keep it (assumption tests alone are sufficient to keep the result)
-        has_any_p = any(k.startswith("p_") for k in set_result.keys()) or any(k.startswith(("sw_", "levene_")) for k in set_result.keys())
-        if has_any_p:
-            out_results.append(set_result)
-
-    # FDR across test sets for each aspect family (if requested)
-    if fdr and out_results:
-        for family in (raw_p_amp, raw_p_slope):
-            if not family:
-                continue
-            ps = []
-            idxs = []
-            for res_idx, pcol in family:
-                if res_idx < len(out_results):
-                    val = out_results[res_idx].get(pcol, np.nan)
-                    ps.append(val if np.isfinite(val) else np.nan)
-                    idxs.append((res_idx, pcol))
-            qs = _bh_fdr(np.asarray(ps, dtype=float))
-            for (res_idx, pcol), q in zip(idxs, qs):
-                out_results[res_idx]["q_" + pcol[2:]] = float(q) if np.isfinite(q) else np.nan
-
-    config = {
-        "type": test_type,
-        "variant": variant,
-        "tails": tails,
-        "fdr": fdr,
-        "norm": norm,
-        "amp": amp,
-        "slope": slope,
-        "n_unit": n_unit,
-    }
-    if use_implicit:
-        config["implicit_testset"] = True
-    return {
-        "results": out_results,
-        "config": config,
-    }
+    return run_main_test_set_loop(
+        shown_groups=shown_groups,
+        shown_sets=shown_sets,
+        g1=g1,
+        g2=g2,
+        fetch_group_testset_observations=fetch_group_testset_observations,
+        n_unit=n_unit,
+        norm=norm,
+        amp=amp,
+        slope=slope,
+        fdr=fdr,
+        test_type=test_type,
+        variant=variant,
+        tails=tails,
+        ref=ref,
+        use_implicit=use_implicit,
+    )
 
 
 # Also expose ttest_df from analysis_v3 (for heatmap) or duplicate if desired.

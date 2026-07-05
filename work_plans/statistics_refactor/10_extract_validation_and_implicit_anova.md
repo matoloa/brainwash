@@ -1,6 +1,6 @@
 # PR-10: Extract validation + latent implicit ANOVA
 
-**Status**: pending | **Depends on**: 09 | **Max production diff**: ~150 LOC moved
+**Status**: NEXT | **Depends on**: 09 | **Max production diff**: ~150 LOC moved
 
 ## Goal
 

@@ -52,6 +52,26 @@ def test_error_no_shown_test_sets_non_io():
     assert out.get("results") == []
 
 
+def test_paired_ttest_returns_results_and_config():
+    g1_vals = [("r1", "s1", 1.0), ("r2", "s1", 1.2), ("r3", "s2", 1.1)]
+    accessor = make_scalar_accessor({"G1": g1_vals})
+    out = compute_statistical_comparison(
+        groups=["G1"],
+        dd_groups=make_dd_groups("G1"),
+        dd_testsets=make_dd_testsets("TS1", "TS2"),
+        get_group_testset_means_fn=accessor,
+        test_type="t-test",
+        variant="paired",
+        amp=True,
+        slope=False,
+        n_unit="subject",
+    )
+    assert "error" not in out
+    assert out.get("results")
+    assert out.get("config", {}).get("type") == "t-test"
+    assert out.get("config", {}).get("variant") == "paired"
+
+
 def test_unpaired_ttest_returns_results_and_config():
     fx = _ttest_fixture()
     out = compute_statistical_comparison(
