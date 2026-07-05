@@ -277,6 +277,47 @@ def _bh_fdr(pvals: np.ndarray) -> np.ndarray:
     return q_unranked
 
 
+def _aspect_measurement_columns(amp: bool, slope: bool, norm: bool) -> list[tuple[str, str]]:
+    aspects = []
+    if amp:
+        aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
+    if slope:
+        aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
+    if not aspects:
+        aspects = [("amp", "EPSP_amp")]
+    return aspects
+
+
+def _aggregate_to_unit_level(obs_df: pd.DataFrame, n_unit: str = "subject") -> pd.DataFrame:
+    """Aggregate to one value per statistical unit (mean over recs).
+    Returns DataFrame with unit key(s) + 'value'. Used by all test branches.
+    - 'subject': group by subject (n = unique subjects)
+    - 'slice': group by (subject, slice) — each unique combination counts as 1 n
+    - 'recording': pass-through (n = recordings)
+    Old projects (missing columns): return as-is (caller emits statusbar warning).
+    """
+    if obs_df.empty or n_unit == "recording" or "value" not in obs_df.columns:
+        return obs_df.copy() if not obs_df.empty else obs_df
+
+    if n_unit == "subject":
+        group_keys = ["subject"]
+    elif n_unit == "slice":
+        group_keys = ["subject", "slice"]
+    else:
+        group_keys = ["subject"]
+
+    if not all(k in obs_df.columns for k in group_keys):
+        return obs_df.copy()
+
+    valid = obs_df[group_keys + ["value"]].dropna()
+    if valid.empty:
+        empty_df = pd.DataFrame({k: pd.Series(dtype=obs_df[k].dtype if k in obs_df.columns else "object") for k in group_keys})
+        empty_df["value"] = pd.Series(dtype=float)
+        return empty_df
+
+    return valid.groupby(group_keys, as_index=False)["value"].mean()
+
+
 def ttest_per_sweep(
     df1: pd.DataFrame,
     df2: pd.DataFrame | None,
@@ -518,13 +559,7 @@ def compute_statistical_comparison(
     # Implicit ANOVA for IO (between-groups on all-sweeps when >=2 groups). Placed early.
     if test_type == "ANOVA" and use_implicit and len(shown_groups) >= 2:
         out_results = []
-        aspects = []
-        if amp:
-            aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
-        if slope:
-            aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
-        if not aspects:
-            aspects = [("amp", "EPSP_amp")]
+        aspects = _aspect_measurement_columns(amp, slope, norm)
 
         # Reuse centralized _get_obs (defined in RM path but we hoist it here for implicit branch; it supports tset=None when use_implicit)
         def _get_obs(g, tset, col, per_sweep=False):
@@ -551,7 +586,7 @@ def compute_statistical_comparison(
             for g in shown_groups:
                 try:
                     obs_df = _get_obs(g, None, col)
-                    # Inline aggregation (subject/slice) — avoids NameError since _aggregate_to_unit_level is defined later.
+                    # Inline aggregation (subject/slice) for implicit IO ANOVA branch.
                     if n_unit != "recording" and not obs_df.empty and "value" in obs_df.columns:
                         gkeys = ["subject", "slice"] if n_unit == "slice" else ["subject"]
                         if all(k in obs_df.columns for k in gkeys):
@@ -663,37 +698,6 @@ def compute_statistical_comparison(
                     }
             except Exception:
                 pass  # fallback gracefully
-
-    def _aggregate_to_unit_level(obs_df: pd.DataFrame, n_unit: str = "subject") -> pd.DataFrame:
-        """Phase 0/1 helper (updated per slice discussion): aggregate to one value per statistical unit (mean over recs).
-        Returns DataFrame with unit key(s) + 'value'. Used by all test branches.
-        - 'subject': group by subject (n = unique subjects)
-        - 'slice': group by (subject, slice) — each *unique combination* counts as 1 n (composite key; slice numbering may vary by lab, no special merging)
-        - 'recording': pass-through (current behavior, n = recordings)
-        Old projects (missing columns): return as-is (caller emits statusbar warning with exact string).
-        v0.16_n_stats_IO: works identically for implicit all-sweeps data.
-        """
-        if obs_df.empty or n_unit == "recording" or "value" not in obs_df.columns:
-            return obs_df.copy() if not obs_df.empty else obs_df
-
-        if n_unit == "subject":
-            group_keys = ["subject"]
-        elif n_unit == "slice":
-            group_keys = ["subject", "slice"]
-        else:
-            group_keys = ["subject"]
-
-        if not all(k in obs_df.columns for k in group_keys):
-            return obs_df.copy()  # missing hierarchy → fallback (warning in UI via _get_stat_test_warning)
-
-        valid = obs_df[group_keys + ["value"]].dropna()
-        if valid.empty:
-            empty_df = pd.DataFrame({k: pd.Series(dtype=obs_df[k].dtype if k in obs_df.columns else "object") for k in group_keys})
-            empty_df["value"] = pd.Series(dtype=float)
-            return empty_df
-
-        agg = valid.groupby(group_keys, as_index=False)["value"].mean()
-        return agg
 
     # --- Repeated-measures ANOVA path (1 group, >=2 test sets) ---
     # Computes omnibus one-way ANOVA across test sets within the single group.

@@ -1,6 +1,6 @@
 # PR-01: Hoist aggregate + aspect columns (in-place)
 
-**Status**: NEXT | **Depends on**: 00 | **Max production diff**: ~80 LOC
+**Status**: ✅ DONE | **Depends on**: 00 | **Max production diff**: ~80 LOC
 
 ## Goal
 

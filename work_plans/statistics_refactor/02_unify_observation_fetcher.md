@@ -1,6 +1,6 @@
 # PR-02: Unify observation fetcher (in-place)
 
-**Status**: pending | **Depends on**: 01 | **Max production diff**: ~100 LOC
+**Status**: NEXT | **Depends on**: 01 | **Max production diff**: ~100 LOC
 
 ## Goal
 
