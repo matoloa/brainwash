@@ -5185,23 +5185,15 @@ class UIsub(
             self.progressBarManager.__enter__()
             # Loading takes control of statusbar (messages pushed via update* callbacks).
             # Non-error state: use default color (darkmode sensitive).
-            self._set_statusbar_appearance(text="Parsing files...")
 
     def updateProgressBar(self, i):
         self.progressBarManager.update(i, "Parsing file ")
-        if self.progressBar.isVisible():
-            # Non-error: push text using default statusbar color (darkmode sensitive)
-            self._set_statusbar_appearance(text=self.progressBar.text())
 
     def updateSubProgressBar(self, idx, total):
         self.progressBarManager.update_sub(idx, total)
-        if self.progressBar.isVisible():
-            self._set_statusbar_appearance(text=self.progressBar.text())
 
     def updateStatusBar(self, text):
         self.progressBarManager.set_status(text)
-        if self.progressBar.isVisible():
-            self._set_statusbar_appearance(text=text)
 
     def onParseDataFinished(self):
         print("onParseDataFinished: entered")
@@ -5481,15 +5473,10 @@ class UIsub(
 
             def _preload_progress(i):
                 self.progressBarManager.update(i, "Preloading recording")
-                if self.progressBar.isVisible():
-                    self._set_statusbar_appearance(text=self.progressBar.text())
 
             thread.progress.connect(_preload_progress)
-
             thread.start()
             self.progressBarManager.__enter__()  # Show progress bar
-            # Loading takes control of statusbar (text using default color, darkmode sensitive)
-            self._set_statusbar_appearance(text="Preloading recordings...")
         else:
             print("No new recordings to preload.")
 
