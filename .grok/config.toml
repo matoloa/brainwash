@@ -1,0 +1,21 @@
+# Project-scoped Grok config for brainwash.
+# Merged with ~/.grok/config.toml; deny/ask rules here apply in this repo.
+#
+# Agent rules (auto-loaded): .grok/rules/*.md
+# Active work: statistics refactor — index work_plans/plan_statistics_refactor.md + ONE card work_plans/statistics_refactor/NN_*.md
+# Naming: human-readable; conservative renames OK — see .grok/rules/naming-and-stats-refactor.md
+# Cancelled: work_plans/History/plan_statusbar_ui.md (no ui.py statusbar edits)
+
+[permission]
+# Builds and environment autodiagnose: prompt before running (on-demand only per AGENTS.md §6).
+ask = [
+    "Bash(uv sync *build*)",
+    "Bash(uv sync --group build)",
+    "Bash(*build_with_cxfreeze*)",
+    "Bash(*build_exe*)",
+    "Bash(*bdist_appimage*)",
+    "Bash(./build-*.sh *)",
+    "Bash(./build-devcontainer.sh *)",
+    "Bash(sudo apt-get *)",
+    "Bash(sudo apt install *)",
+]
