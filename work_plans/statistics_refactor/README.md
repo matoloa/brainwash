@@ -7,7 +7,8 @@ Each `NN_*.md` file is a **complete session brief**. Agents read **only** the cu
 | `00_DONE_bootstrap.md` | 20 | Tests landed |
 | `01`–`02` | 40 each | In-place helper hoist (no new package) |
 | `03`–`04` | 50 each | Create `brainwash_stats/` package |
-| `05`–`09` | 45 each | One statistical test branch per PR |
+| `05`–`07`, `09` | 45 each | One statistical test branch per PR |
+| `08a`–`08b` | 40 each | Cluster perm split: move (08a) then DEBUG cleanup (08b) |
 | `10`–`11` | 50 each | Validation + facade |
 | `VERIFY.md` | 15 | Post-PR commands |
 | `CONTRACT.md` | 35 | Output shape invariants |

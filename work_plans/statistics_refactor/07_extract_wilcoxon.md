@@ -31,4 +31,4 @@ Read through the branch's final `return` (~120 lines).
 
 ## Next
 
-→ [08_extract_cluster_perm.md](08_extract_cluster_perm.md)
+→ [08a_extract_cluster_perm_move.md](08a_extract_cluster_perm_move.md)

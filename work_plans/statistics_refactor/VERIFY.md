@@ -4,6 +4,8 @@
 uv run pytest src/lib/test_statistics_characterization.py -q
 ```
 
+**PR-08a**: suite should report **6 tests** (adds `test_cluster_perm_between_groups_smoke`). That test uses `pytest.importorskip("mne")` — it skips when MNE is not installed; do not `uv sync` neuroscience extras unless the user asks.
+
 Optional (PR 03+ with `brainwash_stats/`):
 
 ```sh
