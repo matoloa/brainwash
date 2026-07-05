@@ -133,7 +133,7 @@ src/
     │                          persistdf(df, folder)
     │                          metadata(path)
     │
-    ├── analysis_v2.py       Active analysis engine. Public API:
+    ├── analysis_v3.py       Active analysis engine. Public API:
     │                          find_events(dfmean, dfdata, config)
     │                          build_dfoutput(dfdata, events, config)
     │                          characterize_graph(dfmean, config)
@@ -143,6 +143,8 @@ src/
     ├── analysis_evaluation.py  Evaluation helpers used alongside analysis_v2.
     │
     ├── analysis_v1.py       Legacy analysis engine — kept for reference only.
+    │                        Not imported by ui.py. Do not add new code here.
+    ├── analysis_v2.py       Legacy analysis engine — kept for reference only.
     │                        Not imported by ui.py. Do not add new code here.
     │
     └── test_parse.py        pytest test suite for the parse pipeline.
@@ -198,12 +200,12 @@ UIstate / DataFrameMixin caching layer
      │  (get_dft, get_dfmean, get_dffilter, get_dfbin, get_dfdiff, …)
      │
      ▼
-analysis_v2.find_events(dfmean, config)
+analysis_v3.find_events(dfmean, config)
      │
      ▶  events dict  — detected fEPSP slope, amplitude, volley, latency, …
      │
      ▼
-analysis_v2.build_dfoutput(dfdata, events, config)
+analysis_v3.build_dfoutput(dfdata, events, config)
      │
      ▶  dfoutput  — one row per sweep with all measured event values
      │
@@ -242,11 +244,11 @@ Flake8 configuration is in `.flake8` at the repo root. The line-length limit is 
 
 All dependencies are declared in `pyproject.toml` and locked in `uv.lock`.
 
-| Group | Purpose | Install command |
-|---|---|---|
-| *(default)* | Runtime — everything needed to run the app | `uv sync` |
-| `dev` | Dev tools — linting, formatting, stubs, testing, notebooks | `uv sync --group dev` |
-| `build` | Packaging only — `cx-Freeze` for producing distributables | `uv sync --group build` |
+| Group       | Purpose                                                    | Install command         |
+| ----------- | ---------------------------------------------------------- | ----------------------- |
+| _(default)_ | Runtime — everything needed to run the app                 | `uv sync`               |
+| `dev`       | Dev tools — linting, formatting, stubs, testing, notebooks | `uv sync --group dev`   |
+| `build`     | Packaging only — `cx-Freeze` for producing distributables  | `uv sync --group build` |
 
 **Add a runtime dependency:**
 
