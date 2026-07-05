@@ -184,9 +184,9 @@ class UIstate:
             "output_ax2_ylim": (0, 1.2),
         }
         self.experiment_type = "time"  # "time", "sweep", "timestamp", "train", "io", "PP"
-        self.io_input = "vamp"
-        self.io_output = "EPSPamp"
-        self.test_type = "None"
+        self.io_input = "vamp"  # "vamp", "vslope", "stim"
+        self.io_output = "EPSPamp"  # "EPSPamp", "EPSPslope"
+        self.test_type = "None"  # "None", "t-test", "ANOVA", "ANCOVA", "Wilcoxon", "Friedman", "Cluster perm."        self.test_type = "None"
         self.test_t_variant = "unpaired"
         self.test_t_tails = "two-sided"
         self.test_fdr = False

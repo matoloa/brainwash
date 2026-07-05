@@ -1,16 +1,72 @@
-# statistics.py
-# ---------------------------------------------------------------------------
-# Statistical testing layer. n_unit="subject" (default); supports slice/recording.
-# Aggregates to unit level; old projects warn via statusbar. Cluster uses recording-level.
-# IO uses implicit all-sweeps + regression. See AGENTS.md for experiment_type/statusbar.
-# ---------------------------------------------------------------------------
-
-import warnings
-
 import numpy as np
 import pandas as pd
-from scipy import stats  # for t.cdf in one-sample approximation
-from scipy.stats import f_oneway, friedmanchisquare, levene, linregress, shapiro, ttest_1samp, ttest_ind, ttest_ind_from_stats, ttest_rel, wilcoxon
+import warnings
+from scipy.stats import levene, shapiro
+
+from .stats import (
+    compute_statistical_comparison,
+    ttest_per_sweep,
+)
+
+__all__ = [
+    "compute_statistical_comparison",
+    "ttest_per_sweep",
+]
+
+
+
+
+
+
+
+
+def _apply_assumption_tests(set_result, obs1, obs2, short, shown_groups, shown_sets, test_type, n_unit, _get_obs):
+    """Extracted Shapiro-Wilk + Levene block (L1402+). Pure; populates sw_/levene_ keys in set_result."""
+    # SW requires n>=3; Levene >=2 groups.
+    valid_obs1 = obs1[np.isfinite(obs1)]
+    n_obs1 = len(valid_obs1)
+    if (short in ("amp", "slope")) and n_obs1 >= 3:
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                sw_stat, sw_p = shapiro(valid_obs1)
+            set_result[f"sw_stat_{short}"] = float(sw_stat)
+            set_result[f"sw_p_{short}"] = float(sw_p)
+        except Exception:
+            set_result[f"sw_stat_{short}"] = np.nan
+            set_result[f"sw_p_{short}"] = np.nan
+
+        if len(shown_groups) >= 2 or (test_type == "ANOVA" and len(shown_sets) >= 2):
+            try:
+                groups_for_lev = [valid_obs1]
+                if obs2 is not None and len(obs2) > 0:
+                    groups_for_lev.append(obs2[np.isfinite(obs2)])
+                elif test_type == "ANOVA" and len(shown_groups) == 1:
+                    for sid2, tset2 in shown_sets:
+                        if sid2 == getattr(set_result, "sid", None):  # avoid self
+                            continue
+                        try:
+                            o_df = _get_obs(shown_groups[0], tset2, short.replace("p_", "") if "p_" in short else "EPSP_amp")
+                            o_df = _aggregate_to_unit_level(o_df, n_unit)
+                            o_vals = o_df["value"].to_numpy(dtype=float) if not o_df.empty else np.array([])
+                            if len(o_vals) > 0:
+                                groups_for_lev.append(o_vals[np.isfinite(o_vals)])
+                        except Exception:
+                            pass
+                if len(groups_for_lev) >= 2:
+                    lev_stat, lev_p = levene(*groups_for_lev, center="mean")
+                    set_result[f"levene_stat_{short}"] = float(lev_stat)
+                    set_result[f"levene_p_{short}"] = float(lev_p)
+                else:
+                    set_result[f"levene_stat_{short}"] = np.nan
+                    set_result[f"levene_p_{short}"] = np.nan
+            except Exception:
+                set_result[f"levene_stat_{short}"] = np.nan
+                set_result[f"levene_p_{short}"] = np.nan
+        else:
+            set_result[f"levene_stat_{short}"] = np.nan
+            set_result[f"levene_p_{short}"] = np.nan
+
 
 # ---------------------------------------------------------------------------
 # FDR and per-sweep test helpers
@@ -119,13 +175,7 @@ def _compute_io_regression_internal(
     group_ns = {}
     r2_per_group = {}
     slope_per_group = {}
-    aspects = []
-    if amp:
-        aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
-    if slope:
-        aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
-    if not aspects:
-        aspects = [("amp", "EPSP_amp")]
+    aspects = _aspect_columns(amp=amp, slope=slope, norm=norm)
 
     for short, col in aspects:
         group_data = {}
@@ -500,6 +550,8 @@ def compute_statistical_comparison(
     if get_group_testset_means_fn is None:
         return {"error": "no data accessor for testset means", "results": []}
 
+    get_obs = _make_get_obs(get_group_testset_means_fn, use_implicit=use_implicit)
+
     # Early IO regression guard for experiment_type=="io" + use_implicit. Calls _compute_io_regression_internal.
     if is_io and use_implicit:
         if uistate is None:
@@ -518,20 +570,9 @@ def compute_statistical_comparison(
     # Implicit ANOVA for IO (between-groups on all-sweeps when >=2 groups). Placed early.
     if test_type == "ANOVA" and use_implicit and len(shown_groups) >= 2:
         out_results = []
-        aspects = []
-        if amp:
-            aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
-        if slope:
-            aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
-        if not aspects:
-            aspects = [("amp", "EPSP_amp")]
+        aspects = _aspect_columns(amp=amp, slope=slope, norm=norm)
 
-        # Reuse centralized _get_obs (defined in RM path but we hoist it here for implicit branch; it supports tset=None when use_implicit)
-        def _get_obs(g, tset, col, per_sweep=False):
-            """Returns obs_df for group/testset (or implicit all-sweeps if use_implicit)."""
-            sweeps_arg = None if use_implicit else (list(tset.get("sweeps", [])) if tset else [])
-            return get_group_testset_means_fn(g, sweeps_arg, aspect=col, per_sweep=per_sweep)
-
+        # Reuse centralized _get_obs (now defined above main path; supports tset=None when use_implicit)
         set_result = {
             "set_id": "__io_anova_implicit__",
             "set_name": None,  # sentinel per debug plan v0.16; UI overrides to suppress name for "IO - ANOVA (n_report): ..." format
@@ -710,17 +751,7 @@ def compute_statistical_comparison(
         }
         raw_p_amp = []
         raw_p_slope = []
-        aspects = []
-        if amp:
-            aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
-        if slope:
-            aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
-
-        # Helper for v0.16_n_stats_IO implicit mode (centralized; used by all branches). Note: implicit ANOVA branch above defines its own copy for early return (to avoid NameError on use_implicit before this def); keep in sync if changing signature.
-        def _get_obs(g, tset, col, per_sweep=False):
-            """Returns obs_df for group/testset (or implicit all-sweeps if use_implicit)."""
-            sweeps_arg = None if use_implicit else (list(tset.get("sweeps", [])) if tset else [])
-            return get_group_testset_means_fn(g, sweeps_arg, aspect=col, per_sweep=per_sweep)
+        aspects = _aspect_columns(amp=amp, slope=slope, norm=norm)
 
         for short, col in aspects:
             vals_list = []
@@ -793,11 +824,7 @@ def compute_statistical_comparison(
         }
         raw_p_amp = []
         raw_p_slope = []
-        aspects = []
-        if amp:
-            aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
-        if slope:
-            aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
+        aspects = _aspect_columns(amp=amp, slope=slope, norm=norm)
         for short, col in aspects:
             vals_list = []
             for sid2, tset2 in shown_sets:
@@ -891,11 +918,7 @@ def compute_statistical_comparison(
         results = []
         raw_p_amp = []
         raw_p_slope = []
-        aspects = []
-        if amp:
-            aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
-        if slope:
-            aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
+        aspects = _aspect_columns(amp=amp, slope=slope, norm=norm)
         if not aspects:
             return {"error": "no aspects selected", "results": []}
         # Phase 1: recording-level only (n_unit overridden above; no aggregator on per-sweep wide data)
@@ -1070,11 +1093,7 @@ def compute_statistical_comparison(
         variant = variant if variant in ("paired", "one-sample") else "paired"
         alt = {"two-sided": "two-sided", "greater": "greater", "less": "less"}.get(tails, "two-sided")
         # shown_sets already extracted + use_implicit set above (centralized guard); remove duplicate
-        aspects = []
-        if amp:
-            aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
-        if slope:
-            aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
+        aspects = _aspect_columns(amp=amp, slope=slope, norm=norm)
         if not aspects:
             return {"error": "no aspects selected", "results": []}
         raw_p_amp = []
@@ -1268,12 +1287,7 @@ def compute_statistical_comparison(
 
     for sid, tset in shown_sets:
         # Resolve which aspects we actually compute for this set
-        aspects = []
-        if amp:
-            aspects.append(("amp", _aspect_name(True, norm)))
-        if slope:
-            aspects.append(("slope", _aspect_name(False, norm)))
-
+        aspects = _aspect_columns(amp=amp, slope=slope, norm=norm)
         if not aspects:
             continue
 
@@ -1399,47 +1413,7 @@ def compute_statistical_comparison(
 
             # Assumption tests (Shapiro-Wilk normality per group/aspect, Levene homogeneity across groups)
             # SW requires n>=3 (scipy shapiro constraint); Levene works for n>=2.
-            valid_obs1 = obs1[np.isfinite(obs1)]
-            n_obs1 = len(valid_obs1)
-            if (short == "amp" or short == "slope") and n_obs1 >= 3:
-                # Shapiro-Wilk on group 1 (or test-set values in RM-ANOVA case)
-                try:
-                    with warnings.catch_warnings():
-                        warnings.simplefilter("ignore")
-                        sw_stat, sw_p = shapiro(valid_obs1)
-                    set_result[f"sw_stat_{short}"] = float(sw_stat)
-                    set_result[f"sw_p_{short}"] = float(sw_p)
-                except Exception:
-                    set_result[f"sw_stat_{short}"] = np.nan
-                    set_result[f"sw_p_{short}"] = np.nan
-                # Levene across groups (or test sets in RM case); skip if <2 groups
-                if len(shown_groups) >= 2 or (test_type == "ANOVA" and len(shown_sets) >= 2):
-                    try:
-                        groups_for_lev = [valid_obs1]
-                        if g2 is not None:
-                            groups_for_lev.append(obs2[np.isfinite(obs2)])
-                        elif test_type == "ANOVA" and len(shown_groups) == 1:
-                            # RM case: collect from all test sets for this aspect
-                            for sid2, tset2 in shown_sets:
-                                if sid2 == sid:
-                                    continue  # already have obs1
-                                try:
-                                    o_df = _get_obs(shown_groups[0], tset2, col)
-                                    o_df = _aggregate_to_unit_level(o_df, n_unit)  # Phase 0
-                                    o_vals = o_df["value"].to_numpy(dtype=float)
-                                    groups_for_lev.append(o_vals[np.isfinite(o_vals)])
-                                except Exception:
-                                    pass
-                        if len(groups_for_lev) >= 2:
-                            lev_stat, lev_p = levene(*groups_for_lev, center="mean")
-                            set_result[f"levene_stat_{short}"] = float(lev_stat)
-                            set_result[f"levene_p_{short}"] = float(lev_p)
-                        else:
-                            set_result[f"levene_stat_{short}"] = np.nan
-                            set_result[f"levene_p_{short}"] = np.nan
-                    except Exception:
-                        set_result[f"levene_stat_{short}"] = np.nan
-                        set_result[f"levene_p_{short}"] = np.nan
+            _apply_assumption_tests(set_result, obs1, obs2, short, shown_groups, shown_sets, test_type, n_unit, _get_obs)
 
             # Track for FDR (per aspect family) - append *before* possible out_results.append
             if short == "amp":
