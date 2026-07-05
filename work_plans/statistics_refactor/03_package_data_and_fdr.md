@@ -1,6 +1,6 @@
 # PR-03: Package — data + FDR helpers
 
-**Status**: NEXT | **Depends on**: 02 | **Max production diff**: ~120 LOC moved
+**Status**: ✅ DONE | **Depends on**: 02 | **Max production diff**: ~120 LOC moved
 
 ## Goal
 

@@ -12,6 +12,13 @@ import pandas as pd
 from scipy import stats  # for t.cdf in one-sample approximation
 from scipy.stats import f_oneway, friedmanchisquare, levene, linregress, shapiro, ttest_1samp, ttest_ind, ttest_ind_from_stats, ttest_rel, wilcoxon
 
+from .brainwash_stats.data import (
+    _aggregate_to_unit_level,
+    _aspect_measurement_columns,
+    _make_group_testset_observation_accessor,
+)
+from .brainwash_stats.fdr import _bh_fdr
+
 # ---------------------------------------------------------------------------
 # FDR and per-sweep test helpers
 # ---------------------------------------------------------------------------
@@ -256,76 +263,6 @@ def _compute_io_regression_internal(
         "results": results,
         "config": config,
     }
-
-
-def _bh_fdr(pvals: np.ndarray) -> np.ndarray:
-    """Benjamini-Hochberg FDR correction. Returns q-values in [0,1]."""
-    p = np.asarray(pvals, dtype=float)
-    n = len(p)
-    if n == 0:
-        return np.array([], dtype=float)
-    order = np.argsort(p)
-    ranked = p[order]
-    q = np.empty(n, dtype=float)
-    prev = 1.0
-    for i in range(n - 1, -1, -1):
-        qval = min(prev, (n / (i + 1.0)) * ranked[i])
-        q[i] = qval
-        prev = qval
-    q_unranked = np.empty(n, dtype=float)
-    q_unranked[order] = np.minimum(q, 1.0)
-    return q_unranked
-
-
-def _aspect_measurement_columns(amp: bool, slope: bool, norm: bool) -> list[tuple[str, str]]:
-    aspects = []
-    if amp:
-        aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
-    if slope:
-        aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
-    if not aspects:
-        aspects = [("amp", "EPSP_amp")]
-    return aspects
-
-
-def _aggregate_to_unit_level(obs_df: pd.DataFrame, n_unit: str = "subject") -> pd.DataFrame:
-    """Aggregate to one value per statistical unit (mean over recs).
-    Returns DataFrame with unit key(s) + 'value'. Used by all test branches.
-    - 'subject': group by subject (n = unique subjects)
-    - 'slice': group by (subject, slice) — each unique combination counts as 1 n
-    - 'recording': pass-through (n = recordings)
-    Old projects (missing columns): return as-is (caller emits statusbar warning).
-    """
-    if obs_df.empty or n_unit == "recording" or "value" not in obs_df.columns:
-        return obs_df.copy() if not obs_df.empty else obs_df
-
-    if n_unit == "subject":
-        group_keys = ["subject"]
-    elif n_unit == "slice":
-        group_keys = ["subject", "slice"]
-    else:
-        group_keys = ["subject"]
-
-    if not all(k in obs_df.columns for k in group_keys):
-        return obs_df.copy()
-
-    valid = obs_df[group_keys + ["value"]].dropna()
-    if valid.empty:
-        empty_df = pd.DataFrame({k: pd.Series(dtype=obs_df[k].dtype if k in obs_df.columns else "object") for k in group_keys})
-        empty_df["value"] = pd.Series(dtype=float)
-        return empty_df
-
-    return valid.groupby(group_keys, as_index=False)["value"].mean()
-
-
-def _make_group_testset_observation_accessor(get_group_testset_means_fn, use_implicit: bool):
-    """Return callable that fetches group/testset observations (implicit all-sweeps when use_implicit)."""
-
-    def fetch(g, tset, col, per_sweep=False):
-        sweeps_arg = None if use_implicit else (list(tset.get("sweeps", [])) if tset else [])
-        return get_group_testset_means_fn(g, sweeps_arg, aspect=col, per_sweep=per_sweep)
-
-    return fetch
 
 
 def ttest_per_sweep(

@@ -1,20 +1,19 @@
-"""Load src/lib/statistics.py without colliding with Python's stdlib ``statistics`` module."""
+"""Load Brainwash statistics module (not Python stdlib ``statistics``)."""
 
 from __future__ import annotations
 
-import importlib.util
+import sys
 from pathlib import Path
 from types import ModuleType
 
-_BRAINWASH_STATISTICS_MODULE_NAME = "brainwash_statistics"
-_STATISTICS_FILE = Path(__file__).resolve().parent / "statistics.py"
+_SRC = Path(__file__).resolve().parent.parent
 
 
 def load_brainwash_statistics_module() -> ModuleType:
-    """Return the Brainwash statistics module (not stdlib ``statistics``)."""
-    spec = importlib.util.spec_from_file_location(_BRAINWASH_STATISTICS_MODULE_NAME, _STATISTICS_FILE)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"cannot load Brainwash statistics from {_STATISTICS_FILE}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    """Return ``lib.statistics`` — same import path as ``ui.py`` and ``main.py``."""
+    src = str(_SRC)
+    if src not in sys.path:
+        sys.path.insert(0, src)
+    import lib.statistics as module
+
     return module

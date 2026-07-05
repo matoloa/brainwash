@@ -1,6 +1,6 @@
 # PR-04: Package — IO helpers
 
-**Status**: pending | **Depends on**: 03 | **Max production diff**: ~200 LOC moved
+**Status**: NEXT | **Depends on**: 03 | **Max production diff**: ~200 LOC moved
 
 ## Goal
 
