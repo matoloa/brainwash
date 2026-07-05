@@ -14,8 +14,8 @@
 |----|------|--------|
 | 00 | [00_DONE_bootstrap.md](statistics_refactor/00_DONE_bootstrap.md) | ✅ done |
 | 01 | [01_hoist_aggregate_and_aspects.md](statistics_refactor/01_hoist_aggregate_and_aspects.md) | ✅ done |
-| 02 | [02_unify_observation_fetcher.md](statistics_refactor/02_unify_observation_fetcher.md) | **NEXT** |
-| 03 | [03_package_data_and_fdr.md](statistics_refactor/03_package_data_and_fdr.md) | pending |
+| 02 | [02_unify_observation_fetcher.md](statistics_refactor/02_unify_observation_fetcher.md) | ✅ done |
+| 03 | [03_package_data_and_fdr.md](statistics_refactor/03_package_data_and_fdr.md) | **NEXT** |
 | 04 | [04_package_io_helpers.md](statistics_refactor/04_package_io_helpers.md) | pending |
 | 05 | [05_extract_friedman.md](statistics_refactor/05_extract_friedman.md) | pending |
 | 06 | [06_extract_rm_anova.md](statistics_refactor/06_extract_rm_anova.md) | pending |

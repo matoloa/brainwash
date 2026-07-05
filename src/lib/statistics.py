@@ -318,6 +318,16 @@ def _aggregate_to_unit_level(obs_df: pd.DataFrame, n_unit: str = "subject") -> p
     return valid.groupby(group_keys, as_index=False)["value"].mean()
 
 
+def _make_group_testset_observation_accessor(get_group_testset_means_fn, use_implicit: bool):
+    """Return callable that fetches group/testset observations (implicit all-sweeps when use_implicit)."""
+
+    def fetch(g, tset, col, per_sweep=False):
+        sweeps_arg = None if use_implicit else (list(tset.get("sweeps", [])) if tset else [])
+        return get_group_testset_means_fn(g, sweeps_arg, aspect=col, per_sweep=per_sweep)
+
+    return fetch
+
+
 def ttest_per_sweep(
     df1: pd.DataFrame,
     df2: pd.DataFrame | None,
@@ -541,6 +551,10 @@ def compute_statistical_comparison(
     if get_group_testset_means_fn is None:
         return {"error": "no data accessor for testset means", "results": []}
 
+    fetch_group_testset_observations = _make_group_testset_observation_accessor(
+        get_group_testset_means_fn, use_implicit
+    )
+
     # Early IO regression guard for experiment_type=="io" + use_implicit. Calls _compute_io_regression_internal.
     if is_io and use_implicit:
         if uistate is None:
@@ -561,12 +575,6 @@ def compute_statistical_comparison(
         out_results = []
         aspects = _aspect_measurement_columns(amp, slope, norm)
 
-        # Reuse centralized _get_obs (defined in RM path but we hoist it here for implicit branch; it supports tset=None when use_implicit)
-        def _get_obs(g, tset, col, per_sweep=False):
-            """Returns obs_df for group/testset (or implicit all-sweeps if use_implicit)."""
-            sweeps_arg = None if use_implicit else (list(tset.get("sweeps", [])) if tset else [])
-            return get_group_testset_means_fn(g, sweeps_arg, aspect=col, per_sweep=per_sweep)
-
         set_result = {
             "set_id": "__io_anova_implicit__",
             "set_name": None,  # sentinel per debug plan v0.16; UI overrides to suppress name for "IO - ANOVA (n_report): ..." format
@@ -585,7 +593,7 @@ def compute_statistical_comparison(
             n_per_group = []
             for g in shown_groups:
                 try:
-                    obs_df = _get_obs(g, None, col)
+                    obs_df = fetch_group_testset_observations(g, None, col)
                     # Inline aggregation (subject/slice) for implicit IO ANOVA branch.
                     if n_unit != "recording" and not obs_df.empty and "value" in obs_df.columns:
                         gkeys = ["subject", "slice"] if n_unit == "slice" else ["subject"]
@@ -714,23 +722,13 @@ def compute_statistical_comparison(
         }
         raw_p_amp = []
         raw_p_slope = []
-        aspects = []
-        if amp:
-            aspects.append(("amp", "EPSP_amp_norm" if norm else "EPSP_amp"))
-        if slope:
-            aspects.append(("slope", "EPSP_slope_norm" if norm else "EPSP_slope"))
-
-        # Helper for v0.16_n_stats_IO implicit mode (centralized; used by all branches). Note: implicit ANOVA branch above defines its own copy for early return (to avoid NameError on use_implicit before this def); keep in sync if changing signature.
-        def _get_obs(g, tset, col, per_sweep=False):
-            """Returns obs_df for group/testset (or implicit all-sweeps if use_implicit)."""
-            sweeps_arg = None if use_implicit else (list(tset.get("sweeps", [])) if tset else [])
-            return get_group_testset_means_fn(g, sweeps_arg, aspect=col, per_sweep=per_sweep)
+        aspects = _aspect_measurement_columns(amp, slope, norm)
 
         for short, col in aspects:
             vals_list = []
             for sid2, tset2 in shown_sets:
                 try:
-                    obs_df = _get_obs(g, tset2, col)
+                    obs_df = fetch_group_testset_observations(g, tset2, col)
                     # Phase 0: aggregate to chosen unit (subject default)
                     obs_df = _aggregate_to_unit_level(obs_df, n_unit)
                     obs = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
@@ -806,7 +804,7 @@ def compute_statistical_comparison(
             vals_list = []
             for sid2, tset2 in shown_sets:
                 try:
-                    obs_df = _get_obs(g, tset2, col)  # uses implicit if use_implicit
+                    obs_df = fetch_group_testset_observations(g, tset2, col)  # uses implicit if use_implicit
                     obs_df = _aggregate_to_unit_level(obs_df, n_unit)  # v0.16_n_stats Phase 0
                     obs = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
                     valid = obs[np.isfinite(obs)]
@@ -942,8 +940,8 @@ def compute_statistical_comparison(
                 }
                 for short, col in aspects:
                     try:
-                        df1 = _get_obs(g1, tset, col, per_sweep=True)  # respects use_implicit (though cluster typically requires explicit)
-                        df2 = _get_obs(g2, tset, col, per_sweep=True)
+                        df1 = fetch_group_testset_observations(g1, tset, col, per_sweep=True)  # respects use_implicit (though cluster typically requires explicit)
+                        df2 = fetch_group_testset_observations(g2, tset, col, per_sweep=True)
                         X1 = _to_matrix(df1)
                         X2 = _to_matrix(df2)
                         n1 = X1.shape[0]
@@ -993,8 +991,8 @@ def compute_statistical_comparison(
             }
             for short, col in aspects:
                 try:
-                    df1 = _get_obs(g, tset1, col, per_sweep=True)
-                    df2 = _get_obs(g, tset2, col, per_sweep=True)
+                    df1 = fetch_group_testset_observations(g, tset1, col, per_sweep=True)
+                    df2 = fetch_group_testset_observations(g, tset2, col, per_sweep=True)
                     X1 = _to_matrix(df1)
                     X2 = _to_matrix(df2)
                     # Align by common rec_IDs (intersection)
@@ -1101,8 +1099,8 @@ def compute_statistical_comparison(
             }
             for short, col in aspects:
                 try:
-                    obs1_df = _get_obs(g, tset1, col)
-                    obs2_df = _get_obs(g, tset2, col)
+                    obs1_df = fetch_group_testset_observations(g, tset1, col)
+                    obs2_df = fetch_group_testset_observations(g, tset2, col)
                     # v0.16_n_stats Phase 1: aggregate to unit level + align by unit key (not rec_ID)
                     obs1_df = _aggregate_to_unit_level(obs1_df, n_unit)
                     obs2_df = _aggregate_to_unit_level(obs2_df, n_unit)
@@ -1191,7 +1189,7 @@ def compute_statistical_comparison(
                 }
                 for short, col in aspects:
                     try:
-                        obs_df = _get_obs(g, tset, col)
+                        obs_df = fetch_group_testset_observations(g, tset, col)
                         obs_df = _aggregate_to_unit_level(obs_df, n_unit)  # Phase 0
                         vals = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
                     except Exception:
@@ -1295,7 +1293,7 @@ def compute_statistical_comparison(
 
         for short, col in aspects:
             try:
-                obs1_df = _get_obs(g1, tset, col)
+                obs1_df = fetch_group_testset_observations(g1, tset, col)
                 obs1_df = _aggregate_to_unit_level(obs1_df, n_unit)  # Phase 0
                 obs1 = obs1_df["value"].to_numpy(dtype=float) if not obs1_df.empty else np.array([], dtype=float)
             except Exception:
@@ -1304,7 +1302,7 @@ def compute_statistical_comparison(
             obs2 = np.array([], dtype=float)
             if variant != "one-sample" and g2 is not None:
                 try:
-                    obs2_df = _get_obs(g2, tset, col)
+                    obs2_df = fetch_group_testset_observations(g2, tset, col)
                     obs2_df = _aggregate_to_unit_level(obs2_df, n_unit)
                     obs2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
                 except Exception:
@@ -1314,7 +1312,7 @@ def compute_statistical_comparison(
                 try:
                     if len(shown_sets) >= 2:
                         sid2, tset2 = shown_sets[1]
-                        obs2_df = _get_obs(g1, tset2, col)
+                        obs2_df = fetch_group_testset_observations(g1, tset2, col)
                         obs2_df = _aggregate_to_unit_level(obs2_df, n_unit)
                         obs2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
                 except Exception:
@@ -1353,7 +1351,7 @@ def compute_statistical_comparison(
                     vals_list = []
                     eff_n = 0
                     for g in shown_groups:
-                        obs_df = _get_obs(g, tset, col)
+                        obs_df = fetch_group_testset_observations(g, tset, col)
                         obs_df = _aggregate_to_unit_level(obs_df, n_unit)  # Phase 0
                         obs = obs_df["value"].to_numpy(dtype=float) if not obs_df.empty else np.array([], dtype=float)
                         valid_obs = obs[np.isfinite(obs)]
@@ -1428,7 +1426,7 @@ def compute_statistical_comparison(
                                 if sid2 == sid:
                                     continue  # already have obs1
                                 try:
-                                    o_df = _get_obs(shown_groups[0], tset2, col)
+                                    o_df = fetch_group_testset_observations(shown_groups[0], tset2, col)
                                     o_df = _aggregate_to_unit_level(o_df, n_unit)  # Phase 0
                                     o_vals = o_df["value"].to_numpy(dtype=float)
                                     groups_for_lev.append(o_vals[np.isfinite(o_vals)])
