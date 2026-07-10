@@ -1707,7 +1707,10 @@ class UIsub(
         return getattr(uistate, "test_type", "None")
 
     def _should_show_stat_test_frame(self) -> bool:
-        """Central helper: hide Statistical Test frame for IO mode (overridable by menu/hide button via viewTools)."""
+        """Central helper: return whether Statistical Test frame should be shown (respects viewTools/menu/hide button state; no auto-hide on IO)."""
+        # Always respect uistate.viewTools["frameToolTest"][1] if present; otherwise default to not IO.
+        if "frameToolTest" in getattr(uistate, "viewTools", {}):
+            return uistate.viewTools["frameToolTest"][1]
         return not self._is_io_mode()
 
     def _get_statusbar_for_current_state(self) -> str | None:
@@ -3439,7 +3442,7 @@ class UIsub(
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(getattr(uistate, "experiment_type", "time") == "io")
         if hasattr(self, "frameToolTest"):
-            self.frameToolTest.setVisible(self._should_show_stat_test_frame())  # overridable by menu/hide button (viewTools); no auto-hide on IO per plan
+            self.frameToolTest.setVisible(self._should_show_stat_test_frame())  # controlled ONLY by menu or hide button (viewTools); no auto-hide on IO
         if hasattr(self, "frameToolTestOptions"):
             self.frameToolTestOptions.setVisible(True)
 
