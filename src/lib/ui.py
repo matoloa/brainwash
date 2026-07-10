@@ -1478,7 +1478,7 @@ class UIsub(
             + list(self._RADIO_TO_TEST_N)  # v0.16_n_stats
         ):
             if hasattr(self, radio_name):
-                getattr(self, radio_name).setEnabled(False)
+                getattr(self, radio_name).setEnabled(False)  # ET/TT radios always enabled per plan (warnings via statusbar)
 
     def uiThaw(self):  # Enable selection changes and checkboxes
         if not uistate.frozen:
@@ -1500,7 +1500,7 @@ class UIsub(
             + list(self._RADIO_TO_TEST_N)  # v0.16_n_stats
         ):
             if hasattr(self, radio_name):
-                getattr(self, radio_name).setEnabled(True)
+                getattr(self, radio_name).setEnabled(True)  # ET/TT radios always enabled per plan (warnings via statusbar)
         # Radio button enabled-state is recording-dependent; a full refresh
         # via tableProjSelectionChanged (called after uiThaw) will set them
         # correctly.  Here we just re-enable sweep (always valid) so the
@@ -1602,9 +1602,8 @@ class UIsub(
 
     def update_anova_label(self):
         """Update label_test_ANOVA and uistate.anova_label based on number of shown test sets.
-        Called whenever test sets are created, shown/hidden, or test_type changes to ANOVA.
+        Called whenever test sets are created, shown/hidden, or test_type changes to ANOVA/ANCOVA.
         v0.16_n_stats_IO: for experiment_type=="io" (no test sets), label="ANOVA (IO all sweeps)".
-        Uses helper for consistency (Phase 1).
         """
         if not hasattr(self, "label_test_ANOVA"):
             return
@@ -1704,14 +1703,11 @@ class UIsub(
         return getattr(uistate, "experiment_type", "time") == "io"
 
     def _effective_test_type(self) -> str:
-        """Central helper: returns test_type or sentinel for IO. No Python None.
-        IO regression uses experiment_type + formal_test_results (no ANCOVA leak to stats)."""
-        if self._is_io_mode():
-            return getattr(uistate, "test_type", "ANCOVA")
+        """Central helper: returns test_type or "None". No sentinel (IO driven by _is_io_mode() and experiment_type per plan/AGENTS.md)."""
         return getattr(uistate, "test_type", "None")
 
     def _should_show_stat_test_frame(self) -> bool:
-        """Central helper: hide Statistical Test frame for IO mode."""
+        """Central helper: hide Statistical Test frame for IO mode (overridable by menu/hide button via viewTools)."""
         return not self._is_io_mode()
 
     def _get_statusbar_for_current_state(self) -> str | None:
@@ -1723,7 +1719,7 @@ class UIsub(
         if eff == "None":
             uistate.statusbar_state = None
             return None
-        if self._is_io_mode() or eff == "ANCOVA":
+        if self._is_io_mode():  # No "or eff == 'ANCOVA'" (sentinel removed; IO first-class)
             formal = getattr(uistate, "formal_test_results", None)
             return self._format_io_regression_statusbar(formal)
         # non-IO: delegate to warning logic (state set in _refresh or applicator)
@@ -1793,7 +1789,6 @@ class UIsub(
         Runs compute_statistical_comparison (experiment_type=io), populates formal_test_results.
         Sets state and refreshes statusbar (via _get_statusbar_for_current_state).
         """
-        test_type = "ANOVA"  # sentinel to bypass stats guard; real path uses experiment_type="io"
         shown_groups = self._get_shown_group_ids()
         shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
         experiment_type = "io"
@@ -1803,7 +1798,7 @@ class UIsub(
                 dd_groups=self.dd_groups,
                 dd_testsets=self.dd_testsets,
                 get_group_testset_means_fn=self.get_group_testset_means,
-                test_type=test_type,
+                test_type="ANOVA",  # sentinel to bypass stats guard; real path uses experiment_type="io"
                 variant="unpaired",  # unused for regression
                 tails="two-sided",  # unused
                 fdr=False,
@@ -1924,7 +1919,7 @@ class UIsub(
     def _get_stat_test_warning(self):
         """Return warning string (for non-IO) or status text (for IO via _format_...), else None.
         Now pure per plan.md (no uistate sets, no clear_formal_test_results). State set only by caller.
-        IO/ANCOVA handled by _get_statusbar_for_current_state -> _format_io_regression_statusbar.
+        IO handled by _get_statusbar_for_current_state -> _format_io_regression_statusbar (no ANCOVA sentinel).
         """
         eff = self._effective_test_type()
         if eff == "None":
@@ -1980,7 +1975,7 @@ class UIsub(
         """
         try:
             eff = self._effective_test_type()
-            if eff == "ANCOVA" or self._is_io_mode():
+            if self._is_io_mode():  # No "ANCOVA" sentinel (IO first-class per plan)
                 self._apply_io_regression()
                 return
             if eff == "None":
@@ -2009,7 +2004,7 @@ class UIsub(
         test_type = eff  # backward compat for legacy non-IO path only
         if eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
             print(
-                f"Statistical test '{eff}' is not yet implemented for v0.16 (t-test, ANOVA, Wilcoxon, Friedman, Cluster perm., ANCOVA for IO supported)."
+                f"Statistical test '{eff}' is not yet implemented for v0.16 (t-test, ANOVA, Wilcoxon, Friedman, Cluster perm.)."
             )
             self.clear_formal_test_results()
             uistate.statusbar_state = "warning"
@@ -2890,6 +2885,7 @@ class UIsub(
         "radioButton_test_none": "None",
         "radioButton_test_t": "t-test",
         "radioButton_test_anova": "ANOVA",
+        "radioButton_test_ancova": "ANCOVA",  # mapped per updated ui_designer.py (radioButton_test_ancova)
         "radioButton_test_wilcoxon": "Wilcoxon",
         "radioButton_test_friedman": "Friedman",
         "radioButton_test_cluster": "Cluster perm.",
@@ -2965,25 +2961,11 @@ class UIsub(
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(exp_type == "io")
         if exp_type == "io":
-            uistate.test_type = "ANCOVA"  # UI sentinel for _effective_test_type() (IO regression driven by experiment_type="io")
-            # Hide main Test Type toolframe (and variants). The setupToolBar call below will also enforce via frameToolTest visibility.
-            for frame_attr in (
-                "frameToolTest",
-                "frameToolTest_sub_t",
-                "frameToolTest_sub_ANOVA",
-                "frameToolTest_sub_wilcoxon",
-                "frameToolTest_friedman",
-                "frameToolTest_cluster",
-            ):
-                if hasattr(self, frame_attr):
-                    getattr(self, frame_attr).setVisible(False)
+            # No test_type sentinel (experiment_type="io" is first-class per AGENTS.md and plan).
+            # Test frame visibility now controlled ONLY by menu or pushButton_hide_test (setViewToolVisible / viewTools).
+            # No auto-hide or gray menu.
             if hasattr(self, "frameToolTestOptions"):
                 getattr(self, "frameToolTestOptions").setVisible(True)  # n_unit relevant for regression granularity
-            # Gray "Statistical test" menu (reuse existing action if present)
-            if hasattr(self, "menuView"):
-                for action in self.menuView.actions():
-                    if "test" in action.text().lower() or "statistical" in action.text().lower():
-                        action.setEnabled(False)
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
         # Clear stale results/state; single apply call below drives statusbar via _get_statusbar_for_current_state
         uistate.formal_test_results = None
@@ -2996,13 +2978,7 @@ class UIsub(
             self.graphRefresh()
             self.apply_statistical_test_if_active()
         elif old_type == "io":
-            # Re-show Statistical test frame when leaving IO (setupToolBar + _should_show_stat_test_frame enforces).
-            if hasattr(self, "frameToolTest"):
-                self.frameToolTest.setVisible(True)
-            if hasattr(self, "menuView"):
-                for action in self.menuView.actions():
-                    if "test" in action.text().lower() or "statistical" in action.text().lower():
-                        action.setEnabled(True)
+            # Re-show via viewTools/menu (no _should_show_stat_test_frame dependency for test frame).
             self.update_show()
             self.zoomAuto()
             self.graphRefresh()
@@ -3027,8 +3003,8 @@ class UIsub(
                 val = getattr(uistate, "label_test_t_one_sample_value", 0.0)
                 self.lineEdit_test_t_one_sample_value.setText(str(val))
         if hasattr(self, "frameToolTest_sub_ANOVA"):
-            self.frameToolTest_sub_ANOVA.setVisible(test_type == "ANOVA")
-            if test_type == "ANOVA":
+            self.frameToolTest_sub_ANOVA.setVisible(test_type in ("ANOVA", "ANCOVA"))
+            if test_type in ("ANOVA", "ANCOVA"):
                 self.update_anova_label()
         if hasattr(self, "frameToolTest_sub_wilcoxon"):
             self.frameToolTest_sub_wilcoxon.setVisible(test_type == "Wilcoxon")
@@ -3113,80 +3089,15 @@ class UIsub(
         self.apply_statistical_test_if_active()
 
     def update_experiment_type_radio_buttons(self):
-        """Enable/disable and select experiment type radio buttons for the current selection."""
+        """Select experiment type radio buttons for the current selection.
+        ET and TT radios are ALWAYS enabled per plan (no setEnabled, no gray styling, no has_* checks).
+        Timestamp triggers statusbar warning; invalid TT states use existing _get_stat_test_warning.
+        """
         if not hasattr(self, "buttonGroup_type"):
             return
 
-        has_stims = False
-        has_sweep_hz = False
-        has_exactly_two_stims = True
-        if uistate.list_idx_select_recs:
-            df_p = self.get_df_project()
-            for idx in uistate.list_idx_select_recs:
-                row = df_p.loc[idx]
-                rec = row["recording_name"]
-                dft = self.dict_ts.get(rec)
-                if dft is not None:
-                    if len(dft) >= 1:
-                        has_stims = True
-                    if len(dft) != 2:
-                        has_exactly_two_stims = False
-                else:
-                    has_exactly_two_stims = False
-                if pd.notna(row.get("sweep_hz")):
-                    has_sweep_hz = True
-        else:
-            has_exactly_two_stims = False
-
-        if hasattr(self, "radioButton_type_sweep"):
-            self.radioButton_type_sweep.setEnabled(True)
-        if hasattr(self, "radioButton_type_train"):
-            self.radioButton_type_train.setEnabled(has_stims)
-        if hasattr(self, "radioButton_type_time"):
-            self.radioButton_type_time.setEnabled(has_sweep_hz)
-        if hasattr(self, "radioButton_type_timestamp"):
-            self.radioButton_type_timestamp.setEnabled(False)  # future
-        if hasattr(self, "radioButton_type_io"):
-            self.radioButton_type_io.setEnabled(True)
-        if hasattr(self, "radioButton_type_pp"):
-            self.radioButton_type_pp.setEnabled(has_exactly_two_stims)
-
-        if hasattr(self, "radioButton_io_stim"):
-            self.radioButton_io_stim.setEnabled(False)
-
-        is_io = getattr(uistate, "experiment_type", "time") == "io"
-        disabled_color = "#666" if uistate.darkmode else "#aaa"
-        for radio_name in (
-            list(self._RADIO_TO_TYPE)
-            + list(self._RADIO_TO_IO_I)
-            + list(self._RADIO_TO_IO_O)
-            + list(self._RADIO_TO_TEST)
-            + list(self._RADIO_TO_TEST_T_VARIANT)
-            + list(self._RADIO_TO_TEST_T_TAILS)
-            + list(self._RADIO_TO_TEST_WILCOX_VARIANT)
-            + list(self._RADIO_TO_TEST_WILCOX_TAILS)
-            + list(self._RADIO_TO_TEST_N)  # v0.16_n_stats
-        ):
-            if hasattr(self, radio_name):
-                radio = getattr(self, radio_name)
-                if radio.isEnabled():
-                    radio.setStyleSheet("")
-                else:
-                    radio.setStyleSheet(f"color: {disabled_color};")
-
+        # No enable/disable or stylesheet (radios always enabled; feedback via statusbar per spec)
         mode = getattr(uistate, "experiment_type", "time")
-        if mode in ["train", "io", "PP"] and not has_stims:
-            mode = "time" if has_sweep_hz else "sweep"
-        elif mode == "time" and not has_sweep_hz:
-            mode = "sweep"
-        elif mode == "timestamp":
-            mode = "time" if has_sweep_hz else "sweep"
-
-        if mode != getattr(uistate, "experiment_type", "time"):
-            uistate.experiment_type = mode
-            if hasattr(self, "frameToolType_sub_io"):
-                self.frameToolType_sub_io.setVisible(mode == "io")
-
         radio_name = self._TYPE_TO_RADIO.get(mode, "radioButton_type_time")
         if hasattr(self, radio_name):
             getattr(self, radio_name).setChecked(True)
@@ -3528,7 +3439,7 @@ class UIsub(
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(getattr(uistate, "experiment_type", "time") == "io")
         if hasattr(self, "frameToolTest"):
-            self.frameToolTest.setVisible(self._should_show_stat_test_frame())
+            self.frameToolTest.setVisible(self._should_show_stat_test_frame())  # overridable by menu/hide button (viewTools); no auto-hide on IO per plan
         if hasattr(self, "frameToolTestOptions"):
             self.frameToolTestOptions.setVisible(True)
 
@@ -3908,11 +3819,6 @@ class UIsub(
             if hasattr(self, radio_name):
                 getattr(self, radio_name).setChecked(True)
 
-        # Phase 0/1 migration for old IO projects (test_type="None" with experiment_type="io" -> "ANCOVA")
-        if getattr(uistate, "experiment_type", "time") == "io" and getattr(uistate, "test_type", "None") == "None":
-            uistate.test_type = "ANCOVA"
-            # Note: radio buttons stay on "None" (no ANCOVA radio); visibility handled by setupToolBar + helpers
-
         if hasattr(self, "frameToolTest_sub_t"):
             self.frameToolTest_sub_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
             # hook the one-sample value lineEdit (default 0.0 from UIState)
@@ -3920,14 +3826,15 @@ class UIsub(
                 val = getattr(uistate, "label_test_t_one_sample_value", 0.0)
                 self.lineEdit_test_t_one_sample_value.setText(str(val))
         if hasattr(self, "frameToolTest_sub_ANOVA"):
-            self.frameToolTest_sub_ANOVA.setVisible(getattr(uistate, "test_type", "None") == "ANOVA")
-            if getattr(uistate, "test_type", "None") == "ANOVA":
+            self.frameToolTest_sub_ANOVA.setVisible(getattr(uistate, "test_type", "None") in ("ANOVA", "ANCOVA"))
+            if getattr(uistate, "test_type", "None") in ("ANOVA", "ANCOVA"):
                 self.update_anova_label()
         if hasattr(self, "frameToolTest_sub_wilcoxon"):
             self.frameToolTest_sub_wilcoxon.setVisible(getattr(uistate, "test_type", "None") == "Wilcoxon")
             if getattr(uistate, "test_type", "None") == "Wilcoxon" and hasattr(self, "lineEdit_wilcoxon_one_sample_value"):
                 val = getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)
                 self.lineEdit_wilcoxon_one_sample_value.setText(str(val))
+        # No migration for old IO (experiment_type drives IO regression; ANCOVA radio now mapped)
 
         # Ensure tools column is treated as fixed pixels
         if len(uistate.splitter.get("h_splitterMaster", [])) == 4:

@@ -273,7 +273,7 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-1037</y>
+          <y>-904</y>
           <width>284</width>
           <height>1980</height>
          </rect>
@@ -2023,7 +2023,7 @@
              <string notr="true">buttonGroup_test</string>
             </attribute>
            </widget>
-           <widget class="QRadioButton" name="radioButton_test_anova_2">
+           <widget class="QRadioButton" name="radioButton_test_ancova">
             <property name="geometry">
              <rect>
               <x>10</x>
@@ -2643,15 +2643,15 @@
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="buttonGroup_wilcoxon_tails"/>
-  <buttongroup name="buttonGroup_test_t_variant"/>
-  <buttongroup name="buttonGroup_wilcoxon_variant"/>
-  <buttongroup name="buttonGroup_test_n"/>
   <buttongroup name="buttonGroup_io_i"/>
-  <buttongroup name="buttonGroup_io_o"/>
-  <buttongroup name="buttonGroup_test_t_tails"/>
-  <buttongroup name="buttonGroup_type"/>
+  <buttongroup name="buttonGroup_test_t_variant"/>
+  <buttongroup name="buttonGroup_test_n"/>
   <buttongroup name="buttonGroup_filter"/>
+  <buttongroup name="buttonGroup_wilcoxon_tails"/>
+  <buttongroup name="buttonGroup_io_o"/>
   <buttongroup name="buttonGroup_test"/>
+  <buttongroup name="buttonGroup_type"/>
+  <buttongroup name="buttonGroup_test_t_tails"/>
+  <buttongroup name="buttonGroup_wilcoxon_variant"/>
  </buttongroups>
 </ui>
