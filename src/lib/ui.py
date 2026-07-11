@@ -2834,6 +2834,7 @@ class UIsub(
             for idx in selected_idx:
                 df_p.at[idx, "filter"] = mode
             self.set_df_project(df_p)
+            self.tableUpdate(restore_selection=True)
             self.recalculate(selection=selected_idx)
             self.update_show()
 
@@ -2870,6 +2871,7 @@ class UIsub(
                 df_p.at[idx, "filter_params"] = json.dumps(params)
 
             self.set_df_project(df_p)
+            self.tableUpdate(restore_selection=True)
             self.recalculate(selection=selected_idx)
             self.update_show()
 
@@ -4141,9 +4143,8 @@ class UIsub(
             df_p.loc[idxs, col] = str(text)
         else:
             df_p.loc[idxs, col] = pd.NA  # explicit NA; displays as blank
-        self.set_df_project(
-            df_p
-        )  # persists + calls tableUpdate() (tablemodel.setData + formatTableLayout + selection restore); updates visual table cells
+        self.set_df_project(df_p)
+        self.tableUpdate(restore_selection=True)  # uses _restore_table_selection for consistent UX
         self.refreshHierarchyLineEdits(df_p)  # refresh line-edits after table update (prevents feedback via disconnect guard)
         self.update_test()  # hierarchy change (subject/slice) can affect n_unit n_report in IO statusbar; forces recompute of wide_df/get_group_testset_means (subject join) + statusbar
         # Force full refresh of groups/dd_groups (invalidates any cached wide_df without subject column)
@@ -4176,10 +4177,9 @@ class UIsub(
     def triggerRefresh(self):
         self.usage("refresh graphs")
         selection = uistate.list_idx_select_recs
-        self.tableProj.clearSelection()
         self.recalculate()
         uistate.list_idx_select_recs = selection
-        self.tableUpdate()
+        self.tableUpdate(restore_selection=True)  # centralized restore (no manual clearSelection)
         self.tableProjSelectionChanged()
 
     def triggerDarkmode(self):
@@ -4222,7 +4222,7 @@ class UIsub(
         self.usage("triggerClearGroups")
         if uistate.list_idx_select_recs:
             self.clearGroupsByRow(uistate.list_idx_select_recs)
-            self.tableUpdate()
+            self.tableUpdate(restore_selection=True)
             self.mouseoverUpdate()
         else:
             print("No files selected.")
@@ -4232,7 +4232,7 @@ class UIsub(
         # Placeholder: For now, delete all buttons and groups
         self.group_controls_remove()
         self.group_remove()
-        self.tableUpdate()
+        self.tableUpdate(restore_selection=True)
         self.mouseoverUpdate()
 
     def triggerNewGroup(self):
@@ -4313,9 +4313,8 @@ class UIsub(
         self.usage("triggerReanalyze")
         selection = uistate.list_idx_select_recs
         self.reanalyze_recordings()
-        self.tableProj.clearSelection()
         uistate.list_idx_select_recs = selection
-        self.tableUpdate()
+        self.tableUpdate(restore_selection=True)  # centralized restore (no manual clearSelection)
         self.tableProjSelectionChanged()
 
     def triggerAddSelectionToTestSet(self):
@@ -4378,6 +4377,7 @@ class UIsub(
         df_p.loc[selection, "gain"] = new_gain
         self.set_df_project(df_p)
         print(f"SetGain: set gain={new_gain} on {n} {noun}.")
+        self.tableUpdate(restore_selection=True)  # preserve selection after gain change
         self.reanalyze_recordings()
 
     def triggerSetSweepHz(self):
@@ -4435,6 +4435,7 @@ class UIsub(
             df_p.at[idx, "status"] = "|".join(flags)
         self.set_df_project(df_p)
         print(f"SetSweepHz: set sweep_hz={new_hz} on {n} {noun}.")
+        self.tableUpdate(restore_selection=True)  # preserve selection after sweep_hz change
         self.update_experiment_type_radio_buttons()
         for idx in selection:
             uiplot.unPlot(rec_ID=df_p.loc[idx, "ID"])
@@ -4964,7 +4965,7 @@ class UIsub(
         df_p["sweeps"] = df_p["sweeps"].fillna("...")
         # v0.16_n: migration will be called inside set_df_project (hierarchy defaults)
         self.set_df_project(df_p)
-        self.tableFormat()
+        self.tableUpdate(restore_selection=True)  # new helper ensures selection is restored after adding data
         logger.debug("addData: %s", self.get_df_project())
         print("addData:", self.get_df_project())
 
@@ -4986,7 +4987,7 @@ class UIsub(
                 # For paired recordings: also rename any references to old_recording_name in df_p['paired_recording']
                 df_p.loc[df_p["paired_recording"] == old_recording_name, "paired_recording"] = new_recording_name
                 self.set_df_project(df_p)
-                self.tableUpdate()
+                self.tableUpdate(restore_selection=True)  # preserve the renamed row selection
                 self.update_recs2plot()
                 old_recording_ID = df_p.at[uistate.list_idx_select_recs[0], "ID"]
                 uiplot.unPlot(old_recording_ID)
@@ -5055,15 +5056,8 @@ class UIsub(
             uistate.list_idx_select_recs = []
 
         self.set_df_project(df_p)
-        self.tableUpdate()
-
-        # Ensure the selection is visible and focused after model reset (Qt sometimes
-        # loses keyboard navigation focus or resets to row 0 on arrow keys after delete).
-        if uistate.list_idx_select_recs:
-            target_idx = uistate.list_idx_select_recs[0]
-            if target_idx < len(df_p):
-                self.tableProj.selectRow(target_idx)
-                self.tableProj.scrollTo(self.tablemodel.index(target_idx, 0))
+        # Use helper for consistent restore (last row on terminal delete, keyboard focus).
+        self.tableUpdate(restore_selection=True, target_idx=None)
         self.tableProjSelectionChanged()
 
     def purgeRecordingData(self, rec_ID, rec_name):
@@ -5201,7 +5195,7 @@ class UIsub(
         # Worker threads (e.g. graphPreloadThread) call set_rec_status too, so
         # guard the call to avoid a cross-thread Qt deadlock.
         if QtCore.QThread.currentThread() is QtWidgets.QApplication.instance().thread():
-            self.tableUpdate()
+            self.tableUpdate(restore_selection=False)  # worker thread; do not touch selection model
 
     # set_dft → DataFrameMixin (ui_data_frames.py)
 
@@ -5281,23 +5275,46 @@ class UIsub(
         )
         self.setButtonParse()
 
-    def tableUpdate(self):
+    def tableUpdate(self, restore_selection: bool = True, target_idx: int | None = None):
         self.updating_tableProj = True  # prevent tableProjSelectionChanged from firing
         # Update data
         df_project = self.get_df_project()
         self.tablemodel.setData(df_project)
         self.formatTableLayout()
         self.tableProj.resizeColumnsToContents()
-        # Restore selection
-        selection_model = self.tableProj.selectionModel()
-        for idx in uistate.list_idx_select_recs:
-            index = self.tablemodel.index(idx, 0)  # get the QModelIndex for the row
-            selection_model.select(
-                index,
-                QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows,
-            )
-            # print(f"tableUpdate: reselecting {len(uistate.list_idx_select_recs)}: {idx}")
+
+        if restore_selection:
+            self._restore_table_selection(df_project, target_idx)
+
         self.updating_tableProj = False
+
+    def _restore_table_selection(self, df_p: pd.DataFrame, target_idx: int | None = None) -> None:
+        """Centralized helper to restore visual + keyboard selection after df_project mutation.
+
+        Called from tableUpdate (and can be called directly after set_df_project).
+        Uses stable logic: prefer explicit target, then uistate, then new last row (good for delete),
+        then first row. Ensures selectRow + scrollTo so arrow keys work reliably.
+        """
+        if target_idx is None:
+            if uistate.list_idx_select_recs:
+                target_idx = uistate.list_idx_select_recs[0]
+            elif len(df_p) > 0:
+                target_idx = len(df_p) - 1  # default to last row on delete/terminal ops
+            else:
+                target_idx = 0
+
+        self.tableProj.clearSelection()  # clean slate after model reset
+
+        if 0 <= target_idx < len(df_p):
+            uistate.list_idx_select_recs = [target_idx]
+            self.tableProj.selectRow(target_idx)
+            self.tableProj.scrollTo(self.tablemodel.index(target_idx, 0))
+            self.tableProj.setFocus()  # ensure keyboard navigation works immediately
+        else:
+            uistate.list_idx_select_recs = []
+
+        # Do NOT call tableProjSelectionChanged here — let caller decide (avoids recursion).
+        # Most callers already follow with it, or it is triggered by selectRow().
 
     # Internal dataframe handling
     def get_prow(self, dfp_idx=None):
@@ -5439,7 +5456,7 @@ class UIsub(
         self.progressBarManager.__exit__(None, None, None)  # Hide progress bar
         # Return control to test warnings
         self.update_test()
-        self.tableFormat()
+        self.tableUpdate(restore_selection=False)  # parse completion; preserve existing selection via uistate
         self.uiThaw()
         self.tableProjSelectionChanged()
 

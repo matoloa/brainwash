@@ -384,7 +384,7 @@ class ProjectMixin:
             self.df_project = df
         self.save_df_project()
         if hasattr(self, "tableUpdate"):
-            self.tableUpdate()  # v0.16_n: always refresh table on set_df_project (fixes lineEdit → table staleness; tableUpdate guards against recursion via updating_tableProj flag)
+            self.tableUpdate(restore_selection=False)  # set_df_project is called from many contexts; let caller control selection restore to avoid recursion
         # Note: full table refresh (tableUpdate/tableFormat) is performed by the calling UIsub methods (e.g. applyHierarchyToSelection, addData, trigger*).
 
     def load_df_project(self, str_projectfolder):  # reads or builds project cfg and groups. Reads fileversion of df_project and saves bw_cfg
@@ -422,7 +422,7 @@ class ProjectMixin:
         self._backfill_sweep_hz()
         uistate.load_cfg(self.dict_folders["project"], config.version)
         self.syncJournalExportMenu()
-        self.tableFormat()
+        self.tableUpdate(restore_selection=False)  # initial load; selection set by later tableProjSelectionChanged
         self.write_bw_cfg()
 
     def _backfill_sweep_hz(self):

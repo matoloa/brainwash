@@ -122,7 +122,7 @@ class DataFrameMixin:
             dfoutput = self.get_dfoutput(p_row, reset=True)
             self.persistOutput(rec, dfoutput, p_row=p_row)
             uiplot.addRow(p_row, df_t, self.get_dfmean(p_row), self.V2mV(dfoutput))
-        self.tableFormat()
+        self.tableUpdate(restore_selection=True)  # centralized restore after recalculate
 
         # group handling
         if selection is None:
@@ -240,6 +240,7 @@ class DataFrameMixin:
             stims = len(dft)
             df_p.loc[row["ID"] == df_p["ID"], "stims"] = stims
             self.set_df_project(df_p)
+            self.tableUpdate(restore_selection=True)  # ensure selection preserved after stim count update
             # If the UI checkbox for 'timepoints_per_stim' is checked OR there's only 1 stim,
             # we assume timepoints don't need adjustment, so we cache df_t as-is.
             if uistate.checkBox["timepoints_per_stim"] or stims == 1:

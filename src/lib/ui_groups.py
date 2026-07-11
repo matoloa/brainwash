@@ -278,7 +278,7 @@ class GroupMixin:
                 self.group_rec_assign(rec_ID, group_ID)
         self.group_save_dd()
         self.set_df_project(dfp)
-        self.tableUpdate()
+        self.tableUpdate(restore_selection=True)  # centralized selection restore (preserves group assignment UX)
         if hasattr(self, "clear_formal_test_results"):
             self.clear_formal_test_results()
         self.graphRefresh()
@@ -524,4 +524,4 @@ class GroupMixin:
                     list_rec_in_groups = group_list(rec_ID)
                     df_p.at[i, "groups"] = ", ".join(sorted(list_rec_in_groups)) if list_rec_in_groups else " "
         self.set_df_project(df_p)
-        self.tableFormat()
+        self.tableUpdate(restore_selection=True)  # use new helper instead of tableFormat (consistent selection restore)
