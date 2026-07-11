@@ -2992,7 +2992,9 @@ class UIsub(
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
         # Clear stale results/state; single apply call below drives statusbar via _get_statusbar_for_current_state
         uistate.formal_test_results = None
-        uistate.statusbar_state = None
+        # Do not unconditionally reset statusbar_state here; let _get_statusbar_for_current_state
+        # (called from update_test) set "warning" for invalid t-test state (e.g. no test sets).
+        # This matches launch-time behavior where warning color is set correctly.
         self.update_test()
         if exp_type == "io":
             self.exorcise()
@@ -3037,7 +3039,9 @@ class UIsub(
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         # Clear stale results/state on test change; apply_statistical_test_if_active drives statusbar
         uistate.formal_test_results = None
-        uistate.statusbar_state = None
+        # Do not unconditionally reset statusbar_state here; let _get_statusbar_for_current_state
+        # (called from update_test) set "warning" for invalid t-test state (e.g. no test sets).
+        # This matches launch-time behavior where warning color is set correctly.
         self.update_test()
 
     def test_t_variant_changed(self, button):
