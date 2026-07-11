@@ -664,8 +664,10 @@ class DataFrameMixin:
             return pd.DataFrame(columns=["rec_ID", "value"])
 
         if per_sweep:
-            # Wide matrix (rec_ID + sweeps). Preserve for caller.
+            # Wide matrix (rec_ID + sweeps). Preserve for caller. Ensure consistent string dtype for rec_ID (matches xy_pairs/rec_ID join).
             out = obs.copy()
+            if "rec_ID" in out.columns:
+                out["rec_ID"] = out["rec_ID"].astype(str)
         else:
             # Scalar mean path (backward compatible)
             sweep_cols = [c for c in obs.columns if c != "rec_ID"]
@@ -677,12 +679,15 @@ class DataFrameMixin:
                 out = out[pd.to_numeric(out["value"], errors="coerce").notna()].copy()
                 out["value"] = pd.to_numeric(out["value"], errors="coerce")
                 out = out.reset_index(drop=True)
+            if "rec_ID" in out.columns:
+                out["rec_ID"] = out["rec_ID"].astype(str)
 
         # Phase 0 (v0.16_n_stats): always join hierarchy columns (non-breaking)
         # Uses df_project.ID == rec_ID (df_project uses ID as primary key).
         df_p = self.get_df_project()
         if not df_p.empty and "subject" in df_p.columns:
             hierarchy = df_p[["ID", "subject", "slice"]].rename(columns={"ID": "rec_ID"})
+            hierarchy["rec_ID"] = hierarchy["rec_ID"].astype(str)
             out = out.merge(hierarchy, on="rec_ID", how="left")
             # Ensure subject/slice are present even if no match (old projects)
             for col in ("subject", "slice"):

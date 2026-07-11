@@ -4153,7 +4153,11 @@ class UIsub(
             df_p
         )  # persists + calls tableUpdate() (tablemodel.setData + formatTableLayout + selection restore); updates visual table cells
         self.refreshHierarchyLineEdits(df_p)  # refresh line-edits after table update (prevents feedback via disconnect guard)
-        self.update_test()  # hierarchy change (subject/slice) can affect n_unit n_report in IO statusbar
+        self.update_test()  # hierarchy change (subject/slice) can affect n_unit n_report in IO statusbar; forces recompute of wide_df/get_group_testset_means (subject join) + statusbar
+        # Force full refresh of groups/dd_groups (invalidates any cached wide_df without subject column)
+        self.group_get_dd()  # rebuilds from updated df_project
+        if hasattr(self, "graphRefresh"):
+            self.graphRefresh()
 
     def triggerToggleTimetable(self, checked=None):
         self.usage("triggerToggleTimetable")
