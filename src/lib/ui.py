@@ -5019,6 +5019,13 @@ class UIsub(
             print("No files selected.")
             return
         df_p = self.get_df_project()
+        # Capture stable ID of the row immediately after the last deleted one (for conservation).
+        # This is robust to df.drop() + reset_index changing all subsequent row numbers.
+        reselect_id = None
+        last_deleted_idx = uistate.list_idx_select_recs[-1]
+        if last_deleted_idx < len(df_p) - 1:
+            reselect_id = df_p.at[last_deleted_idx + 1, "ID"]
+
         for index in uistate.list_idx_select_recs:
             rec_name = df_p.at[index, "recording_name"]
             rec_ID = df_p.at[index, "ID"]
@@ -5028,17 +5035,35 @@ class UIsub(
                 self.purgeRecordingData(rec_ID, rec_name)
                 # this also purges group cache and unplots the group
                 uiplot.unPlot(rec_ID)  # remove plotted lines
-        # store the ID of the line below the last selected row
-        reselect_ID = None
-        if uistate.list_idx_select_recs[-1] < (len(df_p) - 1):
-            reselect_ID = df_p.at[uistate.list_idx_select_recs[-1] + 1, "ID"]
+
         df_p.drop(uistate.list_idx_select_recs, inplace=True)
         df_p.reset_index(inplace=True, drop=True)
+
+        # Set desired selection *before* model reset (set_df_project → tableUpdate).
+        # Prefer the row that followed the deleted block. When deleting the last
+        # row(s), select the *new* last row (standard UX). tableUpdate() restores
+        # via uistate.list_idx_select_recs; SelectionChanged updates everything else.
+        if reselect_id is not None:
+            new_idx = df_p[df_p["ID"] == reselect_id].index
+            if not new_idx.empty:
+                uistate.list_idx_select_recs = [new_idx[0]]
+            else:
+                uistate.list_idx_select_recs = []
+        elif len(df_p) > 0:
+            uistate.list_idx_select_recs = [len(df_p) - 1]
+        else:
+            uistate.list_idx_select_recs = []
+
         self.set_df_project(df_p)
         self.tableUpdate()
-        # reselect the line below the last selected row
-        if reselect_ID is not None:
-            uistate.list_idx_select_recs = [df_p[df_p["ID"] == reselect_ID].index[0]]
+
+        # Ensure the selection is visible and focused after model reset (Qt sometimes
+        # loses keyboard navigation focus or resets to row 0 on arrow keys after delete).
+        if uistate.list_idx_select_recs:
+            target_idx = uistate.list_idx_select_recs[0]
+            if target_idx < len(df_p):
+                self.tableProj.selectRow(target_idx)
+                self.tableProj.scrollTo(self.tablemodel.index(target_idx, 0))
         self.tableProjSelectionChanged()
 
     def purgeRecordingData(self, rec_ID, rec_name):
