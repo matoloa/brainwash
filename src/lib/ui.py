@@ -1744,16 +1744,18 @@ class UIsub(
             if isinstance(cfg, dict) and cfg.get("type") == "IO regression":
                 prefix = "IO ANCOVA"
                 global_notes = []
-                # n_report first (after prefix per new spec), include "subjects" unit; Y/X labels next; results with : (salvage existing)
+                # n_report first (after prefix per approved plan), dynamic unit from n_unit, Y/X labels, : before results (pure formatter)
                 n_report = ""
                 group_ns = cfg.get("group_ns") or (formal[0] if isinstance(formal, list) else formal).get("group_ns", {})
+                n_unit = cfg.get("n_unit", getattr(uistate, "buttonGroup_test_n", "subject"))
+                unit_label = "subjects" if n_unit == "subject" else f"{n_unit}s"
                 if group_ns:
                     ns = []
                     for g, n in group_ns.items():
-                        g_name = self.dd_groups.get(g, {}).get("group_name", f"group {g}").lower()
+                        g_name = self.dd_groups.get(g, {}).get("group_name", f"Group {g}")
                         ns.append(f"{g_name}={n}")
-                    n_report = f"({', '.join(ns)} subjects)"
-                # human labels (Y first / X; reuse maps from io_*_changed; fallback per config)
+                    n_report = f"({', '.join(ns)} {unit_label})"
+                # human labels (Y first then X per IO spec; map from regression config)
                 x_col = cfg.get("x_col", "volley_amp")
                 y_col = cfg.get("y_col", "EPSP_amp")
                 label_map = {
@@ -1769,7 +1771,6 @@ class UIsub(
                 slope_p = cfg.get("slope_p") or (formal[0] if isinstance(formal, list) else formal).get("slope_p")
                 if isinstance(slope_p, (int, float)) and np.isfinite(slope_p):
                     pstr = f"{slope_p:.3g}" if slope_p >= 0.001 else "<0.001"
-                    # no "slope" for EPSP/volley ratio test (per user; config has io_output)
                     stat_label = "slope" if str(cfg.get("io_output", "")).endswith(("slope", "Slope")) else "ratio"
                     global_notes.append(f"{stat_label} p={pstr}")
                 for g, r2v in cfg.get("r2_per_group", {}).items():
@@ -1778,9 +1779,9 @@ class UIsub(
                         break
                 if global_notes:
                     notes_str = " ".join(global_notes)
-                    prefix = f"{prefix} {xy_label} {n_report}, {notes_str}"
+                    prefix = f"{prefix} {n_report} {xy_label}: {notes_str}"
                 else:
-                    prefix = f"{prefix} {xy_label} {n_report}"
+                    prefix = f"{prefix} {n_report} {xy_label}"
                 uistate.statusbar_state = "info"
                 return prefix
             # No formal_results yet (initial switch) or not matching config: benign hint, not an error.
