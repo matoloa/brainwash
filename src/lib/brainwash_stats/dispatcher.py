@@ -3,7 +3,6 @@ from .formal_tests.cluster_perm import run_cluster_permutation
 from .formal_tests.friedman import run_friedman_omnibus
 from .formal_tests.ttest_and_between import run_main_test_set_loop
 from .formal_tests.wilcoxon import run_wilcoxon_tests
-from .io.implicit_anova import run_io_implicit_anova
 from .io.regression import _compute_io_regression_internal
 from .validation import comparison_context, validate_comparison_inputs
 
@@ -34,7 +33,7 @@ def compute_statistical_comparison(
 
     For experiment_type=="io" + no test sets: real X/Y regression via _compute_io_regression_internal
     (linregress per unit + OLS slope test). Produces config with "type": "IO regression".
-    Early IO guard before implicit ANOVA branch. Backward compatible for non-IO.
+    Early IO guard (is_io and use_implicit). ANCOVA is a normal test_type (non-IO ANOVA).
     See AGENTS.md for statusbar and experiment_type rules.
     """
     validation_error = validate_comparison_inputs(
@@ -80,18 +79,8 @@ def compute_statistical_comparison(
             dd_groups=dd_groups,
         )
 
-    if test_type == "ANOVA" and use_implicit and len(shown_groups) >= 2:
-        return run_io_implicit_anova(
-            shown_groups=shown_groups,
-            fetch_group_testset_observations=fetch_group_testset_observations,
-            n_unit=n_unit,
-            norm=norm,
-            amp=amp,
-            slope=slope,
-            fdr=fdr,
-            test_type=test_type,
-            tails=tails,
-        )
+    # Legacy implicit ANOVA path removed (dead since IO regression became first-class).
+    # ANCOVA is now a normal test_type radio (handled as non-IO ANOVA).
 
     if n_unit not in ("subject", "slice", "recording"):
         n_unit = "subject"

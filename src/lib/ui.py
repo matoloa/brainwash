@@ -1180,7 +1180,7 @@ class UIsub(
         # numbers — with a FuncFormatter converting tick labels to time units),
         # so x_mode="sweep" lines are visible in both "sweep" and "time" modes.
         x_mode = v.get("x_mode")
-        is_io = getattr(uistate, "experiment_type", "time") == "io"
+        is_io = self._is_io_mode()
         if x_mode is not None and x_mode != uistate.x_axis:
             if not (x_mode == "sweep" and uistate.x_axis == "time"):
                 return False
@@ -1221,7 +1221,7 @@ class UIsub(
         # x_mode filtering: group lines tagged with a specific x_mode are only
         # visible when that mode is active.
         x_mode = v.get("x_mode")
-        is_io = getattr(uistate, "experiment_type", "time") == "io"
+        is_io = self._is_io_mode()
         if x_mode is not None and x_mode != uistate.x_axis:
             if not (x_mode == "sweep" and uistate.x_axis == "time"):
                 return False
@@ -1603,14 +1603,12 @@ class UIsub(
     def update_anova_label(self):
         """Update label_test_ANOVA and uistate.anova_label based on number of shown test sets.
         Called whenever test sets are created, shown/hidden, or test_type changes to ANOVA/ANCOVA.
-        v0.16_n_stats_IO: for experiment_type=="io" (no test sets), label="ANOVA (IO all sweeps)".
+        (IO regression uses separate statusbar; no special label.)
         """
         if not hasattr(self, "label_test_ANOVA"):
             return
         n = len(self._get_shown_testsets())
-        if self._is_io_mode() and n == 0:
-            label_text = "ANOVA (IO: all sweeps)"
-        elif n > 1:
+        if n > 1:
             label_text = "ANOVA (repeated)"
         else:
             label_text = "ANOVA (one-way)"
@@ -1722,7 +1720,7 @@ class UIsub(
         if eff == "None":
             uistate.statusbar_state = None
             return None
-        if self._is_io_mode():  # No "or eff == 'ANCOVA'" (sentinel removed; IO first-class)
+        if self._is_io_mode():  # IO first-class (ANCOVA is normal test_type radio)
             formal = getattr(uistate, "formal_test_results", None)
             return self._format_io_regression_statusbar(formal)
         # non-IO: delegate to warning logic (state set in _refresh or applicator)
@@ -1923,7 +1921,7 @@ class UIsub(
     def _get_stat_test_warning(self):
         """Return warning string (for non-IO) or status text (for IO via _format_...), else None.
         Now pure per plan.md (no uistate sets, no clear_formal_test_results). State set only by caller.
-        IO handled by _get_statusbar_for_current_state -> _format_io_regression_statusbar (no ANCOVA sentinel).
+        IO handled by _get_statusbar_for_current_state -> _format_io_regression_statusbar.
         """
         eff = self._effective_test_type()
         if eff == "None":
@@ -1998,7 +1996,7 @@ class UIsub(
             return  # prevent recursion from update_test <-> apply_statistical_test_if_active
         try:
             eff = self._effective_test_type()
-            if self._is_io_mode():  # No "ANCOVA" sentinel (IO first-class per plan)
+            if self._is_io_mode():  # IO first-class (ANCOVA is normal test_type radio)
                 self._apply_io_regression()
                 return
             if eff == "None":
@@ -2583,10 +2581,7 @@ class UIsub(
         self.usage("zoomAuto")
         prow = self.get_prow()
 
-        if getattr(uistate, "experiment_type", "time") == "io":
-            ymin_clamp = 0
-        else:
-            ymin_clamp = 0 if uistate.checkBox["output_ymin0"] else None
+        ymin_clamp = 0 if self._is_io_mode() else (0 if uistate.checkBox["output_ymin0"] else None)
 
         if prow is None:
             logger.debug("zoomAuto: no recording selected, fitting to visible groups")
@@ -2653,7 +2648,7 @@ class UIsub(
 
         dft = self.get_dft(row=prow)
 
-        if getattr(uistate, "experiment_type", "time") == "io":
+        if self._is_io_mode():
             xlim1 = self._xlim_from_artists(uistate.ax1, pad=0)
             xlim2 = self._xlim_from_artists(uistate.ax2, pad=0)
             if xlim1 and xlim2:
@@ -2715,12 +2710,9 @@ class UIsub(
         """Compute output xlim/ylim from currently visible artists (groups) and store in uistate.zoom.
         Used when no single recording is selected.
         """
-        if getattr(uistate, "experiment_type", "time") == "io":
-            ymin_clamp = 0
-        else:
-            ymin_clamp = 0 if uistate.checkBox["output_ymin0"] else None
+        ymin_clamp = 0 if self._is_io_mode() else (0 if uistate.checkBox["output_ymin0"] else None)
 
-        if getattr(uistate, "experiment_type", "time") == "io":
+        if self._is_io_mode():
             xlim1 = self._xlim_from_artists(uistate.ax1, pad=0)
             xlim2 = self._xlim_from_artists(uistate.ax2, pad=0)
             if xlim1 and xlim2:
@@ -3140,7 +3132,7 @@ class UIsub(
                 print(f"Checkbox io_trendline clicked, state: {state == 2}")
             elif key == "io_force0":
                 print(f"Checkbox io_force0 clicked, state: {state == 2}")
-                if getattr(uistate, "experiment_type", "time") == "io":
+                if self._is_io_mode():
                     self.exorcise()
                     self.triggerRefresh()
             elif key == "is_group_sample":
@@ -3459,7 +3451,7 @@ class UIsub(
         self.frameToolAspectAmp.setVisible(uistate.checkBox.get("EPSP_amp", False) or uistate.checkBox.get("volley_amp", False))
         self.frameToolAspectSlope.setVisible(uistate.checkBox.get("EPSP_slope", False) or uistate.checkBox.get("volley_slope", False))
         if hasattr(self, "frameToolType_sub_io"):
-            self.frameToolType_sub_io.setVisible(getattr(uistate, "experiment_type", "time") == "io")
+            self.frameToolType_sub_io.setVisible(self._is_io_mode())
         if hasattr(self, "frameToolTest"):
             self.frameToolTest.setVisible(self._should_show_stat_test_frame())  # controlled ONLY by menu or hide button (viewTools); no auto-hide on IO
         if hasattr(self, "frameToolTestOptions"):
@@ -3856,7 +3848,7 @@ class UIsub(
             if getattr(uistate, "test_type", "None") == "Wilcoxon" and hasattr(self, "lineEdit_wilcoxon_one_sample_value"):
                 val = getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)
                 self.lineEdit_wilcoxon_one_sample_value.setText(str(val))
-        # No migration for old IO (experiment_type drives IO regression; ANCOVA radio now mapped)
+        # experiment_type drives IO regression; ANCOVA is normal test_type radio
 
         # Ensure tools column is treated as fixed pixels
         if len(uistate.splitter.get("h_splitterMaster", [])) == 4:
