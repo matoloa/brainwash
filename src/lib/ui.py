@@ -1514,7 +1514,7 @@ class UIsub(
         print(f"Heatmap is {uistate.showHeatmap}")
         if not uistate.showHeatmap:
             uiplot.heatunmap()
-            self._refresh_test_statusbar()
+            self.set_statusbar(None, None)  # pure display refresh (no test recompute)
             return
         t0 = time.time()
         d_group_ndf = {}
@@ -1573,7 +1573,7 @@ class UIsub(
             except Exception:
                 pass
             try:
-                self._refresh_test_statusbar()
+                self.set_statusbar(None, None)  # pure display refresh after heatmap disable
             except Exception:
                 pass
 
@@ -1716,7 +1716,7 @@ class UIsub(
     def _get_statusbar_for_current_state(self) -> str | None:
         """Single source of truth for statusbar per AGENTS.md and plan.md.
         Dispatches based on experiment_type/effective operation. IO prefers formal_test_results config.
-        Pure query (state set only by caller _refresh_test_statusbar). Handles all combinations.
+        Pure query (state set only by caller update_test / set_statusbar). Handles all combinations.
         """
         eff = self._effective_test_type()
         if eff == "None":
@@ -1791,7 +1791,7 @@ class UIsub(
     def _apply_io_regression(self) -> bool:
         """Helper for IO path in apply_statistical_test_if_active (called from dispatcher).
         Runs compute_statistical_comparison (experiment_type=io), populates formal_test_results.
-        Sets state and refreshes statusbar (via _get_statusbar_for_current_state).
+        Sets state and calls update_test() (which ends with set_statusbar).
         """
         shown_groups = self._get_shown_group_ids()
         shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
@@ -1828,13 +1828,13 @@ class UIsub(
             uistate.formal_test_results = results
             uiplot.show_test_markers(results)
             uistate.statusbar_state = "info"
-            self._refresh_test_statusbar()
+            self.update_test()
             return True
         except Exception as ex:
             print(f"IO regression compute error: {ex}")
             self.clear_formal_test_results()
             uistate.statusbar_state = None
-            self._refresh_test_statusbar()
+            self.update_test()
             return False
 
     def _check_ttest_applicability(self, variant: str) -> str | None:
@@ -1950,15 +1950,31 @@ class UIsub(
 
         return warning
 
-    def _refresh_test_statusbar(self):
-        """Update statusbar using _get_statusbar_for_current_state() (single source per plan.md).
-        Sets uistate.statusbar_state + calls _set_statusbar_appearance. Prints message for debugging (as requested).
+    def update_test(self):
+        """Single high-level entrypoint for all changes that affect statistical tests or their statusbar (per approved plan).
+        Always runs statistical analysis if a test is active (via apply_statistical_test_if_active), then calls set_statusbar with the resulting state/text.
         """
         if self._is_loading_active():
             return
+        # Prevent infinite recursion between update_test <-> apply_statistical_test_if_active
+        if getattr(self, "_updating_test", False):
+            return
+        self._updating_test = True
+        try:
+            self.apply_statistical_test_if_active()
+        finally:
+            self._updating_test = False
+
+        # After computation (or if no test active), ensure statusbar is set
         text = self._get_statusbar_for_current_state()
         state = getattr(uistate, "statusbar_state", None)
-        print(f"STATUSBAR: {text} (state={state})")  # debug print for frequent statusbar updates (reinstated per request)
+        self.set_statusbar(state, text)
+
+    def set_statusbar(self, state: str | None = None, text: str | None = None):
+        """Low-level applicator: only does what it is given (debug print + appearance). No computation or queries.
+        Called by update_test() and pure display refreshes.
+        """
+        print(f"STATUSBAR: {text} (state={state})")  # debug print for frequent statusbar updates
         if state == "warning":
             self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=text)
         elif state == "info" or text:
@@ -1967,17 +1983,19 @@ class UIsub(
             self._set_statusbar_appearance(clear=True)
 
     def _on_statusbar_message_cleared(self, text):
-        """After a transient message (e.g. export toast) clears, restore via _refresh_test_statusbar (which now uses uistate.statusbar_state)."""
+        """After a transient message (e.g. export toast) clears, restore via set_statusbar (pure display refresh; no recompute)."""
         if text:
             return
         if self._is_loading_active():
             return
-        self._refresh_test_statusbar()
+        self.set_statusbar(None, None)
 
     def apply_statistical_test_if_active(self):
         """Core dispatcher: if io_regression call _apply_io_regression, None clears, else non-IO.
         Single call site from event handlers (no redundant explicit _apply_io_regression).
         """
+        if getattr(self, "_updating_test", False):
+            return  # prevent recursion from update_test <-> apply_statistical_test_if_active
         try:
             eff = self._effective_test_type()
             if self._is_io_mode():  # No "ANCOVA" sentinel (IO first-class per plan)
@@ -1986,7 +2004,7 @@ class UIsub(
             if eff == "None":
                 self.clear_formal_test_results()
                 uistate.statusbar_state = None
-                self._refresh_test_statusbar()
+                self.update_test()
                 return
             self._apply_non_io_test(eff)
         except Exception as ex:
@@ -1998,7 +2016,7 @@ class UIsub(
                 self.clear_formal_test_results()
             except Exception:
                 pass
-            self._refresh_test_statusbar()
+            self.update_test()
 
     def _apply_non_io_test(self, eff: str) -> None:
         """Isolated non-IO guard + compute logic (extracted from former monster in apply_statistical_test_if_active).
@@ -2013,7 +2031,7 @@ class UIsub(
             )
             self.clear_formal_test_results()
             uistate.statusbar_state = "warning"
-            self._refresh_test_statusbar()
+            self.update_test()
             return
 
         # --- Early applicability checks (abort cleanly if tests cannot run) ---
@@ -2024,7 +2042,7 @@ class UIsub(
                 print("Statistical test: no groups defined.")
             self.clear_formal_test_results()
             uistate.statusbar_state = "warning"
-            self._refresh_test_statusbar()
+            self.update_test()
             return
 
         shown_groups = self._get_shown_group_ids()
@@ -2058,7 +2076,7 @@ class UIsub(
                     print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
             self.clear_formal_test_results()
             uistate.statusbar_state = "warning"
-            self._refresh_test_statusbar()
+            self.update_test()
             return
 
         # Paired t-test additionally requires exactly 2 test sets (the pairing model uses 2 test sets within 1 group)
@@ -2068,14 +2086,14 @@ class UIsub(
                     print("Statistical test: paired requires exactly 2 shown test sets (with 1 group).")
                 self.clear_formal_test_results()
                 uistate.statusbar_state = "warning"
-                self._refresh_test_statusbar()
+                self.update_test()
                 return
             n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
             if n1 < 2:
                 if had_results:
                     print("Statistical test: paired requires N ≥ 2 recordings.")
                 self.clear_formal_test_results()
-                self._refresh_test_statusbar()
+                self.update_test()
                 return
 
         if not shown_ts and test_type not in ("Friedman", "Cluster perm."):
@@ -2083,7 +2101,7 @@ class UIsub(
                 print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
             self.clear_formal_test_results()
             uistate.statusbar_state = "warning"
-            self._refresh_test_statusbar()
+            self.update_test()
             return
 
         if test_type == "Wilcoxon":
@@ -2137,7 +2155,7 @@ class UIsub(
         if not results and not (comp.get("config") and comp.get("config").get("implicit_testset")):
             self.clear_formal_test_results()
             uistate.statusbar_state = None
-            self._refresh_test_statusbar()
+            self.update_test()
             return
         if comp.get("config") and comp.get("config").get("implicit_testset") and (not results or not isinstance(results, list) or len(results) == 0):
             results = [{"config": comp["config"]}]
@@ -2152,7 +2170,7 @@ class UIsub(
         self.usage(f"stat_test applied: {test_type} {effective_variant} {tails} on {set_names} (fdr={fdr}, sw={sw}, levene={lev}, n_unit={n_unit})")
         if results and not getattr(uistate, "statusbar_state", None):
             uistate.statusbar_state = "info"
-        self._refresh_test_statusbar()
+        self.update_test()
 
     def _print_statistical_test_table(self, results, variant, tails, fdr, norm, test_type=None):
         if not results:
@@ -2389,7 +2407,7 @@ class UIsub(
         # Re-apply statusbar state (after darkmode stylesheet reset). Warnings stay red; reports use theme default.
         try:
             if not self._is_loading_active():
-                self._refresh_test_statusbar()
+                self.set_statusbar(None, None)  # pure display refresh (no test recompute)
         except Exception:
             pass
 
@@ -2975,7 +2993,7 @@ class UIsub(
         # Clear stale results/state; single apply call below drives statusbar via _get_statusbar_for_current_state
         uistate.formal_test_results = None
         uistate.statusbar_state = None
-        self._refresh_test_statusbar()
+        self.update_test()
         if exp_type == "io":
             self.exorcise()
             self.triggerRefresh()
@@ -3020,8 +3038,7 @@ class UIsub(
         # Clear stale results/state on test change; apply_statistical_test_if_active drives statusbar
         uistate.formal_test_results = None
         uistate.statusbar_state = None
-        self._refresh_test_statusbar()
-        self.apply_statistical_test_if_active()
+        self.update_test()
 
     def test_t_variant_changed(self, button):
         """Wiring for buttonGroup_test_t_variant (v0.16)."""
@@ -3851,7 +3868,7 @@ class UIsub(
         self.setTableStimVisibility(uistate.showTimetable, initialize=True)
         self.connectUIstate()
         # Initial evaluation of test condition warnings on the statusbar (after config/test radios restored)
-        self._refresh_test_statusbar()
+        self.update_test()
 
     # trigger functions TODO: break out the big ones to separate functions!
 
@@ -4136,7 +4153,7 @@ class UIsub(
             df_p
         )  # persists + calls tableUpdate() (tablemodel.setData + formatTableLayout + selection restore); updates visual table cells
         self.refreshHierarchyLineEdits(df_p)  # refresh line-edits after table update (prevents feedback via disconnect guard)
-        self._refresh_test_statusbar()  # hierarchy change (subject/slice) can affect n_unit n_report in IO statusbar
+        self.update_test()  # hierarchy change (subject/slice) can affect n_unit n_report in IO statusbar
 
     def triggerToggleTimetable(self, checked=None):
         self.usage("triggerToggleTimetable")
@@ -5122,7 +5139,7 @@ class UIsub(
                 uistate.list_idx_recs2preload = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
         self.progressBarManager.__exit__(None, None, None)
         # Return control to test warnings (graphPreload will take over again if needed)
-        self._refresh_test_statusbar()
+        self.update_test()
         print("onParseDataFinished: calling graphPreload")
         self.graphPreload()
 
@@ -5370,7 +5387,7 @@ class UIsub(
         if not uistate.list_idx_recs2preload:
             print("graphPreload: nothing to preload, returning early")
             self.uiThaw()
-            self._refresh_test_statusbar()
+            self.update_test()
             return
         print(f"graphPreload: starting thread for {len(uistate.list_idx_recs2preload)} recordings: {uistate.list_idx_recs2preload}")
         self.progressBar.setValue(0)
@@ -5400,7 +5417,7 @@ class UIsub(
         # with mouseoverUpdate() → graphRefresh(), so calling it here would double-draw.
         self.progressBarManager.__exit__(None, None, None)  # Hide progress bar
         # Return control to test warnings
-        self._refresh_test_statusbar()
+        self.update_test()
         self.tableFormat()
         self.uiThaw()
         self.tableProjSelectionChanged()
