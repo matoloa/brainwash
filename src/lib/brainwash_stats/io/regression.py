@@ -18,12 +18,30 @@ def _compute_io_regression_internal(
     slope_per_group = {}
     aspects = _aspect_measurement_columns(amp, slope, norm)
 
+    # Compute n once per group (reuse across aspects; prevents per-aspect zeroing from NaNs)
+    for g in shown_groups:
+        try:
+            # Use first aspect for n_count (subject count independent of Y)
+            xy_df = _get_io_xy_pairs(g, get_group_testset_means_fn, uistate, n_unit=n_unit, aspect_col=next((c for _, c in aspects), "EPSP_amp"))
+            if xy_df.empty:
+                group_ns[g] = 0
+                continue
+            if n_unit == "subject" and "subject" in xy_df.columns:
+                n_unique = xy_df["subject"].nunique(dropna=False)
+            elif n_unit == "slice" and {"subject", "slice"}.issubset(xy_df.columns):
+                n_unique = xy_df[["subject", "slice"]].drop_duplicates().shape[0]
+            else:
+                n_unique = len(xy_df["rec_ID"].unique()) if "rec_ID" in xy_df.columns else len(xy_df)
+            group_ns[g] = int(n_unique)
+        except Exception:
+            group_ns[g] = 0
+
     for short, col in aspects:
         group_data = {}
         for g in shown_groups:
             try:
                 xy_df = _get_io_xy_pairs(g, get_group_testset_means_fn, uistate, n_unit=n_unit, aspect_col=col)
-                if xy_df.empty or len(xy_df) < 2:
+                if xy_df.empty or len(xy_df) < 2 or group_ns.get(g, 0) == 0:
                     group_data[g] = {"x": np.array([]), "y": np.array([]), "n": 0}
                     continue
                 x = xy_df["x"].to_numpy(dtype=float)
@@ -32,20 +50,13 @@ def _compute_io_regression_internal(
                 if valid.sum() < 2:
                     group_data[g] = {"x": np.array([]), "y": np.array([]), "n": 0}
                     continue
-                if n_unit == "subject" and "subject" in xy_df.columns:
-                    n_unique = xy_df["subject"].nunique()
-                elif n_unit == "slice" and {"subject", "slice"}.issubset(xy_df.columns):
-                    n_unique = xy_df[["subject", "slice"]].drop_duplicates().shape[0]
-                else:
-                    n_unique = len(xy_df["rec_ID"].unique()) if "rec_ID" in xy_df.columns else int(valid.sum())
+                n_unique = group_ns.get(g, 0)  # reuse precomputed n (from plan)
                 group_data[g] = {"x": x[valid], "y": y[valid], "n": int(n_unique)}
-                group_ns[g] = group_data[g]["n"]
                 res = linregress(group_data[g]["x"], group_data[g]["y"])
                 r2_per_group[g] = float(res.rvalue**2) if hasattr(res, "rvalue") and np.isfinite(res.rvalue) else np.nan
                 slope_per_group[g] = float(res.slope) if hasattr(res, "slope") and np.isfinite(res.slope) else np.nan
             except Exception:
                 group_data[g] = {"x": np.array([]), "y": np.array([]), "n": 0}
-                group_ns[g] = 0
                 r2_per_group[g] = np.nan
                 slope_per_group[g] = np.nan
 

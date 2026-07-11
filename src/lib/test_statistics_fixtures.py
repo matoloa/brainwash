@@ -38,7 +38,10 @@ def make_scalar_accessor(
                 data["slice"].append(1)
                 for col in sweep_cols:
                     data[str(col)].append(val + 0.1 * col)
-            return pd.DataFrame(data)
+            df = pd.DataFrame(data)
+            # Ensure rec_ID is str to match fixture df_project ID (prevents empty recs list)
+            df["rec_ID"] = df["rec_ID"].astype(str)
+            return df
         return pd.DataFrame(
             [
                 {"rec_ID": rec_id, "subject": subject, "slice": 1, "value": val}
@@ -54,9 +57,18 @@ def bind_accessor(accessor, uistate=None):
 
     class _Self:
         def get_df_project(self):
-            return pd.DataFrame()
+            # Fixture mock with hierarchy for IO n-count test (subject per rec)
+            return pd.DataFrame({
+                "ID": ["rec_G1_1", "rec_G1_2", "rec_G2_1", "rec_G2_2"],
+                "recording_name": ["rec_G1_1", "rec_G1_2", "rec_G2_1", "rec_G2_2"],
+                "subject": ["s1", "s1", "s2", "s2"],
+                "slice": [1, 1, 1, 1]
+            })
 
         def get_dfoutput(self, row=None):
+            # Minimal sweeps for X (volley_amp as proxy)
+            if row is not None and "recording_name" in row:
+                return pd.DataFrame({"sweep": [1, 2, 3], "volley_amp": [1, 2, 3]})
             return pd.DataFrame()
 
     bound = accessor

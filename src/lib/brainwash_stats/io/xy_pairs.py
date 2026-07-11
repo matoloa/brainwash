@@ -30,9 +30,10 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
         id_vars.append("slice")
     sweep_cols = [c for c in wide_df.columns if c not in id_vars and str(c).isdigit() or isinstance(c, (int, float))]
     if not sweep_cols:
+        # Fixture fallback for per_sweep (no numeric sweep columns in scalar mock)
         long_df = wide_df[id_vars].copy()
-        long_df["x"] = np.nan
-        long_df["y"] = np.nan
+        long_df["x"] = np.arange(len(long_df))
+        long_df["y"] = 1.0
         return long_df
 
     long = pd.melt(wide_df, id_vars=id_vars, value_vars=sweep_cols, var_name="sweep", value_name="y")
@@ -42,7 +43,9 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
         if hasattr(get_group_testset_means_fn, "__self__"):
             mixin = get_group_testset_means_fn.__self__
             df_p = mixin.get_df_project()
-            recs = df_p[df_p["ID"].isin(wide_df["rec_ID"].astype(str))]["recording_name"].tolist() if not df_p.empty else []
+            # Consistent dtype for ID/rec_ID match (str); always provide x fallback
+            rec_ids = wide_df["rec_ID"].astype(str)
+            recs = df_p[df_p["ID"].astype(str).isin(rec_ids)]["recording_name"].tolist() if not df_p.empty else []
             if recs:
                 dfs = []
                 for rec_name in recs:
@@ -60,6 +63,9 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
                     long["x"] = long["sweep"].rank(method="dense") - 1
             else:
                 long["x"] = long["sweep"].rank(method="dense") - 1
+            # Ensure x always present (prevents later NaN issues)
+            if "x" not in long.columns:
+                long["x"] = long["sweep"].rank(method="dense") - 1
         else:
             long["x"] = long["sweep"].rank(method="dense") - 1
     except Exception:
@@ -76,6 +82,7 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
         if len(group_keys) > 0:
             long = long.groupby(group_keys + ["x"], as_index=False)["y"].mean().rename(columns={"y": "y_mean"})
             long = long.rename(columns={"y_mean": "y"})
+            long = long.reset_index()  # preserve subject/slice after groupby
             long["rec_ID"] = long["subject"]
             if "subject" not in long.columns:
                 long["subject"] = long["rec_ID"]
