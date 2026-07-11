@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from ..data import _aggregate_to_unit_level
 
 
 def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="recording", aspect_col="EPSP_amp"):
@@ -30,10 +31,15 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
         id_vars.append("slice")
     sweep_cols = [c for c in wide_df.columns if c not in id_vars and str(c).isdigit() or isinstance(c, (int, float))]
     if not sweep_cols:
-        # Fixture fallback for per_sweep (no numeric sweep columns in scalar mock)
+        # Fixture fallback for per_sweep (no numeric sweep columns in scalar mock); attach n_unique for test
         long_df = wide_df[id_vars].copy()
         long_df["x"] = np.arange(len(long_df))
         long_df["y"] = 1.0
+        n_unique = 0
+        if n_unit == "subject" and "subject" in wide_df.columns and not wide_df["subject"].isna().all():
+            agg_df = _aggregate_to_unit_level(wide_df.rename(columns={y_col: "value"}), n_unit=n_unit)
+            n_unique = int(agg_df["subject"].nunique(dropna=False) if not agg_df.empty and "subject" in agg_df.columns else wide_df["subject"].nunique(dropna=False))
+        long_df["n_unique"] = n_unique
         return long_df
 
     long = pd.melt(wide_df, id_vars=id_vars, value_vars=sweep_cols, var_name="sweep", value_name="y")
@@ -75,6 +81,16 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
     if "x" not in long.columns:
         long["x"] = np.arange(len(long))
 
+    # n_unique from wide_df (before any loss) via _aggregate_to_unit_level -- ensures unique subjects for n_unit="subject"
+    n_unique = 0
+    if n_unit == "subject" and "subject" in wide_df.columns and not wide_df["subject"].isna().all():
+        agg_df = _aggregate_to_unit_level(wide_df.rename(columns={y_col: "value"}), n_unit=n_unit)
+        n_unique = int(agg_df["subject"].nunique(dropna=False) if not agg_df.empty and "subject" in agg_df.columns else wide_df["subject"].nunique(dropna=False))
+    elif n_unit == "slice" and {"subject", "slice"}.issubset(wide_df.columns):
+        n_unique = wide_df[["subject", "slice"]].dropna().drop_duplicates().shape[0]
+    else:
+        n_unique = len(wide_df["rec_ID"].unique()) if "rec_ID" in wide_df.columns else len(wide_df)
+
     if n_unit != "recording" and "subject" in long.columns:
         group_keys = ["subject"]
         if n_unit == "slice" and "slice" in long.columns:
@@ -83,8 +99,15 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
             long = long.groupby(group_keys + ["x"], as_index=False)["y"].mean().rename(columns={"y": "y_mean"})
             long = long.rename(columns={"y_mean": "y"})
             long = long.reset_index()  # preserve subject/slice after groupby
-            long["rec_ID"] = long["subject"]
+            long["rec_ID"] = long.get("subject", long.get("rec_ID"))
             if "subject" not in long.columns:
                 long["subject"] = long["rec_ID"]
+    # Attach n for regression (overrides any loss in long DF); ensure it survives dropna
+    long = long.assign(n_unique=n_unique)
 
-    return long[["rec_ID", "subject", "slice", "x", "y"]].dropna().sort_values("x")
+    # Select only available columns (slice optional in some fixtures/real data paths; prevents KeyError)
+    cols = ["rec_ID", "subject", "x", "y", "n_unique"]
+    if "slice" in long.columns:
+        cols.insert(2, "slice")
+    ret = long[cols].dropna(subset=["x", "y"]).sort_values("x")
+    return ret

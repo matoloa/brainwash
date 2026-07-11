@@ -1952,7 +1952,7 @@ class UIsub(
 
     def _refresh_test_statusbar(self):
         """Update statusbar using _get_statusbar_for_current_state() (single source per plan.md).
-        Sets uistate.statusbar_state + calls _set_statusbar_appearance. No debug print.
+        Sets uistate.statusbar_state + calls _set_statusbar_appearance. Prints message for debugging (as requested).
         """
         if self._is_loading_active():
             return
