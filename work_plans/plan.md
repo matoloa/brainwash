@@ -1,5 +1,3 @@
-# plan.md — moved / cancelled
+# plan.md
 
-**Statusbar / UI experiment-type work is cancelled.** Archived at [`work_plans/History/plan_statusbar_ui.md`](History/plan_statusbar_ui.md).
-
-**Active plan**: [`work_plans/plan_statistics_refactor.md`](plan_statistics_refactor.md) — refactor `statistics.py` only. No `ui.py` statusbar edits.
+**Statusbar/UI work**: Cancelled at `History/plan_statusbar_ui.md`. The approved living plan (session plan.md from 2026-07-11) provides the minimal targeted IO statusbar format alignment in `ui.py:_format_io_regression_statusbar` (resolves open gap from archived `plan_IO_ANCOVA_statusbar_fix.md`, now in History/). Statistics refactor remains complete/active reference. No new plans.
