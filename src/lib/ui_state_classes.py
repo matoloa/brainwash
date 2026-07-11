@@ -197,7 +197,7 @@ class UIstate:
         self.test_wilcox_tails = "two-sided"
         self.label_test_wilcox_one_sample_value = 0.0
         self.anova_label = "ANOVA (one-way)"  # updated dynamically based on # of shown test sets
-        self.buttonGroup_test_n = "subject"  # v0.16_n_stats Phase 0 default (per clarification + protocol)
+        self.buttonGroup_test_n = "subject"  # v0.16_n_stats default (first launch); persisted via get_state/set_state
         # v0.16 Cluster perm. support
         self.test_cluster = False
         self._time_divisor = 1.0  # set by x_axis_xlim when mode == "time"
@@ -686,6 +686,7 @@ class UIstate:
                 "label_test_wilcox_one_sample_value": getattr(self, "label_test_wilcox_one_sample_value", 0.0),
                 "anova_label": getattr(self, "anova_label", "ANOVA (one-way)"),
                 "test_cluster": getattr(self, "test_cluster", False),
+                "buttonGroup_test_n": getattr(self, "buttonGroup_test_n", "subject"),
                 "showTimetable": self.showTimetable,
                 "detailedProjectTable": getattr(self, "detailedProjectTable", False),
                 "detailedTimetable": getattr(self, "detailedTimetable", False),
@@ -730,6 +731,8 @@ class UIstate:
         self.showTimetable = state.get("showTimetable", False)
         self.detailedProjectTable = state.get("detailedProjectTable", False)
         self.detailedTimetable = state.get("detailedTimetable", False)
+        # v0.16_n_stats: persist n_unit radio (Subject/Slice/Recording) across launches (defaults to subject first time)
+        self.buttonGroup_test_n = state.get("buttonGroup_test_n", "subject")
         # v0.16 Cluster perm. support (persist the radio selection)
         if "test_type" in state and state["test_type"] == "Cluster perm.":
             self.test_type = "Cluster perm."

@@ -1958,6 +1958,7 @@ class UIsub(
             return
         text = self._get_statusbar_for_current_state()
         state = getattr(uistate, "statusbar_state", None)
+        print(f"STATUSBAR: {text} (state={state})")  # debug print for frequent statusbar updates (reinstated per request)
         if state == "warning":
             self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=text)
         elif state == "info" or text:
@@ -4135,6 +4136,7 @@ class UIsub(
             df_p
         )  # persists + calls tableUpdate() (tablemodel.setData + formatTableLayout + selection restore); updates visual table cells
         self.refreshHierarchyLineEdits(df_p)  # refresh line-edits after table update (prevents feedback via disconnect guard)
+        self._refresh_test_statusbar()  # hierarchy change (subject/slice) can affect n_unit n_report in IO statusbar
 
     def triggerToggleTimetable(self, checked=None):
         self.usage("triggerToggleTimetable")
