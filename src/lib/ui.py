@@ -1715,6 +1715,7 @@ class UIsub(
         """Single source of truth for statusbar per AGENTS.md and plan.md.
         Dispatches based on experiment_type/effective operation. IO prefers formal_test_results config.
         Pure query (state set only by caller update_test / set_statusbar). Handles all combinations.
+        For non-IO warnings, sets state="warning" when text returned.
         """
         eff = self._effective_test_type()
         if eff == "None":
@@ -1723,8 +1724,13 @@ class UIsub(
         if self._is_io_mode():  # IO first-class (ANCOVA is normal test_type radio)
             formal = getattr(uistate, "formal_test_results", None)
             return self._format_io_regression_statusbar(formal)
-        # non-IO: delegate to warning logic (state set in _refresh or applicator)
-        return self._get_stat_test_warning()
+        # non-IO: warning logic (pure; state set here for red bg on "no test sets" etc.)
+        text = self._get_stat_test_warning()
+        if text is not None:
+            uistate.statusbar_state = "warning"
+        else:
+            uistate.statusbar_state = None
+        return text
 
     def _format_io_regression_statusbar(self, formal):
         """Single source of truth for IO regression statusbar (called from _get_statusbar_for_current_state).
