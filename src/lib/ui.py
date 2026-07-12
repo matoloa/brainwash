@@ -651,9 +651,10 @@ class TableProjSub(QtWidgets.QTableView):
             # For now, use name + lowest level folder
             names = []
             duplicates = []  # remove these from dfAdd
+            df_p_paths = self.parent.get_df_project()["path"].values if hasattr(self.parent, "get_df_project") else self.parent.df_project["path"].values
             for i in file_urls:
                 # check if file is already in df_project
-                if i in self.parent.df_project["path"].values:
+                if i in df_p_paths:
                     print(f"File {i} already in df_project")
                     duplicates.append(i)
                 else:
@@ -2736,8 +2737,8 @@ class UIsub(
 
         ymin_clamp = 0 if self._is_io_mode() else (0 if uistate.checkBox["output_ymin0"] else None)
 
-        if prow is None:
-            logger.debug("zoomAuto: no recording selected, fitting to visible groups")
+        if prow is None or str(prow.get("sweeps", "...")) == "...":
+            logger.debug("zoomAuto: no (parsed) recording selected, fitting to visible groups")
             self._fit_output_zoom_to_groups()
             self.zoomReset(uistate.ax1)
             self.zoomReset(uistate.ax2)
@@ -3260,7 +3261,20 @@ class UIsub(
         uistate.buttonGroup_test_n = n_unit
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.update_test()
-        # make graphs reflect the new level (group means at subject/slice)
+        # Force re-plot of groups using the new n level (unplot old artists first,
+        # because graphGroups skips already-plotted groups and graphRefresh
+        # does not re-fetch means)
+        if hasattr(uiplot, "unPlotGroup"):
+            uiplot.unPlotGroup()
+        # Re-add current groups with data for the new level (modeled after graphGroups)
+        for group_ID in list(self.dd_groups.keys()):
+            if self.dd_groups[group_ID].get("rec_IDs"):
+                dict_group = self.dd_groups[group_ID]
+                level = getattr(uistate, "buttonGroup_test_n", "recording")
+                group_mean_data = self.get_dfgroupmean(group_ID, level=level)
+                x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
+                uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data), x_pos=x_pos)
+        self.update_show()
         if hasattr(self, "graphRefresh"):
             self.graphRefresh(reeval_formal_test=False)
 
@@ -5309,6 +5323,7 @@ class UIsub(
                 self.set_df_project(df_p)
                 # Get the indices of the new rows, as they are in df_p
                 uistate.list_idx_recs2preload = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
+        self.setButtonParse()
         self.progressBarManager.__exit__(None, None, None)
         # Return control to test warnings (graphPreload will take over again if needed)
         self.update_test()
@@ -5444,6 +5459,7 @@ class UIsub(
             self._restore_table_selection(df_project, target_idx)
 
         self.updating_tableProj = False
+        self.setButtonParse()
 
     def _restore_table_selection(self, df_p: pd.DataFrame, target_idx: int | None = None) -> None:
         """Centralized helper to restore visual + keyboard selection after df_project mutation.
@@ -5583,6 +5599,7 @@ class UIsub(
             print("graphPreload: nothing to preload, returning early")
             self.uiThaw()
             self.update_test()
+            self.setButtonParse()
             return
         print(f"graphPreload: starting thread for {len(uistate.list_idx_recs2preload)} recordings: {uistate.list_idx_recs2preload}")
         self.progressBar.setValue(0)

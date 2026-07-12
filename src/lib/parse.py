@@ -38,6 +38,9 @@ def detect_bw_csv_type(df) -> str | None:
 
 def build_dfmean(dfdata, rollingwidth=3):
     print("build_dfmean")
+    if dfdata is None or len(dfdata) == 0:
+        print("build_dfmean: no dfdata provided")
+        return pd.DataFrame(columns=["sweep", "voltage", "prim", "bis"]), 0
     dfmean = pd.pivot_table(dfdata, values="voltage_raw", index="sweep", columns="time", aggfunc="mean").mean().to_frame(name="voltage")
     dfmean["prim"] = dfmean.voltage.rolling(rollingwidth, center=True).mean().diff()
     dfmean["bis"] = dfmean.prim.rolling(rollingwidth, center=True).mean().diff()

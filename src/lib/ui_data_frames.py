@@ -221,6 +221,13 @@ class DataFrameMixin:
         recording_name = row["recording_name"]
         persist = False
 
+        # Guard for unparsed recordings (added via file selector but not yet parsed)
+        if str(row.get("sweeps", "...")) == "...":
+            print(f"get_dfmean: {recording_name} not yet parsed (sweeps=...), returning dummy")
+            dfmean = pd.DataFrame(columns=["sweep", "voltage", "prim", "bis"])
+            self.dict_means[recording_name] = dfmean
+            return self.dict_means[recording_name]
+
         if recording_name in self.dict_means:  # 1: Return cached
             dfmean = self.dict_means[recording_name]
         else:
@@ -229,6 +236,11 @@ class DataFrameMixin:
                 dfmean = pd.read_parquet(str_mean_path)
             else:  # 3: Create file
                 dfdata = self.get_dfdata(row=row)
+                if dfdata is None:
+                    print(f"get_dfmean: dfdata is None for {recording_name} (not imported)")
+                    dfmean = pd.DataFrame(columns=["sweep", "voltage", "prim", "bis"])
+                    self.dict_means[recording_name] = dfmean
+                    return self.dict_means[recording_name]
                 gain = float(row["gain"]) if pd.notna(row["gain"]) else 1.0
                 if gain != 1.0:
                     dfdata = dfdata.copy()
@@ -260,6 +272,9 @@ class DataFrameMixin:
     def get_dft(self, row, reset=False):
         # returns an internal df t for the selected file. If it does not exist, read it from file first.
         rec = row["recording_name"]
+        if str(row.get("sweeps", "...")) == "...":
+            print(f"get_dft: {rec} not parsed yet")
+            return None
         if rec in self.dict_ts.keys() and not reset:
             # print("returning cached dft")
             return self.dict_ts[rec]
@@ -393,6 +408,7 @@ class DataFrameMixin:
             return self.dict_datas[recording_name]
         except FileNotFoundError:
             print(f"did not find {path_data}. Not imported?")
+            return None
 
     # ------------------------------------------------------------------
     # Filter DataFrame
@@ -411,6 +427,11 @@ class DataFrameMixin:
                 dffilter = pd.read_parquet(path_filter)
             else:  # 3: Create file
                 dfdata = self.get_dfdata(row=row)
+                if dfdata is None or str(row.get("sweeps", "...")) == "...":
+                    print(f"get_dffilter: no data for unparsed {recording_name}")
+                    dffilter = pd.DataFrame(columns=["sweep", "time", "voltage"])
+                    self.dict_filters[recording_name] = dffilter
+                    return dffilter
                 gain = float(row["gain"]) if pd.notna(row["gain"]) else 1.0
                 if gain != 1.0:
                     dfdata = dfdata.copy()
