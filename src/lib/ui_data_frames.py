@@ -48,7 +48,7 @@ class DataFrameMixin:
             return df
 
         df_disp = df.copy()
-        for col in ["EPSP_amp", "volley_amp", "EPSP_amp_mean", "volley_amp_mean"]:
+        for col in ["EPSP_amp", "volley_amp", "EPSP_amp_mean", "volley_amp_mean", "EPSP_amp_SEM", "volley_amp_SEM"]:
             if col in df_disp.columns:
                 df_disp[col] = df_disp[col] * 1000.0
 
@@ -663,7 +663,7 @@ class DataFrameMixin:
                         df[mcol] = mean_df[mcol]
                         scol = f"{base}{suf}_SEM"
                         if scol in sem_df.columns:
-                            df[scol] = sem_df[scol]
+                            df[scol] = pd.to_numeric(sem_df[scol], errors="coerce").fillna(0.0)
                         else:
                             df[scol] = 0.0
 
@@ -830,6 +830,10 @@ class DataFrameMixin:
                     .reset_index()
                 )
                 group_mean.columns = [col[0] if col[0] == "sweep" else "_".join(col).strip().replace("sem", "SEM") for col in group_mean.columns.values]
+                # sanitize SEMs (n=1 within group -> NaN from sem)
+                for c in list(group_mean.columns):
+                    if c.endswith("_SEM"):
+                        group_mean[c] = pd.to_numeric(group_mean[c], errors="coerce").fillna(0.0)
             self.df2file(df=group_mean, filename=f"group_{group_ID}", key="mean")
         else:
             # contextual higher level: group by unit within group's recs, avg to units, then across
@@ -881,8 +885,8 @@ class DataFrameMixin:
                         if mcol in m.columns:
                             group_mean[mcol] = m[mcol]
                             scol = f"{base}{suf}_SEM"
-                            if scol in s.columns:
-                                group_mean[scol] = s[scol]
+                            if mcol in s.columns:
+                                group_mean[scol] = pd.to_numeric(s[mcol], errors="coerce").fillna(0.0)
                             else:
                                 group_mean[scol] = 0.0
 

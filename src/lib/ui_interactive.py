@@ -568,24 +568,30 @@ class InteractivePlotMixin:
         if uistate.list_idx_select_recs and uistate.list_idx_select_stims:
             self._update_marker_data()
 
-        if len(uistate.list_idx_select_recs) != 1:
+        n_recs = len(uistate.list_idx_select_recs or [])
+        if n_recs > 1:
             print("(multi-rec-selection) mouseoverUpdate calls self.graphRefresh()")
             self.graphRefresh(reeval_formal_test=False)
             return
-        if len(uistate.list_idx_select_stims) != 1:
+        if len(uistate.list_idx_select_stims or []) != 1:
             print("(multi-stim-selection) mouseoverUpdate calls self.graphRefresh()")
             self.graphRefresh(reeval_formal_test=False)
             return
         # print(f"mouseoverUpdate: {uistate.list_idx_select_recs[0]}, {type(uistate.list_idx_select_recs[0])}")
         prow = self.get_prow()
         if prow is None:
-            logger.debug("mouseoverUpdate: prow is None, calling graphRefresh and returning")
+            # group-only view (0 recs): still wire output hover so ghost can work on group means
+            logger.debug("mouseoverUpdate: prow is None (group view), wiring output hover and returning")
+            self.mouseoverOutput = self.canvasOutput.mpl_connect("motion_notify_event", self.outputMouseover)
+            self.mouseLeaveOutput = self.canvasOutput.mpl_connect("axes_leave_event", self.on_leave_output)
             self.graphRefresh(reeval_formal_test=False)
             return
         rec_ID = prow["ID"]
         trow = self.get_trow()
         if trow is None:
             logger.debug("mouseoverUpdate: trow is None, calling graphRefresh and returning")
+            self.mouseoverOutput = self.canvasOutput.mpl_connect("motion_notify_event", self.outputMouseover)
+            self.mouseLeaveOutput = self.canvasOutput.mpl_connect("axes_leave_event", self.on_leave_output)
             self.graphRefresh(reeval_formal_test=False)
             return
         stim_num = trow["stim"]
@@ -598,6 +604,8 @@ class InteractivePlotMixin:
 
         if not dict_labels:
             print("(no labels) mouseoverUpdate calls self.graphRefresh()")
+            self.mouseoverOutput = self.canvasOutput.mpl_connect("motion_notify_event", self.outputMouseover)
+            self.mouseLeaveOutput = self.canvasOutput.mpl_connect("axes_leave_event", self.on_leave_output)
             self.graphRefresh()
             return
 
@@ -1107,19 +1115,43 @@ class InteractivePlotMixin:
             if uistate.ghost_sweep is not None:
                 self.exorcise()
             return
-        if len(uistate.list_idx_select_recs) != 1:
+        n_recs = len(uistate.list_idx_select_recs or [])
+        if n_recs > 1:
             self.exorcise()
             return
 
         dict_out = {
             key: value
             for key, value in uistate.dict_rec_show.items()
-            if value["axis"] == str_ax and (value["aspect"] in ["EPSP_amp", "EPSP_slope"]) and hasattr(value["line"], "get_xdata")
+            if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope"]) and hasattr(value.get("line"), "get_xdata")
         }
+        use_group_xy = False
+        rec_ID_for_snippet = None
         if not dict_out:
-            return
+            # Fallback for group-only view: use a shown group mean line for (x,y) sweep lookup;
+            # pick first rec in that group to source the actual voltage snippet (ghost).
+            g_out = {
+                key: value
+                for key, value in getattr(uistate, "dict_group_show", {}).items()
+                if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope"]) and hasattr(value.get("line"), "get_xdata")
+            }
+            if not g_out:
+                if uistate.ghost_sweep is not None:
+                    self.exorcise()
+                return
+            dict_pop = list(g_out.values())[0]
+            use_group_xy = True
+            gid = dict_pop.get("group_ID")
+            recs = []
+            if gid is not None and hasattr(self, "dd_groups") and self.dd_groups:
+                recs = self.dd_groups.get(gid, {}).get("rec_IDs", []) or []
+            if not recs:
+                return
+            rec_ID_for_snippet = recs[0]
+        else:
+            dict_pop = list(dict_out.values())[0]
+            rec_ID_for_snippet = dict_pop.get("rec_ID")
 
-        dict_pop = list(dict_out.values())[0]
         x_data = dict_pop["line"].get_xdata()
         y_data = dict_pop["line"].get_ydata()
 
@@ -1134,7 +1166,7 @@ class InteractivePlotMixin:
         if out_x_idx == getattr(uistate, "last_out_x_idx", None):
             return
 
-        rec_ID = dict_pop["rec_ID"]
+        rec_ID = rec_ID_for_snippet
         df_p = self.get_df_project()
         p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
         df_t = self.get_dft(p_row)
@@ -1185,7 +1217,7 @@ class InteractivePlotMixin:
             if uistate.ghost_sweep is not None:
                 self.exorcise()
             return
-        if len(uistate.list_idx_select_recs) != 1:
+        if len(uistate.list_idx_select_recs or []) > 1:
             self.exorcise()
             return
 
@@ -1258,7 +1290,7 @@ class InteractivePlotMixin:
             if uistate.ghost_sweep is not None:
                 self.exorcise()
             return
-        if len(uistate.list_idx_select_recs) != 1:
+        if len(uistate.list_idx_select_recs or []) > 1:
             self.exorcise()
             return
 
@@ -1353,7 +1385,7 @@ class InteractivePlotMixin:
             if uistate.ghost_sweep is not None:
                 self.exorcise()
             return
-        if len(uistate.list_idx_select_recs) != 1:
+        if len(uistate.list_idx_select_recs or []) > 1:
             self.exorcise()
             return
 

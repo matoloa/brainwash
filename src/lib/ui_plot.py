@@ -848,10 +848,13 @@ class UIplot:
             axis = getattr(uistate, axid)
             if axis_legend and not is_pp:
                 try:
-                    axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)
+                    # Tweaked: smaller fontsize for compactness with groups + recs; explicit lists for safety
+                    leg = axis.legend(list(axis_legend.values()), list(axis_legend.keys()), loc=loc, fontsize=8)
                 except TypeError:
                     # Fallback if zorder was passed from ui.py wrapper (matplotlib version issue)
-                    axis.legend(axis_legend.values(), axis_legend.keys(), loc=loc)
+                    leg = axis.legend(list(axis_legend.values()), list(axis_legend.keys()), loc=loc, fontsize=8)
+                if leg is not None:
+                    leg.set_zorder(10)
             else:
                 if axis.get_legend():
                     axis.get_legend().remove()
@@ -1397,43 +1400,73 @@ class UIplot:
         label_mean = f"{group_name} {str_aspect} mean"
         label_norm = f"{group_name} {str_aspect} norm"
         y_mean = df_groupmean[f"{aspect}_mean"]
-        y_mean_SEM = df_groupmean[f"{aspect}_SEM"]
+        sem_col = f"{aspect}_SEM"
+        if sem_col in df_groupmean.columns:
+            y_mean_SEM = pd.to_numeric(df_groupmean[sem_col], errors="coerce").fillna(0.0)
+        else:
+            y_mean_SEM = pd.Series(0.0, index=df_groupmean.index) if hasattr(df_groupmean, "index") else 0.0
+        # align lengths defensively
+        if hasattr(y_mean_SEM, "reindex") and hasattr(y_mean, "index"):
+            y_mean_SEM = y_mean_SEM.reindex(y_mean.index).fillna(0.0)
 
         if f"{aspect}_norm_mean" in df_groupmean.columns:
             y_norm = df_groupmean[f"{aspect}_norm_mean"]
-            y_norm_SEM = df_groupmean[f"{aspect}_norm_SEM"]
+            norm_sem_col = f"{aspect}_norm_SEM"
+            if norm_sem_col in df_groupmean.columns:
+                y_norm_SEM = pd.to_numeric(df_groupmean[norm_sem_col], errors="coerce").fillna(0.0)
+            else:
+                y_norm_SEM = pd.Series(0.0, index=df_groupmean.index) if hasattr(df_groupmean, "index") else 0.0
+            if hasattr(y_norm_SEM, "reindex") and hasattr(y_norm, "index"):
+                y_norm_SEM = y_norm_SEM.reindex(y_norm.index).fillna(0.0)
         else:
             y_norm = None
             y_norm_SEM = None
+
+        # Sanitize lengths for safety (handles edge cases from higher-level aggs)
+        npts = len(x) if hasattr(x, "__len__") else 1
+        y_mean_SEM = np.asarray(y_mean_SEM).ravel()
+        if len(y_mean_SEM) != npts:
+            y_mean_SEM = np.full(npts, float(y_mean_SEM[0]) if len(y_mean_SEM) else 0.0)
+        if y_norm is not None:
+            y_norm_SEM = np.asarray(y_norm_SEM).ravel()
+            if len(y_norm_SEM) != npts:
+                y_norm_SEM = np.full(npts, float(y_norm_SEM[0]) if len(y_norm_SEM) else 0.0)
 
         # print(f"y_mean: {y_mean}")
         # print(f"y_mean_SEM: {y_mean_SEM}")
         # print(f"y_mean - y_mean_SEM: {y_mean - y_mean_SEM}")
         # print(f"y_mean + y_mean_SEM: {y_mean + y_mean_SEM}")
 
+        x_vals = np.asarray(x)
+        y_mean_vals = np.asarray(y_mean)
+        y_sem_vals = np.asarray(y_mean_SEM)
         (meanline,) = axis.plot(
-            x,
-            y_mean,
+            x_vals,
+            y_mean_vals,
             color=color,
             label=label_mean,
             alpha=self.uistate.settings["alpha_line"],
-            zorder=0,
+            zorder=1,
+            linewidth=2.0,
         )
 
         if y_norm is not None:
+            y_norm_vals = np.asarray(y_norm)
+            y_norm_sem_vals = np.asarray(y_norm_SEM)
             (normline,) = axis.plot(
-                x,
-                y_norm,
+                x_vals,
+                y_norm_vals,
                 color=color,
                 label=label_norm,
                 alpha=self.uistate.settings["alpha_line"],
-                zorder=0,
+                zorder=1,
+                linewidth=2.0,
             )
 
-        meanfill = axis.fill_between(x, y_mean - y_mean_SEM, y_mean + y_mean_SEM, alpha=0.3, color=color)
+        meanfill = axis.fill_between(x_vals, y_mean_vals - y_sem_vals, y_mean_vals + y_sem_vals, alpha=0.25, color=color, zorder=0)
 
         if y_norm is not None:
-            normfill = axis.fill_between(x, y_norm - y_norm_SEM, y_norm + y_norm_SEM, alpha=0.3, color=color)
+            normfill = axis.fill_between(x_vals, y_norm_vals - y_norm_sem_vals, y_norm_vals + y_norm_sem_vals, alpha=0.25, color=color, zorder=0)
 
         meanline.set_visible(False)
         meanfill.set_visible(False)

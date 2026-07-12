@@ -3277,6 +3277,8 @@ class UIsub(
         self.update_show()
         if hasattr(self, "graphRefresh"):
             self.graphRefresh(reeval_formal_test=False)
+        if hasattr(self, "mouseoverUpdate"):
+            self.mouseoverUpdate()
 
     def update_experiment_type_radio_buttons(self):
         """Select experiment type radio buttons for the current selection.
