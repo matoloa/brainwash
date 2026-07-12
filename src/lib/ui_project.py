@@ -133,6 +133,14 @@ class ProjectMixin:
             cache_key = "output"
         self.df2file(df=dfoutput, filename=rec_name, key=cache_key)
 
+        # invalidate global unit caches for the subject/slice of this rec (globals are full avg)
+        if hasattr(self, "_invalidate_global_units_for_rec"):
+            rec_id = p_row["ID"] if p_row is not None and "ID" in p_row else rec_name
+            try:
+                self._invalidate_global_units_for_rec(rec_id)
+            except Exception:
+                pass
+
     # ------------------------------------------------------------------
     # Bootstrapping — general (non-project-specific) UI init
     # ------------------------------------------------------------------

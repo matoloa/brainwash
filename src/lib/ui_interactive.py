@@ -1038,7 +1038,8 @@ class InteractivePlotMixin:
 
         for group_ID in affected_groups:
             uiplot.unPlotGroup(group_ID=group_ID)
-            df_groupmean = self.get_dfgroupmean(group_ID)
+            level = getattr(uistate, "buttonGroup_test_n", "recording")
+            df_groupmean = self.get_dfgroupmean(group_ID, level=level)
             x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
             uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.V2mV(df_groupmean), x_pos=x_pos)
 

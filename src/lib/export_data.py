@@ -165,7 +165,9 @@ class ExportMixin:
         dfs = []
         for gid, ginfo in dd_groups.items():
             group_name = ginfo.get("group_name", str(gid))
-            df_mean = self.get_dfgroupmean(gid)
+            uist = getattr(self, "uistate", None) or globals().get("uistate", None)
+            level = getattr(uist, "buttonGroup_test_n", "recording") if uist else "recording"
+            df_mean = self.get_dfgroupmean(gid, level=level)
             if df_mean is not None and not df_mean.empty:
                 df_mean = self.V2mV(df_mean.copy())
                 # Extra scaling for _mean/_SEM columns (V2mV only handles base amp cols; backend is SI units)

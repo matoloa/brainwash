@@ -1526,7 +1526,8 @@ class UIsub(
         for key, sub_dict in self.dd_groups.items():
             if sub_dict["show"]:
                 n = len(sub_dict["rec_IDs"])
-                df = self.get_dfgroupmean(key)
+                level = getattr(uistate, "buttonGroup_test_n", "recording")
+                df = self.get_dfgroupmean(key, level=level)
                 list_l.append(len(df))
                 d_group_ndf[key] = [n, df]
         if len(d_group_ndf) == 2:
@@ -3259,6 +3260,9 @@ class UIsub(
         uistate.buttonGroup_test_n = n_unit
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.update_test()
+        # make graphs reflect the new level (group means at subject/slice)
+        if hasattr(self, "graphRefresh"):
+            self.graphRefresh(reeval_formal_test=False)
 
     def update_experiment_type_radio_buttons(self):
         """Select experiment type radio buttons for the current selection.
@@ -3368,7 +3372,8 @@ class UIsub(
         self.dict_means = {}  # all means
         self.dict_ts = {}  # all timepoints
         self.dict_outputs = {}  # all outputs, x per sweep
-        self.dict_group_means = {}  # means of all group outputs
+        self.dict_group_means = {}  # means of all group outputs (level-aware keys (gid, level))
+        self.dict_global_units = {}  # global subject/slice unit dfs (keyed by (level, subject, slice?))
         self.dd_testsets = {}  # test/sweep sets for group comparisons
         self.dd_group_samples = {}  # group sample means (phase 3.3: group_ID -> {test_ID: df})
         self.dict_diffs = {}  # all diffs (for paired stim)
@@ -4299,6 +4304,8 @@ class UIsub(
         self.update_test()  # hierarchy change (subject/slice) can affect n_unit n_report in IO statusbar; forces recompute of wide_df/get_group_testset_means (subject join) + statusbar
         # Force full refresh of groups/dd_groups (invalidates any cached wide_df without subject column)
         self.group_get_dd()  # rebuilds from updated df_project
+        if hasattr(self, "dict_global_units"):
+            self.dict_global_units.clear()  # globals depend on hierarchy
         if hasattr(self, "graphRefresh"):
             self.graphRefresh()
 
@@ -5623,7 +5630,8 @@ class UIsub(
         if groups_to_plot:
             for group_ID in groups_to_plot:
                 dict_group = self.dd_groups[group_ID]
-                group_mean_data = self.get_dfgroupmean(group_ID)
+                level = getattr(uistate, "buttonGroup_test_n", "recording")
+                group_mean_data = self.get_dfgroupmean(group_ID, level=level)
                 # print(f"graphGroups: Adding group {group_ID} to plot: {group_mean_data}")
                 x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
                 uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data), x_pos=x_pos)

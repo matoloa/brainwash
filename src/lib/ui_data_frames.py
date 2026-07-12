@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import analysis_v3 as analysis
@@ -52,6 +53,69 @@ class DataFrameMixin:
                 df_disp[col] = df_disp[col] * 1000.0
 
         return df_disp
+
+    # ------------------------------------------------------------------
+    # Level-aware helpers for n_unit (recording/slice/subject)
+    # ------------------------------------------------------------------
+
+    LEVEL_RECORDING = "recording"
+    LEVEL_SLICE = "slice"
+    LEVEL_SUBJECT = "subject"
+    VALID_LEVELS = (LEVEL_RECORDING, LEVEL_SLICE, LEVEL_SUBJECT)
+
+    @staticmethod
+    def _sanitize_for_filename(val: str | None) -> str:
+        """Sanitize a subject/slice value for use in cache filenames."""
+        if val is None:
+            val = ""
+        s = str(val)
+        s = re.sub(r"[^A-Za-z0-9_.-]", "_", s)
+        s = s.strip("_")
+        if not s:
+            s = "unknown"
+        return s[:100]
+
+    def _build_unit_series_from_rec_dfs(
+        self, rec_dfs: list[pd.DataFrame], include_sem: bool = True
+    ) -> pd.DataFrame:
+        """Average a list of per-rec dfoutput DataFrames into a unit-level series.
+
+        Returns a df with sweep + _mean/_SEM columns (like group means).
+        Used for both global unit dfs and contextual group units.
+        """
+        if not rec_dfs:
+            return pd.DataFrame(
+                {
+                    "sweep": [],
+                    "EPSP_amp_norm_mean": [],
+                    "EPSP_amp_norm_SEM": [],
+                    "EPSP_slope_norm_mean": [],
+                    "EPSP_slope_norm_SEM": [],
+                    "EPSP_amp_mean": [],
+                    "EPSP_amp_SEM": [],
+                    "EPSP_slope_mean": [],
+                    "EPSP_slope_SEM": [],
+                }
+            )
+
+        concat_df = pd.concat(rec_dfs, ignore_index=True)
+        base_cols = ["EPSP_amp_norm", "EPSP_slope_norm", "EPSP_amp", "EPSP_slope"]
+        agg_spec = {}
+        for c in base_cols:
+            if c in concat_df.columns:
+                agg_spec[c] = ["mean", "sem"] if include_sem else ["mean"]
+        if not agg_spec:
+            return pd.DataFrame({"sweep": []})
+        unit_df = (
+            concat_df.groupby("sweep")
+            .agg(agg_spec)
+            .reset_index()
+        )
+        unit_df.columns = [
+            col[0] if col[0] == "sweep" else "_".join(col).strip().replace("sem", "SEM")
+            for col in unit_df.columns.values
+        ]
+        return unit_df
 
     # ------------------------------------------------------------------
     # Recalculate all outputs
@@ -507,35 +571,213 @@ class DataFrameMixin:
         return dfdiff
 
     # ------------------------------------------------------------------
+    # Global (project-wide) unit-level DataFrames (Subject / Slice)
+    # These are independent of groups. Used for rec-to-subject comparisons etc.
+    # Built with hierarchical averaging (slice = avg recs; subject = avg of slice means).
+    # ------------------------------------------------------------------
+
+    def _get_global_unit_cache_key(self, level: str, subject: str, slc: str | None = None) -> tuple:
+        return (level, str(subject), str(slc) if slc is not None else None)
+
+    def get_global_subject_df(self, subject: str):
+        """Return (or build) the full project-wide mean series for a subject.
+
+        Averages per-slice means (two-stage) to give equal weight to slices.
+        Includes _mean and _SEM (SEM across slices).
+        """
+        if not hasattr(self, "dict_global_units"):
+            self.dict_global_units = {}
+        key = self._get_global_unit_cache_key(self.LEVEL_SUBJECT, subject)
+        if key in self.dict_global_units:
+            return self.dict_global_units[key]
+
+        safe = self._sanitize_for_filename(subject)
+        path = Path(f"{self.dict_folders['cache']}/Subject_{safe}_output.parquet")
+        if path.exists():
+            df = pd.read_parquet(str(path))
+            self.dict_global_units[key] = df
+            return df
+
+        df_p = self.get_df_project()
+        subj_recs = df_p[df_p["subject"].astype(str) == str(subject)]["ID"].tolist()
+        if not subj_recs:
+            df = pd.DataFrame(columns=["sweep", "EPSP_amp_mean", "EPSP_amp_SEM", "EPSP_slope_mean", "EPSP_slope_SEM"])
+            self.df2file(df=df, filename=f"Subject_{safe}", key="output")
+            self.dict_global_units[key] = df
+            return df
+
+        # Group recs by slice, build per-slice means (no sem yet)
+        slice_to_dfs = {}
+        for rec_id in subj_recs:
+            match = df_p[df_p["ID"] == rec_id]
+            if match.empty:
+                continue
+            p_row = match.iloc[0]
+            sl = str(p_row.get("slice", "1"))
+            try:
+                dfo = self.get_dfoutput(row=p_row)
+                slice_to_dfs.setdefault(sl, []).append(dfo)
+            except Exception:
+                continue
+
+        slice_means = []
+        for sl, rec_dfs in slice_to_dfs.items():
+            smean = self._build_unit_series_from_rec_dfs(rec_dfs, include_sem=False)
+            if not smean.empty:
+                slice_means.append(smean)
+
+        if not slice_means:
+            df = pd.DataFrame(columns=["sweep", "EPSP_amp_mean", "EPSP_amp_SEM", "EPSP_slope_mean", "EPSP_slope_SEM"])
+        else:
+            # Average the slice means (which have _mean cols); compute SEM across slices
+            concat_slices = pd.concat(slice_means, ignore_index=True)
+            grouped = concat_slices.groupby("sweep")
+            mean_df = grouped.mean().reset_index()
+            sem_df = grouped.sem(ddof=1).reset_index()
+            df = mean_df[["sweep"]].copy()
+            for base in ["EPSP_amp", "EPSP_slope"]:
+                for suf in ["", "_norm"]:
+                    mcol = f"{base}{suf}_mean"
+                    if mcol in mean_df.columns:
+                        df[mcol] = mean_df[mcol]
+                        scol = f"{base}{suf}_SEM"
+                        if scol in sem_df.columns:
+                            df[scol] = sem_df[scol]
+                        else:
+                            df[scol] = 0.0
+
+        self.df2file(df=df, filename=f"Subject_{safe}", key="output")
+        self.dict_global_units[key] = df
+        return df
+
+    def get_global_slice_df(self, subject: str, slc: str):
+        """Return (or build) the full project-wide mean series for a (subject, slice).
+
+        Averages the recs belonging to this slice.
+        Includes _mean and _SEM (SEM across recs in the slice).
+        """
+        if not hasattr(self, "dict_global_units"):
+            self.dict_global_units = {}
+        key = self._get_global_unit_cache_key(self.LEVEL_SLICE, subject, slc)
+        if key in self.dict_global_units:
+            return self.dict_global_units[key]
+
+        safe_s = self._sanitize_for_filename(subject)
+        safe_sl = self._sanitize_for_filename(slc)
+        path = Path(f"{self.dict_folders['cache']}/Subject_{safe_s}_-_Slice_{safe_sl}_output.parquet")
+        if path.exists():
+            df = pd.read_parquet(str(path))
+            self.dict_global_units[key] = df
+            return df
+
+        df_p = self.get_df_project()
+        slice_recs = df_p[
+            (df_p["subject"].astype(str) == str(subject)) & (df_p["slice"].astype(str) == str(slc))
+        ]["ID"].tolist()
+
+        rec_dfs = []
+        for rec_id in slice_recs:
+            match = df_p[df_p["ID"] == rec_id]
+            if match.empty:
+                continue
+            try:
+                dfo = self.get_dfoutput(row=match.iloc[0])
+                rec_dfs.append(dfo)
+            except Exception:
+                continue
+
+        df = self._build_unit_series_from_rec_dfs(rec_dfs, include_sem=True)
+        self.df2file(df=df, filename=f"Subject_{safe_s}_-_Slice_{safe_sl}", key="output")
+        self.dict_global_units[key] = df
+        return df
+
+    def _invalidate_global_units_for_rec(self, rec_id):
+        """Invalidate cached global unit dfs that include this rec (on output or hierarchy change)."""
+        if not hasattr(self, "dict_global_units") or not self.dict_global_units:
+            return
+        df_p = self.get_df_project()
+        match = df_p[df_p["ID"] == rec_id]
+        if match.empty:
+            self.dict_global_units.clear()
+            return
+        p = match.iloc[0]
+        subj = str(p.get("subject", ""))
+        slc = str(p.get("slice", ""))
+        to_del = []
+        for k in list(self.dict_global_units.keys()):
+            if len(k) >= 2 and k[1] == subj:
+                to_del.append(k)
+            if len(k) >= 3 and k[2] == slc:
+                to_del.append(k)
+        for k in to_del:
+            if k in self.dict_global_units:
+                del self.dict_global_units[k]
+        # delete files
+        if subj:
+            safe = self._sanitize_for_filename(subj)
+            pth = Path(f"{self.dict_folders.get('cache', '.')}/Subject_{safe}_output.parquet")
+            if pth.exists():
+                try: pth.unlink()
+                except: pass
+        if subj and slc:
+            safe_s = self._sanitize_for_filename(subj)
+            safe_sl = self._sanitize_for_filename(slc)
+            pth = Path(f"{self.dict_folders.get('cache', '.')}/Subject_{safe_s}_-_Slice_{safe_sl}_output.parquet")
+            if pth.exists():
+                try: pth.unlink()
+                except: pass
+
+    # ------------------------------------------------------------------
     # Group mean DataFrame
     # ------------------------------------------------------------------
 
-    def get_dfgroupmean(self, group_ID):
-        # returns an internal df output average of <group>. If it does not exist, create it
+    def get_dfgroupmean(self, group_ID, level: str | None = None):
+        """Return group mean df at the requested level (recording/slice/subject).
+
+        level=None or 'recording' -> classic rec-level (back-compat).
+        'slice'/'subject' -> contextual: avg within unit (only group's recs), then across units.
+        Uses per-level cache keys and files for isolation.
+        """
         if not group_ID:
             return pd.DataFrame()
-        if group_ID in self.dict_group_means:  # 1: Return cached
+        eff_level = level or self.LEVEL_RECORDING
+        if eff_level not in self.VALID_LEVELS:
+            eff_level = self.LEVEL_RECORDING
+
+        if not hasattr(self, "dict_group_means"):
+            self.dict_group_means = {}
+        cache_key = (group_ID, eff_level) if isinstance(group_ID, (int, str)) else group_ID
+        if eff_level == self.LEVEL_RECORDING and isinstance(group_ID, (int, str)) and group_ID in self.dict_group_means:
+            val = self.dict_group_means[group_ID]
+            self.dict_group_means[cache_key] = val
+            return val
+        if cache_key in self.dict_group_means:
             if config.verbose:
-                print(f"Returning cached group mean for group {group_ID}")
-            return self.dict_group_means[group_ID]
-        group_path = Path(f"{self.dict_folders['cache']}/group_{group_ID}.parquet")
-        if group_path.exists():  # 2: Read from file
+                print(f"Returning cached group mean for {group_ID} level={eff_level}")
+            return self.dict_group_means[cache_key]
+
+        level_suffix = "" if eff_level == self.LEVEL_RECORDING else f"_{eff_level}"
+        group_path = Path(f"{self.dict_folders['cache']}/group_{group_ID}{level_suffix}_mean.parquet")
+        if group_path.exists():
             if config.verbose:
-                print(f"Loading stored group mean for group {group_ID}")
+                print(f"Loading stored group mean for {group_ID} level={eff_level}")
             group_mean = pd.read_parquet(str(group_path))
-        else:  # 3: Create file
-            if config.verbose:
-                print(f"Building new group mean for group {group_ID}")
-            recs_in_group = self.dd_groups.get(group_ID, {}).get("rec_IDs", [])
-            # print(f"recs_in_group: {recs_in_group}")
+            self.dict_group_means[cache_key] = group_mean
+            return group_mean
+
+        if config.verbose:
+            print(f"Building new group mean for {group_ID} level={eff_level}")
+        recs_in_group = self.dd_groups.get(group_ID, {}).get("rec_IDs", [])
+        df_p = self.get_df_project()
+
+        if eff_level == self.LEVEL_RECORDING:
+            # original rec-level logic
             dfs = []
-            df_p = self.get_df_project()
             for rec_ID in recs_in_group:
                 matching_rows = df_p.loc[df_p["ID"] == rec_ID]
                 if matching_rows.empty:
                     raise ValueError(f"rec_ID {rec_ID} not found in df_project.")
-                else:
-                    p_row = matching_rows.iloc[0]
+                p_row = matching_rows.iloc[0]
                 df = self.get_dfoutput(row=p_row)
                 dfs.append(df)
             if len(dfs) == 0:
@@ -566,21 +808,76 @@ class DataFrameMixin:
                     )
                     .reset_index()
                 )
-            group_mean.columns = [col[0] if col[0] == "sweep" else "_".join(col).strip().replace("sem", "SEM") for col in group_mean.columns.values]
-            # print(f"Group mean columns: {group_mean.columns}")
-            # print(f"Group mean: {group_mean}")
+                group_mean.columns = [col[0] if col[0] == "sweep" else "_".join(col).strip().replace("sem", "SEM") for col in group_mean.columns.values]
             self.df2file(df=group_mean, filename=f"group_{group_ID}", key="mean")
-        self.dict_group_means[group_ID] = group_mean
+        else:
+            # contextual higher level: group by unit within group's recs, avg to units, then across
+            unit_to_dfs = {}
+            for rec_ID in recs_in_group:
+                matching_rows = df_p.loc[df_p["ID"] == rec_ID]
+                if matching_rows.empty:
+                    continue
+                p_row = matching_rows.iloc[0]
+                if eff_level == self.LEVEL_SUBJECT:
+                    unit_key = str(p_row.get("subject", "unknown"))
+                else:  # slice
+                    unit_key = (str(p_row.get("subject", "unknown")), str(p_row.get("slice", "1")))
+                try:
+                    dfo = self.get_dfoutput(row=p_row)
+                    unit_to_dfs.setdefault(unit_key, []).append(dfo)
+                except Exception:
+                    continue
+
+            unit_series = []
+            for ukey, rec_dfs in unit_to_dfs.items():
+                um = self._build_unit_series_from_rec_dfs(rec_dfs, include_sem=False)
+                if not um.empty:
+                    unit_series.append(um)
+
+            if not unit_series:
+                group_mean = pd.DataFrame(
+                    {
+                        "sweep": [],
+                        "EPSP_amp_norm_mean": [],
+                        "EPSP_amp_norm_SEM": [],
+                        "EPSP_slope_norm_mean": [],
+                        "EPSP_slope_norm_SEM": [],
+                        "EPSP_amp_mean": [],
+                        "EPSP_amp_SEM": [],
+                        "EPSP_slope_mean": [],
+                        "EPSP_slope_SEM": [],
+                    }
+                )
+            else:
+                concat_units = pd.concat(unit_series, ignore_index=True)
+                g = concat_units.groupby("sweep")
+                m = g.mean().reset_index()
+                s = g.sem(ddof=1).reset_index()
+                group_mean = m[["sweep"]].copy()
+                for base in ["EPSP_amp", "EPSP_slope"]:
+                    for suf in ["", "_norm"]:
+                        mcol = f"{base}{suf}_mean"
+                        if mcol in m.columns:
+                            group_mean[mcol] = m[mcol]
+                            scol = f"{base}{suf}_SEM"
+                            if scol in s.columns:
+                                group_mean[scol] = s[scol]
+                            else:
+                                group_mean[scol] = 0.0
+
+            fname = f"group_{group_ID}{level_suffix}"
+            self.df2file(df=group_mean, filename=fname, key="mean")
+
+        self.dict_group_means[cache_key] = group_mean
         return group_mean
 
-    def get_dfgroupmean_for_sweeps(self, group_ID, sweeps):
+    def get_dfgroupmean_for_sweeps(self, group_ID, sweeps, level: str | None = None):
         """Return group mean df filtered to the given list of sweep indices.
-        Simple row filter on the existing aggregated mean (acceptable for v0.16 per plan).
-        Re-uses cache of full get_dfgroupmean.
+        Supports level for n_unit-aware means.
         """
         if not group_ID:
             return pd.DataFrame()
-        df = self.get_dfgroupmean(group_ID)
+        df = self.get_dfgroupmean(group_ID, level=level)
         if df is None or df.empty or not sweeps:
             return df if df is not None else pd.DataFrame()
         mask = df["sweep"].isin(sweeps)

@@ -242,7 +242,8 @@ class GroupMixin:
             dict_group = self.dd_groups[group_ID]
             dict_group["rec_IDs"].append(rec_ID)
             self.group_cache_purge([group_ID])
-            df_groupmean = self.get_dfgroupmean(group_ID)
+            level = getattr(uistate, "buttonGroup_test_n", "recording")
+            df_groupmean = self.get_dfgroupmean(group_ID, level=level)
             x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
             uiplot.addGroup(group_ID, dict_group, self.V2mV(df_groupmean), x_pos=x_pos)
             # v0.16: membership change may affect active statistical test
@@ -254,7 +255,8 @@ class GroupMixin:
             dict_group = self.dd_groups[group_ID]
             dict_group["rec_IDs"].remove(rec_ID)
             self.group_cache_purge([group_ID])
-            df_groupmean = self.get_dfgroupmean(group_ID)
+            level = getattr(uistate, "buttonGroup_test_n", "recording")
+            df_groupmean = self.get_dfgroupmean(group_ID, level=level)
             if self.dd_groups[group_ID]["rec_IDs"]:
                 x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
                 uiplot.addGroup(group_ID, dict_group, self.V2mV(df_groupmean), x_pos=x_pos)
@@ -332,28 +334,48 @@ class GroupMixin:
     # Cache
     # ------------------------------------------------------------------
 
-    def group_cache_purge(self, group_IDs=None):  # clear cache so that a new group mean is calculated
+    def group_cache_purge(self, group_IDs=None, levels=None):  # clear cache so that a new group mean is calculated
         if hasattr(self, "turn_heatmap_off"):
             self.turn_heatmap_off()
-        if not self.dict_group_means:
+        if not self.dict_group_means and not getattr(self, "dict_global_units", None):
             print("No groups to purge.")
             return
         if not group_IDs:  # if no group IDs are passed purge all groups
-            group_IDs = list(self.dict_group_means.keys())
-        print(f"group_cache_purge: {group_IDs}, len(group): {len(group_IDs)}")
+            # collect unique group ids from tuple keys too
+            gids = set()
+            for k in list(self.dict_group_means.keys()):
+                if isinstance(k, tuple) and len(k) >= 1:
+                    gids.add(k[0])
+                else:
+                    gids.add(k)
+            group_IDs = list(gids)
+            if hasattr(self, "dict_global_units"):
+                self.dict_global_units.clear()
+        print(f"group_cache_purge: {group_IDs}, levels={levels}")
         for group_ID in group_IDs:
-            if group_ID in self.dict_group_means:
-                del self.dict_group_means[group_ID]
-            path_group_mean_cache = Path(f"{self.dict_folders['cache']}/group_{group_ID}_mean.parquet")
-            if path_group_mean_cache.exists:  # TODO: Upon adding a group, both of these conditions trigger. How?
-                print(f"{path_group_mean_cache} found when checking for existence...")
-                path_group_mean_cache.unlink()
-            if group_ID in self.dict_group_means:
-                del self.dict_group_means[group_ID]
+            # remove level-aware keys
+            keys_to_del = []
+            for k in list(self.dict_group_means.keys()):
+                if isinstance(k, tuple) and k[0] == group_ID:
+                    if levels is None or k[1] in levels:
+                        keys_to_del.append(k)
+                elif k == group_ID and (levels is None or "recording" in (levels or [])):
+                    keys_to_del.append(k)
+            for k in keys_to_del:
+                if k in self.dict_group_means:
+                    del self.dict_group_means[k]
 
-            # also purge all per-test sample parquet files matching the new pattern
-            # {group_name}_sample_{test_id}.parquet so cache is fully invalidated
-            # when test sets or sample pointers change
+            # delete possible parquet variants
+            base = f"{self.dict_folders['cache']}/group_{group_ID}"
+            for lvl in ([""] + [f"_{l}" for l in (levels or ["recording", "slice", "subject"])]):
+                p = Path(f"{base}{lvl}_mean.parquet")
+                if p.exists():
+                    try:
+                        p.unlink()
+                    except Exception:
+                        pass
+
+            # also purge samples
             group_name = self.dd_groups.get(group_ID, {}).get("group_name", f"group_{group_ID}")
             self.group_sample_cache_purge(group_ID)
             if hasattr(self, "dd_group_samples") and group_ID in self.dd_group_samples:
