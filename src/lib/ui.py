@@ -3282,10 +3282,6 @@ class UIsub(
                 self.checkBox_splitOddEven_changed(state)
             elif key == "timepoints_per_stim":
                 self.checkBox_timepoints_per_stim_changed(state)
-            elif key in ["EPSP_amp", "volley_amp"]:
-                self.frameToolAspectAmp.setVisible(uistate.checkBox["EPSP_amp"] or uistate.checkBox["volley_amp"])
-            elif key in ["EPSP_slope", "volley_slope"]:
-                self.frameToolAspectSlope.setVisible(uistate.checkBox["EPSP_slope"] or uistate.checkBox["volley_slope"])
             elif key == "io_trendline":
                 print(f"Checkbox io_trendline clicked, state: {state == 2}")
             elif key == "io_force0":
@@ -3606,8 +3602,6 @@ class UIsub(
             if hasattr(self, frame):
                 getattr(self, frame).setVisible(state)
         self.frameToolFilter_sub_Savgol.setVisible(uistate.settings.get("filter", "voltage") == "savgol")
-        self.frameToolAspectAmp.setVisible(uistate.checkBox.get("EPSP_amp", False) or uistate.checkBox.get("volley_amp", False))
-        self.frameToolAspectSlope.setVisible(uistate.checkBox.get("EPSP_slope", False) or uistate.checkBox.get("volley_slope", False))
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(self._is_io_mode())
         if hasattr(self, "frameToolTest"):
@@ -3725,7 +3719,7 @@ class UIsub(
             "pushButton_hide_y_axis": "frameToolYscale",
             "pushButton_hide_aspect": "frameToolAspect",
             "pushButton_hide_slope_width": "frameToolAspectSlope",
-            "pushButton_hide_slope_width_2": "frameToolAspectAmp",
+            "pushButton_hide_amplitude_width": "frameToolAspectAmp",
             "pushButton_hide_test": "frameToolTest",
         }
         for btn_name, frame_name in hide_buttons.items():
