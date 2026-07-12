@@ -60,6 +60,7 @@ import ui_widgets  # Custom Qt widgets, dialogs, models, threads (extracted Phas
 import ui_table  # TableMixin (Phase 1 start)
 import ui_selection  # SelectionMixin (Phase 1)
 import ui_graph  # GraphCoordinatorMixin (Phase 2)
+import ui_parse  # ParseMixin (Phase 3)
 import yaml  # used by talkback
 from ui_project import df_projectTemplate
 
@@ -143,6 +144,11 @@ ui_graph.uistate = uistate
 ui_graph.config = config
 ui_graph.uiplot = uiplot
 
+# ui_parse
+ui_parse.uistate = uistate
+ui_parse.config = config
+ui_parse.uiplot = uiplot
+
 ####################################################################
 # MAIN UI CLASS
 ####################################################################
@@ -161,6 +167,7 @@ class UIsub(
     ui_table.TableMixin,  # Phase 1
     ui_selection.SelectionMixin,  # Phase 1
     ui_graph.GraphCoordinatorMixin,  # Phase 2
+    ui_parse.ParseMixin,  # Phase 3
 ):
     def __init__(self, mainwindow):
         logger.debug("UIsub __init__ started")
@@ -2885,20 +2892,7 @@ class UIsub(
             logger.warning("No project found in %s", str_projectfolder)
             print(f"No project found in {str_projectfolder}")
 
-    def triggerAddData(self):  # creates file tree for file selection
-        self.usage("triggerAddData")
-        self.dialog = QtWidgets.QDialog()
-        self.ftree = ui_widgets.Filetreesub(self.dialog, parent=self, folder=self.user_documents)
-        self.dialog.show()
-
-    def triggerParse(self):  # parse non-parsed files and folders in self.df_project
-        if uistate.frozen:
-            print("triggerParse: UI is frozen (already parsing), ignoring duplicate call")
-            return
-        self.usage("triggerParse")
-        self.mouseoverDisconnect()
-        self.parseData()
-        self.setButtonParse()
+    # triggerAddData, triggerParse moved to ParseMixin (ui_parse.py)
 
     def triggerReanalyze(self):
         self.usage("triggerReanalyze")
@@ -3035,89 +3029,16 @@ class UIsub(
     # triggerKeepSelectedSweeps, triggerRemoveSelectedSweeps, triggerSplitBySelectedSweeps,
     # sweep_selection_valid, sweep_removal_valid_confirmed → SweepOpsMixin (ui_sweep_ops.py)
 
-    def reanalyze_recordings(self):
-        self.usage("reanalyze_recordings")
-        selection = uistate.list_idx_select_recs
-        n_recs = len(selection)
-        print(f"Reanalyzing {n_recs} selected recording{'s' if n_recs != 1 else ''}...")
-        # purge all derived cache files for selected recordings
-        for rec_idx in selection:
-            p_row = self.df_project.iloc[rec_idx]
-            rec_name = p_row["recording_name"]
-            for folder, suffix in [
-                ("timepoints", ".parquet"),
-                ("cache", "_mean.parquet"),
-                ("cache", "_filter.parquet"),
-                ("cache", "_bin.parquet"),
-                ("cache", "_output.parquet"),
-            ]:
-                path = self.dict_folders[folder] / (rec_name + suffix)
-                if path.exists():
-                    path.unlink()
-                    logger.debug("Deleted %s", path)
-                    print(f"Deleted {path}")
-            self.set_rec_status(rec_name)
-        self.resetCacheDicts()
-        self.recalculate(selection=selection)  # rebuild only affected recordings
+    # reanalyze_recordings moved to ParseMixin (ui_parse.py)
 
     # sweep_shift_gaps, sweep_remove_by_ID, sweep_keep_selected, sweep_remove_selected,
     # sweep_unselect, sweep_split_by_selected → SweepOpsMixin (ui_sweep_ops.py)
 
-    def duplicate_recording(self, source_p_row, new_name=None):
-        source_name = source_p_row["recording_name"]
-        if new_name is None:
-            new_name = f"{source_name}_copy"
-        if new_name in self.df_project["recording_name"].values:
-            print(f"duplicate_recording: recording name '{new_name}' already exists, choose a different name.")
-            return
-        df_proj_new_row = source_p_row.copy()
-        df_proj_new_row["ID"] = str(uuid.uuid4())  # new unique ID
-        df_proj_new_row["recording_name"] = new_name
-        # Update data files: copy source data file to new data file
-        df_project = self.get_df_project()
-        self.df_project = pd.concat([df_project, pd.DataFrame([df_proj_new_row])], ignore_index=True)
-        self.save_df_project()
-        df_data = self.get_dfdata(source_p_row)
-        self.df2file(df_data, new_name, key="data")  # persist data file
-        dfmean, i_stim = parse.build_dfmean(df_data)
-        self.df2file(dfmean, new_name, key="mean")  # persist mean
-        df = parse.zeroSweeps(df_data, i_stim=i_stim)
-        self.df2file(df, new_name, key="filter")  # persist zeroed
-        return
+    # duplicate_recording, create_recording moved to ParseMixin (ui_parse.py)
 
-    def create_recording(self, df_proj_row, rec, df_raw, status_callback=None):
-        def create_row(df_proj_row, new_name, dict_meta):
-            df_proj_new_row = df_proj_row.copy()
-            df_proj_new_row["ID"] = str(uuid.uuid4())
-            df_proj_new_row["recording_name"] = new_name
-            df_proj_new_row["gain"] = uistate.lineEdit["import_gain"]  # capture gain at parse time
-            df_proj_new_row["sweeps"] = dict_meta.get("nsweeps", None)
-            df_proj_new_row["channel"] = ""  # dict_meta.get('channel', None)
-            df_proj_new_row["sweep_duration"] = dict_meta.get("sweep_duration", None)
-            df_proj_new_row["sampling_rate"] = dict_meta.get("sampling_rate", None)
-            df_proj_new_row["resets"] = ""  # dict_meta.get('resets', None)
-            # sweep_hz: inter-sweep rate derived from t0 timestamps; NaN if unavailable
-            sweep_hz = dict_meta.get("sweep_hz", None)
-            df_proj_new_row["sweep_hz"] = sweep_hz if sweep_hz is not None else float("nan")
-            # Build pipe-delimited status flags; append "default Hz" when sweep_hz is absent
-            status_flags = ["Read"]
-            if sweep_hz is None:
-                status_flags.append("default Hz")
-            df_proj_new_row["status"] = "|".join(status_flags)
-            return df_proj_new_row
+    # create_recording moved to ParseMixin (ui_parse.py)
 
-        if status_callback:
-            status_callback("building dataframe...")
-        self.df2file(df_raw, rec, key="data")  # persist raws
-        dfmean, i_stim = parse.build_dfmean(df_raw)
-        if status_callback:
-            status_callback("writing to disk...")
-        self.df2file(dfmean, rec, key="mean")  # persist mean
-        df = parse.zeroSweeps(df_raw, i_stim=i_stim)
-        self.df2file(df, rec, key="filter")  # persist zeroed
-        dict_meta = parse.metadata(df)  # extract metadata
-        df_proj_new_row = create_row(df_proj_row=df_proj_row, new_name=rec, dict_meta=dict_meta)
-        return df_proj_new_row
+    # create_recording moved to ParseMixin (ui_parse.py)
 
     # recalculate → DataFrameMixin (ui_data_frames.py)
 
@@ -3527,38 +3448,7 @@ class UIsub(
         self.update_show(reset=True)
         self.mouseoverUpdate()
 
-    def addData(self, dfAdd):  # concatenate dataframes of old and new data
-        # Check for unique names in dfAdd, vs df_p and dfAdd
-        # Adds (<lowest integer that makes unique>) to the end of non-unique recording_names
-        df_p = self.get_df_project()
-        list_recording_names = set(df_p["recording_name"])
-        for index, row in dfAdd.iterrows():
-            check_recording_name = row["recording_name"]
-            if check_recording_name.endswith("_mean.parquet"):
-                print("recording_name must not end with _mean.parquet - appending _X")  # must not collide with internal naming
-                check_recording_name = check_recording_name + "_X"
-                dfAdd.at[index, "recording_name"] = check_recording_name
-            if check_recording_name in list_recording_names:
-                # print(index, check_recording_name, "already exists!")
-                i = 1
-                new_recording_name = check_recording_name + "(" + str(i) + ")"
-                while new_recording_name in list_recording_names:
-                    i += 1
-                    new_recording_name = check_recording_name + "(" + str(i) + ")"
-                print("New name:", new_recording_name)
-                list_recording_names.add(new_recording_name)
-                dfAdd.at[index, "recording_name"] = new_recording_name
-            else:
-                list_recording_names.add(check_recording_name)
-        df_p = pd.concat([df_p, dfAdd])
-        df_p.reset_index(drop=True, inplace=True)
-        df_p["groups"] = df_p["groups"].fillna(" ")
-        df_p["sweeps"] = df_p["sweeps"].fillna("...")
-        # v0.16_n: migration will be called inside set_df_project (hierarchy defaults)
-        self.set_df_project(df_p)
-        self.tableUpdate(restore_selection=True)  # new helper ensures selection is restored after adding data
-        logger.debug("addData: %s", self.get_df_project())
-        print("addData:", self.get_df_project())
+    # addData moved to ParseMixin (ui_parse.py)
 
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
@@ -3651,104 +3541,9 @@ class UIsub(
         self.tableUpdate(restore_selection=True, target_idx=None)
         self.tableProjSelectionChanged()
 
-    def purgeRecordingData(self, rec_ID, rec_name):
-        def removeFromCache(cache_name):
-            cache = getattr(self, cache_name)
-            if rec_name in cache.keys():
-                cache.pop(rec_name, None)
+    # purgeRecordingData moved to ParseMixin (ui_parse.py)
 
-        def removeFromDisk(folder_name, file_suffix):
-            file_path = Path(self.dict_folders[folder_name] / (rec_name + file_suffix))
-            if file_path.exists():
-                file_path.unlink()
-            else:
-                print(f"purgeRecordingData: file not found: {file_path}")
-
-        groups2purge = self.get_groupsOfRec(rec_ID)
-        if groups2purge:  # if rec_ID is in groups, purge those group caches and update dd_groups
-            # print(f"purgeRecordingData: {rec_name} in groups: {groups2purge}")
-            for group_ID in groups2purge:  # remove rec_ID from rec_IDs of all affected groups
-                print(f"purgeRecordingData: pre  {self.dd_groups[group_ID]['rec_IDs']}")
-                self.dd_groups[group_ID]["rec_IDs"].remove(rec_ID)
-                print(f"purgeRecordingData: post {self.dd_groups[group_ID]['rec_IDs']}")
-            self.group_save_dd()
-            self.group_cache_purge(groups2purge)
-            self.refresh_samples()
-        # clear recording caches
-        for cache_name in [
-            "dict_datas",
-            "dict_means",
-            "dict_filters",
-            "dict_ts",
-            "dict_bins",
-            "dict_outputs",
-        ]:
-            removeFromCache(cache_name)
-        for folder_name, file_suffix in [
-            ("data", ".parquet"),
-            ("timepoints", ".parquet"),
-            ("cache", "_mean.parquet"),
-            ("cache", "_filter.parquet"),
-            ("cache", "_bin.parquet"),
-            ("cache", "_output.parquet"),
-            ("cache", "_output_bin.parquet"),
-        ]:
-            removeFromDisk(folder_name, file_suffix)
-
-    def parseData(self):
-        if hasattr(self, "_current_parse_thread") and self._current_parse_thread is not None:
-            print("parseData: already parsing, ignoring duplicate call")
-            return
-        self.uiFreeze()  # Thawed at the end of graphPreload()
-        # Clean up any existing thread before starting a new one
-        self._cleanup_threads()
-        df_p = self.get_df_project()
-        df_p_to_update = df_p[df_p["sweeps"] == "..."].copy()
-        if len(df_p_to_update) > 0:
-            print(f"parseData: {len(df_p_to_update)} files to parse.")
-            thread = ui_widgets.ParseDataThread(df_p_to_update, self.dict_folders, self)
-            self._current_parse_thread = thread  # Store reference for use in callbacks
-            thread.progress.connect(self.updateProgressBar)
-            thread.sub_progress.connect(self.updateSubProgressBar)
-            thread.status_update.connect(self.updateStatusBar)
-            thread.finished.connect(self.onParseDataFinished)
-            thread.finished.connect(thread.deleteLater)  # Auto-cleanup when done
-            thread.finished.connect(lambda: self._threads.remove(thread) if thread in self._threads else None)
-            thread.finished.connect(lambda: setattr(self, "_current_parse_thread", None))
-            self._threads.append(thread)
-            thread.start()
-            self.progressBarManager = ui_widgets.ProgressBarManager(self.progressBar, len(df_p_to_update))
-            self.progressBarManager.__enter__()
-            # Loading takes control of statusbar (messages pushed via update* callbacks).
-            # Non-error state: use default color (darkmode sensitive).
-
-    def updateProgressBar(self, i):
-        self.progressBarManager.update(i, "Parsing file ")
-
-    def updateSubProgressBar(self, idx, total):
-        self.progressBarManager.update_sub(idx, total)
-
-    def updateStatusBar(self, text):
-        self.progressBarManager.set_status(text)
-
-    def onParseDataFinished(self):
-        print("onParseDataFinished: entered")
-        self.progressBarManager.__exit__(None, None, None)
-        if hasattr(self, "_current_parse_thread") and self._current_parse_thread is not None:
-            thread = self._current_parse_thread
-            if thread.rows:
-                rows2add = pd.concat(thread.rows, axis=1).transpose()
-                df_p = self.get_df_project()
-                df_p = pd.concat([df_p[df_p["sweeps"] != "..."], rows2add]).reset_index(drop=True)
-                self.set_df_project(df_p)
-                # Get the indices of the new rows, as they are in df_p
-                uistate.list_idx_recs2preload = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
-        self.setButtonParse()
-        self.progressBarManager.__exit__(None, None, None)
-        # Return control to test warnings (graphPreload will take over again if needed)
-        self.update_test()
-        print("onParseDataFinished: calling graphPreload")
-        self.graphPreload()
+    # parseData, progress bars, onParseDataFinished moved to ParseMixin (ui_parse.py)
 
     # Data Group handling functions → GroupMixin (ui_groups.py)
     # Writer / project functions → ProjectMixin (ui_project.py)
@@ -3793,12 +3588,7 @@ class UIsub(
 
     # Table handling
 
-    def setButtonParse(self):
-        logger.debug("setButtonParse")
-        print("setButtonParse")
-        unparsed = self.df_project["sweeps"].eq("...").any()
-        self.pushButtonParse.setVisible(bool(unparsed))
-        self.frameParseOptions.setVisible(bool(unparsed))
+    # setButtonParse moved to ParseMixin (ui_parse.py)
 
     def checkBox_splitOddEven_changed(self, state):
         uistate.checkBox["splitOddEven"] = state == 2
@@ -3842,9 +3632,7 @@ class UIsub(
     # Graph interface
 
     # graphWipe, graphAxes, graphPreload, ongraphPreloadFinished, graphGroups, graphUpdate moved to GraphCoordinatorMixin (ui_graph.py)
-
-    def slotAddDfData(self, df):
-        self.addData(df)
+    # slotAddDfData moved to ParseMixin (ui_parse.py)
 
 
 # Root functions
