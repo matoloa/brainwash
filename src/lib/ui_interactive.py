@@ -342,6 +342,7 @@ class InteractivePlotMixin:
         return int(np.nanargmin(distances))
 
     def _draw_ghost_sweep(self, snippet_x, snippet_y, label_text):
+        print(f"DEBUG _draw_ghost_sweep: called, axe={uistate.axe}, snippet_x len={len(snippet_x) if snippet_x is not None else 0}, label={label_text}")
         if uistate.ghost_sweep is None:
             ghost_color = "white" if uistate.darkmode else "black"
             (uistate.ghost_sweep,) = uistate.axe.plot(snippet_x, snippet_y, color=ghost_color, alpha=0.5, zorder=0)
@@ -359,6 +360,7 @@ class InteractivePlotMixin:
         else:
             uistate.ghost_sweep.set_data(snippet_x, snippet_y)
             uistate.ghost_label.set_text(label_text)
+        print("DEBUG _draw_ghost_sweep: ghost plotted on axe (canvasEvent)")
 
     def _draw_mouseover_blob(self, ax, x, y, color):
         if getattr(uistate, "mouseover_out_blob", None) is None:
@@ -372,14 +374,19 @@ class InteractivePlotMixin:
                 uistate.mouseover_out_blob.set_color(color)
 
     def outputMouseover(self, event):
+        print(f"DEBUG outputMouseover: called, inaxes={event.inaxes}, xdata={event.xdata}, ydata={event.ydata}")
         handler = self.mouseover_loader()
         if handler:
+            print(f"DEBUG outputMouseover: dispatching to {handler.__name__}")
             handler(event)
+        else:
+            print("DEBUG outputMouseover: no handler")
 
     def on_leave_output(self, event):
         self.exorcise()
 
     def exorcise(self):
+        print("DEBUG exorcise: called, removing any ghost on axe")
         if uistate.ghost_sweep is not None:
             uistate.ghost_sweep.remove()
             uistate.ghost_sweep = None
@@ -564,19 +571,30 @@ class InteractivePlotMixin:
     def mouseoverUpdate(self):
         self.usage("mouseoverUpdate")
         self.mouseoverDisconnect()
+        n_recs = len(uistate.list_idx_select_recs or [])
+        n_stims = len(uistate.list_idx_select_stims or [])
+        print(f"DEBUG mouseoverUpdate: n_recs={n_recs}, n_stims={n_stims}, recs={uistate.list_idx_select_recs}, stims={uistate.list_idx_select_stims}")
+
+        # Explicitly connect output mouseover (canvasOutput -> ghost on canvasEvent/axe)
+        # when EXACTLY one recording is selected.
+        if n_recs == 1:
+            self.mouseoverOutput = self.canvasOutput.mpl_connect("motion_notify_event", self.outputMouseover)
+            self.mouseLeaveOutput = self.canvasOutput.mpl_connect("axes_leave_event", self.on_leave_output)
+            print("DEBUG mouseoverUpdate: exactly 1 rec selected -> connected canvasOutput mouseover for ghost on axe")
         # if only one item is selected, make a new mouseover event connection
         if uistate.list_idx_select_recs and uistate.list_idx_select_stims:
             self._update_marker_data()
 
-        n_recs = len(uistate.list_idx_select_recs or [])
         if n_recs > 1:
             print("(multi-rec-selection) mouseoverUpdate calls self.graphRefresh()")
             self.graphRefresh(reeval_formal_test=False)
             return
-        if len(uistate.list_idx_select_stims or []) != 1:
+        if n_recs == 0 and len(uistate.list_idx_select_stims or []) != 1:
             print("(multi-stim-selection) mouseoverUpdate calls self.graphRefresh()")
             self.graphRefresh(reeval_formal_test=False)
             return
+        # For exactly one recording selected (n_recs==1), fall through even if stim count !=1,
+        # so that trow=None or no-labels paths can still wire output hover for the ghost on axe.
         # print(f"mouseoverUpdate: {uistate.list_idx_select_recs[0]}, {type(uistate.list_idx_select_recs[0])}")
         prow = self.get_prow()
         if prow is None:
@@ -677,22 +695,47 @@ class InteractivePlotMixin:
     def mouseoverDisconnect(self):
         # self.usage("mouseoverDisconnect")
         # drop any prior mouseover event connections and plots
-        if hasattr(self, "mouseover"):
-            self.canvasEvent.mpl_disconnect(self.mouseoverEvent)
-            self.canvasOutput.mpl_disconnect(self.mouseoverOutput)
+        for conn_attr, canvas_attr in (
+            ("mouseoverMean", "canvasMean"),
+            ("mouseoverEvent", "canvasEvent"),
+            ("mouseoverOutput", "canvasOutput"),
+            ("mouseLeaveOutput", "canvasOutput"),
+        ):
+            if hasattr(self, conn_attr):
+                cid = getattr(self, conn_attr)
+                canvas = getattr(self, canvas_attr, None)
+                if cid is not None and canvas is not None:
+                    try:
+                        canvas.mpl_disconnect(cid)
+                    except Exception:
+                        pass
+                try:
+                    delattr(self, conn_attr)
+                except AttributeError:
+                    setattr(self, conn_attr, None)
+
         if uistate.mouseover_plot is not None:
-            uistate.mouseover_plot[0].remove()
+            try:
+                uistate.mouseover_plot[0].remove()
+            except Exception:
+                pass
             uistate.mouseover_plot = None
         if uistate.mouseover_blob is not None:
-            uistate.mouseover_blob.remove()
+            try:
+                uistate.mouseover_blob.remove()
+            except Exception:
+                pass
             uistate.mouseover_blob = None
         if uistate.mouseover_out is not None:
-            uistate.mouseover_out[0].remove()
+            try:
+                uistate.mouseover_out[0].remove()
+            except Exception:
+                pass
             uistate.mouseover_out = None
         if getattr(uistate, "mouseover_out_blob", None) is not None:
             try:
                 uistate.mouseover_out_blob.remove()
-            except ValueError:
+            except Exception:
                 pass
             uistate.mouseover_out_blob = None
         uistate.mouseover_action = None
@@ -1101,6 +1144,180 @@ class InteractivePlotMixin:
     # --- Phase 2: Specialized Mouseover Strategies ---
 
     def _mouseover_output_time(self, event):
+        print(f"DEBUG _mouseover_output_time: event.inaxes={event.inaxes}, slopeView={uistate.slopeView()}, ampView={uistate.ampView()}")
+        use_mouse_x_direct = False  # for fallback when no data line
+        out_x_idx = 0
+        x_val = 0
+        # Determine str_ax from the actual hovered axis (ax1 or ax2), not global view preference.
+        # This ensures we pick the data line from the axis being moused over.
+        if event.inaxes == getattr(uistate, "ax1", None):
+            str_ax = "ax1"
+        elif event.inaxes == getattr(uistate, "ax2", None):
+            str_ax = "ax2"
+        else:
+            str_ax = None
+        ax = getattr(uistate, str_ax) if str_ax else None
+        if event.inaxes not in (uistate.ax1, uistate.ax2) or str_ax is None:
+            print(f"DEBUG _mouseover_output_time: not on ax1/ax2 or no str_ax={str_ax}, exorcising")
+            if uistate.ghost_sweep is not None:
+                self.exorcise()
+            return
+        if event.inaxes != ax:
+            x, y = ax.transData.inverted().transform((event.x, event.y))
+        else:
+            x, y = event.xdata, event.ydata
+        if x is None or y is None or not (uistate.slopeView() or uistate.ampView()):
+            print("DEBUG _mouseover_output_time: no x/y or no amp/slope view, exorcising")
+            if uistate.ghost_sweep is not None:
+                self.exorcise()
+            return
+        n_recs = len(uistate.list_idx_select_recs or [])
+        print(f"DEBUG _mouseover_output_time: n_recs={n_recs}")
+        if n_recs > 1:
+            self.exorcise()
+            return
+
+        rec_id = None
+        stim_for_rec = 1
+        if n_recs == 1:
+            prow = self.get_prow()
+            if prow is not None:
+                rec_id = prow["ID"]
+            if uistate.list_idx_select_stims:
+                stim_for_rec = uistate.list_idx_select_stims[0] + 1
+            dict_out = {
+                key: value
+                for key, value in uistate.dict_rec_show.items()
+                if rec_id is not None and value.get("rec_ID") == rec_id and value.get("axis") == str_ax and not str(value.get("aspect", "")).endswith("_mean") and hasattr(value.get("line"), "get_xdata")
+            }
+        else:
+            dict_out = {
+                key: value
+                for key, value in uistate.dict_rec_show.items()
+                if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
+            }
+        if n_recs == 1 and len(dict_out) == 0:
+            other = "ax2" if str_ax == "ax1" else "ax1"
+            dict_out = {
+                key: value
+                for key, value in uistate.dict_rec_show.items()
+                if rec_id is not None and value.get("rec_ID") == rec_id and value.get("axis") == other and not str(value.get("aspect", "")).endswith("_mean") and hasattr(value.get("line"), "get_xdata")
+            }
+            if dict_out:
+                print(f"DEBUG _mouseover_output_time: fell back to data line on {other}")
+        print(f"DEBUG _mouseover_output_time: len(dict_rec_show)={len(uistate.dict_rec_show)}, len(dict_out)={len(dict_out)}")
+        # dump ax output lines for debug
+        print("DEBUG ax output lines in dict_rec_show:")
+        for k, v in uistate.dict_rec_show.items():
+            if v.get("axis") in ("ax1", "ax2"):
+                print(f"  key={k}, axis={v.get('axis')}, aspect={v.get('aspect')}, stim={v.get('stim')}, rec_ID={v.get('rec_ID')}")
+        use_group_xy = False
+        rec_ID_for_snippet = None
+        use_mouse_x_direct = False
+        if not dict_out:
+            if n_recs == 1:
+                print("DEBUG _mouseover_output_time: no suitable per-sweep data line on this ax (e.g. only mean hline), using mouse x directly as x_val")
+                rec_ID_for_snippet = rec_id
+                use_mouse_x_direct = True
+                dict_pop = {"rec_ID": rec_id, "stim": stim_for_rec, "line": None}  # dummy
+            else:
+                print("DEBUG _mouseover_output_time: no dict_out for rec, trying group fallback")
+                # Fallback for group-only view: use a shown group mean line for (x,y) sweep lookup;
+                # pick first rec in that group to source the actual voltage snippet (ghost).
+                g_out = {
+                    key: value
+                    for key, value in getattr(uistate, "dict_group_show", {}).items()
+                    if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
+                }
+                if not g_out:
+                    if uistate.ghost_sweep is not None:
+                        self.exorcise()
+                    return
+                dict_pop = list(g_out.values())[0]
+                use_group_xy = True
+                gid = dict_pop.get("group_ID")
+                recs = []
+                if gid is not None and hasattr(self, "dd_groups") and self.dd_groups:
+                    recs = self.dd_groups.get(gid, {}).get("rec_IDs", []) or []
+                if not recs:
+                    return
+                rec_ID_for_snippet = recs[0]
+        else:
+            dict_pop = list(dict_out.values())[0]
+            rec_ID_for_snippet = dict_pop.get("rec_ID")
+            print(f"DEBUG _mouseover_output_time: using rec output line for ghost, rec_ID={rec_ID_for_snippet}, stim={dict_pop.get('stim')}")
+
+        if use_mouse_x_direct:
+            x_val = x
+            out_x_val = x
+            out_y_val = y if y is not None else 0
+            out_x_idx = 0
+        else:
+            x_data = dict_pop["line"].get_xdata()
+            y_data = dict_pop["line"].get_ydata()
+
+            out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
+            x_val = x_data[out_x_idx]
+            out_x_val = x_val
+            out_y_val = y_data[out_x_idx]
+            print(f"DEBUG _mouseover_output_time: nearest out_x_idx={out_x_idx}, x_val={x_val}")
+
+        if not use_mouse_x_direct and out_x_idx == getattr(uistate, "last_out_x_idx", None):
+            print("DEBUG _mouseover_output_time: same x_idx as last, skipping")
+            return
+        if use_mouse_x_direct:
+            out_x_idx = 999  # force update
+
+        rec_ID = rec_ID_for_snippet
+        df_p = self.get_df_project()
+        p_row_df = df_p[df_p["ID"] == rec_ID]
+        if p_row_df.empty:
+            print(f"DEBUG _mouseover_output_time: no matching p_row for rec_ID={rec_ID}")
+            return
+        p_row = p_row_df.iloc[0]
+        df_t = self.get_dft(p_row)
+        rec_filter = p_row["filter"]
+
+        stim = dict_pop.get("stim")
+        if stim is None:
+            stim = 1
+
+        t_row = df_t[df_t["stim"] == stim].iloc[0]
+        offset = t_row["t_stim"]
+
+        if pd.notna(p_row["bin_size"]):
+            dfsource = self.get_dfbin(p_row)
+            ghost_label_text = f"bin {int(x_val)}"
+        else:
+            dfsource = self.get_dffilter(p_row)
+            ghost_label_text = f"sweep {int(x_val)}"
+
+        if use_mouse_x_direct:
+            out_sweeps = dfsource["sweep"].dropna().unique()
+            if len(out_sweeps) > 0:
+                x_val = out_sweeps[ int(np.nanargmin(np.abs(out_sweeps - x_val))) ]
+                print(f"DEBUG _mouseover_output_time: snapped direct x_val to nearest sweep {x_val}")
+
+        dfsweep = dfsource[dfsource["sweep"] == x_val]
+        snippet_x = dfsweep["time"] - offset
+        snippet_y = dfsweep[rec_filter]
+        print(f"DEBUG _mouseover_output_time: dfsweep len={len(dfsweep)}, snippet len={len(snippet_x) if snippet_x is not None else 0}, rec_filter={rec_filter}")
+
+        if getattr(uistate, "mouseover_out_blob", None) is not None:
+            try:
+                uistate.mouseover_out_blob.remove()
+            except ValueError:
+                pass
+            uistate.mouseover_out_blob = None
+
+        print("DEBUG _mouseover_output_time: about to draw ghost on axe (canvasEvent)")
+        self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
+        uistate.axe.figure.canvas.draw_idle()
+        uistate.last_out_x_idx = out_x_idx
+        ax.figure.canvas.draw_idle()
+        print("DEBUG _mouseover_output_time: ghost draw_idle done on axe and ax")
+
+    def _mouseover_output_stim(self, event):
         str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
         ax = getattr(uistate, str_ax) if str_ax else None
         if event.inaxes not in (uistate.ax1, uistate.ax2) or str_ax is None:
@@ -1120,112 +1337,20 @@ class InteractivePlotMixin:
             self.exorcise()
             return
 
-        dict_out = {
-            key: value
-            for key, value in uistate.dict_rec_show.items()
-            if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope"]) and hasattr(value.get("line"), "get_xdata")
-        }
-        use_group_xy = False
-        rec_ID_for_snippet = None
-        if not dict_out:
-            # Fallback for group-only view: use a shown group mean line for (x,y) sweep lookup;
-            # pick first rec in that group to source the actual voltage snippet (ghost).
-            g_out = {
+        if n_recs == 1:
+            prow = self.get_prow()
+            rec_id = prow["ID"] if prow is not None else None
+            dict_out = {
                 key: value
-                for key, value in getattr(uistate, "dict_group_show", {}).items()
-                if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope"]) and hasattr(value.get("line"), "get_xdata")
+                for key, value in uistate.dict_rec_show.items()
+                if rec_id is not None and value.get("rec_ID") == rec_id and value.get("axis") == str_ax and not str(value.get("aspect", "")).endswith("_mean") and hasattr(value.get("line"), "get_xdata")
             }
-            if not g_out:
-                if uistate.ghost_sweep is not None:
-                    self.exorcise()
-                return
-            dict_pop = list(g_out.values())[0]
-            use_group_xy = True
-            gid = dict_pop.get("group_ID")
-            recs = []
-            if gid is not None and hasattr(self, "dd_groups") and self.dd_groups:
-                recs = self.dd_groups.get(gid, {}).get("rec_IDs", []) or []
-            if not recs:
-                return
-            rec_ID_for_snippet = recs[0]
         else:
-            dict_pop = list(dict_out.values())[0]
-            rec_ID_for_snippet = dict_pop.get("rec_ID")
-
-        x_data = dict_pop["line"].get_xdata()
-        y_data = dict_pop["line"].get_ydata()
-
-        import numpy as np
-        import pandas as pd
-
-        out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
-        x_val = x_data[out_x_idx]
-        out_x_val = x_val
-        out_y_val = y_data[out_x_idx]
-
-        if out_x_idx == getattr(uistate, "last_out_x_idx", None):
-            return
-
-        rec_ID = rec_ID_for_snippet
-        df_p = self.get_df_project()
-        p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
-        df_t = self.get_dft(p_row)
-        rec_filter = p_row["filter"]
-
-        stim = dict_pop.get("stim")
-        if stim is None:
-            stim = 1
-
-        t_row = df_t[df_t["stim"] == stim].iloc[0]
-        offset = t_row["t_stim"]
-
-        if pd.notna(p_row["bin_size"]):
-            dfsource = self.get_dfbin(p_row)
-            ghost_label_text = f"bin {int(x_val)}"
-        else:
-            dfsource = self.get_dffilter(p_row)
-            ghost_label_text = f"sweep {int(x_val)}"
-
-        dfsweep = dfsource[dfsource["sweep"] == x_val]
-        snippet_x = dfsweep["time"] - offset
-        snippet_y = dfsweep[rec_filter]
-
-        if getattr(uistate, "mouseover_out_blob", None) is not None:
-            try:
-                uistate.mouseover_out_blob.remove()
-            except ValueError:
-                pass
-            uistate.mouseover_out_blob = None
-
-        self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
-        uistate.axe.figure.canvas.draw_idle()
-        uistate.last_out_x_idx = out_x_idx
-        ax.figure.canvas.draw_idle()
-
-    def _mouseover_output_stim(self, event):
-        str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
-        ax = getattr(uistate, str_ax) if str_ax else None
-        if event.inaxes not in (uistate.ax1, uistate.ax2) or str_ax is None:
-            if uistate.ghost_sweep is not None:
-                self.exorcise()
-            return
-        if event.inaxes != ax:
-            x, y = ax.transData.inverted().transform((event.x, event.y))
-        else:
-            x, y = event.xdata, event.ydata
-        if x is None or y is None or not (uistate.slopeView() or uistate.ampView()):
-            if uistate.ghost_sweep is not None:
-                self.exorcise()
-            return
-        if len(uistate.list_idx_select_recs or []) > 1:
-            self.exorcise()
-            return
-
-        dict_out = {
-            key: value
-            for key, value in uistate.dict_rec_show.items()
-            if value["axis"] == str_ax and (value["aspect"] in ["EPSP_amp", "EPSP_slope"]) and hasattr(value["line"], "get_xdata")
-        }
+            dict_out = {
+                key: value
+                for key, value in uistate.dict_rec_show.items()
+                if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
+            }
         if not dict_out:
             return
 
@@ -1243,7 +1368,11 @@ class InteractivePlotMixin:
 
         rec_ID = dict_pop["rec_ID"]
         df_p = self.get_df_project()
-        p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
+        p_row_df = df_p[df_p["ID"] == rec_ID]
+        if p_row_df.empty:
+            print(f"DEBUG: no matching p_row for rec_ID={rec_ID}")
+            return
+        p_row = p_row_df.iloc[0]
         df_t = self.get_dft(p_row)
         rec_filter = p_row["filter"]
         settings = uistate.settings
@@ -1290,15 +1419,25 @@ class InteractivePlotMixin:
             if uistate.ghost_sweep is not None:
                 self.exorcise()
             return
-        if len(uistate.list_idx_select_recs or []) > 1:
+        n_recs = len(uistate.list_idx_select_recs or [])
+        if n_recs > 1:
             self.exorcise()
             return
 
-        dict_out = {
-            key: value
-            for key, value in uistate.dict_rec_show.items()
-            if value["axis"] == str_ax and (value["aspect"] in ["EPSP_amp", "EPSP_slope"]) and hasattr(value["line"], "get_xdata")
-        }
+        if n_recs == 1:
+            prow = self.get_prow()
+            rec_id = prow["ID"] if prow is not None else None
+            dict_out = {
+                key: value
+                for key, value in uistate.dict_rec_show.items()
+                if rec_id is not None and value.get("rec_ID") == rec_id and value.get("axis") == str_ax and not str(value.get("aspect", "")).endswith("_mean") and hasattr(value.get("line"), "get_xdata")
+            }
+        else:
+            dict_out = {
+                key: value
+                for key, value in uistate.dict_rec_show.items()
+                if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
+            }
         if not dict_out:
             return
 
@@ -1325,7 +1464,11 @@ class InteractivePlotMixin:
 
         rec_ID = dict_pop["rec_ID"]
         df_p = self.get_df_project()
-        p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
+        p_row_df = df_p[df_p["ID"] == rec_ID]
+        if p_row_df.empty:
+            print(f"DEBUG: no matching p_row for rec_ID={rec_ID}")
+            return
+        p_row = p_row_df.iloc[0]
 
         dfoutput = self.get_dfdiff(row=p_row) if uistate.checkBox.get("paired_stims", False) else self.get_dfoutput(row=p_row)
         out_sweeps = dfoutput[dfoutput["sweep"].notna()]
@@ -1385,22 +1528,36 @@ class InteractivePlotMixin:
             if uistate.ghost_sweep is not None:
                 self.exorcise()
             return
-        if len(uistate.list_idx_select_recs or []) > 1:
+        n_recs = len(uistate.list_idx_select_recs or [])
+        if n_recs > 1:
             self.exorcise()
             return
 
-        dict_out = {
-            key: value
-            for key, value in uistate.dict_rec_show.items()
-            if value["axis"] == str_ax and value.get("x_mode") == "io" and hasattr(value["line"], "get_offsets")
-        }
+        if n_recs == 1:
+            prow = self.get_prow()
+            rec_id = prow["ID"] if prow is not None else None
+            dict_out = {
+                key: value
+                for key, value in uistate.dict_rec_show.items()
+                if rec_id is not None and value.get("rec_ID") == rec_id and value["axis"] == str_ax and value.get("x_mode") == "io" and hasattr(value["line"], "get_offsets")
+            }
+        else:
+            dict_out = {
+                key: value
+                for key, value in uistate.dict_rec_show.items()
+                if value["axis"] == str_ax and value.get("x_mode") == "io" and hasattr(value["line"], "get_offsets")
+            }
         if not dict_out:
             return
 
         dict_pop = list(dict_out.values())[0]
         rec_ID = dict_pop["rec_ID"]
         df_p = self.get_df_project()
-        p_row = df_p[df_p["ID"] == rec_ID].iloc[0]
+        p_row_df = df_p[df_p["ID"] == rec_ID]
+        if p_row_df.empty:
+            print(f"DEBUG: no matching p_row for rec_ID={rec_ID}")
+            return
+        p_row = p_row_df.iloc[0]
 
         dfoutput = self.get_dfdiff(row=p_row) if uistate.checkBox["paired_stims"] else self.get_dfoutput(row=p_row)
         dfoutput = self.V2mV(dfoutput)
