@@ -198,7 +198,7 @@ class GroupMixin:
         if hasattr(self, "clear_formal_test_results"):
             self.clear_formal_test_results()
         self.graphRefresh()
-        # graphRefresh wrapper applies the test (recomputes + show_test_markers) after draw
+        # graphRefresh (default) re-evaluates test via update_test() (recomputes + show_test_markers) after draw
 
     def testset_remove_last(self):
         if self.dd_testsets:
@@ -219,7 +219,7 @@ class GroupMixin:
         if hasattr(self, "clear_formal_test_results"):
             self.clear_formal_test_results()
         self.graphRefresh()
-        # graphRefresh wrapper applies the test (recomputes + show_test_markers) after draw
+        # graphRefresh (default) re-evaluates test via update_test() (recomputes + show_test_markers) after draw
 
     def testset_rename(self, set_ID, new_set_name):
         if new_set_name in [s["set_name"] for s in self.dd_testsets.values()]:
@@ -229,7 +229,7 @@ class GroupMixin:
             self.testset_save_dd()
             self.testsetControlsRefresh()
             self.graphRefresh()
-            # graphRefresh wrapper applies (refreshes table with updated name)
+            # graphRefresh (default) re-evaluates test via update_test() (refreshes table with updated name)
         else:
             print(f"Test set name {new_set_name} is not a valid name.")
 

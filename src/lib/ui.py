@@ -950,7 +950,7 @@ class UIsub(
             uistate.list_idx_select_stims = []
             self.update_show()
             self.zoomAuto()
-            self.graphRefresh()
+            self.graphRefresh(reeval_formal_test=False)
             return
 
         prow = self.get_prow()
@@ -1031,7 +1031,7 @@ class UIsub(
 
         self.update_filter_settings(df_p)
         self.connectUIstate()
-        self.graphUpdate()
+        self.graphUpdate(reeval_formal_test=False)
 
         # update_show now runs with a correct, clamped uistate.list_idx_select_stims
         self.update_show()
@@ -1390,7 +1390,7 @@ class UIsub(
     #    WIP section: TODO: move to appropriate header               #
     ##################################################################
 
-    def graphRefresh(self):
+    def graphRefresh(self, reeval_formal_test: bool = True):
         self.usage("graphRefresh")
         dd_groups = self.group_get_dd()
         dd_testset = self.testset_get_dd()
@@ -1409,8 +1409,9 @@ class UIsub(
         if not any_test_shown:
             # uiplot.graphRefresh will always need dd_groups; no testsets → pass only that
             uiplot.graphRefresh(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples)
-            # Re-evaluate any active formal test + statusbar (single entry point)
-            self.update_test()
+            if reeval_formal_test:
+                # Re-evaluate any active formal test + statusbar (single entry point)
+                self.update_test()
             return
 
         # Any test is shown → we will pass dd_testset as second argument.
@@ -1422,8 +1423,9 @@ class UIsub(
             has_shown_sample = any(g.get("sample") is not None for g in dd_groups.values() if g.get("show") in (True, "True", "true", 1, "1"))
             if not has_shown_sample:
                 uiplot.graphRefresh(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples)
-                # Re-evaluate any active formal test + statusbar (single entry point)
-                self.update_test()
+                if reeval_formal_test:
+                    # Re-evaluate any active formal test + statusbar (single entry point)
+                    self.update_test()
                 return
 
             # Build dd_shown_samples = {group_ID: inner_dict_from_get_ddgroup_sample}
@@ -1443,9 +1445,10 @@ class UIsub(
         else:
             uiplot.graphRefresh(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples)
 
-        # Re-evaluate any active formal test + statusbar after draw (single entry point)
-        # This does not affect the independent Heatmap (H) path.
-        self.update_test()
+        if reeval_formal_test:
+            # Re-evaluate any active formal test + statusbar after draw (single entry point)
+            # This does not affect the independent Heatmap (H) path.
+            self.update_test()
 
     def deleteFolder(self, dir_path):
         if os.path.exists(dir_path):
@@ -3144,7 +3147,7 @@ class UIsub(
             self.triggerRefresh()
             self.zoomAuto()
             self.graphRefresh()
-            # graphRefresh now ends with update_test() for test+statusbar
+            # graphRefresh (default) ends with update_test() for test+statusbar
         elif old_type == "io":
             # Re-show via viewTools/menu (no _should_show_stat_test_frame dependency for test frame).
             self.update_show()
@@ -4050,7 +4053,7 @@ class UIsub(
         self.clear_formal_test_results()
         self.update_anova_label()  # update ANOVA label if visible
         self.graphRefresh()
-        # graphRefresh now ends with update_test() which re-evaluates the test and statusbar
+        # graphRefresh (default) ends with update_test() which re-evaluates the test and statusbar
 
     def triggerTestSetRename(self, set_ID):
         self.usage("triggerTestSetRename")
@@ -5631,7 +5634,7 @@ class UIsub(
                 x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
                 uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data), x_pos=x_pos)
 
-    def graphUpdate(self, df=None, row=None):
+    def graphUpdate(self, df=None, row=None, reeval_formal_test: bool = True):
         def processRow(row):
             dfmean = self.get_dfmean(row=row)
             dft = self.get_dft(row=row)
@@ -5657,7 +5660,7 @@ class UIsub(
         self.update_show()
         self.zoomAuto()
         print("graphUpdate calls self.graphRefresh()")
-        self.graphRefresh()
+        self.graphRefresh(reeval_formal_test=reeval_formal_test)
 
     def slotAddDfData(self, df):
         self.addData(df)

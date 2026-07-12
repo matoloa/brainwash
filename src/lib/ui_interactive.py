@@ -570,23 +570,23 @@ class InteractivePlotMixin:
 
         if len(uistate.list_idx_select_recs) != 1:
             print("(multi-rec-selection) mouseoverUpdate calls self.graphRefresh()")
-            self.graphRefresh()
+            self.graphRefresh(reeval_formal_test=False)
             return
         if len(uistate.list_idx_select_stims) != 1:
             print("(multi-stim-selection) mouseoverUpdate calls self.graphRefresh()")
-            self.graphRefresh()
+            self.graphRefresh(reeval_formal_test=False)
             return
         # print(f"mouseoverUpdate: {uistate.list_idx_select_recs[0]}, {type(uistate.list_idx_select_recs[0])}")
         prow = self.get_prow()
         if prow is None:
             logger.debug("mouseoverUpdate: prow is None, calling graphRefresh and returning")
-            self.graphRefresh()
+            self.graphRefresh(reeval_formal_test=False)
             return
         rec_ID = prow["ID"]
         trow = self.get_trow()
         if trow is None:
             logger.debug("mouseoverUpdate: trow is None, calling graphRefresh and returning")
-            self.graphRefresh()
+            self.graphRefresh(reeval_formal_test=False)
             return
         stim_num = trow["stim"]
         uistate.setMargins(axe=uistate.axe)
@@ -621,7 +621,7 @@ class InteractivePlotMixin:
         self.mouseoverOutput = self.canvasOutput.mpl_connect("motion_notify_event", self.outputMouseover)
         self.mouseLeaveOutput = self.canvasOutput.mpl_connect("axes_leave_event", self.on_leave_output)
         # print("mouseoverUpdate calls self.graphRefresh()")
-        self.graphRefresh()
+        self.graphRefresh(reeval_formal_test=False)
 
     def _update_marker_data(self):
         self.usage("_update_marker_data")
