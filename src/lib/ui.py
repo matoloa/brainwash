@@ -1409,8 +1409,8 @@ class UIsub(
         if not any_test_shown:
             # uiplot.graphRefresh will always need dd_groups; no testsets → pass only that
             uiplot.graphRefresh(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples)
-            # v0.16: always run apply (safety net) even on early return paths
-            self.apply_statistical_test_if_active()
+            # Re-evaluate any active formal test + statusbar (single entry point)
+            self.update_test()
             return
 
         # Any test is shown → we will pass dd_testset as second argument.
@@ -1422,8 +1422,8 @@ class UIsub(
             has_shown_sample = any(g.get("sample") is not None for g in dd_groups.values() if g.get("show") in (True, "True", "true", 1, "1"))
             if not has_shown_sample:
                 uiplot.graphRefresh(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples)
-                # v0.16: always run apply (safety net) even on early return paths
-                self.apply_statistical_test_if_active()
+                # Re-evaluate any active formal test + statusbar (single entry point)
+                self.update_test()
                 return
 
             # Build dd_shown_samples = {group_ID: inner_dict_from_get_ddgroup_sample}
@@ -1443,9 +1443,9 @@ class UIsub(
         else:
             uiplot.graphRefresh(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples)
 
-        # v0.16: opportunistic re-apply of active formal test (safety net for data/group changes)
+        # Re-evaluate any active formal test + statusbar after draw (single entry point)
         # This does not affect the independent Heatmap (H) path.
-        self.apply_statistical_test_if_active()
+        self.update_test()
 
     def deleteFolder(self, dir_path):
         if os.path.exists(dir_path):
@@ -1715,7 +1715,7 @@ class UIsub(
         """Single source of truth for statusbar per AGENTS.md and plan.md.
         Dispatches based on experiment_type/effective operation. IO prefers formal_test_results config.
         Pure query (state set only by caller update_test / set_statusbar). Handles all combinations.
-        For non-IO warnings, sets state="warning" when text returned.
+        Non-IO: warnings from checks, or compact success report from formal_test_results when applicable.
         """
         eff = self._effective_test_type()
         if eff == "None":
@@ -1728,9 +1728,16 @@ class UIsub(
         text = self._get_stat_test_warning()
         if text is not None:
             uistate.statusbar_state = "warning"
-        else:
-            uistate.statusbar_state = None
-        return text
+            return text
+        # Success path for explicit tests (t-test, ANOVA, etc.): format compact report from results.
+        # (Full details are in the console via _print_statistical_test_table + plot markers.)
+        formal = getattr(uistate, "formal_test_results", None)
+        if formal:
+            text = self._format_non_io_stat_test_statusbar(formal)
+            if text:
+                return text
+        uistate.statusbar_state = None
+        return None
 
     def _format_io_regression_statusbar(self, formal):
         """Single source of truth for IO regression statusbar (called from _get_statusbar_for_current_state).
@@ -1792,10 +1799,126 @@ class UIsub(
             uistate.statusbar_state = None
             return "IO regression: select ≥2 groups to compute slope comparison"
 
+    def _format_non_io_stat_test_statusbar(self, formal):
+        """Compact success statusbar text for non-IO formal tests (t-test, ANOVA, Wilcoxon, Friedman, Cluster perm.).
+        Called from _get_statusbar_for_current_state only after _get_stat_test_warning() returned None.
+        Structure: test (settings) n : results   (group names + n reported immediately after variant, per proposal).
+        Uses group names (from dd_groups) + effective n from results (post n_unit aggregation) instead of raw n1/n2.
+        Mirrors the n_report style and "n first" placement used by _format_io_regression_statusbar.
+        Keeps text short; full details (stats, q, notes, exact per-set) stay in the console + markers.
+        """
+        if not formal:
+            uistate.statusbar_state = None
+            return None
+        results = formal if isinstance(formal, list) else [formal]
+        if not any(isinstance(r, dict) for r in results):
+            uistate.statusbar_state = None
+            return None
+
+        eff = self._effective_test_type()
+        # variant for t-test / Wilcoxon (others ignore)
+        if eff == "Wilcoxon":
+            variant = getattr(uistate, "test_wilcox_variant", "paired")
+        elif eff == "t-test":
+            variant = getattr(uistate, "test_t_variant", "unpaired")
+        else:
+            variant = None
+
+        test_label = f"{eff} ({variant})" if variant else eff
+
+        # --- n_report with group names (placed right after settings) ---
+        n_report = ""
+        primary = results[0] if results else {}
+        try:
+            if isinstance(primary, dict):
+                n_unit = getattr(uistate, "buttonGroup_test_n", "subject")
+                unit_label = "subjects" if n_unit == "subject" else f"{n_unit}s"
+                ddg = getattr(self, "dd_groups", {}) or {}
+
+                # Prefer explicit group_ns when present (some implicit/IO-derived paths carry it)
+                group_ns = primary.get("group_ns") or (primary.get("config") or {}).get("group_ns", {})
+                if group_ns:
+                    ns = []
+                    for g, n in group_ns.items():
+                        g_name = ddg.get(g, {}).get("group_name", f"Group {g}")
+                        ns.append(f"{g_name}={n}")
+                    if ns:
+                        n_report = f"({', '.join(ns)} {unit_label})"
+                else:
+                    g1 = primary.get("group1")
+                    g2 = primary.get("group2")
+                    n1 = int(primary.get("n1", 0) or 0)
+                    n2 = int(primary.get("n2", 0) or 0)
+
+                    # Normalize singleton lists used by some cluster / multi paths
+                    if isinstance(g1, (list, tuple)) and len(g1) == 1:
+                        g1 = g1[0]
+                    if isinstance(g2, (list, tuple)) and len(g2) == 1:
+                        g2 = g2[0]
+
+                    def _gname(g):
+                        if g is None:
+                            return None
+                        if isinstance(g, (list, tuple)):
+                            return None
+                        return ddg.get(g, {}).get("group_name", f"Group {g}")
+
+                    if g1 is not None and g2 is not None and g1 != g2 and not isinstance(g1, (list, tuple)):
+                        # Two distinct groups (typical unpaired t-test)
+                        p1 = f"{_gname(g1)}={n1}" if n1 else str(_gname(g1))
+                        p2 = f"{_gname(g2)}={n2}" if n2 else str(_gname(g2))
+                        n_report = f"({p1}, {p2} {unit_label})"
+                    elif g1 is not None:
+                        if isinstance(g1, (list, tuple)):
+                            # Multi-group (ANOVA, Friedman, RM-ANOVA, cluster between)
+                            parts = []
+                            val = n1 or n2
+                            for gg in g1:
+                                nm = _gname(gg)
+                                parts.append(f"{nm}={val}" if val else str(nm))
+                            if parts:
+                                n_report = f"({', '.join(parts)} {unit_label})"
+                        else:
+                            # One group (paired, one-sample, within-subjects)
+                            nm = _gname(g1)
+                            val = n1 or n2
+                            n_report = f"({nm}={val} {unit_label})" if val else f"({nm})"
+        except Exception:
+            n_report = ""
+
+        if n_report:
+            test_label = f"{test_label} {n_report}"
+
+        # Cluster perm. (and any multi-result case) reports per set; others use first result only (matches print)
+        is_multi = (eff == "Cluster perm.") or len(results) > 1
+        reports = []
+        for idx, r in enumerate(results):
+            if not isinstance(r, dict):
+                continue
+            set_prefix = ""
+            if is_multi:
+                sname = r.get("set_name") or r.get("set_id") or f"set{idx+1}"
+                set_prefix = f"{sname}: "
+            for key in sorted(k for k in r.keys() if k.startswith("p_")):
+                pval = r.get(key)
+                aspect = key[2:].replace("_norm", " (norm)")  # e.g. amp, slope, amp (norm)
+                if isinstance(pval, (int, float)) and np.isfinite(pval):
+                    pstr = f"{pval:.3g}" if pval >= 0.001 else "<0.001"
+                else:
+                    pstr = "NA"
+                reports.append(f"{set_prefix}{aspect}: p={pstr}")
+
+        if not reports:
+            uistate.statusbar_state = "info"
+            return f"{test_label}: done (see console)"
+        text = f"{test_label}: {'  '.join(reports)}"
+        uistate.statusbar_state = "info"
+        return text
+
     def _apply_io_regression(self) -> bool:
         """Helper for IO path in apply_statistical_test_if_active (called from dispatcher).
-        Runs compute_statistical_comparison (experiment_type=io), populates formal_test_results.
-        Sets state and calls update_test() (which ends with set_statusbar).
+        Runs compute_statistical_comparison (experiment_type=io), populates formal_test_results and markers.
+        Does not touch statusbar; caller (update_test) handles final _get_statusbar_for_current_state + set.
         """
         shown_groups = self._get_shown_group_ids()
         shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
@@ -1831,14 +1954,10 @@ class UIsub(
                     results[0]["config"] = results[0].copy()
             uistate.formal_test_results = results
             uiplot.show_test_markers(results)
-            uistate.statusbar_state = "info"
-            self.update_test()
             return True
         except Exception as ex:
             print(f"IO regression compute error: {ex}")
             self.clear_formal_test_results()
-            uistate.statusbar_state = None
-            self.update_test()
             return False
 
     def _check_ttest_applicability(self, variant: str) -> str | None:
@@ -1970,6 +2089,7 @@ class UIsub(
             self._updating_test = False
 
         # After computation (or if no test active), ensure statusbar is set
+        # (pure query; no "does it agree?" test — we always re-apply on change)
         text = self._get_statusbar_for_current_state()
         state = getattr(uistate, "statusbar_state", None)
         self.set_statusbar(state, text)
@@ -1995,11 +2115,10 @@ class UIsub(
         self.set_statusbar(None, None)
 
     def apply_statistical_test_if_active(self):
-        """Core dispatcher: if io_regression call _apply_io_regression, None clears, else non-IO.
-        Single call site from event handlers (no redundant explicit _apply_io_regression).
+        """Core dispatcher (internal): if io_regression call _apply_io_regression, None clears, else non-IO.
+        Performs the actual test work or clear + markers + console print.
+        Does NOT set statusbar or call back to update_test; the caller of apply (normally update_test) is responsible for the final statusbar via _get_statusbar_for_current_state.
         """
-        if getattr(self, "_updating_test", False):
-            return  # prevent recursion from update_test <-> apply_statistical_test_if_active
         try:
             eff = self._effective_test_type()
             if self._is_io_mode():  # IO first-class (ANCOVA is normal test_type radio)
@@ -2007,8 +2126,6 @@ class UIsub(
                 return
             if eff == "None":
                 self.clear_formal_test_results()
-                uistate.statusbar_state = None
-                self.update_test()
                 return
             self._apply_non_io_test(eff)
         except Exception as ex:
@@ -2020,12 +2137,11 @@ class UIsub(
                 self.clear_formal_test_results()
             except Exception:
                 pass
-            self.update_test()
 
     def _apply_non_io_test(self, eff: str) -> None:
         """Isolated non-IO guard + compute logic (extracted from former monster in apply_statistical_test_if_active).
-        Handles applicability checks (via shown_groups/testsets, min_groups, variant_for_check), calls stats.compute_statistical_comparison,
-        populates results/markers/table, sets statusbar_state, and refreshes. Pure side-effect management per plan safeguards.
+        Handles applicability checks, calls stats.compute..., populates formal_test_results + markers + console table.
+        Does not touch statusbar_state or call update_test; caller (update_test) always does the final query + set.
         Called only for eff in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm.").
         """
         test_type = eff  # backward compat for legacy non-IO path only
@@ -2034,8 +2150,6 @@ class UIsub(
                 f"Statistical test '{eff}' is not yet implemented for v0.16 (t-test, ANOVA, Wilcoxon, Friedman, Cluster perm.)."
             )
             self.clear_formal_test_results()
-            uistate.statusbar_state = "warning"
-            self.update_test()
             return
 
         # --- Early applicability checks (abort cleanly if tests cannot run) ---
@@ -2045,8 +2159,6 @@ class UIsub(
             if had_results:
                 print("Statistical test: no groups defined.")
             self.clear_formal_test_results()
-            uistate.statusbar_state = "warning"
-            self.update_test()
             return
 
         shown_groups = self._get_shown_group_ids()
@@ -2079,8 +2191,6 @@ class UIsub(
                 else:
                     print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
             self.clear_formal_test_results()
-            uistate.statusbar_state = "warning"
-            self.update_test()
             return
 
         # Paired t-test additionally requires exactly 2 test sets (the pairing model uses 2 test sets within 1 group)
@@ -2089,23 +2199,18 @@ class UIsub(
                 if had_results:
                     print("Statistical test: paired requires exactly 2 shown test sets (with 1 group).")
                 self.clear_formal_test_results()
-                uistate.statusbar_state = "warning"
-                self.update_test()
                 return
             n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
             if n1 < 2:
                 if had_results:
                     print("Statistical test: paired requires N ≥ 2 recordings.")
                 self.clear_formal_test_results()
-                self.update_test()
                 return
 
         if not shown_ts and test_type not in ("Friedman", "Cluster perm."):
             if had_results or test_type == "Friedman":
                 print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
             self.clear_formal_test_results()
-            uistate.statusbar_state = "warning"
-            self.update_test()
             return
 
         if test_type == "Wilcoxon":
@@ -2158,8 +2263,6 @@ class UIsub(
 
         if not results and not (comp.get("config") and comp.get("config").get("implicit_testset")):
             self.clear_formal_test_results()
-            uistate.statusbar_state = None
-            self.update_test()
             return
         if comp.get("config") and comp.get("config").get("implicit_testset") and (not results or not isinstance(results, list) or len(results) == 0):
             results = [{"config": comp["config"]}]
@@ -2172,9 +2275,6 @@ class UIsub(
         lev = bool(getattr(uistate, "test_levene", False))
         effective_variant = "unpaired" if test_type == "Cluster perm." else variant
         self.usage(f"stat_test applied: {test_type} {effective_variant} {tails} on {set_names} (fdr={fdr}, sw={sw}, levene={lev}, n_unit={n_unit})")
-        if results and not getattr(uistate, "statusbar_state", None):
-            uistate.statusbar_state = "info"
-        self.update_test()
 
     def _print_statistical_test_table(self, results, variant, tails, fdr, norm, test_type=None):
         if not results:
@@ -2990,7 +3090,7 @@ class UIsub(
             if hasattr(self, "frameToolTestOptions"):
                 getattr(self, "frameToolTestOptions").setVisible(True)  # n_unit relevant for regression granularity
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
-        # Clear stale results/state; single apply call below drives statusbar via _get_statusbar_for_current_state
+        # Clear stale results; update_test is the single entry point (re-eval + statusbar via _get...).
         uistate.formal_test_results = None
         # Do not unconditionally reset statusbar_state here; let _get_statusbar_for_current_state
         # (called from update_test) set "warning" for invalid t-test state (e.g. no test sets).
@@ -3001,7 +3101,7 @@ class UIsub(
             self.triggerRefresh()
             self.zoomAuto()
             self.graphRefresh()
-            self.apply_statistical_test_if_active()
+            # graphRefresh now ends with update_test() for test+statusbar
         elif old_type == "io":
             # Re-show via viewTools/menu (no _should_show_stat_test_frame dependency for test frame).
             self.update_show()
@@ -3037,7 +3137,7 @@ class UIsub(
                 val = getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)
                 self.lineEdit_wilcoxon_one_sample_value.setText(str(val))
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        # Clear stale results/state on test change; apply_statistical_test_if_active drives statusbar
+        # Clear stale results; update_test is the single entry point for re-evaluation + statusbar.
         uistate.formal_test_results = None
         # Do not unconditionally reset statusbar_state here; let _get_statusbar_for_current_state
         # (called from update_test) set "warning" for invalid t-test state (e.g. no test sets).
@@ -3050,7 +3150,7 @@ class UIsub(
         print(f"Selected t-test variant: {variant}")
         uistate.test_t_variant = variant
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.apply_statistical_test_if_active()
+        self.update_test()
 
     def test_t_tails_changed(self, button):
         """Wiring for buttonGroup_test_t_tails (v0.16)."""
@@ -3058,7 +3158,7 @@ class UIsub(
         print(f"Selected t-test tails: {tails}")
         uistate.test_t_tails = tails
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.apply_statistical_test_if_active()
+        self.update_test()
 
     def editTestTOneSampleValue(self, lineEdit):
         """Handler for lineEdit_test_t_one_sample_value (v0.16 one-sample t-test)."""
@@ -3071,7 +3171,7 @@ class UIsub(
         uistate.label_test_t_one_sample_value = val
         print(f"editTestTOneSampleValue: uistate.label_test_t_one_sample_value set to {val}")
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.apply_statistical_test_if_active()
+        self.update_test()
 
     def test_wilcox_variant_changed(self, button):
         """Wiring for buttonGroup_test_wilcox_variant."""
@@ -3079,7 +3179,7 @@ class UIsub(
         print(f"Selected Wilcoxon variant: {variant}")
         uistate.test_wilcox_variant = variant
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.apply_statistical_test_if_active()
+        self.update_test()
 
     def test_wilcox_tails_changed(self, button):
         """Wiring for buttonGroup_test_wilcox_tails."""
@@ -3087,7 +3187,7 @@ class UIsub(
         print(f"Selected Wilcoxon tails: {tails}")
         uistate.test_wilcox_tails = tails
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.apply_statistical_test_if_active()
+        self.update_test()
 
     def editTestWilcoxOneSampleValue(self, lineEdit):
         """Handler for lineEdit_test_wilcox_one_sample_value."""
@@ -3100,7 +3200,7 @@ class UIsub(
         uistate.label_test_wilcox_one_sample_value = val
         print(f"editTestWilcoxOneSampleValue: uistate.label_test_wilcox_one_sample_value set to {val}")
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.apply_statistical_test_if_active()
+        self.update_test()
 
     def n_unit_changed(self, button):
         """v0.16_n_stats: n_unit radio handler (exact match to test_t_variant_changed pattern per clarification/best practice).
@@ -3112,7 +3212,7 @@ class UIsub(
         print(f"Selected n_unit: {n_unit}")
         uistate.buttonGroup_test_n = n_unit
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.apply_statistical_test_if_active()
+        self.update_test()
 
     def update_experiment_type_radio_buttons(self):
         """Select experiment type radio buttons for the current selection.
@@ -3152,15 +3252,15 @@ class UIsub(
             elif key == "test_fdr":
                 print(f"FDR checkbox changed to: {state == 2}")
                 uistate.test_fdr = state == 2
-                self.apply_statistical_test_if_active()
+                self.update_test()
             elif key == "test_sw":
                 print(f"SW checkbox changed to: {state == 2}")
                 uistate.test_sw = state == 2
-                self.apply_statistical_test_if_active()
+                self.update_test()
             elif key == "test_levene":
                 print(f"Levene checkbox changed to: {state == 2}")
                 uistate.test_levene = state == 2
-                self.apply_statistical_test_if_active()
+                self.update_test()
             elif key == "label_test_t_one_sample_value":
                 # handled via dedicated editTestTOneSampleValue; this is for completeness if ever routed here
                 pass
@@ -3885,7 +3985,7 @@ class UIsub(
         self.update_stim_buttons()
         self.update_show()
         self.mouseoverUpdate()
-        self.apply_statistical_test_if_active()
+        self.update_test()
 
     def triggerGroupRename(self, group_ID):
         self.usage("triggerGroupRename")
@@ -3907,7 +4007,7 @@ class UIsub(
         self.clear_formal_test_results()
         self.update_anova_label()  # update ANOVA label if visible
         self.graphRefresh()
-        # graphRefresh wrapper applies the test (recomputes + show_test_markers) after draw
+        # graphRefresh now ends with update_test() which re-evaluates the test and statusbar
 
     def triggerTestSetRename(self, set_ID):
         self.usage("triggerTestSetRename")
