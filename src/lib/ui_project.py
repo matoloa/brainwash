@@ -273,7 +273,9 @@ class ProjectMixin:
     # File write helpers
     # ------------------------------------------------------------------
 
-    def df2file(self, df, filename, key=None):
+    def df2file(self, df, filename=None, key=None, rec=None):
+        if filename is None:
+            filename = rec
         print(f"df2file: filename={filename}, key={key}")
         if config.transient:
             return

@@ -270,13 +270,13 @@ class ParseMixin:
 
         if status_callback:
             status_callback("building dataframe...")
-        self.df2file(df_raw, rec, key="data")  # persist raws
+        self.df2file(df=df_raw, filename=rec, key="data")  # persist raws
         dfmean, i_stim = parse.build_dfmean(df_raw)
         if status_callback:
             status_callback("writing to disk...")
-        self.df2file(dfmean, rec, key="mean")  # persist mean
+        self.df2file(df=dfmean, filename=rec, key="mean")  # persist mean
         df = parse.zeroSweeps(df_raw, i_stim=i_stim)
-        self.df2file(df, rec, key="filter")  # persist zeroed
+        self.df2file(df=df, filename=rec, key="filter")  # persist zeroed
         dict_meta = parse.metadata(df)  # extract metadata
         df_proj_new_row = create_row(df_proj_row=df_proj_row, new_name=rec, dict_meta=dict_meta)
         return df_proj_new_row

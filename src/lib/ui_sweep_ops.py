@@ -160,7 +160,7 @@ class SweepOpsMixin:
         print(f"Sweeps excluded, remaining sweeps: {df_data_filtered['sweep'].unique()}")
         pruned_df = self.sweep_shift_gaps(df_data_filtered, sweeps_to_remove)  # renumber remaining sweeps to close gaps
         print(f"Gaps closed, remaining sweeps: {pruned_df['sweep'].unique()}")
-        self.df2file(df=pruned_df, rec=rec_name, key="data")  # overwrite data file with pruned data
+        self.df2file(df=pruned_df, filename=rec_name, key="data")  # overwrite data file with pruned data
         n_remaining_sweeps = len(pruned_df["sweep"].unique())
         df_project = self.get_df_project()
         df_project.loc[df_project["ID"] == rec_ID, "sweeps"] = n_remaining_sweeps  # update sweeps count in df_project
@@ -283,8 +283,8 @@ class SweepOpsMixin:
             self.df_project.loc[self.df_project["ID"] == source_row["ID"], "sweep_duration"] = sweep_duration_A
 
             # --- Write both halves directly (no intermediate full copy) ---
-            self.df2file(df=df_A, rec=rec_A, key="data")
-            self.df2file(df=df_B, rec=rec_B, key="data")
+            self.df2file(df=df_A, filename=rec_A, key="data")
+            self.df2file(df=df_B, filename=rec_B, key="data")
 
             # --- Clear stale cache for both halves ---
             for rec_name in (rec_A, rec_B):
@@ -345,7 +345,7 @@ class SweepOpsMixin:
         df_cropped["time"] = (df_cropped["time"] - offset).round(9)
 
         new_sweep_duration = parse.metadata(df_cropped)["sweep_duration"]
-        self.df2file(df=df_cropped, rec=rec_name, key="data")
+        self.df2file(df=df_cropped, filename=rec_name, key="data")
         self.df_project.loc[self.df_project["ID"] == rec_ID, "sweep_duration"] = new_sweep_duration
         self.save_df_project()
         self._clear_rec_cache(rec_name)
@@ -457,7 +457,7 @@ class SweepOpsMixin:
             df_joined["time"] = (df_joined["time"] - offset).round(9)
 
             new_sweep_duration = parse.metadata(df_joined)["sweep_duration"]
-            self.df2file(df=df_joined, rec=rec_name, key="data")
+            self.df2file(df=df_joined, filename=rec_name, key="data")
             self.df_project.loc[self.df_project["ID"] == rec_ID, "sweep_duration"] = new_sweep_duration
             self.save_df_project()
             self._clear_rec_cache(rec_name)
@@ -669,8 +669,8 @@ class SweepOpsMixin:
             self.df_project.loc[self.df_project["ID"] == source_row["ID"], "sweep_duration"] = sweep_duration_a
 
             # --- Write both halves as source data files ---
-            self.df2file(df=df_a, rec=rec_a, key="data")
-            self.df2file(df=df_b, rec=rec_b, key="data")
+            self.df2file(df=df_a, filename=rec_a, key="data")
+            self.df2file(df=df_b, filename=rec_b, key="data")
 
             # --- Clear stale cache for both halves ---
             self._clear_rec_cache(rec_a)
