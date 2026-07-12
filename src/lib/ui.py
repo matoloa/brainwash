@@ -5464,25 +5464,32 @@ class UIsub(
     def _restore_table_selection(self, df_p: pd.DataFrame, target_idx: int | None = None) -> None:
         """Centralized helper to restore visual + keyboard selection after df_project mutation.
 
-        Called from tableUpdate (and can be called directly after set_df_project).
-        Uses stable logic: prefer explicit target, then uistate, then new last row (good for delete),
-        then first row. Ensures selectRow + scrollTo so arrow keys work reliably.
+        Supports preserving multi-selection (e.g. after group assignment) when no explicit
+        target is given and previous selection is still valid in the new df.
         """
-        if target_idx is None:
-            if uistate.list_idx_select_recs:
-                target_idx = uistate.list_idx_select_recs[0]
-            elif len(df_p) > 0:
-                target_idx = len(df_p) - 1  # default to last row on delete/terminal ops
-            else:
-                target_idx = 0
-
         self.tableProj.clearSelection()  # clean slate after model reset
 
-        if 0 <= target_idx < len(df_p):
-            uistate.list_idx_select_recs = [target_idx]
-            self.tableProj.selectRow(target_idx)
-            self.tableProj.scrollTo(self.tablemodel.index(target_idx, 0))
-            self.tableProj.setFocus()  # ensure keyboard navigation works immediately
+        to_select = []
+        if target_idx is not None:
+            if 0 <= target_idx < len(df_p):
+                to_select = [target_idx]
+        elif uistate.list_idx_select_recs:
+            to_select = [i for i in uistate.list_idx_select_recs if 0 <= i < len(df_p)]
+            if not to_select and len(df_p) > 0:
+                to_select = [len(df_p) - 1]
+        elif len(df_p) > 0:
+            to_select = [len(df_p) - 1]
+
+        if to_select:
+            selection = QtCore.QItemSelection()
+            for idx in to_select:
+                top_left = self.tablemodel.index(idx, 0)
+                bottom_right = self.tablemodel.index(idx, self.tablemodel.columnCount(QtCore.QModelIndex()) - 1)
+                selection.select(top_left, bottom_right)
+            self.tableProj.selectionModel().select(selection, QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows)
+            self.tableProj.scrollTo(self.tablemodel.index(to_select[0], 0))
+            self.tableProj.setFocus()
+            uistate.list_idx_select_recs = to_select
         else:
             uistate.list_idx_select_recs = []
 

@@ -270,7 +270,10 @@ class GroupMixin:
             print("No parsed files selected.")
             # TODO: set selection to clicked group
             return
-        selected_rec_IDs = dfp.loc[uistate.list_idx_select_recs, "ID"].tolist()  # selected rec_IDs
+        # Preserve the full multi-selection of recordings; we will restore it after
+        # the table model update(s) so that assigning a group does not clear the selection.
+        selected_indices = list(uistate.list_idx_select_recs)
+        selected_rec_IDs = dfp.loc[selected_indices, "ID"].tolist()  # selected rec_IDs
         all_in_group = all(rec_ID in self.dd_groups[group_ID]["rec_IDs"] for rec_ID in selected_rec_IDs)
         if all_in_group:  # If all selected_rec_IDs are in the group_ID, ungroup them
             for rec_ID in selected_rec_IDs:
@@ -280,7 +283,20 @@ class GroupMixin:
                 self.group_rec_assign(rec_ID, group_ID)
         self.group_save_dd()
         self.set_df_project(dfp)
-        self.tableUpdate(restore_selection=True)  # centralized selection restore (preserves group assignment UX)
+        self.tableUpdate(restore_selection=False)  # we restore multi-selection manually below
+        # Restore the original multi-selection of recordings (indices are stable since
+        # group assignment does not add/remove rows).
+        uistate.list_idx_select_recs = selected_indices
+        if selected_indices:
+            self.tableProj.clearSelection()
+            selection = QtCore.QItemSelection()
+            for idx in selected_indices:
+                top_left = self.tablemodel.index(idx, 0)
+                bottom_right = self.tablemodel.index(idx, self.tablemodel.columnCount(QtCore.QModelIndex()) - 1)
+                selection.select(top_left, bottom_right)
+            self.tableProj.selectionModel().select(selection, QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows)
+            self.tableProj.scrollTo(self.tablemodel.index(selected_indices[0], 0))
+            self.tableProj.setFocus()
         if hasattr(self, "clear_formal_test_results"):
             self.clear_formal_test_results()
         self.graphRefresh()
