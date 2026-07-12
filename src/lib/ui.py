@@ -58,6 +58,7 @@ import ui_state_classes
 import ui_sweep_ops
 import ui_widgets  # Custom Qt widgets, dialogs, models, threads (extracted Phase 0)
 import ui_table  # TableMixin (Phase 1 start)
+import ui_selection  # SelectionMixin (Phase 1)
 import yaml  # used by talkback
 from ui_project import df_projectTemplate
 
@@ -66,9 +67,8 @@ from . import statistics as stats  # our statistical testing layer (not the buil
 logger = logging.getLogger(__name__)
 logger.debug("ui.py: os.getcwd(): %s", os.getcwd())
 
-# Config and all custom sub-classes (TableModel, FileTree*, MplCanvas,
-# CustomCheckBox, ProgressBarManager, *Thread, *Dialog, TableProjSub,
-# Filetreesub, confirm) moved to ui_widgets.py (Phase 0 of plan).
+# Config and all custom sub-classes moved to ui_widgets.py (Phase 0).
+# table* and selection/visibility logic moved to ui_table.py + ui_selection.py (Phase 1).
 
 config = ui_widgets.Config()
 uistate = ui_state_classes.UIstate()  # global variable for storing state of UI
@@ -86,6 +86,7 @@ uiplot = ui_plot.UIplot(uistate)
 # This must happen after all singletons (config, uistate, uiplot) and all
 # widget classes (now in ui_widgets) are defined, but before any UIsub instance.
 # ui_widgets also receives uistate for threads that reference it directly.
+# ui_table and ui_selection added in Phase 1.
 # ---------------------------------------------------------------------------
 ui_groups.uistate = uistate
 ui_groups.config = config
@@ -131,6 +132,11 @@ ui_table.uistate = uistate
 ui_table.config = config
 ui_table.uiplot = uiplot
 
+# ui_selection
+ui_selection.uistate = uistate
+ui_selection.config = config
+ui_selection.uiplot = uiplot
+
 ####################################################################
 # MAIN UI CLASS
 ####################################################################
@@ -147,6 +153,7 @@ class UIsub(
     export_data.ExportMixin,
     ui_interactive.InteractivePlotMixin,
     ui_table.TableMixin,  # Phase 1
+    ui_selection.SelectionMixin,  # Phase 1
 ):
     def __init__(self, mainwindow):
         logger.debug("UIsub __init__ started")
@@ -289,118 +296,7 @@ class UIsub(
     #                     Selection changers                             #
     ######################################################################
 
-    def tableProjSelectionChanged(self, selected=None, deselected=None):
-        if self.updating_tableProj:
-            return
-        self.usage("tableProjSelectionChanged")
-        if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
-            self.tableProj.clearSelection()
-        selected_indexes = self.tableProj.selectionModel().selectedRows()
-        # build the list uistate.list_idx_select_recs with indices
-        uistate.list_idx_select_recs = [index.row() for index in selected_indexes]
-        # print(f" - rec_select: {uistate.list_idx_select_recs}")
-        self.update_recs2plot()
-        self.update_sample_checkbox()
-
-        if uistate.df_recs2plot is None:
-            print("No parsed recordings selected.")
-            uistate.list_idx_select_stims = []
-            self.update_show()
-            self.zoomAuto()
-            self.graphRefresh(reeval_formal_test=False)
-            return
-
-        prow = self.get_prow()
-
-        # Determine the dft to use for the stim table layout.
-        # Use the recording with the longest sweep when multiple are selected so the
-        # full x-axis is always visible.
-        if len(uistate.list_idx_select_recs) == 1:
-            dft_for_format = self.get_dft(row=prow)
-        else:
-            uistate.df_rec_select_data = None
-            uistate.df_rec_select_time = None
-            longest_sweep_prow = uistate.df_recs2plot.loc[uistate.df_recs2plot["sweep_duration"].idxmax()]
-            uistate.float_sweep_duration_max = longest_sweep_prow["sweep_duration"]
-            dft_for_format = self.get_dft(row=longest_sweep_prow)
-
-        # Refresh the stim table contents first, then clamp/restore the stim selection
-        # so that update_show() and mouseoverUpdate() see a valid stim index.
-        if dft_for_format is not None:
-            num_stims = len(dft_for_format)
-            # Clamp saved stim indices to the row count of the new recording.
-            # This prevents stale out-of-range indices when switching recordings.
-            valid_stim_indices = [i for i in uistate.list_idx_select_stims if i < num_stims]
-            if not valid_stim_indices and num_stims > 0:
-                valid_stim_indices = [0]  # default to first stim
-            uistate.list_idx_select_stims = valid_stim_indices
-
-            self.tableStimModel.setData(dft_for_format)
-            model = self.tableStim.model()
-            selection = QtCore.QItemSelection()
-            for row_idx in uistate.list_idx_select_stims:
-                index_start = model.index(row_idx, 0)
-                index_end = model.index(row_idx, model.columnCount(QtCore.QModelIndex()) - 1)
-                selection.select(index_start, index_end)
-            self.tableStim.selectionModel().select(selection, QtCore.QItemSelectionModel.ClearAndSelect)
-            self.formatTableStimLayout(dft=dft_for_format)
-        else:
-            # No stims detected — clear stim selection so downstream logic is consistent.
-            uistate.list_idx_select_stims = []
-            logger.debug("tableProjSelectionChanged: dft_for_format is None (no stims detected), clearing stim selection")
-
-        # Now that the stim table and uistate.list_idx_select_stims are up-to-date,
-        # populate the single-rec/single-stim convenience references.
-        if len(uistate.list_idx_select_recs) == 1 and len(uistate.list_idx_select_stims) == 1:
-            uistate.df_rec_select_time = self.get_dft(row=prow)
-            uistate.df_rec_select_data = self.get_dffilter(prow)
-            uistate.float_sweep_duration_max = prow["sweep_duration"]
-            logger.debug(
-                "One recording selected: index %s, stim index %s",
-                uistate.list_idx_select_recs[0],
-                uistate.list_idx_select_stims[0],
-            )
-            print(f"One recording selected: index {uistate.list_idx_select_recs[0]}")
-            print(f"One stim selected: index {uistate.list_idx_select_stims[0]}")
-        else:
-            uistate.df_rec_select_data = None
-            uistate.df_rec_select_time = None
-
-        # Populate lineEdit_bin_size from df_project for the selected recording(s).
-        # Single or uniform multi-selection: show "0" (off) or the int value.
-        # Mixed (differing bin_size values): show "" so editBinSize treats it as a no-op.
-        self.connectUIstate(disconnect=True)
-        self.update_experiment_type_radio_buttons()
-        df_p = self.get_df_project()
-        if uistate.list_idx_select_recs:
-            bin_values = {df_p.loc[i, "bin_size"] for i in uistate.list_idx_select_recs}
-            # Treat NaN as a single distinct value for uniformity checks
-            nan_count = sum(1 for v in bin_values if pd.isna(v))
-            non_nan = {v for v in bin_values if pd.notna(v)}
-            uniform = (nan_count == 0 and len(non_nan) == 1) or (nan_count == len(uistate.list_idx_select_recs))
-            if uniform:
-                single = non_nan.pop() if non_nan else float("nan")
-                self.lineEdit_bin_size.setText("0" if pd.isna(single) else str(int(single)))
-            else:
-                self.lineEdit_bin_size.setText("")
-        else:
-            self.lineEdit_bin_size.setText("")
-
-        self.update_filter_settings(df_p)
-        self.connectUIstate()
-        self.graphUpdate(reeval_formal_test=False)
-
-        # update_show now runs with a correct, clamped uistate.list_idx_select_stims
-        self.update_show()
-        self.zoomAuto()
-        self.update_amp_lineEdits()
-        self.update_slope_lineEdits()
-        self.refreshHierarchyLineEdits(df_p)  # v0.16_n Phase 1: selection → line-edits (after disconnect block)
-
-        t0 = time.time()
-        self.mouseoverUpdate()  # always ends with a single graphRefresh()
-        print(f" - mouseoverUpdate: {round((time.time() - t0) * 1000)} ms")
-
+    # tableProjSelectionChanged moved to TableMixin (ui_table.py)
     def update_filter_settings(self, df_p=None):
         """Helper for filter-settings population. Handles uniform/mixed selection
         logic for radio buttons (filter mode) and savgol lineEdits exactly as before.
@@ -515,234 +411,7 @@ class UIsub(
         self.update_stim_buttons()
         self.mouseoverUpdate()
 
-    def _is_rec_visible(self, v: dict, selected_ids: set, selected_stims: set, valid_pp_ids: set | None = None) -> bool:
-        """Predicate: should this rec-label entry be visible given current UI state."""
-        if v.get("is_zero_width"):
-            return False
-        if v["rec_ID"] not in selected_ids:
-            return False
-        if v["stim"] is not None and v["stim"] not in selected_stims:
-            return False
-
-        # Phase 0 PP mode display guard
-        axis = v.get("axis")
-        is_pp = getattr(uistate, "experiment_type", "time") == "PP"
-        if is_pp and axis in ("ax1", "ax2"):
-            if valid_pp_ids is not None and v["rec_ID"] not in valid_pp_ids:
-                return False
-        # x_mode filtering: lines tagged with a specific x_mode are only visible
-        # when that mode is active.  Lines with x_mode=None (mean, event, axe
-        # markers) are always eligible.
-        # Time mode reuses sweep-mode artists (same underlying data — sweep
-        # numbers — with a FuncFormatter converting tick labels to time units),
-        # so x_mode="sweep" lines are visible in both "sweep" and "time" modes.
-        x_mode = v.get("x_mode")
-        is_io = self._is_io_mode()
-        if x_mode is not None and x_mode != uistate.x_axis:
-            if not (x_mode == "sweep" and uistate.x_axis == "time"):
-                return False
-        if is_io and v.get("line") and v["line"].get_label().endswith(" IO trendline"):
-            if not uistate.checkBox.get("io_trendline", False):
-                return False
-        aspect = v.get("aspect")
-        axis = v.get("axis")
-        if aspect and not uistate.checkBox.get(aspect, True):
-            if axis == "axe" or not is_io:
-                return False
-        # special case for *_mean aspects (volley_amp_mean, volley_slope_mean): independent of parent volley per requirement
-        if aspect in ("volley_amp_mean", "volley_slope_mean"):
-            return uistate.checkBox.get(aspect, False)
-        if aspect and aspect.endswith("_mean") and not uistate.checkBox.get(aspect.replace("_mean", ""), True):
-            if axis == "axe" or not is_io:
-                return False
-        # norm/raw switch: only EPSP amp/slope have a norm variant.
-        # Only applies to ax1/ax2 output lines — markers on axe represent physical
-        # measurement positions and are always shown regardless of normalisation.
-        variant = v.get("variant")
-        norm_active = uistate.checkBox["norm_EPSP"]
-        if axis in ("ax1", "ax2"):
-            if variant == "norm" and not norm_active:
-                return False
-            if variant == "raw" and norm_active and aspect in ("EPSP_amp", "EPSP_slope"):
-                return False
-        return True
-
-    def _is_group_visible(self, v: dict, selected_groups: set | None) -> bool:
-        """Predicate: should this group-label entry be visible given current UI state.
-
-        When selected_groups is None (no recordings selected), all checkbox-ticked
-        groups are shown on ax1/ax2 regardless of recording membership.
-        """
-        if selected_groups is not None and v["group_ID"] not in selected_groups:
-            return False
-        # x_mode filtering: group lines tagged with a specific x_mode are only
-        # visible when that mode is active.
-        x_mode = v.get("x_mode")
-        is_io = self._is_io_mode()
-        if x_mode is not None and x_mode != uistate.x_axis:
-            if not (x_mode == "sweep" and uistate.x_axis == "time"):
-                return False
-        if is_io and v.get("line") and v["line"].get_label().endswith(" IO trendline"):
-            if not uistate.checkBox.get("io_trendline", False):
-                return False
-        aspect = v.get("aspect")
-        axis = v.get("axis")
-        if aspect and not uistate.checkBox.get(aspect, True):
-            if axis == "axe" or not is_io:
-                return False
-        # special case for *_mean aspects (volley_amp_mean, volley_slope_mean): independent of parent volley per requirement
-        if aspect in ("volley_amp_mean", "volley_slope_mean"):
-            return uistate.checkBox.get(aspect, False)
-        if aspect and aspect.endswith("_mean") and not uistate.checkBox.get(aspect.replace("_mean", ""), True):
-            if axis == "axe" or not is_io:
-                return False
-        variant = v.get("variant")
-        norm_active = uistate.checkBox["norm_EPSP"]
-        is_pp = getattr(uistate, "experiment_type", "time") == "PP"
-        if not is_pp:
-            if variant == "norm" and not norm_active:
-                return False
-            if variant == "raw" and norm_active:
-                return False
-        if not self.dd_groups[v["group_ID"]]["show"]:
-            return False
-        return True
-
-    def update_show(self, reset=False):
-        if reset:
-            for v in uistate.dict_rec_labels.values():
-                v["line"].set_visible(False)
-            uistate.dict_rec_show = {}
-            if self.dd_groups is not None:
-                for v in uistate.dict_group_labels.values():
-                    for key in ["line", "fill"]:
-                        obj = v[key]
-                        if hasattr(obj, "set_visible"):
-                            obj.set_visible(False)
-                        elif hasattr(obj, "patches"):
-                            for p in obj.patches:
-                                p.set_visible(False)
-                        elif hasattr(obj, "lines"):
-                            for l in obj.lines:
-                                if l is not None:
-                                    if isinstance(l, (list, tuple)):
-                                        for sub_l in l:
-                                            if sub_l is not None:
-                                                sub_l.set_visible(False)
-                                    else:
-                                        l.set_visible(False)
-                        elif hasattr(obj, "get_children"):
-                            for c in obj.get_children():
-                                if c is not None:
-                                    c.set_visible(False)
-                uistate.dict_group_show = {}
-            # Important: Don't return here! Keep processing the rest of the method
-            # so the currently selected recordings/stims/groups get turned back on.
-
-        if uistate.df_recs2plot is None:
-            # No recordings selected — hide all rec lines but keep checkbox-ticked
-            # groups visible on ax1/ax2.
-            for v in uistate.dict_rec_labels.values():
-                v["line"].set_visible(False)
-            uistate.dict_rec_show = {}
-            if self.dd_groups is not None:
-                new_group_show = {}
-                is_pp = getattr(uistate, "experiment_type", "time") == "PP"
-                for k, v in uistate.dict_group_labels.items():
-                    visible = self._is_group_visible(v, selected_groups=None)
-                    if is_pp and v.get("is_overlay"):
-                        visible = False
-                    for key in ["line", "fill"]:
-                        obj = v[key]
-                        if hasattr(obj, "set_visible"):
-                            obj.set_visible(visible)
-                        elif hasattr(obj, "patches"):
-                            for p in obj.patches:
-                                p.set_visible(visible)
-                        elif hasattr(obj, "lines"):
-                            for l in obj.lines:
-                                if l is not None:
-                                    if isinstance(l, (list, tuple)):
-                                        for sub_l in l:
-                                            if sub_l is not None:
-                                                sub_l.set_visible(visible)
-                                    else:
-                                        l.set_visible(visible)
-                        elif hasattr(obj, "get_children"):
-                            for c in obj.get_children():
-                                c.set_visible(visible)
-                    if visible:
-                        new_group_show[k] = v
-                uistate.dict_group_show = new_group_show
-            return
-
-        selected_ids = set(uistate.df_recs2plot["ID"])
-        selected_stims = {stim + 1 for stim in uistate.list_idx_select_stims}  # stim_select is 0-based (indices) - convert to stims
-        # print(f"update_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}")
-
-        is_pp = getattr(uistate, "experiment_type", "time") == "PP"
-        valid_pp_ids = set()
-        if is_pp:
-            df_p = self.get_df_project()
-            for rec_id in selected_ids:
-                matches = df_p[df_p["ID"] == rec_id]
-                if not matches.empty:
-                    rec_name = matches.iloc[0]["recording_name"]
-                    dft = self.dict_ts.get(rec_name)
-                    if dft is not None and len(dft) == 2:
-                        valid_pp_ids.add(rec_id)
-
-        # rec lines
-        new_rec_show = {}
-        for k, v in uistate.dict_rec_labels.items():
-            visible = self._is_rec_visible(v, selected_ids, selected_stims, valid_pp_ids)
-            v["line"].set_visible(visible)
-            if visible:
-                new_rec_show[k] = v
-        uistate.dict_rec_show = new_rec_show
-
-        # group lines
-        if self.dd_groups is not None:
-            is_pp = getattr(uistate, "experiment_type", "time") == "PP"
-            selected_groups = {group for rec_ID in selected_ids for group in self.get_groupsOfRec(rec_ID)}
-            new_group_show = {}
-            for k, v in uistate.dict_group_labels.items():
-                visible = self._is_group_visible(v, selected_groups)
-
-                if is_pp:
-                    if selected_ids:
-                        # Rec view: hide normal group artists, show overlay
-                        if not v.get("is_overlay"):
-                            visible = False
-                    else:
-                        # Group view: show normal group artists, hide overlay
-                        if v.get("is_overlay"):
-                            visible = False
-
-                for key in ["line", "fill"]:
-                    obj = v[key]
-                    if hasattr(obj, "set_visible"):
-                        obj.set_visible(visible)
-                    elif hasattr(obj, "patches"):
-                        for p in obj.patches:
-                            p.set_visible(visible)
-                    elif hasattr(obj, "lines"):
-                        for l in obj.lines:
-                            if l is not None:
-                                if isinstance(l, (list, tuple)):
-                                    for sub_l in l:
-                                        if sub_l is not None:
-                                            sub_l.set_visible(visible)
-                                else:
-                                    l.set_visible(visible)
-                    elif hasattr(obj, "get_children"):
-                        for c in obj.get_children():
-                            if c is not None:
-                                c.set_visible(visible)
-                if visible:
-                    new_group_show[k] = v
-            uistate.dict_group_show = new_group_show
-
+    # _is_rec_visible, _is_group_visible, update_show moved to SelectionMixin (ui_selection.py)
     def graphRefresh(self, reeval_formal_test: bool = True):
         self.usage("graphRefresh")
         dd_groups = self.group_get_dd()
@@ -2821,136 +2490,9 @@ class UIsub(
         self.canvasEvent = setup_graph(self.graphEvent)
         self.canvasOutput = setup_graph(self.graphOutput)
 
-    def setupTableProj(self):
-        try:
-            # If tableProj already exists, remove it from the layout
-            if hasattr(self, "tableProj"):
-                self.verticalLayoutProj.removeWidget(self.tableProj)
-                sip.delete(self.tableProj)
+    # setupTableProj moved to TableMixin (ui_table.py)
 
-            # Creates an instance of custom QTableView to allow drag&drop
-            self.tableProj = ui_widgets.TableProjSub(parent=self)
-            self.verticalLayoutProj.addWidget(self.tableProj)
-            self.tableProj.setObjectName("tableProj")
-
-            # Set up the table view
-            if not hasattr(self, "df_project"):
-                self.df_project = df_projectTemplate()
-            self.tablemodel = ui_widgets.TableModel(self.df_project)
-            self.tableProj.setModel(self.tablemodel)
-
-            # Enable sorting on the QTableView
-            self.tableProj.setSortingEnabled(True)
-
-            # Connect events
-            self.pushButtonParse.pressed.connect(self.triggerParse)
-            self.tableProj.setSelectionBehavior(ui_widgets.TableProjSub.SelectRows)
-            tableProj_selectionModel = self.tableProj.selectionModel()
-            tableProj_selectionModel.selectionChanged.connect(self.tableProjSelectionChanged)
-            # v0.16_n: tab order for hierarchy line-edits (Phase 0)
-            if hasattr(self, "lineEdit_hierarchy_subject") and hasattr(self, "lineEdit_hierarchy_slice"):
-                self.setTabOrder(self.lineEdit_hierarchy_subject, self.lineEdit_hierarchy_slice)
-            self.formatTableLayout()
-        except Exception as e:
-            print(f"Error setting up tableProj: {e}")
-
-    def setupTableStim(self):
-        dft_init = pd.DataFrame([uistate.default_dict_t])
-        self.tableStimModel = ui_widgets.TableModel(dft_init)
-        self.tableStim.setModel(self.tableStimModel)
-        self.tableStim.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self.tableStim.verticalHeader().hide()
-        self.formatTableStimLayout(dft_init)
-        tableStim_selectionModel = self.tableStim.selectionModel()
-        tableStim_selectionModel.selectionChanged.connect(self.stimSelectionChanged)
-
-    def formatTableLayout(self):
-        logger.debug("formatTableLayout")
-        print("formatTableLayout")
-
-        self.tableProj.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
-        self.tableProj.verticalHeader().hide()
-
-        df_p = self.df_project
-        header = self.tableProj.horizontalHeader()
-
-        # ordered, visible columns
-        column_order = [
-            "status",
-            "recording_name",
-            "subject",  # v0.16_n: always visible immediately after recording_name (per updated requirement)
-            "slice",
-            "groups",
-            "stims",
-            "sweeps",
-            "sweep_duration",
-        ]
-        if uistate.checkBox["paired_stims"]:
-            column_order.append("Tx")
-
-        if getattr(uistate, "detailedProjectTable", False):
-            for col_name in df_p.columns:
-                if col_name not in column_order:
-                    column_order.append(col_name)
-        # v0.16_n: subject/slice now always shown (right of recording_name); detailed view surfaces remaining columns. Compact view simplified.
-
-        col_indices = [df_p.columns.get_loc(name) for name in column_order if name in df_p.columns]
-
-        # Show/hide columns. Set to Interactive (not ResizeToContents) so that
-        # container resizes (splitter drags) do not repeatedly recompute column
-        # widths by scanning table contents. We force a one-time contents-based
-        # size below.
-        num_columns = df_p.shape[1]
-        for col in range(num_columns):
-            if col in col_indices:
-                header.setSectionResizeMode(col, QtWidgets.QHeaderView.Interactive)
-                self.tableProj.setColumnHidden(col, False)
-            else:
-                self.tableProj.setColumnHidden(col, True)
-
-        self.tableProj.resizeColumnsToContents()
-
-        # Reorder visible columns
-        for i, col_index in enumerate(col_indices):
-            header.moveSection(header.visualIndex(col_index), i)
-
-    def formatTableStimLayout(self, dft):
-        if dft is None:
-            dft = pd.DataFrame([uistate.default_dict_t])
-
-        header = self.tableStim.horizontalHeader()
-        column_order = [
-            "stim",
-            "t_stim",
-            "t_EPSP_slope_start",
-            "t_EPSP_slope_end",
-            "t_EPSP_slope_method",
-            "t_EPSP_amp",
-            "t_EPSP_amp_method",
-            "t_volley_slope_start",
-            "t_volley_slope_end",
-            "t_volley_slope_method",
-            "t_volley_amp",
-            "t_volley_amp_method",
-        ]
-        if getattr(uistate, "detailedTimetable", False):
-            for col_name in dft.columns:
-                if col_name not in column_order:
-                    column_order.append(col_name)
-
-        col_indices = [dft.columns.get_loc(col) for col in column_order if col in dft.columns]
-        num_columns = dft.shape[1]
-
-        # Show/hide + Interactive (see formatTableLayout comment for rationale)
-        for col in range(num_columns):
-            if col in col_indices:
-                header.setSectionResizeMode(col, QtWidgets.QHeaderView.Interactive)
-                self.tableStim.setColumnHidden(col, False)
-            else:
-                self.tableStim.setColumnHidden(col, True)
-        for i, col_index in enumerate(col_indices):
-            header.moveSection(header.visualIndex(col_index), i)
-        self.tableStim.resizeColumnsToContents()
+    # setupTableStim and formatTable*Layout moved to TableMixin (ui_table.py)
 
     def setupFolders(self):
         self.dict_folders = self.build_dict_folders()
@@ -4761,121 +4303,14 @@ class UIsub(
         self.graphRefresh()
         self.update_sample_checkbox()
 
-    def update_sample_checkbox(self):
-        """Updates checkBox_is_group_sample enabled/checked state. Called from tableProjSelectionChanged"""
-        if len(uistate.list_idx_select_recs) != 1 or not hasattr(self, "checkBox_is_group_sample"):
-            self.checkBox_is_group_sample.setEnabled(False)
-            self.checkBox_is_group_sample.setChecked(False)
-            return
-        prow = self.get_prow()
-        if prow is None:
-            self.checkBox_is_group_sample.setEnabled(False)
-            self.checkBox_is_group_sample.setChecked(False)
-            return
-        rec_ID = prow["ID"]
-        rec_str = str(rec_ID)
-        groups = self.get_groupsOfRec(rec_ID)
-        enabled = len(groups) > 0
-        checked = enabled and all(str(self.dd_groups.get(g, {}).get("sample")) == rec_str for g in groups)
-        uistate.checkBox["is_group_sample"] = checked
-        checkbox = self.checkBox_is_group_sample
-        checkbox.blockSignals(True)
-        checkbox.setEnabled(enabled)
-        checkbox.setChecked(checked)
-        checkbox.blockSignals(False)
+    # update_sample_checkbox moved to SelectionMixin (ui_selection.py)
 
     # tableFormat moved to TableMixin (ui_table.py)
     def tableFormat(self):
         # delegated to mixin (see ui_table.TableMixin.tableFormat)
         pass
 
-    def tableUpdate(self, restore_selection: bool = True, target_idx: int | None = None):
-        self.updating_tableProj = True  # prevent tableProjSelectionChanged from firing
-        # Update data
-        df_project = self.get_df_project()
-        self.tablemodel.setData(df_project)
-        self.formatTableLayout()
-        self.tableProj.resizeColumnsToContents()
-
-        if restore_selection:
-            self._restore_table_selection(df_project, target_idx)
-
-        self.updating_tableProj = False
-        self.setButtonParse()
-
-    def _restore_table_selection(self, df_p: pd.DataFrame, target_idx: int | None = None) -> None:
-        """Centralized helper to restore visual + keyboard selection after df_project mutation.
-
-        Supports preserving multi-selection (e.g. after group assignment) when no explicit
-        target is given and previous selection is still valid in the new df.
-        """
-        self.tableProj.clearSelection()  # clean slate after model reset
-
-        to_select = []
-        if target_idx is not None:
-            if 0 <= target_idx < len(df_p):
-                to_select = [target_idx]
-        elif uistate.list_idx_select_recs:
-            to_select = [i for i in uistate.list_idx_select_recs if 0 <= i < len(df_p)]
-            if not to_select and len(df_p) > 0:
-                to_select = [len(df_p) - 1]
-        elif len(df_p) > 0:
-            to_select = [len(df_p) - 1]
-
-        if to_select:
-            selection = QtCore.QItemSelection()
-            for idx in to_select:
-                top_left = self.tablemodel.index(idx, 0)
-                bottom_right = self.tablemodel.index(idx, self.tablemodel.columnCount(QtCore.QModelIndex()) - 1)
-                selection.select(top_left, bottom_right)
-            self.tableProj.selectionModel().select(selection, QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows)
-            self.tableProj.scrollTo(self.tablemodel.index(to_select[0], 0))
-            self.tableProj.setFocus()
-            uistate.list_idx_select_recs = to_select
-        else:
-            uistate.list_idx_select_recs = []
-
-        # Do NOT call tableProjSelectionChanged here — let caller decide (avoids recursion).
-        # Most callers already follow with it, or it is triggered by selectRow().
-
-    # Internal dataframe handling
-    def get_prow(self, dfp_idx=None):
-        # returns the selected row with the lowest index in df_project
-        if dfp_idx is not None:
-            dfp = self.get_df_project()
-            row = dfp.loc[dfp_idx]
-            return row
-        if not uistate.list_idx_select_recs:
-            return None
-        dfp = self.get_df_project()
-        row = dfp.loc[uistate.list_idx_select_recs[0]]
-        return row
-
-    def get_trow(self, dfp_idx=None):
-        if dfp_idx is not None:
-            prow = self.get_prow(dfp_idx)
-            if prow is None:
-                logger.debug("get_trow: get_prow(%s) returned None, returning None", dfp_idx)
-                return None
-            dft = self.get_dft(prow)
-        else:
-            if not uistate.list_idx_select_stims:
-                print("get_trow: No stim selected.")
-                return None
-            prow = self.get_prow()
-            if prow is None:
-                logger.debug("get_trow: get_prow() returned None (no recording selected), returning None")
-                return None
-            dft = self.get_dft(prow)
-        if dft is None or len(dft) == 0:
-            print("get_trow: Empty dataframe.")
-            return None
-        # ensure index is valid
-        idx = uistate.list_idx_select_stims[0] if uistate.list_idx_select_stims else 0
-        if idx < 0 or idx >= len(dft):
-            idx = 0
-            uistate.list_idx_select_stims = [0]
-        return dft.loc[idx]
+    # tableUpdate, _restore_table_selection, get_prow, get_trow moved to TableMixin (ui_table.py)
 
     # get_dfmean, get_dft, get_dfoutput, get_dfdata, get_dffilter, get_dfbin,
     # get_dfdiff, get_dfgroupmean, set_uniformTimepoints → DataFrameMixin (ui_data_frames.py)
