@@ -1,7 +1,7 @@
 # Plan: Extract Remaining Logic from UIsub into Mixins (ui.py Refactor)
 
 **Date**: 2026-07-12  
-**Status**: Draft for review  
+**Status**: Phase 5 polish (ui.py ~2750 LOC; StatTestMixin fully extracted; setSplitterSizes moved to ProjectMixin; comments + stale sections cleaned; imports verified). Good for regression / p. Next: remaining large setup methods or Phase 6 eval.  
 **Related**: Previous mixin_problems.md (archived), ongoing ui.py size issues (5720 LOC, UIsub defines 172 methods directly).
 
 ## Background

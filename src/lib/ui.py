@@ -70,8 +70,14 @@ from . import statistics as stats  # our statistical testing layer (not the buil
 logger = logging.getLogger(__name__)
 logger.debug("ui.py: os.getcwd(): %s", os.getcwd())
 
-# Config and all custom sub-classes moved to ui_widgets.py (Phase 0).
-# table* and selection/visibility logic moved to ui_table.py + ui_selection.py (Phase 1).
+# NOTE: Large parts of UIsub have been extracted to mixins (see plan_ui_mixin_extraction.md):
+# - Phase 0: widgets -> ui_widgets.py
+# - Phase 1: table/selection -> ui_table.py + ui_selection.py
+# - Phase 2: graph/zoom -> ui_graph.py
+# - Phase 3: parse -> ui_parse.py
+# - Phase 4: stat tests/statusbar/n_unit -> ui_stat_test.py
+# - Phase 5 (polish): completed core stat move, moved setSplitterSizes to ProjectMixin, cleaned comments/stubs, import fixes.
+# Core UIsub now holds wiring, lifecycle, thin orchestration and non-extracted handlers. (ui.py < 2800 LOC)
 
 config = ui_widgets.Config()
 uistate = ui_state_classes.UIstate()  # global variable for storing state of UI
@@ -317,7 +323,7 @@ class UIsub(
     #                     Selection changers                             #
     ######################################################################
 
-    # tableProjSelectionChanged moved to TableMixin (ui_table.py)
+
     def update_filter_settings(self, df_p=None):
         """Helper for filter-settings population. Handles uniform/mixed selection
         logic for radio buttons (filter mode) and savgol lineEdits exactly as before.
@@ -432,7 +438,6 @@ class UIsub(
         self.update_stim_buttons()
         self.mouseoverUpdate()
 
-    # graph* (Refresh, Wipe, Axes, Preload, Groups, Update), setupCanvases, zoom*, onSplitterMoved (graph part), _xlim/_ylim/_recalc_* moved to GraphCoordinatorMixin (ui_graph.py)
 
     def deleteFolder(self, dir_path):
         if os.path.exists(dir_path):
@@ -565,9 +570,7 @@ class UIsub(
             except Exception:
                 pass
 
-    # Formal statistical test logic moved to StatTestMixin (ui_stat_test.py)
 
-    # _get_shown_group_ids, _get_shown_testsets, update_anova_label, clear_formal_test_results moved to StatTestMixin (ui_stat_test.py)
         """Clear any formal test markers and stored results. Independent of heatmap."""
         try:
             if uiplot is not None:
@@ -586,458 +589,60 @@ class UIsub(
         except Exception:
             return False
 
-    def _set_statusbar_appearance(
-        self, bg_color: str = None, text_color: str = None, bold: bool = False, text: str | None = None, clear: bool = False
-    ):
-        """Set statusbar appearance.
-        - If bg_color is provided (e.g. red #c0392b for errors/warnings), force that background.
-        - Otherwise (non-error states or successful stat test reports), do not force a background color so the
-          statusbar uses its default appearance (sensitive to darkmode()).
-        Text on the internal statusbar_label is always centered.
-        """
-        # Only force a background for error/warning states. For everything else
-        # (including successful statistical test p-value reports) leave the
-        # statusbar's background as the theme default.
-        if bg_color:
-            style = f"QStatusBar {{ background-color: {bg_color}; }}"
-        else:
-            style = ""
+    def _set_statusbar_appearance(self, *a, **k):
+        # provided by StatTestMixin (Phase 4/5)
+        pass
 
-        # Choose a sensible text color for non-error states if none supplied.
-        # For successful stat test reports (and other non-bg cases) we pass bold=True but no bg_color.
-        if text_color is None and bg_color is None:
-            text_color = "#ddd" if getattr(uistate, "darkmode", False) else "#333"
 
-        lbl = "QStatusBar QLabel { qproperty-alignment: AlignCenter; background-color: transparent;"
-        if text_color:
-            lbl += f" color: {text_color};"
-        if bold:
-            lbl += " font-weight: bold;"
-        lbl += " }"
-        self.statusbar.setStyleSheet(style + lbl)
-
-        # Our own controlled label (created in __init__ after setupUi).
-        # We style it directly + via the statusbar stylesheet for maximum reliability.
-        label = getattr(self, "statusbar_label", None)
-        if label is not None:
-            label.setAlignment(QtCore.Qt.AlignCenter)
-            parts = ["background-color: transparent;"]
-            if text_color:
-                parts.append(f"color: {text_color};")
-            if bold:
-                parts.append("font-weight: bold;")
-            label.setStyleSheet("; ".join(parts))
-            if clear or text in (None, ""):
-                label.setText("")
-            elif text is not None:
-                label.setText(text)
-            else:
-                # Force update of stylesheet even if text unchanged (e.g. after usage toasts or darkmode)
-                current_text = label.text()
-                if current_text:
-                    label.setText(current_text)
-            # No extra " " fallback — let caller control text (success reports always pass explicit text)
-
-        # Clear any temporary message so the added label widget (our centered one) is visible.
-        # (showMessage would hide added widgets and show the internal left-aligned temp label.)
-        try:
-            self.statusbar.clearMessage()
-        except Exception:
-            pass
-
-    # _is_io_mode, _effective_test_type, _should_show_stat_test_frame, _get_statusbar_for_current_state, _format_* moved to StatTestMixin (ui_stat_test.py)
-
-    # _format_* statusbar moved to StatTestMixin (ui_stat_test.py)
 
     def _apply_io_regression(self) -> bool:
-        """Helper for IO path in apply_statistical_test_if_active (called from dispatcher).
-        Runs compute_statistical_comparison (experiment_type=io), populates formal_test_results and markers.
-        Does not touch statusbar; caller (update_test) handles final _get_statusbar_for_current_state + set.
-        """
-        shown_groups = self._get_shown_group_ids()
-        shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
-        experiment_type = "io"
-        try:
-            comp = stats.compute_statistical_comparison(
-                groups=shown_groups,
-                dd_groups=self.dd_groups,
-                dd_testsets=self.dd_testsets,
-                get_group_testset_means_fn=self.get_group_testset_means,
-                test_type="ANOVA",  # sentinel to bypass stats guard; real path uses experiment_type="io"
-                variant="unpaired",  # unused for regression
-                tails="two-sided",  # unused
-                fdr=False,
-                norm=False,
-                amp=True,
-                slope=True,
-                ref=0.0,
-                n_unit=getattr(uistate, "buttonGroup_test_n", "subject"),
-                experiment_type=experiment_type,
-            )
-            results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
-            if comp.get("config"):
-                if not isinstance(results, list) or len(results) == 0:
-                    results = [comp["config"].copy()]
-                else:
-                    for r in results:
-                        if isinstance(r, dict):
-                            r.setdefault("config", comp["config"])
-            # Ensure group_ns from results (for IO regression with n_unit=subject) reaches _format_io_regression_statusbar
-            if results and isinstance(results, list) and len(results) > 0 and "group_ns" in results[0]:
-                if isinstance(results[0], dict) and "config" not in results[0]:
-                    results[0]["config"] = results[0].copy()
-            uistate.formal_test_results = results
-            uiplot.show_test_markers(results)
-            return True
-        except Exception as ex:
-            print(f"IO regression compute error: {ex}")
-            self.clear_formal_test_results()
-            return False
+        # provided by StatTestMixin (Phase 4/5)
+        pass
 
     def _check_ttest_applicability(self, variant: str) -> str | None:
-        """Guard for t-test (and similar). Returns warning string or None (no side effects or recursion)."""
-        had_results = bool(getattr(uistate, "formal_test_results", None))
-        if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
-            if had_results:
-                print("Statistical test: no groups defined.")
-            return "No groups defined for t-test"
-        shown_groups = self._get_shown_group_ids()
-        shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
-        min_groups = 1 if variant in ("one-sample", "paired") else 2
-        if len(shown_groups) < min_groups:
-            if had_results:
-                print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant}.")
-            return f"t-test requires {min_groups} group(s) with data"
-        shown_ts = self._get_shown_testsets()
-        if variant == "paired" and len(shown_ts) != 2:
-            if had_results:
-                print("Statistical test: paired requires exactly 2 shown test sets (with 1 group).")
-            return "Paired t-test requires exactly 2 test sets"
-        if variant == "paired":
-            n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
-            if n1 < 2:
-                if had_results:
-                    print("Statistical test: paired requires N ≥ 2 recordings.")
-                return "Paired t-test requires N ≥ 2 recordings per group"
-        if not shown_ts:
-            if had_results:
-                print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
-            return "No test sets shown for t-test"
-        return None
+        # provided by StatTestMixin (Phase 4/5)
+        pass
 
     def _check_anova_applicability(self) -> str | None:
-        """Guard for ANOVA/Friedman (1+ groups with sufficient test sets). Returns warning or None (no side effects)."""
-        had_results = bool(getattr(uistate, "formal_test_results", None))
-        if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
-            if had_results:
-                print("Statistical test: no groups defined.")
-            return "No groups defined for ANOVA"
-        shown_groups = self._get_shown_group_ids()
-        shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
-        shown_ts = self._get_shown_testsets()
-        if len(shown_groups) < 1 or (len(shown_groups) == 1 and len(shown_ts) < 2):
-            if had_results:
-                print(f"Statistical test: ANOVA requires either >=2 groups, or 1 group with >=2 test sets (repeated-measures).")
-            return "ANOVA requires ≥2 groups or 1 group + ≥2 test sets"
-        if not shown_ts and len(shown_groups) == 1:
-            if had_results:
-                print(f"Statistical test: no shown test sets for repeated-measures ANOVA.")
-            return "Repeated-measures ANOVA requires ≥2 test sets"
-        return None
+        # provided by StatTestMixin (Phase 4/5)
+        pass
 
     def _check_wilcoxon_applicability(self, variant: str) -> str | None:
-        """Guard for Wilcoxon (mirrors t-test logic)."""
-        return self._check_ttest_applicability(variant)  # shared logic (Wilcoxon uses same group/ts rules)
+        # provided by StatTestMixin (Phase 4/5)
+        pass
 
     def _check_friedman_applicability(self) -> str | None:
-        """Guard for Friedman (≥3 test sets for repeated-measures). Returns warning or None (no side effects)."""
-        had_results = bool(getattr(uistate, "formal_test_results", None))
-        shown_ts = self._get_shown_testsets()
-        if len(shown_ts) < 3:
-            if had_results or True:  # always show for Friedman
-                print(f"Statistical test: Friedman requires ≥3 test sets (shown_ts={len(shown_ts)})")
-            return "Friedman requires ≥3 test sets for repeated-measures"
-        return None
+        # provided by StatTestMixin (Phase 4/5)
+        pass
 
     def _check_cluster_applicability(self) -> str | None:
-        """Guard for Cluster perm. (between: ≥2 groups; or 1g+2ts). Returns warning or None (no side effects)."""
-        had_results = bool(getattr(uistate, "formal_test_results", None))
-        if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
-            if had_results:
-                print("Statistical test: no groups defined.")
-            return "No groups defined for Cluster perm."
-        shown_groups = self._get_shown_group_ids()
-        shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
-        shown_ts = self._get_shown_testsets()
-        if len(shown_groups) >= 2:
-            return None  # between-subjects OK
-        if len(shown_groups) == 1 and len(shown_ts) >= 2:
-            return None  # within-subjects (paired-like) OK
-        if had_results:
-            print("Statistical test: Cluster perm. requires ≥2 groups or 1 group + 2 test sets.")
-        return "Cluster permutation test requires ≥2 groups or 1 group + ≥2 test sets"
+        # provided by StatTestMixin (Phase 4/5)
+        pass
 
     def _get_stat_test_warning(self):
-        """Return warning string (for non-IO) or status text (for IO via _format_...), else None.
-        Now pure per plan.md (no uistate sets, no clear_formal_test_results). State set only by caller.
-        IO handled by _get_statusbar_for_current_state -> _format_io_regression_statusbar.
-        """
-        eff = self._effective_test_type()
-        if eff == "None":
-            return None
+        # provided by StatTestMixin (Phase 4/5)
+        pass
 
-        if eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
-            return f"Statistical test '{eff}' is not implemented"
-
-        # --- Non-IO explicit test paths (modular helpers) ---
-        if eff == "t-test":
-            variant = getattr(uistate, "test_t_variant", "unpaired")
-            warning = self._check_ttest_applicability(variant)
-        elif eff == "ANOVA":
-            warning = self._check_anova_applicability()
-        elif eff == "Wilcoxon":
-            variant = getattr(uistate, "test_wilcox_variant", "paired")
-            warning = self._check_wilcoxon_applicability(variant)
-        elif eff == "Friedman":
-            warning = self._check_friedman_applicability()
-        elif eff == "Cluster perm.":
-            warning = self._check_cluster_applicability()
-        else:
-            warning = None
-
-        return warning
-
-    # update_test, set_statusbar, _on_statusbar..., apply_statistical_test_if_active, _apply_* moved to StatTestMixin (ui_stat_test.py)
 
     def set_statusbar(self, state: str | None = None, text: str | None = None):
-        """Low-level applicator: only does what it is given (debug print + appearance). No computation or queries.
-        Called by update_test() and pure display refreshes.
-        """
-        print(f"STATUSBAR: {text} (state={state})")  # debug print for frequent statusbar updates
-        if state == "warning":
-            self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=text)
-        elif state == "info" or text:
-            self._set_statusbar_appearance(bg_color=None, bold=True, text=text or "")
-        else:
-            self._set_statusbar_appearance(clear=True)
+        # provided by StatTestMixin (Phase 4/5)
+        pass
 
     def _on_statusbar_message_cleared(self, text):
-        """After a transient message (e.g. export toast) clears, restore via set_statusbar (pure display refresh; no recompute)."""
-        if text:
-            return
-        if self._is_loading_active():
-            return
-        self.set_statusbar(None, None)
+        # provided by StatTestMixin (Phase 4/5)
+        pass
 
     def apply_statistical_test_if_active(self):
-        """Core dispatcher (internal): if io_regression call _apply_io_regression, None clears, else non-IO.
-        Performs the actual test work or clear + markers + console print.
-        Does NOT set statusbar or call back to update_test; the caller of apply (normally update_test) is responsible for the final statusbar via _get_statusbar_for_current_state.
-        """
-        try:
-            eff = self._effective_test_type()
-            if self._is_io_mode():  # IO first-class (ANCOVA is normal test_type radio)
-                self._apply_io_regression()
-                return
-            if eff == "None":
-                self.clear_formal_test_results()
-                return
-            self._apply_non_io_test(eff)
-        except Exception as ex:
-            print(f"Statistical test: aborted (not applicable or internal issue): {ex}")
-            import traceback
-
-            traceback.print_exc()
-            try:
-                self.clear_formal_test_results()
-            except Exception:
-                pass
+        # provided by StatTestMixin (Phase 4/5)
+        pass
 
     def _apply_non_io_test(self, eff: str) -> None:
-        """Isolated non-IO guard + compute logic (extracted from former monster in apply_statistical_test_if_active).
-        Handles applicability checks, calls stats.compute..., populates formal_test_results + markers + console table.
-        Does not touch statusbar_state or call update_test; caller (update_test) always does the final query + set.
-        Called only for eff in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm.").
-        """
-        test_type = eff  # backward compat for legacy non-IO path only
-        if eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
-            print(
-                f"Statistical test '{eff}' is not yet implemented for v0.16 (t-test, ANOVA, Wilcoxon, Friedman, Cluster perm.)."
-            )
-            self.clear_formal_test_results()
-            return
-
-        # --- Early applicability checks (abort cleanly if tests cannot run) ---
-        had_results = bool(getattr(uistate, "formal_test_results", None))
-
-        if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
-            if had_results:
-                print("Statistical test: no groups defined.")
-            self.clear_formal_test_results()
-            return
-
-        shown_groups = self._get_shown_group_ids()
-        # Only groups that have at least one recording can participate in a test
-        shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
-
-        ref_attr = "label_test_t_one_sample_value"
-        if test_type == "Wilcoxon":
-            variant_for_check = getattr(uistate, "test_wilcox_variant", "paired")
-            ref_attr = "label_test_wilcox_one_sample_value"
-        else:
-            variant_for_check = getattr(uistate, "test_t_variant", "unpaired")
-        if test_type == "Cluster perm.":
-            variant_for_check = "unpaired"
-        shown_ts = self._get_shown_testsets()
-        if test_type in ("ANOVA", "Friedman"):
-            min_groups = 1
-        elif test_type == "Cluster perm.":
-            min_groups = 1
-        else:
-            min_groups = 1 if variant_for_check in ("one-sample", "paired") else 2
-        if len(shown_groups) < min_groups and test_type != "Cluster perm.":
-            if had_results or test_type == "Friedman":
-                if test_type == "ANOVA":
-                    print(f"Statistical test: ANOVA requires either >=2 groups, or 1 group with >=2 test sets (repeated-measures).")
-                elif test_type == "Friedman":
-                    print(
-                        f"Statistical test: Friedman min_groups guard: shown_groups={len(shown_groups)} (need >=1), min_groups={min_groups}, shown_ts={len(shown_ts)} (need >=3)"
-                    )
-                else:
-                    print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant_for_check}.")
-            self.clear_formal_test_results()
-            return
-
-        # Paired t-test additionally requires exactly 2 test sets (the pairing model uses 2 test sets within 1 group)
-        if variant_for_check == "paired" and test_type != "Friedman":
-            if len(shown_ts) != 2:
-                if had_results:
-                    print("Statistical test: paired requires exactly 2 shown test sets (with 1 group).")
-                self.clear_formal_test_results()
-                return
-            n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
-            if n1 < 2:
-                if had_results:
-                    print("Statistical test: paired requires N ≥ 2 recordings.")
-                self.clear_formal_test_results()
-                return
-
-        if not shown_ts and test_type not in ("Friedman", "Cluster perm."):
-            if had_results or test_type == "Friedman":
-                print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
-            self.clear_formal_test_results()
-            return
-
-        if test_type == "Wilcoxon":
-            variant = getattr(uistate, "test_wilcox_variant", "paired")
-            tails = getattr(uistate, "test_wilcox_tails", "two-sided")
-        else:
-            variant = getattr(uistate, "test_t_variant", "unpaired")
-            tails = getattr(uistate, "test_t_tails", "two-sided")
-        ref_value = getattr(uistate, ref_attr, 0.0)
-        fdr = bool(getattr(uistate, "test_fdr", False))
-        norm = bool(uistate.checkBox.get("norm_EPSP", False))
-        amp = bool(uistate.checkBox.get("EPSP_amp", True))
-        slope = bool(uistate.checkBox.get("EPSP_slope", True))
-        g1 = shown_groups[0] if shown_groups else None
-        g2 = shown_groups[1] if len(shown_groups) > 1 else None
-        n1 = len(self.dd_groups.get(g1, {}).get("rec_IDs", [])) if g1 else 0
-        n2 = len(self.dd_groups.get(g2, {}).get("rec_IDs", [])) if g2 else 0
-
-        n_unit = getattr(uistate, "buttonGroup_test_n", "subject")
-        experiment_type = getattr(uistate, "experiment_type", "time")
-
-        try:
-            comp = stats.compute_statistical_comparison(
-                groups=shown_groups,
-                dd_groups=self.dd_groups,
-                dd_testsets=self.dd_testsets,
-                get_group_testset_means_fn=self.get_group_testset_means,
-                test_type=test_type,
-                variant=variant,
-                tails=tails,
-                fdr=fdr,
-                norm=norm,
-                amp=amp,
-                slope=slope,
-                ref=ref_value,
-                n_unit=n_unit,
-                experiment_type=experiment_type,
-            )
-            results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
-            if comp.get("config"):
-                if not isinstance(results, list) or len(results) == 0:
-                    results = [comp["config"].copy()]
-                else:
-                    for r in results:
-                        if isinstance(r, dict):
-                            r.setdefault("config", comp["config"])
-        except Exception as ex:
-            print(f"apply_statistical_test compute error: {ex}")
-            results = []
-
-        if not results and not (comp.get("config") and comp.get("config").get("implicit_testset")):
-            self.clear_formal_test_results()
-            return
-        if comp.get("config") and comp.get("config").get("implicit_testset") and (not results or not isinstance(results, list) or len(results) == 0):
-            results = [{"config": comp["config"]}]
-
-        uistate.formal_test_results = results
-        uiplot.show_test_markers(results)
-        self._print_statistical_test_table(results, variant=variant, tails=tails, fdr=fdr, norm=norm, test_type=test_type)
-        set_names = ", ".join(str(r.get("set_name") or r.get("set_id") or "?") for r in results)
-        sw = bool(getattr(uistate, "test_sw", False))
-        lev = bool(getattr(uistate, "test_levene", False))
-        effective_variant = "unpaired" if test_type == "Cluster perm." else variant
-        self.usage(f"stat_test applied: {test_type} {effective_variant} {tails} on {set_names} (fdr={fdr}, sw={sw}, levene={lev}, n_unit={n_unit})")
+        # provided by StatTestMixin (Phase 4/5)
+        pass
 
     def _print_statistical_test_table(self, results, variant, tails, fdr, norm, test_type=None):
-        if not results:
-            return
-        print("\n=== Statistical test (v0.16) ===")
-        effective_variant = "unpaired" if (test_type or variant) == "Cluster perm." else variant
-        print(f"variant={effective_variant}  tails={tails}  fdr={fdr}  norm={norm}")
-        print("Note: each n = mean of aspect over sweeps in the test set, per recording.")
-        # Report all results for Cluster perm. (multiple test sets); first-only for paired t/Wilcoxon
-        if test_type == "Cluster perm.":
-            for r_idx, r in enumerate(results):
-                n1 = r.get("n1", 0)
-                n2 = r.get("n2", 0)
-                set_name = r.get("set_name") or r.get("set_id") or "?"
-                print(f"  {set_name}:")
-                for key in sorted(k for k in r.keys() if k.startswith("p_")):
-                    pval = r.get(key)
-                    sval = r.get("stat_" + key[2:], np.nan)
-                    qval = r.get("q_" + key[2:], None)
-                    aspect = key[2:]
-                    pstr = f"{pval:.4g}" if isinstance(pval, (int, float)) and np.isfinite(pval) else str(pval)
-                    if isinstance(sval, (int, float)) and np.isfinite(sval):
-                        line = f"    {aspect}: p={pstr}  stat={sval:.4g}  n1={n1} n2={n2}"
-                    else:
-                        line = f"    {aspect}: p={pstr}  n1={n1} n2={n2}"
-                    if qval is not None and isinstance(qval, (int, float)) and np.isfinite(qval):
-                        line += f"  q={qval:.4g}"
-                    print(line)
-        else:
-            # Original first-only logic for other tests
-            r = results[0]
-            n1 = r.get("n1", 0)
-            n2 = r.get("n2", 0)
-            # Print one line per computed aspect (p and optional q)
-            for key in sorted(k for k in r.keys() if k.startswith("p_")):
-                pval = r.get(key)
-                sval = r.get("stat_" + key[2:], np.nan)
-                qval = r.get("q_" + key[2:], None)
-                aspect = key[2:]
-                pstr = f"{pval:.4g}" if isinstance(pval, (int, float)) and np.isfinite(pval) else str(pval)
-                if isinstance(sval, (int, float)) and np.isfinite(sval):
-                    line = f"  {aspect}: p={pstr}  stat={sval:.4g}  n1={n1} n2={n2}"
-                else:
-                    line = f"  {aspect}: p={pstr}  n1={n1} n2={n2}"
-                if qval is not None and isinstance(qval, (int, float)) and np.isfinite(qval):
-                    line += f"  q={qval:.4g}"
-                print(line)
-        print("=== end test ===\n")
+        # provided by StatTestMixin (Phase 4/5)
+        pass
 
     def setTableStimVisibility(self, state, initialize=False):
         widget = self.h_splitterMaster.widget(1)  # Get the second widget in the splitter
@@ -1202,9 +807,7 @@ class UIsub(
         except Exception:
             pass
 
-    # _xlim_from_artists, _ylim_from_artists, _recalc_* moved to GraphCoordinatorMixin (ui_graph.py)
 
-    # zoomAuto, _fit_output_zoom_to_groups, zoomReset moved to GraphCoordinatorMixin (ui_graph.py)
 
     def update_recs2plot(self):
         if uistate.list_idx_select_recs:
@@ -1414,9 +1017,7 @@ class UIsub(
             self.zoomAuto()
             self.graphRefresh()
 
-    # test_type_changed, test_*_variant/tails, editTest*, n_unit_changed, update_experiment_type_radio_buttons moved to StatTestMixin (ui_stat_test.py)
 
-    # test_t_variant/tails_changed, editTest*, n_unit_changed, update_experiment_type_radio_buttons moved to StatTestMixin (ui_stat_test.py)
 
     def viewSettingsChanged(self, key, state):
         self.usage(f"viewSettingsChanged {key}, {state == 2}")
@@ -1542,88 +1143,10 @@ class UIsub(
         self.write_usage()
 
     def setSplitterSizes(self, *splitter_names):
-        for splitter_name in splitter_names:
-            splitter = getattr(self, splitter_name)
-            proportions = uistate.splitter.get(splitter_name, [])
-            widgets = [splitter.widget(i) for i in range(splitter.count())]
-            if len(proportions) != len(widgets):
-                continue
+        # provided by ProjectMixin (moved Phase 5 polish)
+        pass
 
-            is_horizontal = splitter.orientation() == QtCore.Qt.Horizontal
-            total_size = splitter.window().width() if is_horizontal else splitter.window().height()
-
-            if total_size < 100:
-                total_size = 1580 if is_horizontal else 1205
-
-            unbounded_prop = sum(p for p in proportions if type(p) == float)
-            fixed_px = sum(p for p in proportions if type(p) != float)
-            remaining_px = max(0, total_size - fixed_px)
-
-            # Store the original size policies of the widgets, and set their size policy to QtWidgets.QSizePolicy.Ignored
-            original_policies = []
-            sizes = []
-            for i, widget in enumerate(widgets):
-                original_policies.append(widget.sizePolicy())
-                widget.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
-
-                p = proportions[i]
-                if type(p) != float:
-                    sizes.append(int((p / total_size) * 100000))
-                else:
-                    if unbounded_prop > 0:
-                        target_px = (p / unbounded_prop) * remaining_px
-                        sizes.append(int((target_px / total_size) * 100000))
-                    else:
-                        sizes.append(0)
-
-            splitter.setSizes(sizes)
-            for widget, policy in zip(widgets, original_policies):
-                widget.setSizePolicy(policy)
-
-    # setupCanvases moved to GraphCoordinatorMixin (ui_graph.py)
-
-    # setupTableProj moved to TableMixin (ui_table.py)
-
-    # setupTableStim and formatTable*Layout moved to TableMixin (ui_table.py)
-
-    def setupFolders(self):
-        self.dict_folders = self.build_dict_folders()
-        # DEBUG: clear cache and timepoints folders
-        if config.clear_cache:
-            self.deleteFolder(self.dict_folders["cache"])
-        if config.clear_timepoints:
-            self.deleteFolder(self.dict_folders["timepoints"])
-        if config.clear_project_folder:
-            self.deleteFolder(self.dict_folders["project"])
-        # Make sure the necessary folders exist
-        if not os.path.exists(self.projects_folder):
-            os.makedirs(self.projects_folder)
-        if not os.path.exists(self.dict_folders["cache"]):
-            os.makedirs(self.dict_folders["cache"])
-        if not os.path.exists(self.dict_folders["timepoints"]):
-            os.makedirs(self.dict_folders["timepoints"])
-
-    def setupToolBar(self):
-        # apply viewstates for tool frames in the toolbar
-        for frame, (text, state) in list(uistate.viewTools.items()):
-            if hasattr(self, frame):
-                getattr(self, frame).setVisible(state)
-        self.frameToolFilter_sub_Savgol.setVisible(uistate.settings.get("filter", "voltage") == "savgol")
-        if hasattr(self, "frameToolType_sub_io"):
-            self.frameToolType_sub_io.setVisible(self._is_io_mode())
-        if hasattr(self, "frameToolTest"):
-            self.frameToolTest.setVisible(self._should_show_stat_test_frame())  # controlled ONLY by menu or hide button (viewTools); no auto-hide on IO
-        if hasattr(self, "frameToolTestOptions"):
-            self.frameToolTestOptions.setVisible(True)
-
-    def build_dict_folders(self):
-        dict_folders = {
-            "project": self.projects_folder / self.projectname,  # path to project folder
-            "data": self.projects_folder / self.projectname / "data",  # path to project data subfolder
-            "timepoints": self.projects_folder / self.projectname / "timepoints",  # path to project timepoints subfolder
-            "cache": self.projects_folder / f"cache {config.version}" / self.projectname,  # path to project cache subfolder
-        }
-        return dict_folders
+    # setupFolders / build_dict_folders / setupToolBar / setSplitterSizes in ProjectMixin (ui_project.py)
 
     def connectUIstate(self, disconnect=False):  # ternary (dis)connect of UI elements
         # experiment type radio button group
@@ -2368,10 +1891,7 @@ class UIsub(
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
         self.write_bw_cfg()
 
-    # triggerCopyTimepoints, triggerCopyOutput, triggerCopyProjectSummary,
-    # triggerExportSweepsCsv, triggerExportSweepsXls,
-    # triggerExportOutputCsv, triggerExportOutputXls, triggerExportOutputImage
-    # → ExportMixin (export_data.py)
+    # (Export logic in ExportMixin)
 
     def triggerRenameRecording(self):
         self.usage("triggerRenameRecording")
@@ -2453,7 +1973,6 @@ class UIsub(
             logger.warning("No project found in %s", str_projectfolder)
             print(f"No project found in {str_projectfolder}")
 
-    # triggerAddData, triggerParse moved to ParseMixin (ui_parse.py)
 
     def triggerReanalyze(self):
         self.usage("triggerReanalyze")
@@ -2587,21 +2106,15 @@ class UIsub(
             uiplot.unPlot(rec_ID=df_p.loc[idx, "ID"])
         self.graphUpdate()
 
-    # triggerKeepSelectedSweeps, triggerRemoveSelectedSweeps, triggerSplitBySelectedSweeps,
-    # sweep_selection_valid, sweep_removal_valid_confirmed → SweepOpsMixin (ui_sweep_ops.py)
+    # (See SweepOpsMixin for sweep ops)
 
-    # reanalyze_recordings moved to ParseMixin (ui_parse.py)
 
-    # sweep_shift_gaps, sweep_remove_by_ID, sweep_keep_selected, sweep_remove_selected,
-    # sweep_unselect, sweep_split_by_selected → SweepOpsMixin (ui_sweep_ops.py)
 
-    # duplicate_recording, create_recording moved to ParseMixin (ui_parse.py)
 
-    # create_recording moved to ParseMixin (ui_parse.py)
 
-    # create_recording moved to ParseMixin (ui_parse.py)
 
-    # recalculate → DataFrameMixin (ui_data_frames.py)
+
+    # (recalculate in DataFrameMixin)
 
     def update_amp_lineEdits(self):
         if not uistate.list_idx_select_recs:
@@ -3009,7 +2522,6 @@ class UIsub(
         self.update_show(reset=True)
         self.mouseoverUpdate()
 
-    # addData moved to ParseMixin (ui_parse.py)
 
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
@@ -3102,12 +2614,9 @@ class UIsub(
         self.tableUpdate(restore_selection=True, target_idx=None)
         self.tableProjSelectionChanged()
 
-    # purgeRecordingData moved to ParseMixin (ui_parse.py)
 
-    # parseData, progress bars, onParseDataFinished moved to ParseMixin (ui_parse.py)
 
-    # Data Group handling functions → GroupMixin (ui_groups.py)
-    # Writer / project functions → ProjectMixin (ui_project.py)
+    # (Groups in GroupMixin; project in ProjectMixin)
 
     def set_rec_status(self, rec_name=None):  # TODO: should run on ID - not name!
         # Updates df_project['status'] to 'manual' if there is a single manual point, else 'default' if there is a default point, else 'auto'
@@ -3145,11 +2654,7 @@ class UIsub(
         if QtCore.QThread.currentThread() is QtWidgets.QApplication.instance().thread():
             self.tableUpdate(restore_selection=False)  # worker thread; do not touch selection model
 
-    # set_dft → DataFrameMixin (ui_data_frames.py)
-
-    # Table handling
-
-    # setButtonParse moved to ParseMixin (ui_parse.py)
+    # (DataFrame helpers in DataFrameMixin)
 
     def checkBox_splitOddEven_changed(self, state):
         uistate.checkBox["splitOddEven"] = state == 2
@@ -3178,22 +2683,10 @@ class UIsub(
         self.graphRefresh()
         self.update_sample_checkbox()
 
-    # update_sample_checkbox moved to SelectionMixin (ui_selection.py)
-
-    # tableFormat moved to TableMixin (ui_table.py)
     def tableFormat(self):
-        # delegated to mixin (see ui_table.TableMixin.tableFormat)
+        # delegated to ui_table.TableMixin
         pass
 
-    # tableUpdate, _restore_table_selection, get_prow, get_trow moved to TableMixin (ui_table.py)
-
-    # get_dfmean, get_dft, get_dfoutput, get_dfdata, get_dffilter, get_dfbin,
-    # get_dfdiff, get_dfgroupmean, set_uniformTimepoints → DataFrameMixin (ui_data_frames.py)
-
-    # Graph interface
-
-    # graphWipe, graphAxes, graphPreload, ongraphPreloadFinished, graphGroups, graphUpdate moved to GraphCoordinatorMixin (ui_graph.py)
-    # slotAddDfData moved to ParseMixin (ui_parse.py)
 
 
 # Root functions

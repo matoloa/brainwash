@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import socket
 import uuid
@@ -512,3 +513,84 @@ class ProjectMixin:
     def save_df_project(self):  # writes df_project to .csv
         path = self.dict_folders["project"] / "project.brainwash"
         self.df_project.to_csv(str(path), index=False)
+
+    def setupFolders(self):
+        self.dict_folders = self.build_dict_folders()
+        # DEBUG: clear cache and timepoints folders
+        if config.clear_cache:
+            self.deleteFolder(self.dict_folders["cache"])
+        if config.clear_timepoints:
+            self.deleteFolder(self.dict_folders["timepoints"])
+        if config.clear_project_folder:
+            self.deleteFolder(self.dict_folders["project"])
+        # Make sure the necessary folders exist
+        if not os.path.exists(self.projects_folder):
+            os.makedirs(self.projects_folder)
+        if not os.path.exists(self.dict_folders["cache"]):
+            os.makedirs(self.dict_folders["cache"])
+        if not os.path.exists(self.dict_folders["timepoints"]):
+            os.makedirs(self.dict_folders["timepoints"])
+
+    def setupToolBar(self):
+        # apply viewstates for tool frames in the toolbar
+        for frame, (text, state) in list(uistate.viewTools.items()):
+            if hasattr(self, frame):
+                getattr(self, frame).setVisible(state)
+        self.frameToolFilter_sub_Savgol.setVisible(uistate.settings.get("filter", "voltage") == "savgol")
+        if hasattr(self, "frameToolType_sub_io"):
+            self.frameToolType_sub_io.setVisible(self._is_io_mode())
+        if hasattr(self, "frameToolTest"):
+            self.frameToolTest.setVisible(self._should_show_stat_test_frame())  # controlled ONLY by menu or hide button (viewTools); no auto-hide on IO
+        if hasattr(self, "frameToolTestOptions"):
+            self.frameToolTestOptions.setVisible(True)
+
+    def build_dict_folders(self):
+        dict_folders = {
+            "project": self.projects_folder / self.projectname,  # path to project folder
+            "data": self.projects_folder / self.projectname / "data",  # path to project data subfolder
+            "timepoints": self.projects_folder / self.projectname / "timepoints",  # path to project timepoints subfolder
+            "cache": self.projects_folder / f"cache {config.version}" / self.projectname,  # path to project cache subfolder
+        }
+        return dict_folders
+
+    def setSplitterSizes(self, *splitter_names):
+        """Set splitter sizes from persisted proportions in uistate.splitter.
+        Moved here in Phase 5 polish (lifecycle/setup belongs with ProjectMixin).
+        """
+        for splitter_name in splitter_names:
+            splitter = getattr(self, splitter_name)
+            proportions = uistate.splitter.get(splitter_name, [])
+            widgets = [splitter.widget(i) for i in range(splitter.count())]
+            if len(proportions) != len(widgets):
+                continue
+
+            is_horizontal = splitter.orientation() == QtCore.Qt.Horizontal
+            total_size = splitter.window().width() if is_horizontal else splitter.window().height()
+
+            if total_size < 100:
+                total_size = 1580 if is_horizontal else 1205
+
+            unbounded_prop = sum(p for p in proportions if type(p) == float)
+            fixed_px = sum(p for p in proportions if type(p) != float)
+            remaining_px = max(0, total_size - fixed_px)
+
+            # Store the original size policies of the widgets, and set their size policy to QtWidgets.QSizePolicy.Ignored
+            original_policies = []
+            sizes = []
+            for i, widget in enumerate(widgets):
+                original_policies.append(widget.sizePolicy())
+                widget.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
+
+                p = proportions[i]
+                if type(p) != float:
+                    sizes.append(int((p / total_size) * 100000))
+                else:
+                    if unbounded_prop > 0:
+                        target_px = (p / unbounded_prop) * remaining_px
+                        sizes.append(int((target_px / total_size) * 100000))
+                    else:
+                        sizes.append(0)
+
+            splitter.setSizes(sizes)
+            for widget, policy in zip(widgets, original_policies):
+                widget.setSizePolicy(policy)
