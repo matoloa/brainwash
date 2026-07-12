@@ -1805,6 +1805,7 @@ class UIsub(
         Structure: test (settings) n : results   (group names + n reported immediately after variant, per proposal).
         Uses group names (from dd_groups) + effective n from results (post n_unit aggregation) instead of raw n1/n2.
         Mirrors the n_report style and "n first" placement used by _format_io_regression_statusbar.
+        FDR/SW/Levene (when their boxes checked) are appended several spaces to the right (only the selected ones, with p-values when present).
         Keeps text short; full details (stats, q, notes, exact per-set) stay in the console + markers.
         """
         if not formal:
@@ -1889,6 +1890,11 @@ class UIsub(
         if n_report:
             test_label = f"{test_label} {n_report}"
 
+        # Read the option flags early so the p/q reporting and suffix can use them.
+        fdr = bool(getattr(uistate, "test_fdr", False))
+        sw = bool(getattr(uistate, "test_sw", False))
+        lev = bool(getattr(uistate, "test_levene", False))
+
         # Cluster perm. (and any multi-result case) reports per set; others use first result only (matches print)
         is_multi = (eff == "Cluster perm.") or len(results) > 1
         reports = []
@@ -1900,18 +1906,55 @@ class UIsub(
                 sname = r.get("set_name") or r.get("set_id") or f"set{idx+1}"
                 set_prefix = f"{sname}: "
             for key in sorted(k for k in r.keys() if k.startswith("p_")):
-                pval = r.get(key)
                 aspect = key[2:].replace("_norm", " (norm)")  # e.g. amp, slope, amp (norm)
-                if isinstance(pval, (int, float)) and np.isfinite(pval):
-                    pstr = f"{pval:.3g}" if pval >= 0.001 else "<0.001"
+                # If FDR selected, prefer the q-value for reporting (what actually controls significance)
+                use_q = fdr and r.get("q_" + key[2:]) is not None
+                val_key = "q_" + key[2:] if use_q else key
+                val = r.get(val_key, r.get(key))
+                if isinstance(val, (int, float)) and np.isfinite(val):
+                    pstr = f"{val:.3g}" if val >= 0.001 else "<0.001"
                 else:
                     pstr = "NA"
-                reports.append(f"{set_prefix}{aspect}: p={pstr}")
+                label = "q" if use_q else "p"
+                reports.append(f"{set_prefix}{aspect}: {label}={pstr}")
+
+        # Build diagnostics suffix (FDR/SW/Levene) only if the boxes are checked.
+        # Appended several spaces to the right of the regular p/q message.
+        diag_suffix = ""
+        if fdr or sw or lev:
+            diag = []
+            if fdr:
+                diag.append("FDR")
+            r = primary  # sw/levene p-values live in the result rows (from assumptions.py)
+            if sw:
+                sw_strs = []
+                for asp in ("amp", "slope"):
+                    p = r.get(f"sw_p_{asp}")
+                    if isinstance(p, (int, float)) and np.isfinite(p):
+                        pstr = f"{p:.3g}" if p >= 0.001 else "<0.001"
+                        sw_strs.append(f"{asp} p={pstr}")
+                if sw_strs:
+                    diag.append("SW(" + " ".join(sw_strs) + ")")
+                else:
+                    diag.append("SW")
+            if lev:
+                lev_strs = []
+                for asp in ("amp", "slope"):
+                    p = r.get(f"levene_p_{asp}")
+                    if isinstance(p, (int, float)) and np.isfinite(p):
+                        pstr = f"{p:.3g}" if p >= 0.001 else "<0.001"
+                        lev_strs.append(f"{asp} p={pstr}")
+                if lev_strs:
+                    diag.append("Lev(" + " ".join(lev_strs) + ")")
+                else:
+                    diag.append("Levene")
+            if diag:
+                diag_suffix = "    " + " ".join(diag)
 
         if not reports:
             uistate.statusbar_state = "info"
-            return f"{test_label}: done (see console)"
-        text = f"{test_label}: {'  '.join(reports)}"
+            return f"{test_label}: done (see console){diag_suffix}"
+        text = f"{test_label}: {'  '.join(reports)}{diag_suffix}"
         uistate.statusbar_state = "info"
         return text
 
