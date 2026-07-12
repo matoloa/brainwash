@@ -342,7 +342,6 @@ class InteractivePlotMixin:
         return int(np.nanargmin(distances))
 
     def _draw_ghost_sweep(self, snippet_x, snippet_y, label_text):
-        print(f"DEBUG _draw_ghost_sweep: called, axe={uistate.axe}, snippet_x len={len(snippet_x) if snippet_x is not None else 0}, label={label_text}")
         if uistate.ghost_sweep is None:
             ghost_color = "white" if uistate.darkmode else "black"
             (uistate.ghost_sweep,) = uistate.axe.plot(snippet_x, snippet_y, color=ghost_color, alpha=0.5, zorder=0)
@@ -360,7 +359,6 @@ class InteractivePlotMixin:
         else:
             uistate.ghost_sweep.set_data(snippet_x, snippet_y)
             uistate.ghost_label.set_text(label_text)
-        print("DEBUG _draw_ghost_sweep: ghost plotted on axe (canvasEvent)")
 
     def _draw_mouseover_blob(self, ax, x, y, color):
         if getattr(uistate, "mouseover_out_blob", None) is None:
@@ -374,19 +372,14 @@ class InteractivePlotMixin:
                 uistate.mouseover_out_blob.set_color(color)
 
     def outputMouseover(self, event):
-        print(f"DEBUG outputMouseover: called, inaxes={event.inaxes}, xdata={event.xdata}, ydata={event.ydata}")
         handler = self.mouseover_loader()
         if handler:
-            print(f"DEBUG outputMouseover: dispatching to {handler.__name__}")
             handler(event)
-        else:
-            print("DEBUG outputMouseover: no handler")
 
     def on_leave_output(self, event):
         self.exorcise()
 
     def exorcise(self):
-        print("DEBUG exorcise: called, removing any ghost on axe")
         if uistate.ghost_sweep is not None:
             uistate.ghost_sweep.remove()
             uistate.ghost_sweep = None
@@ -572,15 +565,12 @@ class InteractivePlotMixin:
         self.usage("mouseoverUpdate")
         self.mouseoverDisconnect()
         n_recs = len(uistate.list_idx_select_recs or [])
-        n_stims = len(uistate.list_idx_select_stims or [])
-        print(f"DEBUG mouseoverUpdate: n_recs={n_recs}, n_stims={n_stims}, recs={uistate.list_idx_select_recs}, stims={uistate.list_idx_select_stims}")
 
         # Explicitly connect output mouseover (canvasOutput -> ghost on canvasEvent/axe)
         # when EXACTLY one recording is selected.
         if n_recs == 1:
             self.mouseoverOutput = self.canvasOutput.mpl_connect("motion_notify_event", self.outputMouseover)
             self.mouseLeaveOutput = self.canvasOutput.mpl_connect("axes_leave_event", self.on_leave_output)
-            print("DEBUG mouseoverUpdate: exactly 1 rec selected -> connected canvasOutput mouseover for ghost on axe")
         # if only one item is selected, make a new mouseover event connection
         if uistate.list_idx_select_recs and uistate.list_idx_select_stims:
             self._update_marker_data()
@@ -1144,7 +1134,6 @@ class InteractivePlotMixin:
     # --- Phase 2: Specialized Mouseover Strategies ---
 
     def _mouseover_output_time(self, event):
-        print(f"DEBUG _mouseover_output_time: event.inaxes={event.inaxes}, slopeView={uistate.slopeView()}, ampView={uistate.ampView()}")
         use_mouse_x_direct = False  # for fallback when no data line
         out_x_idx = 0
         x_val = 0
@@ -1158,7 +1147,6 @@ class InteractivePlotMixin:
             str_ax = None
         ax = getattr(uistate, str_ax) if str_ax else None
         if event.inaxes not in (uistate.ax1, uistate.ax2) or str_ax is None:
-            print(f"DEBUG _mouseover_output_time: not on ax1/ax2 or no str_ax={str_ax}, exorcising")
             if uistate.ghost_sweep is not None:
                 self.exorcise()
             return
@@ -1167,12 +1155,10 @@ class InteractivePlotMixin:
         else:
             x, y = event.xdata, event.ydata
         if x is None or y is None or not (uistate.slopeView() or uistate.ampView()):
-            print("DEBUG _mouseover_output_time: no x/y or no amp/slope view, exorcising")
             if uistate.ghost_sweep is not None:
                 self.exorcise()
             return
         n_recs = len(uistate.list_idx_select_recs or [])
-        print(f"DEBUG _mouseover_output_time: n_recs={n_recs}")
         if n_recs > 1:
             self.exorcise()
             return
@@ -1203,25 +1189,15 @@ class InteractivePlotMixin:
                 for key, value in uistate.dict_rec_show.items()
                 if rec_id is not None and value.get("rec_ID") == rec_id and value.get("axis") == other and not str(value.get("aspect", "")).endswith("_mean") and hasattr(value.get("line"), "get_xdata")
             }
-            if dict_out:
-                print(f"DEBUG _mouseover_output_time: fell back to data line on {other}")
-        print(f"DEBUG _mouseover_output_time: len(dict_rec_show)={len(uistate.dict_rec_show)}, len(dict_out)={len(dict_out)}")
-        # dump ax output lines for debug
-        print("DEBUG ax output lines in dict_rec_show:")
-        for k, v in uistate.dict_rec_show.items():
-            if v.get("axis") in ("ax1", "ax2"):
-                print(f"  key={k}, axis={v.get('axis')}, aspect={v.get('aspect')}, stim={v.get('stim')}, rec_ID={v.get('rec_ID')}")
         use_group_xy = False
         rec_ID_for_snippet = None
         use_mouse_x_direct = False
         if not dict_out:
             if n_recs == 1:
-                print("DEBUG _mouseover_output_time: no suitable per-sweep data line on this ax (e.g. only mean hline), using mouse x directly as x_val")
                 rec_ID_for_snippet = rec_id
                 use_mouse_x_direct = True
                 dict_pop = {"rec_ID": rec_id, "stim": stim_for_rec, "line": None}  # dummy
             else:
-                print("DEBUG _mouseover_output_time: no dict_out for rec, trying group fallback")
                 # Fallback for group-only view: use a shown group mean line for (x,y) sweep lookup;
                 # pick first rec in that group to source the actual voltage snippet (ghost).
                 g_out = {
@@ -1245,7 +1221,6 @@ class InteractivePlotMixin:
         else:
             dict_pop = list(dict_out.values())[0]
             rec_ID_for_snippet = dict_pop.get("rec_ID")
-            print(f"DEBUG _mouseover_output_time: using rec output line for ghost, rec_ID={rec_ID_for_snippet}, stim={dict_pop.get('stim')}")
 
         if use_mouse_x_direct:
             x_val = x
@@ -1260,10 +1235,9 @@ class InteractivePlotMixin:
             x_val = x_data[out_x_idx]
             out_x_val = x_val
             out_y_val = y_data[out_x_idx]
-            print(f"DEBUG _mouseover_output_time: nearest out_x_idx={out_x_idx}, x_val={x_val}")
+
 
         if not use_mouse_x_direct and out_x_idx == getattr(uistate, "last_out_x_idx", None):
-            print("DEBUG _mouseover_output_time: same x_idx as last, skipping")
             return
         if use_mouse_x_direct:
             out_x_idx = 999  # force update
@@ -1272,7 +1246,6 @@ class InteractivePlotMixin:
         df_p = self.get_df_project()
         p_row_df = df_p[df_p["ID"] == rec_ID]
         if p_row_df.empty:
-            print(f"DEBUG _mouseover_output_time: no matching p_row for rec_ID={rec_ID}")
             return
         p_row = p_row_df.iloc[0]
         df_t = self.get_dft(p_row)
@@ -1296,12 +1269,10 @@ class InteractivePlotMixin:
             out_sweeps = dfsource["sweep"].dropna().unique()
             if len(out_sweeps) > 0:
                 x_val = out_sweeps[ int(np.nanargmin(np.abs(out_sweeps - x_val))) ]
-                print(f"DEBUG _mouseover_output_time: snapped direct x_val to nearest sweep {x_val}")
 
         dfsweep = dfsource[dfsource["sweep"] == x_val]
         snippet_x = dfsweep["time"] - offset
         snippet_y = dfsweep[rec_filter]
-        print(f"DEBUG _mouseover_output_time: dfsweep len={len(dfsweep)}, snippet len={len(snippet_x) if snippet_x is not None else 0}, rec_filter={rec_filter}")
 
         if getattr(uistate, "mouseover_out_blob", None) is not None:
             try:
@@ -1310,12 +1281,10 @@ class InteractivePlotMixin:
                 pass
             uistate.mouseover_out_blob = None
 
-        print("DEBUG _mouseover_output_time: about to draw ghost on axe (canvasEvent)")
         self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
         uistate.axe.figure.canvas.draw_idle()
         uistate.last_out_x_idx = out_x_idx
         ax.figure.canvas.draw_idle()
-        print("DEBUG _mouseover_output_time: ghost draw_idle done on axe and ax")
 
     def _mouseover_output_stim(self, event):
         str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
@@ -1370,7 +1339,7 @@ class InteractivePlotMixin:
         df_p = self.get_df_project()
         p_row_df = df_p[df_p["ID"] == rec_ID]
         if p_row_df.empty:
-            print(f"DEBUG: no matching p_row for rec_ID={rec_ID}")
+
             return
         p_row = p_row_df.iloc[0]
         df_t = self.get_dft(p_row)
@@ -1466,7 +1435,7 @@ class InteractivePlotMixin:
         df_p = self.get_df_project()
         p_row_df = df_p[df_p["ID"] == rec_ID]
         if p_row_df.empty:
-            print(f"DEBUG: no matching p_row for rec_ID={rec_ID}")
+
             return
         p_row = p_row_df.iloc[0]
 
@@ -1555,7 +1524,7 @@ class InteractivePlotMixin:
         df_p = self.get_df_project()
         p_row_df = df_p[df_p["ID"] == rec_ID]
         if p_row_df.empty:
-            print(f"DEBUG: no matching p_row for rec_ID={rec_ID}")
+
             return
         p_row = p_row_df.iloc[0]
 
