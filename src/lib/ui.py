@@ -61,6 +61,7 @@ import ui_table  # TableMixin (Phase 1 start)
 import ui_selection  # SelectionMixin (Phase 1)
 import ui_graph  # GraphCoordinatorMixin (Phase 2)
 import ui_parse  # ParseMixin (Phase 3)
+import ui_stat_test  # StatTestMixin (Phase 4)
 import yaml  # used by talkback
 from ui_project import df_projectTemplate
 
@@ -149,6 +150,11 @@ ui_parse.uistate = uistate
 ui_parse.config = config
 ui_parse.uiplot = uiplot
 
+# ui_stat_test
+ui_stat_test.uistate = uistate
+ui_stat_test.config = config
+ui_stat_test.uiplot = uiplot
+
 ####################################################################
 # MAIN UI CLASS
 ####################################################################
@@ -168,6 +174,7 @@ class UIsub(
     ui_selection.SelectionMixin,  # Phase 1
     ui_graph.GraphCoordinatorMixin,  # Phase 2
     ui_parse.ParseMixin,  # Phase 3
+    ui_stat_test.StatTestMixin,  # Phase 4
 ):
     def __init__(self, mainwindow):
         logger.debug("UIsub __init__ started")
@@ -558,48 +565,9 @@ class UIsub(
             except Exception:
                 pass
 
-    # ------------------------------------------------------------------
-    # v0.16 Formal statistical test (Test Sets + groups) — automatic
-    # Separate from toggleHeatmap (which remains the full-range crude tool)
-    # ------------------------------------------------------------------
+    # Formal statistical test logic moved to StatTestMixin (ui_stat_test.py)
 
-    def _get_shown_group_ids(self):
-        if not hasattr(self, "dd_groups") or not self.dd_groups:
-            return []
-        shown = []
-        for gid, g in self.dd_groups.items():
-            if g.get("show") in (True, "True", "true", 1, "1"):
-                shown.append(gid)
-        return shown
-
-    def _get_shown_testsets(self):
-        if not hasattr(self, "dd_testsets") or not self.dd_testsets:
-            return []
-        out = []
-        for sid, ts in self.dd_testsets.items():
-            if ts.get("show", False) and ts.get("sweeps"):
-                out.append((sid, ts))
-        return out
-
-    def update_anova_label(self):
-        """Update label_test_ANOVA and uistate.anova_label based on number of shown test sets.
-        Called whenever test sets are created, shown/hidden, or test_type changes to ANOVA/ANCOVA.
-        (IO regression uses separate statusbar; no special label.)
-        """
-        if not hasattr(self, "label_test_ANOVA"):
-            return
-        n = len(self._get_shown_testsets())
-        if n > 1:
-            label_text = "ANOVA (repeated)"
-        else:
-            label_text = "ANOVA (one-way)"
-        uistate.anova_label = label_text
-        self.label_test_ANOVA.setText(label_text)
-        # Persist immediately (mirrors other test cfg changes)
-        if hasattr(self, "dict_folders") and "project" in self.dict_folders:
-            uistate.save_cfg(projectfolder=self.dict_folders["project"])
-
-    def clear_formal_test_results(self):
+    # _get_shown_group_ids, _get_shown_testsets, update_anova_label, clear_formal_test_results moved to StatTestMixin (ui_stat_test.py)
         """Clear any formal test markers and stored results. Independent of heatmap."""
         try:
             if uiplot is not None:
@@ -677,267 +645,9 @@ class UIsub(
         except Exception:
             pass
 
-    def _is_io_mode(self) -> bool:
-        """Central helper: experiment_type == 'io' (per AGENTS.md)."""
-        return getattr(uistate, "experiment_type", "time") == "io"
+    # _is_io_mode, _effective_test_type, _should_show_stat_test_frame, _get_statusbar_for_current_state, _format_* moved to StatTestMixin (ui_stat_test.py)
 
-    def _effective_test_type(self) -> str:
-        """Central helper: returns test_type or "None". No sentinel (IO driven by _is_io_mode() and experiment_type per plan/AGENTS.md)."""
-        return getattr(uistate, "test_type", "None")
-
-    def _should_show_stat_test_frame(self) -> bool:
-        """Central helper: return whether Statistical Test frame should be shown (respects viewTools/menu/hide button state; no auto-hide on IO)."""
-        # Always respect uistate.viewTools["frameToolTest"][1] if present; otherwise default to not IO.
-        if "frameToolTest" in getattr(uistate, "viewTools", {}):
-            return uistate.viewTools["frameToolTest"][1]
-        return not self._is_io_mode()
-
-    def _get_statusbar_for_current_state(self) -> str | None:
-        """Single source of truth for statusbar per AGENTS.md and plan.md.
-        Dispatches based on experiment_type/effective operation. IO prefers formal_test_results config.
-        Pure query (state set only by caller update_test / set_statusbar). Handles all combinations.
-        Non-IO: warnings from checks, or compact success report from formal_test_results when applicable.
-        """
-        eff = self._effective_test_type()
-        if eff == "None":
-            uistate.statusbar_state = None
-            return None
-        if self._is_io_mode():  # IO first-class (ANCOVA is normal test_type radio)
-            formal = getattr(uistate, "formal_test_results", None)
-            return self._format_io_regression_statusbar(formal)
-        # non-IO: warning logic (pure; state set here for red bg on "no test sets" etc.)
-        text = self._get_stat_test_warning()
-        if text is not None:
-            uistate.statusbar_state = "warning"
-            return text
-        # Success path for explicit tests (t-test, ANOVA, etc.): format compact report from results.
-        # (Full details are in the console via _print_statistical_test_table + plot markers.)
-        formal = getattr(uistate, "formal_test_results", None)
-        if formal:
-            text = self._format_non_io_stat_test_statusbar(formal)
-            if text:
-                return text
-        uistate.statusbar_state = None
-        return None
-
-    def _format_io_regression_statusbar(self, formal):
-        """Single source of truth for IO regression statusbar (called from _get_statusbar_for_current_state).
-        Handles formal_test_results config for "IO regression" type; sets state as side-effect.
-        """
-        if formal:
-            if isinstance(formal, list) and formal:
-                item = formal[0]
-                if isinstance(item, dict):
-                    cfg = item.get("config") or item
-            elif isinstance(formal, dict):
-                cfg = formal.get("config") or formal
-            else:
-                cfg = None
-            if isinstance(cfg, dict) and cfg.get("type") == "IO regression":
-                prefix = "IO ANCOVA"
-                global_notes = []
-                # n_report first (after prefix per approved plan), dynamic unit from n_unit, Y/X labels, : before results (pure formatter)
-                n_report = ""
-                group_ns = cfg.get("group_ns") or (formal[0] if isinstance(formal, list) else formal).get("group_ns", {})
-                n_unit = cfg.get("n_unit", getattr(uistate, "buttonGroup_test_n", "subject"))
-                unit_label = "subjects" if n_unit == "subject" else f"{n_unit}s"
-                if group_ns:
-                    ns = []
-                    for g, n in group_ns.items():
-                        g_name = self.dd_groups.get(g, {}).get("group_name", f"Group {g}")
-                        ns.append(f"{g_name}={n}")
-                    n_report = f"({', '.join(ns)} {unit_label})"
-                # human labels (Y first then X per IO spec; map from regression config)
-                x_col = cfg.get("x_col", "volley_amp")
-                y_col = cfg.get("y_col", "EPSP_amp")
-                label_map = {
-                    "EPSP_amp": "EPSP amp",
-                    "EPSP_slope": "EPSP slope",
-                    "volley_amp": "volley amp",
-                    "volley_slope": "volley slope",
-                    "stim": "stim",
-                }
-                y_label = label_map.get(y_col, y_col.replace("_", " "))
-                x_label = label_map.get(x_col, x_col.replace("_", " "))
-                xy_label = f"{y_label} / {x_label}"
-                slope_p = cfg.get("slope_p") or (formal[0] if isinstance(formal, list) else formal).get("slope_p")
-                if isinstance(slope_p, (int, float)) and np.isfinite(slope_p):
-                    pstr = f"{slope_p:.3g}" if slope_p >= 0.001 else "<0.001"
-                    stat_label = "slope" if str(cfg.get("io_output", "")).endswith(("slope", "Slope")) else "ratio"
-                    global_notes.append(f"{stat_label} p={pstr}")
-                for g, r2v in cfg.get("r2_per_group", {}).items():
-                    if isinstance(r2v, (int, float)) and np.isfinite(r2v):
-                        global_notes.append(f"r²({g})={r2v:.2f}")
-                        break
-                if global_notes:
-                    notes_str = " ".join(global_notes)
-                    prefix = f"{prefix} {n_report} {xy_label}: {notes_str}"
-                else:
-                    prefix = f"{prefix} {n_report} {xy_label}"
-                uistate.statusbar_state = "info"
-                return prefix
-            # No formal_results yet (initial switch) or not matching config: benign hint, not an error.
-            uistate.statusbar_state = None
-            return "IO regression: select ≥2 groups to compute slope comparison"
-
-    def _format_non_io_stat_test_statusbar(self, formal):
-        """Compact success statusbar text for non-IO formal tests (t-test, ANOVA, Wilcoxon, Friedman, Cluster perm.).
-        Called from _get_statusbar_for_current_state only after _get_stat_test_warning() returned None.
-        Structure: test (settings) n : results   (group names + n reported immediately after variant, per proposal).
-        Uses group names (from dd_groups) + effective n from results (post n_unit aggregation) instead of raw n1/n2.
-        Mirrors the n_report style and "n first" placement used by _format_io_regression_statusbar.
-        FDR/SW/Levene (when their boxes checked) are appended several spaces to the right (only the selected ones, with p-values when present).
-        Keeps text short; full details (stats, q, notes, exact per-set) stay in the console + markers.
-        """
-        if not formal:
-            uistate.statusbar_state = None
-            return None
-        results = formal if isinstance(formal, list) else [formal]
-        if not any(isinstance(r, dict) for r in results):
-            uistate.statusbar_state = None
-            return None
-
-        eff = self._effective_test_type()
-        # variant for t-test / Wilcoxon (others ignore)
-        if eff == "Wilcoxon":
-            variant = getattr(uistate, "test_wilcox_variant", "paired")
-        elif eff == "t-test":
-            variant = getattr(uistate, "test_t_variant", "unpaired")
-        else:
-            variant = None
-
-        test_label = f"{eff} ({variant})" if variant else eff
-
-        # --- n_report with group names (placed right after settings) ---
-        n_report = ""
-        primary = results[0] if results else {}
-        try:
-            if isinstance(primary, dict):
-                n_unit = getattr(uistate, "buttonGroup_test_n", "subject")
-                unit_label = "subjects" if n_unit == "subject" else f"{n_unit}s"
-                ddg = getattr(self, "dd_groups", {}) or {}
-
-                # Prefer explicit group_ns when present (some implicit/IO-derived paths carry it)
-                group_ns = primary.get("group_ns") or (primary.get("config") or {}).get("group_ns", {})
-                if group_ns:
-                    ns = []
-                    for g, n in group_ns.items():
-                        g_name = ddg.get(g, {}).get("group_name", f"Group {g}")
-                        ns.append(f"{g_name}={n}")
-                    if ns:
-                        n_report = f"({', '.join(ns)} {unit_label})"
-                else:
-                    g1 = primary.get("group1")
-                    g2 = primary.get("group2")
-                    n1 = int(primary.get("n1", 0) or 0)
-                    n2 = int(primary.get("n2", 0) or 0)
-
-                    # Normalize singleton lists used by some cluster / multi paths
-                    if isinstance(g1, (list, tuple)) and len(g1) == 1:
-                        g1 = g1[0]
-                    if isinstance(g2, (list, tuple)) and len(g2) == 1:
-                        g2 = g2[0]
-
-                    def _gname(g):
-                        if g is None:
-                            return None
-                        if isinstance(g, (list, tuple)):
-                            return None
-                        return ddg.get(g, {}).get("group_name", f"Group {g}")
-
-                    if g1 is not None and g2 is not None and g1 != g2 and not isinstance(g1, (list, tuple)):
-                        # Two distinct groups (typical unpaired t-test)
-                        p1 = f"{_gname(g1)}={n1}" if n1 else str(_gname(g1))
-                        p2 = f"{_gname(g2)}={n2}" if n2 else str(_gname(g2))
-                        n_report = f"({p1}, {p2} {unit_label})"
-                    elif g1 is not None:
-                        if isinstance(g1, (list, tuple)):
-                            # Multi-group (ANOVA, Friedman, RM-ANOVA, cluster between)
-                            parts = []
-                            val = n1 or n2
-                            for gg in g1:
-                                nm = _gname(gg)
-                                parts.append(f"{nm}={val}" if val else str(nm))
-                            if parts:
-                                n_report = f"({', '.join(parts)} {unit_label})"
-                        else:
-                            # One group (paired, one-sample, within-subjects)
-                            nm = _gname(g1)
-                            val = n1 or n2
-                            n_report = f"({nm}={val} {unit_label})" if val else f"({nm})"
-        except Exception:
-            n_report = ""
-
-        if n_report:
-            test_label = f"{test_label} {n_report}"
-
-        # Read the option flags early so the p/q reporting and suffix can use them.
-        fdr = bool(getattr(uistate, "test_fdr", False))
-        sw = bool(getattr(uistate, "test_sw", False))
-        lev = bool(getattr(uistate, "test_levene", False))
-
-        # Cluster perm. (and any multi-result case) reports per set; others use first result only (matches print)
-        is_multi = (eff == "Cluster perm.") or len(results) > 1
-        reports = []
-        for idx, r in enumerate(results):
-            if not isinstance(r, dict):
-                continue
-            set_prefix = ""
-            if is_multi:
-                sname = r.get("set_name") or r.get("set_id") or f"set{idx+1}"
-                set_prefix = f"{sname}: "
-            for key in sorted(k for k in r.keys() if k.startswith("p_")):
-                aspect = key[2:].replace("_norm", " (norm)")  # e.g. amp, slope, amp (norm)
-                # If FDR selected, prefer the q-value for reporting (what actually controls significance)
-                use_q = fdr and r.get("q_" + key[2:]) is not None
-                val_key = "q_" + key[2:] if use_q else key
-                val = r.get(val_key, r.get(key))
-                if isinstance(val, (int, float)) and np.isfinite(val):
-                    pstr = f"{val:.3g}" if val >= 0.001 else "<0.001"
-                else:
-                    pstr = "NA"
-                label = "q" if use_q else "p"
-                reports.append(f"{set_prefix}{aspect}: {label}={pstr}")
-
-        # Build diagnostics suffix (FDR/SW/Levene) only if the boxes are checked.
-        # Appended several spaces to the right of the regular p/q message.
-        diag_suffix = ""
-        if fdr or sw or lev:
-            diag = []
-            if fdr:
-                diag.append("FDR")
-            r = primary  # sw/levene p-values live in the result rows (from assumptions.py)
-            if sw:
-                sw_strs = []
-                for asp in ("amp", "slope"):
-                    p = r.get(f"sw_p_{asp}")
-                    if isinstance(p, (int, float)) and np.isfinite(p):
-                        pstr = f"{p:.3g}" if p >= 0.001 else "<0.001"
-                        sw_strs.append(f"{asp} p={pstr}")
-                if sw_strs:
-                    diag.append("SW(" + " ".join(sw_strs) + ")")
-                else:
-                    diag.append("SW")
-            if lev:
-                lev_strs = []
-                for asp in ("amp", "slope"):
-                    p = r.get(f"levene_p_{asp}")
-                    if isinstance(p, (int, float)) and np.isfinite(p):
-                        pstr = f"{p:.3g}" if p >= 0.001 else "<0.001"
-                        lev_strs.append(f"{asp} p={pstr}")
-                if lev_strs:
-                    diag.append("Lev(" + " ".join(lev_strs) + ")")
-                else:
-                    diag.append("Levene")
-            if diag:
-                diag_suffix = "    " + " ".join(diag)
-
-        if not reports:
-            uistate.statusbar_state = "info"
-            return f"{test_label}: done (see console){diag_suffix}"
-        text = f"{test_label}: {'  '.join(reports)}{diag_suffix}"
-        uistate.statusbar_state = "info"
-        return text
+    # _format_* statusbar moved to StatTestMixin (ui_stat_test.py)
 
     def _apply_io_regression(self) -> bool:
         """Helper for IO path in apply_statistical_test_if_active (called from dispatcher).
@@ -1097,26 +807,7 @@ class UIsub(
 
         return warning
 
-    def update_test(self):
-        """Single high-level entrypoint for all changes that affect statistical tests or their statusbar (per approved plan).
-        Always runs statistical analysis if a test is active (via apply_statistical_test_if_active), then calls set_statusbar with the resulting state/text.
-        """
-        if self._is_loading_active():
-            return
-        # Prevent infinite recursion between update_test <-> apply_statistical_test_if_active
-        if getattr(self, "_updating_test", False):
-            return
-        self._updating_test = True
-        try:
-            self.apply_statistical_test_if_active()
-        finally:
-            self._updating_test = False
-
-        # After computation (or if no test active), ensure statusbar is set
-        # (pure query; no "does it agree?" test — we always re-apply on change)
-        text = self._get_statusbar_for_current_state()
-        state = getattr(uistate, "statusbar_state", None)
-        self.set_statusbar(state, text)
+    # update_test, set_statusbar, _on_statusbar..., apply_statistical_test_if_active, _apply_* moved to StatTestMixin (ui_stat_test.py)
 
     def set_statusbar(self, state: str | None = None, text: str | None = None):
         """Low-level applicator: only does what it is given (debug print + appearance). No computation or queries.
@@ -1723,139 +1414,9 @@ class UIsub(
             self.zoomAuto()
             self.graphRefresh()
 
-    def test_type_changed(self, button):
-        """Handler for buttonGroup_test.buttonClicked signal."""
-        test_type = self._RADIO_TO_TEST.get(button.objectName(), button.text())
-        old_type = getattr(uistate, "test_type", "None")
-        if test_type is None or test_type == old_type:
-            return
-        self.usage(f"test_type_changed → {test_type}")
-        print(f"Selected statistical test: {test_type}")
-        uistate.test_type = test_type
-        if hasattr(self, "frameToolTest_sub_t"):
-            self.frameToolTest_sub_t.setVisible(test_type == "t-test")
-            # hook the one-sample value lineEdit (default 0.0 from UIState)
-            if hasattr(self, "lineEdit_test_t_one_sample_value"):
-                val = getattr(uistate, "label_test_t_one_sample_value", 0.0)
-                self.lineEdit_test_t_one_sample_value.setText(str(val))
-        if hasattr(self, "frameToolTest_sub_ANOVA"):
-            self.frameToolTest_sub_ANOVA.setVisible(test_type in ("ANOVA", "ANCOVA"))
-            if test_type in ("ANOVA", "ANCOVA"):
-                self.update_anova_label()
-        if hasattr(self, "frameToolTest_sub_wilcoxon"):
-            self.frameToolTest_sub_wilcoxon.setVisible(test_type == "Wilcoxon")
-            if test_type == "Wilcoxon" and hasattr(self, "lineEdit_wilcoxon_one_sample_value"):
-                val = getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)
-                self.lineEdit_wilcoxon_one_sample_value.setText(str(val))
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        # Clear stale results; update_test is the single entry point for re-evaluation + statusbar.
-        uistate.formal_test_results = None
-        # Do not unconditionally reset statusbar_state here; let _get_statusbar_for_current_state
-        # (called from update_test) set "warning" for invalid t-test state (e.g. no test sets).
-        # This matches launch-time behavior where warning color is set correctly.
-        self.update_test()
+    # test_type_changed, test_*_variant/tails, editTest*, n_unit_changed, update_experiment_type_radio_buttons moved to StatTestMixin (ui_stat_test.py)
 
-    def test_t_variant_changed(self, button):
-        """Wiring for buttonGroup_test_t_variant (v0.16)."""
-        variant = self._RADIO_TO_TEST_T_VARIANT.get(button.objectName(), button.text())
-        print(f"Selected t-test variant: {variant}")
-        uistate.test_t_variant = variant
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.update_test()
-
-    def test_t_tails_changed(self, button):
-        """Wiring for buttonGroup_test_t_tails (v0.16)."""
-        tails = self._RADIO_TO_TEST_T_TAILS.get(button.objectName(), button.text())
-        print(f"Selected t-test tails: {tails}")
-        uistate.test_t_tails = tails
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.update_test()
-
-    def editTestTOneSampleValue(self, lineEdit):
-        """Handler for lineEdit_test_t_one_sample_value (v0.16 one-sample t-test)."""
-        self.usage("editTestTOneSampleValue")
-        try:
-            val = float(lineEdit.text().replace(",", "."))
-        except ValueError:
-            lineEdit.setText(str(getattr(uistate, "label_test_t_one_sample_value", 0.0)))
-            return
-        uistate.label_test_t_one_sample_value = val
-        print(f"editTestTOneSampleValue: uistate.label_test_t_one_sample_value set to {val}")
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.update_test()
-
-    def test_wilcox_variant_changed(self, button):
-        """Wiring for buttonGroup_test_wilcox_variant."""
-        variant = self._RADIO_TO_TEST_WILCOX_VARIANT.get(button.objectName(), button.text())
-        print(f"Selected Wilcoxon variant: {variant}")
-        uistate.test_wilcox_variant = variant
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.update_test()
-
-    def test_wilcox_tails_changed(self, button):
-        """Wiring for buttonGroup_test_wilcox_tails."""
-        tails = self._RADIO_TO_TEST_WILCOX_TAILS.get(button.objectName(), button.text())
-        print(f"Selected Wilcoxon tails: {tails}")
-        uistate.test_wilcox_tails = tails
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.update_test()
-
-    def editTestWilcoxOneSampleValue(self, lineEdit):
-        """Handler for lineEdit_test_wilcox_one_sample_value."""
-        self.usage("editTestWilcoxOneSampleValue")
-        try:
-            val = float(lineEdit.text().replace(",", "."))
-        except ValueError:
-            lineEdit.setText(str(getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)))
-            return
-        uistate.label_test_wilcox_one_sample_value = val
-        print(f"editTestWilcoxOneSampleValue: uistate.label_test_wilcox_one_sample_value set to {val}")
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.update_test()
-
-    def n_unit_changed(self, button):
-        """v0.16_n_stats: n_unit radio handler (exact match to test_t_variant_changed pattern per clarification/best practice).
-        Updates uistate, saves cfg, triggers re-compute + statusbar. Default subject.
-        """
-        if button is None:
-            return
-        n_unit = self._RADIO_TO_TEST_N.get(button.objectName(), "subject")
-        print(f"Selected n_unit: {n_unit}")
-        uistate.buttonGroup_test_n = n_unit
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        self.update_test()
-        # Force re-plot of groups using the new n level (unplot old artists first,
-        # because graphGroups skips already-plotted groups and graphRefresh
-        # does not re-fetch means)
-        if hasattr(uiplot, "unPlotGroup"):
-            uiplot.unPlotGroup()
-        # Re-add current groups with data for the new level (modeled after graphGroups)
-        for group_ID in list(self.dd_groups.keys()):
-            if self.dd_groups[group_ID].get("rec_IDs"):
-                dict_group = self.dd_groups[group_ID]
-                level = getattr(uistate, "buttonGroup_test_n", "recording")
-                group_mean_data = self.get_dfgroupmean(group_ID, level=level)
-                x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
-                uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data), x_pos=x_pos)
-        self.update_show()
-        if hasattr(self, "graphRefresh"):
-            self.graphRefresh(reeval_formal_test=False)
-        if hasattr(self, "mouseoverUpdate"):
-            self.mouseoverUpdate()
-
-    def update_experiment_type_radio_buttons(self):
-        """Select experiment type radio buttons for the current selection.
-        ET and TT radios are ALWAYS enabled per plan (no setEnabled, no gray styling, no has_* checks).
-        Timestamp triggers statusbar warning; invalid TT states use existing _get_stat_test_warning.
-        """
-        if not hasattr(self, "buttonGroup_type"):
-            return
-
-        # No enable/disable or stylesheet (radios always enabled; feedback via statusbar per spec)
-        mode = getattr(uistate, "experiment_type", "time")
-        radio_name = self._TYPE_TO_RADIO.get(mode, "radioButton_type_time")
-        if hasattr(self, radio_name):
-            getattr(self, radio_name).setChecked(True)
+    # test_t_variant/tails_changed, editTest*, n_unit_changed, update_experiment_type_radio_buttons moved to StatTestMixin (ui_stat_test.py)
 
     def viewSettingsChanged(self, key, state):
         self.usage(f"viewSettingsChanged {key}, {state == 2}")
