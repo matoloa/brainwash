@@ -235,15 +235,25 @@ class GraphCoordinatorMixin:
             dfmean = self.get_dfmean(row=row)
             dft = self.get_dft(row=row)
             print(f"graphUpdate dft: {dft}")
+            if dft is None or (hasattr(dft, "empty") and dft.empty):
+                print(f"graphUpdate: skipping row {row.get('recording_name', '?')} (no dft/stims)")
+                return
             is_pp = getattr(uistate, "experiment_type", "time") == "PP"
             dfoutput = self.get_dfdiff(row=row) if (uistate.checkBox["paired_stims"] and not is_pp) else self.get_dfoutput(row=row)
             if dfoutput is not None:
                 uiplot.addRow(p_row=row, dft=dft, dfmean=dfmean, dfoutput=self.V2mV(dfoutput))
 
         def processDataFrame(df):
-            list_to_plot = [rec_id for rec_id in df["ID"].tolist() if rec_id not in uistate.get_recSet()]
+            list_to_plot = [
+                rec_id for rec_id in df["ID"].tolist()
+                if pd.notna(rec_id) and rec_id not in uistate.get_recSet()
+            ]
             for rec_id in list_to_plot:
-                row = df[df["ID"] == rec_id].iloc[0]
+                matching = df[df["ID"] == rec_id]
+                if matching.empty:
+                    print(f"graphUpdate: no matching row for rec_id {rec_id}, skipping")
+                    continue
+                row = matching.iloc[0]
                 processRow(row)
 
         if row is not None:
@@ -487,12 +497,22 @@ class GraphCoordinatorMixin:
         # _ylim_from_artists is intentionally not used here: axm also contains
         # axvline artists (stim selection markers) whose y-data spans [0, 1] in
         # axes-fraction space and would corrupt the range.
-        uistate.zoom["mean_xlim"] = (0, prow["sweep_duration"])
+        sdur = prow.get("sweep_duration", 1.0)
+        if not np.isfinite(sdur) or sdur <= 0:
+            sdur = 1.0
+        uistate.zoom["mean_xlim"] = (0, sdur)
         dfmean = self.get_dfmean(prow)
-        vmin = float(dfmean["voltage"].min())
-        vmax = float(dfmean["voltage"].max())
+        try:
+            vmin = float(dfmean["voltage"].min())
+            vmax = float(dfmean["voltage"].max())
+            if not (np.isfinite(vmin) and np.isfinite(vmax)):
+                raise ValueError("nonfinite")
+        except Exception:
+            vmin, vmax = -1.0, 1.0
         pad = 0.10
         span = vmax - vmin
+        if not np.isfinite(span) or span <= 0:
+            span = 2.0
         uistate.zoom["mean_ylim"] = (vmin - pad * span, vmax + pad * span)
         if not skip_axe:
             # axe: fit to plotted event artists, skipping the stim artefact by starting
@@ -518,6 +538,8 @@ class GraphCoordinatorMixin:
                 r = matching_rows.iloc[0]
                 rec_dfmean = self.get_dfmean(r)
                 rec_dft = self.get_dft(r)
+                if rec_dft is None or (hasattr(rec_dft, "empty") and rec_dft.empty):
+                    continue
 
                 for _, t_row in rec_dft.iterrows():
                     t_stim = t_row.get("t_stim", 0.0)
@@ -532,6 +554,9 @@ class GraphCoordinatorMixin:
                 ymin = df_min - 0.10 * span
 
             uistate.zoom["event_ylim"] = (ymin, ymax)
+            ey = uistate.zoom["event_ylim"]
+            if not (np.isfinite(ey[0]) and np.isfinite(ey[1])):
+                uistate.zoom["event_ylim"] = (-0.0015, 0.0002)
             uistate.zoom["event_xlim"] = (
                 uistate.settings["event_start"],
                 uistate.settings["event_end"],
@@ -670,23 +695,44 @@ class GraphCoordinatorMixin:
         if axis == uistate.axm:
             logger.debug("zoomReset: axm")
             # print("zoomReset: axm")
-            axis.axes.set_xlim(uistate.zoom["mean_xlim"])
-            axis.axes.set_ylim(uistate.zoom["mean_ylim"])
+            mx = uistate.zoom.get("mean_xlim", (0, 1))
+            my = uistate.zoom.get("mean_ylim", (-1, 1))
+            if not (np.isfinite(mx[0]) and np.isfinite(mx[1])):
+                mx = (0, 1)
+            if not (np.isfinite(my[0]) and np.isfinite(my[1])):
+                my = (-1, 1)
+            axis.axes.set_xlim(mx)
+            axis.axes.set_ylim(my)
             self._recalc_axm_detection_zones()
             axis.figure.canvas.draw_idle()
         elif axis == uistate.axe:
             logger.debug("zoomReset: axe")
             # print("zoomReset: axe")
-            axis.axes.set_xlim(uistate.zoom["event_xlim"])
-            axis.axes.set_ylim(uistate.zoom["event_ylim"])
+            ex = uistate.zoom.get("event_xlim", (uistate.settings.get("event_start", 0), uistate.settings.get("event_end", 0.05)))
+            ey = uistate.zoom.get("event_ylim", (-0.0015, 0.0002))
+            if not (np.isfinite(ex[0]) and np.isfinite(ex[1])):
+                ex = (0, 0.05)
+            if not (np.isfinite(ey[0]) and np.isfinite(ey[1])):
+                ey = (-0.0015, 0.0002)
+            axis.axes.set_xlim(ex)
+            axis.axes.set_ylim(ey)
             axis.figure.canvas.draw_idle()
         elif axis == uistate.ax1 or axis == uistate.ax2:
             logger.debug("zoomReset: ax1/ax2")
             # print("zoomReset: ax1/ax2")
-            uistate.ax1.axes.set_xlim(uistate.zoom["output_xlim"])
-            uistate.ax2.axes.set_xlim(uistate.zoom["output_xlim"])
-            uistate.ax1.axes.set_ylim(uistate.zoom["output_ax1_ylim"])
-            uistate.ax2.axes.set_ylim(uistate.zoom["output_ax2_ylim"])
+            ox = uistate.zoom.get("output_xlim", (0, 1))
+            oy1 = uistate.zoom.get("output_ax1_ylim", (0, 1.5))
+            oy2 = uistate.zoom.get("output_ax2_ylim", (0, 1.5))
+            if not (np.isfinite(ox[0]) and np.isfinite(ox[1])):
+                ox = (0, 1)
+            if not (np.isfinite(oy1[0]) and np.isfinite(oy1[1])):
+                oy1 = (0, 1.5)
+            if not (np.isfinite(oy2[0]) and np.isfinite(oy2[1])):
+                oy2 = (0, 1.5)
+            uistate.ax1.axes.set_xlim(ox)
+            uistate.ax2.axes.set_xlim(ox)
+            uistate.ax1.axes.set_ylim(oy1)
+            uistate.ax2.axes.set_ylim(oy2)
             uistate.ax1.figure.canvas.draw_idle()
         else:
             raise ValueError("zoomReset: unknown axis")

@@ -376,13 +376,16 @@ class DataFrameMixin:
                 dft=dft,
                 filter=filter_col,
             )
-            # Back-fill volley means into dft from the sweep-mode rows
-            for i, t_row in dft.iterrows():
-                stim_nr = t_row["stim"]
-                sweep_rows = dfoutput[(dfoutput["stim"] == stim_nr) & dfoutput["sweep"].notna()]
-                volley_amp_mean = sweep_rows["volley_amp"].mean()
-                dft.at[i, "volley_amp_mean"] = volley_amp_mean
-                dft.at[i, "volley_slope_mean"] = sweep_rows["volley_slope"].mean()
+            if dft is None or dft.empty:
+                print(f"get_dfoutput: dft None/empty for {row['recording_name']}, skipping backfill")
+            else:
+                # Back-fill volley means into dft from the sweep-mode rows
+                for i, t_row in dft.iterrows():
+                    stim_nr = t_row["stim"]
+                    sweep_rows = dfoutput[(dfoutput["stim"] == stim_nr) & dfoutput["sweep"].notna()]
+                    volley_amp_mean = sweep_rows["volley_amp"].mean()
+                    dft.at[i, "volley_amp_mean"] = volley_amp_mean
+                    dft.at[i, "volley_slope_mean"] = sweep_rows["volley_slope"].mean()
             self.set_dft(rec, dft)
             print(f"get_dfoutput: done, dfoutput.shape={dfoutput.shape}")
             dfoutput.reset_index(drop=True, inplace=True)

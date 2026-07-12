@@ -793,7 +793,12 @@ def build_dfoutput(
         Stim-mode rows have sweep=NaN.
     """
     t0 = time.time()
-    print(f"build_dfoutput: entered, dffilter.shape={dffilter.shape}, nsweeps={dffilter['sweep'].nunique()}, nstims={len(dft)}")
+    nstims = len(dft) if dft is not None else 0
+    print(f"build_dfoutput: entered, dffilter.shape={dffilter.shape}, nsweeps={dffilter['sweep'].nunique()}, nstims={nstims}")
+
+    if dft is None or len(dft) == 0:
+        print("build_dfoutput: dft is None or empty, returning empty dfoutput")
+        return pd.DataFrame(columns=["stim", "sweep", "EPSP_amp", "EPSP_amp_norm", "EPSP_slope", "EPSP_slope_norm", "volley_amp", "volley_slope"])
 
     all_rows = []
 

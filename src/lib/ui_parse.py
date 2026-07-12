@@ -20,6 +20,10 @@ from pathlib import Path
 import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
+import parse
+import ui_widgets  # for ParseDataThread, ProgressBarManager, Filetreesub etc. (consistent with ui_table, ui_graph)
+import uuid
+
 # ---------------------------------------------------------------------------
 # Injected singletons — set by ui.py before any UIsub instance is created.
 # ---------------------------------------------------------------------------
@@ -191,7 +195,6 @@ class ParseMixin:
 
     # Additional related for completeness in parse flow
     def triggerAddData(self):  # creates file tree for file selection
-        from ui_widgets import Filetreesub, Ui_Dialog
         self.dialog = QtWidgets.QDialog()
         self.ftree = ui_widgets.Filetreesub(self.dialog, parent=self, folder=self.user_documents)
         self.dialog.exec_()
@@ -245,12 +248,38 @@ class ParseMixin:
         print(f"Duplicated {source_p_row['recording_name']} as {new_name}")
 
     def create_recording(self, df_proj_row, rec, df_raw, status_callback=None):
-        # This is called from ParseDataThread; keep minimal here or delegate
-        # In original it was in ui.py; for extraction, we can leave core creation in ProjectMixin or here.
-        # For now, stub or assume it's handled; full move may require more.
-        print(f"create_recording called for {rec}")
-        # Placeholder - actual implementation may stay or move to ProjectMixin
-        return df_proj_row  # simplistic
+        def create_row(df_proj_row, new_name, dict_meta):
+            df_proj_new_row = df_proj_row.copy()
+            df_proj_new_row["ID"] = str(uuid.uuid4())
+            df_proj_new_row["recording_name"] = new_name
+            df_proj_new_row["gain"] = uistate.lineEdit["import_gain"]  # capture gain at parse time
+            df_proj_new_row["sweeps"] = dict_meta.get("nsweeps", None)
+            df_proj_new_row["channel"] = ""  # dict_meta.get('channel', None)
+            df_proj_new_row["sweep_duration"] = dict_meta.get("sweep_duration", None)
+            df_proj_new_row["sampling_rate"] = dict_meta.get("sampling_rate", None)
+            df_proj_new_row["resets"] = ""  # dict_meta.get('resets', None)
+            # sweep_hz: inter-sweep rate derived from t0 timestamps; NaN if unavailable
+            sweep_hz = dict_meta.get("sweep_hz", None)
+            df_proj_new_row["sweep_hz"] = sweep_hz if sweep_hz is not None else float("nan")
+            # Build pipe-delimited status flags; append "default Hz" when sweep_hz is absent
+            status_flags = ["Read"]
+            if sweep_hz is None:
+                status_flags.append("default Hz")
+            df_proj_new_row["status"] = "|".join(status_flags)
+            return df_proj_new_row
+
+        if status_callback:
+            status_callback("building dataframe...")
+        self.df2file(df_raw, rec, key="data")  # persist raws
+        dfmean, i_stim = parse.build_dfmean(df_raw)
+        if status_callback:
+            status_callback("writing to disk...")
+        self.df2file(dfmean, rec, key="mean")  # persist mean
+        df = parse.zeroSweeps(df_raw, i_stim=i_stim)
+        self.df2file(df, rec, key="filter")  # persist zeroed
+        dict_meta = parse.metadata(df)  # extract metadata
+        df_proj_new_row = create_row(df_proj_row=df_proj_row, new_name=rec, dict_meta=dict_meta)
+        return df_proj_new_row
 
     def deleteSelectedRows(self):
         # moved some purge logic here too for parse flow

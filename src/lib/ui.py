@@ -51,17 +51,17 @@ import parse
 import toml  # for reading pyproject.toml
 import ui_data_frames
 import ui_designer  # Import the Designer-generated UI code
+import ui_graph  # GraphCoordinatorMixin (Phase 2)
 import ui_groups
+import ui_parse  # ParseMixin (Phase 3)
 import ui_plot
 import ui_project
+import ui_selection  # SelectionMixin (Phase 1)
+import ui_stat_test  # StatTestMixin (Phase 4)
 import ui_state_classes
 import ui_sweep_ops
-import ui_widgets  # Custom Qt widgets, dialogs, models, threads (extracted Phase 0)
 import ui_table  # TableMixin (Phase 1 start)
-import ui_selection  # SelectionMixin (Phase 1)
-import ui_graph  # GraphCoordinatorMixin (Phase 2)
-import ui_parse  # ParseMixin (Phase 3)
-import ui_stat_test  # StatTestMixin (Phase 4)
+import ui_widgets  # Custom Qt widgets, dialogs, models, threads (extracted Phase 0)
 import yaml  # used by talkback
 from ui_project import df_projectTemplate
 
@@ -323,7 +323,6 @@ class UIsub(
     #                     Selection changers                             #
     ######################################################################
 
-
     def update_filter_settings(self, df_p=None):
         """Helper for filter-settings population. Handles uniform/mixed selection
         logic for radio buttons (filter mode) and savgol lineEdits exactly as before.
@@ -437,7 +436,6 @@ class UIsub(
         self.update_slope_lineEdits()
         self.update_stim_buttons()
         self.mouseoverUpdate()
-
 
     def deleteFolder(self, dir_path):
         if os.path.exists(dir_path):
@@ -570,7 +568,6 @@ class UIsub(
             except Exception:
                 pass
 
-
         """Clear any formal test markers and stored results. Independent of heatmap."""
         try:
             if uiplot is not None:
@@ -592,8 +589,6 @@ class UIsub(
     def _set_statusbar_appearance(self, *a, **k):
         # provided by StatTestMixin (Phase 4/5)
         pass
-
-
 
     def _apply_io_regression(self) -> bool:
         # provided by StatTestMixin (Phase 4/5)
@@ -622,7 +617,6 @@ class UIsub(
     def _get_stat_test_warning(self):
         # provided by StatTestMixin (Phase 4/5)
         pass
-
 
     def set_statusbar(self, state: str | None = None, text: str | None = None):
         # provided by StatTestMixin (Phase 4/5)
@@ -806,8 +800,6 @@ class UIsub(
                 self.set_statusbar(None, None)  # pure display refresh (no test recompute)
         except Exception:
             pass
-
-
 
     def update_recs2plot(self):
         if uistate.list_idx_select_recs:
@@ -1016,8 +1008,6 @@ class UIsub(
             self.update_show()
             self.zoomAuto()
             self.graphRefresh()
-
-
 
     def viewSettingsChanged(self, key, state):
         self.usage(f"viewSettingsChanged {key}, {state == 2}")
@@ -1973,7 +1963,6 @@ class UIsub(
             logger.warning("No project found in %s", str_projectfolder)
             print(f"No project found in {str_projectfolder}")
 
-
     def triggerReanalyze(self):
         self.usage("triggerReanalyze")
         selection = uistate.list_idx_select_recs
@@ -2108,12 +2097,6 @@ class UIsub(
 
     # (See SweepOpsMixin for sweep ops)
 
-
-
-
-
-
-
     # (recalculate in DataFrameMixin)
 
     def update_amp_lineEdits(self):
@@ -2126,6 +2109,8 @@ class UIsub(
         for idx_rec in uistate.list_idx_select_recs:
             prow = self.get_prow(idx_rec)
             df_t = self.get_dft(prow)
+            if df_t is None or (hasattr(df_t, "empty") and df_t.empty):
+                continue
 
             stims_to_check = uistate.list_idx_select_stims if uistate.list_idx_select_stims else [0]
 
@@ -2176,6 +2161,8 @@ class UIsub(
         for idx_rec in uistate.list_idx_select_recs:
             prow = self.get_prow(idx_rec)
             df_t = self.get_dft(prow)
+            if df_t is None or (hasattr(df_t, "empty") and df_t.empty):
+                continue
 
             stims_to_check = uistate.list_idx_select_stims if uistate.list_idx_select_stims else [0]
 
@@ -2522,7 +2509,6 @@ class UIsub(
         self.update_show(reset=True)
         self.mouseoverUpdate()
 
-
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
         if len(uistate.list_idx_select_recs) != 1:
@@ -2614,8 +2600,6 @@ class UIsub(
         self.tableUpdate(restore_selection=True, target_idx=None)
         self.tableProjSelectionChanged()
 
-
-
     # (Groups in GroupMixin; project in ProjectMixin)
 
     def set_rec_status(self, rec_name=None):  # TODO: should run on ID - not name!
@@ -2686,7 +2670,6 @@ class UIsub(
     def tableFormat(self):
         # delegated to ui_table.TableMixin
         pass
-
 
 
 # Root functions

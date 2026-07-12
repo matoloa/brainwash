@@ -566,12 +566,9 @@ class InteractivePlotMixin:
         self.mouseoverDisconnect()
         n_recs = len(uistate.list_idx_select_recs or [])
 
-        # Explicitly connect output mouseover (canvasOutput -> ghost on canvasEvent/axe)
-        # when EXACTLY one recording is selected.
         if n_recs == 1:
             self.mouseoverOutput = self.canvasOutput.mpl_connect("motion_notify_event", self.outputMouseover)
             self.mouseLeaveOutput = self.canvasOutput.mpl_connect("axes_leave_event", self.on_leave_output)
-        # if only one item is selected, make a new mouseover event connection
         if uistate.list_idx_select_recs and uistate.list_idx_select_stims:
             self._update_marker_data()
 
@@ -583,9 +580,6 @@ class InteractivePlotMixin:
             print("(multi-stim-selection) mouseoverUpdate calls self.graphRefresh()")
             self.graphRefresh(reeval_formal_test=False)
             return
-        # For exactly one recording selected (n_recs==1), fall through even if stim count !=1,
-        # so that trow=None or no-labels paths can still wire output hover for the ghost on axe.
-        # print(f"mouseoverUpdate: {uistate.list_idx_select_recs[0]}, {type(uistate.list_idx_select_recs[0])}")
         prow = self.get_prow()
         if prow is None:
             # group-only view (0 recs): still wire output hover so ghost can work on group means
@@ -658,8 +652,13 @@ class InteractivePlotMixin:
                 p_row = df_p.loc[df_p["ID"] == marker["rec_ID"]].squeeze()
                 dfmean = self.get_dfmean(row=p_row)
                 df_t = self.get_dft(row=p_row)
+                if df_t is None or (hasattr(df_t, "empty") and df_t.empty):
+                    continue
                 stim_num = marker["stim"]
-                t_row = df_t.loc[df_t["stim"] == stim_num].squeeze()
+                t_match = df_t.loc[df_t["stim"] == stim_num]
+                if t_match.empty:
+                    continue
+                t_row = t_match.squeeze()
                 t_stim = round(t_row["t_stim"], precision)
 
                 if is_slope:
@@ -1134,15 +1133,10 @@ class InteractivePlotMixin:
     # --- Phase 2: Specialized Mouseover Strategies ---
 
     def _mouseover_output_time(self, event):
-        use_mouse_x_direct = False  # for fallback when no data line
-        out_x_idx = 0
-        x_val = 0
-        # Determine str_ax from the actual hovered axis (ax1 or ax2), not global view preference.
-        # This ensures we pick the data line from the axis being moused over.
-        if event.inaxes == getattr(uistate, "ax1", None):
-            str_ax = "ax1"
-        elif event.inaxes == getattr(uistate, "ax2", None):
-            str_ax = "ax2"
+        if event.inaxes == getattr(uistate, 'ax1', None):
+            str_ax = 'ax1'
+        elif event.inaxes == getattr(uistate, 'ax2', None):
+            str_ax = 'ax2'
         else:
             str_ax = None
         ax = getattr(uistate, str_ax) if str_ax else None
@@ -1164,83 +1158,65 @@ class InteractivePlotMixin:
             return
 
         rec_id = None
-        stim_for_rec = 1
         if n_recs == 1:
             prow = self.get_prow()
             if prow is not None:
                 rec_id = prow["ID"]
-            if uistate.list_idx_select_stims:
-                stim_for_rec = uistate.list_idx_select_stims[0] + 1
+
+        if n_recs == 1 and rec_id is not None:
+            # for single rec, prefer the hovered ax's per-sweep line (correct stim/offset), fallback to any ax
             dict_out = {
                 key: value
                 for key, value in uistate.dict_rec_show.items()
-                if rec_id is not None and value.get("rec_ID") == rec_id and value.get("axis") == str_ax and not str(value.get("aspect", "")).endswith("_mean") and hasattr(value.get("line"), "get_xdata")
+                if value.get("rec_ID") == rec_id and value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
             }
+            if not dict_out:
+                dict_out = {
+                    key: value
+                    for key, value in uistate.dict_rec_show.items()
+                    if value.get("rec_ID") == rec_id and value.get("axis") in ("ax1", "ax2") and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
+                }
         else:
             dict_out = {
                 key: value
                 for key, value in uistate.dict_rec_show.items()
                 if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
             }
-        if n_recs == 1 and len(dict_out) == 0:
-            other = "ax2" if str_ax == "ax1" else "ax1"
-            dict_out = {
-                key: value
-                for key, value in uistate.dict_rec_show.items()
-                if rec_id is not None and value.get("rec_ID") == rec_id and value.get("axis") == other and not str(value.get("aspect", "")).endswith("_mean") and hasattr(value.get("line"), "get_xdata")
-            }
-        use_group_xy = False
         rec_ID_for_snippet = None
-        use_mouse_x_direct = False
         if not dict_out:
-            if n_recs == 1:
-                rec_ID_for_snippet = rec_id
-                use_mouse_x_direct = True
-                dict_pop = {"rec_ID": rec_id, "stim": stim_for_rec, "line": None}  # dummy
-            else:
-                # Fallback for group-only view: use a shown group mean line for (x,y) sweep lookup;
-                # pick first rec in that group to source the actual voltage snippet (ghost).
-                g_out = {
-                    key: value
-                    for key, value in getattr(uistate, "dict_group_show", {}).items()
-                    if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
-                }
-                if not g_out:
-                    if uistate.ghost_sweep is not None:
-                        self.exorcise()
-                    return
-                dict_pop = list(g_out.values())[0]
-                use_group_xy = True
-                gid = dict_pop.get("group_ID")
-                recs = []
-                if gid is not None and hasattr(self, "dd_groups") and self.dd_groups:
-                    recs = self.dd_groups.get(gid, {}).get("rec_IDs", []) or []
-                if not recs:
-                    return
-                rec_ID_for_snippet = recs[0]
+            # Fallback for group-only view: use a shown group mean line for (x,y) sweep lookup;
+            # pick first rec in that group to source the actual voltage snippet (ghost).
+            g_out = {
+                key: value
+                for key, value in getattr(uistate, "dict_group_show", {}).items()
+                if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
+            }
+            if not g_out:
+                if uistate.ghost_sweep is not None:
+                    self.exorcise()
+                return
+            dict_pop = list(g_out.values())[0]
+            gid = dict_pop.get("group_ID")
+            recs = []
+            if gid is not None and hasattr(self, "dd_groups") and self.dd_groups:
+                recs = self.dd_groups.get(gid, {}).get("rec_IDs", []) or []
+            if not recs:
+                return
+            rec_ID_for_snippet = recs[0]
         else:
             dict_pop = list(dict_out.values())[0]
             rec_ID_for_snippet = dict_pop.get("rec_ID")
 
-        if use_mouse_x_direct:
-            x_val = x
-            out_x_val = x
-            out_y_val = y if y is not None else 0
-            out_x_idx = 0
-        else:
-            x_data = dict_pop["line"].get_xdata()
-            y_data = dict_pop["line"].get_ydata()
+        x_data = dict_pop["line"].get_xdata()
+        y_data = dict_pop["line"].get_ydata()
 
-            out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
-            x_val = x_data[out_x_idx]
-            out_x_val = x_val
-            out_y_val = y_data[out_x_idx]
+        out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
+        x_val = x_data[out_x_idx]
+        out_x_val = x_val
+        out_y_val = y_data[out_x_idx]
 
-
-        if not use_mouse_x_direct and out_x_idx == getattr(uistate, "last_out_x_idx", None):
+        if out_x_idx == getattr(uistate, "last_out_x_idx", None):
             return
-        if use_mouse_x_direct:
-            out_x_idx = 999  # force update
 
         rec_ID = rec_ID_for_snippet
         df_p = self.get_df_project()
@@ -1249,30 +1225,37 @@ class InteractivePlotMixin:
             return
         p_row = p_row_df.iloc[0]
         df_t = self.get_dft(p_row)
+        if df_t is None or (hasattr(df_t, "empty") and df_t.empty):
+            return
         rec_filter = p_row["filter"]
 
         stim = dict_pop.get("stim")
         if stim is None:
             stim = 1
 
-        t_row = df_t[df_t["stim"] == stim].iloc[0]
+        t_match = df_t[df_t["stim"] == stim]
+        if t_match.empty:
+            return
+        t_row = t_match.iloc[0]
         offset = t_row["t_stim"]
 
-        if pd.notna(p_row["bin_size"]):
+        bin_size = p_row.get("bin_size")
+        if pd.notna(bin_size):
             dfsource = self.get_dfbin(p_row)
             ghost_label_text = f"bin {int(x_val)}"
         else:
             dfsource = self.get_dffilter(p_row)
             ghost_label_text = f"sweep {int(x_val)}"
 
-        if use_mouse_x_direct:
-            out_sweeps = dfsource["sweep"].dropna().unique()
-            if len(out_sweeps) > 0:
-                x_val = out_sweeps[ int(np.nanargmin(np.abs(out_sweeps - x_val))) ]
-
+        if dfsource is None or (hasattr(dfsource, "empty") and dfsource.empty):
+            return
         dfsweep = dfsource[dfsource["sweep"] == x_val]
+        if dfsweep.empty:
+            return
         snippet_x = dfsweep["time"] - offset
         snippet_y = dfsweep[rec_filter]
+        if getattr(snippet_x, "empty", False) or len(snippet_x) == 0:
+            return
 
         if getattr(uistate, "mouseover_out_blob", None) is not None:
             try:
@@ -1285,6 +1268,7 @@ class InteractivePlotMixin:
         uistate.axe.figure.canvas.draw_idle()
         uistate.last_out_x_idx = out_x_idx
         ax.figure.canvas.draw_idle()
+
 
     def _mouseover_output_stim(self, event):
         str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
@@ -1326,8 +1310,6 @@ class InteractivePlotMixin:
         dict_pop = list(dict_out.values())[0]
         x_data = dict_pop["line"].get_xdata()
         y_data = dict_pop["line"].get_ydata()
-
-        import numpy as np
 
         out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
         x_val = x_data[out_x_idx]
@@ -1453,7 +1435,6 @@ class InteractivePlotMixin:
 
         df_t = self.get_dft(p_row)
         rec_filter = p_row["filter"]
-        import pandas as pd
 
         stim = dict_pop.get("stim")
         if stim is None:
@@ -1564,8 +1545,6 @@ class InteractivePlotMixin:
         if out_x_idx == getattr(uistate, "last_out_x_idx", None):
             return
 
-        import pandas as pd
-
         df_t = self.get_dft(p_row)
         rec_filter = p_row["filter"]
         stim = df_sweeps["stim"].iloc[out_x_idx]
@@ -1643,9 +1622,6 @@ class InteractivePlotMixin:
             dft_to_update = uistate.dft_temp.iloc[[stim_idx]].copy()
 
         rec_filter = prow.get("filter")
-
-        import numpy as np
-        import pandas as pd
 
         if uistate.x_axis == "stim" and len(uistate.df_rec_select_time) > 1:
             dfmean = self.get_dfmean(row=prow)
@@ -1768,7 +1744,6 @@ class InteractivePlotMixin:
             dft_to_update = uistate.dft_temp.iloc[[stim_idx]].copy()
 
         rec_filter = prow.get("filter")
-        import pandas as pd
 
         if pd.notna(prow.get("bin_size")):
             dffilter = self.get_dfbin(prow)
@@ -1793,8 +1768,6 @@ class InteractivePlotMixin:
             v1 = o1[aspect].values.astype(float)
             v2 = o2[aspect].values.astype(float)
             import warnings
-
-            import numpy as np
 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -1892,7 +1865,6 @@ class InteractivePlotMixin:
 
         dft_to_update = uistate.dft_temp.copy()
         rec_filter = prow.get("filter")
-        import pandas as pd
 
         if pd.notna(prow.get("bin_size")):
             dffilter = self.get_dfbin(prow)
