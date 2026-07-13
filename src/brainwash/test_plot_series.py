@@ -221,6 +221,59 @@ def test_stim_aggregate_sem_reindex():
     assert len(sem) == 2
 
 
+def test_build_io_refresh_specs_for_rec():
+    df = pd.DataFrame(
+        {
+            "sweep": [0, 1, 2],
+            "stim": [1, 1, 1],
+            "volley_amp": [1.0, 2.0, 3.0],
+            "EPSP_amp": [2.0, 4.0, 6.0],
+            "EPSP_amp_norm": [50.0, 100.0, 150.0],
+        }
+    )
+    dict_rec_labels = {
+        "rec1 raw IO scatter": {"x_mode": "io", "variant": "raw"},
+        "rec1 raw IO trendline": {"x_mode": "io", "variant": "raw"},
+        "rec2 raw IO scatter": {"x_mode": "io", "variant": "raw"},
+    }
+    specs = plot_series.build_io_refresh_specs_for_rec(
+        "rec1",
+        dict_rec_labels,
+        df,
+        "vamp",
+        "EPSPamp",
+        force_through_zero=True,
+    )
+    assert len(specs) == 2
+    assert specs[0].label == "rec1 raw IO scatter"
+    assert isinstance(specs[0], plot_series.IoScatterRefreshSpec)
+    assert isinstance(specs[1], plot_series.IoTrendlineRefreshSpec)
+
+
+def test_build_stim_aggregate_refresh_specs():
+    df = pd.DataFrame(
+        {
+            "sweep": [0, 1, None, None],
+            "stim": [1, 1, 1, 2],
+            "EPSP_amp": [1.0, 1.1, 1.05, 2.0],
+            "EPSP_amp_norm": [50.0, 55.0, 52.5, 100.0],
+        }
+    )
+    settings = {
+        "rgb_EPSP_amp": "blue",
+        "rgb_EPSP_slope": "red",
+        "rgb_volley_amp": "green",
+        "rgb_volley_slope": "orange",
+    }
+    existing = frozenset({"rec1 EPSP amp", "rec1 EPSP amp shade"})
+    specs = plot_series.build_stim_aggregate_refresh_specs("rec1", df, settings, existing)
+    assert len(specs) == 1
+    assert specs[0].line_label == "rec1 EPSP amp"
+    assert specs[0].shade_label == "rec1 EPSP amp shade"
+    assert len(specs[0].x) == 2
+    assert specs[0].sem is not None
+
+
 def test_build_pp_recording_plot_specs():
     df = pd.DataFrame(
         {

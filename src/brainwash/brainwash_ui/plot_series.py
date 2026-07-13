@@ -638,6 +638,65 @@ def build_pp_recording_plot_specs(
     return plot_specs
 
 
+def out_line_xy_from_df(
+    dfoutput: pd.DataFrame,
+    stim_num: int,
+    column: str,
+    x_mode: str = "sweep",
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """Sweep/stim-mode output line x/y for updateOutLineFromDf."""
+    df_stim = dfoutput[dfoutput["stim"] == stim_num]
+    if df_stim.empty or column not in df_stim.columns:
+        return None
+    x_col = x_mode if x_mode in df_stim.columns else "sweep"
+    return df_stim[x_col].values, df_stim[column].values
+
+
+def build_ppr_overlay_refresh_specs(
+    rec_label: str,
+    dfoutput: pd.DataFrame,
+    aspect: str,
+    checkbox: dict,
+    settings: dict,
+    existing_labels: frozenset[str],
+) -> list[PpRecordingPlotSpec]:
+    """PP PPR overlay refresh specs for updateOutLineFromDf when label is missing."""
+    out_sweeps = dfoutput[dfoutput["sweep"].notna()]
+    out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
+    out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
+    common_sweeps = out1.index.intersection(out2.index).dropna()
+    if common_sweeps.empty:
+        return []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        base_specs = pp_recording_ppr_specs(
+            out1.loc[common_sweeps],
+            out2.loc[common_sweeps],
+            checkbox,
+            settings,
+        )
+    specs: list[PpRecordingPlotSpec] = []
+    for base in base_specs:
+        if base.aspect != aspect:
+            continue
+        for variant in ("raw", "norm"):
+            label = f"{rec_label} PPR {aspect} {variant}"
+            if label not in existing_labels:
+                continue
+            specs.append(
+                PpRecordingPlotSpec(
+                    label=label,
+                    aspect=aspect,
+                    axid=base.axid,
+                    color=base.color,
+                    variant=variant,
+                    x=np.full(base.n_points, base.x_val),
+                    y=base.ppr,
+                )
+            )
+    return specs
+
+
 @dataclass(frozen=True)
 class StimAggregatePlotSpec:
     line_label: str
@@ -710,6 +769,107 @@ STIM_MODE_SUFFIX_TO_COL = {
     "volley amp": "volley_amp",
     "volley slope": "volley_slope",
 }
+
+
+@dataclass(frozen=True)
+class IoScatterRefreshSpec:
+    label: str
+    x: np.ndarray
+    y: np.ndarray
+
+
+@dataclass(frozen=True)
+class IoTrendlineRefreshSpec:
+    label: str
+    x: np.ndarray
+    y: np.ndarray
+
+
+IoRefreshSpec = IoScatterRefreshSpec | IoTrendlineRefreshSpec
+
+
+def build_io_refresh_specs_for_rec(
+    rec_name: str,
+    dict_rec_labels: dict,
+    dfoutput: pd.DataFrame,
+    io_input: str,
+    io_output: str,
+    *,
+    force_through_zero: bool,
+) -> list[IoRefreshSpec]:
+    """IO scatter/trendline refresh data for updateStimLines (no matplotlib artists)."""
+    specs: list[IoRefreshSpec] = []
+    for key, linedict in dict_rec_labels.items():
+        if not key.startswith(rec_name):
+            continue
+        variant = linedict.get("variant", "raw")
+        if key.endswith(" IO scatter") and linedict.get("x_mode") == "io":
+            xy = io_scatter_xy(dfoutput, io_input, io_output, variant=variant)
+            if xy is not None:
+                specs.append(IoScatterRefreshSpec(label=key, x=xy[0], y=xy[1]))
+        elif key.endswith(" IO trendline") and linedict.get("x_mode") == "io":
+            line_xy = io_trendline_xy(
+                dfoutput,
+                io_input,
+                io_output,
+                variant=variant,
+                force_through_zero=force_through_zero,
+            )
+            if line_xy is not None:
+                specs.append(IoTrendlineRefreshSpec(label=key, x=line_xy[0], y=line_xy[1]))
+    return specs
+
+
+@dataclass(frozen=True)
+class StimAggregateRefreshSpec:
+    line_label: str
+    shade_label: str | None
+    x: np.ndarray
+    y: np.ndarray
+    sem: np.ndarray | None
+    axid: str
+    aspect: str
+    variant: str
+    color_setting_key: str
+
+
+def build_stim_aggregate_refresh_specs(
+    rec_name: str,
+    dfoutput: pd.DataFrame,
+    settings: dict,
+    existing_labels: frozenset[str],
+) -> list[StimAggregateRefreshSpec]:
+    """Stim-mode aggregate line + SEM refresh data for updateStimLines."""
+    out_stim = dfoutput[dfoutput["sweep"].isna()]
+    if out_stim.empty:
+        return []
+    df_sweeps = dfoutput[dfoutput["sweep"].notna()]
+    df_sem = df_sweeps.groupby("stim").sem(numeric_only=True)
+    stims = out_stim["stim"].values
+    specs: list[StimAggregateRefreshSpec] = []
+    for suffix, axid, col, _color, variant in stim_aggregate_line_configs(settings):
+        line_label = f"{rec_name} {suffix}"
+        if line_label not in existing_labels:
+            continue
+        if col not in out_stim.columns:
+            continue
+        aspect = col.replace("_norm", "")
+        sem_vals = stim_aggregate_sem(df_sem, out_stim, col)
+        shade_label = f"{line_label} shade"
+        specs.append(
+            StimAggregateRefreshSpec(
+                line_label=line_label,
+                shade_label=shade_label if sem_vals is not None and shade_label in existing_labels else None,
+                x=stims,
+                y=out_stim[col].values,
+                sem=sem_vals,
+                axid=axid,
+                aspect=aspect,
+                variant=variant,
+                color_setting_key=f"rgb_{aspect}",
+            )
+        )
+    return specs
 
 
 @dataclass(frozen=True)

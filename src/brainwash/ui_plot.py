@@ -1858,79 +1858,56 @@ class UIplot:
             "volley amp"          → "volley_amp"
             "volley slope"        → "volley_slope"
         """
-        # Refresh IO scatter plot if it exists for this recording
-        io_input = self.uistate.experiment.io_input
-        io_output = self.uistate.experiment.io_output
         force0 = bool(self.uistate.project.checkBox.get("io_force0", False))
-        for key, linedict in self.uistate.plot.dict_rec_labels.items():
-            if key.startswith(rec_name) and key.endswith(" IO scatter") and linedict.get("x_mode") == "io":
-                xy = plot_series.io_scatter_xy(
-                    dfoutput, io_input, io_output, variant=linedict.get("variant", "raw")
-                )
-                if xy is not None:
-                    linedict["line"].set_offsets(np.c_[xy[0], xy[1]])
-                    print(f"updateStimLines: refreshed IO scatter '{key}'")
+        dict_rec_labels = self.uistate.plot.dict_rec_labels
+        for spec in plot_series.build_io_refresh_specs_for_rec(
+            rec_name,
+            dict_rec_labels,
+            dfoutput,
+            self.uistate.experiment.io_input,
+            self.uistate.experiment.io_output,
+            force_through_zero=force0,
+        ):
+            linedict = dict_rec_labels[spec.label]
+            if isinstance(spec, plot_series.IoScatterRefreshSpec):
+                linedict["line"].set_offsets(np.c_[spec.x, spec.y])
+                print(f"updateStimLines: refreshed IO scatter '{spec.label}'")
+            else:
+                linedict["line"].set_data(spec.x, spec.y)
+                print(f"updateStimLines: refreshed IO trendline '{spec.label}'")
 
-            elif key.startswith(rec_name) and key.endswith(" IO trendline") and linedict.get("x_mode") == "io":
-                line_xy = plot_series.io_trendline_xy(
-                    dfoutput,
-                    io_input,
-                    io_output,
-                    variant=linedict.get("variant", "raw"),
-                    force_through_zero=force0,
-                )
-                if line_xy is not None:
-                    linedict["line"].set_data(line_xy[0], line_xy[1])
-                    print(f"updateStimLines: refreshed IO trendline '{key}'")
+        existing_labels = frozenset(dict_rec_labels.keys())
+        for spec in plot_series.build_stim_aggregate_refresh_specs(
+            rec_name,
+            dfoutput,
+            self.uistate.project.settings,
+            existing_labels,
+        ):
+            linedict = dict_rec_labels[spec.line_label]
+            linedict["line"].set_xdata(spec.x)
+            linedict["line"].set_ydata(spec.y)
+            print(f"updateStimLines: refreshed '{spec.line_label}'")
 
-        out_stim = dfoutput[dfoutput["sweep"].isna()]
-        if out_stim.empty:
-            return
-
-        df_sweeps = dfoutput[dfoutput["sweep"].notna()]
-        df_sem = df_sweeps.groupby("stim").sem(numeric_only=True)
-
-        for suffix, col in plot_series.STIM_MODE_SUFFIX_TO_COL.items():
-            label = f"{rec_name} {suffix}"
-            if label not in self.uistate.plot.dict_rec_labels:
-                continue
-            if col not in out_stim.columns:
-                continue
-            linedict = self.uistate.plot.dict_rec_labels[label]
-            linedict["line"].set_xdata(out_stim["stim"].values)
-            linedict["line"].set_ydata(out_stim[col].values)
-            print(f"updateStimLines: refreshed '{label}'")
-
-            shade_label = f"{label} shade"
-            sem_vals = plot_series.stim_aggregate_sem(df_sem, out_stim, col)
-            if shade_label in self.uistate.plot.dict_rec_labels and sem_vals is not None:
-                old_shade_dict = self.uistate.plot.dict_rec_labels[shade_label]
+            if spec.shade_label is not None and spec.sem is not None:
+                old_shade_dict = dict_rec_labels[spec.shade_label]
                 try:
                     old_shade_dict["line"].remove()
                 except Exception:
                     pass
-
-                axid = old_shade_dict["axis"]
-                rec_ID = old_shade_dict["rec_ID"]
-                aspect = old_shade_dict["aspect"]
-                variant = old_shade_dict["variant"]
-                color_setting_key = f"rgb_{aspect}"
-                color = self.uistate.project.settings.get(color_setting_key, "black")
-
+                color = self.uistate.project.settings.get(spec.color_setting_key, "black")
                 self.plot_shade(
-                    shade_label,
-                    axid,
-                    out_stim["stim"].values,
-                    out_stim[col].values,
-                    sem_vals,
+                    spec.shade_label,
+                    spec.axid,
+                    spec.x,
+                    spec.y,
+                    spec.sem,
                     color,
-                    rec_ID,
-                    aspect=aspect,
-                    variant=variant,
+                    old_shade_dict["rec_ID"],
+                    aspect=spec.aspect,
+                    variant=spec.variant,
                     x_mode="stim",
                 )
-
-                self.uistate.plot.dict_rec_labels[shade_label]["line"].set_visible(linedict["line"].get_visible())
+                dict_rec_labels[spec.shade_label]["line"].set_visible(linedict["line"].get_visible())
 
     def updateOutLineFromDf(self, label, dfoutput, stim_num, column, x_axis=None):
         """Populate an output line directly from a dfoutput DataFrame.
@@ -1946,47 +1923,37 @@ class UIplot:
         - column: column name to use for y-values (e.g. 'EPSP_amp' or 'EPSP_amp_norm')
         """
         print(f"updateOutLineFromDf: {label}, stim={stim_num}, col={column}")
-        df_stim = dfoutput[dfoutput["stim"] == stim_num]
-        if df_stim.empty or column not in df_stim.columns:
+        xy = plot_series.out_line_xy_from_df(dfoutput, stim_num, column)
+        if xy is None:
             print(f"updateOutLineFromDf: no data for stim={stim_num} col={column}, falling back to updateOutLine")
             self.updateOutLine(label)
             return
 
         if label not in self.uistate.plot.dict_rec_labels:
-            is_pp = self.uistate.experiment.experiment_type == "PP"
-            if is_pp:
+            if self.uistate.experiment.experiment_type == "PP":
                 rec_label = label.split(" - stim ")[0]
                 aspect = column.replace("_norm", "")
-                out_sweeps = dfoutput[dfoutput["sweep"].notna()]
-                out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
-                out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
-                common_sweeps = out1.index.intersection(out2.index).dropna()
-                if not common_sweeps.empty:
-                    o1 = out1.loc[common_sweeps]
-                    o2 = out2.loc[common_sweeps]
-                    if aspect in o1.columns and aspect in o2.columns:
-                        with warnings.catch_warnings():
-                            warnings.simplefilter("ignore")
-                            ppr = plot_series.compute_ppr(
-                                o1[aspect].values.astype(float),
-                                o2[aspect].values.astype(float),
-                            )
-                        for variant in ["raw", "norm"]:
-                            ppr_label = f"{rec_label} PPR {aspect} {variant}"
-                            if ppr_label in self.uistate.plot.dict_rec_labels:
-                                linedict = self.uistate.plot.dict_rec_labels[ppr_label]
-                                line = linedict["line"]
-                                overlay_x = plot_series.pp_overlay_x_map(self.uistate.project.checkBox).get(aspect, 1)
-                                line.set_xdata(np.full(len(common_sweeps), overlay_x))
-                                line.set_ydata(ppr)
+                for spec in plot_series.build_ppr_overlay_refresh_specs(
+                    rec_label,
+                    dfoutput,
+                    aspect,
+                    self.uistate.project.checkBox,
+                    self.uistate.project.settings,
+                    frozenset(self.uistate.plot.dict_rec_labels.keys()),
+                ):
+                    line = self.uistate.plot.dict_rec_labels[spec.label]["line"]
+                    line.set_xdata(spec.x)
+                    line.set_ydata(spec.y)
             return
 
         linedict = self.uistate.plot.dict_rec_labels[label]
-        x_col = linedict.get("x_mode", "sweep")
-        if x_col not in df_stim.columns:
-            x_col = "sweep"
-        linedict["line"].set_xdata(df_stim[x_col].values)
-        linedict["line"].set_ydata(df_stim[column].values)
+        x_mode = linedict.get("x_mode", "sweep")
+        xy = plot_series.out_line_xy_from_df(dfoutput, stim_num, column, x_mode=x_mode)
+        if xy is None:
+            self.updateOutLine(label)
+            return
+        linedict["line"].set_xdata(xy[0])
+        linedict["line"].set_ydata(xy[1])
 
     def updateOutMean(self, label, mean):
         print(f"updateOutMean: {label}, {mean}")
