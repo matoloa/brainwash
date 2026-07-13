@@ -28,7 +28,7 @@ class UIplot:
         ax1 = self.uistate.plot.ax1
         ax2 = self.uistate.plot.ax2
 
-        if not hasattr(self.uistate, "dict_heatmap"):
+        if not hasattr(self.uistate.plot, "dict_heatmap"):
             self.uistate.plot.dict_heatmap = {}
 
         sweeps = df["sweep"].values
@@ -63,7 +63,7 @@ class UIplot:
         ax2.figure.canvas.draw_idle()
 
     def heatunmap(self):
-        d = getattr(self.uistate, "dict_heatmap", None)
+        d = getattr(self.uistate.plot, "dict_heatmap", None)
         if d is None:
             return
         ax = self.uistate.plot.ax1
@@ -101,7 +101,7 @@ class UIplot:
         if ax1 is None or ax2 is None:
             return
 
-        if not hasattr(self.uistate, "dict_test_markers"):
+        if not hasattr(self.uistate.plot, "dict_test_markers"):
             self.uistate.plot.dict_test_markers = {}
 
         d = self.uistate.plot.dict_test_markers
@@ -147,7 +147,7 @@ class UIplot:
             pass
 
     def clear_test_markers(self, draw=True):
-        d = getattr(self.uistate, "dict_test_markers", None)
+        d = getattr(self.uistate.plot, "dict_test_markers", None)
         if not d:
             return
         for col in list(d.keys()):
@@ -265,7 +265,7 @@ class UIplot:
             # axe mean artists live on the event canvas (uistate.plot.axe), not necessarily
             # the canvas of the ax that was passed (e.g. right-click deselect on output graph).
             # Force a redraw of axe so removal becomes visible.
-            if draw and getattr(self.uistate, "axe", None) is not None:
+            if draw and getattr(self.uistate.plot, "axe", None) is not None:
                 try:
                     self.uistate.plot.axe.figure.canvas.draw_idle()
                 except Exception:
@@ -341,7 +341,7 @@ class UIplot:
 
     def clear_testset_spans(self, draw=True):
         """Clear all test set axvspan patches (labeled testset_span_*) from output graph (ax1/ax2 only)."""
-        if not hasattr(self.uistate, "testset_spans") or not self.uistate.plot.testset_spans:
+        if not hasattr(self.uistate.plot, "testset_spans") or not self.uistate.plot.testset_spans:
             if draw and self.uistate.plot.ax1 is not None:
                 self.uistate.plot.ax1.figure.canvas.draw_idle()
             return
@@ -357,12 +357,12 @@ class UIplot:
 
     def clear_sample_artists(self, draw=True, hide=False):
         """Clear or hide sample overlay artists/inset. hide=True clears the dict (explicit reset on every redraw)."""
-        if not hasattr(self.uistate, "sample_artists") or self.uistate.plot.sample_artists is None:
+        if not hasattr(self.uistate.plot, "sample_artists") or self.uistate.plot.sample_artists is None:
             self.uistate.plot.sample_artists = {}
             if draw and self.uistate.plot.ax1 is not None:
                 self.uistate.plot.ax1.figure.canvas.draw_idle()
             return
-        if hide and hasattr(self.uistate, "sample_inset") and self.uistate.plot.sample_inset is not None:
+        if hide and hasattr(self.uistate.plot, "sample_inset") and self.uistate.plot.sample_inset is not None:
             for artist in self.uistate.plot.sample_artists.values():
                 try:
                     artist.set_visible(False)
@@ -378,7 +378,7 @@ class UIplot:
                 except Exception:
                     pass
             self.uistate.plot.sample_artists = {}
-            if hasattr(self.uistate, "sample_inset") and self.uistate.plot.sample_inset is not None:
+            if hasattr(self.uistate.plot, "sample_inset") and self.uistate.plot.sample_inset is not None:
                 try:
                     self.uistate.plot.sample_inset.remove()
                 except Exception:
@@ -393,11 +393,11 @@ class UIplot:
         Supports multiple test sets (solid for first, dashed for second, dotted beyond).
         Callers set dirty flag on group/sample changes."""
 
-        if not hasattr(self.uistate, "sample_dirty"):
+        if not hasattr(self.uistate.plot, "sample_dirty"):
             self.uistate.plot.sample_dirty = True
-        if not hasattr(self.uistate, "sample_inset"):
+        if not hasattr(self.uistate.plot, "sample_inset"):
             self.uistate.plot.sample_inset = None
-        if not hasattr(self.uistate, "sample_artists"):
+        if not hasattr(self.uistate.plot, "sample_artists"):
             self.uistate.plot.sample_artists = {}
 
         should_show = bool(dd_shown_samples)
@@ -535,7 +535,7 @@ class UIplot:
             end = max(sweeps) + 1
             color = dset.get("color", "#a0a0a0")
             for ax_name in ("ax1", "ax2"):
-                ax = getattr(self.uistate, ax_name, None)
+                ax = getattr(self.uistate.plot, ax_name, None)
                 if ax is None:
                     continue
                 span = ax.axvspan(start, end, color=color, alpha=alpha, label=f"testset_span_{set_ID}", zorder=1)
@@ -790,7 +790,7 @@ class UIplot:
                             pass
 
         # Rebuild show dict for the level (caller should invoke full update_show for selection rules if needed)
-        if hasattr(self.uistate, "dict_group_show"):
+        if hasattr(self.uistate.plot, "dict_group_show"):
             new_show = {k: v for k, v in dict_group.items()
                         if v.get("group_ID") is not None and ((v.get("level") == active_level) or (v.get("level") is None))}
             self.uistate.plot.dict_group_show = new_show
@@ -918,7 +918,7 @@ class UIplot:
             # Re-collect the true integer X positions for group labels, ignoring the sub-offsets used for the individual bars
             group_name_to_x = {}
             current_level = uistate.stat_test.buttonGroup_test_n
-            if hasattr(uistate, "dict_group_show"):
+            if hasattr(self.uistate.plot, "dict_group_show"):
                 for key, val in uistate.plot.dict_group_show.items():
                     if "PPR" in key and hasattr(val["line"], "patches") and not val.get("is_overlay"):
                         if val.get("level") and val.get("level") != current_level:
@@ -950,7 +950,7 @@ class UIplot:
 
         # Check if recordings are visible instead of groups
         pp_has_recs = False
-        if exp_type == "PP" and hasattr(uistate, "dict_rec_show"):
+        if exp_type == "PP" and hasattr(self.uistate.plot, "dict_rec_show"):
             for key, val in uistate.plot.dict_rec_show.items():
                 if "PPR" in key and "marker" not in key:
                     pp_has_recs = True
@@ -1012,7 +1012,7 @@ class UIplot:
             self.sample_overlay(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples or {})
 
         # refresh samples (Phase 3.4.3) - create inset (transparent bg; axis visibility + traces controlled in sample_overlay; no sharex/sharey)
-        if not hasattr(self.uistate, "sample_inset"):
+        if not hasattr(self.uistate.plot, "sample_inset"):
             if self.uistate.plot.ax1 is not None:
                 self.uistate.plot.sample_inset = self.uistate.plot.ax1.inset_axes([0.02, 0.68, 0.33, 0.30])
                 self.uistate.plot.sample_inset.set_zorder(10)
@@ -1159,7 +1159,7 @@ class UIplot:
         markersize=None,
         linestyle="-",
     ):
-        is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
+        is_pp = self.uistate.experiment.experiment_type == "PP"
         if is_pp and axid in ("ax1", "ax2") and "PPR" not in label:
             return
         zorder = 0 if width > 1 else 1
@@ -1223,7 +1223,7 @@ class UIplot:
         variant="raw",
         x_mode=None,
     ):
-        is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
+        is_pp = self.uistate.experiment.experiment_type == "PP"
         if is_pp and axid in ("ax1", "ax2") and "PPR" not in label:
             return
         (marker,) = self.get_axis(axid).plot(
@@ -1349,7 +1349,7 @@ class UIplot:
         variant="raw",
         x_mode=None,
     ):
-        is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
+        is_pp = self.uistate.experiment.experiment_type == "PP"
         if is_pp and axid in ("ax1", "ax2") and "PPR" not in label:
             return
         hline = self.get_axis(axid).axhline(
@@ -1387,7 +1387,7 @@ class UIplot:
                 aspect = "EPSP_slope"
         str_aspect = aspect.replace("_", " ")
         x = df_groupmean.sweep
-        eff_level = level or getattr(self.uistate, "buttonGroup_test_n", "recording")
+        eff_level = level or self.uistate.stat_test.buttonGroup_test_n
         label_mean = f"{group_name} {str_aspect} mean"
         label_norm = f"{group_name} {str_aspect} norm"
         # use level-qualified storage keys so we can keep separate artist sets per n_unit level
@@ -1496,16 +1496,16 @@ class UIplot:
         rec_name = p_row["recording_name"]
         rec_filter = p_row["filter"]  # the filter currently used for this recording
         n_stims = len(dft)
-        is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
+        is_pp = self.uistate.experiment.experiment_type == "PP"
         skip_output = is_pp and n_stims != 2
         if rec_filter != "voltage":
             label = f"{rec_name} ({rec_filter})"
         else:
             label = rec_name
 
-        if getattr(self.uistate, "experiment_type", "time") == "io":
-            io_input = getattr(self.uistate, "io_input", "vamp")
-            io_output = getattr(self.uistate, "io_output", "EPSPamp")
+        if self.uistate.experiment.experiment_type == "io":
+            io_input = self.uistate.experiment.io_input
+            io_output = self.uistate.experiment.io_output
 
             x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
             y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
@@ -1991,8 +1991,8 @@ class UIplot:
         If level is None, it is taken from uistate.stat_test.buttonGroup_test_n.
         """
         # plot group meanlines and SEMs
-        eff_level = level or getattr(self.uistate, "buttonGroup_test_n", "recording")
-        exp_type = getattr(self.uistate, "experiment_type", "time")
+        eff_level = level or self.uistate.stat_test.buttonGroup_test_n
+        exp_type = self.uistate.experiment.experiment_type
         if exp_type == "PP":
             group_name = dict_group["group_name"]
             color = dict_group["color"]
@@ -2012,7 +2012,7 @@ class UIplot:
                                 if valid_y:
                                     rec_ppr[rec_id][aspect] = np.mean(valid_y)
 
-            level = eff_level or getattr(self.uistate, "buttonGroup_test_n", "recording")
+            level = eff_level or self.uistate.stat_test.buttonGroup_test_n
             ppr_data = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
             rec_id_order = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
             if level == "recording":
@@ -2201,8 +2201,8 @@ class UIplot:
             return
 
         if exp_type == "io":
-            io_input = getattr(self.uistate, "io_input", "vamp")
-            io_output = getattr(self.uistate, "io_output", "EPSPamp")
+            io_input = self.uistate.experiment.io_input
+            io_output = self.uistate.experiment.io_output
 
             y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
             axid = "ax1"
@@ -2237,7 +2237,7 @@ class UIplot:
                         zorder=2,
                     )
                     scatter.set_visible(False)
-                    io_level = getattr(self.uistate, "buttonGroup_test_n", "recording")
+                    io_level = self.uistate.stat_test.buttonGroup_test_n
                     io_storage_key = self._level_key(f"{group_name} {variant} IO scatter", io_level)
                     self.uistate.plot.dict_group_labels[io_storage_key] = {
                         "group_ID": group_ID,
@@ -2292,7 +2292,7 @@ class UIplot:
                         }
             return
 
-        eff_level = getattr(self.uistate, "buttonGroup_test_n", "recording")
+        eff_level = self.uistate.stat_test.buttonGroup_test_n
         if "EPSP_amp_mean" in df_groupmean.columns and df_groupmean["EPSP_amp_mean"].notna().any():
             self.plot_group_lines("ax1", group_ID, dict_group, df_groupmean, aspect="EPSP_amp", level=eff_level)
         if "EPSP_slope_mean" in df_groupmean.columns and df_groupmean["EPSP_slope_mean"].notna().any():
@@ -2380,7 +2380,7 @@ class UIplot:
             y_end = data_y[np.abs(data_x - x_end).argmin()]
             self.updateLine(f"{label_core} marker", [x_start, x_end], [y_start, y_end])
 
-            is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
+            is_pp = self.uistate.experiment.experiment_type == "PP"
 
             if aspect == "volley slope":
                 volley_slope_mean = trow.get("volley_slope_mean")
@@ -2415,7 +2415,7 @@ class UIplot:
                 pre_stim_mask = (data_x >= -0.002) & (data_x < -0.001)
                 amp_zero_plot = float(data_y[pre_stim_mask].mean()) if pre_stim_mask.any() else y_position
             self.updateAmpMarker(label_core, t_amp, y_position, amp_x, amp_zero_plot, amp=amp)
-            is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
+            is_pp = self.uistate.experiment.experiment_type == "PP"
             if aspect == "volley amp":
                 volley_amp_mean = trow.get("volley_amp_mean")
                 if dfoutput is not None:
@@ -2504,8 +2504,8 @@ class UIplot:
         # Refresh IO scatter plot if it exists for this recording
         for key, linedict in self.uistate.plot.dict_rec_labels.items():
             if key.startswith(rec_name) and key.endswith(" IO scatter") and linedict.get("x_mode") == "io":
-                io_input = getattr(self.uistate, "io_input", "vamp")
-                io_output = getattr(self.uistate, "io_output", "EPSPamp")
+                io_input = self.uistate.experiment.io_input
+                io_output = self.uistate.experiment.io_output
                 x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
                 y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
                 variant = linedict.get("variant", "raw")
@@ -2517,8 +2517,8 @@ class UIplot:
                     print(f"updateStimLines: refreshed IO scatter '{key}'")
 
             elif key.startswith(rec_name) and key.endswith(" IO trendline") and linedict.get("x_mode") == "io":
-                io_input = getattr(self.uistate, "io_input", "vamp")
-                io_output = getattr(self.uistate, "io_output", "EPSPamp")
+                io_input = self.uistate.experiment.io_input
+                io_output = self.uistate.experiment.io_output
                 x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
                 y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
                 variant = linedict.get("variant", "raw")
@@ -2625,7 +2625,7 @@ class UIplot:
             return
 
         if label not in self.uistate.plot.dict_rec_labels:
-            is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
+            is_pp = self.uistate.experiment.experiment_type == "PP"
             if is_pp:
                 rec_label = label.split(" - stim ")[0]
                 aspect = column.replace("_norm", "")

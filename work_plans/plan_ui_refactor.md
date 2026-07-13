@@ -29,6 +29,7 @@
 | 11 | [ui_refactor/11_host_protocols.md](ui_refactor/11_host_protocols.md) | ✅ done |
 | 12 | [ui_refactor/12_remaining_injection.md](ui_refactor/12_remaining_injection.md) | ✅ done |
 | 13 | [ui_refactor/13_plot_model.md](ui_refactor/13_plot_model.md) | ✅ done |
+| 14 | [ui_refactor/14_ui_plot_nested_state.md](ui_refactor/14_ui_plot_nested_state.md) | ✅ done |
 
 After each PR: mark card ✅ in this table, set **NEXT** on the following row.
 
