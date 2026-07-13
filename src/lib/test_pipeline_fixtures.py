@@ -2,8 +2,35 @@
 
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
+
+def resolve_test_abf(directory: Path, stem: str) -> Path | None:
+    """Return local ABF path (.abf or .abf.gitkeep) without requiring git commit."""
+    abf = directory / f"{stem}.abf"
+    if abf.is_file():
+        return abf
+    gitkeep = directory / f"{stem}.abf.gitkeep"
+    if gitkeep.is_file():
+        return gitkeep
+    return None
+
+
+def abf_path_for_parse(directory: Path, stem: str) -> Path | None:
+    """Path suitable for parse.source2dfs (must end with .abf)."""
+    src = resolve_test_abf(directory, stem)
+    if src is None:
+        return None
+    if src.suffix == ".abf":
+        return src
+    dest = directory / f"{stem}.abf"
+    if not dest.exists():
+        shutil.copy2(src, dest)
+    return dest
 
 
 def make_default_dict_t() -> dict:

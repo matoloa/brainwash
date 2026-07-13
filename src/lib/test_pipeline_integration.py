@@ -12,11 +12,14 @@ import pytest
 import analysis_v3 as analysis
 from brainwash_ui import plot_stim
 from parse import build_dfmean, source2dfs, zeroSweeps
-from test_pipeline_fixtures import make_default_dict_t, make_sweep_df
+from test_pipeline_fixtures import abf_path_for_parse, make_default_dict_t, make_sweep_df
 
 _TEST_DATA = Path(__file__).parent / "test_data"
 _GOLDEN_DFOUTPUT = _TEST_DATA / "golden" / "synthetic_dfoutput.parquet"
-_ABF_1CH = _TEST_DATA / "A_21_P0701-S2" / "2022_07_01_0012.abf"
+_ABF_1CH_DIR = _TEST_DATA / "A_21_P0701-S2"
+_ABF_1CH = abf_path_for_parse(_ABF_1CH_DIR, "2022_07_01_0012")
+_ABF_KO_DIR = _TEST_DATA / "KO_02"
+_ABF_KO = abf_path_for_parse(_ABF_KO_DIR, "2022_01_24_0000")
 
 
 def test_synthetic_pipeline_build_dfoutput():
@@ -68,7 +71,7 @@ def test_golden_pipeline_event_window_non_empty():
     assert not df_event.empty
 
 
-@pytest.mark.skipif(not _ABF_1CH.exists(), reason=f"real ABF absent: {_ABF_1CH}")
+@pytest.mark.skipif(_ABF_1CH is None, reason=f"real ABF absent in {_ABF_1CH_DIR}")
 def test_real_abf_source2dfs_to_dfmean():
     dict_dfs = source2dfs(str(_ABF_1CH), gain=1.0)
     assert dict_dfs
@@ -77,3 +80,26 @@ def test_real_abf_source2dfs_to_dfmean():
     assert i_stim is not None
     for col in ("voltage", "prim", "bis", "time"):
         assert col in dfmean.columns
+
+
+@pytest.mark.skipif(_ABF_1CH is None, reason=f"real ABF absent in {_ABF_1CH_DIR}")
+def test_real_abf_pipeline_build_dfoutput():
+    dict_dfs = source2dfs(str(_ABF_1CH), gain=1.0)
+    df_raw = next(iter(dict_dfs.values()))
+    dfmean, i_stim = build_dfmean(df_raw)
+    assert i_stim is not None
+    dffilter = zeroSweeps(df_raw, i_stim=i_stim)
+    dft = analysis.find_events(dfmean=dfmean, default_dict_t=make_default_dict_t(), verbose=False)
+    assert dft is not None and not dft.empty
+    dfoutput = analysis.build_dfoutput(dffilter=dffilter, dfmean=dfmean, dft=dft)
+    assert not dfoutput.empty
+    assert "EPSP_amp" in dfoutput.columns
+    assert "index" not in dfoutput.columns
+
+
+@pytest.mark.skipif(_ABF_KO is None, reason=f"KO ABF absent in {_ABF_KO_DIR}")
+def test_ko_abf_source2dfs_non_empty():
+    dict_dfs = source2dfs(str(_ABF_KO), gain=1.0)
+    assert dict_dfs
+    df_raw = next(iter(dict_dfs.values()))
+    assert len(df_raw) > 0

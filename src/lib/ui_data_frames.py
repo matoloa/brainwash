@@ -331,13 +331,16 @@ class DataFrameMixin:
 
     def get_dfoutput(self, row, reset=False, dft=None):  # Requires df_t
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
+        from brainwash_ui import recording_cache
+
         rec = row["recording_name"]
         bin_active = pd.notna(row["bin_size"])
-        cache_key = "output_bin" if bin_active else "output"
-        cache_suffix = "_output_bin" if bin_active else "_output"
+        cache_key = recording_cache.output_cache_key(bin_active=bin_active)
         if rec in self.dict_outputs and not reset:  # 1: Return cached
             return self.dict_outputs[rec]
-        str_output_path = f"{self.dict_folders['cache']}/{rec}{cache_suffix}.parquet"
+        str_output_path = recording_cache.output_parquet_path(
+            self.dict_folders["cache"], rec, bin_active=bin_active
+        )
         if Path(str_output_path).exists() and not reset:  # 2: Read from file
             dfoutput = pd.read_parquet(str_output_path)
             # Migrate old files that had a spurious 'index' column from reset_index(inplace=True).
