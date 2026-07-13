@@ -282,3 +282,53 @@ def stim_aggregate_sem(df_sem: pd.DataFrame, out_stim: pd.DataFrame, col: str) -
     if col not in df_sem.columns:
         return None
     return df_sem[col].reindex(out_stim["stim"]).values
+
+
+STIM_MODE_SUFFIX_TO_COL = {
+    "EPSP amp": "EPSP_amp",
+    "EPSP amp norm": "EPSP_amp_norm",
+    "EPSP slope": "EPSP_slope",
+    "EPSP slope norm": "EPSP_slope_norm",
+    "volley amp": "volley_amp",
+    "volley slope": "volley_slope",
+}
+
+
+def io_scatter_xy(
+    dfoutput: pd.DataFrame,
+    io_input: str,
+    io_output: str,
+    *,
+    variant: str,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    x_col, y_col_base = io_axis_columns(io_input, io_output)
+    y_col = io_y_column(y_col_base, variant=variant)
+    df_sweeps = dfoutput[dfoutput["sweep"].notna()]
+    df_clean = io_scatter_frame(df_sweeps, x_col, y_col)
+    if df_clean is None:
+        return None
+    return df_clean[x_col].values, df_clean[y_col].values
+
+
+def io_trendline_xy(
+    dfoutput: pd.DataFrame,
+    io_input: str,
+    io_output: str,
+    *,
+    variant: str,
+    force_through_zero: bool,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    x_col, y_col_base = io_axis_columns(io_input, io_output)
+    y_col = io_y_column(y_col_base, variant=variant)
+    df_sweeps = dfoutput[dfoutput["sweep"].notna()]
+    df_clean = io_scatter_frame(df_sweeps, x_col, y_col)
+    if df_clean is None or len(df_clean) < 2:
+        return None
+    reg = compute_io_regression(
+        df_clean[x_col].values,
+        df_clean[y_col].values,
+        force_through_zero=force_through_zero,
+    )
+    if reg is None:
+        return None
+    return reg.x_line, reg.y_line

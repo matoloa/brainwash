@@ -2270,68 +2270,38 @@ class UIplot:
             "volley slope"        → "volley_slope"
         """
         # Refresh IO scatter plot if it exists for this recording
+        io_input = self.uistate.experiment.io_input
+        io_output = self.uistate.experiment.io_output
+        force0 = bool(self.uistate.project.checkBox.get("io_force0", False))
         for key, linedict in self.uistate.plot.dict_rec_labels.items():
             if key.startswith(rec_name) and key.endswith(" IO scatter") and linedict.get("x_mode") == "io":
-                io_input = self.uistate.experiment.io_input
-                io_output = self.uistate.experiment.io_output
-                x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
-                y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
-                variant = linedict.get("variant", "raw")
-                y_col = f"{y_col_base}_norm" if variant == "norm" else y_col_base
-                df_sweeps = dfoutput[dfoutput["sweep"].notna()]
-                if x_col in df_sweeps.columns and y_col in df_sweeps.columns:
-                    df_sweeps_clean = df_sweeps.dropna(subset=[x_col, y_col])
-                    linedict["line"].set_offsets(np.c_[df_sweeps_clean[x_col].values, df_sweeps_clean[y_col].values])
+                xy = plot_series.io_scatter_xy(
+                    dfoutput, io_input, io_output, variant=linedict.get("variant", "raw")
+                )
+                if xy is not None:
+                    linedict["line"].set_offsets(np.c_[xy[0], xy[1]])
                     print(f"updateStimLines: refreshed IO scatter '{key}'")
 
             elif key.startswith(rec_name) and key.endswith(" IO trendline") and linedict.get("x_mode") == "io":
-                io_input = self.uistate.experiment.io_input
-                io_output = self.uistate.experiment.io_output
-                x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
-                y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
-                variant = linedict.get("variant", "raw")
-                y_col = f"{y_col_base}_norm" if variant == "norm" else y_col_base
-                df_sweeps = dfoutput[dfoutput["sweep"].notna()]
-                if x_col in df_sweeps.columns and y_col in df_sweeps.columns:
-                    df_clean = df_sweeps.dropna(subset=[x_col, y_col])
-                    if len(df_clean) > 1:
-                        x_vals = df_clean[x_col].values
-                        y_vals = df_clean[y_col].values
-
-                        if self.uistate.project.checkBox.get("io_force0", False):
-                            x_sq_sum = np.sum(x_vals**2)
-                            m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
-                            c = 0
-                        else:
-                            if x_vals.max() - x_vals.min() < 1e-5:
-                                m = 0
-                                c = np.mean(y_vals)
-                            else:
-                                x_mean = np.mean(x_vals)
-                                m, c_cent = np.polyfit(x_vals - x_mean, y_vals, 1)
-                                c = c_cent - m * x_mean
-                        x_line = np.array([0 if self.uistate.project.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
-                        y_line = m * x_line + c
-                        linedict["line"].set_data(x_line, y_line)
-                        print(f"updateStimLines: refreshed IO trendline '{key}'")
+                line_xy = plot_series.io_trendline_xy(
+                    dfoutput,
+                    io_input,
+                    io_output,
+                    variant=linedict.get("variant", "raw"),
+                    force_through_zero=force0,
+                )
+                if line_xy is not None:
+                    linedict["line"].set_data(line_xy[0], line_xy[1])
+                    print(f"updateStimLines: refreshed IO trendline '{key}'")
 
         out_stim = dfoutput[dfoutput["sweep"].isna()]
         if out_stim.empty:
             return
 
-        suffix_to_col = {
-            "EPSP amp": "EPSP_amp",
-            "EPSP amp norm": "EPSP_amp_norm",
-            "EPSP slope": "EPSP_slope",
-            "EPSP slope norm": "EPSP_slope_norm",
-            "volley amp": "volley_amp",
-            "volley slope": "volley_slope",
-        }
-
         df_sweeps = dfoutput[dfoutput["sweep"].notna()]
         df_sem = df_sweeps.groupby("stim").sem(numeric_only=True)
 
-        for suffix, col in suffix_to_col.items():
+        for suffix, col in plot_series.STIM_MODE_SUFFIX_TO_COL.items():
             label = f"{rec_name} {suffix}"
             if label not in self.uistate.plot.dict_rec_labels:
                 continue
@@ -2343,7 +2313,8 @@ class UIplot:
             print(f"updateStimLines: refreshed '{label}'")
 
             shade_label = f"{label} shade"
-            if shade_label in self.uistate.plot.dict_rec_labels and col in df_sem.columns:
+            sem_vals = plot_series.stim_aggregate_sem(df_sem, out_stim, col)
+            if shade_label in self.uistate.plot.dict_rec_labels and sem_vals is not None:
                 old_shade_dict = self.uistate.plot.dict_rec_labels[shade_label]
                 try:
                     old_shade_dict["line"].remove()
@@ -2362,7 +2333,7 @@ class UIplot:
                     axid,
                     out_stim["stim"].values,
                     out_stim[col].values,
-                    df_sem[col].reindex(out_stim["stim"]).values,
+                    sem_vals,
                     color,
                     rec_ID,
                     aspect=aspect,

@@ -8,14 +8,13 @@
 | PR | Card | Status |
 |----|------|--------|
 | 26 | [ui_refactor/26_ppr_dedupe_interactive.md](ui_refactor/26_ppr_dedupe_interactive.md) | ✅ done |
-| 27 | pending — `updateStimLines` position helpers | pending |
-| 28 | pending — `ui_data_frames` output path pure helpers | pending |
+| 27 | [ui_refactor/27_update_stim_lines.md](ui_refactor/27_update_stim_lines.md) | ✅ done |
+| 28 | [ui_refactor/28_recording_cache_abf_tests.md](ui_refactor/28_recording_cache_abf_tests.md) | ✅ done |
 
-## Baseline (post Phase II + smoke)
+## Baseline
 
-- `uv run pytest src/lib/ -q` → 166 passed, 13 skipped
-- `ui_plot.py` 2462 LOC; `brainwash_ui/` ~947 LOC
-- No real `.abf` in repo (synthetic + golden parquet only)
+- Real ABF available locally as `.abf.gitkeep` (gitignored `*.abf`); `resolve_test_abf` discovers both
+- `uv run pytest src/lib/ -q` — run after each PR
 
 ## Deferred
 

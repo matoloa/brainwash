@@ -100,6 +100,27 @@ def test_stim_aggregate_sem_reindex():
     assert len(sem) == 2
 
 
+def test_io_scatter_xy_and_trendline():
+    df = pd.DataFrame(
+        {
+            "sweep": [0, 1, 2],
+            "stim": [1, 1, 1],
+            "volley_amp": [1.0, 2.0, 3.0],
+            "EPSP_amp": [2.0, 4.0, 6.0],
+        }
+    )
+    xy = plot_series.io_scatter_xy(df, "vamp", "EPSPamp", variant="raw")
+    assert xy is not None
+    assert len(xy[0]) == 3
+    line = plot_series.io_trendline_xy(df, "vamp", "EPSPamp", variant="raw", force_through_zero=True)
+    assert line is not None
+    assert len(line[0]) == 2
+
+
+def test_stim_mode_suffix_to_col_keys():
+    assert plot_series.STIM_MODE_SUFFIX_TO_COL["EPSP amp"] == "EPSP_amp"
+
+
 def test_render_group_mean_series_agg():
     import matplotlib
 
