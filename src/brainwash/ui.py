@@ -852,12 +852,12 @@ class UIsub(
     def usage(self, ui_component):  # Talkback function
         logger.debug("usage: %s", ui_component)
         print(f"usage: {ui_component}")
-        if not config.talkback:
+        if not self.config.talkback:
             return
         if ui_component not in self.dict_usage.keys():
             self.dict_usage[ui_component] = 0
         self.dict_usage[ui_component] += 1
-        if config.talkback and ui_component in self.dict_usage:
+        if self.config.talkback and ui_component in self.dict_usage:
             # Do not clobber an active test warning (red statusbar)
             if self.uistate.stat_test.statusbar_state != "warning":
                 # Show as centered text using the current default (theme/darkmode) color
@@ -899,7 +899,7 @@ class UIsub(
         if path_usage.exists():
             with path_usage.open("r") as file:
                 self.dict_usage = yaml.safe_load(file)
-            self.dict_usage[f"last_used_{config.version}"] = now
+            self.dict_usage[f"last_used_{self.config.version}"] = now
         else:
             os_name = sys.platform
             self.dict_usage = {
@@ -908,7 +908,7 @@ class UIsub(
                 "ID": str(uuid.uuid4()),
                 "os": os_name,
                 "ID_created": now,
-                f"last_used_{config.version}": now,
+                f"last_used_{self.config.version}": now,
             }
         self.write_usage()
 
@@ -1879,7 +1879,8 @@ def get_signals(source):
 
 # Mainguard
 if __name__ == "__main__":
-    print(f"\n\n{config.program_name} {config.version}\n")
+    _config = ui_widgets.Config()
+    print(f"\n\n{_config.program_name} {_config.version}\n")
     app = QtWidgets.QApplication(
         sys.argv
     )  # "QtWidgets.QApplication(sys.argv) appears to cause Qt: Session management error: None of the authentication protocols specified are supported"
