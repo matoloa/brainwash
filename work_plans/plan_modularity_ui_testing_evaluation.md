@@ -398,7 +398,7 @@ Modeled on `work_plans/History/statistics_refactor/` — one concern per PR, ver
 | PR | Scope |
 |----|-------|
 | 3a | Promote `test_parse_click` core steps to pytest |
-| 3b | Extract `build_dft` / output path from `get_dfoutput` (caches stay on mixin) |
+| 3b | Extract `build_dft` / output path from `get_dfoutput` (caches stay on mixin) | ✅ `recording_pipeline.py` |
 
 ### Phase 4 — `AppContext` facade (2+ PRs)
 

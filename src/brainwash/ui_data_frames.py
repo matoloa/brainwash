@@ -15,7 +15,7 @@ import analysis_v3 as analysis
 import numpy as np
 import pandas as pd
 import parse
-from brainwash_ui import recording_cache
+from brainwash_ui import recording_cache, recording_pipeline
 
 class DataFrameMixin:
     """Mixin that provides the internal DataFrame computation layer for UIsub.
@@ -261,7 +261,7 @@ class DataFrameMixin:
     def get_dft(self, row, reset=False):
         # returns an internal df t for the selected file. If it does not exist, read it from file first.
         rec = row["recording_name"]
-        if str(row.get("sweeps", "...")) == "...":
+        if not recording_pipeline.is_recording_parsed(row):
             print(f"get_dft: {rec} not parsed yet")
             return None
         if rec in self.dict_ts.keys() and not reset:
@@ -271,39 +271,25 @@ class DataFrameMixin:
         if Path(str_t_path).exists() and not reset:
             # print("reading dft from file")
             dft = pd.read_parquet(str_t_path)
-            # Migrate old column names: norm_EPSP_from/to → norm_output_from/to
-            if "norm_EPSP_from" in dft.columns:
-                dft.rename(
-                    columns={
-                        "norm_EPSP_from": "norm_output_from",
-                        "norm_EPSP_to": "norm_output_to",
-                    },
-                    inplace=True,
-                )
+            if recording_pipeline.migrate_dft_column_names(dft):
                 self.df2file(df=dft, filename=rec, key="timepoints")  # re-persist with corrected names
-            for col in dft.columns:
-                if col != "stim" and dft[col].dtype in ["int64", "int32", "float32"]:
-                    dft[col] = dft[col].astype("float64")
+            recording_pipeline.normalize_dft_dtypes(dft)
             self.dict_ts[rec] = dft
             return dft
         else:
             print("creating dft")
             default_dict_t = self.uistate.project.default_dict_t.copy()  # Default sizes
             dfmean = self.get_dfmean(row)
-            dft = analysis.find_events(
-                dfmean=dfmean,
+            dft = recording_pipeline.build_dft(
+                dfmean,
                 default_dict_t=default_dict_t,
                 filter=row["filter"],
-                verbose=False,
+                norm_output_from=self.uistate.project.lineEdit["norm_EPSP_from"],
+                norm_output_to=self.uistate.project.lineEdit["norm_EPSP_to"],
             )
-            # TODO: Error handling!
-            if dft.empty:
+            if dft is None:
                 print("get_dft: No stims found.")
                 return None
-            dft["norm_output_from"], dft["norm_output_to"] = (
-                self.uistate.project.lineEdit["norm_EPSP_from"],
-                self.uistate.project.lineEdit["norm_EPSP_to"],
-            )
             df_p = self.get_df_project()  # update (number of) 'stims' columns
             stims = len(dft)
             df_p.loc[row["ID"] == df_p["ID"], "stims"] = stims
@@ -318,9 +304,7 @@ class DataFrameMixin:
                 dfoutput = self.get_dfoutput(row=row, dft=dft)
                 self.set_uniformTimepoints(p_row=row, dft=dft, dfoutput=dfoutput)
                 dft = self.dict_ts[rec]
-            for col in dft.columns:
-                if col != "stim" and dft[col].dtype in ["int64", "int32", "float32"]:
-                    dft[col] = dft[col].astype("float64")
+            recording_pipeline.normalize_dft_dtypes(dft)
             self.dict_ts[rec] = dft
             self.df2file(df=dft, filename=rec, key="timepoints")  # persist dft as parquet
             self.set_rec_status(rec)  # update status in df_project
@@ -342,13 +326,9 @@ class DataFrameMixin:
         )
         if Path(str_output_path).exists() and not reset:  # 2: Read from file
             dfoutput = pd.read_parquet(str_output_path)
-            # Migrate old files that had a spurious 'index' column from reset_index(inplace=True).
-            if "index" in dfoutput.columns:
-                dfoutput.drop(columns=["index"], inplace=True)
-                dfoutput.reset_index(drop=True, inplace=True)
+            dfoutput, needs_repersist = recording_pipeline.clean_dfoutput_from_parquet(dfoutput)
+            if needs_repersist:
                 self.df2file(df=dfoutput, filename=rec, key=cache_key)  # re-persist clean version
-            else:
-                dfoutput.reset_index(drop=True, inplace=True)
         else:  # 3: Create from scratch and persist
             print(f"creating output for {row['recording_name']}")
             dfmean = self.get_dfmean(row=row)
@@ -358,27 +338,16 @@ class DataFrameMixin:
                 dfinput = self.get_dfbin(row)
             else:
                 dfinput = self.get_dffilter(row)
-            filter_val = row.get("filter")
-            filter_col = filter_val if pd.notna(filter_val) and filter_val and filter_val != "none" else "voltage"
-            dfoutput = analysis.build_dfoutput(
-                dffilter=dfinput,
-                dfmean=dfmean,
-                dft=dft,
-                filter=filter_col,
-            )
             if dft is None or dft.empty:
                 print(f"get_dfoutput: dft None/empty for {row['recording_name']}, skipping backfill")
-            else:
-                # Back-fill volley means into dft from the sweep-mode rows
-                for i, t_row in dft.iterrows():
-                    stim_nr = t_row["stim"]
-                    sweep_rows = dfoutput[(dfoutput["stim"] == stim_nr) & dfoutput["sweep"].notna()]
-                    volley_amp_mean = sweep_rows["volley_amp"].mean()
-                    dft.at[i, "volley_amp_mean"] = volley_amp_mean
-                    dft.at[i, "volley_slope_mean"] = sweep_rows["volley_slope"].mean()
+            dfoutput = recording_pipeline.build_dfoutput_from_inputs(
+                dfinput,
+                dfmean,
+                dft,
+                filter_val=row.get("filter"),
+            )
             self.set_dft(rec, dft)
             print(f"get_dfoutput: done, dfoutput.shape={dfoutput.shape}")
-            dfoutput.reset_index(drop=True, inplace=True)
             # Persist the clean version to disk.
             self.df2file(df=dfoutput, filename=rec, key=cache_key)
         # Cache and return

@@ -72,6 +72,15 @@ class StatusbarResult:
 | `reeval` merge | OR semantics: any pending request with `reeval_formal_test=True` wins |
 | `graphRefresh()` | Thin delegate to `request_graph_refresh` (all ~44 call sites dedupe without edits) |
 
+## Recording pipeline (Phase 3b)
+
+| Invariant | Detail |
+|-----------|--------|
+| `build_dft` | `find_events` + `norm_output_from/to` from line edits; empty → `None` |
+| `build_dfoutput_from_inputs` | `resolve_output_filter_col` → `analysis.build_dfoutput` + volley backfill |
+| Parquet migrate | `norm_EPSP_*` → `norm_output_*`; spurious `index` column dropped on read |
+| Caches | `dict_ts` / `dict_outputs` remain on `DataFrameMixin` |
+
 ## Testset span invariants (Phase IV)
 
 | Invariant | Detail |
