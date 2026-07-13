@@ -145,3 +145,43 @@ def display_label_from_key(key: str) -> str:
         if key.endswith(suf):
             return key[: -len(suf)]
     return key
+
+
+def output_legend_locations(*, experiment_type: str, slope_only: bool) -> tuple[str, str]:
+    """Legend anchor per output axis (ax1, ax2)."""
+    if experiment_type == "io":
+        return "lower right", "lower right"
+    if slope_only:
+        return "upper right", "upper right"
+    return "upper right", "lower right"
+
+
+def heatmap_axis_for_column(col: str) -> str | None:
+    if "amp" in col:
+        return "ax1"
+    if "slope" in col:
+        return "ax2"
+    return None
+
+
+def heatmap_y_fraction(col: str) -> float:
+    return 0.92 if "amp" in col else 0.08
+
+
+def significant_heatmap_points(sweeps, ps) -> list[tuple[float, float]]:
+    """Sweep index and p-value pairs with finite p <= 0.05."""
+    out: list[tuple[float, float]] = []
+    for x, p in zip(sweeps, ps):
+        if isinstance(p, (int, float)) and p == p and p <= 0.05:
+            out.append((float(x), float(p)))
+    return out
+
+
+def output_axis_y_visibility(*, amp_view: bool, slope_view: bool) -> tuple[bool, bool]:
+    if not amp_view and not slope_view:
+        return False, False
+    return amp_view, slope_view
+
+
+def slope_yaxis_on_left(*, slope_only: bool) -> bool:
+    return slope_only

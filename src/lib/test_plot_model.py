@@ -75,3 +75,33 @@ def test_level_storage_key_and_display_label():
     assert plot_model.level_storage_key("G1_amp", "subject") == "G1_amp_subject"
     assert plot_model.level_storage_key("G1_amp", "recording") == "G1_amp"
     assert plot_model.display_label_from_key("G1_amp_subject") == "G1_amp"
+
+
+def test_output_legend_locations():
+    assert plot_model.output_legend_locations(experiment_type="time", slope_only=False) == (
+        "upper right",
+        "lower right",
+    )
+    assert plot_model.output_legend_locations(experiment_type="io", slope_only=False) == (
+        "lower right",
+        "lower right",
+    )
+    assert plot_model.output_legend_locations(experiment_type="time", slope_only=True) == (
+        "upper right",
+        "upper right",
+    )
+
+
+def test_heatmap_helpers():
+    assert plot_model.heatmap_axis_for_column("p_amp") == "ax1"
+    assert plot_model.heatmap_axis_for_column("p_slope") == "ax2"
+    assert plot_model.heatmap_axis_for_column("p_other") is None
+    assert plot_model.heatmap_y_fraction("p_amp") == 0.92
+    points = plot_model.significant_heatmap_points([1, 2, 3], [0.01, 0.2, np.nan])
+    assert points == [(1.0, 0.01)]
+
+
+def test_output_axis_visibility():
+    assert plot_model.output_axis_y_visibility(amp_view=False, slope_view=False) == (False, False)
+    assert plot_model.output_axis_y_visibility(amp_view=True, slope_view=False) == (True, False)
+    assert plot_model.slope_yaxis_on_left(slope_only=True) is True

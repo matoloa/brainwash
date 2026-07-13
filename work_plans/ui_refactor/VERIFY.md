@@ -22,6 +22,18 @@ uv run pytest src/lib/test_statusbar_characterization.py -q
 uv run pytest src/lib/test_pipeline_integration.py -q
 ```
 
+**PR-13+** (plot model):
+
+```sh
+uv run pytest src/lib/test_plot_model.py -q
+```
+
+**PR-07+** (pytest-qt):
+
+```sh
+uv run pytest src/lib/test_ui_wiring.py -q
+```
+
 Optional:
 
 ```sh

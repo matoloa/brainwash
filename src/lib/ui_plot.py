@@ -36,25 +36,14 @@ class UIplot:
 
         for col in pcols:
             ps = df[col].values
-
-            if "amp" in col:
-                ax = ax1
-            elif "slope" in col:
-                ax = ax2
-            else:
+            axis_id = plot_model.heatmap_axis_for_column(col)
+            if axis_id is None:
                 continue
-
+            ax = ax1 if axis_id == "ax1" else ax2
             ymin, ymax = ax.get_ylim()
-            if "amp" in col:
-                # amplitudes along the TOP of the graph
-                y = ymin + (ymax - ymin) * 0.92
-            else:
-                # slopes along the BOTTOM of the graph
-                y = ymin + (ymax - ymin) * 0.08
+            y = ymin + (ymax - ymin) * plot_model.heatmap_y_fraction(col)
 
-            for x, p in zip(sweeps, ps):
-                if not np.isfinite(p) or p > 0.05:
-                    continue
+            for x, p in plot_model.significant_heatmap_points(sweeps, ps):
                 color, alpha = plot_model.p_value_color_alpha(p)
                 sc = ax.scatter([x], [y], marker="o", color=[color], alpha=alpha)
                 self.uistate.plot.dict_heatmap.setdefault(col, {})[x] = sc
@@ -807,12 +796,12 @@ class UIplot:
         dd_recs = uistate.plot.dict_rec_show
         dd_group_show = uistate.plot.dict_group_show
         axids = ["ax1", "ax2"]
-        legend_loc = ["upper right", "lower right"]
-        if uistate.experiment.experiment_type == "io":
-            legend_loc = ["lower right", "lower right"]
-        elif uistate.slopeOnly():
-            # slope-only: legend on ax2 (top-right) to match significance markers
-            legend_loc = ["upper right", "upper right"]
+        legend_loc = list(
+            plot_model.output_legend_locations(
+                experiment_type=uistate.experiment.experiment_type,
+                slope_only=uistate.slopeOnly(),
+            )
+        )
         is_pp = uistate.experiment.experiment_type == "PP"
         for axid, loc in zip(axids, legend_loc):
             recs_on_axis = {key: value for key, value in dd_recs.items() if value["axis"] == axid and not key.endswith(" marker")}
@@ -1106,17 +1095,11 @@ class UIplot:
 
         amp_view = uistate.ampView()
         slope_view = uistate.slopeView()
+        show_amp, show_slope = plot_model.output_axis_y_visibility(amp_view=amp_view, slope_view=slope_view)
+        ax1.yaxis.set_visible(show_amp)
+        ax2.yaxis.set_visible(show_slope)
 
-        if not amp_view and not slope_view:
-            # Fallback for no slope/amp view
-            ax1.yaxis.set_visible(False)
-            ax2.yaxis.set_visible(False)
-        else:
-            ax1.yaxis.set_visible(amp_view)
-            ax2.yaxis.set_visible(slope_view)
-
-        # print(f"oneAxisLeft - uistate.ampView: {amp_view}, uistate.slopeView: {slope_view}, uistate.slopeOnly: {uistate.slopeOnly()}")
-        if uistate.slopeOnly():
+        if plot_model.slope_yaxis_on_left(slope_only=uistate.slopeOnly()):
             ax2.yaxis.set_label_position("left")
             ax2.yaxis.set_ticks_position("left")
         else:

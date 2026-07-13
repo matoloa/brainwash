@@ -30,8 +30,11 @@
 | 12 | [ui_refactor/12_remaining_injection.md](ui_refactor/12_remaining_injection.md) | ✅ done |
 | 13 | [ui_refactor/13_plot_model.md](ui_refactor/13_plot_model.md) | ✅ done |
 | 14 | [ui_refactor/14_ui_plot_nested_state.md](ui_refactor/14_ui_plot_nested_state.md) | ✅ done |
+| 15 | [ui_refactor/15_plot_model_phase2.md](ui_refactor/15_plot_model_phase2.md) | ✅ done |
 
 After each PR: mark card ✅ in this table, set **NEXT** on the following row.
+
+**NEXT (human)**: deeper `addRow`/`graphRefresh` plot model extraction or merge `ui-refactor/phase0-3` → main when ready.
 
 ## Shared docs (read on demand)
 
