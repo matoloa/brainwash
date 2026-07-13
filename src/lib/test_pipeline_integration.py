@@ -16,6 +16,7 @@ from test_pipeline_fixtures import abf_path_for_parse, make_default_dict_t, make
 
 _TEST_DATA = Path(__file__).parent / "test_data"
 _GOLDEN_DFOUTPUT = _TEST_DATA / "golden" / "synthetic_dfoutput.parquet"
+_GOLDEN_ABF_DFOUTPUT = _TEST_DATA / "golden" / "abf_1ch_dfoutput.parquet"
 _ABF_1CH_DIR = _TEST_DATA / "A_21_P0701-S2"
 _ABF_1CH = abf_path_for_parse(_ABF_1CH_DIR, "2022_07_01_0012")
 _ABF_KO_DIR = _TEST_DATA / "KO_02"
@@ -62,6 +63,14 @@ def test_golden_dfoutput_parquet_columns():
     for col in ("stim", "sweep", "EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"):
         assert col in df.columns
     assert "index" not in df.columns
+
+
+def test_golden_abf_dfoutput_has_sweep_rows():
+    assert _GOLDEN_ABF_DFOUTPUT.exists(), f"golden missing: {_GOLDEN_ABF_DFOUTPUT}"
+    df = pd.read_parquet(_GOLDEN_ABF_DFOUTPUT)
+    assert len(df) >= 10
+    assert df["sweep"].notna().sum() > 0
+    assert df["EPSP_amp"].notna().any()
 
 
 def test_golden_pipeline_event_window_non_empty():
