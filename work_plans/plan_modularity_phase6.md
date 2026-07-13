@@ -54,3 +54,4 @@ uv run pytest src/brainwash/ -q
 | 6b | remove module aliases | ✅ `284d414` [HIGH RISK phase6b] |
 | 6c | bare config refs fixup | ✅ `4b032d3` [HIGH RISK phase6c] |
 | 7a | UIplot contract doc | ✅ commit 84eb30d |
+| 7b | group line specs → plot_model | ✅ `7aadc92` [HIGH RISK phase7b] |
