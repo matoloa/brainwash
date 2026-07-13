@@ -30,7 +30,7 @@ from matplotlib.figure import Figure
 
 matplotlib_use("Qt5Agg")
 
-import importlib  # for reloading modules
+
 import json  # for saving and loading dicts as strings
 import logging
 import pickle  # for saving and loading dicts
@@ -81,7 +81,6 @@ logger.debug("ui.py: os.getcwd(): %s", os.getcwd())
 
 config = ui_widgets.Config()
 uistate = ui_state_classes.UIstate()  # global variable for storing state of UI
-importlib.reload(ui_plot)
 uiplot = ui_plot.UIplot(uistate)
 
 

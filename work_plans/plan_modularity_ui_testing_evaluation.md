@@ -1,7 +1,7 @@
 # Brainwash: Modularity, UI Separation, and Automated Testing
 
 **Date**: 2026-07-13 (revised)  
-**Status**: Evaluation and recommendation — no implementation  
+**Status**: Phase 0–3 + Phase II (PRs 17–25) implemented on `ui-refactor/phase0-3`. Metrics below are stale baseline; see [plan_ui_refactor_phase2.md](plan_ui_refactor_phase2.md) for current state (~166 tests, `brainwash_ui/` ~950 LOC, mixin injection removed).  
 **Audience**: Human maintainers and agentic contributors  
 **Goal**: Make UI/stat/view changes safe for agents without a full rewrite, reusing the statistics refactor playbook.
 

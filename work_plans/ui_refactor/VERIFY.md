@@ -34,6 +34,12 @@ uv run pytest src/lib/test_plot_model.py -q
 uv run pytest src/lib/test_plot_series.py -q
 ```
 
+**PR-20+** (plot stim):
+
+```sh
+uv run pytest src/lib/test_plot_stim.py -q
+```
+
 **PR-07+** (pytest-qt):
 
 ```sh
