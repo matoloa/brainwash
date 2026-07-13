@@ -52,6 +52,12 @@ Branch: `ui-refactor/phase0-3`. Index: [plan_ui_refactor_phase2.md](plan_ui_refa
 | 34 | [ui_refactor/34_testset_span_descriptors.md](ui_refactor/34_testset_span_descriptors.md) | ✅ done |
 | 35 | [ui_refactor/35_export_image_plot_reuse.md](ui_refactor/35_export_image_plot_reuse.md) | ✅ done |
 
+**Phase V**: [plan_ui_refactor_phase5.md](plan_ui_refactor_phase5.md)
+
+| PR | Card | Status |
+|----|------|--------|
+| 36 | [ui_refactor/36_plot_drag_zones.md](ui_refactor/36_plot_drag_zones.md) | ✅ done |
+
 ## Shared docs
 
 - [ui_refactor/VERIFY.md](ui_refactor/VERIFY.md)
