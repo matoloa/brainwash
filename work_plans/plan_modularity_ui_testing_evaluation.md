@@ -402,8 +402,9 @@ Modeled on `work_plans/History/statistics_refactor/` — one concern per PR, ver
 
 ### Phase 4 — `AppContext` facade (2+ PRs)
 
-- Split `UIstate` with backward-compatible properties
-- Migrate `ui_stat_test` to read `ctx.stat_test` first
+- Split `UIstate` with backward-compatible properties — ✅ PR-06 sub-objects
+- Migrate `ui_stat_test` to read `ctx.stat_test` first — ✅
+- `app_context.compute_statusbar_result` + snapshots — ✅ commit 59
 
 ### Phase 5 — `pytest-qt` smoke (1 PR)
 

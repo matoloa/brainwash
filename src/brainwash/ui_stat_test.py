@@ -13,7 +13,7 @@ import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
 # brainwash stats (local module shadows stdlib; ui.py does "import statistics as stats" equivalent via its context + from . )
-from brainwash_ui import applicability, statusbar, view_state
+from brainwash_ui import app_context, applicability, statusbar, view_state
 
 from . import statistics as stats
 
@@ -228,46 +228,16 @@ class StatTestMixin:
     # -------------------------------------------------------------------------
 
     def _compute_statusbar_for_current_state(self) -> statusbar.StatusbarResult:
-        eff = self._effective_test_type()
-        if eff == "None":
-            return statusbar.StatusbarResult(None, None)
-        if self._is_io_mode():
-            formal = self.uistate.stat_test.formal_test_results
-            return self._format_io_regression_statusbar(formal)
-        warning = self._get_stat_test_warning()
-        if warning is not None:
-            return statusbar.StatusbarResult(warning, "warning")
-        formal = self.uistate.stat_test.formal_test_results
-        if formal:
-            result = self._format_non_io_stat_test_statusbar(formal)
-            if result.text:
-                return result
-        return statusbar.StatusbarResult(None, None)
+        return app_context.compute_statusbar_result(
+            experiment=app_context.experiment_snapshot_from(self.uistate),
+            stat_test=app_context.stat_test_snapshot_from(self.uistate),
+            dd_groups=self._dd_groups_safe(),
+            dd_testsets=self._dd_testsets_safe(),
+        )
 
     def _get_statusbar_for_current_state(self) -> str | None:
         """Return statusbar text for current state without mutating uistate."""
         return self._compute_statusbar_for_current_state().text
-
-    def _format_io_regression_statusbar(self, formal) -> statusbar.StatusbarResult:
-        n_unit = self.uistate.stat_test.buttonGroup_test_n
-        return statusbar.format_io_regression_statusbar(
-            formal,
-            dd_groups=self._dd_groups_safe(),
-            n_unit=n_unit,
-        )
-
-    def _format_non_io_stat_test_statusbar(self, formal) -> statusbar.StatusbarResult:
-        return statusbar.format_non_io_stat_test_statusbar(
-            formal,
-            effective_test_type=self._effective_test_type(),
-            dd_groups=self._dd_groups_safe(),
-            n_unit=self.uistate.stat_test.buttonGroup_test_n,
-            ttest_variant=self.uistate.stat_test.test_t_variant,
-            wilcox_variant=self.uistate.stat_test.test_wilcox_variant,
-            test_fdr=bool(self.uistate.stat_test.test_fdr),
-            test_sw=bool(self.uistate.stat_test.test_sw),
-            test_levene=bool(self.uistate.stat_test.test_levene),
-        )
 
     # -------------------------------------------------------------------------
     # Applicability checks (pure; return warning str or None)

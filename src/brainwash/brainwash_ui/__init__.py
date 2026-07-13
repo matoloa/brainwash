@@ -1,6 +1,7 @@
 """Pure UI-adjacent logic (view state, applicability, statusbar formatters). No Qt."""
 
 from . import (
+    app_context,
     applicability,
     plot_drag,
     plot_model,
@@ -15,6 +16,7 @@ from . import (
 )
 
 __all__ = [
+    "app_context",
     "applicability",
     "plot_drag",
     "plot_model",

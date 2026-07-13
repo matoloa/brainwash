@@ -2,40 +2,18 @@
 
 from PyQt5 import QtWidgets
 
-from brainwash_ui import applicability, statusbar, view_state
+from brainwash_ui import app_context, statusbar, view_state
 from ui_state_classes import UIstate
 
 
 def _statusbar_for_uistate(u: UIstate, *, dd_groups: dict, dd_testsets: dict | None = None) -> statusbar.StatusbarResult:
     """Mirror StatTestMixin statusbar query path without Qt host."""
-    if u.experiment.experiment_type == "io":
-        return statusbar.format_io_regression_statusbar(
-            u.stat_test.formal_test_results,
-            dd_groups=dd_groups,
-            n_unit=u.stat_test.buttonGroup_test_n,
-        )
-    warning = applicability.warning_for_test_type(
-        u.stat_test.test_type,
+    return app_context.compute_statusbar_result(
+        experiment=app_context.experiment_snapshot_from(u),
+        stat_test=app_context.stat_test_snapshot_from(u),
         dd_groups=dd_groups,
         dd_testsets=dd_testsets or {},
-        ttest_variant=u.stat_test.test_t_variant,
-        wilcox_variant=u.stat_test.test_wilcox_variant,
     )
-    if warning:
-        return statusbar.StatusbarResult(warning, "warning")
-    if u.stat_test.formal_test_results:
-        return statusbar.format_non_io_stat_test_statusbar(
-            u.stat_test.formal_test_results,
-            effective_test_type=u.stat_test.test_type,
-            dd_groups=dd_groups,
-            n_unit=u.stat_test.buttonGroup_test_n,
-            ttest_variant=u.stat_test.test_t_variant,
-            wilcox_variant=u.stat_test.test_wilcox_variant,
-            test_fdr=bool(u.stat_test.test_fdr),
-            test_sw=bool(u.stat_test.test_sw),
-            test_levene=bool(u.stat_test.test_levene),
-        )
-    return statusbar.StatusbarResult(None, None)
 
 _TYPE_TO_EXPERIMENT = {
     "radioButton_type_time": "time",

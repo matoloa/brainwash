@@ -7,7 +7,8 @@
 | `brainwash_ui.applicability.*` | Yes | No |
 | `brainwash_ui.view_state.*` | Yes | No |
 | `brainwash_ui.statusbar.format_*` | Yes | No — returns `StatusbarResult` |
-| `StatTestMixin._compute_statusbar_for_current_state` | Pure compute → `StatusbarResult` | No `statusbar_state` mutation |
+| `app_context.compute_statusbar_result` | Pure dispatch from snapshots | No `uistate` mutation |
+| `StatTestMixin._compute_statusbar_for_current_state` | Builds snapshots → `compute_statusbar_result` | No `statusbar_state` mutation |
 | `StatTestMixin._get_statusbar_for_current_state` | Text-only query | Delegates to compute; no mutation |
 | `StatTestMixin.update_test` | Apply path | Sets `statusbar_state`, then `set_statusbar` |
 | `StatTestMixin.set_statusbar` | No (UI) | Updates widgets |
