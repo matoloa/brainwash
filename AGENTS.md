@@ -21,7 +21,7 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
    - **Experiment Type & Test Handling**:
      - `experiment_type="io"` is first-class. Use it directly rather than `"ANCOVA"` sentinel leaking into `compute_statistical_comparison`.
      - IO regression (`_compute_io_regression_internal`) must be reachable without test_type guard bypasses. IO guard stays early in `brainwash_stats/dispatcher.py:compute_statistical_comparison` (before implicit ANOVA).
-     - `_get_stat_test_warning` and `_refresh_test_statusbar` must remain pure (no side effects, no recursion). Statusbar state lives in `uistate`.
+     - Applicability and statusbar **formatters** live in `brainwash_ui/` (pure; no widget side effects). `StatTestMixin._get_stat_test_warning` delegates there. `set_statusbar` / `_get_statusbar_for_current_state` orchestrate display; only the mixin applies `uistate.statusbar_state` and Qt styling (no recursion).
      - Prefer explicit parameter passing over `getattr(uistate, "...")` fallbacks or bound-method `__self__` recovery.
    - **State & Singletons**: `uistate` (from `ui_state_classes.py`) is the source of truth. Module-level injection in mixins is acceptable but document it.
    - **compute_statistical_comparison**: Keep as thin dispatcher where possible. Avoid 1000+ LOC god function growth. Extract helpers for new modes (IO, PP, etc.).

@@ -16,11 +16,11 @@
 |----|------|--------|
 | — | [plan_modularity_ui_testing_evaluation.md](plan_modularity_ui_testing_evaluation.md) | ✅ done (evaluation) |
 | 00 | [ui_refactor/00_DONE_evaluation.md](ui_refactor/00_DONE_evaluation.md) | ✅ done |
-| 01 | [ui_refactor/01_ci_and_agents_hygiene.md](ui_refactor/01_ci_and_agents_hygiene.md) | **NEXT** |
-| 02 | [ui_refactor/02_view_state.md](ui_refactor/02_view_state.md) | pending |
-| 03 | [ui_refactor/03_applicability_checks.md](ui_refactor/03_applicability_checks.md) | pending |
-| 04 | [ui_refactor/04_statusbar_formatters.md](ui_refactor/04_statusbar_formatters.md) | pending |
-| 05 | [ui_refactor/05_pipeline_integration.md](ui_refactor/05_pipeline_integration.md) | pending |
+| 01 | [ui_refactor/01_ci_and_agents_hygiene.md](ui_refactor/01_ci_and_agents_hygiene.md) | ✅ done |
+| 02 | [ui_refactor/02_view_state.md](ui_refactor/02_view_state.md) | ✅ done |
+| 03 | [ui_refactor/03_applicability_checks.md](ui_refactor/03_applicability_checks.md) | ✅ done |
+| 04 | [ui_refactor/04_statusbar_formatters.md](ui_refactor/04_statusbar_formatters.md) | ✅ done |
+| 05 | [ui_refactor/05_pipeline_integration.md](ui_refactor/05_pipeline_integration.md) | **NEXT** |
 | 06 | [ui_refactor/06_app_context_facade.md](ui_refactor/06_app_context_facade.md) | pending |
 | 07 | [ui_refactor/07_pytest_qt_smoke.md](ui_refactor/07_pytest_qt_smoke.md) | pending |
 

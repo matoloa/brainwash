@@ -1,6 +1,6 @@
 # PR-04: Statusbar formatters + purity split
 
-**Status**: pending | **Depends on**: PR-03
+**Status**: DONE | **Depends on**: PR-03
 
 ## Goal
 

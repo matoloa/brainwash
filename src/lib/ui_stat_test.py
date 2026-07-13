@@ -18,6 +18,8 @@ import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
 # brainwash stats (local module shadows stdlib; ui.py does "import statistics as stats" equivalent via its context + from . )
+from brainwash_ui import applicability, statusbar, view_state
+
 from . import statistics as stats
 
 # ---------------------------------------------------------------------------
@@ -99,15 +101,30 @@ class StatTestMixin:
 
     def _get_shown_group_ids(self):
         """Return list of group IDs that are currently shown (checkbox checked)."""
-        if not hasattr(self, "dd_groups") or not self.dd_groups:
+        if not hasattr(self, "dd_groups"):
             return []
-        return [gid for gid, g in self.dd_groups.items() if g.get("show") in (True, "True", "true", 1, "1")]
+        return view_state.visible_group_ids(self.dd_groups)
 
     def _get_shown_testsets(self):
         """Return list of shown test set IDs."""
         if not hasattr(self, "dd_testsets"):
             return []
-        return [tid for tid, t in self.dd_testsets.items() if t.get("show", False)]
+        return view_state.visible_testset_ids(self.dd_testsets)
+
+    def _dd_groups_safe(self) -> dict:
+        if hasattr(self, "dd_groups") and isinstance(self.dd_groups, dict):
+            return self.dd_groups
+        return {}
+
+    def _dd_testsets_safe(self) -> dict:
+        if hasattr(self, "dd_testsets") and isinstance(self.dd_testsets, dict):
+            return self.dd_testsets
+        return {}
+
+    def _maybe_log_applicability_warning(self, warning: str | None, *, always_log: bool = False) -> str | None:
+        if warning and (always_log or bool(getattr(uistate, "formal_test_results", None))):
+            print(f"Statistical test: {warning}")
+        return warning
 
     def update_anova_label(self):
         """Update label_test_ANOVA and uistate.anova_label based on number of shown test sets."""
@@ -221,309 +238,96 @@ class StatTestMixin:
     # Statusbar single source of truth + formatters
     # -------------------------------------------------------------------------
 
+    def _apply_statusbar_result(self, result: statusbar.StatusbarResult) -> str | None:
+        uistate.statusbar_state = result.state
+        return result.text
+
     def _get_statusbar_for_current_state(self) -> str | None:
-        """Single source of truth for statusbar per AGENTS.md and plan.md.
-        Dispatches based on experiment_type/effective operation. IO prefers formal_test_results config.
-        Pure query (state set only by caller update_test / set_statusbar).
-        """
+        """Single source of truth for statusbar text. Sets uistate.statusbar_state once from computed result."""
         eff = self._effective_test_type()
         if eff == "None":
-            uistate.statusbar_state = None
-            return None
+            return self._apply_statusbar_result(statusbar.StatusbarResult(None, None))
         if self._is_io_mode():
             formal = getattr(uistate, "formal_test_results", None)
-            return self._format_io_regression_statusbar(formal)
-        # non-IO
-        text = self._get_stat_test_warning()
-        if text is not None:
-            uistate.statusbar_state = "warning"
-            return text
+            return self._apply_statusbar_result(
+                self._format_io_regression_statusbar(formal)
+            )
+        warning = self._get_stat_test_warning()
+        if warning is not None:
+            return self._apply_statusbar_result(statusbar.StatusbarResult(warning, "warning"))
         formal = getattr(uistate, "formal_test_results", None)
         if formal:
-            text = self._format_non_io_stat_test_statusbar(formal)
-            if text:
-                return text
-        uistate.statusbar_state = None
-        return None
+            result = self._format_non_io_stat_test_statusbar(formal)
+            if result.text:
+                return self._apply_statusbar_result(result)
+        return self._apply_statusbar_result(statusbar.StatusbarResult(None, None))
 
-    def _format_io_regression_statusbar(self, formal):
-        """Single source of truth for IO regression statusbar."""
-        if formal:
-            if isinstance(formal, list) and formal:
-                item = formal[0]
-                if isinstance(item, dict):
-                    cfg = item.get("config") or item
-            elif isinstance(formal, dict):
-                cfg = formal.get("config") or formal
-            else:
-                cfg = None
-            if isinstance(cfg, dict) and cfg.get("type") == "IO regression":
-                prefix = "IO ANCOVA"
-                global_notes = []
-                n_report = ""
-                group_ns = cfg.get("group_ns") or (formal[0] if isinstance(formal, list) else formal).get("group_ns", {})
-                n_unit = cfg.get("n_unit", getattr(uistate, "buttonGroup_test_n", "subject"))
-                unit_label = "subjects" if n_unit == "subject" else f"{n_unit}s"
-                if group_ns:
-                    ns = []
-                    for g, n in group_ns.items():
-                        g_name = self.dd_groups.get(g, {}).get("group_name", f"Group {g}")
-                        ns.append(f"{g_name}={n}")
-                    n_report = f"({', '.join(ns)} {unit_label})"
-                x_col = cfg.get("x_col", "volley_amp")
-                y_col = cfg.get("y_col", "EPSP_amp")
-                label_map = {
-                    "EPSP_amp": "EPSP amp",
-                    "EPSP_slope": "EPSP slope",
-                    "volley_amp": "volley amp",
-                    "volley_slope": "volley slope",
-                    "stim": "stim",
-                }
-                y_label = label_map.get(y_col, y_col.replace("_", " "))
-                x_label = label_map.get(x_col, x_col.replace("_", " "))
-                xy_label = f"{y_label} / {x_label}"
-                slope_p = cfg.get("slope_p") or (formal[0] if isinstance(formal, list) else formal).get("slope_p")
-                if isinstance(slope_p, (int, float)) and np.isfinite(slope_p):
-                    pstr = f"{slope_p:.3g}" if slope_p >= 0.001 else "<0.001"
-                    stat_label = "slope" if str(cfg.get("io_output", "")).endswith(("slope", "Slope")) else "ratio"
-                    global_notes.append(f"{stat_label} p={pstr}")
-                for g, r2v in cfg.get("r2_per_group", {}).items():
-                    if isinstance(r2v, (int, float)) and np.isfinite(r2v):
-                        global_notes.append(f"r²({g})={r2v:.2f}")
-                        break
-                if global_notes:
-                    notes_str = " ".join(global_notes)
-                    prefix = f"{prefix} {n_report} {xy_label}: {notes_str}"
-                else:
-                    prefix = f"{prefix} {n_report} {xy_label}"
-                uistate.statusbar_state = "info"
-                return prefix
-            uistate.statusbar_state = None
-            return "IO regression: select ≥2 groups to compute slope comparison"
-        uistate.statusbar_state = None
-        return None
+    def _format_io_regression_statusbar(self, formal) -> statusbar.StatusbarResult:
+        n_unit = getattr(uistate, "buttonGroup_test_n", "subject")
+        return statusbar.format_io_regression_statusbar(
+            formal,
+            dd_groups=self._dd_groups_safe(),
+            n_unit=n_unit,
+        )
 
-    def _format_non_io_stat_test_statusbar(self, formal):
-        """Compact success statusbar text for non-IO formal tests."""
-        if not formal:
-            uistate.statusbar_state = None
-            return None
-        results = formal if isinstance(formal, list) else [formal]
-        if not any(isinstance(r, dict) for r in results):
-            uistate.statusbar_state = None
-            return None
-
-        eff = self._effective_test_type()
-        if eff == "Wilcoxon":
-            variant = getattr(uistate, "test_wilcox_variant", "paired")
-        elif eff == "t-test":
-            variant = getattr(uistate, "test_t_variant", "unpaired")
-        else:
-            variant = None
-
-        test_label = f"{eff} ({variant})" if variant else eff
-
-        n_report = ""
-        primary = results[0] if results else {}
-        try:
-            if isinstance(primary, dict):
-                n_unit = getattr(uistate, "buttonGroup_test_n", "subject")
-                unit_label = "subjects" if n_unit == "subject" else f"{n_unit}s"
-                ddg = getattr(self, "dd_groups", {}) or {}
-                group_ns = primary.get("group_ns") or (primary.get("config") or {}).get("group_ns", {})
-                if group_ns:
-                    ns = []
-                    for g, n in group_ns.items():
-                        g_name = ddg.get(g, {}).get("group_name", f"Group {g}")
-                        ns.append(f"{g_name}={n}")
-                    if ns:
-                        n_report = f"({', '.join(ns)} {unit_label})"
-                else:
-                    g1 = primary.get("group1")
-                    g2 = primary.get("group2")
-                    n1 = int(primary.get("n1", 0) or 0)
-                    n2 = int(primary.get("n2", 0) or 0)
-                    if isinstance(g1, (list, tuple)) and len(g1) == 1: g1 = g1[0]
-                    if isinstance(g2, (list, tuple)) and len(g2) == 1: g2 = g2[0]
-                    def _gname(g):
-                        if g is None or isinstance(g, (list, tuple)): return None
-                        return ddg.get(g, {}).get("group_name", f"Group {g}")
-                    if g1 is not None and g2 is not None and g1 != g2 and not isinstance(g1, (list, tuple)):
-                        p1 = f"{_gname(g1)}={n1}" if n1 else str(_gname(g1))
-                        p2 = f"{_gname(g2)}={n2}" if n2 else str(_gname(g2))
-                        n_report = f"({p1}, {p2} {unit_label})"
-                    elif g1 is not None:
-                        if isinstance(g1, (list, tuple)):
-                            parts = []
-                            val = n1 or n2
-                            for gg in g1:
-                                nm = _gname(gg)
-                                parts.append(f"{nm}={val}" if val else str(nm))
-                            if parts: n_report = f"({', '.join(parts)} {unit_label})"
-                        else:
-                            nm = _gname(g1)
-                            val = n1 or n2
-                            n_report = f"({nm}={val} {unit_label})" if val else f"({nm})"
-        except Exception:
-            n_report = ""
-
-        if n_report:
-            test_label = f"{test_label} {n_report}"
-
-        fdr = bool(getattr(uistate, "test_fdr", False))
-        sw = bool(getattr(uistate, "test_sw", False))
-        lev = bool(getattr(uistate, "test_levene", False))
-
-        is_multi = (eff == "Cluster perm.") or len(results) > 1
-        reports = []
-        for idx, r in enumerate(results):
-            if not isinstance(r, dict): continue
-            set_prefix = ""
-            if is_multi:
-                sname = r.get("set_name") or r.get("set_id") or f"set{idx+1}"
-                set_prefix = f"{sname}: "
-            for key in sorted(k for k in r.keys() if k.startswith("p_")):
-                aspect = key[2:].replace("_norm", " (norm)")
-                use_q = fdr and r.get("q_" + key[2:]) is not None
-                val_key = "q_" + key[2:] if use_q else key
-                val = r.get(val_key, r.get(key))
-                if isinstance(val, (int, float)) and np.isfinite(val):
-                    pstr = f"{val:.3g}" if val >= 0.001 else "<0.001"
-                else:
-                    pstr = "NA"
-                label = "q" if use_q else "p"
-                reports.append(f"{set_prefix}{aspect}: {label}={pstr}")
-
-        diag = []
-        diag_suffix = ""
-        if sw:
-            diag.append("SW")
-        if lev:
-            lev_strs = []
-            for r in results:
-                for asp in ("amp", "slope"):
-                    p = r.get(f"levene_p_{asp}")
-                    if isinstance(p, (int, float)) and np.isfinite(p):
-                        pstr = f"{p:.3g}" if p >= 0.001 else "<0.001"
-                        lev_strs.append(f"{asp} p={pstr}")
-            if lev_strs:
-                diag.append("Lev(" + " ".join(lev_strs) + ")")
-            else:
-                diag.append("Levene")
-        if diag:
-            diag_suffix = "    " + " ".join(diag)
-
-        if not reports:
-            uistate.statusbar_state = "info"
-            return f"{test_label}: done (see console){diag_suffix}"
-        text = f"{test_label}: {'  '.join(reports)}{diag_suffix}"
-        uistate.statusbar_state = "info"
-        return text
+    def _format_non_io_stat_test_statusbar(self, formal) -> statusbar.StatusbarResult:
+        return statusbar.format_non_io_stat_test_statusbar(
+            formal,
+            effective_test_type=self._effective_test_type(),
+            dd_groups=self._dd_groups_safe(),
+            n_unit=getattr(uistate, "buttonGroup_test_n", "subject"),
+            ttest_variant=getattr(uistate, "test_t_variant", "unpaired"),
+            wilcox_variant=getattr(uistate, "test_wilcox_variant", "paired"),
+            test_fdr=bool(getattr(uistate, "test_fdr", False)),
+            test_sw=bool(getattr(uistate, "test_sw", False)),
+            test_levene=bool(getattr(uistate, "test_levene", False)),
+        )
 
     # -------------------------------------------------------------------------
     # Applicability checks (pure; return warning str or None)
     # -------------------------------------------------------------------------
 
     def _check_ttest_applicability(self, variant: str) -> str | None:
-        had_results = bool(getattr(uistate, "formal_test_results", None))
-        if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
-            if had_results:
-                print("Statistical test: no groups defined.")
-            return "No groups defined for t-test"
-        shown_groups = self._get_shown_group_ids()
-        shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
-        min_groups = 1 if variant in ("one-sample", "paired") else 2
-        if len(shown_groups) < min_groups:
-            if had_results:
-                print(f"Statistical test: need at least {min_groups} shown group(s) with data for {variant}.")
-            return f"t-test requires {min_groups} group(s) with data"
-        shown_ts = self._get_shown_testsets()
-        if variant == "paired" and len(shown_ts) != 2:
-            if had_results:
-                print("Statistical test: paired requires exactly 2 shown test sets (with 1 group).")
-            return "Paired t-test requires exactly 2 test sets"
-        if variant == "paired":
-            n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
-            if n1 < 2:
-                if had_results:
-                    print("Statistical test: paired requires N ≥ 2 recordings.")
-                return "Paired t-test requires N ≥ 2 recordings per group"
-        if not shown_ts:
-            if had_results:
-                print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
-            return "No test sets shown for t-test"
-        return None
+        return self._maybe_log_applicability_warning(
+            applicability.check_ttest_applicability(variant, self._dd_groups_safe(), self._dd_testsets_safe())
+        )
 
     def _check_anova_applicability(self) -> str | None:
-        had_results = bool(getattr(uistate, "formal_test_results", None))
-        if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
-            if had_results:
-                print("Statistical test: no groups defined.")
-            return "No groups defined for ANOVA"
-        shown_groups = self._get_shown_group_ids()
-        shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
-        shown_ts = self._get_shown_testsets()
-        if len(shown_groups) < 1 or (len(shown_groups) == 1 and len(shown_ts) < 2):
-            if had_results:
-                print(f"Statistical test: ANOVA requires either >=2 groups, or 1 group with >=2 test sets (repeated-measures).")
-            return "ANOVA requires ≥2 groups or 1 group + ≥2 test sets"
-        if not shown_ts and len(shown_groups) == 1:
-            if had_results:
-                print(f"Statistical test: no shown test sets for repeated-measures ANOVA.")
-            return "Repeated-measures ANOVA requires ≥2 test sets"
-        return None
+        return self._maybe_log_applicability_warning(
+            applicability.check_anova_applicability(self._dd_groups_safe(), self._dd_testsets_safe())
+        )
 
     def _check_wilcoxon_applicability(self, variant: str) -> str | None:
         return self._check_ttest_applicability(variant)
 
     def _check_friedman_applicability(self) -> str | None:
-        had_results = bool(getattr(uistate, "formal_test_results", None))
-        shown_ts = self._get_shown_testsets()
-        if len(shown_ts) < 3:
-            if had_results or True:
-                print(f"Statistical test: Friedman requires ≥3 test sets (shown_ts={len(shown_ts)})")
-            return "Friedman requires ≥3 test sets for repeated-measures"
-        return None
+        return self._maybe_log_applicability_warning(
+            applicability.check_friedman_applicability(self._dd_testsets_safe()),
+            always_log=True,
+        )
 
     def _check_cluster_applicability(self) -> str | None:
-        had_results = bool(getattr(uistate, "formal_test_results", None))
-        if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
-            if had_results:
-                print("Statistical test: no groups defined.")
-            return "No groups defined for Cluster perm."
-        shown_groups = self._get_shown_group_ids()
-        shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
-        shown_ts = self._get_shown_testsets()
-        if len(shown_groups) >= 2:
-            return None
-        if len(shown_groups) == 1 and len(shown_ts) >= 2:
-            return None
-        if had_results:
-            print("Statistical test: Cluster perm. requires ≥2 groups or 1 group + 2 test sets.")
-        return "Cluster permutation test requires ≥2 groups or 1 group + ≥2 test sets"
+        return self._maybe_log_applicability_warning(
+            applicability.check_cluster_applicability(self._dd_groups_safe(), self._dd_testsets_safe())
+        )
 
     def _get_stat_test_warning(self):
-        """Return warning string (for non-IO) or status text (for IO), else None. Pure."""
+        """Return warning string for non-IO tests, else None. Delegates to brainwash_ui.applicability."""
         eff = self._effective_test_type()
         if eff == "None":
             return None
         if eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
             return f"Statistical test '{eff}' is not implemented"
 
-        if eff == "t-test":
-            variant = getattr(uistate, "test_t_variant", "unpaired")
-            warning = self._check_ttest_applicability(variant)
-        elif eff == "ANOVA":
-            warning = self._check_anova_applicability()
-        elif eff == "Wilcoxon":
-            variant = getattr(uistate, "test_wilcox_variant", "paired")
-            warning = self._check_wilcoxon_applicability(variant)
-        elif eff == "Friedman":
-            warning = self._check_friedman_applicability()
-        elif eff == "Cluster perm.":
-            warning = self._check_cluster_applicability()
-        else:
-            warning = None
+        warning = applicability.warning_for_test_type(
+            eff,
+            dd_groups=self._dd_groups_safe(),
+            dd_testsets=self._dd_testsets_safe(),
+            ttest_variant=getattr(uistate, "test_t_variant", "unpaired"),
+            wilcox_variant=getattr(uistate, "test_wilcox_variant", "paired"),
+        )
+        if warning:
+            self._maybe_log_applicability_warning(warning, always_log=(eff == "Friedman"))
         return warning
 
     # -------------------------------------------------------------------------

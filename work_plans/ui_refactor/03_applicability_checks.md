@@ -1,6 +1,6 @@
 # PR-03: Applicability checks extraction
 
-**Status**: pending | **Depends on**: PR-02
+**Status**: DONE | **Depends on**: PR-02
 
 ## Goal
 

@@ -1,6 +1,6 @@
 # PR-02: View-state pure functions
 
-**Status**: pending | **Depends on**: PR-01
+**Status**: DONE | **Depends on**: PR-01
 
 ## Goal
 

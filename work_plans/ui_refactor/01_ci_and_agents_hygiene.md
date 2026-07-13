@@ -1,6 +1,6 @@
 # PR-01: CI pytest + AGENTS.md hygiene
 
-**Status**: NEXT | **Depends on**: PR-00
+**Status**: DONE | **Depends on**: PR-00
 
 ## Goal
 
