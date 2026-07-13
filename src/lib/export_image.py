@@ -9,6 +9,8 @@ import matplotlib.figure
 import matplotlib.pyplot as plt
 import numpy as np
 
+from brainwash_ui import plot_model, plot_series
+
 
 @dataclass
 class JournalTemplate:
@@ -293,7 +295,7 @@ def render_publication_figure(
             ax.spines["right"].set_visible(False)
 
             if is_pp_mode:
-                for y_val in [1.0, 2.0, 3.0]:
+                for y_val in plot_model.pp_reference_grid_y_values():
                     ax.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
             elif uistate.project.checkBox.get("norm_EPSP"):
                 if panel == "amp":
@@ -312,7 +314,7 @@ def render_publication_figure(
                     )
                 elif panel == "io":
                     io_output = uistate.experiment.io_output
-                    y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+                    _, y_col_base = plot_series.io_axis_columns(uistate.experiment.io_input, io_output)
                     ax.axhline(
                         100,
                         linestyle="dotted",
@@ -324,6 +326,11 @@ def render_publication_figure(
             # We fetch data directly from the plotted group lines in uistate
             # to mirror exactly what was calculated, applying only new styling.
             has_data = False
+            axis_labels = plot_model.output_axis_ylabels(
+                experiment_type=uistate.experiment.experiment_type,
+                io_output=uistate.experiment.io_output if is_io_mode else "",
+                norm_epsP=bool(uistate.project.checkBox.get("norm_EPSP")),
+            )
             for label, info in uistate.plot.dict_group_labels.items():
                 group_id_str = str(info["group_ID"])
                 # We only plot if the group ID is in selected_groups
@@ -370,10 +377,10 @@ def render_publication_figure(
                     if bar_info and hasattr(bar_info.get("line"), "patches") and len(bar_info["line"].patches) > 0:
                         p = bar_info["line"].patches[0]
                         orig_base_x = p.get_x() + p.get_width() / 2
-                        shift = round(orig_base_x) - orig_base_x
+                        shift = plot_series.pp_group_tick_from_bar(p.get_x(), p.get_width()) - orig_base_x
 
                     if hasattr(line, "patches"):  # BarContainer
-                        xdata = [round(p.get_x() + p.get_width() / 2) for p in line.patches]
+                        xdata = [plot_series.pp_group_tick_from_bar(p.get_x(), p.get_width()) for p in line.patches]
                         ydata = [p.get_height() for p in line.patches]
                         width = 0.8  # Standard width
                         color = line.patches[0].get_facecolor()
@@ -403,20 +410,16 @@ def render_publication_figure(
                 if is_io:
                     # In IO mode, all groups are on ax1.  Use the aspect to determine panel.
                     if panel == "io":
-                        aspect = info.get("aspect", "")
-                        if "slope" in aspect.lower():
-                            ax.set_ylabel(f"EPSP Slope %" if uistate.project.checkBox.get("norm_EPSP") else f"EPSP Slope (mV/ms)")
-                        else:
-                            ax.set_ylabel(f"EPSP Amplitude %" if uistate.project.checkBox.get("norm_EPSP") else f"EPSP Amplitude (mV)")
+                        ax.set_ylabel(axis_labels.ax1_ylabel)
                         has_data = True
                     else:
                         continue
                 else:
                     if panel == "amp" and axis_src == "ax1":
-                        ax.set_ylabel("Amplitude %" if uistate.project.checkBox.get("norm_EPSP") else "Amplitude (mV)")
+                        ax.set_ylabel(axis_labels.ax1_ylabel)
                         has_data = True
                     elif panel == "slope" and axis_src == "ax2":
-                        ax.set_ylabel("Slope %" if uistate.project.checkBox.get("norm_EPSP") else "Slope (mV/ms)")
+                        ax.set_ylabel(axis_labels.ax2_ylabel)
                         has_data = True
                     else:
                         # Ignore event/mean panels for now unless they match the source axis
@@ -507,22 +510,23 @@ def render_publication_figure(
 
                 if is_pp_mode:
                     ax.set_xlabel("")
-                    group_name_to_x = {}
+                    bar_specs: list[tuple[float, float, str]] = []
                     for label, info in uistate.plot.dict_group_labels.items():
-                        if info.get("aspect") == panel and hasattr(info.get("line"), "patches"):
-                            if "overlay" in label or info.get("is_overlay"):
-                                continue
-                            try:
-                                patches = info["line"].patches
-                                if patches:
-                                    x_pos_float = patches[0].get_x() + patches[0].get_width() / 2
-                                    x_pos_int = round(x_pos_float)
-                                    group_name = label.split(" PPR")[0]
-                                    group_name_to_x[x_pos_int] = group_name
-                            except:
-                                pass
-                    x_ticks = sorted(list(group_name_to_x.keys()))
-                    x_ticklabels = [group_name_to_x[x] for x in x_ticks]
+                        if info.get("aspect") != panel:
+                            continue
+                        if "overlay" in label or info.get("is_overlay"):
+                            continue
+                        line_obj = info.get("line")
+                        if not hasattr(line_obj, "patches"):
+                            continue
+                        try:
+                            patches = line_obj.patches
+                            if patches:
+                                p = patches[0]
+                                bar_specs.append((p.get_x(), p.get_width(), label.split(" PPR")[0]))
+                        except Exception:
+                            pass
+                    x_ticks, x_ticklabels = plot_series.pp_group_tick_label_map(bar_specs)
                     if x_ticks:
                         ax.set_xticks(x_ticks)
                         ax.set_xticklabels(x_ticklabels)
