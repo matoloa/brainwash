@@ -74,6 +74,12 @@ Branch: `ui-refactor/phase0-3`. Index: [plan_ui_refactor_phase2.md](plan_ui_refa
 |----|------|--------|
 | 40 | [ui_refactor/40_export_xdata_hardening.md](ui_refactor/40_export_xdata_hardening.md) | ✅ done |
 
+**Phase IX**: [plan_ui_refactor_phase9.md](plan_ui_refactor_phase9.md)
+
+| PR | Card | Status |
+|----|------|--------|
+| 42 | [ui_refactor/42_event_bus_graph_refresh.md](ui_refactor/42_event_bus_graph_refresh.md) | ✅ done |
+
 ## Shared docs
 
 - [ui_refactor/VERIFY.md](ui_refactor/VERIFY.md)
