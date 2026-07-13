@@ -56,6 +56,13 @@ def data_source_abf_path(candidate_id: str, *, filename: str = "Concatenate000.a
     return path if path.is_file() else None
 
 
+def data_source_entry(candidate_id: str) -> dict | None:
+    for entry in load_data_source_manifest():
+        if entry["id"] == candidate_id:
+            return entry
+    return None
+
+
 def discover_data_source_abfs(*, characteristic_only: bool = False) -> list[tuple[str, Path]]:
     if characteristic_only:
         id_set = set(characteristic_data_source_ids())

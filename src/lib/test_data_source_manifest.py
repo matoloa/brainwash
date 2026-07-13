@@ -1,5 +1,6 @@
 from test_pipeline_fixtures import (
     characteristic_data_source_ids,
+    data_source_entry,
     data_source_root,
     load_data_source_manifest,
 )
@@ -14,3 +15,11 @@ def test_manifest_lists_fourteen_candidates():
 
 def test_characteristic_test_ids_are_subset():
     assert characteristic_data_source_ids() == ["01", "07", "14"]
+
+
+def test_characteristic_entries_have_metadata():
+    for cid in characteristic_data_source_ids():
+        entry = data_source_entry(cid)
+        assert entry is not None
+        assert entry.get("n_sweeps") == 1080
+        assert entry.get("n_stims") == 1

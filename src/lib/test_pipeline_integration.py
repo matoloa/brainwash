@@ -15,6 +15,7 @@ from parse import build_dfmean, source2dfs, zeroSweeps
 from test_pipeline_fixtures import (
     abf_path_for_parse,
     data_source_abf_path,
+    data_source_entry,
     discover_data_source_abfs,
     make_default_dict_t,
     make_sweep_df,
@@ -142,6 +143,14 @@ def test_data_source_candidate_parses(candidate_id, abf_path):
     dfmean, i_stim = build_dfmean(df_raw)
     assert i_stim is not None
     assert df_raw["sweep"].nunique() > 0
+    entry = data_source_entry(candidate_id)
+    if entry and entry.get("n_sweeps") is not None:
+        assert df_raw["sweep"].nunique() == entry["n_sweeps"]
+    if entry and entry.get("n_stims") is not None:
+        dffilter = zeroSweeps(df_raw, i_stim=i_stim)
+        dft = analysis.find_events(dfmean=dfmean, default_dict_t=make_default_dict_t(), verbose=False)
+        assert dft is not None
+        assert len(dft) == entry["n_stims"]
 
 
 @pytest.mark.skipif(
