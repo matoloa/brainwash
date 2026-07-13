@@ -15,6 +15,7 @@ import analysis_v3 as analysis
 import numpy as np
 import pandas as pd
 import parse
+from brainwash_ui import recording_cache
 
 class DataFrameMixin:
     """Mixin that provides the internal DataFrame computation layer for UIsub.
@@ -219,7 +220,7 @@ class DataFrameMixin:
         if recording_name in self.dict_means:  # 1: Return cached
             dfmean = self.dict_means[recording_name]
         else:
-            str_mean_path = f"{self.dict_folders['cache']}/{recording_name}_mean.parquet"
+            str_mean_path = recording_cache.mean_parquet_path(self.dict_folders["cache"], recording_name)
             if Path(str_mean_path).exists():  # 2: Read from file
                 dfmean = pd.read_parquet(str_mean_path)
             else:  # 3: Create file
@@ -266,7 +267,7 @@ class DataFrameMixin:
         if rec in self.dict_ts.keys() and not reset:
             # print("returning cached dft")
             return self.dict_ts[rec]
-        str_t_path = f"{self.dict_folders['timepoints']}/{rec}.parquet"
+        str_t_path = recording_cache.timepoints_parquet_path(self.dict_folders["timepoints"], rec)
         if Path(str_t_path).exists() and not reset:
             # print("reading dft from file")
             dft = pd.read_parquet(str_t_path)
@@ -331,8 +332,6 @@ class DataFrameMixin:
 
     def get_dfoutput(self, row, reset=False, dft=None):  # Requires df_t
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
-        from brainwash_ui import recording_cache
-
         rec = row["recording_name"]
         bin_active = pd.notna(row["bin_size"])
         cache_key = recording_cache.output_cache_key(bin_active=bin_active)
@@ -395,7 +394,7 @@ class DataFrameMixin:
         recording_name = row["recording_name"]
         if recording_name in self.dict_datas:  # 1: Return cached
             return self.dict_datas[recording_name]
-        path_data = Path(f"{self.dict_folders['data']}/{recording_name}.parquet")
+        path_data = Path(recording_cache.data_parquet_path(self.dict_folders["data"], recording_name))
         try:  # 2: Read from file - datafile should always exist
             dfdata = pd.read_parquet(path_data)
             self.dict_datas[recording_name] = dfdata
@@ -416,7 +415,7 @@ class DataFrameMixin:
         if recording_name in self.dict_filters:  # 1: Return cached
             dffilter = self.dict_filters[recording_name]
         else:
-            path_filter = Path(f"{self.dict_folders['cache']}/{recording_name}_filter.parquet")
+            path_filter = Path(recording_cache.filter_parquet_path(self.dict_folders["cache"], recording_name))
             if Path(path_filter).exists():  # 2: Read from file
                 dffilter = pd.read_parquet(path_filter)
             else:  # 3: Create file
@@ -776,7 +775,11 @@ class DataFrameMixin:
             return self.dict_group_means[cache_key]
 
         level_suffix = "" if eff_level == self.LEVEL_RECORDING else f"_{eff_level}"
-        group_path = Path(f"{self.dict_folders['cache']}/group_{group_ID}{level_suffix}_mean.parquet")
+        group_path = Path(
+            recording_cache.group_mean_parquet_path(
+                self.dict_folders["cache"], group_ID, level_suffix=level_suffix
+            )
+        )
         if group_path.exists():
             if self.config.verbose:
                 print(f"Loading stored group mean for {group_ID} level={eff_level}")

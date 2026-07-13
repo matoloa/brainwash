@@ -11,8 +11,8 @@ Finish high-ROI pure extractions and test leverage from `data_source/` without t
 
 | PR | Card | Status |
 |----|------|--------|
-| 31 | [ui_refactor/31_recording_cache_paths.md](ui_refactor/31_recording_cache_paths.md) | **NEXT** |
-| 32 | [ui_refactor/32_data_source_metadata.md](ui_refactor/32_data_source_metadata.md) | pending |
+| 31 | [ui_refactor/31_recording_cache_paths.md](ui_refactor/31_recording_cache_paths.md) | ✅ done |
+| 32 | [ui_refactor/32_data_source_metadata.md](ui_refactor/32_data_source_metadata.md) | **NEXT** |
 | 33 | [ui_refactor/33_graphrefresh_pp_labels.md](ui_refactor/33_graphrefresh_pp_labels.md) | pending |
 | 34 | [ui_refactor/34_testset_span_descriptors.md](ui_refactor/34_testset_span_descriptors.md) | pending |
 | 35 | [ui_refactor/35_export_image_plot_reuse.md](ui_refactor/35_export_image_plot_reuse.md) | pending |

@@ -46,7 +46,8 @@ Branch: `ui-refactor/phase0-3`. Index: [plan_ui_refactor_phase2.md](plan_ui_refa
 
 | PR | Card | Status |
 |----|------|--------|
-| 31 | [ui_refactor/31_recording_cache_paths.md](ui_refactor/31_recording_cache_paths.md) | **NEXT** |
+| 31 | [ui_refactor/31_recording_cache_paths.md](ui_refactor/31_recording_cache_paths.md) | ✅ done |
+| 32 | [ui_refactor/32_data_source_metadata.md](ui_refactor/32_data_source_metadata.md) | **NEXT** |
 | 32 | [ui_refactor/32_data_source_metadata.md](ui_refactor/32_data_source_metadata.md) | pending |
 | 33 | [ui_refactor/33_graphrefresh_pp_labels.md](ui_refactor/33_graphrefresh_pp_labels.md) | pending |
 | 34 | [ui_refactor/34_testset_span_descriptors.md](ui_refactor/34_testset_span_descriptors.md) | pending |

@@ -1,6 +1,6 @@
 # PR-31: recording_cache — mean/filter/timepoints paths
 
-**Status**: NEXT | **Depends on**: PR-30
+**Status**: DONE | **Depends on**: PR-30
 
 ## Goal
 
