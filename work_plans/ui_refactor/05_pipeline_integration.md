@@ -1,6 +1,6 @@
 # PR-05: Pipeline integration pytest
 
-**Status**: NEXT | **Depends on**: PR-04 (can parallelize after PR-01)
+**Status**: DONE | **Depends on**: PR-04 (can parallelize after PR-01)
 
 ## Goal
 

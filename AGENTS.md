@@ -66,6 +66,8 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
 9. **Project Structure Highlights** (from CONTRIBUTING.md)
    - `src/lib/ui.py`: Largest file (UIsub + mixins). Statusbar, test dispatch, experiment_type logic lives here.
    - `src/lib/statistics.py`: thin facade; stats logic in `src/lib/brainwash_stats/`.
+   - `src/lib/brainwash_ui/`: pure view/statusbar/applicability logic (testable without Qt).
+   - `src/lib/legacy/`: **retain** `analysis_v1.py` / `analysis_v2.py` for scientific reproduction — do not delete; shims at `src/lib/analysis_v1.py` etc.
    - `src/lib/ui_state_classes.py`: `uistate` singleton.
    - Plans are in `work_plans/` (move outdated to `History/`).
    - See full layout in CONTRIBUTING.md.

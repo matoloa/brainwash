@@ -1,0 +1,52 @@
+"""Shared synthetic fixtures for headless pipeline integration tests."""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+
+
+def make_default_dict_t() -> dict:
+    t_volley_slope_width = 0.0003
+    t_epsp_slope_width = 0.0007
+    resolution = 0.0001
+
+    def floor_to(v, r):
+        return (v // r) * r
+
+    return {
+        "t_volley_slope_width": t_volley_slope_width,
+        "t_EPSP_slope_width": t_epsp_slope_width,
+        "stim": 0,
+        "t_stim": 0,
+        "amp_zero": 0,
+        "norm_output_from": 0,
+        "norm_output_to": 0,
+    }
+
+
+def make_sweep_df(
+    n_sweeps: int = 5,
+    n_timepoints: int = 100,
+    dt: float = 0.001,
+    stim_index: int = 40,
+    step_size: float = 0.001,
+) -> pd.DataFrame:
+    times = np.round(np.arange(n_timepoints) * dt, 6)
+    voltage = np.zeros(n_timepoints)
+    voltage[stim_index:] = step_size
+    t0_per_sweep = np.arange(n_sweeps) * (n_timepoints * dt)
+    sweeps_col = np.repeat(np.arange(n_sweeps), n_timepoints)
+    times_col = np.tile(times, n_sweeps)
+    voltage_col = np.tile(voltage, n_sweeps)
+    t0_col = np.repeat(t0_per_sweep, n_timepoints)
+    datetime_col = pd.to_datetime(t0_col + times_col, unit="s")
+    return pd.DataFrame(
+        {
+            "sweep": sweeps_col,
+            "time": times_col,
+            "voltage_raw": voltage_col,
+            "t0": t0_col,
+            "datetime": datetime_col,
+        }
+    )

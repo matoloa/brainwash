@@ -291,7 +291,7 @@ Move `src/lib/` → `src/brainwash/` with compatibility shims:
 |------|------|----------|
 | Composition controllers | After services + tests | Avoid second rewrite |
 | Event bus | After call graph is mapped | 54+ refresh call sites |
-| Delete `analysis_v1/v2` | After confirming `analysis_evaluation.py` unused in prod | Still imported |
+| Quarantine `analysis_v1/v2` to `legacy/` | **Never delete** — required for scientific reproduction via `analysis_evaluation.py` | Moved; shims preserve imports |
 | Full `UIsub` decomposition | Optional long-term | Mixin extraction already gave 80% of file-split benefit |
 
 ### Tier D — Deprioritized (diminishing returns)
