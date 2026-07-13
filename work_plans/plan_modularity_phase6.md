@@ -68,3 +68,4 @@ uv run pytest src/brainwash/ -q
 | 7b | updateStimLines refresh specs | ✅ `12120f9` [HIGH RISK phase7b] |
 | 7b | updateOutLineFromDf xy/PPR refresh | ✅ `2cc8052` [HIGH RISK phase7b] |
 | 7b | oneAxisLeft plan + rec_label_entry | ✅ `d85da8f` [HIGH RISK phase7b] |
+| 7b | amp_width + addRow/graphRefresh render trim | ✅ `fa4b348` [HIGH RISK phase7b] |
