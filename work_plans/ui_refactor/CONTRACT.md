@@ -61,6 +61,15 @@ class StatusbarResult:
 | Output sweep drag | `plot_drag.drag_release_line_candidates` filters `SWEEP_OUTPUT_ASPECTS` on ax1/ax2 |
 | Export replay | `export_image` uses `plot_drag.artist_xdata` / `artist_ydata` for line and inset artists |
 
+## Graph refresh bus (Phase IX)
+
+| Invariant | Detail |
+|-----------|--------|
+| Entry point | `GraphCoordinatorMixin.request_graph_refresh` coalesces via `refresh_bus.merge_graph_refresh_requests` |
+| Scheduling | `QTimer.singleShot(0, _flush_pending_graph_refresh)` — one draw per event-loop tick |
+| `reeval` merge | OR semantics: any pending request with `reeval_formal_test=True` wins |
+| `graphRefresh()` | Thin delegate to `request_graph_refresh` (all ~44 call sites dedupe without edits) |
+
 ## Testset span invariants (Phase IV)
 
 | Invariant | Detail |

@@ -16,7 +16,9 @@ import time
 
 import numpy as np
 import pandas as pd
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtWidgets
+
+from brainwash_ui import refresh_bus
 
 import matplotlib.collections as mcoll
 
@@ -45,7 +47,42 @@ class GraphCoordinatorMixin:
         - ui_widgets.graphPreloadThread, ui_widgets.ProgressBarManager, ui_widgets.MplCanvas
     """
 
+    def _init_graph_refresh_bus(self) -> None:
+        if hasattr(self, "_graph_refresh_pending"):
+            return
+        self._graph_refresh_pending: refresh_bus.GraphRefreshRequest | None = None
+        self._graph_refresh_scheduled = False
+        self._graph_refresh_flushing = False
+
+    def request_graph_refresh(self, *, reeval_formal_test: bool = True) -> None:
+        self._init_graph_refresh_bus()
+        incoming = refresh_bus.GraphRefreshRequest(reeval_formal_test=reeval_formal_test)
+        self._graph_refresh_pending = refresh_bus.merge_graph_refresh_requests(
+            self._graph_refresh_pending,
+            incoming,
+        )
+        if self._graph_refresh_flushing:
+            return
+        if self._graph_refresh_scheduled:
+            return
+        self._graph_refresh_scheduled = True
+        QtCore.QTimer.singleShot(0, self._flush_pending_graph_refresh)
+
+    def _flush_pending_graph_refresh(self) -> None:
+        self._graph_refresh_scheduled = False
+        while self._graph_refresh_pending is not None:
+            req = self._graph_refresh_pending
+            self._graph_refresh_pending = None
+            self._graph_refresh_flushing = True
+            try:
+                self._graph_refresh_impl(reeval_formal_test=req.reeval_formal_test)
+            finally:
+                self._graph_refresh_flushing = False
+
     def graphRefresh(self, reeval_formal_test: bool = True):
+        self.request_graph_refresh(reeval_formal_test=reeval_formal_test)
+
+    def _graph_refresh_impl(self, reeval_formal_test: bool = True):
         self.usage("graphRefresh")
         dd_groups = self.group_get_dd()
         dd_testset = self.testset_get_dd()
