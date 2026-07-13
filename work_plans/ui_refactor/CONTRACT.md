@@ -1,0 +1,44 @@
+# UI refactor contract (do not break during extraction)
+
+## Statusbar purity split (target state after PR-04)
+
+| Function | Pure? | May mutate `uistate`? |
+|----------|-------|----------------------|
+| `brainwash_ui.applicability.*` | Yes | No |
+| `brainwash_ui.view_state.*` | Yes | No |
+| `brainwash_ui.statusbar.format_*` | Yes | No — returns `StatusbarResult` |
+| `StatTestMixin._get_statusbar_for_current_state` | Query only after PR-04 | Sets `statusbar_state` only via caller |
+| `StatTestMixin.set_statusbar` | No (UI) | Updates widgets |
+
+## StatusbarResult shape (after PR-04)
+
+```python
+@dataclass(frozen=True)
+class StatusbarResult:
+    text: str | None
+    state: Literal["info", "warning"] | None
+```
+
+## Applicability invariants
+
+| Test type | Condition | Warning string (exact) |
+|-----------|-----------|--------------------------|
+| t-test unpaired | < 2 groups with data | `t-test requires 2 group(s) with data` |
+| t-test paired | ≠ 2 test sets | `Paired t-test requires exactly 2 test sets` |
+| Friedman | < 3 test sets | `Friedman requires ≥3 test sets for repeated-measures` |
+| Any | no groups | `No groups defined for <test>` |
+
+## View-state invariants
+
+- `visible_group_ids`: only groups with `show` in `(True, "True", "true", 1, "1")`.
+- Hidden group never appears in `visible_group_ids`.
+- `visible_testset_ids`: only testsets with `show` truthy.
+
+## IO statusbar (unchanged — stats layer)
+
+`experiment_type="io"` + empty test sets → `config["type"] == "IO regression"` (see `work_plans/History/statistics_refactor/CONTRACT.md`). UI formatters must show `IO ANCOVA` prefix when formal result present.
+
+## Public entrypoints (unchanged)
+
+- `compute_statistical_comparison`, `ttest_per_sweep`, `from . import statistics as stats`
+- `UIsub` signal wiring — behavior preserved via thin mixin delegates
