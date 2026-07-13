@@ -231,7 +231,7 @@ class UIstate:
                 if "PPR" in key and "marker" not in key and val.get("line") and val["line"].get_visible():
                     has_recs = True
                     try:
-                        rec_x_positions.extend(val["line"].get_xdata())
+                        rec_x_positions.extend(plot_drag.artist_xdata(val["line"]).tolist())
                     except Exception:
                         pass
             if has_recs:
@@ -295,8 +295,8 @@ class UIstate:
                                 x_min = min(x_min, np.nanmin(x_data))
                                 x_max = max(x_max, np.nanmax(x_data))
                         elif hasattr(line, "get_xdata"):
-                            x_data = line.get_xdata()
-                            if len(x_data) > 0:
+                            x_data = plot_drag.artist_xdata(line)
+                            if x_data.size > 0:
                                 x_min = min(x_min, np.nanmin(x_data))
                                 x_max = max(x_max, np.nanmax(x_data))
                     except Exception:

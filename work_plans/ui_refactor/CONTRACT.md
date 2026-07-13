@@ -59,6 +59,7 @@ class StatusbarResult:
 | Hit test | `plot_drag.point_in_zone(x, y, zone)` |
 | Artist x/y | `plot_drag.artist_xdata` / `artist_ydata` — always `np.asarray`; never index `Series` with `[-1]` |
 | Output sweep drag | `plot_drag.drag_release_line_candidates` filters `SWEEP_OUTPUT_ASPECTS` on ax1/ax2 |
+| Export replay | `export_image` uses `plot_drag.artist_xdata` / `artist_ydata` for line and inset artists |
 
 ## Testset span invariants (Phase IV)
 

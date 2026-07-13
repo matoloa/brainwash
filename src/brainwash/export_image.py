@@ -9,7 +9,7 @@ import matplotlib.figure
 import matplotlib.pyplot as plt
 import numpy as np
 
-from brainwash_ui import plot_model, plot_series
+from brainwash_ui import plot_drag, plot_model, plot_series
 
 
 @dataclass
@@ -433,8 +433,8 @@ def render_publication_figure(
                     xdata = offsets[:, 0].copy()
                     ydata = offsets[:, 1].copy()
                 else:
-                    xdata = line.get_xdata().copy()
-                    ydata = line.get_ydata().copy()
+                    xdata = plot_drag.artist_xdata(line).copy()
+                    ydata = plot_drag.artist_ydata(line).copy()
 
                 if hasattr(line, "get_color"):
                     color = line.get_color()
@@ -566,8 +566,8 @@ def render_publication_figure(
                         if not line.get_visible():
                             continue
 
-                        x_data = line.get_xdata()
-                        y_data = line.get_ydata()
+                        x_data = plot_drag.artist_xdata(line)
+                        y_data = plot_drag.artist_ydata(line)
                         y_filtered = [y for x, y in zip(x_data, y_data) if x > 0.001]
                         all_ys.extend(y_filtered)
 
