@@ -64,4 +64,4 @@ uv run pytest src/brainwash/ -q
 | 7b | graphRefresh axis format/PP x-ticks | ✅ commit 76 [HIGH RISK phase7b] |
 | 7b | styleUpdate + sample_overlay specs | ✅ commit 77 [HIGH RISK phase7b] |
 | 7b | update_axe_mean → plot_stim | ✅ `9fea1f5` [HIGH RISK phase7b] |
-| 8 | remove `src/lib` shim | ✅ `b4a0f28` [HIGH RISK phase8] |
+| 8 | remove `src/lib` shim | ✅ `3647b6b` [HIGH RISK phase8] |
