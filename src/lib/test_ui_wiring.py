@@ -1,9 +1,41 @@
 """pytest-qt smoke tests (offscreen; no full UIsub)."""
 
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtWidgets
 
-from brainwash_ui import view_state
+from brainwash_ui import applicability, statusbar, view_state
 from ui_state_classes import UIstate
+
+
+def _statusbar_for_uistate(u: UIstate, *, dd_groups: dict, dd_testsets: dict | None = None) -> statusbar.StatusbarResult:
+    """Mirror StatTestMixin statusbar query path without Qt host."""
+    if u.experiment.experiment_type == "io":
+        return statusbar.format_io_regression_statusbar(
+            u.stat_test.formal_test_results,
+            dd_groups=dd_groups,
+            n_unit=u.stat_test.buttonGroup_test_n,
+        )
+    warning = applicability.warning_for_test_type(
+        u.stat_test.test_type,
+        dd_groups=dd_groups,
+        dd_testsets=dd_testsets or {},
+        ttest_variant=u.stat_test.test_t_variant,
+        wilcox_variant=u.stat_test.test_wilcox_variant,
+    )
+    if warning:
+        return statusbar.StatusbarResult(warning, "warning")
+    if u.stat_test.formal_test_results:
+        return statusbar.format_non_io_stat_test_statusbar(
+            u.stat_test.formal_test_results,
+            effective_test_type=u.stat_test.test_type,
+            dd_groups=dd_groups,
+            n_unit=u.stat_test.buttonGroup_test_n,
+            ttest_variant=u.stat_test.test_t_variant,
+            wilcox_variant=u.stat_test.test_wilcox_variant,
+            test_fdr=bool(u.stat_test.test_fdr),
+            test_sw=bool(u.stat_test.test_sw),
+            test_levene=bool(u.stat_test.test_levene),
+        )
+    return statusbar.StatusbarResult(None, None)
 
 _TYPE_TO_EXPERIMENT = {
     "radioButton_type_time": "time",
@@ -54,3 +86,46 @@ def test_stat_test_frame_visibility_follows_view_tools(qtbot):
 
     u.project.viewTools["frameToolTest"][1] = True
     assert view_state.should_show_stat_test_frame("io", u.project.viewTools) is True
+
+
+def test_stat_test_host_io_statusbar_text(qtbot):
+    u = UIstate()
+    u.experiment.experiment_type = "io"
+    u.stat_test.formal_test_results = [
+        {
+            "config": {
+                "type": "IO regression",
+                "x_col": "volley_amp",
+                "y_col": "EPSP_amp",
+                "group_ns": {"G1": 2, "G2": 3},
+                "slope_p": 0.04,
+                "r2_per_group": {},
+                "n_unit": "subject",
+            }
+        }
+    ]
+    dd_groups = {"G1": {"group_name": "Ctl"}, "G2": {"group_name": "Tx"}}
+    result = _statusbar_for_uistate(u, dd_groups=dd_groups)
+    assert result.text is not None
+    assert "IO ANCOVA" in result.text
+    assert result.state == "info"
+
+
+def test_stat_test_host_ttest_warning_single_group(qtbot):
+    u = UIstate()
+    u.experiment.experiment_type = "time"
+    u.stat_test.test_type = "t-test"
+    u.stat_test.test_t_variant = "unpaired"
+    dd_groups = {"G1": {"show": True, "rec_IDs": ["r1"], "group_name": "Only"}}
+    result = _statusbar_for_uistate(u, dd_groups=dd_groups)
+    assert result.text is not None
+    assert "t-test requires 2 group(s) with data" in result.text
+    assert result.state == "warning"
+
+
+def test_hidden_group_excluded_from_visible_ids(qtbot):
+    dd = {
+        "G1": {"show": True, "rec_IDs": ["r1"]},
+        "G2": {"show": False, "rec_IDs": ["r2"]},
+    }
+    assert view_state.visible_group_ids(dd) == ["G1"]
