@@ -57,7 +57,7 @@ import ui_parse  # ParseMixin (Phase 3)
 import ui_plot
 import ui_project
 import ui_selection  # SelectionMixin (Phase 1)
-import ui_stat_test  # StatTestMixin (Phase 4)
+import lib.ui_stat_test as ui_stat_test  # StatTestMixin (Phase 4)
 import ui_state_classes
 import ui_sweep_ops
 import ui_table  # TableMixin (Phase 1 start)
@@ -585,58 +585,6 @@ class UIsub(
             return bool(self.progressBar.isVisible())
         except Exception:
             return False
-
-    def _set_statusbar_appearance(self, *a, **k):
-        # provided by StatTestMixin (Phase 4/5)
-        pass
-
-    def _apply_io_regression(self) -> bool:
-        # provided by StatTestMixin (Phase 4/5)
-        pass
-
-    def _check_ttest_applicability(self, variant: str) -> str | None:
-        # provided by StatTestMixin (Phase 4/5)
-        pass
-
-    def _check_anova_applicability(self) -> str | None:
-        # provided by StatTestMixin (Phase 4/5)
-        pass
-
-    def _check_wilcoxon_applicability(self, variant: str) -> str | None:
-        # provided by StatTestMixin (Phase 4/5)
-        pass
-
-    def _check_friedman_applicability(self) -> str | None:
-        # provided by StatTestMixin (Phase 4/5)
-        pass
-
-    def _check_cluster_applicability(self) -> str | None:
-        # provided by StatTestMixin (Phase 4/5)
-        pass
-
-    def _get_stat_test_warning(self):
-        # provided by StatTestMixin (Phase 4/5)
-        pass
-
-    def set_statusbar(self, state: str | None = None, text: str | None = None):
-        # provided by StatTestMixin (Phase 4/5)
-        pass
-
-    def _on_statusbar_message_cleared(self, text):
-        # provided by StatTestMixin (Phase 4/5)
-        pass
-
-    def apply_statistical_test_if_active(self):
-        # provided by StatTestMixin (Phase 4/5)
-        pass
-
-    def _apply_non_io_test(self, eff: str) -> None:
-        # provided by StatTestMixin (Phase 4/5)
-        pass
-
-    def _print_statistical_test_table(self, results, variant, tails, fdr, norm, test_type=None):
-        # provided by StatTestMixin (Phase 4/5)
-        pass
 
     def setTableStimVisibility(self, state, initialize=False):
         widget = self.h_splitterMaster.widget(1)  # Get the second widget in the splitter

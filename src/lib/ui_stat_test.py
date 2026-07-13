@@ -18,7 +18,7 @@ import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
 # brainwash stats (local module shadows stdlib; ui.py does "import statistics as stats" equivalent via its context + from . )
-import statistics as stats
+from . import statistics as stats
 
 # ---------------------------------------------------------------------------
 # Injected singletons — set by ui.py before any UIsub instance is created.
