@@ -1,7 +1,7 @@
 import time  # counting time for functions
 import warnings
 
-from brainwash_ui import plot_model, plot_series
+from brainwash_ui import plot_model, plot_series, plot_stim
 
 import matplotlib.pyplot as plt  # for the scatterplot
 import numpy as np
@@ -1500,34 +1500,17 @@ class UIplot:
 
         dict_gradient = self.get_dict_gradient(n_stims)
 
-        settings = self.uistate.project.settings  # Event window, color, and alpha settings
-        variables = [
-            "t_EPSP_amp",
-            "t_EPSP_slope_start",
-            "t_EPSP_slope_end",
-            "t_volley_amp",
-            "t_volley_slope_start",
-            "t_volley_slope_end",
-        ]
+        settings = self.uistate.project.settings
 
-        # Process detected stims
         for i_stim, t_row in dft.iterrows():
             color = dict_gradient[i_stim]
-            stim_num = i_stim + 1  # 1-numbering (visible to user)
+            stim_num = plot_stim.stim_num_from_index(i_stim)
             stim_str = f"- stim {stim_num}"
             t_stim = t_row["t_stim"]
-            out = dfoutput[dfoutput["stim"] == stim_num]  # TODO: enable switch to dfdiff?
-            _t_idx = (dfmean["time"] - t_stim).abs().idxmin()
-            y_position = dfmean.loc[_t_idx, rec_filter]  # nearest-time lookup (float-safe)
-            # amp_zero_plot: mean of rec_filter in the 2 ms before t_stim on dfmean.
-            # Used for visual positioning on axe; matches the plotted local baseline.
+            out = dfoutput[dfoutput["stim"] == stim_num]
+            amp_zero_plot, _y_at_stim = plot_stim.amp_zero_and_y_at_stim(dfmean, t_stim, rec_filter)
+            plot_stim.shift_stim_times(t_row, t_stim)
 
-            _pre_stim = dfmean[(dfmean["time"] >= t_stim - 0.002) & (dfmean["time"] < t_stim - 0.001)]
-            amp_zero_plot = _pre_stim[rec_filter].mean() if not _pre_stim.empty else dfmean.loc[_t_idx, rec_filter]
-            for var in variables:  # Convert all variables except t_stim to stim-specific time
-                t_row[var] -= t_stim
-
-            # add markers to Mean
             self.plot_marker(f"mean {label} {stim_str} marker", "axm", t_stim, 0, color, rec_ID)
             self.plot_vline(
                 f"mean {label} {stim_str} selection marker",
@@ -1537,12 +1520,10 @@ class UIplot:
                 rec_ID,
                 stim=stim_num,
             )
-            # add to Events
-            window_start = t_stim + settings["event_start"]
-            window_end = t_stim + settings["event_end"]
 
-            df_event = dfmean[(dfmean["time"] >= window_start) & (dfmean["time"] <= window_end)].copy()
-            df_event["time"] = df_event["time"] - t_stim  # shift event so that t_stim is at time 0
+            df_event = plot_stim.event_window_df(
+                dfmean, t_stim, settings["event_start"], settings["event_end"], rec_filter
+            )
             self.plot_line(
                 f"{label} {stim_str}",
                 "axe",
@@ -1553,13 +1534,11 @@ class UIplot:
                 stim=stim_num,
             )
 
-            # plot markers on axe, output lines on ax1 and ax2
-            out = dfoutput[dfoutput["stim"] == stim_num]  # TODO: enable switch to dfdiff?
             out_stim_row = out[out["sweep"].isna()]
 
             if not np.isnan(t_row["t_EPSP_amp"]):
                 x_position = t_row["t_EPSP_amp"]
-                y_position = df_event.loc[(df_event["time"] - x_position).abs().idxmin(), rec_filter] if not df_event.empty else 0
+                y_position = plot_stim.y_at_event_time(df_event, x_position, rec_filter)
                 self.plot_marker(
                     f"{label} {stim_str} EPSP amp marker",
                     "axe",
@@ -1574,23 +1553,10 @@ class UIplot:
                     x_position - t_row["t_EPSP_amp_halfwidth"],
                     x_position + t_row["t_EPSP_amp_halfwidth"],
                 )
-                if not out_stim_row.empty:
-                    epsp_amp_val = out_stim_row["EPSP_amp"].values[0] / 1000.0
-                else:
-                    epsp_amp_val = np.nan
-
-                if pd.isna(epsp_amp_val):
-                    half = t_row.get("t_EPSP_amp_halfwidth", 0)
-                    if half == 0:
-                        amp_val = df_event.loc[(df_event["time"] - x_position).abs().idxmin(), rec_filter] if not df_event.empty else amp_zero_plot
-                    else:
-                        amp_val = df_event.loc[(df_event["time"] >= x_position - half) & (df_event["time"] <= x_position + half), rec_filter].mean()
-                    epsp_amp_val = -(amp_val - amp_zero_plot)
-
-                amp_y = (
-                    amp_zero_plot,
-                    amp_zero_plot - epsp_amp_val,
+                epsp_amp_val = plot_stim.resolve_epsp_amp_si(
+                    out_stim_row, df_event, x_position, t_row, rec_filter, amp_zero_plot
                 )
+                amp_y = (amp_zero_plot, amp_zero_plot - epsp_amp_val)
                 self.plot_amp_width(
                     f"{label} {stim_str} EPSP amp",
                     "axe",
@@ -1629,25 +1595,23 @@ class UIplot:
                 self.plot_line(
                     f"{label} {stim_str} amp_zero marker",
                     "axe",
-                    [-0.002, -0.001],
+                    list(plot_stim.AMP_ZERO_PRE_WINDOW),
                     [amp_zero_plot, amp_zero_plot],
                     settings["rgb_EPSP_amp"],
                     rec_ID,
                     aspect="EPSP_amp",
                     stim=stim_num,
-                )  # TODO: hardcoded x
+                )
 
-            x_start, x_end = t_row["t_EPSP_slope_start"], t_row["t_EPSP_slope_end"]
-            if not (np.isnan(x_start) or np.isnan(x_end)):
-                index = (df_event["time"] - x_start).abs().idxmin()
-                y_start = df_event.loc[index, rec_filter] if index in df_event.index else None
-                index = (df_event["time"] - x_end).abs().idxmin()
-                y_end = df_event.loc[index, rec_filter] if index in df_event.index else None
+            epsp_slope = plot_stim.slope_segment(
+                df_event, t_row["t_EPSP_slope_start"], t_row["t_EPSP_slope_end"], rec_filter
+            )
+            if epsp_slope is not None:
                 self.plot_line(
                     f"{label} {stim_str} EPSP slope marker",
                     "axe",
-                    [x_start, x_end],
-                    [y_start, y_end],
+                    [epsp_slope.x_start, epsp_slope.x_end],
+                    [epsp_slope.y_start, epsp_slope.y_end],
                     settings["rgb_EPSP_slope"],
                     rec_ID,
                     aspect="EPSP_slope",
@@ -1681,14 +1645,14 @@ class UIplot:
 
             if not np.isnan(t_row["t_volley_amp"]):
                 x_position = t_row["t_volley_amp"]
-                y_position = df_event.loc[(df_event["time"] - x_position).abs().idxmin(), rec_filter] if not df_event.empty else 0
-                color = settings["rgb_volley_amp"]
+                y_position = plot_stim.y_at_event_time(df_event, x_position, rec_filter)
+                volley_color = settings["rgb_volley_amp"]
                 self.plot_marker(
                     f"{label} {stim_str} volley amp marker",
                     "axe",
                     t_row["t_volley_amp"],
                     y_position,
-                    settings["rgb_volley_amp"],
+                    volley_color,
                     rec_ID,
                     aspect="volley_amp",
                     stim=stim_num,
@@ -1697,27 +1661,9 @@ class UIplot:
                     x_position - t_row["t_volley_amp_halfwidth"],
                     x_position + t_row["t_volley_amp_halfwidth"],
                 )
-                volley_amp_mean = t_row.get("volley_amp_mean")
-                if volley_amp_mean is not None and not pd.isna(volley_amp_mean):
-                    pass  # Values natively map back to SI inside the plotting bounds
-                else:
-                    if not out_stim_row.empty:
-                        volley_amp_mean = out_stim_row["volley_amp"].values[0] / 1000.0
-                    else:
-                        volley_amp_mean = np.nan
-
-                    if pd.isna(volley_amp_mean):
-                        half = t_row.get("t_volley_amp_halfwidth", 0)
-                        if half == 0:
-                            amp_val = (
-                                df_event.loc[(df_event["time"] - x_position).abs().idxmin(), rec_filter] if not df_event.empty else amp_zero_plot
-                            )
-                        else:
-                            amp_val = df_event.loc[
-                                (df_event["time"] >= x_position - half) & (df_event["time"] <= x_position + half), rec_filter
-                            ].mean()
-                        volley_amp_mean = -(amp_val - amp_zero_plot)
-
+                volley_amp_mean = plot_stim.resolve_volley_amp_si(
+                    t_row, out_stim_row, df_event, x_position, rec_filter, amp_zero_plot
+                )
                 amp_y = amp_zero_plot, amp_zero_plot - volley_amp_mean
                 self.plot_amp_width(
                     f"{label} {stim_str} volley amp",
@@ -1725,7 +1671,7 @@ class UIplot:
                     x_position,
                     amp_x,
                     amp_y,
-                    color,
+                    volley_color,
                     rec_ID,
                     aspect="volley_amp",
                     stim=stim_num,
@@ -1733,8 +1679,8 @@ class UIplot:
                 self.plot_hline(
                     f"{label} {stim_str} volley amp mean",
                     "ax1",
-                    volley_amp_mean * 1000.0,  # dft stores SI (V); ax1 expects mV for display
-                    settings["rgb_volley_amp"],
+                    plot_stim.volley_amp_hline_mv(volley_amp_mean),
+                    volley_color,
                     rec_ID,
                     aspect="volley_amp_mean",
                     stim=stim_num,
@@ -1745,33 +1691,29 @@ class UIplot:
                     "ax1",
                     out["sweep"],
                     out["volley_amp"],
-                    settings["rgb_volley_amp"],
+                    volley_color,
                     rec_ID,
                     aspect="volley_amp",
                     stim=stim_num,
                     x_mode="sweep",
                 )
 
-            x_start, x_end = t_row["t_volley_slope_start"], t_row["t_volley_slope_end"]
-            if not (np.isnan(x_start) or np.isnan(x_end)):
-                index = (df_event["time"] - x_start).abs().idxmin()
-                y_start = df_event.loc[index, rec_filter] if index in df_event.index else None
-                index = (df_event["time"] - x_end).abs().idxmin()
-                y_end = df_event.loc[index, rec_filter] if index in df_event.index else None
+            volley_slope = plot_stim.slope_segment(
+                df_event, t_row["t_volley_slope_start"], t_row["t_volley_slope_end"], rec_filter
+            )
+            if volley_slope is not None:
                 self.plot_line(
                     f"{label} {stim_str} volley slope marker",
                     "axe",
-                    [x_start, x_end],
-                    [y_start, y_end],
+                    [volley_slope.x_start, volley_slope.x_end],
+                    [volley_slope.y_start, volley_slope.y_end],
                     settings["rgb_volley_slope"],
                     rec_ID,
                     aspect="volley_slope",
                     stim=stim_num,
                     width=5,
                 )
-                volley_slope_mean = t_row.get("volley_slope_mean")
-                if volley_slope_mean is None or pd.isna(volley_slope_mean):
-                    volley_slope_mean = out_stim_row["volley_slope"].values[0] if not out_stim_row.empty else out["volley_slope"].mean()
+                volley_slope_mean = plot_stim.resolve_volley_slope_mean(t_row, out_stim_row, out)
                 self.plot_hline(
                     f"{label} {stim_str} volley slope mean",
                     "ax2",
