@@ -70,6 +70,12 @@ def test_group_mean_plots_for_df():
     assert plots == [("ax2", "EPSP_slope", "EPSP_slope_mean")]
 
 
+def test_compute_ppr_percent():
+    ppr = plot_series.compute_ppr_percent(np.array([1.0, 2.0]), np.array([2.0, 1.0]))
+    assert ppr[0] == 200.0
+    assert ppr[1] == 50.0
+
+
 def test_compute_ppr_non_finite_to_nan():
     v1 = np.array([1.0, 0.0, 2.0])
     v2 = np.array([2.0, 1.0, 4.0])

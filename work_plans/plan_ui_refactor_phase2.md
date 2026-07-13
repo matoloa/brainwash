@@ -1,6 +1,6 @@
 # UI Refactor Phase II — Agent index
 
-> **Status**: Active. Branch: `ui-refactor/phase0-3`. **Do not merge to main** until human says so.
+> **Status**: Complete. Branch: `ui-refactor/phase0-3`. Manual smoke PASS. Phase III: [plan_ui_refactor_phase3.md](plan_ui_refactor_phase3.md).
 > Parent: [plan_ui_refactor.md](plan_ui_refactor.md) (PRs 00–16 ✅).
 
 ## Progress
@@ -19,12 +19,11 @@
 
 After each PR: mark ✅ here and in [plan_ui_refactor.md](plan_ui_refactor.md); set **NEXT** on following row.
 
-## Verified baseline (2026-07-13)
+## Verified baseline (final)
 
-- `uv run pytest src/lib/ -q` → 148 passed, 13 skipped
-- `ui_plot.py` 2572 LOC; `brainwash_ui/` ~720 LOC; 26 `plot_model`/`plot_series` delegations in `ui_plot`
-- `test_data/*.abf` → gitkeep only (pipeline ABF tests skip)
-- `pp_overlay_x_map` exists but `addRow` / `updateOutLineFromDf` still duplicate inline `x_val_map`
+- `uv run pytest src/lib/ -q` → 166 passed, 13 skipped
+- `ui_plot.py` 2462 LOC; `brainwash_ui/` ~947 LOC
+- `test_data/*.abf` → gitkeep only (synthetic + golden parquet)
 
 ## Execution order
 

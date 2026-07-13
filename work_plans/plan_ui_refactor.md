@@ -32,6 +32,12 @@ Branch: `ui-refactor/phase0-3`. Index: [plan_ui_refactor_phase2.md](plan_ui_refa
 | 24 | [ui_refactor/24_statusbar_wiring_tests.md](ui_refactor/24_statusbar_wiring_tests.md) | ✅ done |
 | 25 | [ui_refactor/25_hygiene_archive.md](ui_refactor/25_hygiene_archive.md) | ✅ done |
 
+**Phase III**: [plan_ui_refactor_phase3.md](plan_ui_refactor_phase3.md) — manual smoke PASS.
+
+| PR | Card | Status |
+|----|------|--------|
+| 26 | [ui_refactor/26_ppr_dedupe_interactive.md](ui_refactor/26_ppr_dedupe_interactive.md) | ✅ done |
+
 **NEXT (human)**: merge `ui-refactor/phase0-3` → main when ready.
 
 ## Shared docs

@@ -43,6 +43,7 @@ import uuid  # generating unique talkback ID
 from datetime import datetime  # used in project name defaults
 
 import analysis_v3 as analysis
+from brainwash_ui import plot_series
 
 # brainwash files
 import parse
@@ -2238,8 +2239,7 @@ class UIsub(
                             v2 = o2[aspect].values.astype(float)
                             with warnings.catch_warnings():
                                 warnings.simplefilter("ignore")
-                                ppr = (v2 / v1) * 100
-                                ppr[~np.isfinite(ppr)] = np.nan
+                                ppr = plot_series.compute_ppr_percent(v1, v2)
                             pp_df[f"PPR_{aspect}"] = ppr
 
                     selected_outputs = pd.concat([selected_outputs, pp_df], ignore_index=True)

@@ -1,9 +1,11 @@
 import logging
+import warnings
 
 import numpy as np
 import pandas as pd
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+from brainwash_ui import plot_series
 from lib import analysis_v3 as analysis
 from lib import ui_plot
 
@@ -1763,19 +1765,10 @@ class InteractivePlotMixin:
             o2 = out2.loc[common_sweeps]
             v1 = o1[aspect].values.astype(float)
             v2 = o2[aspect].values.astype(float)
-            import warnings
-
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                ppr = v2 / v1
-                ppr[~np.isfinite(ppr)] = np.nan
-            x_val_map = {}
-            i = 1
-            for key in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]:
-                if self.uistate.project.checkBox.get(key, True):
-                    x_val_map[key] = i
-                    i += 1
-            x_val = x_val_map.get(aspect, 1)
+                ppr = plot_series.compute_ppr(v1, v2)
+            x_val = plot_series.pp_overlay_x_map(self.uistate.project.checkBox).get(aspect, 1)
             drag_x = np.full(len(common_sweeps), x_val)
             drag_y = ppr
             marker_style = "o"

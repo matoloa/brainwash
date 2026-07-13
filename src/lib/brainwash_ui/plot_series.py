@@ -218,6 +218,10 @@ def compute_ppr(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
     return ppr
 
 
+def compute_ppr_percent(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
+    return compute_ppr(v1, v2) * 100.0
+
+
 def pp_recording_aspect_configs(settings: dict) -> list[tuple[str, str, str]]:
     return [
         ("EPSP_amp", "ax1", settings.get("rgb_EPSP_amp", "blue")),
