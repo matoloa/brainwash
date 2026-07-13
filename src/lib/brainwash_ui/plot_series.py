@@ -193,6 +193,19 @@ def pp_overlay_x_map(checkbox: dict) -> dict[str, int]:
     return x_val_map
 
 
+def pp_group_tick_from_bar(x_left: float, bar_width: float) -> int:
+    return round(x_left + bar_width / 2)
+
+
+def pp_group_tick_label_map(bar_specs: list[tuple[float, float, str]]) -> tuple[list[int], list[str]]:
+    """Build sorted PP group xticks from (x_left, width, display_label) tuples."""
+    name_by_x: dict[int, str] = {}
+    for x_left, width, label in bar_specs:
+        name_by_x[pp_group_tick_from_bar(x_left, width)] = label
+    ticks = sorted(name_by_x.keys())
+    return ticks, [name_by_x[x] for x in ticks]
+
+
 def pp_recording_view_ticks(checkbox: dict) -> tuple[list[int], list[str]]:
     ticks: list[int] = []
     labels: list[str] = []

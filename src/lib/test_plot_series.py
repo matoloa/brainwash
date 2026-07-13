@@ -29,6 +29,13 @@ def test_compute_io_regression_ols():
     assert abs(reg.slope - 2.0) < 1e-9
 
 
+def test_pp_group_tick_label_map():
+    # Bar centers at integer group positions (matplotlib PP layout).
+    ticks, labels = plot_series.pp_group_tick_label_map([(0.6, 0.8, "G1"), (1.6, 0.8, "G2")])
+    assert ticks == [1, 2]
+    assert labels == ["G1", "G2"]
+
+
 def test_pp_overlay_x_map_all_enabled():
     m = plot_series.pp_overlay_x_map(
         {"EPSP_amp": True, "EPSP_slope": True, "volley_amp": True, "volley_slope": True}

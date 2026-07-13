@@ -895,7 +895,7 @@ class UIplot:
             ax2.set_xlabel("")
 
             # Re-collect the true integer X positions for group labels, ignoring the sub-offsets used for the individual bars
-            group_name_to_x = {}
+            bar_specs: list[tuple[float, float, str]] = []
             current_level = uistate.stat_test.buttonGroup_test_n
             if hasattr(self.uistate.plot, "dict_group_show"):
                 for key, val in uistate.plot.dict_group_show.items():
@@ -903,16 +903,19 @@ class UIplot:
                         if val.get("level") and val.get("level") != current_level:
                             continue
                         try:
-                            # The original x_pos is an integer (1.0, 2.0, etc), so we round the fractional bar position back to the nearest integer
-                            x_pos_float = val["line"].patches[0].get_x() + val["line"].patches[0].get_width() / 2
-                            x_pos_int = round(x_pos_float)
-                            group_name = self._display_label( key.split(" PPR")[0] )
-                            group_name_to_x[x_pos_int] = group_name
-                        except:
+                            patch = val["line"].patches[0]
+                            bar_specs.append(
+                                (
+                                    patch.get_x(),
+                                    patch.get_width(),
+                                    self._display_label(key.split(" PPR")[0]),
+                                )
+                            )
+                        except Exception:
                             pass
 
-            x_ticks = sorted(list(group_name_to_x.keys()))
-            x_ticklabels = [group_name_to_x[x] for x in x_ticks]
+            x_ticks, x_ticklabels = plot_series.pp_group_tick_label_map(bar_specs)
+            group_name_to_x = dict(zip(x_ticks, x_ticklabels))
 
             if not x_ticks:
                 ax1.tick_params(axis="x", bottom=False, labelbottom=False)
