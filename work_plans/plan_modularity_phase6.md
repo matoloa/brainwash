@@ -65,3 +65,6 @@ uv run pytest src/brainwash/ -q
 | 7b | styleUpdate + sample_overlay specs | ✅ commit 77 [HIGH RISK phase7b] |
 | 7b | update_axe_mean → plot_stim | ✅ `9fea1f5` [HIGH RISK phase7b] |
 | 8 | remove `src/lib` shim | ✅ `3647b6b` [HIGH RISK phase8] |
+| 7b | updateStimLines refresh specs | ✅ `12120f9` [HIGH RISK phase7b] |
+| 7b | updateOutLineFromDf xy/PPR refresh | ✅ `2cc8052` [HIGH RISK phase7b] |
+| 7b | oneAxisLeft plan + rec_label_entry | ✅ `d85da8f` [HIGH RISK phase7b] |
