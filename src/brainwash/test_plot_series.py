@@ -250,6 +250,42 @@ def test_build_io_refresh_specs_for_rec():
     assert isinstance(specs[1], plot_series.IoTrendlineRefreshSpec)
 
 
+def test_out_line_xy_from_df():
+    df = pd.DataFrame(
+        {
+            "sweep": [0, 1, 0, 1],
+            "stim": [1, 1, 2, 2],
+            "EPSP_amp": [1.0, 2.0, 3.0, 4.0],
+        }
+    )
+    xy = plot_series.out_line_xy_from_df(df, 2, "EPSP_amp")
+    assert xy is not None
+    assert list(xy[0]) == [0, 1]
+    assert list(xy[1]) == [3.0, 4.0]
+    assert plot_series.out_line_xy_from_df(df, 9, "EPSP_amp") is None
+
+
+def test_build_ppr_overlay_refresh_specs():
+    df = pd.DataFrame(
+        {
+            "sweep": [0, 1, 0, 1],
+            "stim": [1, 1, 2, 2],
+            "EPSP_amp": [1.0, 2.0, 2.0, 4.0],
+        }
+    )
+    existing = frozenset({"rec1 PPR EPSP_amp raw", "rec1 PPR EPSP_amp norm"})
+    specs = plot_series.build_ppr_overlay_refresh_specs(
+        "rec1",
+        df,
+        "EPSP_amp",
+        {"EPSP_amp": True},
+        {"rgb_EPSP_amp": "blue"},
+        existing,
+    )
+    assert len(specs) == 2
+    assert specs[0].y[0] == 2.0
+
+
 def test_build_stim_aggregate_refresh_specs():
     df = pd.DataFrame(
         {

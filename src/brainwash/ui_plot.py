@@ -984,20 +984,19 @@ class UIplot:
 
     def oneAxisLeft(self):
         ax1, ax2 = self.uistate.plot.ax1, self.uistate.plot.ax2
-        uistate = self.uistate
-        # sets ax1 and ax2 visibility and position
         ax1.set_visible(True)
         ax2.set_visible(True)
         ax1.xaxis.set_visible(True)
         ax2.xaxis.set_visible(False)
 
-        amp_view = uistate.ampView()
-        slope_view = uistate.slopeView()
-        show_amp, show_slope = plot_model.output_axis_y_visibility(amp_view=amp_view, slope_view=slope_view)
-        ax1.yaxis.set_visible(show_amp)
-        ax2.yaxis.set_visible(show_slope)
-
-        if plot_model.slope_yaxis_on_left(slope_only=uistate.slopeOnly()):
+        plan = plot_model.build_one_axis_left_plan(
+            amp_view=self.uistate.ampView(),
+            slope_view=self.uistate.slopeView(),
+            slope_only=self.uistate.slopeOnly(),
+        )
+        ax1.yaxis.set_visible(plan.ax1_yaxis_visible)
+        ax2.yaxis.set_visible(plan.ax2_yaxis_visible)
+        if plan.ax2_yaxis_on_left:
             ax2.yaxis.set_label_position("left")
             ax2.yaxis.set_ticks_position("left")
         else:
@@ -1055,13 +1054,15 @@ class UIplot:
         (line,) = self.get_axis(axid).plot(x, y, **kwargs)
         line.set_visible(False)
         self.uistate.plot.dict_rec_labels[label] = {
-            "rec_ID": rec_ID,
-            "aspect": aspect,
-            "variant": variant,
-            "stim": stim,
+            **plot_model.rec_label_entry(
+                rec_ID=rec_ID,
+                aspect=aspect,
+                variant=variant,
+                stim=stim,
+                axis=axid,
+                x_mode=x_mode,
+            ),
             "line": line,
-            "axis": axid,
-            "x_mode": x_mode,
         }
 
     def plot_shade(
@@ -1082,13 +1083,15 @@ class UIplot:
         fill = self.get_axis(axid).fill_between(x, y_mean - sem, y_mean + sem, alpha=alpha, color=color, zorder=0)
         fill.set_visible(False)
         self.uistate.plot.dict_rec_labels[label] = {
-            "rec_ID": rec_ID,
-            "aspect": aspect,
-            "variant": variant,
-            "stim": stim,
+            **plot_model.rec_label_entry(
+                rec_ID=rec_ID,
+                aspect=aspect,
+                variant=variant,
+                stim=stim,
+                axis=axid,
+                x_mode=x_mode,
+            ),
             "line": fill,
-            "axis": axid,
-            "x_mode": x_mode,
         }
 
     def plot_marker(
@@ -1120,13 +1123,15 @@ class UIplot:
         )
         marker.set_visible(False)
         self.uistate.plot.dict_rec_labels[label] = {
-            "rec_ID": rec_ID,
-            "aspect": aspect,
-            "variant": variant,
-            "stim": stim,
+            **plot_model.rec_label_entry(
+                rec_ID=rec_ID,
+                aspect=aspect,
+                variant=variant,
+                stim=stim,
+                axis=axid,
+                x_mode=x_mode,
+            ),
             "line": marker,
-            "axis": axid,
-            "x_mode": x_mode,
         }
 
     def plot_amp_width(
@@ -1208,13 +1213,15 @@ class UIplot:
         )
         vline.set_visible(False)
         self.uistate.plot.dict_rec_labels[label] = {
-            "rec_ID": rec_ID,
-            "aspect": aspect,
-            "variant": variant,
-            "stim": stim,
+            **plot_model.rec_label_entry(
+                rec_ID=rec_ID,
+                aspect=aspect,
+                variant=variant,
+                stim=stim,
+                axis=axid,
+                x_mode=x_mode,
+            ),
             "line": vline,
-            "axis": axid,
-            "x_mode": x_mode,
         }
 
     def plot_hline(
@@ -1243,13 +1250,15 @@ class UIplot:
         )
         hline.set_visible(False)
         self.uistate.plot.dict_rec_labels[label] = {
-            "rec_ID": rec_ID,
-            "aspect": aspect,
-            "variant": variant,
-            "stim": stim,
+            **plot_model.rec_label_entry(
+                rec_ID=rec_ID,
+                aspect=aspect,
+                variant=variant,
+                stim=stim,
+                axis=axid,
+                x_mode=x_mode,
+            ),
             "line": hline,
-            "axis": axid,
-            "x_mode": x_mode,
         }
 
     def plot_group_lines(self, axid, group_ID, dict_group, df_groupmean, aspect=None, level=None):
