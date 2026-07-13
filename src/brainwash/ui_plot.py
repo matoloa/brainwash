@@ -1721,70 +1721,53 @@ class UIplot:
                 )
 
         if self.uistate.experiment.experiment_type == "PP" and not skip_output:
-            out_sweeps = dfoutput[dfoutput["sweep"].notna()]
-            out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
-            out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
-            common_sweeps = out1.index.intersection(out2.index).dropna()
-            if not common_sweeps.empty:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    for spec in plot_series.pp_recording_ppr_specs(
-                        out1.loc[common_sweeps],
-                        out2.loc[common_sweeps],
-                        self.uistate.project.checkBox,
-                        settings,
-                    ):
-                        for variant in ["raw", "norm"]:
-                            self.plot_line(
-                                f"{label} PPR {spec.aspect} {variant}",
-                                spec.axid,
-                                np.full(spec.n_points, spec.x_val),
-                                spec.ppr,
-                                spec.color,
-                                rec_ID,
-                                aspect=spec.aspect,
-                                stim=None,
-                                variant=variant,
-                                x_mode="sweep",
-                                marker="o",
-                                markersize=10,
-                                linestyle="None",
-                            )
-
-        out_stim = dfoutput[dfoutput["sweep"].isna()]
-        if not out_stim.empty:
-            df_sweeps = dfoutput[dfoutput["sweep"].notna()]
-            df_sem = df_sweeps.groupby("stim").sem(numeric_only=True)
-            stims = out_stim["stim"].values
-            for suffix, axid, col, color, variant in plot_series.stim_aggregate_line_configs(settings):
-                if col not in out_stim.columns:
-                    continue
-                aspect = col.replace("_norm", "")
+            for spec in plot_series.build_pp_recording_plot_specs(
+                dfoutput,
+                label,
+                self.uistate.project.checkBox,
+                settings,
+            ):
                 self.plot_line(
-                    f"{label} {suffix}",
-                    axid,
-                    stims,
-                    out_stim[col].values,
-                    color,
+                    spec.label,
+                    spec.axid,
+                    spec.x,
+                    spec.y,
+                    spec.color,
                     rec_ID,
-                    aspect=aspect,
-                    variant=variant,
+                    aspect=spec.aspect,
+                    stim=None,
+                    variant=spec.variant,
+                    x_mode="sweep",
+                    marker="o",
+                    markersize=10,
+                    linestyle="None",
+                )
+
+        for spec in plot_series.build_stim_aggregate_plot_specs(dfoutput, label, settings):
+            self.plot_line(
+                spec.line_label,
+                spec.axid,
+                spec.x,
+                spec.y,
+                spec.color,
+                rec_ID,
+                aspect=spec.aspect,
+                variant=spec.variant,
+                x_mode="stim",
+            )
+            if spec.sem is not None and spec.shade_label is not None:
+                self.plot_shade(
+                    spec.shade_label,
+                    spec.axid,
+                    spec.x,
+                    spec.y,
+                    spec.sem,
+                    spec.color,
+                    rec_ID,
+                    aspect=spec.aspect,
+                    variant=spec.variant,
                     x_mode="stim",
                 )
-                sem_vals = plot_series.stim_aggregate_sem(df_sem, out_stim, col)
-                if sem_vals is not None:
-                    self.plot_shade(
-                        f"{label} {suffix} shade",
-                        axid,
-                        stims,
-                        out_stim[col].values,
-                        sem_vals,
-                        color,
-                        rec_ID,
-                        aspect=aspect,
-                        variant=variant,
-                        x_mode="stim",
-                    )
 
     def addGroup(self, group_ID, dict_group, df_groupmean, x_pos=1, level=None):
         """Add (or update) group artists for the given level.

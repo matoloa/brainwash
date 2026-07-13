@@ -107,6 +107,50 @@ def test_stim_aggregate_sem_reindex():
     assert len(sem) == 2
 
 
+def test_build_pp_recording_plot_specs():
+    df = pd.DataFrame(
+        {
+            "sweep": [0, 1, 0, 1],
+            "stim": [1, 1, 2, 2],
+            "EPSP_amp": [1.0, 2.0, 2.0, 4.0],
+        }
+    )
+    specs = plot_series.build_pp_recording_plot_specs(
+        df,
+        "rec1",
+        {"EPSP_amp": True},
+        {"rgb_EPSP_amp": "blue", "rgb_EPSP_slope": "red", "rgb_volley_amp": "g", "rgb_volley_slope": "o"},
+    )
+    assert len(specs) == 2
+    assert all(isinstance(s, plot_series.PpRecordingPlotSpec) for s in specs)
+    assert {s.variant for s in specs} == {"raw", "norm"}
+    assert specs[0].aspect == "EPSP_amp"
+    assert len(specs[0].y) == 2
+
+
+def test_build_stim_aggregate_plot_specs():
+    df = pd.DataFrame(
+        {
+            "sweep": [0, 1, None, None],
+            "stim": [1, 1, 1, 2],
+            "EPSP_amp": [1.0, 1.1, 1.05, 2.0],
+            "EPSP_amp_norm": [50.0, 55.0, 52.5, 100.0],
+        }
+    )
+    settings = {
+        "rgb_EPSP_amp": "blue",
+        "rgb_EPSP_slope": "red",
+        "rgb_volley_amp": "green",
+        "rgb_volley_slope": "orange",
+    }
+    specs = plot_series.build_stim_aggregate_plot_specs(df, "rec1", settings)
+    line_specs = [s for s in specs if s.line_label.endswith("EPSP amp")]
+    assert len(line_specs) == 1
+    assert line_specs[0].shade_label == "rec1 EPSP amp shade"
+    assert line_specs[0].sem is not None
+    assert len(line_specs[0].x) == 2
+
+
 def test_build_io_recording_plot_specs():
     df = pd.DataFrame(
         {

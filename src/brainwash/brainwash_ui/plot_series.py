@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -275,6 +276,102 @@ def pp_recording_ppr_specs(
                 ppr=compute_ppr(v1, v2),
                 x_val=x_map.get(aspect, 1),
                 n_points=len(v1),
+            )
+        )
+    return specs
+
+
+@dataclass(frozen=True)
+class PpRecordingPlotSpec:
+    label: str
+    aspect: str
+    axid: str
+    color: str
+    variant: str
+    x: np.ndarray
+    y: np.ndarray
+
+
+def build_pp_recording_plot_specs(
+    dfoutput: pd.DataFrame,
+    label: str,
+    checkbox: dict,
+    settings: dict,
+) -> list[PpRecordingPlotSpec]:
+    """PP PPR scatter specs for addRow (raw + norm variants per aspect)."""
+    out_sweeps = dfoutput[dfoutput["sweep"].notna()]
+    out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
+    out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
+    common_sweeps = out1.index.intersection(out2.index).dropna()
+    if common_sweeps.empty:
+        return []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        base_specs = pp_recording_ppr_specs(
+            out1.loc[common_sweeps],
+            out2.loc[common_sweeps],
+            checkbox,
+            settings,
+        )
+    plot_specs: list[PpRecordingPlotSpec] = []
+    for base in base_specs:
+        for variant in ("raw", "norm"):
+            plot_specs.append(
+                PpRecordingPlotSpec(
+                    label=f"{label} PPR {base.aspect} {variant}",
+                    aspect=base.aspect,
+                    axid=base.axid,
+                    color=base.color,
+                    variant=variant,
+                    x=np.full(base.n_points, base.x_val),
+                    y=base.ppr,
+                )
+            )
+    return plot_specs
+
+
+@dataclass(frozen=True)
+class StimAggregatePlotSpec:
+    line_label: str
+    shade_label: str | None
+    axid: str
+    aspect: str
+    variant: str
+    color: str
+    x: np.ndarray
+    y: np.ndarray
+    sem: np.ndarray | None
+
+
+def build_stim_aggregate_plot_specs(
+    dfoutput: pd.DataFrame,
+    label: str,
+    settings: dict,
+) -> list[StimAggregatePlotSpec]:
+    """Stim-mode aggregate line + SEM shade specs for addRow."""
+    out_stim = dfoutput[dfoutput["sweep"].isna()]
+    if out_stim.empty:
+        return []
+    df_sweeps = dfoutput[dfoutput["sweep"].notna()]
+    df_sem = df_sweeps.groupby("stim").sem(numeric_only=True)
+    stims = out_stim["stim"].values
+    specs: list[StimAggregatePlotSpec] = []
+    for suffix, axid, col, color, variant in stim_aggregate_line_configs(settings):
+        if col not in out_stim.columns:
+            continue
+        aspect = col.replace("_norm", "")
+        sem_vals = stim_aggregate_sem(df_sem, out_stim, col)
+        specs.append(
+            StimAggregatePlotSpec(
+                line_label=f"{label} {suffix}",
+                shade_label=f"{label} {suffix} shade" if sem_vals is not None else None,
+                axid=axid,
+                aspect=aspect,
+                variant=variant,
+                color=color,
+                x=stims,
+                y=out_stim[col].values,
+                sem=sem_vals,
             )
         )
     return specs

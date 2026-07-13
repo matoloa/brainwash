@@ -56,3 +56,4 @@ uv run pytest src/brainwash/ -q
 | 7a | UIplot contract doc | ✅ commit 84eb30d |
 | 7b | group line specs → plot_model | ✅ `7aadc92` [HIGH RISK phase7b] |
 | 7b | IO addRow specs → plot_series | ✅ commit 70 [HIGH RISK phase7b] |
+| 7b | PP/stim aggregate addRow specs | ✅ commit 71 [HIGH RISK phase7b] |
