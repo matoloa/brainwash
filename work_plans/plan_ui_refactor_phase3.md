@@ -11,10 +11,12 @@
 | 27 | [ui_refactor/27_update_stim_lines.md](ui_refactor/27_update_stim_lines.md) | ✅ done |
 | 28 | [ui_refactor/28_recording_cache_abf_tests.md](ui_refactor/28_recording_cache_abf_tests.md) | ✅ done |
 | 29 | [ui_refactor/29_abf_golden_parquet.md](ui_refactor/29_abf_golden_parquet.md) | ✅ done |
+| 30 | [ui_refactor/30_data_source_candidates.md](ui_refactor/30_data_source_candidates.md) | ✅ done |
 
 ## Baseline
 
-- Real ABF available locally as `.abf.gitkeep` (gitignored `*.abf`); `resolve_test_abf` discovers both
+- `data_source/manifest.json` — 14 Concatenate000.abf candidates (local; `*.abf` gitignored)
+- Legacy `test_data` `.abf.gitkeep` still supported via `abf_path_for_parse`
 - `uv run pytest src/lib/ -q` — run after each PR
 
 ## Deferred

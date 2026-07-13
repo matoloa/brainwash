@@ -2,11 +2,51 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+
+def repo_root() -> Path:
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def data_source_root() -> Path:
+    return repo_root() / "data_source"
+
+
+def load_data_source_manifest() -> list[dict]:
+    manifest_path = data_source_root() / "manifest.json"
+    if manifest_path.is_file():
+        data = json.loads(manifest_path.read_text())
+        return list(data.get("candidates", []))
+    root = data_source_root()
+    if not root.is_dir():
+        return []
+    return [
+        {"id": d.name, "file": "Concatenate000.abf"}
+        for d in sorted(root.iterdir())
+        if d.is_dir() and d.name.isdigit()
+    ]
+
+
+def data_source_abf_path(candidate_id: str, *, filename: str = "Concatenate000.abf") -> Path | None:
+    path = data_source_root() / candidate_id / filename
+    return path if path.is_file() else None
+
+
+def discover_data_source_abfs() -> list[tuple[str, Path]]:
+    found: list[tuple[str, Path]] = []
+    for entry in load_data_source_manifest():
+        cid = entry["id"]
+        fname = entry.get("file", "Concatenate000.abf")
+        path = data_source_abf_path(cid, filename=fname)
+        if path is not None:
+            found.append((cid, path))
+    return found
 
 
 def resolve_test_abf(directory: Path, stem: str) -> Path | None:

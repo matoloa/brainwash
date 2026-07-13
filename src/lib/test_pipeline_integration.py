@@ -12,11 +12,19 @@ import pytest
 import analysis_v3 as analysis
 from brainwash_ui import plot_stim
 from parse import build_dfmean, source2dfs, zeroSweeps
-from test_pipeline_fixtures import abf_path_for_parse, make_default_dict_t, make_sweep_df
+from test_pipeline_fixtures import (
+    abf_path_for_parse,
+    data_source_abf_path,
+    discover_data_source_abfs,
+    make_default_dict_t,
+    make_sweep_df,
+)
 
 _TEST_DATA = Path(__file__).parent / "test_data"
 _GOLDEN_DFOUTPUT = _TEST_DATA / "golden" / "synthetic_dfoutput.parquet"
 _GOLDEN_ABF_DFOUTPUT = _TEST_DATA / "golden" / "abf_1ch_dfoutput.parquet"
+_GOLDEN_DATA_SOURCE_01 = _TEST_DATA / "golden" / "data_source_01_dfoutput.parquet"
+_DATA_SOURCE_ABFS = discover_data_source_abfs()
 _ABF_1CH_DIR = _TEST_DATA / "A_21_P0701-S2"
 _ABF_1CH = abf_path_for_parse(_ABF_1CH_DIR, "2022_07_01_0012")
 _ABF_KO_DIR = _TEST_DATA / "KO_02"
@@ -62,6 +70,14 @@ def test_golden_dfoutput_parquet_columns():
     df = pd.read_parquet(_GOLDEN_DFOUTPUT)
     for col in ("stim", "sweep", "EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"):
         assert col in df.columns
+    assert "index" not in df.columns
+
+
+def test_golden_data_source_01_dfoutput():
+    assert _GOLDEN_DATA_SOURCE_01.exists(), f"golden missing: {_GOLDEN_DATA_SOURCE_01}"
+    df = pd.read_parquet(_GOLDEN_DATA_SOURCE_01)
+    assert len(df) == 1080
+    assert df["sweep"].notna().all()
     assert "index" not in df.columns
 
 
@@ -112,3 +128,34 @@ def test_ko_abf_source2dfs_non_empty():
     assert dict_dfs
     df_raw = next(iter(dict_dfs.values()))
     assert len(df_raw) > 0
+
+
+@pytest.mark.parametrize(
+    "candidate_id,abf_path",
+    _DATA_SOURCE_ABFS or [pytest.param("none", None, marks=pytest.mark.skip(reason="data_source ABF absent"))],
+    ids=[c[0] for c in _DATA_SOURCE_ABFS] or ["no-data"],
+)
+def test_data_source_candidate_parses(candidate_id, abf_path):
+    dict_dfs = source2dfs(str(abf_path), gain=1.0)
+    assert dict_dfs
+    df_raw = next(iter(dict_dfs.values()))
+    dfmean, i_stim = build_dfmean(df_raw)
+    assert i_stim is not None
+    assert df_raw["sweep"].nunique() > 0
+
+
+@pytest.mark.skipif(
+    data_source_abf_path("01") is None,
+    reason="data_source/01/Concatenate000.abf absent",
+)
+def test_data_source_01_pipeline_build_dfoutput():
+    abf = data_source_abf_path("01")
+    dict_dfs = source2dfs(str(abf), gain=1.0)
+    df_raw = next(iter(dict_dfs.values()))
+    dfmean, i_stim = build_dfmean(df_raw)
+    dffilter = zeroSweeps(df_raw, i_stim=i_stim)
+    dft = analysis.find_events(dfmean=dfmean, default_dict_t=make_default_dict_t(), verbose=False)
+    assert dft is not None and not dft.empty
+    dfoutput = analysis.build_dfoutput(dffilter=dffilter, dfmean=dfmean, dft=dft)
+    assert len(dfoutput) == 1080
+    assert "EPSP_amp" in dfoutput.columns
