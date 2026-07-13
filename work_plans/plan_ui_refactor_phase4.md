@@ -1,6 +1,6 @@
 # UI Refactor Phase IV — Agent index
 
-> **Status**: Active. Branch: `ui-refactor/phase0-3`.
+> **Status**: ✅ Complete. Branch: `ui-refactor/phase0-3`.
 > Phase III: [plan_ui_refactor_phase3.md](plan_ui_refactor_phase3.md) ✅
 
 ## Goal
@@ -12,41 +12,22 @@ Finish high-ROI pure extractions and test leverage from `data_source/` without t
 | PR | Card | Status |
 |----|------|--------|
 | 31 | [ui_refactor/31_recording_cache_paths.md](ui_refactor/31_recording_cache_paths.md) | ✅ done |
-| 32 | [ui_refactor/32_data_source_metadata.md](ui_refactor/32_data_source_metadata.md) | **NEXT** |
-| 33 | [ui_refactor/33_graphrefresh_pp_labels.md](ui_refactor/33_graphrefresh_pp_labels.md) | pending |
-| 34 | [ui_refactor/34_testset_span_descriptors.md](ui_refactor/34_testset_span_descriptors.md) | pending |
-| 35 | [ui_refactor/35_export_image_plot_reuse.md](ui_refactor/35_export_image_plot_reuse.md) | pending |
+| 32 | [ui_refactor/32_data_source_metadata.md](ui_refactor/32_data_source_metadata.md) | ✅ done |
+| 33 | [ui_refactor/33_graphrefresh_pp_labels.md](ui_refactor/33_graphrefresh_pp_labels.md) | ✅ done |
+| 34 | [ui_refactor/34_testset_span_descriptors.md](ui_refactor/34_testset_span_descriptors.md) | ✅ done |
+| 35 | [ui_refactor/35_export_image_plot_reuse.md](ui_refactor/35_export_image_plot_reuse.md) | ✅ done |
 
-After each PR: mark ✅ here and in [plan_ui_refactor.md](plan_ui_refactor.md); set **NEXT** on following row.
-
-## Verified baseline (post Phase III)
+## Verified baseline (post Phase IV)
 
 | Metric | Value |
 |--------|-------|
-| Tests | 193 passed, 1 skipped (`uv run pytest src/lib/ -q`) |
-| `brainwash_ui/` | ~1K LOC (7 modules) |
-| `ui_plot.py` | ~2433 LOC |
-| `ui_interactive.py` | ~2004 LOC |
-| `data_source/` | 14 candidates; pytest uses `characteristic_test_ids` (`01`, `07`, `14`) |
+| Tests | 201 passed, 1 skipped (`uv run pytest src/lib/ -q`) |
+| `brainwash_ui/` | ~1.1K LOC (8 modules incl. `plot_testsets`) |
+| `ui_plot.py` | ~2435 LOC |
+| `export_image.py` | delegates IO labels, PP grid, PP ticks to `brainwash_ui` |
+| `data_source/` | 14 candidates; pytest uses `characteristic_test_ids` (`01`, `07`, `14`) with `n_sweeps`/`n_stims` metadata |
 
-## Execution order (strict default)
-
-```
-31 (recording_cache paths) → 32 (data_source metadata) → 33 (PP labels) → 34 (testset spans) → 35 (export_image)
-```
-
-PR-32 can run after PR-31 in parallel only on a separate branch; default sequential.
-
-## Success criteria (Phase IV complete)
-
-| Milestone | Target |
-|-----------|--------|
-| `recording_cache.py` | Covers output, mean, filter, timepoints, group-mean paths used by `ui_data_frames` |
-| `data_source/manifest.json` | Metadata per candidate; characteristic tests assert sweep/stim counts |
-| `ui_plot.py` LOC | <2350 after PR-33+34 |
-| Agent self-verify | No app launch for PR-31–34; `uv run pytest src/lib/ -q` green |
-
-## Deferred (Phase V+ — do not start until IV green)
+## Deferred (Phase V+ — do not start until human approves merge)
 
 | Item | Reason |
 |------|--------|

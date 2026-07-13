@@ -1,6 +1,6 @@
 # PR-33: graphRefresh PP group label helpers (narrow)
 
-**Status**: pending | **Depends on**: PR-32
+**Status**: ✅ done | **Depends on**: PR-32
 
 ## Goal
 

@@ -1,6 +1,6 @@
 # PR-32: data_source manifest metadata + assertions
 
-**Status**: pending | **Depends on**: PR-31
+**Status**: ✅ done | **Depends on**: PR-31
 
 ## Goal
 

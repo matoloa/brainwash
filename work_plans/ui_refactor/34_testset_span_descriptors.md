@@ -1,6 +1,6 @@
 # PR-34: testset span descriptors
 
-**Status**: pending | **Depends on**: PR-33
+**Status**: ✅ done | **Depends on**: PR-33
 
 ## Goal
 

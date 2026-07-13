@@ -1,6 +1,6 @@
 # PR-35: export_image plot reuse
 
-**Status**: pending | **Depends on**: PR-34
+**Status**: ✅ done | **Depends on**: PR-34
 
 ## Goal
 
