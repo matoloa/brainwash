@@ -11,6 +11,43 @@ from lib import ui_plot
 
 logger = logging.getLogger(__name__)
 
+_SWEEP_OUTPUT_ASPECTS = frozenset({"EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"})
+
+
+def _artist_xdata(line) -> np.ndarray:
+    return np.asarray(line.get_xdata(), dtype=float).ravel()
+
+
+def _drag_release_line_candidates(rec_ID, graph: str, *, dict_rec_show: dict, dict_rec_labels: dict) -> list[tuple[object, np.ndarray]]:
+    if graph == "mean":
+        axes = {"axm"}
+        require_sweep_aspect = False
+    elif graph == "output":
+        axes = {"ax1", "ax2"}
+        require_sweep_aspect = True
+    else:
+        return []
+
+    candidates: list[tuple[object, np.ndarray]] = []
+    for store in (dict_rec_show, dict_rec_labels):
+        if not store:
+            continue
+        for value in store.values():
+            if value.get("rec_ID") != rec_ID or value.get("axis") not in axes:
+                continue
+            if require_sweep_aspect and value.get("aspect") not in _SWEEP_OUTPUT_ASPECTS:
+                continue
+            line = value.get("line")
+            if line is None or not hasattr(line, "get_xdata"):
+                continue
+            xdata = _artist_xdata(line)
+            if xdata.size == 0:
+                continue
+            candidates.append((line, xdata))
+        if candidates:
+            break
+    return candidates
+
 
 class InteractivePlotMixin:
     #####################################################
@@ -308,19 +345,19 @@ class InteractivePlotMixin:
                 p.mouseover_action = action
                 plotMouseover(action, axe)
 
-                    # Debugging block
-                    if False:
-                        prow = self.get_prow()
-                        rec_name = prow["recording_name"]
-                        rec_ID = prow["ID"]
-                        trow = self.get_trow()
-                        # new_dict = {key: value for key, value in self.uistate.plot.dict_rec_labels.items() if value.get('stim') == stim_num and value.get('rec_ID') == rec_ID and value.get('axis') == 'ax2'}
-                        # EPSP_slope = new_dict.get(f"{rec_name} - stim {stim_num} EPSP slope")
-                        EPSP_slope = self.uistate.plot.dict_rec_labels.get(f"{rec_name} - stim {trow['stim']} EPSP slope")
-                        line = EPSP_slope.get("line")
-                        line.set_linewidth(10)
-                        print(f"{EPSP_slope} - {action}")
-                    break
+                # Debugging block
+                if False:
+                    prow = self.get_prow()
+                    rec_name = prow["recording_name"]
+                    rec_ID = prow["ID"]
+                    trow = self.get_trow()
+                    # new_dict = {key: value for key, value in self.uistate.plot.dict_rec_labels.items() if value.get('stim') == stim_num and value.get('rec_ID') == rec_ID and value.get('axis') == 'ax2'}
+                    # EPSP_slope = new_dict.get(f"{rec_name} - stim {stim_num} EPSP slope")
+                    EPSP_slope = self.uistate.plot.dict_rec_labels.get(f"{rec_name} - stim {trow['stim']} EPSP slope")
+                    line = EPSP_slope.get("line")
+                    line.set_linewidth(10)
+                    print(f"{EPSP_slope} - {action}")
+                break
 
             if self.uistate.plot.mouseover_action is None:
                 if self.uistate.plot.mouseover_blob is not None:
@@ -400,24 +437,22 @@ class InteractivePlotMixin:
         # function to set up x scales for dragging and releasing on mean- and output canvases
         if graph == "mean":  # self.uistate.plot.axm
             canvas = self.canvasMean
-            filtered_values = [value["line"] for value in self.uistate.plot.dict_rec_labels.values() if value["rec_ID"] == rec_ID and value["axis"] == "axm"]
         elif graph == "output":  # self.uistate.plot.ax1+ax2
             canvas = self.canvasOutput
-            filtered_values = [
-                value["line"]
-                for value in self.uistate.plot.dict_rec_labels.values()
-                if value["rec_ID"] == rec_ID and (value["axis"] == "ax1" or value["axis"] == "ax2")
-            ]
         else:
             print("connectDragRelease: Incorrect graph reference.")
             return
 
-        filtered_values = [line for line in filtered_values if len(line.get_xdata()) > 0]
-        max_x_line = max(filtered_values, key=lambda line: line.get_xdata()[-1], default=None)
-        if max_x_line is None:
+        candidates = _drag_release_line_candidates(
+            rec_ID,
+            graph,
+            dict_rec_show=self.uistate.plot.dict_rec_show,
+            dict_rec_labels=self.uistate.plot.dict_rec_labels,
+        )
+        if not candidates:
             print("No lines found. Cannot set up drag and release.")
             return
-        x_data = max_x_line.get_xdata()
+        _max_x_line, x_data = max(candidates, key=lambda item: item[1][-1])
         self.mouse_drag = canvas.mpl_connect(
             "motion_notify_event",
             lambda event: self.xDrag(event, canvas=canvas, x_data=x_data, x_range=x_range),
