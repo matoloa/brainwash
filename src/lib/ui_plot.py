@@ -1,7 +1,7 @@
 import time  # counting time for functions
 import warnings
 
-from brainwash_ui import plot_model, plot_series, plot_stim
+from brainwash_ui import plot_model, plot_series, plot_stim, plot_testsets
 
 import matplotlib.pyplot as plt  # for the scatterplot
 import numpy as np
@@ -389,7 +389,7 @@ class UIplot:
         if not hasattr(self.uistate.plot, "sample_artists"):
             self.uistate.plot.sample_artists = {}
 
-        should_show = bool(dd_shown_samples)
+        should_show = plot_testsets.sample_overlay_should_show(dd_shown_samples)
 
         if self.uistate.plot.sample_inset is None:
             if self.uistate.plot.ax1 is None or not should_show:
@@ -515,20 +515,19 @@ class UIplot:
             if draw and self.uistate.plot.ax1 is not None:
                 self.uistate.plot.ax1.figure.canvas.draw_idle()
             return
-        alpha = 0.08
-        for set_ID, dset in sorted(dd_testset.items()):
-            if not dset.get("show", False) or not dset.get("sweeps"):
+        for spec in plot_testsets.testset_span_specs(dd_testset):
+            ax = self.get_axis(spec.ax_name)
+            if ax is None:
                 continue
-            sweeps = dset["sweeps"]
-            start = min(sweeps)
-            end = max(sweeps) + 1
-            color = dset.get("color", "#a0a0a0")
-            for ax_name in ("ax1", "ax2"):
-                ax = self.get_axis(ax_name)
-                if ax is None:
-                    continue
-                span = ax.axvspan(start, end, color=color, alpha=alpha, label=f"testset_span_{set_ID}", zorder=1)
-                self.uistate.plot.testset_spans.setdefault(set_ID, {})[ax_name] = span
+            span = ax.axvspan(
+                spec.start,
+                spec.end,
+                color=spec.color,
+                alpha=spec.alpha,
+                label=f"{plot_testsets.TESTSET_SPAN_LABEL_PREFIX}{spec.set_id}",
+                zorder=spec.zorder,
+            )
+            self.uistate.plot.testset_spans.setdefault(spec.set_id, {})[spec.ax_name] = span
         if draw and self.uistate.plot.ax1 is not None:
             self.uistate.plot.ax1.figure.canvas.draw_idle()
 

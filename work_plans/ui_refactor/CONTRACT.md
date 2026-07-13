@@ -49,6 +49,14 @@ class StatusbarResult:
 | `amp_zero_plot` | Mean of `rec_filter` in 2 ms window `[t_stim-0.002, t_stim-0.001)` on `dfmean` |
 | Stim numbering | User-visible `stim_num = i_stim + 1` |
 
+## Testset span invariants (Phase IV)
+
+| Invariant | Detail |
+|-----------|--------|
+| Span label | `testset_span_{set_ID}` |
+| Alpha | `0.08` default |
+| Sweep window | `[min(sweeps), max(sweeps)+1)` on ax1 and ax2 |
+
 ## Public entrypoints (unchanged)
 
 - `compute_statistical_comparison`, `ttest_per_sweep`, `from . import statistics as stats`
