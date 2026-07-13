@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
-from brainwash_ui import refresh_bus
+from brainwash_ui import plot_drag, refresh_bus
 
 import matplotlib.collections as mcoll
 
@@ -353,7 +353,7 @@ class GraphCoordinatorMixin:
                 continue
             if line.get_transform() != axis.transData:
                 continue
-            xdata = np.asarray(line.get_xdata(), dtype=float).ravel()
+            xdata = plot_drag.artist_xdata(line)
             mask = np.isfinite(xdata)
             if mask.any():
                 all_x.append(xdata[mask])
@@ -415,8 +415,8 @@ class GraphCoordinatorMixin:
                 continue
             if line.get_transform() != axis.transData:
                 continue
-            xdata = np.asarray(line.get_xdata(), dtype=float).ravel()
-            ydata = np.asarray(line.get_ydata(), dtype=float).ravel()
+            xdata = plot_drag.artist_xdata(line)
+            ydata = plot_drag.artist_ydata(line)
             mask = np.isfinite(ydata)
             if x_min is not None:
                 mask &= xdata >= x_min
