@@ -77,6 +77,20 @@ def test_level_storage_key_and_display_label():
     assert plot_model.display_label_from_key("G1_amp_subject") == "G1_amp"
 
 
+def test_output_axis_ylabels():
+    labels = plot_model.output_axis_ylabels(experiment_type="io", io_output="EPSPamp", norm_epsP=False)
+    assert labels.ax1_ylabel == "EPSP Amplitude (mV)"
+    assert labels.ax2_ylabel == ""
+    pp = plot_model.output_axis_ylabels(experiment_type="PP", io_output="", norm_epsP=False)
+    assert pp.ax1_ylabel == "PPR Amp (%)"
+    time_norm = plot_model.output_axis_ylabels(experiment_type="time", io_output="", norm_epsP=True)
+    assert time_norm.ax2_ylabel == "Slope %"
+
+
+def test_pp_reference_grid_y_values():
+    assert plot_model.pp_reference_grid_y_values() == (1.0, 2.0, 3.0)
+
+
 def test_output_legend_locations():
     assert plot_model.output_legend_locations(experiment_type="time", slope_only=False) == (
         "upper right",

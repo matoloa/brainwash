@@ -12,8 +12,8 @@
 | 19 | [ui_refactor/19_nested_getattr_cleanup.md](ui_refactor/19_nested_getattr_cleanup.md) | ✅ done |
 | 20 | [ui_refactor/20_plot_stim.md](ui_refactor/20_plot_stim.md) | ✅ done |
 | 21 | [ui_refactor/21_plot_series_pp_aggregate.md](ui_refactor/21_plot_series_pp_aggregate.md) | ✅ done |
-| 22 | [ui_refactor/22_plot_layout.md](ui_refactor/22_plot_layout.md) | **NEXT** |
-| 23 | [ui_refactor/23_pipeline_goldens.md](ui_refactor/23_pipeline_goldens.md) | pending |
+| 22 | [ui_refactor/22_plot_layout.md](ui_refactor/22_plot_layout.md) | ✅ done |
+| 23 | [ui_refactor/23_pipeline_goldens.md](ui_refactor/23_pipeline_goldens.md) | **NEXT** |
 | 24 | [ui_refactor/24_statusbar_wiring_tests.md](ui_refactor/24_statusbar_wiring_tests.md) | pending |
 | 25 | [ui_refactor/25_hygiene_archive.md](ui_refactor/25_hygiene_archive.md) | pending |
 

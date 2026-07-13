@@ -854,34 +854,24 @@ class UIplot:
         axe.set_xlabel("Time (ms)")
 
         exp_type = uistate.experiment.experiment_type
+        axis_labels = plot_model.output_axis_ylabels(
+            experiment_type=exp_type,
+            io_output=uistate.experiment.io_output,
+            norm_epsP=bool(uistate.project.checkBox["norm_EPSP"]),
+        )
+        ax1.set_ylabel(axis_labels.ax1_ylabel)
+        ax2.set_ylabel(axis_labels.ax2_ylabel)
         if exp_type == "io":
-            io_out = uistate.experiment.io_output
-            ax2.set_ylabel("")
-            if "slope" in io_out.lower():
-                ax1.set_ylabel("EPSP Slope %" if uistate.project.checkBox["norm_EPSP"] else "EPSP Slope (mV/ms)")
-            else:
-                ax1.set_ylabel("EPSP Amplitude %" if uistate.project.checkBox["norm_EPSP"] else "EPSP Amplitude (mV)")
-
             ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax1.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax2.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
         elif exp_type == "PP":
-            ax1.set_ylabel("PPR Amp (%)")
-            ax2.set_ylabel("PPR Slope (%)")
-
             ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
         else:
-            ax1.tick_params(axis="x", bottom=True, length=3.5)  # restore matplotlib default tick marks
+            ax1.tick_params(axis="x", bottom=True, length=3.5)
             ax2.tick_params(axis="x", bottom=True, length=3.5)
-            if uistate.project.checkBox["norm_EPSP"]:
-                ax1.set_ylabel("Amplitude %")
-                ax2.set_ylabel("Slope %")
-            else:
-                ax1.set_ylabel("Amplitude (mV)")
-                ax2.set_ylabel("Slope (mV/ms)")
-
             ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax2.xaxis.set_major_formatter(uistate.x_axis_formatter())
@@ -897,7 +887,7 @@ class UIplot:
                     except:
                         pass
 
-            for y_val in [1.0, 2.0, 3.0]:
+            for y_val in plot_model.pp_reference_grid_y_values():
                 ax1.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
                 ax2.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
         if exp_type == "PP":

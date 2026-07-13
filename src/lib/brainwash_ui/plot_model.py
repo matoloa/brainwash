@@ -185,3 +185,27 @@ def output_axis_y_visibility(*, amp_view: bool, slope_view: bool) -> tuple[bool,
 
 def slope_yaxis_on_left(*, slope_only: bool) -> bool:
     return slope_only
+
+
+@dataclass(frozen=True)
+class OutputAxisLabels:
+    ax1_ylabel: str
+    ax2_ylabel: str
+
+
+def output_axis_ylabels(*, experiment_type: str, io_output: str, norm_epsP: bool) -> OutputAxisLabels:
+    if experiment_type == "io":
+        if "slope" in io_output.lower():
+            ax1 = "EPSP Slope %" if norm_epsP else "EPSP Slope (mV/ms)"
+        else:
+            ax1 = "EPSP Amplitude %" if norm_epsP else "EPSP Amplitude (mV)"
+        return OutputAxisLabels(ax1, "")
+    if experiment_type == "PP":
+        return OutputAxisLabels("PPR Amp (%)", "PPR Slope (%)")
+    if norm_epsP:
+        return OutputAxisLabels("Amplitude %", "Slope %")
+    return OutputAxisLabels("Amplitude (mV)", "Slope (mV/ms)")
+
+
+def pp_reference_grid_y_values() -> tuple[float, float, float]:
+    return (1.0, 2.0, 3.0)
