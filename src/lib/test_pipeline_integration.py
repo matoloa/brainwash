@@ -10,10 +10,12 @@ import pandas as pd
 import pytest
 
 import analysis_v3 as analysis
+from brainwash_ui import plot_stim
 from parse import build_dfmean, source2dfs, zeroSweeps
 from test_pipeline_fixtures import make_default_dict_t, make_sweep_df
 
 _TEST_DATA = Path(__file__).parent / "test_data"
+_GOLDEN_DFOUTPUT = _TEST_DATA / "golden" / "synthetic_dfoutput.parquet"
 _ABF_1CH = _TEST_DATA / "A_21_P0701-S2" / "2022_07_01_0012.abf"
 
 
@@ -49,6 +51,21 @@ def test_parquet_roundtrip_no_spurious_index_column():
         assert "index" not in df2.columns
     finally:
         os.unlink(path)
+
+
+def test_golden_dfoutput_parquet_columns():
+    assert _GOLDEN_DFOUTPUT.exists(), f"golden missing: {_GOLDEN_DFOUTPUT}"
+    df = pd.read_parquet(_GOLDEN_DFOUTPUT)
+    for col in ("stim", "sweep", "EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"):
+        assert col in df.columns
+    assert "index" not in df.columns
+
+
+def test_golden_pipeline_event_window_non_empty():
+    df_raw = make_sweep_df()
+    dfmean, _i_stim = build_dfmean(df_raw)
+    df_event = plot_stim.event_window_df(dfmean, t_stim=0.04, event_start=-0.01, event_end=0.02, rec_filter="prim")
+    assert not df_event.empty
 
 
 @pytest.mark.skipif(not _ABF_1CH.exists(), reason=f"real ABF absent: {_ABF_1CH}")
