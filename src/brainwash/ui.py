@@ -75,9 +75,10 @@ logger.debug("ui.py: os.getcwd(): %s", os.getcwd())
 # - Phase 5 (polish): connectUIstate/applyConfigStates/hierarchy/rename → ProjectMixin; stubs removed.
 # Core UIsub now holds wiring, lifecycle, thin orchestration and non-extracted handlers. (ui.py ~2600 LOC)
 
-config = ui_widgets.Config()
-uistate = ui_state_classes.UIstate()  # global variable for storing state of UI
-uiplot = ui_plot.UIplot(uistate)
+# Per-UIsub instances (Phase 6a). Module aliases updated in UIsub.__init__; removed in Phase 6b.
+config: ui_widgets.Config | None = None
+uistate: ui_state_classes.UIstate | None = None
+uiplot: ui_plot.UIplot | None = None
 
 
 import brainwash.export_data as export_data
@@ -114,9 +115,10 @@ class UIsub(
         logger.debug("UIsub init")
         print(" - UIsub init, verbose mode")
 
-        self.uistate = uistate
-        self.config = config
-        self.uiplot = uiplot
+        global config, uistate, uiplot
+        self.config = config = ui_widgets.Config()
+        self.uistate = uistate = ui_state_classes.UIstate()
+        self.uiplot = uiplot = ui_plot.UIplot(self.uistate)
 
         # Custom UI initialization - non-QtDesigner-generated instructions
         self.pushButtonParse.setVisible(False)

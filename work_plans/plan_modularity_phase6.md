@@ -1,0 +1,46 @@
+# Modularity Phase 6+ — Agent index
+
+> **Status**: Active. Branch: `ui-refactor/phase0-3`.
+> Phases 0–5 + 3b + 4: complete. **Human approved Phase 6+ scope 2026-07-13.**
+
+## HIGH RISK commit convention
+
+Phase 6+ commits use the message suffix **`[HIGH RISK phase6X]`** so they can be found and reverted as a block:
+
+```sh
+git log --oneline --grep='HIGH RISK'
+git revert <sha>..HEAD   # or reset branch to pre-phase6 tag
+```
+
+Pre-phase6 rollback point: last commit before first `[HIGH RISK]` (currently commit 60 / `a2f2dd2`).
+
+## Scope (approved)
+
+| Phase | Card | Risk | Scope | Rollback if |
+|-------|------|------|-------|-------------|
+| **6a** | [phase6/01_per_uisub_singletons.md](phase6/01_per_uisub_singletons.md) | **HIGH** | Move `config`/`uistate`/`uiplot` off `ui.py` import time → `UIsub.__init__` | App fails to start; stale state across sessions |
+| **6b** | phase6/02_remove_module_aliases.md | **HIGH** | Drop deprecated `ui.uistate` module aliases (after 6a smoke) | Legacy script breaks |
+| **7a** | phase6/03_uiplot_contract.md | medium | Document `UIplot` host contract + plot_model boundaries only | — |
+| **7b** | TBD | **HIGH** | Extract pure plot descriptor builders from `ui_plot.py` (incremental) | Plot regressions |
+| **8** | TBD | **HIGH** | Package rename `src/lib` shim removal | Import breaks |
+
+**Out of scope (forbidden without explicit approval)**:
+- Full `UIplot` rewrite in one PR
+- `UIsub` composition rewrite
+- `compute_statistical_comparison` / stats dispatcher changes
+- Distribution builds
+
+## Verify (after each HIGH RISK commit)
+
+```sh
+uv run pytest src/brainwash/ -q
+# Manual: launch app, load project, select rec, graph refresh, IO statusbar
+```
+
+## Progress
+
+| PR | Card | Status |
+|----|------|--------|
+| 6a | per-UIsub singletons | in progress |
+| 6b | remove module aliases | pending |
+| 7a | UIplot contract doc | pending |

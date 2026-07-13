@@ -68,6 +68,6 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
    - `src/brainwash/statistics.py`: thin facade; stats logic in `src/brainwash/brainwash_stats/`.
    - `src/brainwash/brainwash_ui/`: pure view/statusbar/applicability logic (testable without Qt).
    - `src/brainwash/legacy/`: **retain** `analysis_v1.py` / `analysis_v2.py` for scientific reproduction — do not delete; shims at `src/brainwash/analysis_v1.py` etc.
-   - `src/brainwash/ui_state_classes.py`: `uistate` singleton — use `uistate.project`, `.experiment`, `.stat_test`, `.plot` (no flat attrs).
+   - `src/brainwash/ui_state_classes.py`: `UIstate` per `UIsub` — use `self.uistate.project`, `.experiment`, `.stat_test`, `.plot` (no flat attrs; no import-time `ui.uistate`).
    - Plans are in `work_plans/` (move outdated to `History/`).
    - See full layout in CONTRIBUTING.md.
