@@ -1740,41 +1740,25 @@ class UIplot:
             out_sweeps = dfoutput[dfoutput["sweep"].notna()]
             out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
             out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
-
             common_sweeps = out1.index.intersection(out2.index).dropna()
             if not common_sweeps.empty:
-                o1 = out1.loc[common_sweeps]
-                o2 = out2.loc[common_sweeps]
-
-                configs = [
-                    ("EPSP_amp", "ax1", settings.get("rgb_EPSP_amp", "blue")),
-                    ("EPSP_slope", "ax2", settings.get("rgb_EPSP_slope", "red")),
-                    ("volley_amp", "ax1", settings.get("rgb_volley_amp", "green")),
-                    ("volley_slope", "ax2", settings.get("rgb_volley_slope", "orange")),
-                ]
-
-                for aspect, axid, color in configs:
-                    if aspect in o1.columns and aspect in o2.columns:
-                        v1 = o1[aspect].values.astype(float)
-                        v2 = o2[aspect].values.astype(float)
-
-                        with warnings.catch_warnings():
-                            warnings.simplefilter("ignore")
-                            ppr = v2 / v1
-                            # replace inf and -inf with nan
-                            ppr[~np.isfinite(ppr)] = np.nan
-
-                        x_val = plot_series.pp_overlay_x_map(self.uistate.project.checkBox).get(aspect, 1)
-
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    for spec in plot_series.pp_recording_ppr_specs(
+                        out1.loc[common_sweeps],
+                        out2.loc[common_sweeps],
+                        self.uistate.project.checkBox,
+                        settings,
+                    ):
                         for variant in ["raw", "norm"]:
                             self.plot_line(
-                                f"{label} PPR {aspect} {variant}",
-                                axid,
-                                np.full(len(common_sweeps), x_val),
-                                ppr,
-                                color,
+                                f"{label} PPR {spec.aspect} {variant}",
+                                spec.axid,
+                                np.full(spec.n_points, spec.x_val),
+                                spec.ppr,
+                                spec.color,
                                 rec_ID,
-                                aspect=aspect,
+                                aspect=spec.aspect,
                                 stim=None,
                                 variant=variant,
                                 x_mode="sweep",
@@ -1783,52 +1767,40 @@ class UIplot:
                                 linestyle="None",
                             )
 
-        # Stim-mode aggregate lines (always created when stim-mode rows exist;
-        # visibility controlled by x_mode filtering in _is_rec_visible).
         out_stim = dfoutput[dfoutput["sweep"].isna()]
         if not out_stim.empty:
             df_sweeps = dfoutput[dfoutput["sweep"].notna()]
             df_sem = df_sweeps.groupby("stim").sem(numeric_only=True)
-
-            configs = [
-                ("EPSP amp", "ax1", "EPSP_amp", settings["rgb_EPSP_amp"], "raw"),
-                ("EPSP amp norm", "ax1", "EPSP_amp_norm", settings["rgb_EPSP_amp"], "norm"),
-                ("EPSP slope", "ax2", "EPSP_slope", settings["rgb_EPSP_slope"], "raw"),
-                ("EPSP slope norm", "ax2", "EPSP_slope_norm", settings["rgb_EPSP_slope"], "norm"),
-                ("volley amp", "ax1", "volley_amp", settings["rgb_volley_amp"], "raw"),
-                ("volley slope", "ax2", "volley_slope", settings["rgb_volley_slope"], "raw"),
-            ]
-
             stims = out_stim["stim"].values
-
-            for suffix, axid, col, color, variant in configs:
-                if col in out_stim.columns:
-                    aspect = col.replace("_norm", "")
-                    self.plot_line(
-                        f"{label} {suffix}",
+            for suffix, axid, col, color, variant in plot_series.stim_aggregate_line_configs(settings):
+                if col not in out_stim.columns:
+                    continue
+                aspect = col.replace("_norm", "")
+                self.plot_line(
+                    f"{label} {suffix}",
+                    axid,
+                    stims,
+                    out_stim[col].values,
+                    color,
+                    rec_ID,
+                    aspect=aspect,
+                    variant=variant,
+                    x_mode="stim",
+                )
+                sem_vals = plot_series.stim_aggregate_sem(df_sem, out_stim, col)
+                if sem_vals is not None:
+                    self.plot_shade(
+                        f"{label} {suffix} shade",
                         axid,
                         stims,
                         out_stim[col].values,
+                        sem_vals,
                         color,
                         rec_ID,
                         aspect=aspect,
                         variant=variant,
                         x_mode="stim",
                     )
-                    if col in df_sem.columns:
-                        sem_vals = df_sem[col].reindex(out_stim["stim"]).values
-                        self.plot_shade(
-                            f"{label} {suffix} shade",
-                            axid,
-                            stims,
-                            out_stim[col].values,
-                            sem_vals,
-                            color,
-                            rec_ID,
-                            aspect=aspect,
-                            variant=variant,
-                            x_mode="stim",
-                        )
 
     def addGroup(self, group_ID, dict_group, df_groupmean, x_pos=1, level=None):
         """Add (or update) group artists for the given level.
@@ -2443,13 +2415,12 @@ class UIplot:
                     o1 = out1.loc[common_sweeps]
                     o2 = out2.loc[common_sweeps]
                     if aspect in o1.columns and aspect in o2.columns:
-                        v1 = o1[aspect].values.astype(float)
-                        v2 = o2[aspect].values.astype(float)
                         with warnings.catch_warnings():
                             warnings.simplefilter("ignore")
-                            ppr = v2 / v1
-                            ppr[~np.isfinite(ppr)] = np.nan
-
+                            ppr = plot_series.compute_ppr(
+                                o1[aspect].values.astype(float),
+                                o2[aspect].values.astype(float),
+                            )
                         for variant in ["raw", "norm"]:
                             ppr_label = f"{rec_label} PPR {aspect} {variant}"
                             if ppr_label in self.uistate.plot.dict_rec_labels:

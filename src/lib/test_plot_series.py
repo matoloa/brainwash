@@ -70,6 +70,30 @@ def test_group_mean_plots_for_df():
     assert plots == [("ax2", "EPSP_slope", "EPSP_slope_mean")]
 
 
+def test_compute_ppr_non_finite_to_nan():
+    v1 = np.array([1.0, 0.0, 2.0])
+    v2 = np.array([2.0, 1.0, 4.0])
+    ppr = plot_series.compute_ppr(v1, v2)
+    assert ppr[0] == 2.0
+    assert np.isnan(ppr[1])
+
+
+def test_pp_recording_ppr_specs():
+    o1 = pd.DataFrame({"EPSP_amp": [1.0, 2.0]}, index=[0, 1])
+    o2 = pd.DataFrame({"EPSP_amp": [2.0, 4.0]}, index=[0, 1])
+    specs = plot_series.pp_recording_ppr_specs(o1, o2, {"EPSP_amp": True}, {"rgb_EPSP_amp": "blue"})
+    assert len(specs) == 1
+    assert specs[0].x_val == 1
+    assert len(specs[0].ppr) == 2
+
+
+def test_stim_aggregate_sem_reindex():
+    df_sem = pd.DataFrame({"EPSP_amp": [0.1, 0.2]}, index=[1, 2])
+    out_stim = pd.DataFrame({"stim": [1, 2], "EPSP_amp": [1.0, 2.0]})
+    sem = plot_series.stim_aggregate_sem(df_sem, out_stim, "EPSP_amp")
+    assert len(sem) == 2
+
+
 def test_render_group_mean_series_agg():
     import matplotlib
 

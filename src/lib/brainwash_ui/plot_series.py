@@ -210,3 +210,71 @@ def mean_sem(vals: list[float]) -> tuple[float, float]:
     mean_val = float(np.mean(arr))
     sem_val = float(np.std(arr, ddof=1) / np.sqrt(len(arr))) if len(arr) > 1 else 0.0
     return mean_val, sem_val
+
+
+def compute_ppr(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
+    ppr = np.asarray(v2, dtype=float) / np.asarray(v1, dtype=float)
+    ppr[~np.isfinite(ppr)] = np.nan
+    return ppr
+
+
+def pp_recording_aspect_configs(settings: dict) -> list[tuple[str, str, str]]:
+    return [
+        ("EPSP_amp", "ax1", settings.get("rgb_EPSP_amp", "blue")),
+        ("EPSP_slope", "ax2", settings.get("rgb_EPSP_slope", "red")),
+        ("volley_amp", "ax1", settings.get("rgb_volley_amp", "green")),
+        ("volley_slope", "ax2", settings.get("rgb_volley_slope", "orange")),
+    ]
+
+
+@dataclass(frozen=True)
+class PpRecordingPprSpec:
+    aspect: str
+    axid: str
+    color: str
+    ppr: np.ndarray
+    x_val: int
+    n_points: int
+
+
+def pp_recording_ppr_specs(
+    o1: pd.DataFrame,
+    o2: pd.DataFrame,
+    checkbox: dict,
+    settings: dict,
+) -> list[PpRecordingPprSpec]:
+    x_map = pp_overlay_x_map(checkbox)
+    specs: list[PpRecordingPprSpec] = []
+    for aspect, axid, color in pp_recording_aspect_configs(settings):
+        if aspect not in o1.columns or aspect not in o2.columns:
+            continue
+        v1 = o1[aspect].values.astype(float)
+        v2 = o2[aspect].values.astype(float)
+        specs.append(
+            PpRecordingPprSpec(
+                aspect=aspect,
+                axid=axid,
+                color=color,
+                ppr=compute_ppr(v1, v2),
+                x_val=x_map.get(aspect, 1),
+                n_points=len(v1),
+            )
+        )
+    return specs
+
+
+def stim_aggregate_line_configs(settings: dict) -> list[tuple[str, str, str, str, str]]:
+    return [
+        ("EPSP amp", "ax1", "EPSP_amp", settings["rgb_EPSP_amp"], "raw"),
+        ("EPSP amp norm", "ax1", "EPSP_amp_norm", settings["rgb_EPSP_amp"], "norm"),
+        ("EPSP slope", "ax2", "EPSP_slope", settings["rgb_EPSP_slope"], "raw"),
+        ("EPSP slope norm", "ax2", "EPSP_slope_norm", settings["rgb_EPSP_slope"], "norm"),
+        ("volley amp", "ax1", "volley_amp", settings["rgb_volley_amp"], "raw"),
+        ("volley slope", "ax2", "volley_slope", settings["rgb_volley_slope"], "raw"),
+    ]
+
+
+def stim_aggregate_sem(df_sem: pd.DataFrame, out_stim: pd.DataFrame, col: str) -> np.ndarray | None:
+    if col not in df_sem.columns:
+        return None
+    return df_sem[col].reindex(out_stim["stim"]).values
