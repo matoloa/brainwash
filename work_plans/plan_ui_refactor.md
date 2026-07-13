@@ -58,6 +58,13 @@ Branch: `ui-refactor/phase0-3`. Index: [plan_ui_refactor_phase2.md](plan_ui_refa
 |----|------|--------|
 | 36 | [ui_refactor/36_plot_drag_zones.md](ui_refactor/36_plot_drag_zones.md) | ✅ done |
 
+**Phase VI**: [plan_ui_refactor_phase6.md](plan_ui_refactor_phase6.md)
+
+| PR | Card | Status |
+|----|------|--------|
+| 37 | [ui_refactor/37_output_sweep_drag_fix.md](ui_refactor/37_output_sweep_drag_fix.md) | ✅ done |
+| 39 | [ui_refactor/39_plot_drag_artist_xdata.md](ui_refactor/39_plot_drag_artist_xdata.md) | ✅ done |
+
 ## Shared docs
 
 - [ui_refactor/VERIFY.md](ui_refactor/VERIFY.md)
