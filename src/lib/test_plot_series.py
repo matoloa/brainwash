@@ -29,6 +29,18 @@ def test_compute_io_regression_ols():
     assert abs(reg.slope - 2.0) < 1e-9
 
 
+def test_pp_overlay_x_map_all_enabled():
+    m = plot_series.pp_overlay_x_map(
+        {"EPSP_amp": True, "EPSP_slope": True, "volley_amp": True, "volley_slope": True}
+    )
+    assert m == {"EPSP_amp": 1, "EPSP_slope": 2, "volley_amp": 3, "volley_slope": 4}
+
+
+def test_pp_overlay_x_map_partial():
+    m = plot_series.pp_overlay_x_map({"EPSP_amp": True, "EPSP_slope": False, "volley_amp": True, "volley_slope": False})
+    assert m == {"EPSP_amp": 1, "volley_amp": 2}
+
+
 def test_pp_bar_layout_single_aspect():
     configs = plot_series.pp_bar_layout([("EPSP_amp", "ax1")])
     assert len(configs) == 1

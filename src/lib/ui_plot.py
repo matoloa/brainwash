@@ -1822,14 +1822,7 @@ class UIplot:
                             # replace inf and -inf with nan
                             ppr[~np.isfinite(ppr)] = np.nan
 
-                        # Assign discrete x-values to group the blobs side-by-side
-                        x_val_map = {}
-                        i = 1
-                        for key in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]:
-                            if self.uistate.project.checkBox.get(key, True):
-                                x_val_map[key] = i
-                                i += 1
-                        x_val = x_val_map.get(aspect, 1)
+                        x_val = plot_series.pp_overlay_x_map(self.uistate.project.checkBox).get(aspect, 1)
 
                         for variant in ["raw", "norm"]:
                             self.plot_line(
@@ -2520,13 +2513,7 @@ class UIplot:
                             if ppr_label in self.uistate.plot.dict_rec_labels:
                                 linedict = self.uistate.plot.dict_rec_labels[ppr_label]
                                 line = linedict["line"]
-                                x_val_map = {}
-                                idx = 1
-                                for key in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]:
-                                    if self.uistate.project.checkBox.get(key, True):
-                                        x_val_map[key] = idx
-                                        idx += 1
-                                overlay_x = x_val_map.get(aspect, 1)
+                                overlay_x = plot_series.pp_overlay_x_map(self.uistate.project.checkBox).get(aspect, 1)
                                 line.set_xdata(np.full(len(common_sweeps), overlay_x))
                                 line.set_ydata(ppr)
             return
