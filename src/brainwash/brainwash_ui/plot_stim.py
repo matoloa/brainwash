@@ -514,6 +514,107 @@ def slope_marker_xy(trow, aspect: str, stim_offset: float, data_x: np.ndarray, d
     return [x_start, x_end], [y_start, y_end]
 
 
+@dataclass(frozen=True)
+class DragOutputUpdate:
+    label: str
+    method: str
+    column: str | None = None
+    mean_value: float | None = None
+
+
+@dataclass(frozen=True)
+class SlopeDragUpdatePlan:
+    marker_label: str
+    marker_x: list
+    marker_y: list
+    output_updates: tuple[DragOutputUpdate, ...]
+
+
+@dataclass(frozen=True)
+class AmpDragUpdatePlan:
+    label_core: str
+    geom: AmpDragGeometry
+    amp: float | None
+    output_updates: tuple[DragOutputUpdate, ...]
+
+
+def build_slope_drag_update_plan(
+    trow,
+    aspect: str,
+    stim_offset: float,
+    data_x: np.ndarray,
+    data_y: np.ndarray,
+    label_core: str,
+    *,
+    norm_epsp: bool,
+    is_pp: bool,
+    has_dfoutput: bool,
+) -> SlopeDragUpdatePlan:
+    marker_x, marker_y = slope_marker_xy(trow, aspect, stim_offset, data_x, data_y)
+    out_label = drag_output_label(label_core, aspect, norm_epsp)
+    col = slope_output_column(aspect, norm_epsp)
+    output_updates: list[DragOutputUpdate] = []
+    if aspect == "volley slope":
+        if is_pp and has_dfoutput:
+            output_updates.append(DragOutputUpdate(label_core, "from_df", column=col))
+        elif not is_pp:
+            output_updates.append(
+                DragOutputUpdate(
+                    f"{label_core} mean",
+                    "out_mean",
+                    mean_value=trow.get("volley_slope_mean"),
+                )
+            )
+    elif is_pp and has_dfoutput:
+        output_updates.append(DragOutputUpdate(out_label, "from_df", column=col))
+    else:
+        output_updates.append(DragOutputUpdate(out_label, "out_line"))
+    return SlopeDragUpdatePlan(
+        marker_label=f"{label_core} marker",
+        marker_x=marker_x,
+        marker_y=marker_y,
+        output_updates=tuple(output_updates),
+    )
+
+
+def build_amp_drag_update_plan(
+    trow,
+    aspect: str,
+    stim_offset: float,
+    data_x: np.ndarray,
+    data_y: np.ndarray,
+    label_core: str,
+    amp,
+    amp_zero_plot: float | None,
+    *,
+    norm_epsp: bool,
+    is_pp: bool,
+    has_dfoutput: bool,
+) -> AmpDragUpdatePlan:
+    geom = amp_drag_geometry(trow, aspect, stim_offset, data_x, data_y, amp_zero_plot)
+    out_label = drag_output_label(label_core, aspect, norm_epsp)
+    col = amp_output_column(aspect, norm_epsp)
+    output_updates: list[DragOutputUpdate] = []
+    if aspect == "volley amp":
+        if has_dfoutput:
+            output_updates.append(DragOutputUpdate(label_core, "from_df", column=col))
+        elif not is_pp:
+            output_updates.append(DragOutputUpdate(label_core, "out_line"))
+        if not is_pp:
+            output_updates.append(
+                DragOutputUpdate(
+                    f"{label_core} mean",
+                    "out_mean",
+                    mean_value=trow.get("volley_amp_mean"),
+                )
+            )
+    elif has_dfoutput:
+        output_updates.append(DragOutputUpdate(out_label, "from_df", column=col))
+    elif not is_pp:
+        output_updates.append(DragOutputUpdate(out_label, "out_line"))
+    return AmpDragUpdatePlan(label_core=label_core, geom=geom, amp=amp, output_updates=tuple(output_updates))
+
+
 def amp_zero_from_drag_trace(data_x: np.ndarray, data_y: np.ndarray, y_fallback: float) -> float:
     pre_stim_mask = (data_x >= AMP_ZERO_PRE_WINDOW[0]) & (data_x < AMP_ZERO_PRE_WINDOW[1])
     if pre_stim_mask.any():

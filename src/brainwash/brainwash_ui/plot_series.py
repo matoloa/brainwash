@@ -290,6 +290,37 @@ class PpGroupBarPlotSpec:
     scatter_color: str
 
 
+@dataclass(frozen=True)
+class PpGroupBarStoreItem:
+    suffix: str
+    rec_id: object | None
+    is_overlay: bool
+
+
+def pp_group_bar_store_items(spec: PpGroupBarPlotSpec) -> tuple[PpGroupBarStoreItem, ...]:
+    items: list[PpGroupBarStoreItem] = [
+        PpGroupBarStoreItem("bar", None, False),
+        PpGroupBarStoreItem("err", None, False),
+        PpGroupBarStoreItem("overlay_bar", None, True),
+        PpGroupBarStoreItem("overlay_err", None, True),
+    ]
+    for pt in spec.scatter_points:
+        items.append(PpGroupBarStoreItem(f"{pt.rec_id} point", pt.rec_id, False))
+    return tuple(items)
+
+
+DEPRECATED_EPSP_OUTPUT_SUFFIXES = (
+    ("EPSP amp", "EPSP_amp"),
+    ("EPSP amp norm", "EPSP_amp_norm"),
+    ("EPSP slope", "EPSP_slope"),
+    ("EPSP slope norm", "EPSP_slope_norm"),
+)
+
+
+def deprecated_epsp_output_refresh_labels(rec_name: str) -> tuple[tuple[str, str], ...]:
+    return tuple((f"{rec_name} {suffix}", col) for suffix, col in DEPRECATED_EPSP_OUTPUT_SUFFIXES)
+
+
 def build_pp_group_bar_plot_specs(
     *,
     aggregate: PprLevelAggregate,

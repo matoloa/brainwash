@@ -55,6 +55,28 @@ def test_aggregate_ppr_at_level_recording():
     assert agg.rec_id_order["EPSP_amp"] == ["r1", "r2"]
 
 
+def test_pp_group_bar_store_items():
+    spec = plot_series.PpGroupBarPlotSpec(
+        aspect="EPSP_amp",
+        axid="ax1",
+        bar_x=1.0,
+        bar_width=0.8,
+        mean_val=1.5,
+        sem_val=0.1,
+        overlay_x=1,
+        scatter_points=(plot_series.PpGroupScatterPointSpec(1.1, 2.0, "r1"),),
+        scatter_color="white",
+    )
+    items = plot_series.pp_group_bar_store_items(spec)
+    assert len(items) == 5
+    assert items[-1].suffix == "r1 point"
+
+
+def test_deprecated_epsp_output_refresh_labels():
+    labels = plot_series.deprecated_epsp_output_refresh_labels("rec1")
+    assert labels[0] == ("rec1 EPSP amp", "EPSP_amp")
+
+
 def test_build_pp_group_bar_plot_specs():
     agg = plot_series.PprLevelAggregate(
         ppr_data={"EPSP_amp": [2.0, 4.0], "EPSP_slope": [], "volley_amp": [], "volley_slope": []},

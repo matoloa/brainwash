@@ -715,20 +715,7 @@ class UIplot:
                     obj = v.get(key)
                     if obj is not None:
                         try:
-                            if hasattr(obj, "set_visible"):
-                                obj.set_visible(visible_for_level)
-                            elif hasattr(obj, "patches"):
-                                for p in obj.patches:
-                                    p.set_visible(visible_for_level)
-                            elif hasattr(obj, "lines"):
-                                for l in (obj.lines if isinstance(obj.lines, (list, tuple)) else [obj.lines]):
-                                    if l is not None:
-                                        if isinstance(l, (list, tuple)):
-                                            for sub_l in l:
-                                                if sub_l is not None:
-                                                    sub_l.set_visible(visible_for_level)
-                                        else:
-                                            l.set_visible(visible_for_level)
+                            self._set_plot_artist_visible(obj, visible_for_level)
                         except Exception:
                             pass
 
@@ -772,44 +759,41 @@ class UIplot:
             uistate.plot.dict_rec_labels["output amp 100% marker"]["line"].set_visible(uistate.ampView())
             uistate.plot.dict_rec_labels["output slope 100% marker"]["line"].set_visible(uistate.slopeView())
 
-    def _apply_pp_graph_refresh_xaxis(self, ax1, ax2, plan):
-        if plan.ax1_xlabel is not None:
-            ax1.set_xlabel(plan.ax1_xlabel)
-        if plan.ax2_xlabel is not None:
-            ax2.set_xlabel(plan.ax2_xlabel)
-        if plan.ticks:
-            ax1.set_xticks(plan.ticks)
-            ax1.set_xticklabels(plan.ticklabels)
-            ax2.set_xticks(plan.ticks)
-            ax2.set_xticklabels(plan.ticklabels)
-        if plan.hide_all:
-            ax1.tick_params(axis="x", bottom=False, labelbottom=False)
-            ax2.tick_params(axis="x", bottom=False, labelbottom=False)
-        elif plan.labels_only:
-            ax1.tick_params(axis="x", bottom=False, labelbottom=True)
-            ax2.tick_params(axis="x", bottom=False, labelbottom=True)
+    def _set_plot_artist_visible(self, artist, visible: bool) -> None:
+        if hasattr(artist, "set_visible"):
+            artist.set_visible(visible)
+        elif hasattr(artist, "patches"):
+            for patch in artist.patches:
+                patch.set_visible(visible)
+        elif hasattr(artist, "lines"):
+            for line in artist.lines:
+                if line is None:
+                    continue
+                if isinstance(line, (list, tuple)):
+                    for sub_line in line:
+                        if sub_line is not None:
+                            sub_line.set_visible(visible)
+                else:
+                    line.set_visible(visible)
 
-    def graphRefresh(self, dd_groups, dd_testset=None, dd_shown_samples=None):
-        # show only selected and imported lines, only appropriate aspects
-        uistate = self.uistate
-        if uistate.plot.axm is None:
-            print("No axes to refresh")
-            return
-        t0 = time.time()
+    def _apply_drag_output_update(self, update: plot_stim.DragOutputUpdate, dfoutput, stim_num: int) -> None:
+        if update.method == "from_df":
+            self.updateOutLineFromDf(update.label, dfoutput, stim_num, update.column)
+        elif update.method == "out_line":
+            self.updateOutLine(update.label)
+        elif update.method == "out_mean":
+            self.updateOutMean(update.label, update.mean_value)
 
-        # Set recordings and group legends
+    def _refresh_output_legends(self, uistate, *, is_pp: bool, current_level: str) -> None:
         dd_recs = uistate.plot.dict_rec_show
         dd_group_show = uistate.plot.dict_group_show
-        axids = ["ax1", "ax2"]
         legend_loc = list(
             plot_model.output_legend_locations(
                 experiment_type=uistate.experiment.experiment_type,
                 slope_only=uistate.slopeOnly(),
             )
         )
-        is_pp = uistate.experiment.experiment_type == "PP"
-        current_level = uistate.stat_test.buttonGroup_test_n
-        for axid, loc in zip(axids, legend_loc):
+        for axid, loc in zip(["ax1", "ax2"], legend_loc):
             axis_legend = plot_model.output_axis_legend_map(
                 dd_recs,
                 dd_group_show,
@@ -820,40 +804,25 @@ class UIplot:
             axis = getattr(uistate.plot, axid)
             if axis_legend and not is_pp:
                 try:
-                    # Tweaked: smaller fontsize for compactness with groups + recs; explicit lists for safety
                     leg = axis.legend(list(axis_legend.values()), list(axis_legend.keys()), loc=loc, fontsize=8)
                 except TypeError:
-                    # Fallback if zorder was passed from ui.py wrapper (matplotlib version issue)
                     leg = axis.legend(list(axis_legend.values()), list(axis_legend.keys()), loc=loc, fontsize=8)
                 if leg is not None:
                     leg.set_zorder(10)
-            else:
-                if axis.get_legend():
-                    axis.get_legend().remove()
-
+            elif axis.get_legend():
+                axis.get_legend().remove()
         for axid in ["axm", "axe"]:
             axis = getattr(uistate.plot, axid)
             if axis.get_legend():
                 axis.get_legend().remove()
 
-        # print(f" - - graphRefresh: legends: {round((time.time() - t0) * 1000)} ms")
-        # t1 = time.time()
-
-        # arrange axes and labels
-        axm, axe, ax1, ax2 = (
-            self.uistate.plot.axm,
-            self.uistate.plot.axe,
-            self.uistate.plot.ax1,
-            self.uistate.plot.ax2,
-        )
-
-        axm.axis("off")
-
+    def _configure_event_axis(self, axe) -> None:
         axe.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:.1f}"))
         axe.set_ylabel(plot_model.EVENT_AXIS_YLABEL)
         axe.xaxis.set_major_formatter(FuncFormatter(lambda t, _: f"{t * 1e3:.1f}"))
         axe.set_xlabel(plot_model.EVENT_AXIS_XLABEL)
 
+    def _configure_output_axes(self, uistate, ax1, ax2) -> str:
         exp_type = uistate.experiment.experiment_type
         axis_labels = plot_model.output_axis_ylabels(
             experiment_type=exp_type,
@@ -874,50 +843,43 @@ class UIplot:
                 ax2.xaxis.set_major_formatter(uistate.x_axis_formatter())
             else:
                 ax2.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
-
-        # Add horizontal dotted grid lines at 100%, 200%, 300% for PPR
-        if exp_type == "PP":
-            # clear previous dashed lines if we didn't just exorcise
-            for ax in [ax1, ax2]:
-                lines_to_remove = [line for line in ax.lines if line.get_linestyle() == ":" and line.get_color() == "gray"]
-                for line in lines_to_remove:
-                    try:
-                        line.remove()
-                    except:
-                        pass
-
-            for y_val in plot_model.pp_reference_grid_y_values():
-                ax1.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
-                ax2.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
-        if exp_type == "PP":
-            bar_specs = []
-            if hasattr(self.uistate.plot, "dict_group_show"):
-                bar_specs = plot_series.collect_pp_group_bar_patch_specs(
-                    uistate.plot.dict_group_show,
-                    current_level,
-                    lambda base: self._display_label(base),
-                )
-            pp_has_recs = hasattr(self.uistate.plot, "dict_rec_show") and plot_series.pp_has_visible_rec_ppr(
-                uistate.plot.dict_rec_show
-            )
-            pp_xplan = plot_series.build_pp_graph_refresh_xaxis_plan(
-                bar_specs,
-                uistate.project.checkBox,
-                pp_has_recs=pp_has_recs,
-            )
-            self._apply_pp_graph_refresh_xaxis(ax1, ax2, pp_xplan)
-
         if exp_type != "PP":
             ax1.set_xlabel(uistate.x_axis_xlabel())
             ax1.xaxis.set_major_locator(uistate.x_axis_locator())
             ax2.xaxis.set_major_locator(uistate.x_axis_locator())
-        # print(f"output_xlim: {uistate.project.zoom['output_xlim']}")
-        ax1.figure.subplots_adjust(bottom=0.2)
-        self.oneAxisLeft()
-        # print(f" - - graphRefresh: axis setup: {round((time.time() - t1) * 1000)} ms")
-        # t1 = time.time()
+        return exp_type
 
-        # maintain drag selections through reselection
+    def _apply_pp_reference_grid(self, ax1, ax2) -> None:
+        for ax in [ax1, ax2]:
+            lines_to_remove = [line for line in ax.lines if line.get_linestyle() == ":" and line.get_color() == "gray"]
+            for line in lines_to_remove:
+                try:
+                    line.remove()
+                except Exception:
+                    pass
+        for y_val in plot_model.pp_reference_grid_y_values():
+            ax1.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
+            ax2.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
+
+    def _apply_pp_graph_refresh_axes(self, uistate, ax1, ax2, current_level: str) -> None:
+        bar_specs = []
+        if hasattr(self.uistate.plot, "dict_group_show"):
+            bar_specs = plot_series.collect_pp_group_bar_patch_specs(
+                uistate.plot.dict_group_show,
+                current_level,
+                lambda base: self._display_label(base),
+            )
+        pp_has_recs = hasattr(self.uistate.plot, "dict_rec_show") and plot_series.pp_has_visible_rec_ppr(
+            uistate.plot.dict_rec_show
+        )
+        pp_xplan = plot_series.build_pp_graph_refresh_xaxis_plan(
+            bar_specs,
+            uistate.project.checkBox,
+            pp_has_recs=pp_has_recs,
+        )
+        self._apply_pp_graph_refresh_xaxis(ax1, ax2, pp_xplan)
+
+    def _maintain_drag_selections(self, uistate, axm, ax1, ax2) -> None:
         if uistate.plot.x_select["mean_start"] is not None:
             self.xSelect(canvas=axm.figure.canvas, draw=False)
         if uistate.plot.x_select["output_start"] is not None:
@@ -926,13 +888,11 @@ class UIplot:
             else:
                 self.xSelect(canvas=ax1.figure.canvas, draw=False)
 
-        # visualize test sets (Phase 2) - spans persist independently of xSelect
+    def _refresh_sample_inset_and_overlays(self, uistate, dd_groups, dd_testset, dd_shown_samples) -> None:
         if dd_testset is not None:
             self.visualize_test_sets(dd_testset=dd_testset, draw=False)
             self.uistate.plot.sample_dirty = True
             self.sample_overlay(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples or {})
-
-        # refresh samples (Phase 3.4.3) - create inset (transparent bg; axis visibility + traces controlled in sample_overlay; no sharex/sharey)
         if not hasattr(self.uistate.plot, "sample_inset"):
             if self.uistate.plot.ax1 is not None:
                 self.uistate.plot.sample_inset = self.uistate.plot.ax1.inset_axes([0.02, 0.68, 0.33, 0.30])
@@ -945,33 +905,62 @@ class UIplot:
         elif hasattr(self, "uisub") and hasattr(self.uisub, "refresh_samples"):
             self.uisub.refresh_samples()
 
-        self._ensure_reference_hlines(uistate)
-        # print(f" - - graphRefresh: markers/hlines: {round((time.time() - t1) * 1000)} ms")
-        # t1 = time.time()
-
-        # update mean of selected sweeps on axe
-        self.update_axe_mean(draw=False)
-        # print(f" - - graphRefresh: update_axe_mean: {round((time.time() - t1) * 1000)} ms")
-        # t1 = time.time()
-
-        # redraw
+    def _draw_graph_canvases(self, axm, axe, ax1) -> None:
         axm.figure.canvas.draw_idle()
-        # print(f" - - graphRefresh: draw axm: {round((time.time() - t1) * 1000)} ms")
-        # t1 = time.time()
         axe.figure.canvas.draw_idle()
-        # print(f" - - graphRefresh: draw axe: {round((time.time() - t1) * 1000)} ms")
-        # t1 = time.time()
-        ax1.figure.canvas.draw_idle()  # ax2 should be on the same canvas
-        # print(f" - - graphRefresh: draw ax1/ax2: {round((time.time() - t1) * 1000)} ms")
+        ax1.figure.canvas.draw_idle()
 
-        # Re-apply formal test * / ns labels after full refresh (they attach to ax1/ax2 and
-        # should normally survive, but this guarantees they reappear if any clear happened).
+    def _apply_pp_graph_refresh_xaxis(self, ax1, ax2, plan):
+        if plan.ax1_xlabel is not None:
+            ax1.set_xlabel(plan.ax1_xlabel)
+        if plan.ax2_xlabel is not None:
+            ax2.set_xlabel(plan.ax2_xlabel)
+        if plan.ticks:
+            ax1.set_xticks(plan.ticks)
+            ax1.set_xticklabels(plan.ticklabels)
+            ax2.set_xticks(plan.ticks)
+            ax2.set_xticklabels(plan.ticklabels)
+        if plan.hide_all:
+            ax1.tick_params(axis="x", bottom=False, labelbottom=False)
+            ax2.tick_params(axis="x", bottom=False, labelbottom=False)
+        elif plan.labels_only:
+            ax1.tick_params(axis="x", bottom=False, labelbottom=True)
+            ax2.tick_params(axis="x", bottom=False, labelbottom=True)
+
+    def graphRefresh(self, dd_groups, dd_testset=None, dd_shown_samples=None):
+        uistate = self.uistate
+        if uistate.plot.axm is None:
+            print("No axes to refresh")
+            return
+        t0 = time.time()
+        is_pp = uistate.experiment.experiment_type == "PP"
+        current_level = uistate.stat_test.buttonGroup_test_n
+        axm, axe, ax1, ax2 = (
+            self.uistate.plot.axm,
+            self.uistate.plot.axe,
+            self.uistate.plot.ax1,
+            self.uistate.plot.ax2,
+        )
+
+        self._refresh_output_legends(uistate, is_pp=is_pp, current_level=current_level)
+        axm.axis("off")
+        self._configure_event_axis(axe)
+        exp_type = self._configure_output_axes(uistate, ax1, ax2)
+        if exp_type == "PP":
+            self._apply_pp_reference_grid(ax1, ax2)
+            self._apply_pp_graph_refresh_axes(uistate, ax1, ax2, current_level)
+        ax1.figure.subplots_adjust(bottom=0.2)
+        self.oneAxisLeft()
+        self._maintain_drag_selections(uistate, axm, ax1, ax2)
+        self._refresh_sample_inset_and_overlays(uistate, dd_groups, dd_testset, dd_shown_samples)
+        self._ensure_reference_hlines(uistate)
+        self.update_axe_mean(draw=False)
+        self._draw_graph_canvases(axm, axe, ax1)
         if uistate.stat_test.formal_test_results:
             try:
                 self.show_test_markers(uistate.stat_test.formal_test_results)
             except Exception:
                 pass
-
         print(f" - - graphRefresh total: {round((time.time() - t0) * 1000)} ms")
 
     def oneAxisLeft(self):
@@ -1392,6 +1381,23 @@ class UIplot:
                 "line": trendline,
             }
 
+    def _render_pp_recording_plot_spec(self, spec, rec_ID):
+        self.plot_line(
+            spec.label,
+            spec.axid,
+            spec.x,
+            spec.y,
+            spec.color,
+            rec_ID,
+            aspect=spec.aspect,
+            stim=None,
+            variant=spec.variant,
+            x_mode="sweep",
+            marker="o",
+            markersize=10,
+            linestyle="None",
+        )
+
     def _render_stim_aggregate_plot_spec(self, spec, rec_ID):
         self.plot_line(
             spec.line_label,
@@ -1525,21 +1531,7 @@ class UIplot:
                 self.uistate.project.checkBox,
                 settings,
             ):
-                self.plot_line(
-                    spec.label,
-                    spec.axid,
-                    spec.x,
-                    spec.y,
-                    spec.color,
-                    rec_ID,
-                    aspect=spec.aspect,
-                    stim=None,
-                    variant=spec.variant,
-                    x_mode="sweep",
-                    marker="o",
-                    markersize=10,
-                    linestyle="None",
-                )
+                self._render_pp_recording_plot_spec(spec, rec_ID)
 
         for spec in plot_series.build_stim_aggregate_plot_specs(dfoutput, label, settings):
             self._render_stim_aggregate_plot_spec(spec, rec_ID)
@@ -1603,31 +1595,25 @@ class UIplot:
             label=f"{group_name} PPR {spec.aspect} overlay_err",
         )
 
-        items_to_store = [
-            (bar_artist, "bar", None, False),
-            (err_artist, "err", None, False),
-            (overlay_bar_artist, "overlay_bar", None, True),
-            (overlay_err_artist, "overlay_err", None, True),
-        ]
-        for art, rid in scat_artists:
-            items_to_store.append((art, f"{rid} point", rid, False))
-
-        for artist, suffix, rec_id_val, is_overlay in items_to_store:
+        artists = [bar_artist, err_artist, overlay_bar_artist, overlay_err_artist]
+        artists.extend(art for art, _rid in scat_artists)
+        store_items = plot_series.pp_group_bar_store_items(spec)
+        for artist, store_item in zip(artists, store_items):
             self._hide_plot_artist(artist)
-            d = {
+            self.uistate.plot.dict_group_labels[
+                self._level_key(f"{group_name} PPR {spec.aspect} {store_item.suffix}", level)
+            ] = {
                 **plot_model.pp_group_bar_label_entry(
                     group_ID=group_ID,
                     aspect=spec.aspect,
                     level=level,
                     axis=spec.axid,
-                    rec_ID=rec_id_val,
-                    is_overlay=is_overlay,
+                    rec_ID=store_item.rec_id,
+                    is_overlay=store_item.is_overlay,
                 ),
                 "line": artist,
                 "fill": artist,
             }
-            ppr_storage_key = self._level_key(f"{group_name} PPR {spec.aspect} {suffix}", level)
-            self.uistate.plot.dict_group_labels[ppr_storage_key] = d
 
     def _render_io_group_plot_spec(self, spec, group_ID, color):
         if isinstance(spec, plot_series.IoGroupScatterPlotSpec):
@@ -1676,74 +1662,78 @@ class UIplot:
                 "fill": trendline,
             }
 
+    def _add_group_pp(self, group_ID, dict_group, x_pos, level):
+        group_name = dict_group["group_name"]
+        color = dict_group["color"]
+        rec_ppr = plot_series.extract_rec_ppr_means(
+            self.uistate.plot.dict_rec_labels,
+            dict_group["rec_IDs"],
+        )
+        df_p = None
+        try:
+            if hasattr(self, "uisub") and self.uisub and hasattr(self.uisub, "get_df_project"):
+                df_p = self.uisub.get_df_project()
+        except Exception:
+            df_p = None
+        aggregate = plot_series.aggregate_ppr_at_level(rec_ppr, level, df_p)
+        for bar_spec in plot_series.build_pp_group_bar_plot_specs(
+            aggregate=aggregate,
+            x_pos=x_pos,
+            level=level,
+            checkbox=self.uistate.project.checkBox,
+            settings=self.uistate.project.settings,
+        ):
+            try:
+                self._render_pp_group_bar_spec(bar_spec, group_ID, group_name, color, level)
+            except Exception as e:
+                print(f"DEBUG: addGroup error in drawing loop: {e}")
+
+    def _add_group_io(self, group_ID, dict_group):
+        _, y_col_base = plot_series.io_axis_columns(
+            self.uistate.experiment.io_input,
+            self.uistate.experiment.io_output,
+        )
+        color = dict_group["color"]
+        group_name = dict_group["group_name"]
+        io_level = self.uistate.stat_test.buttonGroup_test_n
+        force0 = bool(self.uistate.project.checkBox.get("io_force0", False))
+        for variant in ("raw", "norm"):
+            xy = plot_series.collect_io_group_scatter_xy(
+                self.uistate.plot.dict_rec_labels,
+                dict_group["rec_IDs"],
+                variant,
+            )
+            if xy is None:
+                continue
+            for spec in plot_series.build_io_group_plot_specs(
+                group_name,
+                xy[0],
+                xy[1],
+                y_col_base=y_col_base,
+                variant=variant,
+                level=io_level,
+                force_through_zero=force0,
+            ):
+                self._render_io_group_plot_spec(spec, group_ID, color)
+
+    def _add_group_means(self, group_ID, dict_group, df_groupmean, level):
+        for axid, aspect, _col in plot_series.group_mean_plots_for_df(df_groupmean):
+            self.plot_group_lines(axid, group_ID, dict_group, df_groupmean, aspect=aspect, level=level)
+
     def addGroup(self, group_ID, dict_group, df_groupmean, x_pos=1, level=None):
         """Add (or update) group artists for the given level.
 
         If level is None, it is taken from uistate.stat_test.buttonGroup_test_n.
         """
-        # plot group meanlines and SEMs
         eff_level = level or self.uistate.stat_test.buttonGroup_test_n
         exp_type = self.uistate.experiment.experiment_type
         if exp_type == "PP":
-            group_name = dict_group["group_name"]
-            color = dict_group["color"]
-            level = eff_level or self.uistate.stat_test.buttonGroup_test_n
-            rec_ppr = plot_series.extract_rec_ppr_means(
-                self.uistate.plot.dict_rec_labels,
-                dict_group["rec_IDs"],
-            )
-            df_p = None
-            try:
-                if hasattr(self, "uisub") and self.uisub and hasattr(self.uisub, "get_df_project"):
-                    df_p = self.uisub.get_df_project()
-            except Exception:
-                df_p = None
-            aggregate = plot_series.aggregate_ppr_at_level(rec_ppr, level, df_p)
-            for bar_spec in plot_series.build_pp_group_bar_plot_specs(
-                aggregate=aggregate,
-                x_pos=x_pos,
-                level=level,
-                checkbox=self.uistate.project.checkBox,
-                settings=self.uistate.project.settings,
-            ):
-                try:
-                    self._render_pp_group_bar_spec(bar_spec, group_ID, group_name, color, level)
-                except Exception as e:
-                    print(f"DEBUG: addGroup error in drawing loop: {e}")
+            self._add_group_pp(group_ID, dict_group, x_pos, eff_level or self.uistate.stat_test.buttonGroup_test_n)
             return
-
         if exp_type == "io":
-            _, y_col_base = plot_series.io_axis_columns(
-                self.uistate.experiment.io_input,
-                self.uistate.experiment.io_output,
-            )
-            color = dict_group["color"]
-            group_name = dict_group["group_name"]
-            io_level = self.uistate.stat_test.buttonGroup_test_n
-            force0 = bool(self.uistate.project.checkBox.get("io_force0", False))
-            for variant in ("raw", "norm"):
-                xy = plot_series.collect_io_group_scatter_xy(
-                    self.uistate.plot.dict_rec_labels,
-                    dict_group["rec_IDs"],
-                    variant,
-                )
-                if xy is None:
-                    continue
-                for spec in plot_series.build_io_group_plot_specs(
-                    group_name,
-                    xy[0],
-                    xy[1],
-                    y_col_base=y_col_base,
-                    variant=variant,
-                    level=io_level,
-                    force_through_zero=force0,
-                ):
-                    self._render_io_group_plot_spec(spec, group_ID, color)
+            self._add_group_io(group_ID, dict_group)
             return
-
-        eff_level = self.uistate.stat_test.buttonGroup_test_n
-        for axid, aspect, _col in plot_series.group_mean_plots_for_df(df_groupmean):
-            self.plot_group_lines(axid, group_ID, dict_group, df_groupmean, aspect=aspect, level=eff_level)
+        self._add_group_means(group_ID, dict_group, df_groupmean, self.uistate.stat_test.buttonGroup_test_n)
 
     def update(
         self,
@@ -1773,8 +1763,6 @@ class UIplot:
         """
 
         data_x, data_y = plot_stim.validate_drag_update_inputs(prow, trow, aspect, data_x, data_y, amp)
-        norm = self.uistate.project.checkBox["norm_EPSP"]
-        stim_offset = trow["t_stim"]
         label_core = plot_stim.drag_update_label_core(
             prow["recording_name"],
             prow.get("filter"),
@@ -1783,36 +1771,42 @@ class UIplot:
         )
         is_pp = self.uistate.experiment.experiment_type == "PP"
         stim_num = trow["stim"]
+        has_dfoutput = dfoutput is not None
+        norm = self.uistate.project.checkBox["norm_EPSP"]
 
         if aspect in plot_stim.SLOPE_DRAG_ASPECTS:
-            x_data, y_data = plot_stim.slope_marker_xy(trow, aspect, stim_offset, data_x, data_y)
-            self.updateLine(f"{label_core} marker", x_data, y_data)
-            out_label = plot_stim.drag_output_label(label_core, aspect, norm)
-            if aspect == "volley slope":
-                if is_pp and dfoutput is not None:
-                    self.updateOutLineFromDf(label_core, dfoutput, stim_num, plot_stim.slope_output_column(aspect, norm))
-                elif not is_pp:
-                    self.updateOutMean(f"{label_core} mean", trow.get("volley_slope_mean"))
-            elif is_pp and dfoutput is not None:
-                self.updateOutLineFromDf(out_label, dfoutput, stim_num, plot_stim.slope_output_column(aspect, norm))
-            else:
-                self.updateOutLine(out_label)
+            plan = plot_stim.build_slope_drag_update_plan(
+                trow,
+                aspect,
+                trow["t_stim"],
+                data_x,
+                data_y,
+                label_core,
+                norm_epsp=norm,
+                is_pp=is_pp,
+                has_dfoutput=has_dfoutput,
+            )
+            self.updateLine(plan.marker_label, plan.marker_x, plan.marker_y)
+            for out_update in plan.output_updates:
+                self._apply_drag_output_update(out_update, dfoutput, stim_num)
         elif aspect in plot_stim.AMP_DRAG_ASPECTS:
-            geom = plot_stim.amp_drag_geometry(trow, aspect, stim_offset, data_x, data_y, amp_zero_plot)
-            self.updateAmpMarker(label_core, geom.t_amp, geom.y_position, geom.amp_x, geom.amp_zero, amp=amp)
-            out_label = plot_stim.drag_output_label(label_core, aspect, norm)
-            col = plot_stim.amp_output_column(aspect, norm)
-            if aspect == "volley amp":
-                if dfoutput is not None:
-                    self.updateOutLineFromDf(label_core, dfoutput, stim_num, col)
-                elif not is_pp:
-                    self.updateOutLine(label_core)
-                if not is_pp:
-                    self.updateOutMean(f"{label_core} mean", trow.get("volley_amp_mean"))
-            elif dfoutput is not None:
-                self.updateOutLineFromDf(out_label, dfoutput, stim_num, col)
-            elif not is_pp:
-                self.updateOutLine(out_label)
+            plan = plot_stim.build_amp_drag_update_plan(
+                trow,
+                aspect,
+                trow["t_stim"],
+                data_x,
+                data_y,
+                label_core,
+                amp,
+                amp_zero_plot,
+                norm_epsp=norm,
+                is_pp=is_pp,
+                has_dfoutput=has_dfoutput,
+            )
+            geom = plan.geom
+            self.updateAmpMarker(plan.label_core, geom.t_amp, geom.y_position, geom.amp_x, geom.amp_zero, amp=plan.amp)
+            for out_update in plan.output_updates:
+                self._apply_drag_output_update(out_update, dfoutput, stim_num)
 
     def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None, draw=False):
         axe = self.uistate.plot.axe
@@ -1987,18 +1981,19 @@ class UIplot:
     #     #DEPRECATED FUNCTIONS - TO BE REMOVED IN FUTURE RELEASES      #
     #####################################################################
 
-    def updateEPSPout(self, rec_name, out):  # TODO: update this last remaining ax-cycle to use the dict
-        # OBSOLETE - called by norm, does not operate on stim-specific data!
-        ax1, ax2 = self.uistate.plot.ax1, self.uistate.plot.ax2
-        for line in ax1.get_lines():
-            if line.get_label() == f"{rec_name} EPSP amp":
-                line.set_ydata(out["EPSP_amp"])
-            if line.get_label() == f"{rec_name} EPSP amp norm":
-                line.set_ydata(out["EPSP_amp_norm"])
-                ax1.figure.canvas.draw_idle()
-        for line in ax2.get_lines():
-            if line.get_label() == f"{rec_name} EPSP slope":
-                line.set_ydata(out["EPSP_slope"])
-            if line.get_label() == f"{rec_name} EPSP slope norm":
-                line.set_ydata(out["EPSP_slope_norm"])
-                ax2.figure.canvas.draw_idle()
+    def updateEPSPout(self, rec_name, out):
+        # OBSOLETE - dict_rec_labels path for norm refresh (no stim-specific data).
+        dict_rec_labels = self.uistate.plot.dict_rec_labels
+        draw_axes: set[str] = set()
+        for label, col in plot_series.deprecated_epsp_output_refresh_labels(rec_name):
+            if label not in dict_rec_labels or col not in out:
+                continue
+            entry = dict_rec_labels[label]
+            entry["line"].set_ydata(out[col])
+            axis = entry.get("axis")
+            if axis in ("ax1", "ax2"):
+                draw_axes.add(axis)
+        for axid in draw_axes:
+            axis = self.get_axis(axid)
+            if axis is not None:
+                axis.figure.canvas.draw_idle()
