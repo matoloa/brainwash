@@ -58,7 +58,7 @@ import ui_parse  # ParseMixin (Phase 3)
 import ui_plot
 import ui_project
 import ui_selection  # SelectionMixin (Phase 1)
-import lib.ui_stat_test as ui_stat_test  # StatTestMixin (Phase 4)
+import brainwash.ui_stat_test as ui_stat_test  # StatTestMixin (Phase 4)
 import ui_state_classes
 import ui_sweep_ops
 import ui_table  # TableMixin (Phase 1)
@@ -85,9 +85,9 @@ uistate = ui_state_classes.UIstate()  # global variable for storing state of UI
 uiplot = ui_plot.UIplot(uistate)
 
 
-import lib.export_data as export_data
-import lib.ui_interactive as ui_interactive
-import lib.ui_menus as ui_menus
+import brainwash.export_data as export_data
+import brainwash.ui_interactive as ui_interactive
+import brainwash.ui_menus as ui_menus
 
 ####################################################################
 # MAIN UI CLASS

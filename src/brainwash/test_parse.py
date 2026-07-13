@@ -13,8 +13,8 @@
 #   - parse_abf / folder            (file I/O — skipped when real ABFs are absent)
 #
 # Real test-data ABF files are not committed to the repo. Place them at:
-#   src/lib/test_data/A_21_P0701-S2/2022_07_01_0012.abf  (1-channel)
-#   src/lib/test_data/KO_02/2022_01_24_0000.abf           (2-channel)
+#   src/brainwash/test_data/A_21_P0701-S2/2022_07_01_0012.abf  (1-channel)
+#   src/brainwash/test_data/KO_02/2022_01_24_0000.abf           (2-channel)
 # and the file-I/O tests will run automatically.
 
 import os

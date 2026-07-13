@@ -6,8 +6,8 @@ import pandas as pd
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from brainwash_ui import plot_drag, plot_series
-from lib import analysis_v3 as analysis
-from lib import ui_plot
+from brainwash import analysis_v3 as analysis
+from brainwash import ui_plot
 
 logger = logging.getLogger(__name__)
 

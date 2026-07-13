@@ -36,9 +36,9 @@ import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
 
-# Make src/lib importable when running from the notebook directory or repo root.
+# Make src/brainwash importable when running from the notebook directory or repo root.
 _reporoot = Path(os.getcwd())
-# Walk up until we find src/lib or hit the filesystem root.
+# Walk up until we find src/brainwash or hit the filesystem root.
 for _candidate in [_reporoot, _reporoot.parent, _reporoot.parent.parent]:
     if (_candidate / "src" / "lib").exists():
         _reporoot = _candidate

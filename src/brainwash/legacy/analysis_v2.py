@@ -724,7 +724,7 @@ if __name__ == "__main__":
     from pathlib import Path as _Path
 
     _reporoot = _Path(os.getcwd()).parent
-    sys.path.append(str(_reporoot / "src/lib/"))
+    sys.path.append(str(_reporoot / "src/brainwash/"))
 
     import parse
     import ui_state_classes as ui

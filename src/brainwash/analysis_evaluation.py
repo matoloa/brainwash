@@ -32,7 +32,7 @@ import seaborn as sns
 from sklearn.linear_model import LinearRegression
 
 reporoot = Path(os.getcwd()).parent
-sys.path.append(str(reporoot / "src/lib/"))
+sys.path.append(str(reporoot / "src/brainwash/"))
 import analysis_v1
 import analysis_v2
 

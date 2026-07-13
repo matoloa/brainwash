@@ -32,7 +32,7 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
    - Rename **conservatively** when names cause confusion or bugs — especially stdlib collisions, duplicate nested helpers, cryptic abbreviations (`_get_obs`). **One rename family per PR**; keep public API stable unless the user approves.
    - **Stable stats public API**: `compute_statistical_comparison`, `ttest_per_sweep`, `ui.py` import `from . import statistics as stats`.
    - **Tests**: never `from statistics import …` (stdlib); use `load_brainwash_statistics.load_brainwash_statistics_module()`.
-   - Stats package layout: `src/lib/brainwash_stats/`; facade `src/lib/statistics.py`. Naming notes: `.grok/rules/naming-and-stats-refactor.md`.
+   - Stats package layout: `src/brainwash/brainwash_stats/`; facade `src/brainwash/statistics.py`. Naming notes: `.grok/rules/naming-and-stats-refactor.md`.
 
 5. **Code Style & Conventions (Extends CONTRIBUTING.md)**
    - Follow Black (`line-length=150`), isort, flake8.
@@ -43,9 +43,9 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
    - **Security/Quality**: Avoid injection risks. Trust framework guarantees inside boundaries.
 
 6. **Statistics layer** (refactor complete — PRs 00–11)
-   - **Facade**: `src/lib/statistics.py` re-exports `compute_statistical_comparison`, `ttest_per_sweep`, `_bh_fdr`.
-   - **Implementation**: `src/lib/brainwash_stats/` (`dispatcher.py`, `validation.py`, `formal_tests/`, `io/`, etc.).
-   - **Tests**: `uv run pytest src/lib/test_statistics_characterization.py -q`; use `load_brainwash_statistics.py` in tests (never stdlib `statistics`).
+   - **Facade**: `src/brainwash/statistics.py` re-exports `compute_statistical_comparison`, `ttest_per_sweep`, `_bh_fdr`.
+   - **Implementation**: `src/brainwash/brainwash_stats/` (`dispatcher.py`, `validation.py`, `formal_tests/`, `io/`, etc.).
+   - **Tests**: `uv run pytest src/brainwash/test_statistics_characterization.py -q`; use `load_brainwash_statistics.py` in tests (never stdlib `statistics`).
    - **Archived plan**: `work_plans/History/plan_statistics_refactor.md` + `work_plans/History/statistics_refactor/`.
    - **Forbidden** (still): `StatContext`, `ComparisonMode`, `MODE_HANDLERS`, guard reordering in dispatcher.
 
@@ -64,10 +64,10 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
    - Do not run builds or autodiagnose as part of verification, bug-fix wrap-up, or `/check-work` unless explicitly requested.
 
 9. **Project Structure Highlights** (from CONTRIBUTING.md)
-   - `src/lib/ui.py`: Largest file (UIsub + mixins). Statusbar, test dispatch, experiment_type logic lives here.
-   - `src/lib/statistics.py`: thin facade; stats logic in `src/lib/brainwash_stats/`.
-   - `src/lib/brainwash_ui/`: pure view/statusbar/applicability logic (testable without Qt).
-   - `src/lib/legacy/`: **retain** `analysis_v1.py` / `analysis_v2.py` for scientific reproduction — do not delete; shims at `src/lib/analysis_v1.py` etc.
-   - `src/lib/ui_state_classes.py`: `uistate` singleton — use `uistate.project`, `.experiment`, `.stat_test`, `.plot` (no flat attrs).
+   - `src/brainwash/ui.py`: Largest file (UIsub + mixins). Statusbar, test dispatch, experiment_type logic lives here.
+   - `src/brainwash/statistics.py`: thin facade; stats logic in `src/brainwash/brainwash_stats/`.
+   - `src/brainwash/brainwash_ui/`: pure view/statusbar/applicability logic (testable without Qt).
+   - `src/brainwash/legacy/`: **retain** `analysis_v1.py` / `analysis_v2.py` for scientific reproduction — do not delete; shims at `src/brainwash/analysis_v1.py` etc.
+   - `src/brainwash/ui_state_classes.py`: `uistate` singleton — use `uistate.project`, `.experiment`, `.stat_test`, `.plot` (no flat attrs).
    - Plans are in `work_plans/` (move outdated to `History/`).
    - See full layout in CONTRIBUTING.md.

@@ -1007,6 +1007,6 @@ def build_dfbinstimoutput(
 
 
 # Statistical test support moved to statistics.py (v0.16+).
-# See src/lib/statistics.py for _bh_fdr, ttest_per_sweep, compute_statistical_comparison
+# See src/brainwash/statistics.py for _bh_fdr, ttest_per_sweep, compute_statistical_comparison
 # (including one-way ANOVA + eta² effect size). analysis_v3 remains focused on feature
 # extraction from raw data (find_events, build_dfoutput, measure_waveform, etc.).

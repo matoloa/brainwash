@@ -68,33 +68,33 @@ powershell -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 ## Running Tests
 
-Tests live alongside the source in `src/lib/` and are discovered by `pytest`.
+Tests live alongside the source in `src/brainwash/` and are discovered by `pytest`.
 
 **Run the full test suite:**
 
 ```sh
-uv run python -m pytest src/lib/
+uv run python -m pytest src/brainwash/
 ```
 
 **Run a specific test file:**
 
 ```sh
-uv run python -m pytest src/lib/test_parse.py -v
+uv run python -m pytest src/brainwash/test_parse.py -v
 ```
 
 **Run with output captured off (useful when tests print a lot):**
 
 ```sh
-uv run python -m pytest src/lib/ -s
+uv run python -m pytest src/brainwash/ -s
 ```
 
-Test data fixtures are kept in `src/lib/test_data/`. When writing new tests, add small representative `.abf` or `.ibw` files there rather than generating data synthetically — the parse pipeline is sensitive to real file structure.
+Test data fixtures are kept in `src/brainwash/test_data/`. When writing new tests, add small representative `.abf` or `.ibw` files there rather than generating data synthetically — the parse pipeline is sensitive to real file structure.
 
 ---
 
 ## Module Layout
 
-The source code lives entirely under `src/lib/`. Below is an annotated map.
+The source code lives entirely under `src/brainwash/`. Below is an annotated map.
 
 ```
 src/
@@ -225,14 +225,14 @@ The project uses **Black** for formatting and **isort** for import ordering, bot
 **Format a file:**
 
 ```sh
-uv run black src/lib/ui.py
-uv run isort src/lib/ui.py
+uv run black src/brainwash/ui.py
+uv run isort src/brainwash/ui.py
 ```
 
 **Lint:**
 
 ```sh
-uv run flake8 src/lib/
+uv run flake8 src/brainwash/
 ```
 
 Flake8 configuration is in `.flake8` at the repo root. The line-length limit is **150** (matching the Black config).

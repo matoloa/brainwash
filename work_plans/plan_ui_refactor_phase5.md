@@ -25,7 +25,7 @@ Low-risk pure extractions around event-plot interaction geometry and regression 
 
 | Item | Reason |
 |------|--------|
-| `src/lib` → `src/brainwash` package rename | Agent churn |
+| `src/brainwash` → `src/brainwash` package rename | Agent churn |
 | Event bus / `graphRefresh` dedup | Needs call-graph map |
 | Full `ui_interactive` drag-core extraction | Artist-handle coupled |
 | Full `UIsub` decomposition | Low ROI |

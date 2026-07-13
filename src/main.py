@@ -6,7 +6,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-# Ensure `src/` is on sys.path so `lib` is importable regardless of how
+# Ensure `src/` is on sys.path so `brainwash` is importable regardless of how
 # main.py is invoked (e.g. `python src/main.py`, `python -m src.main`,
 # or a frozen cx_Freeze executable).
 _src_dir = str(Path(__file__).parent)
@@ -76,7 +76,10 @@ if __name__ == "__main__":
     # Import intentionally late so the logging config is in place before any
     # module-level code in ui.py runs.
     #
-    from lib.ui import UIsub
+    from brainwash.lib_compat import install_lib_import_alias
+
+    install_lib_import_alias()
+    from brainwash.ui import UIsub
 
     if debug:
         try:

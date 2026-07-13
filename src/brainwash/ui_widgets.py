@@ -63,7 +63,7 @@ class Config:
         #
         # Search order (most-specific first):
         #   1. Frozen build: the exe lives in build/exe.*/ and we copy
-        #      pyproject.toml to lib/pyproject.toml next to it, so look
+            #      pyproject.toml to brainwash/pyproject.toml next to it, so look
         #      relative to sys.executable first.
         #   2. Development: relative paths from cwd (src/ or repo root).
         #   3. Fallback: walk every entry in sys.path (AppImage, editable
@@ -73,12 +73,12 @@ class Config:
             anchors: list[Path] = []
             if getattr(sys, "frozen", False):
                 anchors.append(Path(sys.executable).parent)
-            anchors.append(Path(__file__).parent)  # src/lib/
+            anchors.append(Path(__file__).parent)  # src/brainwash/
             anchors.append(Path(__file__).parent.parent)  # src/
             anchors.append(Path(__file__).parent.parent.parent)  # repo root
 
             for anchor in anchors:
-                for rel in ["lib/" + filename, filename]:
+                for rel in ["brainwash/" + filename, "lib/" + filename, filename]:
                     candidate = anchor / rel
                     if candidate.is_file():
                         return candidate

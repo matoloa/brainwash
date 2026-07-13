@@ -23,4 +23,4 @@ Harden matplotlib/pandas artist indexing and consolidate drag helpers in `plot_d
 
 ## Deferred
 
-Package rename, event bus, full drag-core, `UIsub` split — unchanged from Phase V.
+Package rename ✅ ([phase7](plan_ui_refactor_phase7_package_rename.md)). Event bus, full drag-core, `UIsub` split — deferred.

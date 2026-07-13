@@ -1,4 +1,4 @@
-"""pytest path setup: src/lib must precede stdlib so local statistics.py is importable."""
+"""pytest path setup: src/brainwash must precede stdlib so local statistics.py is importable."""
 
 import sys
 from pathlib import Path

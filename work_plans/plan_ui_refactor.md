@@ -5,7 +5,7 @@
 
 ## Active scope
 
-- **Pure UI-adjacent logic** → `src/lib/brainwash_ui/` (view_state, applicability, statusbar, plot_model, plot_series, plot_stim).
+- **Pure UI-adjacent logic** → `src/brainwash/brainwash_ui/` (view_state, applicability, statusbar, plot_model, plot_series, plot_stim).
 - **Tests** → characterization + `test_pipeline_integration.py` + `test_ui_wiring.py`.
 - **CI** → `.github/workflows/test.yml`.
 - **No** full `UIsub` composition rewrite. **No** package rename. **No** distribution builds unless asked.

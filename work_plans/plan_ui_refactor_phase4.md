@@ -21,7 +21,7 @@ Finish high-ROI pure extractions and test leverage from `data_source/` without t
 
 | Metric | Value |
 |--------|-------|
-| Tests | 201 passed, 1 skipped (`uv run pytest src/lib/ -q`) |
+| Tests | 201 passed, 1 skipped (`uv run pytest src/brainwash/ -q`) |
 | `brainwash_ui/` | ~1.1K LOC (8 modules incl. `plot_testsets`) |
 | `ui_plot.py` | ~2435 LOC |
 | `export_image.py` | delegates IO labels, PP grid, PP ticks to `brainwash_ui` |
@@ -31,7 +31,7 @@ Finish high-ROI pure extractions and test leverage from `data_source/` without t
 
 | Item | Reason |
 |------|--------|
-| `src/lib` → `src/brainwash` package rename | Agent churn |
+| `src/brainwash` → `src/brainwash` package rename | Agent churn |
 | Event bus / `graphRefresh` call dedup (~54 sites) | Needs call-graph map |
 | `ui_interactive` drag-core extraction | Artist-handle coupled |
 | Full `UIsub` decomposition | Low ROI vs pure-layer wins |

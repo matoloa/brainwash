@@ -7,5 +7,5 @@ reproducibility, and comparison against `analysis_v3.py` via `analysis_evaluatio
 - **Do not import** from v1/v2 in new production code (`ui.py`, mixins, `brainwash_ui/`).
 - Agents: edit only when explicitly asked to reproduce or compare historical pipelines.
 
-Compatibility shims at `src/lib/analysis_v1.py` and `src/lib/analysis_v2.py` preserve
+Compatibility shims at `src/brainwash/analysis_v1.py` and `src/brainwash/analysis_v2.py` preserve
 existing imports (`import analysis_v1`, notebook paths).

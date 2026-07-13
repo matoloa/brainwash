@@ -7,7 +7,7 @@ on:
 
 jobs:
   pytest:
-    name: pytest src/lib
+    name: pytest src/brainwash
     runs-on: ubuntu-latest
     env:
       QT_QPA_PLATFORM: offscreen
@@ -25,4 +25,4 @@ jobs:
         run: uv sync --frozen --group dev
 
       - name: Run tests
-        run: uv run pytest src/lib/ -q
+        run: uv run pytest src/brainwash/ -q

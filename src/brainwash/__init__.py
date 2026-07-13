@@ -5,9 +5,9 @@ This is a workaround to allow imports from modules on the same level, and tests.
 We have concluded that __init__ only runs once, even if we import several modules from its folder.
 """
 
-# print(f"lib/__init__.py was just run")
 import sys
 from pathlib import Path
 
 folder_path = str(Path(__file__).parent)
-sys.path.append(folder_path)
+if folder_path not in sys.path:
+    sys.path.append(folder_path)

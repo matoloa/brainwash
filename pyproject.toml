@@ -2,7 +2,7 @@
 constraint-dependencies = ["pyqt5-qt5==5.15.2"]
 
 [tool.pytest.ini_options]
-testpaths = ["src/lib"]
+testpaths = ["src/brainwash"]
 
 [tool.black]
 line-length = 150

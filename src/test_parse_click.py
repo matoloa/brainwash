@@ -49,11 +49,11 @@ log.info(f"Python {sys.version}")
 log.info(f"Log file: {LOG_PATH}")
 
 # ---------------------------------------------------------------------------
-# sys.path: add src/ and src/lib/
+# sys.path: add src/ and src/brainwash/
 # ---------------------------------------------------------------------------
 _src = str(Path(__file__).parent)
-_lib = str(Path(__file__).parent / "lib")
-for _p in (_src, _lib):
+_bw = str(Path(__file__).parent / "brainwash")
+for _p in (_src, _bw):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 

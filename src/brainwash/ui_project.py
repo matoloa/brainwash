@@ -24,7 +24,7 @@ import pyarrow.parquet as pq
 import yaml
 from PyQt5 import QtCore, QtWidgets
 
-import lib.parse as parse
+import brainwash.parse as parse
 from project_schema import INT_COLUMNS, df_projectTemplate
 
 logger = logging.getLogger(__name__)
