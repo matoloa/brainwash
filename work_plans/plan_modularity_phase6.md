@@ -12,7 +12,15 @@ git log --oneline --grep='HIGH RISK'
 git revert <sha>..HEAD   # or reset branch to pre-phase6 tag
 ```
 
-Pre-phase6 rollback point: last commit before first `[HIGH RISK]` (currently commit 60 / `a2f2dd2`).
+Pre-phase6 rollback point: **`a2f2dd2`** (commit 60, before first `[HIGH RISK]`).
+
+Rollback entire Phase 6 block:
+
+```sh
+git reset --hard a2f2dd2   # local only — confirm before push
+# or revert range:
+git revert 015b9d2..HEAD
+```
 
 ## Scope (approved)
 
@@ -41,6 +49,6 @@ uv run pytest src/brainwash/ -q
 
 | PR | Card | Status |
 |----|------|--------|
-| 6a | per-UIsub singletons | in progress |
-| 6b | remove module aliases | pending |
+| 6a | per-UIsub singletons | ✅ `015b9d2` [HIGH RISK phase6a] |
+| 6b | remove module aliases | in progress |
 | 7a | UIplot contract doc | pending |
