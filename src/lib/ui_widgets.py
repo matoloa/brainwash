@@ -25,7 +25,7 @@ from matplotlib.figure import Figure
 
 # brainwash
 import parse
-from ui_project import df_projectTemplate
+from project_schema import df_projectTemplate
 
 logger = logging.getLogger(__name__)
 

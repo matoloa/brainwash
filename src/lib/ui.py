@@ -63,7 +63,7 @@ import ui_sweep_ops
 import ui_table  # TableMixin (Phase 1)
 import ui_widgets  # Custom Qt widgets, dialogs, models, threads (extracted Phase 0)
 import yaml  # used by talkback
-from ui_project import df_projectTemplate
+from project_schema import df_projectTemplate
 
 from . import statistics as stats  # our statistical testing layer (not the built-in stdlib module)
 

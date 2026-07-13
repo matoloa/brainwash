@@ -25,55 +25,9 @@ import yaml
 from PyQt5 import QtCore, QtWidgets
 
 import lib.parse as parse
-from ui_widgets import InputDialogPopup
+from project_schema import df_projectTemplate
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Project DataFrame schema
-# ---------------------------------------------------------------------------
-
-
-# Columns that are logically integers but may contain NaN.  Using pandas'
-# nullable Int64 dtype prevents display as "1.0", "2.0", etc.
-_INT_COLUMNS = ["stims", "sampling_rate", "bin_size"]
-
-
-def df_projectTemplate():
-    """Return empty DataFrame with current schema (v0.16_n includes subject/slice hierarchy per statistical_protocol.md).
-    New columns default to NaN; _migrate_hierarchy fills sensible defaults on first load/import.
-    """
-    df = pd.DataFrame(
-        columns=[
-            "ID",  # str: unique identifier for recording
-            "host",  # str: computer name
-            "path",  # str: path of original source file
-            "status",  # str: blank if ok, 'default' is default recordings. TODO: add more states
-            "recording_name",  # str: name of recording
-            "subject",  # str: biological subject/animal ID (defines n per statistical_protocol.md)
-            "slice",  # str: slice within subject; default "1" (nested repeated measure per statistical_protocol.md)
-            "gain",  # float: gain of recording, applied at cache-build time; defaults to 1.0
-            "stims",  # int: number of stims in recording
-            "sweeps",  # int: number of sweeps in recording
-            "sweep_duration",  # float: duration of each sweep in seconds
-            "sweep_hz",  # float: assumed inter-sweep rate in Hz for time-axis display; NaN triggers 1 Hz fallback with status warning
-            "sampling_rate",  # int: sampling rate in Hz
-            "bin_size",  # int: bin size in sweeps for output; 0 means binning disabled
-            "resets",  # str: list of number of first sweep in source file, for breaking up tables of non-continuous recordings
-            "filter",  # str: filter used for analysis
-            "filter_params",  # str: filter parameters
-            "groups",  # str: group name(s); maintained by uisub.dfgroups and its functions
-            "parsetimestamp",  # str: timestamp of parsing of original source file
-            "channel",  # str: this recording is only from this channel
-            "paired_recording",  # DEPRECATED (paired-stimulus workflow). str: unique ID of paired recording
-            "Tx",  # DEPRECATED (paired-stimulus workflow). Boolean: Treatment / Control, for paired recordings
-            "exclude",  # Boolean: If True, exclude this recording from analysis
-            "comment",  # str: user comment
-        ]
-    )
-    for col in _INT_COLUMNS:
-        df[col] = df[col].astype(pd.Int64Dtype())
-    return df
 
 
 class ProjectMixin:
@@ -320,6 +274,8 @@ class ProjectMixin:
         self.graphWipe()  # for good measure
 
     def renameProject(self):  # changes name of project folder and updates .cfg
+        from ui_widgets import InputDialogPopup
+
         RenameDialog = InputDialogPopup()
         new_project_name = RenameDialog.showInputDialog(title="Rename project", query="")
         # check if ok

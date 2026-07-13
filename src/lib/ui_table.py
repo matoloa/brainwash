@@ -19,7 +19,7 @@ from PyQt5 import QtCore, QtWidgets, sip
 
 import ui_widgets  # for TableModel, TableProjSub etc. (injected widgets)
 
-from ui_project import df_projectTemplate
+from project_schema import df_projectTemplate
 
 # ---------------------------------------------------------------------------
 # Uses self.uistate / self.config / self.uiplot on UIsub (see ui.py).
