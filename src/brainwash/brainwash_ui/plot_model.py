@@ -192,6 +192,40 @@ def rec_label_entry(
     }
 
 
+def amp_width_marker_entry(
+    *,
+    rec_ID,
+    aspect=None,
+    variant: str = "raw",
+    stim=None,
+    axis: str,
+    x_mode=None,
+    is_zero_width: bool,
+) -> dict:
+    """Amp-width x/y marker metadata (extends rec_label_entry)."""
+    return {
+        **rec_label_entry(
+            rec_ID=rec_ID,
+            aspect=aspect,
+            variant=variant,
+            stim=stim,
+            axis=axis,
+            x_mode=x_mode,
+        ),
+        "is_zero_width": is_zero_width,
+    }
+
+
+def reference_hline_label_entry(*, axis: str, variant=None) -> dict:
+    """Reference hline metadata for graphRefresh (events zero, output 100%)."""
+    return {
+        "rec_ID": None,
+        "stim": None,
+        "variant": variant,
+        "axis": axis,
+    }
+
+
 def io_rec_label_entry(
     *,
     rec_ID,

@@ -251,3 +251,21 @@ def test_rec_label_entry_and_io_alias():
     io_entry = plot_model.io_rec_label_entry(rec_ID="r1", aspect="EPSP_amp", variant="raw")
     assert io_entry["x_mode"] == "io"
     assert io_entry["stim"] is None
+
+
+def test_amp_width_marker_entry():
+    entry = plot_model.amp_width_marker_entry(
+        rec_ID="r1",
+        aspect="EPSP_amp",
+        axis="axe",
+        stim=1,
+        is_zero_width=True,
+    )
+    assert entry["is_zero_width"] is True
+    assert entry["aspect"] == "EPSP_amp"
+
+
+def test_reference_hline_label_entry():
+    entry = plot_model.reference_hline_label_entry(axis="ax1")
+    assert entry["rec_ID"] is None
+    assert entry["axis"] == "ax1"

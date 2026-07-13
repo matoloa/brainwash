@@ -566,6 +566,10 @@ def amp_width_y_coords(amp_si: float, amp_zero: float) -> tuple[float, float]:
     return amp_zero, (0 - amp_si) + amp_zero
 
 
+def amp_x_is_zero_width(amp_x) -> bool:
+    return amp_x[0] == amp_x[1]
+
+
 def mean_of_selected_sweeps(df: pd.DataFrame, selected, col: str) -> pd.DataFrame:
     df_sweeps = df[df["sweep"].isin(selected)]
     return df_sweeps.groupby("time", as_index=False)[col].mean()

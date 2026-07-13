@@ -156,6 +156,11 @@ def test_mean_of_selected_sweeps():
     assert list(mean_df["prim"]) == [2.0, 3.0]
 
 
+def test_amp_x_is_zero_width():
+    assert plot_stim.amp_x_is_zero_width((0.01, 0.01)) is True
+    assert plot_stim.amp_x_is_zero_width((0.01, 0.02)) is False
+
+
 def test_build_axe_mean_plot_specs():
     df = pd.DataFrame(
         {

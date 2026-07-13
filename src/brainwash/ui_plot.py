@@ -738,6 +738,40 @@ class UIplot:
                         if v.get("group_ID") is not None and ((v.get("level") == active_level) or (v.get("level") is None))}
             self.uistate.plot.dict_group_show = new_show
 
+    def _ensure_reference_hlines(self, uistate) -> None:
+        if "Events y zero marker" not in self.uistate.plot.dict_rec_labels:
+            hline0 = self.uistate.plot.axe.axhline(0, linestyle="dotted", alpha=0.3)
+            self.uistate.plot.dict_rec_labels["Events y zero marker"] = {
+                **plot_model.reference_hline_label_entry(axis="axe"),
+                "line": hline0,
+            }
+        uistate.plot.dict_rec_labels["Events y zero marker"]["line"].set_visible(True)
+
+        if uistate.project.checkBox["norm_EPSP"]:
+            if "Output y 100% marker" not in self.uistate.plot.dict_rec_labels:
+                hline100ax1 = self.uistate.plot.ax1.axhline(
+                    100,
+                    linestyle="dotted",
+                    alpha=0.3,
+                    color=uistate.project.settings["rgb_EPSP_amp"],
+                )
+                hline100ax2 = self.uistate.plot.ax2.axhline(
+                    100,
+                    linestyle="dotted",
+                    alpha=0.3,
+                    color=uistate.project.settings["rgb_EPSP_slope"],
+                )
+                self.uistate.plot.dict_rec_labels["output amp 100% marker"] = {
+                    **plot_model.reference_hline_label_entry(axis="ax1"),
+                    "line": hline100ax1,
+                }
+                self.uistate.plot.dict_rec_labels["output slope 100% marker"] = {
+                    **plot_model.reference_hline_label_entry(axis="ax2"),
+                    "line": hline100ax2,
+                }
+            uistate.plot.dict_rec_labels["output amp 100% marker"]["line"].set_visible(uistate.ampView())
+            uistate.plot.dict_rec_labels["output slope 100% marker"]["line"].set_visible(uistate.slopeView())
+
     def _apply_pp_graph_refresh_xaxis(self, ax1, ax2, plan):
         if plan.ax1_xlabel is not None:
             ax1.set_xlabel(plan.ax1_xlabel)
@@ -911,49 +945,7 @@ class UIplot:
         elif hasattr(self, "uisub") and hasattr(self.uisub, "refresh_samples"):
             self.uisub.refresh_samples()
 
-        # 0-hline for Events
-        if not "Events y zero marker" in self.uistate.plot.dict_rec_labels:
-            hline0 = self.uistate.plot.axe.axhline(0, linestyle="dotted", alpha=0.3)
-            self.uistate.plot.dict_rec_labels["Events y zero marker"] = {
-                "rec_ID": None,
-                "stim": None,
-                "variant": None,
-                "line": hline0,
-                "axis": "axe",
-            }
-        uistate.plot.dict_rec_labels["Events y zero marker"]["line"].set_visible(True)
-
-        # 100-hline for relative Output
-        if uistate.project.checkBox["norm_EPSP"]:
-            if not "Output y 100% marker" in self.uistate.plot.dict_rec_labels:
-                hline100ax1 = self.uistate.plot.ax1.axhline(
-                    100,
-                    linestyle="dotted",
-                    alpha=0.3,
-                    color=uistate.project.settings["rgb_EPSP_amp"],
-                )
-                hline100ax2 = self.uistate.plot.ax2.axhline(
-                    100,
-                    linestyle="dotted",
-                    alpha=0.3,
-                    color=uistate.project.settings["rgb_EPSP_slope"],
-                )
-                self.uistate.plot.dict_rec_labels["output amp 100% marker"] = {
-                    "rec_ID": None,
-                    "stim": None,
-                    "variant": None,
-                    "line": hline100ax1,
-                    "axis": "ax1",
-                }
-                self.uistate.plot.dict_rec_labels["output slope 100% marker"] = {
-                    "rec_ID": None,
-                    "stim": None,
-                    "variant": None,
-                    "line": hline100ax2,
-                    "axis": "ax2",
-                }
-            uistate.plot.dict_rec_labels["output amp 100% marker"]["line"].set_visible(uistate.ampView())
-            uistate.plot.dict_rec_labels["output slope 100% marker"]["line"].set_visible(uistate.slopeView())
+        self._ensure_reference_hlines(uistate)
         # print(f" - - graphRefresh: markers/hlines: {round((time.time() - t1) * 1000)} ms")
         # t1 = time.time()
 
@@ -1148,7 +1140,7 @@ class UIplot:
         variant="raw",
         x_mode=None,
     ):
-        is_zero_width = amp_x[0] == amp_x[1]
+        is_zero_width = plot_stim.amp_x_is_zero_width(amp_x)
         (xline,) = self.get_axis(axid).plot(
             amp_x,
             [amp_y[1], amp_y[1]],
@@ -1170,24 +1162,28 @@ class UIplot:
         xline.set_visible(False)
         yline.set_visible(False)
         self.uistate.plot.dict_rec_labels[f"{label} x marker"] = {
-            "rec_ID": rec_ID,
-            "aspect": aspect,
-            "variant": variant,
-            "stim": stim,
+            **plot_model.amp_width_marker_entry(
+                rec_ID=rec_ID,
+                aspect=aspect,
+                variant=variant,
+                stim=stim,
+                axis=axid,
+                x_mode=x_mode,
+                is_zero_width=is_zero_width,
+            ),
             "line": xline,
-            "axis": axid,
-            "is_zero_width": is_zero_width,
-            "x_mode": x_mode,
         }
         self.uistate.plot.dict_rec_labels[f"{label} y marker"] = {
-            "rec_ID": rec_ID,
-            "aspect": aspect,
-            "variant": variant,
-            "stim": stim,
+            **plot_model.amp_width_marker_entry(
+                rec_ID=rec_ID,
+                aspect=aspect,
+                variant=variant,
+                stim=stim,
+                axis=axid,
+                x_mode=x_mode,
+                is_zero_width=False,
+            ),
             "line": yline,
-            "axis": axid,
-            "is_zero_width": False,
-            "x_mode": x_mode,
         }
 
     def plot_vline(
@@ -1336,6 +1332,92 @@ class UIplot:
                 "fill": normfill,
             }
 
+    def _hide_plot_artist(self, artist) -> None:
+        if hasattr(artist, "set_visible"):
+            artist.set_visible(False)
+        elif hasattr(artist, "patches"):
+            for patch in artist.patches:
+                patch.set_visible(False)
+        elif hasattr(artist, "lines"):
+            for line in artist.lines:
+                if line is None:
+                    continue
+                if isinstance(line, (list, tuple)):
+                    for sub_line in line:
+                        if sub_line is not None:
+                            sub_line.set_visible(False)
+                else:
+                    line.set_visible(False)
+
+    def _render_io_recording_plot_spec(self, spec, rec_ID, color):
+        axid = "ax1"
+        if isinstance(spec, plot_series.IoScatterPlotSpec):
+            scatter = self.get_axis(axid).scatter(
+                spec.x,
+                spec.y,
+                c=[color],
+                alpha=0.8,
+                label=spec.label,
+                s=20,
+                zorder=2,
+            )
+            scatter.set_visible(False)
+            self.uistate.plot.dict_rec_labels[spec.label] = {
+                **plot_model.io_rec_label_entry(
+                    rec_ID=rec_ID,
+                    aspect=spec.aspect,
+                    variant=spec.variant,
+                    axis=axid,
+                ),
+                "line": scatter,
+            }
+        else:
+            (trendline,) = self.get_axis(axid).plot(
+                spec.x,
+                spec.y,
+                color=color,
+                linestyle="--",
+                alpha=0.8,
+                label=spec.label,
+                zorder=1,
+            )
+            trendline.set_visible(False)
+            self.uistate.plot.dict_rec_labels[spec.label] = {
+                **plot_model.io_rec_label_entry(
+                    rec_ID=rec_ID,
+                    aspect=spec.aspect,
+                    variant=spec.variant,
+                    axis=axid,
+                ),
+                "line": trendline,
+            }
+
+    def _render_stim_aggregate_plot_spec(self, spec, rec_ID):
+        self.plot_line(
+            spec.line_label,
+            spec.axid,
+            spec.x,
+            spec.y,
+            spec.color,
+            rec_ID,
+            aspect=spec.aspect,
+            variant=spec.variant,
+            x_mode="stim",
+        )
+        if spec.sem is not None and spec.shade_label is not None:
+            self.plot_shade(
+                spec.shade_label,
+                spec.axid,
+                spec.x,
+                spec.y,
+                spec.sem,
+                spec.color,
+                rec_ID,
+                aspect=spec.aspect,
+                variant=spec.variant,
+                x_mode="stim",
+            )
+
     def _render_stim_event_plot_spec(self, spec, rec_ID):
         if isinstance(spec, plot_stim.StimMarkerPlotSpec):
             self.plot_marker(
@@ -1401,7 +1483,6 @@ class UIplot:
                 self.uistate.experiment.io_input,
                 self.uistate.experiment.io_output,
             )
-            axid = "ax1"
             color = self.uistate.project.settings.get(f"rgb_{y_col_base}", "black")
             force0 = bool(self.uistate.project.checkBox.get("io_force0", False))
             for spec in plot_series.build_io_recording_plot_specs(
@@ -1411,46 +1492,7 @@ class UIplot:
                 self.uistate.experiment.io_output,
                 force_through_zero=force0,
             ):
-                if isinstance(spec, plot_series.IoScatterPlotSpec):
-                    scatter = self.get_axis(axid).scatter(
-                        spec.x,
-                        spec.y,
-                        c=[color],
-                        alpha=0.8,
-                        label=spec.label,
-                        s=20,
-                        zorder=2,
-                    )
-                    scatter.set_visible(False)
-                    self.uistate.plot.dict_rec_labels[spec.label] = {
-                        **plot_model.io_rec_label_entry(
-                            rec_ID=rec_ID,
-                            aspect=spec.aspect,
-                            variant=spec.variant,
-                            axis=axid,
-                        ),
-                        "line": scatter,
-                    }
-                else:
-                    (trendline,) = self.get_axis(axid).plot(
-                        spec.x,
-                        spec.y,
-                        color=color,
-                        linestyle="--",
-                        alpha=0.8,
-                        label=spec.label,
-                        zorder=1,
-                    )
-                    trendline.set_visible(False)
-                    self.uistate.plot.dict_rec_labels[spec.label] = {
-                        **plot_model.io_rec_label_entry(
-                            rec_ID=rec_ID,
-                            aspect=spec.aspect,
-                            variant=spec.variant,
-                            axis=axid,
-                        ),
-                        "line": trendline,
-                    }
+                self._render_io_recording_plot_spec(spec, rec_ID, color)
 
         # Add meanline to Mean
         self.plot_line(
@@ -1500,30 +1542,7 @@ class UIplot:
                 )
 
         for spec in plot_series.build_stim_aggregate_plot_specs(dfoutput, label, settings):
-            self.plot_line(
-                spec.line_label,
-                spec.axid,
-                spec.x,
-                spec.y,
-                spec.color,
-                rec_ID,
-                aspect=spec.aspect,
-                variant=spec.variant,
-                x_mode="stim",
-            )
-            if spec.sem is not None and spec.shade_label is not None:
-                self.plot_shade(
-                    spec.shade_label,
-                    spec.axid,
-                    spec.x,
-                    spec.y,
-                    spec.sem,
-                    spec.color,
-                    rec_ID,
-                    aspect=spec.aspect,
-                    variant=spec.variant,
-                    x_mode="stim",
-                )
+            self._render_stim_aggregate_plot_spec(spec, rec_ID)
 
     def _render_pp_group_bar_spec(self, spec, group_ID, group_name, color, level):
         bar_artist = self.get_axis(spec.axid).bar(
@@ -1594,21 +1613,7 @@ class UIplot:
             items_to_store.append((art, f"{rid} point", rid, False))
 
         for artist, suffix, rec_id_val, is_overlay in items_to_store:
-            if hasattr(artist, "set_visible"):
-                artist.set_visible(False)
-            elif hasattr(artist, "patches"):
-                for p in artist.patches:
-                    p.set_visible(False)
-            elif hasattr(artist, "lines"):
-                for l in artist.lines:
-                    if l is not None:
-                        if isinstance(l, (list, tuple)):
-                            for sub_l in l:
-                                if sub_l is not None:
-                                    sub_l.set_visible(False)
-                        else:
-                            l.set_visible(False)
-
+            self._hide_plot_artist(artist)
             d = {
                 **plot_model.pp_group_bar_label_entry(
                     group_ID=group_ID,
@@ -1818,7 +1823,7 @@ class UIplot:
         self.uistate.plot.dict_rec_labels[f"{labelbase} marker"]["line"].set_data(x, y)
         amp_si = plot_stim.resolve_drag_amp_si(amp, float(y[0]), amp_zero)
         if amp_si is not None:
-            is_zero_width = amp_x[0] == amp_x[1]
+            is_zero_width = plot_stim.amp_x_is_zero_width(amp_x)
             amp_y = plot_stim.amp_width_y_coords(amp_si, amp_zero)
             self.uistate.plot.dict_rec_labels[f"{labelbase} x marker"]["line"].set_data(amp_x, [amp_y[1], amp_y[1]])
             self.uistate.plot.dict_rec_labels[f"{labelbase} y marker"]["line"].set_data([x[0], x[0]], amp_y)
