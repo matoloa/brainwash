@@ -49,6 +49,15 @@ class StatusbarResult:
 | `amp_zero_plot` | Mean of `rec_filter` in 2 ms window `[t_stim-0.002, t_stim-0.001)` on `dfmean` |
 | Stim numbering | User-visible `stim_num = i_stim + 1` |
 
+## Drag zone invariants (Phase V)
+
+| Invariant | Detail |
+|-----------|--------|
+| Session owner | Amp/slope xy and `*_move_zone` / `*_resize_zone` live on `uistate.plot` (`PlotSession`), never on `UIstate` root |
+| Amp zone | `plot_drag.amp_move_zone(x, y, x_margin, y_margin)` |
+| Slope zones | `plot_drag.slope_drag_state(x, y, …)` → start/end xy + move + resize zones |
+| Hit test | `plot_drag.point_in_zone(x, y, zone)` |
+
 ## Testset span invariants (Phase IV)
 
 | Invariant | Detail |

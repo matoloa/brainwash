@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from brainwash_ui import plot_series
+from brainwash_ui import plot_drag, plot_series
 from lib import analysis_v3 as analysis
 from lib import ui_plot
 
@@ -303,11 +303,10 @@ class InteractivePlotMixin:
                 zones["volley slope move"] = p.volley_slope_move_zone
             p.mouseover_action = None
             for action, zone in zones.items():
-                if not zone:
+                if not plot_drag.point_in_zone(x, y, zone):
                     continue
-                if zone["x"][0] <= x <= zone["x"][1] and zone["y"][0] <= y <= zone["y"][1]:
-                    p.mouseover_action = action
-                    plotMouseover(action, axe)
+                p.mouseover_action = action
+                plotMouseover(action, axe)
 
                     # Debugging block
                     if False:

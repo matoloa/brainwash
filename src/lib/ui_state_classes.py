@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from matplotlib.ticker import AutoLocator, FixedLocator, FuncFormatter, Locator
 
+from brainwash_ui import plot_drag
+
 from ui_state_parts import ExperimentConfig, PlotSession, ProjectPersistedState, StatTestState
 
 if TYPE_CHECKING:
@@ -142,25 +144,27 @@ class UIstate:
 
     def updateSlopeZone(self, type, x, y):
         p = self.plot
-        slope_start = x[0], y[0]
-        slope_end = x[-1], y[-1]
-        x_window = min(x), max(x)
-        y_window = min(y), max(y)
+        slope_start, slope_end, move_zone, resize_zone = plot_drag.slope_drag_state(
+            x,
+            y,
+            x_margin=p.x_margin,
+            y_margin=p.y_margin,
+        )
         setattr(p, f"{type}_slope_start_xy", slope_start)
         setattr(p, f"{type}_slope_end_xy", slope_end)
         zone_move = getattr(p, f"{type}_slope_move_zone")
-        zone_move["x"] = (x_window[0] - p.x_margin, x_window[-1] + p.x_margin)
-        zone_move["y"] = (y_window[0] - p.y_margin, y_window[-1] + p.y_margin)
+        zone_move.clear()
+        zone_move.update(move_zone)
         zone_resize = getattr(p, f"{type}_slope_resize_zone")
-        zone_resize["x"] = (x[-1] - p.x_margin, x[-1] + p.x_margin)
-        zone_resize["y"] = (y[-1] - p.y_margin, y[-1] + p.y_margin)
+        zone_resize.clear()
+        zone_resize.update(resize_zone)
 
     def updateAmpZone(self, type, x, y):
         p = self.plot
         setattr(p, f"{type}_amp_xy", (x, y))
         zone = getattr(p, f"{type}_amp_move_zone")
-        zone["x"] = (x - p.x_margin, x + p.x_margin)
-        zone["y"] = (y - p.y_margin, y + p.y_margin)
+        zone.clear()
+        zone.update(plot_drag.amp_move_zone(x, y, x_margin=p.x_margin, y_margin=p.y_margin))
 
     def get_recSet(self):
         return set(value["rec_ID"] for value in self.plot.dict_rec_labels.values())
