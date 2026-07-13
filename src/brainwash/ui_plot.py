@@ -517,41 +517,30 @@ class UIplot:
         self.clear_axe_mean()
         # if exactly one RECORDING is selected, plot the mean of selected SWEEPS one axe, if any
         if self.uistate.plot.x_select["output"] and len(self.uistate.plot.list_idx_select_recs) == 1:
-            # print(f" - selected sweep(s): {self.uistate.plot.x_select['output']}")
-            # build mean of selected sweeps
             idx_rec = self.uistate.plot.list_idx_select_recs[0]
             rec_ID = self.uistate.plot.df_recs2plot.loc[idx_rec, "ID"]
             selected = self.uistate.plot.x_select["output"]
-            df = self.uistate.plot.df_rec_select_data
-            col = self.uistate.project.settings.get("filter") or "voltage"
-            df_sweeps = df[df["sweep"].isin(selected)]
-            df_mean = df_sweeps.groupby("time", as_index=False)[col].mean()
-            # calculate offset for t_stim
             df_t = self.uistate.plot.df_rec_select_time
-            n_stims = len(df_t)
-            dict_gradient = self.get_dict_gradient(n_stims)
-            alpha = self.uistate.project.settings["alpha_line"] / 2  # make mean-of-selected-lines more transparent
-            for i_stim, t_row in df_t.iterrows():
-                color = dict_gradient[i_stim]
-                stim_num = i_stim + 1  # 1-numbering (visible to user)
-                stim_str = f"- stim {stim_num}"
-                t_stim = t_row["t_stim"]
-                # add to Events
-                window_start = t_stim + self.uistate.project.settings["event_start"]
-                window_end = t_stim + self.uistate.project.settings["event_end"]
-                df_event = df_mean[(df_mean["time"] >= window_start) & (df_mean["time"] <= window_end)].copy()
-                df_event["time"] = df_event["time"] - t_stim  # shift event so that t_stim is at time 0
+            stim_colors = self.get_dict_gradient(len(df_t))
+            for spec in plot_stim.build_axe_mean_plot_specs(
+                rec_ID,
+                selected,
+                self.uistate.plot.df_rec_select_data,
+                df_t,
+                self.uistate.project.settings,
+                stim_colors,
+            ):
                 self.plot_line(
-                    f"axe mean selected sweeps {stim_str}",
-                    "axe",
-                    df_event["time"],
-                    df_event[col],
-                    color,
-                    rec_ID,
-                    stim=stim_num,
-                    alpha=alpha,
+                    spec.label,
+                    spec.axid,
+                    spec.x,
+                    spec.y,
+                    spec.color,
+                    spec.rec_id,
+                    stim=spec.stim,
+                    alpha=spec.alpha,
                 )
-                self.uistate.plot.dict_rec_labels[f"axe mean selected sweeps {stim_str}"]["line"].set_visible(True)
+                self.uistate.plot.dict_rec_labels[spec.label]["line"].set_visible(True)
         if draw:
             self.uistate.plot.axe.figure.canvas.draw_idle()
 

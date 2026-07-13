@@ -142,3 +142,35 @@ def test_build_stim_event_plot_specs_minimal():
     assert "rec1 - stim 1 EPSP amp" in labels
     assert any(isinstance(s, plot_stim.StimAmpWidthPlotSpec) for s in specs)
     assert any(isinstance(s, plot_stim.StimLinePlotSpec) and s.axid == "axe" for s in specs)
+
+
+def test_mean_of_selected_sweeps():
+    df = pd.DataFrame(
+        {
+            "sweep": [0, 0, 1, 1],
+            "time": [0.0, 0.01, 0.0, 0.01],
+            "prim": [1.0, 2.0, 3.0, 4.0],
+        }
+    )
+    mean_df = plot_stim.mean_of_selected_sweeps(df, [0, 1], "prim")
+    assert list(mean_df["prim"]) == [2.0, 3.0]
+
+
+def test_build_axe_mean_plot_specs():
+    df = pd.DataFrame(
+        {
+            "sweep": [0, 0, 1, 1],
+            "time": [0.03, 0.04, 0.05, 0.06],
+            "prim": [0.0, 0.001, 0.0, 0.002],
+        }
+    )
+    df_t = pd.DataFrame([{"t_stim": 0.04}, {"t_stim": 0.05}])
+    settings = {"filter": "prim", "event_start": -0.01, "event_end": 0.02, "alpha_line": 0.8}
+    specs = plot_stim.build_axe_mean_plot_specs("rec1", [0, 1], df, df_t, settings, {0: "red", 1: "blue"})
+    assert len(specs) == 2
+    assert specs[0].label == "axe mean selected sweeps - stim 1"
+    assert specs[0].axid == "axe"
+    assert specs[0].rec_id == "rec1"
+    assert specs[0].stim == 1
+    assert specs[0].alpha == 0.4
+    assert specs[0].color == "red"

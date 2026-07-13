@@ -564,3 +564,54 @@ def resolve_drag_amp_si(amp, y_position: float, amp_zero: float) -> float | None
 
 def amp_width_y_coords(amp_si: float, amp_zero: float) -> tuple[float, float]:
     return amp_zero, (0 - amp_si) + amp_zero
+
+
+def mean_of_selected_sweeps(df: pd.DataFrame, selected, col: str) -> pd.DataFrame:
+    df_sweeps = df[df["sweep"].isin(selected)]
+    return df_sweeps.groupby("time", as_index=False)[col].mean()
+
+
+@dataclass(frozen=True)
+class AxeMeanLinePlotSpec:
+    label: str
+    axid: str
+    x: object
+    y: object
+    color: object
+    rec_id: str
+    stim: int
+    alpha: float
+
+
+def build_axe_mean_plot_specs(
+    rec_id: str,
+    selected_sweeps,
+    df_rec_data: pd.DataFrame,
+    df_rec_time: pd.DataFrame,
+    settings: dict,
+    stim_colors: dict[int, str],
+) -> list[AxeMeanLinePlotSpec]:
+    """Mean-of-selected-sweeps trace descriptors for update_axe_mean (no matplotlib artists)."""
+    col = settings.get("filter") or "voltage"
+    df_mean = mean_of_selected_sweeps(df_rec_data, selected_sweeps, col)
+    alpha = settings["alpha_line"] / 2
+    specs: list[AxeMeanLinePlotSpec] = []
+    for i_stim, t_row in df_rec_time.iterrows():
+        color = stim_colors[i_stim]
+        stim_num = stim_num_from_index(i_stim)
+        stim_str = _stim_label_suffix(stim_num)
+        t_stim = t_row["t_stim"]
+        df_event = event_window_df(df_mean, t_stim, settings["event_start"], settings["event_end"], col)
+        specs.append(
+            AxeMeanLinePlotSpec(
+                label=f"axe mean selected sweeps {stim_str}",
+                axid="axe",
+                x=df_event["time"],
+                y=df_event[col],
+                color=color,
+                rec_id=rec_id,
+                stim=stim_num,
+                alpha=alpha,
+            )
+        )
+    return specs
