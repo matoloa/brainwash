@@ -38,6 +38,17 @@ class StatusbarResult:
 
 `experiment_type="io"` + empty test sets → `config["type"] == "IO regression"` (see `work_plans/History/statistics_refactor/CONTRACT.md`). UI formatters must show `IO ANCOVA` prefix when formal result present.
 
+## Plot invariants (Phase II)
+
+| Invariant | Detail |
+|-----------|--------|
+| IO scatter labels | `{label} {raw\|norm} IO scatter` / `IO trendline` |
+| PP x positions | `plot_series.pp_overlay_x_map(checkBox)` is sole source for aspect → integer x |
+| PPR finite values | `ppr = v2/v1`; non-finite → `nan` |
+| SI boundary | `dft` stores SI (V); `ax1` display uses mV (`* 1000`) at artist boundary only |
+| `amp_zero_plot` | Mean of `rec_filter` in 2 ms window `[t_stim-0.002, t_stim-0.001)` on `dfmean` |
+| Stim numbering | User-visible `stim_num = i_stim + 1` |
+
 ## Public entrypoints (unchanged)
 
 - `compute_statistical_comparison`, `ttest_per_sweep`, `from . import statistics as stats`

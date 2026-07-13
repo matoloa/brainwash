@@ -33,9 +33,21 @@
 | 15 | [ui_refactor/15_plot_model_phase2.md](ui_refactor/15_plot_model_phase2.md) | ✅ done |
 | 16 | [ui_refactor/16_plot_series_addrow.md](ui_refactor/16_plot_series_addrow.md) | ✅ done |
 
-After each PR: mark card ✅ in this table, set **NEXT** on the following row.
+**Phase II** (branch `ui-refactor/phase0-3`): [plan_ui_refactor_phase2.md](plan_ui_refactor_phase2.md)
 
-**NEXT (human)**: merge `ui-refactor/phase0-3` → main when ready; optional stim-loop / `update()` extraction in `ui_plot.py`.
+| PR | Card | Status |
+|----|------|--------|
+| 17 | [ui_refactor/17_index_and_plot_contract.md](ui_refactor/17_index_and_plot_contract.md) | ✅ done |
+| 18 | [ui_refactor/18_pp_overlay_dedupe.md](ui_refactor/18_pp_overlay_dedupe.md) | **NEXT** |
+| 19 | [ui_refactor/19_nested_getattr_cleanup.md](ui_refactor/19_nested_getattr_cleanup.md) | pending |
+| 20 | [ui_refactor/20_plot_stim.md](ui_refactor/20_plot_stim.md) | pending |
+| 21 | [ui_refactor/21_plot_series_pp_aggregate.md](ui_refactor/21_plot_series_pp_aggregate.md) | pending |
+| 22 | [ui_refactor/22_plot_layout.md](ui_refactor/22_plot_layout.md) | pending |
+| 23 | [ui_refactor/23_pipeline_goldens.md](ui_refactor/23_pipeline_goldens.md) | pending |
+| 24 | [ui_refactor/24_statusbar_wiring_tests.md](ui_refactor/24_statusbar_wiring_tests.md) | pending |
+| 25 | [ui_refactor/25_hygiene_archive.md](ui_refactor/25_hygiene_archive.md) | pending |
+
+After each PR: mark card ✅ in this table, set **NEXT** on the following row.
 
 ## Shared docs (read on demand)
 
