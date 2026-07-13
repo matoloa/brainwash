@@ -223,9 +223,10 @@ class StatTestMixin:
 
     def _should_show_stat_test_frame(self) -> bool:
         """Central helper: return whether Statistical Test frame should be shown (respects viewTools/menu/hide button state; no auto-hide on IO)."""
-        if "frameToolTest" in getattr(uistate, "viewTools", {}):
-            return uistate.viewTools["frameToolTest"][1]
-        return not self._is_io_mode()
+        return view_state.should_show_stat_test_frame(
+            getattr(uistate, "experiment_type", "time"),
+            getattr(uistate, "viewTools", None),
+        )
 
     def _is_loading_active(self):
         """True while parsing or preloading is using the progressBar. (delegates or local)"""

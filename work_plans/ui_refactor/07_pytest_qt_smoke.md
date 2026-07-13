@@ -1,6 +1,6 @@
 # PR-07: pytest-qt smoke tests
 
-**Status**: pending | **Depends on**: PR-06 (or PR-04 minimum)
+**Status**: DONE | **Depends on**: PR-06 (or PR-04 minimum)
 
 ## Goal
 

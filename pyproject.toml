@@ -57,6 +57,7 @@ dev = [
     "black",
     "isort",
     "pytest",
+    "pytest-qt>=4.5.0",
 ]
 build = [
     "cx-freeze==8.6",

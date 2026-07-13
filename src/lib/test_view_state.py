@@ -26,6 +26,17 @@ def test_visible_testset_ids():
     assert view_state.visible_testset_ids(None) == []
 
 
+def test_should_show_stat_test_frame_io_default_hidden():
+    assert view_state.should_show_stat_test_frame("io", {}) is False
+
+
+def test_should_show_stat_test_frame_respects_view_tools():
+    tools = {"frameToolTest": ["Statistical Test", True]}
+    assert view_state.should_show_stat_test_frame("io", tools) is True
+    tools["frameToolTest"][1] = False
+    assert view_state.should_show_stat_test_frame("time", tools) is False
+
+
 def test_groups_with_recordings_filters_empty():
     dd = make_dd_groups("G1", "G2")
     dd["G2"]["rec_IDs"] = []

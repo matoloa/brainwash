@@ -142,10 +142,9 @@ src/
     │
     ├── analysis_evaluation.py  Evaluation helpers used alongside analysis_v2.
     │
-    ├── analysis_v1.py       Legacy analysis engine — kept for reference only.
-    │                        Not imported by ui.py. Do not add new code here.
-    ├── analysis_v2.py       Legacy analysis engine — kept for reference only.
-    │                        Not imported by ui.py. Do not add new code here.
+    ├── analysis_v1.py       Shim → legacy/analysis_v1.py (scientific reproduction; do not delete).
+    ├── analysis_v2.py       Shim → legacy/analysis_v2.py (scientific reproduction; do not delete).
+    ├── legacy/              Historical analysis v1/v2 + README (used by analysis_evaluation.py).
     │
     └── test_parse.py        pytest test suite for the parse pipeline.
 ```
