@@ -22,11 +22,7 @@ pd.options.future.infer_string = False
 if getattr(sys, "frozen", False):
     os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "matplotlib"))
 
-# TODO: kick these out to ui_plot.py
-import matplotlib.collections as mcoll
 from matplotlib import use as matplotlib_use
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
 
 matplotlib_use("Qt5Agg")
 

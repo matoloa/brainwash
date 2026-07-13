@@ -1,7 +1,7 @@
 # Plan: Extract Remaining Logic from UIsub into Mixins (ui.py Refactor)
 
 **Date**: 2026-07-12  
-**Status**: WIP. Phase 1 (table + selection) complete + cleaned (duplicates removed, methods moved to ui_table.py / ui_selection.py, wiring & docs updated). All planned mixins exist and are wired (ui_graph, ui_parse, ui_stat_test too). ui.py reduced to ~2584 LOC (main size goal met). Many thin `trigger*` / `*_changed` / edit* handlers + lifecycle remain in core (allowed per plan). Phase 5 polish (remaining moves?, comment cleanup, full regression) still pending.  
+**Status**: WIP. Phases 0–4 complete. ui.py ~2580 LOC (size goal met). Phase 5 polish in progress: unused matplotlib imports removed from ui.py; xdata hardening + zoom-limit tests landed post Phase X. Remaining: full manual regression (project load/save, all experiment types, export, darkmode).  
 **Related**: Previous mixin_problems.md (archived), ongoing ui.py size issues (5720 LOC, UIsub defines 172 methods directly).
 
 ## Background
