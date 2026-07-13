@@ -13,7 +13,7 @@ import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
 # brainwash stats (local module shadows stdlib; ui.py does "import statistics as stats" equivalent via its context + from . )
-from brainwash_ui import app_context, applicability, statusbar, view_state
+from brainwash_ui import app_context, statusbar, view_state
 
 from . import statistics as stats
 
@@ -110,11 +110,6 @@ class StatTestMixin:
         if hasattr(self, "dd_testsets") and isinstance(self.dd_testsets, dict):
             return self.dd_testsets
         return {}
-
-    def _maybe_log_applicability_warning(self, warning: str | None, *, always_log: bool = False) -> str | None:
-        if warning and (always_log or bool(self.uistate.stat_test.formal_test_results)):
-            print(f"Statistical test: {warning}")
-        return warning
 
     def update_anova_label(self):
         """Update label_test_ANOVA and self.uistate.stat_test.anova_label based on number of shown test sets."""
@@ -240,53 +235,6 @@ class StatTestMixin:
         return self._compute_statusbar_for_current_state().text
 
     # -------------------------------------------------------------------------
-    # Applicability checks (pure; return warning str or None)
-    # -------------------------------------------------------------------------
-
-    def _check_ttest_applicability(self, variant: str) -> str | None:
-        return self._maybe_log_applicability_warning(
-            applicability.check_ttest_applicability(variant, self._dd_groups_safe(), self._dd_testsets_safe())
-        )
-
-    def _check_anova_applicability(self) -> str | None:
-        return self._maybe_log_applicability_warning(
-            applicability.check_anova_applicability(self._dd_groups_safe(), self._dd_testsets_safe())
-        )
-
-    def _check_wilcoxon_applicability(self, variant: str) -> str | None:
-        return self._check_ttest_applicability(variant)
-
-    def _check_friedman_applicability(self) -> str | None:
-        return self._maybe_log_applicability_warning(
-            applicability.check_friedman_applicability(self._dd_testsets_safe()),
-            always_log=True,
-        )
-
-    def _check_cluster_applicability(self) -> str | None:
-        return self._maybe_log_applicability_warning(
-            applicability.check_cluster_applicability(self._dd_groups_safe(), self._dd_testsets_safe())
-        )
-
-    def _get_stat_test_warning(self):
-        """Return warning string for non-IO tests, else None. Delegates to brainwash_ui.applicability."""
-        eff = self._effective_test_type()
-        if eff == "None":
-            return None
-        if eff not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
-            return f"Statistical test '{eff}' is not implemented"
-
-        warning = applicability.warning_for_test_type(
-            eff,
-            dd_groups=self._dd_groups_safe(),
-            dd_testsets=self._dd_testsets_safe(),
-            ttest_variant=self.uistate.stat_test.test_t_variant,
-            wilcox_variant=self.uistate.stat_test.test_wilcox_variant,
-        )
-        if warning:
-            self._maybe_log_applicability_warning(warning, always_log=(eff == "Friedman"))
-        return warning
-
-    # -------------------------------------------------------------------------
     # Main entry point + dispatcher + workers
     # -------------------------------------------------------------------------
 
@@ -309,8 +257,7 @@ class StatTestMixin:
         self.set_statusbar(result.state, result.text)
 
     def set_statusbar(self, state: str | None = None, text: str | None = None):
-        """Low-level applicator: only does what it is given (debug print + appearance)."""
-        print(f"STATUSBAR: {text} (state={state})")
+        """Low-level applicator: only does what it is given (appearance + label text)."""
         if state == "warning":
             self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=text)
         elif state == "info" or text:

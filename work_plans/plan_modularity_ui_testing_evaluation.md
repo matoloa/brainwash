@@ -1,7 +1,7 @@
 # Brainwash: Modularity, UI Separation, and Automated Testing
 
 **Date**: 2026-07-13 (revised)  
-**Status**: Phase 0–X complete on `ui-refactor/phase0-3` (PR-44). **218** pytest tests in `src/brainwash/` (incl. pytest-qt wiring + refresh-bus coalesce). CI test workflow active. Section 1 metrics are a 2026-07-13 snapshot — refresh before planning new work.  
+**Status**: Phases 0–5 + 3b + 4 complete on `ui-refactor/phase0-3`. **227** pytest tests in `src/brainwash/`. Next: Phase 6+ (injection removal / UIplot split) — needs human scope approval. Section 1 LOC metrics are a 2026-07-13 snapshot.  
 **Audience**: Human maintainers and agentic contributors  
 **Goal**: Make UI/stat/view changes safe for agents without a full rewrite, reusing the statistics refactor playbook.
 
