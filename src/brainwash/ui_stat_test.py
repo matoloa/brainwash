@@ -227,29 +227,26 @@ class StatTestMixin:
     # Statusbar single source of truth + formatters
     # -------------------------------------------------------------------------
 
-    def _apply_statusbar_result(self, result: statusbar.StatusbarResult) -> str | None:
-        self.uistate.stat_test.statusbar_state = result.state
-        return result.text
-
-    def _get_statusbar_for_current_state(self) -> str | None:
-        """Single source of truth for statusbar text. Sets self.uistate.stat_test.statusbar_state once from computed result."""
+    def _compute_statusbar_for_current_state(self) -> statusbar.StatusbarResult:
         eff = self._effective_test_type()
         if eff == "None":
-            return self._apply_statusbar_result(statusbar.StatusbarResult(None, None))
+            return statusbar.StatusbarResult(None, None)
         if self._is_io_mode():
             formal = self.uistate.stat_test.formal_test_results
-            return self._apply_statusbar_result(
-                self._format_io_regression_statusbar(formal)
-            )
+            return self._format_io_regression_statusbar(formal)
         warning = self._get_stat_test_warning()
         if warning is not None:
-            return self._apply_statusbar_result(statusbar.StatusbarResult(warning, "warning"))
+            return statusbar.StatusbarResult(warning, "warning")
         formal = self.uistate.stat_test.formal_test_results
         if formal:
             result = self._format_non_io_stat_test_statusbar(formal)
             if result.text:
-                return self._apply_statusbar_result(result)
-        return self._apply_statusbar_result(statusbar.StatusbarResult(None, None))
+                return result
+        return statusbar.StatusbarResult(None, None)
+
+    def _get_statusbar_for_current_state(self) -> str | None:
+        """Return statusbar text for current state without mutating uistate."""
+        return self._compute_statusbar_for_current_state().text
 
     def _format_io_regression_statusbar(self, formal) -> statusbar.StatusbarResult:
         n_unit = self.uistate.stat_test.buttonGroup_test_n
@@ -337,9 +334,9 @@ class StatTestMixin:
         finally:
             self._updating_test = False
 
-        text = self._get_statusbar_for_current_state()
-        state = self.uistate.stat_test.statusbar_state
-        self.set_statusbar(state, text)
+        result = self._compute_statusbar_for_current_state()
+        self.uistate.stat_test.statusbar_state = result.state
+        self.set_statusbar(result.state, result.text)
 
     def set_statusbar(self, state: str | None = None, text: str | None = None):
         """Low-level applicator: only does what it is given (debug print + appearance)."""
