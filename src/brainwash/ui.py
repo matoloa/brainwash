@@ -48,17 +48,17 @@ import parse
 import toml  # for reading pyproject.toml
 import ui_data_frames
 import ui_designer  # Import the Designer-generated UI code
-import ui_graph  # GraphCoordinatorMixin (Phase 2)
+import ui_graph
 import ui_groups
-import ui_parse  # ParseMixin (Phase 3)
+import ui_parse
 import ui_plot
 import ui_project
-import ui_selection  # SelectionMixin (Phase 1)
-import brainwash.ui_stat_test as ui_stat_test  # StatTestMixin (Phase 4)
+import ui_selection
+import brainwash.ui_stat_test as ui_stat_test
 import ui_state_classes
 import ui_sweep_ops
-import ui_table  # TableMixin (Phase 1)
-import ui_widgets  # Custom Qt widgets, dialogs, models, threads (extracted Phase 0)
+import ui_table
+import ui_widgets
 import yaml  # used by talkback
 from project_schema import df_projectTemplate
 
@@ -100,11 +100,11 @@ class UIsub(
     ui_menus.MenuMixin,
     export_data.ExportMixin,
     ui_interactive.InteractivePlotMixin,
-    ui_table.TableMixin,  # Phase 1
-    ui_selection.SelectionMixin,  # Phase 1
-    ui_graph.GraphCoordinatorMixin,  # Phase 2
-    ui_parse.ParseMixin,  # Phase 3
-    ui_stat_test.StatTestMixin,  # Phase 4
+    ui_table.TableMixin,
+    ui_selection.SelectionMixin,
+    ui_graph.GraphCoordinatorMixin,
+    ui_parse.ParseMixin,
+    ui_stat_test.StatTestMixin,
 ):
     def __init__(self, mainwindow):
         logger.debug("UIsub __init__ started")
