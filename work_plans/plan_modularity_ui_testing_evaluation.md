@@ -69,7 +69,7 @@ These confuse agents and should be resolved in early PRs:
 
 | Gap | Detail | Recommendation |
 |-----|--------|----------------|
-| **Statusbar “purity”** | `AGENTS.md` requires `_get_stat_test_warning` to be pure; `_get_statusbar_for_current_state` docstring says "Pure query" | Implementation **mutates** `uistate.statusbar_state` in 11 places in `ui_stat_test.py` | Split into `compute_statusbar(state) -> (text, appearance)` (pure) and `apply_statusbar(...)` (UI only) |
+| **Statusbar “purity”** | ~~`_get_statusbar_for_current_state` mutated in query path~~ | Fixed: `_compute_statusbar_for_current_state` (pure) + `update_test` apply path | — |
 | **Stale symbol** | `AGENTS.md` references `_refresh_test_statusbar` | Symbol **does not exist** in codebase | Update `AGENTS.md` to `set_statusbar` / `_get_statusbar_for_current_state` or add thin alias |
 | **Import inconsistency** | `import ui_groups` vs `import lib.ui_stat_test` | `conftest.py` prepends `src/lib` to `sys.path` | Document canonical import style; package rename is optional later |
 | **`importlib.reload(ui_plot)`** | In `ui.py` startup | Suggests fragile import/injection ordering | Remove when injection is replaced or document why it stays |
