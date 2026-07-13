@@ -17,6 +17,7 @@ Each `NN_*.md` file is a **complete session brief**. Agents read **only** the cu
 | `10_data_frames_injection.md` | 35 | `DataFrameMixin` → `self.uistate` |
 | `11_host_protocols.md` | 40 | `Protocol` host contracts |
 | `12_remaining_injection.md` | 40 | Batch migrate remaining mixins |
+| `13_plot_model.md` | 45 | Pure `plot_model` + test marker specs |
 | `VERIFY.md` | 20 | Post-PR commands |
 | `CONTRACT.md` | 40 | Statusbar/view invariants |
 

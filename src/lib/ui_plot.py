@@ -1,6 +1,8 @@
 import time  # counting time for functions
 import warnings
 
+from brainwash_ui import plot_model
+
 import matplotlib.pyplot as plt  # for the scatterplot
 import numpy as np
 import pandas as pd
@@ -53,26 +55,12 @@ class UIplot:
             for x, p in zip(sweeps, ps):
                 if not np.isfinite(p) or p > 0.05:
                     continue
-                color, alpha = self._p_color_alpha(p)
+                color, alpha = plot_model.p_value_color_alpha(p)
                 sc = ax.scatter([x], [y], marker="o", color=[color], alpha=alpha)
                 self.uistate.plot.dict_heatmap.setdefault(col, {})[x] = sc
 
         ax1.figure.canvas.draw_idle()
         ax2.figure.canvas.draw_idle()
-
-    @staticmethod
-    def _p_color_alpha(p):
-        """Return (rgb_color, alpha) for significant p-values (p <= 0.05).
-        Alpha always 0.5. Yellow at 0.05, red at p < 0.005.
-        """
-        alpha = 0.5
-        if p < 0.005:
-            color = (1.0, 0.0, 0.0)  # red
-        else:
-            t = (0.05 - p) / 0.045
-            g = 1.0 - t
-            color = (1.0, g, 0.0)  # yellow -> red
-        return color, alpha
 
     def heatunmap(self):
         d = getattr(self.uistate, "dict_heatmap", None)
@@ -119,115 +107,38 @@ class UIplot:
         d = self.uistate.plot.dict_test_markers
         self.clear_test_markers(draw=False)
 
-        dark = bool(getattr(self.uistate, "darkmode", False))
-
-        # Paired (t-test or Wilcoxon): place ONLY one */na marker, horizontally
-        # centered between the x-positions of the first and second test set.
-        # Legend-matching y-placement (amp/slope top-right rules) is unchanged.
-        test_type = getattr(self.uistate, "test_type", "None")
-        if test_type == "Wilcoxon":
-            variant = getattr(self.uistate, "test_wilcox_variant", "paired")
-        else:
-            variant = getattr(self.uistate, "test_t_variant", "unpaired")
-        is_single_marker = variant in ("paired", "one-sample") and len(results or []) >= 2
-
-        for res in results or []:
-            sweeps = res.get("sweeps", []) or []
-            if not sweeps:
+        st = self.uistate.stat_test
+        specs = plot_model.build_test_marker_specs(
+            results,
+            test_type=st.test_type,
+            t_variant=st.test_t_variant,
+            wilcox_variant=st.test_wilcox_variant,
+            amp_view=self.uistate.ampView(),
+            slope_view=self.uistate.slopeView(),
+            dark=bool(self.uistate.darkmode),
+        )
+        axes = {"ax1": ax1, "ax2": ax2}
+        for spec in specs:
+            target_ax = axes.get(spec.axis)
+            if target_ax is None:
                 continue
             try:
-                x = float(np.mean(sweeps))
+                trans = blended_transform_factory(target_ax.transData, target_ax.transAxes)
+                txt = target_ax.text(
+                    spec.x,
+                    spec.y_frac,
+                    spec.label,
+                    transform=trans,
+                    ha="center",
+                    va=spec.va,
+                    fontsize=13,
+                    fontweight="bold",
+                    color=spec.color,
+                    zorder=12,
+                )
+                d.setdefault(spec.storage_pcol, {})[spec.x] = txt
             except Exception:
-                continue
-
-            # For paired/one-sample: override x to midpoint between first and second test set
-            # (res[0] and res[1] correspond to the two test sets). Only process
-            # the first result (single marker, per user request).
-            if is_single_marker:
-                if results.index(res) != 0:
-                    continue  # skip second result for single-marker variant
-                try:
-                    sweeps2 = results[1].get("sweeps", []) or []
-                    x2 = float(np.mean(sweeps2))
-                    x = (x + x2) / 2.0
-                except Exception:
-                    pass  # fallback to first-set x
-
-            # Collect p/q for amp aspects -> ax1, slope aspects -> ax2.
-            # Legend/significance convention:
-            #   - both shown: amp high (top-right on ax1), slope low (bottom-right on ax2)
-            #   - only amp:   amp high (top-right on ax1)
-            #   - only slope: slope high (top-right on ax2)
-            amp_pcols = [k for k in res.keys() if k.startswith("p_") and "amp" in k]
-            slope_pcols = [k for k in res.keys() if k.startswith("p_") and "slope" in k]
-            amp_view = bool(getattr(self.uistate, "ampView", lambda: True)())
-            slope_view = bool(getattr(self.uistate, "slopeView", lambda: True)())
-
-            placements = []
-            if amp_view and slope_view:
-                # both: amp high, slope low (matches legend convention)
-                for pcol in amp_pcols:
-                    placements.append((pcol, ax1, 0.94, "top"))
-                for pcol in slope_pcols:
-                    placements.append((pcol, ax2, 0.06, "bottom"))
-            elif amp_view:
-                # only amp: place at top-right on ax1
-                for pcol in amp_pcols:
-                    placements.append((pcol, ax1, 0.94, "top"))
-            elif slope_view:
-                # only slope: place at top-right on ax2
-                for pcol in slope_pcols:
-                    placements.append((pcol, ax2, 0.94, "top"))
-
-            for pcol, target_ax, y_frac, va in placements:
-                if not pcol:
-                    continue
-                qcol = "q_" + pcol[2:]
-                pval = res.get(pcol)
-                qval = res.get(qcol)
-
-                # Use q for significance decision if present and finite, else p
-                val = qval if (isinstance(qval, (int, float)) and np.isfinite(qval)) else pval
-
-                # Conventional graduated significance markers
-                if isinstance(val, (int, float)) and np.isfinite(val):
-                    if val < 0.001:
-                        label = "***"
-                    elif val < 0.01:
-                        label = "**"
-                    elif val < 0.05:
-                        label = "*"
-                    else:
-                        label = "ns"
-                else:
-                    label = "ns"
-
-                is_sig = label != "ns"
-
-                # Significance markers use high-contrast black/white (bare, no bbox).
-                # "ns" uses a muted gray suited to the mode.
-                if is_sig:
-                    color = "white" if dark else "black"
-                else:
-                    color = "#aaaaaa" if dark else "#555555"
-
-                try:
-                    trans = blended_transform_factory(target_ax.transData, target_ax.transAxes)
-                    txt = target_ax.text(
-                        x,
-                        y_frac,
-                        label,
-                        transform=trans,
-                        ha="center",
-                        va=va,
-                        fontsize=13,
-                        fontweight="bold",
-                        color=color,
-                        zorder=12,
-                    )
-                    d.setdefault(pcol, {})[x] = txt
-                except Exception:
-                    pass
+                pass
 
         try:
             ax1.figure.canvas.draw_idle()
@@ -834,17 +745,10 @@ class UIplot:
                 del dict_group_show[key]
 
     def _level_key(self, base_label, level):
-        """Helper to make level-qualified storage key for group artists (recording has no suffix)."""
-        if not level or level == "recording":
-            return base_label
-        return f"{base_label}_{level}"
+        return plot_model.level_storage_key(base_label, level)
 
     def _display_label(self, key):
-        """Strip level suffix from storage key for display (legends, etc.)."""
-        for suf in ("_subject", "_slice", "_recording"):
-            if key.endswith(suf):
-                return key[:-len(suf)]
-        return key
+        return plot_model.display_label_from_key(key)
 
     def update_group_level_visibility(self, active_level=None):
         """Toggle visibility of group artists so only the current n_unit level is shown.
@@ -854,7 +758,7 @@ class UIplot:
         Integrates with the level filter already present in update_show.
         """
         if active_level is None:
-            active_level = getattr(self.uistate, "buttonGroup_test_n", "recording")
+            active_level = self.uistate.stat_test.buttonGroup_test_n
 
         # Ensure only artists for the active level (or untagged) are visible.
         # We set visibility here for level, and let update_show handle selection rules.
