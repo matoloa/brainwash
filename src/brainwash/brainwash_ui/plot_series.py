@@ -464,6 +464,48 @@ def collect_pp_group_bar_patch_specs(
     return specs
 
 
+@dataclass(frozen=True)
+class PpGraphRefreshXAxisPlan:
+    ticks: tuple[int, ...]
+    ticklabels: tuple[str, ...]
+    ax1_xlabel: str | None
+    ax2_xlabel: str | None
+    hide_all: bool
+    labels_only: bool
+
+
+def build_pp_graph_refresh_xaxis_plan(
+    bar_specs: list[tuple[float, float, str]],
+    checkbox: dict,
+    *,
+    pp_has_recs: bool,
+) -> PpGraphRefreshXAxisPlan:
+    """PP output x-tick/label plan for graphRefresh (no matplotlib)."""
+    x_ticks, x_ticklabels = pp_group_tick_label_map(bar_specs)
+    if x_ticks:
+        return PpGraphRefreshXAxisPlan(
+            ticks=tuple(x_ticks),
+            ticklabels=tuple(x_ticklabels),
+            ax1_xlabel="",
+            ax2_xlabel="",
+            hide_all=False,
+            labels_only=True,
+        )
+    if pp_has_recs:
+        rec_ticks, rec_labels = pp_recording_view_ticks(checkbox)
+        if not rec_ticks:
+            return PpGraphRefreshXAxisPlan((), (), "No aspect selected", None, hide_all=True, labels_only=False)
+        return PpGraphRefreshXAxisPlan(
+            ticks=tuple(rec_ticks),
+            ticklabels=tuple(rec_labels),
+            ax1_xlabel="",
+            ax2_xlabel="",
+            hide_all=False,
+            labels_only=True,
+        )
+    return PpGraphRefreshXAxisPlan((), (), None, None, hide_all=True, labels_only=False)
+
+
 def pp_group_tick_label_map(bar_specs: list[tuple[float, float, str]]) -> tuple[list[int], list[str]]:
     """Build sorted PP group xticks from (x_left, width, display_label) tuples."""
     name_by_x: dict[int, str] = {}

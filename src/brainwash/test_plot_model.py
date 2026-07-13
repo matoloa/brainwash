@@ -160,6 +160,20 @@ def test_output_axis_ylabels():
     assert time_norm.ax2_ylabel == "Slope %"
 
 
+def test_output_axis_format_mode():
+    io_mode = plot_model.output_axis_format_mode("io")
+    assert io_mode.use_g_formatters is True
+    assert io_mode.time_x_formatter_on_ax2 is False
+    time_mode = plot_model.output_axis_format_mode("time")
+    assert time_mode.time_x_formatter_on_ax2 is True
+    assert time_mode.show_output_x_tick_marks is True
+
+
+def test_event_axis_label_constants():
+    assert plot_model.EVENT_AXIS_YLABEL == "Voltage (mV)"
+    assert plot_model.EVENT_AXIS_XLABEL == "Time (ms)"
+
+
 def test_pp_reference_grid_y_values():
     assert plot_model.pp_reference_grid_y_values() == (1.0, 2.0, 3.0)
 

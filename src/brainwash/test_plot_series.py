@@ -92,6 +92,38 @@ def test_build_io_group_plot_specs():
     assert specs[0].storage_key == "G1 raw IO scatter"
 
 
+def test_build_pp_graph_refresh_xaxis_plan_group_bars():
+    specs = [(0.6, 0.3, "G1")]
+    plan = plot_series.build_pp_graph_refresh_xaxis_plan(specs, {"EPSP_amp": True}, pp_has_recs=False)
+    assert plan.ticks == (1,)
+    assert plan.labels_only is True
+    assert plan.ax1_xlabel == ""
+
+
+def test_build_pp_graph_refresh_xaxis_plan_recording_view():
+    checkbox = {
+        "EPSP_amp": True,
+        "EPSP_slope": False,
+        "volley_amp": False,
+        "volley_slope": False,
+    }
+    plan = plot_series.build_pp_graph_refresh_xaxis_plan([], checkbox, pp_has_recs=True)
+    assert plan.ticks == (1,)
+    assert plan.labels_only is True
+
+
+def test_build_pp_graph_refresh_xaxis_plan_no_aspects():
+    checkbox = {
+        "EPSP_amp": False,
+        "EPSP_slope": False,
+        "volley_amp": False,
+        "volley_slope": False,
+    }
+    plan = plot_series.build_pp_graph_refresh_xaxis_plan([], checkbox, pp_has_recs=True)
+    assert plan.ax1_xlabel == "No aspect selected"
+    assert plan.hide_all is True
+
+
 def test_pp_has_visible_rec_ppr():
     assert plot_series.pp_has_visible_rec_ppr({"rec PPR EPSP_amp": {}}) is True
     assert plot_series.pp_has_visible_rec_ppr({"rec PPR EPSP_amp marker": {}}) is False

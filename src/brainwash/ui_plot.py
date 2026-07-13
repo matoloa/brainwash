@@ -783,6 +783,23 @@ class UIplot:
                         if v.get("group_ID") is not None and ((v.get("level") == active_level) or (v.get("level") is None))}
             self.uistate.plot.dict_group_show = new_show
 
+    def _apply_pp_graph_refresh_xaxis(self, ax1, ax2, plan):
+        if plan.ax1_xlabel is not None:
+            ax1.set_xlabel(plan.ax1_xlabel)
+        if plan.ax2_xlabel is not None:
+            ax2.set_xlabel(plan.ax2_xlabel)
+        if plan.ticks:
+            ax1.set_xticks(plan.ticks)
+            ax1.set_xticklabels(plan.ticklabels)
+            ax2.set_xticks(plan.ticks)
+            ax2.set_xticklabels(plan.ticklabels)
+        if plan.hide_all:
+            ax1.tick_params(axis="x", bottom=False, labelbottom=False)
+            ax2.tick_params(axis="x", bottom=False, labelbottom=False)
+        elif plan.labels_only:
+            ax1.tick_params(axis="x", bottom=False, labelbottom=True)
+            ax2.tick_params(axis="x", bottom=False, labelbottom=True)
+
     def graphRefresh(self, dd_groups, dd_testset=None, dd_shown_samples=None):
         # show only selected and imported lines, only appropriate aspects
         uistate = self.uistate
@@ -844,9 +861,9 @@ class UIplot:
         axm.axis("off")
 
         axe.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v * 1e3:.1f}"))
-        axe.set_ylabel("Voltage (mV)")
+        axe.set_ylabel(plot_model.EVENT_AXIS_YLABEL)
         axe.xaxis.set_major_formatter(FuncFormatter(lambda t, _: f"{t * 1e3:.1f}"))
-        axe.set_xlabel("Time (ms)")
+        axe.set_xlabel(plot_model.EVENT_AXIS_XLABEL)
 
         exp_type = uistate.experiment.experiment_type
         axis_labels = plot_model.output_axis_ylabels(
@@ -856,20 +873,18 @@ class UIplot:
         )
         ax1.set_ylabel(axis_labels.ax1_ylabel)
         ax2.set_ylabel(axis_labels.ax2_ylabel)
-        if exp_type == "io":
-            ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
-            ax1.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
-            ax2.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
-            ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
-        elif exp_type == "PP":
-            ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
-            ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
-        else:
+        fmt_mode = plot_model.output_axis_format_mode(exp_type)
+        if fmt_mode.show_output_x_tick_marks:
             ax1.tick_params(axis="x", bottom=True, length=3.5)
             ax2.tick_params(axis="x", bottom=True, length=3.5)
+        if fmt_mode.use_g_formatters:
             ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
-            ax2.xaxis.set_major_formatter(uistate.x_axis_formatter())
+            ax1.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+            if fmt_mode.time_x_formatter_on_ax2:
+                ax2.xaxis.set_major_formatter(uistate.x_axis_formatter())
+            else:
+                ax2.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
 
         # Add horizontal dotted grid lines at 100%, 200%, 300% for PPR
         if exp_type == "PP":
@@ -886,9 +901,6 @@ class UIplot:
                 ax1.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
                 ax2.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
         if exp_type == "PP":
-            ax1.set_xlabel("")
-            ax2.set_xlabel("")
-
             bar_specs = []
             if hasattr(self.uistate.plot, "dict_group_show"):
                 bar_specs = plot_series.collect_pp_group_bar_patch_specs(
@@ -896,45 +908,15 @@ class UIplot:
                     current_level,
                     lambda base: self._display_label(base),
                 )
-
-            x_ticks, x_ticklabels = plot_series.pp_group_tick_label_map(bar_specs)
-            group_name_to_x = dict(zip(x_ticks, x_ticklabels))
-
-            if not x_ticks:
-                ax1.tick_params(axis="x", bottom=False, labelbottom=False)
-                ax2.tick_params(axis="x", bottom=False, labelbottom=False)
-            else:
-                ax1.set_xticks(x_ticks)
-                ax1.set_xticklabels(x_ticklabels)
-                ax2.set_xticks(x_ticks)
-                ax2.set_xticklabels(x_ticklabels)
-
-                # Turn off the tick *marks* (the physical lines), leaving just the labels
-                ax1.tick_params(axis="x", bottom=False, labelbottom=True)
-                ax2.tick_params(axis="x", bottom=False, labelbottom=True)
-
-        pp_has_recs = (
-            exp_type == "PP"
-            and hasattr(self.uistate.plot, "dict_rec_show")
-            and plot_series.pp_has_visible_rec_ppr(uistate.plot.dict_rec_show)
-        )
-
-        if exp_type == "PP" and pp_has_recs and not group_name_to_x:
-            x_ticks, x_ticklabels = plot_series.pp_recording_view_ticks(uistate.project.checkBox)
-
-            if not x_ticks:
-                ax1.set_xlabel("No aspect selected")
-                ax1.tick_params(axis="x", bottom=False, labelbottom=False)
-                ax2.tick_params(axis="x", bottom=False, labelbottom=False)
-            else:
-                ax1.set_xlabel("")
-                ax2.set_xlabel("")
-                ax1.set_xticks(x_ticks)
-                ax1.set_xticklabels(x_ticklabels)
-                ax2.set_xticks(x_ticks)
-                ax2.set_xticklabels(x_ticklabels)
-                ax1.tick_params(axis="x", bottom=False, labelbottom=True)
-                ax2.tick_params(axis="x", bottom=False, labelbottom=True)
+            pp_has_recs = hasattr(self.uistate.plot, "dict_rec_show") and plot_series.pp_has_visible_rec_ppr(
+                uistate.plot.dict_rec_show
+            )
+            pp_xplan = plot_series.build_pp_graph_refresh_xaxis_plan(
+                bar_specs,
+                uistate.project.checkBox,
+                pp_has_recs=pp_has_recs,
+            )
+            self._apply_pp_graph_refresh_xaxis(ax1, ax2, pp_xplan)
 
         if exp_type != "PP":
             ax1.set_xlabel(uistate.x_axis_xlabel())

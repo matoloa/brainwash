@@ -352,3 +352,22 @@ def output_axis_ylabels(*, experiment_type: str, io_output: str, norm_epsP: bool
 
 def pp_reference_grid_y_values() -> tuple[float, float, float]:
     return (1.0, 2.0, 3.0)
+
+
+EVENT_AXIS_YLABEL = "Voltage (mV)"
+EVENT_AXIS_XLABEL = "Time (ms)"
+
+
+@dataclass(frozen=True)
+class OutputAxisFormatMode:
+    use_g_formatters: bool
+    time_x_formatter_on_ax2: bool
+    show_output_x_tick_marks: bool
+
+
+def output_axis_format_mode(experiment_type: str) -> OutputAxisFormatMode:
+    if experiment_type == "io":
+        return OutputAxisFormatMode(use_g_formatters=True, time_x_formatter_on_ax2=False, show_output_x_tick_marks=False)
+    if experiment_type == "PP":
+        return OutputAxisFormatMode(use_g_formatters=True, time_x_formatter_on_ax2=False, show_output_x_tick_marks=False)
+    return OutputAxisFormatMode(use_g_formatters=True, time_x_formatter_on_ax2=True, show_output_x_tick_marks=True)
