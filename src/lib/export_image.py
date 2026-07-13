@@ -272,10 +272,10 @@ def render_publication_figure(
     }
 
     with matplotlib.rc_context(rc_params):
-        is_io_mode = getattr(uistate, "experiment_type", "time") == "io"
-        is_pp_mode = getattr(uistate, "experiment_type", "time") == "PP"
+        is_io_mode = uistate.experiment.experiment_type == "io"
+        is_pp_mode = uistate.experiment.experiment_type == "PP"
         if is_pp_mode:
-            panels_to_render = [asp for asp in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"] if uistate.checkBox.get(asp, True)]
+            panels_to_render = [asp for asp in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"] if uistate.project.checkBox.get(asp, True)]
         elif is_io_mode:
             panels_to_render = ["io"]
         else:
@@ -295,43 +295,43 @@ def render_publication_figure(
             if is_pp_mode:
                 for y_val in [1.0, 2.0, 3.0]:
                     ax.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
-            elif uistate.checkBox.get("norm_EPSP"):
+            elif uistate.project.checkBox.get("norm_EPSP"):
                 if panel == "amp":
                     ax.axhline(
                         100,
                         linestyle="dotted",
                         alpha=0.3,
-                        color=uistate.settings.get("rgb_EPSP_amp", "black"),
+                        color=uistate.project.settings.get("rgb_EPSP_amp", "black"),
                     )
                 elif panel == "slope":
                     ax.axhline(
                         100,
                         linestyle="dotted",
                         alpha=0.3,
-                        color=uistate.settings.get("rgb_EPSP_slope", "black"),
+                        color=uistate.project.settings.get("rgb_EPSP_slope", "black"),
                     )
                 elif panel == "io":
-                    io_output = getattr(uistate, "io_output", "EPSPamp")
+                    io_output = uistate.experiment.io_output
                     y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
                     ax.axhline(
                         100,
                         linestyle="dotted",
                         alpha=0.3,
-                        color=uistate.settings.get(f"rgb_{y_col_base}", "black"),
+                        color=uistate.project.settings.get(f"rgb_{y_col_base}", "black"),
                     )
 
             # Re-plot data by identifying relevant lines from the existing interactive axes
             # We fetch data directly from the plotted group lines in uistate
             # to mirror exactly what was calculated, applying only new styling.
             has_data = False
-            for label, info in uistate.dict_group_labels.items():
+            for label, info in uistate.plot.dict_group_labels.items():
                 group_id_str = str(info["group_ID"])
                 # We only plot if the group ID is in selected_groups
                 if group_id_str not in [str(g) for g in selected_groups]:
                     continue
 
                 # Only plot lines that are currently toggled visible in the UI
-                if label not in uistate.dict_group_show:
+                if label not in uistate.plot.dict_group_show:
                     continue
 
                 axis_src = info.get("axis")
@@ -366,7 +366,7 @@ def render_publication_figure(
                     # Calculate offset to center elements back on their base integer group tick
                     shift = 0
                     bar_label = f"{label.split(' PPR')[0]} PPR {info.get('aspect')} bar"
-                    bar_info = uistate.dict_group_labels.get(bar_label)
+                    bar_info = uistate.plot.dict_group_labels.get(bar_label)
                     if bar_info and hasattr(bar_info.get("line"), "patches") and len(bar_info["line"].patches) > 0:
                         p = bar_info["line"].patches[0]
                         orig_base_x = p.get_x() + p.get_width() / 2
@@ -405,18 +405,18 @@ def render_publication_figure(
                     if panel == "io":
                         aspect = info.get("aspect", "")
                         if "slope" in aspect.lower():
-                            ax.set_ylabel(f"EPSP Slope %" if uistate.checkBox.get("norm_EPSP") else f"EPSP Slope (mV/ms)")
+                            ax.set_ylabel(f"EPSP Slope %" if uistate.project.checkBox.get("norm_EPSP") else f"EPSP Slope (mV/ms)")
                         else:
-                            ax.set_ylabel(f"EPSP Amplitude %" if uistate.checkBox.get("norm_EPSP") else f"EPSP Amplitude (mV)")
+                            ax.set_ylabel(f"EPSP Amplitude %" if uistate.project.checkBox.get("norm_EPSP") else f"EPSP Amplitude (mV)")
                         has_data = True
                     else:
                         continue
                 else:
                     if panel == "amp" and axis_src == "ax1":
-                        ax.set_ylabel("Amplitude %" if uistate.checkBox.get("norm_EPSP") else "Amplitude (mV)")
+                        ax.set_ylabel("Amplitude %" if uistate.project.checkBox.get("norm_EPSP") else "Amplitude (mV)")
                         has_data = True
                     elif panel == "slope" and axis_src == "ax2":
-                        ax.set_ylabel("Slope %" if uistate.checkBox.get("norm_EPSP") else "Slope (mV/ms)")
+                        ax.set_ylabel("Slope %" if uistate.project.checkBox.get("norm_EPSP") else "Slope (mV/ms)")
                         has_data = True
                     else:
                         # Ignore event/mean panels for now unless they match the source axis
@@ -508,7 +508,7 @@ def render_publication_figure(
                 if is_pp_mode:
                     ax.set_xlabel("")
                     group_name_to_x = {}
-                    for label, info in uistate.dict_group_labels.items():
+                    for label, info in uistate.plot.dict_group_labels.items():
                         if info.get("aspect") == panel and hasattr(info.get("line"), "patches"):
                             if "overlay" in label or info.get("is_overlay"):
                                 continue
@@ -540,7 +540,7 @@ def render_publication_figure(
                     ax.legend(by_label.values(), by_label.keys(), frameon=False)
 
                 show_inset = (is_io_mode and panel == "io") or (not is_io_mode and panel in ["amp", "slope"])
-                if show_inset and hasattr(uistate, "sample_inset") and uistate.sample_inset is not None and uistate.sample_inset.get_visible():
+                if show_inset and hasattr(uistate, "sample_inset") and uistate.plot.sample_inset is not None and uistate.plot.sample_inset.get_visible():
                     export_inset = ax.inset_axes([0.02, 0.68, 0.20, 0.30])
                     export_inset.set_zorder(10)
                     export_inset.set_facecolor((0, 0, 0, 0))
@@ -551,7 +551,7 @@ def render_publication_figure(
                     export_inset.set_axis_off()
 
                     all_ys = []
-                    for key, line in getattr(uistate, "sample_artists", {}).items():
+                    for key, line in uistate.plot.sample_artists.items():
                         if len(key) == 3:
                             group_ID, test_id, stim_num = key
                         else:
@@ -585,15 +585,15 @@ def render_publication_figure(
                     export_inset.autoscale_view(scalex=False)
 
                 # Add significance markers if formal test results are present
-                formal_results = getattr(uistate, "formal_test_results", None)
+                formal_results = uistate.stat_test.formal_test_results
                 if formal_results:
-                    test_type = getattr(uistate, "test_type", "None")
+                    test_type = uistate.stat_test.test_type
                     if test_type == "Wilcoxon":
-                        variant = getattr(uistate, "test_wilcox_variant", "paired")
+                        variant = uistate.stat_test.test_wilcox_variant
                     else:
-                        variant = getattr(uistate, "test_t_variant", "unpaired")
-                    fdr_flag = bool(getattr(uistate, "test_fdr", False))
-                    dark_flag = bool(getattr(uistate, "darkmode", False))
+                        variant = uistate.stat_test.test_t_variant
+                    fdr_flag = bool(uistate.stat_test.test_fdr)
+                    dark_flag = bool(uistate.darkmode)
                     # Per-panel visibility for significance markers (matches ui_plot.py:show_test_markers exactly).
                     # When both aspects selected: amp panel -> low y on ax1 (p_amp/**), slope panel -> high y on ax2 (p_slope/*).
                     if panel in ("amp", "amplitude", "EPSP_amp"):
@@ -605,10 +605,10 @@ def render_publication_figure(
                         slope_v = True
                         label_override = None
                     else:
-                        amp_v = bool(getattr(uistate, "checkBox", {}).get("EPSP_amp", True))
-                        slope_v = bool(getattr(uistate, "checkBox", {}).get("EPSP_slope", True))
+                        amp_v = bool(uistate.project.checkBox.get("EPSP_amp", True))
+                        slope_v = bool(uistate.project.checkBox.get("EPSP_slope", True))
                         label_override = None
-                    io_out = getattr(uistate, "io_output", None) if is_io_mode else None
+                    io_out = uistate.experiment.io_output if is_io_mode else None
                     _add_significance_markers(
                         ax=ax,
                         panel=panel,
@@ -627,8 +627,8 @@ def render_publication_figure(
 
                 fig.tight_layout()
                 if panel == "io":
-                    io_input = getattr(uistate, "io_input", "vamp")
-                    io_output = getattr(uistate, "io_output", "EPSPamp")
+                    io_input = uistate.experiment.io_input
+                    io_output = uistate.experiment.io_output
                     panel_key = f"{io_input}-{io_output}"
                 else:
                     panel_key = panel_name_map.get(panel, panel)
@@ -643,30 +643,30 @@ def build_figure_text_md(uistate, template, group_names=None) -> str:
     patterns from _get_stat_test_warning (ui.py) and _add_significance_markers.
     Per-panel .md strategy (Option A): one .md per PNG with matching base name.
     """
-    if not uistate or getattr(uistate, "test_type", "None") == "None":
+    if not uistate or uistate.stat_test.test_type == "None":
         return "(Exported without statistical comparison overlay.)"
 
-    test_type = getattr(uistate, "test_type", "None")
-    results = getattr(uistate, "formal_test_results", []) or []
+    test_type = uistate.stat_test.test_type
+    results = uistate.stat_test.formal_test_results or []
     if not results:
         return "(Exported without statistical comparison overlay.)"
 
     # Extract config (defensive, mirrors ui.py/_get_stat_test_warning)
-    fdr = bool(getattr(uistate, "test_fdr", False))
-    variant = getattr(uistate, "test_t_variant", "unpaired")
+    fdr = bool(uistate.stat_test.test_fdr)
+    variant = uistate.stat_test.test_t_variant
     if test_type == "Wilcoxon":
-        variant = getattr(uistate, "test_wilcox_variant", "paired")
-    tails = getattr(uistate, "test_t_tails", "two-sided") if test_type != "Wilcoxon" else getattr(uistate, "test_wilcox_tails", "two-sided")
-    sw = bool(getattr(uistate, "test_sw", False))
-    levene = bool(getattr(uistate, "test_levene", False))
-    norm = bool(getattr(uistate, "checkBox", {}).get("norm_EPSP", False))
-    amp_enabled = bool(getattr(uistate, "checkBox", {}).get("EPSP_amp", True))
-    slope_enabled = bool(getattr(uistate, "checkBox", {}).get("EPSP_slope", True))
+        variant = uistate.stat_test.test_wilcox_variant
+    tails = uistate.stat_test.test_t_tails if test_type != "Wilcoxon" else uistate.stat_test.test_wilcox_tails
+    sw = bool(uistate.stat_test.test_sw)
+    levene = bool(uistate.stat_test.test_levene)
+    norm = bool(uistate.project.checkBox.get("norm_EPSP", False))
+    amp_enabled = bool(uistate.project.checkBox.get("EPSP_amp", True))
+    slope_enabled = bool(uistate.project.checkBox.get("EPSP_slope", True))
 
     # Group names (fallback to set_name or generic)
     group_map = group_names or {}
     if not group_map and hasattr(uistate, "dict_group_labels"):
-        for k, v in getattr(uistate, "dict_group_labels", {}).items():
+        for k, v in uistate.plot.dict_group_labels.items():
             if isinstance(v, dict) and "group_name" in v:
                 group_map[str(v.get("group_ID", ""))] = v["group_name"]
 
@@ -806,13 +806,13 @@ if __name__ == "__main__":
         [yi - ye for yi, ye in zip(y, yerr)],
         [yi + ye for yi, ye in zip(y, yerr)],
     )
-    mock_uistate.dict_group_labels["Group 1 EPSP amp mean"] = {
+    mock_uistate.plot.dict_group_labels["Group 1 EPSP amp mean"] = {
         "group_ID": 1,
         "axis": "ax1",
         "line": line_amp,
         "fill": fill_amp,
     }
-    mock_uistate.dict_group_show["Group 1 EPSP amp mean"] = mock_uistate.dict_group_labels["Group 1 EPSP amp mean"]
+    mock_uistate.plot.dict_group_show["Group 1 EPSP amp mean"] = mock_uistate.plot.dict_group_labels["Group 1 EPSP amp mean"]
 
     (line_slope,) = ax.plot(x, [y_i * 0.5 for y_i in y], color="red", label="slope")
     fill_slope = ax.fill_between(
@@ -822,13 +822,13 @@ if __name__ == "__main__":
         color="red",
         alpha=0.3,
     )
-    mock_uistate.dict_group_labels["Group 2 EPSP slope mean"] = {
+    mock_uistate.plot.dict_group_labels["Group 2 EPSP slope mean"] = {
         "group_ID": 2,
         "axis": "ax2",
         "line": line_slope,
         "fill": fill_slope,
     }
-    mock_uistate.dict_group_show["Group 2 EPSP slope mean"] = mock_uistate.dict_group_labels["Group 2 EPSP slope mean"]
+    mock_uistate.plot.dict_group_show["Group 2 EPSP slope mean"] = mock_uistate.plot.dict_group_labels["Group 2 EPSP slope mean"]
 
     template = JOURNAL_TEMPLATES["jneurosci_1col"]
     try:

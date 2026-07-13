@@ -400,8 +400,8 @@ class ParseDataThread(QtCore.QThread):
                 recording_name = df_proj_row["recording_name"]
                 source_path = df_proj_row["path"]
                 self.progress.emit(i)
-                split_odd_even = uistate.checkBox.get("splitOddEven", False)
-                split_at_time = uistate.lineEdit.get("split_at_time", 0) or None
+                split_odd_even = uistate.project.checkBox.get("splitOddEven", False)
+                split_at_time = uistate.project.lineEdit.get("split_at_time", 0) or None
 
                 def _sub_progress_callback(idx, total):
                     self.sub_progress.emit(idx, total)
@@ -411,7 +411,7 @@ class ParseDataThread(QtCore.QThread):
 
                 dict_dfs_raw = parse.source2dfs(
                     source=source_path,
-                    gain=uistate.lineEdit["import_gain"],
+                    gain=uistate.project.lineEdit["import_gain"],
                     split_odd_even=split_odd_even,
                     split_at_time=split_at_time,
                     progress_callback=_sub_progress_callback,
@@ -460,9 +460,9 @@ class graphPreloadThread(QtCore.QThread):
 
     def run(self):
         try:
-            print(f"graphPreloadThread.run: entered, {len(self.uistate.list_idx_recs2preload)} recordings")
-            df_p = self.df_p.loc[self.uistate.list_idx_recs2preload]
-            self.uistate.list_idx_recs2preload = []
+            print(f"graphPreloadThread.run: entered, {len(self.uistate.project.list_idx_recs2preload)} recordings")
+            df_p = self.df_p.loc[self.uistate.project.list_idx_recs2preload]
+            self.uistate.project.list_idx_recs2preload = []
             self.i = 0
             for i, p_row in df_p.iterrows():
                 print(f"graphPreloadThread.run: processing {p_row['recording_name']}")
@@ -478,7 +478,7 @@ class graphPreloadThread(QtCore.QThread):
                 _ = self.uisub.get_dffilter(row=p_row)
                 print("graphPreloadThread.run: calling get_dfoutput")
                 is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
-                if self.uistate.checkBox["paired_stims"] and not is_pp:
+                if self.uistate.project.checkBox["paired_stims"] and not is_pp:
                     dfoutput = self.uisub.get_dfdiff(row=p_row)
                 else:
                     dfoutput = self.uisub.get_dfoutput(row=p_row)

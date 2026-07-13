@@ -45,7 +45,7 @@ class GraphCoordinatorMixin:
         - self.progressBar, self.progressBarManager (ui_widgets)
         - self.graphClicked, self.zoomOnScroll
         - self.refreshHierarchyLineEdits, self.update_amp_lineEdits, self.update_slope_lineEdits
-        - uistate.ax*, uistate.zoom, uistate.settings, uistate.checkBox, etc.
+        - uistate.ax*, uistate.project.zoom, uistate.project.settings, uistate.project.checkBox, etc.
         - uiplot.graphRefresh, uiplot.addGroup, uiplot.addRow, uiplot.clear_sample_artists
         - ui_widgets.graphPreloadThread, ui_widgets.ProgressBarManager, ui_widgets.MplCanvas
     """
@@ -59,7 +59,7 @@ class GraphCoordinatorMixin:
         if hasattr(self, "dd_group_samples"):
             self.dd_group_samples = {}
         if hasattr(uiplot, "uistate"):
-            uiplot.uistate.sample_dirty = True
+            uiplot.uistate.plot.sample_dirty = True
         if hasattr(uiplot, "clear_sample_artists"):
             uiplot.clear_sample_artists(draw=False)
 
@@ -112,10 +112,10 @@ class GraphCoordinatorMixin:
 
     def graphWipe(self):  # removes all plots from canvasEvent and canvasOutput
         self.exorcise()
-        uistate.dict_rec_labels = {}
-        uistate.dict_rec_show = {}
-        uistate.dict_group_labels = {}
-        uistate.dict_group_show = {}
+        uistate.plot.dict_rec_labels = {}
+        uistate.plot.dict_rec_show = {}
+        uistate.plot.dict_group_labels = {}
+        uistate.plot.dict_group_show = {}
         if hasattr(self, "canvasMean"):
             self.canvasMean.figure.legends.clear()
             self.canvasMean.axes.cla()
@@ -132,14 +132,14 @@ class GraphCoordinatorMixin:
 
     def graphAxes(self):  # plot selected row(s), or clear graph if empty
         print("graphAxes")
-        uistate.axm = self.canvasMean.axes
-        uistate.axe = self.canvasEvent.axes
+        uistate.plot.axm = self.canvasMean.axes
+        uistate.plot.axe = self.canvasEvent.axes
         ax1 = self.canvasOutput.axes
-        if uistate.ax2 is not None and hasattr(uistate, "ax2"):  # remove ax2 if it exists
-            uistate.ax2.remove()
+        if uistate.plot.ax2 is not None and hasattr(uistate, "ax2"):  # remove ax2 if it exists
+            uistate.plot.ax2.remove()
         ax2 = ax1.twinx()
-        uistate.ax2 = ax2  # Store the ax2 instance
-        uistate.ax1 = ax1
+        uistate.plot.ax2 = ax2  # Store the ax2 instance
+        uistate.plot.ax1 = ax1
         # connect scroll event if not already connected #TODO: when graphAxes is called only once, the check should be redundant
         if not hasattr(self, "scroll_event_connected") or not self.scroll_event_connected:
             self.canvasMean.mpl_connect(
@@ -168,17 +168,17 @@ class GraphCoordinatorMixin:
         self.mouseoverDisconnect()
         # Clean up any existing thread before starting a new one
         self._cleanup_threads()
-        if not uistate.list_idx_recs2preload:
+        if not uistate.project.list_idx_recs2preload:
             print("graphPreload: list_idx_recs2preload empty, falling back to all parsed recordings")
             df_p = self.get_df_project()
-            uistate.list_idx_recs2preload = df_p[~df_p["sweeps"].eq("...")].index.tolist()
-        if not uistate.list_idx_recs2preload:
+            uistate.project.list_idx_recs2preload = df_p[~df_p["sweeps"].eq("...")].index.tolist()
+        if not uistate.project.list_idx_recs2preload:
             print("graphPreload: nothing to preload, returning early")
             self.uiThaw()
             self.update_test()
             self.setButtonParse()
             return
-        print(f"graphPreload: starting thread for {len(uistate.list_idx_recs2preload)} recordings: {uistate.list_idx_recs2preload}")
+        print(f"graphPreload: starting thread for {len(uistate.project.list_idx_recs2preload)} recordings: {uistate.project.list_idx_recs2preload}")
         self.progressBar.setValue(0)
         thread = ui_widgets.graphPreloadThread(uistate, uiplot, self)
         thread.finished.connect(lambda: self.ongraphPreloadFinished(t0))
@@ -187,8 +187,8 @@ class GraphCoordinatorMixin:
         self._threads.append(thread)
 
         # Create ProgressBarManager and connect progress signal
-        if len(uistate.list_idx_recs2preload) > 0:
-            self.progressBarManager = ui_widgets.ProgressBarManager(self.progressBar, len(uistate.list_idx_recs2preload))
+        if len(uistate.project.list_idx_recs2preload) > 0:
+            self.progressBarManager = ui_widgets.ProgressBarManager(self.progressBar, len(uistate.project.list_idx_recs2preload))
 
             def _preload_progress(i):
                 self.progressBarManager.update(i, "Preloading recording")
@@ -219,13 +219,13 @@ class GraphCoordinatorMixin:
         if not all_group_ids:
             return
         groups_with_records = {group_id: group_info for group_id, group_info in self.dd_groups.items() if group_info["rec_IDs"]}
-        current_level = getattr(uistate, "buttonGroup_test_n", "recording")
+        current_level = uistate.stat_test.buttonGroup_test_n
         already_plotted_groups = set(uistate.get_groupSet(level=current_level))
         groups_to_plot = all_group_ids & set(groups_with_records.keys()) - already_plotted_groups
         if groups_to_plot:
             for group_ID in groups_to_plot:
                 dict_group = self.dd_groups[group_ID]
-                level = getattr(uistate, "buttonGroup_test_n", "recording")
+                level = uistate.stat_test.buttonGroup_test_n
                 group_mean_data = self.get_dfgroupmean(group_ID, level=level)
                 # print(f"graphGroups: Adding group {group_ID} to plot: {group_mean_data}")
                 x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
@@ -239,8 +239,8 @@ class GraphCoordinatorMixin:
             if dft is None or (hasattr(dft, "empty") and dft.empty):
                 print(f"graphUpdate: skipping row {row.get('recording_name', '?')} (no dft/stims)")
                 return
-            is_pp = getattr(uistate, "experiment_type", "time") == "PP"
-            dfoutput = self.get_dfdiff(row=row) if (uistate.checkBox["paired_stims"] and not is_pp) else self.get_dfoutput(row=row)
+            is_pp = uistate.experiment.experiment_type == "PP"
+            dfoutput = self.get_dfdiff(row=row) if (uistate.project.checkBox["paired_stims"] and not is_pp) else self.get_dfoutput(row=row)
             if dfoutput is not None:
                 uiplot.addRow(p_row=row, dft=dft, dfmean=dfmean, dfoutput=self.V2mV(dfoutput))
 
@@ -288,7 +288,7 @@ class GraphCoordinatorMixin:
         if total_size == 0:
             return
 
-        old_proportions = uistate.splitter.get(splitter_name, [])
+        old_proportions = uistate.project.splitter.get(splitter_name, [])
         sizes = splitter.sizes()
         unbounded_px = sum(size for i, size in enumerate(sizes) if i >= len(old_proportions) or type(old_proportions[i]) == float)
 
@@ -300,14 +300,14 @@ class GraphCoordinatorMixin:
                 proportions.append(float(size / unbounded_px if unbounded_px > 0 else 0.0))
 
         # print(f"{splitter_name}, total_size: {total_size}, Proportions: {proportions}")
-        uistate.splitter[splitter_name] = proportions
+        uistate.project.splitter[splitter_name] = proportions
         if splitter_name == "h_splitterMaster" and self.h_splitterMaster.widget(1).isVisible():
             # Recompute graph zooms when the output splitter moves, because the
             # artists' screen positions changed and the hit-test zones for
             # mouseover/selection are now stale.
             self.zoomAuto(reset=True)
             # Ensure the new limits are applied to the canvases.
-            for ax in (uistate.ax1, uistate.ax2):
+            for ax in (uistate.plot.ax1, uistate.plot.ax2):
                 if ax is not None:
                     try:
                         ax.figure.canvas.draw_idle()
@@ -453,15 +453,15 @@ class GraphCoordinatorMixin:
         Must be called after axe limits have been committed so that the
         pixel→data transform reflects the new scale.
         """
-        if uistate.mouseover_action is None:
+        if uistate.plot.mouseover_action is None:
             return
-        uistate.setMargins(axe=uistate.axe)
-        if uistate.mouseover_action in ("EPSP slope", "volley slope"):
-            if uistate.mouseover_plot is None:
+        uistate.setMargins(axe=uistate.plot.axe)
+        if uistate.plot.mouseover_action in ("EPSP slope", "volley slope"):
+            if uistate.plot.mouseover_plot is None:
                 return
             uistate.updateDragZones()
-        elif uistate.mouseover_action in ("EPSP amp move", "volley amp move"):
-            if uistate.mouseover_blob is None:
+        elif uistate.plot.mouseover_action in ("EPSP amp move", "volley amp move"):
+            if uistate.plot.mouseover_blob is None:
                 return
             uistate.updatePointDragZone()
 
@@ -475,23 +475,23 @@ class GraphCoordinatorMixin:
         5-pixel buffer on every side, so the whole rendered blob is always inside
         the detection area with a small margin to spare.
         """
-        if uistate.df_rec_select_time is None or uistate.df_rec_select_time.empty:
+        if uistate.plot.df_rec_select_time is None or uistate.plot.df_rec_select_time.empty:
             return
         pixels = ui_plot.STIM_MARKER_SIZE // 2 + 5
-        uistate.setMarginsAxm(axm=uistate.axm, pixels=pixels)
+        uistate.setMarginsAxm(axm=uistate.plot.axm, pixels=pixels)
 
     def zoomAuto(self, reset=False, skip_axe=False):
         # set and apply Auto-zoom parameters for all axes
         self.usage("zoomAuto")
         prow = self.get_prow()
 
-        ymin_clamp = 0 if self._is_io_mode() else (0 if uistate.checkBox["output_ymin0"] else None)
+        ymin_clamp = 0 if self._is_io_mode() else (0 if uistate.project.checkBox["output_ymin0"] else None)
 
         if prow is None or str(prow.get("sweeps", "...")) == "...":
             logger.debug("zoomAuto: no (parsed) recording selected, fitting to visible groups")
             self._fit_output_zoom_to_groups()
-            self.zoomReset(uistate.ax1)
-            self.zoomReset(uistate.ax2)
+            self.zoomReset(uistate.plot.ax1)
+            self.zoomReset(uistate.plot.ax2)
             return
 
         # axm: derive from raw mean voltage data with fractional padding.
@@ -501,7 +501,7 @@ class GraphCoordinatorMixin:
         sdur = prow.get("sweep_duration", 1.0)
         if not np.isfinite(sdur) or sdur <= 0:
             sdur = 1.0
-        uistate.zoom["mean_xlim"] = (0, sdur)
+        uistate.project.zoom["mean_xlim"] = (0, sdur)
         dfmean = self.get_dfmean(prow)
         try:
             vmin = float(dfmean["voltage"].min())
@@ -514,13 +514,13 @@ class GraphCoordinatorMixin:
         span = vmax - vmin
         if not np.isfinite(span) or span <= 0:
             span = 2.0
-        uistate.zoom["mean_ylim"] = (vmin - pad * span, vmax + pad * span)
+        uistate.project.zoom["mean_ylim"] = (vmin - pad * span, vmax + pad * span)
         if not skip_axe:
             # axe: fit to plotted event artists, skipping the stim artefact by starting
             # 0.5 ms after t=0 (the stim); x-axis on axe is already shifted so t=0 is
             # the stim, so the offset is absolute, not relative to event_start.
             artefact_offset = 0.0005  # seconds after t_stim=0 — clears the artefact spike
-            artist_ylim = self._ylim_from_artists(uistate.axe, x_min=artefact_offset)
+            artist_ylim = self._ylim_from_artists(uistate.plot.axe, x_min=artefact_offset)
             ymax = artist_ylim[1] if artist_ylim else 0.0002
             ymin = artist_ylim[0] if artist_ylim else -0.0015
 
@@ -528,7 +528,7 @@ class GraphCoordinatorMixin:
             # to ensure immunity against single-sweep noise and large artefacts.
             visible_df_mins = []
             dfp = self.get_df_project()
-            visible_rec_ids = {v["rec_ID"] for v in uistate.dict_rec_show.values() if "rec_ID" in v and v.get("axis") == "axe"}
+            visible_rec_ids = {v["rec_ID"] for v in uistate.plot.dict_rec_show.values() if "rec_ID" in v and v.get("axis") == "axe"}
             if not visible_rec_ids and prow is not None:
                 visible_rec_ids = {prow["ID"]}
 
@@ -554,13 +554,13 @@ class GraphCoordinatorMixin:
                 span = ymax - df_min if ymax > df_min else abs(df_min)
                 ymin = df_min - 0.10 * span
 
-            uistate.zoom["event_ylim"] = (ymin, ymax)
-            ey = uistate.zoom["event_ylim"]
+            uistate.project.zoom["event_ylim"] = (ymin, ymax)
+            ey = uistate.project.zoom["event_ylim"]
             if not (np.isfinite(ey[0]) and np.isfinite(ey[1])):
-                uistate.zoom["event_ylim"] = (-0.0015, 0.0002)
-            uistate.zoom["event_xlim"] = (
-                uistate.settings["event_start"],
-                uistate.settings["event_end"],
+                uistate.project.zoom["event_ylim"] = (-0.0015, 0.0002)
+            uistate.project.zoom["event_xlim"] = (
+                uistate.project.settings["event_start"],
+                uistate.project.settings["event_end"],
             )
         # ax1 / ax2: fit to plotted output artists; fall back to (0, 1.5).
         # Clamp bottom to zero only when output_ymin0 is checked.
@@ -568,8 +568,8 @@ class GraphCoordinatorMixin:
         dft = self.get_dft(row=prow)
 
         if self._is_io_mode():
-            xlim1 = self._xlim_from_artists(uistate.ax1, pad=0)
-            xlim2 = self._xlim_from_artists(uistate.ax2, pad=0)
+            xlim1 = self._xlim_from_artists(uistate.plot.ax1, pad=0)
+            xlim2 = self._xlim_from_artists(uistate.plot.ax2, pad=0)
             if xlim1 and xlim2:
                 out_xmax = max(xlim1[1], xlim2[1])
             elif xlim1:
@@ -581,20 +581,20 @@ class GraphCoordinatorMixin:
 
             out_xmax = out_xmax * 1.15 if out_xmax > 0 else 1.0
             out_xmin = 0
-            uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
+            uistate.project.zoom["output_xlim"] = (out_xmin, out_xmax)
 
-            y1 = self._ylim_from_artists(uistate.ax1, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
-            y2 = self._ylim_from_artists(uistate.ax2, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
-            uistate.zoom["output_ax1_ylim"] = (0, y1[1] * 1.15 if y1 and y1[1] > 0 else 1.5)
-            uistate.zoom["output_ax2_ylim"] = (0, y2[1] * 1.15 if y2 and y2[1] > 0 else 1.5)
-        elif getattr(uistate, "experiment_type", "time") == "PP":
-            uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow, dft=dft)
+            y1 = self._ylim_from_artists(uistate.plot.ax1, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
+            y2 = self._ylim_from_artists(uistate.plot.ax2, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
+            uistate.project.zoom["output_ax1_ylim"] = (0, y1[1] * 1.15 if y1 and y1[1] > 0 else 1.5)
+            uistate.project.zoom["output_ax2_ylim"] = (0, y2[1] * 1.15 if y2 and y2[1] > 0 else 1.5)
+        elif uistate.experiment.experiment_type == "PP":
+            uistate.project.zoom["output_xlim"] = uistate.x_axis_xlim(prow, dft=dft)
             # In PP mode, lock the Y-axis to dynamically start at 0 and scale up to include all active data,
             # snapping to clean multiples of 100 if possible.
-            out_xmin, out_xmax = uistate.zoom["output_xlim"]
+            out_xmin, out_xmax = uistate.project.zoom["output_xlim"]
 
-            y1 = self._ylim_from_artists(uistate.ax1, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
-            y2 = self._ylim_from_artists(uistate.ax2, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
+            y1 = self._ylim_from_artists(uistate.plot.ax1, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
+            y2 = self._ylim_from_artists(uistate.plot.ax2, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
 
             def snap_pp_max(y_bounds):
                 if not y_bounds:
@@ -602,38 +602,38 @@ class GraphCoordinatorMixin:
                 return max(3.0, (int(y_bounds[1] / 1.0) + 1) * 1.0)
 
             # Unify the PP mode axes so they always share identical Y-axis boundaries
-            uistate.zoom["output_ax1_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
-            uistate.zoom["output_ax2_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
+            uistate.project.zoom["output_ax1_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
+            uistate.project.zoom["output_ax2_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
         else:
-            uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow, dft=dft)
-            out_xmin, out_xmax = uistate.zoom["output_xlim"]
+            uistate.project.zoom["output_xlim"] = uistate.x_axis_xlim(prow, dft=dft)
+            out_xmin, out_xmax = uistate.project.zoom["output_xlim"]
 
-            uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (
+            uistate.project.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.plot.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (
                 0,
                 1.5,
             )
-            uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (
+            uistate.project.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.plot.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (
                 0,
                 1.5,
             )
         if skip_axe:
-            self.zoomReset(uistate.axm)
-            self.zoomReset(uistate.ax1)
-            self.zoomReset(uistate.ax2)
+            self.zoomReset(uistate.plot.axm)
+            self.zoomReset(uistate.plot.ax1)
+            self.zoomReset(uistate.plot.ax2)
         else:
             self.zoomReset()
         self._recalc_axe_drag_zones()
         self._recalc_axm_detection_zones()
 
     def _fit_output_zoom_to_groups(self):
-        """Compute output xlim/ylim from currently visible artists (groups) and store in uistate.zoom.
+        """Compute output xlim/ylim from currently visible artists (groups) and store in uistate.project.zoom.
         Used when no single recording is selected.
         """
-        ymin_clamp = 0 if self._is_io_mode() else (0 if uistate.checkBox["output_ymin0"] else None)
+        ymin_clamp = 0 if self._is_io_mode() else (0 if uistate.project.checkBox["output_ymin0"] else None)
 
         if self._is_io_mode():
-            xlim1 = self._xlim_from_artists(uistate.ax1, pad=0)
-            xlim2 = self._xlim_from_artists(uistate.ax2, pad=0)
+            xlim1 = self._xlim_from_artists(uistate.plot.ax1, pad=0)
+            xlim2 = self._xlim_from_artists(uistate.plot.ax2, pad=0)
             if xlim1 and xlim2:
                 out_xmax = max(xlim1[1], xlim2[1])
             elif xlim1:
@@ -644,29 +644,29 @@ class GraphCoordinatorMixin:
                 out_xmax = 1.0
             out_xmax = out_xmax * 1.15 if out_xmax > 0 else 1.0
             out_xmin = 0
-            uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
+            uistate.project.zoom["output_xlim"] = (out_xmin, out_xmax)
 
-            y1 = self._ylim_from_artists(uistate.ax1, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
-            y2 = self._ylim_from_artists(uistate.ax2, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
-            uistate.zoom["output_ax1_ylim"] = (0, y1[1] * 1.15 if y1 and y1[1] > 0 else 1.5)
-            uistate.zoom["output_ax2_ylim"] = (0, y2[1] * 1.15 if y2 and y2[1] > 0 else 1.5)
-        elif getattr(uistate, "experiment_type", "time") == "PP":
-            uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow=None, dft=None)
-            out_xmin, out_xmax = uistate.zoom["output_xlim"]
+            y1 = self._ylim_from_artists(uistate.plot.ax1, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
+            y2 = self._ylim_from_artists(uistate.plot.ax2, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
+            uistate.project.zoom["output_ax1_ylim"] = (0, y1[1] * 1.15 if y1 and y1[1] > 0 else 1.5)
+            uistate.project.zoom["output_ax2_ylim"] = (0, y2[1] * 1.15 if y2 and y2[1] > 0 else 1.5)
+        elif uistate.experiment.experiment_type == "PP":
+            uistate.project.zoom["output_xlim"] = uistate.x_axis_xlim(prow=None, dft=None)
+            out_xmin, out_xmax = uistate.project.zoom["output_xlim"]
 
-            y1 = self._ylim_from_artists(uistate.ax1, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
-            y2 = self._ylim_from_artists(uistate.ax2, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
+            y1 = self._ylim_from_artists(uistate.plot.ax1, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
+            y2 = self._ylim_from_artists(uistate.plot.ax2, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
 
             def snap_pp_max(y_bounds):
                 if not y_bounds:
                     return 3.0
                 return max(3.0, (int(y_bounds[1] / 1.0) + 1) * 1.0)
 
-            uistate.zoom["output_ax1_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
-            uistate.zoom["output_ax2_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
+            uistate.project.zoom["output_ax1_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
+            uistate.project.zoom["output_ax2_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
         else:
-            xlim1 = self._xlim_from_artists(uistate.ax1)
-            xlim2 = self._xlim_from_artists(uistate.ax2)
+            xlim1 = self._xlim_from_artists(uistate.plot.ax1)
+            xlim2 = self._xlim_from_artists(uistate.plot.ax2)
 
             if xlim1 and xlim2:
                 out_xmin, out_xmax = min(xlim1[0], xlim2[0]), max(xlim1[1], xlim2[1])
@@ -677,27 +677,27 @@ class GraphCoordinatorMixin:
             else:
                 out_xmin, out_xmax = (0, 1)
 
-            uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
-            uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
-            uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
+            uistate.project.zoom["output_xlim"] = (out_xmin, out_xmax)
+            uistate.project.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.plot.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
+            uistate.project.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.plot.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
 
     def zoomReset(self, axis=None):
         # self.usage("zoomReset")
         if axis is None:
             for axis in [
-                uistate.axm,
-                uistate.axe,
-                uistate.ax1,
-                uistate.ax2,
+                uistate.plot.axm,
+                uistate.plot.axe,
+                uistate.plot.ax1,
+                uistate.plot.ax2,
             ]:
                 # print(f"zoomReset: all canvases: {axis}")
                 self.zoomReset(axis)
             return
-        if axis == uistate.axm:
+        if axis == uistate.plot.axm:
             logger.debug("zoomReset: axm")
             # print("zoomReset: axm")
-            mx = uistate.zoom.get("mean_xlim", (0, 1))
-            my = uistate.zoom.get("mean_ylim", (-1, 1))
+            mx = uistate.project.zoom.get("mean_xlim", (0, 1))
+            my = uistate.project.zoom.get("mean_ylim", (-1, 1))
             if not (np.isfinite(mx[0]) and np.isfinite(mx[1])):
                 mx = (0, 1)
             if not (np.isfinite(my[0]) and np.isfinite(my[1])):
@@ -706,11 +706,11 @@ class GraphCoordinatorMixin:
             axis.axes.set_ylim(my)
             self._recalc_axm_detection_zones()
             axis.figure.canvas.draw_idle()
-        elif axis == uistate.axe:
+        elif axis == uistate.plot.axe:
             logger.debug("zoomReset: axe")
             # print("zoomReset: axe")
-            ex = uistate.zoom.get("event_xlim", (uistate.settings.get("event_start", 0), uistate.settings.get("event_end", 0.05)))
-            ey = uistate.zoom.get("event_ylim", (-0.0015, 0.0002))
+            ex = uistate.project.zoom.get("event_xlim", (uistate.project.settings.get("event_start", 0), uistate.project.settings.get("event_end", 0.05)))
+            ey = uistate.project.zoom.get("event_ylim", (-0.0015, 0.0002))
             if not (np.isfinite(ex[0]) and np.isfinite(ex[1])):
                 ex = (0, 0.05)
             if not (np.isfinite(ey[0]) and np.isfinite(ey[1])):
@@ -718,35 +718,35 @@ class GraphCoordinatorMixin:
             axis.axes.set_xlim(ex)
             axis.axes.set_ylim(ey)
             axis.figure.canvas.draw_idle()
-        elif axis == uistate.ax1 or axis == uistate.ax2:
+        elif axis == uistate.plot.ax1 or axis == uistate.plot.ax2:
             logger.debug("zoomReset: ax1/ax2")
             # print("zoomReset: ax1/ax2")
-            ox = uistate.zoom.get("output_xlim", (0, 1))
-            oy1 = uistate.zoom.get("output_ax1_ylim", (0, 1.5))
-            oy2 = uistate.zoom.get("output_ax2_ylim", (0, 1.5))
+            ox = uistate.project.zoom.get("output_xlim", (0, 1))
+            oy1 = uistate.project.zoom.get("output_ax1_ylim", (0, 1.5))
+            oy2 = uistate.project.zoom.get("output_ax2_ylim", (0, 1.5))
             if not (np.isfinite(ox[0]) and np.isfinite(ox[1])):
                 ox = (0, 1)
             if not (np.isfinite(oy1[0]) and np.isfinite(oy1[1])):
                 oy1 = (0, 1.5)
             if not (np.isfinite(oy2[0]) and np.isfinite(oy2[1])):
                 oy2 = (0, 1.5)
-            uistate.ax1.axes.set_xlim(ox)
-            uistate.ax2.axes.set_xlim(ox)
-            uistate.ax1.axes.set_ylim(oy1)
-            uistate.ax2.axes.set_ylim(oy2)
-            uistate.ax1.figure.canvas.draw_idle()
+            uistate.plot.ax1.axes.set_xlim(ox)
+            uistate.plot.ax2.axes.set_xlim(ox)
+            uistate.plot.ax1.axes.set_ylim(oy1)
+            uistate.plot.ax2.axes.set_ylim(oy2)
+            uistate.plot.ax1.figure.canvas.draw_idle()
         else:
             raise ValueError("zoomReset: unknown axis")
 
     def _fit_output_zoom_to_groups(self):
-        """Compute output xlim/ylim from currently visible artists (groups) and store in uistate.zoom.
+        """Compute output xlim/ylim from currently visible artists (groups) and store in uistate.project.zoom.
         Used when no single recording is selected.
         """
-        ymin_clamp = 0 if self._is_io_mode() else (0 if uistate.checkBox["output_ymin0"] else None)
+        ymin_clamp = 0 if self._is_io_mode() else (0 if uistate.project.checkBox["output_ymin0"] else None)
 
         if self._is_io_mode():
-            xlim1 = self._xlim_from_artists(uistate.ax1, pad=0)
-            xlim2 = self._xlim_from_artists(uistate.ax2, pad=0)
+            xlim1 = self._xlim_from_artists(uistate.plot.ax1, pad=0)
+            xlim2 = self._xlim_from_artists(uistate.plot.ax2, pad=0)
             if xlim1 and xlim2:
                 out_xmax = max(xlim1[1], xlim2[1])
             elif xlim1:
@@ -757,29 +757,29 @@ class GraphCoordinatorMixin:
                 out_xmax = 1.0
             out_xmax = out_xmax * 1.15 if out_xmax > 0 else 1.0
             out_xmin = 0
-            uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
+            uistate.project.zoom["output_xlim"] = (out_xmin, out_xmax)
 
-            y1 = self._ylim_from_artists(uistate.ax1, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
-            y2 = self._ylim_from_artists(uistate.ax2, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
-            uistate.zoom["output_ax1_ylim"] = (0, y1[1] * 1.15 if y1 and y1[1] > 0 else 1.5)
-            uistate.zoom["output_ax2_ylim"] = (0, y2[1] * 1.15 if y2 and y2[1] > 0 else 1.5)
-        elif getattr(uistate, "experiment_type", "time") == "PP":
-            uistate.zoom["output_xlim"] = uistate.x_axis_xlim(prow=None, dft=None)
-            out_xmin, out_xmax = uistate.zoom["output_xlim"]
+            y1 = self._ylim_from_artists(uistate.plot.ax1, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
+            y2 = self._ylim_from_artists(uistate.plot.ax2, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
+            uistate.project.zoom["output_ax1_ylim"] = (0, y1[1] * 1.15 if y1 and y1[1] > 0 else 1.5)
+            uistate.project.zoom["output_ax2_ylim"] = (0, y2[1] * 1.15 if y2 and y2[1] > 0 else 1.5)
+        elif uistate.experiment.experiment_type == "PP":
+            uistate.project.zoom["output_xlim"] = uistate.x_axis_xlim(prow=None, dft=None)
+            out_xmin, out_xmax = uistate.project.zoom["output_xlim"]
 
-            y1 = self._ylim_from_artists(uistate.ax1, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
-            y2 = self._ylim_from_artists(uistate.ax2, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
+            y1 = self._ylim_from_artists(uistate.plot.ax1, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
+            y2 = self._ylim_from_artists(uistate.plot.ax2, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
 
             def snap_pp_max(y_bounds):
                 if not y_bounds:
                     return 3.0
                 return max(3.0, (int(y_bounds[1] / 1.0) + 1) * 1.0)
 
-            uistate.zoom["output_ax1_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
-            uistate.zoom["output_ax2_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
+            uistate.project.zoom["output_ax1_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
+            uistate.project.zoom["output_ax2_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
         else:
-            xlim1 = self._xlim_from_artists(uistate.ax1)
-            xlim2 = self._xlim_from_artists(uistate.ax2)
+            xlim1 = self._xlim_from_artists(uistate.plot.ax1)
+            xlim2 = self._xlim_from_artists(uistate.plot.ax2)
 
             if xlim1 and xlim2:
                 out_xmin, out_xmax = min(xlim1[0], xlim2[0]), max(xlim1[1], xlim2[1])
@@ -790,6 +790,6 @@ class GraphCoordinatorMixin:
             else:
                 out_xmin, out_xmax = (0, 1)
 
-            uistate.zoom["output_xlim"] = (out_xmin, out_xmax)
-            uistate.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
-            uistate.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
+            uistate.project.zoom["output_xlim"] = (out_xmin, out_xmax)
+            uistate.project.zoom["output_ax1_ylim"] = self._ylim_from_artists(uistate.plot.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
+            uistate.project.zoom["output_ax2_ylim"] = self._ylim_from_artists(uistate.plot.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)

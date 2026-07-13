@@ -130,9 +130,9 @@ class DataFrameMixin:
         if hasattr(self, "turn_heatmap_off"):
             self.turn_heatmap_off()
 
-        norm_from = uistate.lineEdit["norm_EPSP_from"]
-        norm_to = uistate.lineEdit["norm_EPSP_to"]
-        dt = uistate.default_dict_t
+        norm_from = uistate.project.lineEdit["norm_EPSP_from"]
+        norm_to = uistate.project.lineEdit["norm_EPSP_to"]
+        dt = uistate.project.default_dict_t
         dt["norm_output_from"] = norm_from
         dt["norm_output_to"] = norm_to
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
@@ -299,7 +299,7 @@ class DataFrameMixin:
             return dft
         else:
             print("creating dft")
-            default_dict_t = uistate.default_dict_t.copy()  # Default sizes
+            default_dict_t = uistate.project.default_dict_t.copy()  # Default sizes
             dfmean = self.get_dfmean(row)
             dft = analysis.find_events(
                 dfmean=dfmean,
@@ -312,8 +312,8 @@ class DataFrameMixin:
                 print("get_dft: No stims found.")
                 return None
             dft["norm_output_from"], dft["norm_output_to"] = (
-                uistate.lineEdit["norm_EPSP_from"],
-                uistate.lineEdit["norm_EPSP_to"],
+                uistate.project.lineEdit["norm_EPSP_from"],
+                uistate.project.lineEdit["norm_EPSP_to"],
             )
             df_p = self.get_df_project()  # update (number of) 'stims' columns
             stims = len(dft)
@@ -322,7 +322,7 @@ class DataFrameMixin:
             self.tableUpdate(restore_selection=True)  # ensure selection preserved after stim count update
             # If the UI checkbox for 'timepoints_per_stim' is checked OR there's only 1 stim,
             # we assume timepoints don't need adjustment, so we cache df_t as-is.
-            if uistate.checkBox["timepoints_per_stim"] or stims == 1:
+            if uistate.project.checkBox["timepoints_per_stim"] or stims == 1:
                 self.dict_ts[rec] = dft  # update cache
             # Otherwise, compute a uniform timepoint structure based on the current row and df_t.
             else:
@@ -1087,12 +1087,12 @@ class DataFrameMixin:
             return self.dd_group_samples[group_ID]
         p_row = matching.iloc[0]
 
-        df = self.get_dffilter(p_row)  # must use filter DF (has 'time' column); matches update_axe_mean + uistate.df_rec_select_data
-        col = uistate.settings.get("filter") or "voltage"
+        df = self.get_dffilter(p_row)  # must use filter DF (has 'time' column); matches update_axe_mean + uistate.plot.df_rec_select_data
+        col = uistate.project.settings.get("filter") or "voltage"
         if col not in df.columns:
             col = "voltage"  # fallback to ensure column exists in df_sweeps
         df_t = self.get_dft(row=p_row)
-        settings = uistate.settings
+        settings = uistate.project.settings
         mean_dfs = {}
 
         # Build one mean DF per shown testset (different sweeps per testset) + save per-test parquet
@@ -1152,7 +1152,7 @@ class DataFrameMixin:
         def use_t_from_stim_with_max(p_row, df_t, dfoutput, column):
             # find highest EPSP_slope in df_output and apply uniform timepoints to all stims
             print(f" - use_t_from_stim_with_max called with df_t:\n{df_t}")
-            precision = uistate.settings["precision"]
+            precision = uistate.project.settings["precision"]
             if column in dfoutput.columns:
                 print(f"dfoutput:\n{dfoutput}")
                 idx_max_EPSP = dfoutput[column].idxmax()

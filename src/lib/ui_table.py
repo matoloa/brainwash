@@ -65,20 +65,20 @@ class TableMixin:
         self.setButtonParse()
 
     def update_recs2plot(self):
-        """Rebuild uistate.df_recs2plot from current selection (positional rows).
+        """Rebuild uistate.plot.df_recs2plot from current selection (positional rows).
         Filters out unparsed rows (sweeps == "...").
         """
-        if not uistate.list_idx_select_recs:
-            uistate.df_recs2plot = None
+        if not uistate.plot.list_idx_select_recs:
+            uistate.plot.df_recs2plot = None
             return
         try:
             df_p = self.get_df_project()
-            df_project_selected = df_p.iloc[uistate.list_idx_select_recs]
-            uistate.df_recs2plot = df_project_selected[df_project_selected["sweeps"] != "..."]
-            if uistate.df_recs2plot.empty:
-                uistate.df_recs2plot = None
+            df_project_selected = df_p.iloc[uistate.plot.list_idx_select_recs]
+            uistate.plot.df_recs2plot = df_project_selected[df_project_selected["sweeps"] != "..."]
+            if uistate.plot.df_recs2plot.empty:
+                uistate.plot.df_recs2plot = None
         except Exception:
-            uistate.df_recs2plot = None
+            uistate.plot.df_recs2plot = None
 
     def tableProjSelectionChanged(self, selected=None, deselected=None):
         if self.updating_tableProj:
@@ -87,13 +87,13 @@ class TableMixin:
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableProj.clearSelection()
         selected_indexes = self.tableProj.selectionModel().selectedRows()
-        uistate.list_idx_select_recs = [index.row() for index in selected_indexes]
+        uistate.plot.list_idx_select_recs = [index.row() for index in selected_indexes]
         self.update_recs2plot()
         self.update_sample_checkbox()
 
-        if uistate.df_recs2plot is None:
+        if uistate.plot.df_recs2plot is None:
             print("No parsed recordings selected.")
-            uistate.list_idx_select_stims = []
+            uistate.plot.list_idx_select_stims = []
             self.update_show()
             self.zoomAuto()
             self.graphRefresh(reeval_formal_test=False)
@@ -101,51 +101,51 @@ class TableMixin:
 
         prow = self.get_prow()
 
-        if len(uistate.list_idx_select_recs) == 1:
+        if len(uistate.plot.list_idx_select_recs) == 1:
             dft_for_format = self.get_dft(row=prow)
         else:
-            uistate.df_rec_select_data = None
-            uistate.df_rec_select_time = None
-            longest_sweep_prow = uistate.df_recs2plot.loc[uistate.df_recs2plot["sweep_duration"].idxmax()]
-            uistate.float_sweep_duration_max = longest_sweep_prow["sweep_duration"]
+            uistate.plot.df_rec_select_data = None
+            uistate.plot.df_rec_select_time = None
+            longest_sweep_prow = uistate.plot.df_recs2plot.loc[uistate.plot.df_recs2plot["sweep_duration"].idxmax()]
+            uistate.plot.float_sweep_duration_max = longest_sweep_prow["sweep_duration"]
             dft_for_format = self.get_dft(row=longest_sweep_prow)
 
         if dft_for_format is not None:
             num_stims = len(dft_for_format)
-            valid_stim_indices = [i for i in uistate.list_idx_select_stims if i < num_stims]
+            valid_stim_indices = [i for i in uistate.plot.list_idx_select_stims if i < num_stims]
             if not valid_stim_indices and num_stims > 0:
                 valid_stim_indices = [0]
-            uistate.list_idx_select_stims = valid_stim_indices
+            uistate.plot.list_idx_select_stims = valid_stim_indices
 
             self.tableStimModel.setData(dft_for_format)
             model = self.tableStim.model()
             selection = QtCore.QItemSelection()
-            for row_idx in uistate.list_idx_select_stims:
+            for row_idx in uistate.plot.list_idx_select_stims:
                 index_start = model.index(row_idx, 0)
                 index_end = model.index(row_idx, model.columnCount(QtCore.QModelIndex()) - 1)
                 selection.select(index_start, index_end)
             self.tableStim.selectionModel().select(selection, QtCore.QItemSelectionModel.ClearAndSelect)
             self.formatTableStimLayout(dft=dft_for_format)
         else:
-            uistate.list_idx_select_stims = []
+            uistate.plot.list_idx_select_stims = []
             logger.debug("tableProjSelectionChanged: dft_for_format is None (no stims detected), clearing stim selection")
 
-        if len(uistate.list_idx_select_recs) == 1 and len(uistate.list_idx_select_stims) == 1:
-            uistate.df_rec_select_time = self.get_dft(row=prow)
-            uistate.df_rec_select_data = self.get_dffilter(prow)
-            uistate.float_sweep_duration_max = prow["sweep_duration"]
+        if len(uistate.plot.list_idx_select_recs) == 1 and len(uistate.plot.list_idx_select_stims) == 1:
+            uistate.plot.df_rec_select_time = self.get_dft(row=prow)
+            uistate.plot.df_rec_select_data = self.get_dffilter(prow)
+            uistate.plot.float_sweep_duration_max = prow["sweep_duration"]
         else:
-            uistate.df_rec_select_data = None
-            uistate.df_rec_select_time = None
+            uistate.plot.df_rec_select_data = None
+            uistate.plot.df_rec_select_time = None
 
         self.connectUIstate(disconnect=True)
         self.update_experiment_type_radio_buttons()
         df_p = self.get_df_project()
-        if uistate.list_idx_select_recs:
-            bin_values = {df_p.loc[i, "bin_size"] for i in uistate.list_idx_select_recs}
+        if uistate.plot.list_idx_select_recs:
+            bin_values = {df_p.loc[i, "bin_size"] for i in uistate.plot.list_idx_select_recs}
             nan_count = sum(1 for v in bin_values if pd.isna(v))
             non_nan = {v for v in bin_values if pd.notna(v)}
-            uniform = (nan_count == 0 and len(non_nan) == 1) or (nan_count == len(uistate.list_idx_select_recs))
+            uniform = (nan_count == 0 and len(non_nan) == 1) or (nan_count == len(uistate.plot.list_idx_select_recs))
             if uniform:
                 single = non_nan.pop() if non_nan else float("nan")
                 self.lineEdit_bin_size.setText("0" if pd.isna(single) else str(int(single)))
@@ -187,8 +187,8 @@ class TableMixin:
         if target_idx is not None:
             if 0 <= target_idx < len(df_p):
                 to_select = [target_idx]
-        elif uistate.list_idx_select_recs:
-            to_select = [i for i in uistate.list_idx_select_recs if 0 <= i < len(df_p)]
+        elif uistate.plot.list_idx_select_recs:
+            to_select = [i for i in uistate.plot.list_idx_select_recs if 0 <= i < len(df_p)]
             if not to_select and len(df_p) > 0:
                 to_select = [len(df_p) - 1]
         elif len(df_p) > 0:
@@ -203,19 +203,19 @@ class TableMixin:
             self.tableProj.selectionModel().select(selection, QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows)
             self.tableProj.scrollTo(self.tablemodel.index(to_select[0], 0))
             self.tableProj.setFocus()
-            uistate.list_idx_select_recs = to_select
+            uistate.plot.list_idx_select_recs = to_select
         else:
-            uistate.list_idx_select_recs = []
+            uistate.plot.list_idx_select_recs = []
 
     def get_prow(self, dfp_idx=None):
         if dfp_idx is not None:
             dfp = self.get_df_project()
             row = dfp.loc[dfp_idx]
             return row
-        if not uistate.list_idx_select_recs:
+        if not uistate.plot.list_idx_select_recs:
             return None
         dfp = self.get_df_project()
-        row = dfp.loc[uistate.list_idx_select_recs[0]]
+        row = dfp.loc[uistate.plot.list_idx_select_recs[0]]
         return row
 
     def get_trow(self, dfp_idx=None):
@@ -226,7 +226,7 @@ class TableMixin:
                 return None
             dft = self.get_dft(prow)
         else:
-            if not uistate.list_idx_select_stims:
+            if not uistate.plot.list_idx_select_stims:
                 print("get_trow: No stim selected.")
                 return None
             prow = self.get_prow()
@@ -237,10 +237,10 @@ class TableMixin:
         if dft is None or len(dft) == 0:
             print("get_trow: Empty dataframe.")
             return None
-        idx = uistate.list_idx_select_stims[0] if uistate.list_idx_select_stims else 0
+        idx = uistate.plot.list_idx_select_stims[0] if uistate.plot.list_idx_select_stims else 0
         if idx < 0 or idx >= len(dft):
             idx = 0
-            uistate.list_idx_select_stims = [0]
+            uistate.plot.list_idx_select_stims = [0]
         return dft.loc[idx]
 
     def setupTableProj(self):
@@ -272,7 +272,7 @@ class TableMixin:
             print(f"Error setting up tableProj: {e}")
 
     def setupTableStim(self):
-        dft_init = pd.DataFrame([uistate.default_dict_t])
+        dft_init = pd.DataFrame([uistate.project.default_dict_t])
         self.tableStimModel = ui_widgets.TableModel(dft_init)
         self.tableStim.setModel(self.tableStimModel)
         self.tableStim.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
@@ -301,10 +301,10 @@ class TableMixin:
             "sweeps",
             "sweep_duration",
         ]
-        if uistate.checkBox["paired_stims"]:
+        if uistate.project.checkBox["paired_stims"]:
             column_order.append("Tx")
 
-        if getattr(uistate, "detailedProjectTable", False):
+        if uistate.project.detailedProjectTable:
             for col_name in df_p.columns:
                 if col_name not in column_order:
                     column_order.append(col_name)
@@ -326,7 +326,7 @@ class TableMixin:
 
     def formatTableStimLayout(self, dft):
         if dft is None:
-            dft = pd.DataFrame([uistate.default_dict_t])
+            dft = pd.DataFrame([uistate.project.default_dict_t])
 
         header = self.tableStim.horizontalHeader()
         column_order = [
@@ -343,7 +343,7 @@ class TableMixin:
             "t_volley_amp",
             "t_volley_amp_method",
         ]
-        if getattr(uistate, "detailedTimetable", False):
+        if uistate.project.detailedTimetable:
             for col_name in dft.columns:
                 if col_name not in column_order:
                     column_order.append(col_name)
@@ -374,7 +374,7 @@ class TableMixin:
 
         sizes = self.h_splitterMaster.sizes()
         if state:
-            prop = uistate.settings.get("dft_width_proportion", 0.2)
+            prop = uistate.project.settings.get("dft_width_proportion", 0.2)
             total = sizes[1] + sizes[2]
             sizes[1] = min(total, max(100, int(total * prop)))
             sizes[2] = total - sizes[1]
@@ -388,7 +388,7 @@ class TableMixin:
 
         total_size = sum(sizes)
         if total_size > 0:
-            old_proportions = uistate.splitter.get("h_splitterMaster", [])
+            old_proportions = uistate.project.splitter.get("h_splitterMaster", [])
             unbounded_px = sum(size for i, size in enumerate(sizes) if i >= len(old_proportions) or type(old_proportions[i]) == float)
             proportions = []
             for i, size in enumerate(sizes):
@@ -396,4 +396,4 @@ class TableMixin:
                     proportions.append(int(size))
                 else:
                     proportions.append(float(size / unbounded_px if unbounded_px > 0 else 0.0))
-            uistate.splitter["h_splitterMaster"] = proportions
+            uistate.project.splitter["h_splitterMaster"] = proportions

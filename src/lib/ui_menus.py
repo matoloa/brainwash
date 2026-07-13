@@ -96,7 +96,7 @@ class MenuMixin:
 
         self.actionHeatmap = QtWidgets.QAction("Heatmap")
         self.actionHeatmap.setCheckable(True)
-        self.actionHeatmap.setChecked(uistate.showHeatmap)
+        self.actionHeatmap.setChecked(uistate.plot.showHeatmap)
         self.actionHeatmap.setShortcut("H")
         self.actionHeatmap.triggered.connect(self.triggerShowHeatmap)
         self.menuView.addAction(self.actionHeatmap)
@@ -108,14 +108,14 @@ class MenuMixin:
 
         self.actionTimetable = QtWidgets.QAction("Timetable")
         self.actionTimetable.setCheckable(True)
-        self.actionTimetable.setChecked(uistate.showTimetable)
+        self.actionTimetable.setChecked(uistate.project.showTimetable)
         self.actionTimetable.setShortcut("Alt+T")
         self.actionTimetable.triggered.connect(self.triggerShowTimetable)
         self.menuView.addAction(self.actionTimetable)
 
         # Dynamically add a checkable toggle per toolbar panel (frame name → [title, visible])
         # lambda captures frame by default arg to avoid closure-over-loop-variable bug
-        for frame, (text, initial_state) in uistate.viewTools.items():
+        for frame, (text, initial_state) in uistate.project.viewTools.items():
             action = QtWidgets.QAction(text, self.menuView)
             action.setCheckable(True)
             action.setChecked(initial_state)
@@ -243,7 +243,7 @@ class MenuMixin:
             action = QtWidgets.QAction(f"   {j_name}", self.menuExport)
             action.setCheckable(True)
             action.setData(j_key)
-            if uistate.settings.get("journal_export", "jneurosci") == j_key:
+            if uistate.project.settings.get("journal_export", "jneurosci") == j_key:
                 action.setChecked(True)
             action.triggered.connect(lambda checked, k=j_key: self.setJournalExport(k))
             self.journalActionGroup.addAction(action)
@@ -260,17 +260,17 @@ class MenuMixin:
         self.menuExport.addAction(self.actionExport2Col)
 
     def syncJournalExportMenu(self):
-        journal = uistate.settings.get("journal_export", "jneurosci")
+        journal = uistate.project.settings.get("journal_export", "jneurosci")
         for action in self.journalActionGroup.actions():
             if action.data() == journal:
                 action.setChecked(True)
                 break
 
     def setJournalExport(self, journal_key):
-        uistate.settings["journal_export"] = journal_key
+        uistate.project.settings["journal_export"] = journal_key
         if journal_key in export_image.JOURNAL_COLOR_PALETTES:
             palette = export_image.JOURNAL_COLOR_PALETTES[journal_key]
-            uistate.colors = palette[:]
+            uistate.project.colors = palette[:]
             if hasattr(self, "dd_groups") and self.dd_groups:
                 for gid in sorted(self.dd_groups.keys()):
                     idx = (gid - 1) % len(palette) if isinstance(gid, int) else 0
@@ -278,7 +278,7 @@ class MenuMixin:
                 if hasattr(self, "group_save_dd"):
                     self.group_save_dd()
             if hasattr(uistate, "dict_group_labels") and hasattr(self, "dd_groups"):
-                for info in list(uistate.dict_group_labels.values()):
+                for info in list(uistate.plot.dict_group_labels.values()):
                     gid = info.get("group_ID")
                     if gid is not None:
                         gid_key = int(gid) if str(gid).isdigit() else gid
@@ -335,9 +335,9 @@ class MenuMixin:
             uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
     def triggerExport1Col(self, checked=False):
-        journal = uistate.settings.get("journal_export", "jneurosci")
+        journal = uistate.project.settings.get("journal_export", "jneurosci")
         self.triggerExportOutputImage(f"{journal}_1col")
 
     def triggerExport2Col(self, checked=False):
-        journal = uistate.settings.get("journal_export", "jneurosci")
+        journal = uistate.project.settings.get("journal_export", "jneurosci")
         self.triggerExportOutputImage(f"{journal}_2col")

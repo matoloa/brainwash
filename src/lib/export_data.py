@@ -36,7 +36,7 @@ class ExportMixin:
         print(msg)
 
     def _require_selection(self) -> list[pd.Series] | None:
-        if not uistate.list_idx_select_recs:
+        if not uistate.plot.list_idx_select_recs:
             QtWidgets.QMessageBox.warning(
                 None,
                 "Export Error",
@@ -46,7 +46,7 @@ class ExportMixin:
 
         selected_rows = []
         df_project = self.get_df_project()
-        for idx in uistate.list_idx_select_recs:
+        for idx in uistate.plot.list_idx_select_recs:
             if idx in df_project.index:
                 selected_rows.append(df_project.loc[idx])
 
@@ -203,7 +203,7 @@ class ExportMixin:
         if hasattr(self, "tableProj"):
             self.tableProj.clearSelection()
 
-        selected_groups = list(set(str(info["group_ID"]) for info in uistate.dict_group_show.values()))
+        selected_groups = list(set(str(info["group_ID"]) for info in uistate.plot.dict_group_show.values()))
 
         if not selected_groups:
             QtWidgets.QMessageBox.warning(

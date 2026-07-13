@@ -21,7 +21,7 @@
 | 03 | [ui_refactor/03_applicability_checks.md](ui_refactor/03_applicability_checks.md) | ✅ done |
 | 04 | [ui_refactor/04_statusbar_formatters.md](ui_refactor/04_statusbar_formatters.md) | ✅ done |
 | 05 | [ui_refactor/05_pipeline_integration.md](ui_refactor/05_pipeline_integration.md) | ✅ done |
-| 06 | [ui_refactor/06_app_context_facade.md](ui_refactor/06_app_context_facade.md) | **NEXT** |
+| 06 | [ui_refactor/06_app_context_facade.md](ui_refactor/06_app_context_facade.md) | ✅ done |
 | 07 | [ui_refactor/07_pytest_qt_smoke.md](ui_refactor/07_pytest_qt_smoke.md) | ✅ done |
 
 After each PR: mark card ✅ in this table, set **NEXT** on the following row.

@@ -49,7 +49,7 @@ class ParseMixin:
         - self.progressBar, self.progressBarManager
         - self.graphRefresh()
         - ui_widgets.ParseDataThread, ui_widgets.ProgressBarManager, ui_widgets.InputDialogPopup
-        - uistate.list_idx_select_recs, uistate.list_idx_recs2preload, etc.
+        - uistate.plot.list_idx_select_recs, uistate.project.list_idx_recs2preload, etc.
     """
 
     def addData(self, dfAdd):  # concatenate dataframes of old and new data
@@ -176,7 +176,7 @@ class ParseMixin:
                 df_p = pd.concat([df_p[df_p["sweeps"] != "..."], rows2add]).reset_index(drop=True)
                 self.set_df_project(df_p)
                 # Get the indices of the new rows, as they are in df_p
-                uistate.list_idx_recs2preload = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
+                uistate.project.list_idx_recs2preload = df_p.index[df_p.index >= len(df_p) - len(rows2add)].tolist()
         self.setButtonParse()
         self.progressBarManager.__exit__(None, None, None)
         # Return control to test warnings (graphPreload will take over again if needed)
@@ -204,11 +204,11 @@ class ParseMixin:
         self.parseData()
 
     def reanalyze_recordings(self):
-        if not uistate.list_idx_select_recs:
+        if not uistate.plot.list_idx_select_recs:
             print("No recordings selected for reanalysis.")
             return
         df_p = self.get_df_project()
-        for idx in uistate.list_idx_select_recs:
+        for idx in uistate.plot.list_idx_select_recs:
             prow = df_p.loc[idx]
             if str(prow.get("sweeps", "...")) == "...":
                 continue
@@ -253,7 +253,7 @@ class ParseMixin:
             df_proj_new_row = df_proj_row.copy()
             df_proj_new_row["ID"] = str(uuid.uuid4())
             df_proj_new_row["recording_name"] = new_name
-            df_proj_new_row["gain"] = uistate.lineEdit["import_gain"]  # capture gain at parse time
+            df_proj_new_row["gain"] = uistate.project.lineEdit["import_gain"]  # capture gain at parse time
             df_proj_new_row["sweeps"] = dict_meta.get("nsweeps", None)
             df_proj_new_row["channel"] = ""  # dict_meta.get('channel', None)
             df_proj_new_row["sweep_duration"] = dict_meta.get("sweep_duration", None)
@@ -284,16 +284,16 @@ class ParseMixin:
 
     def deleteSelectedRows(self):
         # moved some purge logic here too for parse flow
-        if not uistate.list_idx_select_recs:
+        if not uistate.plot.list_idx_select_recs:
             print("No files selected.")
             return
         df_p = self.get_df_project()
         reselect_id = None
-        last_deleted_idx = uistate.list_idx_select_recs[-1]
+        last_deleted_idx = uistate.plot.list_idx_select_recs[-1]
         if last_deleted_idx < len(df_p) - 1:
             reselect_id = df_p.at[last_deleted_idx + 1, "ID"]
 
-        for index in uistate.list_idx_select_recs:
+        for index in uistate.plot.list_idx_select_recs:
             rec_name = df_p.at[index, "recording_name"]
             rec_ID = df_p.at[index, "ID"]
             sweeps = df_p.at[index, "sweeps"]
@@ -302,19 +302,19 @@ class ParseMixin:
                 self.purgeRecordingData(rec_ID, rec_name)
                 uiplot.unPlot(rec_ID)
 
-        df_p.drop(uistate.list_idx_select_recs, inplace=True)
+        df_p.drop(uistate.plot.list_idx_select_recs, inplace=True)
         df_p.reset_index(inplace=True, drop=True)
 
         if reselect_id is not None:
             new_idx = df_p[df_p["ID"] == reselect_id].index
             if not new_idx.empty:
-                uistate.list_idx_select_recs = [new_idx[0]]
+                uistate.plot.list_idx_select_recs = [new_idx[0]]
             else:
-                uistate.list_idx_select_recs = []
+                uistate.plot.list_idx_select_recs = []
         elif len(df_p) > 0:
-            uistate.list_idx_select_recs = [len(df_p) - 1]
+            uistate.plot.list_idx_select_recs = [len(df_p) - 1]
         else:
-            uistate.list_idx_select_recs = []
+            uistate.plot.list_idx_select_recs = []
 
         self.set_df_project(df_p)
         self.tableUpdate(restore_selection=True, target_idx=None)

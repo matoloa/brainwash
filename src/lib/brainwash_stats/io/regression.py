@@ -118,17 +118,17 @@ def _compute_io_regression_internal(
     x_col = "volley_amp"
     y_col = "EPSP_amp"
     if uistate is not None:
-        io_input = getattr(uistate, "io_input", "vamp")
+        io_input = uistate.experiment.io_input
         x_map = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}
         x_col = x_map.get(io_input, "volley_amp")
-        io_output = getattr(uistate, "io_output", "EPSPamp")
+        io_output = uistate.experiment.io_output
         y_map = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}
         y_col = y_map.get(io_output, "EPSP_amp")
 
     config = {
         "type": "IO regression",
-        "io_input": getattr(uistate, "io_input", "vamp") if uistate else "vamp",
-        "io_output": getattr(uistate, "io_output", "EPSPamp") if uistate else "EPSPamp",
+        "io_input": uistate.experiment.io_input if uistate else "vamp",
+        "io_output": uistate.experiment.io_output if uistate else "EPSPamp",
         "x_col": x_col,
         "y_col": y_col,
         "n_unit": n_unit,

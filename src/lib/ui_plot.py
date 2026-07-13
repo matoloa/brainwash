@@ -23,11 +23,11 @@ class UIplot:
         print(f"UIplot instantiated: {self.uistate.anyView()}")
 
     def heatmap(self, df):
-        ax1 = self.uistate.ax1
-        ax2 = self.uistate.ax2
+        ax1 = self.uistate.plot.ax1
+        ax2 = self.uistate.plot.ax2
 
         if not hasattr(self.uistate, "dict_heatmap"):
-            self.uistate.dict_heatmap = {}
+            self.uistate.plot.dict_heatmap = {}
 
         sweeps = df["sweep"].values
         pcols = [c for c in df.columns if c.startswith("p_")]
@@ -55,7 +55,7 @@ class UIplot:
                     continue
                 color, alpha = self._p_color_alpha(p)
                 sc = ax.scatter([x], [y], marker="o", color=[color], alpha=alpha)
-                self.uistate.dict_heatmap.setdefault(col, {})[x] = sc
+                self.uistate.plot.dict_heatmap.setdefault(col, {})[x] = sc
 
         ax1.figure.canvas.draw_idle()
         ax2.figure.canvas.draw_idle()
@@ -78,7 +78,7 @@ class UIplot:
         d = getattr(self.uistate, "dict_heatmap", None)
         if d is None:
             return
-        ax = self.uistate.ax1
+        ax = self.uistate.plot.ax1
         # print(f"heatunmap: {d}")
         for col in list(d.keys()):
             for x, sc in list(d[col].items()):
@@ -106,17 +106,17 @@ class UIplot:
         - "ns" uses a muted gray appropriate for the current mode.
         For paired t-test: shows exactly one marker (centered between the two test sets).
         Otherwise shows one label per computed aspect per shown test set.
-        Uses uistate.dict_test_markers for storage (values are Text artists).
+        Uses uistate.plot.dict_test_markers for storage (values are Text artists).
         """
-        ax1 = self.uistate.ax1
-        ax2 = self.uistate.ax2
+        ax1 = self.uistate.plot.ax1
+        ax2 = self.uistate.plot.ax2
         if ax1 is None or ax2 is None:
             return
 
         if not hasattr(self.uistate, "dict_test_markers"):
-            self.uistate.dict_test_markers = {}
+            self.uistate.plot.dict_test_markers = {}
 
-        d = self.uistate.dict_test_markers
+        d = self.uistate.plot.dict_test_markers
         self.clear_test_markers(draw=False)
 
         dark = bool(getattr(self.uistate, "darkmode", False))
@@ -249,8 +249,8 @@ class UIplot:
         d.clear()
         if draw:
             try:
-                self.uistate.ax1.figure.canvas.draw_idle()
-                self.uistate.ax2.figure.canvas.draw_idle()
+                self.uistate.plot.ax1.figure.canvas.draw_idle()
+                self.uistate.plot.ax2.figure.canvas.draw_idle()
             except Exception:
                 pass
 
@@ -321,21 +321,21 @@ class UIplot:
 
     def xDeselect(self, ax, reset=False, draw=True):
         # clear previous axvlines and axvspans
-        ax1, ax2 = self.uistate.ax1, self.uistate.ax2
+        ax1, ax2 = self.uistate.plot.ax1, self.uistate.plot.ax2
         if ax == ax1 or ax == ax2:
             axlines = ax1.get_lines() + ax2.get_lines()
             axpatches = ax1.patches + ax2.patches
             if reset:
-                self.uistate.x_select["output"] = set()
-                self.uistate.x_select["output_start"] = None
-                self.uistate.x_select["output_end"] = None
+                self.uistate.plot.x_select["output"] = set()
+                self.uistate.plot.x_select["output_start"] = None
+                self.uistate.plot.x_select["output_end"] = None
                 self.clear_testset_spans(draw=False)  # clear on full output reset per Phase 2
         else:  # axm
             axlines = list(ax.get_lines())
             axpatches = list(ax.patches)
             if reset:
-                self.uistate.x_select["mean_start"] = None
-                self.uistate.x_select["mean_end"] = None
+                self.uistate.plot.x_select["mean_start"] = None
+                self.uistate.plot.x_select["mean_end"] = None
 
         for line in axlines:
             if line.get_label().startswith("xSelect"):
@@ -351,12 +351,12 @@ class UIplot:
                     pass
         if reset:
             self.clear_axe_mean()
-            # axe mean artists live on the event canvas (uistate.axe), not necessarily
+            # axe mean artists live on the event canvas (uistate.plot.axe), not necessarily
             # the canvas of the ax that was passed (e.g. right-click deselect on output graph).
             # Force a redraw of axe so removal becomes visible.
             if draw and getattr(self.uistate, "axe", None) is not None:
                 try:
-                    self.uistate.axe.figure.canvas.draw_idle()
+                    self.uistate.plot.axe.figure.canvas.draw_idle()
                 except Exception:
                     pass
         if draw:
@@ -364,46 +364,46 @@ class UIplot:
 
     def xSelect(self, canvas, draw=True):
         # draws a selected range of x values on <canvas>
-        if canvas == self.uistate.axm.figure.canvas:
-            ax = self.uistate.axm
+        if canvas == self.uistate.plot.axm.figure.canvas:
+            ax = self.uistate.plot.axm
             self.xDeselect(ax, draw=False)
-            if self.uistate.x_select["mean_start"] is None:
+            if self.uistate.plot.x_select["mean_start"] is None:
                 return
-            if self.uistate.x_select["mean_end"] is None:
-                # print(f"Selected x: {self.uistate.x_select['mean_start']}")
+            if self.uistate.plot.x_select["mean_end"] is None:
+                # print(f"Selected x: {self.uistate.plot.x_select['mean_start']}")
                 ax.axvline(
-                    x=self.uistate.x_select["mean_start"],
+                    x=self.uistate.plot.x_select["mean_start"],
                     color="blue",
                     label="xSelect_x",
                 )
             else:
                 start, end = (
-                    self.uistate.x_select["mean_start"],
-                    self.uistate.x_select["mean_end"],
+                    self.uistate.plot.x_select["mean_start"],
+                    self.uistate.plot.x_select["mean_end"],
                 )
                 # print(f"Selected x_range: {start} - {end}")
                 ax.axvline(x=start, color="blue", label="xSelect_start")
                 ax.axvline(x=end, color="blue", label="xSelect_end")
                 ax.axvspan(start, end, color="blue", alpha=0.1, label="xSelect_span")
         else:  # canvasOutput
-            if self.uistate.checkBox["EPSP_slope"]:
-                ax = self.uistate.ax2
+            if self.uistate.project.checkBox["EPSP_slope"]:
+                ax = self.uistate.plot.ax2
             else:
-                ax = self.uistate.ax1
+                ax = self.uistate.plot.ax1
             self.xDeselect(ax, draw=False)  # will clear both ax1 and ax2, if fed either one
-            if self.uistate.x_select["output_end"] is None:
+            if self.uistate.plot.x_select["output_end"] is None:
                 # If only the start is selected, draw a line at the start
-                # print(f"Selected x: {self.uistate.x_select['output_start']}")
+                # print(f"Selected x: {self.uistate.plot.x_select['output_start']}")
                 ax.axvline(
-                    x=self.uistate.x_select["output_start"],
+                    x=self.uistate.plot.x_select["output_start"],
                     color="blue",
                     label="xSelect_x",
                 )
             else:
                 # If both start and end are selected, draw the range
                 start, end = (
-                    self.uistate.x_select["output_start"],
-                    self.uistate.x_select["output_end"],
+                    self.uistate.plot.x_select["output_start"],
+                    self.uistate.plot.x_select["output_end"],
                 )
                 # print(f"Selected x_range: {start} - {end}")
                 ax.axvline(x=start, color="blue", label="xSelect_start")
@@ -414,15 +414,15 @@ class UIplot:
             canvas.draw_idle()
 
     def clear_axe_mean(self):
-        # if uistate.dict_rec_labels exists and contains keys that start with "axe mean selected sweeps", remove their lines and del the items
-        if self.uistate.dict_rec_labels:
-            for key in [k for k in self.uistate.dict_rec_labels if k.startswith("axe mean selected sweeps")]:
+        # if uistate.plot.dict_rec_labels exists and contains keys that start with "axe mean selected sweeps", remove their lines and del the items
+        if self.uistate.plot.dict_rec_labels:
+            for key in [k for k in self.uistate.plot.dict_rec_labels if k.startswith("axe mean selected sweeps")]:
                 try:
-                    self.uistate.dict_rec_labels[key]["line"].remove()
+                    self.uistate.plot.dict_rec_labels[key]["line"].remove()
                 except Exception:
                     pass
                 try:
-                    del self.uistate.dict_rec_labels[key]
+                    del self.uistate.plot.dict_rec_labels[key]
                 except Exception:
                     pass
         else:
@@ -430,51 +430,51 @@ class UIplot:
 
     def clear_testset_spans(self, draw=True):
         """Clear all test set axvspan patches (labeled testset_span_*) from output graph (ax1/ax2 only)."""
-        if not hasattr(self.uistate, "testset_spans") or not self.uistate.testset_spans:
-            if draw and self.uistate.ax1 is not None:
-                self.uistate.ax1.figure.canvas.draw_idle()
+        if not hasattr(self.uistate, "testset_spans") or not self.uistate.plot.testset_spans:
+            if draw and self.uistate.plot.ax1 is not None:
+                self.uistate.plot.ax1.figure.canvas.draw_idle()
             return
-        for spans in self.uistate.testset_spans.values():
+        for spans in self.uistate.plot.testset_spans.values():
             for patch in spans.values():
                 try:
                     patch.remove()
                 except Exception:
                     pass
-        self.uistate.testset_spans = {}
-        if draw and self.uistate.ax1 is not None:
-            self.uistate.ax1.figure.canvas.draw_idle()
+        self.uistate.plot.testset_spans = {}
+        if draw and self.uistate.plot.ax1 is not None:
+            self.uistate.plot.ax1.figure.canvas.draw_idle()
 
     def clear_sample_artists(self, draw=True, hide=False):
         """Clear or hide sample overlay artists/inset. hide=True clears the dict (explicit reset on every redraw)."""
-        if not hasattr(self.uistate, "sample_artists") or self.uistate.sample_artists is None:
-            self.uistate.sample_artists = {}
-            if draw and self.uistate.ax1 is not None:
-                self.uistate.ax1.figure.canvas.draw_idle()
+        if not hasattr(self.uistate, "sample_artists") or self.uistate.plot.sample_artists is None:
+            self.uistate.plot.sample_artists = {}
+            if draw and self.uistate.plot.ax1 is not None:
+                self.uistate.plot.ax1.figure.canvas.draw_idle()
             return
-        if hide and hasattr(self.uistate, "sample_inset") and self.uistate.sample_inset is not None:
-            for artist in self.uistate.sample_artists.values():
+        if hide and hasattr(self.uistate, "sample_inset") and self.uistate.plot.sample_inset is not None:
+            for artist in self.uistate.plot.sample_artists.values():
                 try:
                     artist.set_visible(False)
                 except Exception:
                     pass
-            self.uistate.sample_inset.set_visible(False)
-            self.uistate.sample_inset.set_axis_off()
-            self.uistate.sample_artists = {}
+            self.uistate.plot.sample_inset.set_visible(False)
+            self.uistate.plot.sample_inset.set_axis_off()
+            self.uistate.plot.sample_artists = {}
         else:
-            for artist in self.uistate.sample_artists.values():
+            for artist in self.uistate.plot.sample_artists.values():
                 try:
                     artist.remove()
                 except Exception:
                     pass
-            self.uistate.sample_artists = {}
-            if hasattr(self.uistate, "sample_inset") and self.uistate.sample_inset is not None:
+            self.uistate.plot.sample_artists = {}
+            if hasattr(self.uistate, "sample_inset") and self.uistate.plot.sample_inset is not None:
                 try:
-                    self.uistate.sample_inset.remove()
+                    self.uistate.plot.sample_inset.remove()
                 except Exception:
                     pass
-                self.uistate.sample_inset = None
-        if draw and self.uistate.ax1 is not None:
-            self.uistate.ax1.figure.canvas.draw_idle()
+                self.uistate.plot.sample_inset = None
+        if draw and self.uistate.plot.ax1 is not None:
+            self.uistate.plot.ax1.figure.canvas.draw_idle()
 
     def sample_overlay(self, dd_groups, dd_testset, dd_shown_samples):
         """Only (re)draw inset+traces when sample_dirty or visibility changed.
@@ -483,20 +483,20 @@ class UIplot:
         Callers set dirty flag on group/sample changes."""
 
         if not hasattr(self.uistate, "sample_dirty"):
-            self.uistate.sample_dirty = True
+            self.uistate.plot.sample_dirty = True
         if not hasattr(self.uistate, "sample_inset"):
-            self.uistate.sample_inset = None
+            self.uistate.plot.sample_inset = None
         if not hasattr(self.uistate, "sample_artists"):
-            self.uistate.sample_artists = {}
+            self.uistate.plot.sample_artists = {}
 
         should_show = bool(dd_shown_samples)
 
-        if self.uistate.sample_inset is None:
-            if self.uistate.ax1 is None or not should_show:
+        if self.uistate.plot.sample_inset is None:
+            if self.uistate.plot.ax1 is None or not should_show:
                 return
-            self.uistate.sample_inset = self.uistate.ax1.inset_axes([0.02, 0.68, 0.20, 0.30])
-            self.uistate.sample_inset.set_zorder(10)
-            inset = self.uistate.sample_inset
+            self.uistate.plot.sample_inset = self.uistate.plot.ax1.inset_axes([0.02, 0.68, 0.20, 0.30])
+            self.uistate.plot.sample_inset.set_zorder(10)
+            inset = self.uistate.plot.sample_inset
             inset.set_facecolor((0, 0, 0, 0))
             inset.patch.set_alpha(0.0)
             for spine in inset.spines.values():
@@ -504,14 +504,14 @@ class UIplot:
             inset.tick_params(axis="both", which="both", bottom=False, left=False, labelbottom=False, labelleft=False)
             inset.set_axis_off()
 
-        inset = self.uistate.sample_inset
+        inset = self.uistate.plot.sample_inset
 
         if not should_show:
             if inset.get_visible():
                 self.clear_sample_artists(draw=False, hide=True)
-                self.uistate.sample_dirty = False
+                self.uistate.plot.sample_dirty = False
             return
-        if not self.uistate.sample_dirty and inset.get_visible():
+        if not self.uistate.plot.sample_dirty and inset.get_visible():
             return
 
         self.clear_sample_artists(draw=False, hide=True)
@@ -522,10 +522,10 @@ class UIplot:
         for spine in inset.spines.values():
             spine.set_visible(False)
         inset.tick_params(axis="both", which="both", bottom=False, left=False, labelbottom=False, labelleft=False)
-        self.uistate.sample_artists = {}
+        self.uistate.plot.sample_artists = {}
 
         if dd_shown_samples is None or not bool(dd_shown_samples):
-            self.uistate.sample_dirty = False
+            self.uistate.plot.sample_dirty = False
             return
 
         # Force full artist clear (hide=True) on every redraw. This resets the inset
@@ -562,7 +562,7 @@ class UIplot:
                 df = inner.get(test_id_raw) or inner.get(test_id)
                 if df is None or df.empty:
                     continue
-                col = self.uistate.settings.get("filter") or "voltage"
+                col = self.uistate.project.settings.get("filter") or "voltage"
                 if col not in df.columns:
                     col = df.columns[-1]  # safe fallback
                 linestyle = "-" if t_idx == 0 else "--" if t_idx == 1 else ":"
@@ -574,8 +574,8 @@ class UIplot:
                     mask = df_event["time"].values > 0.001
                     all_ys.extend(y_data[mask])
                     key = (group_ID, test_id, stim_num)
-                    if key in self.uistate.sample_artists:
-                        line = self.uistate.sample_artists[key]
+                    if key in self.uistate.plot.sample_artists:
+                        line = self.uistate.plot.sample_artists[key]
                         line.set_data(df_event["time"].values, y_data)
                         line.set_linestyle(linestyle)
                         line.set_zorder(11)
@@ -592,7 +592,7 @@ class UIplot:
                             zorder=11,
                         )
                         # print(f"*** DF: {df_event}")
-                        self.uistate.sample_artists[key] = line
+                        self.uistate.plot.sample_artists[key] = line
 
         if all_ys:
             ymin, ymax = min(all_ys), max(all_ys)
@@ -601,19 +601,19 @@ class UIplot:
         inset.relim()
         inset.autoscale_view(scalex=False)
 
-        self.uistate.sample_dirty = False
-        if self.uistate.ax1 is not None:
-            self.uistate.ax1.figure.canvas.draw_idle()
+        self.uistate.plot.sample_dirty = False
+        if self.uistate.plot.ax1 is not None:
+            self.uistate.plot.ax1.figure.canvas.draw_idle()
 
     def visualize_test_sets(self, dd_testset, draw=True):
         """Draw gray axvspan for each shown test set on ax1/ax2 (twinx) only.
         Uses min/max of sweeps (assumes continuous/sorted per clarifications).
-        Gray with low alpha, no legend entry, stores artists in uistate.testset_spans.
+        Gray with low alpha, no legend entry, stores artists in uistate.plot.testset_spans.
         """
         self.clear_testset_spans(draw=False)
-        if not dd_testset or self.uistate.ax1 is None:
-            if draw and self.uistate.ax1 is not None:
-                self.uistate.ax1.figure.canvas.draw_idle()
+        if not dd_testset or self.uistate.plot.ax1 is None:
+            if draw and self.uistate.plot.ax1 is not None:
+                self.uistate.plot.ax1.figure.canvas.draw_idle()
             return
         alpha = 0.08
         for set_ID, dset in sorted(dd_testset.items()):
@@ -628,9 +628,9 @@ class UIplot:
                 if ax is None:
                     continue
                 span = ax.axvspan(start, end, color=color, alpha=alpha, label=f"testset_span_{set_ID}", zorder=1)
-                self.uistate.testset_spans.setdefault(set_ID, {})[ax_name] = span
-        if draw and self.uistate.ax1 is not None:
-            self.uistate.ax1.figure.canvas.draw_idle()
+                self.uistate.plot.testset_spans.setdefault(set_ID, {})[ax_name] = span
+        if draw and self.uistate.plot.ax1 is not None:
+            self.uistate.plot.ax1.figure.canvas.draw_idle()
 
     def update_axe_mean(self, draw=True):
         """
@@ -641,29 +641,29 @@ class UIplot:
         """
         self.clear_axe_mean()
         # if exactly one RECORDING is selected, plot the mean of selected SWEEPS one axe, if any
-        if self.uistate.x_select["output"] and len(self.uistate.list_idx_select_recs) == 1:
-            # print(f" - selected sweep(s): {self.uistate.x_select['output']}")
+        if self.uistate.plot.x_select["output"] and len(self.uistate.plot.list_idx_select_recs) == 1:
+            # print(f" - selected sweep(s): {self.uistate.plot.x_select['output']}")
             # build mean of selected sweeps
-            idx_rec = self.uistate.list_idx_select_recs[0]
-            rec_ID = self.uistate.df_recs2plot.loc[idx_rec, "ID"]
-            selected = self.uistate.x_select["output"]
-            df = self.uistate.df_rec_select_data
-            col = self.uistate.settings.get("filter") or "voltage"
+            idx_rec = self.uistate.plot.list_idx_select_recs[0]
+            rec_ID = self.uistate.plot.df_recs2plot.loc[idx_rec, "ID"]
+            selected = self.uistate.plot.x_select["output"]
+            df = self.uistate.plot.df_rec_select_data
+            col = self.uistate.project.settings.get("filter") or "voltage"
             df_sweeps = df[df["sweep"].isin(selected)]
             df_mean = df_sweeps.groupby("time", as_index=False)[col].mean()
             # calculate offset for t_stim
-            df_t = self.uistate.df_rec_select_time
+            df_t = self.uistate.plot.df_rec_select_time
             n_stims = len(df_t)
             dict_gradient = self.get_dict_gradient(n_stims)
-            alpha = self.uistate.settings["alpha_line"] / 2  # make mean-of-selected-lines more transparent
+            alpha = self.uistate.project.settings["alpha_line"] / 2  # make mean-of-selected-lines more transparent
             for i_stim, t_row in df_t.iterrows():
                 color = dict_gradient[i_stim]
                 stim_num = i_stim + 1  # 1-numbering (visible to user)
                 stim_str = f"- stim {stim_num}"
                 t_stim = t_row["t_stim"]
                 # add to Events
-                window_start = t_stim + self.uistate.settings["event_start"]
-                window_end = t_stim + self.uistate.settings["event_end"]
+                window_start = t_stim + self.uistate.project.settings["event_start"]
+                window_end = t_stim + self.uistate.project.settings["event_end"]
                 df_event = df_mean[(df_mean["time"] >= window_start) & (df_mean["time"] <= window_end)].copy()
                 df_event["time"] = df_event["time"] - t_stim  # shift event so that t_stim is at time 0
                 self.plot_line(
@@ -676,16 +676,16 @@ class UIplot:
                     stim=stim_num,
                     alpha=alpha,
                 )
-                self.uistate.dict_rec_labels[f"axe mean selected sweeps {stim_str}"]["line"].set_visible(True)
+                self.uistate.plot.dict_rec_labels[f"axe mean selected sweeps {stim_str}"]["line"].set_visible(True)
         if draw:
-            self.uistate.axe.figure.canvas.draw_idle()
+            self.uistate.plot.axe.figure.canvas.draw_idle()
 
     def styleUpdate(self):
         axm, axe, ax1, ax2 = (
-            self.uistate.axm,
-            self.uistate.axe,
-            self.uistate.ax1,
-            self.uistate.ax2,
+            self.uistate.plot.axm,
+            self.uistate.plot.axe,
+            self.uistate.plot.ax1,
+            self.uistate.plot.ax2,
         )
         if self.uistate.darkmode:
             style.use("dark_background")
@@ -707,19 +707,19 @@ class UIplot:
             # print("Default mode activated")
 
         # 3.4.2: refresh sample overlays after style change (light/dark compatibility)
-        if hasattr(self.uistate, "dd_group_samples") and self.uistate.dd_group_samples:
+        if hasattr(self.uistate, "dd_group_samples") and self.uistate.plot.dd_group_samples:
             if hasattr(self.uistate, "refresh_samples"):
                 self.uistate.refresh_samples()
             else:
-                self.sample_overlay(dd_groups=getattr(self, "dd_groups", None), dd_testset=None, dd_shown_samples=self.uistate.dd_group_samples)
-            self.uistate.sample_dirty = True
+                self.sample_overlay(dd_groups=getattr(self, "dd_groups", None), dd_testset=None, dd_shown_samples=self.uistate.plot.dd_group_samples)
+            self.uistate.plot.sample_dirty = True
 
     def hideAll(self):
         axm, axe, ax1, ax2 = (
-            self.uistate.axm,
-            self.uistate.axe,
-            self.uistate.ax1,
-            self.uistate.ax2,
+            self.uistate.plot.axm,
+            self.uistate.plot.axe,
+            self.uistate.plot.ax1,
+            self.uistate.plot.ax2,
         )
         for ax in [axm, axe, ax1, ax2]:
             if ax is not None:
@@ -737,8 +737,8 @@ class UIplot:
         print("All lines hidden")
 
     def unPlot(self, rec_ID=None):
-        dict_rec = self.uistate.dict_rec_labels
-        dict_show = self.uistate.dict_rec_show
+        dict_rec = self.uistate.plot.dict_rec_labels
+        dict_show = self.uistate.plot.dict_rec_show
         if rec_ID is None:
             keys_to_remove = list(dict_rec.keys())
         else:
@@ -770,8 +770,8 @@ class UIplot:
         (recording/slice/subject). This supports keeping separate artist sets
         per level so we can toggle instead of always destroying/recreating.
         """
-        dict_group = self.uistate.dict_group_labels
-        dict_group_show = self.uistate.dict_group_show
+        dict_group = self.uistate.plot.dict_group_labels
+        dict_group_show = self.uistate.plot.dict_group_show
         if group_ID is None:
             keys_to_remove = list(dict_group.keys())  # Remove all if group_ID is None
             if hasattr(self, "clear_test_markers"):
@@ -858,7 +858,7 @@ class UIplot:
 
         # Ensure only artists for the active level (or untagged) are visible.
         # We set visibility here for level, and let update_show handle selection rules.
-        dict_group = self.uistate.dict_group_labels
+        dict_group = self.uistate.plot.dict_group_labels
 
         for k, v in list(dict_group.items()):
             if v.get("group_ID") is not None:
@@ -889,32 +889,32 @@ class UIplot:
         if hasattr(self.uistate, "dict_group_show"):
             new_show = {k: v for k, v in dict_group.items()
                         if v.get("group_ID") is not None and ((v.get("level") == active_level) or (v.get("level") is None))}
-            self.uistate.dict_group_show = new_show
+            self.uistate.plot.dict_group_show = new_show
 
     def graphRefresh(self, dd_groups, dd_testset=None, dd_shown_samples=None):
         # show only selected and imported lines, only appropriate aspects
         uistate = self.uistate
-        if uistate.axm is None:
+        if uistate.plot.axm is None:
             print("No axes to refresh")
             return
         t0 = time.time()
 
         # Set recordings and group legends
-        dd_recs = uistate.dict_rec_show
-        dd_group_show = uistate.dict_group_show
+        dd_recs = uistate.plot.dict_rec_show
+        dd_group_show = uistate.plot.dict_group_show
         axids = ["ax1", "ax2"]
         legend_loc = ["upper right", "lower right"]
-        if getattr(uistate, "experiment_type", "time") == "io":
+        if uistate.experiment.experiment_type == "io":
             legend_loc = ["lower right", "lower right"]
         elif uistate.slopeOnly():
             # slope-only: legend on ax2 (top-right) to match significance markers
             legend_loc = ["upper right", "upper right"]
-        is_pp = getattr(uistate, "experiment_type", "time") == "PP"
+        is_pp = uistate.experiment.experiment_type == "PP"
         for axid, loc in zip(axids, legend_loc):
             recs_on_axis = {key: value for key, value in dd_recs.items() if value["axis"] == axid and not key.endswith(" marker")}
             axis_legend = {key: value["line"] for key, value in recs_on_axis.items()}
             if axid in ["ax1", "ax2"]:
-                current_level = getattr(uistate, "buttonGroup_test_n", "recording")
+                current_level = uistate.stat_test.buttonGroup_test_n
                 groups_on_axis = {
                     key: value for key, value in dd_group_show.items()
                     if value["axis"] == axid and (value.get("level") == current_level or value.get("level") is None)
@@ -923,7 +923,7 @@ class UIplot:
                 for key, value in groups_on_axis.items():
                     display_key = self._display_label(key)
                     axis_legend[display_key] = value["line"]
-            axis = getattr(uistate, axid)
+            axis = getattr(uistate.plot, axid)
             if axis_legend and not is_pp:
                 try:
                     # Tweaked: smaller fontsize for compactness with groups + recs; explicit lists for safety
@@ -938,7 +938,7 @@ class UIplot:
                     axis.get_legend().remove()
 
         for axid in ["axm", "axe"]:
-            axis = getattr(uistate, axid)
+            axis = getattr(uistate.plot, axid)
             if axis.get_legend():
                 axis.get_legend().remove()
 
@@ -947,10 +947,10 @@ class UIplot:
 
         # arrange axes and labels
         axm, axe, ax1, ax2 = (
-            self.uistate.axm,
-            self.uistate.axe,
-            self.uistate.ax1,
-            self.uistate.ax2,
+            self.uistate.plot.axm,
+            self.uistate.plot.axe,
+            self.uistate.plot.ax1,
+            self.uistate.plot.ax2,
         )
 
         axm.axis("off")
@@ -960,14 +960,14 @@ class UIplot:
         axe.xaxis.set_major_formatter(FuncFormatter(lambda t, _: f"{t * 1e3:.1f}"))
         axe.set_xlabel("Time (ms)")
 
-        exp_type = getattr(uistate, "experiment_type", "time")
+        exp_type = uistate.experiment.experiment_type
         if exp_type == "io":
-            io_out = getattr(uistate, "io_output", "EPSPamp")
+            io_out = uistate.experiment.io_output
             ax2.set_ylabel("")
             if "slope" in io_out.lower():
-                ax1.set_ylabel("EPSP Slope %" if uistate.checkBox["norm_EPSP"] else "EPSP Slope (mV/ms)")
+                ax1.set_ylabel("EPSP Slope %" if uistate.project.checkBox["norm_EPSP"] else "EPSP Slope (mV/ms)")
             else:
-                ax1.set_ylabel("EPSP Amplitude %" if uistate.checkBox["norm_EPSP"] else "EPSP Amplitude (mV)")
+                ax1.set_ylabel("EPSP Amplitude %" if uistate.project.checkBox["norm_EPSP"] else "EPSP Amplitude (mV)")
 
             ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax1.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
@@ -982,7 +982,7 @@ class UIplot:
         else:
             ax1.tick_params(axis="x", bottom=True, length=3.5)  # restore matplotlib default tick marks
             ax2.tick_params(axis="x", bottom=True, length=3.5)
-            if uistate.checkBox["norm_EPSP"]:
+            if uistate.project.checkBox["norm_EPSP"]:
                 ax1.set_ylabel("Amplitude %")
                 ax2.set_ylabel("Slope %")
             else:
@@ -1013,9 +1013,9 @@ class UIplot:
 
             # Re-collect the true integer X positions for group labels, ignoring the sub-offsets used for the individual bars
             group_name_to_x = {}
-            current_level = getattr(uistate, "buttonGroup_test_n", "recording")
+            current_level = uistate.stat_test.buttonGroup_test_n
             if hasattr(uistate, "dict_group_show"):
-                for key, val in uistate.dict_group_show.items():
+                for key, val in uistate.plot.dict_group_show.items():
                     if "PPR" in key and hasattr(val["line"], "patches") and not val.get("is_overlay"):
                         if val.get("level") and val.get("level") != current_level:
                             continue
@@ -1047,7 +1047,7 @@ class UIplot:
         # Check if recordings are visible instead of groups
         pp_has_recs = False
         if exp_type == "PP" and hasattr(uistate, "dict_rec_show"):
-            for key, val in uistate.dict_rec_show.items():
+            for key, val in uistate.plot.dict_rec_show.items():
                 if "PPR" in key and "marker" not in key:
                     pp_has_recs = True
                     break
@@ -1055,16 +1055,16 @@ class UIplot:
         if exp_type == "PP" and pp_has_recs and not group_name_to_x:
             x_ticks = []
             x_ticklabels = []
-            if uistate.checkBox.get("EPSP_amp", True):
+            if uistate.project.checkBox.get("EPSP_amp", True):
                 x_ticks.append(1)
                 x_ticklabels.append("EPSP Amp")
-            if uistate.checkBox.get("EPSP_slope", True):
+            if uistate.project.checkBox.get("EPSP_slope", True):
                 x_ticks.append(2)
                 x_ticklabels.append("EPSP Slope")
-            if uistate.checkBox.get("volley_amp", True):
+            if uistate.project.checkBox.get("volley_amp", True):
                 x_ticks.append(3)
                 x_ticklabels.append("Volley Amp")
-            if uistate.checkBox.get("volley_slope", True):
+            if uistate.project.checkBox.get("volley_slope", True):
                 x_ticks.append(4)
                 x_ticklabels.append("Volley Slope")
 
@@ -1086,17 +1086,17 @@ class UIplot:
             ax1.set_xlabel(uistate.x_axis_xlabel())
             ax1.xaxis.set_major_locator(uistate.x_axis_locator())
             ax2.xaxis.set_major_locator(uistate.x_axis_locator())
-        # print(f"output_xlim: {uistate.zoom['output_xlim']}")
+        # print(f"output_xlim: {uistate.project.zoom['output_xlim']}")
         ax1.figure.subplots_adjust(bottom=0.2)
         self.oneAxisLeft()
         # print(f" - - graphRefresh: axis setup: {round((time.time() - t1) * 1000)} ms")
         # t1 = time.time()
 
         # maintain drag selections through reselection
-        if uistate.x_select["mean_start"] is not None:
+        if uistate.plot.x_select["mean_start"] is not None:
             self.xSelect(canvas=axm.figure.canvas, draw=False)
-        if uistate.x_select["output_start"] is not None:
-            if uistate.checkBox["EPSP_slope"]:
+        if uistate.plot.x_select["output_start"] is not None:
+            if uistate.project.checkBox["EPSP_slope"]:
                 self.xSelect(canvas=ax2.figure.canvas, draw=False)
             else:
                 self.xSelect(canvas=ax1.figure.canvas, draw=False)
@@ -1104,65 +1104,65 @@ class UIplot:
         # visualize test sets (Phase 2) - spans persist independently of xSelect
         if dd_testset is not None:
             self.visualize_test_sets(dd_testset=dd_testset, draw=False)
-            self.uistate.sample_dirty = True
+            self.uistate.plot.sample_dirty = True
             self.sample_overlay(dd_groups=dd_groups, dd_testset=dd_testset, dd_shown_samples=dd_shown_samples or {})
 
         # refresh samples (Phase 3.4.3) - create inset (transparent bg; axis visibility + traces controlled in sample_overlay; no sharex/sharey)
         if not hasattr(self.uistate, "sample_inset"):
-            if self.uistate.ax1 is not None:
-                self.uistate.sample_inset = self.uistate.ax1.inset_axes([0.02, 0.68, 0.33, 0.30])
-                self.uistate.sample_inset.set_zorder(10)
-                self.uistate.sample_inset.set_facecolor((0, 0, 0, 0))
-                self.uistate.sample_inset.set_axis_off()
-                self.uistate.sample_dirty = True
+            if self.uistate.plot.ax1 is not None:
+                self.uistate.plot.sample_inset = self.uistate.plot.ax1.inset_axes([0.02, 0.68, 0.33, 0.30])
+                self.uistate.plot.sample_inset.set_zorder(10)
+                self.uistate.plot.sample_inset.set_facecolor((0, 0, 0, 0))
+                self.uistate.plot.sample_inset.set_axis_off()
+                self.uistate.plot.sample_dirty = True
         if hasattr(self.uistate, "refresh_samples"):
             self.uistate.refresh_samples()
         elif hasattr(self, "uisub") and hasattr(self.uisub, "refresh_samples"):
             self.uisub.refresh_samples()
 
         # 0-hline for Events
-        if not "Events y zero marker" in self.uistate.dict_rec_labels:
-            hline0 = self.uistate.axe.axhline(0, linestyle="dotted", alpha=0.3)
-            self.uistate.dict_rec_labels["Events y zero marker"] = {
+        if not "Events y zero marker" in self.uistate.plot.dict_rec_labels:
+            hline0 = self.uistate.plot.axe.axhline(0, linestyle="dotted", alpha=0.3)
+            self.uistate.plot.dict_rec_labels["Events y zero marker"] = {
                 "rec_ID": None,
                 "stim": None,
                 "variant": None,
                 "line": hline0,
                 "axis": "axe",
             }
-        uistate.dict_rec_labels["Events y zero marker"]["line"].set_visible(True)
+        uistate.plot.dict_rec_labels["Events y zero marker"]["line"].set_visible(True)
 
         # 100-hline for relative Output
-        if uistate.checkBox["norm_EPSP"]:
-            if not "Output y 100% marker" in self.uistate.dict_rec_labels:
-                hline100ax1 = self.uistate.ax1.axhline(
+        if uistate.project.checkBox["norm_EPSP"]:
+            if not "Output y 100% marker" in self.uistate.plot.dict_rec_labels:
+                hline100ax1 = self.uistate.plot.ax1.axhline(
                     100,
                     linestyle="dotted",
                     alpha=0.3,
-                    color=uistate.settings["rgb_EPSP_amp"],
+                    color=uistate.project.settings["rgb_EPSP_amp"],
                 )
-                hline100ax2 = self.uistate.ax2.axhline(
+                hline100ax2 = self.uistate.plot.ax2.axhline(
                     100,
                     linestyle="dotted",
                     alpha=0.3,
-                    color=uistate.settings["rgb_EPSP_slope"],
+                    color=uistate.project.settings["rgb_EPSP_slope"],
                 )
-                self.uistate.dict_rec_labels["output amp 100% marker"] = {
+                self.uistate.plot.dict_rec_labels["output amp 100% marker"] = {
                     "rec_ID": None,
                     "stim": None,
                     "variant": None,
                     "line": hline100ax1,
                     "axis": "ax1",
                 }
-                self.uistate.dict_rec_labels["output slope 100% marker"] = {
+                self.uistate.plot.dict_rec_labels["output slope 100% marker"] = {
                     "rec_ID": None,
                     "stim": None,
                     "variant": None,
                     "line": hline100ax2,
                     "axis": "ax2",
                 }
-            uistate.dict_rec_labels["output amp 100% marker"]["line"].set_visible(uistate.ampView())
-            uistate.dict_rec_labels["output slope 100% marker"]["line"].set_visible(uistate.slopeView())
+            uistate.plot.dict_rec_labels["output amp 100% marker"]["line"].set_visible(uistate.ampView())
+            uistate.plot.dict_rec_labels["output slope 100% marker"]["line"].set_visible(uistate.slopeView())
         # print(f" - - graphRefresh: markers/hlines: {round((time.time() - t1) * 1000)} ms")
         # t1 = time.time()
 
@@ -1183,16 +1183,16 @@ class UIplot:
 
         # Re-apply formal test * / ns labels after full refresh (they attach to ax1/ax2 and
         # should normally survive, but this guarantees they reappear if any clear happened).
-        if getattr(uistate, "formal_test_results", None):
+        if uistate.stat_test.formal_test_results:
             try:
-                self.show_test_markers(uistate.formal_test_results)
+                self.show_test_markers(uistate.stat_test.formal_test_results)
             except Exception:
                 pass
 
         print(f" - - graphRefresh total: {round((time.time() - t0) * 1000)} ms")
 
     def oneAxisLeft(self):
-        ax1, ax2 = self.uistate.ax1, self.uistate.ax2
+        ax1, ax2 = self.uistate.plot.ax1, self.uistate.plot.ax2
         uistate = self.uistate
         # sets ax1 and ax2 visibility and position
         ax1.set_visible(True)
@@ -1221,10 +1221,10 @@ class UIplot:
 
     def get_axis(self, axisname):  # returns the axis object by name (using only object references failed in some cases)
         axis_dict = {
-            "axm": self.uistate.axm,
-            "axe": self.uistate.axe,
-            "ax1": self.uistate.ax1,
-            "ax2": self.uistate.ax2,
+            "axm": self.uistate.plot.axm,
+            "axe": self.uistate.plot.axe,
+            "ax1": self.uistate.plot.ax1,
+            "ax2": self.uistate.plot.ax2,
         }
         return axis_dict.get(axisname, None)
 
@@ -1261,7 +1261,7 @@ class UIplot:
         zorder = 0 if width > 1 else 1
         if is_pp and axid in ("ax1", "ax2") and "PPR" in label:
             zorder = 4  # Ensure rec blobs paint OVER the group overlays
-        alpha = alpha if alpha is not None else self.uistate.settings["alpha_line"]
+        alpha = alpha if alpha is not None else self.uistate.project.settings["alpha_line"]
         kwargs = {"color": color, "label": label, "alpha": alpha, "linewidth": width, "zorder": zorder, "linestyle": linestyle}
         if marker is not None:
             kwargs["marker"] = marker
@@ -1269,7 +1269,7 @@ class UIplot:
             kwargs["markersize"] = markersize
         (line,) = self.get_axis(axid).plot(x, y, **kwargs)
         line.set_visible(False)
-        self.uistate.dict_rec_labels[label] = {
+        self.uistate.plot.dict_rec_labels[label] = {
             "rec_ID": rec_ID,
             "aspect": aspect,
             "variant": variant,
@@ -1293,10 +1293,10 @@ class UIplot:
         variant="raw",
         x_mode="stim",
     ):
-        alpha = self.uistate.settings.get("alpha_shade", 0.3)
+        alpha = self.uistate.project.settings.get("alpha_shade", 0.3)
         fill = self.get_axis(axid).fill_between(x, y_mean - sem, y_mean + sem, alpha=alpha, color=color, zorder=0)
         fill.set_visible(False)
-        self.uistate.dict_rec_labels[label] = {
+        self.uistate.plot.dict_rec_labels[label] = {
             "rec_ID": rec_ID,
             "aspect": aspect,
             "variant": variant,
@@ -1334,7 +1334,7 @@ class UIplot:
             label=label,
         )
         marker.set_visible(False)
-        self.uistate.dict_rec_labels[label] = {
+        self.uistate.plot.dict_rec_labels[label] = {
             "rec_ID": rec_ID,
             "aspect": aspect,
             "variant": variant,
@@ -1364,7 +1364,7 @@ class UIplot:
             [amp_y[1], amp_y[1]],
             color=color,
             label=f"{label} x",
-            alpha=self.uistate.settings["alpha_line"],
+            alpha=self.uistate.project.settings["alpha_line"],
             zorder=2,
             linewidth=2,
         )
@@ -1373,13 +1373,13 @@ class UIplot:
             amp_y,
             color=color,
             label=f"{label} y",
-            alpha=self.uistate.settings["alpha_line"],
+            alpha=self.uistate.project.settings["alpha_line"],
             zorder=2,
             linewidth=2,
         )
         xline.set_visible(False)
         yline.set_visible(False)
-        self.uistate.dict_rec_labels[f"{label} x marker"] = {
+        self.uistate.plot.dict_rec_labels[f"{label} x marker"] = {
             "rec_ID": rec_ID,
             "aspect": aspect,
             "variant": variant,
@@ -1389,7 +1389,7 @@ class UIplot:
             "is_zero_width": is_zero_width,
             "x_mode": x_mode,
         }
-        self.uistate.dict_rec_labels[f"{label} y marker"] = {
+        self.uistate.plot.dict_rec_labels[f"{label} y marker"] = {
             "rec_ID": rec_ID,
             "aspect": aspect,
             "variant": variant,
@@ -1416,13 +1416,13 @@ class UIplot:
         vline = self.get_axis(axid).axvline(
             x=x,
             color=color,
-            alpha=self.uistate.settings["alpha_mark"],
+            alpha=self.uistate.project.settings["alpha_mark"],
             label=label,
             linewidth=linewidth,
             zorder=0,
         )
         vline.set_visible(False)
-        self.uistate.dict_rec_labels[label] = {
+        self.uistate.plot.dict_rec_labels[label] = {
             "rec_ID": rec_ID,
             "aspect": aspect,
             "variant": variant,
@@ -1451,13 +1451,13 @@ class UIplot:
         hline = self.get_axis(axid).axhline(
             y=y,
             color=color,
-            alpha=self.uistate.settings["alpha_mark"],
+            alpha=self.uistate.project.settings["alpha_mark"],
             label=label,
             linewidth=linewidth,
             zorder=0,
         )
         hline.set_visible(False)
-        self.uistate.dict_rec_labels[label] = {
+        self.uistate.plot.dict_rec_labels[label] = {
             "rec_ID": rec_ID,
             "aspect": aspect,
             "variant": variant,
@@ -1535,7 +1535,7 @@ class UIplot:
             y_mean_vals,
             color=color,
             label=label_mean,
-            alpha=self.uistate.settings["alpha_line"],
+            alpha=self.uistate.project.settings["alpha_line"],
             zorder=1,
             linewidth=2.0,
         )
@@ -1548,7 +1548,7 @@ class UIplot:
                 y_norm_vals,
                 color=color,
                 label=label_norm,
-                alpha=self.uistate.settings["alpha_line"],
+                alpha=self.uistate.project.settings["alpha_line"],
                 zorder=1,
                 linewidth=2.0,
             )
@@ -1560,7 +1560,7 @@ class UIplot:
 
         meanline.set_visible(False)
         meanfill.set_visible(False)
-        self.uistate.dict_group_labels[mean_storage_key] = {
+        self.uistate.plot.dict_group_labels[mean_storage_key] = {
             "group_ID": group_ID,
             "stim": None,
             "aspect": aspect,
@@ -1575,7 +1575,7 @@ class UIplot:
         if y_norm is not None:
             normline.set_visible(False)
             normfill.set_visible(False)
-            self.uistate.dict_group_labels[norm_storage_key] = {
+            self.uistate.plot.dict_group_labels[norm_storage_key] = {
                 "group_ID": group_ID,
                 "stim": None,
                 "aspect": aspect,
@@ -1607,7 +1607,7 @@ class UIplot:
             y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
 
             axid = "ax1"
-            color = self.uistate.settings.get(f"rgb_{y_col_base}", "black")
+            color = self.uistate.project.settings.get(f"rgb_{y_col_base}", "black")
 
             df_sweeps = dfoutput[dfoutput["sweep"].notna()]
             for variant in ["raw", "norm"]:
@@ -1625,7 +1625,7 @@ class UIplot:
                         zorder=2,
                     )
                     scatter.set_visible(False)
-                    self.uistate.dict_rec_labels[f"{label} {variant} IO scatter"] = {
+                    self.uistate.plot.dict_rec_labels[f"{label} {variant} IO scatter"] = {
                         "rec_ID": rec_ID,
                         "aspect": y_col_base,
                         "variant": variant,
@@ -1639,7 +1639,7 @@ class UIplot:
                         x_vals = df_clean[x_col].values
                         y_vals = df_clean[y_col].values
 
-                        if self.uistate.checkBox.get("io_force0", False):
+                        if self.uistate.project.checkBox.get("io_force0", False):
                             x_sq_sum = np.sum(x_vals**2)
                             m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
                             c = 0
@@ -1651,7 +1651,7 @@ class UIplot:
                                 x_mean = np.mean(x_vals)
                                 m, c_cent = np.polyfit(x_vals - x_mean, y_vals, 1)
                                 c = c_cent - m * x_mean
-                        x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
+                        x_line = np.array([0 if self.uistate.project.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
                         y_line = m * x_line + c
 
                         (trendline,) = self.get_axis(axid).plot(
@@ -1664,7 +1664,7 @@ class UIplot:
                             zorder=1,
                         )
                         trendline.set_visible(False)
-                        self.uistate.dict_rec_labels[f"{label} {variant} IO trendline"] = {
+                        self.uistate.plot.dict_rec_labels[f"{label} {variant} IO trendline"] = {
                             "rec_ID": rec_ID,
                             "aspect": y_col_base,
                             "variant": variant,
@@ -1686,7 +1686,7 @@ class UIplot:
 
         dict_gradient = self.get_dict_gradient(n_stims)
 
-        settings = self.uistate.settings  # Event window, color, and alpha settings
+        settings = self.uistate.project.settings  # Event window, color, and alpha settings
         variables = [
             "t_EPSP_amp",
             "t_EPSP_slope_start",
@@ -2012,7 +2012,7 @@ class UIplot:
                         x_val_map = {}
                         i = 1
                         for key in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]:
-                            if self.uistate.checkBox.get(key, True):
+                            if self.uistate.project.checkBox.get(key, True):
                                 x_val_map[key] = i
                                 i += 1
                         x_val = x_val_map.get(aspect, 1)
@@ -2084,7 +2084,7 @@ class UIplot:
     def addGroup(self, group_ID, dict_group, df_groupmean, x_pos=1, level=None):
         """Add (or update) group artists for the given level.
 
-        If level is None, it is taken from uistate.buttonGroup_test_n.
+        If level is None, it is taken from uistate.stat_test.buttonGroup_test_n.
         """
         # plot group meanlines and SEMs
         eff_level = level or getattr(self.uistate, "buttonGroup_test_n", "recording")
@@ -2098,7 +2098,7 @@ class UIplot:
             rec_ppr = {}
             for rec_id in dict_group["rec_IDs"]:
                 rec_ppr[rec_id] = {}
-                for key, linedict in self.uistate.dict_rec_labels.items():
+                for key, linedict in self.uistate.plot.dict_rec_labels.items():
                     if linedict.get("rec_ID") == rec_id and "PPR" in key and linedict.get("variant") == "raw":
                         aspect = linedict.get("aspect")
                         if aspect:
@@ -2154,7 +2154,7 @@ class UIplot:
             ]
 
             # Dynamically calculate spacing offsets for only the enabled aspects
-            active_aspects = [item for item in aspect_list if self.uistate.checkBox.get(item[0], True)]
+            active_aspects = [item for item in aspect_list if self.uistate.project.checkBox.get(item[0], True)]
             n_active = len(active_aspects)
 
             configs = []
@@ -2207,7 +2207,7 @@ class UIplot:
                             # Jitter the points slightly along the X axis so they don't overlap perfectly
                             jitter = np.random.uniform(-0.06, 0.06, size=len(vals)) if len(vals) > 1 else np.array([0])
                             x_jittered = [bar_x] * len(vals) + jitter
-                            aspect_color = self.uistate.settings.get(f"rgb_{aspect}", "white")
+                            aspect_color = self.uistate.project.settings.get(f"rgb_{aspect}", "white")
 
                             for j, (val, rid) in enumerate(zip(vals, rec_id_order[aspect])):
                                 xj = x_jittered[j]
@@ -2220,7 +2220,7 @@ class UIplot:
                         x_val_map = {}
                         idx = 1
                         for key in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]:
-                            if self.uistate.checkBox.get(key, True):
+                            if self.uistate.project.checkBox.get(key, True):
                                 x_val_map[key] = idx
                                 idx += 1
                         overlay_x = x_val_map.get(aspect, 1)
@@ -2290,7 +2290,7 @@ class UIplot:
                             if rec_id_val is not None:
                                 d["rec_ID"] = rec_id_val
                             ppr_storage_key = self._level_key(f"{group_name} PPR {aspect} {suffix}", level)
-                            self.uistate.dict_group_labels[ppr_storage_key] = d
+                            self.uistate.plot.dict_group_labels[ppr_storage_key] = d
                     except Exception as e:
                         print(f"DEBUG: addGroup error in drawing loop: {e}")
                         continue
@@ -2309,8 +2309,8 @@ class UIplot:
                 all_x = []
                 all_y = []
 
-                # find scatters in uistate.dict_rec_labels
-                for key, linedict in self.uistate.dict_rec_labels.items():
+                # find scatters in uistate.plot.dict_rec_labels
+                for key, linedict in self.uistate.plot.dict_rec_labels.items():
                     if linedict.get("x_mode") == "io" and linedict.get("rec_ID") in dict_group["rec_IDs"]:
                         if key.endswith(f"{variant} IO scatter"):
                             scatter = linedict["line"]
@@ -2335,7 +2335,7 @@ class UIplot:
                     scatter.set_visible(False)
                     io_level = getattr(self.uistate, "buttonGroup_test_n", "recording")
                     io_storage_key = self._level_key(f"{group_name} {variant} IO scatter", io_level)
-                    self.uistate.dict_group_labels[io_storage_key] = {
+                    self.uistate.plot.dict_group_labels[io_storage_key] = {
                         "group_ID": group_ID,
                         "aspect": y_col_base,
                         "variant": variant,
@@ -2348,7 +2348,7 @@ class UIplot:
                     }
 
                     if len(x_vals) > 1:
-                        if self.uistate.checkBox.get("io_force0", False):
+                        if self.uistate.project.checkBox.get("io_force0", False):
                             x_sq_sum = np.sum(x_vals**2)
                             m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
                             c = 0
@@ -2360,7 +2360,7 @@ class UIplot:
                                 x_mean = np.mean(x_vals)
                                 m, c_cent = np.polyfit(x_vals - x_mean, y_vals, 1)
                                 c = c_cent - m * x_mean
-                        x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
+                        x_line = np.array([0 if self.uistate.project.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
                         y_line = m * x_line + c
 
                         (trendline,) = self.get_axis(axid).plot(
@@ -2375,7 +2375,7 @@ class UIplot:
                         )
                         trendline.set_visible(False)
                         io_trend_key = self._level_key(f"{group_name} {variant} IO trendline", io_level)
-                        self.uistate.dict_group_labels[io_trend_key] = {
+                        self.uistate.plot.dict_group_labels[io_trend_key] = {
                             "group_ID": group_ID,
                             "aspect": y_col_base,
                             "variant": variant,
@@ -2410,7 +2410,7 @@ class UIplot:
         amp_zero_plot=None,
     ):
         """
-        Updates the existing plotted artists stored in `self.uistate.dict_rec_labels`.
+        Updates the existing plotted artists stored in `self.uistate.plot.dict_rec_labels`.
         Parameters
         - prow (pandas.Series): df_project row for selected recording.
         - trow (pandas.Series): dft (timepoint) row for selected stim.
@@ -2460,7 +2460,7 @@ class UIplot:
                 raise KeyError(f"trow missing required key: '{key}'")
 
         # TODO: unspaghetti this mess
-        norm = self.uistate.checkBox["norm_EPSP"]
+        norm = self.uistate.project.checkBox["norm_EPSP"]
         stim_offset = trow["t_stim"]
         rec_filter = prow.get("filter")
         rec_name = prow["recording_name"]
@@ -2532,12 +2532,12 @@ class UIplot:
                     self.updateOutLine(label_core)
 
     def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None, draw=False):
-        axe = self.uistate.axe
+        axe = self.uistate.plot.axe
         print(f"updateAmpMarker called with labelbase: {labelbase}, x: {x}, y: {y}, amp_x: {amp_x}, amp_zero: {amp_zero}, amp: {amp}")
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
         print(f"updateAmpMarker: {labelbase}, x: {x}, y: {y}, amp_x: {amp_x}, amp_zero: {amp_zero}, amp: {amp}")
-        self.uistate.dict_rec_labels[f"{labelbase} marker"]["line"].set_data(x, y)
+        self.uistate.plot.dict_rec_labels[f"{labelbase} marker"]["line"].set_data(x, y)
         if amp is None or pd.isna(amp):
             amp = -(y[0] - amp_zero)
 
@@ -2550,29 +2550,29 @@ class UIplot:
 
             is_zero_width = amp_x[0] == amp_x[1]
             amp_y = amp_zero, (0 - amp) + amp_zero
-            self.uistate.dict_rec_labels[f"{labelbase} x marker"]["line"].set_data(amp_x, [amp_y[1], amp_y[1]])
-            self.uistate.dict_rec_labels[f"{labelbase} y marker"]["line"].set_data([x[0], x[0]], amp_y)
-            self.uistate.dict_rec_labels[f"{labelbase} x marker"]["is_zero_width"] = is_zero_width
-            self.uistate.dict_rec_labels[f"{labelbase} y marker"]["is_zero_width"] = False
+            self.uistate.plot.dict_rec_labels[f"{labelbase} x marker"]["line"].set_data(amp_x, [amp_y[1], amp_y[1]])
+            self.uistate.plot.dict_rec_labels[f"{labelbase} y marker"]["line"].set_data([x[0], x[0]], amp_y)
+            self.uistate.plot.dict_rec_labels[f"{labelbase} x marker"]["is_zero_width"] = is_zero_width
+            self.uistate.plot.dict_rec_labels[f"{labelbase} y marker"]["is_zero_width"] = False
         if draw:
             axe.figure.canvas.draw_idle()
 
     def updateLine(self, plot_to_update, x_data, y_data, draw=False):
-        axe = self.uistate.axe
-        dict_line = self.uistate.dict_rec_labels[plot_to_update]
+        axe = self.uistate.plot.axe
+        dict_line = self.uistate.plot.dict_rec_labels[plot_to_update]
         dict_line["line"].set_data(x_data, y_data)
         if draw:
             axe.figure.canvas.draw_idle()
 
     def updateOutLine(self, label):
         print(f"updateOutLine: {label}")
-        mouseover_out = self.uistate.mouseover_out
+        mouseover_out = self.uistate.plot.mouseover_out
         if mouseover_out is None:
             print(f"updateOutLine: mouseover_out is None, skipping update for '{label}'")
             return
-        if label not in self.uistate.dict_rec_labels:
+        if label not in self.uistate.plot.dict_rec_labels:
             return
-        linedict = self.uistate.dict_rec_labels[label]
+        linedict = self.uistate.plot.dict_rec_labels[label]
         linedict["line"].set_xdata(mouseover_out[0].get_xdata())
         linedict["line"].set_ydata(mouseover_out[0].get_ydata())
 
@@ -2598,7 +2598,7 @@ class UIplot:
             "volley slope"        → "volley_slope"
         """
         # Refresh IO scatter plot if it exists for this recording
-        for key, linedict in self.uistate.dict_rec_labels.items():
+        for key, linedict in self.uistate.plot.dict_rec_labels.items():
             if key.startswith(rec_name) and key.endswith(" IO scatter") and linedict.get("x_mode") == "io":
                 io_input = getattr(self.uistate, "io_input", "vamp")
                 io_output = getattr(self.uistate, "io_output", "EPSPamp")
@@ -2626,7 +2626,7 @@ class UIplot:
                         x_vals = df_clean[x_col].values
                         y_vals = df_clean[y_col].values
 
-                        if self.uistate.checkBox.get("io_force0", False):
+                        if self.uistate.project.checkBox.get("io_force0", False):
                             x_sq_sum = np.sum(x_vals**2)
                             m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
                             c = 0
@@ -2638,7 +2638,7 @@ class UIplot:
                                 x_mean = np.mean(x_vals)
                                 m, c_cent = np.polyfit(x_vals - x_mean, y_vals, 1)
                                 c = c_cent - m * x_mean
-                        x_line = np.array([0 if self.uistate.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
+                        x_line = np.array([0 if self.uistate.project.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
                         y_line = m * x_line + c
                         linedict["line"].set_data(x_line, y_line)
                         print(f"updateStimLines: refreshed IO trendline '{key}'")
@@ -2661,18 +2661,18 @@ class UIplot:
 
         for suffix, col in suffix_to_col.items():
             label = f"{rec_name} {suffix}"
-            if label not in self.uistate.dict_rec_labels:
+            if label not in self.uistate.plot.dict_rec_labels:
                 continue
             if col not in out_stim.columns:
                 continue
-            linedict = self.uistate.dict_rec_labels[label]
+            linedict = self.uistate.plot.dict_rec_labels[label]
             linedict["line"].set_xdata(out_stim["stim"].values)
             linedict["line"].set_ydata(out_stim[col].values)
             print(f"updateStimLines: refreshed '{label}'")
 
             shade_label = f"{label} shade"
-            if shade_label in self.uistate.dict_rec_labels and col in df_sem.columns:
-                old_shade_dict = self.uistate.dict_rec_labels[shade_label]
+            if shade_label in self.uistate.plot.dict_rec_labels and col in df_sem.columns:
+                old_shade_dict = self.uistate.plot.dict_rec_labels[shade_label]
                 try:
                     old_shade_dict["line"].remove()
                 except Exception:
@@ -2683,7 +2683,7 @@ class UIplot:
                 aspect = old_shade_dict["aspect"]
                 variant = old_shade_dict["variant"]
                 color_setting_key = f"rgb_{aspect}"
-                color = self.uistate.settings.get(color_setting_key, "black")
+                color = self.uistate.project.settings.get(color_setting_key, "black")
 
                 self.plot_shade(
                     shade_label,
@@ -2698,7 +2698,7 @@ class UIplot:
                     x_mode="stim",
                 )
 
-                self.uistate.dict_rec_labels[shade_label]["line"].set_visible(linedict["line"].get_visible())
+                self.uistate.plot.dict_rec_labels[shade_label]["line"].set_visible(linedict["line"].get_visible())
 
     def updateOutLineFromDf(self, label, dfoutput, stim_num, column, x_axis=None):
         """Populate an output line directly from a dfoutput DataFrame.
@@ -2720,7 +2720,7 @@ class UIplot:
             self.updateOutLine(label)
             return
 
-        if label not in self.uistate.dict_rec_labels:
+        if label not in self.uistate.plot.dict_rec_labels:
             is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
             if is_pp:
                 rec_label = label.split(" - stim ")[0]
@@ -2742,13 +2742,13 @@ class UIplot:
 
                         for variant in ["raw", "norm"]:
                             ppr_label = f"{rec_label} PPR {aspect} {variant}"
-                            if ppr_label in self.uistate.dict_rec_labels:
-                                linedict = self.uistate.dict_rec_labels[ppr_label]
+                            if ppr_label in self.uistate.plot.dict_rec_labels:
+                                linedict = self.uistate.plot.dict_rec_labels[ppr_label]
                                 line = linedict["line"]
                                 x_val_map = {}
                                 idx = 1
                                 for key in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]:
-                                    if self.uistate.checkBox.get(key, True):
+                                    if self.uistate.project.checkBox.get(key, True):
                                         x_val_map[key] = idx
                                         idx += 1
                                 overlay_x = x_val_map.get(aspect, 1)
@@ -2756,7 +2756,7 @@ class UIplot:
                                 line.set_ydata(ppr)
             return
 
-        linedict = self.uistate.dict_rec_labels[label]
+        linedict = self.uistate.plot.dict_rec_labels[label]
         x_col = linedict.get("x_mode", "sweep")
         if x_col not in df_stim.columns:
             x_col = "sweep"
@@ -2765,13 +2765,13 @@ class UIplot:
 
     def updateOutMean(self, label, mean):
         print(f"updateOutMean: {label}, {mean}")
-        mouseover_out = self.uistate.mouseover_out
+        mouseover_out = self.uistate.plot.mouseover_out
         if mouseover_out is None:
             print(f"updateOutMean: mouseover_out is None, skipping update for '{label}'")
             return
-        if label not in self.uistate.dict_rec_labels:
+        if label not in self.uistate.plot.dict_rec_labels:
             return
-        linedict = self.uistate.dict_rec_labels[label]
+        linedict = self.uistate.plot.dict_rec_labels[label]
         linedict["line"].set_xdata(mouseover_out[0].get_xdata())
         linedict["line"].set_ydata([mean] * len(linedict["line"].get_xdata()))
         # linedict['line'].set_ydata(mean)
@@ -2782,7 +2782,7 @@ class UIplot:
 
     def updateEPSPout(self, rec_name, out):  # TODO: update this last remaining ax-cycle to use the dict
         # OBSOLETE - called by norm, does not operate on stim-specific data!
-        ax1, ax2 = self.uistate.ax1, self.uistate.ax2
+        ax1, ax2 = self.uistate.plot.ax1, self.uistate.plot.ax2
         for line in ax1.get_lines():
             if line.get_label() == f"{rec_name} EPSP amp":
                 line.set_ydata(out["EPSP_amp"])

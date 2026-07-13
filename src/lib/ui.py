@@ -330,8 +330,8 @@ class UIsub(
         if df_p is None:
             df_p = self.get_df_project()
 
-        if len(uistate.list_idx_select_recs) > 0:
-            selected_df = df_p.loc[uistate.list_idx_select_recs]
+        if len(uistate.plot.list_idx_select_recs) > 0:
+            selected_df = df_p.loc[uistate.plot.list_idx_select_recs]
 
             # 1. Filter Mode (radio buttons)
             filters = selected_df["filter"].unique()
@@ -346,13 +346,13 @@ class UIsub(
             if len(filter_modes) == 1:
                 f_mode = filter_modes.pop()
                 if f_mode == "voltage":
-                    uistate.settings["filter"] = "voltage"
+                    uistate.project.settings["filter"] = "voltage"
                     self.radioButton_filter_none.setChecked(True)
                 elif f_mode == "savgol":
-                    uistate.settings["filter"] = "savgol"
+                    uistate.project.settings["filter"] = "savgol"
                     self.radioButton_filter_savgol.setChecked(True)
             else:
-                uistate.settings["filter"] = "voltage"
+                uistate.project.settings["filter"] = "voltage"
                 self.buttonGroup_filter.setExclusive(False)
                 self.radioButton_filter_none.setChecked(False)
                 self.radioButton_filter_savgol.setChecked(False)
@@ -372,14 +372,14 @@ class UIsub(
 
             if len(windows) == 1:
                 val = windows.pop()
-                uistate.lineEdit["savgol_window"] = val
+                uistate.project.lineEdit["savgol_window"] = val
                 self.lineEdit_savgol_window.setText(str(val))
             else:
                 self.lineEdit_savgol_window.setText("")
 
             if len(polys) == 1:
                 val = polys.pop()
-                uistate.lineEdit["savgol_poly"] = val
+                uistate.project.lineEdit["savgol_poly"] = val
                 self.lineEdit_savgol_poly.setText(str(val))
             else:
                 self.lineEdit_savgol_poly.setText("")
@@ -396,8 +396,8 @@ class UIsub(
         if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.RightButton:
             self.tableStim.clearSelection()
 
-        if uistate.mean_mouseover_stim_select is not None:  # clicked graph
-            row = uistate.mean_mouseover_stim_select - 1
+        if uistate.plot.mean_mouseover_stim_select is not None:  # clicked graph
+            row = uistate.plot.mean_mouseover_stim_select - 1
             model_index = self.tableStimModel.index(row, 0)
 
             modifiers = QtWidgets.QApplication.keyboardModifiers()
@@ -406,7 +406,7 @@ class UIsub(
             else:
                 flag = QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows
 
-            uistate.mean_mouseover_stim_select = None
+            uistate.plot.mean_mouseover_stim_select = None
 
             # Safely disconnect if connected to prevent a recursive loop
             try:
@@ -418,16 +418,16 @@ class UIsub(
 
         selected_indexes = self.tableStim.selectionModel().selectedRows()
 
-        # build the list uistate.list_idx_select_stims with indices
-        uistate.list_idx_select_stims = [index.row() for index in selected_indexes]
+        # build the list uistate.plot.list_idx_select_stims with indices
+        uistate.plot.list_idx_select_stims = [index.row() for index in selected_indexes]
 
         # update single-recording reference dataframe if applicable
-        if len(uistate.list_idx_select_recs) == 1:
+        if len(uistate.plot.list_idx_select_recs) == 1:
             prow = self.get_prow()
             if prow is not None:
-                uistate.df_rec_select_time = self.get_dft(row=prow)
+                uistate.plot.df_rec_select_time = self.get_dft(row=prow)
         else:
-            uistate.df_rec_select_time = None
+            uistate.plot.df_rec_select_time = None
 
         self.update_stim_buttons()
         self.update_show()
@@ -448,13 +448,13 @@ class UIsub(
             os.rmdir(dir_path)  # remove the directory itself
 
     def uiFreeze(self):  # Disable selection changes and checkboxes
-        if uistate.frozen:
+        if uistate.plot.frozen:
             return
-        uistate.frozen = True
+        uistate.plot.frozen = True
         self.tableProj.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.connectUIstate(disconnect=True)
-        for key, _ in uistate.checkBox.items():
+        for key, _ in uistate.project.checkBox.items():
             if hasattr(self, f"checkBox_{key}"):
                 checkBox = getattr(self, f"checkBox_{key}")
                 checkBox.setEnabled(False)
@@ -471,12 +471,12 @@ class UIsub(
                 getattr(self, radio_name).setEnabled(False)  # ET/TT radios always enabled per plan (warnings via statusbar)
 
     def uiThaw(self):  # Enable selection changes and checkboxes
-        if not uistate.frozen:
+        if not uistate.plot.frozen:
             return
         self.tableProj.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.tableStim.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.connectUIstate()
-        for key, _ in uistate.checkBox.items():
+        for key, _ in uistate.project.checkBox.items():
             if hasattr(self, f"checkBox_{key}"):
                 checkBox = getattr(self, f"checkBox_{key}")
                 checkBox.setEnabled(True)
@@ -497,12 +497,12 @@ class UIsub(
         # group is not left fully disabled.
         if hasattr(self, "radioButton_type_sweep"):
             self.radioButton_type_sweep.setEnabled(True)
-        uistate.frozen = False
+        uistate.plot.frozen = False
 
     def toggleHeatmap(self):
-        uistate.showHeatmap = not uistate.showHeatmap
-        print(f"Heatmap is {uistate.showHeatmap}")
-        if not uistate.showHeatmap:
+        uistate.plot.showHeatmap = not uistate.plot.showHeatmap
+        print(f"Heatmap is {uistate.plot.showHeatmap}")
+        if not uistate.plot.showHeatmap:
             uiplot.heatunmap()
             self.set_statusbar(None, None)  # pure display refresh (no test recompute)
             return
@@ -513,7 +513,7 @@ class UIsub(
         for key, sub_dict in self.dd_groups.items():
             if sub_dict["show"]:
                 n = len(sub_dict["rec_IDs"])
-                level = getattr(uistate, "buttonGroup_test_n", "recording")
+                level = uistate.stat_test.buttonGroup_test_n
                 df = self.get_dfgroupmean(key, level=level)
                 list_l.append(len(df))
                 d_group_ndf[key] = [n, df]
@@ -526,9 +526,9 @@ class UIsub(
                     list_l.append(l)
                     print(f"{key} - N: {n} - {l} sweeps")
                 # perform test
-                norm = uistate.checkBox["norm_EPSP"]
-                amp = uistate.checkBox["EPSP_amp"]
-                slope = uistate.checkBox["EPSP_slope"]
+                norm = uistate.project.checkBox["norm_EPSP"]
+                amp = uistate.project.checkBox["EPSP_amp"]
+                slope = uistate.project.checkBox["EPSP_slope"]
                 df_ttest = analysis.ttest_df(d_group_ndf, norm=norm, amp=amp, slope=slope)
                 if not df_ttest.empty:
                     uiplot.heatmap(df_ttest)
@@ -552,8 +552,8 @@ class UIsub(
 
     def turn_heatmap_off(self):
         """Turn off heatmap (if on), remove any dots, sync menu, and restore normal statusbar."""
-        if getattr(uistate, "showHeatmap", False):
-            uistate.showHeatmap = False
+        if uistate.plot.showHeatmap:
+            uistate.plot.showHeatmap = False
             try:
                 uiplot.heatunmap()
             except Exception:
@@ -575,8 +575,8 @@ class UIsub(
         except Exception:
             pass
         if hasattr(uistate, "formal_test_results"):
-            uistate.formal_test_results = None
-        uistate.statusbar_state = None  # reset non-persisted state on clear
+            uistate.stat_test.formal_test_results = None
+        uistate.stat_test.statusbar_state = None  # reset non-persisted state on clear
         # leave printed console output as-is (user can scroll)
 
     def _is_loading_active(self):
@@ -709,14 +709,14 @@ class UIsub(
         mode = mode_str if mode_str != "none" else "voltage"
 
         self.usage(f"filter_mode_changed → {mode}")
-        uistate.settings["filter"] = mode
-        print(f"filter_mode_changed: uistate.settings['filter'] set to {mode}")
+        uistate.project.settings["filter"] = mode
+        print(f"filter_mode_changed: uistate.project.settings['filter'] set to {mode}")
         self.frameToolFilter_sub_Savgol.setVisible(mode == "savgol")
 
         df_p = self.get_df_project()
         if "filter" in df_p.columns and df_p["filter"].dtype != object:
             df_p["filter"] = df_p["filter"].astype(object)
-        selected_idx = uistate.list_idx_select_recs
+        selected_idx = uistate.plot.list_idx_select_recs
         if len(selected_idx) > 0:
             for idx in selected_idx:
                 df_p.at[idx, "filter"] = mode
@@ -734,13 +734,13 @@ class UIsub(
         key = lineEdit.objectName().replace("lineEdit_", "")
 
         self.usage(f"editSavgolParams → {key}: {val}")
-        uistate.lineEdit[key] = val
-        print(f"editSavgolParams: uistate.lineEdit['{key}'] set to {val}")
+        uistate.project.lineEdit[key] = val
+        print(f"editSavgolParams: uistate.project.lineEdit['{key}'] set to {val}")
 
         df_p = self.get_df_project()
         if "filter_params" in df_p.columns and df_p["filter_params"].dtype != object:
             df_p["filter_params"] = df_p["filter_params"].astype(object)
-        selected_idx = uistate.list_idx_select_recs
+        selected_idx = uistate.plot.list_idx_select_recs
 
         if len(selected_idx) > 0:
             for idx in selected_idx:
@@ -835,10 +835,10 @@ class UIsub(
     def io_input_changed(self, button):
         """Handler for buttonGroup_io_i.buttonClicked signal."""
         io_input = self._RADIO_TO_IO_I.get(button.objectName())
-        if io_input is None or io_input == getattr(uistate, "io_input", "vamp"):
+        if io_input is None or io_input == uistate.experiment.io_input:
             return
         self.usage(f"io_input_changed → {io_input}")
-        uistate.io_input = io_input
+        uistate.experiment.io_input = io_input
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
         self.exorcise()
         self.triggerRefresh()
@@ -846,10 +846,10 @@ class UIsub(
     def io_output_changed(self, button):
         """Handler for buttonGroup_io_o.buttonClicked signal."""
         io_output = self._RADIO_TO_IO_O.get(button.objectName())
-        if io_output is None or io_output == getattr(uistate, "io_output", "EPSPamp"):
+        if io_output is None or io_output == uistate.experiment.io_output:
             return
         self.usage(f"io_output_changed → {io_output}")
-        uistate.io_output = io_output
+        uistate.experiment.io_output = io_output
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
         self.exorcise()
         self.triggerRefresh()
@@ -857,11 +857,11 @@ class UIsub(
     def experiment_type_changed(self, button):
         """Handler for buttonGroup_type.buttonClicked signal."""
         exp_type = self._RADIO_TO_TYPE.get(button.objectName())
-        old_type = getattr(uistate, "experiment_type", "time")
+        old_type = uistate.experiment.experiment_type
         if exp_type is None or exp_type == old_type:
             return
         self.usage(f"experiment_type_changed → {exp_type}")
-        uistate.experiment_type = exp_type
+        uistate.experiment.experiment_type = exp_type
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(exp_type == "io")
         if exp_type == "io":
@@ -872,7 +872,7 @@ class UIsub(
                 getattr(self, "frameToolTestOptions").setVisible(True)  # n_unit relevant for regression granularity
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
         # Clear stale results; update_test is the single entry point (re-eval + statusbar via _get...).
-        uistate.formal_test_results = None
+        uistate.stat_test.formal_test_results = None
         # Do not unconditionally reset statusbar_state here; let _get_statusbar_for_current_state
         # (called from update_test) set "warning" for invalid t-test state (e.g. no test sets).
         # This matches launch-time behavior where warning color is set correctly.
@@ -895,8 +895,8 @@ class UIsub(
 
     def viewSettingsChanged(self, key, state):
         self.usage(f"viewSettingsChanged {key}, {state == 2}")
-        if key in uistate.checkBox.keys():
-            uistate.checkBox[key] = state == 2
+        if key in uistate.project.checkBox:
+            uistate.project.checkBox[key] = state == 2
             if key == "splitOddEven":
                 self.checkBox_splitOddEven_changed(state)
             elif key == "timepoints_per_stim":
@@ -910,26 +910,22 @@ class UIsub(
                     self.triggerRefresh()
             elif key == "is_group_sample":
                 self.checkBox_is_group_sample_changed(state)
-            elif key == "test_fdr":
-                print(f"FDR checkbox changed to: {state == 2}")
-                uistate.test_fdr = state == 2
-                self.update_test()
-            elif key == "test_sw":
-                print(f"SW checkbox changed to: {state == 2}")
-                uistate.test_sw = state == 2
-                self.update_test()
-            elif key == "test_levene":
-                print(f"Levene checkbox changed to: {state == 2}")
-                uistate.test_levene = state == 2
-                self.update_test()
             elif key == "label_test_t_one_sample_value":
-                # handled via dedicated editTestTOneSampleValue; this is for completeness if ever routed here
                 pass
+        elif key == "test_fdr":
+            uistate.stat_test.test_fdr = state == 2
+            self.update_test()
+        elif key == "test_sw":
+            uistate.stat_test.test_sw = state == 2
+            self.update_test()
+        elif key == "test_levene":
+            uistate.stat_test.test_levene = state == 2
+            self.update_test()
         # print(f"viewSettingsChanged: {key} = {state == 2}")
         self.update_show()
         if key in ["output_ymin0", "norm_EPSP"]:
             self.zoomAuto()
-        elif getattr(uistate, "experiment_type", "time") == "PP" and key in ["EPSP_amp", "volley_amp", "EPSP_slope", "volley_slope"]:
+        elif uistate.experiment.experiment_type == "PP" and key in ["EPSP_amp", "volley_amp", "EPSP_slope", "volley_slope"]:
             self.zoomAuto()
         # norm/amp/slope (visible aspects) affect heatmap and statistical test inputs;
         # clear stale heatmap dots and formal test markers when they change.
@@ -963,7 +959,7 @@ class UIsub(
         self.dict_usage[ui_component] += 1
         if config.talkback and ui_component in self.dict_usage:
             # Do not clobber an active test warning (red statusbar)
-            if getattr(uistate, "statusbar_state", None) != "warning":
+            if uistate.stat_test.statusbar_state != "warning":
                 # Show as centered text using the current default (theme/darkmode) color
                 self._set_statusbar_appearance(text=f"Used {ui_component} {self.dict_usage[ui_component]} times", bold=False)
         self.write_usage()
@@ -993,7 +989,7 @@ class UIsub(
         self.dd_group_samples = {}  # group sample means (phase 3.3: group_ID -> {test_ID: df})
         self.dict_diffs = {}  # all diffs (for paired stim)
         if hasattr(self, "uistate") and hasattr(self.uistate, "testset_spans"):
-            self.uistate.testset_spans = {}  # clear testset spans on cache reset (Phase 2)
+            self.uistate.plot.testset_spans = {}  # clear testset spans on cache reset (Phase 2)
 
     # uisub init refactoring (bootstrap and loadProject live in ProjectMixin)
 
@@ -1136,8 +1132,9 @@ class UIsub(
                         pass
                 else:
                     btn.clicked.connect(lambda checked, f=frame_name: self.setViewToolVisible(f, visible=False))
-        # checkBoxes
-        for key, value in uistate.checkBox.items():
+        # checkBoxes (project dict + stat_test-only widgets)
+        checkbox_keys = list(uistate.project.checkBox.keys()) + ["test_fdr", "test_sw", "test_levene"]
+        for key in checkbox_keys:
             if not hasattr(self, f"checkBox_{key}"):
                 continue
             checkBox = getattr(self, f"checkBox_{key}")
@@ -1279,7 +1276,7 @@ class UIsub(
                 )
 
         # pushButtons
-        for str_button, str_function in uistate.pushButtons.items():
+        for str_button, str_function in uistate.project.pushButtons.items():
             button, func = getattr(self, str_button), getattr(self, str_function)
             if disconnect:
                 try:
@@ -1289,7 +1286,7 @@ class UIsub(
             else:
                 button.pressed.connect(func)
         # SplitterMoved
-        for splitter_name in uistate.splitter.keys():
+        for splitter_name in uistate.project.splitter.keys():
             splitter = getattr(self, splitter_name)
             if disconnect:
                 try:
@@ -1301,16 +1298,16 @@ class UIsub(
 
     def applyConfigStates(self):
         if hasattr(self, "actionToggleProjectTable"):
-            self.actionToggleProjectTable.setChecked(getattr(uistate, "detailedProjectTable", False))
+            self.actionToggleProjectTable.setChecked(uistate.project.detailedProjectTable)
 
         if hasattr(self, "actionToggleTimetable"):
-            self.actionToggleTimetable.setChecked(getattr(uistate, "detailedTimetable", False))
+            self.actionToggleTimetable.setChecked(uistate.project.detailedTimetable)
 
         if hasattr(self, "actionTimetable"):
-            self.actionTimetable.setChecked(uistate.showTimetable)
+            self.actionTimetable.setChecked(uistate.project.showTimetable)
 
         if hasattr(self, "menuView"):
-            for frame, (text, state) in uistate.viewTools.items():
+            for frame, (text, state) in uistate.project.viewTools.items():
                 for action in self.menuView.actions():
                     if action.text() == text:
                         action.setChecked(state)
@@ -1319,101 +1316,101 @@ class UIsub(
         # Disconnect signals to prevent editingFinished from triggering from .setText
         self.connectUIstate(disconnect=True)
 
-        for key, value in uistate.checkBox.items():
+        for key, value in uistate.project.checkBox.items():
             if hasattr(self, f"checkBox_{key}"):
                 checkBox = getattr(self, f"checkBox_{key}")
                 checkBox.setChecked(value)
 
-        if uistate.settings.get("filter") == "savgol":
+        if uistate.project.settings.get("filter") == "savgol":
             self.radioButton_filter_savgol.setChecked(True)
         else:
             self.radioButton_filter_none.setChecked(True)
 
-        self.lineEdit_savgol_window.setText(str(uistate.lineEdit.get("savgol_window", 9)))
-        self.lineEdit_savgol_poly.setText(str(uistate.lineEdit.get("savgol_poly", 3)))
+        self.lineEdit_savgol_window.setText(str(uistate.project.lineEdit.get("savgol_window", 9)))
+        self.lineEdit_savgol_poly.setText(str(uistate.project.lineEdit.get("savgol_poly", 3)))
 
-        self.lineEdit_norm_EPSP_start.setText(f"{uistate.lineEdit['norm_EPSP_from']}")
-        self.lineEdit_norm_EPSP_end.setText(f"{uistate.lineEdit['norm_EPSP_to']}")
-        self.lineEdit_split_at_time.setText(f"{uistate.lineEdit['split_at_time'] * 1000:g}")
-        self.lineEdit_EPSP_amp_halfwidth.setText(f"{uistate.lineEdit['EPSP_amp_halfwidth_ms']}")
-        self.lineEdit_volley_amp_halfwidth.setText(f"{uistate.lineEdit['volley_amp_halfwidth_ms']}")
-        self.lineEdit_EPSP_slope_width.setText(f"{uistate.lineEdit.get('EPSP_slope_width_ms', 0)}")
-        self.lineEdit_volley_slope_width.setText(f"{uistate.lineEdit.get('volley_slope_width_ms', 0)}")
+        self.lineEdit_norm_EPSP_start.setText(f"{uistate.project.lineEdit['norm_EPSP_from']}")
+        self.lineEdit_norm_EPSP_end.setText(f"{uistate.project.lineEdit['norm_EPSP_to']}")
+        self.lineEdit_split_at_time.setText(f"{uistate.project.lineEdit['split_at_time'] * 1000:g}")
+        self.lineEdit_EPSP_amp_halfwidth.setText(f"{uistate.project.lineEdit['EPSP_amp_halfwidth_ms']}")
+        self.lineEdit_volley_amp_halfwidth.setText(f"{uistate.project.lineEdit['volley_amp_halfwidth_ms']}")
+        self.lineEdit_EPSP_slope_width.setText(f"{uistate.project.lineEdit.get('EPSP_slope_width_ms', 0)}")
+        self.lineEdit_volley_slope_width.setText(f"{uistate.project.lineEdit.get('volley_slope_width_ms', 0)}")
 
         # apply experiment type radio button selection from config
         if hasattr(self, "buttonGroup_type"):
-            type_radio_name = self._TYPE_TO_RADIO.get(getattr(uistate, "experiment_type", "time"), "radioButton_type_time")
+            type_radio_name = self._TYPE_TO_RADIO.get(uistate.experiment.experiment_type, "radioButton_type_time")
             if hasattr(self, type_radio_name):
                 getattr(self, type_radio_name).setChecked(True)
 
         # apply IO input/output radio button selection from config
         if hasattr(self, "buttonGroup_io_i"):
-            io_i_name = self._IO_I_TO_RADIO.get(getattr(uistate, "io_input", "vamp"), "radioButton_io_vamp")
+            io_i_name = self._IO_I_TO_RADIO.get(uistate.experiment.io_input, "radioButton_io_vamp")
             if hasattr(self, io_i_name):
                 getattr(self, io_i_name).setChecked(True)
 
         if hasattr(self, "buttonGroup_io_o"):
-            io_o_name = self._IO_O_TO_RADIO.get(getattr(uistate, "io_output", "EPSPamp"), "radioButton_io_EPSPamp")
+            io_o_name = self._IO_O_TO_RADIO.get(uistate.experiment.io_output, "radioButton_io_EPSPamp")
             if hasattr(self, io_o_name):
                 getattr(self, io_o_name).setChecked(True)
 
         # apply test radio button selections from config
         if hasattr(self, "buttonGroup_test"):
-            test_radio_name = self._TEST_TO_RADIO.get(getattr(uistate, "test_type", "None"), "radioButton_test_none")
+            test_radio_name = self._TEST_TO_RADIO.get(uistate.stat_test.test_type, "radioButton_test_none")
             if hasattr(self, test_radio_name):
                 getattr(self, test_radio_name).setChecked(True)
         if hasattr(self, "buttonGroup_test_t_variant"):
-            variant_name = self._TEST_T_VARIANT_TO_RADIO.get(getattr(uistate, "test_t_variant", "unpaired"), "radioButton_test_t_variant_unpaired")
+            variant_name = self._TEST_T_VARIANT_TO_RADIO.get(uistate.stat_test.test_t_variant, "radioButton_test_t_variant_unpaired")
             if hasattr(self, variant_name):
                 getattr(self, variant_name).setChecked(True)
         if hasattr(self, "buttonGroup_test_t_tails"):
-            tails_name = self._TEST_T_TAILS_TO_RADIO.get(getattr(uistate, "test_t_tails", "two-sided"), "radioButton_test_t_tails_two")
+            tails_name = self._TEST_T_TAILS_TO_RADIO.get(uistate.stat_test.test_t_tails, "radioButton_test_t_tails_two")
             if hasattr(self, tails_name):
                 getattr(self, tails_name).setChecked(True)
         if hasattr(self, "buttonGroup_wilcoxon_variant"):
             wilcox_variant_name = self._TEST_WILCOX_VARIANT_TO_RADIO.get(
-                getattr(uistate, "test_wilcox_variant", "paired"), "radioButton_wilcoxon_variant_paired"
+                uistate.stat_test.test_wilcox_variant, "radioButton_wilcoxon_variant_paired"
             )
             if hasattr(self, wilcox_variant_name):
                 getattr(self, wilcox_variant_name).setChecked(True)
         if hasattr(self, "buttonGroup_wilcoxon_tails"):
             wilcox_tails_name = self._TEST_WILCOX_TAILS_TO_RADIO.get(
-                getattr(uistate, "test_wilcox_tails", "two-sided"), "radioButton_wilcoxon_tails_two"
+                uistate.stat_test.test_wilcox_tails, "radioButton_wilcoxon_tails_two"
             )
             if hasattr(self, wilcox_tails_name):
                 getattr(self, wilcox_tails_name).setChecked(True)
         # v0.16_n_stats: default n_unit radio to subject (per clarification + plan Phase 0)
         if hasattr(self, "buttonGroup_test_n"):
-            default_n = getattr(uistate, "buttonGroup_test_n", "subject")
+            default_n = uistate.stat_test.buttonGroup_test_n
             radio_name = self._TEST_N_TO_RADIO.get(default_n, "radioButton_test_n_subject")
             if hasattr(self, radio_name):
                 getattr(self, radio_name).setChecked(True)
 
         if hasattr(self, "frameToolTest_sub_t"):
-            self.frameToolTest_sub_t.setVisible(getattr(uistate, "test_type", "None") == "t-test")
+            self.frameToolTest_sub_t.setVisible(uistate.stat_test.test_type == "t-test")
             # hook the one-sample value lineEdit (default 0.0 from UIState)
             if hasattr(self, "lineEdit_test_t_one_sample_value"):
-                val = getattr(uistate, "label_test_t_one_sample_value", 0.0)
+                val = uistate.stat_test.label_test_t_one_sample_value
                 self.lineEdit_test_t_one_sample_value.setText(str(val))
         if hasattr(self, "frameToolTest_sub_ANOVA"):
-            self.frameToolTest_sub_ANOVA.setVisible(getattr(uistate, "test_type", "None") in ("ANOVA", "ANCOVA"))
-            if getattr(uistate, "test_type", "None") in ("ANOVA", "ANCOVA"):
+            self.frameToolTest_sub_ANOVA.setVisible(uistate.stat_test.test_type in ("ANOVA", "ANCOVA"))
+            if uistate.stat_test.test_type in ("ANOVA", "ANCOVA"):
                 self.update_anova_label()
         if hasattr(self, "frameToolTest_sub_wilcoxon"):
-            self.frameToolTest_sub_wilcoxon.setVisible(getattr(uistate, "test_type", "None") == "Wilcoxon")
-            if getattr(uistate, "test_type", "None") == "Wilcoxon" and hasattr(self, "lineEdit_wilcoxon_one_sample_value"):
-                val = getattr(uistate, "label_test_wilcox_one_sample_value", 0.0)
+            self.frameToolTest_sub_wilcoxon.setVisible(uistate.stat_test.test_type == "Wilcoxon")
+            if uistate.stat_test.test_type == "Wilcoxon" and hasattr(self, "lineEdit_wilcoxon_one_sample_value"):
+                val = uistate.stat_test.label_test_wilcox_one_sample_value
                 self.lineEdit_wilcoxon_one_sample_value.setText(str(val))
         # experiment_type drives IO regression; ANCOVA is normal test_type radio
 
         # Ensure tools column is treated as fixed pixels
-        if len(uistate.splitter.get("h_splitterMaster", [])) == 4:
-            if type(uistate.splitter["h_splitterMaster"][3]) == float:
-                uistate.splitter["h_splitterMaster"][3] = 300
+        if len(uistate.project.splitter.get("h_splitterMaster", [])) == 4:
+            if type(uistate.project.splitter["h_splitterMaster"][3]) == float:
+                uistate.project.splitter["h_splitterMaster"][3] = 300
 
         # apply splitter proportions from project config
-        self.setSplitterSizes(*uistate.splitter.keys())
-        self.setTableStimVisibility(uistate.showTimetable, initialize=True)
+        self.setSplitterSizes(*uistate.project.splitter.keys())
+        self.setTableStimVisibility(uistate.project.showTimetable, initialize=True)
         self.connectUIstate()
         # Initial evaluation of test condition warnings on the statusbar (after config/test radios restored)
         self.update_test()
@@ -1462,25 +1459,25 @@ class UIsub(
 
     def triggerStimAdd(self):
         self.usage("triggerStimAdd")
-        if not uistate.list_idx_select_recs:
+        if not uistate.plot.list_idx_select_recs:
             print("triggerStimAdd: No files selected.")
             return
 
-        t_start = uistate.x_select["mean_start"]
+        t_start = uistate.plot.x_select["mean_start"]
         if t_start is None:
             print("triggerStimAdd: No selection in axm.")
             return
 
         df_p = self.get_df_project()
 
-        for index in uistate.list_idx_select_recs:
+        for index in uistate.plot.list_idx_select_recs:
             p_row = df_p.loc[index]
             rec_name = p_row["recording_name"]
             rec_ID = p_row["ID"]
 
             df_t = self.get_dft(p_row)
 
-            new_row = uistate.default_dict_t.copy()
+            new_row = uistate.project.default_dict_t.copy()
             new_row["t_stim"] = t_start
 
             # Make sure it's constructed securely as a 1D Series converting to DataFrame
@@ -1511,13 +1508,13 @@ class UIsub(
 
         self.set_df_project(df_p)
 
-        uistate.x_select["mean_start"] = None
-        uistate.x_select["mean_end"] = None
+        uistate.plot.x_select["mean_start"] = None
+        uistate.plot.x_select["mean_end"] = None
         self.lineEdit_mean_selection_start.setText("")
         self.lineEdit_mean_selection_end.setText("")
 
-        uistate.list_idx_select_stims = [0]
-        p_row = df_p.loc[uistate.list_idx_select_recs[0]]
+        uistate.plot.list_idx_select_stims = [0]
+        p_row = df_p.loc[uistate.plot.list_idx_select_recs[0]]
         df_t = self.get_dft(p_row)
         self.tableStimModel.setData(df_t)
         self.formatTableStimLayout(df_t)
@@ -1536,16 +1533,16 @@ class UIsub(
 
     def triggerStimRemove(self):
         self.usage("triggerStimRemove")
-        if not uistate.list_idx_select_recs:
+        if not uistate.plot.list_idx_select_recs:
             print("triggerStimRemove: No files selected.")
             return
-        if not uistate.list_idx_select_stims:
+        if not uistate.plot.list_idx_select_stims:
             print("triggerStimRemove: No stims selected to remove.")
             return
 
         df_p = self.get_df_project()
 
-        for index in uistate.list_idx_select_recs:
+        for index in uistate.plot.list_idx_select_recs:
             p_row = df_p.loc[index]
             rec_name = p_row["recording_name"]
             rec_ID = p_row["ID"]
@@ -1553,7 +1550,7 @@ class UIsub(
             df_t = self.get_dft(p_row)
             dfoutput = self.get_dfoutput(p_row)
 
-            stims_to_remove = sorted(uistate.list_idx_select_stims, reverse=True)
+            stims_to_remove = sorted(uistate.plot.list_idx_select_stims, reverse=True)
             for idx_stim in stims_to_remove:
                 if idx_stim < len(df_t):
                     stim_id = df_t.iloc[idx_stim]["stim"]
@@ -1583,8 +1580,8 @@ class UIsub(
         self.set_df_project(df_p)
 
         # Reset selection to first stim (or empty if none left)
-        uistate.list_idx_select_stims = [0] if len(df_t) > 0 else []
-        p_row = df_p.loc[uistate.list_idx_select_recs[0]]
+        uistate.plot.list_idx_select_stims = [0] if len(df_t) > 0 else []
+        p_row = df_p.loc[uistate.plot.list_idx_select_recs[0]]
         df_t = self.get_dft(p_row)
         self.tableStimModel.setData(df_t)
         self.formatTableStimLayout(df_t)
@@ -1646,12 +1643,12 @@ class UIsub(
         self.usage("triggerToggleProjectTable")
         if hasattr(self, "tableProj"):
             if type(checked) == bool:
-                uistate.detailedProjectTable = checked
+                uistate.project.detailedProjectTable = checked
             else:
-                uistate.detailedProjectTable = not getattr(uistate, "detailedProjectTable", False)
+                uistate.project.detailedProjectTable = not uistate.project.detailedProjectTable
             self.formatTableLayout()
             if hasattr(self, "actionToggleProjectTable"):
-                self.actionToggleProjectTable.setChecked(uistate.detailedProjectTable)
+                self.actionToggleProjectTable.setChecked(uistate.project.detailedProjectTable)
             uistate.save_cfg(projectfolder=self.dict_folders.get("project"))
 
     # v0.16_n Phase 0: hierarchy hide button (reuses setViewToolVisible)
@@ -1667,7 +1664,7 @@ class UIsub(
             return
         # prevent recursive editingFinished during setText
         self.connectUIstate(disconnect=True)
-        idxs = uistate.list_idx_select_recs or []
+        idxs = uistate.plot.list_idx_select_recs or []
         if not idxs:
             self.lineEdit_hierarchy_subject.setText("")
             self.lineEdit_hierarchy_slice.setText("")
@@ -1688,7 +1685,7 @@ class UIsub(
         if not hasattr(self, le_name):
             return
         text = getattr(self, le_name).text().strip()
-        idxs = uistate.list_idx_select_recs
+        idxs = uistate.plot.list_idx_select_recs
         if not idxs:
             return
         df_p = self.get_df_project().copy()
@@ -1716,29 +1713,29 @@ class UIsub(
         self.usage("triggerToggleTimetable")
         if hasattr(self, "tableStim"):
             if type(checked) == bool:
-                uistate.detailedTimetable = checked
+                uistate.project.detailedTimetable = checked
             else:
-                uistate.detailedTimetable = not getattr(uistate, "detailedTimetable", False)
+                uistate.project.detailedTimetable = not uistate.project.detailedTimetable
             dft = None
-            if uistate.list_idx_select_recs:
-                prow = self.get_prow(uistate.list_idx_select_recs[0])
+            if uistate.plot.list_idx_select_recs:
+                prow = self.get_prow(uistate.plot.list_idx_select_recs[0])
                 if prow is not None:
                     dft = self.get_dft(prow)
 
             if dft is None:
-                dft = pd.DataFrame([uistate.default_dict_t])
+                dft = pd.DataFrame([uistate.project.default_dict_t])
 
             self.formatTableStimLayout(dft)
 
             if hasattr(self, "actionToggleTimetable"):
-                self.actionToggleTimetable.setChecked(uistate.detailedTimetable)
+                self.actionToggleTimetable.setChecked(uistate.project.detailedTimetable)
             uistate.save_cfg(projectfolder=self.dict_folders.get("project"))
 
     def triggerRefresh(self):
         self.usage("refresh graphs")
-        selection = uistate.list_idx_select_recs
+        selection = uistate.plot.list_idx_select_recs
         self.recalculate()
-        uistate.list_idx_select_recs = selection
+        uistate.plot.list_idx_select_recs = selection
         self.tableUpdate(restore_selection=True)  # centralized restore (no manual clearSelection)
         self.tableProjSelectionChanged()
 
@@ -1755,16 +1752,16 @@ class UIsub(
     def triggerShowTimetable(self, checked=None):
         self.usage("triggerShowTimetable")
         if type(checked) == bool:
-            uistate.showTimetable = checked
+            uistate.project.showTimetable = checked
         else:
-            uistate.showTimetable = not uistate.showTimetable
+            uistate.project.showTimetable = not uistate.project.showTimetable
 
         if hasattr(self, "actionTimetable"):
-            self.actionTimetable.setChecked(uistate.showTimetable)
+            self.actionTimetable.setChecked(uistate.project.showTimetable)
 
-        self.setTableStimVisibility(uistate.showTimetable)
+        self.setTableStimVisibility(uistate.project.showTimetable)
 
-        if uistate.dict_rec_show:
+        if uistate.plot.dict_rec_show:
             self.tableProjSelectionChanged()
         uistate.save_cfg(projectfolder=self.dict_folders["project"])
         self.write_bw_cfg()
@@ -1777,8 +1774,8 @@ class UIsub(
 
     def triggerClearGroups(self):
         self.usage("triggerClearGroups")
-        if uistate.list_idx_select_recs:
-            self.clearGroupsByRow(uistate.list_idx_select_recs)
+        if uistate.plot.list_idx_select_recs:
+            self.clearGroupsByRow(uistate.plot.list_idx_select_recs)
             self.tableUpdate(restore_selection=True)
             self.mouseoverUpdate()
         else:
@@ -1853,9 +1850,9 @@ class UIsub(
 
     def triggerReanalyze(self):
         self.usage("triggerReanalyze")
-        selection = uistate.list_idx_select_recs
+        selection = uistate.plot.list_idx_select_recs
         self.reanalyze_recordings()
-        uistate.list_idx_select_recs = selection
+        uistate.plot.list_idx_select_recs = selection
         self.tableUpdate(restore_selection=True)  # centralized restore (no manual clearSelection)
         self.tableProjSelectionChanged()
 
@@ -1874,7 +1871,7 @@ class UIsub(
 
     def triggerSetGain(self):
         self.usage("triggerSetGain")
-        selection = uistate.list_idx_select_recs
+        selection = uistate.plot.list_idx_select_recs
         if not selection:
             print("SetGain: no recordings selected.")
             return
@@ -1924,7 +1921,7 @@ class UIsub(
 
     def triggerSetSweepHz(self):
         self.usage("triggerSetSweepHz")
-        selection = uistate.list_idx_select_recs
+        selection = uistate.plot.list_idx_select_recs
         if not selection:
             print("SetSweepHz: no recordings selected.")
             return
@@ -1988,19 +1985,19 @@ class UIsub(
     # (recalculate in DataFrameMixin)
 
     def update_amp_lineEdits(self):
-        if not uistate.list_idx_select_recs:
+        if not uistate.plot.list_idx_select_recs:
             return
 
         selected_EPSP_hws = set()
         selected_volley_hws = set()
 
-        for idx_rec in uistate.list_idx_select_recs:
+        for idx_rec in uistate.plot.list_idx_select_recs:
             prow = self.get_prow(idx_rec)
             df_t = self.get_dft(prow)
             if df_t is None or (hasattr(df_t, "empty") and df_t.empty):
                 continue
 
-            stims_to_check = uistate.list_idx_select_stims if uistate.list_idx_select_stims else [0]
+            stims_to_check = uistate.plot.list_idx_select_stims if uistate.plot.list_idx_select_stims else [0]
 
             for idx_stim in stims_to_check:
                 if idx_stim < len(df_t):
@@ -2023,7 +2020,7 @@ class UIsub(
 
     def update_stim_buttons(self):
         if hasattr(self, "pushButton_stim_add"):
-            has_selection = uistate.x_select.get("mean_start") is not None
+            has_selection = uistate.plot.x_select.get("mean_start") is not None
             self.pushButton_stim_add.setEnabled(has_selection)
             # Optional visual styling cue for disabled state if generic qt css doesn't apply well
             if has_selection:
@@ -2040,19 +2037,19 @@ class UIsub(
                 self.pushButton_stim_remove.setStyleSheet("")
 
     def update_slope_lineEdits(self):
-        if not uistate.list_idx_select_recs:
+        if not uistate.plot.list_idx_select_recs:
             return
 
         selected_EPSP_ws = set()
         selected_volley_ws = set()
 
-        for idx_rec in uistate.list_idx_select_recs:
+        for idx_rec in uistate.plot.list_idx_select_recs:
             prow = self.get_prow(idx_rec)
             df_t = self.get_dft(prow)
             if df_t is None or (hasattr(df_t, "empty") and df_t.empty):
                 continue
 
-            stims_to_check = uistate.list_idx_select_stims if uistate.list_idx_select_stims else [0]
+            stims_to_check = uistate.plot.list_idx_select_stims if uistate.plot.list_idx_select_stims else [0]
 
             for idx_stim in stims_to_check:
                 if idx_stim < len(df_t):
@@ -2084,10 +2081,10 @@ class UIsub(
 
         val_in_seconds = num / 1000
 
-        for idx_rec in uistate.list_idx_select_recs:
+        for idx_rec in uistate.plot.list_idx_select_recs:
             prow = self.get_prow(idx_rec)
             df_t = self.get_dft(prow)
-            stims_to_edit = uistate.list_idx_select_stims if uistate.list_idx_select_stims else [0]
+            stims_to_edit = uistate.plot.list_idx_select_stims if uistate.plot.list_idx_select_stims else [0]
 
             if lineEditName == "lineEdit_EPSP_slope_width":
                 if df_t["t_EPSP_slope_width"].dtype != "float64":
@@ -2117,7 +2114,7 @@ class UIsub(
 
             self.set_dft(prow["recording_name"], df_t)
 
-        self.recalculate(selection=uistate.list_idx_select_recs)
+        self.recalculate(selection=uistate.plot.list_idx_select_recs)
         self.update_slope_lineEdits()
 
     def editAmpHalfwidth(self, lineEdit):
@@ -2131,10 +2128,10 @@ class UIsub(
 
         val_in_seconds = num / 1000
 
-        for idx_rec in uistate.list_idx_select_recs:
+        for idx_rec in uistate.plot.list_idx_select_recs:
             prow = self.get_prow(idx_rec)
             df_t = self.get_dft(prow)
-            stims_to_edit = uistate.list_idx_select_stims if uistate.list_idx_select_stims else [0]
+            stims_to_edit = uistate.plot.list_idx_select_stims if uistate.plot.list_idx_select_stims else [0]
 
             if lineEditName == "lineEdit_EPSP_amp_halfwidth" and df_t["t_EPSP_amp_halfwidth"].dtype != "float64":
                 df_t["t_EPSP_amp_halfwidth"] = df_t["t_EPSP_amp_halfwidth"].astype("float64")
@@ -2150,7 +2147,7 @@ class UIsub(
 
             self.set_dft(prow["recording_name"], df_t)
 
-        self.recalculate(selection=uistate.list_idx_select_recs)
+        self.recalculate(selection=uistate.plot.list_idx_select_recs)
         self.update_amp_lineEdits()
 
     def editSort(self, lineEdit, start, end, request="int"):
@@ -2189,12 +2186,12 @@ class UIsub(
             num = 0
         lineEdit.setText(str(num))
         if lineEditName == "lineEdit_split_at_time":
-            uistate.lineEdit["split_at_time"] = float(lineEdit.text()) / 1000.0
-            if uistate.lineEdit["split_at_time"] is not None and uistate.lineEdit["split_at_time"] != 0:
-                uistate.checkBox["splitOddEven"] = False
+            uistate.project.lineEdit["split_at_time"] = float(lineEdit.text()) / 1000.0
+            if uistate.project.lineEdit["split_at_time"] is not None and uistate.project.lineEdit["split_at_time"] != 0:
+                uistate.project.checkBox["splitOddEven"] = False
                 self.checkBox_splitOddEven.setChecked(False)
         elif lineEditName == "lineEdit_import_gain":
-            uistate.lineEdit["import_gain"] = float(lineEdit.text())
+            uistate.project.lineEdit["import_gain"] = float(lineEdit.text())
 
     def editMeanSelectRange(self, lineEdit):
         self.usage("editMeanSelectRange")
@@ -2205,9 +2202,9 @@ class UIsub(
             request="float",
         )
         # lineEdits display ms; uistate stores s
-        uistate.x_select["mean_start"] = low / 1000.0
-        uistate.x_select["mean_end"] = high / 1000.0 if high else None
-        uiplot.xSelect(uistate.axm.figure.canvas)
+        uistate.plot.x_select["mean_start"] = low / 1000.0
+        uistate.plot.x_select["mean_end"] = high / 1000.0 if high else None
+        uiplot.xSelect(uistate.plot.axm.figure.canvas)
 
     def editSweepSelectRange(self, lineEdit):
         self.usage("editSweepSelectRange")
@@ -2216,9 +2213,9 @@ class UIsub(
             start=self.lineEdit_sweeps_range_from,
             end=self.lineEdit_sweeps_range_to,
         )
-        uistate.x_select["output_start"], uistate.x_select["output_end"] = low, high
-        uistate.x_select["output"] = set(range(low, high + 1))
-        uiplot.xSelect(uistate.ax1.figure.canvas)
+        uistate.plot.x_select["output_start"], uistate.plot.x_select["output_end"] = low, high
+        uistate.plot.x_select["output"] = set(range(low, high + 1))
+        uiplot.xSelect(uistate.plot.ax1.figure.canvas)
         uiplot.update_axe_mean()
 
     def editNormRange(self, lineEdit):
@@ -2246,8 +2243,8 @@ class UIsub(
 
         # Determine scope: selected recordings, or all if none selected.
         df_p = self.get_df_project()
-        if uistate.list_idx_select_recs:
-            indices = uistate.list_idx_select_recs
+        if uistate.plot.list_idx_select_recs:
+            indices = uistate.plot.list_idx_select_recs
         else:
             indices = list(df_p.index)
 
@@ -2275,11 +2272,11 @@ class UIsub(
 
     def copy_dft(self):
         # get selected dft(s) and copy to clipboard
-        if len(uistate.list_idx_select_recs) < 1:
+        if len(uistate.plot.list_idx_select_recs) < 1:
             print("copy_dft: nothing selected.")
             return
         selected_dfts = pd.DataFrame()
-        for rec in uistate.list_idx_select_recs:
+        for rec in uistate.plot.list_idx_select_recs:
             p_row = self.get_df_project().loc[rec]
             dft = self.get_dft(p_row)
             dft.insert(0, "recording_name", p_row["recording_name"])
@@ -2287,13 +2284,13 @@ class UIsub(
         selected_dfts.to_clipboard(index=False)
 
     def copy_output(self):
-        if len(uistate.list_idx_select_recs) < 1:
+        if len(uistate.plot.list_idx_select_recs) < 1:
             print("copy_output: nothing selected.")
             return
         selected_outputs = pd.DataFrame()
-        is_pp = getattr(uistate, "experiment_type", "time") == "PP"
+        is_pp = uistate.experiment.experiment_type == "PP"
 
-        for rec in uistate.list_idx_select_recs:
+        for rec in uistate.plot.list_idx_select_recs:
             p_row = self.get_df_project().loc[rec]
             output = self.get_dfoutput(p_row).copy()
             output.insert(0, "recording_name", p_row["recording_name"])
@@ -2332,11 +2329,11 @@ class UIsub(
         selected_outputs.to_clipboard(index=False)
 
     def stimDetect(self):
-        if not uistate.list_idx_select_recs:
+        if not uistate.plot.list_idx_select_recs:
             print("No files selected.")
             return
         df_p = self.get_df_project()
-        for index in uistate.list_idx_select_recs:
+        for index in uistate.plot.list_idx_select_recs:
             p_row = df_p.loc[index]
             old_df_t = self.get_dft(p_row)
             rec_name = p_row["recording_name"]
@@ -2346,17 +2343,17 @@ class UIsub(
                 print(f"{rec_name} not parsed yet.")
                 continue
             print(f"Detecting stims for {rec_name}")
-            if uistate.x_select["mean_start"] is not None:
-                print(f" - range: {uistate.x_select['mean_start']} to {uistate.x_select['mean_end']}")
+            if uistate.plot.x_select["mean_start"] is not None:
+                print(f" - range: {uistate.plot.x_select['mean_start']} to {uistate.plot.x_select['mean_end']}")
             dfmean = self.get_dfmean(p_row)
-            if uistate.x_select["mean_start"] is not None and uistate.x_select["mean_end"] is not None:
+            if uistate.plot.x_select["mean_start"] is not None and uistate.plot.x_select["mean_end"] is not None:
                 dfmean_range = dfmean[
-                    (dfmean["time"] >= uistate.x_select["mean_start"]) & (dfmean["time"] <= uistate.x_select["mean_end"])
+                    (dfmean["time"] >= uistate.plot.x_select["mean_start"]) & (dfmean["time"] <= uistate.plot.x_select["mean_end"])
                 ].reset_index(drop=True)
             else:
                 dfmean_range = dfmean
-            default_dict_t = uistate.default_dict_t.copy()  # Default sizes
-            print(f"stimDetect: {rec_name} calling find_events within range:\n{uistate.x_select}")
+            default_dict_t = uistate.project.default_dict_t.copy()  # Default sizes
+            print(f"stimDetect: {rec_name} calling find_events within range:\n{uistate.plot.x_select}")
             new_df_t = analysis.find_events(
                 dfmean=dfmean_range,
                 default_dict_t=default_dict_t,
@@ -2366,7 +2363,7 @@ class UIsub(
             if new_df_t is None:
                 print(f"StimDetect: No stims found for {rec_name}.")
                 continue
-            if uistate.checkBox["timepoints_per_stim"] or stims == 1:
+            if uistate.project.checkBox["timepoints_per_stim"] or stims == 1:
                 self.set_dft(rec_name, new_df_t)
             else:
                 dfoutput = self.get_dfoutput(p_row)
@@ -2387,8 +2384,8 @@ class UIsub(
             dfoutput = self.get_dfoutput(p_row)
             self.persistOutput(p_row["recording_name"], dfoutput, p_row=p_row)
             uiplot.addRow(p_row, new_df_t, dfmean, self.V2mV(dfoutput))
-        uistate.list_idx_select_stims = [0]
-        p_row = df_p.loc[uistate.list_idx_select_recs[0]]
+        uistate.plot.list_idx_select_stims = [0]
+        p_row = df_p.loc[uistate.plot.list_idx_select_recs[0]]
         df_t = self.get_dft(p_row)
         self.tableStimModel.setData(df_t)
         self.formatTableStimLayout(df_t)
@@ -2399,11 +2396,11 @@ class UIsub(
 
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files
-        if len(uistate.list_idx_select_recs) != 1:
+        if len(uistate.plot.list_idx_select_recs) != 1:
             print("Rename: please select one row only for renaming.")
             return
         df_p = self.get_df_project()
-        old_recording_name = df_p.at[uistate.list_idx_select_recs[0], "recording_name"]
+        old_recording_name = df_p.at[uistate.plot.list_idx_select_recs[0], "recording_name"]
         RenameDialog = ui_widgets.InputDialogPopup()
         new_recording_name = RenameDialog.showInputDialog(title="Rename recording", query=old_recording_name)
         # check if the new name is a valid filename
@@ -2411,15 +2408,15 @@ class UIsub(
             list_recording_names = set(df_p["recording_name"])
             if not new_recording_name in list_recording_names:  # prevent duplicates
                 self.rename_files_by_rec_name(old_name=old_recording_name, new_name=new_recording_name)
-                df_p.at[uistate.list_idx_select_recs[0], "recording_name"] = new_recording_name
+                df_p.at[uistate.plot.list_idx_select_recs[0], "recording_name"] = new_recording_name
                 # For paired recordings: also rename any references to old_recording_name in df_p['paired_recording']
                 df_p.loc[df_p["paired_recording"] == old_recording_name, "paired_recording"] = new_recording_name
                 self.set_df_project(df_p)
                 self.tableUpdate(restore_selection=True)  # preserve the renamed row selection
                 self.update_recs2plot()
-                old_recording_ID = df_p.at[uistate.list_idx_select_recs[0], "ID"]
+                old_recording_ID = df_p.at[uistate.plot.list_idx_select_recs[0], "ID"]
                 uiplot.unPlot(old_recording_ID)
-                self.graphUpdate(row=df_p.loc[uistate.list_idx_select_recs[0]])
+                self.graphUpdate(row=df_p.loc[uistate.plot.list_idx_select_recs[0]])
                 self.update_show(reset=True)
             else:
                 print(f"new_recording_name {new_recording_name} already exists")
@@ -2444,18 +2441,18 @@ class UIsub(
                 raise FileNotFoundError
 
     def deleteSelectedRows(self):
-        if not uistate.list_idx_select_recs:
+        if not uistate.plot.list_idx_select_recs:
             print("No files selected.")
             return
         df_p = self.get_df_project()
         # Capture stable ID of the row immediately after the last deleted one (for conservation).
         # This is robust to df.drop() + reset_index changing all subsequent row numbers.
         reselect_id = None
-        last_deleted_idx = uistate.list_idx_select_recs[-1]
+        last_deleted_idx = uistate.plot.list_idx_select_recs[-1]
         if last_deleted_idx < len(df_p) - 1:
             reselect_id = df_p.at[last_deleted_idx + 1, "ID"]
 
-        for index in uistate.list_idx_select_recs:
+        for index in uistate.plot.list_idx_select_recs:
             rec_name = df_p.at[index, "recording_name"]
             rec_ID = df_p.at[index, "ID"]
             sweeps = df_p.at[index, "sweeps"]
@@ -2465,23 +2462,23 @@ class UIsub(
                 # this also purges group cache and unplots the group
                 uiplot.unPlot(rec_ID)  # remove plotted lines
 
-        df_p.drop(uistate.list_idx_select_recs, inplace=True)
+        df_p.drop(uistate.plot.list_idx_select_recs, inplace=True)
         df_p.reset_index(inplace=True, drop=True)
 
         # Set desired selection *before* model reset (set_df_project → tableUpdate).
         # Prefer the row that followed the deleted block. When deleting the last
         # row(s), select the *new* last row (standard UX). tableUpdate() restores
-        # via uistate.list_idx_select_recs; SelectionChanged updates everything else.
+        # via uistate.plot.list_idx_select_recs; SelectionChanged updates everything else.
         if reselect_id is not None:
             new_idx = df_p[df_p["ID"] == reselect_id].index
             if not new_idx.empty:
-                uistate.list_idx_select_recs = [new_idx[0]]
+                uistate.plot.list_idx_select_recs = [new_idx[0]]
             else:
-                uistate.list_idx_select_recs = []
+                uistate.plot.list_idx_select_recs = []
         elif len(df_p) > 0:
-            uistate.list_idx_select_recs = [len(df_p) - 1]
+            uistate.plot.list_idx_select_recs = [len(df_p) - 1]
         else:
-            uistate.list_idx_select_recs = []
+            uistate.plot.list_idx_select_recs = []
 
         self.set_df_project(df_p)
         # Use helper for consistent restore (last row on terminal delete, keyboard focus).
@@ -2529,21 +2526,21 @@ class UIsub(
     # (DataFrame helpers in DataFrameMixin)
 
     def checkBox_splitOddEven_changed(self, state):
-        uistate.checkBox["splitOddEven"] = state == 2
+        uistate.project.checkBox["splitOddEven"] = state == 2
         logger.debug("checkBox_splitOddEven_changed: %s", state)
         print(f"checkBox_splitOddEven_changed: {state}")
 
     def checkBox_timepoints_per_stim_changed(self, state):
-        uistate.checkBox["timepoints_per_stim"] = state == 2
+        uistate.project.checkBox["timepoints_per_stim"] = state == 2
         print(f"checkBox_timepoints_per_stim_changed: {state}")
         if state == 0:
             self.set_uniformTimepoints()
 
     def checkBox_is_group_sample_changed(self, state):
-        uistate.checkBox["is_group_sample"] = state == 2
+        uistate.project.checkBox["is_group_sample"] = state == 2
         logger.debug("checkBox_is_group_sample_changed: %s", state)
         print(f"checkBox_is_group_sample_changed: {state}")
-        if len(uistate.list_idx_select_recs) != 1:
+        if len(uistate.plot.list_idx_select_recs) != 1:
             return
         prow = self.get_prow()
         if prow is None:

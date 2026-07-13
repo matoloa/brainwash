@@ -1,10 +1,10 @@
 # PR-06: AppContext / UIstate facade
 
-**Status**: pending | **Depends on**: PR-04
+**Status**: DONE | **Depends on**: PR-04
 
 ## Goal
 
-Split `UIstate` into sub-objects behind a backward-compatible facade (`ProjectState`, `StatTestState`, `PlotSession`, etc.).
+Split `UIstate` into nested sub-objects (`project`, `experiment`, `stat_test`, `plot`) — no flat-attribute facade.
 
 ## Tasks
 

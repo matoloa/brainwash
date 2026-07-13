@@ -5,12 +5,12 @@ from ..data import _aggregate_to_unit_level
 
 def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="recording", aspect_col="EPSP_amp"):
     """Returns long DataFrame with ['rec_ID', 'subject', 'slice', 'x', 'y'] for all sweeps in group.
-    Uses per_sweep=True, melts, joins real X from dfoutput via uistate.io_input. Falls back to sweep rank if X missing.
+    Uses per_sweep=True, melts, joins real X from dfoutput via uistate.experiment.io_input. Falls back to sweep rank if X missing.
     """
     if uistate is None:
         io_input = "vamp"
     else:
-        io_input = getattr(uistate, "io_input", "vamp")
+        io_input = uistate.experiment.io_input
 
     x_map = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}
     x_col = x_map.get(io_input, "volley_amp")

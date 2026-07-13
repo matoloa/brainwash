@@ -15,9 +15,14 @@ def make_dd_testsets(*set_ids: str, sweeps: list | None = None, show: bool = Tru
 
 
 class MinimalUistate:
+    """Test double matching UIstate.experiment layout for IO regression paths."""
+
     def __init__(self, io_input: str = "vamp", io_output: str = "EPSPamp"):
-        self.io_input = io_input
-        self.io_output = io_output
+        from ui_state_parts import ExperimentConfig
+
+        self.experiment = ExperimentConfig()
+        self.experiment.io_input = io_input
+        self.experiment.io_output = io_output
 
 
 def make_scalar_accessor(

@@ -114,7 +114,7 @@ class GroupMixin:
                 group_ID += 1
         self.dd_groups[group_ID] = {
             "group_name": f"group {group_ID}",
-            "color": uistate.colors[group_ID - 1],
+            "color": uistate.project.colors[group_ID - 1],
             "show": "True",
             "rec_IDs": [],
             "sample": None,
@@ -181,13 +181,13 @@ class GroupMixin:
         if self.dd_testsets:
             while set_ID in self.dd_testsets.keys():
                 set_ID += 1
-        selected_sweeps = sorted(uistate.x_select.get("output", set()))
+        selected_sweeps = sorted(uistate.plot.x_select.get("output", set()))
         if not selected_sweeps:
             print("No sweeps selected for test set.")
             return
         self.dd_testsets[set_ID] = {
             "set_name": f"set {set_ID}",
-            "color": uistate.colors[set_ID - 1 % len(uistate.colors)],
+            "color": uistate.project.colors[set_ID - 1 % len(uistate.project.colors)],
             "show": True,
             "sweeps": selected_sweeps,
             "description": f"Test set {set_ID} created from selection",
@@ -245,7 +245,7 @@ class GroupMixin:
             dict_group["rec_IDs"].append(rec_ID)
             uiplot.unPlotGroup(group_ID)  # all levels stale after membership change
             self.group_cache_purge([group_ID])  # all levels
-            level = getattr(uistate, "buttonGroup_test_n", "recording")
+            level = uistate.stat_test.buttonGroup_test_n
             df_groupmean = self.get_dfgroupmean(group_ID, level=level)
             x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
             uiplot.addGroup(group_ID, dict_group, self.V2mV(df_groupmean), x_pos=x_pos, level=level)
@@ -259,7 +259,7 @@ class GroupMixin:
             dict_group["rec_IDs"].remove(rec_ID)
             uiplot.unPlotGroup(group_ID)  # all levels stale
             self.group_cache_purge([group_ID])  # all levels
-            level = getattr(uistate, "buttonGroup_test_n", "recording")
+            level = uistate.stat_test.buttonGroup_test_n
             df_groupmean = self.get_dfgroupmean(group_ID, level=level)
             if self.dd_groups[group_ID]["rec_IDs"]:
                 x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
@@ -270,13 +270,13 @@ class GroupMixin:
 
     def group_selection(self, group_ID):
         dfp = self.get_df_project()
-        if uistate.df_recs2plot is None:
+        if uistate.plot.df_recs2plot is None:
             print("No parsed files selected.")
             # TODO: set selection to clicked group
             return
         # Preserve the full multi-selection of recordings; we will restore it after
         # the table model update(s) so that assigning a group does not clear the selection.
-        selected_indices = list(uistate.list_idx_select_recs)
+        selected_indices = list(uistate.plot.list_idx_select_recs)
         selected_rec_IDs = dfp.loc[selected_indices, "ID"].tolist()  # selected rec_IDs
         all_in_group = all(rec_ID in self.dd_groups[group_ID]["rec_IDs"] for rec_ID in selected_rec_IDs)
         if all_in_group:  # If all selected_rec_IDs are in the group_ID, ungroup them
@@ -290,7 +290,7 @@ class GroupMixin:
         self.tableUpdate(restore_selection=False)  # we restore multi-selection manually below
         # Restore the original multi-selection of recordings (indices are stable since
         # group assignment does not add/remove rows).
-        uistate.list_idx_select_recs = selected_indices
+        uistate.plot.list_idx_select_recs = selected_indices
         if selected_indices:
             self.tableProj.clearSelection()
             selection = QtCore.QItemSelection()
@@ -310,10 +310,10 @@ class GroupMixin:
     # ------------------------------------------------------------------
     def add_to_data_set(self):
         """Replaces previous compare stub. Captures current sweep selection and creates a new Test Set (set_ID + default name 'set N')."""
-        if not uistate.list_idx_select_recs:
+        if not uistate.plot.list_idx_select_recs:
             print("No recording selected for test set.")
             return
-        if not uistate.x_select.get("output"):
+        if not uistate.plot.x_select.get("output"):
             print("No sweeps selected. Drag on output graph or use sweep range controls first.")
             return
         self.testset_new()
@@ -324,10 +324,10 @@ class GroupMixin:
     # ------------------------------------------------------------------
     def set_group_sample(self, rec_ID: str | None = None):
         if rec_ID is None:
-            if len(getattr(uistate, "list_idx_select_recs", [])) != 1:
+            if len(uistate.plot.list_idx_select_recs) != 1:
                 return
             df_p = self.get_df_project()
-            idx = uistate.list_idx_select_recs[0]
+            idx = uistate.plot.list_idx_select_recs[0]
             rec_ID = str(df_p.iloc[idx]["ID"]) if not df_p.empty else None
             if rec_ID is None:
                 return
@@ -436,7 +436,7 @@ class GroupMixin:
         """Dedicated refresh for samples. Loops over groups with non-None "sample"
         key and calls self.get_ddgroup_sample(g) (this triggers build/persist
         of <group_name>_sample.parquet with 'stim' column + t=0). Sets
-        uiplot.uistate.sample_dirty=True so next graphRefresh (which receives
+        uiplot.uistate.plot.sample_dirty=True so next graphRefresh (which receives
         dd_shown_samples from ui.py) will redraw the overlay via sample_overlay.
         """
         if not hasattr(self, "dd_group_samples"):
@@ -456,7 +456,7 @@ class GroupMixin:
 
         # ensure redraw on next graphRefresh
         if hasattr(uiplot, "uistate"):
-            uiplot.uistate.sample_dirty = True
+            uiplot.uistate.plot.sample_dirty = True
 
     # ------------------------------------------------------------------
     # Qt widget controls

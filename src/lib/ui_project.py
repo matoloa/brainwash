@@ -209,7 +209,7 @@ class ProjectMixin:
         self.applyConfigStates()  # apply config states to UI elements
         self.graphAxes()
         self.darkmode()  # set darkmode if set in bw_cfg. Requires tables and canvases be loaded!
-        self.setTableStimVisibility(uistate.showTimetable)
+        self.setTableStimVisibility(uistate.project.showTimetable)
         self.setupToolBar()
         # set focus to TableProj, so that arrows work immediately
         self.tableProj.setFocus()
@@ -229,8 +229,8 @@ class ProjectMixin:
         self.projects_folder = self.user_documents / "Brainwash Projects"
         self.projectname = "My Project"
         uistate.darkmode = True
-        uistate.showTimetable = False
-        uistate.showHeatmap = False
+        uistate.project.showTimetable = False
+        uistate.plot.showHeatmap = False
 
         # Load config if present
         if config.bw_cfg_yaml is not None:
@@ -244,8 +244,8 @@ class ProjectMixin:
                         self.projects_folder = Path(cfg.get("projects_folder", self.projects_folder))
                         self.projectname = cfg.get("projectname", self.projectname)
                     uistate.darkmode = cfg.get("darkmode", True)
-                    uistate.showTimetable = cfg.get("showTimetable", False)
-                    uistate.showHeatmap = cfg.get("showHeatmap", False)
+                    uistate.project.showTimetable = cfg.get("showTimetable", False)
+                    uistate.plot.showHeatmap = cfg.get("showHeatmap", False)
         else:
             self.bw_cfg_yaml = None  # Make sure it's defined for consistency
 
@@ -260,8 +260,8 @@ class ProjectMixin:
             "projects_folder": str(self.projects_folder),
             "projectname": self.projectname,
             "darkmode": uistate.darkmode,
-            "showTimetable": uistate.showTimetable,
-            "showHeatmap": uistate.showHeatmap,
+            "showTimetable": uistate.project.showTimetable,
+            "showHeatmap": uistate.plot.showHeatmap,
         }
         path = Path(self.bw_cfg_yaml)  # ensure Path
         path.parent.mkdir(parents=True, exist_ok=True)  # critical for XDG/portable
@@ -535,10 +535,10 @@ class ProjectMixin:
 
     def setupToolBar(self):
         # apply viewstates for tool frames in the toolbar
-        for frame, (text, state) in list(uistate.viewTools.items()):
+        for frame, (text, state) in list(uistate.project.viewTools.items()):
             if hasattr(self, frame):
                 getattr(self, frame).setVisible(state)
-        self.frameToolFilter_sub_Savgol.setVisible(uistate.settings.get("filter", "voltage") == "savgol")
+        self.frameToolFilter_sub_Savgol.setVisible(uistate.project.settings.get("filter", "voltage") == "savgol")
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(self._is_io_mode())
         if hasattr(self, "frameToolTest"):
@@ -556,12 +556,12 @@ class ProjectMixin:
         return dict_folders
 
     def setSplitterSizes(self, *splitter_names):
-        """Set splitter sizes from persisted proportions in uistate.splitter.
+        """Set splitter sizes from persisted proportions in uistate.project.splitter.
         Moved here in Phase 5 polish (lifecycle/setup belongs with ProjectMixin).
         """
         for splitter_name in splitter_names:
             splitter = getattr(self, splitter_name)
-            proportions = uistate.splitter.get(splitter_name, [])
+            proportions = uistate.project.splitter.get(splitter_name, [])
             widgets = [splitter.widget(i) for i in range(splitter.count())]
             if len(proportions) != len(widgets):
                 continue
