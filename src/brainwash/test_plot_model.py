@@ -169,6 +169,13 @@ def test_output_axis_format_mode():
     assert time_mode.show_output_x_tick_marks is True
 
 
+def test_plot_style_colors():
+    dark = plot_model.plot_style_colors(dark=True)
+    light = plot_model.plot_style_colors(dark=False)
+    assert dark.mpl_style == "dark_background"
+    assert light.figure_facecolor == "white"
+
+
 def test_event_axis_label_constants():
     assert plot_model.EVENT_AXIS_YLABEL == "Voltage (mV)"
     assert plot_model.EVENT_AXIS_XLABEL == "Time (ms)"

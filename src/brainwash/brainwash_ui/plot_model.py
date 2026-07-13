@@ -365,6 +365,21 @@ class OutputAxisFormatMode:
     show_output_x_tick_marks: bool
 
 
+@dataclass(frozen=True)
+class PlotStyleColors:
+    mpl_style: str
+    figure_facecolor: str
+    axes_facecolor: str
+    label_color: str
+    tick_color: str
+
+
+def plot_style_colors(*, dark: bool) -> PlotStyleColors:
+    if dark:
+        return PlotStyleColors("dark_background", "#333333", "#333333", "white", "white")
+    return PlotStyleColors("default", "white", "white", "black", "black")
+
+
 def output_axis_format_mode(experiment_type: str) -> OutputAxisFormatMode:
     if experiment_type == "io":
         return OutputAxisFormatMode(use_g_formatters=True, time_x_formatter_on_ax2=False, show_output_x_tick_marks=False)

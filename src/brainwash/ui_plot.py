@@ -394,7 +394,7 @@ class UIplot:
         if self.uistate.plot.sample_inset is None:
             if self.uistate.plot.ax1 is None or not should_show:
                 return
-            self.uistate.plot.sample_inset = self.uistate.plot.ax1.inset_axes([0.02, 0.68, 0.20, 0.30])
+            self.uistate.plot.sample_inset = self.uistate.plot.ax1.inset_axes(list(plot_testsets.SAMPLE_INSET_BOUNDS))
             self.uistate.plot.sample_inset.set_zorder(10)
             inset = self.uistate.plot.sample_inset
             inset.set_facecolor((0, 0, 0, 0))
@@ -441,63 +441,39 @@ class UIplot:
         inset.set_zorder(10)
         inset.set_axis_off()
 
-        all_ys = []
-        # Get ordered list of *shown* test sets (from dd_testset) once; used for
-        # consistent line styles (solid/dashed/dotted) across groups.
-        visible_test_list = [tid for tid, tset in sorted((dd_testset or {}).items()) if tset.get("show", False)]
-        for g_idx, (group_ID, inner) in enumerate(dd_shown_samples.items()):
-            # Robust lookup for group_ID (int vs str keys are a common silent-continue source
-            # in this codebase; dd_shown_samples uses int keys from dict construction while
-            # dd_groups often normalizes to str)
-            if not inner or str(group_ID) not in {str(k) for k in (dd_groups or {})}:
-                continue
-            group_dict = (dd_groups or {}).get(str(group_ID), (dd_groups or {}).get(group_ID, {}))
-            if not group_dict.get("show", True):
-                continue
-            color = group_dict.get("color", "#0000ff")
-            for t_idx, test_id_raw in enumerate(visible_test_list):
-                if str(test_id_raw) not in {str(k) for k in inner.keys()}:
-                    continue
-                test_id = str(test_id_raw)
-                df = inner.get(test_id_raw) or inner.get(test_id)
-                if df is None or df.empty:
-                    continue
-                col = self.uistate.project.settings.get("filter") or "voltage"
-                if col not in df.columns:
-                    col = df.columns[-1]  # safe fallback
-                linestyle = "-" if t_idx == 0 else "--" if t_idx == 1 else ":"
-                # y_offset = g_idx * 0.25  # larger offset for visibility on inset
-                for stim_num in sorted(df.get("stim", pd.Series([1])).unique()):
-                    df_event = df[df["stim"] == stim_num].copy() if "stim" in df.columns else df.copy()
-                    y_data = df_event[col].values  # + y_offset
-                    # Only use data after the artefact for ylim calculation
-                    mask = df_event["time"].values > 0.001
-                    all_ys.extend(y_data[mask])
-                    key = (group_ID, test_id, stim_num)
-                    if key in self.uistate.plot.sample_artists:
-                        line = self.uistate.plot.sample_artists[key]
-                        line.set_data(df_event["time"].values, y_data)
-                        line.set_linestyle(linestyle)
-                        line.set_zorder(11)
-                        line.set_visible(True)
-                    else:
-                        (line,) = inset.plot(
-                            df_event["time"].values,
-                            y_data,
-                            color=color,
-                            alpha=0.75,
-                            linewidth=1.0,
-                            linestyle=linestyle,
-                            label=f"sample_g{group_ID}_t{test_id}_s{stim_num}",
-                            zorder=11,
-                        )
-                        # print(f"*** DF: {df_event}")
-                        self.uistate.plot.sample_artists[key] = line
+        filter_col = self.uistate.project.settings.get("filter") or "voltage"
+        trace_specs = plot_testsets.build_sample_overlay_trace_specs(
+            dd_groups,
+            dd_testset,
+            dd_shown_samples,
+            filter_col=filter_col,
+        )
+        for spec in trace_specs:
+            group_ID, test_id, stim_num = spec.artist_key
+            key = spec.artist_key
+            if key in self.uistate.plot.sample_artists:
+                line = self.uistate.plot.sample_artists[key]
+                line.set_data(spec.time, spec.y)
+                line.set_linestyle(spec.linestyle)
+                line.set_zorder(11)
+                line.set_visible(True)
+            else:
+                (line,) = inset.plot(
+                    spec.time,
+                    spec.y,
+                    color=spec.color,
+                    alpha=0.75,
+                    linewidth=1.0,
+                    linestyle=spec.linestyle,
+                    label=f"sample_g{group_ID}_t{test_id}_s{stim_num}",
+                    zorder=11,
+                )
+                self.uistate.plot.sample_artists[key] = line
 
-        if all_ys:
-            ymin, ymax = min(all_ys), max(all_ys)
-            inset.set_ylim(ymin * 1.1, ymax + 0.0001)
-        inset.set_xlim(-0.005, 0.035)  # aligned event window
+        ylim = plot_testsets.sample_overlay_ylim(trace_specs)
+        if ylim is not None:
+            inset.set_ylim(*ylim)
+        inset.set_xlim(*plot_testsets.SAMPLE_INSET_XLIM)
         inset.relim()
         inset.autoscale_view(scalex=False)
 
@@ -586,24 +562,14 @@ class UIplot:
             self.uistate.plot.ax1,
             self.uistate.plot.ax2,
         )
-        if self.uistate.darkmode:
-            style.use("dark_background")
-            for ax in [axm, axe, ax1, ax2]:
-                ax.figure.patch.set_facecolor("#333333")
-                ax.set_facecolor("#333333")
-                ax.xaxis.label.set_color("white")
-                ax.yaxis.label.set_color("white")
-                ax.tick_params(colors="white")
-            # print("Dark mode activated")
-        else:
-            style.use("default")
-            for ax in [axm, axe, ax1, ax2]:
-                ax.figure.patch.set_facecolor("white")
-                ax.set_facecolor("white")
-                ax.xaxis.label.set_color("black")
-                ax.yaxis.label.set_color("black")
-                ax.tick_params(colors="black")
-            # print("Default mode activated")
+        colors = plot_model.plot_style_colors(dark=bool(self.uistate.darkmode))
+        style.use(colors.mpl_style)
+        for ax in [axm, axe, ax1, ax2]:
+            ax.figure.patch.set_facecolor(colors.figure_facecolor)
+            ax.set_facecolor(colors.axes_facecolor)
+            ax.xaxis.label.set_color(colors.label_color)
+            ax.yaxis.label.set_color(colors.label_color)
+            ax.tick_params(colors=colors.tick_color)
 
         # 3.4.2: refresh sample overlays after style change (light/dark compatibility)
         if hasattr(self.uistate, "dd_group_samples") and self.uistate.plot.dd_group_samples:

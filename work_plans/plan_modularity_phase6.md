@@ -62,3 +62,4 @@ uv run pytest src/brainwash/ -q
 | 7b | graphRefresh legend/PP ticks → plot_model/series | ✅ commit 74 [HIGH RISK phase7b] |
 | 7b | UIplot.update drag geometry → plot_stim | ✅ commit 75 [HIGH RISK phase7b] |
 | 7b | graphRefresh axis format/PP x-ticks | ✅ commit 76 [HIGH RISK phase7b] |
+| 7b | styleUpdate + sample_overlay specs | ✅ commit 77 [HIGH RISK phase7b] |
