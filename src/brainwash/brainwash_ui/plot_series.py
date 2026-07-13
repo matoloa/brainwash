@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
+
+from brainwash_ui import plot_drag, plot_model
 
 IO_INPUT_TO_XCOL = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}
 IO_OUTPUT_TO_YCOL = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}
@@ -182,6 +184,238 @@ def pp_bar_layout(active_aspects: list[tuple[str, str]]) -> list[tuple[str, str,
         offset = start_offset + (i * bar_width)
         configs.append((asp, axid, offset, bar_width * 0.9))
     return configs
+
+
+PPR_ASPECTS = ("EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope")
+
+
+def extract_rec_ppr_means(dict_rec_labels: dict, rec_ids: list) -> dict:
+    """Per-recording PPR means from existing raw PPR line artists in dict_rec_labels."""
+    rec_ppr: dict = {}
+    rec_id_set = set(rec_ids)
+    for rec_id in rec_ids:
+        rec_ppr[rec_id] = {}
+    for _key, linedict in dict_rec_labels.items():
+        rec_id = linedict.get("rec_ID")
+        if rec_id not in rec_id_set:
+            continue
+        if "PPR" not in _key or linedict.get("variant") != "raw":
+            continue
+        aspect = linedict.get("aspect")
+        if not aspect:
+            continue
+        y_data = plot_drag.artist_ydata(linedict["line"])
+        if y_data.size == 0:
+            continue
+        valid_y = [float(y) for y in y_data if np.isfinite(y)]
+        if valid_y:
+            rec_ppr[rec_id][aspect] = float(np.mean(valid_y))
+    return rec_ppr
+
+
+@dataclass
+class PprLevelAggregate:
+    ppr_data: dict[str, list[float]] = field(
+        default_factory=lambda: {a: [] for a in PPR_ASPECTS}
+    )
+    rec_id_order: dict[str, list] = field(
+        default_factory=lambda: {a: [] for a in PPR_ASPECTS}
+    )
+
+
+def aggregate_ppr_at_level(
+    rec_ppr: dict,
+    level: str,
+    df_project: pd.DataFrame | None,
+) -> PprLevelAggregate:
+    agg = PprLevelAggregate()
+    if level == "recording":
+        for rec_id, aspect_vals in rec_ppr.items():
+            for asp, val in aspect_vals.items():
+                if asp in agg.ppr_data:
+                    agg.ppr_data[asp].append(val)
+                    agg.rec_id_order[asp].append(rec_id)
+        return agg
+
+    rec_to_unit: dict = {}
+    if df_project is not None:
+        for rec_id in rec_ppr:
+            mm = df_project[df_project["ID"] == rec_id]
+            if mm.empty:
+                continue
+            pr = mm.iloc[0]
+            if level == "subject":
+                uk = str(pr.get("subject", "unknown"))
+            else:
+                uk = f"{pr.get('subject', 'unknown')}_{pr.get('slice', '1')}"
+            rec_to_unit[rec_id] = uk
+
+    unit_asp: dict[str, dict[str, list[float]]] = {}
+    for rec_id, aspect_vals in rec_ppr.items():
+        uk = rec_to_unit.get(rec_id, rec_id)
+        bucket = unit_asp.setdefault(uk, {})
+        for asp, val in aspect_vals.items():
+            bucket.setdefault(asp, []).append(val)
+    for _uk, aspect_map in unit_asp.items():
+        for asp, vlist in aspect_map.items():
+            if asp in agg.ppr_data and vlist:
+                agg.ppr_data[asp].append(float(np.mean(vlist)))
+    return agg
+
+
+def pp_group_scatter_jitter(n: int, rng=None) -> np.ndarray:
+    if n <= 1:
+        return np.array([0.0])
+    gen = rng if rng is not None else np.random
+    return gen.uniform(-0.06, 0.06, size=n)
+
+
+@dataclass(frozen=True)
+class PpGroupScatterPointSpec:
+    x: float
+    y: float
+    rec_id: object
+
+
+@dataclass(frozen=True)
+class PpGroupBarPlotSpec:
+    aspect: str
+    axid: str
+    bar_x: float
+    bar_width: float
+    mean_val: float
+    sem_val: float
+    overlay_x: int
+    scatter_points: tuple[PpGroupScatterPointSpec, ...]
+    scatter_color: str
+
+
+def build_pp_group_bar_plot_specs(
+    *,
+    aggregate: PprLevelAggregate,
+    x_pos: float,
+    level: str,
+    checkbox: dict,
+    settings: dict,
+    rng=None,
+) -> list[PpGroupBarPlotSpec]:
+    specs: list[PpGroupBarPlotSpec] = []
+    overlay_map = pp_overlay_x_map(checkbox)
+    for aspect, axid, offset, bar_w in pp_bar_layout(pp_active_aspects(checkbox)):
+        vals = aggregate.ppr_data.get(aspect, [])
+        if not vals:
+            continue
+        mean_val, sem_val = mean_sem(vals)
+        bar_x = x_pos + offset
+        scatter_points: tuple[PpGroupScatterPointSpec, ...] = ()
+        scatter_color = settings.get(f"rgb_{aspect}", "white")
+        if level == "recording" and aspect in aggregate.rec_id_order:
+            jitter = pp_group_scatter_jitter(len(vals), rng=rng)
+            scatter_points = tuple(
+                PpGroupScatterPointSpec(bar_x + float(j), float(val), rid)
+                for j, val, rid in zip(jitter, vals, aggregate.rec_id_order[aspect])
+            )
+        specs.append(
+            PpGroupBarPlotSpec(
+                aspect=aspect,
+                axid=axid,
+                bar_x=bar_x,
+                bar_width=bar_w,
+                mean_val=mean_val,
+                sem_val=sem_val,
+                overlay_x=overlay_map.get(aspect, 1),
+                scatter_points=scatter_points,
+                scatter_color=scatter_color,
+            )
+        )
+    return specs
+
+
+def collect_io_group_scatter_xy(
+    dict_rec_labels: dict,
+    rec_ids: list,
+    variant: str,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    rec_id_set = set(rec_ids)
+    all_x: list[np.ndarray] = []
+    all_y: list[np.ndarray] = []
+    suffix = f"{variant} IO scatter"
+    for key, linedict in dict_rec_labels.items():
+        if linedict.get("x_mode") != "io" or linedict.get("rec_ID") not in rec_id_set:
+            continue
+        if not key.endswith(suffix):
+            continue
+        scatter = linedict["line"]
+        offsets = scatter.get_offsets()
+        if len(offsets) == 0:
+            continue
+        all_x.append(offsets[:, 0])
+        all_y.append(offsets[:, 1])
+    if not all_x:
+        return None
+    return np.concatenate(all_x), np.concatenate(all_y)
+
+
+@dataclass(frozen=True)
+class IoGroupScatterPlotSpec:
+    label: str
+    storage_key: str
+    variant: str
+    aspect: str
+    level: str
+    x: np.ndarray
+    y: np.ndarray
+
+
+@dataclass(frozen=True)
+class IoGroupTrendlinePlotSpec:
+    label: str
+    storage_key: str
+    variant: str
+    aspect: str
+    level: str
+    x: np.ndarray
+    y: np.ndarray
+
+
+def build_io_group_plot_specs(
+    group_name: str,
+    x_vals: np.ndarray,
+    y_vals: np.ndarray,
+    *,
+    y_col_base: str,
+    variant: str,
+    level: str,
+    force_through_zero: bool,
+) -> list[IoGroupScatterPlotSpec | IoGroupTrendlinePlotSpec]:
+    specs: list[IoGroupScatterPlotSpec | IoGroupTrendlinePlotSpec] = []
+    scatter_label = f"{group_name} {variant} IO scatter"
+    specs.append(
+        IoGroupScatterPlotSpec(
+            label=scatter_label,
+            storage_key=plot_model.level_storage_key(scatter_label, level),
+            variant=variant,
+            aspect=y_col_base,
+            level=level,
+            x=x_vals,
+            y=y_vals,
+        )
+    )
+    reg = compute_io_regression(x_vals, y_vals, force_through_zero=force_through_zero)
+    if reg is not None:
+        trend_label = f"{group_name} {variant} IO trendline"
+        specs.append(
+            IoGroupTrendlinePlotSpec(
+                label=trend_label,
+                storage_key=plot_model.level_storage_key(trend_label, level),
+                variant=variant,
+                aspect=y_col_base,
+                level=level,
+                x=reg.x_line,
+                y=reg.y_line,
+            )
+        )
+    return specs
 
 
 def pp_overlay_x_map(checkbox: dict) -> dict[str, int]:

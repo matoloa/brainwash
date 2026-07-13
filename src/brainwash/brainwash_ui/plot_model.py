@@ -189,6 +189,50 @@ def io_rec_label_entry(
     }
 
 
+def io_group_label_entry(
+    *,
+    group_ID,
+    aspect: str,
+    variant: str,
+    axis: str,
+    level: str,
+) -> dict:
+    return {
+        "group_ID": group_ID,
+        "aspect": aspect,
+        "variant": variant,
+        "stim": None,
+        "axis": axis,
+        "x_mode": "io",
+        "level": level,
+    }
+
+
+def pp_group_bar_label_entry(
+    *,
+    group_ID,
+    aspect: str,
+    level: str,
+    axis: str,
+    rec_ID=None,
+    is_overlay: bool = False,
+) -> dict:
+    entry = {
+        "group_ID": group_ID,
+        "aspect": aspect,
+        "variant": "raw",
+        "stim": None,
+        "axis": axis,
+        "x_mode": "sweep",
+        "is_container": True,
+        "is_overlay": is_overlay,
+        "level": level,
+    }
+    if rec_ID is not None:
+        entry["rec_ID"] = rec_ID
+    return entry
+
+
 def group_line_label_entry(
     *,
     group_ID,

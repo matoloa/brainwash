@@ -48,6 +48,50 @@ def test_pp_overlay_x_map_partial():
     assert m == {"EPSP_amp": 1, "volley_amp": 2}
 
 
+def test_aggregate_ppr_at_level_recording():
+    rec_ppr = {"r1": {"EPSP_amp": 2.0}, "r2": {"EPSP_amp": 4.0}}
+    agg = plot_series.aggregate_ppr_at_level(rec_ppr, "recording", None)
+    assert agg.ppr_data["EPSP_amp"] == [2.0, 4.0]
+    assert agg.rec_id_order["EPSP_amp"] == ["r1", "r2"]
+
+
+def test_build_pp_group_bar_plot_specs():
+    agg = plot_series.PprLevelAggregate(
+        ppr_data={"EPSP_amp": [2.0, 4.0], "EPSP_slope": [], "volley_amp": [], "volley_slope": []},
+        rec_id_order={"EPSP_amp": ["r1", "r2"], "EPSP_slope": [], "volley_amp": [], "volley_slope": []},
+    )
+    rng = np.random.default_rng(0)
+    specs = plot_series.build_pp_group_bar_plot_specs(
+        aggregate=agg,
+        x_pos=1.0,
+        level="recording",
+        checkbox={"EPSP_amp": True, "EPSP_slope": False, "volley_amp": False, "volley_slope": False},
+        settings={"rgb_EPSP_amp": "blue", "rgb_EPSP_slope": "red", "rgb_volley_amp": "g", "rgb_volley_slope": "o"},
+        rng=rng,
+    )
+    assert len(specs) == 1
+    assert specs[0].mean_val == 3.0
+    assert len(specs[0].scatter_points) == 2
+
+
+def test_build_io_group_plot_specs():
+    x = np.array([1.0, 2.0, 3.0])
+    y = np.array([2.0, 4.0, 6.0])
+    specs = plot_series.build_io_group_plot_specs(
+        "G1",
+        x,
+        y,
+        y_col_base="EPSP_amp",
+        variant="raw",
+        level="recording",
+        force_through_zero=True,
+    )
+    assert len(specs) == 2
+    assert isinstance(specs[0], plot_series.IoGroupScatterPlotSpec)
+    assert isinstance(specs[1], plot_series.IoGroupTrendlinePlotSpec)
+    assert specs[0].storage_key == "G1 raw IO scatter"
+
+
 def test_pp_bar_layout_single_aspect():
     configs = plot_series.pp_bar_layout([("EPSP_amp", "ax1")])
     assert len(configs) == 1

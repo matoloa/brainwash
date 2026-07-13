@@ -1597,6 +1597,152 @@ class UIplot:
                     x_mode="stim",
                 )
 
+    def _render_pp_group_bar_spec(self, spec, group_ID, group_name, color, level):
+        bar_artist = self.get_axis(spec.axid).bar(
+            [spec.bar_x],
+            [spec.mean_val],
+            width=spec.bar_width,
+            color=color,
+            edgecolor="black",
+            alpha=1.0,
+            zorder=2,
+            label=f"{group_name} PPR {spec.aspect} bar",
+        )
+        err_artist = self.get_axis(spec.axid).errorbar(
+            [spec.bar_x],
+            [spec.mean_val],
+            yerr=[spec.sem_val],
+            fmt="none",
+            ecolor="black",
+            elinewidth=1.5,
+            capsize=5,
+            capthick=1.5,
+            zorder=3,
+            label=f"{group_name} PPR {spec.aspect} err",
+        )
+        scat_artists = []
+        for pt in spec.scatter_points:
+            scat_art = self.get_axis(spec.axid).scatter(
+                [pt.x],
+                [pt.y],
+                color=spec.scatter_color,
+                edgecolor="black",
+                zorder=4,
+                s=40,
+                label=f"{group_name} PPR {spec.aspect} {pt.rec_id} point",
+            )
+            scat_artists.append((scat_art, pt.rec_id))
+
+        overlay_bar_artist = self.get_axis(spec.axid).bar(
+            [spec.overlay_x],
+            [spec.mean_val],
+            width=0.4,
+            color=color,
+            edgecolor="black",
+            alpha=0.2,
+            zorder=2,
+            label=f"{group_name} PPR {spec.aspect} overlay_bar",
+        )
+        overlay_err_artist = self.get_axis(spec.axid).errorbar(
+            [spec.overlay_x],
+            [spec.mean_val],
+            yerr=[spec.sem_val],
+            fmt="none",
+            ecolor="black",
+            elinewidth=1.5,
+            capsize=5,
+            capthick=1.5,
+            zorder=3,
+            label=f"{group_name} PPR {spec.aspect} overlay_err",
+        )
+
+        items_to_store = [
+            (bar_artist, "bar", None, False),
+            (err_artist, "err", None, False),
+            (overlay_bar_artist, "overlay_bar", None, True),
+            (overlay_err_artist, "overlay_err", None, True),
+        ]
+        for art, rid in scat_artists:
+            items_to_store.append((art, f"{rid} point", rid, False))
+
+        for artist, suffix, rec_id_val, is_overlay in items_to_store:
+            if hasattr(artist, "set_visible"):
+                artist.set_visible(False)
+            elif hasattr(artist, "patches"):
+                for p in artist.patches:
+                    p.set_visible(False)
+            elif hasattr(artist, "lines"):
+                for l in artist.lines:
+                    if l is not None:
+                        if isinstance(l, (list, tuple)):
+                            for sub_l in l:
+                                if sub_l is not None:
+                                    sub_l.set_visible(False)
+                        else:
+                            l.set_visible(False)
+
+            d = {
+                **plot_model.pp_group_bar_label_entry(
+                    group_ID=group_ID,
+                    aspect=spec.aspect,
+                    level=level,
+                    axis=spec.axid,
+                    rec_ID=rec_id_val,
+                    is_overlay=is_overlay,
+                ),
+                "line": artist,
+                "fill": artist,
+            }
+            ppr_storage_key = self._level_key(f"{group_name} PPR {spec.aspect} {suffix}", level)
+            self.uistate.plot.dict_group_labels[ppr_storage_key] = d
+
+    def _render_io_group_plot_spec(self, spec, group_ID, color):
+        if isinstance(spec, plot_series.IoGroupScatterPlotSpec):
+            scatter = self.get_axis("ax1").scatter(
+                spec.x,
+                spec.y,
+                c=[color],
+                alpha=0.3,
+                label=spec.label,
+                s=20,
+                zorder=2,
+            )
+            scatter.set_visible(False)
+            self.uistate.plot.dict_group_labels[spec.storage_key] = {
+                **plot_model.io_group_label_entry(
+                    group_ID=group_ID,
+                    aspect=spec.aspect,
+                    variant=spec.variant,
+                    axis="ax1",
+                    level=spec.level,
+                ),
+                "line": scatter,
+                "fill": scatter,
+            }
+        else:
+            (trendline,) = self.get_axis("ax1").plot(
+                spec.x,
+                spec.y,
+                color=color,
+                linestyle="-",
+                linewidth=2,
+                alpha=0.9,
+                label=spec.label,
+                zorder=3,
+            )
+            trendline.set_visible(False)
+            self.uistate.plot.dict_group_labels[spec.storage_key] = {
+                **plot_model.io_group_label_entry(
+                    group_ID=group_ID,
+                    aspect=spec.aspect,
+                    variant=spec.variant,
+                    axis="ax1",
+                    level=spec.level,
+                ),
+                "line": trendline,
+                "fill": trendline,
+            }
+
     def addGroup(self, group_ID, dict_group, df_groupmean, x_pos=1, level=None):
         """Add (or update) group artists for the given level.
 
@@ -1608,185 +1754,29 @@ class UIplot:
         if exp_type == "PP":
             group_name = dict_group["group_name"]
             color = dict_group["color"]
-
-            # Find all PPR lines for recordings in this group
-            # collect per-rec PPR means
-            rec_ppr = {}
-            for rec_id in dict_group["rec_IDs"]:
-                rec_ppr[rec_id] = {}
-                for key, linedict in self.uistate.plot.dict_rec_labels.items():
-                    if linedict.get("rec_ID") == rec_id and "PPR" in key and linedict.get("variant") == "raw":
-                        aspect = linedict.get("aspect")
-                        if aspect:
-                            y_data = plot_drag.artist_ydata(linedict["line"])
-                            if y_data.size > 0:
-                                valid_y = [y for y in y_data if np.isfinite(y)]
-                                if valid_y:
-                                    rec_ppr[rec_id][aspect] = np.mean(valid_y)
-
             level = eff_level or self.uistate.stat_test.buttonGroup_test_n
-            ppr_data = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
-            rec_id_order = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
-            if level == "recording":
-                for rec_id, ad in rec_ppr.items():
-                    for asp, v in ad.items():
-                        if asp in ppr_data:
-                            ppr_data[asp].append(v)
-                            rec_id_order[asp].append(rec_id)
-            else:
-                # aggregate at unit level
+            rec_ppr = plot_series.extract_rec_ppr_means(
+                self.uistate.plot.dict_rec_labels,
+                dict_group["rec_IDs"],
+            )
+            df_p = None
+            try:
+                if hasattr(self, "uisub") and self.uisub and hasattr(self.uisub, "get_df_project"):
+                    df_p = self.uisub.get_df_project()
+            except Exception:
                 df_p = None
+            aggregate = plot_series.aggregate_ppr_at_level(rec_ppr, level, df_p)
+            for bar_spec in plot_series.build_pp_group_bar_plot_specs(
+                aggregate=aggregate,
+                x_pos=x_pos,
+                level=level,
+                checkbox=self.uistate.project.checkBox,
+                settings=self.uistate.project.settings,
+            ):
                 try:
-                    if hasattr(self, "uisub") and self.uisub and hasattr(self.uisub, "get_df_project"):
-                        df_p = self.uisub.get_df_project()
-                except Exception:
-                    df_p = None
-                rec_to_unit = {}
-                if df_p is not None:
-                    for rec_id in rec_ppr:
-                        mm = df_p[df_p["ID"] == rec_id]
-                        if not mm.empty:
-                            pr = mm.iloc[0]
-                            if level == "subject":
-                                uk = str(pr.get("subject", "unknown"))
-                            else:
-                                uk = f"{pr.get('subject', 'unknown')}_{pr.get('slice', '1')}"
-                            rec_to_unit[rec_id] = uk
-                unit_asp = defaultdict(lambda: defaultdict(list))
-                for rec_id, ad in rec_ppr.items():
-                    uk = rec_to_unit.get(rec_id, rec_id)
-                    for asp, v in ad.items():
-                        unit_asp[uk][asp].append(v)
-                for uk, ad in unit_asp.items():
-                    for asp, vlist in ad.items():
-                        if asp in ppr_data and vlist:
-                            ppr_data[asp].append(np.mean(vlist))
-
-            active_aspects = plot_series.pp_active_aspects(self.uistate.project.checkBox)
-            configs = plot_series.pp_bar_layout(active_aspects)
-
-            for aspect, axid, offset, bar_w in configs:
-                vals = ppr_data[aspect]
-                if vals:
-                    try:
-                        mean_val, sem_val = plot_series.mean_sem(vals)
-                        bar_x = x_pos + offset
-                    except Exception as e:
-                        print(f"DEBUG: addGroup error in math loop: {e}")
-                        continue
-
-                    try:
-                        # 1. Plot the bar
-                        bar_artist = self.get_axis(axid).bar(
-                            [bar_x],
-                            [mean_val],
-                            width=bar_w,
-                            color=color,
-                            edgecolor="black",
-                            alpha=1.0,
-                            zorder=2,
-                            label=f"{group_name} PPR {aspect} bar",
-                        )
-                        # 2. Plot error bars
-                        err_artist = self.get_axis(axid).errorbar(
-                            [bar_x],
-                            [mean_val],
-                            yerr=[sem_val],
-                            fmt="none",
-                            ecolor="black",
-                            elinewidth=1.5,
-                            capsize=5,
-                            capthick=1.5,
-                            zorder=3,
-                            label=f"{group_name} PPR {aspect} err",
-                        )
-                        # 3. Plot individual points (only at recording level; at higher n_unit the 'vals' are unit aggregates)
-                        scat_artists = []
-                        if level == "recording" and 'rec_id_order' in locals() and aspect in rec_id_order:
-                            # Jitter the points slightly along the X axis so they don't overlap perfectly
-                            jitter = np.random.uniform(-0.06, 0.06, size=len(vals)) if len(vals) > 1 else np.array([0])
-                            x_jittered = [bar_x] * len(vals) + jitter
-                            aspect_color = self.uistate.project.settings.get(f"rgb_{aspect}", "white")
-
-                            for j, (val, rid) in enumerate(zip(vals, rec_id_order[aspect])):
-                                xj = x_jittered[j]
-                                scat_art = self.get_axis(axid).scatter(
-                                    [xj], [val], color=aspect_color, edgecolor="black", zorder=4, s=40, label=f"{group_name} PPR {aspect} {rid} point"
-                                )
-                                scat_artists.append((scat_art, rid))
-
-                        # 4. Create overlay artists for Rec View
-                        overlay_x = plot_series.pp_overlay_x_map(self.uistate.project.checkBox).get(aspect, 1)
-
-                        overlay_bar_artist = self.get_axis(axid).bar(
-                            [overlay_x],
-                            [mean_val],
-                            width=0.4,
-                            color=color,
-                            edgecolor="black",
-                            alpha=0.2,
-                            zorder=2,
-                            label=f"{group_name} PPR {aspect} overlay_bar",
-                        )
-                        overlay_err_artist = self.get_axis(axid).errorbar(
-                            [overlay_x],
-                            [mean_val],
-                            yerr=[sem_val],
-                            fmt="none",
-                            ecolor="black",
-                            elinewidth=1.5,
-                            capsize=5,
-                            capthick=1.5,
-                            zorder=3,
-                            label=f"{group_name} PPR {aspect} overlay_err",
-                        )
-
-                        # Store artists so they can be hidden/shown or cleared
-                        items_to_store = [
-                            (bar_artist, "bar", None, False),
-                            (err_artist, "err", None, False),
-                            (overlay_bar_artist, "overlay_bar", None, True),
-                            (overlay_err_artist, "overlay_err", None, True),
-                        ]
-                        for art, rid in scat_artists:
-                            items_to_store.append((art, f"{rid} point", rid, False))
-
-                        for artist, suffix, rec_id_val, is_overlay in items_to_store:
-                            if hasattr(artist, "set_visible"):
-                                artist.set_visible(False)
-                            elif hasattr(artist, "patches"):
-                                for p in artist.patches:
-                                    p.set_visible(False)
-                            elif hasattr(artist, "lines"):
-                                for l in artist.lines:
-                                    if l is not None:
-                                        if isinstance(l, (list, tuple)):
-                                            for sub_l in l:
-                                                if sub_l is not None:
-                                                    sub_l.set_visible(False)
-                                        else:
-                                            l.set_visible(False)
-
-                            d = {
-                                "group_ID": group_ID,
-                                "aspect": aspect,
-                                "variant": "raw",
-                                "stim": None,
-                                "line": artist,
-                                "fill": artist,
-                                "axis": axid,
-                                "x_mode": "sweep",
-                                "is_container": True,
-                                "is_overlay": is_overlay,
-                                "level": level,
-                            }
-                            if rec_id_val is not None:
-                                d["rec_ID"] = rec_id_val
-                            ppr_storage_key = self._level_key(f"{group_name} PPR {aspect} {suffix}", level)
-                            self.uistate.plot.dict_group_labels[ppr_storage_key] = d
-                    except Exception as e:
-                        print(f"DEBUG: addGroup error in drawing loop: {e}")
-                        continue
+                    self._render_pp_group_bar_spec(bar_spec, group_ID, group_name, color, level)
+                except Exception as e:
+                    print(f"DEBUG: addGroup error in drawing loop: {e}")
             return
 
         if exp_type == "io":
@@ -1794,81 +1784,28 @@ class UIplot:
                 self.uistate.experiment.io_input,
                 self.uistate.experiment.io_output,
             )
-            axid = "ax1"
             color = dict_group["color"]
             group_name = dict_group["group_name"]
-
-            for variant in ["raw", "norm"]:
-                all_x = []
-                all_y = []
-
-                # find scatters in uistate.plot.dict_rec_labels
-                for key, linedict in self.uistate.plot.dict_rec_labels.items():
-                    if linedict.get("x_mode") == "io" and linedict.get("rec_ID") in dict_group["rec_IDs"]:
-                        if key.endswith(f"{variant} IO scatter"):
-                            scatter = linedict["line"]
-                            offsets = scatter.get_offsets()
-                            if len(offsets) > 0:
-                                all_x.append(offsets[:, 0])
-                                all_y.append(offsets[:, 1])
-
-                if all_x and all_y:
-                    x_vals = np.concatenate(all_x)
-                    y_vals = np.concatenate(all_y)
-
-                    scatter = self.get_axis(axid).scatter(
-                        x_vals,
-                        y_vals,
-                        c=[color],
-                        alpha=0.3,
-                        label=f"{group_name} {variant} IO scatter",
-                        s=20,
-                        zorder=2,
-                    )
-                    scatter.set_visible(False)
-                    io_level = self.uistate.stat_test.buttonGroup_test_n
-                    io_storage_key = self._level_key(f"{group_name} {variant} IO scatter", io_level)
-                    self.uistate.plot.dict_group_labels[io_storage_key] = {
-                        "group_ID": group_ID,
-                        "aspect": y_col_base,
-                        "variant": variant,
-                        "stim": None,
-                        "line": scatter,
-                        "fill": scatter,
-                        "axis": axid,
-                        "x_mode": "io",
-                        "level": io_level,
-                    }
-
-                    reg = plot_series.compute_io_regression(
-                        x_vals,
-                        y_vals,
-                        force_through_zero=bool(self.uistate.project.checkBox.get("io_force0", False)),
-                    )
-                    if reg is not None:
-                        (trendline,) = self.get_axis(axid).plot(
-                            reg.x_line,
-                            reg.y_line,
-                            color=color,
-                            linestyle="-",
-                            linewidth=2,
-                            alpha=0.9,
-                            label=f"{group_name} {variant} IO trendline",
-                            zorder=3,
-                        )
-                        trendline.set_visible(False)
-                        io_trend_key = self._level_key(f"{group_name} {variant} IO trendline", io_level)
-                        self.uistate.plot.dict_group_labels[io_trend_key] = {
-                            "group_ID": group_ID,
-                            "aspect": y_col_base,
-                            "variant": variant,
-                            "stim": None,
-                            "line": trendline,
-                            "fill": trendline,
-                            "axis": axid,
-                            "x_mode": "io",
-                            "level": io_level,
-                        }
+            io_level = self.uistate.stat_test.buttonGroup_test_n
+            force0 = bool(self.uistate.project.checkBox.get("io_force0", False))
+            for variant in ("raw", "norm"):
+                xy = plot_series.collect_io_group_scatter_xy(
+                    self.uistate.plot.dict_rec_labels,
+                    dict_group["rec_IDs"],
+                    variant,
+                )
+                if xy is None:
+                    continue
+                for spec in plot_series.build_io_group_plot_specs(
+                    group_name,
+                    xy[0],
+                    xy[1],
+                    y_col_base=y_col_base,
+                    variant=variant,
+                    level=io_level,
+                    force_through_zero=force0,
+                ):
+                    self._render_io_group_plot_spec(spec, group_ID, color)
             return
 
         eff_level = self.uistate.stat_test.buttonGroup_test_n

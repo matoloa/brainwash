@@ -100,6 +100,31 @@ def test_io_rec_label_entry():
     }
 
 
+def test_io_group_label_entry():
+    entry = plot_model.io_group_label_entry(
+        group_ID=2,
+        aspect="EPSP_amp",
+        variant="raw",
+        axis="ax1",
+        level="slice",
+    )
+    assert entry["x_mode"] == "io"
+    assert entry["level"] == "slice"
+
+
+def test_pp_group_bar_label_entry():
+    entry = plot_model.pp_group_bar_label_entry(
+        group_ID=1,
+        aspect="EPSP_amp",
+        level="recording",
+        axis="ax1",
+        rec_ID="r3",
+        is_overlay=True,
+    )
+    assert entry["is_overlay"] is True
+    assert entry["rec_ID"] == "r3"
+
+
 def test_group_line_label_entry():
     entry = plot_model.group_line_label_entry(
         group_ID=3,
