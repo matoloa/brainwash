@@ -888,7 +888,7 @@ class UIsub(
         self.dd_testsets = {}  # test/sweep sets for group comparisons
         self.dd_group_samples = {}  # group sample means (phase 3.3: group_ID -> {test_ID: df})
         self.dict_diffs = {}  # all diffs (for paired stim)
-        if hasattr(self, "self.uistate") and hasattr(self.uistate, "testset_spans"):
+        if hasattr(self, "uistate") and hasattr(self.uistate.plot, "testset_spans"):
             self.uistate.plot.testset_spans = {}  # clear testset spans on cache reset (Phase 2)
 
     # uisub init refactoring (bootstrap and loadProject live in ProjectMixin)

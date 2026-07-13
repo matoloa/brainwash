@@ -11,8 +11,9 @@ These commits change when `config`, `uistate`, and `uiplot` are created. Before 
 | `a2f2dd2` | grok build auto commit 60 | **Rollback point** — last commit before Phase 6 |
 | `015b9d2` | grok build auto commit 61 `[HIGH RISK phase6a]` | Instantiate `config` / `uistate` / `uiplot` in `UIsub.__init__`; temporary module aliases |
 | `284d414` | grok build auto commit 62 `[HIGH RISK phase6b]` | Remove `brainwash.ui` module aliases (`uistate`, `uiplot`, `config`) |
+| `4b032d3` | grok build auto commit 63 `[HIGH RISK phase6c]` | Fix bare `config` refs in `usage()` / `setupTalkback()` after 6b |
 
-Later commits (`63`–`64`) are plan/docs only — not HIGH RISK.
+Later commits (`64`–`66`) are plan/docs only — not HIGH RISK.
 
 ## Find HIGH RISK commits
 
