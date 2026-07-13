@@ -8,7 +8,8 @@
 - **Pure UI-adjacent logic** → `src/brainwash/brainwash_ui/` (view_state, applicability, statusbar, plot_model, plot_series, plot_stim).
 - **Tests** → characterization + `test_pipeline_integration.py` + `test_ui_wiring.py`.
 - **CI** → `.github/workflows/test.yml`.
-- **No** full `UIsub` composition rewrite. **No** package rename. **No** distribution builds unless asked.
+- **No** full `UIsub` composition rewrite. **No** distribution builds unless asked.
+- Package root: `src/brainwash/` (`src/lib/` is deprecated shim only).
 
 ## Progress — Phase 0–3 (archived)
 
@@ -64,6 +65,14 @@ Branch: `ui-refactor/phase0-3`. Index: [plan_ui_refactor_phase2.md](plan_ui_refa
 |----|------|--------|
 | 37 | [ui_refactor/37_output_sweep_drag_fix.md](ui_refactor/37_output_sweep_drag_fix.md) | ✅ done |
 | 39 | [ui_refactor/39_plot_drag_artist_xdata.md](ui_refactor/39_plot_drag_artist_xdata.md) | ✅ done |
+
+**Phase VII**: [plan_ui_refactor_phase7_package_rename.md](plan_ui_refactor_phase7_package_rename.md) ✅
+
+**Phase VIII**: [plan_ui_refactor_phase8.md](plan_ui_refactor_phase8.md)
+
+| PR | Card | Status |
+|----|------|--------|
+| 40 | [ui_refactor/40_export_xdata_hardening.md](ui_refactor/40_export_xdata_hardening.md) | ✅ done |
 
 ## Shared docs
 
