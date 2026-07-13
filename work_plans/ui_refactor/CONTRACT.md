@@ -57,6 +57,8 @@ class StatusbarResult:
 | Amp zone | `plot_drag.amp_move_zone(x, y, x_margin, y_margin)` |
 | Slope zones | `plot_drag.slope_drag_state(x, y, …)` → start/end xy + move + resize zones |
 | Hit test | `plot_drag.point_in_zone(x, y, zone)` |
+| Artist x/y | `plot_drag.artist_xdata` / `artist_ydata` — always `np.asarray`; never index `Series` with `[-1]` |
+| Output sweep drag | `plot_drag.drag_release_line_candidates` filters `SWEEP_OUTPUT_ASPECTS` on ax1/ax2 |
 
 ## Testset span invariants (Phase IV)
 

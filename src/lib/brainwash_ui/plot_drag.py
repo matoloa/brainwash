@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import numpy as np
+
+SWEEP_OUTPUT_ASPECTS = frozenset({"EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"})
+
 
 def amp_move_zone(x: float, y: float, *, x_margin: float, y_margin: float) -> dict[str, tuple[float, float]]:
     return {
@@ -40,3 +44,54 @@ def point_in_zone(x: float, y: float, zone: dict) -> bool:
     x0, x1 = zone["x"]
     y0, y1 = zone["y"]
     return x0 <= x <= x1 and y0 <= y <= y1
+
+
+def artist_xdata(line) -> np.ndarray:
+    return np.asarray(line.get_xdata(), dtype=float).ravel()
+
+
+def artist_ydata(line) -> np.ndarray:
+    return np.asarray(line.get_ydata(), dtype=float).ravel()
+
+
+def artist_xy_first(line) -> tuple[float, float]:
+    xdata = artist_xdata(line)
+    ydata = artist_ydata(line)
+    return float(xdata[0]), float(ydata[0])
+
+
+def drag_release_line_candidates(
+    rec_ID,
+    graph: str,
+    *,
+    dict_rec_show: dict,
+    dict_rec_labels: dict,
+) -> list[tuple[object, np.ndarray]]:
+    if graph == "mean":
+        axes = {"axm"}
+        require_sweep_aspect = False
+    elif graph == "output":
+        axes = {"ax1", "ax2"}
+        require_sweep_aspect = True
+    else:
+        return []
+
+    candidates: list[tuple[object, np.ndarray]] = []
+    for store in (dict_rec_show, dict_rec_labels):
+        if not store:
+            continue
+        for value in store.values():
+            if value.get("rec_ID") != rec_ID or value.get("axis") not in axes:
+                continue
+            if require_sweep_aspect and value.get("aspect") not in SWEEP_OUTPUT_ASPECTS:
+                continue
+            line = value.get("line")
+            if line is None or not hasattr(line, "get_xdata"):
+                continue
+            xdata = artist_xdata(line)
+            if xdata.size == 0:
+                continue
+            candidates.append((line, xdata))
+        if candidates:
+            break
+    return candidates

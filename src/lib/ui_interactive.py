@@ -11,43 +11,6 @@ from lib import ui_plot
 
 logger = logging.getLogger(__name__)
 
-_SWEEP_OUTPUT_ASPECTS = frozenset({"EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"})
-
-
-def _artist_xdata(line) -> np.ndarray:
-    return np.asarray(line.get_xdata(), dtype=float).ravel()
-
-
-def _drag_release_line_candidates(rec_ID, graph: str, *, dict_rec_show: dict, dict_rec_labels: dict) -> list[tuple[object, np.ndarray]]:
-    if graph == "mean":
-        axes = {"axm"}
-        require_sweep_aspect = False
-    elif graph == "output":
-        axes = {"ax1", "ax2"}
-        require_sweep_aspect = True
-    else:
-        return []
-
-    candidates: list[tuple[object, np.ndarray]] = []
-    for store in (dict_rec_show, dict_rec_labels):
-        if not store:
-            continue
-        for value in store.values():
-            if value.get("rec_ID") != rec_ID or value.get("axis") not in axes:
-                continue
-            if require_sweep_aspect and value.get("aspect") not in _SWEEP_OUTPUT_ASPECTS:
-                continue
-            line = value.get("line")
-            if line is None or not hasattr(line, "get_xdata"):
-                continue
-            xdata = _artist_xdata(line)
-            if xdata.size == 0:
-                continue
-            candidates.append((line, xdata))
-        if candidates:
-            break
-    return candidates
-
 
 class InteractivePlotMixin:
     #####################################################
@@ -116,8 +79,8 @@ class InteractivePlotMixin:
                 label_core = rec_name
             label = f"{label_core} - stim {trow['stim']}"
             dict_event = self.uistate.plot.dict_rec_labels[label]
-            data_x = dict_event["line"].get_xdata()
-            data_y = dict_event["line"].get_ydata()
+            data_x = plot_drag.artist_xdata(dict_event["line"])
+            data_y = plot_drag.artist_ydata(dict_event["line"])
             self.uistate.plot.x_on_click = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
             # print(f"self.uistate.plot.x_on_click: {self.uistate.plot.x_on_click}")
             if event.inaxes is not None:
@@ -443,7 +406,7 @@ class InteractivePlotMixin:
             print("connectDragRelease: Incorrect graph reference.")
             return
 
-        candidates = _drag_release_line_candidates(
+        candidates = plot_drag.drag_release_line_candidates(
             rec_ID,
             graph,
             dict_rec_show=self.uistate.plot.dict_rec_show,
@@ -647,17 +610,23 @@ class InteractivePlotMixin:
         for label, value in dict_labels.items():
             line = value["line"]
             if label.endswith("EPSP amp marker"):
-                self.uistate.updatePointDragZone(aspect="EPSP amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
+                x, y = plot_drag.artist_xy_first(line)
+                self.uistate.updatePointDragZone(aspect="EPSP amp move", x=x, y=y)
             elif label.endswith("volley amp marker"):
-                self.uistate.updatePointDragZone(
-                    aspect="volley amp move",
-                    x=line.get_xdata()[0],
-                    y=line.get_ydata()[0],
-                )
+                x, y = plot_drag.artist_xy_first(line)
+                self.uistate.updatePointDragZone(aspect="volley amp move", x=x, y=y)
             elif label.endswith("EPSP slope marker"):
-                self.uistate.updateDragZones(aspect="EPSP slope", x=line.get_xdata(), y=line.get_ydata())
+                self.uistate.updateDragZones(
+                    aspect="EPSP slope",
+                    x=plot_drag.artist_xdata(line),
+                    y=plot_drag.artist_ydata(line),
+                )
             elif label.endswith("volley slope marker"):
-                self.uistate.updateDragZones(aspect="volley slope", x=line.get_xdata(), y=line.get_ydata())
+                self.uistate.updateDragZones(
+                    aspect="volley slope",
+                    x=plot_drag.artist_xdata(line),
+                    y=plot_drag.artist_ydata(line),
+                )
 
         self.mouseoverMean = self.canvasMean.mpl_connect("motion_notify_event", self.meanMouseover)
         self.mouseoverEvent = self.canvasEvent.mpl_connect("motion_notify_event", self.eventMouseover)
@@ -1240,8 +1209,8 @@ class InteractivePlotMixin:
             dict_pop = list(dict_out.values())[0]
             rec_ID_for_snippet = dict_pop.get("rec_ID")
 
-        x_data = dict_pop["line"].get_xdata()
-        y_data = dict_pop["line"].get_ydata()
+        x_data = plot_drag.artist_xdata(dict_pop["line"])
+        y_data = plot_drag.artist_ydata(dict_pop["line"])
 
         out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
         x_val = x_data[out_x_idx]
@@ -1341,8 +1310,8 @@ class InteractivePlotMixin:
             return
 
         dict_pop = list(dict_out.values())[0]
-        x_data = dict_pop["line"].get_xdata()
-        y_data = dict_pop["line"].get_ydata()
+        x_data = plot_drag.artist_xdata(dict_pop["line"])
+        y_data = plot_drag.artist_ydata(dict_pop["line"])
 
         out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
         x_val = x_data[out_x_idx]
@@ -1426,8 +1395,8 @@ class InteractivePlotMixin:
             return
 
         dict_pop = list(dict_out.values())[0]
-        x_data = dict_pop["line"].get_xdata()
-        y_data = dict_pop["line"].get_ydata()
+        x_data = plot_drag.artist_xdata(dict_pop["line"])
+        y_data = plot_drag.artist_ydata(dict_pop["line"])
 
         xlim = ax.get_xlim()
         ylim = ax.get_ylim()

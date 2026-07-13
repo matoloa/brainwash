@@ -123,8 +123,8 @@ class UIstate:
             assert p.mouseover_action is not None
             assert p.mouseover_plot is not None
             aspect = p.mouseover_action
-            x = p.mouseover_plot[0].get_xdata()
-            y = p.mouseover_plot[0].get_ydata()
+            x = plot_drag.artist_xdata(p.mouseover_plot[0])
+            y = plot_drag.artist_ydata(p.mouseover_plot[0])
         if aspect.startswith("EPSP slope"):
             self.updateSlopeZone("EPSP", x, y)
         elif aspect.startswith("volley slope"):
