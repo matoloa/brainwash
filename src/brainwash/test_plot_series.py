@@ -107,6 +107,52 @@ def test_stim_aggregate_sem_reindex():
     assert len(sem) == 2
 
 
+def test_build_io_recording_plot_specs():
+    df = pd.DataFrame(
+        {
+            "sweep": [0, 1, 2],
+            "stim": [1, 1, 1],
+            "volley_amp": [1.0, 2.0, 3.0],
+            "EPSP_amp": [2.0, 4.0, 6.0],
+            "EPSP_amp_norm": [50.0, 100.0, 150.0],
+        }
+    )
+    specs = plot_series.build_io_recording_plot_specs(
+        df,
+        "rec1",
+        "vamp",
+        "EPSPamp",
+        force_through_zero=True,
+    )
+    assert len(specs) == 4
+    scatter_raw = next(s for s in specs if s.label == "rec1 raw IO scatter")
+    trend_raw = next(s for s in specs if s.label == "rec1 raw IO trendline")
+    assert isinstance(scatter_raw, plot_series.IoScatterPlotSpec)
+    assert isinstance(trend_raw, plot_series.IoTrendlinePlotSpec)
+    assert len(scatter_raw.x) == 3
+    assert len(trend_raw.x) == 2
+
+
+def test_build_io_recording_plot_specs_skips_missing_norm():
+    df = pd.DataFrame(
+        {
+            "sweep": [0, 1],
+            "stim": [1, 1],
+            "volley_amp": [1.0, 2.0],
+            "EPSP_amp": [2.0, 4.0],
+        }
+    )
+    specs = plot_series.build_io_recording_plot_specs(
+        df,
+        "rec1",
+        "vamp",
+        "EPSPamp",
+        force_through_zero=False,
+    )
+    assert len(specs) == 2
+    assert all("raw" in s.label for s in specs)
+
+
 def test_io_scatter_xy_and_trendline():
     df = pd.DataFrame(
         {

@@ -307,6 +307,68 @@ STIM_MODE_SUFFIX_TO_COL = {
 }
 
 
+@dataclass(frozen=True)
+class IoScatterPlotSpec:
+    label: str
+    variant: str
+    aspect: str
+    x: np.ndarray
+    y: np.ndarray
+
+
+@dataclass(frozen=True)
+class IoTrendlinePlotSpec:
+    label: str
+    variant: str
+    aspect: str
+    x: np.ndarray
+    y: np.ndarray
+
+
+def build_io_recording_plot_specs(
+    dfoutput: pd.DataFrame,
+    label: str,
+    io_input: str,
+    io_output: str,
+    *,
+    force_through_zero: bool,
+) -> list[IoScatterPlotSpec | IoTrendlinePlotSpec]:
+    """Pure IO scatter/trendline data for addRow (no matplotlib artists)."""
+    _, y_col_base = io_axis_columns(io_input, io_output)
+    specs: list[IoScatterPlotSpec | IoTrendlinePlotSpec] = []
+    for variant in ("raw", "norm"):
+        xy = io_scatter_xy(dfoutput, io_input, io_output, variant=variant)
+        if xy is None:
+            continue
+        specs.append(
+            IoScatterPlotSpec(
+                label=f"{label} {variant} IO scatter",
+                variant=variant,
+                aspect=y_col_base,
+                x=xy[0],
+                y=xy[1],
+            )
+        )
+        line_xy = io_trendline_xy(
+            dfoutput,
+            io_input,
+            io_output,
+            variant=variant,
+            force_through_zero=force_through_zero,
+        )
+        if line_xy is not None:
+            specs.append(
+                IoTrendlinePlotSpec(
+                    label=f"{label} {variant} IO trendline",
+                    variant=variant,
+                    aspect=y_col_base,
+                    x=line_xy[0],
+                    y=line_xy[1],
+                )
+            )
+    return specs
+
+
 def io_scatter_xy(
     dfoutput: pd.DataFrame,
     io_input: str,

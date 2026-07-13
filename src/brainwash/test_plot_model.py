@@ -88,6 +88,18 @@ def test_build_group_line_specs_with_norm():
     assert specs[1].variant == "norm"
 
 
+def test_io_rec_label_entry():
+    entry = plot_model.io_rec_label_entry(rec_ID="r1", aspect="EPSP_amp", variant="raw")
+    assert entry == {
+        "rec_ID": "r1",
+        "aspect": "EPSP_amp",
+        "variant": "raw",
+        "stim": None,
+        "axis": "ax1",
+        "x_mode": "io",
+    }
+
+
 def test_group_line_label_entry():
     entry = plot_model.group_line_label_entry(
         group_ID=3,

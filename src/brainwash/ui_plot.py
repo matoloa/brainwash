@@ -1417,64 +1417,59 @@ class UIplot:
         label = plot_series.recording_plot_label(rec_name, rec_filter)
 
         if self.uistate.experiment.experiment_type == "io":
-            x_col, y_col_base = plot_series.io_axis_columns(
+            _, y_col_base = plot_series.io_axis_columns(
                 self.uistate.experiment.io_input,
                 self.uistate.experiment.io_output,
             )
             axid = "ax1"
             color = self.uistate.project.settings.get(f"rgb_{y_col_base}", "black")
-            df_sweeps = dfoutput[dfoutput["sweep"].notna()]
             force0 = bool(self.uistate.project.checkBox.get("io_force0", False))
-            for variant in ["raw", "norm"]:
-                y_col = plot_series.io_y_column(y_col_base, variant=variant)
-                df_clean = plot_series.io_scatter_frame(df_sweeps, x_col, y_col)
-                if df_clean is None:
-                    continue
-
-                scatter = self.get_axis(axid).scatter(
-                    df_clean[x_col].values,
-                    df_clean[y_col].values,
-                    c=[color],
-                    alpha=0.8,
-                    label=f"{label} {variant} IO scatter",
-                    s=20,
-                    zorder=2,
-                )
-                scatter.set_visible(False)
-                self.uistate.plot.dict_rec_labels[f"{label} {variant} IO scatter"] = {
-                    "rec_ID": rec_ID,
-                    "aspect": y_col_base,
-                    "variant": variant,
-                    "stim": None,
-                    "line": scatter,
-                    "axis": axid,
-                    "x_mode": "io",
-                }
-
-                reg = plot_series.compute_io_regression(
-                    df_clean[x_col].values,
-                    df_clean[y_col].values,
-                    force_through_zero=force0,
-                )
-                if reg is not None:
+            for spec in plot_series.build_io_recording_plot_specs(
+                dfoutput,
+                label,
+                self.uistate.experiment.io_input,
+                self.uistate.experiment.io_output,
+                force_through_zero=force0,
+            ):
+                if isinstance(spec, plot_series.IoScatterPlotSpec):
+                    scatter = self.get_axis(axid).scatter(
+                        spec.x,
+                        spec.y,
+                        c=[color],
+                        alpha=0.8,
+                        label=spec.label,
+                        s=20,
+                        zorder=2,
+                    )
+                    scatter.set_visible(False)
+                    self.uistate.plot.dict_rec_labels[spec.label] = {
+                        **plot_model.io_rec_label_entry(
+                            rec_ID=rec_ID,
+                            aspect=spec.aspect,
+                            variant=spec.variant,
+                            axis=axid,
+                        ),
+                        "line": scatter,
+                    }
+                else:
                     (trendline,) = self.get_axis(axid).plot(
-                        reg.x_line,
-                        reg.y_line,
+                        spec.x,
+                        spec.y,
                         color=color,
                         linestyle="--",
                         alpha=0.8,
-                        label=f"{label} {variant} IO trendline",
+                        label=spec.label,
                         zorder=1,
                     )
                     trendline.set_visible(False)
-                    self.uistate.plot.dict_rec_labels[f"{label} {variant} IO trendline"] = {
-                        "rec_ID": rec_ID,
-                        "aspect": y_col_base,
-                        "variant": variant,
-                        "stim": None,
+                    self.uistate.plot.dict_rec_labels[spec.label] = {
+                        **plot_model.io_rec_label_entry(
+                            rec_ID=rec_ID,
+                            aspect=spec.aspect,
+                            variant=spec.variant,
+                            axis=axid,
+                        ),
                         "line": trendline,
-                        "axis": axid,
-                        "x_mode": "io",
                     }
 
         # Add meanline to Mean

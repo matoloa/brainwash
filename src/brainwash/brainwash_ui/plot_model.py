@@ -172,6 +172,23 @@ def build_group_line_specs(
     return specs
 
 
+def io_rec_label_entry(
+    *,
+    rec_ID,
+    aspect: str,
+    variant: str,
+    axis: str = "ax1",
+) -> dict:
+    return {
+        "rec_ID": rec_ID,
+        "aspect": aspect,
+        "variant": variant,
+        "stim": None,
+        "axis": axis,
+        "x_mode": "io",
+    }
+
+
 def group_line_label_entry(
     *,
     group_ID,
