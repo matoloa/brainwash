@@ -220,7 +220,8 @@ class InteractivePlotMixin:
     def eventMouseover(self, event):  # determine which event is being mouseovered
         if self.uistate.plot.df_rec_select_data is None:  # no single recording/stim combo selected
             return
-        axe = self.uistate.plot.axe
+        p = self.uistate.plot
+        axe = p.axe
 
         def plotMouseover(action, axe):
             alpha = 0.8
@@ -228,22 +229,22 @@ class InteractivePlotMixin:
             if "slope" in action:
                 if "EPSP" in action:
                     x_range = (
-                        self.uistate.EPSP_slope_start_xy[0],
-                        self.uistate.EPSP_slope_end_xy[0],
+                        p.EPSP_slope_start_xy[0],
+                        p.EPSP_slope_end_xy[0],
                     )
                     y_range = (
-                        self.uistate.EPSP_slope_start_xy[1],
-                        self.uistate.EPSP_slope_end_xy[1],
+                        p.EPSP_slope_start_xy[1],
+                        p.EPSP_slope_end_xy[1],
                     )
                     color = self.uistate.project.settings["rgb_EPSP_slope"]
                 elif "volley" in action:
                     x_range = (
-                        self.uistate.volley_slope_start_xy[0],
-                        self.uistate.volley_slope_end_xy[0],
+                        p.volley_slope_start_xy[0],
+                        p.volley_slope_end_xy[0],
                     )
                     y_range = (
-                        self.uistate.volley_slope_start_xy[1],
-                        self.uistate.volley_slope_end_xy[1],
+                        p.volley_slope_start_xy[1],
+                        p.volley_slope_end_xy[1],
                     )
                     color = self.uistate.project.settings["rgb_volley_slope"]
 
@@ -271,10 +272,10 @@ class InteractivePlotMixin:
 
             elif "amp" in action:
                 if "EPSP" in action:
-                    x, y = self.uistate.EPSP_amp_xy
+                    x, y = p.EPSP_amp_xy
                     color = self.uistate.project.settings["rgb_EPSP_amp"]
                 elif "volley" in action:
-                    x, y = self.uistate.volley_amp_xy
+                    x, y = p.volley_amp_xy
                     color = self.uistate.project.settings["rgb_volley_amp"]
 
                 if self.uistate.plot.mouseover_blob is None:
@@ -291,21 +292,21 @@ class InteractivePlotMixin:
         if event.inaxes == axe:
             zones = {}
             if self.uistate.project.checkBox["EPSP_amp"]:
-                zones["EPSP amp move"] = self.uistate.EPSP_amp_move_zone
+                zones["EPSP amp move"] = p.EPSP_amp_move_zone
             if self.uistate.project.checkBox["EPSP_slope"]:
-                zones["EPSP slope resize"] = self.uistate.EPSP_slope_resize_zone
-                zones["EPSP slope move"] = self.uistate.EPSP_slope_move_zone
+                zones["EPSP slope resize"] = p.EPSP_slope_resize_zone
+                zones["EPSP slope move"] = p.EPSP_slope_move_zone
             if self.uistate.project.checkBox["volley_amp"]:
-                zones["volley amp move"] = self.uistate.volley_amp_move_zone
+                zones["volley amp move"] = p.volley_amp_move_zone
             if self.uistate.project.checkBox["volley_slope"]:
-                zones["volley slope resize"] = self.uistate.volley_slope_resize_zone
-                zones["volley slope move"] = self.uistate.volley_slope_move_zone
-            self.uistate.plot.mouseover_action = None
+                zones["volley slope resize"] = p.volley_slope_resize_zone
+                zones["volley slope move"] = p.volley_slope_move_zone
+            p.mouseover_action = None
             for action, zone in zones.items():
                 if not zone:
                     continue
                 if zone["x"][0] <= x <= zone["x"][1] and zone["y"][0] <= y <= zone["y"][1]:
-                    self.uistate.plot.mouseover_action = action
+                    p.mouseover_action = action
                     plotMouseover(action, axe)
 
                     # Debugging block
