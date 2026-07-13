@@ -7,14 +7,7 @@
 # Also owns df_projectTemplate — the schema/factory for the project DataFrame.
 # ui.py imports it from here directly.
 #
-# Module-level singletons are injected by ui.py at startup (after all
-# singletons and widget classes are created but before any UIsub instance
-# is constructed):
-#
-#   ui_project.uistate          = uistate
-#   ui_project.config           = config
-#   ui_project.uiplot           = uiplot
-#   ui_project.InputDialogPopup = InputDialogPopup
+# Uses self.uistate / self.config / self.uiplot on UIsub (see ui.py).
 
 from __future__ import annotations
 
@@ -32,6 +25,7 @@ import yaml
 from PyQt5 import QtCore, QtWidgets
 
 import lib.parse as parse
+from ui_widgets import InputDialogPopup
 
 logger = logging.getLogger(__name__)
 
@@ -80,15 +74,6 @@ def df_projectTemplate():
     for col in _INT_COLUMNS:
         df[col] = df[col].astype(pd.Int64Dtype())
     return df
-
-
-# ---------------------------------------------------------------------------
-# Injected singletons — set by ui.py before any UIsub instance is created.
-# ---------------------------------------------------------------------------
-uistate = None  # type: ignore[assignment]
-config = None  # type: ignore[assignment]
-uiplot = None  # type: ignore[assignment]
-InputDialogPopup = None  # type: ignore[assignment]
 
 
 class ProjectMixin:
@@ -154,7 +139,7 @@ class ProjectMixin:
             0,
             0,
             int(screen.width() * 0.999) - getattr(config, "work_space", 0),
-            int(screen.height()) - config.terminal_space,
+            int(screen.height()) - self.config.terminal_space,
         )
 
         self.get_bw_cfg()  # load/create bw global config file (not project specific)
@@ -164,7 +149,7 @@ class ProjectMixin:
         self.fqdn = socket.getfqdn()  # get computer name and local domain, for project file
 
         # debug mode; for printing widget focus every 1000ms
-        if config.track_widget_focus:
+        if self.config.track_widget_focus:
             self.timer = QtCore.QTimer(self.mainwindow)
             self.timer.timeout.connect(self.checkFocus)
             self.timer.start(1000)
@@ -186,13 +171,13 @@ class ProjectMixin:
             print(f"Project file {self.dict_folders['project'] / 'project.brainwash'} not found, creating new project file")
             self.df_project = df_projectTemplate()
         # If local cfg.pkl exists, load it, otherwise create it
-        uistate.reset()
-        uistate.load_cfg(
+        self.uistate.reset()
+        self.uistate.load_cfg(
             projectfolder=self.dict_folders["project"],
-            bw_version=config.version,
-            force_reset=config.force_cfg_reset,
+            bw_version=self.config.version,
+            force_reset=self.config.force_cfg_reset,
         )
-        self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
+        self.mainwindow.setWindowTitle(f"Brainwash {self.config.version} - {self.projectname}")
 
         # Load group data
         self.dd_groups = self.group_get_dd()
@@ -200,7 +185,7 @@ class ProjectMixin:
         # Load test set data (integer set_ID based, defaults "set 1", "set 2", ...; persisted in test_sets.pkl)
         self.dd_testsets = self.testset_get_dd()
         self.dd_group_samples = {}  # phase 3.3: group_ID -> {test_ID: df}; populated lazily via get_ddgroup_sample()
-        if config.talkback:
+        if self.config.talkback:
             self.setupTalkback()
         # Set up canvases and graphs
         self.groupControlsRefresh()  # add group controls to UI
@@ -209,7 +194,7 @@ class ProjectMixin:
         self.applyConfigStates()  # apply config states to UI elements
         self.graphAxes()
         self.darkmode()  # set darkmode if set in bw_cfg. Requires tables and canvases be loaded!
-        self.setTableStimVisibility(uistate.project.showTimetable)
+        self.setTableStimVisibility(self.uistate.project.showTimetable)
         self.setupToolBar()
         # set focus to TableProj, so that arrows work immediately
         self.tableProj.setFocus()
@@ -228,13 +213,13 @@ class ProjectMixin:
         self.user_documents = Path.home() / "Documents"
         self.projects_folder = self.user_documents / "Brainwash Projects"
         self.projectname = "My Project"
-        uistate.darkmode = True
-        uistate.project.showTimetable = False
-        uistate.plot.showHeatmap = False
+        self.uistate.darkmode = True
+        self.uistate.project.showTimetable = False
+        self.uistate.plot.showHeatmap = False
 
         # Load config if present
-        if config.bw_cfg_yaml is not None:
-            self.bw_cfg_yaml = Path(config.bw_cfg_yaml)
+        if self.config.bw_cfg_yaml is not None:
+            self.bw_cfg_yaml = Path(self.config.bw_cfg_yaml)
             if self.bw_cfg_yaml.exists():
                 with self.bw_cfg_yaml.open("r") as file:
                     cfg = yaml.safe_load(file) or {}
@@ -243,9 +228,9 @@ class ProjectMixin:
                         self.user_documents = Path(cfg.get("user_documents", self.user_documents))
                         self.projects_folder = Path(cfg.get("projects_folder", self.projects_folder))
                         self.projectname = cfg.get("projectname", self.projectname)
-                    uistate.darkmode = cfg.get("darkmode", True)
-                    uistate.project.showTimetable = cfg.get("showTimetable", False)
-                    uistate.plot.showHeatmap = cfg.get("showHeatmap", False)
+                    self.uistate.darkmode = cfg.get("darkmode", True)
+                    self.uistate.project.showTimetable = cfg.get("showTimetable", False)
+                    self.uistate.plot.showHeatmap = cfg.get("showHeatmap", False)
         else:
             self.bw_cfg_yaml = None  # Make sure it's defined for consistency
 
@@ -253,15 +238,15 @@ class ProjectMixin:
         """Write bw_cfg.yaml using path from Config (now guaranteed writable).
         Creates parent dir (XDG or portable .config) on first run.
         """
-        if config.transient or self.bw_cfg_yaml is None:
+        if self.config.transient or self.bw_cfg_yaml is None:
             return
         cfg = {
             "user_documents": str(self.user_documents),
             "projects_folder": str(self.projects_folder),
             "projectname": self.projectname,
-            "darkmode": uistate.darkmode,
-            "showTimetable": uistate.project.showTimetable,
-            "showHeatmap": uistate.plot.showHeatmap,
+            "darkmode": self.uistate.darkmode,
+            "showTimetable": self.uistate.project.showTimetable,
+            "showHeatmap": self.uistate.plot.showHeatmap,
         }
         path = Path(self.bw_cfg_yaml)  # ensure Path
         path.parent.mkdir(parents=True, exist_ok=True)  # critical for XDG/portable
@@ -277,7 +262,7 @@ class ProjectMixin:
         if filename is None:
             filename = rec
         print(f"df2file: filename={filename}, key={key}")
-        if config.transient:
+        if self.config.transient:
             return
         self.dict_folders["cache"].mkdir(exist_ok=True)
         filetype = "parquet"
@@ -309,7 +294,7 @@ class ProjectMixin:
                 unique_project_name = "Project " + date + "(" + str(i) + ")"
             if not (self.projects_folder / unique_project_name).exists():
                 break  # Found a unique name, exit loop
-            if config.verbose:
+            if self.config.verbose:
                 print(f"*** {unique_project_name} already exists")
             i += 1
 
@@ -330,8 +315,8 @@ class ProjectMixin:
         return
 
     def clearProject(self):
-        uiplot.unPlot()  # all rec plots
-        uiplot.unPlotGroup()  # all group plots (all levels, full project clear)
+        self.uiplot.unPlot()  # all rec plots
+        self.uiplot.unPlotGroup()  # all group plots (all levels, full project clear)
         self.graphWipe()  # for good measure
 
     def renameProject(self):  # changes name of project folder and updates .cfg
@@ -339,7 +324,7 @@ class ProjectMixin:
         new_project_name = RenameDialog.showInputDialog(title="Rename project", query="")
         # check if ok
         if (self.projects_folder / new_project_name).exists():
-            if config.verbose:
+            if self.config.verbose:
                 print(f"Project name {new_project_name} already exists")
         elif re.match(r"^[a-zA-Z0-9_ -]+$", str(new_project_name)) is not None:  # True if valid filename
             dict_old = self.dict_folders
@@ -349,7 +334,7 @@ class ProjectMixin:
             if Path(dict_old["cache"]).exists():
                 dict_old["cache"].rename(self.dict_folders["cache"])
             self.write_bw_cfg()  # update boot-up-path in bw_cfg.yaml to new project folder
-            self.mainwindow.setWindowTitle(f"Brainwash {config.version} - {self.projectname}")
+            self.mainwindow.setWindowTitle(f"Brainwash {self.config.version} - {self.projectname}")
         else:
             print(f"Project name {new_project_name} is not a valid path.")
 
@@ -431,7 +416,7 @@ class ProjectMixin:
         self.df_project = self._migrate_hierarchy(self.df_project)
 
         self._backfill_sweep_hz()
-        uistate.load_cfg(self.dict_folders["project"], config.version)
+        self.uistate.load_cfg(self.dict_folders["project"], self.config.version)
         self.syncJournalExportMenu()
         self.tableUpdate(restore_selection=False)  # initial load; selection set by later tableProjSelectionChanged
         self.write_bw_cfg()
@@ -519,11 +504,11 @@ class ProjectMixin:
     def setupFolders(self):
         self.dict_folders = self.build_dict_folders()
         # DEBUG: clear cache and timepoints folders
-        if config.clear_cache:
+        if self.config.clear_cache:
             self.deleteFolder(self.dict_folders["cache"])
-        if config.clear_timepoints:
+        if self.config.clear_timepoints:
             self.deleteFolder(self.dict_folders["timepoints"])
-        if config.clear_project_folder:
+        if self.config.clear_project_folder:
             self.deleteFolder(self.dict_folders["project"])
         # Make sure the necessary folders exist
         if not os.path.exists(self.projects_folder):
@@ -535,10 +520,10 @@ class ProjectMixin:
 
     def setupToolBar(self):
         # apply viewstates for tool frames in the toolbar
-        for frame, (text, state) in list(uistate.project.viewTools.items()):
+        for frame, (text, state) in list(self.uistate.project.viewTools.items()):
             if hasattr(self, frame):
                 getattr(self, frame).setVisible(state)
-        self.frameToolFilter_sub_Savgol.setVisible(uistate.project.settings.get("filter", "voltage") == "savgol")
+        self.frameToolFilter_sub_Savgol.setVisible(self.uistate.project.settings.get("filter", "voltage") == "savgol")
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(self._is_io_mode())
         if hasattr(self, "frameToolTest"):
@@ -551,17 +536,17 @@ class ProjectMixin:
             "project": self.projects_folder / self.projectname,  # path to project folder
             "data": self.projects_folder / self.projectname / "data",  # path to project data subfolder
             "timepoints": self.projects_folder / self.projectname / "timepoints",  # path to project timepoints subfolder
-            "cache": self.projects_folder / f"cache {config.version}" / self.projectname,  # path to project cache subfolder
+            "cache": self.projects_folder / f"cache {self.config.version}" / self.projectname,  # path to project cache subfolder
         }
         return dict_folders
 
     def setSplitterSizes(self, *splitter_names):
-        """Set splitter sizes from persisted proportions in uistate.project.splitter.
+        """Set splitter sizes from persisted proportions in self.uistate.project.splitter.
         Moved here in Phase 5 polish (lifecycle/setup belongs with ProjectMixin).
         """
         for splitter_name in splitter_names:
             splitter = getattr(self, splitter_name)
-            proportions = uistate.project.splitter.get(splitter_name, [])
+            proportions = self.uistate.project.splitter.get(splitter_name, [])
             widgets = [splitter.widget(i) for i in range(splitter.count())]
             if len(proportions) != len(widgets):
                 continue

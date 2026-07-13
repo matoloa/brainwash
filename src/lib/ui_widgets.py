@@ -3,14 +3,7 @@
 # from ui.py (Phase 0 of ui mixin extraction plan).
 #
 # These are mostly UI building blocks used by UIsub and some mixins.
-# Some (CustomCheckBox, InputDialogPopup, confirm, etc.) are injected into
-# mixins via the same singleton pattern used for uistate/config/uiplot.
-#
-# Module-level singletons (for threads etc. that need uistate):
-#   import ui_widgets
-#   ui_widgets.uistate = uistate
-#   ui_widgets.config = config
-#   etc. (done in ui.py after definition)
+# Threads receive uistate/uiplot via constructor; mixins import widgets directly.
 
 from __future__ import annotations
 
@@ -25,11 +18,6 @@ from pathlib import Path
 import pandas as pd
 import toml
 from PyQt5 import QtCore, QtGui, QtWidgets
-
-# Module-level singletons (injected by ui.py, like the mixins)
-uistate = None
-config = None
-uiplot = None
 
 # Matplotlib (only for MplCanvas)
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -252,9 +240,7 @@ class FileTreeSelectorModel(QtWidgets.QFileSystemModel):  # Paired with a FileTr
         return QtWidgets.QFileSystemModel.setData(self, index, value, role)
 
     def traverseDirectory(self, parentindex, callback=None):
-        verbose = getattr(config, "verbose", False) if config is not None else False
-        if verbose:
-            print("traverseDirectory():")
+        logger.debug("traverseDirectory()")
         callback(parentindex)
         if self.hasChildren(parentindex):
             path = self.filePath(parentindex)
@@ -400,8 +386,8 @@ class ParseDataThread(QtCore.QThread):
                 recording_name = df_proj_row["recording_name"]
                 source_path = df_proj_row["path"]
                 self.progress.emit(i)
-                split_odd_even = uistate.project.checkBox.get("splitOddEven", False)
-                split_at_time = uistate.project.lineEdit.get("split_at_time", 0) or None
+                split_odd_even = self.uisub.uistate.project.checkBox.get("splitOddEven", False)
+                split_at_time = self.uisub.uistate.project.lineEdit.get("split_at_time", 0) or None
 
                 def _sub_progress_callback(idx, total):
                     self.sub_progress.emit(idx, total)
@@ -411,7 +397,7 @@ class ParseDataThread(QtCore.QThread):
 
                 dict_dfs_raw = parse.source2dfs(
                     source=source_path,
-                    gain=uistate.project.lineEdit["import_gain"],
+                    gain=self.uisub.uistate.project.lineEdit["import_gain"],
                     split_odd_even=split_odd_even,
                     split_at_time=split_at_time,
                     progress_callback=_sub_progress_callback,
@@ -477,7 +463,7 @@ class graphPreloadThread(QtCore.QThread):
                 print("graphPreloadThread.run: calling get_dffilter")
                 _ = self.uisub.get_dffilter(row=p_row)
                 print("graphPreloadThread.run: calling get_dfoutput")
-                is_pp = getattr(self.uistate, "experiment_type", "time") == "PP"
+                is_pp = self.uistate.experiment.experiment_type == "PP"
                 if self.uistate.project.checkBox["paired_stims"] and not is_pp:
                     dfoutput = self.uisub.get_dfdiff(row=p_row)
                 else:

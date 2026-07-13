@@ -2,16 +2,7 @@
 # SweepOpsMixin — sweep editing operations extracted from UIsub (Phase 5 refactor).
 # These methods handle sweep selection validation, removal, reordering, and splitting.
 #
-# Module-level singletons are injected by ui.py at startup (after all
-# singletons and widget classes are created but before any UIsub instance
-# is constructed):
-#
-#   import ui_sweep_ops
-#   ui_sweep_ops.uistate = uistate
-#   ui_sweep_ops.config  = config
-#   ui_sweep_ops.uiplot  = uiplot
-#   ui_sweep_ops.confirm = confirm
-#   ui_sweep_ops.InputDialogPopup = InputDialogPopup
+# Uses self.uistate / self.config / self.uiplot on UIsub (see ui.py).
 
 from __future__ import annotations
 
@@ -20,14 +11,7 @@ import uuid
 import numpy as np
 import pandas as pd
 import parse
-
-# ---------------------------------------------------------------------------
-# Injected singletons — set by ui.py before any UIsub instance is created.
-# ---------------------------------------------------------------------------
-uistate = None  # type: ignore[assignment]
-config = None  # type: ignore[assignment]
-uiplot = None  # type: ignore[assignment]
-confirm = None  # type: ignore[assignment]
+from ui_widgets import InputDialogPopup, confirm
 
 
 class SweepOpsMixin:
@@ -38,21 +22,21 @@ class SweepOpsMixin:
     # ------------------------------------------------------------------
 
     def sweepsSelect(self, even: bool):
-        if uistate.project.checkBox["EPSP_slope"]:
-            ax = uistate.plot.ax2
+        if self.uistate.project.checkBox["EPSP_slope"]:
+            ax = self.uistate.plot.ax2
         else:
-            ax = uistate.plot.ax1
-        uiplot.xDeselect(ax, reset=True)
-        if len(uistate.plot.list_idx_select_recs) == 0:
+            ax = self.uistate.plot.ax1
+        self.uiplot.xDeselect(ax, reset=True)
+        if len(self.uistate.plot.list_idx_select_recs) == 0:
             return
         self.lineEdit_sweeps_range_from.setText("Even" if even else "Odd")
         self.lineEdit_sweeps_range_to.setText("")
         prow = self.get_prow()
         total_sweeps = prow["sweeps"]
         selected = {i for i in range(total_sweeps) if (i % 2 == 0) == even}
-        uistate.plot.x_select["output"] = selected
+        self.uistate.plot.x_select["output"] = selected
         print(f"Selected all {'even' if even else 'odd'}: {len(selected)} sweeps.")
-        uiplot.update_axe_mean()
+        self.uiplot.update_axe_mean()
 
     # ------------------------------------------------------------------
     # Trigger slots (wired to menu / toolbar actions)
@@ -87,25 +71,25 @@ class SweepOpsMixin:
     # ------------------------------------------------------------------
 
     def sweep_selection_valid(self):
-        n_recs = len(uistate.plot.list_idx_select_recs)
-        n_sweeps = len(uistate.plot.x_select["output"])
+        n_recs = len(self.uistate.plot.list_idx_select_recs)
+        n_sweeps = len(self.uistate.plot.x_select["output"])
         if not n_recs:
             print("No recordings selected")
             return False
-        print(f"{n_recs} selected recording{'s' if n_recs != 1 else ''}: {uistate.plot.list_idx_select_recs}")
+        print(f"{n_recs} selected recording{'s' if n_recs != 1 else ''}: {self.uistate.plot.list_idx_select_recs}")
         if not n_sweeps:
             print("No sweeps selected")
             return False
-        print(f"{n_sweeps} selected sweep{'s' if n_sweeps != 1 else ''}: {uistate.plot.x_select['output']}")
+        print(f"{n_sweeps} selected sweep{'s' if n_sweeps != 1 else ''}: {self.uistate.plot.x_select['output']}")
         return True
 
     def sweep_removal_valid_confirmed(self):
         if not self.sweep_selection_valid():
             return False
         # Confirm with the user before performing destructive removal across recordings
-        selected_sweeps = uistate.plot.x_select.get("output") if isinstance(uistate.plot.x_select, dict) else None
+        selected_sweeps = self.uistate.plot.x_select.get("output") if isinstance(self.uistate.plot.x_select, dict) else None
         n_sweeps = len(selected_sweeps) if selected_sweeps else 0
-        n_recs = len(uistate.plot.list_idx_select_recs)
+        n_recs = len(self.uistate.plot.list_idx_select_recs)
         title = "Remove sweeps"
         message = (
             f"Remove {n_sweeps} selected sweep{'s' if n_sweeps != 1 else ''}\n"
@@ -139,7 +123,7 @@ class SweepOpsMixin:
         """
         self.usage("data_remove_sweeps_by_ID")
         p_row = self.df_project[self.df_project["ID"] == rec_ID].iloc[0]
-        set_sweeps_to_remove = selection if selection is not None else uistate.plot.x_select["output"]
+        set_sweeps_to_remove = selection if selection is not None else self.uistate.plot.x_select["output"]
         rec_name = p_row["recording_name"]
         df_data_copy = self.get_dfdata(p_row).copy()
         # check that selected sweeps exist in df_data
@@ -175,7 +159,7 @@ class SweepOpsMixin:
         for old_file in [old_timepoints, old_mean, old_filter, old_bin, old_output]:
             if old_file.exists():
                 old_file.unlink()
-                if config.verbose:
+                if self.config.verbose:
                     print(f"Deleted cache file: {old_file}")
         return
 
@@ -184,21 +168,21 @@ class SweepOpsMixin:
         if not self.sweep_selection_valid():
             return
         n_sweeps_all = 0
-        for rec_idx in uistate.plot.list_idx_select_recs:  # get all sweeps from the longest selected recording
+        for rec_idx in self.uistate.plot.list_idx_select_recs:  # get all sweeps from the longest selected recording
             p_row = self.df_project.iloc[rec_idx]
             n_sweeps = p_row["sweeps"]
             if n_sweeps > n_sweeps_all:
                 n_sweeps_all = n_sweeps
         print(f"sweep_keep_selected: longest selected recording has {n_sweeps_all} sweep{'s' if n_sweeps_all != 1 else ''}.")
-        set_sweeps_to_remove = uistate.plot.x_select["output"]  # get selected sweeps
-        uistate.plot.x_select["output"] = set(range(n_sweeps_all)) - set_sweeps_to_remove  # inverse selection
+        set_sweeps_to_remove = self.uistate.plot.x_select["output"]  # get selected sweeps
+        self.uistate.plot.x_select["output"] = set(range(n_sweeps_all)) - set_sweeps_to_remove  # inverse selection
         self.sweep_remove_selected()  # removes inverted selection and clears selection
 
     def sweep_remove_selected(self):
         # for each selected recording, remove selected sweeps, if they exist, and shift remaining sweep numbers to close gaps
         if not self.sweep_removal_valid_confirmed():
             return
-        for rec_idx in uistate.plot.list_idx_select_recs:
+        for rec_idx in self.uistate.plot.list_idx_select_recs:
             rec_ID = self.df_project.at[rec_idx, "ID"]
             self.sweep_remove_by_ID(rec_ID)
         self.sweep_unselect()
@@ -207,8 +191,8 @@ class SweepOpsMixin:
 
     def sweep_unselect(self):
         # clear selections and recalculate outputs
-        uistate.plot.list_idx_select_recs = []  # clear uistate selection list
-        uiplot.xDeselect(ax=uistate.plot.ax1, reset=True)  # clear sweep selection: resets uistate.plot.x_select
+        self.uistate.plot.list_idx_select_recs = []  # clear uistate selection list
+        self.uiplot.xDeselect(ax=self.uistate.plot.ax1, reset=True)  # clear sweep selection: resets self.uistate.plot.x_select
         self.lineEdit_sweeps_range_from.setText("")  # clear lineEdits
         self.lineEdit_sweeps_range_to.setText("")
         self.tableProj.clearSelection()  # clear visual effect of df_project selection
@@ -218,16 +202,16 @@ class SweepOpsMixin:
             return
 
         n_sweeps_all = 0
-        for rec_idx in uistate.plot.list_idx_select_recs:
+        for rec_idx in self.uistate.plot.list_idx_select_recs:
             p_row = self.df_project.iloc[rec_idx]
             n_sweeps = p_row["sweeps"]
             if n_sweeps > n_sweeps_all:
                 n_sweeps_all = n_sweeps
 
-        selected_sweeps = uistate.plot.x_select["output"]
+        selected_sweeps = self.uistate.plot.x_select["output"]
         other_sweeps = set(range(n_sweeps_all)) - selected_sweeps
         n_sweeps = len(selected_sweeps)
-        n_recs = len(uistate.plot.list_idx_select_recs)
+        n_recs = len(self.uistate.plot.list_idx_select_recs)
         title = "Split sweeps by selection"
         message = (
             f"Split {n_recs} selected recording{'s' if n_recs != 1 else ''}\n"
@@ -241,7 +225,7 @@ class SweepOpsMixin:
         # copy original df_project for loop: self.df_project will be modified
         original_df_project = self.get_df_project().copy()
 
-        for rec_idx in uistate.plot.list_idx_select_recs:
+        for rec_idx in self.uistate.plot.list_idx_select_recs:
             source_row = original_df_project.iloc[rec_idx]
             source_name = source_row["recording_name"]
             rec_A = source_name + "_A"
@@ -291,7 +275,7 @@ class SweepOpsMixin:
                 self._clear_rec_cache(rec_name)
 
             self.save_df_project()
-            uiplot.unPlot(source_row["ID"])
+            self.uiplot.unPlot(source_row["ID"])
             row_A = self.df_project[self.df_project["ID"] == source_row["ID"]].iloc[0]
             row_B = self.df_project[self.df_project["recording_name"] == rec_B].iloc[0]
             self.graphUpdate(row=row_A)
@@ -313,8 +297,8 @@ class SweepOpsMixin:
         which is only meaningful for split — callers that need a range must
         check that end_s is not None themselves.
         """
-        mean_start = uistate.plot.x_select.get("mean_start")
-        mean_end = uistate.plot.x_select.get("mean_end")
+        mean_start = self.uistate.plot.x_select.get("mean_start")
+        mean_end = self.uistate.plot.x_select.get("mean_end")
         if not mean_start:
             print("time_selection_valid: no time selection on mean graph.")
             return None
@@ -360,7 +344,7 @@ class SweepOpsMixin:
 
         Requires mean_start and mean_end to both be set.
         """
-        if not uistate.plot.list_idx_select_recs:
+        if not self.uistate.plot.list_idx_select_recs:
             print("time_keep_selected: no recordings selected.")
             return
         sel = self._time_selection_valid()
@@ -371,7 +355,7 @@ class SweepOpsMixin:
             print("time_keep_selected: a time range (start and end) is required.")
             return
 
-        n_recs = len(uistate.plot.list_idx_select_recs)
+        n_recs = len(self.uistate.plot.list_idx_select_recs)
         dur_ms = round((end_s - start_s) * 1000)
         if not confirm(
             title="Keep only selected time",
@@ -385,7 +369,7 @@ class SweepOpsMixin:
             print("time_keep_selected: cancelled by user.")
             return
 
-        for rec_idx in uistate.plot.list_idx_select_recs:
+        for rec_idx in self.uistate.plot.list_idx_select_recs:
             rec_ID = self.df_project.at[rec_idx, "ID"]
             self.time_crop_by_ID(rec_ID, keep_start_s=start_s, keep_end_s=end_s)
 
@@ -399,7 +383,7 @@ class SweepOpsMixin:
         fragments are concatenated per sweep with the second fragment
         re-zeroed so time is continuous from 0.
         """
-        if not uistate.plot.list_idx_select_recs:
+        if not self.uistate.plot.list_idx_select_recs:
             print("time_discard_selected: no recordings selected.")
             return
         sel = self._time_selection_valid()
@@ -410,7 +394,7 @@ class SweepOpsMixin:
             print("time_discard_selected: a time range (start and end) is required.")
             return
 
-        n_recs = len(uistate.plot.list_idx_select_recs)
+        n_recs = len(self.uistate.plot.list_idx_select_recs)
         dur_ms = round((end_s - start_s) * 1000)
         if not confirm(
             title="Discard selected time",
@@ -424,7 +408,7 @@ class SweepOpsMixin:
             print("time_discard_selected: cancelled by user.")
             return
 
-        for rec_idx in uistate.plot.list_idx_select_recs:
+        for rec_idx in self.uistate.plot.list_idx_select_recs:
             rec_ID = self.df_project.at[rec_idx, "ID"]
             p_row = self.df_project[self.df_project["ID"] == rec_ID].iloc[0]
             rec_name = p_row["recording_name"]
@@ -510,18 +494,18 @@ class SweepOpsMixin:
             p = self.dict_folders["cache"] / (rec_name + suffix)
             if p.exists():
                 p.unlink()
-                if config.verbose:
+                if self.config.verbose:
                     print(f"Deleted cache file: {p}")
         tp = self.dict_folders["timepoints"] / (rec_name + ".parquet")
         if tp.exists():
             tp.unlink()
-            if config.verbose:
+            if self.config.verbose:
                 print(f"Deleted cache file: {tp}")
 
     def sweep_split_by_time(self):
         """Split each selected recording at a within-sweep time point (ms).
 
-        If ``uistate.plot.x_select["mean_start"]`` is set and non-zero the value is
+        If ``self.uistate.plot.x_select["mean_start"]`` is set and non-zero the value is
         used directly (it is already in seconds).  Otherwise the user is
         prompted for a split time in milliseconds.
 
@@ -542,12 +526,12 @@ class SweepOpsMixin:
         parquet is a working copy made at import time, not the original raw
         file, so mutating it is correct.
         """
-        if not uistate.plot.list_idx_select_recs:
+        if not self.uistate.plot.list_idx_select_recs:
             print("sweep_split_by_time: no recordings selected.")
             return
 
         # --- Resolve split time: use mean_start if set, else ask ---
-        mean_start = uistate.plot.x_select.get("mean_start")
+        mean_start = self.uistate.plot.x_select.get("mean_start")
         if mean_start is not None and mean_start != 0:
             split_s = float(mean_start)
             print(f"sweep_split_by_time: using mean_start = {split_s} s")
@@ -572,10 +556,10 @@ class SweepOpsMixin:
             split_s = split_ms / 1000.0
 
         # --- Build confirmation message ---
-        n_recs = len(uistate.plot.list_idx_select_recs)
+        n_recs = len(self.uistate.plot.list_idx_select_recs)
         split_ms = split_s * 1000.0
         # Derive sweep duration from the first selected recording for the summary.
-        first_row = self.get_df_project().iloc[uistate.plot.list_idx_select_recs[0]]
+        first_row = self.get_df_project().iloc[self.uistate.plot.list_idx_select_recs[0]]
         sweep_duration = first_row.get("sweep_duration")
         try:
             sweep_duration = float(sweep_duration)
@@ -603,7 +587,7 @@ class SweepOpsMixin:
 
         original_df_project = self.get_df_project().copy()
 
-        for rec_idx in uistate.plot.list_idx_select_recs:
+        for rec_idx in self.uistate.plot.list_idx_select_recs:
             source_row = original_df_project.iloc[rec_idx]
             source_name = source_row["recording_name"]
 
@@ -677,7 +661,7 @@ class SweepOpsMixin:
             self._clear_rec_cache(rec_b)
 
             self.save_df_project()
-            uiplot.unPlot(source_row["ID"])
+            self.uiplot.unPlot(source_row["ID"])
             row_a = self.df_project[self.df_project["ID"] == source_row["ID"]].iloc[0]
             row_b = self.df_project[self.df_project["recording_name"] == rec_b].iloc[0]
             self.graphUpdate(row=row_a)

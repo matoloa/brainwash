@@ -27,8 +27,11 @@
 | 09 | [ui_refactor/09_selection_injection.md](ui_refactor/09_selection_injection.md) | ✅ done |
 | 10 | [ui_refactor/10_data_frames_injection.md](ui_refactor/10_data_frames_injection.md) | ✅ done |
 | 11 | [ui_refactor/11_host_protocols.md](ui_refactor/11_host_protocols.md) | ✅ done |
+| 12 | [ui_refactor/12_remaining_injection.md](ui_refactor/12_remaining_injection.md) | ✅ done |
 
 After each PR: mark card ✅ in this table, set **NEXT** on the following row.
+
+**NEXT (human)**: UIplot model/view split — see [plan_modularity_ui_testing_evaluation.md](plan_modularity_ui_testing_evaluation.md) Tier B4.
 
 ## Shared docs (read on demand)
 

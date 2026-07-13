@@ -3,14 +3,14 @@
 # Owns both the Export menu item wiring (previously in ui_menus.py) and
 # the trigger/implementation methods for all export actions.
 #
-# Module-level singletons are injected by ui.py at startup (after all
+# Uses self.uistate / self.config / self.uiplot on UIsub (see ui.py).
 # singletons and widget classes are created but before any UIsub instance
 # is constructed):
 #
 #   import export_data
 #   export_data.uistate = uistate
 #   export_data.config  = config
-#   export_data.uiplot  = uiplot
+#   export_data.uiplot  = self.uiplot
 
 from __future__ import annotations
 
@@ -19,12 +19,7 @@ import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
 # ---------------------------------------------------------------------------
-# Injected singletons — set by ui.py before any UIsub instance is created.
-# ---------------------------------------------------------------------------
-uistate = None  # type: ignore[assignment]
-config = None  # type: ignore[assignment]
-uiplot = None  # type: ignore[assignment]
-
+# Uses self.uistate / self.config / self.uiplot on UIsub (see ui.py).
 
 class ExportMixin:
     """Mixin that provides all export trigger methods for UIsub.
@@ -36,7 +31,7 @@ class ExportMixin:
         print(msg)
 
     def _require_selection(self) -> list[pd.Series] | None:
-        if not uistate.plot.list_idx_select_recs:
+        if not self.uistate.plot.list_idx_select_recs:
             QtWidgets.QMessageBox.warning(
                 None,
                 "Export Error",
@@ -46,7 +41,7 @@ class ExportMixin:
 
         selected_rows = []
         df_project = self.get_df_project()
-        for idx in uistate.plot.list_idx_select_recs:
+        for idx in self.uistate.plot.list_idx_select_recs:
             if idx in df_project.index:
                 selected_rows.append(df_project.loc[idx])
 
@@ -165,7 +160,7 @@ class ExportMixin:
         dfs = []
         for gid, ginfo in dd_groups.items():
             group_name = ginfo.get("group_name", str(gid))
-            uist = getattr(self, "uistate", None) or globals().get("uistate", None)
+            uist = self.uistate
             level = getattr(uist, "buttonGroup_test_n", "recording") if uist else "recording"
             df_mean = self.get_dfgroupmean(gid, level=level)
             if df_mean is not None and not df_mean.empty:
@@ -203,7 +198,7 @@ class ExportMixin:
         if hasattr(self, "tableProj"):
             self.tableProj.clearSelection()
 
-        selected_groups = list(set(str(info["group_ID"]) for info in uistate.plot.dict_group_show.values()))
+        selected_groups = list(set(str(info["group_ID"]) for info in self.uistate.plot.dict_group_show.values()))
 
         if not selected_groups:
             QtWidgets.QMessageBox.warning(
@@ -224,7 +219,7 @@ class ExportMixin:
 
         group_names = {str(gid): ginfo.get("group_name", str(gid)) for gid, ginfo in getattr(self, "dd_groups", {}).items()}
 
-        figures = export_image.render_publication_figure(uistate, uiplot, template, selected_groups, group_names)
+        figures = export_image.render_publication_figure(self.uistate, self.uiplot, template, selected_groups, group_names)
 
         if not figures:
             QtWidgets.QMessageBox.warning(
@@ -243,7 +238,7 @@ class ExportMixin:
             fig.savefig(out_path_png, dpi=template.dpi, bbox_inches="tight")
 
             # Phase 0: minimal .md with "text" (final typewriter in export_data per plan)
-            figure_text_md = export_image.build_figure_text_md(uistate, template, group_names)
+            figure_text_md = export_image.build_figure_text_md(self.uistate, template, group_names)
             out_path_md = out_path_png.with_suffix(".md")
             out_path_md.write_text(figure_text_md, encoding="utf-8")
             print(f"Saved figure text: {out_path_md}")

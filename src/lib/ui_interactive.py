@@ -9,10 +9,6 @@ from lib import ui_plot
 
 logger = logging.getLogger(__name__)
 
-uistate = None
-config = None
-uiplot = None
-
 
 class InteractivePlotMixin:
     #####################################################
@@ -21,58 +17,58 @@ class InteractivePlotMixin:
 
     def graphClicked(self, event, canvas):  # graph click event
         if event.button == 2:  # middle click, reset zoom on the clicked graph
-            if canvas == self.canvasOutput and uistate.plot.ax1 is not None:
-                if not uistate.plot.list_idx_select_recs:
+            if canvas == self.canvasOutput and self.uistate.plot.ax1 is not None:
+                if not self.uistate.plot.list_idx_select_recs:
                     # Groups visible on ax1/ax2 with no single recording selected: fit from current groups
                     self._fit_output_zoom_to_groups()
-                self.zoomReset(uistate.plot.ax1)
-            elif uistate.plot.list_idx_select_recs:
-                if canvas == self.canvasMean and uistate.plot.axm is not None:
-                    self.zoomReset(uistate.plot.axm)
-                elif canvas == self.canvasEvent and uistate.plot.axe is not None:
-                    self.zoomReset(uistate.plot.axe)
+                self.zoomReset(self.uistate.plot.ax1)
+            elif self.uistate.plot.list_idx_select_recs:
+                if canvas == self.canvasMean and self.uistate.plot.axm is not None:
+                    self.zoomReset(self.uistate.plot.axm)
+                elif canvas == self.canvasEvent and self.uistate.plot.axe is not None:
+                    self.zoomReset(self.uistate.plot.axe)
             return
-        if not uistate.plot.list_idx_select_recs:  # no recording selected; do nothing for other interactions
+        if not self.uistate.plot.list_idx_select_recs:  # no recording selected; do nothing for other interactions
             return
         x = event.xdata
         if x is None:  # clicked outside graph; do nothing
             return
         self.usage("graphClicked")
         if event.button == 3:  # right click, deselect
-            if uistate.plot.dragging:
+            if self.uistate.plot.dragging:
                 return
             self.mouse_drag = None
             self.mouse_release = None
-            uistate.plot.x_drag = None
+            self.uistate.plot.x_drag = None
             # Clear texts + selection state immediately (lightweight) for responsive feel and
             # so that any immediate readers (tagging etc.) see the cleared range.
             # Defer the artist removes (xDeselect + clear_axe + testset spans) + stim buttons + draws.
             if canvas == self.canvasMean:
                 self.lineEdit_mean_selection_start.setText("")
                 self.lineEdit_mean_selection_end.setText("")
-                uistate.plot.x_select["mean_start"] = None
-                uistate.plot.x_select["mean_end"] = None
+                self.uistate.plot.x_select["mean_start"] = None
+                self.uistate.plot.x_select["mean_end"] = None
             else:
                 self.lineEdit_sweeps_range_from.setText("")
                 self.lineEdit_sweeps_range_to.setText("")
-                uistate.plot.x_select["output"] = set()
-                uistate.plot.x_select["output_start"] = None
-                uistate.plot.x_select["output_end"] = None
+                self.uistate.plot.x_select["output"] = set()
+                self.uistate.plot.x_select["output_start"] = None
+                self.uistate.plot.x_select["output_end"] = None
             QtCore.QTimer.singleShot(0, lambda c=canvas: self._finalize_deselect(c))
             return
 
         # left clicked on a graph
-        uistate.plot.dragging = True
+        self.uistate.plot.dragging = True
         prow = self.get_prow()
         if prow is None:
-            uistate.plot.dragging = False
+            self.uistate.plot.dragging = False
             return
 
         if (
-            (canvas == self.canvasEvent) and (len(uistate.plot.list_idx_select_recs) == 1) and (len(uistate.plot.list_idx_select_stims) == 1)
+            (canvas == self.canvasEvent) and (len(self.uistate.plot.list_idx_select_recs) == 1) and (len(self.uistate.plot.list_idx_select_stims) == 1)
         ):  # Event canvas left-clicked with just one rec and stim selected, middle graph: editing detected events
-            uistate.plot.dft_temp = self.get_dft(prow).copy()
-            trow = uistate.plot.dft_temp.loc[uistate.plot.list_idx_select_stims[0]]
+            self.uistate.plot.dft_temp = self.get_dft(prow).copy()
+            trow = self.uistate.plot.dft_temp.loc[self.uistate.plot.list_idx_select_stims[0]]
             rec_filter = prow["filter"]
             rec_name = prow["recording_name"]
             if rec_filter != "voltage":
@@ -80,14 +76,14 @@ class InteractivePlotMixin:
             else:
                 label_core = rec_name
             label = f"{label_core} - stim {trow['stim']}"
-            dict_event = uistate.plot.dict_rec_labels[label]
+            dict_event = self.uistate.plot.dict_rec_labels[label]
             data_x = dict_event["line"].get_xdata()
             data_y = dict_event["line"].get_ydata()
-            uistate.plot.x_on_click = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
-            # print(f"uistate.plot.x_on_click: {uistate.plot.x_on_click}")
+            self.uistate.plot.x_on_click = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
+            # print(f"self.uistate.plot.x_on_click: {self.uistate.plot.x_on_click}")
             if event.inaxes is not None:
-                if (event.button == 1 or event.button == 3) and (uistate.plot.mouseover_action is not None):
-                    action = uistate.plot.mouseover_action
+                if (event.button == 1 or event.button == 3) and (self.uistate.plot.mouseover_action is not None):
+                    action = self.uistate.plot.mouseover_action
                     # print(f"mouseover action: {action}")
                     if action.startswith("EPSP slope"):
                         start, end = (
@@ -125,25 +121,25 @@ class InteractivePlotMixin:
                     )
 
         elif canvas == self.canvasMean:  # Mean canvas (top graph) left-clicked: overview and selecting ranges for finding relevant stims
-            if uistate.plot.mean_mouseover_stim_select is not None:
-                uistate.plot.dragging = False
+            if self.uistate.plot.mean_mouseover_stim_select is not None:
+                self.uistate.plot.dragging = False
                 self.stimSelectionChanged()
                 return
             dfmean = self.get_dfmean(prow)  # Required for event dragging, x and y
             time_values = dfmean["time"].values
-            uistate.plot.x_on_click = time_values[np.abs(time_values - x).argmin()]
-            uistate.plot.x_select["mean_start"] = uistate.plot.x_on_click
-            self.lineEdit_mean_selection_start.setText(f"{uistate.plot.x_select['mean_start'] * 1000:g}")
+            self.uistate.plot.x_on_click = time_values[np.abs(time_values - x).argmin()]
+            self.uistate.plot.x_select["mean_start"] = self.uistate.plot.x_on_click
+            self.lineEdit_mean_selection_start.setText(f"{self.uistate.plot.x_select['mean_start'] * 1000:g}")
             self.update_stim_buttons()
             self.connectDragRelease(x_range=time_values, rec_ID=prow["ID"], graph="mean")
         elif canvas == self.canvasOutput:  # Output canvas (bottom graph) left-clicked: click and drag to select specific sweeps
-            if uistate.experiment.experiment_type == "io":
-                uistate.plot.dragging = False
+            if self.uistate.experiment.experiment_type == "io":
+                self.uistate.plot.dragging = False
                 return
             sweep_numbers = list(range(0, int(prow["sweeps"])))
-            uistate.plot.x_on_click = sweep_numbers[np.abs(sweep_numbers - x).argmin()]
-            uistate.plot.x_select["output_start"] = uistate.plot.x_on_click
-            self.lineEdit_sweeps_range_from.setText(str(uistate.plot.x_on_click))
+            self.uistate.plot.x_on_click = sweep_numbers[np.abs(sweep_numbers - x).argmin()]
+            self.uistate.plot.x_select["output_start"] = self.uistate.plot.x_on_click
+            self.lineEdit_sweeps_range_from.setText(str(self.uistate.plot.x_on_click))
             self.connectDragRelease(x_range=sweep_numbers, rec_ID=prow["ID"], graph="output")
 
     # pyqtSlot decorators
@@ -153,8 +149,8 @@ class InteractivePlotMixin:
         y = event.ydata
         if x is None or y is None:
             return
-        uistate.plot.mean_mouseover_stim_select = None  # Always clear on movement initially
-        dft = uistate.plot.df_rec_select_time
+        self.uistate.plot.mean_mouseover_stim_select = None  # Always clear on movement initially
+        dft = self.uistate.plot.df_rec_select_time
         if dft is None or dft.empty:
             # print("No single recording selected with timepoints to mouseover.")
             return
@@ -173,33 +169,33 @@ class InteractivePlotMixin:
         else:
             label_core = rec_name
 
-        axm = uistate.plot.axm
-        uistate.plot.mean_mouseover_stim_select = None  # name of stim that will be selected if clicked
-        uistate.plot.mean_stim_x_ranges = {}  # dict: stim_num: (x_start, x_end)
+        axm = self.uistate.plot.axm
+        self.uistate.plot.mean_mouseover_stim_select = None  # name of stim that will be selected if clicked
+        self.uistate.plot.mean_stim_x_ranges = {}  # dict: stim_num: (x_start, x_end)
         # Margins are set pixel-based by _recalc_axm_detection_zones; recompute
         # here only as a fallback when they have not been initialised yet.
-        if uistate.plot.mean_x_margin is None or uistate.plot.mean_y_margin is None:
-            uistate.setMarginsAxm(axm=axm, pixels=ui_plot.STIM_MARKER_SIZE // 2 + 5)
+        if self.uistate.plot.mean_x_margin is None or self.uistate.plot.mean_y_margin is None:
+            self.uistate.setMarginsAxm(axm=axm, pixels=ui_plot.STIM_MARKER_SIZE // 2 + 5)
         y_range = (
-            -uistate.plot.mean_y_margin,
-            uistate.plot.mean_y_margin,
+            -self.uistate.plot.mean_y_margin,
+            self.uistate.plot.mean_y_margin,
         )  # stim markers should be at y~0
 
         # build detection zones for each stim
         for row in dft.itertuples(index=False):
             stim = row.stim
             t_stim = row.t_stim
-            x_range = t_stim - uistate.plot.mean_x_margin, t_stim + uistate.plot.mean_x_margin
-            uistate.plot.mean_stim_x_ranges[stim] = x_range
+            x_range = t_stim - self.uistate.plot.mean_x_margin, t_stim + self.uistate.plot.mean_x_margin
+            self.uistate.plot.mean_stim_x_ranges[stim] = x_range
         # check if mouse is within any of the stim zones
-        for stim, x_range in uistate.plot.mean_stim_x_ranges.items():
+        for stim, x_range in self.uistate.plot.mean_stim_x_ranges.items():
             if x_range[0] <= x <= x_range[1] and y_range[0] <= y <= y_range[1]:
-                uistate.plot.mean_mouseover_stim_select = stim
-                # print(f"meanMouseover of {uistate.plot.mean_mouseover_stim_select}: x={x}, y={y}")
+                self.uistate.plot.mean_mouseover_stim_select = stim
+                # print(f"meanMouseover of {self.uistate.plot.mean_mouseover_stim_select}: x={x}, y={y}")
                 # find corresponding selection marker:
                 stim_str = f"- stim {stim}"
                 label = f"mean {label_core} {stim_str} marker"
-                stim_marker = uistate.plot.dict_rec_labels.get(label)
+                stim_marker = self.uistate.plot.dict_rec_labels.get(label)
                 # print(f"{label}: {stim_marker}")
                 # zorder mouseovered marker to top, alpha 1
                 if stim_marker is not None:
@@ -211,7 +207,7 @@ class InteractivePlotMixin:
                 # reset all stim markers to default zorder and alpha
                 stim_str = f"- stim {stim}"
                 label = f"mean {label_core} {stim_str} marker"
-                stim_marker = uistate.plot.dict_rec_labels.get(label)
+                stim_marker = self.uistate.plot.dict_rec_labels.get(label)
                 if stim_marker is not None:
                     stim_marker_line = stim_marker.get("line")
                     stim_marker_line.set_zorder(0)
@@ -220,9 +216,9 @@ class InteractivePlotMixin:
         axm.figure.canvas.draw_idle()
 
     def eventMouseover(self, event):  # determine which event is being mouseovered
-        if uistate.plot.df_rec_select_data is None:  # no single recording/stim combo selected
+        if self.uistate.plot.df_rec_select_data is None:  # no single recording/stim combo selected
             return
-        axe = uistate.plot.axe
+        axe = self.uistate.plot.axe
 
         def plotMouseover(action, axe):
             alpha = 0.8
@@ -230,34 +226,34 @@ class InteractivePlotMixin:
             if "slope" in action:
                 if "EPSP" in action:
                     x_range = (
-                        uistate.EPSP_slope_start_xy[0],
-                        uistate.EPSP_slope_end_xy[0],
+                        self.uistate.EPSP_slope_start_xy[0],
+                        self.uistate.EPSP_slope_end_xy[0],
                     )
                     y_range = (
-                        uistate.EPSP_slope_start_xy[1],
-                        uistate.EPSP_slope_end_xy[1],
+                        self.uistate.EPSP_slope_start_xy[1],
+                        self.uistate.EPSP_slope_end_xy[1],
                     )
-                    color = uistate.project.settings["rgb_EPSP_slope"]
+                    color = self.uistate.project.settings["rgb_EPSP_slope"]
                 elif "volley" in action:
                     x_range = (
-                        uistate.volley_slope_start_xy[0],
-                        uistate.volley_slope_end_xy[0],
+                        self.uistate.volley_slope_start_xy[0],
+                        self.uistate.volley_slope_end_xy[0],
                     )
                     y_range = (
-                        uistate.volley_slope_start_xy[1],
-                        uistate.volley_slope_end_xy[1],
+                        self.uistate.volley_slope_start_xy[1],
+                        self.uistate.volley_slope_end_xy[1],
                     )
-                    color = uistate.project.settings["rgb_volley_slope"]
+                    color = self.uistate.project.settings["rgb_volley_slope"]
 
-                if uistate.plot.mouseover_blob is None:
-                    uistate.plot.mouseover_blob = axe.scatter(x_range[1], y_range[1], color=color, s=100, alpha=alpha)
+                if self.uistate.plot.mouseover_blob is None:
+                    self.uistate.plot.mouseover_blob = axe.scatter(x_range[1], y_range[1], color=color, s=100, alpha=alpha)
                 else:
-                    uistate.plot.mouseover_blob.set_offsets([x_range[1], y_range[1]])
-                    uistate.plot.mouseover_blob.set_sizes([100])
-                    uistate.plot.mouseover_blob.set_color(color)
+                    self.uistate.plot.mouseover_blob.set_offsets([x_range[1], y_range[1]])
+                    self.uistate.plot.mouseover_blob.set_sizes([100])
+                    self.uistate.plot.mouseover_blob.set_color(color)
 
-                if uistate.plot.mouseover_plot is None:
-                    uistate.plot.mouseover_plot = axe.plot(
+                if self.uistate.plot.mouseover_plot is None:
+                    self.uistate.plot.mouseover_plot = axe.plot(
                         x_range,
                         y_range,
                         color=color,
@@ -266,25 +262,25 @@ class InteractivePlotMixin:
                         label="mouseover",
                     )
                 else:
-                    uistate.plot.mouseover_plot[0].set_data(x_range, y_range)
-                    uistate.plot.mouseover_plot[0].set_linewidth(linewidth)
-                    uistate.plot.mouseover_plot[0].set_alpha(alpha)
-                    uistate.plot.mouseover_plot[0].set_color(color)
+                    self.uistate.plot.mouseover_plot[0].set_data(x_range, y_range)
+                    self.uistate.plot.mouseover_plot[0].set_linewidth(linewidth)
+                    self.uistate.plot.mouseover_plot[0].set_alpha(alpha)
+                    self.uistate.plot.mouseover_plot[0].set_color(color)
 
             elif "amp" in action:
                 if "EPSP" in action:
-                    x, y = uistate.EPSP_amp_xy
-                    color = uistate.project.settings["rgb_EPSP_amp"]
+                    x, y = self.uistate.EPSP_amp_xy
+                    color = self.uistate.project.settings["rgb_EPSP_amp"]
                 elif "volley" in action:
-                    x, y = uistate.volley_amp_xy
-                    color = uistate.project.settings["rgb_volley_amp"]
+                    x, y = self.uistate.volley_amp_xy
+                    color = self.uistate.project.settings["rgb_volley_amp"]
 
-                if uistate.plot.mouseover_blob is None:
-                    uistate.plot.mouseover_blob = axe.scatter(x, y, color=color, s=100, alpha=alpha)
+                if self.uistate.plot.mouseover_blob is None:
+                    self.uistate.plot.mouseover_blob = axe.scatter(x, y, color=color, s=100, alpha=alpha)
                 else:
-                    uistate.plot.mouseover_blob.set_offsets([x, y])
-                    uistate.plot.mouseover_blob.set_sizes([100])
-                    uistate.plot.mouseover_blob.set_color(color)
+                    self.uistate.plot.mouseover_blob.set_offsets([x, y])
+                    self.uistate.plot.mouseover_blob.set_sizes([100])
+                    self.uistate.plot.mouseover_blob.set_color(color)
 
         x = event.xdata
         y = event.ydata
@@ -292,22 +288,22 @@ class InteractivePlotMixin:
             return
         if event.inaxes == axe:
             zones = {}
-            if uistate.project.checkBox["EPSP_amp"]:
-                zones["EPSP amp move"] = uistate.EPSP_amp_move_zone
-            if uistate.project.checkBox["EPSP_slope"]:
-                zones["EPSP slope resize"] = uistate.EPSP_slope_resize_zone
-                zones["EPSP slope move"] = uistate.EPSP_slope_move_zone
-            if uistate.project.checkBox["volley_amp"]:
-                zones["volley amp move"] = uistate.volley_amp_move_zone
-            if uistate.project.checkBox["volley_slope"]:
-                zones["volley slope resize"] = uistate.volley_slope_resize_zone
-                zones["volley slope move"] = uistate.volley_slope_move_zone
-            uistate.plot.mouseover_action = None
+            if self.uistate.project.checkBox["EPSP_amp"]:
+                zones["EPSP amp move"] = self.uistate.EPSP_amp_move_zone
+            if self.uistate.project.checkBox["EPSP_slope"]:
+                zones["EPSP slope resize"] = self.uistate.EPSP_slope_resize_zone
+                zones["EPSP slope move"] = self.uistate.EPSP_slope_move_zone
+            if self.uistate.project.checkBox["volley_amp"]:
+                zones["volley amp move"] = self.uistate.volley_amp_move_zone
+            if self.uistate.project.checkBox["volley_slope"]:
+                zones["volley slope resize"] = self.uistate.volley_slope_resize_zone
+                zones["volley slope move"] = self.uistate.volley_slope_move_zone
+            self.uistate.plot.mouseover_action = None
             for action, zone in zones.items():
                 if not zone:
                     continue
                 if zone["x"][0] <= x <= zone["x"][1] and zone["y"][0] <= y <= zone["y"][1]:
-                    uistate.plot.mouseover_action = action
+                    self.uistate.plot.mouseover_action = action
                     plotMouseover(action, axe)
 
                     # Debugging block
@@ -316,19 +312,19 @@ class InteractivePlotMixin:
                         rec_name = prow["recording_name"]
                         rec_ID = prow["ID"]
                         trow = self.get_trow()
-                        # new_dict = {key: value for key, value in uistate.plot.dict_rec_labels.items() if value.get('stim') == stim_num and value.get('rec_ID') == rec_ID and value.get('axis') == 'ax2'}
+                        # new_dict = {key: value for key, value in self.uistate.plot.dict_rec_labels.items() if value.get('stim') == stim_num and value.get('rec_ID') == rec_ID and value.get('axis') == 'ax2'}
                         # EPSP_slope = new_dict.get(f"{rec_name} - stim {stim_num} EPSP slope")
-                        EPSP_slope = uistate.plot.dict_rec_labels.get(f"{rec_name} - stim {trow['stim']} EPSP slope")
+                        EPSP_slope = self.uistate.plot.dict_rec_labels.get(f"{rec_name} - stim {trow['stim']} EPSP slope")
                         line = EPSP_slope.get("line")
                         line.set_linewidth(10)
                         print(f"{EPSP_slope} - {action}")
                     break
 
-            if uistate.plot.mouseover_action is None:
-                if uistate.plot.mouseover_blob is not None:
-                    uistate.plot.mouseover_blob.set_sizes([0])
-                if uistate.plot.mouseover_plot is not None:
-                    uistate.plot.mouseover_plot[0].set_linewidth(0)
+            if self.uistate.plot.mouseover_action is None:
+                if self.uistate.plot.mouseover_blob is not None:
+                    self.uistate.plot.mouseover_blob.set_sizes([0])
+                if self.uistate.plot.mouseover_plot is not None:
+                    self.uistate.plot.mouseover_plot[0].set_linewidth(0)
 
             axe.figure.canvas.draw_idle()
 
@@ -342,34 +338,34 @@ class InteractivePlotMixin:
         return int(np.nanargmin(distances))
 
     def _draw_ghost_sweep(self, snippet_x, snippet_y, label_text):
-        if uistate.plot.ghost_sweep is None:
-            ghost_color = "white" if uistate.darkmode else "black"
-            (uistate.plot.ghost_sweep,) = uistate.plot.axe.plot(snippet_x, snippet_y, color=ghost_color, alpha=0.5, zorder=0)
-            if uistate.plot.ghost_label is None:
-                uistate.plot.ghost_label = uistate.plot.axe.text(
+        if self.uistate.plot.ghost_sweep is None:
+            ghost_color = "white" if self.uistate.darkmode else "black"
+            (self.uistate.plot.ghost_sweep,) = self.uistate.plot.axe.plot(snippet_x, snippet_y, color=ghost_color, alpha=0.5, zorder=0)
+            if self.uistate.plot.ghost_label is None:
+                self.uistate.plot.ghost_label = self.uistate.plot.axe.text(
                     1,
                     1,
                     label_text,
-                    transform=uistate.plot.axe.transAxes,
+                    transform=self.uistate.plot.axe.transAxes,
                     ha="left",
                     va="bottom",
                 )
             else:
-                uistate.plot.ghost_label.set_text(label_text)
+                self.uistate.plot.ghost_label.set_text(label_text)
         else:
-            uistate.plot.ghost_sweep.set_data(snippet_x, snippet_y)
-            uistate.plot.ghost_label.set_text(label_text)
+            self.uistate.plot.ghost_sweep.set_data(snippet_x, snippet_y)
+            self.uistate.plot.ghost_label.set_text(label_text)
 
     def _draw_mouseover_blob(self, ax, x, y, color):
-        if uistate.plot.mouseover_out_blob is None:
-            uistate.plot.mouseover_out_blob = ax.scatter(x, y, color=color, s=150, alpha=0.8, zorder=10)
+        if self.uistate.plot.mouseover_out_blob is None:
+            self.uistate.plot.mouseover_out_blob = ax.scatter(x, y, color=color, s=150, alpha=0.8, zorder=10)
         else:
-            if uistate.plot.mouseover_out_blob.axes != ax:
-                uistate.plot.mouseover_out_blob.remove()
-                uistate.plot.mouseover_out_blob = ax.scatter(x, y, color=color, s=150, alpha=0.8, zorder=10)
+            if self.uistate.plot.mouseover_out_blob.axes != ax:
+                self.uistate.plot.mouseover_out_blob.remove()
+                self.uistate.plot.mouseover_out_blob = ax.scatter(x, y, color=color, s=150, alpha=0.8, zorder=10)
             else:
-                uistate.plot.mouseover_out_blob.set_offsets([[x, y]])
-                uistate.plot.mouseover_out_blob.set_color(color)
+                self.uistate.plot.mouseover_out_blob.set_offsets([[x, y]])
+                self.uistate.plot.mouseover_out_blob.set_color(color)
 
     def outputMouseover(self, event):
         handler = self.mouseover_loader()
@@ -380,34 +376,34 @@ class InteractivePlotMixin:
         self.exorcise()
 
     def exorcise(self):
-        if uistate.plot.ghost_sweep is not None:
-            uistate.plot.ghost_sweep.remove()
-            uistate.plot.ghost_sweep = None
-        if uistate.plot.ghost_label is not None:
-            uistate.plot.ghost_label.remove()
-            uistate.plot.ghost_label = None
-        if uistate.plot.mouseover_out_blob is not None:
+        if self.uistate.plot.ghost_sweep is not None:
+            self.uistate.plot.ghost_sweep.remove()
+            self.uistate.plot.ghost_sweep = None
+        if self.uistate.plot.ghost_label is not None:
+            self.uistate.plot.ghost_label.remove()
+            self.uistate.plot.ghost_label = None
+        if self.uistate.plot.mouseover_out_blob is not None:
             try:
-                uistate.plot.mouseover_out_blob.remove()
+                self.uistate.plot.mouseover_out_blob.remove()
             except ValueError:
                 pass
-            uistate.plot.mouseover_out_blob = None
-            if uistate.plot.ax1 is not None:
-                uistate.plot.ax1.figure.canvas.draw_idle()
-        if uistate.plot.axe is not None:
-            uistate.plot.axe.figure.canvas.draw_idle()
+            self.uistate.plot.mouseover_out_blob = None
+            if self.uistate.plot.ax1 is not None:
+                self.uistate.plot.ax1.figure.canvas.draw_idle()
+        if self.uistate.plot.axe is not None:
+            self.uistate.plot.axe.figure.canvas.draw_idle()
 
     def connectDragRelease(self, x_range, rec_ID, graph):
         self.usage("connectDragRelease")
         # function to set up x scales for dragging and releasing on mean- and output canvases
-        if graph == "mean":  # uistate.plot.axm
+        if graph == "mean":  # self.uistate.plot.axm
             canvas = self.canvasMean
-            filtered_values = [value["line"] for value in uistate.plot.dict_rec_labels.values() if value["rec_ID"] == rec_ID and value["axis"] == "axm"]
-        elif graph == "output":  # uistate.plot.ax1+ax2
+            filtered_values = [value["line"] for value in self.uistate.plot.dict_rec_labels.values() if value["rec_ID"] == rec_ID and value["axis"] == "axm"]
+        elif graph == "output":  # self.uistate.plot.ax1+ax2
             canvas = self.canvasOutput
             filtered_values = [
                 value["line"]
-                for value in uistate.plot.dict_rec_labels.values()
+                for value in self.uistate.plot.dict_rec_labels.values()
                 if value["rec_ID"] == rec_ID and (value["axis"] == "ax1" or value["axis"] == "ax2")
             ]
         else:
@@ -431,29 +427,29 @@ class InteractivePlotMixin:
 
     def xDrag(self, event, canvas, x_data, x_range):
         # self.usage("xDrag")
-        if not uistate.plot.dragging:
+        if not self.uistate.plot.dragging:
             return
         if event.xdata is None:
             return
         x = event.xdata  # mouse x position
         x_drag_val = x_range[np.abs(x_range - x).argmin()]
-        if x_drag_val == uistate.plot.x_drag_last:  # return if the pointer hasn't moved enough
+        if x_drag_val == self.uistate.plot.x_drag_last:  # return if the pointer hasn't moved enough
             return
-        uistate.plot.x_drag = x_drag_val
-        uistate.plot.x_drag_last = x_drag_val
+        self.uistate.plot.x_drag = x_drag_val
+        self.uistate.plot.x_drag_last = x_drag_val
         if canvas == self.canvasMean:
-            uistate.plot.x_select["mean_end"] = uistate.plot.x_drag
-            self.lineEdit_mean_selection_end.setText(f"{uistate.plot.x_drag * 1000:g}")
+            self.uistate.plot.x_select["mean_end"] = self.uistate.plot.x_drag
+            self.lineEdit_mean_selection_end.setText(f"{self.uistate.plot.x_drag * 1000:g}")
         else:
-            uistate.plot.x_select["output_end"] = uistate.plot.x_drag
-            uistate.plot.x_select["output"] = set(
+            self.uistate.plot.x_select["output_end"] = self.uistate.plot.x_drag
+            self.uistate.plot.x_select["output"] = set(
                 range(
-                    min(uistate.plot.x_on_click, uistate.plot.x_drag),
-                    max(uistate.plot.x_on_click, uistate.plot.x_drag) + 1,
+                    min(self.uistate.plot.x_on_click, self.uistate.plot.x_drag),
+                    max(self.uistate.plot.x_on_click, self.uistate.plot.x_drag) + 1,
                 )
             )
-            # print(f"uistate.plot.x_select['output']: {uistate.plot.x_select['output']}")
-        uiplot.xSelect(canvas=canvas)
+            # print(f"self.uistate.plot.x_select['output']: {self.uistate.plot.x_select['output']}")
+        self.uiplot.xSelect(canvas=canvas)
 
     def drag_released(self, event, canvas):
         self.usage("drag_released")
@@ -463,7 +459,7 @@ class InteractivePlotMixin:
         # Fallback: if motions did not populate x_drag (possible on some platforms/Wayland),
         # use the release event position (snapped) when it differs from the press point.
         # This prevents drags from being mis-treated as click-only single-sweep selections.
-        if uistate.plot.x_drag is None and event is not None and event.xdata is not None:
+        if self.uistate.plot.x_drag is None and event is not None and event.xdata is not None:
             try:
                 if is_output:
                     prow = self.get_prow()
@@ -473,50 +469,50 @@ class InteractivePlotMixin:
                             cands = list(range(0, n))
                             arr = np.asarray(cands)
                             rx = cands[int(np.argmin(np.abs(arr - event.xdata)))]
-                            if rx != uistate.plot.x_on_click:
-                                uistate.plot.x_drag = rx
+                            if rx != self.uistate.plot.x_on_click:
+                                self.uistate.plot.x_drag = rx
                 else:
                     # mean graph: x is time (float)
-                    if uistate.plot.x_on_click is not None and abs(event.xdata - uistate.plot.x_on_click) > 1e-9:
-                        uistate.plot.x_drag = event.xdata
+                    if self.uistate.plot.x_on_click is not None and abs(event.xdata - self.uistate.plot.x_on_click) > 1e-9:
+                        self.uistate.plot.x_drag = event.xdata
             except Exception:
                 pass
 
         # Compute final selection state immediately (no heavy artist work yet)
-        if uistate.plot.x_drag is None:  # click only
+        if self.uistate.plot.x_drag is None:  # click only
             if is_mean:
-                uistate.plot.x_select["mean_end"] = None
+                self.uistate.plot.x_select["mean_end"] = None
             elif is_output:
-                uistate.plot.x_select["output_end"] = None
-                uistate.plot.x_select["output"] = {uistate.plot.x_on_click}  # ensure set type
+                self.uistate.plot.x_select["output_end"] = None
+                self.uistate.plot.x_select["output"] = {self.uistate.plot.x_on_click}  # ensure set type
         else:  # click and drag
-            start, end = sorted((uistate.plot.x_on_click, uistate.plot.x_drag))
+            start, end = sorted((self.uistate.plot.x_on_click, self.uistate.plot.x_drag))
             if is_mean:
-                uistate.plot.x_select["mean_start"] = start
-                uistate.plot.x_select["mean_end"] = end
+                self.uistate.plot.x_select["mean_start"] = start
+                self.uistate.plot.x_select["mean_end"] = end
             elif is_output:
-                uistate.plot.x_select["output_start"] = start
-                uistate.plot.x_select["output_end"] = end
-                uistate.plot.x_select["output"] = set(range(start, end + 1))
+                self.uistate.plot.x_select["output_start"] = start
+                self.uistate.plot.x_select["output_end"] = end
+                self.uistate.plot.x_select["output"] = set(range(start, end + 1))
 
         # Set the text fields synchronously for immediate user feedback (lightweight).
         # The more expensive canvas artist work is still deferred.
         if is_mean:
-            if uistate.plot.x_select.get("mean_end") is None:
+            if self.uistate.plot.x_select.get("mean_end") is None:
                 self.lineEdit_mean_selection_end.setText("")
-                if uistate.plot.x_select.get("mean_start") is not None:
-                    self.lineEdit_mean_selection_start.setText(f"{uistate.plot.x_select['mean_start'] * 1000:g}")
+                if self.uistate.plot.x_select.get("mean_start") is not None:
+                    self.lineEdit_mean_selection_start.setText(f"{self.uistate.plot.x_select['mean_start'] * 1000:g}")
             else:
-                self.lineEdit_mean_selection_start.setText(f"{uistate.plot.x_select.get('mean_start', 0) * 1000:g}")
-                self.lineEdit_mean_selection_end.setText(f"{uistate.plot.x_select.get('mean_end', 0) * 1000:g}")
+                self.lineEdit_mean_selection_start.setText(f"{self.uistate.plot.x_select.get('mean_start', 0) * 1000:g}")
+                self.lineEdit_mean_selection_end.setText(f"{self.uistate.plot.x_select.get('mean_end', 0) * 1000:g}")
         elif is_output:
-            if uistate.plot.x_select.get("output_end") is None:
+            if self.uistate.plot.x_select.get("output_end") is None:
                 self.lineEdit_sweeps_range_to.setText("")
-                if uistate.plot.x_select.get("output_start") is not None:
-                    self.lineEdit_sweeps_range_from.setText(str(uistate.plot.x_select["output_start"]))
+                if self.uistate.plot.x_select.get("output_start") is not None:
+                    self.lineEdit_sweeps_range_from.setText(str(self.uistate.plot.x_select["output_start"]))
             else:
-                self.lineEdit_sweeps_range_from.setText(str(uistate.plot.x_select.get("output_start", "")))
-                self.lineEdit_sweeps_range_to.setText(str(uistate.plot.x_select.get("output_end", "")))
+                self.lineEdit_sweeps_range_from.setText(str(self.uistate.plot.x_select.get("output_start", "")))
+                self.lineEdit_sweeps_range_to.setText(str(self.uistate.plot.x_select.get("output_end", "")))
 
         # Cleanup event bindings immediately; release the handler fast
         for cid in (self.mouse_drag, self.mouse_release):
@@ -527,8 +523,8 @@ class InteractivePlotMixin:
                     pass
         self.mouse_drag = None
         self.mouse_release = None
-        uistate.plot.x_drag = None
-        uistate.plot.dragging = False
+        self.uistate.plot.x_drag = None
+        self.uistate.plot.dragging = False
 
         # Defer only the matplotlib artist changes + draw_idle (update_axe_mean/xSelect).
         # Widget text has already been set above. Doing remove/plot/axv + draw from inside
@@ -541,10 +537,10 @@ class InteractivePlotMixin:
         """
         try:
             if is_mean:
-                uiplot.xSelect(canvas=canvas)
+                self.uiplot.xSelect(canvas=canvas)
             elif is_output:
-                uiplot.update_axe_mean()
-                uiplot.xSelect(canvas=canvas)
+                self.uiplot.update_axe_mean()
+                self.uiplot.xSelect(canvas=canvas)
         except Exception as ex:
             print(f"_finalize_drag_release error: {ex}")
 
@@ -554,9 +550,9 @@ class InteractivePlotMixin:
         """
         try:
             if canvas == self.canvasMean:
-                uiplot.xDeselect(ax=uistate.plot.axm, reset=True)
+                self.uiplot.xDeselect(ax=self.uistate.plot.axm, reset=True)
             else:
-                uiplot.xDeselect(ax=uistate.plot.ax1, reset=True)
+                self.uiplot.xDeselect(ax=self.uistate.plot.ax1, reset=True)
             self.update_stim_buttons()
         except Exception as ex:
             print(f"_finalize_deselect error: {ex}")
@@ -564,19 +560,19 @@ class InteractivePlotMixin:
     def mouseoverUpdate(self):
         self.usage("mouseoverUpdate")
         self.mouseoverDisconnect()
-        n_recs = len(uistate.plot.list_idx_select_recs or [])
+        n_recs = len(self.uistate.plot.list_idx_select_recs or [])
 
         if n_recs == 1:
             self.mouseoverOutput = self.canvasOutput.mpl_connect("motion_notify_event", self.outputMouseover)
             self.mouseLeaveOutput = self.canvasOutput.mpl_connect("axes_leave_event", self.on_leave_output)
-        if uistate.plot.list_idx_select_recs and uistate.plot.list_idx_select_stims:
+        if self.uistate.plot.list_idx_select_recs and self.uistate.plot.list_idx_select_stims:
             self._update_marker_data()
 
         if n_recs > 1:
             print("(multi-rec-selection) mouseoverUpdate calls self.graphRefresh()")
             self.graphRefresh(reeval_formal_test=False)
             return
-        if n_recs == 0 and len(uistate.plot.list_idx_select_stims or []) != 1:
+        if n_recs == 0 and len(self.uistate.plot.list_idx_select_stims or []) != 1:
             print("(multi-stim-selection) mouseoverUpdate calls self.graphRefresh()")
             self.graphRefresh(reeval_formal_test=False)
             return
@@ -597,10 +593,10 @@ class InteractivePlotMixin:
             self.graphRefresh(reeval_formal_test=False)
             return
         stim_num = trow["stim"]
-        uistate.setMargins(axe=uistate.plot.axe)
+        self.uistate.setMargins(axe=self.uistate.plot.axe)
         dict_labels = {
             key: value
-            for key, value in uistate.plot.dict_rec_labels.items()
+            for key, value in self.uistate.plot.dict_rec_labels.items()
             if key.endswith(" marker") and value["rec_ID"] == rec_ID and value["axis"] == "axe" and value["stim"] == stim_num
         }
 
@@ -614,17 +610,17 @@ class InteractivePlotMixin:
         for label, value in dict_labels.items():
             line = value["line"]
             if label.endswith("EPSP amp marker"):
-                uistate.updatePointDragZone(aspect="EPSP amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
+                self.uistate.updatePointDragZone(aspect="EPSP amp move", x=line.get_xdata()[0], y=line.get_ydata()[0])
             elif label.endswith("volley amp marker"):
-                uistate.updatePointDragZone(
+                self.uistate.updatePointDragZone(
                     aspect="volley amp move",
                     x=line.get_xdata()[0],
                     y=line.get_ydata()[0],
                 )
             elif label.endswith("EPSP slope marker"):
-                uistate.updateDragZones(aspect="EPSP slope", x=line.get_xdata(), y=line.get_ydata())
+                self.uistate.updateDragZones(aspect="EPSP slope", x=line.get_xdata(), y=line.get_ydata())
             elif label.endswith("volley slope marker"):
-                uistate.updateDragZones(aspect="volley slope", x=line.get_xdata(), y=line.get_ydata())
+                self.uistate.updateDragZones(aspect="volley slope", x=line.get_xdata(), y=line.get_ydata())
 
         self.mouseoverMean = self.canvasMean.mpl_connect("motion_notify_event", self.meanMouseover)
         self.mouseoverEvent = self.canvasEvent.mpl_connect("motion_notify_event", self.eventMouseover)
@@ -637,7 +633,7 @@ class InteractivePlotMixin:
         self.usage("_update_marker_data")
         # update xy data of shown markers
         df_p = self.get_df_project()
-        precision = uistate.project.settings["precision"]
+        precision = self.uistate.project.settings["precision"]
 
         aspects = [
             ("EPSP_slope", " EPSP slope marker", True),
@@ -647,7 +643,7 @@ class InteractivePlotMixin:
         ]
 
         for aspect_prefix, marker_suffix, is_slope in aspects:
-            markers = {k: v for k, v in uistate.plot.dict_rec_show.items() if k.endswith(marker_suffix)}
+            markers = {k: v for k, v in self.uistate.plot.dict_rec_show.items() if k.endswith(marker_suffix)}
             for marker in markers.values():
                 p_row = df_p.loc[df_p["ID"] == marker["rec_ID"]].squeeze()
                 dfmean = self.get_dfmean(row=p_row)
@@ -703,31 +699,31 @@ class InteractivePlotMixin:
                 except AttributeError:
                     setattr(self, conn_attr, None)
 
-        if uistate.plot.mouseover_plot is not None:
+        if self.uistate.plot.mouseover_plot is not None:
             try:
-                uistate.plot.mouseover_plot[0].remove()
+                self.uistate.plot.mouseover_plot[0].remove()
             except Exception:
                 pass
-            uistate.plot.mouseover_plot = None
-        if uistate.plot.mouseover_blob is not None:
+            self.uistate.plot.mouseover_plot = None
+        if self.uistate.plot.mouseover_blob is not None:
             try:
-                uistate.plot.mouseover_blob.remove()
+                self.uistate.plot.mouseover_blob.remove()
             except Exception:
                 pass
-            uistate.plot.mouseover_blob = None
-        if uistate.plot.mouseover_out is not None:
+            self.uistate.plot.mouseover_blob = None
+        if self.uistate.plot.mouseover_out is not None:
             try:
-                uistate.plot.mouseover_out[0].remove()
+                self.uistate.plot.mouseover_out[0].remove()
             except Exception:
                 pass
-            uistate.plot.mouseover_out = None
-        if uistate.plot.mouseover_out_blob is not None:
+            self.uistate.plot.mouseover_out = None
+        if self.uistate.plot.mouseover_out_blob is not None:
             try:
-                uistate.plot.mouseover_out_blob.remove()
+                self.uistate.plot.mouseover_out_blob.remove()
             except Exception:
                 pass
-            uistate.plot.mouseover_out_blob = None
-        uistate.plot.mouseover_action = None
+            self.uistate.plot.mouseover_out_blob = None
+        self.uistate.plot.mouseover_action = None
 
     def eventDragSlope(self, event, action, data_x, data_y, prior_slope_start, prior_slope_end):  # graph dragging event
         # self.usage("eventDragSlope")
@@ -735,11 +731,11 @@ class InteractivePlotMixin:
         if event.xdata is None or action is None:
             return
         x = event.xdata
-        uistate.plot.x_drag = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
-        if uistate.plot.x_drag == uistate.plot.x_drag_last:  # if the dragged event hasn't moved an index point, change nothing
+        self.uistate.plot.x_drag = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
+        if self.uistate.plot.x_drag == self.uistate.plot.x_drag_last:  # if the dragged event hasn't moved an index point, change nothing
             return
-        precision = uistate.project.settings["precision"]
-        time_diff = uistate.plot.x_drag - uistate.plot.x_on_click
+        precision = self.uistate.project.settings["precision"]
+        time_diff = self.uistate.plot.x_drag - self.uistate.plot.x_on_click
         # get the x values of the slope
         blob = True  # only moving amplitudes and resizing slopes have a blob
         if action.endswith("resize"):
@@ -756,11 +752,11 @@ class InteractivePlotMixin:
         x_indices = np.searchsorted(data_x, [x_start, x_end])
         y_start, y_end = data_y[x_indices]
         # remember the last x index
-        uistate.plot.x_drag_last = uistate.plot.x_drag
+        self.uistate.plot.x_drag_last = self.uistate.plot.x_drag
         # update the mouseover plot
-        uistate.plot.mouseover_plot[0].set_data([x_start, x_end], [y_start, y_end])
+        self.uistate.plot.mouseover_plot[0].set_data([x_start, x_end], [y_start, y_end])
         if blob:
-            uistate.plot.mouseover_blob.set_offsets([x_end, y_end])
+            self.uistate.plot.mouseover_blob.set_offsets([x_end, y_end])
         self.canvasEvent.draw_idle()
         self.eventDragUpdate(x_start, x_end, precision)
 
@@ -770,19 +766,19 @@ class InteractivePlotMixin:
         if event.xdata is None:
             return
         x = event.xdata
-        uistate.plot.x_drag = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
-        if uistate.plot.x_drag == uistate.plot.x_drag_last:  # if the dragged event hasn't moved an index point, change nothing
+        self.uistate.plot.x_drag = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
+        if self.uistate.plot.x_drag == self.uistate.plot.x_drag_last:  # if the dragged event hasn't moved an index point, change nothing
             return
-        precision = uistate.project.settings["precision"]
-        time_diff = uistate.plot.x_drag - uistate.plot.x_on_click
+        precision = self.uistate.project.settings["precision"]
+        time_diff = self.uistate.plot.x_drag - self.uistate.plot.x_on_click
         x_point = round(prior_amp + time_diff, precision)
         idx = (np.abs(data_x - x_point)).argmin()
         y_point = data_y[idx]
         # print (f"x_point: {x_point}, y_point: {y_point}")
         # remember the last x index
-        uistate.plot.x_drag_last = uistate.plot.x_drag
+        self.uistate.plot.x_drag_last = self.uistate.plot.x_drag
         # update the mouseover plot
-        uistate.plot.mouseover_blob.set_offsets([x_point, y_point])
+        self.uistate.plot.mouseover_blob.set_offsets([x_point, y_point])
         self.canvasEvent.draw_idle()
         self.eventDragUpdate(x_point, x_point, precision)
 
@@ -799,8 +795,8 @@ class InteractivePlotMixin:
     def _eventDragReleased(self, event, data_x, data_y):  # graph release event
         # TODO: Overhaul this whole magic-string-mess
         self.usage("eventDragReleased")
-        if uistate.plot.mouseover_action is None:
-            uistate.plot.dragging = False
+        if self.uistate.plot.mouseover_action is None:
+            self.uistate.plot.dragging = False
             if getattr(self, "mouse_release", None) is not None:
                 self.canvasEvent.mpl_disconnect(self.mouse_release)
                 self.mouse_release = None
@@ -809,17 +805,17 @@ class InteractivePlotMixin:
                 self.mouse_drag = None
             self.mouseoverUpdate()
             return
-        print(f" - uistate.plot.mouseover_action: {uistate.plot.mouseover_action}")
+        print(f" - self.uistate.plot.mouseover_action: {self.uistate.plot.mouseover_action}")
         self.canvasEvent.mpl_disconnect(self.mouse_drag)
         self.canvasEvent.mpl_disconnect(self.mouse_release)
-        uistate.plot.x_drag_last = None
-        if uistate.plot.x_drag is None or uistate.plot.x_drag == uistate.plot.x_on_click:  # nothing to update (no movement or same position)
+        self.uistate.plot.x_drag_last = None
+        if self.uistate.plot.x_drag is None or self.uistate.plot.x_drag == self.uistate.plot.x_on_click:  # nothing to update (no movement or same position)
             print("x_drag is None or x_drag == x_on_click")
             self.mouseoverUpdate()
             return
 
-        dft_temp = uistate.plot.dft_temp  # copied on clicked, updated while dragging
-        stim_idx = uistate.plot.list_idx_select_stims[0]
+        dft_temp = self.uistate.plot.dft_temp  # copied on clicked, updated while dragging
+        stim_idx = self.uistate.plot.list_idx_select_stims[0]
         trow_temp = dft_temp.iloc[stim_idx]
 
         # Map drag actions to (0:method value, 1:aspect name, 2:{new measuring points}, 3:plot update function)
@@ -831,7 +827,7 @@ class InteractivePlotMixin:
                     "t_EPSP_slope_start": trow_temp["t_EPSP_slope_start"],
                     "t_EPSP_slope_end": trow_temp["t_EPSP_slope_end"],
                 },
-                uistate.updateDragZones,
+                self.uistate.updateDragZones,
             ),
             "EPSP amp move": (
                 "t_EPSP_amp_method",
@@ -841,7 +837,7 @@ class InteractivePlotMixin:
                     "t_EPSP_amp_halfwidth": trow_temp["t_EPSP_amp_halfwidth"],
                     "amp_zero": trow_temp["amp_zero"],
                 },
-                uistate.updatePointDragZone,
+                self.uistate.updatePointDragZone,
             ),
             "volley slope": (
                 "t_volley_slope_method",
@@ -850,7 +846,7 @@ class InteractivePlotMixin:
                     "t_volley_slope_start": trow_temp["t_volley_slope_start"],
                     "t_volley_slope_end": trow_temp["t_volley_slope_end"],
                 },
-                uistate.updateDragZones,
+                self.uistate.updateDragZones,
             ),
             "volley amp move": (
                 "t_volley_amp_method",
@@ -860,13 +856,13 @@ class InteractivePlotMixin:
                     "t_volley_amp_halfwidth": trow_temp["t_volley_amp_halfwidth"],
                     "amp_zero": trow_temp["amp_zero"],
                 },
-                uistate.updatePointDragZone,
+                self.uistate.updatePointDragZone,
             ),
         }
         # Build a dict_t of new measuring points and update drag zones
         dict_t_updates = {}
         for action, values in action_mapping.items():
-            if uistate.plot.mouseover_action.startswith(action):
+            if self.uistate.plot.mouseover_action.startswith(action):
                 method_field = values[0]
                 aspect = values[1]
                 dict_t_updates = values[2]
@@ -885,7 +881,7 @@ class InteractivePlotMixin:
         else:
             logger.warning(
                 "eventDragReleased: mouseover_action '%s' did not match any known action; aborting update.",
-                uistate.plot.mouseover_action,
+                self.uistate.plot.mouseover_action,
             )
             self.mouseoverUpdate()
             return
@@ -909,12 +905,12 @@ class InteractivePlotMixin:
         stim_num = trow_temp["stim"]
 
         n_stims = prow["stims"]
-        if not uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
-            dft_to_update = uistate.plot.dft_temp.copy()
+        if not self.uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
+            dft_to_update = self.uistate.plot.dft_temp.copy()
             if method_field in dict_t_updates:
                 dft_to_update[method_field] = dict_t_updates[method_field]
         else:
-            dft_to_update = uistate.plot.dft_temp.iloc[[stim_idx]].copy()
+            dft_to_update = self.uistate.plot.dft_temp.iloc[[stim_idx]].copy()
             dft_to_update.update(pd.DataFrame([dict_t_updates]))
 
         rec_filter = prow.get("filter")
@@ -930,19 +926,19 @@ class InteractivePlotMixin:
         # print(f"dfoutput: {dfoutput}")
         # update volley means
         if aspect == "volley amp":
-            if not uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
+            if not self.uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
                 for s in new_dfoutput["stim"].unique():
                     dft_temp.loc[dft_temp["stim"] == s, "volley_amp_mean"] = new_dfoutput[new_dfoutput["stim"] == s]["volley_amp"].mean()
             else:
                 dft_temp.loc[dft_temp.index[stim_idx], "volley_amp_mean"] = new_dfoutput["volley_amp"].mean()
         elif aspect == "volley slope":
-            if not uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
+            if not self.uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
                 for s in new_dfoutput["stim"].unique():
                     dft_temp.loc[dft_temp["stim"] == s, "volley_slope_mean"] = new_dfoutput[new_dfoutput["stim"] == s]["volley_slope"].mean()
             else:
                 dft_temp.loc[dft_temp.index[stim_idx], "volley_slope_mean"] = new_dfoutput["volley_slope"].mean()
 
-        if uistate.project.checkBox["timepoints_per_stim"] or n_stims == 1:
+        if self.uistate.project.checkBox["timepoints_per_stim"] or n_stims == 1:
             new_dfoutput["stim"] = int(stim_num)
 
         dfoutput.set_index(["stim", "sweep"], inplace=True)
@@ -984,7 +980,7 @@ class InteractivePlotMixin:
                     dfoutput = pd.concat([dfoutput, pd.DataFrame([stim_row])], ignore_index=True)
 
         self.persistOutput(rec_name=rec_name, dfoutput=dfoutput, p_row=prow)
-        uiplot.updateStimLines(rec_name=rec_name, dfoutput=self.V2mV(dfoutput))
+        self.uiplot.updateStimLines(rec_name=rec_name, dfoutput=self.V2mV(dfoutput))
 
         self.set_dft(rec_name, dft_temp)
         new_dft = self.get_dft(prow)
@@ -1006,7 +1002,7 @@ class InteractivePlotMixin:
         _pre_stim = dfmean[(dfmean["time"] >= stim_offset - 0.002) & (dfmean["time"] < stim_offset - 0.001)]
         amp_zero_plot = _pre_stim[rec_filter].mean() if not _pre_stim.empty else dfmean.loc[(dfmean["time"] - stim_offset).abs().idxmin(), rec_filter]
 
-        uiplot.update(
+        self.uiplot.update(
             prow=prow,
             trow=trow,
             aspect=aspect,
@@ -1055,11 +1051,11 @@ class InteractivePlotMixin:
                     amp_val = dfmean.loc[(dfmean["time"] >= t_amp_val - half) & (dfmean["time"] <= t_amp_val + half), rec_filter].mean()
                 amp = -(amp_val - amp_zero_plot)
 
-            uiplot.updateAmpMarker(labelamp, x, y, amp_x, amp_zero_plot, amp=amp)
+            self.uiplot.updateAmpMarker(labelamp, x, y, amp_x, amp_zero_plot, amp=amp)
 
         if aspect in ["EPSP amp", "volley amp"]:
             # print(f" - {aspect} updated")
-            if uistate.project.checkBox["timepoints_per_stim"]:
+            if self.uistate.project.checkBox["timepoints_per_stim"]:
                 update_amp_marker(trow, aspect, prow, dfmean, dfoutput)
             else:
                 dft = self.get_dft(prow)
@@ -1078,10 +1074,10 @@ class InteractivePlotMixin:
 
         for group_ID in affected_groups:
             self.clear_group_level(group_ID)  # all levels stale after rec edit
-            level = uistate.stat_test.buttonGroup_test_n
+            level = self.uistate.stat_test.buttonGroup_test_n
             df_groupmean = self.get_dfgroupmean(group_ID, level=level)
             x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
-            uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.V2mV(df_groupmean), x_pos=x_pos, level=level)
+            self.uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.V2mV(df_groupmean), x_pos=x_pos, level=level)
 
         self.update_show()  # Re-apply visibility rules to the newly added group artists
         # Group membership change can affect formal test results; clear cached so safeguard won't redraw stale
@@ -1092,40 +1088,40 @@ class InteractivePlotMixin:
         self.update_slope_lineEdits()
         self.zoomAuto(skip_axe=True)
 
-        if config.talkback:
+        if self.config.talkback:
             self.talkback()
 
     # --- Phase 3: Loaders (Dispatchers) ---
 
     def mouseover_loader(self):
-        experiment_type = uistate.experiment.experiment_type
+        experiment_type = self.uistate.experiment.experiment_type
         if experiment_type == "io":
             return self._mouseover_output_io
         elif experiment_type == "PP":
             return self._mouseover_output_pp
-        elif uistate.x_axis == "stim":
+        elif self.uistate.x_axis == "stim":
             return self._mouseover_output_stim
         else:
             return self._mouseover_output_time
 
     def drag_update_loader(self):
-        experiment_type = uistate.experiment.experiment_type
+        experiment_type = self.uistate.experiment.experiment_type
         if experiment_type == "io":
             return self._drag_update_io
         elif experiment_type == "PP":
             return self._drag_update_pp
-        elif uistate.x_axis == "stim":
+        elif self.uistate.x_axis == "stim":
             return self._drag_update_time
         else:
             return self._drag_update_time
 
     def drag_release_loader(self):
-        experiment_type = uistate.experiment.experiment_type
+        experiment_type = self.uistate.experiment.experiment_type
         if experiment_type == "io":
             return self._drag_release_io
         elif experiment_type == "PP":
             return self._drag_release_pp
-        elif uistate.x_axis == "stim":
+        elif self.uistate.x_axis == "stim":
             return self._drag_release_time
         else:
             return self._drag_release_time
@@ -1133,26 +1129,26 @@ class InteractivePlotMixin:
     # --- Phase 2: Specialized Mouseover Strategies ---
 
     def _mouseover_output_time(self, event):
-        if event.inaxes == uistate.plot.ax1:
+        if event.inaxes == self.uistate.plot.ax1:
             str_ax = 'ax1'
-        elif event.inaxes == uistate.plot.ax2:
+        elif event.inaxes == self.uistate.plot.ax2:
             str_ax = 'ax2'
         else:
             str_ax = None
-        ax = getattr(uistate.plot, str_ax) if str_ax else None
-        if event.inaxes not in (uistate.plot.ax1, uistate.plot.ax2) or str_ax is None:
-            if uistate.plot.ghost_sweep is not None:
+        ax = getattr(self.uistate.plot, str_ax) if str_ax else None
+        if event.inaxes not in (self.uistate.plot.ax1, self.uistate.plot.ax2) or str_ax is None:
+            if self.uistate.plot.ghost_sweep is not None:
                 self.exorcise()
             return
         if event.inaxes != ax:
             x, y = ax.transData.inverted().transform((event.x, event.y))
         else:
             x, y = event.xdata, event.ydata
-        if x is None or y is None or not (uistate.slopeView() or uistate.ampView()):
-            if uistate.plot.ghost_sweep is not None:
+        if x is None or y is None or not (self.uistate.slopeView() or self.uistate.ampView()):
+            if self.uistate.plot.ghost_sweep is not None:
                 self.exorcise()
             return
-        n_recs = len(uistate.plot.list_idx_select_recs or [])
+        n_recs = len(self.uistate.plot.list_idx_select_recs or [])
         if n_recs > 1:
             self.exorcise()
             return
@@ -1167,19 +1163,19 @@ class InteractivePlotMixin:
             # for single rec, prefer the hovered ax's per-sweep line (correct stim/offset), fallback to any ax
             dict_out = {
                 key: value
-                for key, value in uistate.plot.dict_rec_show.items()
+                for key, value in self.uistate.plot.dict_rec_show.items()
                 if value.get("rec_ID") == rec_id and value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
             }
             if not dict_out:
                 dict_out = {
                     key: value
-                    for key, value in uistate.plot.dict_rec_show.items()
+                    for key, value in self.uistate.plot.dict_rec_show.items()
                     if value.get("rec_ID") == rec_id and value.get("axis") in ("ax1", "ax2") and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
                 }
         else:
             dict_out = {
                 key: value
-                for key, value in uistate.plot.dict_rec_show.items()
+                for key, value in self.uistate.plot.dict_rec_show.items()
                 if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
             }
         rec_ID_for_snippet = None
@@ -1188,11 +1184,11 @@ class InteractivePlotMixin:
             # pick first rec in that group to source the actual voltage snippet (ghost).
             g_out = {
                 key: value
-                for key, value in uistate.plot.dict_group_show.items()
+                for key, value in self.uistate.plot.dict_group_show.items()
                 if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
             }
             if not g_out:
-                if uistate.plot.ghost_sweep is not None:
+                if self.uistate.plot.ghost_sweep is not None:
                     self.exorcise()
                 return
             dict_pop = list(g_out.values())[0]
@@ -1215,7 +1211,7 @@ class InteractivePlotMixin:
         out_x_val = x_val
         out_y_val = y_data[out_x_idx]
 
-        if out_x_idx == uistate.plot.last_out_x_idx:
+        if out_x_idx == self.uistate.plot.last_out_x_idx:
             return
 
         rec_ID = rec_ID_for_snippet
@@ -1257,35 +1253,35 @@ class InteractivePlotMixin:
         if getattr(snippet_x, "empty", False) or len(snippet_x) == 0:
             return
 
-        if uistate.plot.mouseover_out_blob is not None:
+        if self.uistate.plot.mouseover_out_blob is not None:
             try:
-                uistate.plot.mouseover_out_blob.remove()
+                self.uistate.plot.mouseover_out_blob.remove()
             except ValueError:
                 pass
-            uistate.plot.mouseover_out_blob = None
+            self.uistate.plot.mouseover_out_blob = None
 
         self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
-        uistate.plot.axe.figure.canvas.draw_idle()
-        uistate.plot.last_out_x_idx = out_x_idx
+        self.uistate.plot.axe.figure.canvas.draw_idle()
+        self.uistate.plot.last_out_x_idx = out_x_idx
         ax.figure.canvas.draw_idle()
 
 
     def _mouseover_output_stim(self, event):
-        str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
-        ax = getattr(uistate.plot, str_ax) if str_ax else None
-        if event.inaxes not in (uistate.plot.ax1, uistate.plot.ax2) or str_ax is None:
-            if uistate.plot.ghost_sweep is not None:
+        str_ax = "ax2" if self.uistate.slopeView() else "ax1" if self.uistate.ampView() else None
+        ax = getattr(self.uistate.plot, str_ax) if str_ax else None
+        if event.inaxes not in (self.uistate.plot.ax1, self.uistate.plot.ax2) or str_ax is None:
+            if self.uistate.plot.ghost_sweep is not None:
                 self.exorcise()
             return
         if event.inaxes != ax:
             x, y = ax.transData.inverted().transform((event.x, event.y))
         else:
             x, y = event.xdata, event.ydata
-        if x is None or y is None or not (uistate.slopeView() or uistate.ampView()):
-            if uistate.plot.ghost_sweep is not None:
+        if x is None or y is None or not (self.uistate.slopeView() or self.uistate.ampView()):
+            if self.uistate.plot.ghost_sweep is not None:
                 self.exorcise()
             return
-        n_recs = len(uistate.plot.list_idx_select_recs or [])
+        n_recs = len(self.uistate.plot.list_idx_select_recs or [])
         if n_recs > 1:
             self.exorcise()
             return
@@ -1295,13 +1291,13 @@ class InteractivePlotMixin:
             rec_id = prow["ID"] if prow is not None else None
             dict_out = {
                 key: value
-                for key, value in uistate.plot.dict_rec_show.items()
+                for key, value in self.uistate.plot.dict_rec_show.items()
                 if rec_id is not None and value.get("rec_ID") == rec_id and value.get("axis") == str_ax and not str(value.get("aspect", "")).endswith("_mean") and hasattr(value.get("line"), "get_xdata")
             }
         else:
             dict_out = {
                 key: value
-                for key, value in uistate.plot.dict_rec_show.items()
+                for key, value in self.uistate.plot.dict_rec_show.items()
                 if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
             }
         if not dict_out:
@@ -1314,7 +1310,7 @@ class InteractivePlotMixin:
         out_x_idx = int(np.nanargmin(np.abs(x_data - x)))
         x_val = x_data[out_x_idx]
 
-        if out_x_idx == uistate.plot.last_out_x_idx:
+        if out_x_idx == self.uistate.plot.last_out_x_idx:
             return
 
         rec_ID = dict_pop["rec_ID"]
@@ -1326,7 +1322,7 @@ class InteractivePlotMixin:
         p_row = p_row_df.iloc[0]
         df_t = self.get_dft(p_row)
         rec_filter = p_row["filter"]
-        settings = uistate.project.settings
+        settings = self.uistate.project.settings
 
         stim_num = int(x_val)
         matching = df_t[df_t["stim"] == stim_num]
@@ -1343,34 +1339,34 @@ class InteractivePlotMixin:
         snippet_y = snippet[rec_filter]
         ghost_label_text = f"stim {stim_num}"
 
-        if uistate.plot.mouseover_out_blob is not None:
+        if self.uistate.plot.mouseover_out_blob is not None:
             try:
-                uistate.plot.mouseover_out_blob.remove()
+                self.uistate.plot.mouseover_out_blob.remove()
             except ValueError:
                 pass
-            uistate.plot.mouseover_out_blob = None
+            self.uistate.plot.mouseover_out_blob = None
 
         self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
-        uistate.plot.axe.figure.canvas.draw_idle()
-        uistate.plot.last_out_x_idx = out_x_idx
+        self.uistate.plot.axe.figure.canvas.draw_idle()
+        self.uistate.plot.last_out_x_idx = out_x_idx
         ax.figure.canvas.draw_idle()
 
     def _mouseover_output_pp(self, event):
-        str_ax = "ax2" if uistate.slopeView() else "ax1" if uistate.ampView() else None
-        ax = getattr(uistate.plot, str_ax) if str_ax else None
-        if event.inaxes not in (uistate.plot.ax1, uistate.plot.ax2) or str_ax is None:
-            if uistate.plot.ghost_sweep is not None:
+        str_ax = "ax2" if self.uistate.slopeView() else "ax1" if self.uistate.ampView() else None
+        ax = getattr(self.uistate.plot, str_ax) if str_ax else None
+        if event.inaxes not in (self.uistate.plot.ax1, self.uistate.plot.ax2) or str_ax is None:
+            if self.uistate.plot.ghost_sweep is not None:
                 self.exorcise()
             return
         if event.inaxes != ax:
             x, y = ax.transData.inverted().transform((event.x, event.y))
         else:
             x, y = event.xdata, event.ydata
-        if x is None or y is None or not (uistate.slopeView() or uistate.ampView()):
-            if uistate.plot.ghost_sweep is not None:
+        if x is None or y is None or not (self.uistate.slopeView() or self.uistate.ampView()):
+            if self.uistate.plot.ghost_sweep is not None:
                 self.exorcise()
             return
-        n_recs = len(uistate.plot.list_idx_select_recs or [])
+        n_recs = len(self.uistate.plot.list_idx_select_recs or [])
         if n_recs > 1:
             self.exorcise()
             return
@@ -1380,13 +1376,13 @@ class InteractivePlotMixin:
             rec_id = prow["ID"] if prow is not None else None
             dict_out = {
                 key: value
-                for key, value in uistate.plot.dict_rec_show.items()
+                for key, value in self.uistate.plot.dict_rec_show.items()
                 if rec_id is not None and value.get("rec_ID") == rec_id and value.get("axis") == str_ax and not str(value.get("aspect", "")).endswith("_mean") and hasattr(value.get("line"), "get_xdata")
             }
         else:
             dict_out = {
                 key: value
-                for key, value in uistate.plot.dict_rec_show.items()
+                for key, value in self.uistate.plot.dict_rec_show.items()
                 if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
             }
         if not dict_out:
@@ -1421,7 +1417,7 @@ class InteractivePlotMixin:
             return
         p_row = p_row_df.iloc[0]
 
-        dfoutput = self.get_dfdiff(row=p_row) if uistate.project.checkBox.get("paired_stims", False) else self.get_dfoutput(row=p_row)
+        dfoutput = self.get_dfdiff(row=p_row) if self.uistate.project.checkBox.get("paired_stims", False) else self.get_dfoutput(row=p_row)
         out_sweeps = dfoutput[dfoutput["sweep"].notna()]
         out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
         out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
@@ -1430,7 +1426,7 @@ class InteractivePlotMixin:
             safe_idx = min(out_x_idx, len(common_sweeps) - 1)
             x_val = common_sweeps[safe_idx]
 
-        if out_x_idx == uistate.plot.last_out_x_idx:
+        if out_x_idx == self.uistate.plot.last_out_x_idx:
             return
 
         df_t = self.get_dft(p_row)
@@ -1455,19 +1451,19 @@ class InteractivePlotMixin:
         snippet_y = dfsweep[rec_filter]
 
         aspect = dict_pop.get("aspect", "EPSP_amp")
-        highlight_color = uistate.project.settings.get(f"rgb_{aspect}", "red")
+        highlight_color = self.uistate.project.settings.get(f"rgb_{aspect}", "red")
 
         self._draw_mouseover_blob(ax, out_x_val, out_y_val, highlight_color)
         self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
-        uistate.plot.axe.figure.canvas.draw_idle()
-        uistate.plot.last_out_x_idx = out_x_idx
+        self.uistate.plot.axe.figure.canvas.draw_idle()
+        self.uistate.plot.last_out_x_idx = out_x_idx
         ax.figure.canvas.draw_idle()
 
     def _mouseover_output_io(self, event):
         str_ax = "ax1"
-        ax = getattr(uistate.plot, str_ax) if str_ax else None
-        if event.inaxes not in (uistate.plot.ax1, uistate.plot.ax2) or str_ax is None:
-            if uistate.plot.ghost_sweep is not None:
+        ax = getattr(self.uistate.plot, str_ax) if str_ax else None
+        if event.inaxes not in (self.uistate.plot.ax1, self.uistate.plot.ax2) or str_ax is None:
+            if self.uistate.plot.ghost_sweep is not None:
                 self.exorcise()
             return
         if event.inaxes != ax:
@@ -1475,10 +1471,10 @@ class InteractivePlotMixin:
         else:
             x, y = event.xdata, event.ydata
         if x is None or y is None:
-            if uistate.plot.ghost_sweep is not None:
+            if self.uistate.plot.ghost_sweep is not None:
                 self.exorcise()
             return
-        n_recs = len(uistate.plot.list_idx_select_recs or [])
+        n_recs = len(self.uistate.plot.list_idx_select_recs or [])
         if n_recs > 1:
             self.exorcise()
             return
@@ -1488,13 +1484,13 @@ class InteractivePlotMixin:
             rec_id = prow["ID"] if prow is not None else None
             dict_out = {
                 key: value
-                for key, value in uistate.plot.dict_rec_show.items()
+                for key, value in self.uistate.plot.dict_rec_show.items()
                 if rec_id is not None and value.get("rec_ID") == rec_id and value["axis"] == str_ax and value.get("x_mode") == "io" and hasattr(value["line"], "get_offsets")
             }
         else:
             dict_out = {
                 key: value
-                for key, value in uistate.plot.dict_rec_show.items()
+                for key, value in self.uistate.plot.dict_rec_show.items()
                 if value["axis"] == str_ax and value.get("x_mode") == "io" and hasattr(value["line"], "get_offsets")
             }
         if not dict_out:
@@ -1509,11 +1505,11 @@ class InteractivePlotMixin:
             return
         p_row = p_row_df.iloc[0]
 
-        dfoutput = self.get_dfdiff(row=p_row) if uistate.project.checkBox["paired_stims"] else self.get_dfoutput(row=p_row)
+        dfoutput = self.get_dfdiff(row=p_row) if self.uistate.project.checkBox["paired_stims"] else self.get_dfoutput(row=p_row)
         dfoutput = self.V2mV(dfoutput)
         df_sweeps = dfoutput[dfoutput["sweep"].notna()].reset_index(drop=True)
-        io_input = uistate.experiment.io_input
-        io_output = uistate.experiment.io_output
+        io_input = self.uistate.experiment.io_input
+        io_output = self.uistate.experiment.io_output
         x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
         y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
 
@@ -1542,7 +1538,7 @@ class InteractivePlotMixin:
         out_x_val = x_array[out_x_idx]
         out_y_val = y_array[out_x_idx]
 
-        if out_x_idx == uistate.plot.last_out_x_idx:
+        if out_x_idx == self.uistate.plot.last_out_x_idx:
             return
 
         df_t = self.get_dft(p_row)
@@ -1564,30 +1560,30 @@ class InteractivePlotMixin:
         snippet_y = dfsweep[rec_filter]
 
         aspect = dict_pop.get("aspect", "EPSP_amp")
-        highlight_color = uistate.project.settings.get(f"rgb_{aspect}", "red")
+        highlight_color = self.uistate.project.settings.get(f"rgb_{aspect}", "red")
 
         self._draw_mouseover_blob(ax, out_x_val, out_y_val, highlight_color)
         self._draw_ghost_sweep(snippet_x, snippet_y, ghost_label_text)
-        uistate.plot.axe.figure.canvas.draw_idle()
-        uistate.plot.last_out_x_idx = out_x_idx
+        self.uistate.plot.axe.figure.canvas.draw_idle()
+        self.uistate.plot.last_out_x_idx = out_x_idx
         ax.figure.canvas.draw_idle()
 
     # --- Phase 2: Specialized Drag Update Strategies ---
 
     def _drag_update_time(self, x_start, x_end, precision):
-        action = uistate.plot.mouseover_action
+        action = self.uistate.plot.mouseover_action
         if action is None:
             return
         aspect = "_".join(action.split()[:2])
-        stim_idx = uistate.plot.list_idx_select_stims[0]
+        stim_idx = self.uistate.plot.list_idx_select_stims[0]
         prow = self.get_prow()
         n_stims = prow["stims"]
-        dft_temp = uistate.plot.dft_temp
+        dft_temp = self.uistate.plot.dft_temp
         stim_offset = dft_temp.at[stim_idx, "t_stim"]
         dict_t = {}
 
         if aspect in ["EPSP_slope", "volley_slope"]:
-            axis = uistate.plot.ax2
+            axis = self.uistate.plot.ax2
             slope_width = round(x_end - x_start, precision)
             dict_t = {
                 f"t_{aspect}_start": round(x_start + stim_offset, precision),
@@ -1595,7 +1591,7 @@ class InteractivePlotMixin:
                 f"t_{aspect}_width": round(slope_width, precision),
             }
         elif aspect in ["EPSP_amp", "volley_amp"]:
-            axis = uistate.plot.ax1
+            axis = self.uistate.plot.ax1
             dict_t = {
                 "t_stim": stim_offset,
                 f"t_{aspect}": round(x_start + stim_offset, precision),
@@ -1603,7 +1599,7 @@ class InteractivePlotMixin:
 
         for key, value in dict_t.items():
             dft_temp.at[stim_idx, key] = value
-            if not uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
+            if not self.uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
                 offset = dft_temp.at[stim_idx, "t_stim"] - dft_temp.at[stim_idx, key]
                 for i, i_trow in dft_temp.iterrows():
                     dft_temp.at[i, key] = round(i_trow["t_stim"] - offset, precision)
@@ -1616,14 +1612,14 @@ class InteractivePlotMixin:
         dict_t["stim"] = trow_temp["stim"]
         dict_t["amp_zero"] = trow_temp["amp_zero"]
 
-        if not uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
-            dft_to_update = uistate.plot.dft_temp.copy()
+        if not self.uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
+            dft_to_update = self.uistate.plot.dft_temp.copy()
         else:
-            dft_to_update = uistate.plot.dft_temp.iloc[[stim_idx]].copy()
+            dft_to_update = self.uistate.plot.dft_temp.iloc[[stim_idx]].copy()
 
         rec_filter = prow.get("filter")
 
-        if uistate.x_axis == "stim" and len(uistate.plot.df_rec_select_time) > 1:
+        if self.uistate.x_axis == "stim" and len(self.uistate.plot.df_rec_select_time) > 1:
             dfmean = self.get_dfmean(row=prow)
             dict_t_stim = dft_to_update.iloc[0].to_dict()
             t_stim = dict_t_stim.get("t_stim", 0.0)
@@ -1655,7 +1651,7 @@ class InteractivePlotMixin:
             out = self.V2mV(out)
             if aspect in ["EPSP_amp", "EPSP_slope"]:
                 aspect_norm = f"{aspect}_norm"
-                outkey = aspect_norm if uistate.project.checkBox["norm_EPSP"] else aspect
+                outkey = aspect_norm if self.uistate.project.checkBox["norm_EPSP"] else aspect
             else:
                 outkey = aspect
 
@@ -1665,51 +1661,51 @@ class InteractivePlotMixin:
             linestyle = "-"
 
         msize = 6
-        if uistate.plot.mouseover_out is None:
-            uistate.plot.mouseover_out = axis.plot(
+        if self.uistate.plot.mouseover_out is None:
+            self.uistate.plot.mouseover_out = axis.plot(
                 drag_x,
                 drag_y,
-                color=uistate.project.settings.get(f"rgb_{aspect}", "black"),
+                color=self.uistate.project.settings.get(f"rgb_{aspect}", "black"),
                 linewidth=3,
                 linestyle=linestyle,
                 marker=marker_style,
                 markersize=msize,
             )
         else:
-            if getattr(uistate.plot.mouseover_out[0], "axes", None) != axis:
-                uistate.plot.mouseover_out[0].remove()
-                uistate.plot.mouseover_out = axis.plot(
+            if getattr(self.uistate.plot.mouseover_out[0], "axes", None) != axis:
+                self.uistate.plot.mouseover_out[0].remove()
+                self.uistate.plot.mouseover_out = axis.plot(
                     drag_x,
                     drag_y,
-                    color=uistate.project.settings.get(f"rgb_{aspect}", "black"),
+                    color=self.uistate.project.settings.get(f"rgb_{aspect}", "black"),
                     linewidth=3,
                     linestyle=linestyle,
                     marker=marker_style,
                     markersize=msize,
                 )
             else:
-                uistate.plot.mouseover_out[0].set_data(drag_x, drag_y)
-                uistate.plot.mouseover_out[0].set_marker(marker_style)
-                uistate.plot.mouseover_out[0].set_linestyle(linestyle)
-                uistate.plot.mouseover_out[0].set_color(uistate.project.settings.get(f"rgb_{aspect}", "black"))
-                uistate.plot.mouseover_out[0].set_markersize(msize)
+                self.uistate.plot.mouseover_out[0].set_data(drag_x, drag_y)
+                self.uistate.plot.mouseover_out[0].set_marker(marker_style)
+                self.uistate.plot.mouseover_out[0].set_linestyle(linestyle)
+                self.uistate.plot.mouseover_out[0].set_color(self.uistate.project.settings.get(f"rgb_{aspect}", "black"))
+                self.uistate.plot.mouseover_out[0].set_markersize(msize)
 
         self.canvasOutput.draw_idle()
 
     def _drag_update_pp(self, x_start, x_end, precision):
-        action = uistate.plot.mouseover_action
+        action = self.uistate.plot.mouseover_action
         if action is None:
             return
         aspect = "_".join(action.split()[:2])
-        stim_idx = uistate.plot.list_idx_select_stims[0]
+        stim_idx = self.uistate.plot.list_idx_select_stims[0]
         prow = self.get_prow()
         n_stims = prow["stims"]
-        dft_temp = uistate.plot.dft_temp
+        dft_temp = self.uistate.plot.dft_temp
         stim_offset = dft_temp.at[stim_idx, "t_stim"]
         dict_t = {}
 
         if aspect in ["EPSP_slope", "volley_slope"]:
-            axis = uistate.plot.ax2
+            axis = self.uistate.plot.ax2
             slope_width = round(x_end - x_start, precision)
             dict_t = {
                 f"t_{aspect}_start": round(x_start + stim_offset, precision),
@@ -1717,7 +1713,7 @@ class InteractivePlotMixin:
                 f"t_{aspect}_width": round(slope_width, precision),
             }
         elif aspect in ["EPSP_amp", "volley_amp"]:
-            axis = uistate.plot.ax1
+            axis = self.uistate.plot.ax1
             dict_t = {
                 "t_stim": stim_offset,
                 f"t_{aspect}": round(x_start + stim_offset, precision),
@@ -1725,7 +1721,7 @@ class InteractivePlotMixin:
 
         for key, value in dict_t.items():
             dft_temp.at[stim_idx, key] = value
-            if not uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
+            if not self.uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
                 offset = dft_temp.at[stim_idx, "t_stim"] - dft_temp.at[stim_idx, key]
                 for i, i_trow in dft_temp.iterrows():
                     dft_temp.at[i, key] = round(i_trow["t_stim"] - offset, precision)
@@ -1738,10 +1734,10 @@ class InteractivePlotMixin:
         dict_t["stim"] = trow_temp["stim"]
         dict_t["amp_zero"] = trow_temp["amp_zero"]
 
-        if not uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
-            dft_to_update = uistate.plot.dft_temp.copy()
+        if not self.uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
+            dft_to_update = self.uistate.plot.dft_temp.copy()
         else:
-            dft_to_update = uistate.plot.dft_temp.iloc[[stim_idx]].copy()
+            dft_to_update = self.uistate.plot.dft_temp.iloc[[stim_idx]].copy()
 
         rec_filter = prow.get("filter")
 
@@ -1776,7 +1772,7 @@ class InteractivePlotMixin:
             x_val_map = {}
             i = 1
             for key in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]:
-                if uistate.project.checkBox.get(key, True):
+                if self.uistate.project.checkBox.get(key, True):
                     x_val_map[key] = i
                     i += 1
             x_val = x_val_map.get(aspect, 1)
@@ -1787,7 +1783,7 @@ class InteractivePlotMixin:
         else:
             if aspect in ["EPSP_amp", "EPSP_slope"]:
                 aspect_norm = f"{aspect}_norm"
-                outkey = aspect_norm if uistate.project.checkBox["norm_EPSP"] else aspect
+                outkey = aspect_norm if self.uistate.project.checkBox["norm_EPSP"] else aspect
             else:
                 outkey = aspect
             drag_x = out["sweep"]
@@ -1796,48 +1792,48 @@ class InteractivePlotMixin:
             linestyle = "-"
 
         msize = 6
-        if uistate.plot.mouseover_out is None:
-            uistate.plot.mouseover_out = axis.plot(
+        if self.uistate.plot.mouseover_out is None:
+            self.uistate.plot.mouseover_out = axis.plot(
                 drag_x,
                 drag_y,
-                color=uistate.project.settings.get(f"rgb_{aspect}", "black"),
+                color=self.uistate.project.settings.get(f"rgb_{aspect}", "black"),
                 linewidth=3,
                 linestyle=linestyle,
                 marker=marker_style,
                 markersize=msize,
             )
         else:
-            if getattr(uistate.plot.mouseover_out[0], "axes", None) != axis:
-                uistate.plot.mouseover_out[0].remove()
-                uistate.plot.mouseover_out = axis.plot(
+            if getattr(self.uistate.plot.mouseover_out[0], "axes", None) != axis:
+                self.uistate.plot.mouseover_out[0].remove()
+                self.uistate.plot.mouseover_out = axis.plot(
                     drag_x,
                     drag_y,
-                    color=uistate.project.settings.get(f"rgb_{aspect}", "black"),
+                    color=self.uistate.project.settings.get(f"rgb_{aspect}", "black"),
                     linewidth=3,
                     linestyle=linestyle,
                     marker=marker_style,
                     markersize=msize,
                 )
             else:
-                uistate.plot.mouseover_out[0].set_data(drag_x, drag_y)
-                uistate.plot.mouseover_out[0].set_marker(marker_style)
-                uistate.plot.mouseover_out[0].set_linestyle(linestyle)
-                uistate.plot.mouseover_out[0].set_color(uistate.project.settings.get(f"rgb_{aspect}", "black"))
-                uistate.plot.mouseover_out[0].set_markersize(msize)
+                self.uistate.plot.mouseover_out[0].set_data(drag_x, drag_y)
+                self.uistate.plot.mouseover_out[0].set_marker(marker_style)
+                self.uistate.plot.mouseover_out[0].set_linestyle(linestyle)
+                self.uistate.plot.mouseover_out[0].set_color(self.uistate.project.settings.get(f"rgb_{aspect}", "black"))
+                self.uistate.plot.mouseover_out[0].set_markersize(msize)
 
         self.canvasOutput.draw_idle()
 
     def _drag_update_io(self, x_start, x_end, precision):
-        action = uistate.plot.mouseover_action
+        action = self.uistate.plot.mouseover_action
         if action is None:
             return
         aspect = "_".join(action.split()[:2])
-        stim_idx = uistate.plot.list_idx_select_stims[0]
+        stim_idx = self.uistate.plot.list_idx_select_stims[0]
         prow = self.get_prow()
-        dft_temp = uistate.plot.dft_temp
+        dft_temp = self.uistate.plot.dft_temp
         stim_offset = dft_temp.at[stim_idx, "t_stim"]
         dict_t = {}
-        axis = uistate.plot.ax1
+        axis = self.uistate.plot.ax1
 
         if aspect in ["EPSP_slope", "volley_slope"]:
             slope_width = round(x_end - x_start, precision)
@@ -1863,7 +1859,7 @@ class InteractivePlotMixin:
         dict_t["stim"] = trow_temp["stim"]
         dict_t["amp_zero"] = trow_temp["amp_zero"]
 
-        dft_to_update = uistate.plot.dft_temp.copy()
+        dft_to_update = self.uistate.plot.dft_temp.copy()
         rec_filter = prow.get("filter")
 
         if pd.notna(prow.get("bin_size")):
@@ -1879,8 +1875,8 @@ class InteractivePlotMixin:
         )
         out = self.V2mV(out)
 
-        io_input = uistate.experiment.io_input
-        io_output = uistate.experiment.io_output
+        io_input = self.uistate.experiment.io_input
+        io_output = self.uistate.experiment.io_output
         x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
         y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
 
@@ -1892,34 +1888,34 @@ class InteractivePlotMixin:
         aspect = y_col
 
         msize = 10
-        if uistate.plot.mouseover_out is None:
-            uistate.plot.mouseover_out = axis.plot(
+        if self.uistate.plot.mouseover_out is None:
+            self.uistate.plot.mouseover_out = axis.plot(
                 drag_x,
                 drag_y,
-                color=uistate.project.settings.get(f"rgb_{aspect}", "black"),
+                color=self.uistate.project.settings.get(f"rgb_{aspect}", "black"),
                 linewidth=3,
                 linestyle=linestyle,
                 marker=marker_style,
                 markersize=msize,
             )
         else:
-            if getattr(uistate.plot.mouseover_out[0], "axes", None) != axis:
-                uistate.plot.mouseover_out[0].remove()
-                uistate.plot.mouseover_out = axis.plot(
+            if getattr(self.uistate.plot.mouseover_out[0], "axes", None) != axis:
+                self.uistate.plot.mouseover_out[0].remove()
+                self.uistate.plot.mouseover_out = axis.plot(
                     drag_x,
                     drag_y,
-                    color=uistate.project.settings.get(f"rgb_{aspect}", "black"),
+                    color=self.uistate.project.settings.get(f"rgb_{aspect}", "black"),
                     linewidth=3,
                     linestyle=linestyle,
                     marker=marker_style,
                     markersize=msize,
                 )
             else:
-                uistate.plot.mouseover_out[0].set_data(drag_x, drag_y)
-                uistate.plot.mouseover_out[0].set_marker(marker_style)
-                uistate.plot.mouseover_out[0].set_linestyle(linestyle)
-                uistate.plot.mouseover_out[0].set_color(uistate.project.settings.get(f"rgb_{aspect}", "black"))
-                uistate.plot.mouseover_out[0].set_markersize(msize)
+                self.uistate.plot.mouseover_out[0].set_data(drag_x, drag_y)
+                self.uistate.plot.mouseover_out[0].set_marker(marker_style)
+                self.uistate.plot.mouseover_out[0].set_linestyle(linestyle)
+                self.uistate.plot.mouseover_out[0].set_color(self.uistate.project.settings.get(f"rgb_{aspect}", "black"))
+                self.uistate.plot.mouseover_out[0].set_markersize(msize)
 
         self.canvasOutput.draw_idle()
 
@@ -1937,15 +1933,15 @@ class InteractivePlotMixin:
     def zoomOnScroll(self, event, graph):
         if graph == "mean":
             canvas = self.canvasMean
-            ax = uistate.plot.axm
+            ax = self.uistate.plot.axm
         elif graph == "event":
             canvas = self.canvasEvent
-            ax = uistate.plot.axe
+            ax = self.uistate.plot.axe
         elif graph == "output":
             canvas = self.canvasOutput
-            slope_left = uistate.slopeOnly()
-            ax = uistate.plot.ax2
-            ax1 = uistate.plot.ax1
+            slope_left = self.uistate.slopeOnly()
+            ax = self.uistate.plot.ax2
+            ax1 = self.uistate.plot.ax1
 
         if event.button == "up":
             zoom = 1.1
@@ -1968,28 +1964,28 @@ class InteractivePlotMixin:
         on_right = x >= right
 
         # Apply the zoom
-        ymin0 = uistate.project.checkBox["output_ymin0"]
+        ymin0 = self.uistate.project.checkBox["output_ymin0"]
         if on_x:  # check this first; x takes precedence
             ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
         elif "slope_left" in locals():  # on output
             if on_left:
                 if slope_left:  # scroll left y zoom output slope y
-                    ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom  # TODO: uistate.project.checkBox...
+                    ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom  # TODO: self.uistate.project.checkBox...
                     ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
                 else:  # scroll left y to zoom output amp y
-                    ymin = 0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom  # TODO: uistate.project.checkBox...
+                    ymin = 0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom  # TODO: self.uistate.project.checkBox...
                     ax1.set_ylim(ymin, y + (ax1.get_ylim()[1] - y) / zoom)
             elif on_right and not slope_left:  # scroll right y to zoom output slope y
-                ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom  # TODO: uistate.project.checkBox...
+                ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom  # TODO: self.uistate.project.checkBox...
                 ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
             else:  # default, scroll graph to zoom all
                 ax1.set_xlim(
                     x - (x - ax1.get_xlim()[0]) / zoom,
                     x + (ax1.get_xlim()[1] - x) / zoom,
                 )
-                ymin = 0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom  # TODO: uistate.project.checkBox...
+                ymin = 0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom  # TODO: self.uistate.project.checkBox...
                 ax1.set_ylim(ymin, y + (ax1.get_ylim()[1] - y) / zoom)
-                ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom  # TODO: uistate.project.checkBox...
+                ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom  # TODO: self.uistate.project.checkBox...
                 ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
         else:  # on mean or event graphs
             if on_left:  # scroll left x to zoom mean or event x
