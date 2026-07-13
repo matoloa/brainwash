@@ -47,6 +47,48 @@ def test_stim_num_from_index():
     assert plot_stim.stim_num_from_index(0) == 1
 
 
+def test_validate_drag_update_inputs():
+    prow = pd.Series({"recording_name": "r1", "filter": "voltage"})
+    trow = {"t_stim": 0.04, "stim": 1}
+    x, y = plot_stim.validate_drag_update_inputs(
+        prow, trow, "EPSP amp", np.array([0.0, 0.01]), np.array([0.0, 0.001]), None
+    )
+    assert len(x) == 2
+
+
+def test_drag_update_label_core_and_output_label():
+    assert plot_stim.drag_update_label_core("rec1", "voltage", 1, "EPSP amp") == "rec1 - stim 1 EPSP amp"
+    assert (
+        plot_stim.drag_update_label_core("rec1", "savgol", 2, "EPSP slope")
+        == "rec1 (savgol) - stim 2 EPSP slope"
+    )
+    assert plot_stim.drag_output_label("rec1 - stim 1 EPSP amp", "EPSP amp", True) == "rec1 - stim 1 EPSP amp norm"
+    assert plot_stim.amp_output_column("EPSP amp", True) == "EPSP_amp_norm"
+
+
+def test_amp_drag_geometry_and_resolve_drag_amp_si():
+    trow = {
+        "t_EPSP_amp": 0.05,
+        "t_EPSP_amp_halfwidth": 0.001,
+    }
+    data_x = np.array([-0.0015, 0.0, 0.01, 0.02])
+    data_y = np.array([0.0, 0.001, 0.002, 0.003])
+    geom = plot_stim.amp_drag_geometry(trow, "EPSP amp", 0.04, data_x, data_y)
+    assert abs(geom.t_amp - 0.01) < 1e-9
+    assert geom.amp_zero == 0.0
+    assert plot_stim.resolve_drag_amp_si(5000.0, geom.y_position, geom.amp_zero) == 5.0
+
+
+def test_slope_marker_xy():
+    trow = {"t_EPSP_slope_start": 0.045, "t_EPSP_slope_end": 0.055}
+    data_x = np.linspace(0, 0.02, 5)
+    data_y = data_x * 0.1
+    x_data, y_data = plot_stim.slope_marker_xy(trow, "EPSP slope", 0.04, data_x, data_y)
+    assert len(x_data) == 2
+    assert abs(x_data[0] - 0.005) < 1e-6
+    assert abs(x_data[1] - 0.015) < 1e-6
+
+
 def test_build_stim_event_plot_specs_minimal():
     dfmean = _dfmean_with_stim()
     dft = pd.DataFrame(

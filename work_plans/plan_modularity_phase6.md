@@ -60,3 +60,4 @@ uv run pytest src/brainwash/ -q
 | 7b | per-stim event loop → plot_stim | ✅ commit 72 [HIGH RISK phase7b] |
 | 7b | addGroup PP/IO specs → plot_series | ✅ commit 73 [HIGH RISK phase7b] |
 | 7b | graphRefresh legend/PP ticks → plot_model/series | ✅ commit 74 [HIGH RISK phase7b] |
+| 7b | UIplot.update drag geometry → plot_stim | ✅ commit 75 [HIGH RISK phase7b] |

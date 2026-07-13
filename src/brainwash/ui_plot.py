@@ -1821,111 +1821,47 @@ class UIplot:
             copying from the live-drag mouseover_out (single-point).
         """
 
-        # Validate input formats
-        if not isinstance(prow, pd.Series):
-            raise TypeError(f"prow must be pandas.Series, got {type(prow).__name__}")
-        if not isinstance(trow, (pd.Series, dict)):
-            raise TypeError(f"trow must be pandas.Series or dict, got {type(trow).__name__}")
-        if isinstance(trow, dict) and not trow:
-            raise ValueError("trow dict is empty")
-
-        valid_aspects = ["EPSP slope", "volley slope", "EPSP amp", "volley amp"]
-        if aspect not in valid_aspects:
-            raise ValueError(f"aspect must be one of {valid_aspects}, got '{aspect}'")
-        if not isinstance(data_x, np.ndarray):
-            try:
-                data_x = np.asarray(data_x)
-            except (TypeError, ValueError):
-                raise TypeError(f"data_x must be array-like, got {type(data_x).__name__}")
-        if not isinstance(data_y, np.ndarray):
-            try:
-                data_y = np.asarray(data_y)
-            except (TypeError, ValueError):
-                raise TypeError(f"data_y must be array-like, got {type(data_y).__name__}")
-
-        if len(data_x) != len(data_y):
-            raise ValueError(f"data_x and data_y must have same length, got {len(data_x)} and {len(data_y)}")
-
-        if amp is not None and not isinstance(amp, (int, float, np.number)):
-            raise TypeError(f"amp must be numeric or None, got {type(amp).__name__}")
-
-        # Validate required keys in trow
-        required_keys = ["t_stim", "stim"]
-        for key in required_keys:
-            if key not in trow:
-                raise KeyError(f"trow missing required key: '{key}'")
-
-        # TODO: unspaghetti this mess
+        data_x, data_y = plot_stim.validate_drag_update_inputs(prow, trow, aspect, data_x, data_y, amp)
         norm = self.uistate.project.checkBox["norm_EPSP"]
         stim_offset = trow["t_stim"]
-        rec_filter = prow.get("filter")
-        rec_name = prow["recording_name"]
-        if rec_filter != "voltage":
-            label_core = f"{rec_name} ({rec_filter}) - stim {trow['stim']} {aspect}"
-        else:
-            label_core = f"{rec_name} - stim {trow['stim']} {aspect}"
+        label_core = plot_stim.drag_update_label_core(
+            prow["recording_name"],
+            prow.get("filter"),
+            trow["stim"],
+            aspect,
+        )
+        is_pp = self.uistate.experiment.experiment_type == "PP"
+        stim_num = trow["stim"]
 
-        if aspect in ["EPSP slope", "volley slope"]:
-            x_start = trow[f"t_{aspect.replace(' ', '_')}_start"] - stim_offset
-            x_end = trow[f"t_{aspect.replace(' ', '_')}_end"] - stim_offset
-            y_start = data_y[np.abs(data_x - x_start).argmin()]
-            y_end = data_y[np.abs(data_x - x_end).argmin()]
-            self.updateLine(f"{label_core} marker", [x_start, x_end], [y_start, y_end])
-
-            is_pp = self.uistate.experiment.experiment_type == "PP"
-
+        if aspect in plot_stim.SLOPE_DRAG_ASPECTS:
+            x_data, y_data = plot_stim.slope_marker_xy(trow, aspect, stim_offset, data_x, data_y)
+            self.updateLine(f"{label_core} marker", x_data, y_data)
+            out_label = plot_stim.drag_output_label(label_core, aspect, norm)
             if aspect == "volley slope":
-                volley_slope_mean = trow.get("volley_slope_mean")
-                if is_pp:
-                    stim_num = trow["stim"]
-                    if dfoutput is not None:
-                        self.updateOutLineFromDf(label_core, dfoutput, stim_num, aspect.replace(" ", "_"))
-                else:
-                    self.updateOutMean(f"{label_core} mean", volley_slope_mean)
-            else:  # EPSP slope
-                if norm:
-                    label_core += " norm"
                 if is_pp and dfoutput is not None:
-                    stim_num = trow["stim"]
-                    col = f"EPSP_slope_norm" if norm else "EPSP_slope"
-                    self.updateOutLineFromDf(label_core, dfoutput, stim_num, col)
-                else:
-                    self.updateOutLine(label_core)
-        elif aspect in ["EPSP amp", "volley amp"]:
-            key = aspect.replace(" ", "_")
-            t_amp = trow[f"t_{key}"] - stim_offset
-            y_position = data_y[np.abs(data_x - t_amp).argmin()]
-            amp_x = (
-                t_amp - trow[f"t_{key}_halfwidth"],
-                t_amp + trow[f"t_{key}_halfwidth"],
-            )
-            # amp_zero_plot: mean of axe data_y in the pre-stim region (data_x < 0).
-            # data_x is already shifted so t_stim = 0, data_y is raw voltage.
-            # This matches exactly what axe displays, regardless of filter column
-            # or DC offset — and is consistent with addRow's amp_zero_plot.
-            if amp_zero_plot is None:
-                pre_stim_mask = (data_x >= -0.002) & (data_x < -0.001)
-                amp_zero_plot = float(data_y[pre_stim_mask].mean()) if pre_stim_mask.any() else y_position
-            self.updateAmpMarker(label_core, t_amp, y_position, amp_x, amp_zero_plot, amp=amp)
-            is_pp = self.uistate.experiment.experiment_type == "PP"
+                    self.updateOutLineFromDf(label_core, dfoutput, stim_num, plot_stim.slope_output_column(aspect, norm))
+                elif not is_pp:
+                    self.updateOutMean(f"{label_core} mean", trow.get("volley_slope_mean"))
+            elif is_pp and dfoutput is not None:
+                self.updateOutLineFromDf(out_label, dfoutput, stim_num, plot_stim.slope_output_column(aspect, norm))
+            else:
+                self.updateOutLine(out_label)
+        elif aspect in plot_stim.AMP_DRAG_ASPECTS:
+            geom = plot_stim.amp_drag_geometry(trow, aspect, stim_offset, data_x, data_y, amp_zero_plot)
+            self.updateAmpMarker(label_core, geom.t_amp, geom.y_position, geom.amp_x, geom.amp_zero, amp=amp)
+            out_label = plot_stim.drag_output_label(label_core, aspect, norm)
+            col = plot_stim.amp_output_column(aspect, norm)
             if aspect == "volley amp":
-                volley_amp_mean = trow.get("volley_amp_mean")
                 if dfoutput is not None:
-                    stim_num = trow["stim"]
-                    self.updateOutLineFromDf(label_core, dfoutput, stim_num, key)
+                    self.updateOutLineFromDf(label_core, dfoutput, stim_num, col)
                 elif not is_pp:
                     self.updateOutLine(label_core)
                 if not is_pp:
-                    self.updateOutMean(f"{label_core} mean", volley_amp_mean)
-            else:  # EPSP amp
-                if norm:
-                    label_core += " norm"
-                if dfoutput is not None:
-                    stim_num = trow["stim"]
-                    col = f"{key}_norm" if norm else key
-                    self.updateOutLineFromDf(label_core, dfoutput, stim_num, col)
-                elif not is_pp:
-                    self.updateOutLine(label_core)
+                    self.updateOutMean(f"{label_core} mean", trow.get("volley_amp_mean"))
+            elif dfoutput is not None:
+                self.updateOutLineFromDf(out_label, dfoutput, stim_num, col)
+            elif not is_pp:
+                self.updateOutLine(out_label)
 
     def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None, draw=False):
         axe = self.uistate.plot.axe
@@ -1934,18 +1870,10 @@ class UIplot:
         y = np.atleast_1d(y)
         print(f"updateAmpMarker: {labelbase}, x: {x}, y: {y}, amp_x: {amp_x}, amp_zero: {amp_zero}, amp: {amp}")
         self.uistate.plot.dict_rec_labels[f"{labelbase} marker"]["line"].set_data(x, y)
-        if amp is None or pd.isna(amp):
-            amp = -(y[0] - amp_zero)
-
-        if amp is not None and not pd.isna(amp):
-            expected_amp = -(y[0] - amp_zero)
-            if abs(expected_amp) > 1e-6 and abs(amp / expected_amp) > 50:
-                amp = amp / 1000.0
-            elif abs(expected_amp) <= 1e-6 and abs(amp) > 1e-3:
-                amp = amp / 1000.0
-
+        amp_si = plot_stim.resolve_drag_amp_si(amp, float(y[0]), amp_zero)
+        if amp_si is not None:
             is_zero_width = amp_x[0] == amp_x[1]
-            amp_y = amp_zero, (0 - amp) + amp_zero
+            amp_y = plot_stim.amp_width_y_coords(amp_si, amp_zero)
             self.uistate.plot.dict_rec_labels[f"{labelbase} x marker"]["line"].set_data(amp_x, [amp_y[1], amp_y[1]])
             self.uistate.plot.dict_rec_labels[f"{labelbase} y marker"]["line"].set_data([x[0], x[0]], amp_y)
             self.uistate.plot.dict_rec_labels[f"{labelbase} x marker"]["is_zero_width"] = is_zero_width

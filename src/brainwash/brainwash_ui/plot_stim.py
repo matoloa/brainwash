@@ -449,3 +449,118 @@ def build_stim_event_plot_specs(
             )
 
     return specs
+
+
+DRAG_UPDATE_ASPECTS = ("EPSP slope", "volley slope", "EPSP amp", "volley amp")
+SLOPE_DRAG_ASPECTS = frozenset({"EPSP slope", "volley slope"})
+AMP_DRAG_ASPECTS = frozenset({"EPSP amp", "volley amp"})
+
+
+def validate_drag_update_inputs(prow, trow, aspect, data_x, data_y, amp) -> tuple[np.ndarray, np.ndarray]:
+    if not isinstance(prow, pd.Series):
+        raise TypeError(f"prow must be pandas.Series, got {type(prow).__name__}")
+    if not isinstance(trow, (pd.Series, dict)):
+        raise TypeError(f"trow must be pandas.Series or dict, got {type(trow).__name__}")
+    if isinstance(trow, dict) and not trow:
+        raise ValueError("trow dict is empty")
+    if aspect not in DRAG_UPDATE_ASPECTS:
+        raise ValueError(f"aspect must be one of {DRAG_UPDATE_ASPECTS}, got '{aspect}'")
+    try:
+        x_arr = np.asarray(data_x)
+        y_arr = np.asarray(data_y)
+    except (TypeError, ValueError) as exc:
+        raise TypeError(f"data_x/data_y must be array-like: {exc}") from exc
+    if len(x_arr) != len(y_arr):
+        raise ValueError(f"data_x and data_y must have same length, got {len(x_arr)} and {len(y_arr)}")
+    if amp is not None and not isinstance(amp, (int, float, np.number)):
+        raise TypeError(f"amp must be numeric or None, got {type(amp).__name__}")
+    for key in ("t_stim", "stim"):
+        if key not in trow:
+            raise KeyError(f"trow missing required key: '{key}'")
+    return x_arr, y_arr
+
+
+def drag_update_label_core(rec_name: str, rec_filter, stim, aspect: str) -> str:
+    if rec_filter != "voltage":
+        return f"{rec_name} ({rec_filter}) - stim {stim} {aspect}"
+    return f"{rec_name} - stim {stim} {aspect}"
+
+
+def drag_output_label(label_core: str, aspect: str, norm_epsp: bool) -> str:
+    if norm_epsp and aspect in ("EPSP slope", "EPSP amp"):
+        return f"{label_core} norm"
+    return label_core
+
+
+def slope_output_column(aspect: str, norm_epsp: bool) -> str:
+    if aspect == "EPSP slope":
+        return "EPSP_slope_norm" if norm_epsp else "EPSP_slope"
+    return aspect.replace(" ", "_")
+
+
+def amp_output_column(aspect: str, norm_epsp: bool) -> str:
+    key = aspect.replace(" ", "_")
+    if aspect == "EPSP amp" and norm_epsp:
+        return f"{key}_norm"
+    return key
+
+
+def slope_marker_xy(trow, aspect: str, stim_offset: float, data_x: np.ndarray, data_y: np.ndarray) -> tuple[list, list]:
+    key = aspect.replace(" ", "_")
+    x_start = trow[f"t_{key}_start"] - stim_offset
+    x_end = trow[f"t_{key}_end"] - stim_offset
+    y_start = float(data_y[np.abs(data_x - x_start).argmin()])
+    y_end = float(data_y[np.abs(data_x - x_end).argmin()])
+    return [x_start, x_end], [y_start, y_end]
+
+
+def amp_zero_from_drag_trace(data_x: np.ndarray, data_y: np.ndarray, y_fallback: float) -> float:
+    pre_stim_mask = (data_x >= AMP_ZERO_PRE_WINDOW[0]) & (data_x < AMP_ZERO_PRE_WINDOW[1])
+    if pre_stim_mask.any():
+        return float(data_y[pre_stim_mask].mean())
+    return float(y_fallback)
+
+
+@dataclass(frozen=True)
+class AmpDragGeometry:
+    t_amp: float
+    y_position: float
+    amp_x: tuple[float, float]
+    amp_zero: float
+
+
+def amp_drag_geometry(
+    trow,
+    aspect: str,
+    stim_offset: float,
+    data_x: np.ndarray,
+    data_y: np.ndarray,
+    amp_zero_plot: float | None = None,
+) -> AmpDragGeometry:
+    key = aspect.replace(" ", "_")
+    t_amp = trow[f"t_{key}"] - stim_offset
+    y_position = float(data_y[np.abs(data_x - t_amp).argmin()])
+    amp_x = (
+        t_amp - trow[f"t_{key}_halfwidth"],
+        t_amp + trow[f"t_{key}_halfwidth"],
+    )
+    if amp_zero_plot is None:
+        amp_zero_plot = amp_zero_from_drag_trace(data_x, data_y, y_position)
+    return AmpDragGeometry(t_amp=t_amp, y_position=y_position, amp_x=amp_x, amp_zero=amp_zero_plot)
+
+
+def resolve_drag_amp_si(amp, y_position: float, amp_zero: float) -> float | None:
+    if amp is None or pd.isna(amp):
+        amp = -(y_position - amp_zero)
+    if amp is None or pd.isna(amp):
+        return None
+    expected_amp = -(y_position - amp_zero)
+    if abs(expected_amp) > 1e-6 and abs(amp / expected_amp) > 50:
+        amp = amp / 1000.0
+    elif abs(expected_amp) <= 1e-6 and abs(amp) > 1e-3:
+        amp = amp / 1000.0
+    return float(amp)
+
+
+def amp_width_y_coords(amp_si: float, amp_zero: float) -> tuple[float, float]:
+    return amp_zero, (0 - amp_si) + amp_zero
