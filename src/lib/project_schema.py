@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-_INT_COLUMNS = ["stims", "sampling_rate", "bin_size"]
+INT_COLUMNS = ["stims", "sampling_rate", "bin_size"]
 
 
 def df_projectTemplate():
@@ -37,6 +37,6 @@ def df_projectTemplate():
             "comment",
         ]
     )
-    for col in _INT_COLUMNS:
+    for col in INT_COLUMNS:
         df[col] = df[col].astype(pd.Int64Dtype())
     return df

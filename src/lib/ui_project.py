@@ -25,7 +25,7 @@ import yaml
 from PyQt5 import QtCore, QtWidgets
 
 import lib.parse as parse
-from project_schema import df_projectTemplate
+from project_schema import INT_COLUMNS, df_projectTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ class ProjectMixin:
         self.mainwindow.setGeometry(
             0,
             0,
-            int(screen.width() * 0.999) - getattr(config, "work_space", 0),
+            int(screen.width() * 0.999) - getattr(self.config, "work_space", 0),
             int(screen.height()) - self.config.terminal_space,
         )
 
@@ -310,7 +310,7 @@ class ProjectMixin:
         else:
             # Restore nullable-integer dtypes that pd.concat can degrade to
             # object when mixing Int64 rows with newly-parsed Series rows.
-            for col in _INT_COLUMNS:
+            for col in INT_COLUMNS:
                 if col in df.columns:
                     df[col] = df[col].astype(pd.Int64Dtype())
             # sweeps is a mixed-type sentinel column: unparsed rows hold the
@@ -354,7 +354,7 @@ class ProjectMixin:
                 self.df_project[col] = None
         # Restore nullable-integer dtypes lost during CSV round-trip (CSV
         # reads integer-with-NaN columns as float64, producing "1.0" display).
-        for col in _INT_COLUMNS:
+        for col in INT_COLUMNS:
             if col in self.df_project.columns:
                 self.df_project[col] = self.df_project[col].astype(pd.Int64Dtype())
 
