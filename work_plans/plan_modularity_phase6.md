@@ -2,6 +2,7 @@
 
 > **Status**: Active. Branch: `ui-refactor/phase0-3`.
 > Phases 0–5 + 3b + 4: complete. **Human approved Phase 6+ scope 2026-07-13.**
+> **Rollback guide**: [phase6/README.md](phase6/README.md) (commits `61`/`62` HIGH RISK).
 
 ## HIGH RISK commit convention
 
