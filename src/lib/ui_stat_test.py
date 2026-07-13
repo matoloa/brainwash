@@ -891,6 +891,14 @@ class StatTestMixin:
         uistate.buttonGroup_test_n = n_unit
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.update_test()
+
+        # force fresh group means at new n_unit level (clear any prior caches for these groups)
+        if hasattr(self, "dict_group_means"):
+            for gid in list(self.dd_groups.keys()):
+                self.dict_group_means.pop(gid, None)
+                for lev in getattr(self, "VALID_LEVELS", ["recording", "slice", "subject"]):
+                    self.dict_group_means.pop((gid, lev), None)
+
         if hasattr(uiplot, "unPlotGroup"):
             uiplot.unPlotGroup()
         for group_ID in list(self.dd_groups.keys()):
@@ -905,6 +913,14 @@ class StatTestMixin:
             self.graphRefresh(reeval_formal_test=False)
         if hasattr(self, "mouseoverUpdate"):
             self.mouseoverUpdate()
+
+        # force canvas redraw so group mean lines / SEM shades update immediately
+        for cname in ("canvasMean", "canvasEvent", "canvasOutput"):
+            if hasattr(self, cname):
+                try:
+                    getattr(self, cname).draw_idle()
+                except Exception:
+                    pass
 
     def update_experiment_type_radio_buttons(self):
         """Select experiment type radio buttons for the current state."""

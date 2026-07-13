@@ -4,6 +4,7 @@ import warnings
 import matplotlib.pyplot as plt  # for the scatterplot
 import numpy as np
 import pandas as pd
+from collections import defaultdict
 
 # import seaborn as sns
 from matplotlib import style
@@ -1997,21 +1998,57 @@ class UIplot:
             color = dict_group["color"]
 
             # Find all PPR lines for recordings in this group
-            ppr_data = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
-            rec_id_order = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
+            # collect per-rec PPR means
+            rec_ppr = {}
             for rec_id in dict_group["rec_IDs"]:
-                print(f"DEBUG addGroup parsing rec_id: {rec_id}")
+                rec_ppr[rec_id] = {}
                 for key, linedict in self.uistate.dict_rec_labels.items():
                     if linedict.get("rec_ID") == rec_id and "PPR" in key and linedict.get("variant") == "raw":
                         aspect = linedict.get("aspect")
-                        if aspect in ppr_data:
+                        if aspect:
                             y_data = linedict["line"].get_ydata()
-                            print(f"DEBUG addGroup found {key}: len y_data = {len(y_data)}")
                             if len(y_data) > 0:
                                 valid_y = [y for y in y_data if np.isfinite(y)]
                                 if valid_y:
-                                    ppr_data[aspect].append(np.mean(valid_y))
-                                    rec_id_order[aspect].append(rec_id)
+                                    rec_ppr[rec_id][aspect] = np.mean(valid_y)
+
+            level = getattr(self.uistate, "buttonGroup_test_n", "recording")
+            ppr_data = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
+            rec_id_order = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
+            if level == "recording":
+                for rec_id, ad in rec_ppr.items():
+                    for asp, v in ad.items():
+                        if asp in ppr_data:
+                            ppr_data[asp].append(v)
+                            rec_id_order[asp].append(rec_id)
+            else:
+                # aggregate at unit level
+                df_p = None
+                try:
+                    if hasattr(self, "uisub") and self.uisub and hasattr(self.uisub, "get_df_project"):
+                        df_p = self.uisub.get_df_project()
+                except Exception:
+                    df_p = None
+                rec_to_unit = {}
+                if df_p is not None:
+                    for rec_id in rec_ppr:
+                        mm = df_p[df_p["ID"] == rec_id]
+                        if not mm.empty:
+                            pr = mm.iloc[0]
+                            if level == "subject":
+                                uk = str(pr.get("subject", "unknown"))
+                            else:
+                                uk = f"{pr.get('subject', 'unknown')}_{pr.get('slice', '1')}"
+                            rec_to_unit[rec_id] = uk
+                unit_asp = defaultdict(lambda: defaultdict(list))
+                for rec_id, ad in rec_ppr.items():
+                    uk = rec_to_unit.get(rec_id, rec_id)
+                    for asp, v in ad.items():
+                        unit_asp[uk][asp].append(v)
+                for uk, ad in unit_asp.items():
+                    for asp, vlist in ad.items():
+                        if asp in ppr_data and vlist:
+                            ppr_data[asp].append(np.mean(vlist))
 
             aspect_list = [
                 ("EPSP_amp", "ax1"),
@@ -2069,19 +2106,20 @@ class UIplot:
                             zorder=3,
                             label=f"{group_name} PPR {aspect} err",
                         )
-                        # 3. Plot individual points
-                        # Jitter the points slightly along the X axis so they don't overlap perfectly
-                        jitter = np.random.uniform(-0.06, 0.06, size=len(vals)) if len(vals) > 1 else np.array([0])
-                        x_jittered = [bar_x] * len(vals) + jitter
-                        aspect_color = self.uistate.settings.get(f"rgb_{aspect}", "white")
-
+                        # 3. Plot individual points (only at recording level; at higher n_unit the 'vals' are unit aggregates)
                         scat_artists = []
-                        for j, (val, rid) in enumerate(zip(vals, rec_id_order[aspect])):
-                            xj = x_jittered[j]
-                            scat_art = self.get_axis(axid).scatter(
-                                [xj], [val], color=aspect_color, edgecolor="black", zorder=4, s=40, label=f"{group_name} PPR {aspect} {rid} point"
-                            )
-                            scat_artists.append((scat_art, rid))
+                        if level == "recording" and 'rec_id_order' in locals() and aspect in rec_id_order:
+                            # Jitter the points slightly along the X axis so they don't overlap perfectly
+                            jitter = np.random.uniform(-0.06, 0.06, size=len(vals)) if len(vals) > 1 else np.array([0])
+                            x_jittered = [bar_x] * len(vals) + jitter
+                            aspect_color = self.uistate.settings.get(f"rgb_{aspect}", "white")
+
+                            for j, (val, rid) in enumerate(zip(vals, rec_id_order[aspect])):
+                                xj = x_jittered[j]
+                                scat_art = self.get_axis(axid).scatter(
+                                    [xj], [val], color=aspect_color, edgecolor="black", zorder=4, s=40, label=f"{group_name} PPR {aspect} {rid} point"
+                                )
+                                scat_artists.append((scat_art, rid))
 
                         # 4. Create overlay artists for Rec View
                         x_val_map = {}
