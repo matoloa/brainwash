@@ -113,10 +113,6 @@ ui_project.config = config
 ui_project.uiplot = uiplot
 ui_project.InputDialogPopup = ui_widgets.InputDialogPopup
 
-ui_data_frames.uistate = uistate
-ui_data_frames.config = config
-ui_data_frames.uiplot = uiplot
-
 import lib.export_data as export_data
 import lib.ui_interactive as ui_interactive
 import lib.ui_menus as ui_menus
@@ -141,11 +137,6 @@ ui_table.uistate = uistate
 ui_table.config = config
 ui_table.uiplot = uiplot
 
-# ui_selection
-ui_selection.uistate = uistate
-ui_selection.config = config
-ui_selection.uiplot = uiplot
-
 # ui_graph
 ui_graph.uistate = uistate
 ui_graph.config = config
@@ -155,11 +146,6 @@ ui_graph.uiplot = uiplot
 ui_parse.uistate = uistate
 ui_parse.config = config
 ui_parse.uiplot = uiplot
-
-# ui_stat_test
-ui_stat_test.uistate = uistate
-ui_stat_test.config = config
-ui_stat_test.uiplot = uiplot
 
 ####################################################################
 # MAIN UI CLASS
@@ -190,6 +176,10 @@ class UIsub(
         logger.debug("setupUi done")
         logger.debug("UIsub init")
         print(" - UIsub init, verbose mode")
+
+        self.uistate = uistate
+        self.config = config
+        self.uiplot = uiplot
 
         # Custom UI initialization - non-QtDesigner-generated instructions
         self.pushButtonParse.setVisible(False)

@@ -2,12 +2,7 @@
 # StatTestMixin — formal statistical tests, applicability checks, statusbar, n_unit, etc.
 # extracted from UIsub (Phase 4 of ui mixin extraction plan).
 #
-# Module-level singletons are injected by ui.py (same pattern as other mixins):
-#
-#   import ui_stat_test
-#   ui_stat_test.uistate = uistate
-#   ui_stat_test.config  = config
-#   ui_stat_test.uiplot  = uiplot
+# Uses self.uistate / self.uiplot set on UIsub at construction (see ui.py).
 
 from __future__ import annotations
 
@@ -22,18 +17,13 @@ from brainwash_ui import applicability, statusbar, view_state
 
 from . import statistics as stats
 
-# ---------------------------------------------------------------------------
-# Injected singletons — set by ui.py before any UIsub instance is created.
-# ---------------------------------------------------------------------------
-uistate = None  # type: ignore[assignment]
-config = None  # type: ignore[assignment]
-uiplot = None  # type: ignore[assignment]
-
 logger = logging.getLogger(__name__)
 
 
 class StatTestMixin:
     """Mixin that provides formal statistical test coordination, applicability checks, statusbar logic, n_unit handling, etc.
+
+    Host: ``protocols.StatTestHost``
 
     Host requirements:
         - self.dd_groups, self.dd_testsets
@@ -122,12 +112,12 @@ class StatTestMixin:
         return {}
 
     def _maybe_log_applicability_warning(self, warning: str | None, *, always_log: bool = False) -> str | None:
-        if warning and (always_log or bool(uistate.stat_test.formal_test_results)):
+        if warning and (always_log or bool(self.uistate.stat_test.formal_test_results)):
             print(f"Statistical test: {warning}")
         return warning
 
     def update_anova_label(self):
-        """Update label_test_ANOVA and uistate.stat_test.anova_label based on number of shown test sets."""
+        """Update label_test_ANOVA and self.uistate.stat_test.anova_label based on number of shown test sets."""
         if not hasattr(self, "label_test_ANOVA"):
             return
         n = len(self._get_shown_testsets())
@@ -135,20 +125,19 @@ class StatTestMixin:
             label_text = "ANOVA (repeated)"
         else:
             label_text = "ANOVA (one-way)"
-        uistate.stat_test.anova_label = label_text
+        self.uistate.stat_test.anova_label = label_text
         self.label_test_ANOVA.setText(label_text)
         if hasattr(self, "dict_folders") and "project" in getattr(self, "dict_folders", {}):
-            uistate.save_cfg(projectfolder=self.dict_folders["project"])
+            self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
     def clear_formal_test_results(self):
         """Clear any formal test markers and stored results. Independent of heatmap."""
         try:
-            if uiplot is not None:
-                uiplot.clear_test_markers(draw=True)
+            self.uiplot.clear_test_markers(draw=True)
         except Exception:
             pass
-        uistate.stat_test.formal_test_results = None
-        uistate.stat_test.statusbar_state = None  # reset non-persisted state on clear
+        self.uistate.stat_test.formal_test_results = None
+        self.uistate.stat_test.statusbar_state = None  # reset non-persisted state on clear
         # leave printed console output as-is (user can scroll)
 
     # -------------------------------------------------------------------------
@@ -174,7 +163,7 @@ class StatTestMixin:
 
         # Choose a sensible text color for non-error states if none supplied.
         if text_color is None and bg_color is None:
-            text_color = "#ddd" if uistate.darkmode else "#333"
+            text_color = "#ddd" if self.uistate.darkmode else "#333"
 
         lbl = "QStatusBar QLabel { qproperty-alignment: AlignCenter; background-color: transparent;"
         if text_color:
@@ -213,18 +202,18 @@ class StatTestMixin:
     # -------------------------------------------------------------------------
 
     def _is_io_mode(self) -> bool:
-        return uistate.experiment.experiment_type == "io"
+        return self.uistate.experiment.experiment_type == "io"
 
     def _effective_test_type(self) -> str:
         if self._is_io_mode():
             return "io_regression"
-        return uistate.stat_test.test_type
+        return self.uistate.stat_test.test_type
 
     def _should_show_stat_test_frame(self) -> bool:
         """Central helper: return whether Statistical Test frame should be shown (respects viewTools/menu/hide button state; no auto-hide on IO)."""
         return view_state.should_show_stat_test_frame(
-            uistate.experiment.experiment_type,
-            uistate.project.viewTools,
+            self.uistate.experiment.experiment_type,
+            self.uistate.project.viewTools,
         )
 
     def _is_loading_active(self):
@@ -239,23 +228,23 @@ class StatTestMixin:
     # -------------------------------------------------------------------------
 
     def _apply_statusbar_result(self, result: statusbar.StatusbarResult) -> str | None:
-        uistate.stat_test.statusbar_state = result.state
+        self.uistate.stat_test.statusbar_state = result.state
         return result.text
 
     def _get_statusbar_for_current_state(self) -> str | None:
-        """Single source of truth for statusbar text. Sets uistate.stat_test.statusbar_state once from computed result."""
+        """Single source of truth for statusbar text. Sets self.uistate.stat_test.statusbar_state once from computed result."""
         eff = self._effective_test_type()
         if eff == "None":
             return self._apply_statusbar_result(statusbar.StatusbarResult(None, None))
         if self._is_io_mode():
-            formal = uistate.stat_test.formal_test_results
+            formal = self.uistate.stat_test.formal_test_results
             return self._apply_statusbar_result(
                 self._format_io_regression_statusbar(formal)
             )
         warning = self._get_stat_test_warning()
         if warning is not None:
             return self._apply_statusbar_result(statusbar.StatusbarResult(warning, "warning"))
-        formal = uistate.stat_test.formal_test_results
+        formal = self.uistate.stat_test.formal_test_results
         if formal:
             result = self._format_non_io_stat_test_statusbar(formal)
             if result.text:
@@ -263,7 +252,7 @@ class StatTestMixin:
         return self._apply_statusbar_result(statusbar.StatusbarResult(None, None))
 
     def _format_io_regression_statusbar(self, formal) -> statusbar.StatusbarResult:
-        n_unit = uistate.stat_test.buttonGroup_test_n
+        n_unit = self.uistate.stat_test.buttonGroup_test_n
         return statusbar.format_io_regression_statusbar(
             formal,
             dd_groups=self._dd_groups_safe(),
@@ -275,12 +264,12 @@ class StatTestMixin:
             formal,
             effective_test_type=self._effective_test_type(),
             dd_groups=self._dd_groups_safe(),
-            n_unit=uistate.stat_test.buttonGroup_test_n,
-            ttest_variant=uistate.stat_test.test_t_variant,
-            wilcox_variant=uistate.stat_test.test_wilcox_variant,
-            test_fdr=bool(uistate.stat_test.test_fdr),
-            test_sw=bool(uistate.stat_test.test_sw),
-            test_levene=bool(uistate.stat_test.test_levene),
+            n_unit=self.uistate.stat_test.buttonGroup_test_n,
+            ttest_variant=self.uistate.stat_test.test_t_variant,
+            wilcox_variant=self.uistate.stat_test.test_wilcox_variant,
+            test_fdr=bool(self.uistate.stat_test.test_fdr),
+            test_sw=bool(self.uistate.stat_test.test_sw),
+            test_levene=bool(self.uistate.stat_test.test_levene),
         )
 
     # -------------------------------------------------------------------------
@@ -323,8 +312,8 @@ class StatTestMixin:
             eff,
             dd_groups=self._dd_groups_safe(),
             dd_testsets=self._dd_testsets_safe(),
-            ttest_variant=uistate.stat_test.test_t_variant,
-            wilcox_variant=uistate.stat_test.test_wilcox_variant,
+            ttest_variant=self.uistate.stat_test.test_t_variant,
+            wilcox_variant=self.uistate.stat_test.test_wilcox_variant,
         )
         if warning:
             self._maybe_log_applicability_warning(warning, always_log=(eff == "Friedman"))
@@ -349,7 +338,7 @@ class StatTestMixin:
             self._updating_test = False
 
         text = self._get_statusbar_for_current_state()
-        state = uistate.stat_test.statusbar_state
+        state = self.uistate.stat_test.statusbar_state
         self.set_statusbar(state, text)
 
     def set_statusbar(self, state: str | None = None, text: str | None = None):
@@ -409,7 +398,7 @@ class StatTestMixin:
                 amp=True,
                 slope=True,
                 ref=0.0,
-                n_unit=uistate.stat_test.buttonGroup_test_n,
+                n_unit=self.uistate.stat_test.buttonGroup_test_n,
                 experiment_type=experiment_type,
             )
             results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
@@ -423,8 +412,8 @@ class StatTestMixin:
             if results and isinstance(results, list) and len(results) > 0 and "group_ns" in results[0]:
                 if isinstance(results[0], dict) and "config" not in results[0]:
                     results[0]["config"] = results[0].copy()
-            uistate.stat_test.formal_test_results = results
-            uiplot.show_test_markers(results)
+            self.uistate.stat_test.formal_test_results = results
+            self.uiplot.show_test_markers(results)
             return True
         except Exception as ex:
             print(f"IO regression compute error: {ex}")
@@ -439,7 +428,7 @@ class StatTestMixin:
             self.clear_formal_test_results()
             return
 
-        had_results = bool(uistate.stat_test.formal_test_results)
+        had_results = bool(self.uistate.stat_test.formal_test_results)
 
         if not hasattr(self, "dd_groups") or not isinstance(self.dd_groups, dict) or not self.dd_groups:
             if had_results:
@@ -452,10 +441,10 @@ class StatTestMixin:
 
         ref_attr = "label_test_t_one_sample_value"
         if test_type == "Wilcoxon":
-            variant_for_check = uistate.stat_test.test_wilcox_variant
+            variant_for_check = self.uistate.stat_test.test_wilcox_variant
             ref_attr = "label_test_wilcox_one_sample_value"
         else:
-            variant_for_check = uistate.stat_test.test_t_variant
+            variant_for_check = self.uistate.stat_test.test_t_variant
         if test_type == "Cluster perm.":
             variant_for_check = "unpaired"
         shown_ts = self._get_shown_testsets()
@@ -496,23 +485,23 @@ class StatTestMixin:
             return
 
         if test_type == "Wilcoxon":
-            variant = uistate.stat_test.test_wilcox_variant
-            tails = uistate.stat_test.test_wilcox_tails
+            variant = self.uistate.stat_test.test_wilcox_variant
+            tails = self.uistate.stat_test.test_wilcox_tails
         else:
-            variant = uistate.stat_test.test_t_variant
-            tails = uistate.stat_test.test_t_tails
-        ref_value = getattr(uistate.stat_test, ref_attr, 0.0)
-        fdr = bool(uistate.stat_test.test_fdr)
-        norm = bool(uistate.project.checkBox.get("norm_EPSP", False))
-        amp = bool(uistate.project.checkBox.get("EPSP_amp", True))
-        slope = bool(uistate.project.checkBox.get("EPSP_slope", True))
+            variant = self.uistate.stat_test.test_t_variant
+            tails = self.uistate.stat_test.test_t_tails
+        ref_value = getattr(self.uistate.stat_test, ref_attr, 0.0)
+        fdr = bool(self.uistate.stat_test.test_fdr)
+        norm = bool(self.uistate.project.checkBox.get("norm_EPSP", False))
+        amp = bool(self.uistate.project.checkBox.get("EPSP_amp", True))
+        slope = bool(self.uistate.project.checkBox.get("EPSP_slope", True))
         g1 = shown_groups[0] if shown_groups else None
         g2 = shown_groups[1] if len(shown_groups) > 1 else None
         n1 = len(self.dd_groups.get(g1, {}).get("rec_IDs", [])) if g1 else 0
         n2 = len(self.dd_groups.get(g2, {}).get("rec_IDs", [])) if g2 else 0
 
-        n_unit = uistate.stat_test.buttonGroup_test_n
-        experiment_type = uistate.experiment.experiment_type
+        n_unit = self.uistate.stat_test.buttonGroup_test_n
+        experiment_type = self.uistate.experiment.experiment_type
 
         try:
             comp = stats.compute_statistical_comparison(
@@ -549,12 +538,12 @@ class StatTestMixin:
         if comp.get("config") and comp.get("config").get("implicit_testset") and (not results or not isinstance(results, list) or len(results) == 0):
             results = [{"config": comp["config"]}]
 
-        uistate.stat_test.formal_test_results = results
-        uiplot.show_test_markers(results)
+        self.uistate.stat_test.formal_test_results = results
+        self.uiplot.show_test_markers(results)
         self._print_statistical_test_table(results, variant=variant, tails=tails, fdr=fdr, norm=norm, test_type=test_type)
         set_names = ", ".join(str(r.get("set_name") or r.get("set_id") or "?") for r in results)
-        sw = bool(uistate.stat_test.test_sw)
-        lev = bool(uistate.stat_test.test_levene)
+        sw = bool(self.uistate.stat_test.test_sw)
+        lev = bool(self.uistate.stat_test.test_levene)
         effective_variant = "unpaired" if test_type == "Cluster perm." else variant
         self.usage(f"stat_test applied: {test_type} {effective_variant} {tails} on {set_names} (fdr={fdr}, sw={sw}, levene={lev}, n_unit={n_unit})")
 
@@ -610,16 +599,16 @@ class StatTestMixin:
     def test_type_changed(self, button):
         """Handler for buttonGroup_test.buttonClicked signal."""
         test_type = self._RADIO_TO_TEST.get(button.objectName(), button.text()) if hasattr(self, "_RADIO_TO_TEST") else button.text()
-        old_type = uistate.stat_test.test_type
+        old_type = self.uistate.stat_test.test_type
         if test_type is None or test_type == old_type:
             return
         self.usage(f"test_type_changed → {test_type}")
         print(f"Selected statistical test: {test_type}")
-        uistate.stat_test.test_type = test_type
+        self.uistate.stat_test.test_type = test_type
         if hasattr(self, "frameToolTest_sub_t"):
             self.frameToolTest_sub_t.setVisible(test_type == "t-test")
             if hasattr(self, "lineEdit_test_t_one_sample_value"):
-                val = uistate.stat_test.label_test_t_one_sample_value
+                val = self.uistate.stat_test.label_test_t_one_sample_value
                 self.lineEdit_test_t_one_sample_value.setText(str(val))
         if hasattr(self, "frameToolTest_sub_ANOVA"):
             self.frameToolTest_sub_ANOVA.setVisible(test_type in ("ANOVA", "ANCOVA"))
@@ -628,38 +617,38 @@ class StatTestMixin:
         if hasattr(self, "frameToolTest_sub_wilcoxon"):
             self.frameToolTest_sub_wilcoxon.setVisible(test_type == "Wilcoxon")
             if test_type == "Wilcoxon" and hasattr(self, "lineEdit_wilcoxon_one_sample_value"):
-                val = uistate.stat_test.label_test_wilcox_one_sample_value
+                val = self.uistate.stat_test.label_test_wilcox_one_sample_value
                 self.lineEdit_wilcoxon_one_sample_value.setText(str(val))
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
-        uistate.stat_test.formal_test_results = None
+        self.uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.uistate.stat_test.formal_test_results = None
         self.update_test()
 
     def test_t_variant_changed(self, button):
         variant = self._RADIO_TO_TEST_T_VARIANT.get(button.objectName(), button.text()) if hasattr(self, "_RADIO_TO_TEST_T_VARIANT") else button.text()
         print(f"Selected t-test variant: {variant}")
-        uistate.stat_test.test_t_variant = variant
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.uistate.stat_test.test_t_variant = variant
+        self.uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.update_test()
 
     def test_t_tails_changed(self, button):
         tails = self._RADIO_TO_TEST_T_TAILS.get(button.objectName(), button.text()) if hasattr(self, "_RADIO_TO_TEST_T_TAILS") else button.text()
         print(f"Selected t-test tails: {tails}")
-        uistate.stat_test.test_t_tails = tails
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.uistate.stat_test.test_t_tails = tails
+        self.uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.update_test()
 
     def test_wilcox_variant_changed(self, button):
         variant = self._RADIO_TO_TEST_WILCOX_VARIANT.get(button.objectName(), button.text()) if hasattr(self, "_RADIO_TO_TEST_WILCOX_VARIANT") else button.text()
         print(f"Selected Wilcoxon variant: {variant}")
-        uistate.stat_test.test_wilcox_variant = variant
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.uistate.stat_test.test_wilcox_variant = variant
+        self.uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.update_test()
 
     def test_wilcox_tails_changed(self, button):
         tails = self._RADIO_TO_TEST_WILCOX_TAILS.get(button.objectName(), button.text()) if hasattr(self, "_RADIO_TO_TEST_WILCOX_TAILS") else button.text()
         print(f"Selected Wilcoxon tails: {tails}")
-        uistate.stat_test.test_wilcox_tails = tails
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.uistate.stat_test.test_wilcox_tails = tails
+        self.uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.update_test()
 
     def editTestTOneSampleValue(self, lineEdit):
@@ -667,11 +656,11 @@ class StatTestMixin:
         try:
             val = float(lineEdit.text().replace(",", "."))
         except ValueError:
-            lineEdit.setText(str(uistate.stat_test.label_test_t_one_sample_value))
+            lineEdit.setText(str(self.uistate.stat_test.label_test_t_one_sample_value))
             return
-        uistate.stat_test.label_test_t_one_sample_value = val
-        print(f"editTestTOneSampleValue: uistate.stat_test.label_test_t_one_sample_value set to {val}")
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.uistate.stat_test.label_test_t_one_sample_value = val
+        print(f"editTestTOneSampleValue: self.uistate.stat_test.label_test_t_one_sample_value set to {val}")
+        self.uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.update_test()
 
     def editTestWilcoxOneSampleValue(self, lineEdit):
@@ -679,11 +668,11 @@ class StatTestMixin:
         try:
             val = float(lineEdit.text().replace(",", "."))
         except ValueError:
-            lineEdit.setText(str(uistate.stat_test.label_test_wilcox_one_sample_value))
+            lineEdit.setText(str(self.uistate.stat_test.label_test_wilcox_one_sample_value))
             return
-        uistate.stat_test.label_test_wilcox_one_sample_value = val
-        print(f"editTestWilcoxOneSampleValue: uistate.stat_test.label_test_wilcox_one_sample_value set to {val}")
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.uistate.stat_test.label_test_wilcox_one_sample_value = val
+        print(f"editTestWilcoxOneSampleValue: self.uistate.stat_test.label_test_wilcox_one_sample_value set to {val}")
+        self.uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.update_test()
 
     def n_unit_changed(self, button):
@@ -692,14 +681,14 @@ class StatTestMixin:
             return
         n_unit = self._RADIO_TO_TEST_N.get(button.objectName(), "subject") if hasattr(self, "_RADIO_TO_TEST_N") else "subject"
         print(f"Selected n_unit: {n_unit}")
-        uistate.stat_test.buttonGroup_test_n = n_unit
-        uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
+        self.uistate.stat_test.buttonGroup_test_n = n_unit
+        self.uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.update_test()
 
         # Lazy per-level (per plan): only create artists for this level if they don't exist yet.
         # Do NOT clear/unplot previous levels — their artists remain (hidden) so future switches are pure toggles.
         # Only the required level's df is computed (lazy in get_dfgroupmean).
-        current_level = uistate.stat_test.buttonGroup_test_n
+        current_level = self.uistate.stat_test.buttonGroup_test_n
         for group_ID in list(self.dd_groups.keys()):
             if not self.dd_groups[group_ID].get("rec_IDs"):
                 continue
@@ -707,7 +696,7 @@ class StatTestMixin:
 
             # Check if we already have artists for this level for this group (by level tag, supporting suffixed keys)
             has_level = False
-            for k, v in uistate.plot.dict_group_labels.items():
+            for k, v in self.uistate.plot.dict_group_labels.items():
                 if v.get("group_ID") == group_ID and v.get("level") == current_level:
                     has_level = True
                     break
@@ -715,11 +704,11 @@ class StatTestMixin:
             if not has_level:
                 group_mean_data = self.get_dfgroupmean(group_ID, level=current_level)
                 x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
-                uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data), x_pos=x_pos, level=current_level)
+                self.uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data), x_pos=x_pos, level=current_level)
 
         self.update_show()  # applies level filter from current n_unit + selection rules
-        if hasattr(uiplot, "update_group_level_visibility"):
-            uiplot.update_group_level_visibility(current_level)
+        if hasattr(self.uiplot, "update_group_level_visibility"):
+            self.uiplot.update_group_level_visibility(current_level)
 
         if hasattr(self, "graphRefresh"):
             self.graphRefresh(reeval_formal_test=False)
@@ -738,7 +727,7 @@ class StatTestMixin:
         """Select experiment type radio buttons for the current state."""
         if not hasattr(self, "buttonGroup_type"):
             return
-        mode = uistate.experiment.experiment_type
+        mode = self.uistate.experiment.experiment_type
         radio_name = self._TYPE_TO_RADIO.get(mode, "radioButton_type_time") if hasattr(self, "_TYPE_TO_RADIO") else None
         if radio_name and hasattr(self, radio_name):
             getattr(self, radio_name).setChecked(True)

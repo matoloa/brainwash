@@ -2,12 +2,7 @@
 # SelectionMixin — visibility, show logic, rec/group selection handling
 # extracted from UIsub (Phase 1 of ui mixin extraction plan).
 #
-# Module-level singletons are injected by ui.py (same pattern as other mixins):
-#
-#   import ui_selection
-#   ui_selection.uistate = uistate
-#   ui_selection.config  = config
-#   ui_selection.uiplot  = uiplot
+# Uses self.uistate / self.uiplot set on UIsub at construction (see ui.py).
 
 from __future__ import annotations
 
@@ -16,18 +11,13 @@ import logging
 import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
-# ---------------------------------------------------------------------------
-# Injected singletons — set by ui.py before any UIsub instance is created.
-# ---------------------------------------------------------------------------
-uistate = None  # type: ignore[assignment]
-config = None  # type: ignore[assignment]
-uiplot = None  # type: ignore[assignment]
-
 logger = logging.getLogger(__name__)
 
 
 class SelectionMixin:
     """Mixin that provides rec/group visibility logic (update_show) and selection helpers.
+
+    Host: ``protocols.SelectionHost``
 
     Host requirements:
         - self.dd_groups, self.get_groupsOfRec()
@@ -36,8 +26,8 @@ class SelectionMixin:
         - self.formatTableStimLayout(), self.setButtonParse()
         - self.graphUpdate(), self.zoomAuto(), self.graphRefresh()
         - self.usage()
-        - uistate.plot.dict_rec_labels, uistate.plot.dict_group_labels, etc.
-        - uistate.plot.list_idx_select_recs, uistate.plot.list_idx_select_stims
+        - self.uistate.plot.dict_rec_labels, self.uistate.plot.dict_group_labels, etc.
+        - self.uistate.plot.list_idx_select_recs, self.uistate.plot.list_idx_select_stims
         - self._is_io_mode()
         - self.dict_folders (for save_cfg in setViewToolVisible)
     """
@@ -53,7 +43,7 @@ class SelectionMixin:
 
         # Phase 0 PP mode display guard
         axis = v.get("axis")
-        is_pp = uistate.experiment.experiment_type == "PP"
+        is_pp = self.uistate.experiment.experiment_type == "PP"
         if is_pp and axis in ("ax1", "ax2"):
             if valid_pp_ids is not None and v["rec_ID"] not in valid_pp_ids:
                 return False
@@ -65,28 +55,28 @@ class SelectionMixin:
         # so x_mode="sweep" lines are visible in both "sweep" and "time" modes.
         x_mode = v.get("x_mode")
         is_io = self._is_io_mode()
-        if x_mode is not None and x_mode != uistate.x_axis:
-            if not (x_mode == "sweep" and uistate.x_axis == "time"):
+        if x_mode is not None and x_mode != self.uistate.x_axis:
+            if not (x_mode == "sweep" and self.uistate.x_axis == "time"):
                 return False
         if is_io and v.get("line") and v["line"].get_label().endswith(" IO trendline"):
-            if not uistate.project.checkBox.get("io_trendline", False):
+            if not self.uistate.project.checkBox.get("io_trendline", False):
                 return False
         aspect = v.get("aspect")
         axis = v.get("axis")
-        if aspect and not uistate.project.checkBox.get(aspect, True):
+        if aspect and not self.uistate.project.checkBox.get(aspect, True):
             if axis == "axe" or not is_io:
                 return False
         # special case for *_mean aspects (volley_amp_mean, volley_slope_mean): independent of parent volley per requirement
         if aspect in ("volley_amp_mean", "volley_slope_mean"):
-            return uistate.project.checkBox.get(aspect, False)
-        if aspect and aspect.endswith("_mean") and not uistate.project.checkBox.get(aspect.replace("_mean", ""), True):
+            return self.uistate.project.checkBox.get(aspect, False)
+        if aspect and aspect.endswith("_mean") and not self.uistate.project.checkBox.get(aspect.replace("_mean", ""), True):
             if axis == "axe" or not is_io:
                 return False
         # norm/raw switch: only EPSP amp/slope have a norm variant.
         # Only applies to ax1/ax2 output lines — markers on axe represent physical
         # measurement positions and are always shown regardless of normalisation.
         variant = v.get("variant")
-        norm_active = uistate.project.checkBox["norm_EPSP"]
+        norm_active = self.uistate.project.checkBox["norm_EPSP"]
         if axis in ("ax1", "ax2"):
             if variant == "norm" and not norm_active:
                 return False
@@ -106,26 +96,26 @@ class SelectionMixin:
         # visible when that mode is active.
         x_mode = v.get("x_mode")
         is_io = self._is_io_mode()
-        if x_mode is not None and x_mode != uistate.x_axis:
-            if not (x_mode == "sweep" and uistate.x_axis == "time"):
+        if x_mode is not None and x_mode != self.uistate.x_axis:
+            if not (x_mode == "sweep" and self.uistate.x_axis == "time"):
                 return False
         if is_io and v.get("line") and v["line"].get_label().endswith(" IO trendline"):
-            if not uistate.project.checkBox.get("io_trendline", False):
+            if not self.uistate.project.checkBox.get("io_trendline", False):
                 return False
         aspect = v.get("aspect")
         axis = v.get("axis")
-        if aspect and not uistate.project.checkBox.get(aspect, True):
+        if aspect and not self.uistate.project.checkBox.get(aspect, True):
             if axis == "axe" or not is_io:
                 return False
         # special case for *_mean aspects (volley_amp_mean, volley_slope_mean): independent of parent volley per requirement
         if aspect in ("volley_amp_mean", "volley_slope_mean"):
-            return uistate.project.checkBox.get(aspect, False)
-        if aspect and aspect.endswith("_mean") and not uistate.project.checkBox.get(aspect.replace("_mean", ""), True):
+            return self.uistate.project.checkBox.get(aspect, False)
+        if aspect and aspect.endswith("_mean") and not self.uistate.project.checkBox.get(aspect.replace("_mean", ""), True):
             if axis == "axe" or not is_io:
                 return False
         variant = v.get("variant")
-        norm_active = uistate.project.checkBox["norm_EPSP"]
-        is_pp = uistate.experiment.experiment_type == "PP"
+        norm_active = self.uistate.project.checkBox["norm_EPSP"]
+        is_pp = self.uistate.experiment.experiment_type == "PP"
         if not is_pp:
             if variant == "norm" and not norm_active:
                 return False
@@ -137,11 +127,11 @@ class SelectionMixin:
 
     def update_show(self, reset=False):
         if reset:
-            for v in uistate.plot.dict_rec_labels.values():
+            for v in self.uistate.plot.dict_rec_labels.values():
                 v["line"].set_visible(False)
-            uistate.plot.dict_rec_show = {}
+            self.uistate.plot.dict_rec_show = {}
             if self.dd_groups is not None:
-                for v in uistate.plot.dict_group_labels.values():
+                for v in self.uistate.plot.dict_group_labels.values():
                     for key in ["line", "fill"]:
                         obj = v[key]
                         if hasattr(obj, "set_visible"):
@@ -162,25 +152,25 @@ class SelectionMixin:
                             for c in obj.get_children():
                                 if c is not None:
                                     c.set_visible(False)
-                uistate.plot.dict_group_show = {}
+                self.uistate.plot.dict_group_show = {}
             # Important: Don't return here! Keep processing the rest of the method
             # so the currently selected recordings/stims/groups get turned back on.
 
-        if uistate.plot.df_recs2plot is None:
+        if self.uistate.plot.df_recs2plot is None:
             # No recordings selected — hide all rec lines but keep checkbox-ticked
             # groups visible on ax1/ax2.
-            for v in uistate.plot.dict_rec_labels.values():
+            for v in self.uistate.plot.dict_rec_labels.values():
                 v["line"].set_visible(False)
-            uistate.plot.dict_rec_show = {}
+            self.uistate.plot.dict_rec_show = {}
             if self.dd_groups is not None:
                 new_group_show = {}
-                is_pp = uistate.experiment.experiment_type == "PP"
-                for k, v in uistate.plot.dict_group_labels.items():
+                is_pp = self.uistate.experiment.experiment_type == "PP"
+                for k, v in self.uistate.plot.dict_group_labels.items():
                     visible = self._is_group_visible(v, selected_groups=None)
                     if is_pp and v.get("is_overlay"):
                         visible = False
                     # respect current n_unit level
-                    current_level = uistate.stat_test.buttonGroup_test_n
+                    current_level = self.uistate.stat_test.buttonGroup_test_n
                     if v.get("level") and v.get("level") != current_level:
                         visible = False
                     for key in ["line", "fill"]:
@@ -204,14 +194,14 @@ class SelectionMixin:
                                 c.set_visible(visible)
                     if visible:
                         new_group_show[k] = v
-                uistate.plot.dict_group_show = new_group_show
+                self.uistate.plot.dict_group_show = new_group_show
             return
 
-        selected_ids = set(uistate.plot.df_recs2plot["ID"])
-        selected_stims = {stim + 1 for stim in uistate.plot.list_idx_select_stims}  # stim_select is 0-based (indices) - convert to stims
+        selected_ids = set(self.uistate.plot.df_recs2plot["ID"])
+        selected_stims = {stim + 1 for stim in self.uistate.plot.list_idx_select_stims}  # stim_select is 0-based (indices) - convert to stims
         # print(f"update_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}")
 
-        is_pp = uistate.experiment.experiment_type == "PP"
+        is_pp = self.uistate.experiment.experiment_type == "PP"
         valid_pp_ids = set()
         if is_pp:
             df_p = self.get_df_project()
@@ -225,19 +215,19 @@ class SelectionMixin:
 
         # rec lines
         new_rec_show = {}
-        for k, v in uistate.plot.dict_rec_labels.items():
+        for k, v in self.uistate.plot.dict_rec_labels.items():
             visible = self._is_rec_visible(v, selected_ids, selected_stims, valid_pp_ids)
             v["line"].set_visible(visible)
             if visible:
                 new_rec_show[k] = v
-        uistate.plot.dict_rec_show = new_rec_show
+        self.uistate.plot.dict_rec_show = new_rec_show
 
         # group lines
         if self.dd_groups is not None:
-            is_pp = uistate.experiment.experiment_type == "PP"
+            is_pp = self.uistate.experiment.experiment_type == "PP"
             selected_groups = {group for rec_ID in selected_ids for group in self.get_groupsOfRec(rec_ID)}
             new_group_show = {}
-            for k, v in uistate.plot.dict_group_labels.items():
+            for k, v in self.uistate.plot.dict_group_labels.items():
                 visible = self._is_group_visible(v, selected_groups)
 
                 if is_pp:
@@ -251,7 +241,7 @@ class SelectionMixin:
                             visible = False
 
                 # Level-aware visibility for n_unit (recording/slice/subject)
-                current_level = uistate.stat_test.buttonGroup_test_n
+                current_level = self.uistate.stat_test.buttonGroup_test_n
                 if v.get("level") and v.get("level") != current_level:
                     visible = False
 
@@ -277,15 +267,15 @@ class SelectionMixin:
                                 c.set_visible(visible)
                 if visible:
                     new_group_show[k] = v
-            uistate.plot.dict_group_show = new_group_show
+            self.uistate.plot.dict_group_show = new_group_show
 
             # enforce n_unit level visibility for groups (separate artists per level)
-            if hasattr(uiplot, "update_group_level_visibility"):
-                uiplot.update_group_level_visibility()
+            if hasattr(self.uiplot, "update_group_level_visibility"):
+                self.uiplot.update_group_level_visibility()
 
     def update_sample_checkbox(self):
         """Updates checkBox_is_group_sample enabled/checked state. Called from tableProjSelectionChanged"""
-        if len(uistate.plot.list_idx_select_recs) != 1 or not hasattr(self, "checkBox_is_group_sample"):
+        if len(self.uistate.plot.list_idx_select_recs) != 1 or not hasattr(self, "checkBox_is_group_sample"):
             self.checkBox_is_group_sample.setEnabled(False)
             self.checkBox_is_group_sample.setChecked(False)
             return
@@ -299,7 +289,7 @@ class SelectionMixin:
         groups = self.get_groupsOfRec(rec_ID)
         enabled = len(groups) > 0
         checked = enabled and all(str(self.dd_groups.get(g, {}).get("sample")) == rec_str for g in groups)
-        uistate.project.checkBox["is_group_sample"] = checked
+        self.uistate.project.checkBox["is_group_sample"] = checked
         checkbox = self.checkBox_is_group_sample
         checkbox.blockSignals(True)
         checkbox.setEnabled(enabled)
@@ -309,14 +299,14 @@ class SelectionMixin:
     def setViewToolVisible(self, frame, visible=None):
         """Toggle visibility of tool frames (hierarchy, timetable, etc) and sync menu state + persist."""
         self.usage(f"setViewToolVisible {frame} {visible}")
-        if frame in uistate.project.viewTools:
+        if frame in self.uistate.project.viewTools:
             if visible is None:
-                visible = not uistate.project.viewTools[frame][1]
-            uistate.project.viewTools[frame][1] = visible
+                visible = not self.uistate.project.viewTools[frame][1]
+            self.uistate.project.viewTools[frame][1] = visible
             getattr(self, frame).setVisible(visible)
 
             # Sync the menu action if it exists
-            text = uistate.project.viewTools[frame][0]
+            text = self.uistate.project.viewTools[frame][0]
             if hasattr(self, "menuView"):
                 for action in self.menuView.actions():
                     if action.text() == text:
@@ -328,4 +318,4 @@ class SelectionMixin:
                 visible = not getattr(self, frame).isVisible()
             getattr(self, frame).setVisible(visible)
 
-        uistate.save_cfg(projectfolder=self.dict_folders["project"])
+        self.uistate.save_cfg(projectfolder=self.dict_folders["project"])

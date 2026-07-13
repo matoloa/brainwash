@@ -3,14 +3,7 @@
 # These methods handle all internal DataFrame caching, building, and transformation:
 # means, timepoints, outputs, filters, bins, diffs, group means, and uniform timepoints.
 #
-# Module-level singletons are injected by ui.py at startup (after all
-# singletons and widget classes are created but before any UIsub instance
-# is constructed):
-#
-#   import ui_data_frames
-#   ui_data_frames.uistate = uistate
-#   ui_data_frames.config  = config
-#   ui_data_frames.uiplot  = uiplot
+# Uses self.uistate / self.config / self.uiplot set on UIsub at construction (see ui.py).
 
 from __future__ import annotations
 
@@ -23,16 +16,11 @@ import numpy as np
 import pandas as pd
 import parse
 
-# ---------------------------------------------------------------------------
-# Injected singletons — set by ui.py before any UIsub instance is created.
-# ---------------------------------------------------------------------------
-uistate = None  # type: ignore[assignment]
-config = None  # type: ignore[assignment]
-uiplot = None  # type: ignore[assignment]
-
-
 class DataFrameMixin:
-    """Mixin that provides the internal DataFrame computation layer for UIsub."""
+    """Mixin that provides the internal DataFrame computation layer for UIsub.
+
+    Host: ``protocols.DataFrameHost``
+    """
 
     # ------------------------------------------------------------------
     # Stub / trivial helpers
@@ -130,22 +118,22 @@ class DataFrameMixin:
         if hasattr(self, "turn_heatmap_off"):
             self.turn_heatmap_off()
 
-        norm_from = uistate.project.lineEdit["norm_EPSP_from"]
-        norm_to = uistate.project.lineEdit["norm_EPSP_to"]
-        dt = uistate.project.default_dict_t
+        norm_from = self.uistate.project.lineEdit["norm_EPSP_from"]
+        norm_to = self.uistate.project.lineEdit["norm_EPSP_to"]
+        dt = self.uistate.project.default_dict_t
         dt["norm_output_from"] = norm_from
         dt["norm_output_to"] = norm_to
-        uistate.save_cfg(projectfolder=self.dict_folders["project"])
+        self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
         df_p = self.get_df_project()
         rows = df_p.iloc[selection] if selection is not None else df_p
 
         if selection is None:
-            uiplot.unPlot()
-            uiplot.unPlotGroup()  # all levels (full clear)
+            self.uiplot.unPlot()
+            self.uiplot.unPlotGroup()  # all levels (full clear)
         else:
             for _, p_row in rows.iterrows():
-                uiplot.unPlot(p_row["ID"])
+                self.uiplot.unPlot(p_row["ID"])
             # Ensure unique group IDs and convert to list correctly
             affected_group_IDs = list(set([g for _, p_row in rows.iterrows() for g in self.get_groupsOfRec(p_row["ID"])]))
             for group_ID in affected_group_IDs:
@@ -185,7 +173,7 @@ class DataFrameMixin:
                 print(dfbin)
             dfoutput = self.get_dfoutput(p_row, reset=True)
             self.persistOutput(rec, dfoutput, p_row=p_row)
-            uiplot.addRow(p_row, df_t, self.get_dfmean(p_row), self.V2mV(dfoutput))
+            self.uiplot.addRow(p_row, df_t, self.get_dfmean(p_row), self.V2mV(dfoutput))
         self.tableUpdate(restore_selection=True)  # centralized restore after recalculate
 
         # group handling
@@ -197,7 +185,7 @@ class DataFrameMixin:
         if hasattr(self, "dd_group_samples"):
             self.dd_group_samples = {}
 
-        uiplot.hideAll()
+        self.uiplot.hideAll()
         self.update_show(reset=(selection is None))
         self.mouseoverUpdate()
         self.uiThaw()
@@ -299,7 +287,7 @@ class DataFrameMixin:
             return dft
         else:
             print("creating dft")
-            default_dict_t = uistate.project.default_dict_t.copy()  # Default sizes
+            default_dict_t = self.uistate.project.default_dict_t.copy()  # Default sizes
             dfmean = self.get_dfmean(row)
             dft = analysis.find_events(
                 dfmean=dfmean,
@@ -312,8 +300,8 @@ class DataFrameMixin:
                 print("get_dft: No stims found.")
                 return None
             dft["norm_output_from"], dft["norm_output_to"] = (
-                uistate.project.lineEdit["norm_EPSP_from"],
-                uistate.project.lineEdit["norm_EPSP_to"],
+                self.uistate.project.lineEdit["norm_EPSP_from"],
+                self.uistate.project.lineEdit["norm_EPSP_to"],
             )
             df_p = self.get_df_project()  # update (number of) 'stims' columns
             stims = len(dft)
@@ -322,7 +310,7 @@ class DataFrameMixin:
             self.tableUpdate(restore_selection=True)  # ensure selection preserved after stim count update
             # If the UI checkbox for 'timepoints_per_stim' is checked OR there's only 1 stim,
             # we assume timepoints don't need adjustment, so we cache df_t as-is.
-            if uistate.project.checkBox["timepoints_per_stim"] or stims == 1:
+            if self.uistate.project.checkBox["timepoints_per_stim"] or stims == 1:
                 self.dict_ts[rec] = dft  # update cache
             # Otherwise, compute a uniform timepoint structure based on the current row and df_t.
             else:
@@ -780,20 +768,20 @@ class DataFrameMixin:
             self.dict_group_means[cache_key] = val
             return val
         if cache_key in self.dict_group_means:
-            if config.verbose:
+            if self.config.verbose:
                 print(f"Returning cached group mean for {group_ID} level={eff_level}")
             return self.dict_group_means[cache_key]
 
         level_suffix = "" if eff_level == self.LEVEL_RECORDING else f"_{eff_level}"
         group_path = Path(f"{self.dict_folders['cache']}/group_{group_ID}{level_suffix}_mean.parquet")
         if group_path.exists():
-            if config.verbose:
+            if self.config.verbose:
                 print(f"Loading stored group mean for {group_ID} level={eff_level}")
             group_mean = pd.read_parquet(str(group_path))
             self.dict_group_means[cache_key] = group_mean
             return group_mean
 
-        if config.verbose:
+        if self.config.verbose:
             print(f"Building new group mean for {group_ID} level={eff_level}")
         recs_in_group = self.dd_groups.get(group_ID, {}).get("rec_IDs", [])
         df_p = self.get_df_project()
@@ -1041,7 +1029,7 @@ class DataFrameMixin:
             self.dd_group_samples = {}
 
         if group_ID in self.dd_group_samples:  # 1: Return cached
-            if config.verbose:
+            if self.config.verbose:
                 print(f"Returning cached group sample for group {group_ID}")
             return self.dd_group_samples[group_ID]
 
@@ -1058,7 +1046,7 @@ class DataFrameMixin:
         for test_id in shown_testsets:
             sample_path = Path(f"{self.dict_folders['cache']}/{group_name}_sample_{test_id}.parquet")
             if sample_path.exists():
-                if config.verbose:
+                if self.config.verbose:
                     print(f"Loading stored group sample for group {group_ID} test {test_id}")
                 df = pd.read_parquet(str(sample_path))
                 inner[test_id] = df
@@ -1067,7 +1055,7 @@ class DataFrameMixin:
             return self.dd_group_samples[group_ID]
 
         # 3: Build from scratch for EVERY shown testset (real tid keys)
-        if config.verbose:
+        if self.config.verbose:
             print(f"Building new group sample for group {group_ID}")
 
         sample_rec = self.dd_groups.get(group_ID, {}).get("sample")
@@ -1087,12 +1075,12 @@ class DataFrameMixin:
             return self.dd_group_samples[group_ID]
         p_row = matching.iloc[0]
 
-        df = self.get_dffilter(p_row)  # must use filter DF (has 'time' column); matches update_axe_mean + uistate.plot.df_rec_select_data
-        col = uistate.project.settings.get("filter") or "voltage"
+        df = self.get_dffilter(p_row)  # must use filter DF (has 'time' column); matches update_axe_mean + self.uistate.plot.df_rec_select_data
+        col = self.uistate.project.settings.get("filter") or "voltage"
         if col not in df.columns:
             col = "voltage"  # fallback to ensure column exists in df_sweeps
         df_t = self.get_dft(row=p_row)
-        settings = uistate.project.settings
+        settings = self.uistate.project.settings
         mean_dfs = {}
 
         # Build one mean DF per shown testset (different sweeps per testset) + save per-test parquet
@@ -1152,7 +1140,7 @@ class DataFrameMixin:
         def use_t_from_stim_with_max(p_row, df_t, dfoutput, column):
             # find highest EPSP_slope in df_output and apply uniform timepoints to all stims
             print(f" - use_t_from_stim_with_max called with df_t:\n{df_t}")
-            precision = uistate.project.settings["precision"]
+            precision = self.uistate.project.settings["precision"]
             if column in dfoutput.columns:
                 print(f"dfoutput:\n{dfoutput}")
                 idx_max_EPSP = dfoutput[column].idxmax()

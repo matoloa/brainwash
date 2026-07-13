@@ -12,6 +12,10 @@ Each `NN_*.md` file is a **complete session brief**. Agents read **only** the cu
 | `05_pipeline_integration.md` | 50 | Promote `test_parse_click` → pytest |
 | `06_app_context_facade.md` | 45 | Split `UIstate` with backward-compat facade |
 | `07_pytest_qt_smoke.md` | 40 | `pytest-qt` wiring smoke tests |
+| `08_stat_test_injection.md` | 35 | `StatTestMixin` → `self.uistate` |
+| `09_selection_injection.md` | 35 | `SelectionMixin` → `self.uistate` |
+| `10_data_frames_injection.md` | 35 | `DataFrameMixin` → `self.uistate` |
+| `11_host_protocols.md` | 40 | `Protocol` host contracts |
 | `VERIFY.md` | 20 | Post-PR commands |
 | `CONTRACT.md` | 40 | Statusbar/view invariants |
 

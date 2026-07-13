@@ -23,6 +23,10 @@
 | 05 | [ui_refactor/05_pipeline_integration.md](ui_refactor/05_pipeline_integration.md) | ✅ done |
 | 06 | [ui_refactor/06_app_context_facade.md](ui_refactor/06_app_context_facade.md) | ✅ done |
 | 07 | [ui_refactor/07_pytest_qt_smoke.md](ui_refactor/07_pytest_qt_smoke.md) | ✅ done |
+| 08 | [ui_refactor/08_stat_test_injection.md](ui_refactor/08_stat_test_injection.md) | ✅ done |
+| 09 | [ui_refactor/09_selection_injection.md](ui_refactor/09_selection_injection.md) | ✅ done |
+| 10 | [ui_refactor/10_data_frames_injection.md](ui_refactor/10_data_frames_injection.md) | ✅ done |
+| 11 | [ui_refactor/11_host_protocols.md](ui_refactor/11_host_protocols.md) | ✅ done |
 
 After each PR: mark card ✅ in this table, set **NEXT** on the following row.
 
