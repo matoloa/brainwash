@@ -19,6 +19,7 @@ Each `NN_*.md` file is a **complete session brief**. Agents read **only** the cu
 | `12_remaining_injection.md` | 40 | Batch migrate remaining mixins |
 | `13_plot_model.md` | 45 | Pure `plot_model` + test marker specs |
 | `15_plot_model_phase2.md` | 40 | Legend/heatmap/axis layout helpers |
+| `16_plot_series_addrow.md` | 50 | `plot_series` addRow/addGroup extraction |
 | `VERIFY.md` | 20 | Post-PR commands |
 | `CONTRACT.md` | 40 | Statusbar/view invariants |
 

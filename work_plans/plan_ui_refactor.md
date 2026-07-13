@@ -31,10 +31,11 @@
 | 13 | [ui_refactor/13_plot_model.md](ui_refactor/13_plot_model.md) | ✅ done |
 | 14 | [ui_refactor/14_ui_plot_nested_state.md](ui_refactor/14_ui_plot_nested_state.md) | ✅ done |
 | 15 | [ui_refactor/15_plot_model_phase2.md](ui_refactor/15_plot_model_phase2.md) | ✅ done |
+| 16 | [ui_refactor/16_plot_series_addrow.md](ui_refactor/16_plot_series_addrow.md) | ✅ done |
 
 After each PR: mark card ✅ in this table, set **NEXT** on the following row.
 
-**NEXT (human)**: deeper `addRow`/`graphRefresh` plot model extraction or merge `ui-refactor/phase0-3` → main when ready.
+**NEXT (human)**: merge `ui-refactor/phase0-3` → main when ready; optional stim-loop / `update()` extraction in `ui_plot.py`.
 
 ## Shared docs (read on demand)
 

@@ -1,7 +1,7 @@
 import time  # counting time for functions
 import warnings
 
-from brainwash_ui import plot_model
+from brainwash_ui import plot_model, plot_series
 
 import matplotlib.pyplot as plt  # for the scatterplot
 import numpy as np
@@ -946,20 +946,7 @@ class UIplot:
                     break
 
         if exp_type == "PP" and pp_has_recs and not group_name_to_x:
-            x_ticks = []
-            x_ticklabels = []
-            if uistate.project.checkBox.get("EPSP_amp", True):
-                x_ticks.append(1)
-                x_ticklabels.append("EPSP Amp")
-            if uistate.project.checkBox.get("EPSP_slope", True):
-                x_ticks.append(2)
-                x_ticklabels.append("EPSP Slope")
-            if uistate.project.checkBox.get("volley_amp", True):
-                x_ticks.append(3)
-                x_ticklabels.append("Volley Amp")
-            if uistate.project.checkBox.get("volley_slope", True):
-                x_ticks.append(4)
-                x_ticklabels.append("Volley Slope")
+            x_ticks, x_ticklabels = plot_series.pp_recording_view_ticks(uistate.project.checkBox)
 
             if not x_ticks:
                 ax1.set_xlabel("No aspect selected")
@@ -1364,59 +1351,17 @@ class UIplot:
         color = dict_group["color"]
         axis = self.get_axis(axid)
         if aspect is None:
-            if axid == "ax1":
-                aspect = "EPSP_amp"
-            else:
-                aspect = "EPSP_slope"
+            aspect = plot_series.default_group_aspect(axid)
         str_aspect = aspect.replace("_", " ")
-        x = df_groupmean.sweep
         eff_level = level or self.uistate.stat_test.buttonGroup_test_n
         label_mean = f"{group_name} {str_aspect} mean"
         label_norm = f"{group_name} {str_aspect} norm"
-        # use level-qualified storage keys so we can keep separate artist sets per n_unit level
         mean_storage_key = self._level_key(label_mean, eff_level)
         norm_storage_key = self._level_key(label_norm, eff_level)
-        y_mean = df_groupmean[f"{aspect}_mean"]
-        sem_col = f"{aspect}_SEM"
-        if sem_col in df_groupmean.columns:
-            y_mean_SEM = pd.to_numeric(df_groupmean[sem_col], errors="coerce").fillna(0.0)
-        else:
-            y_mean_SEM = pd.Series(0.0, index=df_groupmean.index) if hasattr(df_groupmean, "index") else 0.0
-        # align lengths defensively
-        if hasattr(y_mean_SEM, "reindex") and hasattr(y_mean, "index"):
-            y_mean_SEM = y_mean_SEM.reindex(y_mean.index).fillna(0.0)
-
-        if f"{aspect}_norm_mean" in df_groupmean.columns:
-            y_norm = df_groupmean[f"{aspect}_norm_mean"]
-            norm_sem_col = f"{aspect}_norm_SEM"
-            if norm_sem_col in df_groupmean.columns:
-                y_norm_SEM = pd.to_numeric(df_groupmean[norm_sem_col], errors="coerce").fillna(0.0)
-            else:
-                y_norm_SEM = pd.Series(0.0, index=df_groupmean.index) if hasattr(df_groupmean, "index") else 0.0
-            if hasattr(y_norm_SEM, "reindex") and hasattr(y_norm, "index"):
-                y_norm_SEM = y_norm_SEM.reindex(y_norm.index).fillna(0.0)
-        else:
-            y_norm = None
-            y_norm_SEM = None
-
-        # Sanitize lengths for safety (handles edge cases from higher-level aggs)
-        npts = len(x) if hasattr(x, "__len__") else 1
-        y_mean_SEM = np.asarray(y_mean_SEM).ravel()
-        if len(y_mean_SEM) != npts:
-            y_mean_SEM = np.full(npts, float(y_mean_SEM[0]) if len(y_mean_SEM) else 0.0)
-        if y_norm is not None:
-            y_norm_SEM = np.asarray(y_norm_SEM).ravel()
-            if len(y_norm_SEM) != npts:
-                y_norm_SEM = np.full(npts, float(y_norm_SEM[0]) if len(y_norm_SEM) else 0.0)
-
-        # print(f"y_mean: {y_mean}")
-        # print(f"y_mean_SEM: {y_mean_SEM}")
-        # print(f"y_mean - y_mean_SEM: {y_mean - y_mean_SEM}")
-        # print(f"y_mean + y_mean_SEM: {y_mean + y_mean_SEM}")
-
-        x_vals = np.asarray(x)
-        y_mean_vals = np.asarray(y_mean)
-        y_sem_vals = np.asarray(y_mean_SEM)
+        series = plot_series.extract_group_mean_series(df_groupmean, aspect)
+        x_vals = series.x
+        y_mean_vals = series.y_mean
+        y_sem_vals = series.y_sem
         (meanline,) = axis.plot(
             x_vals,
             y_mean_vals,
@@ -1427,9 +1372,9 @@ class UIplot:
             linewidth=2.0,
         )
 
-        if y_norm is not None:
-            y_norm_vals = np.asarray(y_norm)
-            y_norm_sem_vals = np.asarray(y_norm_SEM)
+        if series.y_norm is not None:
+            y_norm_vals = series.y_norm
+            y_norm_sem_vals = series.y_norm_sem
             (normline,) = axis.plot(
                 x_vals,
                 y_norm_vals,
@@ -1442,7 +1387,7 @@ class UIplot:
 
         meanfill = axis.fill_between(x_vals, y_mean_vals - y_sem_vals, y_mean_vals + y_sem_vals, alpha=0.25, color=color, zorder=0)
 
-        if y_norm is not None:
+        if series.y_norm is not None:
             normfill = axis.fill_between(x_vals, y_norm_vals - y_norm_sem_vals, y_norm_vals + y_norm_sem_vals, alpha=0.25, color=color, zorder=0)
 
         meanline.set_visible(False)
@@ -1459,7 +1404,7 @@ class UIplot:
             "level": eff_level,
         }
 
-        if y_norm is not None:
+        if series.y_norm is not None:
             normline.set_visible(False)
             normfill.set_visible(False)
             self.uistate.plot.dict_group_labels[norm_storage_key] = {
@@ -1479,87 +1424,69 @@ class UIplot:
         rec_name = p_row["recording_name"]
         rec_filter = p_row["filter"]  # the filter currently used for this recording
         n_stims = len(dft)
-        is_pp = self.uistate.experiment.experiment_type == "PP"
-        skip_output = is_pp and n_stims != 2
-        if rec_filter != "voltage":
-            label = f"{rec_name} ({rec_filter})"
-        else:
-            label = rec_name
+        skip_output = plot_series.skip_pp_recording_output(self.uistate.experiment.experiment_type, n_stims)
+        label = plot_series.recording_plot_label(rec_name, rec_filter)
 
         if self.uistate.experiment.experiment_type == "io":
-            io_input = self.uistate.experiment.io_input
-            io_output = self.uistate.experiment.io_output
-
-            x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
-            y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
-
+            x_col, y_col_base = plot_series.io_axis_columns(
+                self.uistate.experiment.io_input,
+                self.uistate.experiment.io_output,
+            )
             axid = "ax1"
             color = self.uistate.project.settings.get(f"rgb_{y_col_base}", "black")
-
             df_sweeps = dfoutput[dfoutput["sweep"].notna()]
+            force0 = bool(self.uistate.project.checkBox.get("io_force0", False))
             for variant in ["raw", "norm"]:
-                y_col = f"{y_col_base}_norm" if variant == "norm" else y_col_base
-                if x_col in df_sweeps.columns and y_col in df_sweeps.columns:
-                    df_clean = df_sweeps.dropna(subset=[x_col, y_col])
+                y_col = plot_series.io_y_column(y_col_base, variant=variant)
+                df_clean = plot_series.io_scatter_frame(df_sweeps, x_col, y_col)
+                if df_clean is None:
+                    continue
 
-                    scatter = self.get_axis(axid).scatter(
-                        df_clean[x_col].values,
-                        df_clean[y_col].values,
-                        c=[color],
+                scatter = self.get_axis(axid).scatter(
+                    df_clean[x_col].values,
+                    df_clean[y_col].values,
+                    c=[color],
+                    alpha=0.8,
+                    label=f"{label} {variant} IO scatter",
+                    s=20,
+                    zorder=2,
+                )
+                scatter.set_visible(False)
+                self.uistate.plot.dict_rec_labels[f"{label} {variant} IO scatter"] = {
+                    "rec_ID": rec_ID,
+                    "aspect": y_col_base,
+                    "variant": variant,
+                    "stim": None,
+                    "line": scatter,
+                    "axis": axid,
+                    "x_mode": "io",
+                }
+
+                reg = plot_series.compute_io_regression(
+                    df_clean[x_col].values,
+                    df_clean[y_col].values,
+                    force_through_zero=force0,
+                )
+                if reg is not None:
+                    (trendline,) = self.get_axis(axid).plot(
+                        reg.x_line,
+                        reg.y_line,
+                        color=color,
+                        linestyle="--",
                         alpha=0.8,
-                        label=f"{label} {variant} IO scatter",
-                        s=20,
-                        zorder=2,
+                        label=f"{label} {variant} IO trendline",
+                        zorder=1,
                     )
-                    scatter.set_visible(False)
-                    self.uistate.plot.dict_rec_labels[f"{label} {variant} IO scatter"] = {
+                    trendline.set_visible(False)
+                    self.uistate.plot.dict_rec_labels[f"{label} {variant} IO trendline"] = {
                         "rec_ID": rec_ID,
                         "aspect": y_col_base,
                         "variant": variant,
                         "stim": None,
-                        "line": scatter,
+                        "line": trendline,
                         "axis": axid,
                         "x_mode": "io",
                     }
-
-                    if len(df_clean) > 1:
-                        x_vals = df_clean[x_col].values
-                        y_vals = df_clean[y_col].values
-
-                        if self.uistate.project.checkBox.get("io_force0", False):
-                            x_sq_sum = np.sum(x_vals**2)
-                            m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
-                            c = 0
-                        else:
-                            if x_vals.max() - x_vals.min() < 1e-5:
-                                m = 0
-                                c = np.mean(y_vals)
-                            else:
-                                x_mean = np.mean(x_vals)
-                                m, c_cent = np.polyfit(x_vals - x_mean, y_vals, 1)
-                                c = c_cent - m * x_mean
-                        x_line = np.array([0 if self.uistate.project.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
-                        y_line = m * x_line + c
-
-                        (trendline,) = self.get_axis(axid).plot(
-                            x_line,
-                            y_line,
-                            color=color,
-                            linestyle="--",
-                            alpha=0.8,
-                            label=f"{label} {variant} IO trendline",
-                            zorder=1,
-                        )
-                        trendline.set_visible(False)
-                        self.uistate.plot.dict_rec_labels[f"{label} {variant} IO trendline"] = {
-                            "rec_ID": rec_ID,
-                            "aspect": y_col_base,
-                            "variant": variant,
-                            "stim": None,
-                            "line": trendline,
-                            "axis": axid,
-                            "x_mode": "io",
-                        }
 
         # Add meanline to Mean
         self.plot_line(
@@ -1867,7 +1794,7 @@ class UIplot:
                     x_mode="sweep",
                 )
 
-        if is_pp and not skip_output:
+        if self.uistate.experiment.experiment_type == "PP" and not skip_output:
             out_sweeps = dfoutput[dfoutput["sweep"].notna()]
             out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
             out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
@@ -2033,31 +1960,14 @@ class UIplot:
                         if asp in ppr_data and vlist:
                             ppr_data[asp].append(np.mean(vlist))
 
-            aspect_list = [
-                ("EPSP_amp", "ax1"),
-                ("EPSP_slope", "ax2"),
-                ("volley_amp", "ax1"),
-                ("volley_slope", "ax2"),
-            ]
-
-            # Dynamically calculate spacing offsets for only the enabled aspects
-            active_aspects = [item for item in aspect_list if self.uistate.project.checkBox.get(item[0], True)]
-            n_active = len(active_aspects)
-
-            configs = []
-            if n_active > 0:
-                bar_width = 0.8 / max(1, n_active)  # Max total cluster width is 0.8 to leave 0.2 spacing between groups
-                start_offset = -0.4 + (bar_width / 2)
-                for i, (asp, axid) in enumerate(active_aspects):
-                    offset = start_offset + (i * bar_width)
-                    configs.append((asp, axid, offset, bar_width * 0.9))  # 10% gap between bars within cluster
+            active_aspects = plot_series.pp_active_aspects(self.uistate.project.checkBox)
+            configs = plot_series.pp_bar_layout(active_aspects)
 
             for aspect, axid, offset, bar_w in configs:
                 vals = ppr_data[aspect]
                 if vals:
                     try:
-                        mean_val = np.mean(vals)
-                        sem_val = np.std(vals, ddof=1) / np.sqrt(len(vals)) if len(vals) > 1 else 0
+                        mean_val, sem_val = plot_series.mean_sem(vals)
                         bar_x = x_pos + offset
                     except Exception as e:
                         print(f"DEBUG: addGroup error in math loop: {e}")
@@ -2104,13 +2014,7 @@ class UIplot:
                                 scat_artists.append((scat_art, rid))
 
                         # 4. Create overlay artists for Rec View
-                        x_val_map = {}
-                        idx = 1
-                        for key in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]:
-                            if self.uistate.project.checkBox.get(key, True):
-                                x_val_map[key] = idx
-                                idx += 1
-                        overlay_x = x_val_map.get(aspect, 1)
+                        overlay_x = plot_series.pp_overlay_x_map(self.uistate.project.checkBox).get(aspect, 1)
 
                         overlay_bar_artist = self.get_axis(axid).bar(
                             [overlay_x],
@@ -2184,10 +2088,10 @@ class UIplot:
             return
 
         if exp_type == "io":
-            io_input = self.uistate.experiment.io_input
-            io_output = self.uistate.experiment.io_output
-
-            y_col_base = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+            _, y_col_base = plot_series.io_axis_columns(
+                self.uistate.experiment.io_input,
+                self.uistate.experiment.io_output,
+            )
             axid = "ax1"
             color = dict_group["color"]
             group_name = dict_group["group_name"]
@@ -2234,25 +2138,15 @@ class UIplot:
                         "level": io_level,
                     }
 
-                    if len(x_vals) > 1:
-                        if self.uistate.project.checkBox.get("io_force0", False):
-                            x_sq_sum = np.sum(x_vals**2)
-                            m = np.sum(x_vals * y_vals) / x_sq_sum if x_sq_sum != 0 else 0
-                            c = 0
-                        else:
-                            if x_vals.max() - x_vals.min() < 1e-5:
-                                m = 0
-                                c = np.mean(y_vals)
-                            else:
-                                x_mean = np.mean(x_vals)
-                                m, c_cent = np.polyfit(x_vals - x_mean, y_vals, 1)
-                                c = c_cent - m * x_mean
-                        x_line = np.array([0 if self.uistate.project.checkBox.get("io_force0", False) else x_vals.min(), x_vals.max()])
-                        y_line = m * x_line + c
-
+                    reg = plot_series.compute_io_regression(
+                        x_vals,
+                        y_vals,
+                        force_through_zero=bool(self.uistate.project.checkBox.get("io_force0", False)),
+                    )
+                    if reg is not None:
                         (trendline,) = self.get_axis(axid).plot(
-                            x_line,
-                            y_line,
+                            reg.x_line,
+                            reg.y_line,
                             color=color,
                             linestyle="-",
                             linewidth=2,
@@ -2276,14 +2170,8 @@ class UIplot:
             return
 
         eff_level = self.uistate.stat_test.buttonGroup_test_n
-        if "EPSP_amp_mean" in df_groupmean.columns and df_groupmean["EPSP_amp_mean"].notna().any():
-            self.plot_group_lines("ax1", group_ID, dict_group, df_groupmean, aspect="EPSP_amp", level=eff_level)
-        if "EPSP_slope_mean" in df_groupmean.columns and df_groupmean["EPSP_slope_mean"].notna().any():
-            self.plot_group_lines("ax2", group_ID, dict_group, df_groupmean, aspect="EPSP_slope", level=eff_level)
-        if "volley_amp_mean" in df_groupmean.columns and df_groupmean["volley_amp_mean"].notna().any():
-            self.plot_group_lines("ax1", group_ID, dict_group, df_groupmean, aspect="volley_amp", level=eff_level)
-        if "volley_slope_mean" in df_groupmean.columns and df_groupmean["volley_slope_mean"].notna().any():
-            self.plot_group_lines("ax2", group_ID, dict_group, df_groupmean, aspect="volley_slope", level=eff_level)
+        for axid, aspect, _col in plot_series.group_mean_plots_for_df(df_groupmean):
+            self.plot_group_lines(axid, group_ID, dict_group, df_groupmean, aspect=aspect, level=eff_level)
 
     def update(
         self,

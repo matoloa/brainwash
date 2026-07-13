@@ -28,6 +28,12 @@ uv run pytest src/lib/test_pipeline_integration.py -q
 uv run pytest src/lib/test_plot_model.py -q
 ```
 
+**PR-16+** (plot series):
+
+```sh
+uv run pytest src/lib/test_plot_series.py -q
+```
+
 **PR-07+** (pytest-qt):
 
 ```sh
