@@ -4,7 +4,7 @@
 
 ## Goal
 
-Wire `data_source/{01..14}/Concatenate000.abf` into pipeline tests via committed `manifest.json` + parametrized smoke; golden parquet for `01`.
+Wire `data_source/{01..14}/Concatenate000.abf` via `manifest.json`; parametrized smoke runs **characteristic** ids only (`01`, `07`, `14`); golden parquet for `01`.
 
 ## Verify
 

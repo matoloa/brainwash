@@ -1,5 +1,6 @@
 {
   "description": "Local ABF candidates for pipeline integration tests (*.abf gitignored; folders committed).",
+  "characteristic_test_ids": ["01", "07", "14"],
   "candidates": [
     {"id": "01", "file": "Concatenate000.abf"},
     {"id": "02", "file": "Concatenate000.abf"},

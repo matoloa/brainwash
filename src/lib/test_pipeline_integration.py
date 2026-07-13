@@ -24,7 +24,7 @@ _TEST_DATA = Path(__file__).parent / "test_data"
 _GOLDEN_DFOUTPUT = _TEST_DATA / "golden" / "synthetic_dfoutput.parquet"
 _GOLDEN_ABF_DFOUTPUT = _TEST_DATA / "golden" / "abf_1ch_dfoutput.parquet"
 _GOLDEN_DATA_SOURCE_01 = _TEST_DATA / "golden" / "data_source_01_dfoutput.parquet"
-_DATA_SOURCE_ABFS = discover_data_source_abfs()
+_DATA_SOURCE_ABFS = discover_data_source_abfs(characteristic_only=True)
 _ABF_1CH_DIR = _TEST_DATA / "A_21_P0701-S2"
 _ABF_1CH = abf_path_for_parse(_ABF_1CH_DIR, "2022_07_01_0012")
 _ABF_KO_DIR = _TEST_DATA / "KO_02"

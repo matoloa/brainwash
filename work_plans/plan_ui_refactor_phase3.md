@@ -15,7 +15,7 @@
 
 ## Baseline
 
-- `data_source/manifest.json` — 14 Concatenate000.abf candidates (local; `*.abf` gitignored)
+- `data_source/manifest.json` — 14 candidates; pytest smoke uses `characteristic_test_ids` (`01`, `07`, `14`)
 - Legacy `test_data` `.abf.gitkeep` still supported via `abf_path_for_parse`
 - `uv run pytest src/lib/ -q` — run after each PR
 

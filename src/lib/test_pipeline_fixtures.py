@@ -18,11 +18,17 @@ def data_source_root() -> Path:
     return repo_root() / "data_source"
 
 
-def load_data_source_manifest() -> list[dict]:
+def load_data_source_manifest_raw() -> dict:
     manifest_path = data_source_root() / "manifest.json"
     if manifest_path.is_file():
-        data = json.loads(manifest_path.read_text())
-        return list(data.get("candidates", []))
+        return json.loads(manifest_path.read_text())
+    return {}
+
+
+def load_data_source_manifest() -> list[dict]:
+    entries = list(load_data_source_manifest_raw().get("candidates", []))
+    if entries:
+        return entries
     root = data_source_root()
     if not root.is_dir():
         return []
@@ -33,14 +39,31 @@ def load_data_source_manifest() -> list[dict]:
     ]
 
 
+def characteristic_data_source_ids() -> list[str]:
+    raw = load_data_source_manifest_raw()
+    ids = raw.get("characteristic_test_ids")
+    if ids:
+        return list(ids)
+    candidates = load_data_source_manifest()
+    if not candidates:
+        return []
+    picks = [candidates[0]["id"], candidates[len(candidates) // 2]["id"], candidates[-1]["id"]]
+    return list(dict.fromkeys(picks))
+
+
 def data_source_abf_path(candidate_id: str, *, filename: str = "Concatenate000.abf") -> Path | None:
     path = data_source_root() / candidate_id / filename
     return path if path.is_file() else None
 
 
-def discover_data_source_abfs() -> list[tuple[str, Path]]:
+def discover_data_source_abfs(*, characteristic_only: bool = False) -> list[tuple[str, Path]]:
+    if characteristic_only:
+        id_set = set(characteristic_data_source_ids())
+        entries = [e for e in load_data_source_manifest() if e["id"] in id_set]
+    else:
+        entries = load_data_source_manifest()
     found: list[tuple[str, Path]] = []
-    for entry in load_data_source_manifest():
+    for entry in entries:
         cid = entry["id"]
         fname = entry.get("file", "Concatenate000.abf")
         path = data_source_abf_path(cid, filename=fname)
