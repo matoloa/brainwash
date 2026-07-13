@@ -172,6 +172,26 @@ def build_group_line_specs(
     return specs
 
 
+def rec_label_entry(
+    *,
+    rec_ID,
+    aspect=None,
+    variant: str = "raw",
+    stim=None,
+    axis: str,
+    x_mode=None,
+) -> dict:
+    """Shared dict_rec_labels metadata (caller adds ``line`` artist)."""
+    return {
+        "rec_ID": rec_ID,
+        "aspect": aspect,
+        "variant": variant,
+        "stim": stim,
+        "axis": axis,
+        "x_mode": x_mode,
+    }
+
+
 def io_rec_label_entry(
     *,
     rec_ID,
@@ -179,14 +199,14 @@ def io_rec_label_entry(
     variant: str,
     axis: str = "ax1",
 ) -> dict:
-    return {
-        "rec_ID": rec_ID,
-        "aspect": aspect,
-        "variant": variant,
-        "stim": None,
-        "axis": axis,
-        "x_mode": "io",
-    }
+    return rec_label_entry(
+        rec_ID=rec_ID,
+        aspect=aspect,
+        variant=variant,
+        stim=None,
+        axis=axis,
+        x_mode="io",
+    )
 
 
 def io_group_label_entry(
@@ -328,6 +348,22 @@ def output_axis_y_visibility(*, amp_view: bool, slope_view: bool) -> tuple[bool,
 
 def slope_yaxis_on_left(*, slope_only: bool) -> bool:
     return slope_only
+
+
+@dataclass(frozen=True)
+class OneAxisLeftPlan:
+    ax1_yaxis_visible: bool
+    ax2_yaxis_visible: bool
+    ax2_yaxis_on_left: bool
+
+
+def build_one_axis_left_plan(*, amp_view: bool, slope_view: bool, slope_only: bool) -> OneAxisLeftPlan:
+    show_amp, show_slope = output_axis_y_visibility(amp_view=amp_view, slope_view=slope_view)
+    return OneAxisLeftPlan(
+        ax1_yaxis_visible=show_amp,
+        ax2_yaxis_visible=show_slope,
+        ax2_yaxis_on_left=slope_yaxis_on_left(slope_only=slope_only),
+    )
 
 
 @dataclass(frozen=True)

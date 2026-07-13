@@ -235,3 +235,19 @@ def test_output_axis_visibility():
     assert plot_model.output_axis_y_visibility(amp_view=False, slope_view=False) == (False, False)
     assert plot_model.output_axis_y_visibility(amp_view=True, slope_view=False) == (True, False)
     assert plot_model.slope_yaxis_on_left(slope_only=True) is True
+
+
+def test_build_one_axis_left_plan():
+    plan = plot_model.build_one_axis_left_plan(amp_view=True, slope_view=False, slope_only=True)
+    assert plan.ax1_yaxis_visible is True
+    assert plan.ax2_yaxis_visible is False
+    assert plan.ax2_yaxis_on_left is True
+
+
+def test_rec_label_entry_and_io_alias():
+    entry = plot_model.rec_label_entry(rec_ID="r1", aspect="EPSP_amp", axis="ax1", x_mode="stim")
+    assert entry["rec_ID"] == "r1"
+    assert entry["x_mode"] == "stim"
+    io_entry = plot_model.io_rec_label_entry(rec_ID="r1", aspect="EPSP_amp", variant="raw")
+    assert io_entry["x_mode"] == "io"
+    assert io_entry["stim"] is None
