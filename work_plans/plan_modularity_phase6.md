@@ -50,5 +50,5 @@ uv run pytest src/brainwash/ -q
 | PR | Card | Status |
 |----|------|--------|
 | 6a | per-UIsub singletons | ✅ `015b9d2` [HIGH RISK phase6a] |
-| 6b | remove module aliases | in progress |
-| 7a | UIplot contract doc | pending |
+| 6b | remove module aliases | ✅ `284d414` [HIGH RISK phase6b] |
+| 7a | UIplot contract doc | in progress |

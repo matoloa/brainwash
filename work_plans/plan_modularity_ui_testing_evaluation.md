@@ -1,7 +1,7 @@
 # Brainwash: Modularity, UI Separation, and Automated Testing
 
 **Date**: 2026-07-13 (revised)  
-**Status**: Phases 0–5 + 3b + 4 complete on `ui-refactor/phase0-3`. **227** pytest tests in `src/brainwash/`. Next: Phase 6+ (injection removal / UIplot split) — needs human scope approval. Section 1 LOC metrics are a 2026-07-13 snapshot.  
+**Status**: Phases 0–5 + 3b + 4 complete. **Phase 6a–6b** done (HIGH RISK — see [plan_modularity_phase6.md](plan_modularity_phase6.md)). **228** tests. Rollback point before Phase 6: `a2f2dd2`. Next: manual app smoke, then Phase 7b UIplot extraction (HIGH RISK, incremental).  
 **Audience**: Human maintainers and agentic contributors  
 **Goal**: Make UI/stat/view changes safe for agents without a full rewrite, reusing the statistics refactor playbook.
 
