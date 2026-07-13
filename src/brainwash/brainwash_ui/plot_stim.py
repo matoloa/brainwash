@@ -134,3 +134,318 @@ def resolve_volley_slope_mean(t_row: pd.Series, out_stim_row: pd.DataFrame, out:
     if not out_stim_row.empty:
         return float(out_stim_row["volley_slope"].values[0])
     return float(out["volley_slope"].mean())
+
+
+@dataclass(frozen=True)
+class StimMarkerPlotSpec:
+    label: str
+    axid: str
+    x: float
+    y: float
+    color: str
+    aspect: str | None = None
+    stim: int | None = None
+
+
+@dataclass(frozen=True)
+class StimVlinePlotSpec:
+    label: str
+    axid: str
+    x: float
+    color: str
+    stim: int | None = None
+
+
+@dataclass(frozen=True)
+class StimLinePlotSpec:
+    label: str
+    axid: str
+    x: object
+    y: object
+    color: str
+    stim: int | None = None
+    aspect: str | None = None
+    variant: str = "raw"
+    x_mode: str | None = None
+    width: int = 1
+
+
+@dataclass(frozen=True)
+class StimAmpWidthPlotSpec:
+    label: str
+    axid: str
+    x_center: float
+    amp_x: tuple[float, float]
+    amp_y: tuple[float, float]
+    color: str
+    aspect: str
+    stim: int
+
+
+@dataclass(frozen=True)
+class StimHlinePlotSpec:
+    label: str
+    axid: str
+    y: float
+    color: str
+    aspect: str
+    stim: int
+    x_mode: str = "sweep"
+
+
+StimEventPlotSpec = (
+    StimMarkerPlotSpec | StimVlinePlotSpec | StimLinePlotSpec | StimAmpWidthPlotSpec | StimHlinePlotSpec
+)
+
+
+def _stim_label_suffix(stim_num: int) -> str:
+    return f"- stim {stim_num}"
+
+
+def build_stim_event_plot_specs(
+    label: str,
+    dft: pd.DataFrame,
+    dfmean: pd.DataFrame,
+    dfoutput: pd.DataFrame,
+    rec_filter: str,
+    settings: dict,
+    stim_colors: dict[int, str],
+) -> list[StimEventPlotSpec]:
+    """Per-stim event/marker/output descriptors for addRow (no matplotlib artists)."""
+    specs: list[StimEventPlotSpec] = []
+    for i_stim, t_row in dft.iterrows():
+        color = stim_colors[i_stim]
+        stim_num = stim_num_from_index(i_stim)
+        stim_str = _stim_label_suffix(stim_num)
+        t_stim = t_row["t_stim"]
+        out = dfoutput[dfoutput["stim"] == stim_num]
+        amp_zero_plot, _y_at_stim = amp_zero_and_y_at_stim(dfmean, t_stim, rec_filter)
+        shift_stim_times(t_row, t_stim)
+
+        specs.append(StimMarkerPlotSpec(f"mean {label} {stim_str} marker", "axm", t_stim, 0.0, color))
+        specs.append(
+            StimVlinePlotSpec(f"mean {label} {stim_str} selection marker", "axm", t_stim, color, stim=stim_num)
+        )
+
+        df_event = event_window_df(
+            dfmean, t_stim, settings["event_start"], settings["event_end"], rec_filter
+        )
+        specs.append(
+            StimLinePlotSpec(
+                f"{label} {stim_str}",
+                "axe",
+                df_event["time"].values,
+                df_event[rec_filter].values,
+                color,
+                stim=stim_num,
+            )
+        )
+
+        out_stim_row = out[out["sweep"].isna()]
+
+        if not np.isnan(t_row["t_EPSP_amp"]):
+            x_position = t_row["t_EPSP_amp"]
+            y_position = y_at_event_time(df_event, x_position, rec_filter)
+            specs.append(
+                StimMarkerPlotSpec(
+                    f"{label} {stim_str} EPSP amp marker",
+                    "axe",
+                    x_position,
+                    y_position,
+                    settings["rgb_EPSP_amp"],
+                    aspect="EPSP_amp",
+                    stim=stim_num,
+                )
+            )
+            amp_x = (
+                x_position - t_row["t_EPSP_amp_halfwidth"],
+                x_position + t_row["t_EPSP_amp_halfwidth"],
+            )
+            epsp_amp_val = resolve_epsp_amp_si(out_stim_row, df_event, x_position, t_row, rec_filter, amp_zero_plot)
+            amp_y = (amp_zero_plot, amp_zero_plot - epsp_amp_val)
+            specs.append(
+                StimAmpWidthPlotSpec(
+                    f"{label} {stim_str} EPSP amp",
+                    "axe",
+                    x_position,
+                    amp_x,
+                    amp_y,
+                    settings["rgb_EPSP_amp"],
+                    "EPSP_amp",
+                    stim_num,
+                )
+            )
+            specs.extend(
+                [
+                    StimLinePlotSpec(
+                        f"{label} {stim_str} EPSP amp",
+                        "ax1",
+                        out["sweep"].values,
+                        out["EPSP_amp"].values,
+                        settings["rgb_EPSP_amp"],
+                        stim=stim_num,
+                        aspect="EPSP_amp",
+                        variant="raw",
+                        x_mode="sweep",
+                    ),
+                    StimLinePlotSpec(
+                        f"{label} {stim_str} EPSP amp norm",
+                        "ax1",
+                        out["sweep"].values,
+                        out["EPSP_amp_norm"].values,
+                        settings["rgb_EPSP_amp"],
+                        stim=stim_num,
+                        aspect="EPSP_amp",
+                        variant="norm",
+                        x_mode="sweep",
+                    ),
+                    StimLinePlotSpec(
+                        f"{label} {stim_str} amp_zero marker",
+                        "axe",
+                        list(AMP_ZERO_PRE_WINDOW),
+                        [amp_zero_plot, amp_zero_plot],
+                        settings["rgb_EPSP_amp"],
+                        stim=stim_num,
+                        aspect="EPSP_amp",
+                    ),
+                ]
+            )
+
+        epsp_slope = slope_segment(
+            df_event, t_row["t_EPSP_slope_start"], t_row["t_EPSP_slope_end"], rec_filter
+        )
+        if epsp_slope is not None:
+            specs.extend(
+                [
+                    StimLinePlotSpec(
+                        f"{label} {stim_str} EPSP slope marker",
+                        "axe",
+                        [epsp_slope.x_start, epsp_slope.x_end],
+                        [epsp_slope.y_start, epsp_slope.y_end],
+                        settings["rgb_EPSP_slope"],
+                        stim=stim_num,
+                        aspect="EPSP_slope",
+                        width=5,
+                    ),
+                    StimLinePlotSpec(
+                        f"{label} {stim_str} EPSP slope",
+                        "ax2",
+                        out["sweep"].values,
+                        out["EPSP_slope"].values,
+                        settings["rgb_EPSP_slope"],
+                        stim=stim_num,
+                        aspect="EPSP_slope",
+                        variant="raw",
+                        x_mode="sweep",
+                    ),
+                    StimLinePlotSpec(
+                        f"{label} {stim_str} EPSP slope norm",
+                        "ax2",
+                        out["sweep"].values,
+                        out["EPSP_slope_norm"].values,
+                        settings["rgb_EPSP_slope"],
+                        stim=stim_num,
+                        aspect="EPSP_slope",
+                        variant="norm",
+                        x_mode="sweep",
+                    ),
+                ]
+            )
+
+        if not np.isnan(t_row["t_volley_amp"]):
+            x_position = t_row["t_volley_amp"]
+            y_position = y_at_event_time(df_event, x_position, rec_filter)
+            volley_color = settings["rgb_volley_amp"]
+            specs.append(
+                StimMarkerPlotSpec(
+                    f"{label} {stim_str} volley amp marker",
+                    "axe",
+                    t_row["t_volley_amp"],
+                    y_position,
+                    volley_color,
+                    aspect="volley_amp",
+                    stim=stim_num,
+                )
+            )
+            amp_x = (
+                x_position - t_row["t_volley_amp_halfwidth"],
+                x_position + t_row["t_volley_amp_halfwidth"],
+            )
+            volley_amp_mean = resolve_volley_amp_si(
+                t_row, out_stim_row, df_event, x_position, rec_filter, amp_zero_plot
+            )
+            amp_y = (amp_zero_plot, amp_zero_plot - volley_amp_mean)
+            specs.append(
+                StimAmpWidthPlotSpec(
+                    f"{label} {stim_str} volley amp",
+                    "axe",
+                    x_position,
+                    amp_x,
+                    amp_y,
+                    volley_color,
+                    "volley_amp",
+                    stim_num,
+                )
+            )
+            specs.extend(
+                [
+                    StimHlinePlotSpec(
+                        f"{label} {stim_str} volley amp mean",
+                        "ax1",
+                        volley_amp_hline_mv(volley_amp_mean),
+                        volley_color,
+                        "volley_amp_mean",
+                        stim_num,
+                    ),
+                    StimLinePlotSpec(
+                        f"{label} {stim_str} volley amp",
+                        "ax1",
+                        out["sweep"].values,
+                        out["volley_amp"].values,
+                        volley_color,
+                        stim=stim_num,
+                        aspect="volley_amp",
+                        x_mode="sweep",
+                    ),
+                ]
+            )
+
+        volley_slope = slope_segment(
+            df_event, t_row["t_volley_slope_start"], t_row["t_volley_slope_end"], rec_filter
+        )
+        if volley_slope is not None:
+            volley_slope_mean = resolve_volley_slope_mean(t_row, out_stim_row, out)
+            specs.extend(
+                [
+                    StimLinePlotSpec(
+                        f"{label} {stim_str} volley slope marker",
+                        "axe",
+                        [volley_slope.x_start, volley_slope.x_end],
+                        [volley_slope.y_start, volley_slope.y_end],
+                        settings["rgb_volley_slope"],
+                        stim=stim_num,
+                        aspect="volley_slope",
+                        width=5,
+                    ),
+                    StimHlinePlotSpec(
+                        f"{label} {stim_str} volley slope mean",
+                        "ax2",
+                        volley_slope_mean,
+                        settings["rgb_volley_slope"],
+                        "volley_slope_mean",
+                        stim_num,
+                    ),
+                    StimLinePlotSpec(
+                        f"{label} {stim_str} volley slope",
+                        "ax2",
+                        out["sweep"].values,
+                        out["volley_slope"].values,
+                        settings["rgb_volley_slope"],
+                        stim=stim_num,
+                        aspect="volley_slope",
+                        x_mode="sweep",
+                    ),
+                ]
+            )
+
+    return specs

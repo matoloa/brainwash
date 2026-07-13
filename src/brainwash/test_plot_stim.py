@@ -45,3 +45,58 @@ def test_slope_segment_nan_returns_none():
 
 def test_stim_num_from_index():
     assert plot_stim.stim_num_from_index(0) == 1
+
+
+def test_build_stim_event_plot_specs_minimal():
+    dfmean = _dfmean_with_stim()
+    dft = pd.DataFrame(
+        [
+            {
+                "stim": 1,
+                "t_stim": 0.04,
+                "t_EPSP_amp": 0.01,
+                "t_EPSP_amp_halfwidth": 0.001,
+                "t_EPSP_slope_start": 0.005,
+                "t_EPSP_slope_end": 0.015,
+                "t_volley_amp": np.nan,
+                "t_volley_amp_halfwidth": 0.0,
+                "t_volley_slope_start": np.nan,
+                "t_volley_slope_end": np.nan,
+            }
+        ]
+    )
+    dfoutput = pd.DataFrame(
+        {
+            "sweep": [0, 1, None],
+            "stim": [1, 1, 1],
+            "EPSP_amp": [5.0, 6.0, 5.5],
+            "EPSP_amp_norm": [50.0, 60.0, 55.0],
+            "EPSP_slope": [0.1, 0.2, 0.15],
+            "EPSP_slope_norm": [10.0, 20.0, 15.0],
+            "volley_amp": [1.0, 1.1, 1.05],
+            "volley_slope": [0.01, 0.02, 0.015],
+        }
+    )
+    settings = {
+        "event_start": -0.01,
+        "event_end": 0.02,
+        "rgb_EPSP_amp": "blue",
+        "rgb_EPSP_slope": "red",
+        "rgb_volley_amp": "green",
+        "rgb_volley_slope": "orange",
+    }
+    specs = plot_stim.build_stim_event_plot_specs(
+        "rec1",
+        dft,
+        dfmean,
+        dfoutput,
+        "prim",
+        settings,
+        {0: "cyan"},
+    )
+    assert len(specs) >= 5
+    labels = {s.label for s in specs}
+    assert "mean rec1 - stim 1 marker" in labels
+    assert "rec1 - stim 1 EPSP amp" in labels
+    assert any(isinstance(s, plot_stim.StimAmpWidthPlotSpec) for s in specs)
+    assert any(isinstance(s, plot_stim.StimLinePlotSpec) and s.axid == "axe" for s in specs)

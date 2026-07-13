@@ -1408,6 +1408,58 @@ class UIplot:
                 "fill": normfill,
             }
 
+    def _render_stim_event_plot_spec(self, spec, rec_ID):
+        if isinstance(spec, plot_stim.StimMarkerPlotSpec):
+            self.plot_marker(
+                spec.label,
+                spec.axid,
+                spec.x,
+                spec.y,
+                spec.color,
+                rec_ID,
+                aspect=spec.aspect,
+                stim=spec.stim,
+            )
+        elif isinstance(spec, plot_stim.StimVlinePlotSpec):
+            self.plot_vline(spec.label, spec.axid, spec.x, spec.color, rec_ID, stim=spec.stim)
+        elif isinstance(spec, plot_stim.StimAmpWidthPlotSpec):
+            self.plot_amp_width(
+                spec.label,
+                spec.axid,
+                spec.x_center,
+                spec.amp_x,
+                spec.amp_y,
+                spec.color,
+                rec_ID,
+                aspect=spec.aspect,
+                stim=spec.stim,
+            )
+        elif isinstance(spec, plot_stim.StimHlinePlotSpec):
+            self.plot_hline(
+                spec.label,
+                spec.axid,
+                spec.y,
+                spec.color,
+                rec_ID,
+                aspect=spec.aspect,
+                stim=spec.stim,
+                x_mode=spec.x_mode,
+            )
+        else:
+            self.plot_line(
+                spec.label,
+                spec.axid,
+                spec.x,
+                spec.y,
+                spec.color,
+                rec_ID,
+                aspect=spec.aspect,
+                stim=spec.stim,
+                variant=spec.variant,
+                x_mode=spec.x_mode,
+                width=spec.width,
+            )
+
     def addRow(self, p_row, dft, dfmean, dfoutput):
         rec_ID = p_row["ID"]
         rec_name = p_row["recording_name"]
@@ -1483,242 +1535,18 @@ class UIplot:
         )
 
         dict_gradient = self.get_dict_gradient(n_stims)
-
         settings = self.uistate.project.settings
 
-        for i_stim, t_row in dft.iterrows():
-            color = dict_gradient[i_stim]
-            stim_num = plot_stim.stim_num_from_index(i_stim)
-            stim_str = f"- stim {stim_num}"
-            t_stim = t_row["t_stim"]
-            out = dfoutput[dfoutput["stim"] == stim_num]
-            amp_zero_plot, _y_at_stim = plot_stim.amp_zero_and_y_at_stim(dfmean, t_stim, rec_filter)
-            plot_stim.shift_stim_times(t_row, t_stim)
-
-            self.plot_marker(f"mean {label} {stim_str} marker", "axm", t_stim, 0, color, rec_ID)
-            self.plot_vline(
-                f"mean {label} {stim_str} selection marker",
-                "axm",
-                t_stim,
-                color,
-                rec_ID,
-                stim=stim_num,
-            )
-
-            df_event = plot_stim.event_window_df(
-                dfmean, t_stim, settings["event_start"], settings["event_end"], rec_filter
-            )
-            self.plot_line(
-                f"{label} {stim_str}",
-                "axe",
-                df_event["time"],
-                df_event[rec_filter],
-                color,
-                rec_ID,
-                stim=stim_num,
-            )
-
-            out_stim_row = out[out["sweep"].isna()]
-
-            if not np.isnan(t_row["t_EPSP_amp"]):
-                x_position = t_row["t_EPSP_amp"]
-                y_position = plot_stim.y_at_event_time(df_event, x_position, rec_filter)
-                self.plot_marker(
-                    f"{label} {stim_str} EPSP amp marker",
-                    "axe",
-                    x_position,
-                    y_position,
-                    settings["rgb_EPSP_amp"],
-                    rec_ID,
-                    aspect="EPSP_amp",
-                    stim=stim_num,
-                )
-                amp_x = (
-                    x_position - t_row["t_EPSP_amp_halfwidth"],
-                    x_position + t_row["t_EPSP_amp_halfwidth"],
-                )
-                epsp_amp_val = plot_stim.resolve_epsp_amp_si(
-                    out_stim_row, df_event, x_position, t_row, rec_filter, amp_zero_plot
-                )
-                amp_y = (amp_zero_plot, amp_zero_plot - epsp_amp_val)
-                self.plot_amp_width(
-                    f"{label} {stim_str} EPSP amp",
-                    "axe",
-                    x_position,
-                    amp_x,
-                    amp_y,
-                    settings["rgb_EPSP_amp"],
-                    rec_ID,
-                    aspect="EPSP_amp",
-                    stim=stim_num,
-                )
-                self.plot_line(
-                    f"{label} {stim_str} EPSP amp",
-                    "ax1",
-                    out["sweep"],
-                    out["EPSP_amp"],
-                    settings["rgb_EPSP_amp"],
-                    rec_ID,
-                    aspect="EPSP_amp",
-                    stim=stim_num,
-                    variant="raw",
-                    x_mode="sweep",
-                )
-                self.plot_line(
-                    f"{label} {stim_str} EPSP amp norm",
-                    "ax1",
-                    out["sweep"],
-                    out["EPSP_amp_norm"],
-                    settings["rgb_EPSP_amp"],
-                    rec_ID,
-                    aspect="EPSP_amp",
-                    stim=stim_num,
-                    variant="norm",
-                    x_mode="sweep",
-                )
-                self.plot_line(
-                    f"{label} {stim_str} amp_zero marker",
-                    "axe",
-                    list(plot_stim.AMP_ZERO_PRE_WINDOW),
-                    [amp_zero_plot, amp_zero_plot],
-                    settings["rgb_EPSP_amp"],
-                    rec_ID,
-                    aspect="EPSP_amp",
-                    stim=stim_num,
-                )
-
-            epsp_slope = plot_stim.slope_segment(
-                df_event, t_row["t_EPSP_slope_start"], t_row["t_EPSP_slope_end"], rec_filter
-            )
-            if epsp_slope is not None:
-                self.plot_line(
-                    f"{label} {stim_str} EPSP slope marker",
-                    "axe",
-                    [epsp_slope.x_start, epsp_slope.x_end],
-                    [epsp_slope.y_start, epsp_slope.y_end],
-                    settings["rgb_EPSP_slope"],
-                    rec_ID,
-                    aspect="EPSP_slope",
-                    stim=stim_num,
-                    width=5,
-                )
-                self.plot_line(
-                    f"{label} {stim_str} EPSP slope",
-                    "ax2",
-                    out["sweep"],
-                    out["EPSP_slope"],
-                    settings["rgb_EPSP_slope"],
-                    rec_ID,
-                    aspect="EPSP_slope",
-                    stim=stim_num,
-                    variant="raw",
-                    x_mode="sweep",
-                )
-                self.plot_line(
-                    f"{label} {stim_str} EPSP slope norm",
-                    "ax2",
-                    out["sweep"],
-                    out["EPSP_slope_norm"],
-                    settings["rgb_EPSP_slope"],
-                    rec_ID,
-                    aspect="EPSP_slope",
-                    stim=stim_num,
-                    variant="norm",
-                    x_mode="sweep",
-                )
-
-            if not np.isnan(t_row["t_volley_amp"]):
-                x_position = t_row["t_volley_amp"]
-                y_position = plot_stim.y_at_event_time(df_event, x_position, rec_filter)
-                volley_color = settings["rgb_volley_amp"]
-                self.plot_marker(
-                    f"{label} {stim_str} volley amp marker",
-                    "axe",
-                    t_row["t_volley_amp"],
-                    y_position,
-                    volley_color,
-                    rec_ID,
-                    aspect="volley_amp",
-                    stim=stim_num,
-                )
-                amp_x = (
-                    x_position - t_row["t_volley_amp_halfwidth"],
-                    x_position + t_row["t_volley_amp_halfwidth"],
-                )
-                volley_amp_mean = plot_stim.resolve_volley_amp_si(
-                    t_row, out_stim_row, df_event, x_position, rec_filter, amp_zero_plot
-                )
-                amp_y = amp_zero_plot, amp_zero_plot - volley_amp_mean
-                self.plot_amp_width(
-                    f"{label} {stim_str} volley amp",
-                    "axe",
-                    x_position,
-                    amp_x,
-                    amp_y,
-                    volley_color,
-                    rec_ID,
-                    aspect="volley_amp",
-                    stim=stim_num,
-                )
-                self.plot_hline(
-                    f"{label} {stim_str} volley amp mean",
-                    "ax1",
-                    plot_stim.volley_amp_hline_mv(volley_amp_mean),
-                    volley_color,
-                    rec_ID,
-                    aspect="volley_amp_mean",
-                    stim=stim_num,
-                    x_mode="sweep",
-                )
-                self.plot_line(
-                    f"{label} {stim_str} volley amp",
-                    "ax1",
-                    out["sweep"],
-                    out["volley_amp"],
-                    volley_color,
-                    rec_ID,
-                    aspect="volley_amp",
-                    stim=stim_num,
-                    x_mode="sweep",
-                )
-
-            volley_slope = plot_stim.slope_segment(
-                df_event, t_row["t_volley_slope_start"], t_row["t_volley_slope_end"], rec_filter
-            )
-            if volley_slope is not None:
-                self.plot_line(
-                    f"{label} {stim_str} volley slope marker",
-                    "axe",
-                    [volley_slope.x_start, volley_slope.x_end],
-                    [volley_slope.y_start, volley_slope.y_end],
-                    settings["rgb_volley_slope"],
-                    rec_ID,
-                    aspect="volley_slope",
-                    stim=stim_num,
-                    width=5,
-                )
-                volley_slope_mean = plot_stim.resolve_volley_slope_mean(t_row, out_stim_row, out)
-                self.plot_hline(
-                    f"{label} {stim_str} volley slope mean",
-                    "ax2",
-                    volley_slope_mean,
-                    settings["rgb_volley_slope"],
-                    rec_ID,
-                    aspect="volley_slope_mean",
-                    stim=stim_num,
-                    x_mode="sweep",
-                )
-                self.plot_line(
-                    f"{label} {stim_str} volley slope",
-                    "ax2",
-                    out["sweep"],
-                    out["volley_slope"],
-                    settings["rgb_volley_slope"],
-                    rec_ID,
-                    aspect="volley_slope",
-                    stim=stim_num,
-                    x_mode="sweep",
-                )
+        for spec in plot_stim.build_stim_event_plot_specs(
+            label,
+            dft,
+            dfmean,
+            dfoutput,
+            rec_filter,
+            settings,
+            dict_gradient,
+        ):
+            self._render_stim_event_plot_spec(spec, rec_ID)
 
         if self.uistate.experiment.experiment_type == "PP" and not skip_output:
             for spec in plot_series.build_pp_recording_plot_specs(
