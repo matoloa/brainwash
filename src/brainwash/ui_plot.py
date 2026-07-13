@@ -1344,71 +1344,68 @@ class UIplot:
         axis = self.get_axis(axid)
         if aspect is None:
             aspect = plot_series.default_group_aspect(axid)
-        str_aspect = aspect.replace("_", " ")
         eff_level = level or self.uistate.stat_test.buttonGroup_test_n
-        label_mean = f"{group_name} {str_aspect} mean"
-        label_norm = f"{group_name} {str_aspect} norm"
-        mean_storage_key = self._level_key(label_mean, eff_level)
-        norm_storage_key = self._level_key(label_norm, eff_level)
         series = plot_series.extract_group_mean_series(df_groupmean, aspect)
         x_vals = series.x
         y_mean_vals = series.y_mean
         y_sem_vals = series.y_sem
+        line_specs = plot_model.build_group_line_specs(
+            group_name,
+            aspect,
+            eff_level,
+            include_norm=series.y_norm is not None,
+        )
+        raw_spec = line_specs[0]
         (meanline,) = axis.plot(
             x_vals,
             y_mean_vals,
             color=color,
-            label=label_mean,
+            label=raw_spec.display_label,
             alpha=self.uistate.project.settings["alpha_line"],
             zorder=1,
             linewidth=2.0,
         )
+        meanfill = axis.fill_between(x_vals, y_mean_vals - y_sem_vals, y_mean_vals + y_sem_vals, alpha=0.25, color=color, zorder=0)
+        meanline.set_visible(False)
+        meanfill.set_visible(False)
+        self.uistate.plot.dict_group_labels[raw_spec.storage_key] = {
+            **plot_model.group_line_label_entry(
+                group_ID=group_ID,
+                aspect=aspect,
+                variant=raw_spec.variant,
+                axis=axid,
+                level=eff_level,
+            ),
+            "line": meanline,
+            "fill": meanfill,
+        }
 
         if series.y_norm is not None:
+            norm_spec = line_specs[1]
             y_norm_vals = series.y_norm
             y_norm_sem_vals = series.y_norm_sem
             (normline,) = axis.plot(
                 x_vals,
                 y_norm_vals,
                 color=color,
-                label=label_norm,
+                label=norm_spec.display_label,
                 alpha=self.uistate.project.settings["alpha_line"],
                 zorder=1,
                 linewidth=2.0,
             )
-
-        meanfill = axis.fill_between(x_vals, y_mean_vals - y_sem_vals, y_mean_vals + y_sem_vals, alpha=0.25, color=color, zorder=0)
-
-        if series.y_norm is not None:
             normfill = axis.fill_between(x_vals, y_norm_vals - y_norm_sem_vals, y_norm_vals + y_norm_sem_vals, alpha=0.25, color=color, zorder=0)
-
-        meanline.set_visible(False)
-        meanfill.set_visible(False)
-        self.uistate.plot.dict_group_labels[mean_storage_key] = {
-            "group_ID": group_ID,
-            "stim": None,
-            "aspect": aspect,
-            "variant": "raw",
-            "axis": axid,
-            "line": meanline,
-            "fill": meanfill,
-            "x_mode": "sweep",
-            "level": eff_level,
-        }
-
-        if series.y_norm is not None:
             normline.set_visible(False)
             normfill.set_visible(False)
-            self.uistate.plot.dict_group_labels[norm_storage_key] = {
-                "group_ID": group_ID,
-                "stim": None,
-                "aspect": aspect,
-                "variant": "norm",
-                "axis": axid,
+            self.uistate.plot.dict_group_labels[norm_spec.storage_key] = {
+                **plot_model.group_line_label_entry(
+                    group_ID=group_ID,
+                    aspect=aspect,
+                    variant=norm_spec.variant,
+                    axis=axid,
+                    level=eff_level,
+                ),
                 "line": normline,
                 "fill": normfill,
-                "x_mode": "sweep",
-                "level": eff_level,
             }
 
     def addRow(self, p_row, dft, dfmean, dfoutput):

@@ -71,6 +71,42 @@ def test_build_test_marker_specs_paired_single_marker():
     assert specs[0].color == "white"
 
 
+def test_build_group_line_specs_raw_only():
+    specs = plot_model.build_group_line_specs("Group A", "EPSP_amp", "slice", include_norm=False)
+    assert len(specs) == 1
+    assert specs[0].display_label == "Group A EPSP amp mean"
+    assert specs[0].storage_key == "Group A EPSP amp mean_slice"
+    assert specs[0].variant == "raw"
+
+
+def test_build_group_line_specs_with_norm():
+    specs = plot_model.build_group_line_specs("G1", "EPSP_slope", "recording", include_norm=True)
+    assert len(specs) == 2
+    assert specs[0].variant == "raw"
+    assert specs[1].display_label == "G1 EPSP slope norm"
+    assert specs[1].storage_key == "G1 EPSP slope norm"
+    assert specs[1].variant == "norm"
+
+
+def test_group_line_label_entry():
+    entry = plot_model.group_line_label_entry(
+        group_ID=3,
+        aspect="EPSP_amp",
+        variant="raw",
+        axis="ax1",
+        level="subject",
+    )
+    assert entry == {
+        "group_ID": 3,
+        "stim": None,
+        "aspect": "EPSP_amp",
+        "variant": "raw",
+        "axis": "ax1",
+        "x_mode": "sweep",
+        "level": "subject",
+    }
+
+
 def test_level_storage_key_and_display_label():
     assert plot_model.level_storage_key("G1_amp", "subject") == "G1_amp_subject"
     assert plot_model.level_storage_key("G1_amp", "recording") == "G1_amp"

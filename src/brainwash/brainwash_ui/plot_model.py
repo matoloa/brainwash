@@ -134,6 +134,63 @@ def build_test_marker_specs(
     return specs
 
 
+@dataclass(frozen=True)
+class GroupLineVariantSpec:
+    display_label: str
+    storage_key: str
+    variant: str
+
+
+def group_line_display_labels(group_name: str, aspect: str) -> tuple[str, str]:
+    str_aspect = aspect.replace("_", " ")
+    return f"{group_name} {str_aspect} mean", f"{group_name} {str_aspect} norm"
+
+
+def build_group_line_specs(
+    group_name: str,
+    aspect: str,
+    level: str,
+    *,
+    include_norm: bool,
+) -> list[GroupLineVariantSpec]:
+    mean_label, norm_label = group_line_display_labels(group_name, aspect)
+    specs = [
+        GroupLineVariantSpec(
+            display_label=mean_label,
+            storage_key=level_storage_key(mean_label, level),
+            variant="raw",
+        )
+    ]
+    if include_norm:
+        specs.append(
+            GroupLineVariantSpec(
+                display_label=norm_label,
+                storage_key=level_storage_key(norm_label, level),
+                variant="norm",
+            )
+        )
+    return specs
+
+
+def group_line_label_entry(
+    *,
+    group_ID,
+    aspect: str,
+    variant: str,
+    axis: str,
+    level: str,
+) -> dict:
+    return {
+        "group_ID": group_ID,
+        "stim": None,
+        "aspect": aspect,
+        "variant": variant,
+        "axis": axis,
+        "x_mode": "sweep",
+        "level": level,
+    }
+
+
 def level_storage_key(base_label: str, level: str | None) -> str:
     if not level or level == "recording":
         return base_label
