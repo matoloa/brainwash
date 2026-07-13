@@ -27,7 +27,6 @@ from matplotlib import use as matplotlib_use
 matplotlib_use("Qt5Agg")
 
 
-import json  # for saving and loading dicts as strings
 import logging
 import pickle  # for saving and loading dicts
 import re  # regular expressions
