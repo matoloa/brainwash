@@ -1,7 +1,7 @@
 # Brainwash: Modularity, UI Separation, and Automated Testing
 
 **Date**: 2026-07-13 (revised)  
-**Status**: Phase 0–3 + Phase II (PRs 17–25) implemented on `ui-refactor/phase0-3`. Metrics below are stale baseline; see [plan_ui_refactor_phase2.md](plan_ui_refactor_phase2.md) for current state (~166 tests, `brainwash_ui/` ~950 LOC, mixin injection removed).  
+**Status**: Phase 0–X complete on `ui-refactor/phase0-3` (PR-44). **218** pytest tests in `src/brainwash/` (incl. pytest-qt wiring + refresh-bus coalesce). CI test workflow active. Section 1 metrics are a 2026-07-13 snapshot — refresh before planning new work.  
 **Audience**: Human maintainers and agentic contributors  
 **Goal**: Make UI/stat/view changes safe for agents without a full rewrite, reusing the statistics refactor playbook.
 
@@ -16,7 +16,7 @@ The highest-leverage path is **not** more mixin file moves. It is:
 1. Extract **pure application logic** (statusbar text, view filters, recording pipeline) into testable modules.
 2. Add **characterization tests + contracts** (mirror `brainwash_stats/CONTRACT.md`).
 3. Promote **`test_parse_click.py`** into pytest for headless integration.
-4. Add a **CI test job** (today: builds only, no pytest in GitHub Actions).
+4. ~~Add a **CI test job**~~ — done (`.github/workflows/test.yml`).
 5. Defer composition/controllers and package rename until services and tests exist.
 
 ---
@@ -38,10 +38,10 @@ Numbers below were checked against the repo; use this table as the ground truth 
 | `hasattr(self, …)` in `ui*.py` | **171** | Implicit host contracts |
 | `print()` in `ui*.py` | **375** | Weak structured observability |
 | Cross-mixin refresh calls | **~54** | `graphRefresh` / `update_show` / `turn_heatmap_off` / `apply_statistical_test_if_active` |
-| pytest tests (`src/lib/`) | **115** | 108 in `test_parse.py` + 7 in `test_statistics_characterization.py` |
-| UI/Qt pytest tests | **0** | No `pytest-qt` in `pyproject.toml` |
-| `test_parse_click.py` | Standalone script | Not collected by pytest |
-| GitHub Actions | Build/release only | **No automated test workflow** |
+| pytest tests (`src/brainwash/`) | **218** collected | incl. statusbar, view_state, pipeline integration, pytest-qt wiring |
+| UI/Qt pytest tests | **9+** | `test_ui_wiring.py`, `test_refresh_bus_qt.py`, etc. |
+| `test_parse_click.py` | Promoted | Core steps in `test_pipeline_integration.py` |
+| GitHub Actions | Build + **pytest** | `.github/workflows/test.yml` on push/PR |
 | Legacy analysis | `analysis_v1.py` + `analysis_v2.py` (~1,721 LOC) | Still imported by `analysis_evaluation.py` |
 
 ### What already works (extend these patterns)
