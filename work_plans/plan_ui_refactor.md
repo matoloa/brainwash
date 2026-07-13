@@ -1,6 +1,6 @@
 # UI refactor — agent index
 
-> **Status**: Active. Parent evaluation: [plan_modularity_ui_testing_evaluation.md](plan_modularity_ui_testing_evaluation.md).
+> **Status**: Phase 0–X complete (PR-44). No **NEXT** card. Parent evaluation: [plan_modularity_ui_testing_evaluation.md](plan_modularity_ui_testing_evaluation.md).
 > Phase 0–3 cards archived under [History/ui_refactor/](History/ui_refactor/).
 
 ## Active scope
@@ -79,6 +79,13 @@ Branch: `ui-refactor/phase0-3`. Index: [plan_ui_refactor_phase2.md](plan_ui_refa
 | PR | Card | Status |
 |----|------|--------|
 | 42 | [ui_refactor/42_event_bus_graph_refresh.md](ui_refactor/42_event_bus_graph_refresh.md) | ✅ done |
+
+**Phase X**: [plan_ui_refactor_phase10.md](plan_ui_refactor_phase10.md) ✅
+
+| PR | Card | Status |
+|----|------|--------|
+| 43 | [ui_refactor/43_ui_plot_xdata_hardening.md](ui_refactor/43_ui_plot_xdata_hardening.md) | ✅ done |
+| 44 | [ui_refactor/44_refresh_bus_qt_test.md](ui_refactor/44_refresh_bus_qt_test.md) | ✅ done |
 
 ## Shared docs
 

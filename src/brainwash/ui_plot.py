@@ -1,7 +1,7 @@
 import time  # counting time for functions
 import warnings
 
-from brainwash_ui import plot_model, plot_series, plot_stim, plot_testsets
+from brainwash_ui import plot_drag, plot_model, plot_series, plot_stim, plot_testsets
 
 import matplotlib.pyplot as plt  # for the scatterplot
 import numpy as np
@@ -1815,8 +1815,8 @@ class UIplot:
                     if linedict.get("rec_ID") == rec_id and "PPR" in key and linedict.get("variant") == "raw":
                         aspect = linedict.get("aspect")
                         if aspect:
-                            y_data = linedict["line"].get_ydata()
-                            if len(y_data) > 0:
+                            y_data = plot_drag.artist_ydata(linedict["line"])
+                            if y_data.size > 0:
                                 valid_y = [y for y in y_data if np.isfinite(y)]
                                 if valid_y:
                                     rec_ppr[rec_id][aspect] = np.mean(valid_y)
@@ -2247,8 +2247,8 @@ class UIplot:
         if label not in self.uistate.plot.dict_rec_labels:
             return
         linedict = self.uistate.plot.dict_rec_labels[label]
-        linedict["line"].set_xdata(mouseover_out[0].get_xdata())
-        linedict["line"].set_ydata(mouseover_out[0].get_ydata())
+        linedict["line"].set_xdata(plot_drag.artist_xdata(mouseover_out[0]))
+        linedict["line"].set_ydata(plot_drag.artist_ydata(mouseover_out[0]))
 
     def updateStimLines(self, rec_name: str, dfoutput: "pd.DataFrame") -> None:
         """Refresh all stim-mode output artists for *rec_name* from *dfoutput*.
@@ -2410,8 +2410,9 @@ class UIplot:
         if label not in self.uistate.plot.dict_rec_labels:
             return
         linedict = self.uistate.plot.dict_rec_labels[label]
-        linedict["line"].set_xdata(mouseover_out[0].get_xdata())
-        linedict["line"].set_ydata([mean] * len(linedict["line"].get_xdata()))
+        x_len = len(plot_drag.artist_xdata(linedict["line"]))
+        linedict["line"].set_xdata(plot_drag.artist_xdata(mouseover_out[0]))
+        linedict["line"].set_ydata([mean] * x_len)
         # linedict['line'].set_ydata(mean)
 
     #####################################################################
