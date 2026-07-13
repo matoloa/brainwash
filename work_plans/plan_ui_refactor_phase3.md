@@ -1,6 +1,6 @@
 # UI Refactor Phase III — Agent index
 
-> **Status**: Active. Branch: `ui-refactor/phase0-3`. Manual smoke PASS (2026-07-13).
+> **Status**: Complete. Branch: `ui-refactor/phase0-3`. Manual smoke PASS. Phase IV: [plan_ui_refactor_phase4.md](plan_ui_refactor_phase4.md).
 > Phase II: [plan_ui_refactor_phase2.md](plan_ui_refactor_phase2.md) ✅
 
 ## Progress

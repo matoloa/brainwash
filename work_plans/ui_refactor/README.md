@@ -20,6 +20,12 @@ Each `NN_*.md` file is a **complete session brief**. Agents read **only** the cu
 | `13_plot_model.md` | 45 | Pure `plot_model` + test marker specs |
 | `15_plot_model_phase2.md` | 40 | Legend/heatmap/axis layout helpers |
 | `16_plot_series_addrow.md` | 50 | `plot_series` addRow/addGroup extraction |
+| Phase IV index | — | [../plan_ui_refactor_phase4.md](../plan_ui_refactor_phase4.md) |
+| `31_recording_cache_paths.md` | 40 | Cache path helpers for `ui_data_frames` |
+| `32_data_source_metadata.md` | 35 | Manifest metadata + characteristic assertions |
+| `33_graphrefresh_pp_labels.md` | 40 | PP group tick label pure helpers |
+| `34_testset_span_descriptors.md` | 45 | `visualize_test_sets` / `sample_overlay` specs |
+| `35_export_image_plot_reuse.md` | 40 | `export_image` dedupe via `brainwash_ui` |
 | `VERIFY.md` | 20 | Post-PR commands |
 | `CONTRACT.md` | 40 | Statusbar/view invariants |
 
