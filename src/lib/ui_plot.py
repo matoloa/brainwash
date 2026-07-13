@@ -763,7 +763,13 @@ class UIplot:
             uis.ghost_sweep = None
             uis.ghost_label = None
 
-    def unPlotGroup(self, group_ID=None):
+    def unPlotGroup(self, group_ID=None, level=None):
+        """Remove group artists.
+
+        If level is provided, only remove artists for that specific n_unit level
+        (recording/slice/subject). This supports keeping separate artist sets
+        per level so we can toggle instead of always destroying/recreating.
+        """
         dict_group = self.uistate.dict_group_labels
         dict_group_show = self.uistate.dict_group_show
         if group_ID is None:
@@ -772,6 +778,12 @@ class UIplot:
                 self.clear_test_markers(draw=False)
         else:
             keys_to_remove = [key for key, value in dict_group.items() if group_ID == value["group_ID"]]
+
+        if level is not None:
+            keys_to_remove = [
+                k for k in keys_to_remove
+                if dict_group.get(k, {}).get("level") == level
+            ]
         for key in keys_to_remove:
             artist = dict_group[key].get("line")
             if artist is not None:
@@ -821,6 +833,64 @@ class UIplot:
             if key in dict_group_show:
                 del dict_group_show[key]
 
+    def _level_key(self, base_label, level):
+        """Helper to make level-qualified storage key for group artists (recording has no suffix)."""
+        if not level or level == "recording":
+            return base_label
+        return f"{base_label}_{level}"
+
+    def _display_label(self, key):
+        """Strip level suffix from storage key for display (legends, etc.)."""
+        for suf in ("_subject", "_slice", "_recording"):
+            if key.endswith(suf):
+                return key[:-len(suf)]
+        return key
+
+    def update_group_level_visibility(self, active_level=None):
+        """Toggle visibility of group artists so only the current n_unit level is shown.
+
+        This allows keeping separate artist sets (mean + SEM) per level
+        and switching cheaply via visibility instead of unplot/replot.
+        Integrates with the level filter already present in update_show.
+        """
+        if active_level is None:
+            active_level = getattr(self.uistate, "buttonGroup_test_n", "recording")
+
+        # Ensure only artists for the active level (or untagged) are visible.
+        # We set visibility here for level, and let update_show handle selection rules.
+        dict_group = self.uistate.dict_group_labels
+
+        for k, v in list(dict_group.items()):
+            if v.get("group_ID") is not None:
+                is_correct_level = (v.get("level") == active_level) or (v.get("level") is None)
+                visible_for_level = is_correct_level
+                for key in ["line", "fill"]:
+                    obj = v.get(key)
+                    if obj is not None:
+                        try:
+                            if hasattr(obj, "set_visible"):
+                                obj.set_visible(visible_for_level)
+                            elif hasattr(obj, "patches"):
+                                for p in obj.patches:
+                                    p.set_visible(visible_for_level)
+                            elif hasattr(obj, "lines"):
+                                for l in (obj.lines if isinstance(obj.lines, (list, tuple)) else [obj.lines]):
+                                    if l is not None:
+                                        if isinstance(l, (list, tuple)):
+                                            for sub_l in l:
+                                                if sub_l is not None:
+                                                    sub_l.set_visible(visible_for_level)
+                                        else:
+                                            l.set_visible(visible_for_level)
+                        except Exception:
+                            pass
+
+        # Rebuild show dict for the level (caller should invoke full update_show for selection rules if needed)
+        if hasattr(self.uistate, "dict_group_show"):
+            new_show = {k: v for k, v in dict_group.items()
+                        if v.get("group_ID") is not None and ((v.get("level") == active_level) or (v.get("level") is None))}
+            self.uistate.dict_group_show = new_show
+
     def graphRefresh(self, dd_groups, dd_testset=None, dd_shown_samples=None):
         # show only selected and imported lines, only appropriate aspects
         uistate = self.uistate
@@ -844,8 +914,15 @@ class UIplot:
             recs_on_axis = {key: value for key, value in dd_recs.items() if value["axis"] == axid and not key.endswith(" marker")}
             axis_legend = {key: value["line"] for key, value in recs_on_axis.items()}
             if axid in ["ax1", "ax2"]:
-                groups_on_axis = {key: value for key, value in dd_group_show.items() if value["axis"] == axid}
-                axis_legend.update({key: value["line"] for key, value in groups_on_axis.items()})
+                current_level = getattr(uistate, "buttonGroup_test_n", "recording")
+                groups_on_axis = {
+                    key: value for key, value in dd_group_show.items()
+                    if value["axis"] == axid and (value.get("level") == current_level or value.get("level") is None)
+                }
+                # use clean display labels (strip level suffix if present)
+                for key, value in groups_on_axis.items():
+                    display_key = self._display_label(key)
+                    axis_legend[display_key] = value["line"]
             axis = getattr(uistate, axid)
             if axis_legend and not is_pp:
                 try:
@@ -936,14 +1013,17 @@ class UIplot:
 
             # Re-collect the true integer X positions for group labels, ignoring the sub-offsets used for the individual bars
             group_name_to_x = {}
+            current_level = getattr(uistate, "buttonGroup_test_n", "recording")
             if hasattr(uistate, "dict_group_show"):
                 for key, val in uistate.dict_group_show.items():
                     if "PPR" in key and hasattr(val["line"], "patches") and not val.get("is_overlay"):
+                        if val.get("level") and val.get("level") != current_level:
+                            continue
                         try:
                             # The original x_pos is an integer (1.0, 2.0, etc), so we round the fractional bar position back to the nearest integer
                             x_pos_float = val["line"].patches[0].get_x() + val["line"].patches[0].get_width() / 2
                             x_pos_int = round(x_pos_float)
-                            group_name = key.split(" PPR")[0]
+                            group_name = self._display_label( key.split(" PPR")[0] )
                             group_name_to_x[x_pos_int] = group_name
                         except:
                             pass
@@ -1387,7 +1467,12 @@ class UIplot:
             "x_mode": x_mode,
         }
 
-    def plot_group_lines(self, axid, group_ID, dict_group, df_groupmean, aspect=None):
+    def plot_group_lines(self, axid, group_ID, dict_group, df_groupmean, aspect=None, level=None):
+        """Plot group mean line + SEM fill for a given aspect.
+
+        level (if provided) is stored on the artist entry so we can keep
+        separate plot sets for recording/slice/subject and toggle them.
+        """
         group_name = dict_group["group_name"]
         color = dict_group["color"]
         axis = self.get_axis(axid)
@@ -1398,8 +1483,12 @@ class UIplot:
                 aspect = "EPSP_slope"
         str_aspect = aspect.replace("_", " ")
         x = df_groupmean.sweep
+        eff_level = level or getattr(self.uistate, "buttonGroup_test_n", "recording")
         label_mean = f"{group_name} {str_aspect} mean"
         label_norm = f"{group_name} {str_aspect} norm"
+        # use level-qualified storage keys so we can keep separate artist sets per n_unit level
+        mean_storage_key = self._level_key(label_mean, eff_level)
+        norm_storage_key = self._level_key(label_norm, eff_level)
         y_mean = df_groupmean[f"{aspect}_mean"]
         sem_col = f"{aspect}_SEM"
         if sem_col in df_groupmean.columns:
@@ -1471,7 +1560,7 @@ class UIplot:
 
         meanline.set_visible(False)
         meanfill.set_visible(False)
-        self.uistate.dict_group_labels[label_mean] = {
+        self.uistate.dict_group_labels[mean_storage_key] = {
             "group_ID": group_ID,
             "stim": None,
             "aspect": aspect,
@@ -1480,12 +1569,13 @@ class UIplot:
             "line": meanline,
             "fill": meanfill,
             "x_mode": "sweep",
+            "level": eff_level,
         }
 
         if y_norm is not None:
             normline.set_visible(False)
             normfill.set_visible(False)
-            self.uistate.dict_group_labels[label_norm] = {
+            self.uistate.dict_group_labels[norm_storage_key] = {
                 "group_ID": group_ID,
                 "stim": None,
                 "aspect": aspect,
@@ -1494,6 +1584,7 @@ class UIplot:
                 "line": normline,
                 "fill": normfill,
                 "x_mode": "sweep",
+                "level": eff_level,
             }
 
     def addRow(self, p_row, dft, dfmean, dfoutput):
@@ -1990,8 +2081,13 @@ class UIplot:
                             x_mode="stim",
                         )
 
-    def addGroup(self, group_ID, dict_group, df_groupmean, x_pos=1):
+    def addGroup(self, group_ID, dict_group, df_groupmean, x_pos=1, level=None):
+        """Add (or update) group artists for the given level.
+
+        If level is None, it is taken from uistate.buttonGroup_test_n.
+        """
         # plot group meanlines and SEMs
+        eff_level = level or getattr(self.uistate, "buttonGroup_test_n", "recording")
         exp_type = getattr(self.uistate, "experiment_type", "time")
         if exp_type == "PP":
             group_name = dict_group["group_name"]
@@ -2012,7 +2108,7 @@ class UIplot:
                                 if valid_y:
                                     rec_ppr[rec_id][aspect] = np.mean(valid_y)
 
-            level = getattr(self.uistate, "buttonGroup_test_n", "recording")
+            level = eff_level or getattr(self.uistate, "buttonGroup_test_n", "recording")
             ppr_data = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
             rec_id_order = {"EPSP_amp": [], "EPSP_slope": [], "volley_amp": [], "volley_slope": []}
             if level == "recording":
@@ -2069,7 +2165,6 @@ class UIplot:
                     offset = start_offset + (i * bar_width)
                     configs.append((asp, axid, offset, bar_width * 0.9))  # 10% gap between bars within cluster
 
-            print(f"DEBUG addGroup called for {group_name}")
             for aspect, axid, offset, bar_w in configs:
                 vals = ppr_data[aspect]
                 if vals:
@@ -2190,10 +2285,12 @@ class UIplot:
                                 "x_mode": "sweep",
                                 "is_container": True,
                                 "is_overlay": is_overlay,
+                                "level": level,
                             }
                             if rec_id_val is not None:
                                 d["rec_ID"] = rec_id_val
-                            self.uistate.dict_group_labels[f"{group_name} PPR {aspect} {suffix}"] = d
+                            ppr_storage_key = self._level_key(f"{group_name} PPR {aspect} {suffix}", level)
+                            self.uistate.dict_group_labels[ppr_storage_key] = d
                     except Exception as e:
                         print(f"DEBUG: addGroup error in drawing loop: {e}")
                         continue
@@ -2236,7 +2333,9 @@ class UIplot:
                         zorder=2,
                     )
                     scatter.set_visible(False)
-                    self.uistate.dict_group_labels[f"{group_name} {variant} IO scatter"] = {
+                    io_level = getattr(self.uistate, "buttonGroup_test_n", "recording")
+                    io_storage_key = self._level_key(f"{group_name} {variant} IO scatter", io_level)
+                    self.uistate.dict_group_labels[io_storage_key] = {
                         "group_ID": group_ID,
                         "aspect": y_col_base,
                         "variant": variant,
@@ -2245,6 +2344,7 @@ class UIplot:
                         "fill": scatter,
                         "axis": axid,
                         "x_mode": "io",
+                        "level": io_level,
                     }
 
                     if len(x_vals) > 1:
@@ -2274,7 +2374,8 @@ class UIplot:
                             zorder=3,
                         )
                         trendline.set_visible(False)
-                        self.uistate.dict_group_labels[f"{group_name} {variant} IO trendline"] = {
+                        io_trend_key = self._level_key(f"{group_name} {variant} IO trendline", io_level)
+                        self.uistate.dict_group_labels[io_trend_key] = {
                             "group_ID": group_ID,
                             "aspect": y_col_base,
                             "variant": variant,
@@ -2283,17 +2384,19 @@ class UIplot:
                             "fill": trendline,
                             "axis": axid,
                             "x_mode": "io",
+                            "level": io_level,
                         }
             return
 
+        eff_level = getattr(self.uistate, "buttonGroup_test_n", "recording")
         if "EPSP_amp_mean" in df_groupmean.columns and df_groupmean["EPSP_amp_mean"].notna().any():
-            self.plot_group_lines("ax1", group_ID, dict_group, df_groupmean, aspect="EPSP_amp")
+            self.plot_group_lines("ax1", group_ID, dict_group, df_groupmean, aspect="EPSP_amp", level=eff_level)
         if "EPSP_slope_mean" in df_groupmean.columns and df_groupmean["EPSP_slope_mean"].notna().any():
-            self.plot_group_lines("ax2", group_ID, dict_group, df_groupmean, aspect="EPSP_slope")
+            self.plot_group_lines("ax2", group_ID, dict_group, df_groupmean, aspect="EPSP_slope", level=eff_level)
         if "volley_amp_mean" in df_groupmean.columns and df_groupmean["volley_amp_mean"].notna().any():
-            self.plot_group_lines("ax1", group_ID, dict_group, df_groupmean, aspect="volley_amp")
+            self.plot_group_lines("ax1", group_ID, dict_group, df_groupmean, aspect="volley_amp", level=eff_level)
         if "volley_slope_mean" in df_groupmean.columns and df_groupmean["volley_slope_mean"].notna().any():
-            self.plot_group_lines("ax2", group_ID, dict_group, df_groupmean, aspect="volley_slope")
+            self.plot_group_lines("ax2", group_ID, dict_group, df_groupmean, aspect="volley_slope", level=eff_level)
 
     def update(
         self,

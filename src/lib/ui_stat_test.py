@@ -892,29 +892,37 @@ class StatTestMixin:
         uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.update_test()
 
-        # force fresh group means at new n_unit level (clear any prior caches for these groups)
-        if hasattr(self, "dict_group_means"):
-            for gid in list(self.dd_groups.keys()):
-                self.dict_group_means.pop(gid, None)
-                for lev in getattr(self, "VALID_LEVELS", ["recording", "slice", "subject"]):
-                    self.dict_group_means.pop((gid, lev), None)
-
-        if hasattr(uiplot, "unPlotGroup"):
-            uiplot.unPlotGroup()
+        # Lazy per-level (per plan): only create artists for this level if they don't exist yet.
+        # Do NOT clear/unplot previous levels — their artists remain (hidden) so future switches are pure toggles.
+        # Only the required level's df is computed (lazy in get_dfgroupmean).
+        current_level = getattr(uistate, "buttonGroup_test_n", "recording")
         for group_ID in list(self.dd_groups.keys()):
-            if self.dd_groups[group_ID].get("rec_IDs"):
-                dict_group = self.dd_groups[group_ID]
-                level = getattr(uistate, "buttonGroup_test_n", "recording")
-                group_mean_data = self.get_dfgroupmean(group_ID, level=level)
+            if not self.dd_groups[group_ID].get("rec_IDs"):
+                continue
+            dict_group = self.dd_groups[group_ID]
+
+            # Check if we already have artists for this level for this group (by level tag, supporting suffixed keys)
+            has_level = False
+            for k, v in uistate.dict_group_labels.items():
+                if v.get("group_ID") == group_ID and v.get("level") == current_level:
+                    has_level = True
+                    break
+
+            if not has_level:
+                group_mean_data = self.get_dfgroupmean(group_ID, level=current_level)
                 x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
-                uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data), x_pos=x_pos)
-        self.update_show()
+                uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data), x_pos=x_pos, level=current_level)
+
+        self.update_show()  # applies level filter from current n_unit + selection rules
+        if hasattr(uiplot, "update_group_level_visibility"):
+            uiplot.update_group_level_visibility(current_level)
+
         if hasattr(self, "graphRefresh"):
             self.graphRefresh(reeval_formal_test=False)
         if hasattr(self, "mouseoverUpdate"):
             self.mouseoverUpdate()
 
-        # force canvas redraw so group mean lines / SEM shades update immediately
+        # force canvas redraw
         for cname in ("canvasMean", "canvasEvent", "canvasOutput"):
             if hasattr(self, cname):
                 try:

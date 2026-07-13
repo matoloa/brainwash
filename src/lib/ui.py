@@ -60,7 +60,7 @@ import ui_selection  # SelectionMixin (Phase 1)
 import lib.ui_stat_test as ui_stat_test  # StatTestMixin (Phase 4)
 import ui_state_classes
 import ui_sweep_ops
-import ui_table  # TableMixin (Phase 1 start)
+import ui_table  # TableMixin (Phase 1)
 import ui_widgets  # Custom Qt widgets, dialogs, models, threads (extracted Phase 0)
 import yaml  # used by talkback
 from ui_project import df_projectTemplate
@@ -72,12 +72,12 @@ logger.debug("ui.py: os.getcwd(): %s", os.getcwd())
 
 # NOTE: Large parts of UIsub have been extracted to mixins (see plan_ui_mixin_extraction.md):
 # - Phase 0: widgets -> ui_widgets.py
-# - Phase 1: table/selection -> ui_table.py + ui_selection.py
+# - Phase 1: table/selection -> ui_table.py + ui_selection.py (methods moved + cleaned; update_recs2plot/setViewToolVisible deduped)
 # - Phase 2: graph/zoom -> ui_graph.py
 # - Phase 3: parse -> ui_parse.py
 # - Phase 4: stat tests/statusbar/n_unit -> ui_stat_test.py
 # - Phase 5 (polish): completed core stat move, moved setSplitterSizes to ProjectMixin, cleaned comments/stubs, import fixes.
-# Core UIsub now holds wiring, lifecycle, thin orchestration and non-extracted handlers. (ui.py < 2800 LOC)
+# Core UIsub now holds wiring, lifecycle, thin orchestration and non-extracted handlers. (ui.py ~2600 LOC)
 
 config = ui_widgets.Config()
 uistate = ui_state_classes.UIstate()  # global variable for storing state of UI
@@ -95,7 +95,7 @@ uiplot = ui_plot.UIplot(uistate)
 # This must happen after all singletons (config, uistate, uiplot) and all
 # widget classes (now in ui_widgets) are defined, but before any UIsub instance.
 # ui_widgets also receives uistate for threads that reference it directly.
-# ui_table and ui_selection added in Phase 1.
+# ui_table / ui_selection added in Phase 1.
 # ---------------------------------------------------------------------------
 ui_groups.uistate = uistate
 ui_groups.config = config
@@ -586,66 +586,9 @@ class UIsub(
         except Exception:
             return False
 
-    def setTableStimVisibility(self, state, initialize=False):
-        widget = self.h_splitterMaster.widget(1)  # Get the second widget in the splitter
-
-        if initialize:
-            widget.setVisible(state)
-            return
-
-        if state == widget.isVisible():
-            return
-
-        sizes = self.h_splitterMaster.sizes()
-        if state:
-            prop = uistate.settings.get("dft_width_proportion", 0.2)
-            total = sizes[1] + sizes[2]
-            sizes[1] = min(total, max(100, int(total * prop)))
-            sizes[2] = total - sizes[1]
-            widget.setVisible(True)
-            self.h_splitterMaster.setSizes(sizes)
-        else:
-            sizes[2] += sizes[1]
-            sizes[1] = 0
-            widget.setVisible(False)
-            self.h_splitterMaster.setSizes(sizes)
-
-        total_size = sum(sizes)
-        if total_size > 0:
-            old_proportions = uistate.splitter.get("h_splitterMaster", [])
-            unbounded_px = sum(size for i, size in enumerate(sizes) if i >= len(old_proportions) or type(old_proportions[i]) == float)
-            proportions = []
-            for i, size in enumerate(sizes):
-                if i < len(old_proportions) and type(old_proportions[i]) != float:
-                    proportions.append(int(size))
-                else:
-                    proportions.append(float(size / unbounded_px if unbounded_px > 0 else 0.0))
-            uistate.splitter["h_splitterMaster"] = proportions
-
+    # setTableStimVisibility moved to TableMixin (ui_table.py)
+    # setViewToolVisible moved to SelectionMixin (ui_selection.py)
     # onSplitterMoved (splitter proportion logic kept here; graph zoom part in GraphCoordinatorMixin)
-
-    def setViewToolVisible(self, frame, visible=None):
-        self.usage(f"setViewToolVisible {frame} {visible}")
-        if frame in uistate.viewTools:
-            if visible is None:
-                visible = not uistate.viewTools[frame][1]
-            uistate.viewTools[frame][1] = visible
-            getattr(self, frame).setVisible(visible)
-
-            # Sync the menu action if it exists
-            text = uistate.viewTools[frame][0]
-            if hasattr(self, "menuView"):
-                for action in self.menuView.actions():
-                    if action.text() == text:
-                        if action.isChecked() != visible:
-                            action.setChecked(visible)
-                        break
-        else:
-            if visible is None:
-                visible = not getattr(self, frame).isVisible()
-            getattr(self, frame).setVisible(visible)
-
-        uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
     def talkback(self):
         prow = self.get_prow()
@@ -749,14 +692,7 @@ class UIsub(
         except Exception:
             pass
 
-    def update_recs2plot(self):
-        if uistate.list_idx_select_recs:
-            df_project_selected = self.get_df_project().iloc[uistate.list_idx_select_recs]
-            uistate.df_recs2plot = df_project_selected[df_project_selected["sweeps"] != "..."]
-            if uistate.df_recs2plot.empty:
-                uistate.df_recs2plot = None
-        else:
-            uistate.df_recs2plot = None
+    # update_recs2plot moved to TableMixin (ui_table.py)
 
     # --- X-axis radio button mapping ---
     _RADIO_TO_MODE = {
@@ -1769,6 +1705,10 @@ class UIsub(
         self.group_get_dd()  # rebuilds from updated df_project
         if hasattr(self, "dict_global_units"):
             self.dict_global_units.clear()  # globals depend on hierarchy
+        # Invalidate group means and plots for non-rec levels (hierarchy affects them)
+        self.group_cache_purge(levels=["slice", "subject"])
+        if hasattr(uiplot, "unPlotGroup"):
+            uiplot.unPlotGroup()  # clear all to be safe, will re-add current on refresh
         if hasattr(self, "graphRefresh"):
             self.graphRefresh()
 
@@ -2615,9 +2555,7 @@ class UIsub(
         self.graphRefresh()
         self.update_sample_checkbox()
 
-    def tableFormat(self):
-        # delegated to ui_table.TableMixin
-        pass
+    # tableFormat (and other table methods) moved to TableMixin in ui_table.py
 
 
 # Root functions

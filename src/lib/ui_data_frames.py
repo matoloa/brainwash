@@ -142,14 +142,14 @@ class DataFrameMixin:
 
         if selection is None:
             uiplot.unPlot()
-            uiplot.unPlotGroup()
+            uiplot.unPlotGroup()  # all levels (full clear)
         else:
             for _, p_row in rows.iterrows():
                 uiplot.unPlot(p_row["ID"])
             # Ensure unique group IDs and convert to list correctly
             affected_group_IDs = list(set([g for _, p_row in rows.iterrows() for g in self.get_groupsOfRec(p_row["ID"])]))
             for group_ID in affected_group_IDs:
-                uiplot.unPlotGroup(group_ID)
+                self.clear_group_level(group_ID)  # all levels for affected groups
 
         for _, p_row in rows.iterrows():
             rec = p_row["recording_name"]
@@ -190,9 +190,9 @@ class DataFrameMixin:
 
         # group handling
         if selection is None:
-            self.group_cache_purge()
+            self.group_cache_purge()  # all levels
         else:
-            self.group_cache_purge(affected_group_IDs)
+            self.group_cache_purge(affected_group_IDs)  # all levels for affected (rec change affects all)
         # 3.4.1: invalidate sample cache on group changes (sample or testset sweeps may be affected)
         if hasattr(self, "dd_group_samples"):
             self.dd_group_samples = {}
@@ -761,6 +761,10 @@ class DataFrameMixin:
         level=None or 'recording' -> classic rec-level (back-compat).
         'slice'/'subject' -> contextual: avg within unit (only group's recs), then across units.
         Uses per-level cache keys and files for isolation.
+
+        Plotting now keeps separate artists per level (see plan_nunit_group_plotting.md),
+        toggled via visibility in update_show / update_group_level_visibility.
+        Only computed on demand for active level.
         """
         if not group_ID:
             return pd.DataFrame()

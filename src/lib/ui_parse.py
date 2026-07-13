@@ -106,7 +106,8 @@ class ParseMixin:
                 self.dd_groups[group_ID]["rec_IDs"].remove(rec_ID)
                 print(f"purgeRecordingData: post {self.dd_groups[group_ID]['rec_IDs']}")
             self.group_save_dd()
-            self.group_cache_purge(groups2purge)
+            for group_ID in groups2purge:
+                self.clear_group_level(group_ID)  # all levels for affected
             self.refresh_samples()
         # clear recording caches
         for cache_name in [

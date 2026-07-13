@@ -219,7 +219,8 @@ class GraphCoordinatorMixin:
         if not all_group_ids:
             return
         groups_with_records = {group_id: group_info for group_id, group_info in self.dd_groups.items() if group_info["rec_IDs"]}
-        already_plotted_groups = set(uistate.get_groupSet())
+        current_level = getattr(uistate, "buttonGroup_test_n", "recording")
+        already_plotted_groups = set(uistate.get_groupSet(level=current_level))
         groups_to_plot = all_group_ids & set(groups_with_records.keys()) - already_plotted_groups
         if groups_to_plot:
             for group_ID in groups_to_plot:
@@ -228,7 +229,7 @@ class GraphCoordinatorMixin:
                 group_mean_data = self.get_dfgroupmean(group_ID, level=level)
                 # print(f"graphGroups: Adding group {group_ID} to plot: {group_mean_data}")
                 x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
-                uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data), x_pos=x_pos)
+                uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data), x_pos=x_pos, level=level)
 
     def graphUpdate(self, df=None, row=None, reeval_formal_test: bool = True):
         def processRow(row):

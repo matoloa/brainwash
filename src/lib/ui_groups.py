@@ -143,13 +143,15 @@ class GroupMixin:
 
     def group_remove(self, group_ID=None):
         if group_ID is None:
+            uiplot.unPlotGroup()  # all
             self.dd_groups = {}
             self.group_cache_purge()
             self.group_controls_remove()
         else:
             if group_ID in self.dd_groups:
+                uiplot.unPlotGroup(group_ID)  # all levels
                 del self.dd_groups[group_ID]
-            self.group_cache_purge([group_ID])
+            self.group_cache_purge([group_ID])  # will also unplot per level
             self.group_controls_remove(group_ID)
         self.group_save_dd()
         self.refresh_samples()  # 3.4.3: group removal must trigger sample refresh
@@ -241,11 +243,12 @@ class GroupMixin:
         if rec_ID not in self.dd_groups[group_ID]["rec_IDs"]:
             dict_group = self.dd_groups[group_ID]
             dict_group["rec_IDs"].append(rec_ID)
-            self.group_cache_purge([group_ID])
+            uiplot.unPlotGroup(group_ID)  # all levels stale after membership change
+            self.group_cache_purge([group_ID])  # all levels
             level = getattr(uistate, "buttonGroup_test_n", "recording")
             df_groupmean = self.get_dfgroupmean(group_ID, level=level)
             x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
-            uiplot.addGroup(group_ID, dict_group, self.V2mV(df_groupmean), x_pos=x_pos)
+            uiplot.addGroup(group_ID, dict_group, self.V2mV(df_groupmean), x_pos=x_pos, level=level)
             # v0.16: membership change may affect active statistical test
             if hasattr(self, "apply_statistical_test_if_active"):
                 self.apply_statistical_test_if_active()
@@ -254,12 +257,13 @@ class GroupMixin:
         if rec_ID in self.dd_groups[group_ID]["rec_IDs"]:
             dict_group = self.dd_groups[group_ID]
             dict_group["rec_IDs"].remove(rec_ID)
-            self.group_cache_purge([group_ID])
+            uiplot.unPlotGroup(group_ID)  # all levels stale
+            self.group_cache_purge([group_ID])  # all levels
             level = getattr(uistate, "buttonGroup_test_n", "recording")
             df_groupmean = self.get_dfgroupmean(group_ID, level=level)
             if self.dd_groups[group_ID]["rec_IDs"]:
                 x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
-                uiplot.addGroup(group_ID, dict_group, self.V2mV(df_groupmean), x_pos=x_pos)
+                uiplot.addGroup(group_ID, dict_group, self.V2mV(df_groupmean), x_pos=x_pos, level=level)
             # v0.16: membership change may affect active statistical test
             if hasattr(self, "apply_statistical_test_if_active"):
                 self.apply_statistical_test_if_active()
@@ -381,6 +385,13 @@ class GroupMixin:
                 if k in self.dict_group_means:
                     del self.dict_group_means[k]
 
+                # destroy corresponding plot artists at the same place we destroy the df cache (per-level)
+                try:
+                    lvl = k[1] if isinstance(k, tuple) else "recording"
+                    uiplot.unPlotGroup(group_ID, level=lvl)
+                except (NameError, AttributeError, TypeError):
+                    pass
+
             # delete possible parquet variants
             base = f"{self.dict_folders['cache']}/group_{group_ID}"
             for lvl in ([""] + [f"_{l}" for l in (levels or ["recording", "slice", "subject"])]):
@@ -405,6 +416,18 @@ class GroupMixin:
             for sample_file in cache_dir.glob(f"{group_name}_sample_*.parquet"):
                 if sample_file.exists():
                     sample_file.unlink()
+
+    def clear_group_level(self, group_ID, level=None):
+        """Clear df cache and plot artists for a specific level (or all if level=None).
+
+        This is the convenience for level-granular staleness.
+        """
+        levels = [level] if level else None
+        self.group_cache_purge([group_ID], levels=levels)
+        try:
+            uiplot.unPlotGroup(group_ID, level=level)
+        except (NameError, AttributeError, Exception):
+            pass
 
     # ------------------------------------------------------------------
     # Sample refresh (Phase 3.4.3 - full implementation)

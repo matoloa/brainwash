@@ -34,28 +34,18 @@ logger = logging.getLogger(__name__)
 class TableMixin:
     """Mixin that provides project table (tableProj) and stim table management.
 
-    Host requirements:
+    Host requirements (provided by UIsub or other mixins):
         - self.df_project (or get_df_project())
-        - self.tableProj, self.tableView, self.tableStim etc. widgets
-        - self.update_recs2plot(), self.update_show(), self.zoomAuto(), self.graphRefresh()
-        - self.get_dft(), self.get_dfmean(), self.get_dfoutput(), self.V2mV()
-        - self.create_recording(), self.addData()
-        - self.formatTableLayout(), self.setButtonParse()
-        - uistate.list_idx_select_recs, uistate.df_recs2plot etc.
+        - self.tableProj, self.tableStim, self.h_splitterMaster widgets
+        - self.update_show(), self.zoomAuto(), self.graphRefresh(), self.graphUpdate()
+        - self.get_dft(), self.get_dffilter(), self.get_df_project()
+        - self.update_filter_settings(), self.update_experiment_type_radio_buttons()
+        - self.update_amp_lineEdits(), self.update_slope_lineEdits()
+        - self.refreshHierarchyLineEdits(), self.setButtonParse()
+        - self.usage(), self.mouseoverUpdate()
+        - self.connectUIstate()
+        - uistate.* selection state, df_recs2plot etc.
     """
-
-    def tableProjSelectionChanged(self, selected=None, deselected=None):
-        # (body moved from ui.py - full implementation would be copied here)
-        # For this initial extraction step, the method body remains in UIsub
-        # and we delegate or will move in follow-up edit.
-        # Placeholder to satisfy the plan structure.
-        if hasattr(self, "_orig_tableProjSelectionChanged"):
-            return self._orig_tableProjSelectionChanged(selected, deselected)
-        # In real step the full def would be here.
-        pass
-
-    # Additional table methods (tableUpdate, _restore_table_selection, get_prow, get_trow,
-    # tableFormat, setupTable*, formatTableLayout, etc.) would be moved here in full Phase 1.
 
     def tableFormat(self):
         logger.debug("tableFormat")
@@ -75,13 +65,18 @@ class TableMixin:
         self.setButtonParse()
 
     def update_recs2plot(self):
-        """Rebuild uistate.df_recs2plot from current selection."""
+        """Rebuild uistate.df_recs2plot from current selection (positional rows).
+        Filters out unparsed rows (sweeps == "...").
+        """
         if not uistate.list_idx_select_recs:
             uistate.df_recs2plot = None
             return
-        df_p = self.get_df_project()
         try:
-            uistate.df_recs2plot = df_p.loc[uistate.list_idx_select_recs]
+            df_p = self.get_df_project()
+            df_project_selected = df_p.iloc[uistate.list_idx_select_recs]
+            uistate.df_recs2plot = df_project_selected[df_project_selected["sweeps"] != "..."]
+            if uistate.df_recs2plot.empty:
+                uistate.df_recs2plot = None
         except Exception:
             uistate.df_recs2plot = None
 
@@ -269,7 +264,8 @@ class TableMixin:
             self.tableProj.setSelectionBehavior(ui_widgets.TableProjSub.SelectRows)
             tableProj_selectionModel = self.tableProj.selectionModel()
             tableProj_selectionModel.selectionChanged.connect(self.tableProjSelectionChanged)
-            if hasattr(self, "lineEdit_hierarchy_subject") and hasattr(self, "lineEdit_hierarchy_slice"):
+            if (hasattr(self, "lineEdit_hierarchy_subject") and hasattr(self, "lineEdit_hierarchy_slice")
+                    and hasattr(self, "setTabOrder")):
                 self.setTabOrder(self.lineEdit_hierarchy_subject, self.lineEdit_hierarchy_slice)
             self.formatTableLayout()
         except Exception as e:
@@ -364,3 +360,40 @@ class TableMixin:
         for i, col_index in enumerate(col_indices):
             header.moveSection(header.visualIndex(col_index), i)
         self.tableStim.resizeColumnsToContents()
+
+    def setTableStimVisibility(self, state, initialize=False):
+        """Toggle visibility of the stim table (right pane of master splitter)."""
+        widget = self.h_splitterMaster.widget(1)  # Get the second widget in the splitter
+
+        if initialize:
+            widget.setVisible(state)
+            return
+
+        if state == widget.isVisible():
+            return
+
+        sizes = self.h_splitterMaster.sizes()
+        if state:
+            prop = uistate.settings.get("dft_width_proportion", 0.2)
+            total = sizes[1] + sizes[2]
+            sizes[1] = min(total, max(100, int(total * prop)))
+            sizes[2] = total - sizes[1]
+            widget.setVisible(True)
+            self.h_splitterMaster.setSizes(sizes)
+        else:
+            sizes[2] += sizes[1]
+            sizes[1] = 0
+            widget.setVisible(False)
+            self.h_splitterMaster.setSizes(sizes)
+
+        total_size = sum(sizes)
+        if total_size > 0:
+            old_proportions = uistate.splitter.get("h_splitterMaster", [])
+            unbounded_px = sum(size for i, size in enumerate(sizes) if i >= len(old_proportions) or type(old_proportions[i]) == float)
+            proportions = []
+            for i, size in enumerate(sizes):
+                if i < len(old_proportions) and type(old_proportions[i]) != float:
+                    proportions.append(int(size))
+                else:
+                    proportions.append(float(size / unbounded_px if unbounded_px > 0 else 0.0))
+            uistate.splitter["h_splitterMaster"] = proportions

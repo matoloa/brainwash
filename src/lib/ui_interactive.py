@@ -1068,7 +1068,7 @@ class InteractivePlotMixin:
 
         # update groups
         affected_groups = self.get_groupsOfRec(prow["ID"])
-        self.group_cache_purge(affected_groups)
+        self.group_cache_purge(affected_groups)  # all levels (data/settings change invalidates all)
 
         # We MUST run update_show BEFORE rebuilding the groups so that
         # the dict_rec_labels (which dict_group_show relies on for PPR data gathering)
@@ -1077,11 +1077,11 @@ class InteractivePlotMixin:
         self.update_show()
 
         for group_ID in affected_groups:
-            uiplot.unPlotGroup(group_ID=group_ID)
+            self.clear_group_level(group_ID)  # all levels stale after rec edit
             level = getattr(uistate, "buttonGroup_test_n", "recording")
             df_groupmean = self.get_dfgroupmean(group_ID, level=level)
             x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
-            uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.V2mV(df_groupmean), x_pos=x_pos)
+            uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.V2mV(df_groupmean), x_pos=x_pos, level=level)
 
         self.update_show()  # Re-apply visibility rules to the newly added group artists
         # Group membership change can affect formal test results; clear cached so safeguard won't redraw stale

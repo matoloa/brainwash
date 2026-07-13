@@ -331,7 +331,7 @@ class ProjectMixin:
 
     def clearProject(self):
         uiplot.unPlot()  # all rec plots
-        uiplot.unPlotGroup()  # all group plots
+        uiplot.unPlotGroup()  # all group plots (all levels, full project clear)
         self.graphWipe()  # for good measure
 
     def renameProject(self):  # changes name of project folder and updates .cfg

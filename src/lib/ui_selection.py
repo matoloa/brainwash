@@ -27,18 +27,19 @@ logger = logging.getLogger(__name__)
 
 
 class SelectionMixin:
-    """Mixin that provides rec/group visibility logic and selection show updates.
+    """Mixin that provides rec/group visibility logic (update_show) and selection helpers.
 
     Host requirements:
-        - self.dd_groups
+        - self.dd_groups, self.get_groupsOfRec()
         - self.get_df_project(), self.get_dft(), self.get_dffilter()
         - self.update_filter_settings(), self.update_experiment_type_radio_buttons()
         - self.formatTableStimLayout(), self.setButtonParse()
         - self.graphUpdate(), self.zoomAuto(), self.graphRefresh()
-        - self.get_groupsOfRec()
-        - uistate.dict_rec_labels, uistate.dict_group_labels, uistate.df_recs2plot, etc.
+        - self.usage()
+        - uistate.dict_rec_labels, uistate.dict_group_labels, etc.
         - uistate.list_idx_select_recs, uistate.list_idx_select_stims
         - self._is_io_mode()
+        - self.dict_folders (for save_cfg in setViewToolVisible)
     """
 
     def _is_rec_visible(self, v: dict, selected_ids: set, selected_stims: set, valid_pp_ids: set | None = None) -> bool:
@@ -178,6 +179,10 @@ class SelectionMixin:
                     visible = self._is_group_visible(v, selected_groups=None)
                     if is_pp and v.get("is_overlay"):
                         visible = False
+                    # respect current n_unit level
+                    current_level = getattr(uistate, "buttonGroup_test_n", "recording")
+                    if v.get("level") and v.get("level") != current_level:
+                        visible = False
                     for key in ["line", "fill"]:
                         obj = v[key]
                         if hasattr(obj, "set_visible"):
@@ -245,6 +250,11 @@ class SelectionMixin:
                         if v.get("is_overlay"):
                             visible = False
 
+                # Level-aware visibility for n_unit (recording/slice/subject)
+                current_level = getattr(uistate, "buttonGroup_test_n", "recording")
+                if v.get("level") and v.get("level") != current_level:
+                    visible = False
+
                 for key in ["line", "fill"]:
                     obj = v[key]
                     if hasattr(obj, "set_visible"):
@@ -269,16 +279,9 @@ class SelectionMixin:
                     new_group_show[k] = v
             uistate.dict_group_show = new_group_show
 
-    def update_recs2plot(self):
-        """Rebuild uistate.df_recs2plot from current selection. Called from table changes."""
-        if not uistate.list_idx_select_recs:
-            uistate.df_recs2plot = None
-            return
-        df_p = self.get_df_project()
-        try:
-            uistate.df_recs2plot = df_p.loc[uistate.list_idx_select_recs]
-        except Exception:
-            uistate.df_recs2plot = None
+            # enforce n_unit level visibility for groups (separate artists per level)
+            if hasattr(uiplot, "update_group_level_visibility"):
+                uiplot.update_group_level_visibility()
 
     def update_sample_checkbox(self):
         """Updates checkBox_is_group_sample enabled/checked state. Called from tableProjSelectionChanged"""
@@ -304,8 +307,25 @@ class SelectionMixin:
         checkbox.blockSignals(False)
 
     def setViewToolVisible(self, frame, visible=None):
-        """Toggle visibility of tool frames (e.g. for hierarchy or timetable)."""
-        if visible is None:
-            visible = not frame.isVisible()
-        frame.setVisible(visible)
-        # Additional logic may be in caller
+        """Toggle visibility of tool frames (hierarchy, timetable, etc) and sync menu state + persist."""
+        self.usage(f"setViewToolVisible {frame} {visible}")
+        if frame in uistate.viewTools:
+            if visible is None:
+                visible = not uistate.viewTools[frame][1]
+            uistate.viewTools[frame][1] = visible
+            getattr(self, frame).setVisible(visible)
+
+            # Sync the menu action if it exists
+            text = uistate.viewTools[frame][0]
+            if hasattr(self, "menuView"):
+                for action in self.menuView.actions():
+                    if action.text() == text:
+                        if action.isChecked() != visible:
+                            action.setChecked(visible)
+                        break
+        else:
+            if visible is None:
+                visible = not getattr(self, frame).isVisible()
+            getattr(self, frame).setVisible(visible)
+
+        uistate.save_cfg(projectfolder=self.dict_folders["project"])

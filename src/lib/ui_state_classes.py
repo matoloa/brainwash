@@ -435,8 +435,11 @@ class UIstate:
     def get_recSet(self):  # returns a set of all rec IDs that are currently plotted
         return set([value["rec_ID"] for value in self.dict_rec_labels.values()])
 
-    def get_groupSet(self):  # returns a set of all group IDs that are currently plotted
-        return set([value["group_ID"] for value in self.dict_group_labels.values()])
+    def get_groupSet(self, level=None):  # returns a set of all group IDs that are currently plotted (optionally for a specific n_unit level)
+        if level is None:
+            return set([value["group_ID"] for value in self.dict_group_labels.values()])
+        return set([value["group_ID"] for value in self.dict_group_labels.values()
+                    if value.get("level") == level or value.get("level") is None])
 
     # --- x-axis mode helpers (7.2–7.5) ---
 
