@@ -92,6 +92,44 @@ def test_build_io_group_plot_specs():
     assert specs[0].storage_key == "G1 raw IO scatter"
 
 
+def test_pp_has_visible_rec_ppr():
+    assert plot_series.pp_has_visible_rec_ppr({"rec PPR EPSP_amp": {}}) is True
+    assert plot_series.pp_has_visible_rec_ppr({"rec PPR EPSP_amp marker": {}}) is False
+    assert plot_series.pp_has_visible_rec_ppr({}) is False
+
+
+def test_collect_pp_group_bar_patch_specs():
+    class _Patch:
+        def __init__(self, x, width):
+            self._x = x
+            self._width = width
+
+        def get_x(self):
+            return self._x
+
+        def get_width(self):
+            return self._width
+
+    class _Bar:
+        patches = [_Patch(0.6, 0.3)]
+
+    show = {
+        "Group A PPR EPSP_amp bar_subject": {
+            "line": _Bar(),
+            "is_overlay": False,
+            "level": "subject",
+        },
+        "Group A PPR EPSP_amp overlay_bar_subject": {
+            "line": _Bar(),
+            "is_overlay": True,
+            "level": "subject",
+        },
+    }
+    specs = plot_series.collect_pp_group_bar_patch_specs(show, "subject", lambda base: base)
+    assert len(specs) == 1
+    assert specs[0][2] == "Group A"
+
+
 def test_pp_bar_layout_single_aspect():
     configs = plot_series.pp_bar_layout([("EPSP_amp", "ax1")])
     assert len(configs) == 1

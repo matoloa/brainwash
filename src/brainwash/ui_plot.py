@@ -802,19 +802,15 @@ class UIplot:
             )
         )
         is_pp = uistate.experiment.experiment_type == "PP"
+        current_level = uistate.stat_test.buttonGroup_test_n
         for axid, loc in zip(axids, legend_loc):
-            recs_on_axis = {key: value for key, value in dd_recs.items() if value["axis"] == axid and not key.endswith(" marker")}
-            axis_legend = {key: value["line"] for key, value in recs_on_axis.items()}
-            if axid in ["ax1", "ax2"]:
-                current_level = uistate.stat_test.buttonGroup_test_n
-                groups_on_axis = {
-                    key: value for key, value in dd_group_show.items()
-                    if value["axis"] == axid and (value.get("level") == current_level or value.get("level") is None)
-                }
-                # use clean display labels (strip level suffix if present)
-                for key, value in groups_on_axis.items():
-                    display_key = self._display_label(key)
-                    axis_legend[display_key] = value["line"]
+            axis_legend = plot_model.output_axis_legend_map(
+                dd_recs,
+                dd_group_show,
+                axid=axid,
+                current_level=current_level,
+                include_groups=axid in ("ax1", "ax2"),
+            )
             axis = getattr(uistate.plot, axid)
             if axis_legend and not is_pp:
                 try:
@@ -893,25 +889,13 @@ class UIplot:
             ax1.set_xlabel("")
             ax2.set_xlabel("")
 
-            # Re-collect the true integer X positions for group labels, ignoring the sub-offsets used for the individual bars
-            bar_specs: list[tuple[float, float, str]] = []
-            current_level = uistate.stat_test.buttonGroup_test_n
+            bar_specs = []
             if hasattr(self.uistate.plot, "dict_group_show"):
-                for key, val in uistate.plot.dict_group_show.items():
-                    if "PPR" in key and hasattr(val["line"], "patches") and not val.get("is_overlay"):
-                        if val.get("level") and val.get("level") != current_level:
-                            continue
-                        try:
-                            patch = val["line"].patches[0]
-                            bar_specs.append(
-                                (
-                                    patch.get_x(),
-                                    patch.get_width(),
-                                    self._display_label(key.split(" PPR")[0]),
-                                )
-                            )
-                        except Exception:
-                            pass
+                bar_specs = plot_series.collect_pp_group_bar_patch_specs(
+                    uistate.plot.dict_group_show,
+                    current_level,
+                    lambda base: self._display_label(base),
+                )
 
             x_ticks, x_ticklabels = plot_series.pp_group_tick_label_map(bar_specs)
             group_name_to_x = dict(zip(x_ticks, x_ticklabels))
@@ -929,13 +913,11 @@ class UIplot:
                 ax1.tick_params(axis="x", bottom=False, labelbottom=True)
                 ax2.tick_params(axis="x", bottom=False, labelbottom=True)
 
-        # Check if recordings are visible instead of groups
-        pp_has_recs = False
-        if exp_type == "PP" and hasattr(self.uistate.plot, "dict_rec_show"):
-            for key, val in uistate.plot.dict_rec_show.items():
-                if "PPR" in key and "marker" not in key:
-                    pp_has_recs = True
-                    break
+        pp_has_recs = (
+            exp_type == "PP"
+            and hasattr(self.uistate.plot, "dict_rec_show")
+            and plot_series.pp_has_visible_rec_ppr(uistate.plot.dict_rec_show)
+        )
 
         if exp_type == "PP" and pp_has_recs and not group_name_to_x:
             x_ticks, x_ticklabels = plot_series.pp_recording_view_ticks(uistate.project.checkBox)

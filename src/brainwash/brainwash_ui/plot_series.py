@@ -432,6 +432,38 @@ def pp_group_tick_from_bar(x_left: float, bar_width: float) -> int:
     return round(x_left + bar_width / 2)
 
 
+def pp_has_visible_rec_ppr(dict_rec_show: dict) -> bool:
+    for key in dict_rec_show:
+        if "PPR" in key and "marker" not in key:
+            return True
+    return False
+
+
+def collect_pp_group_bar_patch_specs(
+    dict_group_show: dict,
+    current_level: str,
+    group_display_name,
+) -> list[tuple[float, float, str]]:
+    """(x_left, bar_width, tick_label) from visible PP group bar containers."""
+    specs: list[tuple[float, float, str]] = []
+    for key, val in dict_group_show.items():
+        if "PPR" not in key or val.get("is_overlay"):
+            continue
+        line = val.get("line")
+        if line is None or not hasattr(line, "patches"):
+            continue
+        level = val.get("level")
+        if level is not None and level != current_level:
+            continue
+        try:
+            patch = line.patches[0]
+            base_name = key.split(" PPR")[0]
+            specs.append((patch.get_x(), patch.get_width(), group_display_name(base_name)))
+        except Exception:
+            pass
+    return specs
+
+
 def pp_group_tick_label_map(bar_specs: list[tuple[float, float, str]]) -> tuple[list[int], list[str]]:
     """Build sorted PP group xticks from (x_left, width, display_label) tuples."""
     name_by_x: dict[int, str] = {}

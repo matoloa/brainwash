@@ -164,6 +164,28 @@ def test_pp_reference_grid_y_values():
     assert plot_model.pp_reference_grid_y_values() == (1.0, 2.0, 3.0)
 
 
+def test_output_axis_legend_map():
+    dd_recs = {
+        "rec1 EPSP amp": {"axis": "ax1", "line": "line1"},
+        "rec1 marker": {"axis": "ax1", "line": "m1"},
+    }
+    dd_groups = {
+        "G1 EPSP amp mean_subject": {"axis": "ax1", "line": "g1", "level": "subject"},
+        "G2 EPSP amp mean_slice": {"axis": "ax1", "line": "g2", "level": "slice"},
+    }
+    legend = plot_model.output_axis_legend_map(
+        dd_recs,
+        dd_groups,
+        axid="ax1",
+        current_level="subject",
+        include_groups=True,
+    )
+    assert "rec1 EPSP amp" in legend
+    assert "rec1 marker" not in legend
+    assert "G1 EPSP amp mean" in legend
+    assert "G2 EPSP amp mean" not in legend
+
+
 def test_output_legend_locations():
     assert plot_model.output_legend_locations(experiment_type="time", slope_only=False) == (
         "upper right",
