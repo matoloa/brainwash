@@ -39,7 +39,8 @@
 |----|------|--------|
 | 17 | [ui_refactor/17_index_and_plot_contract.md](ui_refactor/17_index_and_plot_contract.md) | ✅ done |
 | 18 | [ui_refactor/18_pp_overlay_dedupe.md](ui_refactor/18_pp_overlay_dedupe.md) | ✅ done |
-| 19 | [ui_refactor/19_nested_getattr_cleanup.md](ui_refactor/19_nested_getattr_cleanup.md) | **NEXT** |
+| 19 | [ui_refactor/19_nested_getattr_cleanup.md](ui_refactor/19_nested_getattr_cleanup.md) | ✅ done |
+| 20 | [ui_refactor/20_plot_stim.md](ui_refactor/20_plot_stim.md) | **NEXT** |
 | 19 | [ui_refactor/19_nested_getattr_cleanup.md](ui_refactor/19_nested_getattr_cleanup.md) | pending |
 | 20 | [ui_refactor/20_plot_stim.md](ui_refactor/20_plot_stim.md) | pending |
 | 21 | [ui_refactor/21_plot_series_pp_aggregate.md](ui_refactor/21_plot_series_pp_aggregate.md) | pending |

@@ -1135,7 +1135,7 @@ class InteractivePlotMixin:
             str_ax = 'ax2'
         else:
             str_ax = None
-        ax = getattr(self.uistate.plot, str_ax) if str_ax else None
+        ax = self.uiplot.get_axis(str_ax) if str_ax else None
         if event.inaxes not in (self.uistate.plot.ax1, self.uistate.plot.ax2) or str_ax is None:
             if self.uistate.plot.ghost_sweep is not None:
                 self.exorcise()
@@ -1268,7 +1268,7 @@ class InteractivePlotMixin:
 
     def _mouseover_output_stim(self, event):
         str_ax = "ax2" if self.uistate.slopeView() else "ax1" if self.uistate.ampView() else None
-        ax = getattr(self.uistate.plot, str_ax) if str_ax else None
+        ax = self.uiplot.get_axis(str_ax) if str_ax else None
         if event.inaxes not in (self.uistate.plot.ax1, self.uistate.plot.ax2) or str_ax is None:
             if self.uistate.plot.ghost_sweep is not None:
                 self.exorcise()
@@ -1353,7 +1353,7 @@ class InteractivePlotMixin:
 
     def _mouseover_output_pp(self, event):
         str_ax = "ax2" if self.uistate.slopeView() else "ax1" if self.uistate.ampView() else None
-        ax = getattr(self.uistate.plot, str_ax) if str_ax else None
+        ax = self.uiplot.get_axis(str_ax) if str_ax else None
         if event.inaxes not in (self.uistate.plot.ax1, self.uistate.plot.ax2) or str_ax is None:
             if self.uistate.plot.ghost_sweep is not None:
                 self.exorcise()
@@ -1461,7 +1461,7 @@ class InteractivePlotMixin:
 
     def _mouseover_output_io(self, event):
         str_ax = "ax1"
-        ax = getattr(self.uistate.plot, str_ax) if str_ax else None
+        ax = self.uiplot.get_axis(str_ax) if str_ax else None
         if event.inaxes not in (self.uistate.plot.ax1, self.uistate.plot.ax2) or str_ax is None:
             if self.uistate.plot.ghost_sweep is not None:
                 self.exorcise()

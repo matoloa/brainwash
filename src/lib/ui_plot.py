@@ -52,8 +52,8 @@ class UIplot:
         ax2.figure.canvas.draw_idle()
 
     def heatunmap(self):
-        d = getattr(self.uistate.plot, "dict_heatmap", None)
-        if d is None:
+        d = self.uistate.plot.dict_heatmap
+        if not d:
             return
         ax = self.uistate.plot.ax1
         # print(f"heatunmap: {d}")
@@ -136,7 +136,7 @@ class UIplot:
             pass
 
     def clear_test_markers(self, draw=True):
-        d = getattr(self.uistate.plot, "dict_test_markers", None)
+        d = self.uistate.plot.dict_test_markers
         if not d:
             return
         for col in list(d.keys()):
@@ -254,7 +254,7 @@ class UIplot:
             # axe mean artists live on the event canvas (uistate.plot.axe), not necessarily
             # the canvas of the ax that was passed (e.g. right-click deselect on output graph).
             # Force a redraw of axe so removal becomes visible.
-            if draw and getattr(self.uistate.plot, "axe", None) is not None:
+            if draw and self.uistate.plot.axe is not None:
                 try:
                     self.uistate.plot.axe.figure.canvas.draw_idle()
                 except Exception:
@@ -524,7 +524,7 @@ class UIplot:
             end = max(sweeps) + 1
             color = dset.get("color", "#a0a0a0")
             for ax_name in ("ax1", "ax2"):
-                ax = getattr(self.uistate.plot, ax_name, None)
+                ax = self.get_axis(ax_name)
                 if ax is None:
                     continue
                 span = ax.axvspan(start, end, color=color, alpha=alpha, label=f"testset_span_{set_ID}", zorder=1)
