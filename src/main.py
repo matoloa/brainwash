@@ -148,9 +148,10 @@ if __name__ == "__main__":
             _log_exceptions(_m)
 
         MainWindow.show()
-        MainWindow.raise_()  # bring to top of Z-order
-        MainWindow.activateWindow()  # request input focus
-        force_focus(MainWindow)  # Win32 fallback for stubborn builds
+        if app.platformName() != "wayland":
+            MainWindow.raise_()
+            MainWindow.activateWindow()
+            force_focus(MainWindow)  # Win32 fallback for stubborn builds
         logger.info("MainWindow shown, entering event loop")
 
         sys.exit(app.exec_())
