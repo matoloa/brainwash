@@ -772,6 +772,7 @@ def build_dfoutput(
     dft: pd.DataFrame,
     filter: str = "voltage",
     quick: bool = False,
+    verbose: bool = False,
 ) -> pd.DataFrame:
     """
     Compute the unified output DataFrame for one recording.
@@ -786,6 +787,7 @@ def build_dfoutput(
         dft:      Timepoints DataFrame (one row per stim).
         filter:   Voltage column name.
         quick:    If True, skip halfwidth averaging (single-point amp only).
+        verbose:  If True, print timing diagnostics to stdout.
 
     Returns:
         DataFrame with columns: stim, sweep, EPSP_amp, EPSP_amp_norm,
@@ -794,10 +796,12 @@ def build_dfoutput(
     """
     t0 = time.time()
     nstims = len(dft) if dft is not None else 0
-    print(f"build_dfoutput: entered, dffilter.shape={dffilter.shape}, nsweeps={dffilter['sweep'].nunique()}, nstims={nstims}")
+    if verbose:
+        print(f"build_dfoutput: entered, dffilter.shape={dffilter.shape}, nsweeps={dffilter['sweep'].nunique()}, nstims={nstims}")
 
     if dft is None or len(dft) == 0:
-        print("build_dfoutput: dft is None or empty, returning empty dfoutput")
+        if verbose:
+            print("build_dfoutput: dft is None or empty, returning empty dfoutput")
         return pd.DataFrame(columns=["stim", "sweep", "EPSP_amp", "EPSP_amp_norm", "EPSP_slope", "EPSP_slope_norm", "volley_amp", "volley_slope"])
 
     all_rows = []
@@ -890,7 +894,8 @@ def build_dfoutput(
             dfblock["volley_slope"] = np.nan
 
         all_rows.append(dfblock)
-        print(f"build_dfoutput: stim {stim_nr} sweep-mode done ({round((time.time() - t0) * 1000)}ms)")
+        if verbose:
+            print(f"build_dfoutput: stim {stim_nr} sweep-mode done ({round((time.time() - t0) * 1000)}ms)")
 
     # ------------------------------------------------------------------
     # Stim-mode rows: measure dfmean sliced around each stim window
@@ -918,7 +923,8 @@ def build_dfoutput(
             stim_rows.append(stim_row)
 
         all_rows.append(pd.DataFrame(stim_rows))
-        print(f"build_dfoutput: stim-mode rows done ({round((time.time() - t0) * 1000)}ms)")
+        if verbose:
+            print(f"build_dfoutput: stim-mode rows done ({round((time.time() - t0) * 1000)}ms)")
 
     # ------------------------------------------------------------------
     # Assemble and enforce column order
@@ -939,7 +945,8 @@ def build_dfoutput(
             dfoutput[col] = np.nan
     dfoutput = dfoutput[col_order]  # type: ignore[assignment]
 
-    print(f"build_dfoutput: done {round((time.time() - t0) * 1000)}ms, shape={dfoutput.shape}")
+    if verbose:
+        print(f"build_dfoutput: done {round((time.time() - t0) * 1000)}ms, shape={dfoutput.shape}")
     return dfoutput
 
 

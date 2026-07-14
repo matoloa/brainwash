@@ -9,7 +9,8 @@
 - **Tests** → characterization + `test_pipeline_integration.py` + `test_ui_wiring.py`.
 - **CI** → `.github/workflows/test.yml`.
 - **No** full `UIsub` composition rewrite. **No** distribution builds unless asked.
-- Package root: `src/brainwash/` (`src/lib/` is deprecated shim only).
+- Package root: `src/brainwash/` (Phase 8 removed `src/lib` shim).
+- Manual regression: [manual_smokes_after_refactor.md](manual_smokes_after_refactor.md).
 
 ## Progress — Phase 0–3 (archived)
 

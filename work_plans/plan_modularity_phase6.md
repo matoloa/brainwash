@@ -1,7 +1,7 @@
 # Modularity Phase 6+ — Agent index
 
-> **Status**: Active. Branch: `ui-refactor/phase0-3`.
-> Phases 0–5 + 3b + 4: complete. **Human approved Phase 6+ scope 2026-07-13.**
+> **Status**: ✅ Complete (2026-07-14). Branch: `ui-refactor/phase0-3`.
+> Phases 6a–6c, 7a–7b, 8 done. Manual regression: [manual_smokes_after_refactor.md](manual_smokes_after_refactor.md).
 > **Rollback guide**: [phase6/README.md](phase6/README.md) (commits `61`/`62` HIGH RISK).
 
 ## HIGH RISK commit convention
@@ -30,8 +30,8 @@ git revert 015b9d2..HEAD
 | **6a** | [phase6/01_per_uisub_singletons.md](phase6/01_per_uisub_singletons.md) | **HIGH** | Move `config`/`uistate`/`uiplot` off `ui.py` import time → `UIsub.__init__` | App fails to start; stale state across sessions |
 | **6b** | phase6/02_remove_module_aliases.md | **HIGH** | Drop deprecated `ui.uistate` module aliases (after 6a smoke) | Legacy script breaks |
 | **7a** | phase6/03_uiplot_contract.md | medium | Document `UIplot` host contract + plot_model boundaries only | — |
-| **7b** | TBD | **HIGH** | Extract pure plot descriptor builders from `ui_plot.py` (incremental) | Plot regressions |
-| **8** | TBD | **HIGH** | Package rename `src/lib` shim removal | Import breaks |
+| **7b** | [phase6/03_uiplot_contract.md](phase6/03_uiplot_contract.md) + incremental PRs | **HIGH** | Extract pure plot descriptor builders from `ui_plot.py` | Plot regressions |
+| **8** | commit `3647b6b` | **HIGH** | Remove `src/lib` shim; package root `src/brainwash/` | Import breaks |
 
 **Out of scope (forbidden without explicit approval)**:
 - Full `UIplot` rewrite in one PR

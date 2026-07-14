@@ -1810,10 +1810,8 @@ class UIplot:
 
     def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None, draw=False):
         axe = self.uistate.plot.axe
-        print(f"updateAmpMarker called with labelbase: {labelbase}, x: {x}, y: {y}, amp_x: {amp_x}, amp_zero: {amp_zero}, amp: {amp}")
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
-        print(f"updateAmpMarker: {labelbase}, x: {x}, y: {y}, amp_x: {amp_x}, amp_zero: {amp_zero}, amp: {amp}")
         self.uistate.plot.dict_rec_labels[f"{labelbase} marker"]["line"].set_data(x, y)
         amp_si = plot_stim.resolve_drag_amp_si(amp, float(y[0]), amp_zero)
         if amp_si is not None:

@@ -68,6 +68,6 @@ Symptoms might include: app fails at startup, wrong project state after new/open
 - Test: `src/brainwash/test_ui_singletons.py`
 - Index: [plan_modularity_phase6.md](../plan_modularity_phase6.md)
 
-## Next (not in these commits)
+## Status (2026-07-14)
 
-Phase **7b** (`UIplot` incremental extraction) is separate and will use its own `[HIGH RISK phase7b]` tags. Do not start until manual smoke on Phase 6 passes.
+Phases **6a–6c**, **7b**, and **8** are complete on `ui-refactor/phase0-3`. Manual regression checklist: [manual_smokes_after_refactor.md](../manual_smokes_after_refactor.md).

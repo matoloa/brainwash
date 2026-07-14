@@ -1,7 +1,7 @@
 # Brainwash: Modularity, UI Separation, and Automated Testing
 
-**Date**: 2026-07-13 (revised)  
-**Status**: Phases 0–5 + 3b + 4 complete. **Phase 6a–6b** done (HIGH RISK — see [plan_modularity_phase6.md](plan_modularity_phase6.md)). **228** tests. Rollback point before Phase 6: `a2f2dd2`. Next: manual app smoke, then Phase 7b UIplot extraction (HIGH RISK, incremental).  
+**Date**: 2026-07-14 (revised)  
+**Status**: Phases 0–5 + 3b + 4 + **6–8 + 7b** complete. Branch: `ui-refactor/phase0-3`. **273** pytest tests. Manual regression: [manual_smokes_after_refactor.md](manual_smokes_after_refactor.md). Rollback point before Phase 6: `a2f2dd2`. Index: [plan_modularity_phase6.md](plan_modularity_phase6.md).  
 **Audience**: Human maintainers and agentic contributors  
 **Goal**: Make UI/stat/view changes safe for agents without a full rewrite, reusing the statistics refactor playbook.
 
@@ -38,7 +38,7 @@ Numbers below were checked against the repo; use this table as the ground truth 
 | `hasattr(self, …)` in `ui*.py` | **171** | Implicit host contracts |
 | `print()` in `ui*.py` | **375** | Weak structured observability |
 | Cross-mixin refresh calls | **~54** | `graphRefresh` / `update_show` / `turn_heatmap_off` / `apply_statistical_test_if_active` |
-| pytest tests (`src/brainwash/`) | **218** collected | incl. statusbar, view_state, pipeline integration, pytest-qt wiring |
+| pytest tests (`src/brainwash/`) | **273** collected | incl. statusbar, view_state, pipeline integration, pytest-qt wiring |
 | UI/Qt pytest tests | **9+** | `test_ui_wiring.py`, `test_refresh_bus_qt.py`, etc. |
 | `test_parse_click.py` | Promoted | Core steps in `test_pipeline_integration.py` |
 | GitHub Actions | Build + **pytest** | `.github/workflows/test.yml` on push/PR |
