@@ -139,7 +139,7 @@ class InteractivePlotMixin:
                 self.uistate.plot.dragging = False
                 return
             sweep_numbers = list(range(0, int(prow["sweeps"])))
-            self.uistate.plot.x_on_click = sweep_numbers[np.abs(sweep_numbers - x).argmin()]
+            self.uistate.plot.x_on_click = plot_drag.snap_sweep_index(sweep_numbers, x)
             self.uistate.plot.x_select["output_start"] = self.uistate.plot.x_on_click
             self.lineEdit_sweeps_range_from.setText(str(self.uistate.plot.x_on_click))
             self.connectDragRelease(x_range=sweep_numbers, rec_ID=prow["ID"], graph="output")
@@ -432,7 +432,10 @@ class InteractivePlotMixin:
         if event.xdata is None:
             return
         x = event.xdata  # mouse x position
-        x_drag_val = x_range[np.abs(x_range - x).argmin()]
+        if canvas == self.canvasMean:
+            x_drag_val = plot_drag.snap_to_nearest_x(x_range, x)
+        else:
+            x_drag_val = plot_drag.snap_sweep_index(x_range, x)
         if x_drag_val == self.uistate.plot.x_drag_last:  # return if the pointer hasn't moved enough
             return
         self.uistate.plot.x_drag = x_drag_val
@@ -442,11 +445,9 @@ class InteractivePlotMixin:
             self.lineEdit_mean_selection_end.setText(f"{self.uistate.plot.x_drag * 1000:g}")
         else:
             self.uistate.plot.x_select["output_end"] = self.uistate.plot.x_drag
-            self.uistate.plot.x_select["output"] = set(
-                range(
-                    min(self.uistate.plot.x_on_click, self.uistate.plot.x_drag),
-                    max(self.uistate.plot.x_on_click, self.uistate.plot.x_drag) + 1,
-                )
+            self.uistate.plot.x_select["output"] = plot_drag.output_sweep_range(
+                self.uistate.plot.x_on_click,
+                self.uistate.plot.x_drag,
             )
             # print(f"self.uistate.plot.x_select['output']: {self.uistate.plot.x_select['output']}")
         self.uiplot.xSelect(canvas=canvas)
@@ -484,7 +485,7 @@ class InteractivePlotMixin:
                 self.uistate.plot.x_select["mean_end"] = None
             elif is_output:
                 self.uistate.plot.x_select["output_end"] = None
-                self.uistate.plot.x_select["output"] = {self.uistate.plot.x_on_click}  # ensure set type
+                self.uistate.plot.x_select["output"] = {int(self.uistate.plot.x_on_click)}
         else:  # click and drag
             start, end = sorted((self.uistate.plot.x_on_click, self.uistate.plot.x_drag))
             if is_mean:
@@ -493,7 +494,7 @@ class InteractivePlotMixin:
             elif is_output:
                 self.uistate.plot.x_select["output_start"] = start
                 self.uistate.plot.x_select["output_end"] = end
-                self.uistate.plot.x_select["output"] = set(range(start, end + 1))
+                self.uistate.plot.x_select["output"] = plot_drag.output_sweep_range(start, end)
 
         # Set the text fields synchronously for immediate user feedback (lightweight).
         # The more expensive canvas artist work is still deferred.

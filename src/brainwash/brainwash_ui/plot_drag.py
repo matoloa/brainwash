@@ -60,6 +60,24 @@ def artist_xy_first(line) -> tuple[float, float]:
     return float(xdata[0]), float(ydata[0])
 
 
+def snap_to_nearest_x(x_range, x: float):
+    """Return the nearest x in *x_range* to mouse *x* (may be numpy scalar)."""
+    arr = np.asarray(x_range, dtype=float)
+    return arr[np.abs(arr - x).argmin()]
+
+
+def snap_sweep_index(x_range, x: float) -> int:
+    """Snap mouse *x* to nearest sweep index (Python int for range()/set)."""
+    return int(snap_to_nearest_x(x_range, x))
+
+
+def output_sweep_range(start, end) -> set[int]:
+    """Inclusive sweep index range from drag endpoints (coerces numpy scalars)."""
+    lo = int(min(start, end))
+    hi = int(max(start, end))
+    return set(range(lo, hi + 1))
+
+
 def drag_release_line_candidates(
     rec_ID,
     graph: str,

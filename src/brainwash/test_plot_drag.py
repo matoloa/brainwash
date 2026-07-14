@@ -51,6 +51,18 @@ def test_artist_xy_first():
     assert plot_drag.artist_xy_first(line) == (2.0, 4.0)
 
 
+def test_snap_sweep_index_returns_python_int():
+    assert plot_drag.snap_sweep_index(list(range(10)), 3.7) == 4
+    assert type(plot_drag.snap_sweep_index(list(range(10)), 3.7)) is int
+
+
+def test_output_sweep_range_coerces_numpy_scalars():
+    import numpy as np
+
+    sel = plot_drag.output_sweep_range(np.float64(2.0), np.int64(5))
+    assert sel == {2, 3, 4, 5}
+
+
 def test_drag_release_line_candidates_prefers_sweep_aspects():
     rec_show = {
         "fill": {
