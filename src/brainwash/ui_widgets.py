@@ -30,6 +30,66 @@ from project_schema import df_projectTemplate
 logger = logging.getLogger(__name__)
 
 
+class StimUaItemDelegate(QtWidgets.QStyledItemDelegate):
+    """µA column editor: select-all on open; Enter commits and requests next row."""
+
+    enter_pressed = QtCore.pyqtSignal(int)  # row that was edited
+
+    def createEditor(self, parent, option, index):
+        editor = super().createEditor(parent, option, index)
+        if isinstance(editor, QtWidgets.QLineEdit):
+            # No QDoubleValidator: it can swallow intermediate keystrokes.
+            editor.installEventFilter(self)
+        return editor
+
+    def setEditorData(self, editor, index):
+        super().setEditorData(editor, index)
+        # Select existing value once before the editor is shown so the first
+        # key replaces it. Do NOT selectAll on a timer — that races after the
+        # first typed digit and makes "20" become "0".
+        if isinstance(editor, QtWidgets.QLineEdit) and editor.text():
+            editor.selectAll()
+
+    def eventFilter(self, obj, event):
+        if event.type() == QtCore.QEvent.KeyPress and isinstance(obj, QtWidgets.QLineEdit):
+            key = event.key()
+            if key in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+                # Find model index for this editor via parent table
+                table = obj.parent()
+                while table is not None and not isinstance(table, QtWidgets.QTableWidget):
+                    table = table.parent()
+                row = -1
+                if table is not None:
+                    idx = table.currentIndex()
+                    if idx.isValid():
+                        row = idx.row()
+                self.commitData.emit(obj)
+                self.closeEditor.emit(obj, QtWidgets.QAbstractItemDelegate.NoHint)
+                if row >= 0:
+                    self.enter_pressed.emit(row)
+                return True
+        return super().eventFilter(obj, event)
+
+
+class StimTableShortcutFilter(QtCore.QObject):
+    """QObject event filter: block group digit shortcuts while stim µA table is focused.
+
+    Must be a real QObject — UIsub (mixin stack) is not a valid installEventFilter target.
+    """
+
+    def eventFilter(self, obj, event):
+        if event.type() == QtCore.QEvent.ShortcutOverride:
+            key = event.key()
+            if (QtCore.Qt.Key_0 <= key <= QtCore.Qt.Key_9) or key in (
+                QtCore.Qt.Key_Period,
+                QtCore.Qt.Key_Comma,
+                QtCore.Qt.Key_Minus,
+            ):
+                event.accept()
+                return True
+        return False
+
+
 ####################################################################
 #                             Globals                              #
 ####################################################################

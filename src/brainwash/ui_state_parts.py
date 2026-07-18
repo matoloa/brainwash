@@ -272,6 +272,8 @@ class PlotSession:
         self.testset_spans = {}
         # Output series on ax1/ax2: "line" (connected) or "dots" (markers only).
         self.output_line_style = "dots"
+        # IO stim µA table: True until Apply (CSV may already be saved; plot not yet).
+        self.stim_intensity_dirty = False
         self.axm = None
         self.axe = None
         self.ax1 = None

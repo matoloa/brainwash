@@ -81,3 +81,20 @@ def should_show_io_stim_frame(
 ) -> bool:
     """IO stim-µA tool frame: user pin ∧ experiment_type io ∧ input stim."""
     return bool(pin_visible) and experiment_type == "io" and io_input == "stim"
+
+
+def suppress_io_output_for_stim_dirty(
+    *,
+    experiment_type: str,
+    io_input: str,
+    dirty: bool,
+    x_mode: str | None = None,
+    axis: str | None = None,
+) -> bool:
+    """Hide IO scatter/trend artists while stim µA edits await Apply.
+
+    Only artists tagged ``x_mode="io"`` (not event window / axe).
+    """
+    if not dirty or experiment_type != "io" or io_input != "stim":
+        return False
+    return x_mode == "io"

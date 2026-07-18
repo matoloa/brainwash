@@ -82,3 +82,21 @@ def test_should_show_io_stim_frame_pin_and_mode():
     assert not view_state.should_show_io_stim_frame("PP", "stim", pin_visible=True)
     # Default pin is True
     assert view_state.should_show_io_stim_frame("io", "stim")
+
+
+def test_suppress_io_output_for_stim_dirty():
+    assert view_state.suppress_io_output_for_stim_dirty(
+        experiment_type="io", io_input="stim", dirty=True, x_mode="io"
+    )
+    assert not view_state.suppress_io_output_for_stim_dirty(
+        experiment_type="io", io_input="stim", dirty=True, x_mode="axe"
+    )
+    assert not view_state.suppress_io_output_for_stim_dirty(
+        experiment_type="io", io_input="stim", dirty=False, x_mode="io"
+    )
+    assert not view_state.suppress_io_output_for_stim_dirty(
+        experiment_type="io", io_input="vamp", dirty=True, x_mode="io"
+    )
+    assert not view_state.suppress_io_output_for_stim_dirty(
+        experiment_type="time", io_input="stim", dirty=True, x_mode="io"
+    )

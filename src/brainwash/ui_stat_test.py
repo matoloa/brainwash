@@ -278,13 +278,19 @@ class StatTestMixin:
         finally:
             self._updating_test = False
 
+        # Stim µA pending Apply takes precedence over formal-test chrome.
+        if getattr(self, "_stim_intensity_dirty_active", lambda: False)():
+            self._show_stim_intensity_pending_statusbar()
+            return
         result = self._compute_statusbar_for_current_state()
         self.uistate.stat_test.statusbar_state = result.state
         self.set_statusbar(result.state, result.text)
 
     def set_statusbar(self, state: str | None = None, text: str | None = None):
         """Low-level applicator: only does what it is given (appearance + label text)."""
-        if state == "warning":
+        if state == "stim_intensity_pending":
+            self._set_statusbar_appearance("#e67e22", text_color="white", bold=True, text=text or "Press Apply to update results")
+        elif state == "warning":
             self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=text)
         elif state == "info" or text:
             self._set_statusbar_appearance(bg_color=None, bold=True, text=text or "")
@@ -296,6 +302,9 @@ class StatTestMixin:
         if text:
             return
         if self._is_loading_active():
+            return
+        if getattr(self, "_stim_intensity_dirty_active", lambda: False)():
+            self._show_stim_intensity_pending_statusbar()
             return
         # Recompute display only (no re-run of formal tests). Previously this called
         # set_statusbar(None, None) which wiped the label permanently.

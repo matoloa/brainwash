@@ -584,7 +584,11 @@ class GroupMixin:
         )
         self.new_group_menu_item = getattr(self, f"actionAddTo_{str_ID}")
         self.new_group_menu_item.triggered.connect(lambda checked, add_group_ID=group_ID: self.group_selection(add_group_ID))
+        # Bare digits steal keystrokes from table/line editors (e.g. stim µA "20").
+        # Keep digit shortcuts but only when focus is not in a text-entry widget —
+        # see SelectionMixin.eventFilter / _text_entry_has_focus.
         self.new_group_menu_item.setShortcut(f"{str_ID}")
+        self.new_group_menu_item.setShortcutContext(QtCore.Qt.WindowShortcut)
         self.menuGroups.addAction(self.new_group_menu_item)
         self.new_checkbox = CustomCheckBox(group_ID)
         self.new_checkbox.rightClicked.connect(self.triggerGroupRename)  # str_ID is passed by CustomCheckBox

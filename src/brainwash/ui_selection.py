@@ -13,10 +13,13 @@ import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
 from brainwash_ui import recording_cache, stim_intensity, view_state
+from ui_widgets import StimTableShortcutFilter, StimUaItemDelegate
 
 logger = logging.getLogger(__name__)
 
-_STIM_STRENGTH_LABEL_DEFAULT = "IO - Input stim µA"
+_STIM_STRENGTH_LABEL_DEFAULT = "IO - Input µA"
+_STIM_STRENGTH_PENDING_MSG = "Press Apply to update results"
+_STIM_STRENGTH_ORANGE = "#e67e22"
 
 
 class SelectionMixin:
@@ -68,6 +71,14 @@ class SelectionMixin:
                 return False
         aspect = v.get("aspect")
         axis = v.get("axis")
+        if view_state.suppress_io_output_for_stim_dirty(
+            experiment_type=self.uistate.experiment.experiment_type,
+            io_input=self.uistate.experiment.io_input,
+            dirty=bool(getattr(self.uistate.plot, "stim_intensity_dirty", False)),
+            x_mode=x_mode,
+            axis=axis,
+        ):
+            return False
         if aspect and not self.uistate.project.checkBox.get(aspect, True):
             if axis == "axe" or not is_io:
                 return False
@@ -113,6 +124,14 @@ class SelectionMixin:
                 return False
         aspect = v.get("aspect")
         axis = v.get("axis")
+        if view_state.suppress_io_output_for_stim_dirty(
+            experiment_type=self.uistate.experiment.experiment_type,
+            io_input=self.uistate.experiment.io_input,
+            dirty=bool(getattr(self.uistate.plot, "stim_intensity_dirty", False)),
+            x_mode=x_mode,
+            axis=axis,
+        ):
+            return False
         if aspect and not self.uistate.project.checkBox.get(aspect, True):
             if axis == "axe" or not is_io:
                 return False
@@ -330,12 +349,62 @@ class SelectionMixin:
         if visible:
             self.refresh_stim_strength_table()
 
+    def _ensure_stim_strength_table_configured(self) -> None:
+        """One-time edit triggers, delegate (Enter→next row), focus policy."""
+        table = getattr(self, "tableWidget_stim_strength", None)
+        if table is None or getattr(table, "_stim_strength_configured", False):
+            return
+        table._stim_strength_configured = True
+        table.setFocusPolicy(QtCore.Qt.StrongFocus)
+        table.setEditTriggers(
+            QtWidgets.QAbstractItemView.DoubleClicked
+            | QtWidgets.QAbstractItemView.SelectedClicked
+            | QtWidgets.QAbstractItemView.EditKeyPressed
+            | QtWidgets.QAbstractItemView.AnyKeyPressed
+        )
+        table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectItems)
+        table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        table.setTabKeyNavigation(True)
+        # Don't let the tools scroll area eat the first keystroke
+        table.setFocusProxy(None)
+        # Beat group digit shortcuts (actionAddTo_2 = "2") so µA typing works.
+        # Filter must be a QObject — not UIsub (mixin host is not a valid QObject filter).
+        guard = StimTableShortcutFilter(table)
+        table.installEventFilter(guard)
+        table.viewport().installEventFilter(guard)
+        self._stim_strength_shortcut_filter = guard
+        delegate = StimUaItemDelegate(table)
+        delegate.enter_pressed.connect(self._stim_strength_enter_next_row)
+        table.setItemDelegateForColumn(1, delegate)
+        self._stim_strength_delegate = delegate
+
+    def _stim_strength_enter_next_row(self, row: int) -> None:
+        """After Enter commits a µA cell, move edit focus to the next bin."""
+        table = getattr(self, "tableWidget_stim_strength", None)
+        if table is None:
+            return
+        next_row = int(row) + 1
+        if next_row >= table.rowCount():
+            return
+
+        def _open_next():
+            table.setCurrentCell(next_row, 1)
+            item = table.item(next_row, 1)
+            if item is not None:
+                table.editItem(item)
+
+        QtCore.QTimer.singleShot(0, _open_next)
+
     def refresh_stim_strength_table(self) -> None:
         """Fill tableWidget_stim_strength for the selected rec (bins only)."""
         if not hasattr(self, "tableWidget_stim_strength"):
             return
+        self._ensure_stim_strength_table_configured()
         table = self.tableWidget_stim_strength
         label = getattr(self, "label_io_input_stim", None)
+        # Don't rebuild mid-edit (would drop the first keystrokes of the next cell)
+        if table.state() == QtWidgets.QAbstractItemView.EditingState:
+            return
 
         def _set_label(text: str) -> None:
             if label is not None:
@@ -413,7 +482,11 @@ class SelectionMixin:
             table.setItem(i, 0, lab)
             val = bin_vals[i]
             text = "" if not np.isfinite(val) else f"{val:g}"
-            table.setItem(i, 1, QtWidgets.QTableWidgetItem(text))
+            ua = QtWidgets.QTableWidgetItem(text)
+            ua.setFlags(
+                QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+            )
+            table.setItem(i, 1, ua)
         header = table.horizontalHeader()
         header.setStretchLastSection(True)
         row_h = max(table.verticalHeader().defaultSectionSize(), 20)
@@ -439,17 +512,71 @@ class SelectionMixin:
             "n_sweeps": n_sweeps,
             "path": path,
         }
+        btn = getattr(self, "pushButton_io_stim_strength_apply", None)
+        if btn is not None:
+            btn.setEnabled(bool(getattr(self.uistate.plot, "stim_intensity_dirty", False)))
 
-    def on_stim_strength_cell_changed(self, row: int, column: int) -> None:
-        """Write bin µA edits to CSV (expanded to raw sweeps) and refresh IO."""
-        if column != 1:
+    def _stim_intensity_dirty_active(self) -> bool:
+        return (
+            bool(getattr(self.uistate.plot, "stim_intensity_dirty", False))
+            and self.uistate.experiment.experiment_type == "io"
+            and self.uistate.experiment.io_input == "stim"
+        )
+
+    def _set_stim_intensity_dirty(self, dirty: bool) -> None:
+        self.uistate.plot.stim_intensity_dirty = bool(dirty)
+        btn = getattr(self, "pushButton_io_stim_strength_apply", None)
+        if btn is not None:
+            btn.setEnabled(bool(dirty) and self._is_io_mode() and self.uistate.experiment.io_input == "stim")
+        # Defer hide/statusbar work so it does not run inside editor close / next key
+        QtCore.QTimer.singleShot(0, self._apply_stim_intensity_dirty_ui)
+
+    def _show_stim_intensity_pending_statusbar(self) -> None:
+        if hasattr(self, "_set_statusbar_appearance"):
+            self.uistate.stat_test.statusbar_state = "stim_intensity_pending"
+            self._set_statusbar_appearance(
+                _STIM_STRENGTH_ORANGE,
+                text_color="white",
+                bold=True,
+                text=_STIM_STRENGTH_PENDING_MSG,
+            )
+
+    def _draw_output_canvases(self) -> None:
+        for cname in ("canvasOutput", "canvasMean", "canvasEvent"):
+            c = getattr(self, cname, None)
+            if c is not None:
+                try:
+                    c.draw_idle()
+                except Exception:
+                    pass
+
+    def _apply_stim_intensity_dirty_ui(self) -> None:
+        """Hide IO output and show orange Apply warning while dirty; else restore."""
+        try:
+            self.update_show()
+        except Exception:
+            pass
+        self._draw_output_canvases()
+        if self._stim_intensity_dirty_active():
+            self._show_stim_intensity_pending_statusbar()
             return
-        if getattr(self, "_stim_strength_table_updating", False):
-            return
+        if getattr(self.uistate.stat_test, "statusbar_state", None) == "stim_intensity_pending":
+            self.uistate.stat_test.statusbar_state = None
+            if hasattr(self, "update_test"):
+                try:
+                    self.update_test()
+                except Exception:
+                    if hasattr(self, "_set_statusbar_appearance"):
+                        self._set_statusbar_appearance(clear=True)
+            elif hasattr(self, "_set_statusbar_appearance"):
+                self._set_statusbar_appearance(clear=True)
+
+    def _write_stim_strength_table_to_csv(self) -> bool:
+        """Expand current table bins → sweep CSV. Returns False if nothing to write."""
         meta = getattr(self, "_stim_strength_table_meta", None)
         table = getattr(self, "tableWidget_stim_strength", None)
         if not meta or table is None or not meta.get("path"):
-            return
+            return False
         n_bins = int(meta["n_bins"])
         bin_size = int(meta["bin_size"])
         n_sweeps = int(meta["n_sweeps"])
@@ -468,12 +595,63 @@ class SelectionMixin:
             bin_values, bin_size=bin_size, n_sweeps=n_sweeps
         )
         stim_intensity.save_stim_intensity_csv(meta["path"], stim_intensity.frame_from_series(mapping))
+        return True
+
+    def on_stim_strength_cell_changed(self, row: int, column: int) -> None:
+        """Save CSV (cheap) and mark dirty — no full IO rebuild until Apply."""
+        if column != 1:
+            return
+        if getattr(self, "_stim_strength_table_updating", False):
+            return
+        table = getattr(self, "tableWidget_stim_strength", None)
+        # Ignore spurious changes while the table is being rebuilt
+        if table is not None and table.signalsBlocked():
+            return
+        if not self._write_stim_strength_table_to_csv():
+            return
+        if self._is_io_mode() and self.uistate.experiment.io_input == "stim":
+            self._set_stim_intensity_dirty(True)
+
+    def on_stim_strength_apply(self) -> None:
+        """Apply: ensure CSV saved, clear dirty, single IO refresh."""
+        self.usage("on_stim_strength_apply")
+        self._write_stim_strength_table_to_csv()
+        self.uistate.plot.stim_intensity_dirty = False
+        btn = getattr(self, "pushButton_io_stim_strength_apply", None)
+        if btn is not None:
+            btn.setEnabled(False)
+        if getattr(self.uistate.stat_test, "statusbar_state", None) == "stim_intensity_pending":
+            self.uistate.stat_test.statusbar_state = None
         if self._is_io_mode() and self.uistate.experiment.io_input == "stim":
             try:
                 self.exorcise()
                 self.triggerRefresh()
             except Exception as e:
-                logger.debug("on_stim_strength_cell_changed refresh: %s", e)
+                logger.debug("on_stim_strength_apply refresh: %s", e)
+            if hasattr(self, "update_test"):
+                try:
+                    self.update_test()
+                except Exception:
+                    pass
+        else:
+            self._apply_stim_intensity_dirty_ui()
+
+    def clear_stim_intensity_dirty(self) -> None:
+        """Drop pending Apply state (e.g. leave IO or leave Stim input). CSVs unchanged."""
+        if not getattr(self.uistate.plot, "stim_intensity_dirty", False):
+            btn = getattr(self, "pushButton_io_stim_strength_apply", None)
+            if btn is not None:
+                btn.setEnabled(False)
+            return
+        self.uistate.plot.stim_intensity_dirty = False
+        btn = getattr(self, "pushButton_io_stim_strength_apply", None)
+        if btn is not None:
+            btn.setEnabled(False)
+        if getattr(self.uistate.stat_test, "statusbar_state", None) == "stim_intensity_pending":
+            self.uistate.stat_test.statusbar_state = None
+            if hasattr(self, "_set_statusbar_appearance"):
+                # Restore via update_test if available after caller finishes mode switch
+                pass
 
     def setViewToolVisible(self, frame, visible=None):
         """Toggle visibility of tool frames (hierarchy, timetable, etc) and sync menu state + persist."""

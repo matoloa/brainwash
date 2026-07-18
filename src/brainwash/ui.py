@@ -750,10 +750,14 @@ class UIsub(
             return
         self.usage(f"io_input_changed → {io_input}")
         self.uistate.experiment.io_input = io_input
+        if io_input != "stim":
+            self.clear_stim_intensity_dirty()
         self._update_io_stim_frame_visibility()
         self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
         self.exorcise()
         self.triggerRefresh()
+        if hasattr(self, "update_test"):
+            self.update_test()
 
     def io_output_changed(self, button):
         """Handler for buttonGroup_io_o.buttonClicked signal."""
@@ -774,6 +778,8 @@ class UIsub(
             return
         self.usage(f"experiment_type_changed → {exp_type}")
         self.uistate.experiment.experiment_type = exp_type
+        if exp_type != "io":
+            self.clear_stim_intensity_dirty()
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(exp_type == "io")
         self._update_io_stim_frame_visibility()
