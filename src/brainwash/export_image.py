@@ -995,8 +995,22 @@ def _figure_text_panel_title(panel_hint: str | None, exp_type: str) -> str:
     return f"[{panel_hint}.]"
 
 
-def _figure_text_measure_phrase(panel_hint: str | None, amp_on: bool, slope_on: bool) -> str:
+def _figure_text_measure_phrase(panel_hint: str | None, amp_on: bool, slope_on: bool, exp_type: str = "time") -> str:
     p = (panel_hint or "").lower()
+    if exp_type == "PP":
+        if p in ("amplitude", "amp", "epsp_amp") or "epsp_amp" in p:
+            return "paired-pulse ratio (PPR) of EPSP amplitude (stim2/stim1)"
+        if p in ("slope", "epsp_slope") or "epsp_slope" in p:
+            return "paired-pulse ratio (PPR) of EPSP slope (stim2/stim1)"
+        if "volley" in p and "slope" in p:
+            return "paired-pulse ratio (PPR) of volley slope (stim2/stim1)"
+        if "volley" in p:
+            return "paired-pulse ratio (PPR) of volley amplitude (stim2/stim1)"
+        if amp_on and slope_on:
+            return "paired-pulse ratio (PPR; stim2/stim1)"
+        if slope_on:
+            return "paired-pulse ratio (PPR) of EPSP slope (stim2/stim1)"
+        return "paired-pulse ratio (PPR) of EPSP amplitude (stim2/stim1)"
     if p in ("amplitude", "amp", "epsp_amp"):
         return "EPSP amplitude"
     if p in ("slope", "epsp_slope"):
@@ -1160,7 +1174,7 @@ def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | 
     )
     lines.append("")
 
-    measure = _figure_text_measure_phrase(panel_hint, amp_on, slope_on)
+    measure = _figure_text_measure_phrase(panel_hint, amp_on, slope_on, exp_type=exp_type)
     x_phrase = {
         "time": "time",
         "timestamp": "time",
@@ -1172,9 +1186,15 @@ def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | 
     norm_note = " Data are normalized to baseline." if norm else ""
     group_n = _figure_text_group_n_phrase(results, group_map, n_unit)
 
-    lines.append(
-        f"Group means (± SEM) of **{measure}** versus **{x_phrase}** for {group_n}.{norm_note}"
-    )
+    if exp_type == "PP":
+        lines.append(
+            f"Box plots (median, IQR, Tukey whiskers) of unit-level **{measure}** by **{x_phrase}** "
+            f"for {group_n}, with individual unit values overlaid.{norm_note}"
+        )
+    else:
+        lines.append(
+            f"Group means (± SEM) of **{measure}** versus **{x_phrase}** for {group_n}.{norm_note}"
+        )
     lines.append("")
 
     # --- Statistics section ---
@@ -1306,8 +1326,19 @@ def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | 
 
     # Formal non-IO tests
     test_prose = _figure_text_test_prose(test_type, variant, tails, fdr)
+    qty_note = ""
+    if exp_type == "PP" or (
+        results
+        and isinstance(results[0], dict)
+        and isinstance((results[0].get("config") or {}).get("quantity"), str)
+        and "PPR" in (results[0].get("config") or {}).get("quantity", "")
+    ):
+        qty_note = (
+            " Each unit value is the mean **paired-pulse ratio (PPR = stim2/stim1)** "
+            "over the analysis window (all sweeps if no test set)."
+        )
     stat_sentences = [
-        f"{test_prose} at the **{n_unit}** level.",
+        f"{test_prose} at the **{n_unit}** level.{qty_note}",
     ]
 
     prefer_q = fdr
@@ -1336,16 +1367,23 @@ def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | 
             n_bit = f"; *n* = {n1}"
 
         aspects = []
+        ppr_prefix = "PPR of " if exp_type == "PP" else ""
         if amp_on and isinstance(p_amp, (int, float)) and np.isfinite(p_amp):
             lab = "*q*" if prefer_q and isinstance(q_amp, (int, float)) else "*p*"
-            aspects.append(f"EPSP amplitude {lab} = {_figure_text_pstr(p_amp, q_amp, prefer_q=prefer_q)}")
+            aspects.append(
+                f"{ppr_prefix}EPSP amplitude {lab} = {_figure_text_pstr(p_amp, q_amp, prefer_q=prefer_q)}"
+            )
         if slope_on and isinstance(p_slope, (int, float)) and np.isfinite(p_slope):
             lab = "*q*" if prefer_q and isinstance(q_slope, (int, float)) else "*p*"
-            aspects.append(f"EPSP slope {lab} = {_figure_text_pstr(p_slope, q_slope, prefer_q=prefer_q)}")
+            aspects.append(
+                f"{ppr_prefix}EPSP slope {lab} = {_figure_text_pstr(p_slope, q_slope, prefer_q=prefer_q)}"
+            )
         # Generic p_* keys (ANOVA multi-aspect etc.)
         if not aspects:
             for key in sorted(k for k in res.keys() if k.startswith("p_")):
                 aspect = key[2:].replace("_", " ")
+                if exp_type == "PP" and not aspect.upper().startswith("PPR"):
+                    aspect = f"PPR {aspect}"
                 qkey = "q_" + key[2:]
                 val = res.get(key)
                 qv = res.get(qkey)

@@ -791,6 +791,29 @@ class UIsub(
             if prev is not None and hasattr(self, "_set_stat_test_type"):
                 self._set_stat_test_type(prev, save=False)
             self.uistate.stat_test.test_type_before_io = None
+        if exp_type == "PP":
+            # Single-window PP: paired needs 2 condition test sets; default to between-group unpaired.
+            if self.uistate.stat_test.test_t_variant == "paired":
+                self.uistate.stat_test.test_t_variant = "unpaired"
+                radio = getattr(self, "radioButton_test_t_variant_unpaired", None)
+                if radio is not None:
+                    radio.blockSignals(True)
+                    radio.setChecked(True)
+                    radio.blockSignals(False)
+            if getattr(self.uistate.stat_test, "test_wilcox_variant", None) == "paired":
+                # Wilcoxon has no unpaired; one-sample vs 1 is the sensible single-window default.
+                self.uistate.stat_test.test_wilcox_variant = "one-sample"
+                radio_w = getattr(self, "radioButton_wilcoxon_variant_one", None)
+                if radio_w is not None:
+                    radio_w.blockSignals(True)
+                    radio_w.setChecked(True)
+                    radio_w.blockSignals(False)
+                if float(getattr(self.uistate.stat_test, "label_test_wilcox_one_sample_value", 0) or 0) == 0.0:
+                    self.uistate.stat_test.label_test_wilcox_one_sample_value = 1.0
+                if float(getattr(self.uistate.stat_test, "label_test_t_one_sample_value", 0) or 0) == 0.0:
+                    self.uistate.stat_test.label_test_t_one_sample_value = 1.0
+            if hasattr(self, "_update_one_sample_ref_visibility"):
+                self._update_one_sample_ref_visibility()
         self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
         # Clear stale results; update_test is the single entry point (re-eval + statusbar via _get...).
         self.uistate.stat_test.formal_test_results = None

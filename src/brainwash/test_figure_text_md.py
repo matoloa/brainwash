@@ -92,6 +92,36 @@ def test_skeleton_no_test_still_structured():
     assert "[EPSP amplitude" in md
 
 
+def test_skeleton_pp_mentions_ppr_and_boxplots():
+    u = UIstate()
+    u.experiment.experiment_type = "PP"
+    u.stat_test.test_type = "t-test"
+    u.stat_test.test_t_variant = "unpaired"
+    u.stat_test.buttonGroup_test_n = "subject"
+    u.stat_test.formal_test_results = [
+        {
+            "set_name": "all sweeps (PP)",
+            "p_amp": 0.03,
+            "n1": 4,
+            "n2": 5,
+            "group1": "G1",
+            "group2": "G2",
+            "config": {"type": "t-test (PPR)", "quantity": "PPR (stim2/stim1)"},
+        }
+    ]
+    md = build_figure_text_md(
+        u,
+        _template(),
+        group_names={"G1": "Ctl", "G2": "Drug"},
+        panel_hint="amplitude",
+    )
+    assert "Box plots" in md or "box" in md.lower()
+    assert "PPR" in md or "paired-pulse" in md.lower()
+    assert "stim2/stim1" in md
+    assert "Group means (± SEM)" not in md
+    assert "PPR of EPSP amplitude" in md or "PPR" in md
+
+
 def test_skeleton_ttest_includes_p_and_checklist():
     u = UIstate()
     u.experiment.experiment_type = "time"
