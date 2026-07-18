@@ -588,9 +588,9 @@ def render_publication_figure(
                     export_inset.relim()
                     export_inset.autoscale_view(scalex=False)
 
-                # Add significance markers if formal test results are present
+                # Significance * markers: time/PP only. IO ANCOVA is statusbar + methods .md (PR-D).
                 formal_results = uistate.stat_test.formal_test_results
-                if formal_results:
+                if formal_results and not is_io_mode:
                     test_type = uistate.stat_test.test_type
                     if test_type == "Wilcoxon":
                         variant = uistate.stat_test.test_wilcox_variant
@@ -648,12 +648,27 @@ def build_figure_text_md(uistate, template, group_names=None) -> str:
     Per-panel .md strategy (Option A): one .md per PNG with matching base name.
     """
     if not uistate or uistate.stat_test.test_type == "None":
+        if getattr(uistate, "experiment", None) and uistate.experiment.experiment_type == "io":
+            return "(IO figure exported without ANCOVA selected.)"
         return "(Exported without statistical comparison overlay.)"
 
     test_type = uistate.stat_test.test_type
     results = uistate.stat_test.formal_test_results or []
     if not results:
         return "(Exported without statistical comparison overlay.)"
+
+    # IO ANCOVA: methods paragraph from pure statusbar helper (PR-D)
+    exp_type = getattr(getattr(uistate, "experiment", None), "experiment_type", "time")
+    if exp_type == "io" and test_type == "ANCOVA":
+        from brainwash_ui import statusbar as statusbar_fmt
+
+        dd = {}
+        # Prefer live group names from host if available via uistate only (pure export path)
+        return statusbar_fmt.format_io_ancova_methods_text(
+            results,
+            dd_groups=dd,
+            n_unit=getattr(uistate.stat_test, "buttonGroup_test_n", "subject"),
+        )
 
     # Extract config (defensive, mirrors ui.py/_get_stat_test_warning)
     fdr = bool(uistate.stat_test.test_fdr)

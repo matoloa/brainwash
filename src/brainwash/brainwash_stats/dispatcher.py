@@ -3,7 +3,7 @@ from .formal_tests.cluster_perm import run_cluster_permutation
 from .formal_tests.friedman import run_friedman_omnibus
 from .formal_tests.ttest_and_between import run_main_test_set_loop
 from .formal_tests.wilcoxon import run_wilcoxon_tests
-from .io.regression import _compute_io_regression_internal
+from .io.ancova import compute_io_ancova
 from .validation import comparison_context, validate_comparison_inputs
 
 
@@ -23,6 +23,9 @@ def compute_statistical_comparison(
     n_unit: str = "subject",
     experiment_type: str = "time",
     uistate=None,
+    force_through_zero: bool = False,
+    test_sw: bool = False,
+    test_levene: bool = False,
 ) -> dict:
     """
     High-level entry point used by UI for formal statistical tests on Test Sets.
@@ -32,6 +35,7 @@ def compute_statistical_comparison(
     Cluster perm. forces recording-level n.
 
     IO formal analysis: experiment_type=="io" and test_type=="ANCOVA" only.
+    Textbook ANCOVA (homogeneity of slopes then covariate-adjusted group test).
     Uses all sweeps/bins (test sets ignored for v1). Config type "IO ANCOVA".
     See work_plans/plan_io_ancova_publication.md.
     """
@@ -64,11 +68,11 @@ def compute_statistical_comparison(
     is_io = ctx["is_io"]
     fetch_group_testset_observations = ctx["fetch_group_testset_observations"]
 
-    # PR-B: IO ANCOVA radio gate only — do not require empty test sets; do not fall through to time ANOVA.
+    # PR-B/C: IO ANCOVA only — ignore test sets; no fall-through to time ANOVA.
     if is_io and test_type == "ANCOVA":
         if uistate is None:
             uistate = getattr(get_group_testset_means_fn, "__self__", None)
-        return _compute_io_regression_internal(
+        return compute_io_ancova(
             shown_groups=shown_groups,
             get_group_testset_means_fn=get_group_testset_means_fn,
             uistate=uistate,
@@ -77,6 +81,9 @@ def compute_statistical_comparison(
             amp=amp,
             slope=slope,
             dd_groups=dd_groups,
+            force_through_zero=force_through_zero,
+            test_sw=test_sw,
+            test_levene=test_levene,
         )
 
     if n_unit not in ("subject", "slice", "recording"):

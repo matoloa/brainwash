@@ -73,21 +73,128 @@ def format_io_regression_statusbar(
     y_label = label_map.get(y_col, y_col.replace("_", " "))
     x_label = label_map.get(x_col, x_col.replace("_", " "))
     xy_label = f"{y_label} / {x_label}"
-    slope_p = cfg.get("slope_p") or (formal[0] if isinstance(formal, list) else formal).get("slope_p")
-    if isinstance(slope_p, (int, float)) and np.isfinite(slope_p):
-        pstr = f"{slope_p:.3g}" if slope_p >= 0.001 else "<0.001"
-        stat_label = "slope" if str(cfg.get("io_output", "")).endswith(("slope", "Slope")) else "ratio"
-        global_notes.append(f"{stat_label} p={pstr}")
-    for g, r2v in cfg.get("r2_per_group", {}).items():
+
+    def _pstr(p) -> str | None:
+        if isinstance(p, (int, float)) and np.isfinite(p):
+            return f"{p:.3g}" if p >= 0.001 else "<0.001"
+        return None
+
+    primary = cfg.get("primary_contrast")
+    p_int = cfg.get("p_interaction", cfg.get("slope_p"))
+    p_grp = cfg.get("p_group_ancova")
+    if primary == "group_adjusted":
+        ps = _pstr(p_grp)
+        if ps:
+            global_notes.append(f"group p={ps} (X-adj)")
+        pi = _pstr(p_int)
+        if pi:
+            global_notes.append(f"slopes OK (p_int={pi})")
+    else:
+        # Heterogeneous slopes or legacy results: lead with interaction / slope comparison
+        p_slope = p_int if p_int is not None else cfg.get("slope_p") or (formal[0] if isinstance(formal, list) else formal).get("slope_p")
+        ps = _pstr(p_slope)
+        if ps:
+            if primary == "slope_interaction":
+                global_notes.append(f"slopes differ (interaction p={ps})")
+            else:
+                stat_label = "slope" if str(cfg.get("io_output", "")).endswith(("slope", "Slope")) else "ratio"
+                global_notes.append(f"{stat_label} p={ps}")
+        slopes = cfg.get("slope_per_group") or {}
+        for g, sl in list(slopes.items())[:2]:
+            if isinstance(sl, (int, float)) and np.isfinite(sl):
+                g_name = _group_display_name(dd_groups, g)
+                global_notes.append(f"slope({g_name})={sl:.3g}")
+    for g, r2v in (cfg.get("r2_per_group") or {}).items():
         if isinstance(r2v, (int, float)) and np.isfinite(r2v):
             global_notes.append(f"r²({g})={r2v:.2f}")
             break
+    assum = cfg.get("assumptions") or {}
+    for note in (assum.get("notes") or [])[:2]:
+        global_notes.append(f"warn: {note}")
     if global_notes:
         notes_str = " ".join(global_notes)
         prefix = f"{prefix} {n_report} {xy_label}: {notes_str}"
     else:
         prefix = f"{prefix} {n_report} {xy_label}"
     return StatusbarResult(prefix, "info")
+
+
+def format_io_ancova_methods_text(
+    formal,
+    *,
+    dd_groups: dict | None = None,
+    n_unit: str = "subject",
+) -> str:
+    """Journal-ready methods / caption paragraph for IO ANCOVA (export .md companion)."""
+    dd_groups = dd_groups or {}
+    cfg = None
+    if isinstance(formal, list) and formal:
+        item = formal[0]
+        if isinstance(item, dict):
+            cfg = item.get("config") or item
+    elif isinstance(formal, dict):
+        cfg = formal.get("config") or formal
+    if not isinstance(cfg, dict) or cfg.get("type") not in ("IO ANCOVA", "IO regression"):
+        return "(IO ANCOVA results unavailable.)"
+
+    label_map = {
+        "EPSP_amp": "EPSP amplitude",
+        "EPSP_slope": "EPSP slope",
+        "volley_amp": "volley amplitude",
+        "volley_slope": "volley slope",
+        "stim": "stimulus intensity",
+    }
+    y_lab = label_map.get(cfg.get("y_col", ""), cfg.get("y_col", "Y").replace("_", " "))
+    x_lab = label_map.get(cfg.get("x_col", ""), cfg.get("x_col", "X").replace("_", " "))
+    unit = _unit_label(n_unit)
+    group_ns = cfg.get("group_ns") or {}
+    n_bits = []
+    for g, n in group_ns.items():
+        n_bits.append(f"{_group_display_name(dd_groups, g)} n={n}")
+    n_str = "; ".join(n_bits) if n_bits else f"unit={unit}"
+
+    def _p(p) -> str:
+        if not isinstance(p, (int, float)) or not np.isfinite(p):
+            return "n.a."
+        return f"{p:.3g}" if p >= 0.001 else "<0.001"
+
+    force0 = bool(cfg.get("force_through_zero"))
+    force_note = " Regressions were constrained through the origin." if force0 else ""
+    alpha = cfg.get("alpha_slopes", 0.05)
+    p_int = cfg.get("p_interaction", cfg.get("slope_p"))
+    p_grp = cfg.get("p_group_ancova")
+    p_cov = cfg.get("p_covariate")
+    primary = cfg.get("primary_contrast")
+    slopes_ok = cfg.get("slopes_homogeneous")
+
+    sentences = [
+        f"Input–output relationships ({y_lab} vs {x_lab}) were compared across groups with ANCOVA "
+        f"using statistical units at the {n_unit} level ({n_str}).{force_note}",
+        f"Homogeneity of regression slopes was tested via the X×group interaction (α={alpha:g}; "
+        f"interaction p={_p(p_int)}).",
+    ]
+    if primary == "group_adjusted" or slopes_ok:
+        sentences.append(
+            f"Slopes did not differ significantly; the primary test was the group effect adjusted for {x_lab} "
+            f"(ANCOVA group p={_p(p_grp)}; covariate p={_p(p_cov)})."
+        )
+    else:
+        sentences.append(
+            "Regression slopes differed across groups; the interaction is reported as the primary contrast "
+            "and group main effects from a common-slope ANCOVA are not interpreted."
+        )
+        slopes = cfg.get("slope_per_group") or {}
+        if slopes:
+            bits = []
+            for g, sl in slopes.items():
+                if isinstance(sl, (int, float)) and np.isfinite(sl):
+                    bits.append(f"{_group_display_name(dd_groups, g)}={sl:.3g}")
+            if bits:
+                sentences.append("Per-group slopes: " + ", ".join(bits) + ".")
+    notes = (cfg.get("assumptions") or {}).get("notes") or []
+    if notes:
+        sentences.append("Assumption checks: " + "; ".join(notes) + ".")
+    return " ".join(sentences)
 
 
 def format_non_io_stat_test_statusbar(

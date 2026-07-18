@@ -1,6 +1,10 @@
 """Characterization tests for brainwash_ui.statusbar formatters."""
 
-from brainwash_ui.statusbar import format_io_regression_statusbar, format_non_io_stat_test_statusbar
+from brainwash_ui.statusbar import (
+    format_io_ancova_methods_text,
+    format_io_regression_statusbar,
+    format_non_io_stat_test_statusbar,
+)
 
 
 def test_io_regression_statusbar_with_slope_p_and_r2():
@@ -54,6 +58,54 @@ def test_io_regression_statusbar_empty():
     result = format_io_regression_statusbar(None, dd_groups={})
     assert result.text is None
     assert result.state is None
+
+
+def test_io_ancova_methods_text_group_adjusted():
+    formal = [
+        {
+            "config": {
+                "type": "IO ANCOVA",
+                "x_col": "volley_amp",
+                "y_col": "EPSP_amp",
+                "group_ns": {"G1": 3, "G2": 4},
+                "p_interaction": 0.4,
+                "p_group_ancova": 0.01,
+                "p_covariate": 0.001,
+                "primary_contrast": "group_adjusted",
+                "slopes_homogeneous": True,
+                "force_through_zero": False,
+                "alpha_slopes": 0.05,
+                "assumptions": {"notes": []},
+            }
+        }
+    ]
+    text = format_io_ancova_methods_text(formal, dd_groups={"G1": {"group_name": "Ctl"}, "G2": {"group_name": "Tx"}})
+    assert "ANCOVA" in text
+    assert "Homogeneity of regression slopes" in text
+    assert "group effect adjusted" in text
+    assert "Ctl n=3" in text
+
+
+def test_io_ancova_methods_text_heterogeneous():
+    formal = [
+        {
+            "config": {
+                "type": "IO ANCOVA",
+                "x_col": "volley_amp",
+                "y_col": "EPSP_amp",
+                "group_ns": {"G1": 2, "G2": 2},
+                "p_interaction": 0.001,
+                "primary_contrast": "slope_interaction",
+                "slopes_homogeneous": False,
+                "slope_per_group": {"G1": 1.0, "G2": 2.0},
+                "alpha_slopes": 0.05,
+                "assumptions": {},
+            }
+        }
+    ]
+    text = format_io_ancova_methods_text(formal, dd_groups={})
+    assert "differed across groups" in text
+    assert "Per-group slopes" in text
 
 
 def test_non_io_ttest_statusbar_p_values():

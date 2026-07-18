@@ -328,6 +328,7 @@ class StatTestMixin:
         shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
         experiment_type = "io"
         try:
+            cb = self.uistate.project.checkBox
             comp = stats.compute_statistical_comparison(
                 groups=shown_groups,
                 dd_groups=self.dd_groups,
@@ -337,12 +338,15 @@ class StatTestMixin:
                 variant="unpaired",
                 tails="two-sided",
                 fdr=False,
-                norm=False,
-                amp=True,
-                slope=True,
+                norm=bool(cb.get("norm_EPSP", False)),
+                amp=bool(cb.get("EPSP_amp", True)),
+                slope=bool(cb.get("EPSP_slope", True)),
                 ref=0.0,
                 n_unit=self.uistate.stat_test.buttonGroup_test_n,
                 experiment_type=experiment_type,
+                force_through_zero=bool(cb.get("io_force0", False)),
+                test_sw=bool(self.uistate.stat_test.test_sw),
+                test_levene=bool(self.uistate.stat_test.test_levene),
             )
             results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
             if comp.get("config"):
@@ -356,12 +360,62 @@ class StatTestMixin:
                 if isinstance(results[0], dict) and "config" not in results[0]:
                     results[0]["config"] = results[0].copy()
             self.uistate.stat_test.formal_test_results = results
-            self.uiplot.show_test_markers(results)
+            # PR-D: no sweep-style * markers on IO scatter (statusbar + console/export only).
+            if hasattr(self.uiplot, "clear_test_markers"):
+                self.uiplot.clear_test_markers(draw=True)
+            self._print_io_ancova_table(results, comp.get("config") or {})
+            cb = self.uistate.project.checkBox
+            self.usage(
+                f"stat_test applied: IO ANCOVA n_unit={self.uistate.stat_test.buttonGroup_test_n} "
+                f"force0={bool(cb.get('io_force0', False))} "
+                f"primary={(comp.get('config') or {}).get('primary_contrast')}"
+            )
             return True
         except Exception as ex:
             print(f"IO ANCOVA compute error: {ex}")
             self.clear_formal_test_results()
             return False
+
+    def _print_io_ancova_table(self, results, config: dict | None = None) -> None:
+        """Console summary for publication-oriented IO ANCOVA."""
+        cfg = config or {}
+        if results and isinstance(results[0], dict):
+            cfg = results[0].get("config") or cfg or results[0]
+        print("\n=== IO ANCOVA (v0.16) ===")
+        print(
+            f"n_unit={cfg.get('n_unit')}  X={cfg.get('x_col')}  Y={cfg.get('y_col')}  "
+            f"force0={cfg.get('force_through_zero')}  α_slopes={cfg.get('alpha_slopes', 0.05)}"
+        )
+        print(f"primary_contrast={cfg.get('primary_contrast')}  slopes_homogeneous={cfg.get('slopes_homogeneous')}")
+
+        def _pf(p):
+            if isinstance(p, (int, float)) and np.isfinite(p):
+                return f"{p:.4g}"
+            return "n.a."
+
+        print(
+            f"  interaction: F={_pf(cfg.get('F_interaction'))}  p={_pf(cfg.get('p_interaction', cfg.get('slope_p')))}"
+        )
+        print(
+            f"  ANCOVA group (X-adj): F={_pf(cfg.get('F_group_ancova'))}  p={_pf(cfg.get('p_group_ancova'))}"
+        )
+        print(f"  covariate X: F={_pf(cfg.get('F_covariate'))}  p={_pf(cfg.get('p_covariate'))}")
+        group_ns = cfg.get("group_ns") or {}
+        if group_ns:
+            print("  n by group:", ", ".join(f"{g}={n}" for g, n in group_ns.items()))
+        slopes = cfg.get("slope_per_group") or {}
+        if slopes:
+            print("  slopes:", ", ".join(f"{g}={sl:.4g}" if isinstance(sl, (int, float)) and np.isfinite(sl) else f"{g}=n.a." for g, sl in slopes.items()))
+        r2s = cfg.get("r2_per_group") or {}
+        if r2s:
+            print("  r²:", ", ".join(f"{g}={r:.3f}" if isinstance(r, (int, float)) and np.isfinite(r) else f"{g}=n.a." for g, r in r2s.items()))
+        adj = cfg.get("adjusted_means") or {}
+        if adj:
+            print("  adjusted means @ mean(X):", ", ".join(f"{g}={v:.4g}" for g, v in adj.items() if isinstance(v, (int, float)) and np.isfinite(v)))
+        notes = (cfg.get("assumptions") or {}).get("notes") or []
+        if notes:
+            print("  assumptions:", "; ".join(notes))
+        print("=========================\n")
 
     def _apply_non_io_test(self, eff: str) -> None:
         """Isolated non-IO guard + compute logic."""

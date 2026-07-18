@@ -29,7 +29,9 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
         id_vars.append("subject")
     if "slice" in wide_df.columns:
         id_vars.append("slice")
-    sweep_cols = [c for c in wide_df.columns if c not in id_vars and str(c).isdigit() or isinstance(c, (int, float))]
+    sweep_cols = [
+        c for c in wide_df.columns if c not in id_vars and (str(c).isdigit() or isinstance(c, (int, float)))
+    ]
     if not sweep_cols:
         # Fixture fallback for per_sweep (no numeric sweep columns in scalar mock); attach n_unique for test
         long_df = wide_df[id_vars].copy()
@@ -43,38 +45,58 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
         return long_df
 
     long = pd.melt(wide_df, id_vars=id_vars, value_vars=sweep_cols, var_name="sweep", value_name="y")
-    long["sweep"] = pd.to_numeric(long["sweep"], errors="coerce").astype(int)
+    long["sweep"] = pd.to_numeric(long["sweep"], errors="coerce")
+    long = long.dropna(subset=["sweep"])
+    long["sweep"] = long["sweep"].astype(int)
+    long["rec_ID"] = long["rec_ID"].map(lambda v: str(v))
 
     try:
         if hasattr(get_group_testset_means_fn, "__self__"):
             mixin = get_group_testset_means_fn.__self__
             df_p = mixin.get_df_project()
-            # Consistent dtype for ID/rec_ID match (str); always provide x fallback
-            rec_ids = wide_df["rec_ID"].astype(str)
-            recs = df_p[df_p["ID"].astype(str).isin(rec_ids)]["recording_name"].tolist() if not df_p.empty else []
-            if recs:
-                dfs = []
-                for rec_name in recs:
-                    prow = df_p[df_p["recording_name"] == rec_name].iloc[0]
+            # Per-recording X join (rec_ID + sweep) — not global sweep→X (mis-aligns recs).
+            x_parts = []
+            if not df_p.empty and "ID" in df_p.columns:
+                id_to_name = {
+                    str(r["ID"]): r["recording_name"]
+                    for _, r in df_p.iterrows()
+                    if pd.notna(r.get("ID"))
+                }
+                for rid in long["rec_ID"].unique():
+                    rec_name = id_to_name.get(str(rid))
+                    if rec_name is None:
+                        continue
+                    match = df_p[df_p["recording_name"] == rec_name]
+                    if match.empty:
+                        continue
+                    prow = match.iloc[0]
                     dfo = mixin.get_dfoutput(row=prow)
-                    if dfo is not None and not dfo.empty:
-                        dfs.append(dfo[["sweep", x_col]].copy() if x_col in dfo.columns else dfo[["sweep"]].copy())
-                if dfs:
-                    x_df = pd.concat(dfs, ignore_index=True)
-                    if x_col in x_df.columns:
-                        long = long.merge(x_df.rename(columns={x_col: "x"}), on="sweep", how="left")
+                    if dfo is None or dfo.empty or "sweep" not in dfo.columns:
+                        continue
+                    piece = dfo[["sweep"]].copy()
+                    piece["rec_ID"] = str(rid)
+                    piece["sweep"] = pd.to_numeric(piece["sweep"], errors="coerce")
+                    if x_col in dfo.columns:
+                        piece["x"] = pd.to_numeric(dfo[x_col], errors="coerce")
                     else:
-                        long["x"] = long["sweep"].rank(method="dense") - 1
-                else:
-                    long["x"] = long["sweep"].rank(method="dense") - 1
+                        piece["x"] = np.nan
+                    x_parts.append(piece.dropna(subset=["sweep"]))
+            if x_parts:
+                x_df = pd.concat(x_parts, ignore_index=True)
+                x_df["sweep"] = x_df["sweep"].astype(int)
+                long = long.merge(x_df, on=["rec_ID", "sweep"], how="left")
+            if "x" not in long.columns or long["x"].isna().all():
+                long["x"] = long.groupby("rec_ID")["sweep"].rank(method="dense") - 1
             else:
-                long["x"] = long["sweep"].rank(method="dense") - 1
-            # Ensure x always present (prevents later NaN issues)
-            if "x" not in long.columns:
-                long["x"] = long["sweep"].rank(method="dense") - 1
+                # Per-rec fallback where X missing
+                miss = long["x"].isna()
+                if miss.any():
+                    long.loc[miss, "x"] = long.loc[miss].groupby("rec_ID")["sweep"].rank(method="dense") - 1
         else:
             long["x"] = long["sweep"].rank(method="dense") - 1
     except Exception:
+        long["x"] = long.groupby("rec_ID")["sweep"].rank(method="dense") - 1
+    if "x" not in long.columns:
         long["x"] = long["sweep"].rank(method="dense") - 1
 
     long = long.dropna(subset=["y"])
