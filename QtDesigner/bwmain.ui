@@ -273,7 +273,7 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-534</y>
+          <y>-405</y>
           <width>284</width>
           <height>2087</height>
          </rect>
@@ -1218,7 +1218,7 @@
              <rect>
               <x>10</x>
               <y>10</y>
-              <width>241</width>
+              <width>121</width>
               <height>17</height>
              </rect>
             </property>
@@ -1230,7 +1230,7 @@
              </font>
             </property>
             <property name="text">
-             <string>IO - Input stim µA</string>
+             <string>IO - Input µA</string>
             </property>
            </widget>
            <widget class="QTableWidget" name="tableWidget_stim_strength">
@@ -1257,6 +1257,19 @@
             </property>
             <property name="flat">
              <bool>true</bool>
+            </property>
+           </widget>
+           <widget class="QPushButton" name="pushButton_io_stim_strength_apply">
+            <property name="geometry">
+             <rect>
+              <x>170</x>
+              <y>10</y>
+              <width>61</width>
+              <height>25</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Apply</string>
             </property>
            </widget>
           </widget>
