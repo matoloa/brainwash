@@ -1,7 +1,8 @@
 # UI refactor — agent index
 
-> **Status**: Phase 0–X complete (PR-44). No **NEXT** card. Parent evaluation: [plan_modularity_ui_testing_evaluation.md](plan_modularity_ui_testing_evaluation.md).
-> Phase 0–3 cards archived under [History/ui_refactor/](History/ui_refactor/).
+> **Archived** (2026-07-18). Phase 0–X complete (PR-44). Tag: `ui-refactor/phase0-3-done`. No **NEXT** card.
+> Parent evaluation: [plan_modularity_ui_testing_evaluation.md](plan_modularity_ui_testing_evaluation.md).
+> Session cards: [ui_refactor/](ui_refactor/). Active product branch: `0.16.3-nunit`.
 
 ## Active scope
 

@@ -1,8 +1,10 @@
 # Plan: 0.16.2 — Level-Aware Group Data for Graphs (Respect Subject/Slice n) + Global Unit DFs
 
-**Status**: Draft for review. Once accepted, this becomes the initial content of the 0.16.2 branch (pushed as starting point for implementation).
+> **Archived** (2026-07-18). Core implemented on `0.16.2` / `ui-refactor/phase0-3`. Follow-on plot artists: [plan_nunit_group_plotting.md](plan_nunit_group_plotting.md). Active n-unit troubleshooting: branch `0.16.3-nunit`.
 
-**Date**: 2026-07-12 (today)
+**Status**: ✅ Implemented (core). Residual bugfix on `0.16.3-nunit`.
+
+**Date**: 2026-07-12
 **Branch goal**: Deliver the core refactor so that graphs (group means, SEMs, bars, points) respect the `n_unit` (Subject/Slice/Recording) choice the same way statistical tests do. Add global (project-wide) Subject/Slice aggregated dfs for new use cases (e.g., compare individual recording to its Subject mean). Prioritize robust + functional correctness. "Direct operation on group-independent globals inside group summaries" is Nice-To-Have / future.
 
 **Key settled requirements from discussion** (see full thread for details):

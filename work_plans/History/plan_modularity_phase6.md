@@ -1,7 +1,7 @@
 # Modularity Phase 6+ — Agent index
 
-> **Status**: ✅ Complete (2026-07-14). Branch: `ui-refactor/phase0-3`.
-> Phases 6a–6c, 7a–7b, 8 done. Manual regression: [manual_smokes_after_refactor.md](manual_smokes_after_refactor.md).
+> **Archived** (2026-07-18). ✅ Complete (2026-07-14). Branch: `ui-refactor/phase0-3` / tag `ui-refactor/phase0-3-done`.
+> Phases 6a–6c, 7a–7b, 8 done. Manual regression: [../manual_smokes_after_refactor.md](../manual_smokes_after_refactor.md).
 > **Rollback guide**: [phase6/README.md](phase6/README.md) (commits `61`/`62` HIGH RISK).
 
 ## HIGH RISK commit convention

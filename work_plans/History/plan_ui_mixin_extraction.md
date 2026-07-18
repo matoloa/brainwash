@@ -1,8 +1,8 @@
 # Plan: Extract Remaining Logic from UIsub into Mixins (ui.py Refactor)
 
 **Date**: 2026-07-12  
-**Status**: ✅ Complete (Phases 0–5). ui.py **~1895 LOC** / **84** methods on `UIsub` (target <3000 met). Phase 5: removed `setSplitterSizes`/`_is_loading_active`/`deleteSelectedRows` stubs; moved `connectUIstate`, `applyConfigStates`, hierarchy + recording rename to `ProjectMixin`. Manual regression checklist still recommended before merge.  
-**Related**: Previous mixin_problems.md (archived), ongoing ui.py size issues (5720 LOC, UIsub defines 172 methods directly).
+**Status**: **Archived** (2026-07-18). ✅ Complete (Phases 0–5). Manual regression: [../manual_smokes_after_refactor.md](../manual_smokes_after_refactor.md).  
+**Related**: Previous mixin_problems.md (Archive/), UI refactor History indices.
 
 ## Background
 

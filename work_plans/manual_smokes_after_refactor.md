@@ -1,10 +1,10 @@
 # Manual smokes after refactor
 
-**Branch**: `ui-refactor/phase0-3`  
+**Branch**: `0.16.3-nunit` (checklist written for `ui-refactor/phase0-3`; still valid post-refactor)  
 **Date**: 2026-07-14  
 **Scope**: Post-refactor regression checklist covering UI refactor (Phases 0–X), modularity (Phases 6–8), mixin extraction, `brainwash_ui/` pure-layer extractions, and Phase 7b `UIplot` thinning.
 
-**Related plans**: [plan_ui_refactor.md](plan_ui_refactor.md) · [plan_modularity_phase6.md](plan_modularity_phase6.md) · [plan_modularity_ui_testing_evaluation.md](plan_modularity_ui_testing_evaluation.md) · [ui_refactor/CONTRACT.md](ui_refactor/CONTRACT.md) · [phase6/README.md](phase6/README.md)
+**Related plans** (archived): [History/plan_ui_refactor.md](History/plan_ui_refactor.md) · [History/plan_modularity_phase6.md](History/plan_modularity_phase6.md) · [History/plan_modularity_ui_testing_evaluation.md](History/plan_modularity_ui_testing_evaluation.md) · [History/ui_refactor/CONTRACT.md](History/ui_refactor/CONTRACT.md) · [History/phase6/README.md](History/phase6/README.md)
 
 **Rollback point** (pre–Phase 6): `a2f2dd2`
 
@@ -180,7 +180,7 @@ PYTHONPATH=src uv run python -c "from brainwash import ui; from brainwash.brainw
 
 ---
 
-## 9. Groups & n_unit (plan_nunit_group_plotting)
+## 9. Groups & n_unit ([History/plan_nunit_group_plotting.md](History/plan_nunit_group_plotting.md))
 
 | # | Step | Expected | Phase |
 |---|------|----------|-------|

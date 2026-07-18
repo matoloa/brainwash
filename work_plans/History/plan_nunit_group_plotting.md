@@ -1,5 +1,9 @@
 # Plan: Upgrade Group Plotting for Per-n_unit Level Artists
 
+> **Archived** (2026-07-18). Per-level artists / visibility toggle largely implemented on `ui-refactor/phase0-3`. Residual n-unit bugs tracked on branch `0.16.3-nunit` (not via this plan). Parent data layer: [plan_0.16.2_level_aware_group_data.md](plan_0.16.2_level_aware_group_data.md).
+
+**Status**: ✅ Implemented (core plot-level design).
+
 ## Context & Motivation
 
 The app supports hierarchical n_unit levels for statistical analysis and group display: `recording`, `slice`, and `subject` (controlled by `buttonGroup_test_n` / `uistate.buttonGroup_test_n`).

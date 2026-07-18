@@ -69,6 +69,6 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
    - `src/brainwash/brainwash_ui/`: pure view/statusbar/applicability logic (testable without Qt).
    - `src/brainwash/legacy/`: **retain** `analysis_v1.py` / `analysis_v2.py` for scientific reproduction — do not delete; shims at `src/brainwash/analysis_v1.py` etc.
    - `src/brainwash/ui_state_classes.py`: `UIstate` per `UIsub` — use `self.uistate.project`, `.experiment`, `.stat_test`, `.plot` (no flat attrs; no import-time `ui.uistate`).
-   - Plans are in `work_plans/` (move outdated to `History/`).
-   - **Modularity Phases 6–8 + 7b**: complete on `ui-refactor/phase0-3`; manual regression checklist: `work_plans/manual_smokes_after_refactor.md`.
+   - Plans are in `work_plans/` (move outdated to `History/`). Active: `manual_smokes_after_refactor.md`. Completed UI refactor / modularity / 0.16.2 n_unit core: `work_plans/History/`.
+   - **Modularity Phases 6–8 + 7b** + UI refactor 0–X: complete (tag `ui-refactor/phase0-3-done`); checklist: `work_plans/manual_smokes_after_refactor.md`. Active line: `0.16.3-nunit`.
    - See full layout in CONTRIBUTING.md.

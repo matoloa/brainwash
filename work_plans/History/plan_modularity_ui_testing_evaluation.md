@@ -1,7 +1,7 @@
 # Brainwash: Modularity, UI Separation, and Automated Testing
 
 **Date**: 2026-07-14 (revised)  
-**Status**: Phases 0–5 + 3b + 4 + **6–8 + 7b** complete. Branch: `ui-refactor/phase0-3`. **273** pytest tests. Manual regression: [manual_smokes_after_refactor.md](manual_smokes_after_refactor.md). Rollback point before Phase 6: `a2f2dd2`. Index: [plan_modularity_phase6.md](plan_modularity_phase6.md).  
+**Status**: **Archived** (2026-07-18). Phases 0–5 + 3b + 4 + **6–8 + 7b** complete. Tag: `ui-refactor/phase0-3-done`. Manual regression: [../manual_smokes_after_refactor.md](../manual_smokes_after_refactor.md). Rollback before Phase 6: `a2f2dd2`. Index: [plan_modularity_phase6.md](plan_modularity_phase6.md).  
 **Audience**: Human maintainers and agentic contributors  
 **Goal**: Make UI/stat/view changes safe for agents without a full rewrite, reusing the statistics refactor playbook.
 

@@ -1,6 +1,8 @@
 # UI refactor — micro-plans
 
-Each `NN_*.md` file is a **complete session brief**. Agents read **only** the current **NEXT** card from [../plan_ui_refactor.md](../plan_ui_refactor.md).
+> **Archived** (2026-07-18). UI refactor complete; no **NEXT** card. Index: [../plan_ui_refactor.md](../plan_ui_refactor.md).
+
+Each `NN_*.md` file is a **complete session brief** (historical).
 
 | File | ~lines | Purpose |
 |------|--------|---------|
