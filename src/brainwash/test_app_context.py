@@ -17,6 +17,47 @@ def test_compute_statusbar_io_empty():
     assert result.text is None
 
 
+def test_compute_statusbar_io_warns_on_non_ancova_test():
+    u = UIstate()
+    u.experiment.experiment_type = "io"
+    u.stat_test.test_type = "t-test"
+    result = app_context.compute_statusbar_result(
+        experiment=app_context.experiment_snapshot_from(u),
+        stat_test=app_context.stat_test_snapshot_from(u),
+        dd_groups={},
+        dd_testsets={},
+    )
+    assert result.state == "warning"
+    assert result.text == "Use ANCOVA for Input-Output experiment analysis"
+
+
+def test_compute_statusbar_io_ancova_allows_regression_path():
+    u = UIstate()
+    u.experiment.experiment_type = "io"
+    u.stat_test.test_type = "ANCOVA"
+    u.stat_test.formal_test_results = [
+        {
+            "config": {
+                "type": "IO regression",
+                "x_col": "volley_amp",
+                "y_col": "EPSP_amp",
+                "group_ns": {"G1": 2},
+                "slope_p": 0.01,
+                "r2_per_group": {},
+            }
+        }
+    ]
+    result = app_context.compute_statusbar_result(
+        experiment=app_context.experiment_snapshot_from(u),
+        stat_test=app_context.stat_test_snapshot_from(u),
+        dd_groups={"G1": {"group_name": "Ctl"}},
+        dd_testsets={},
+    )
+    assert result.state == "info"
+    assert result.text is not None
+    assert "IO ANCOVA" in result.text
+
+
 def test_compute_statusbar_ttest_warning():
     u = UIstate()
     u.stat_test.test_type = "t-test"

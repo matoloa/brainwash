@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from . import applicability, statusbar
 
 _IMPLEMENTED_TEST_TYPES = frozenset({"t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."})
+# IO regression is driven by experiment_type; only ANCOVA (or no test) is appropriate.
+_IO_ALLOWED_TEST_TYPES = frozenset({"ANCOVA", "None"})
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,11 @@ def compute_statusbar_result(
     if stat_test.test_type == "None" and experiment.experiment_type != "io":
         return statusbar.StatusbarResult(None, None)
     if experiment.experiment_type == "io":
+        if stat_test.test_type not in _IO_ALLOWED_TEST_TYPES:
+            return statusbar.StatusbarResult(
+                "Use ANCOVA for Input-Output experiment analysis",
+                "warning",
+            )
         return statusbar.format_io_regression_statusbar(
             stat_test.formal_test_results,
             dd_groups=dd_groups or {},
