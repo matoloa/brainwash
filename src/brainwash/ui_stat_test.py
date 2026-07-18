@@ -483,6 +483,12 @@ class StatTestMixin:
             return
 
         if variant_for_check == "paired" and test_type != "Friedman":
+            # Paired t-test / Wilcoxon: exactly 1 shown group + exactly 2 test sets.
+            if len(shown_groups) != 1:
+                if had_results:
+                    print("Statistical test: paired requires exactly 1 shown group with data.")
+                self.clear_formal_test_results()
+                return
             if len(shown_ts) != 2:
                 if had_results:
                     print("Statistical test: paired requires exactly 2 shown test sets (with 1 group).")

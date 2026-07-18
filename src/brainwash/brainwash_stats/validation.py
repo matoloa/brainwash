@@ -70,6 +70,8 @@ def validate_comparison_inputs(
     # IO ANCOVA does not require test sets (and ignores them for data selection in v1).
     if not shown_sets and not is_io:
         return {"error": "no shown test sets", "results": []}
+    if variant == "paired" and len(shown_sets) != 2:
+        return {"error": "paired t-test requires exactly 2 shown test sets", "results": []}
 
     if get_group_testset_means_fn is None:
         return {"error": "no data accessor for testset means", "results": []}

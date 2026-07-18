@@ -9,16 +9,20 @@ def check_ttest_applicability(variant: str, dd_groups: dict | None, dd_testsets:
     if not dd_groups:
         return "No groups defined for t-test"
     shown_groups = groups_with_recordings(dd_groups, visible_group_ids(dd_groups))
-    min_groups = 1 if variant in ("one-sample", "paired") else 2
-    if len(shown_groups) < min_groups:
-        return f"t-test requires {min_groups} group(s) with data"
     shown_ts = visible_testset_ids(dd_testsets)
-    if variant == "paired" and len(shown_ts) != 2:
-        return "Paired t-test requires exactly 2 test sets"
     if variant == "paired":
+        # Exactly one shown group + exactly two test sets (within-unit before/after, etc.)
+        if len(shown_groups) != 1:
+            return "Paired t-test requires exactly 1 group with data"
+        if len(shown_ts) != 2:
+            return "Paired t-test requires exactly 2 test sets"
         n1 = len(dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
         if n1 < 2:
             return "Paired t-test requires N ≥ 2 recordings per group"
+        return None
+    min_groups = 1 if variant == "one-sample" else 2
+    if len(shown_groups) < min_groups:
+        return f"t-test requires {min_groups} group(s) with data"
     if not shown_ts:
         return "No test sets shown for t-test"
     return None

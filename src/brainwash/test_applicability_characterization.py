@@ -23,6 +23,23 @@ def test_ttest_paired_needs_two_testsets():
     )
 
 
+def test_ttest_paired_needs_exactly_one_group():
+    dd_g = _groups("G1", "G2")
+    dd_g["G1"]["rec_IDs"] = ["r1", "r2"]
+    dd_g["G2"]["rec_IDs"] = ["r3", "r4"]
+    dd_ts = make_dd_testsets("TS1", "TS2")
+    assert applicability.check_ttest_applicability("paired", dd_g, dd_ts) == (
+        "Paired t-test requires exactly 1 group with data"
+    )
+
+
+def test_ttest_paired_ok_one_group_two_sets():
+    dd_g = _groups("G1")
+    dd_g["G1"]["rec_IDs"] = ["r1", "r2"]
+    dd_ts = make_dd_testsets("TS1", "TS2")
+    assert applicability.check_ttest_applicability("paired", dd_g, dd_ts) is None
+
+
 def test_ttest_paired_needs_two_recordings():
     dd_g = _groups("G1")
     dd_g["G1"]["rec_IDs"] = ["r1"]
