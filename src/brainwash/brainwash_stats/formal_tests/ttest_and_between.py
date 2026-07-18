@@ -29,6 +29,8 @@ def run_main_test_set_loop(
     tails,
     ref,
     use_implicit,
+    test_sw: bool = False,
+    test_levene: bool = False,
 ) -> dict:
     alt = {"two-sided": "two-sided", "greater": "greater", "less": "less"}.get(tails, "two-sided")
 
@@ -156,20 +158,23 @@ def run_main_test_set_loop(
             if "eta2" in set_result:
                 set_result["eta2"] = set_result.get("eta2", np.nan)
 
-            _apply_assumption_tests(
-                set_result,
-                short=short,
-                obs1=obs1,
-                obs2=obs2,
-                g2=g2,
-                shown_groups=shown_groups,
-                test_type=test_type,
-                shown_sets=shown_sets,
-                sid=sid,
-                fetch_group_testset_observations=fetch_group_testset_observations,
-                n_unit=n_unit,
-                col=col,
-            )
+            if test_sw or test_levene:
+                _apply_assumption_tests(
+                    set_result,
+                    short=short,
+                    obs1=obs1,
+                    obs2=obs2,
+                    g2=g2,
+                    shown_groups=shown_groups,
+                    test_type=test_type,
+                    shown_sets=shown_sets,
+                    sid=sid,
+                    fetch_group_testset_observations=fetch_group_testset_observations,
+                    n_unit=n_unit,
+                    col=col,
+                    do_sw=bool(test_sw),
+                    do_levene=bool(test_levene),
+                )
 
             if short == "amp":
                 raw_p_amp.append((len(out_results), p_key))

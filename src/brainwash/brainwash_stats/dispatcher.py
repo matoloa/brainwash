@@ -187,4 +187,6 @@ def compute_statistical_comparison(
         tails=tails,
         ref=ref,
         use_implicit=use_implicit,
+        test_sw=test_sw,
+        test_levene=test_levene,
     )

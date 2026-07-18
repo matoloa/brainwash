@@ -121,15 +121,133 @@ def format_io_regression_statusbar(
             bit += f" r²={r2v:.2f}"
         global_notes.append(bit)
 
-    assum = cfg.get("assumptions") or {}
-    for note in (assum.get("notes") or [])[:2]:
-        global_notes.append(f" - Warning: {note}")
+    # Merge assumptions from config + all result rows (multi-aspect IO).
+    assum: dict = {}
+    if isinstance(cfg, dict) and isinstance(cfg.get("assumptions"), dict):
+        assum.update(cfg["assumptions"])
+    if isinstance(formal, list):
+        for item in formal:
+            if not isinstance(item, dict):
+                continue
+            for blob in (item.get("assumptions"), (item.get("config") or {}).get("assumptions")):
+                if not isinstance(blob, dict):
+                    continue
+                for k, v in blob.items():
+                    if k == "notes":
+                        # keep union of notes
+                        prev = list(assum.get("notes") or [])
+                        for n in v or []:
+                            if n not in prev:
+                                prev.append(n)
+                        assum["notes"] = prev
+                    elif assum.get(k) is None and v is not None:
+                        assum[k] = v
+    global_notes.extend(_assumption_statusbar_tokens(assum))
     if global_notes:
         notes_str = " ".join(global_notes)
         prefix = f"{prefix} {n_report} {xy_label}: {notes_str}"
     else:
         prefix = f"{prefix} {n_report} {xy_label}"
     return StatusbarResult(prefix, "info")
+
+
+def _finite_p(v) -> float | None:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if np.isfinite(f) else None
+
+
+def _assumption_statusbar_tokens(assumptions: dict | None) -> list[str]:
+    """SW:ok / Lev:ok when p>=0.05; ' - Warning: …' for failures / notes. Never SW:on."""
+    out: list[str] = []
+    assum = assumptions or {}
+    sw_p = _finite_p(assum.get("sw_p"))
+    lev_p = _finite_p(assum.get("levene_p"))
+    if sw_p is not None and sw_p >= 0.05:
+        out.append("SW:ok")
+    if lev_p is not None and lev_p >= 0.05:
+        out.append("Lev:ok")
+    for note in (assum.get("notes") or [])[:2]:
+        out.append(f" - Warning: {note}")
+    return out
+
+
+def _collect_assumption_ps(results: list) -> tuple[list[float], list[float], list[str], list[str]]:
+    """Gather SW/Levene p-values and skip reasons from formal result rows."""
+    sw_ps: list[float] = []
+    lev_ps: list[float] = []
+    sw_skips: list[str] = []
+    lev_skips: list[str] = []
+    for r in results:
+        if not isinstance(r, dict):
+            continue
+        for k, v in r.items():
+            if k.startswith("sw_p"):
+                p = _finite_p(v)
+                if p is not None:
+                    sw_ps.append(p)
+            if k.startswith("levene_p"):
+                p = _finite_p(v)
+                if p is not None:
+                    lev_ps.append(p)
+            if k.startswith("sw_skip_") and v:
+                sw_skips.append(str(v))
+            if k.startswith("levene_skip_") and v:
+                lev_skips.append(str(v))
+        for blob in (r.get("assumptions"), (r.get("config") or {}).get("assumptions")):
+            if not isinstance(blob, dict):
+                continue
+            p = _finite_p(blob.get("sw_p"))
+            if p is not None:
+                sw_ps.append(p)
+            p = _finite_p(blob.get("levene_p"))
+            if p is not None:
+                lev_ps.append(p)
+    return sw_ps, lev_ps, sw_skips, lev_skips
+
+
+def _non_io_assumption_diag(results: list, *, test_sw: bool, test_levene: bool) -> str:
+    """SW:ok / Lev:ok, warnings, or skip stamps (e.g. SW:n<3). Never silent when checkbox on."""
+    tokens: list[str] = []
+    sw_ps, lev_ps, sw_skips, lev_skips = _collect_assumption_ps(results)
+    if test_sw:
+        if sw_ps:
+            if any(p < 0.05 for p in sw_ps):
+                pmin = min(sw_ps)
+                pstr = f"{pmin:.3g}" if pmin >= 0.001 else "<0.001"
+                tokens.append(f" - Warning: SW p={pstr}")
+            else:
+                tokens.append("SW:ok")
+        elif sw_skips:
+            # e.g. n=2<3 → SW:n<3
+            sk = sw_skips[0]
+            if "n=" in sk and "<3" in sk:
+                tokens.append("SW:n<3")
+            else:
+                tokens.append(f"SW:skip({sk})")
+        else:
+            tokens.append("SW:skip")
+    if test_levene:
+        if lev_ps:
+            if any(p < 0.05 for p in lev_ps):
+                pmin = min(lev_ps)
+                pstr = f"{pmin:.3g}" if pmin >= 0.001 else "<0.001"
+                tokens.append(f" - Warning: Lev p={pstr}")
+            else:
+                tokens.append("Lev:ok")
+        elif lev_skips:
+            sk = lev_skips[0]
+            if "n<2" in sk:
+                tokens.append("Lev:n<2")
+            else:
+                tokens.append(f"Lev:skip({sk})")
+        else:
+            tokens.append("Lev:skip")
+    if not tokens:
+        return ""
+    return "    " + " ".join(tokens)
 
 
 def format_io_ancova_methods_text(
@@ -366,24 +484,7 @@ def format_non_io_stat_test_statusbar(
             label = "q" if use_q else "p"
             reports.append(f"{set_prefix}{aspect}: {label}={pstr}")
 
-    diag = []
-    diag_suffix = ""
-    if test_sw:
-        diag.append("SW")
-    if test_levene:
-        lev_strs = []
-        for r in results:
-            for asp in ("amp", "slope"):
-                p = r.get(f"levene_p_{asp}")
-                if isinstance(p, (int, float)) and np.isfinite(p):
-                    pstr = f"{p:.3g}" if p >= 0.001 else "<0.001"
-                    lev_strs.append(f"{asp} p={pstr}")
-        if lev_strs:
-            diag.append("Lev(" + " ".join(lev_strs) + ")")
-        else:
-            diag.append("Levene")
-    if diag:
-        diag_suffix = "    " + " ".join(diag)
+    diag_suffix = _non_io_assumption_diag(results, test_sw=test_sw, test_levene=test_levene)
 
     if not reports:
         return StatusbarResult(f"{test_label}: done (see console){diag_suffix}", "info")

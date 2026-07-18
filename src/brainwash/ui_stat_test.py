@@ -427,9 +427,14 @@ class StatTestMixin:
         adj = cfg.get("adjusted_means") or {}
         if adj:
             print("  adjusted means @ mean(X):", ", ".join(f"{g}={v:.4g}" for g, v in adj.items() if isinstance(v, (int, float)) and np.isfinite(v)))
-        notes = (cfg.get("assumptions") or {}).get("notes") or []
-        if notes:
-            print("  assumptions:", "; ".join(notes))
+        assum = cfg.get("assumptions") or {}
+        notes = assum.get("notes") or []
+        sw_p, lev_p = assum.get("sw_p"), assum.get("levene_p")
+        if sw_p is not None or lev_p is not None or notes:
+            print(
+                f"  assumptions: SW p={_pf(sw_p)}  Levene p={_pf(lev_p)}"
+                + (f"  notes: {'; '.join(notes)}" if notes else "")
+            )
         print("=========================\n")
 
     def _apply_non_io_test(self, eff: str) -> None:
@@ -531,6 +536,8 @@ class StatTestMixin:
                 ref=ref_value,
                 n_unit=n_unit,
                 experiment_type=experiment_type,
+                test_sw=bool(self.uistate.stat_test.test_sw),
+                test_levene=bool(self.uistate.stat_test.test_levene),
             )
             results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
             if comp.get("config"):
@@ -566,6 +573,21 @@ class StatTestMixin:
         effective_variant = "unpaired" if (test_type or variant) == "Cluster perm." else variant
         print(f"variant={effective_variant}  tails={tails}  fdr={fdr}  norm={norm}")
         print("Note: each n = mean of aspect over sweeps in the test set, per recording.")
+        # Assumption lines (SW / Levene) when present on any result
+        for r in results:
+            if not isinstance(r, dict):
+                continue
+            bits = []
+            for k in sorted(r.keys()):
+                if k.startswith("sw_p") or k.startswith("levene_p"):
+                    v = r.get(k)
+                    if isinstance(v, (int, float)) and np.isfinite(v):
+                        bits.append(f"{k}={v:.4g}")
+                if k.startswith("sw_skip_") or k.startswith("levene_skip_"):
+                    bits.append(f"{k}={r.get(k)}")
+            if bits:
+                sname = r.get("set_name") or r.get("set_id") or "?"
+                print(f"  assumptions [{sname}]: " + ", ".join(bits))
         if test_type == "Cluster perm.":
             for r_idx, r in enumerate(results):
                 n1 = r.get("n1", 0)

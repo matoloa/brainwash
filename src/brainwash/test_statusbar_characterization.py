@@ -123,6 +123,80 @@ def test_io_statusbar_spells_out_warning_for_assumption_notes():
     result = format_io_regression_statusbar(formal, dd_groups={"G1": {"group_name": "Ctl"}})
     assert " - Warning: SW residual p=0.02" in (result.text or "")
     assert "warn:" not in (result.text or "")
+    assert "SW:ok" not in (result.text or "")
+
+
+def test_io_statusbar_sw_lev_ok_stamps():
+    formal = [
+        {
+            "config": {
+                "type": "IO ANCOVA",
+                "x_col": "volley_amp",
+                "y_col": "EPSP_amp",
+                "group_ns": {"G1": 2, "G2": 2},
+                "primary_contrast": "group_adjusted",
+                "p_group_ancova": 0.01,
+                "p_interaction": 0.5,
+                "slope_per_group": {"G1": 1.0, "G2": 1.0},
+                "r2_per_group": {"G1": 0.9, "G2": 0.9},
+                "assumptions": {"notes": [], "sw_p": 0.4, "levene_p": 0.6},
+            }
+        }
+    ]
+    result = format_io_regression_statusbar(
+        formal, dd_groups={"G1": {"group_name": "A"}, "G2": {"group_name": "B"}}
+    )
+    assert "SW:ok" in (result.text or "")
+    assert "Lev:ok" in (result.text or "")
+    assert " - Warning:" not in (result.text or "")
+
+
+def test_non_io_statusbar_sw_lev_ok_not_bare_labels():
+    formal = [
+        {
+            "set_name": "T1",
+            "p_amp": 0.01,
+            "n1": 5,
+            "n2": 5,
+            "sw_p_amp": 0.3,
+            "levene_p_amp": 0.4,
+        }
+    ]
+    result = format_non_io_stat_test_statusbar(
+        formal,
+        effective_test_type="t-test",
+        dd_groups={"G1": {"group_name": "A"}, "G2": {"group_name": "B"}},
+        test_sw=True,
+        test_levene=True,
+    )
+    assert "SW:ok" in (result.text or "")
+    assert "Lev:ok" in (result.text or "")
+    assert "SW:on" not in (result.text or "")
+    assert "Levene" not in (result.text or "")
+
+
+def test_non_io_skip_stamps_when_n_too_small():
+    """Checkbox on, skip reasons from compute → SW:n<3 / Lev:n<2 (not silent, not SW:on)."""
+    formal = [
+        {
+            "set_name": "T1",
+            "p_amp": 0.01,
+            "n1": 2,
+            "n2": 2,
+            "sw_skip_amp": "n=2<3",
+            "levene_skip_amp": "n<2 per group",
+        }
+    ]
+    result = format_non_io_stat_test_statusbar(
+        formal,
+        effective_test_type="t-test",
+        dd_groups={},
+        test_sw=True,
+        test_levene=True,
+    )
+    assert "SW:n<3" in (result.text or "")
+    assert "Lev:n<2" in (result.text or "")
+    assert "SW:on" not in (result.text or "")
 
 
 def test_format_io_ancova_assumption_prose_nonnormal():
