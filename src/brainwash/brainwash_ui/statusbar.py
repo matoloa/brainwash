@@ -123,7 +123,7 @@ def format_io_regression_statusbar(
 
     assum = cfg.get("assumptions") or {}
     for note in (assum.get("notes") or [])[:2]:
-        global_notes.append(f"warn: {note}")
+        global_notes.append(f" - Warning: {note}")
     if global_notes:
         notes_str = " ".join(global_notes)
         prefix = f"{prefix} {n_report} {xy_label}: {notes_str}"
@@ -204,10 +204,65 @@ def format_io_ancova_methods_text(
                     bits.append(f"{_group_display_name(dd_groups, g)}={sl:.3g}")
             if bits:
                 sentences.append("Per-group slopes: " + ", ".join(bits) + ".")
-    notes = (cfg.get("assumptions") or {}).get("notes") or []
-    if notes:
-        sentences.append("Assumption checks: " + "; ".join(notes) + ".")
+    assum = cfg.get("assumptions") or {}
+    ass_prose = format_io_ancova_assumption_prose(assum)
+    if ass_prose:
+        sentences.append(ass_prose)
     return " ".join(sentences)
+
+
+def format_io_ancova_assumption_prose(assumptions: dict | None) -> str:
+    """Verbose methods-style text for SW/Levene residual checks (figure .md / methods)."""
+    if not assumptions:
+        return ""
+    bits: list[str] = []
+    sw_p = assumptions.get("sw_p")
+    lev_p = assumptions.get("levene_p")
+    notes = list(assumptions.get("notes") or [])
+
+    def _p(p) -> str:
+        if not isinstance(p, (int, float)) or not np.isfinite(p):
+            return "n.a."
+        return f"{p:.3g}" if p >= 0.001 else "<0.001"
+
+    # Always explain residuals briefly when any assumption info is present
+    if sw_p is not None or lev_p is not None or notes:
+        bits.append(
+            "Residuals are the vertical distances from each data point to the fitted IO regression "
+            "line (observed Y minus predicted Y under the primary model)."
+        )
+    if isinstance(sw_p, (int, float)) and np.isfinite(sw_p):
+        if sw_p < 0.05:
+            bits.append(
+                f"Shapiro–Wilk test on residuals suggested a non-normal residual distribution "
+                f"(*p* = {_p(sw_p)}); linear-model *p*-values should be interpreted with caution "
+                f"(consider robust methods, transforms, or nonparametric alternatives)."
+            )
+        else:
+            bits.append(
+                f"Shapiro–Wilk test on residuals did not indicate clear non-normality (*p* = {_p(sw_p)})."
+            )
+    if isinstance(lev_p, (int, float)) and np.isfinite(lev_p):
+        if lev_p < 0.05:
+            bits.append(
+                f"Levene’s test suggested heterogeneous residual variance across groups "
+                f"(*p* = {_p(lev_p)}); ANCOVA *p*-values may be sensitive to this."
+            )
+        else:
+            bits.append(
+                f"Levene’s test did not indicate clear residual variance heterogeneity across groups "
+                f"(*p* = {_p(lev_p)})."
+            )
+    # Failure / skip notes not already covered by p-values
+    for n in notes:
+        s = str(n)
+        if s.startswith("SW residual") or s.startswith("Levene residual"):
+            continue  # already expanded via sw_p / levene_p
+        if "unavailable" in s or "failed" in s or "skipped" in s:
+            bits.append(f"Assumption-check note: {s}.")
+        elif s not in " ".join(bits):
+            bits.append(s if s.endswith(".") else s + ".")
+    return " ".join(bits)
 
 
 def format_non_io_stat_test_statusbar(

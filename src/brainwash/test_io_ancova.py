@@ -238,6 +238,29 @@ def test_n_unit_subject_counts_unique_subjects():
     assert out["config"]["group_ns"]["G2"] == 2
 
 
+def test_sw_levene_run_without_statsmodels():
+    """SW/Levene use scipy residuals; must not claim statsmodels unavailable."""
+    rng = np.random.default_rng(0)
+    # Parallel slopes, different intercepts; enough points for SW
+    rows = []
+    for g, intercept in (("G1", 0.0), ("G2", 2.0)):
+        x = np.linspace(1, 10, 12)
+        y = intercept + 1.0 * x + rng.normal(0, 0.15, size=len(x))
+        for xi, yi in zip(x, y):
+            rows.append({"x": xi, "y": yi, "group": g})
+    pooled = pd.DataFrame(rows)
+    fit = _fit_io_ancova_pooled(pooled, force0=False, alpha_slopes=0.05, do_sw=True, do_levene=True)
+    notes = (fit.get("assumptions") or {}).get("notes") or []
+    assert not any("statsmodels unavailable" in str(n) for n in notes)
+    # SW p should be populated on healthy residuals
+    sw_p = (fit.get("assumptions") or {}).get("sw_p")
+    assert sw_p is None or (isinstance(sw_p, float) and np.isfinite(sw_p))
+    lev_p = (fit.get("assumptions") or {}).get("levene_p")
+    assert lev_p is None or (isinstance(lev_p, float) and np.isfinite(lev_p))
+    # At least one of SW/Levene should produce a p on this design
+    assert sw_p is not None or lev_p is not None
+
+
 def test_force0_flag_propagates_to_config():
     acc = _make_parallel_accessor()
     out = compute_io_ancova(

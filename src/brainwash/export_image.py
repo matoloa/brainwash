@@ -1111,6 +1111,14 @@ def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | 
         if pair_bits:
             methods = methods.rstrip(".") + ". Per-group fits: " + "; ".join(pair_bits) + "."
         lines.append(methods)
+        # Verbose residual / normality notes (SW, Levene) for the author
+        if isinstance(cfg, dict):
+            ass_prose = statusbar_fmt.format_io_ancova_assumption_prose(cfg.get("assumptions") or {})
+            if ass_prose:
+                lines.append("")
+                lines.append("### Assumption checks (residuals)")
+                lines.append("")
+                lines.append(ass_prose)
         lines.append("")
         lines.append("### Symbols")
         lines.append("")
@@ -1197,15 +1205,31 @@ def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | 
     if eta_bits:
         stat_sentences.append("Effect size: " + "; ".join(eta_bits) + ".")
 
-    assum = []
-    if sw:
-        assum.append("Shapiro–Wilk (SW)")
-    if levene:
-        assum.append("Levene")
-    if assum:
-        stat_sentences.append(
-            "Assumption checks enabled: " + " and ".join(assum) + " (see console / session if flagged)."
-        )
+    # Pull residual assumption prose from first result if present (non-IO formal tests)
+    ass_dict = {}
+    for r in results:
+        if isinstance(r, dict) and r.get("assumptions"):
+            ass_dict = r.get("assumptions") or {}
+            break
+        if isinstance(r, dict) and (r.get("config") or {}).get("assumptions"):
+            ass_dict = (r.get("config") or {}).get("assumptions") or {}
+            break
+    if ass_dict:
+        from brainwash_ui import statusbar as statusbar_fmt
+
+        ass_prose = statusbar_fmt.format_io_ancova_assumption_prose(ass_dict)
+        if ass_prose:
+            stat_sentences.append(ass_prose)
+    else:
+        assum = []
+        if sw:
+            assum.append("Shapiro–Wilk (SW)")
+        if levene:
+            assum.append("Levene")
+        if assum:
+            stat_sentences.append(
+                "Assumption checks enabled: " + " and ".join(assum) + " (see console / session if flagged)."
+            )
 
     lines.append(" ".join(stat_sentences))
     lines.append("")

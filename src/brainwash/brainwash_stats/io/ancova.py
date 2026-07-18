@@ -63,32 +63,42 @@ def _term_fp(anova_table: pd.DataFrame | None, *name_substrings: str) -> tuple[f
     return np.nan, np.nan, None
 
 
-def _assumption_checks(model, groups: pd.Series, *, do_sw: bool, do_levene: bool) -> dict:
+def _assumption_checks_from_residuals(
+    resid: np.ndarray,
+    groups: pd.Series | None,
+    *,
+    do_sw: bool,
+    do_levene: bool,
+) -> dict:
+    """SW / Levene on model residuals (scipy only — no statsmodels required)."""
     notes: list[str] = []
     out: dict = {"sw_p": None, "levene_p": None, "notes": notes}
-    try:
-        resid = np.asarray(model.resid, dtype=float)
-        resid = resid[np.isfinite(resid)]
-    except Exception:
-        notes.append("residuals unavailable")
-        return out
+    resid = np.asarray(resid, dtype=float)
+    if groups is not None and len(groups) == len(resid):
+        gser = pd.Series(groups).astype(str).reset_index(drop=True)
+        finite = np.isfinite(resid)
+        resid_f = resid[finite]
+        gser_f = gser[finite]
+    else:
+        finite = np.isfinite(resid)
+        resid_f = resid[finite]
+        gser_f = None
 
-    if do_sw and 3 <= len(resid) <= 5000:
+    if do_sw and 3 <= len(resid_f) <= 5000:
         try:
-            _w, p = shapiro(resid)
+            _w, p = shapiro(resid_f)
             out["sw_p"] = float(p)
             if p < 0.05:
                 notes.append(f"SW residual p={p:.3g}")
         except Exception:
             notes.append("SW failed")
 
-    if do_levene and groups is not None and len(groups) == len(model.resid):
+    if do_levene and gser_f is not None and len(gser_f) == len(resid_f):
         try:
             from scipy.stats import levene
 
-            gser = pd.Series(groups).astype(str)
-            res_s = pd.Series(np.asarray(model.resid, dtype=float))
-            samples = [res_s[gser == g].dropna().values for g in gser.unique()]
+            res_s = pd.Series(resid_f)
+            samples = [res_s[gser_f == g].dropna().values for g in gser_f.unique()]
             samples = [s for s in samples if len(s) >= 2]
             if len(samples) >= 2:
                 _stat, p = levene(*samples, center="median")
@@ -98,6 +108,89 @@ def _assumption_checks(model, groups: pd.Series, *, do_sw: bool, do_levene: bool
         except Exception:
             notes.append("Levene failed")
     return out
+
+
+def _assumption_checks(model, groups: pd.Series, *, do_sw: bool, do_levene: bool) -> dict:
+    try:
+        resid = np.asarray(model.resid, dtype=float)
+    except Exception:
+        return {"sw_p": None, "levene_p": None, "notes": ["residuals unavailable"]}
+    return _assumption_checks_from_residuals(resid, groups, do_sw=do_sw, do_levene=do_levene)
+
+
+def _scipy_primary_residuals(pooled: pd.DataFrame, *, force0: bool, separate_slopes: bool) -> np.ndarray:
+    """Residuals from scipy fits matching primary ANCOVA contrast (no statsmodels).
+
+    separate_slopes=True  → per-group slope (and intercept unless force0)
+    separate_slopes=False → common slope + per-group intercept (classical ANCOVA)
+    """
+    n = len(pooled)
+    resid = np.full(n, np.nan, dtype=float)
+    gcol = pooled["group"].astype(str)
+    x_all = pooled["x"].to_numpy(dtype=float)
+    y_all = pooled["y"].to_numpy(dtype=float)
+
+    if separate_slopes:
+        for g in gcol.unique():
+            m = (gcol == g).to_numpy()
+            x, y = x_all[m], y_all[m]
+            ok = np.isfinite(x) & np.isfinite(y)
+            if ok.sum() < 2:
+                continue
+            if force0:
+                ssx = float(np.sum(x[ok] * x[ok]))
+                b = float(np.sum(x[ok] * y[ok]) / ssx) if ssx > 0 else 0.0
+                pred = b * x
+            else:
+                res = linregress(x[ok], y[ok])
+                pred = res.slope * x + res.intercept
+            r = np.full(m.sum(), np.nan)
+            r[ok] = y[ok] - pred[ok]
+            resid[m] = r
+        return resid
+
+    # Common slope, group intercepts
+    ok = np.isfinite(x_all) & np.isfinite(y_all)
+    if ok.sum() < 2:
+        return resid
+    if force0:
+        ssx = float(np.sum(x_all[ok] * x_all[ok]))
+        b = float(np.sum(x_all[ok] * y_all[ok]) / ssx) if ssx > 0 else 0.0
+        for g in gcol.unique():
+            m = (gcol == g).to_numpy() & ok
+            if m.sum() < 1:
+                continue
+            # y = b*x + a_g  with force0 additive-style group offset
+            a_g = float(np.mean(y_all[m] - b * x_all[m]))
+            resid[m] = y_all[m] - (a_g + b * x_all[m])
+        return resid
+
+    # Demean within group → common slope
+    dx_list, dy_list = [], []
+    means: dict[str, tuple[float, float]] = {}
+    for g in gcol.unique():
+        m = (gcol == g).to_numpy() & ok
+        if m.sum() < 1:
+            continue
+        mx, my = float(np.mean(x_all[m])), float(np.mean(y_all[m]))
+        means[str(g)] = (mx, my)
+        if m.sum() >= 2:
+            dx_list.append(x_all[m] - mx)
+            dy_list.append(y_all[m] - my)
+    if not dx_list:
+        return resid
+    dx = np.concatenate(dx_list)
+    dy = np.concatenate(dy_list)
+    sxx = float(np.sum(dx * dx))
+    b = float(np.sum(dx * dy) / sxx) if sxx > 0 else 0.0
+    for g in gcol.unique():
+        m = (gcol == g).to_numpy() & ok
+        if m.sum() < 1 or str(g) not in means:
+            continue
+        mx, my = means[str(g)]
+        a_g = my - b * mx
+        resid[m] = y_all[m] - (a_g + b * x_all[m])
+    return resid
 
 
 def _chow_slope_interaction(pooled: pd.DataFrame, *, force0: bool) -> tuple[float, float, int, int]:
@@ -298,17 +391,30 @@ def _fit_io_ancova_pooled(
                     adjusted_means[str(g)] = float(res.slope * x_bar + res.intercept)
 
     assumptions = {"notes": [], "sw_p": None, "levene_p": None}
-    if m_add is not None or m_int is not None:
-        primary_model = m_add if (slopes_ok and m_add is not None) else m_int
-        if primary_model is not None:
-            assumptions = _assumption_checks(
-                primary_model,
-                pooled["group"],
-                do_sw=do_sw,
-                do_levene=do_levene,
-            )
-    elif do_sw or do_levene:
-        assumptions["notes"].append("statsmodels unavailable; assumption tests skipped")
+    if do_sw or do_levene:
+        if m_add is not None or m_int is not None:
+            primary_model = m_add if (slopes_ok and m_add is not None) else m_int
+            if primary_model is not None:
+                assumptions = _assumption_checks(
+                    primary_model,
+                    pooled["group"],
+                    do_sw=do_sw,
+                    do_levene=do_levene,
+                )
+        else:
+            # Scipy path: SW/Levene only need residuals — not statsmodels.
+            try:
+                resid = _scipy_primary_residuals(
+                    pooled, force0=force0, separate_slopes=not slopes_ok
+                )
+                assumptions = _assumption_checks_from_residuals(
+                    resid,
+                    pooled["group"],
+                    do_sw=do_sw,
+                    do_levene=do_levene,
+                )
+            except Exception:
+                assumptions["notes"].append("assumption tests failed (scipy residuals)")
 
     return {
         "p_interaction": float(p_int) if np.isfinite(p_int) else np.nan,

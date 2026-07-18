@@ -1,6 +1,7 @@
 """Characterization tests for brainwash_ui.statusbar formatters."""
 
 from brainwash_ui.statusbar import (
+    format_io_ancova_assumption_prose,
     format_io_ancova_methods_text,
     format_io_regression_statusbar,
     format_non_io_stat_test_statusbar,
@@ -100,6 +101,37 @@ def test_io_regression_statusbar_error_stub():
     )
     assert result.state == "warning"
     assert "need at least two shown groups" in (result.text or "")
+
+
+def test_io_statusbar_spells_out_warning_for_assumption_notes():
+    formal = [
+        {
+            "config": {
+                "type": "IO ANCOVA",
+                "x_col": "volley_amp",
+                "y_col": "EPSP_amp",
+                "group_ns": {"G1": 2},
+                "primary_contrast": "group_adjusted",
+                "p_group_ancova": 0.01,
+                "p_interaction": 0.5,
+                "slope_per_group": {"G1": 1.0},
+                "r2_per_group": {"G1": 0.9},
+                "assumptions": {"notes": ["SW residual p=0.02"], "sw_p": 0.02},
+            }
+        }
+    ]
+    result = format_io_regression_statusbar(formal, dd_groups={"G1": {"group_name": "Ctl"}})
+    assert " - Warning: SW residual p=0.02" in (result.text or "")
+    assert "warn:" not in (result.text or "")
+
+
+def test_format_io_ancova_assumption_prose_nonnormal():
+    text = format_io_ancova_assumption_prose(
+        {"sw_p": 0.01, "levene_p": 0.4, "notes": ["SW residual p=0.01"]}
+    )
+    assert "vertical distances" in text
+    assert "non-normal residual distribution" in text
+    assert "0.01" in text or "<0.001" in text
 
 
 def test_io_ancova_methods_text_group_adjusted():

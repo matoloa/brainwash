@@ -157,6 +157,11 @@ def test_skeleton_io_ancova_uses_methods_and_group_names():
                 "p_covariate": 0.001,
                 "slope_per_group": {"G1": 1.0, "G2": 0.9},
                 "r2_per_group": {"G1": 0.9, "G2": 0.85},
+                "assumptions": {
+                    "sw_p": 0.01,
+                    "levene_p": 0.4,
+                    "notes": ["SW residual p=0.01"],
+                },
             }
         }
     ]
@@ -170,3 +175,6 @@ def test_skeleton_io_ancova_uses_methods_and_group_names():
     assert "Ctl" in md or "subject" in md
     assert "Per-group fits" in md or "slope" in md.lower()
     assert "### Checklist" in md
+    assert "### Assumption checks (residuals)" in md
+    assert "Residuals are the vertical distances" in md
+    assert "non-normal residual distribution" in md
