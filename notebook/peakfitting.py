@@ -23,7 +23,7 @@ import sys
 import os
 
 folder_path = Path(os.path.abspath("")).parent
-sys.path.append(str(folder_path / "src/lib"))  # append src/lib to import modules from it
+sys.path.append(str(folder_path / "src/brainwash"))  # append src/brainwash to import modules from it
 import analysis
 
 # %%

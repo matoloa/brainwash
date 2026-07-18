@@ -6,7 +6,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-# Ensure `src/` is on sys.path so `lib` is importable regardless of how
+# Ensure `src/` is on sys.path so `brainwash` is importable regardless of how
 # main.py is invoked (e.g. `python src/main.py`, `python -m src.main`,
 # or a frozen cx_Freeze executable).
 _src_dir = str(Path(__file__).parent)
@@ -54,9 +54,15 @@ if __name__ == "__main__":
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
     logging.getLogger("matplotlib.font_manager").setLevel(logging.WARNING)
 
-    logger.info(
-        f"Brainwash starting — platform={sys.platform}, " f"frozen={getattr(sys, 'frozen', False)}, " f"argv={sys.argv}, py={sys.version[:50]}"
-    )
+    logger.info(f"Brainwash starting — platform={sys.platform}, frozen={getattr(sys, 'frozen', False)}, argv={sys.argv}, py={sys.version[:50]}")
+
+    # On Wayland, Qt 5 + PyQt5 can exhibit severe input lag and repaint stalls.
+    # Force the X11 (xcb) backend automatically unless the user has explicitly
+    # chosen a platform plugin via the environment.
+    if os.environ.get("QT_QPA_PLATFORM") is None:
+        if os.environ.get("WAYLAND_DISPLAY") or os.environ.get("XDG_SESSION_TYPE") == "wayland":
+            os.environ["QT_QPA_PLATFORM"] = "xcb"
+            logger.info("Wayland session detected; forcing X11 (xcb) backend for responsiveness")
 
     # pandas 3.0 changed the default string dtype to Arrow-backed string[pyarrow],
     # which rejects assignment of non-string values (int, float, etc.).
@@ -69,8 +75,7 @@ if __name__ == "__main__":
 
     # Import intentionally late so the logging config is in place before any
     # module-level code in ui.py runs.
-    #
-    from lib.ui import UIsub
+    from brainwash.ui import UIsub
 
     if debug:
         try:
@@ -141,11 +146,12 @@ if __name__ == "__main__":
         ):
             _log_exceptions(_m)
 
-        MainWindow.show()
-        MainWindow.raise_()  # bring to top of Z-order
-        MainWindow.activateWindow()  # request input focus
-        force_focus(MainWindow)  # Win32 fallback for stubborn builds
-        logger.info("MainWindow shown, entering event loop")
+        MainWindow.showMaximized()
+        if app.platformName() != "wayland":
+            MainWindow.raise_()
+            MainWindow.activateWindow()
+            force_focus(MainWindow)  # Win32 fallback for stubborn builds
+        logger.info("MainWindow shown maximized, entering event loop")
 
         sys.exit(app.exec_())
     except Exception:

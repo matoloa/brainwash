@@ -2,7 +2,7 @@
 constraint-dependencies = ["pyqt5-qt5==5.15.2"]
 
 [tool.pytest.ini_options]
-testpaths = ["src/lib"]
+testpaths = ["src/brainwash"]
 
 [tool.black]
 line-length = 150
@@ -21,7 +21,7 @@ line_length = 150
 
 [project]
 name = "brainwash"
-version = "0.15.0"
+version = "0.16.3"
 description = "A data visualization tool for electrophysiological recordings, with convenience functions."
 requires-python = ">=3.12"
 dependencies = [
@@ -42,6 +42,10 @@ dependencies = [
     "igor2",
     "pyarrow",
 ]
+# Optional for neuroscience features (cluster permutation test in v0.16+)
+# pip install ".[neuroscience]" or `pip install mne`
+[project.optional-dependencies]
+neuroscience = ["mne>=1.8"]
 
 [dependency-groups]
 dev = [
@@ -53,6 +57,7 @@ dev = [
     "black",
     "isort",
     "pytest",
+    "pytest-qt>=4.5.0",
 ]
 build = [
     "cx-freeze==8.6",

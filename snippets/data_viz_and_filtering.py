@@ -30,7 +30,7 @@ import numpy as np
 import pandas as pd
 
 folder_path = os.path.abspath("")
-folder_path = str(Path(os.path.abspath("")).parent / "src/lib")
+folder_path = str(Path(os.path.abspath("")).parent / "src/brainwash")
 sys.path.append(folder_path)
 
 from analysis import find_all_t

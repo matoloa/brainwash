@@ -29,14 +29,14 @@ if _venv_site is None:
 
 print(f"site-packages: {_venv_site}")
 
-# pyproject.toml is read at runtime by ui.py (Config.__init__) to get the
-# version string.  It is placed at lib/pyproject.toml so the existing search
-# list in ui.py ("lib" entry) finds it without any code changes.
-# NOTE: do NOT add "lib/" here — cx_Freeze already freezes the lib package
-# automatically (it is imported by main.py).  Adding it as an include_files
-# entry would copy a raw directory into build/exe.*/lib/, which makes Python
-# see lib/lib/__init__.py and breaks all "from lib import …" imports.
+# pyproject.toml is read at runtime by Config (ui_widgets) for the version string.
+# Destination must NOT be "brainwash/..." on Linux: the frozen executable is also
+# named "brainwash", so creating a brainwash/ directory fails with File exists
+# (Errno 17).  Place next to the exe (and under lib/) — _find_file searches both.
+# NOTE: do NOT ship the source package tree via include_files; list "brainwash" in
+# packages so cx_Freeze freezes modules under lib/brainwash/.
 include_files = [
+    ("../pyproject.toml", "pyproject.toml"),
     ("../pyproject.toml", "lib/pyproject.toml"),
 ]
 
@@ -111,8 +111,8 @@ options = {
         "packages": [
             # application source package — list explicitly so cx_Freeze
             # includes all submodules, even those imported lazily at runtime
-            # (e.g. lib.parse imported inside _backfill_sweep_hz).
-            "lib",
+            # (e.g. brainwash.parse imported inside _backfill_sweep_hz).
+            "brainwash",
             # Qt
             "PyQt5",
             # numeric / scientific

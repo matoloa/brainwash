@@ -43,4 +43,4 @@ class Ui_Dialog(object):
         Dialog.setWindowTitle(_translate("Dialog", "Dialog"))
 
 
-from lib.ui import FileTreeSelectorDialog
+from brainwash.ui_widgets import FileTreeSelectorDialog

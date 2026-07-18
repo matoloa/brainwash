@@ -1,0 +1,20 @@
+{
+  "description": "Local ABF candidates for pipeline integration tests (*.abf gitignored; folders committed).",
+  "characteristic_test_ids": ["01", "07", "14"],
+  "candidates": [
+    {"id": "01", "file": "Concatenate000.abf", "n_sweeps": 1080, "n_stims": 1},
+    {"id": "02", "file": "Concatenate000.abf"},
+    {"id": "03", "file": "Concatenate000.abf"},
+    {"id": "04", "file": "Concatenate000.abf"},
+    {"id": "05", "file": "Concatenate000.abf"},
+    {"id": "06", "file": "Concatenate000.abf"},
+    {"id": "07", "file": "Concatenate000.abf", "n_sweeps": 1080, "n_stims": 1},
+    {"id": "08", "file": "Concatenate000.abf"},
+    {"id": "09", "file": "Concatenate000.abf"},
+    {"id": "10", "file": "Concatenate000.abf"},
+    {"id": "11", "file": "Concatenate000.abf"},
+    {"id": "12", "file": "Concatenate000.abf"},
+    {"id": "13", "file": "Concatenate000.abf"},
+    {"id": "14", "file": "Concatenate000.abf", "n_sweeps": 1080, "n_stims": 1}
+  ]
+}

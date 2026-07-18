@@ -36,16 +36,29 @@ jobs:
       - name: Install patchelf (Linux)
         run: sudo apt-get update && sudo apt-get install -y patchelf
 
-      # Build the executable
-      - name: Build with cx_Freeze
-        working-directory: ./src # Adjust to your subdirectory
-        run: uv run python build_with_cxfreeze_multiarch_setup.py bdist_appimage > cxbuild_appimage.log
-        # run: python setup.py build_exe
+      # Clean stale build trees (partial builds leave a 'brainwash' file that
+      # collides with include_files destinations on re-run).
+      - name: Clean previous cx_Freeze output
+        working-directory: ./src
+        run: rm -rf build dist
 
-      - name: List files for debugging
+      # Build the executable (tee so GitHub Actions log shows the real error;
+      # pipefail so a failed freeze fails the step, not only tee succeeding).
+      - name: Build with cx_Freeze
+        working-directory: ./src
         run: |
-          ls -R src/dist/ || echo "src/dist/ not found"
-          ls -R build/ || echo "build/ not found"
+          set -o pipefail
+          uv run python build_with_cxfreeze_multiarch_setup.py bdist_appimage 2>&1 | tee cxbuild_appimage.log
+
+      # Note (v0.16+): bw_cfg.yaml now uses XDG ~/.config/brainwash/ or portable
+      # <AppImage>.config/ sibling (see docs/build.md). No longer written inside
+      # the read-only AppImage squashfs.
+      - name: List files for debugging
+        if: always()
+        run: |
+          ls -la src/dist/ || echo "src/dist/ not found"
+          ls -la src/build/ || echo "src/build/ not found"
+          tail -n 80 src/cxbuild_appimage.log || true
         shell: bash
 
         # Extract version from pyproject.toml

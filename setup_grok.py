@@ -31,7 +31,7 @@ packages = [
 ]
 
 # Include additional files (e.g., Qt plugins, resources)
-include_files = [("README.md", "README.md"), ("pyproject.toml", "pyproject.toml"), "src/lib/"]
+include_files = [("README.md", "README.md"), ("pyproject.toml", "pyproject.toml"), "src/brainwash/"]
 
 try:
     from cx_Freeze.hooks import get_qt_plugins_paths

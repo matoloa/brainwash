@@ -68,33 +68,33 @@ powershell -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 ## Running Tests
 
-Tests live alongside the source in `src/lib/` and are discovered by `pytest`.
+Tests live alongside the source in `src/brainwash/` and are discovered by `pytest`.
 
 **Run the full test suite:**
 
 ```sh
-uv run python -m pytest src/lib/
+uv run python -m pytest src/brainwash/
 ```
 
 **Run a specific test file:**
 
 ```sh
-uv run python -m pytest src/lib/test_parse.py -v
+uv run python -m pytest src/brainwash/test_parse.py -v
 ```
 
 **Run with output captured off (useful when tests print a lot):**
 
 ```sh
-uv run python -m pytest src/lib/ -s
+uv run python -m pytest src/brainwash/ -s
 ```
 
-Test data fixtures are kept in `src/lib/test_data/`. When writing new tests, add small representative `.abf` or `.ibw` files there rather than generating data synthetically — the parse pipeline is sensitive to real file structure.
+Test data fixtures are kept in `src/brainwash/test_data/`. When writing new tests, add small representative `.abf` or `.ibw` files there rather than generating data synthetically — the parse pipeline is sensitive to real file structure.
 
 ---
 
 ## Module Layout
 
-The source code lives entirely under `src/lib/`. Below is an annotated map.
+The source code lives entirely under `src/brainwash/`. Below is an annotated map.
 
 ```
 src/
@@ -133,7 +133,7 @@ src/
     │                          persistdf(df, folder)
     │                          metadata(path)
     │
-    ├── analysis_v2.py       Active analysis engine. Public API:
+    ├── analysis_v3.py       Active analysis engine. Public API:
     │                          find_events(dfmean, dfdata, config)
     │                          build_dfoutput(dfdata, events, config)
     │                          characterize_graph(dfmean, config)
@@ -142,8 +142,9 @@ src/
     │
     ├── analysis_evaluation.py  Evaluation helpers used alongside analysis_v2.
     │
-    ├── analysis_v1.py       Legacy analysis engine — kept for reference only.
-    │                        Not imported by ui.py. Do not add new code here.
+    ├── analysis_v1.py       Shim → legacy/analysis_v1.py (scientific reproduction; do not delete).
+    ├── analysis_v2.py       Shim → legacy/analysis_v2.py (scientific reproduction; do not delete).
+    ├── legacy/              Historical analysis v1/v2 + README (used by analysis_evaluation.py).
     │
     └── test_parse.py        pytest test suite for the parse pipeline.
 ```
@@ -198,12 +199,12 @@ UIstate / DataFrameMixin caching layer
      │  (get_dft, get_dfmean, get_dffilter, get_dfbin, get_dfdiff, …)
      │
      ▼
-analysis_v2.find_events(dfmean, config)
+analysis_v3.find_events(dfmean, config)
      │
      ▶  events dict  — detected fEPSP slope, amplitude, volley, latency, …
      │
      ▼
-analysis_v2.build_dfoutput(dfdata, events, config)
+analysis_v3.build_dfoutput(dfdata, events, config)
      │
      ▶  dfoutput  — one row per sweep with all measured event values
      │
@@ -224,14 +225,14 @@ The project uses **Black** for formatting and **isort** for import ordering, bot
 **Format a file:**
 
 ```sh
-uv run black src/lib/ui.py
-uv run isort src/lib/ui.py
+uv run black src/brainwash/ui.py
+uv run isort src/brainwash/ui.py
 ```
 
 **Lint:**
 
 ```sh
-uv run flake8 src/lib/
+uv run flake8 src/brainwash/
 ```
 
 Flake8 configuration is in `.flake8` at the repo root. The line-length limit is **150** (matching the Black config).
@@ -242,11 +243,11 @@ Flake8 configuration is in `.flake8` at the repo root. The line-length limit is 
 
 All dependencies are declared in `pyproject.toml` and locked in `uv.lock`.
 
-| Group | Purpose | Install command |
-|---|---|---|
-| *(default)* | Runtime — everything needed to run the app | `uv sync` |
-| `dev` | Dev tools — linting, formatting, stubs, testing, notebooks | `uv sync --group dev` |
-| `build` | Packaging only — `cx-Freeze` for producing distributables | `uv sync --group build` |
+| Group       | Purpose                                                    | Install command         |
+| ----------- | ---------------------------------------------------------- | ----------------------- |
+| _(default)_ | Runtime — everything needed to run the app                 | `uv sync`               |
+| `dev`       | Dev tools — linting, formatting, stubs, testing, notebooks | `uv sync --group dev`   |
+| `build`     | Packaging only — `cx-Freeze` for producing distributables  | `uv sync --group build` |
 
 **Add a runtime dependency:**
 
