@@ -865,6 +865,11 @@ class ProjectMixin:
                 checkBox = getattr(self, f"checkBox_{key}")
                 checkBox.setChecked(value)
 
+        # Stat-test options live on uistate.stat_test (not project.checkBox); must sync widgets at launch
+        for key in ("test_fdr", "test_sw", "test_levene"):
+            if hasattr(self, f"checkBox_{key}"):
+                getattr(self, f"checkBox_{key}").setChecked(bool(getattr(self.uistate.stat_test, key, False)))
+
         if self.uistate.project.settings.get("filter") == "savgol":
             self.radioButton_filter_savgol.setChecked(True)
         else:
