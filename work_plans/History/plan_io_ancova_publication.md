@@ -1,6 +1,6 @@
 # Plan: Publication-grade IO ANCOVA (radio-triggered only)
 
-**Status:** APPROVED (2026-07-18) — **PR-A–D done**; next PR-E (expanded characterization / goldens)  
+**Status:** APPROVED (2026-07-18) — **PR-A–E complete** (IO ANCOVA radio gate + textbook engine + reporting + characterization)  
 **Branch target:** `0.16.3-nunit` or follow-on  
 **Goal:** Make Input–Output formal analysis **trigger only from the ANCOVA radio**, fix UI/engine inconsistencies, and deliver a **textbook-style ANCOVA** suitable for respectable scientific reporting (methods text, statusbar, export).
 
@@ -307,15 +307,15 @@ Do **not** ship PR-C without PR-A (would still run on wrong radio).
 
 ## 7. Definition of done
 
-- [ ] Formal IO analysis runs **only** when ANCOVA is selected (and experiment is IO).  
-- [ ] Non-ANCOVA on IO: warning statusbar, **no** formal IO results/markers.  
-- [ ] Entering IO selects ANCOVA.  
-- [ ] Shown test sets do not silently switch to time-ANOVA.  
-- [ ] Results include interaction test + (when appropriate) covariate-adjusted group test.  
-- [ ] Statusbar states primary contrast and key p-values.  
-- [ ] XY per unit is scientifically defensible (rec-safe join + n_unit).  
-- [ ] Characterization tests for parallel vs non-parallel synthetic data.  
-- [ ] Methods-ready wording available from config/statusbar (and optionally export).
+- [x] Formal IO analysis runs **only** when ANCOVA is selected (and experiment is IO).  
+- [x] Non-ANCOVA on IO: warning statusbar, **no** formal IO results/markers.  
+- [x] Entering IO selects ANCOVA.  
+- [x] Shown test sets do not silently switch to time-ANOVA.  
+- [x] Results include interaction test + (when appropriate) covariate-adjusted group test.  
+- [x] Statusbar states primary contrast and key p-values.  
+- [x] XY per unit is scientifically defensible (rec-safe join + n_unit).  
+- [x] Characterization tests for parallel vs non-parallel synthetic data.  
+- [x] Methods-ready wording available from config/statusbar (and optionally export).
 
 ---
 

@@ -19,13 +19,14 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
 
 3. **Architectural Guidelines (Especially for UI/Stats Layer)**
    - **Experiment Type & Test Handling**:
-     - `experiment_type="io"` is first-class. Use it directly rather than `"ANCOVA"` sentinel leaking into `compute_statistical_comparison`.
-     - IO regression (`_compute_io_regression_internal`) must be reachable without test_type guard bypasses. IO guard stays early in `brainwash_stats/dispatcher.py:compute_statistical_comparison` (before implicit ANOVA).
+     - `experiment_type="io"` is first-class. Formal IO analysis runs **only** when `stat_test.test_type == "ANCOVA"` (radio-gated). Entering IO selects ANCOVA; non-ANCOVA on IO → warning statusbar, no formal results.
+     - Textbook IO ANCOVA: `brainwash_stats/io/ancova.py` (`compute_io_ancova`) — homogeneity of slopes then (if OK) group-adjusted ANCOVA; config type `"IO ANCOVA"` (legacy `"IO regression"` still readable). Shown test sets ignored for v1 IO path.
+     - IO guard stays early in `brainwash_stats/dispatcher.py:compute_statistical_comparison` (before implicit ANOVA). Thin delegate: `regression.py` → `ancova`.
      - Applicability, statusbar, and plot descriptors live in `brainwash_ui/` (pure; no widget side effects). `UIplot` renders `plot_model` / `plot_series` specs; stats wiring delegates to `brainwash_ui.applicability` / `statusbar`.
      - Prefer explicit parameter passing over `getattr(uistate, "...")` fallbacks or bound-method `__self__` recovery.
    - **State & Singletons**: `uistate` (from `ui_state_classes.py`) is the source of truth. `UIsub` sets `self.uistate` / `self.config` / `self.uiplot`; all mixins use `self.*` — no module-level singleton injection.
    - **compute_statistical_comparison**: Keep as thin dispatcher where possible. Avoid 1000+ LOC god function growth. Extract helpers for new modes (IO, PP, etc.).
-   - **Statusbar**: One source of truth via `_get_statusbar_for_current_state()` or equivalent. IO regression must produce `{"config": {"type": "IO regression", ...}}` reliably.
+   - **Statusbar**: One source of truth via `_get_statusbar_for_current_state()` or equivalent. IO ANCOVA must produce `{"config": {"type": "IO ANCOVA", ...}}` (accept legacy `"IO regression"`).
 
 4. **Naming (human-readable, conservative renames encouraged)**
    - Prefer names understandable to a new contributor without deep context (verb phrases for functions, domain nouns for modules).
@@ -38,15 +39,15 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
    - Follow Black (`line-length=150`), isort, flake8.
    - **No gold-plating**: Do not add features, docstrings, type hints, error handling, or abstractions beyond the exact request.
    - **Edits**: Use `search_replace` (after `read_file`). Prefer editing existing files over creating new ones. Never create documentation unless explicitly asked.
-   - **Verification**: Before marking task complete, run relevant tests (`uv run pytest`), launch app, and verify behavior (e.g. IO switch → correct statusbar with slope p, r², n_report).
+   - **Verification**: Before marking task complete, run relevant tests (`uv run pytest`), launch app, and verify behavior (e.g. IO + ANCOVA → statusbar with group/interaction p, r², n_unit; non-ANCOVA on IO → warning only).
    - **Comments**: Only for why (not what). Reference plans only if active. Use `file:line` pattern when referencing code.
    - **Security/Quality**: Avoid injection risks. Trust framework guarantees inside boundaries.
 
 6. **Statistics layer** (refactor complete — PRs 00–11)
    - **Facade**: `src/brainwash/statistics.py` re-exports `compute_statistical_comparison`, `ttest_per_sweep`, `_bh_fdr`.
    - **Implementation**: `src/brainwash/brainwash_stats/` (`dispatcher.py`, `validation.py`, `formal_tests/`, `io/`, etc.).
-   - **Tests**: `uv run pytest src/brainwash/test_statistics_characterization.py -q`; use `load_brainwash_statistics.py` in tests (never stdlib `statistics`).
-   - **Archived plan**: `work_plans/History/plan_statistics_refactor.md` + `work_plans/History/statistics_refactor/`.
+   - **Tests**: `uv run pytest src/brainwash/test_statistics_characterization.py src/brainwash/test_io_ancova.py -q`; use `load_brainwash_statistics.py` in tests (never stdlib `statistics`).
+   - **Archived plans**: `work_plans/History/plan_statistics_refactor.md` + `statistics_refactor/`; `work_plans/History/plan_io_ancova_publication.md` (PR-A–E complete).
    - **Forbidden** (still): `StatContext`, `ComparisonMode`, `MODE_HANDLERS`, guard reordering in dispatcher.
 
 7. **Workflow for Common Tasks**
@@ -69,6 +70,6 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
    - `src/brainwash/brainwash_ui/`: pure view/statusbar/applicability logic (testable without Qt).
    - `src/brainwash/legacy/`: **retain** `analysis_v1.py` / `analysis_v2.py` for scientific reproduction — do not delete; shims at `src/brainwash/analysis_v1.py` etc.
    - `src/brainwash/ui_state_classes.py`: `UIstate` per `UIsub` — use `self.uistate.project`, `.experiment`, `.stat_test`, `.plot` (no flat attrs; no import-time `ui.uistate`).
-   - Plans are in `work_plans/` (move outdated to `History/`). Active: `manual_smokes_after_refactor.md`. Completed UI refactor / modularity / 0.16.2 n_unit core: `work_plans/History/`.
-   - **Modularity Phases 6–8 + 7b** + UI refactor 0–X: complete (tag `ui-refactor/phase0-3-done`); checklist: `work_plans/manual_smokes_after_refactor.md`. Active line: `0.16.3-nunit`.
+   - Plans are in `work_plans/` (move outdated to `History/`). Active: `manual_smokes_after_refactor.md`, `NTH.md`. Completed: UI refactor / modularity / 0.16.2 n_unit / IO ANCOVA publication → `work_plans/History/`.
+   - **Modularity Phases 6–8 + 7b** + UI refactor 0–X: complete (tag `ui-refactor/phase0-3-done`); checklist: `work_plans/manual_smokes_after_refactor.md`. Active line: `0.16.3-nunit` (IO ANCOVA PR-A–E done).
    - See full layout in CONTRIBUTING.md.
