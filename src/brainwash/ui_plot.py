@@ -1649,6 +1649,7 @@ class UIplot:
                 "pp_tick_label": spec.tick_label,
                 "pp_values": list(spec.values),
                 "pp_n": spec.n,
+                "pp_group_color": color,
                 "pp_aux_artists": aux_artists,
                 "is_pp_box": True,
             }

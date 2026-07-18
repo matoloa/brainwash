@@ -47,6 +47,37 @@ JOURNAL_TEMPLATES: dict[str, JournalTemplate] = {
 DEFAULT_JOURNAL_EXPORT = "jneurosci"
 
 
+def _export_artist_color(artist, default="black"):
+    """Face/line color from a matplotlib artist (PathPatch box, bar, line, scatter)."""
+    if artist is None:
+        return default
+    if hasattr(artist, "patches") and getattr(artist, "patches", None):
+        try:
+            return artist.patches[0].get_facecolor()
+        except Exception:
+            pass
+    if hasattr(artist, "get_facecolor"):
+        try:
+            c = artist.get_facecolor()
+            if c is not None:
+                return c
+        except Exception:
+            pass
+    if hasattr(artist, "get_facecolors"):
+        try:
+            fcs = artist.get_facecolors()
+            if len(fcs):
+                return fcs[0]
+        except Exception:
+            pass
+    if hasattr(artist, "get_color"):
+        try:
+            return artist.get_color()
+        except Exception:
+            pass
+    return default
+
+
 def resolve_journal_export_key(settings_or_key) -> str:
     """Return a valid journal palette key (e.g. jneurosci).
 
@@ -495,15 +526,10 @@ def render_publication_figure(
 
                 # Check if this line corresponds to the current panel
 
-                # Pre-extract color safely so PP mode can use it
-                if hasattr(line, "patches") and len(line.patches) > 0:
-                    group_color = line.patches[0].get_facecolor()
-                elif hasattr(line, "get_color"):
-                    group_color = line.get_color()
-                elif hasattr(line, "get_facecolors") and len(line.get_facecolors()) > 0:
-                    group_color = line.get_facecolors()[0]
-                else:
-                    group_color = "black"
+                # Color: stored group color (box export) > face of patch/box > line color
+                group_color = info.get("pp_group_color")
+                if group_color is None:
+                    group_color = _export_artist_color(line, default="black")
 
                 if is_pp_mode:
                     if info.get("aspect") != panel:
@@ -514,11 +540,12 @@ def render_publication_figure(
                     ax.set_ylabel(f"PPR ({aspect_str})")  # ratio stim2/stim1
                     has_data = True
 
-                    # Box summary (preferred)
+                    # Box summary (preferred): journal-thin black outline, group face color
                     if info.get("is_pp_box") and info.get("pp_values"):
                         bx = float(info.get("pp_box_x", 1.0))
                         bw = float(info.get("pp_box_width", 0.5))
                         vals = list(info["pp_values"])
+                        lw = template.linewidth_axes
                         bp = ax.boxplot(
                             [vals],
                             positions=[bx],
@@ -527,13 +554,23 @@ def render_publication_figure(
                             showfliers=False,
                             manage_ticks=False,
                             whis=1.5,
+                            boxprops=dict(linewidth=lw, edgecolor="black"),
+                            whiskerprops=dict(color="black", linewidth=lw),
+                            capprops=dict(color="black", linewidth=lw),
+                            medianprops=dict(color="black", linewidth=lw),
                         )
                         for box in bp.get("boxes", []):
                             box.set_facecolor(group_color)
                             box.set_edgecolor("black")
                             box.set_alpha(0.85)
+                            box.set_linewidth(lw)
                         for med in bp.get("medians", []):
                             med.set_color("black")
+                            med.set_linewidth(lw)
+                        for key in ("whiskers", "caps"):
+                            for art in bp.get(key, []):
+                                art.set_color("black")
+                                art.set_linewidth(lw)
                         continue
 
                     # Unit scatter points
@@ -544,9 +581,10 @@ def render_publication_figure(
                                 ax.scatter(
                                     off[:, 0],
                                     off[:, 1],
-                                    c=[group_color],
+                                    facecolors="white",
                                     edgecolors="black",
-                                    s=40,
+                                    linewidths=template.linewidth_axes,
+                                    s=18,
                                     zorder=4,
                                 )
                         except Exception:
