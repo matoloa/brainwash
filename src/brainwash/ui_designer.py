@@ -1022,7 +1022,7 @@ class Ui_mainWindow(object):
         self.label_io_output.setText(_translate("mainWindow", "Output"))
         self.checkBox_io_trendline.setText(_translate("mainWindow", "Trendline"))
         self.checkBox_io_force0.setText(_translate("mainWindow", "Force 0.0"))
-        self.label_io_input_stim.setText(_translate("mainWindow", "IO - Input stim"))
+        self.label_io_input_stim.setText(_translate("mainWindow", "IO - Input stim µA"))
         self.label_filter.setText(_translate("mainWindow", "Filter"))
         self.radioButton_filter_none.setText(_translate("mainWindow", "None"))
         self.radioButton_filter_savgol.setText(_translate("mainWindow", "SavGol"))

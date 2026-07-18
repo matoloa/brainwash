@@ -1230,7 +1230,7 @@
              </font>
             </property>
             <property name="text">
-             <string>IO - Input stim</string>
+             <string>IO - Input stim µA</string>
             </property>
            </widget>
           </widget>
