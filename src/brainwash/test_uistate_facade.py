@@ -41,6 +41,28 @@ def test_cfg_pickle_roundtrip():
         assert u2.project.project_table_sort == {"column": "recording_name", "order": 1}
 
 
+def test_amp_slope_view_ignore_volley_under_relative():
+    u = UIstate()
+    u.project.checkBox["EPSP_amp"] = False
+    u.project.checkBox["EPSP_slope"] = False
+    u.project.checkBox["volley_amp"] = True
+    u.project.checkBox["volley_amp_mean"] = True
+    u.project.checkBox["volley_slope"] = True
+    u.project.checkBox["volley_slope_mean"] = True
+    u.project.checkBox["norm_EPSP"] = False
+    assert u.ampView() is True
+    assert u.slopeView() is True
+    u.project.checkBox["norm_EPSP"] = True
+    # Volley still checked, but ignored in relative mode
+    assert u.project.checkBox["volley_amp"] is True
+    assert u.project.checkBox["volley_slope_mean"] is True
+    assert u.ampView() is False
+    assert u.slopeView() is False
+    u.project.checkBox["EPSP_amp"] = True
+    assert u.ampView() is True
+    assert u.slopeView() is False
+
+
 def test_project_table_sort_normalize_and_legacy_cfg():
     from ui_state_parts import ProjectPersistedState
 

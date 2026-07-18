@@ -11,6 +11,8 @@ import logging
 import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
+from brainwash_ui import view_state
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,6 +68,11 @@ class SelectionMixin:
         if aspect and not self.uistate.project.checkBox.get(aspect, True):
             if axis == "axe" or not is_io:
                 return False
+        # Relative mode: volley has no relative series — hide ax1/ax2 output
+        # (incl. means). Checkbox state is preserved; event markers stay on axe.
+        norm_active = self.uistate.project.checkBox["norm_EPSP"]
+        if view_state.suppress_volley_under_norm(aspect, norm_active=norm_active, axis=axis):
+            return False
         # special case for *_mean aspects (volley_amp_mean, volley_slope_mean): independent of parent volley per requirement
         if aspect in ("volley_amp_mean", "volley_slope_mean"):
             return self.uistate.project.checkBox.get(aspect, False)
@@ -76,7 +83,6 @@ class SelectionMixin:
         # Only applies to ax1/ax2 output lines — markers on axe represent physical
         # measurement positions and are always shown regardless of normalisation.
         variant = v.get("variant")
-        norm_active = self.uistate.project.checkBox["norm_EPSP"]
         if axis in ("ax1", "ax2"):
             if variant == "norm" and not norm_active:
                 return False
@@ -107,6 +113,11 @@ class SelectionMixin:
         if aspect and not self.uistate.project.checkBox.get(aspect, True):
             if axis == "axe" or not is_io:
                 return False
+        # Relative mode: volley has no relative series — hide group volley output.
+        # Checkbox state is preserved for when relative mode is turned off.
+        norm_active = self.uistate.project.checkBox["norm_EPSP"]
+        if view_state.suppress_volley_under_norm(aspect, norm_active=norm_active, axis=axis):
+            return False
         # special case for *_mean aspects (volley_amp_mean, volley_slope_mean): independent of parent volley per requirement
         if aspect in ("volley_amp_mean", "volley_slope_mean"):
             return self.uistate.project.checkBox.get(aspect, False)
@@ -114,7 +125,6 @@ class SelectionMixin:
             if axis == "axe" or not is_io:
                 return False
         variant = v.get("variant")
-        norm_active = self.uistate.project.checkBox["norm_EPSP"]
         is_pp = self.uistate.experiment.experiment_type == "PP"
         if not is_pp:
             if variant == "norm" and not norm_active:

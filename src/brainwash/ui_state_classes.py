@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.ticker import AutoLocator, FixedLocator, FuncFormatter, Locator
 
-from brainwash_ui import plot_drag, plot_series
+from brainwash_ui import plot_drag, plot_series, view_state
 
 from ui_state_parts import ExperimentConfig, PlotSession, ProjectPersistedState, StatTestState
 
@@ -412,21 +412,38 @@ class UIstate:
     def ampView(self):
         if self.experiment.experiment_type == "io":
             return True
+        # Volley checkboxes ignored under Relative mode (no relative volley series).
         show = self.project.checkBox
-        return show.get("EPSP_amp", False) or show.get("volley_amp", False) or show.get("volley_amp_mean", False)
+        return (
+            view_state.aspect_counts_for_output_view("EPSP_amp", show)
+            or view_state.aspect_counts_for_output_view("volley_amp", show)
+            or view_state.aspect_counts_for_output_view("volley_amp_mean", show)
+        )
 
     def slopeView(self):
         if self.experiment.experiment_type == "io":
             return False
         show = self.project.checkBox
-        return show.get("EPSP_slope", False) or show.get("volley_slope", False) or show.get("volley_slope_mean", False)
+        return (
+            view_state.aspect_counts_for_output_view("EPSP_slope", show)
+            or view_state.aspect_counts_for_output_view("volley_slope", show)
+            or view_state.aspect_counts_for_output_view("volley_slope_mean", show)
+        )
 
     def slopeOnly(self):
         if self.experiment.experiment_type == "io":
             return False
         show = self.project.checkBox
-        has_slope = show.get("EPSP_slope", False) or show.get("volley_slope", False) or show.get("volley_slope_mean", False)
-        has_amp = show.get("EPSP_amp", False) or show.get("volley_amp", False) or show.get("volley_amp_mean", False)
+        has_slope = (
+            view_state.aspect_counts_for_output_view("EPSP_slope", show)
+            or view_state.aspect_counts_for_output_view("volley_slope", show)
+            or view_state.aspect_counts_for_output_view("volley_slope_mean", show)
+        )
+        has_amp = (
+            view_state.aspect_counts_for_output_view("EPSP_amp", show)
+            or view_state.aspect_counts_for_output_view("volley_amp", show)
+            or view_state.aspect_counts_for_output_view("volley_amp_mean", show)
+        )
         return has_slope and not has_amp
 
     def anyView(self):

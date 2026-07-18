@@ -450,7 +450,15 @@ def render_publication_figure(
         is_io_mode = uistate.experiment.experiment_type == "io"
         is_pp_mode = uistate.experiment.experiment_type == "PP"
         if is_pp_mode:
-            panels_to_render = [asp for asp in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"] if uistate.project.checkBox.get(asp, True)]
+            # Relative mode: volley has no relative series — omit volley panels
+            # (checkbox state is preserved; ignored for export panel selection).
+            _cb = uistate.project.checkBox
+            _norm = bool(_cb.get("norm_EPSP", False))
+            panels_to_render = [
+                asp
+                for asp in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]
+                if _cb.get(asp, True) and not (_norm and asp.startswith("volley_"))
+            ]
         elif is_io_mode:
             panels_to_render = ["io"]
         else:

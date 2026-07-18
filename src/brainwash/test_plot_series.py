@@ -53,6 +53,27 @@ def test_pp_group_xlim_from_ticks():
     assert plot_series.pp_group_xlim_from_ticks([1.0, 2.0, 3.0], pad=0.6) == (0.4, 3.6)
 
 
+def test_pp_active_aspects_omits_volley_under_relative():
+    cb = {
+        "EPSP_amp": True,
+        "EPSP_slope": True,
+        "volley_amp": True,
+        "volley_slope": True,
+        "norm_EPSP": False,
+    }
+    active = plot_series.pp_active_aspects(cb)
+    assert ("volley_amp", "ax1") in active
+    assert ("volley_slope", "ax2") in active
+    cb["norm_EPSP"] = True
+    active_rel = plot_series.pp_active_aspects(cb)
+    assert ("volley_amp", "ax1") not in active_rel
+    assert ("volley_slope", "ax2") not in active_rel
+    assert ("EPSP_amp", "ax1") in active_rel
+    # Checkboxes preserved
+    assert cb["volley_amp"] is True
+    assert cb["volley_slope"] is True
+
+
 def test_pp_overlay_x_map_all_enabled():
     m = plot_series.pp_overlay_x_map(
         {"EPSP_amp": True, "EPSP_slope": True, "volley_amp": True, "volley_slope": True}

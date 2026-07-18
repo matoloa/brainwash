@@ -196,7 +196,21 @@ def extract_group_mean_series(df_groupmean: pd.DataFrame, aspect: str) -> GroupM
 
 
 def pp_active_aspects(checkbox: dict) -> list[tuple[str, str]]:
-    return [(asp, axid) for asp, axid in PP_ASPECT_AXES if checkbox.get(asp, True)]
+    """Enabled PP aspects for layout/build.
+
+    Volley aspects are omitted under Relative (norm_EPSP): no relative volley
+    series exists. Checkbox state is left unchanged and reapplied when relative
+    mode is off.
+    """
+    norm = bool(checkbox.get("norm_EPSP", False))
+    out: list[tuple[str, str]] = []
+    for asp, axid in PP_ASPECT_AXES:
+        if not checkbox.get(asp, True):
+            continue
+        if norm and asp in ("volley_amp", "volley_slope"):
+            continue
+        out.append((asp, axid))
+    return out
 
 
 def pp_bar_layout(active_aspects: list[tuple[str, str]]) -> list[tuple[str, str, float, float]]:
@@ -608,8 +622,14 @@ def pp_overlay_x_map(checkbox: dict) -> dict[str, int]:
     """Enabled aspects → stable x slot (1=amp, 2=slope, 3=volley amp, 4=volley slope).
 
     Fixed slots so volley never lands on the EPSP amp tick when both are shown.
+    Volley slots are omitted under Relative mode (same rule as pp_active_aspects).
     """
-    return {asp: x for asp, x in PP_ASPECT_X.items() if checkbox.get(asp, True)}
+    norm = bool(checkbox.get("norm_EPSP", False))
+    return {
+        asp: x
+        for asp, x in PP_ASPECT_X.items()
+        if checkbox.get(asp, True) and not (norm and asp in ("volley_amp", "volley_slope"))
+    }
 
 
 def pp_group_tick_from_bar(x_left: float, bar_width: float) -> float:

@@ -42,3 +42,32 @@ def test_groups_with_recordings_filters_empty():
     dd["G2"]["rec_IDs"] = []
     shown = view_state.visible_group_ids(dd)
     assert view_state.groups_with_recordings(dd, shown) == ["G1"]
+
+
+def test_suppress_volley_under_norm_output_only():
+    assert view_state.suppress_volley_under_norm("volley_amp", norm_active=True, axis="ax1")
+    assert view_state.suppress_volley_under_norm("volley_slope_mean", norm_active=True, axis="ax2")
+    assert view_state.suppress_volley_under_norm("volley_amp_mean", norm_active=True, axis=None)
+    # Event markers stay under Relative mode
+    assert not view_state.suppress_volley_under_norm("volley_amp", norm_active=True, axis="axe")
+    # Off when not relative
+    assert not view_state.suppress_volley_under_norm("volley_amp", norm_active=False, axis="ax1")
+    # EPSP not suppressed by this rule
+    assert not view_state.suppress_volley_under_norm("EPSP_amp", norm_active=True, axis="ax1")
+
+
+def test_aspect_counts_for_output_view_ignores_volley_when_relative():
+    cb = {
+        "EPSP_amp": False,
+        "volley_amp": True,
+        "volley_amp_mean": True,
+        "norm_EPSP": False,
+    }
+    assert view_state.aspect_counts_for_output_view("volley_amp", cb)
+    assert view_state.aspect_counts_for_output_view("volley_amp_mean", cb)
+    cb["norm_EPSP"] = True
+    assert not view_state.aspect_counts_for_output_view("volley_amp", cb)
+    assert not view_state.aspect_counts_for_output_view("volley_amp_mean", cb)
+    # EPSP still counts when checked
+    cb["EPSP_amp"] = True
+    assert view_state.aspect_counts_for_output_view("EPSP_amp", cb)
