@@ -124,3 +124,25 @@ def test_io_input_map_stim_to_stim_intensity():
     x_col, y_col = plot_series.io_axis_columns("stim", "EPSPamp")
     assert x_col == "stim_intensity"
     assert y_col == "EPSP_amp"
+
+
+def test_table_height_for_rows_caps_at_12():
+    h1 = si.table_height_for_rows(1, row_height=24, header_height=24, frame_pad=4)
+    h12 = si.table_height_for_rows(12, row_height=24, header_height=24, frame_pad=4)
+    h13 = si.table_height_for_rows(13, row_height=24, header_height=24, frame_pad=4)
+    assert h12 == h13  # cap
+    assert h1 < h12
+    assert h12 == 24 + 12 * 24 + 4
+
+
+def test_n_bins_from_max_sweep():
+    assert si.n_bins_from_max_sweep(9, 5) == 2  # sweeps 0..9, bin_size 5
+    assert si.n_bins_from_max_sweep(4, 5) == 1
+
+
+def test_series_for_binned_output():
+    # raw sweeps with bin_size 2
+    series = {0: 20.0, 1: 20.0, 2: 40.0, 3: 40.0}
+    by_bin = si.series_for_binned_output(series, n_bins=2, bin_size=2)
+    assert by_bin[0] == 20.0
+    assert by_bin[1] == 40.0

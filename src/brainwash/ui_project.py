@@ -683,6 +683,16 @@ class ProjectMixin:
                         pass
                 else:
                     btn.clicked.connect(lambda checked, f=frame_name: self.setViewToolVisible(f, visible=False))
+        # IO stim strength table (bins → µA CSV)
+        if hasattr(self, "tableWidget_stim_strength"):
+            tw = self.tableWidget_stim_strength
+            if disconnect:
+                try:
+                    tw.cellChanged.disconnect()
+                except TypeError:
+                    pass
+            else:
+                tw.cellChanged.connect(self.on_stim_strength_cell_changed)
         # checkBoxes (project dict + stat_test-only widgets)
         checkbox_keys = list(self.uistate.project.checkBox.keys()) + ["test_fdr", "test_sw", "test_levene"]
         for key in checkbox_keys:

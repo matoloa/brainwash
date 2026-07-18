@@ -334,7 +334,11 @@ class DataFrameMixin:
     # ------------------------------------------------------------------
 
     def _join_stim_intensity(self, row, dfoutput: pd.DataFrame) -> pd.DataFrame:
-        """Attach user-owned stim_intensity (µA) from CSV; never persists into measurement parquet."""
+        """Attach user-owned stim_intensity (µA) from CSV; never persists into measurement parquet.
+
+        When the recording is binned, dfoutput.sweep is bin index — reduce CSV
+        (stored at raw-sweep grain) to one µA per bin before join.
+        """
         if dfoutput is None:
             return dfoutput
         rec = row["recording_name"]
@@ -343,6 +347,16 @@ class DataFrameMixin:
             return stim_intensity.attach_stim_intensity_column(dfoutput, None)
         path = recording_cache.stim_intensity_csv_path(str(folder), rec)
         series_df = stim_intensity.load_stim_intensity_csv(path)
+        bin_size = row.get("bin_size") if hasattr(row, "get") else row["bin_size"] if "bin_size" in row.index else None
+        if bin_size is not None and pd.notna(bin_size) and int(bin_size) >= 1 and dfoutput is not None and not dfoutput.empty:
+            sweeps = pd.to_numeric(dfoutput.get("sweep"), errors="coerce")
+            finite = sweeps.dropna()
+            if not finite.empty:
+                n_bins = int(finite.max()) + 1
+                series_map = stim_intensity.series_for_binned_output(
+                    series_df, n_bins=n_bins, bin_size=int(bin_size)
+                )
+                return stim_intensity.attach_stim_intensity_column(dfoutput, series_map)
         return stim_intensity.attach_stim_intensity_column(dfoutput, series_df)
 
     def get_dfoutput(self, row, reset=False, dft=None):  # Requires df_t

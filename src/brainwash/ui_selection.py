@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import logging
 
+import numpy as np
 import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
-from brainwash_ui import view_state
+from brainwash_ui import recording_cache, stim_intensity, view_state
 
 logger = logging.getLogger(__name__)
+
+_STIM_STRENGTH_LABEL_DEFAULT = "IO - Input stim µA"
 
 
 class SelectionMixin:
@@ -318,13 +321,159 @@ class SelectionMixin:
             return
         exp = self.uistate.experiment
         pin = self.uistate.project.viewTools.get("frameToolType_sub_io_stim", ["", True])[1]
-        self.frameToolType_sub_io_stim.setVisible(
-            view_state.should_show_io_stim_frame(
-                exp.experiment_type,
-                exp.io_input,
-                pin_visible=bool(pin),
-            )
+        visible = view_state.should_show_io_stim_frame(
+            exp.experiment_type,
+            exp.io_input,
+            pin_visible=bool(pin),
         )
+        self.frameToolType_sub_io_stim.setVisible(visible)
+        if visible:
+            self.refresh_stim_strength_table()
+
+    def refresh_stim_strength_table(self) -> None:
+        """Fill tableWidget_stim_strength for the selected rec (bins only)."""
+        if not hasattr(self, "tableWidget_stim_strength"):
+            return
+        table = self.tableWidget_stim_strength
+        label = getattr(self, "label_io_input_stim", None)
+
+        def _set_label(text: str) -> None:
+            if label is not None:
+                label.setText(text)
+
+        def _clear_table(*, message: str) -> None:
+            _set_label(message)
+            table.blockSignals(True)
+            table.setColumnCount(2)
+            table.setHorizontalHeaderLabels(["bin", "µA"])
+            table.setRowCount(0)
+            table.blockSignals(False)
+            table.setFixedHeight(stim_intensity.table_height_for_rows(0, row_height=max(table.verticalHeader().defaultSectionSize(), 20)))
+
+        exp = self.uistate.experiment
+        pin = self.uistate.project.viewTools.get("frameToolType_sub_io_stim", ["", True])[1]
+        if not view_state.should_show_io_stim_frame(exp.experiment_type, exp.io_input, pin_visible=bool(pin)):
+            return
+
+        idxs = self.uistate.plot.list_idx_select_recs or []
+        if len(idxs) != 1:
+            _clear_table(message=f"{_STIM_STRENGTH_LABEL_DEFAULT} — select one rec")
+            return
+
+        try:
+            prow = self.get_prow()
+        except Exception:
+            prow = None
+        if prow is None or (isinstance(prow, pd.DataFrame) and prow.empty):
+            _clear_table(message=f"{_STIM_STRENGTH_LABEL_DEFAULT} — select one rec")
+            return
+        if isinstance(prow, pd.DataFrame):
+            prow = prow.iloc[0]
+
+        bin_size = prow.get("bin_size") if hasattr(prow, "get") else prow["bin_size"]
+        if bin_size is None or pd.isna(bin_size) or int(bin_size) < 1:
+            _clear_table(message=f"{_STIM_STRENGTH_LABEL_DEFAULT} — set bin size")
+            return
+
+        bin_size = int(bin_size)
+        try:
+            dff = self.get_dffilter(prow)
+            if dff is None or dff.empty or "sweep" not in dff.columns:
+                _clear_table(message=f"{_STIM_STRENGTH_LABEL_DEFAULT} — no sweeps")
+                return
+            max_sweep = int(pd.to_numeric(dff["sweep"], errors="coerce").max())
+            n_bins = stim_intensity.n_bins_from_max_sweep(max_sweep, bin_size)
+            n_sweeps = max_sweep + 1  # 0-based inclusive
+        except Exception as e:
+            logger.debug("refresh_stim_strength_table: %s", e)
+            _clear_table(message=f"{_STIM_STRENGTH_LABEL_DEFAULT} — set bin size")
+            return
+
+        if n_bins < 1:
+            _clear_table(message=f"{_STIM_STRENGTH_LABEL_DEFAULT} — no bins")
+            return
+
+        rec = prow["recording_name"]
+        folder = self.dict_folders.get("stim_intensity")
+        path = recording_cache.stim_intensity_csv_path(str(folder), rec) if folder is not None else None
+        series_df = stim_intensity.load_stim_intensity_csv(path) if path else stim_intensity.load_stim_intensity_csv("")
+        bin_vals = stim_intensity.bin_values_from_sweep_series(
+            series_df, n_bins=n_bins, bin_size=bin_size
+        )
+
+        _set_label(_STIM_STRENGTH_LABEL_DEFAULT)
+        table.blockSignals(True)
+        table.setColumnCount(2)
+        table.setHorizontalHeaderLabels(["bin", "µA"])
+        table.setRowCount(n_bins)
+        table.verticalHeader().setVisible(False)
+        for i in range(n_bins):
+            lab = QtWidgets.QTableWidgetItem(f"bin{i}")
+            lab.setFlags(lab.flags() & ~QtCore.Qt.ItemIsEditable)
+            table.setItem(i, 0, lab)
+            val = bin_vals[i]
+            text = "" if not np.isfinite(val) else f"{val:g}"
+            table.setItem(i, 1, QtWidgets.QTableWidgetItem(text))
+        header = table.horizontalHeader()
+        header.setStretchLastSection(True)
+        row_h = max(table.verticalHeader().defaultSectionSize(), 20)
+        hdr_h = table.horizontalHeader().height() or 24
+        th = stim_intensity.table_height_for_rows(n_bins, row_height=row_h, header_height=hdr_h)
+        table.setFixedHeight(th)
+        if n_bins > stim_intensity.TABLE_VISIBLE_ROW_CAP:
+            table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        else:
+            table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        # Grow parent frame so absolute-geometry table is not clipped
+        frame = getattr(self, "frameToolType_sub_io_stim", None)
+        if frame is not None:
+            top = table.geometry().y()
+            frame.setMinimumHeight(top + th + 8)
+        table.blockSignals(False)
+        # Stash for save path
+        self._stim_strength_table_meta = {
+            "rec": rec,
+            "bin_size": bin_size,
+            "n_bins": n_bins,
+            "n_sweeps": n_sweeps,
+            "path": path,
+        }
+
+    def on_stim_strength_cell_changed(self, row: int, column: int) -> None:
+        """Write bin µA edits to CSV (expanded to raw sweeps) and refresh IO."""
+        if column != 1:
+            return
+        if getattr(self, "_stim_strength_table_updating", False):
+            return
+        meta = getattr(self, "_stim_strength_table_meta", None)
+        table = getattr(self, "tableWidget_stim_strength", None)
+        if not meta or table is None or not meta.get("path"):
+            return
+        n_bins = int(meta["n_bins"])
+        bin_size = int(meta["bin_size"])
+        n_sweeps = int(meta["n_sweeps"])
+        bin_values: list[float | None] = []
+        for i in range(n_bins):
+            item = table.item(i, 1)
+            text = item.text().strip() if item is not None else ""
+            if text == "":
+                bin_values.append(None)
+                continue
+            try:
+                bin_values.append(float(text.replace(",", ".")))
+            except ValueError:
+                bin_values.append(None)
+        mapping = stim_intensity.expand_bin_values_to_sweeps(
+            bin_values, bin_size=bin_size, n_sweeps=n_sweeps
+        )
+        stim_intensity.save_stim_intensity_csv(meta["path"], stim_intensity.frame_from_series(mapping))
+        if self._is_io_mode() and self.uistate.experiment.io_input == "stim":
+            try:
+                self.exorcise()
+                self.triggerRefresh()
+            except Exception as e:
+                logger.debug("on_stim_strength_cell_changed refresh: %s", e)
 
     def setViewToolVisible(self, frame, visible=None):
         """Toggle visibility of tool frames (hierarchy, timetable, etc) and sync menu state + persist."""

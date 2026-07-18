@@ -180,6 +180,46 @@ def expand_bin_values_to_sweeps(
 
 
 DFOUTPUT_COL = "stim_intensity"  # joined column name on dfoutput (SI-free µA)
+TABLE_VISIBLE_ROW_CAP = 12  # UI: fit all rows until this many; then scroll
+
+
+def table_height_for_rows(
+    n_rows: int,
+    *,
+    row_height: int = 24,
+    header_height: int = 24,
+    frame_pad: int = 4,
+    max_visible: int = TABLE_VISIBLE_ROW_CAP,
+) -> int:
+    """Pixel height for stim strength table: fit min(n, max_visible) rows."""
+    n = max(0, int(n_rows))
+    visible = min(n, max_visible) if n else 0
+    if visible == 0:
+        return header_height + frame_pad
+    return header_height + visible * row_height + frame_pad
+
+
+def n_bins_from_max_sweep(max_sweep: int, bin_size: int) -> int:
+    """Match get_dfbin: num_bins = (max_sweep // bin_size) + 1 for 0-based sweeps."""
+    if bin_size < 1:
+        raise ValueError("bin_size must be >= 1")
+    if max_sweep < 0:
+        return 0
+    return int(max_sweep) // int(bin_size) + 1
+
+
+def series_for_binned_output(
+    series: Mapping[int, float] | pd.DataFrame | None,
+    *,
+    n_bins: int,
+    bin_size: int,
+    sweep_start: int = 0,
+) -> dict[int, float]:
+    """Reduce raw-sweep series to bin-index → µA for joining binned dfoutput."""
+    arr = bin_values_from_sweep_series(
+        series, n_bins=n_bins, bin_size=bin_size, sweep_start=sweep_start
+    )
+    return {i: float(arr[i]) for i in range(n_bins) if np.isfinite(arr[i])}
 
 
 def attach_stim_intensity_column(

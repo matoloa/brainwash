@@ -1204,6 +1204,7 @@ class UIsub(
         display = "0" if pd.isna(derived) else str(derived)
         self.lineEdit_bin_size.setText(display)
         self.recalculate()
+        self.refresh_stim_strength_table()
 
     def triggerToggleProjectTable(self, checked=None):
         self.usage("triggerToggleProjectTable")
@@ -1777,6 +1778,7 @@ class UIsub(
         self.set_df_project(df_p)
         self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
         self.recalculate()
+        self.refresh_stim_strength_table()
 
     def copy_dft(self):
         # get selected dft(s) and copy to clipboard

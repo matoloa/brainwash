@@ -196,6 +196,7 @@ class TableMixin:
 
         self.update_filter_settings(df_p)
         self.connectUIstate()
+        self.refresh_stim_strength_table()
         self.graphUpdate(reeval_formal_test=False)
 
         self.update_show()
