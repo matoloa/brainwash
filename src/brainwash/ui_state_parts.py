@@ -98,6 +98,8 @@ class ProjectPersistedState:
         self.showTimetable = False
         self.detailedProjectTable = False
         self.detailedTimetable = False
+        # Project table header sort: column name (stable) + 0=asc / 1=desc. None = unsorted.
+        self.project_table_sort = {"column": None, "order": 0}
         self.pushButtons = {
             "pushButton_stim_add": "triggerStimAdd",
             "pushButton_stim_remove": "triggerStimRemove",
@@ -107,6 +109,22 @@ class ProjectPersistedState:
             "pushButton_hide_hierarchy": "triggerHideHierarchy",
         }
         self.list_idx_recs2preload = []
+
+    @staticmethod
+    def _normalize_project_table_sort(raw) -> dict:
+        default = {"column": None, "order": 0}
+        if not isinstance(raw, dict):
+            return default.copy()
+        col = raw.get("column")
+        if col is not None:
+            col = str(col).strip() or None
+        try:
+            order = int(raw.get("order", 0))
+        except (TypeError, ValueError):
+            order = 0
+        if order not in (0, 1):
+            order = 0
+        return {"column": col, "order": order}
 
     def to_state_dict(self) -> dict:
         return {
@@ -122,6 +140,7 @@ class ProjectPersistedState:
             "showTimetable": self.showTimetable,
             "detailedProjectTable": self.detailedProjectTable,
             "detailedTimetable": self.detailedTimetable,
+            "project_table_sort": self._normalize_project_table_sort(self.project_table_sort),
         }
 
     def apply_state_dict(self, state: dict, *, zoom_defaults: dict) -> None:
@@ -165,6 +184,7 @@ class ProjectPersistedState:
         self.showTimetable = state.get("showTimetable", False)
         self.detailedProjectTable = state.get("detailedProjectTable", False)
         self.detailedTimetable = state.get("detailedTimetable", False)
+        self.project_table_sort = self._normalize_project_table_sort(state.get("project_table_sort"))
 
 
 class ExperimentConfig:

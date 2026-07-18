@@ -213,15 +213,75 @@ class TableMixin:
         # Capture IDs before setData (model order may be sorted; indices are view rows).
         selected_ids = self._selected_recording_ids() if restore_selection else []
         df_project = self.get_df_project()
+        self._sync_tablemodel_sort_from_project_pref(df_project)
         self.tablemodel.setData(df_project)
         self.formatTableLayout()
         self.tableProj.resizeColumnsToContents()
+        self._sync_project_table_sort_indicator()
 
         if restore_selection:
             self._restore_table_selection(df_project, target_idx, rec_ids=selected_ids)
 
         self.updating_tableProj = False
         self.setButtonParse()
+
+    def _sync_tablemodel_sort_from_project_pref(self, df=None) -> None:
+        """Map uistate.project.project_table_sort (column name) onto TableModel indices."""
+        model = getattr(self, "tablemodel", None)
+        if model is None:
+            return
+        pref = getattr(self.uistate.project, "project_table_sort", None) or {}
+        col_name = pref.get("column")
+        if not col_name:
+            model._sort_column = None
+            model._sort_order = QtCore.Qt.AscendingOrder
+            return
+        src = df if df is not None and getattr(df, "columns", None) is not None else getattr(model, "_data", None)
+        if src is None or getattr(src, "empty", True) or col_name not in src.columns:
+            return
+        try:
+            loc = src.columns.get_loc(col_name)
+            col_idx = int(loc)
+        except (TypeError, ValueError, KeyError):
+            return
+        order_int = int(pref.get("order", 0) or 0)
+        model._sort_column = col_idx
+        model._sort_order = QtCore.Qt.AscendingOrder if order_int == 0 else QtCore.Qt.DescendingOrder
+
+    def _sync_project_table_sort_indicator(self) -> None:
+        """Keep header sort arrow in sync with model remembered sort."""
+        model = getattr(self, "tablemodel", None)
+        table = getattr(self, "tableProj", None)
+        if model is None or table is None:
+            return
+        col = getattr(model, "_sort_column", None)
+        if col is None:
+            return
+        try:
+            table.horizontalHeader().setSortIndicator(col, model._sort_order)
+        except Exception:
+            pass
+
+    def _on_project_table_sorted(self, column: int, order) -> None:
+        """Persist column-name sort preference after header click (debounced cfg save)."""
+        if getattr(self, "_suppress_table_sort_persist", False):
+            return
+        model = getattr(self, "tablemodel", None)
+        if model is None or model._data is None or getattr(model._data, "empty", True):
+            return
+        if not (0 <= int(column) < model._data.shape[1]):
+            return
+        col_name = str(model._data.columns[int(column)])
+        order_int = 0 if order == QtCore.Qt.AscendingOrder else 1
+        pref = getattr(self.uistate.project, "project_table_sort", None) or {}
+        if pref.get("column") == col_name and int(pref.get("order", 0) or 0) == order_int:
+            return
+        self.uistate.project.project_table_sort = {"column": col_name, "order": order_int}
+        timer = getattr(self, "_save_cfg_timer", None)
+        if timer is not None:
+            timer.start(400)
+        elif hasattr(self, "_save_cfg_now"):
+            self._save_cfg_now()
 
     def _model_rows_for_rec_ids(self, rec_ids: list) -> list[int]:
         """Map recording IDs → row indices in the (possibly sorted) table model."""
@@ -329,6 +389,7 @@ class TableMixin:
             if not hasattr(self, "df_project"):
                 self.df_project = df_projectTemplate()
             self.tablemodel = ui_widgets.TableModel(self.df_project)
+            self.tablemodel._sort_changed_callback = self._on_project_table_sorted
             self.tableProj.setModel(self.tablemodel)
 
             self.tableProj.setSortingEnabled(True)
@@ -341,6 +402,8 @@ class TableMixin:
                     and hasattr(self, "setTabOrder")):
                 self.setTabOrder(self.lineEdit_hierarchy_subject, self.lineEdit_hierarchy_slice)
             self.formatTableLayout()
+            self._sync_tablemodel_sort_from_project_pref(self.df_project)
+            self._sync_project_table_sort_indicator()
         except Exception as e:
             print(f"Error setting up tableProj: {e}")
 

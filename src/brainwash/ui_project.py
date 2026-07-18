@@ -847,6 +847,18 @@ class ProjectMixin:
         if hasattr(self, "actionToggleTimetable"):
             self.actionToggleTimetable.setChecked(self.uistate.project.detailedTimetable)
 
+        # Project table column sort from cfg (column name → model index + header arrow)
+        if hasattr(self, "_sync_tablemodel_sort_from_project_pref"):
+            self._sync_tablemodel_sort_from_project_pref(getattr(self, "df_project", None))
+            if hasattr(self, "tablemodel") and getattr(self.tablemodel, "_sort_column", None) is not None:
+                try:
+                    self._suppress_table_sort_persist = True
+                    self.tablemodel.sort(self.tablemodel._sort_column, self.tablemodel._sort_order)
+                finally:
+                    self._suppress_table_sort_persist = False
+            if hasattr(self, "_sync_project_table_sort_indicator"):
+                self._sync_project_table_sort_indicator()
+
         if hasattr(self, "actionTimetable"):
             self.actionTimetable.setChecked(self.uistate.project.showTimetable)
 

@@ -142,6 +142,8 @@ class TableModel(QtCore.QAbstractTableModel):
         # Last user-chosen sort; reapplied in setData so tableUpdate keeps order.
         self._sort_column = None
         self._sort_order = QtCore.Qt.AscendingOrder
+        # Optional: fn(column: int, order: Qt.SortOrder) after user/API sort.
+        self._sort_changed_callback = None
 
     def data(self, index, role=None):  # dataCell
         if role is None:
@@ -205,6 +207,8 @@ class TableModel(QtCore.QAbstractTableModel):
             self.layoutAboutToBeChanged.emit()
             self._apply_remembered_sort()
             self.layoutChanged.emit()
+            if self._sort_changed_callback is not None:
+                self._sort_changed_callback(column, order)
         except Exception as e:
             print(f"Error sorting table: {e}")
 
