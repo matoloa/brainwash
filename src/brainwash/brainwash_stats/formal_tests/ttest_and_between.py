@@ -213,7 +213,8 @@ def run_main_test_set_loop(
     test_sw: bool = False,
     test_levene: bool = False,
 ) -> dict:
-    if variant == "paired":
+    # Paired path is t-test only; ANOVA/etc. must not inherit leftover variant="paired".
+    if variant == "paired" and test_type == "t-test":
         return _run_paired_ttest(
             shown_groups=shown_groups,
             shown_sets=shown_sets,

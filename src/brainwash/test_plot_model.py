@@ -71,6 +71,26 @@ def test_build_test_marker_specs_paired_single_marker():
     assert specs[0].color == "white"
 
 
+def test_build_test_marker_specs_anova_ignores_t_paired_variant():
+    """ANOVA must place per-set markers even if t-test radio is still 'paired'."""
+    results = [
+        {"sweeps": [1, 3], "p_amp": 0.01},
+        {"sweeps": [5, 7], "p_amp": 0.04},
+    ]
+    specs = plot_model.build_test_marker_specs(
+        results,
+        test_type="ANOVA",
+        t_variant="paired",
+        wilcox_variant="paired",
+        amp_view=True,
+        slope_view=False,
+        dark=True,
+    )
+    assert len(specs) == 2
+    assert specs[0].x == 2.0
+    assert specs[1].x == 6.0
+
+
 def test_build_test_marker_specs_paired_one_result_with_sweeps2():
     """Unit-aligned paired path emits one result row with sweeps + sweeps2."""
     results = [{"sweeps": [1, 3], "sweeps2": [5, 7], "p_amp": 0.0005}]

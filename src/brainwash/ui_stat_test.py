@@ -482,7 +482,8 @@ class StatTestMixin:
             self.clear_formal_test_results()
             return
 
-        if variant_for_check == "paired" and test_type != "Friedman":
+        # Paired constraints apply only to t-test / Wilcoxon — not ANOVA/Friedman/Cluster.
+        if variant_for_check == "paired" and test_type in ("t-test", "Wilcoxon"):
             # Paired t-test / Wilcoxon: exactly 1 shown group + exactly 2 test sets.
             if len(shown_groups) != 1:
                 if had_results:
@@ -510,8 +511,12 @@ class StatTestMixin:
         if test_type == "Wilcoxon":
             variant = self.uistate.stat_test.test_wilcox_variant
             tails = self.uistate.stat_test.test_wilcox_tails
-        else:
+        elif test_type == "t-test":
             variant = self.uistate.stat_test.test_t_variant
+            tails = self.uistate.stat_test.test_t_tails
+        else:
+            # ANOVA / Friedman / Cluster: t-test variant radios must not redirect the engine.
+            variant = "unpaired"
             tails = self.uistate.stat_test.test_t_tails
         ref_value = getattr(self.uistate.stat_test, ref_attr, 0.0)
         fdr = bool(self.uistate.stat_test.test_fdr)

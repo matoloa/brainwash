@@ -255,6 +255,50 @@ def test_io_ancova_ignores_shown_test_sets():
     assert out["results"][0].get("set_id") == "__io_ancova__"
 
 
+def test_anova_multi_group_ignores_leftover_paired_variant():
+    """t-test 'paired' radio must not blank multi-group one-way ANOVA."""
+    g1 = [("r1", "s1", 1.0), ("r2", "s2", 1.1), ("r3", "s3", 1.05)]
+    g2 = [("r4", "s4", 2.5), ("r5", "s5", 2.6), ("r6", "s6", 2.55)]
+    out = compute_statistical_comparison(
+        groups=["G1", "G2"],
+        dd_groups=make_dd_groups("G1", "G2"),
+        dd_testsets=make_dd_testsets("TS1"),
+        get_group_testset_means_fn=make_scalar_accessor({"G1": g1, "G2": g2}),
+        test_type="ANOVA",
+        variant="paired",  # leftover UI radio
+        amp=True,
+        slope=False,
+        n_unit="subject",
+    )
+    assert "error" not in out, out
+    assert out.get("results")
+    res = out["results"][0]
+    assert "p_amp" in res
+    assert isinstance(res["p_amp"], float)
+    assert res.get("sweeps")  # markers need x position
+
+
+def test_anova_rm_emits_sweeps_for_markers():
+    g1 = [("r1", "s1", 1.0), ("r2", "s2", 1.2), ("r3", "s3", 1.1)]
+    out = compute_statistical_comparison(
+        groups=["G1"],
+        dd_groups=make_dd_groups("G1"),
+        dd_testsets=make_dd_testsets("TS1", "TS2"),
+        get_group_testset_means_fn=make_scalar_accessor({"G1": g1}),
+        test_type="ANOVA",
+        variant="paired",
+        amp=True,
+        slope=False,
+        n_unit="subject",
+    )
+    assert "error" not in out, out
+    assert out.get("results")
+    res = out["results"][0]
+    assert res.get("set_id") == "__anova_rm_omnibus__"
+    assert res.get("sweeps")
+    assert "p_amp" in res
+
+
 def test_io_rejects_non_ancova_test_type():
     g1 = [("rec_G1_1", "s1", 1.0), ("rec_G1_2", "s1", 1.5)]
     g2 = [("rec_G2_1", "s2", 2.0), ("rec_G2_2", "s2", 2.5)]

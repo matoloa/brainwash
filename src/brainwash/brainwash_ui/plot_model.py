@@ -109,7 +109,13 @@ def build_test_marker_specs(
 ) -> list[TestMarkerSpec]:
     if not results:
         return []
-    variant = wilcox_variant if test_type == "Wilcoxon" else t_variant
+    # t-test / Wilcoxon variants only; ANOVA/Friedman/Cluster are not "paired" markers.
+    if test_type == "Wilcoxon":
+        variant = wilcox_variant
+    elif test_type == "t-test":
+        variant = t_variant
+    else:
+        variant = "unpaired"
     # Paired / one-sample: one marker (midpoint of the two test-set windows).
     is_single = variant in ("paired", "one-sample")
     specs: list[TestMarkerSpec] = []

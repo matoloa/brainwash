@@ -43,7 +43,11 @@ def validate_comparison_inputs(
             err["config"] = {"type": "IO ANCOVA"}
         return err
 
-    if variant == "one-sample":
+    # t-test / Wilcoxon variant radios must not constrain ANOVA / Friedman / Cluster.
+    paired_variant = test_type in ("t-test", "Wilcoxon") and variant == "paired"
+    one_sample_variant = test_type in ("t-test", "Wilcoxon") and variant == "one-sample"
+
+    if one_sample_variant:
         pass
     elif test_type == "ANOVA" and len(shown_groups) == 1:
         pass
@@ -59,7 +63,7 @@ def validate_comparison_inputs(
                 "results": [],
                 "config": {"type": "IO ANCOVA"},
             }
-    elif variant == "paired":
+    elif paired_variant:
         if len(shown_groups) != 1:
             return {"error": "paired t-test requires exactly 1 group", "results": []}
     else:
@@ -70,7 +74,7 @@ def validate_comparison_inputs(
     # IO ANCOVA does not require test sets (and ignores them for data selection in v1).
     if not shown_sets and not is_io:
         return {"error": "no shown test sets", "results": []}
-    if variant == "paired" and len(shown_sets) != 2:
+    if paired_variant and len(shown_sets) != 2:
         return {"error": "paired t-test requires exactly 2 shown test sets", "results": []}
 
     if get_group_testset_means_fn is None:
@@ -97,18 +101,20 @@ def comparison_context(
 
     g1 = None
     g2 = None
-    if variant == "one-sample":
+    paired_variant = test_type in ("t-test", "Wilcoxon") and variant == "paired"
+    one_sample_variant = test_type in ("t-test", "Wilcoxon") and variant == "one-sample"
+    if one_sample_variant:
         g1 = shown_groups[0]
         g2 = None
-    elif test_type == "ANOVA" and len(shown_groups) == 1:
+    elif test_type == "ANOVA":
         g1 = shown_groups[0]
-        g2 = None
+        g2 = shown_groups[1] if len(shown_groups) > 1 else None
     elif test_type == "Friedman" and len(shown_groups) == 1:
         g1 = shown_groups[0]
         g2 = None
     elif test_type == "Cluster perm.":
         pass
-    elif variant == "paired":
+    elif paired_variant:
         g1 = shown_groups[0]
         g2 = None
     else:

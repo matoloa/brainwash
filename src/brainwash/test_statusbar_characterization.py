@@ -287,6 +287,27 @@ def test_non_io_empty_formal():
     assert result.text is None
 
 
+def test_non_io_anova_statusbar_shows_p():
+    formal = [
+        {
+            "set_name": "set 1",
+            "group1": ["G1", "G2"],
+            "n1": 5,
+            "p_amp": 0.012,
+            "sweeps": [1, 2, 3],
+        }
+    ]
+    result = format_non_io_stat_test_statusbar(
+        formal,
+        effective_test_type="ANOVA",
+        dd_groups={"G1": {"group_name": "A"}, "G2": {"group_name": "B"}},
+        ttest_variant="paired",  # leftover radio must not blank ANOVA statusbar
+    )
+    assert result.text is not None
+    assert "ANOVA" in result.text
+    assert "amp: p=0.012" in result.text
+
+
 def test_non_io_paired_statusbar_n_dropped_warning():
     formal = [
         {

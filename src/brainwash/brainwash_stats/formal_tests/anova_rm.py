@@ -18,10 +18,14 @@ def run_repeated_measures_anova(
 ) -> dict:
     """Omnibus one-way ANOVA across test sets within a single group (>=2 test sets)."""
     g = shown_groups[0]
+    # Marker x: mean of all participating test-set sweeps (empty → no marker).
+    all_sweeps: list = []
+    for _sid, tset in shown_sets:
+        all_sweeps.extend(list(tset.get("sweeps") or []))
     rm_res = {
         "set_id": "__anova_rm_omnibus__",
         "set_name": "ANOVA (repeated, omnibus)",
-        "sweeps": [],
+        "sweeps": all_sweeps,
         "group1": shown_groups,
         "n1": 0,
         "n2": 0,
