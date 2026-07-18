@@ -41,6 +41,7 @@ class ProjectPersistedState:
             "frameToolAspectAmp": ["Amplitude width", False],
             "frameToolTest": ["Statistical test", True],
             "frameToolHierarchy": ["Hierarchy", True],
+            "frameToolType_sub_io_stim": ["IO stim µA", True],
         }
         self.checkBox = {
             "EPSP_amp": True,

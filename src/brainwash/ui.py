@@ -750,6 +750,7 @@ class UIsub(
             return
         self.usage(f"io_input_changed → {io_input}")
         self.uistate.experiment.io_input = io_input
+        self._update_io_stim_frame_visibility()
         self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
         self.exorcise()
         self.triggerRefresh()
@@ -775,6 +776,7 @@ class UIsub(
         self.uistate.experiment.experiment_type = exp_type
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(exp_type == "io")
+        self._update_io_stim_frame_visibility()
         if exp_type == "io":
             # PR-A: IO formal analysis is ANCOVA-only — default radio and stash prior test.
             if old_type != "io":

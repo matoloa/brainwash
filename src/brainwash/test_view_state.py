@@ -71,3 +71,14 @@ def test_aspect_counts_for_output_view_ignores_volley_when_relative():
     # EPSP still counts when checked
     cb["EPSP_amp"] = True
     assert view_state.aspect_counts_for_output_view("EPSP_amp", cb)
+
+
+def test_should_show_io_stim_frame_pin_and_mode():
+    assert view_state.should_show_io_stim_frame("io", "stim", pin_visible=True)
+    assert not view_state.should_show_io_stim_frame("io", "stim", pin_visible=False)
+    assert not view_state.should_show_io_stim_frame("io", "vamp", pin_visible=True)
+    assert not view_state.should_show_io_stim_frame("io", "vslope", pin_visible=True)
+    assert not view_state.should_show_io_stim_frame("time", "stim", pin_visible=True)
+    assert not view_state.should_show_io_stim_frame("PP", "stim", pin_visible=True)
+    # Default pin is True
+    assert view_state.should_show_io_stim_frame("io", "stim")

@@ -497,11 +497,14 @@ class ProjectMixin:
     def setupToolBar(self):
         # apply viewstates for tool frames in the toolbar
         for frame, (text, state) in list(self.uistate.project.viewTools.items()):
+            if frame == "frameToolType_sub_io_stim":
+                continue  # pin ∧ IO ∧ stim — applied below
             if hasattr(self, frame):
                 getattr(self, frame).setVisible(state)
         self.frameToolFilter_sub_Savgol.setVisible(self.uistate.project.settings.get("filter", "voltage") == "savgol")
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(self._is_io_mode())
+        self._update_io_stim_frame_visibility()
         if hasattr(self, "frameToolTest"):
             self.frameToolTest.setVisible(self._should_show_stat_test_frame())  # controlled ONLY by menu or hide button (viewTools); no auto-hide on IO
         if hasattr(self, "frameToolTestOptions"):
@@ -665,6 +668,7 @@ class ProjectMixin:
             "pushButton_hide_slope_width": "frameToolAspectSlope",
             "pushButton_hide_amplitude_width": "frameToolAspectAmp",
             "pushButton_hide_test": "frameToolTest",
+            "pushButton_hide_IO_input_stim": "frameToolType_sub_io_stim",
         }
         for btn_name, frame_name in hide_buttons.items():
             if hasattr(self, btn_name):

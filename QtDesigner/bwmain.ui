@@ -273,9 +273,9 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-494</y>
+          <y>-534</y>
           <width>284</width>
-          <height>2107</height>
+          <height>2087</height>
          </rect>
         </property>
         <property name="minimumSize">
@@ -1008,7 +1008,7 @@
              <rect>
               <x>10</x>
               <y>70</y>
-              <width>91</width>
+              <width>121</width>
               <height>17</height>
              </rect>
             </property>
@@ -1204,7 +1204,7 @@
            <property name="minimumSize">
             <size>
              <width>201</width>
-             <height>41</height>
+             <height>101</height>
             </size>
            </property>
            <property name="frameShape">
@@ -1231,6 +1231,32 @@
             </property>
             <property name="text">
              <string>IO - Input stim µA</string>
+            </property>
+           </widget>
+           <widget class="QTableWidget" name="tableWidget_stim_strength">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>40</y>
+              <width>241</width>
+              <height>51</height>
+             </rect>
+            </property>
+           </widget>
+           <widget class="QPushButton" name="pushButton_hide_IO_input_stim">
+            <property name="geometry">
+             <rect>
+              <x>240</x>
+              <y>10</y>
+              <width>21</width>
+              <height>21</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>-</string>
+            </property>
+            <property name="flat">
+             <bool>true</bool>
             </property>
            </widget>
           </widget>
@@ -2679,15 +2705,15 @@
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="buttonGroup_test_t_tails"/>
-  <buttongroup name="buttonGroup_wilcoxon_variant"/>
-  <buttongroup name="buttonGroup_io_o"/>
-  <buttongroup name="buttonGroup_io_i"/>
   <buttongroup name="buttonGroup_test"/>
+  <buttongroup name="buttonGroup_test_t_tails"/>
+  <buttongroup name="buttonGroup_type"/>
+  <buttongroup name="buttonGroup_test_t_variant"/>
+  <buttongroup name="buttonGroup_wilcoxon_variant"/>
+  <buttongroup name="buttonGroup_wilcoxon_tails"/>
+  <buttongroup name="buttonGroup_io_i"/>
   <buttongroup name="buttonGroup_test_n"/>
   <buttongroup name="buttonGroup_filter"/>
-  <buttongroup name="buttonGroup_type"/>
-  <buttongroup name="buttonGroup_wilcoxon_tails"/>
-  <buttongroup name="buttonGroup_test_t_variant"/>
+  <buttongroup name="buttonGroup_io_o"/>
  </buttongroups>
 </ui>

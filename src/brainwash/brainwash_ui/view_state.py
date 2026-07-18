@@ -71,3 +71,13 @@ def should_show_stat_test_frame(experiment_type: str, view_tools: dict | None) -
     if view_tools and "frameToolTest" in view_tools:
         return bool(view_tools["frameToolTest"][1])
     return experiment_type != "io"
+
+
+def should_show_io_stim_frame(
+    experiment_type: str,
+    io_input: str,
+    *,
+    pin_visible: bool = True,
+) -> bool:
+    """IO stim-µA tool frame: user pin ∧ experiment_type io ∧ input stim."""
+    return bool(pin_visible) and experiment_type == "io" and io_input == "stim"

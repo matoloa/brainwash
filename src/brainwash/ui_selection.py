@@ -312,6 +312,20 @@ class SelectionMixin:
         checkbox.setChecked(checked)
         checkbox.blockSignals(False)
 
+    def _update_io_stim_frame_visibility(self) -> None:
+        """Show IO stim-µA frame only when pin ∧ experiment_type io ∧ input stim."""
+        if not hasattr(self, "frameToolType_sub_io_stim"):
+            return
+        exp = self.uistate.experiment
+        pin = self.uistate.project.viewTools.get("frameToolType_sub_io_stim", ["", True])[1]
+        self.frameToolType_sub_io_stim.setVisible(
+            view_state.should_show_io_stim_frame(
+                exp.experiment_type,
+                exp.io_input,
+                pin_visible=bool(pin),
+            )
+        )
+
     def setViewToolVisible(self, frame, visible=None):
         """Toggle visibility of tool frames (hierarchy, timetable, etc) and sync menu state + persist."""
         self.usage(f"setViewToolVisible {frame} {visible}")
@@ -319,7 +333,11 @@ class SelectionMixin:
             if visible is None:
                 visible = not self.uistate.project.viewTools[frame][1]
             self.uistate.project.viewTools[frame][1] = visible
-            getattr(self, frame).setVisible(visible)
+            if frame == "frameToolType_sub_io_stim":
+                # Pin only; mode gates applied by helper (must not show under non-IO / non-stim).
+                self._update_io_stim_frame_visibility()
+            else:
+                getattr(self, frame).setVisible(visible)
 
             # Sync the menu action if it exists
             text = self.uistate.project.viewTools[frame][0]
