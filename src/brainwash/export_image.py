@@ -44,6 +44,40 @@ JOURNAL_TEMPLATES: dict[str, JournalTemplate] = {
     "nature_2col": JournalTemplate(name="Nature (2 col)", width_mm=183, height_mm=130, font_family="sans-serif"),
 }
 
+DEFAULT_JOURNAL_EXPORT = "jneurosci"
+
+
+def resolve_journal_export_key(settings_or_key) -> str:
+    """Return a valid journal palette key (e.g. jneurosci).
+
+    Project settings historically defaulted journal_export to None; dict.get(key, default)
+    does not substitute when the key exists with value None → template 'None_1col'.
+    """
+    if isinstance(settings_or_key, dict):
+        key = settings_or_key.get("journal_export", DEFAULT_JOURNAL_EXPORT)
+    else:
+        key = settings_or_key
+    if key is None or key == "" or str(key).lower() in ("none", "null"):
+        return DEFAULT_JOURNAL_EXPORT
+    key = str(key)
+    # Accept full template keys by stripping _1col/_2col
+    if key in JOURNAL_TEMPLATES:
+        return key.rsplit("_", 1)[0]
+    known = {k.rsplit("_", 1)[0] for k in JOURNAL_TEMPLATES}
+    if key in known:
+        return key
+    return DEFAULT_JOURNAL_EXPORT
+
+
+def resolve_export_template_key(settings_or_journal, width: str = "1col") -> str:
+    """Build a JOURNAL_TEMPLATES key like 'jneurosci_1col'."""
+    journal = resolve_journal_export_key(settings_or_journal)
+    w = width if width in ("1col", "2col") else "1col"
+    key = f"{journal}_{w}"
+    if key not in JOURNAL_TEMPLATES:
+        key = f"{DEFAULT_JOURNAL_EXPORT}_{w}"
+    return key
+
 
 # Fractional y-span headroom above data for export * markers + brackets.
 # Live time/sweep zoom uses pad≈0.2; export uses slightly more for bracket offset.

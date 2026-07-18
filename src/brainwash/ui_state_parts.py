@@ -83,7 +83,7 @@ class ProjectPersistedState:
             "rgb_volley_slope": (1, 0.5, 1),
             "alpha_mark": 0.4,
             "alpha_line": 1,
-            "journal_export": None,
+            "journal_export": "jneurosci",
         }
         self.zoom = {
             "mean_xlim": (0, 1),

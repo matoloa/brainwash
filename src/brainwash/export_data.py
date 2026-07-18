@@ -190,8 +190,26 @@ class ExportMixin:
     # ------------------------------------------------------------------
 
     def triggerExportOutputImage(self, template_key: str | bool = "jneurosci_1col"):
-        if isinstance(template_key, bool):
-            template_key = "jneurosci_1col"
+        if isinstance(template_key, bool) or template_key is None:
+            template_key = export_image.resolve_export_template_key(
+                self.uistate.project.settings, "1col"
+            )
+        else:
+            # Coerce legacy None/invalid journal keys (e.g. "None_1col")
+            raw = str(template_key)
+            if raw not in export_image.JOURNAL_TEMPLATES:
+                if raw.endswith("_2col"):
+                    template_key = export_image.resolve_export_template_key(
+                        self.uistate.project.settings, "2col"
+                    )
+                else:
+                    template_key = export_image.resolve_export_template_key(
+                        self.uistate.project.settings, "1col"
+                    )
+            # Persist recovered journal so the menu matches
+            j = export_image.resolve_journal_export_key(str(template_key).rsplit("_", 1)[0])
+            if self.uistate.project.settings.get("journal_export") in (None, "", "None"):
+                self.uistate.project.settings["journal_export"] = j
 
         self.usage(f"triggerExportOutputImage: {template_key}")
 
@@ -209,6 +227,11 @@ class ExportMixin:
             return
 
         template = export_image.JOURNAL_TEMPLATES.get(template_key)
+        if not template:
+            template_key = export_image.resolve_export_template_key(
+                self.uistate.project.settings, "1col"
+            )
+            template = export_image.JOURNAL_TEMPLATES.get(template_key)
         if not template:
             QtWidgets.QMessageBox.warning(
                 None,

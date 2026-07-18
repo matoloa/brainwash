@@ -3,6 +3,8 @@
 from export_image import (
     JournalTemplate,
     build_figure_text_md,
+    resolve_export_template_key,
+    resolve_journal_export_key,
     _figure_text_unit_warning,
 )
 from ui_state_classes import UIstate
@@ -86,6 +88,16 @@ def test_skeleton_slice_n_unit_leads_with_warning():
     assert md.index("Note on statistical units") < md.index("## Caption draft")
     assert "**slice**" in md
     assert "not subjects" in md
+
+
+def test_resolve_journal_export_none_key_defaults_jneurosci():
+    assert resolve_journal_export_key(None) == "jneurosci"
+    assert resolve_journal_export_key({"journal_export": None}) == "jneurosci"
+    assert resolve_journal_export_key({"journal_export": "None"}) == "jneurosci"
+    assert resolve_export_template_key({"journal_export": None}, "1col") == "jneurosci_1col"
+    assert resolve_export_template_key(None, "2col") == "jneurosci_2col"
+    assert resolve_journal_export_key("nature") == "nature"
+    assert resolve_export_template_key("nature", "1col") == "nature_1col"
 
 
 def test_skeleton_io_ancova_uses_methods_and_group_names():

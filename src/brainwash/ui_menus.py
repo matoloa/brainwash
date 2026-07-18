@@ -241,7 +241,7 @@ class MenuMixin:
             action = QtWidgets.QAction(f"   {j_name}", self.menuExport)
             action.setCheckable(True)
             action.setData(j_key)
-            if self.uistate.project.settings.get("journal_export", "jneurosci") == j_key:
+            if export_image.resolve_journal_export_key(self.uistate.project.settings) == j_key:
                 action.setChecked(True)
             action.triggered.connect(lambda checked, k=j_key: self.setJournalExport(k))
             self.journalActionGroup.addAction(action)
@@ -258,13 +258,14 @@ class MenuMixin:
         self.menuExport.addAction(self.actionExport2Col)
 
     def syncJournalExportMenu(self):
-        journal = self.uistate.project.settings.get("journal_export", "jneurosci")
+        journal = export_image.resolve_journal_export_key(self.uistate.project.settings)
         for action in self.journalActionGroup.actions():
             if action.data() == journal:
                 action.setChecked(True)
                 break
 
     def setJournalExport(self, journal_key):
+        journal_key = export_image.resolve_journal_export_key(journal_key)
         self.uistate.project.settings["journal_export"] = journal_key
         if journal_key in export_image.JOURNAL_COLOR_PALETTES:
             palette = export_image.JOURNAL_COLOR_PALETTES[journal_key]
@@ -333,9 +334,9 @@ class MenuMixin:
             self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
     def triggerExport1Col(self, checked=False):
-        journal = self.uistate.project.settings.get("journal_export", "jneurosci")
-        self.triggerExportOutputImage(f"{journal}_1col")
+        key = export_image.resolve_export_template_key(self.uistate.project.settings, "1col")
+        self.triggerExportOutputImage(key)
 
     def triggerExport2Col(self, checked=False):
-        journal = self.uistate.project.settings.get("journal_export", "jneurosci")
-        self.triggerExportOutputImage(f"{journal}_2col")
+        key = export_image.resolve_export_template_key(self.uistate.project.settings, "2col")
+        self.triggerExportOutputImage(key)
