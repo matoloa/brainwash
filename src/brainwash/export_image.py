@@ -242,8 +242,8 @@ def _add_significance_markers(
     if not results:
         return
 
-    # Determine if this is a single-marker variant (paired/one-sample)
-    is_single_marker = variant in ("paired", "one-sample") and len(results) >= 2
+    # Paired/one-sample: one marker centered between the two test-set windows
+    is_single_marker = variant in ("paired", "one-sample")
 
     # Sweep-range bracket (journal convention): horizontal line + short vertical ticks
     # at min(sweeps) to max(sweeps). Sits ~1-2 pt below marker. Uses linewidth_axes.
@@ -263,9 +263,12 @@ def _add_significance_markers(
             if idx != 0:
                 continue
             try:
-                sweeps2 = results[1].get("sweeps", []) or []
-                x2 = float(np.mean(sweeps2)) * _xs
-                x = (x + x2) / 2.0
+                sweeps2 = res.get("sweeps2") or []
+                if not sweeps2 and len(results) >= 2:
+                    sweeps2 = results[1].get("sweeps", []) or []
+                if sweeps2:
+                    x2 = float(np.mean(sweeps2)) * _xs
+                    x = (x + x2) / 2.0
             except Exception:
                 pass
 
@@ -838,6 +841,47 @@ def _figure_text_force0_warning(*, force0: bool, exp_type: str | None = None) ->
     )
 
 
+def _figure_text_paired_drop_warning(results: list | None) -> str | None:
+    """Self-contained note when paired tests excluded incomplete unit pairs."""
+    if not results:
+        return None
+    for res in results:
+        if not isinstance(res, dict):
+            continue
+        try:
+            n_dropped = int(res.get("n_dropped", 0) or 0)
+        except (TypeError, ValueError):
+            n_dropped = 0
+        if n_dropped <= 0:
+            continue
+        n_pairs = res.get("n_pairs", res.get("n1"))
+        try:
+            n_pairs_i = int(n_pairs) if n_pairs is not None else None
+        except (TypeError, ValueError):
+            n_pairs_i = None
+        lines = [
+            "> **Note on incomplete pairs:** The paired analysis used **complete cases only**: "
+            "statistical units were included only when both test sets had a finite value after "
+            f"aggregation to the chosen unit. **{n_dropped}** unit(s) were excluded",
+        ]
+        if n_pairs_i is not None:
+            lines[0] += f"; **{n_pairs_i}** complete pair(s) remained"
+        lines[0] += "."
+        dropped = res.get("paired_dropped") or []
+        if dropped:
+            lines.append(">")
+            lines.append("> Excluded units:")
+            for d in dropped:
+                unit = d.get("unit", "?")
+                reason = d.get("reason", "incomplete pair")
+                lines.append(f"> - `{unit}`: {reason}")
+        lines.append(
+            "> <!-- Remove or rewrite this note if attrition is intentional and already described. -->"
+        )
+        return "\n".join(lines)
+    return None
+
+
 def _figure_text_dd_groups(group_names: dict | None) -> dict:
     """Map {gid: name} or {gid: {group_name: ...}} → statusbar-style dd_groups."""
     out: dict = {}
@@ -1014,6 +1058,10 @@ def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | 
     force0_warn = _figure_text_force0_warning(force0=force0, exp_type=exp_type)
     if force0_warn:
         lines.extend([force0_warn, ""])
+
+    paired_drop_warn = _figure_text_paired_drop_warning(results)
+    if paired_drop_warn:
+        lines.extend([paired_drop_warn, ""])
 
     lines.append("## Caption draft")
     lines.append("")

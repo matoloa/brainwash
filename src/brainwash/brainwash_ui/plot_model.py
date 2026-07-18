@@ -64,8 +64,11 @@ def marker_x_for_results(results: list, *, variant: str) -> float | None:
         x = float(sum(sweeps) / len(sweeps))
     except Exception:
         return None
-    if variant in ("paired", "one-sample") and len(results) >= 2:
-        sweeps2 = results[1].get("sweeps", []) or []
+    if variant in ("paired", "one-sample"):
+        # Prefer sweeps2 on the same result (unit-aligned paired contrast); fall back to 2nd row.
+        sweeps2 = res0.get("sweeps2") or []
+        if not sweeps2 and len(results) >= 2:
+            sweeps2 = results[1].get("sweeps", []) or []
         if sweeps2:
             try:
                 x2 = float(sum(sweeps2) / len(sweeps2))
@@ -107,7 +110,8 @@ def build_test_marker_specs(
     if not results:
         return []
     variant = wilcox_variant if test_type == "Wilcoxon" else t_variant
-    is_single = variant in ("paired", "one-sample") and len(results) >= 2
+    # Paired / one-sample: one marker (midpoint of the two test-set windows).
+    is_single = variant in ("paired", "one-sample")
     specs: list[TestMarkerSpec] = []
 
     for idx, res in enumerate(results):

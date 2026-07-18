@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 
-from ..data import _aggregate_to_unit_level, _aspect_measurement_columns
+from ..data import _aggregate_to_unit_level, _align_paired_unit_values, _aspect_measurement_columns
 
 
 def _apply_wilcoxon_fdr(out_results, raw_p_amp, raw_p_slope, fdr):
@@ -72,14 +72,22 @@ def run_wilcoxon_tests(
         g = shown_groups[0]
         sid1, tset1 = shown_sets[0]
         sid2, tset2 = shown_sets[1]
+        name1 = tset1.get("set_name", f"set {sid1}")
+        name2 = tset2.get("set_name", f"set {sid2}")
         set_result = {
-            "set_id": sid1,
-            "set_name": tset1.get("set_name", f"set {sid1}"),
+            "set_id": f"{sid1}_{sid2}",
+            "set_name": f"{name1} vs {name2}",
             "sweeps": list(tset1.get("sweeps", [])),
+            "sweeps2": list(tset2.get("sweeps", [])),
             "group1": g,
             "n1": 0,
             "n2": 0,
+            "n_pairs": 0,
+            "n_dropped": 0,
+            "paired_dropped": [],
         }
+        all_dropped: list[dict] = []
+        seen_drop_units: set[str] = set()
         for short, col in aspects:
             try:
                 obs1_df = fetch_group_testset_observations(g, tset1, col)
@@ -88,14 +96,19 @@ def run_wilcoxon_tests(
                 obs2_df = _aggregate_to_unit_level(obs2_df, n_unit)
             except Exception:
                 obs1_df = obs2_df = pd.DataFrame({"value": []})
-            vals1 = obs1_df["value"].to_numpy(dtype=float) if not obs1_df.empty else np.array([], dtype=float)
-            vals2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
-            v1 = vals1[np.isfinite(vals1)]
-            v2 = vals2[np.isfinite(vals2)]
-            eff_n = min(len(v1), len(v2))
+            aligned = _align_paired_unit_values(obs1_df, obs2_df, n_unit=n_unit)
+            v1 = aligned["v1"]
+            v2 = aligned["v2"]
+            n_pairs = int(aligned["n_pairs"])
+            n_dropped = int(aligned["n_dropped"])
+            for d in aligned.get("dropped") or []:
+                u = d.get("unit")
+                if u is not None and u not in seen_drop_units:
+                    seen_drop_units.add(u)
+                    all_dropped.append(d)
             p = np.nan
             stat = np.nan
-            if eff_n >= 2:
+            if n_pairs >= 2:
                 try:
                     d = v1 - v2
                     if alt == "two-sided":
@@ -111,12 +124,18 @@ def run_wilcoxon_tests(
             s_key = f"stat_{short}" + ("_norm" if norm else "")
             set_result[p_key] = float(p) if np.isfinite(p) else np.nan
             set_result[s_key] = float(stat) if np.isfinite(stat) else np.nan
-            set_result["n1"] = max(int(set_result.get("n1", 0)), eff_n)
+            set_result[f"n_pairs_{short}"] = n_pairs
+            set_result[f"n_dropped_{short}"] = n_dropped
+            set_result["n1"] = max(int(set_result.get("n1", 0)), n_pairs)
             set_result["n2"] = set_result["n1"]
+            set_result["n_pairs"] = max(int(set_result.get("n_pairs", 0)), n_pairs)
+            set_result["n_dropped"] = max(int(set_result.get("n_dropped", 0)), n_dropped)
             if short == "amp":
                 raw_p_amp.append((len(out_results), p_key))
             else:
                 raw_p_slope.append((len(out_results), p_key))
+        set_result["paired_dropped"] = all_dropped
+        set_result["n_dropped"] = max(int(set_result.get("n_dropped", 0)), len(all_dropped))
         if any(k.startswith("p_") for k in set_result.keys()):
             out_results.append(set_result)
         _apply_wilcoxon_fdr(out_results, raw_p_amp, raw_p_slope, fdr)

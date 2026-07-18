@@ -285,3 +285,30 @@ def test_non_io_ttest_statusbar_p_values():
 def test_non_io_empty_formal():
     result = format_non_io_stat_test_statusbar(None, effective_test_type="ANOVA", dd_groups={})
     assert result.text is None
+
+
+def test_non_io_paired_statusbar_n_dropped_warning():
+    formal = [
+        {
+            "group1": "G1",
+            "n1": 4,
+            "n2": 4,
+            "n_pairs": 4,
+            "n_dropped": 2,
+            "p_amp": 0.04,
+            "paired_dropped": [
+                {"unit": "s3", "reason": "no finite value in test set 2 (present only in test set 1)"},
+                {"unit": "s4", "reason": "no finite value in test set 1 (present only in test set 2)"},
+            ],
+        }
+    ]
+    result = format_non_io_stat_test_statusbar(
+        formal,
+        effective_test_type="t-test",
+        dd_groups={"G1": {"group_name": "Ctl"}},
+        ttest_variant="paired",
+    )
+    assert result.state == "warning"
+    assert "2 n dropped" in result.text
+    assert "t-test (paired)" in result.text
+

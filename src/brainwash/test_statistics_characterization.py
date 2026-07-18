@@ -6,7 +6,11 @@ Start minimal (5 tests). Expand per work_plans/plan_statistics_refactor.md only 
 import pandas as pd
 import pytest
 
-from brainwash_stats.data import _aggregate_to_unit_level, _normalize_hierarchy_key
+from brainwash_stats.data import (
+    _aggregate_to_unit_level,
+    _align_paired_unit_values,
+    _normalize_hierarchy_key,
+)
 from load_brainwash_statistics import load_brainwash_statistics_module
 
 brainwash_statistics = load_brainwash_statistics_module()
@@ -77,6 +81,43 @@ def test_error_no_shown_test_sets_non_io():
     assert out.get("results") == []
 
 
+def test_align_paired_unit_values_inner_join_and_drops():
+    obs1 = pd.DataFrame(
+        {
+            "rec_ID": ["r1", "r2", "r3"],
+            "subject": ["s1", "s2", "s3"],
+            "slice": ["1", "1", "1"],
+            "value": [1.0, 2.0, 3.0],
+        }
+    )
+    # s3 only in set1; s4 only in set2; s1/s2 complete
+    obs2 = pd.DataFrame(
+        {
+            "rec_ID": ["r1", "r2", "r4"],
+            "subject": ["s1", "s2", "s4"],
+            "slice": ["1", "1", "1"],
+            "value": [1.5, 2.5, 4.0],
+        }
+    )
+    aligned = _align_paired_unit_values(obs1, obs2, n_unit="subject")
+    assert aligned["n_pairs"] == 2
+    assert aligned["n_dropped"] == 2
+    assert list(aligned["v1"]) == pytest.approx([1.0, 2.0])
+    assert list(aligned["v2"]) == pytest.approx([1.5, 2.5])
+    units = {d["unit"] for d in aligned["dropped"]}
+    assert units == {"s3", "s4"}
+
+
+def test_align_paired_unit_values_recording_keys():
+    obs1 = pd.DataFrame({"rec_ID": ["a", "b"], "subject": ["s1", "s1"], "value": [1.0, 2.0]})
+    obs2 = pd.DataFrame({"rec_ID": ["b", "c"], "subject": ["s1", "s2"], "value": [3.0, 4.0]})
+    aligned = _align_paired_unit_values(obs1, obs2, n_unit="recording")
+    assert aligned["n_pairs"] == 1
+    assert aligned["v1"][0] == pytest.approx(2.0)
+    assert aligned["v2"][0] == pytest.approx(3.0)
+    assert aligned["n_dropped"] == 2
+
+
 def test_paired_ttest_returns_results_and_config():
     g1_vals = [("r1", "s1", 1.0), ("r2", "s1", 1.2), ("r3", "s2", 1.1)]
     accessor = make_scalar_accessor({"G1": g1_vals})
@@ -93,8 +134,63 @@ def test_paired_ttest_returns_results_and_config():
     )
     assert "error" not in out
     assert out.get("results")
+    assert len(out["results"]) == 1
+    res = out["results"][0]
     assert out.get("config", {}).get("type") == "t-test"
     assert out.get("config", {}).get("variant") == "paired"
+    assert res.get("n_pairs") == 2  # s1, s2 after subject aggregation
+    assert res.get("n_dropped", 0) == 0
+    assert "sweeps2" in res
+
+
+def test_paired_ttest_drops_incomplete_units():
+    """Units only in one test set are excluded; n_pairs reflects complete cases."""
+
+    def accessor(g, sweeps, aspect="EPSP_amp", per_sweep=False):
+        sweeps = list(sweeps or [])
+        # TS1 default sweeps [1,2,3]; TS2 we override in dd with [10,11,12]
+        if 10 in sweeps:
+            rows = [
+                ("r1", "s1", 2.0),
+                ("r2", "s2", 2.2),
+                # s3 only in set2
+                ("r4", "s3", 9.0),
+            ]
+        else:
+            rows = [
+                ("r1", "s1", 1.0),
+                ("r2", "s2", 1.1),
+                # s4 only in set1
+                ("r3", "s4", 0.5),
+            ]
+        return pd.DataFrame(
+            [{"rec_ID": rid, "subject": sub, "slice": "1", "value": val} for rid, sub, val in rows]
+        )
+
+    dd_ts = {
+        "TS1": {"show": True, "sweeps": [1, 2, 3], "set_name": "pre"},
+        "TS2": {"show": True, "sweeps": [10, 11, 12], "set_name": "post"},
+    }
+    out = compute_statistical_comparison(
+        groups=["G1"],
+        dd_groups=make_dd_groups("G1"),
+        dd_testsets=dd_ts,
+        get_group_testset_means_fn=accessor,
+        test_type="t-test",
+        variant="paired",
+        amp=True,
+        slope=False,
+        n_unit="subject",
+    )
+    assert "error" not in out
+    assert len(out["results"]) == 1
+    res = out["results"][0]
+    assert res["n_pairs"] == 2
+    assert res["n1"] == 2 and res["n2"] == 2
+    assert res["n_dropped"] == 2
+    drop_units = {d["unit"] for d in res.get("paired_dropped") or []}
+    assert drop_units == {"s3", "s4"}
+    assert "vs" in (res.get("set_name") or "")
 
 
 def test_unpaired_ttest_returns_results_and_config():

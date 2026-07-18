@@ -609,6 +609,15 @@ def format_non_io_stat_test_statusbar(
     if n_report:
         test_label = f"{test_label} {n_report}"
 
+    # Complete-case paired attrition (short glanceable warning)
+    n_dropped_total = 0
+    if isinstance(primary, dict):
+        try:
+            n_dropped_total = int(primary.get("n_dropped", 0) or 0)
+        except (TypeError, ValueError):
+            n_dropped_total = 0
+    drop_suffix = f"  {n_dropped_total} n dropped" if n_dropped_total > 0 else ""
+
     is_multi = (eff == "Cluster perm.") or len(results) > 1
     reports = []
     for idx, r in enumerate(results):
@@ -631,8 +640,9 @@ def format_non_io_stat_test_statusbar(
             reports.append(f"{set_prefix}{aspect}: {label}={pstr}")
 
     diag_suffix = _non_io_assumption_diag(results, test_sw=test_sw, test_levene=test_levene)
+    state: StatusbarState = "warning" if n_dropped_total > 0 else "info"
 
     if not reports:
-        return StatusbarResult(f"{test_label}: done (see console){diag_suffix}", "info")
-    text = f"{test_label}: {'  '.join(reports)}{diag_suffix}"
-    return StatusbarResult(text, "info")
+        return StatusbarResult(f"{test_label}: done (see console){drop_suffix}{diag_suffix}", state)
+    text = f"{test_label}: {'  '.join(reports)}{drop_suffix}{diag_suffix}"
+    return StatusbarResult(text, state)

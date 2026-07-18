@@ -1,5 +1,6 @@
 import re
 
+import numpy as np
 import pandas as pd
 
 
@@ -42,6 +43,15 @@ def _normalize_hierarchy_key(val) -> str | None:
     return s
 
 
+def _unit_key_columns(n_unit: str) -> list[str]:
+    """Join keys for pairing / aggregation at the chosen statistical unit."""
+    if n_unit == "recording":
+        return ["rec_ID"]
+    if n_unit == "slice":
+        return ["subject", "slice"]
+    return ["subject"]
+
+
 def _aggregate_to_unit_level(obs_df: pd.DataFrame, n_unit: str = "subject") -> pd.DataFrame:
     """Aggregate to one value per statistical unit (mean over recs).
     Returns DataFrame with unit key(s) + 'value'. Used by all test branches.
@@ -74,6 +84,111 @@ def _aggregate_to_unit_level(obs_df: pd.DataFrame, n_unit: str = "subject") -> p
         return empty_df
 
     return valid.groupby(group_keys, as_index=False)["value"].mean()
+
+
+def _format_unit_label(row: pd.Series, keys: list[str]) -> str:
+    if len(keys) == 1:
+        return str(row[keys[0]])
+    return ", ".join(f"{k}={row[k]}" for k in keys)
+
+
+def _prepare_unit_value_frame(obs_df: pd.DataFrame | None, keys: list[str]) -> pd.DataFrame:
+    """Normalize keys + value for pairing; one row per unit key."""
+    empty = pd.DataFrame(columns=keys + ["value"])
+    if obs_df is None or obs_df.empty or "value" not in obs_df.columns:
+        return empty
+    if not all(k in obs_df.columns for k in keys):
+        return empty
+    df = obs_df[keys + ["value"]].copy()
+    for k in keys:
+        if k == "rec_ID":
+            df[k] = df[k].map(lambda v: str(v).strip() if pd.notna(v) and str(v).strip() else None)
+        else:
+            df[k] = df[k].map(_normalize_hierarchy_key)
+    df["value"] = pd.to_numeric(df["value"], errors="coerce")
+    df = df.dropna(subset=keys + ["value"])
+    if df.empty:
+        return empty
+    if df.duplicated(subset=keys).any():
+        df = df.groupby(keys, as_index=False)["value"].mean()
+    return df.reset_index(drop=True)
+
+
+def _align_paired_unit_values(
+    obs1_df: pd.DataFrame | None,
+    obs2_df: pd.DataFrame | None,
+    n_unit: str = "subject",
+) -> dict:
+    """Inner-join two unit-level frames for paired tests (complete-case pairs only).
+
+    Returns:
+      v1, v2: aligned float arrays (same length = n_pairs)
+      n_pairs, n_dropped: ints
+      dropped: list[{unit, reason}] for incomplete units
+    """
+    keys = _unit_key_columns(n_unit)
+    a = _prepare_unit_value_frame(obs1_df, keys)
+    b = _prepare_unit_value_frame(obs2_df, keys)
+    empty_out = {
+        "v1": np.array([], dtype=float),
+        "v2": np.array([], dtype=float),
+        "n_pairs": 0,
+        "n_dropped": 0,
+        "dropped": [],
+    }
+    if a.empty and b.empty:
+        return empty_out
+
+    merged = a.merge(b, on=keys, how="outer", suffixes=("_1", "_2"), indicator=True)
+    dropped: list[dict] = []
+    for _, row in merged.iterrows():
+        lab = _format_unit_label(row, keys)
+        side = row["_merge"]
+        if side == "left_only":
+            dropped.append(
+                {
+                    "unit": lab,
+                    "reason": "no finite value in test set 2 (present only in test set 1)",
+                }
+            )
+        elif side == "right_only":
+            dropped.append(
+                {
+                    "unit": lab,
+                    "reason": "no finite value in test set 1 (present only in test set 2)",
+                }
+            )
+        else:
+            v1 = row.get("value_1")
+            v2 = row.get("value_2")
+            if not (np.isfinite(v1) and np.isfinite(v2)):
+                dropped.append(
+                    {
+                        "unit": lab,
+                        "reason": "non-finite value in one or both test sets",
+                    }
+                )
+
+    complete = merged[merged["_merge"] == "both"].copy()
+    if not complete.empty:
+        ok = np.isfinite(complete["value_1"].to_numpy(dtype=float)) & np.isfinite(complete["value_2"].to_numpy(dtype=float))
+        complete = complete.loc[ok]
+    n_pairs = int(len(complete))
+    if n_pairs == 0:
+        return {
+            "v1": np.array([], dtype=float),
+            "v2": np.array([], dtype=float),
+            "n_pairs": 0,
+            "n_dropped": len(dropped),
+            "dropped": dropped,
+        }
+    return {
+        "v1": complete["value_1"].to_numpy(dtype=float),
+        "v2": complete["value_2"].to_numpy(dtype=float),
+        "n_pairs": n_pairs,
+        "n_dropped": len(dropped),
+        "dropped": dropped,
+    }
 
 
 def _make_group_testset_observation_accessor(get_group_testset_means_fn, use_implicit: bool):

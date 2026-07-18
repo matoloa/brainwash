@@ -6,6 +6,7 @@ from export_image import (
     resolve_export_template_key,
     resolve_journal_export_key,
     _figure_text_force0_warning,
+    _figure_text_paired_drop_warning,
     _figure_text_unit_warning,
 )
 from ui_state_classes import UIstate
@@ -28,6 +29,56 @@ def test_unit_warning_only_for_slice_and_recording():
     assert "**animal**" not in w_slice.lower()
     w_rec = _figure_text_unit_warning("recording")
     assert w_rec is not None and "recording" in w_rec
+
+
+def test_paired_drop_warning_lists_units_and_rule():
+    assert _figure_text_paired_drop_warning([]) is None
+    assert _figure_text_paired_drop_warning([{"n_dropped": 0}]) is None
+    w = _figure_text_paired_drop_warning(
+        [
+            {
+                "n_dropped": 2,
+                "n_pairs": 5,
+                "paired_dropped": [
+                    {"unit": "s3", "reason": "no finite value in test set 2 (present only in test set 1)"},
+                    {"unit": "s4", "reason": "no finite value in test set 1 (present only in test set 2)"},
+                ],
+            }
+        ]
+    )
+    assert w is not None
+    assert "complete cases only" in w
+    assert "2" in w and "5" in w
+    assert "`s3`" in w and "`s4`" in w
+    assert "test set 2" in w
+
+
+def test_skeleton_paired_includes_incomplete_pair_note():
+    u = UIstate()
+    u.stat_test.test_type = "t-test"
+    u.stat_test.test_t_variant = "paired"
+    u.stat_test.buttonGroup_test_n = "subject"
+    u.stat_test.formal_test_results = [
+        {
+            "set_name": "pre vs post",
+            "sweeps": [1, 2],
+            "sweeps2": [10, 11],
+            "p_amp": 0.02,
+            "n1": 5,
+            "n2": 5,
+            "n_pairs": 5,
+            "n_dropped": 1,
+            "paired_dropped": [
+                {"unit": "s9", "reason": "no finite value in test set 2 (present only in test set 1)"},
+            ],
+            "group1": "G1",
+        }
+    ]
+    md = build_figure_text_md(u, _template(), group_names={"G1": "Ctl"}, panel_hint="amplitude")
+    assert "Note on incomplete pairs" in md
+    assert "complete cases only" in md
+    assert "`s9`" in md
+    assert "statusbar" not in md.lower()
 
 
 def test_skeleton_no_test_still_structured():

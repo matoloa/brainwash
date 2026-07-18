@@ -1,8 +1,9 @@
 import numpy as np
+import pandas as pd
 from scipy.stats import f_oneway, ttest_1samp, ttest_ind, ttest_rel
 
 from ..assumptions import _apply_assumption_tests
-from ..data import _aggregate_to_unit_level
+from ..data import _aggregate_to_unit_level, _align_paired_unit_values
 from ..fdr import _bh_fdr
 
 
@@ -10,6 +11,186 @@ def _aspect_name(use_amp: bool, use_norm: bool) -> str | None:
     if use_amp:
         return "EPSP_amp_norm" if use_norm else "EPSP_amp"
     return "EPSP_slope_norm" if use_norm else "EPSP_slope"
+
+
+def _run_paired_ttest(
+    *,
+    shown_groups,
+    shown_sets,
+    g1,
+    fetch_group_testset_observations,
+    n_unit,
+    norm,
+    amp,
+    slope,
+    fdr,
+    test_type,
+    variant,
+    tails,
+    use_implicit,
+    test_sw: bool = False,
+    test_levene: bool = False,
+) -> dict:
+    """Paired t-test: one group, two test sets, unit-key complete-case pairs."""
+    alt = {"two-sided": "two-sided", "greater": "greater", "less": "less"}.get(tails, "two-sided")
+    if len(shown_sets) != 2:
+        return {"error": "paired t-test requires exactly 2 shown test sets", "results": []}
+    if g1 is None:
+        return {"error": "paired t-test requires exactly 1 group", "results": []}
+
+    sid1, tset1 = shown_sets[0]
+    sid2, tset2 = shown_sets[1]
+    name1 = tset1.get("set_name", f"set {sid1}")
+    name2 = tset2.get("set_name", f"set {sid2}")
+    sweeps1 = list(tset1.get("sweeps", []))
+    sweeps2 = list(tset2.get("sweeps", []))
+
+    aspects = []
+    if amp:
+        aspects.append(("amp", _aspect_name(True, norm)))
+    if slope:
+        aspects.append(("slope", _aspect_name(False, norm)))
+    if not aspects:
+        return {"results": [], "config": {"type": test_type, "variant": variant, "n_unit": n_unit}}
+
+    set_result = {
+        "set_id": f"{sid1}_{sid2}",
+        "set_name": f"{name1} vs {name2}",
+        "sweeps": sweeps1,
+        "sweeps2": sweeps2,
+        "group1": g1,
+        "group2": None,
+        "n1": 0,
+        "n2": 0,
+        "n_pairs": 0,
+        "n_dropped": 0,
+        "paired_dropped": [],
+    }
+
+    raw_p_amp = []
+    raw_p_slope = []
+    out_results = []
+    all_dropped: list[dict] = []
+    seen_drop_units: set[str] = set()
+
+    for short, col in aspects:
+        try:
+            obs1_df = fetch_group_testset_observations(g1, tset1, col)
+            obs1_df = _aggregate_to_unit_level(obs1_df, n_unit)
+            obs2_df = fetch_group_testset_observations(g1, tset2, col)
+            obs2_df = _aggregate_to_unit_level(obs2_df, n_unit)
+        except Exception:
+            obs1_df = obs2_df = pd.DataFrame({"value": []})
+
+        aligned = _align_paired_unit_values(obs1_df, obs2_df, n_unit=n_unit)
+        v1 = aligned["v1"]
+        v2 = aligned["v2"]
+        n_pairs = int(aligned["n_pairs"])
+        n_dropped = int(aligned["n_dropped"])
+
+        for d in aligned.get("dropped") or []:
+            u = d.get("unit")
+            if u is not None and u not in seen_drop_units:
+                seen_drop_units.add(u)
+                all_dropped.append(d)
+
+        p = np.nan
+        stat = np.nan
+        try:
+            if n_pairs >= 2:
+                res = ttest_rel(v1, v2, alternative=alt)
+                stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
+                p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
+        except Exception:
+            p = np.nan
+            stat = np.nan
+
+        p_key = f"p_{short}" + ("_norm" if norm else "")
+        s_key = f"stat_{short}" + ("_norm" if norm else "")
+        set_result[p_key] = float(p) if np.isfinite(p) else np.nan
+        set_result[s_key] = float(stat) if np.isfinite(stat) else np.nan
+        set_result[f"col_{short}"] = col
+        set_result[f"n_pairs_{short}"] = n_pairs
+        set_result[f"n_dropped_{short}"] = n_dropped
+
+        if n_pairs >= 1:
+            set_result[f"mean_{short}_g1"] = float(np.mean(v1))
+            set_result[f"sd_{short}_g1"] = float(np.std(v1, ddof=1)) if n_pairs >= 2 else 0.0
+            set_result[f"mean_{short}_g2"] = float(np.mean(v2))
+            set_result[f"sd_{short}_g2"] = float(np.std(v2, ddof=1)) if n_pairs >= 2 else 0.0
+
+        set_result["n1"] = max(int(set_result.get("n1", 0)), n_pairs)
+        set_result["n2"] = set_result["n1"]
+        set_result["n_pairs"] = max(int(set_result.get("n_pairs", 0)), n_pairs)
+        set_result["n_dropped"] = max(int(set_result.get("n_dropped", 0)), n_dropped)
+
+        gns = set_result.setdefault("group_ns", {})
+        if g1 is not None and n_pairs:
+            gns[g1] = max(int(gns.get(g1, 0)), n_pairs)
+
+        # SW on set1 unit values (pre-pair sample); Levene not applicable for 1-group paired
+        obs1 = obs1_df["value"].to_numpy(dtype=float) if obs1_df is not None and not obs1_df.empty and "value" in obs1_df.columns else np.array([], dtype=float)
+        if test_sw or test_levene:
+            _apply_assumption_tests(
+                set_result,
+                short=short,
+                obs1=obs1,
+                obs2=np.array([], dtype=float),
+                g2=None,
+                shown_groups=shown_groups,
+                test_type=test_type,
+                shown_sets=shown_sets,
+                sid=sid1,
+                fetch_group_testset_observations=fetch_group_testset_observations,
+                n_unit=n_unit,
+                col=col,
+                do_sw=bool(test_sw),
+                do_levene=bool(test_levene),
+            )
+
+        if short == "amp":
+            raw_p_amp.append((0, p_key))
+        else:
+            raw_p_slope.append((0, p_key))
+
+    set_result["paired_dropped"] = all_dropped
+    # Prefer union drop count when aspect lists differ
+    set_result["n_dropped"] = max(int(set_result.get("n_dropped", 0)), len(all_dropped))
+
+    has_any_p = any(k.startswith("p_") for k in set_result.keys()) or any(
+        k.startswith(("sw_", "levene_")) for k in set_result.keys()
+    )
+    if has_any_p:
+        out_results.append(set_result)
+
+    if fdr and out_results:
+        for family in (raw_p_amp, raw_p_slope):
+            if not family:
+                continue
+            ps = []
+            idxs = []
+            for res_idx, pcol in family:
+                if res_idx < len(out_results):
+                    val = out_results[res_idx].get(pcol, np.nan)
+                    ps.append(val if np.isfinite(val) else np.nan)
+                    idxs.append((res_idx, pcol))
+            qs = _bh_fdr(np.asarray(ps, dtype=float))
+            for (res_idx, pcol), q in zip(idxs, qs):
+                out_results[res_idx]["q_" + pcol[2:]] = float(q) if np.isfinite(q) else np.nan
+
+    config = {
+        "type": test_type,
+        "variant": variant,
+        "tails": tails,
+        "fdr": fdr,
+        "norm": norm,
+        "amp": amp,
+        "slope": slope,
+        "n_unit": n_unit,
+    }
+    if use_implicit:
+        config["implicit_testset"] = True
+    return {"results": out_results, "config": config}
 
 
 def run_main_test_set_loop(
@@ -32,6 +213,25 @@ def run_main_test_set_loop(
     test_sw: bool = False,
     test_levene: bool = False,
 ) -> dict:
+    if variant == "paired":
+        return _run_paired_ttest(
+            shown_groups=shown_groups,
+            shown_sets=shown_sets,
+            g1=g1,
+            fetch_group_testset_observations=fetch_group_testset_observations,
+            n_unit=n_unit,
+            norm=norm,
+            amp=amp,
+            slope=slope,
+            fdr=fdr,
+            test_type=test_type,
+            variant=variant,
+            tails=tails,
+            use_implicit=use_implicit,
+            test_sw=test_sw,
+            test_levene=test_levene,
+        )
+
     alt = {"two-sided": "two-sided", "greater": "greater", "less": "less"}.get(tails, "two-sided")
 
     raw_p_amp = []
@@ -76,15 +276,6 @@ def run_main_test_set_loop(
                     obs2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
                 except Exception:
                     obs2 = np.array([], dtype=float)
-            elif variant == "paired":
-                try:
-                    if len(shown_sets) >= 2:
-                        sid2, tset2 = shown_sets[1]
-                        obs2_df = fetch_group_testset_observations(g1, tset2, col)
-                        obs2_df = _aggregate_to_unit_level(obs2_df, n_unit)
-                        obs2 = obs2_df["value"].to_numpy(dtype=float) if not obs2_df.empty else np.array([], dtype=float)
-                except Exception:
-                    obs2 = np.array([], dtype=float)
 
             p = np.nan
             stat = np.nan
@@ -97,17 +288,6 @@ def run_main_test_set_loop(
                     eff_n1 = int(vals.size)
                     if eff_n1 >= 1:
                         res = ttest_1samp(vals, popmean=ref, alternative=alt)
-                        stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
-                        p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
-                elif variant == "paired":
-                    v1 = obs1[np.isfinite(obs1)]
-                    v2 = obs2[np.isfinite(obs2)]
-                    eff_n1 = min(len(v1), len(v2))
-                    eff_n2 = eff_n1
-                    if eff_n1 >= 2:
-                        v1 = v1[:eff_n1]
-                        v2 = v2[:eff_n1]
-                        res = ttest_rel(v1, v2, alternative=alt)
                         stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
                         p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
                 elif test_type == "ANOVA":
