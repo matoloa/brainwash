@@ -380,6 +380,13 @@ class GroupMixin:
         to_select = self._rows_for_rec_ids(dfp, selected_rec_IDs, preferred_order=selected_indices)
         self._select_project_table_rows(to_select)
 
+        # addGroup creates artists with set_visible(False); visibility is applied only
+        # in update_show. selection restore blocks selectionChanged, so we must call it.
+        if hasattr(self, "update_recs2plot"):
+            self.update_recs2plot()
+        if hasattr(self, "update_show"):
+            self.update_show()
+
         if hasattr(self, "clear_formal_test_results"):
             self.clear_formal_test_results()
         self.graphRefresh()
