@@ -508,13 +508,52 @@ def render_publication_figure(
                 if is_pp_mode:
                     if info.get("aspect") != panel:
                         continue
-                    if "overlay" in label:
-                        continue  # Do not export overlays
+                    if "overlay" in label or info.get("is_overlay"):
+                        continue
                     aspect_str = panel.replace("_", " ").replace("amp", "amplitude")
-                    ax.set_ylabel(f"PPR ({aspect_str})")
+                    ax.set_ylabel(f"PPR ({aspect_str})")  # ratio stim2/stim1
                     has_data = True
 
-                    # Calculate offset to center elements back on their base integer group tick
+                    # Box summary (preferred)
+                    if info.get("is_pp_box") and info.get("pp_values"):
+                        bx = float(info.get("pp_box_x", 1.0))
+                        bw = float(info.get("pp_box_width", 0.5))
+                        vals = list(info["pp_values"])
+                        bp = ax.boxplot(
+                            [vals],
+                            positions=[bx],
+                            widths=bw,
+                            patch_artist=True,
+                            showfliers=False,
+                            manage_ticks=False,
+                            whis=1.5,
+                        )
+                        for box in bp.get("boxes", []):
+                            box.set_facecolor(group_color)
+                            box.set_edgecolor("black")
+                            box.set_alpha(0.85)
+                        for med in bp.get("medians", []):
+                            med.set_color("black")
+                        continue
+
+                    # Unit scatter points
+                    if "point" in label and hasattr(line, "get_offsets"):
+                        try:
+                            off = line.get_offsets()
+                            if len(off):
+                                ax.scatter(
+                                    off[:, 0],
+                                    off[:, 1],
+                                    c=[group_color],
+                                    edgecolors="black",
+                                    s=40,
+                                    zorder=4,
+                                )
+                        except Exception:
+                            pass
+                        continue
+
+                    # Legacy bar path
                     shift = 0
                     bar_label = f"{label.split(' PPR')[0]} PPR {info.get('aspect')} bar"
                     bar_info = uistate.plot.dict_group_labels.get(bar_label)
@@ -662,6 +701,12 @@ def render_publication_figure(
                         if info.get("aspect") != panel:
                             continue
                         if "overlay" in label or info.get("is_overlay"):
+                            continue
+                        if info.get("is_pp_box") and info.get("pp_box_x") is not None:
+                            bx = float(info["pp_box_x"])
+                            bw = float(info.get("pp_box_width", 0.5))
+                            tick_lab = info.get("pp_tick_label") or label.split(" PPR")[0]
+                            bar_specs.append((bx - bw / 2.0, bw, tick_lab))
                             continue
                         line_obj = info.get("line")
                         if not hasattr(line_obj, "patches"):

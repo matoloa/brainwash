@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.ticker import AutoLocator, FixedLocator, FuncFormatter, Locator
 
-from brainwash_ui import plot_drag
+from brainwash_ui import plot_drag, plot_series
 
 from ui_state_parts import ExperimentConfig, PlotSession, ProjectPersistedState, StatTestState
 
@@ -231,30 +231,36 @@ class UIstate:
 
     def x_axis_xlim(self, prow, dft=None) -> tuple:
         if self.experiment.experiment_type == "PP":
-            has_groups = False
-            max_x = 1.5
+            box_xs: list[float] = []
             for key, val in self.plot.dict_group_show.items():
-                if "PPR" in key and hasattr(val["line"], "patches"):
-                    has_groups = True
+                if "PPR" not in key or "point" in key:
+                    continue
+                if val.get("pp_box_x") is not None:
                     try:
-                        max_x = max(max_x, val["line"].patches[0].get_x() + val["line"].patches[0].get_width() / 2)
+                        box_xs.append(float(val["pp_box_x"]))
+                        continue
                     except Exception:
                         pass
-            if has_groups:
-                return (0.5, max_x)
-            has_recs = False
+                line = val.get("line")
+                if line is not None and hasattr(line, "patches") and line.patches:
+                    try:
+                        p = line.patches[0]
+                        box_xs.append(float(p.get_x() + p.get_width() / 2))
+                    except Exception:
+                        pass
+            if box_xs:
+                xlim = plot_series.pp_group_xlim_from_ticks(box_xs, pad=0.6)
+                if xlim is not None:
+                    return xlim
             rec_x_positions = []
             for key, val in self.plot.dict_rec_show.items():
                 if "PPR" in key and "marker" not in key and val.get("line") and val["line"].get_visible():
-                    has_recs = True
                     try:
                         rec_x_positions.extend(plot_drag.artist_xdata(val["line"]).tolist())
                     except Exception:
                         pass
-            if has_recs:
-                if rec_x_positions:
-                    return (min(rec_x_positions) - 0.5, max(rec_x_positions) + 0.5)
-                return (0.5, 4.5)
+            if rec_x_positions:
+                return (min(rec_x_positions) - 0.5, max(rec_x_positions) + 0.5)
             return (0.5, 1.5)
 
         mode = self.x_axis

@@ -847,6 +847,16 @@ class UIsub(
         if key in ["output_ymin0", "norm_EPSP"]:
             self.zoomAuto()
         elif self.uistate.experiment.experiment_type == "PP" and key in ["EPSP_amp", "volley_amp", "EPSP_slope", "volley_slope"]:
+            # Aspect set changes group box columns / rec PPR x slots — rebuild so
+            # volley never remains stacked on the EPSP amp position.
+            if getattr(self, "dd_groups", None):
+                for gid in list(self.dd_groups.keys()):
+                    try:
+                        self.clear_group_level(gid)
+                    except Exception:
+                        pass
+                if hasattr(self, "graphGroups"):
+                    self.graphGroups()
             self.zoomAuto()
         # norm/amp/slope (visible aspects) affect heatmap and statistical test inputs;
         # clear stale heatmap dots and formal test markers when they change.

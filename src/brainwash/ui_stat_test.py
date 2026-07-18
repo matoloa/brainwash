@@ -13,7 +13,7 @@ import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
 # brainwash stats (local module shadows stdlib; ui.py does "import statistics as stats" equivalent via its context + from . )
-from brainwash_ui import app_context, statusbar, view_state
+from brainwash_ui import app_context, plot_series, statusbar, view_state
 
 from . import statistics as stats
 
@@ -911,7 +911,7 @@ class StatTestMixin:
 
             if not has_level:
                 group_mean_data = self.get_dfgroupmean(group_ID, level=current_level)
-                x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
+                x_pos = plot_series.pp_group_x_position(self.dd_groups, group_ID)
                 self.uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data), x_pos=x_pos, level=current_level)
 
         self.update_show()  # applies level filter from current n_unit + selection rules

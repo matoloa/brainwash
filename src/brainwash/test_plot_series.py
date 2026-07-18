@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from brainwash_ui import plot_series
 
@@ -30,10 +31,26 @@ def test_compute_io_regression_ols():
 
 
 def test_pp_group_tick_label_map():
-    # Bar centers at integer group positions (matplotlib PP layout).
-    ticks, labels = plot_series.pp_group_tick_label_map([(0.6, 0.8, "G1"), (1.6, 0.8, "G2")])
-    assert ticks == [1, 2]
-    assert labels == ["G1", "G2"]
+    # One tick per box center; labels kept per box (not collapsed).
+    ticks, labels = plot_series.pp_group_tick_label_map(
+        [(0.6, 0.8, "G1 amp (n=3)"), (1.6, 0.8, "G2 amp (n=4)")]
+    )
+    assert ticks == [1.0, 2.0]
+    assert labels == ["G1 amp (n=3)", "G2 amp (n=4)"]
+
+
+def test_pp_group_x_position_skips_empty_groups():
+    dd = {
+        "g0": {"rec_IDs": []},
+        "g1": {"rec_IDs": ["r1"]},
+        "g2": {"rec_IDs": ["r2"]},
+    }
+    assert plot_series.pp_group_x_position(dd, "g1") == 1
+    assert plot_series.pp_group_x_position(dd, "g2") == 2
+
+
+def test_pp_group_xlim_from_ticks():
+    assert plot_series.pp_group_xlim_from_ticks([1.0, 2.0, 3.0], pad=0.6) == (0.4, 3.6)
 
 
 def test_pp_overlay_x_map_all_enabled():
@@ -44,8 +61,23 @@ def test_pp_overlay_x_map_all_enabled():
 
 
 def test_pp_overlay_x_map_partial():
+    # Fixed slots: volley amp stays at 3 (never collapses onto EPSP amp at 1)
     m = plot_series.pp_overlay_x_map({"EPSP_amp": True, "EPSP_slope": False, "volley_amp": True, "volley_slope": False})
-    assert m == {"EPSP_amp": 1, "volley_amp": 2}
+    assert m == {"EPSP_amp": 1, "volley_amp": 3}
+
+
+def test_pp_recording_view_ticks_match_overlay_slots():
+    checkbox = {"EPSP_amp": True, "EPSP_slope": False, "volley_amp": True, "volley_slope": False}
+    ticks, labels = plot_series.pp_recording_view_ticks(checkbox)
+    assert ticks == [1, 3]
+    assert labels == ["EPSP Amp", "Volley Amp"]
+    # Data x for each aspect must equal its tick (never volley→amp)
+    o1 = __import__("pandas").DataFrame({"EPSP_amp": [1.0], "volley_amp": [1.0]})
+    o2 = __import__("pandas").DataFrame({"EPSP_amp": [2.0], "volley_amp": [2.0]})
+    specs = plot_series.pp_recording_ppr_specs(o1, o2, checkbox, {"rgb_EPSP_amp": "b", "rgb_volley_amp": "g"})
+    by_asp = {s.aspect: s.x_val for s in specs}
+    assert by_asp["EPSP_amp"] == 1
+    assert by_asp["volley_amp"] == 3
 
 
 def test_aggregate_ppr_at_level_recording():
@@ -72,6 +104,19 @@ def test_aggregate_ppr_at_level_subject_collapses_recs():
     agg = plot_series.aggregate_ppr_at_level(rec_ppr, "subject", df_p)
     vals = sorted(agg.ppr_data["EPSP_amp"])
     assert vals == [3.0, 6.0]  # mean(2,4)=3 for S1; 6 for S2
+    assert len(agg.rec_id_order["EPSP_amp"]) == 2  # unit labels for dots
+
+
+def test_rec_mean_ppr_from_dfoutput():
+    df = pd.DataFrame(
+        {
+            "sweep": [0, 0, 1, 1],
+            "stim": [1, 2, 1, 2],
+            "EPSP_amp": [1.0, 2.0, 2.0, 4.0],
+        }
+    )
+    means = plot_series.rec_mean_ppr_from_dfoutput(df)
+    assert means["EPSP_amp"] == pytest.approx(2.0)  # mean of 2/1 and 4/2
 
 
 def test_aggregate_ppr_at_level_slice_keeps_slices_separate():
@@ -110,8 +155,29 @@ def test_pp_group_bar_store_items():
         scatter_color="white",
     )
     items = plot_series.pp_group_bar_store_items(spec)
-    assert len(items) == 5
+    assert len(items) == 3  # bar + err + point (no overlays)
     assert items[-1].suffix == "r1 point"
+
+
+def test_build_pp_group_box_plot_specs():
+    agg = plot_series.PprLevelAggregate(
+        ppr_data={"EPSP_amp": [1.0, 2.0, 3.0], "EPSP_slope": [], "volley_amp": [], "volley_slope": []},
+        rec_id_order={"EPSP_amp": ["r1", "r2", "r3"], "EPSP_slope": [], "volley_amp": [], "volley_slope": []},
+    )
+    rng = np.random.default_rng(0)
+    specs = plot_series.build_pp_group_box_plot_specs(
+        aggregate=agg,
+        x_pos=1.0,
+        group_name="Ctl",
+        checkbox={"EPSP_amp": True, "EPSP_slope": False, "volley_amp": False, "volley_slope": False},
+        settings={"rgb_EPSP_amp": "blue"},
+        rng=rng,
+    )
+    assert len(specs) == 1
+    assert specs[0].n == 3
+    assert specs[0].tick_label == "Ctl amp (n=3)"
+    assert specs[0].values == (1.0, 2.0, 3.0)
+    assert len(specs[0].scatter_points) == 3
 
 
 def test_deprecated_epsp_output_refresh_labels():
@@ -157,9 +223,11 @@ def test_build_io_group_plot_specs():
 
 
 def test_build_pp_graph_refresh_xaxis_plan_group_bars():
-    specs = [(0.6, 0.3, "G1")]
+    # left=0.6, width=0.8 → center 1.0 (box at integer group slot)
+    specs = [(0.6, 0.8, "G1 amp (n=3)")]
     plan = plot_series.build_pp_graph_refresh_xaxis_plan(specs, {"EPSP_amp": True}, pp_has_recs=False)
-    assert plan.ticks == (1,)
+    assert plan.ticks == (1.0,)
+    assert plan.ticklabels == ("G1 amp (n=3)",)
     assert plan.labels_only is True
     assert plan.ax1_xlabel == ""
 
@@ -231,6 +299,108 @@ def test_pp_bar_layout_single_aspect():
     assert len(configs) == 1
     assert configs[0][0] == "EPSP_amp"
     assert configs[0][3] > 0
+    # Single aspect → centered on group slot
+    assert abs(configs[0][2]) < 1e-9
+
+
+def test_pp_bar_layout_amp_slope_side_by_side():
+    """Amp (ax1) and slope (ax2) share twinx x-space → different offsets, not stacked."""
+    configs = plot_series.pp_bar_layout([("EPSP_amp", "ax1"), ("EPSP_slope", "ax2")])
+    assert len(configs) == 2
+    assert configs[0][0] == "EPSP_amp"
+    assert configs[1][0] == "EPSP_slope"
+    assert configs[0][2] < 0  # amp left of group center
+    assert configs[1][2] > 0  # slope right of group center
+    assert abs(configs[0][2] - configs[1][2]) > 0.2
+
+
+def test_pp_bar_layout_volley_not_on_epsp_amp_slot():
+    """EPSP amp and volley amp get distinct offsets (volley is not drawn on amp's tick)."""
+    configs = plot_series.pp_bar_layout([("EPSP_amp", "ax1"), ("volley_amp", "ax1")])
+    assert [c[0] for c in configs] == ["EPSP_amp", "volley_amp"]
+    assert configs[0][2] != configs[1][2]
+    assert configs[0][2] < configs[1][2]
+
+
+def test_build_pp_group_box_amp_and_volley_distinct_x():
+    agg = plot_series.PprLevelAggregate(
+        ppr_data={
+            "EPSP_amp": [1.0, 2.0],
+            "EPSP_slope": [],
+            "volley_amp": [1.5, 2.5],
+            "volley_slope": [],
+        },
+        rec_id_order={
+            "EPSP_amp": ["r1", "r2"],
+            "EPSP_slope": [],
+            "volley_amp": ["r1", "r2"],
+            "volley_slope": [],
+        },
+    )
+    specs = plot_series.build_pp_group_box_plot_specs(
+        aggregate=agg,
+        x_pos=1.0,
+        group_name="G1",
+        checkbox={"EPSP_amp": True, "EPSP_slope": False, "volley_amp": True, "volley_slope": False},
+        settings={"rgb_EPSP_amp": "blue", "rgb_volley_amp": "green"},
+        rng=__import__("numpy").random.default_rng(0),
+    )
+    assert len(specs) == 2
+    by_asp = {s.aspect: s for s in specs}
+    assert by_asp["EPSP_amp"].box_x != by_asp["volley_amp"].box_x
+    assert by_asp["EPSP_amp"].tick_label.startswith("G1 amp")
+    assert "volley" in by_asp["volley_amp"].tick_label
+    # Tick centers match box centers
+    lefts = [(s.box_x - s.box_width / 2, s.box_width, s.tick_label) for s in specs]
+    ticks, labels = plot_series.pp_group_tick_label_map(lefts)
+    assert ticks == sorted([by_asp["EPSP_amp"].box_x, by_asp["volley_amp"].box_x])
+
+
+def test_collect_pp_group_bar_patch_specs_from_box_meta():
+    # Side-by-side: amp left of center, slope right (twinx shared x)
+    show = {
+        "Ctl PPR EPSP_amp box_recording": {
+            "pp_box_x": 0.8,
+            "pp_box_width": 0.36,
+            "pp_tick_label": "Ctl amp (n=3)",
+            "axis": "ax1",
+            "level": "recording",
+            "is_overlay": False,
+        },
+        "Ctl PPR EPSP_slope box_recording": {
+            "pp_box_x": 1.2,
+            "pp_box_width": 0.36,
+            "pp_tick_label": "Ctl slope (n=3)",
+            "axis": "ax2",
+            "level": "recording",
+            "is_overlay": False,
+        },
+        "Drug PPR EPSP_amp box_recording": {
+            "pp_box_x": 1.8,
+            "pp_box_width": 0.36,
+            "pp_tick_label": "Drug amp (n=4)",
+            "axis": "ax1",
+            "level": "recording",
+            "is_overlay": False,
+        },
+        "Drug PPR EPSP_slope box_recording": {
+            "pp_box_x": 2.2,
+            "pp_box_width": 0.36,
+            "pp_tick_label": "Drug slope (n=4)",
+            "axis": "ax2",
+            "level": "recording",
+            "is_overlay": False,
+        },
+    }
+    # Combined (no axis filter): labels for every box on the shared x-axis
+    all_specs = plot_series.collect_pp_group_bar_patch_specs(show, "recording", lambda base: base)
+    assert len(all_specs) == 4
+    ticks, labels = plot_series.pp_group_tick_label_map(all_specs)
+    assert ticks == [0.8, 1.2, 1.8, 2.2]
+    assert labels == ["Ctl amp (n=3)", "Ctl slope (n=3)", "Drug amp (n=4)", "Drug slope (n=4)"]
+    xlim = plot_series.pp_group_xlim_from_ticks(ticks, pad=0.6)
+    assert xlim[0] == pytest.approx(0.2)
+    assert xlim[1] == pytest.approx(2.8)
 
 
 def test_extract_group_mean_series():

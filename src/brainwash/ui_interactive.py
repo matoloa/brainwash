@@ -1135,7 +1135,7 @@ class InteractivePlotMixin:
             self.clear_group_level(group_ID)  # all levels stale after rec edit
             level = self.uistate.stat_test.buttonGroup_test_n
             df_groupmean = self.get_dfgroupmean(group_ID, level=level)
-            x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
+            x_pos = plot_series.pp_group_x_position(self.dd_groups, group_ID)
             self.uiplot.addGroup(group_ID, self.dd_groups[group_ID], self.V2mV(df_groupmean), x_pos=x_pos, level=level)
 
         self.update_show()  # Re-apply visibility rules to the newly added group artists

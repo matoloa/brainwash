@@ -435,7 +435,8 @@ def output_axis_ylabels(*, experiment_type: str, io_output: str, norm_epsP: bool
             ax1 = "EPSP Amplitude %" if norm_epsP else "EPSP Amplitude (mV)"
         return OutputAxisLabels(ax1, "")
     if experiment_type == "PP":
-        return OutputAxisLabels("PPR Amp (%)", "PPR Slope (%)")
+        # Ratio stim2/stim1 (not percent); reference grid at 1, 2, 3
+        return OutputAxisLabels("PPR Amp", "PPR Slope")
     if norm_epsP:
         return OutputAxisLabels("Amplitude %", "Slope %")
     return OutputAxisLabels("Amplitude (mV)", "Slope (mV/ms)")

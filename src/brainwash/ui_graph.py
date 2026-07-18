@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
-from brainwash_ui import plot_drag, refresh_bus
+from brainwash_ui import plot_drag, plot_series, refresh_bus
 
 import matplotlib.collections as mcoll
 
@@ -259,7 +259,7 @@ class GraphCoordinatorMixin:
                 level = self.uistate.stat_test.buttonGroup_test_n
                 group_mean_data = self.get_dfgroupmean(group_ID, level=level)
                 # print(f"graphGroups: Adding group {group_ID} to plot: {group_mean_data}")
-                x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
+                x_pos = plot_series.pp_group_x_position(self.dd_groups, group_ID)
                 self.uiplot.addGroup(group_ID, dict_group, self.V2mV(group_mean_data), x_pos=x_pos, level=level)
 
     def graphUpdate(self, df=None, row=None, reeval_formal_test: bool = True):

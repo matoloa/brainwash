@@ -13,6 +13,7 @@ from pathlib import Path
 import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
+from brainwash_ui import plot_series
 from ui_widgets import CustomCheckBox
 
 
@@ -234,7 +235,7 @@ class GroupMixin:
             self.group_cache_purge([group_ID])  # all levels
             level = self.uistate.stat_test.buttonGroup_test_n
             df_groupmean = self.get_dfgroupmean(group_ID, level=level)
-            x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
+            x_pos = plot_series.pp_group_x_position(self.dd_groups, group_ID)
             self.uiplot.addGroup(group_ID, dict_group, self.V2mV(df_groupmean), x_pos=x_pos, level=level)
             # v0.16: membership change may affect active statistical test
             if hasattr(self, "apply_statistical_test_if_active"):
@@ -249,7 +250,7 @@ class GroupMixin:
             level = self.uistate.stat_test.buttonGroup_test_n
             df_groupmean = self.get_dfgroupmean(group_ID, level=level)
             if self.dd_groups[group_ID]["rec_IDs"]:
-                x_pos = 1 + list(self.dd_groups.keys()).index(group_ID)
+                x_pos = plot_series.pp_group_x_position(self.dd_groups, group_ID)
                 self.uiplot.addGroup(group_ID, dict_group, self.V2mV(df_groupmean), x_pos=x_pos, level=level)
             # v0.16: membership change may affect active statistical test
             if hasattr(self, "apply_statistical_test_if_active"):

@@ -192,6 +192,9 @@ class SelectionMixin:
                         elif hasattr(obj, "get_children"):
                             for c in obj.get_children():
                                 c.set_visible(visible)
+                    for aux in v.get("pp_aux_artists") or []:
+                        if aux is not None and hasattr(aux, "set_visible"):
+                            aux.set_visible(visible)
                     if visible:
                         new_group_show[k] = v
                 self.uistate.plot.dict_group_show = new_group_show
@@ -265,6 +268,9 @@ class SelectionMixin:
                         for c in obj.get_children():
                             if c is not None:
                                 c.set_visible(visible)
+                for aux in v.get("pp_aux_artists") or []:
+                    if aux is not None and hasattr(aux, "set_visible"):
+                        aux.set_visible(visible)
                 if visible:
                     new_group_show[k] = v
             self.uistate.plot.dict_group_show = new_group_show

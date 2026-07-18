@@ -683,6 +683,13 @@ class UIplot:
                     except Exception:
                         pass
 
+            for aux in dict_group[key].get("pp_aux_artists") or []:
+                if aux is not None and hasattr(aux, "remove"):
+                    try:
+                        aux.remove()
+                    except Exception:
+                        pass
+
             del dict_group[key]
             if key in dict_group_show:
                 del dict_group_show[key]
@@ -865,6 +872,11 @@ class UIplot:
             ax2.axhline(y_val, color="gray", linestyle=":", alpha=0.5, zorder=0)
 
     def _apply_pp_graph_refresh_axes(self, uistate, ax1, ax2, current_level: str) -> None:
+        # Shared x ticks across twin axes: amp (ax1) + slope (ax2) sit side-by-side,
+        # and only ax1 shows the bottom labels (oneAxisLeft hides ax2.xaxis).
+        pp_has_recs = hasattr(self.uistate.plot, "dict_rec_show") and plot_series.pp_has_visible_rec_ppr(
+            uistate.plot.dict_rec_show
+        )
         bar_specs = []
         if hasattr(self.uistate.plot, "dict_group_show"):
             bar_specs = plot_series.collect_pp_group_bar_patch_specs(
@@ -872,15 +884,18 @@ class UIplot:
                 current_level,
                 lambda base: self._display_label(base),
             )
-        pp_has_recs = hasattr(self.uistate.plot, "dict_rec_show") and plot_series.pp_has_visible_rec_ppr(
-            uistate.plot.dict_rec_show
-        )
         pp_xplan = plot_series.build_pp_graph_refresh_xaxis_plan(
             bar_specs,
             uistate.project.checkBox,
             pp_has_recs=pp_has_recs,
         )
-        self._apply_pp_graph_refresh_xaxis(ax1, ax2, pp_xplan)
+        self._apply_pp_graph_refresh_xaxis(ax1, pp_xplan)
+        self._apply_pp_graph_refresh_xaxis(ax2, pp_xplan)
+        # Keep zoom state in sync so later zoomReset does not clamp the last group to the edge.
+        if bar_specs and pp_xplan.ticks:
+            xlim = plot_series.pp_group_xlim_from_ticks(pp_xplan.ticks, pad=0.6)
+            if xlim is not None:
+                uistate.project.zoom["output_xlim"] = xlim
 
     def _maintain_drag_selections(self, uistate, axm, ax1, ax2) -> None:
         if uistate.plot.x_select["mean_start"] is not None:
@@ -913,22 +928,20 @@ class UIplot:
         axe.figure.canvas.draw_idle()
         ax1.figure.canvas.draw_idle()
 
-    def _apply_pp_graph_refresh_xaxis(self, ax1, ax2, plan):
+    def _apply_pp_graph_refresh_xaxis(self, ax, plan):
+        """Apply PP x ticks/labels/limits to one output axis."""
         if plan.ax1_xlabel is not None:
-            ax1.set_xlabel(plan.ax1_xlabel)
-        if plan.ax2_xlabel is not None:
-            ax2.set_xlabel(plan.ax2_xlabel)
+            ax.set_xlabel(plan.ax1_xlabel)
         if plan.ticks:
-            ax1.set_xticks(plan.ticks)
-            ax1.set_xticklabels(plan.ticklabels)
-            ax2.set_xticks(plan.ticks)
-            ax2.set_xticklabels(plan.ticklabels)
+            ax.set_xticks(list(plan.ticks))
+            ax.set_xticklabels(list(plan.ticklabels))
+            xlim = plot_series.pp_group_xlim_from_ticks(plan.ticks, pad=0.6)
+            if xlim is not None:
+                ax.set_xlim(xlim)
         if plan.hide_all:
-            ax1.tick_params(axis="x", bottom=False, labelbottom=False)
-            ax2.tick_params(axis="x", bottom=False, labelbottom=False)
+            ax.tick_params(axis="x", bottom=False, labelbottom=False)
         elif plan.labels_only:
-            ax1.tick_params(axis="x", bottom=False, labelbottom=True)
-            ax2.tick_params(axis="x", bottom=False, labelbottom=True)
+            ax.tick_params(axis="x", bottom=False, labelbottom=True)
 
     def graphRefresh(self, dd_groups, dd_testset=None, dd_shown_samples=None):
         uistate = self.uistate
@@ -1566,32 +1579,40 @@ class UIplot:
         for spec in plot_series.build_stim_aggregate_plot_specs(dfoutput, label, settings):
             self._render_stim_aggregate_plot_spec(spec, rec_ID)
 
-    def _render_pp_group_bar_spec(self, spec, group_ID, group_name, color, level):
-        bar_artist = self.get_axis(spec.axid).bar(
-            [spec.bar_x],
-            [spec.mean_val],
-            width=spec.bar_width,
-            color=color,
-            edgecolor="black",
-            alpha=1.0,
-            zorder=2,
-            label=f"{group_name} PPR {spec.aspect} bar",
+    def _render_pp_group_box_spec(self, spec, group_ID, group_name, color, level):
+        """Draw box + unit dots; store geometry for ticks/export (no mean±SEM bar)."""
+        ax = self.get_axis(spec.axid)
+        vals = list(spec.values)
+        bp = ax.boxplot(
+            [vals],
+            positions=[spec.box_x],
+            widths=spec.box_width,
+            patch_artist=True,
+            showfliers=False,
+            manage_ticks=False,
+            whis=1.5,
         )
-        err_artist = self.get_axis(spec.axid).errorbar(
-            [spec.bar_x],
-            [spec.mean_val],
-            yerr=[spec.sem_val],
-            fmt="none",
-            ecolor="black",
-            elinewidth=1.5,
-            capsize=5,
-            capthick=1.5,
-            zorder=3,
-            label=f"{group_name} PPR {spec.aspect} err",
-        )
+        for box in bp.get("boxes", []):
+            box.set_facecolor(color)
+            box.set_edgecolor("black")
+            box.set_alpha(0.85)
+            box.set_zorder(2)
+        for med in bp.get("medians", []):
+            med.set_color("black")
+            med.set_linewidth(1.5)
+            med.set_zorder(3)
+        for key in ("whiskers", "caps"):
+            for art in bp.get(key, []):
+                art.set_color("black")
+                art.set_zorder(2)
+
+        box_artist = bp["boxes"][0] if bp.get("boxes") else None
+        # Whiskers/medians/caps must share visibility with the box body (update_show
+        # only flips line/fill keys).
+        aux_artists = list(bp.get("medians", [])) + list(bp.get("whiskers", [])) + list(bp.get("caps", []))
         scat_artists = []
         for pt in spec.scatter_points:
-            scat_art = self.get_axis(spec.axid).scatter(
+            scat_art = ax.scatter(
                 [pt.x],
                 [pt.y],
                 color=spec.scatter_color,
@@ -1602,47 +1623,50 @@ class UIplot:
             )
             scat_artists.append((scat_art, pt.rec_id))
 
-        overlay_bar_artist = self.get_axis(spec.axid).bar(
-            [spec.overlay_x],
-            [spec.mean_val],
-            width=0.4,
-            color=color,
-            edgecolor="black",
-            alpha=0.2,
-            zorder=2,
-            label=f"{group_name} PPR {spec.aspect} overlay_bar",
-        )
-        overlay_err_artist = self.get_axis(spec.axid).errorbar(
-            [spec.overlay_x],
-            [spec.mean_val],
-            yerr=[spec.sem_val],
-            fmt="none",
-            ecolor="black",
-            elinewidth=1.5,
-            capsize=5,
-            capthick=1.5,
-            zorder=3,
-            label=f"{group_name} PPR {spec.aspect} overlay_err",
-        )
-
-        artists = [bar_artist, err_artist, overlay_bar_artist, overlay_err_artist]
-        artists.extend(art for art, _rid in scat_artists)
-        store_items = plot_series.pp_group_bar_store_items(spec)
-        for artist, store_item in zip(artists, store_items):
-            self._hide_plot_artist(artist)
+        # Primary storage: box patch + metadata for ticks/export
+        if box_artist is not None:
+            self._hide_plot_artist(box_artist)
+            for art in aux_artists:
+                try:
+                    self._hide_plot_artist(art)
+                except Exception:
+                    pass
             self.uistate.plot.dict_group_labels[
-                self._level_key(f"{group_name} PPR {spec.aspect} {store_item.suffix}", level)
+                self._level_key(f"{group_name} PPR {spec.aspect} box", level)
             ] = {
                 **plot_model.pp_group_bar_label_entry(
                     group_ID=group_ID,
                     aspect=spec.aspect,
                     level=level,
                     axis=spec.axid,
-                    rec_ID=store_item.rec_id,
-                    is_overlay=store_item.is_overlay,
+                    rec_ID=None,
+                    is_overlay=False,
                 ),
-                "line": artist,
-                "fill": artist,
+                "line": box_artist,
+                "fill": box_artist,
+                "pp_box_x": spec.box_x,
+                "pp_box_width": spec.box_width,
+                "pp_tick_label": spec.tick_label,
+                "pp_values": list(spec.values),
+                "pp_n": spec.n,
+                "pp_aux_artists": aux_artists,
+                "is_pp_box": True,
+            }
+        for scat_art, rid in scat_artists:
+            self._hide_plot_artist(scat_art)
+            self.uistate.plot.dict_group_labels[
+                self._level_key(f"{group_name} PPR {spec.aspect} {rid} point", level)
+            ] = {
+                **plot_model.pp_group_bar_label_entry(
+                    group_ID=group_ID,
+                    aspect=spec.aspect,
+                    level=level,
+                    axis=spec.axid,
+                    rec_ID=rid,
+                    is_overlay=False,
+                ),
+                "line": scat_art,
+                "fill": scat_art,
             }
 
     def _render_io_group_plot_spec(self, spec, group_ID, color):
@@ -1705,28 +1729,47 @@ class UIplot:
     def _add_group_pp(self, group_ID, dict_group, x_pos, level):
         group_name = dict_group["group_name"]
         color = dict_group["color"]
-        rec_ppr = plot_series.extract_rec_ppr_means(
-            self.uistate.plot.dict_rec_labels,
-            dict_group["rec_IDs"],
-        )
+        # Prefer data-driven PPR from dfoutput; fall back to artist scrape.
+        rec_ppr: dict = {}
+        host = getattr(self, "uisub", None)
         df_p = self._host_get_df_project()
+        if host is not None and hasattr(host, "get_dfoutput") and df_p is not None and not df_p.empty:
+            for rec_id in dict_group.get("rec_IDs", []):
+                match = df_p[df_p["ID"] == rec_id]
+                if match.empty:
+                    # try string match
+                    match = df_p[df_p["ID"].astype(str) == str(rec_id)]
+                if match.empty:
+                    continue
+                try:
+                    dfo = host.get_dfoutput(row=match.iloc[0])
+                    means = plot_series.rec_mean_ppr_from_dfoutput(dfo)
+                    if means:
+                        rec_ppr[rec_id] = means
+                except Exception:
+                    continue
+        if not rec_ppr:
+            rec_ppr = plot_series.extract_rec_ppr_means(
+                self.uistate.plot.dict_rec_labels,
+                dict_group["rec_IDs"],
+            )
         if level not in (None, "recording") and df_p is None:
             print(
                 f"WARNING: PP group {group_ID} n_unit={level} without df_project; "
                 "falling back to per-recording units (wire uiplot.uisub)."
             )
-        aggregate = plot_series.aggregate_ppr_at_level(rec_ppr, level, df_p)
-        for bar_spec in plot_series.build_pp_group_bar_plot_specs(
+        aggregate = plot_series.aggregate_ppr_at_level(rec_ppr, level or "recording", df_p)
+        for box_spec in plot_series.build_pp_group_box_plot_specs(
             aggregate=aggregate,
             x_pos=x_pos,
-            level=level,
+            group_name=group_name,
             checkbox=self.uistate.project.checkBox,
             settings=self.uistate.project.settings,
         ):
             try:
-                self._render_pp_group_bar_spec(bar_spec, group_ID, group_name, color, level)
+                self._render_pp_group_box_spec(box_spec, group_ID, group_name, color, level)
             except Exception as e:
-                print(f"DEBUG: addGroup error in drawing loop: {e}")
+                print(f"DEBUG: addGroup error in PP box drawing: {e}")
 
     def _add_group_io(self, group_ID, dict_group, level=None):
         _, y_col_base = plot_series.io_axis_columns(

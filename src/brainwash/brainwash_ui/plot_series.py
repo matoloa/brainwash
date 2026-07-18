@@ -27,12 +27,39 @@ PP_ASPECT_AXES = (
     ("volley_slope", "ax2"),
 )
 
+# Stable x slots for recording PP view (and group aspect ordering).
+# Volley must never share the EPSP amp/slope slot when toggled on later.
+PP_ASPECT_X = {
+    "EPSP_amp": 1,
+    "EPSP_slope": 2,
+    "volley_amp": 3,
+    "volley_slope": 4,
+}
+
 PP_ASPECT_LABELS = {
     "EPSP_amp": "EPSP Amp",
     "EPSP_slope": "EPSP Slope",
     "volley_amp": "Volley Amp",
     "volley_slope": "Volley Slope",
 }
+
+# Short tokens for x-tick labels: "Ctl amp (n=6)"
+PP_ASPECT_TICK = {
+    "EPSP_amp": "amp",
+    "EPSP_slope": "slope",
+    "volley_amp": "volley amp",
+    "volley_slope": "volley slope",
+}
+
+
+def pp_group_x_position(dd_groups: dict | None, group_ID) -> int:
+    """1-based x slot among groups that have recordings (stable dict order)."""
+    if not dd_groups:
+        return 1
+    ordered = [gid for gid, g in dd_groups.items() if g.get("rec_IDs")]
+    if group_ID not in ordered:
+        return 1
+    return 1 + ordered.index(group_ID)
 
 
 @dataclass(frozen=True)
@@ -173,14 +200,21 @@ def pp_active_aspects(checkbox: dict) -> list[tuple[str, str]]:
 
 
 def pp_bar_layout(active_aspects: list[tuple[str, str]]) -> list[tuple[str, str, float, float]]:
-    """Return (aspect, axid, x_offset, bar_width) per enabled PP aspect."""
+    """Return (aspect, axid, x_offset, bar_width) per enabled PP aspect.
+
+    Offsets follow the stable aspect order (amp, slope, volley amp, volley slope)
+    across the shared twinx x-space so each box sits on its own tick — volley never
+    stacks on the EPSP amp slot.
+    """
     if not active_aspects:
         return []
     n_active = len(active_aspects)
     bar_width = 0.8 / max(1, n_active)
     start_offset = -0.4 + (bar_width / 2)
+    # Order by fixed aspect slot so EPSP amp / volley amp keep distinct columns.
+    ordered = sorted(active_aspects, key=lambda t: PP_ASPECT_X.get(t[0], 99))
     configs: list[tuple[str, str, float, float]] = []
-    for i, (asp, axid) in enumerate(active_aspects):
+    for i, (asp, axid) in enumerate(ordered):
         offset = start_offset + (i * bar_width)
         configs.append((asp, axid, offset, bar_width * 0.9))
     return configs
@@ -189,8 +223,33 @@ def pp_bar_layout(active_aspects: list[tuple[str, str]]) -> list[tuple[str, str,
 PPR_ASPECTS = ("EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope")
 
 
+def rec_mean_ppr_from_dfoutput(dfoutput: pd.DataFrame | None) -> dict[str, float]:
+    """Mean PPR (stim2/stim1) per aspect from a recording dfoutput. Pure; no artists."""
+    if dfoutput is None or getattr(dfoutput, "empty", True):
+        return {}
+    if "stim" not in dfoutput.columns or "sweep" not in dfoutput.columns:
+        return {}
+    out_sweeps = dfoutput[dfoutput["sweep"].notna()]
+    out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
+    out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
+    common = out1.index.intersection(out2.index).dropna()
+    if common.empty:
+        return {}
+    o1 = out1.loc[common]
+    o2 = out2.loc[common]
+    means: dict[str, float] = {}
+    for aspect in PPR_ASPECTS:
+        if aspect not in o1.columns or aspect not in o2.columns:
+            continue
+        ppr = compute_ppr(o1[aspect].to_numpy(dtype=float), o2[aspect].to_numpy(dtype=float))
+        valid = ppr[np.isfinite(ppr)]
+        if valid.size:
+            means[aspect] = float(np.mean(valid))
+    return means
+
+
 def extract_rec_ppr_means(dict_rec_labels: dict, rec_ids: list) -> dict:
-    """Per-recording PPR means from existing raw PPR line artists in dict_rec_labels."""
+    """Fallback: per-recording PPR means from raw PPR line artists (legacy)."""
     rec_ppr: dict = {}
     rec_id_set = set(rec_ids)
     for rec_id in rec_ids:
@@ -218,6 +277,7 @@ class PprLevelAggregate:
     ppr_data: dict[str, list[float]] = field(
         default_factory=lambda: {a: [] for a in PPR_ASPECTS}
     )
+    # Parallel unit labels (rec_ID or subject/slice key) for each value in ppr_data
     rec_id_order: dict[str, list] = field(
         default_factory=lambda: {a: [] for a in PPR_ASPECTS}
     )
@@ -229,7 +289,7 @@ def aggregate_ppr_at_level(
     df_project: pd.DataFrame | None,
 ) -> PprLevelAggregate:
     agg = PprLevelAggregate()
-    if level == "recording":
+    if level == "recording" or level in (None, ""):
         for rec_id, aspect_vals in rec_ppr.items():
             for asp, val in aspect_vals.items():
                 if asp in agg.ppr_data:
@@ -256,10 +316,11 @@ def aggregate_ppr_at_level(
         bucket = unit_asp.setdefault(uk, {})
         for asp, val in aspect_vals.items():
             bucket.setdefault(asp, []).append(val)
-    for _uk, aspect_map in unit_asp.items():
+    for uk, aspect_map in unit_asp.items():
         for asp, vlist in aspect_map.items():
             if asp in agg.ppr_data and vlist:
                 agg.ppr_data[asp].append(float(np.mean(vlist)))
+                agg.rec_id_order[asp].append(uk)
     return agg
 
 
@@ -279,6 +340,8 @@ class PpGroupScatterPointSpec:
 
 @dataclass(frozen=True)
 class PpGroupBarPlotSpec:
+    """Legacy bar±SEM spec (tests / fallback). Prefer PpGroupBoxPlotSpec."""
+
     aspect: str
     axid: str
     bar_x: float
@@ -286,6 +349,21 @@ class PpGroupBarPlotSpec:
     mean_val: float
     sem_val: float
     overlay_x: int
+    scatter_points: tuple[PpGroupScatterPointSpec, ...]
+    scatter_color: str
+
+
+@dataclass(frozen=True)
+class PpGroupBoxPlotSpec:
+    """Group PP summary: box (distribution) + unit dots + n for tick label."""
+
+    aspect: str
+    axid: str
+    box_x: float
+    box_width: float
+    values: tuple[float, ...]
+    n: int
+    tick_label: str
     scatter_points: tuple[PpGroupScatterPointSpec, ...]
     scatter_color: str
 
@@ -301,9 +379,14 @@ def pp_group_bar_store_items(spec: PpGroupBarPlotSpec) -> tuple[PpGroupBarStoreI
     items: list[PpGroupBarStoreItem] = [
         PpGroupBarStoreItem("bar", None, False),
         PpGroupBarStoreItem("err", None, False),
-        PpGroupBarStoreItem("overlay_bar", None, True),
-        PpGroupBarStoreItem("overlay_err", None, True),
     ]
+    for pt in spec.scatter_points:
+        items.append(PpGroupBarStoreItem(f"{pt.rec_id} point", pt.rec_id, False))
+    return tuple(items)
+
+
+def pp_group_box_store_items(spec: PpGroupBoxPlotSpec) -> tuple[PpGroupBarStoreItem, ...]:
+    items: list[PpGroupBarStoreItem] = [PpGroupBarStoreItem("box", None, False)]
     for pt in spec.scatter_points:
         items.append(PpGroupBarStoreItem(f"{pt.rec_id} point", pt.rec_id, False))
     return tuple(items)
@@ -330,6 +413,7 @@ def build_pp_group_bar_plot_specs(
     settings: dict,
     rng=None,
 ) -> list[PpGroupBarPlotSpec]:
+    """Legacy mean±SEM bar specs (kept for tests)."""
     specs: list[PpGroupBarPlotSpec] = []
     overlay_map = pp_overlay_x_map(checkbox)
     for aspect, axid, offset, bar_w in pp_bar_layout(pp_active_aspects(checkbox)):
@@ -340,11 +424,12 @@ def build_pp_group_bar_plot_specs(
         bar_x = x_pos + offset
         scatter_points: tuple[PpGroupScatterPointSpec, ...] = ()
         scatter_color = settings.get(f"rgb_{aspect}", "white")
-        if level == "recording" and aspect in aggregate.rec_id_order:
+        unit_ids = aggregate.rec_id_order.get(aspect, [])
+        if unit_ids and len(unit_ids) == len(vals):
             jitter = pp_group_scatter_jitter(len(vals), rng=rng)
             scatter_points = tuple(
                 PpGroupScatterPointSpec(bar_x + float(j), float(val), rid)
-                for j, val, rid in zip(jitter, vals, aggregate.rec_id_order[aspect])
+                for j, val, rid in zip(jitter, vals, unit_ids)
             )
         specs.append(
             PpGroupBarPlotSpec(
@@ -357,6 +442,52 @@ def build_pp_group_bar_plot_specs(
                 overlay_x=overlay_map.get(aspect, 1),
                 scatter_points=scatter_points,
                 scatter_color=scatter_color,
+            )
+        )
+    return specs
+
+
+def build_pp_group_box_plot_specs(
+    *,
+    aggregate: PprLevelAggregate,
+    x_pos: float,
+    group_name: str,
+    checkbox: dict,
+    settings: dict,
+    rng=None,
+) -> list[PpGroupBoxPlotSpec]:
+    """Box + unit dots + n tick label for group PP summary."""
+    specs: list[PpGroupBoxPlotSpec] = []
+    for aspect, axid, offset, bar_w in pp_bar_layout(pp_active_aspects(checkbox)):
+        vals = [float(v) for v in aggregate.ppr_data.get(aspect, []) if np.isfinite(v)]
+        if not vals:
+            continue
+        box_x = x_pos + offset
+        unit_ids = list(aggregate.rec_id_order.get(aspect, []))
+        # Align unit ids with filtered vals if needed
+        if len(unit_ids) != len(aggregate.ppr_data.get(aspect, [])):
+            unit_ids = [f"u{i}" for i in range(len(vals))]
+        else:
+            raw = aggregate.ppr_data.get(aspect, [])
+            unit_ids = [uid for uid, v in zip(unit_ids, raw) if np.isfinite(v)]
+        jitter = pp_group_scatter_jitter(len(vals), rng=rng)
+        scatter_points = tuple(
+            PpGroupScatterPointSpec(box_x + float(j), float(val), rid)
+            for j, val, rid in zip(jitter, vals, unit_ids)
+        )
+        n = len(vals)
+        aspect_tick = PP_ASPECT_TICK.get(aspect, aspect)
+        specs.append(
+            PpGroupBoxPlotSpec(
+                aspect=aspect,
+                axid=axid,
+                box_x=box_x,
+                box_width=bar_w,
+                values=tuple(vals),
+                n=n,
+                tick_label=f"{group_name} {aspect_tick} (n={n})",
+                scatter_points=scatter_points,
+                scatter_color=settings.get(f"rgb_{aspect}", "white"),
             )
         )
     return specs
@@ -450,17 +581,16 @@ def build_io_group_plot_specs(
 
 
 def pp_overlay_x_map(checkbox: dict) -> dict[str, int]:
-    x_val_map: dict[str, int] = {}
-    idx = 1
-    for key in ("EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"):
-        if checkbox.get(key, True):
-            x_val_map[key] = idx
-            idx += 1
-    return x_val_map
+    """Enabled aspects → stable x slot (1=amp, 2=slope, 3=volley amp, 4=volley slope).
+
+    Fixed slots so volley never lands on the EPSP amp tick when both are shown.
+    """
+    return {asp: x for asp, x in PP_ASPECT_X.items() if checkbox.get(asp, True)}
 
 
-def pp_group_tick_from_bar(x_left: float, bar_width: float) -> int:
-    return round(x_left + bar_width / 2)
+def pp_group_tick_from_bar(x_left: float, bar_width: float) -> float:
+    """Center x of a bar/box given left edge and width."""
+    return float(x_left) + float(bar_width) / 2.0
 
 
 def pp_has_visible_rec_ppr(dict_rec_show: dict) -> bool:
@@ -474,17 +604,37 @@ def collect_pp_group_bar_patch_specs(
     dict_group_show: dict,
     current_level: str,
     group_display_name,
+    *,
+    axis: str | None = None,
 ) -> list[tuple[float, float, str]]:
-    """(x_left, bar_width, tick_label) from visible PP group bar containers."""
+    """(x_left, width, tick_label) from visible PP group containers.
+
+    Supports box metadata (pp_box_*) and legacy bar patches.
+    If axis is set (ax1/ax2), only that panel's boxes are included.
+    """
     specs: list[tuple[float, float, str]] = []
     for key, val in dict_group_show.items():
         if "PPR" not in key or val.get("is_overlay"):
             continue
-        line = val.get("line")
-        if line is None or not hasattr(line, "patches"):
+        if "point" in key:
             continue
         level = val.get("level")
         if level is not None and level != current_level:
+            continue
+        if axis is not None and val.get("axis") not in (None, axis):
+            continue
+        # Prefer stored box/bar geometry (works for boxplot PathPatch + export)
+        if val.get("pp_box_x") is not None:
+            try:
+                x = float(val["pp_box_x"])
+                w = float(val.get("pp_box_width", 0.5))
+                tick_label = val.get("pp_tick_label") or group_display_name(key.split(" PPR")[0])
+                specs.append((x - w / 2.0, w, tick_label))
+                continue
+            except Exception:
+                pass
+        line = val.get("line")
+        if line is None or not hasattr(line, "patches"):
             continue
         try:
             patch = line.patches[0]
@@ -497,7 +647,7 @@ def collect_pp_group_bar_patch_specs(
 
 @dataclass(frozen=True)
 class PpGraphRefreshXAxisPlan:
-    ticks: tuple[int, ...]
+    ticks: tuple[float, ...]
     ticklabels: tuple[str, ...]
     ax1_xlabel: str | None
     ax2_xlabel: str | None
@@ -537,22 +687,41 @@ def build_pp_graph_refresh_xaxis_plan(
     return PpGraphRefreshXAxisPlan((), (), None, None, hide_all=True, labels_only=False)
 
 
-def pp_group_tick_label_map(bar_specs: list[tuple[float, float, str]]) -> tuple[list[int], list[str]]:
-    """Build sorted PP group xticks from (x_left, width, display_label) tuples."""
-    name_by_x: dict[int, str] = {}
+def pp_group_tick_label_map(bar_specs: list[tuple[float, float, str]]) -> tuple[list[float], list[str]]:
+    """Build sorted PP xticks from (x_left, width, display_label); one tick per box center."""
+    items: list[tuple[float, str]] = []
+    seen: set[float] = set()
     for x_left, width, label in bar_specs:
-        name_by_x[pp_group_tick_from_bar(x_left, width)] = label
-    ticks = sorted(name_by_x.keys())
-    return ticks, [name_by_x[x] for x in ticks]
+        center = round(pp_group_tick_from_bar(x_left, width), 4)
+        if center in seen:
+            # Keep distinct labels: nudge key slightly if collision (multi-aspect)
+            center = center + 1e-3 * len(items)
+        seen.add(center)
+        items.append((center, label))
+    items.sort(key=lambda t: t[0])
+    return [c for c, _ in items], [lab for _, lab in items]
+
+
+def pp_group_xlim_from_ticks(ticks: list[float] | tuple[float, ...], pad: float = 0.6) -> tuple[float, float] | None:
+    """X limits so every box/tick fits with side padding."""
+    if not ticks:
+        return None
+    tmin, tmax = float(min(ticks)), float(max(ticks))
+    if tmin == tmax:
+        return (tmin - pad, tmax + pad)
+    return (tmin - pad, tmax + pad)
 
 
 def pp_recording_view_ticks(checkbox: dict) -> tuple[list[int], list[str]]:
+    """X ticks for recording PP view — positions must match pp_overlay_x_map (sequential)."""
+    x_map = pp_overlay_x_map(checkbox)
     ticks: list[int] = []
     labels: list[str] = []
-    for i, (asp, _) in enumerate(PP_ASPECT_AXES, start=1):
-        if checkbox.get(asp, True):
-            ticks.append(i)
-            labels.append(PP_ASPECT_LABELS[asp])
+    for asp, _axid in PP_ASPECT_AXES:
+        if asp not in x_map:
+            continue
+        ticks.append(x_map[asp])
+        labels.append(PP_ASPECT_LABELS[asp])
     return ticks, labels
 
 
@@ -600,7 +769,11 @@ def pp_recording_ppr_specs(
     checkbox: dict,
     settings: dict,
 ) -> list[PpRecordingPprSpec]:
-    x_map = pp_overlay_x_map(checkbox)
+    """One PPR series per aspect present in data at its fixed x slot.
+
+    Checkbox only affects which series are visible later (update_show); positions
+    stay fixed so enabling volley never places it on the EPSP amp tick.
+    """
     specs: list[PpRecordingPprSpec] = []
     for aspect, axid, color in pp_recording_aspect_configs(settings):
         if aspect not in o1.columns or aspect not in o2.columns:
@@ -613,7 +786,7 @@ def pp_recording_ppr_specs(
                 axid=axid,
                 color=color,
                 ppr=compute_ppr(v1, v2),
-                x_val=x_map.get(aspect, 1),
+                x_val=PP_ASPECT_X[aspect],
                 n_points=len(v1),
             )
         )

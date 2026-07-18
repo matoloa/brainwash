@@ -223,7 +223,9 @@ def test_output_axis_ylabels():
     assert labels.ax1_ylabel == "EPSP Amplitude (mV)"
     assert labels.ax2_ylabel == ""
     pp = plot_model.output_axis_ylabels(experiment_type="PP", io_output="", norm_epsP=False)
-    assert pp.ax1_ylabel == "PPR Amp (%)"
+    assert pp.ax1_ylabel == "PPR Amp"
+    assert pp.ax2_ylabel == "PPR Slope"
+    assert "%" not in pp.ax1_ylabel
     time_norm = plot_model.output_axis_ylabels(experiment_type="time", io_output="", norm_epsP=True)
     assert time_norm.ax2_ylabel == "Slope %"
 
