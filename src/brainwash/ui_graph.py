@@ -636,14 +636,20 @@ class GraphCoordinatorMixin:
             self.uistate.project.zoom["output_ax1_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
             self.uistate.project.zoom["output_ax2_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
         else:
+            # Extra top headroom for SEM bands + significance markers (was default pad=0.10)
+            out_ypad = 0.2
             self.uistate.project.zoom["output_xlim"] = self.uistate.x_axis_xlim(prow, dft=dft)
             out_xmin, out_xmax = self.uistate.project.zoom["output_xlim"]
 
-            self.uistate.project.zoom["output_ax1_ylim"] = self._ylim_from_artists(self.uistate.plot.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (
+            self.uistate.project.zoom["output_ax1_ylim"] = self._ylim_from_artists(
+                self.uistate.plot.ax1, pad=out_ypad, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
+            ) or (
                 0,
                 1.5,
             )
-            self.uistate.project.zoom["output_ax2_ylim"] = self._ylim_from_artists(self.uistate.plot.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (
+            self.uistate.project.zoom["output_ax2_ylim"] = self._ylim_from_artists(
+                self.uistate.plot.ax2, pad=out_ypad, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
+            ) or (
                 0,
                 1.5,
             )
@@ -709,8 +715,13 @@ class GraphCoordinatorMixin:
                 out_xmin, out_xmax = (0, 1)
 
             self.uistate.project.zoom["output_xlim"] = (out_xmin, out_xmax)
-            self.uistate.project.zoom["output_ax1_ylim"] = self._ylim_from_artists(self.uistate.plot.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
-            self.uistate.project.zoom["output_ax2_ylim"] = self._ylim_from_artists(self.uistate.plot.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
+            out_ypad = 0.2  # match zoomAuto time/sweep/train headroom for SEM + markers
+            self.uistate.project.zoom["output_ax1_ylim"] = self._ylim_from_artists(
+                self.uistate.plot.ax1, pad=out_ypad, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
+            ) or (0, 1.5)
+            self.uistate.project.zoom["output_ax2_ylim"] = self._ylim_from_artists(
+                self.uistate.plot.ax2, pad=out_ypad, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
+            ) or (0, 1.5)
 
     def zoomReset(self, axis=None):
         # self.usage("zoomReset")
@@ -822,5 +833,10 @@ class GraphCoordinatorMixin:
                 out_xmin, out_xmax = (0, 1)
 
             self.uistate.project.zoom["output_xlim"] = (out_xmin, out_xmax)
-            self.uistate.project.zoom["output_ax1_ylim"] = self._ylim_from_artists(self.uistate.plot.ax1, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
-            self.uistate.project.zoom["output_ax2_ylim"] = self._ylim_from_artists(self.uistate.plot.ax2, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax) or (0, 1.5)
+            out_ypad = 0.2  # match zoomAuto time/sweep/train headroom for SEM + markers
+            self.uistate.project.zoom["output_ax1_ylim"] = self._ylim_from_artists(
+                self.uistate.plot.ax1, pad=out_ypad, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
+            ) or (0, 1.5)
+            self.uistate.project.zoom["output_ax2_ylim"] = self._ylim_from_artists(
+                self.uistate.plot.ax2, pad=out_ypad, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
+            ) or (0, 1.5)

@@ -146,12 +146,12 @@ if __name__ == "__main__":
         ):
             _log_exceptions(_m)
 
-        MainWindow.show()
+        MainWindow.showMaximized()
         if app.platformName() != "wayland":
             MainWindow.raise_()
             MainWindow.activateWindow()
             force_focus(MainWindow)  # Win32 fallback for stubborn builds
-        logger.info("MainWindow shown, entering event loop")
+        logger.info("MainWindow shown maximized, entering event loop")
 
         sys.exit(app.exec_())
     except Exception:
