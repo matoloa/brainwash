@@ -51,6 +51,44 @@ def test_artist_xy_first():
     assert plot_drag.artist_xy_first(line) == (2.0, 4.0)
 
 
+class _IdentityTransform:
+    def transform(self, pts):
+        return np.asarray(pts, dtype=float)
+
+
+class _ScaleYTransform:
+    """Maps data → display with Y stretched 10× (simulates tall aspect in data, short on screen)."""
+
+    def transform(self, pts):
+        p = np.asarray(pts, dtype=float).copy()
+        p[:, 1] = p[:, 1] * 10.0
+        return p
+
+
+def test_nearest_point_index_display_identity():
+    # Mouse at (1, 0); points at (0,0) and (2,0) → closer is (0,0) index 0? dist 1 vs 1 — first min
+    idx = plot_drag.nearest_point_index_display(0.1, 0.0, [0.0, 2.0], [0.0, 0.0], _IdentityTransform())
+    assert idx == 0
+    idx = plot_drag.nearest_point_index_display(1.9, 0.0, [0.0, 2.0], [0.0, 0.0], _IdentityTransform())
+    assert idx == 1
+
+
+def test_nearest_point_index_display_uses_screen_not_data_range():
+    # Two candidates from mouse at (0, 0) in *data*:
+    # A: (1, 0) — far in X only
+    # B: (0, 0.5) — far in Y only
+    # Identity display: A is farther in data units (1 vs 0.5) → B wins.
+    xs = [1.0, 0.0]
+    ys = [0.0, 0.5]
+    assert plot_drag.nearest_point_index_display(0.0, 0.0, xs, ys, _IdentityTransform()) == 1
+    # After Y×10 display transform, B is 5 display units away, A is 1 → A wins (screen-space).
+    assert plot_drag.nearest_point_index_display(0.0, 0.0, xs, ys, _ScaleYTransform()) == 0
+
+
+def test_nearest_point_index_display_all_nan():
+    assert plot_drag.nearest_point_index_display(0.0, 0.0, [np.nan], [np.nan], _IdentityTransform()) is None
+
+
 def test_snap_sweep_index_returns_python_int():
     assert plot_drag.snap_sweep_index(list(range(10)), 3.7) == 4
     assert type(plot_drag.snap_sweep_index(list(range(10)), 3.7)) is int

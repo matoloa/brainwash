@@ -369,13 +369,15 @@ class InteractivePlotMixin:
             axe.figure.canvas.draw_idle()
 
     @staticmethod
-    def _get_nearest_point(x, y, x_array, y_array, x_range, y_range):
-        dx = (x_array - x) / x_range
-        dy = (y_array - y) / y_range
-        distances = dx**2 + dy**2
-        if np.all(np.isnan(distances)):
-            return None
-        return int(np.nanargmin(distances))
+    def _get_nearest_point(mouse_disp_x, mouse_disp_y, x_array, y_array, transform):
+        """Nearest scatter/line sample to the mouse in *display* (screen) space."""
+        return plot_drag.nearest_point_index_display(
+            mouse_disp_x,
+            mouse_disp_y,
+            x_array,
+            y_array,
+            transform,
+        )
 
     def _draw_ghost_sweep(self, snippet_x, snippet_y, label_text):
         if self.uistate.plot.ghost_sweep is None:
@@ -1429,16 +1431,8 @@ class InteractivePlotMixin:
         x_data = plot_drag.artist_xdata(dict_pop["line"])
         y_data = plot_drag.artist_ydata(dict_pop["line"])
 
-        xlim = ax.get_xlim()
-        ylim = ax.get_ylim()
-        x_range = xlim[1] - xlim[0]
-        y_range = ylim[1] - ylim[0]
-        if x_range == 0:
-            x_range = 1
-        if y_range == 0:
-            y_range = 1
-
-        out_x_idx = self._get_nearest_point(x, y, x_data, y_data, x_range, y_range)
+        # Screen-space nearest (event.x/y are display coords; not data-range fractions).
+        out_x_idx = self._get_nearest_point(event.x, event.y, x_data, y_data, ax.transData)
         if out_x_idx is None:
             return
 
@@ -1558,16 +1552,8 @@ class InteractivePlotMixin:
         x_array = df_sweeps[x_col].values.astype(float)
         y_array = df_sweeps[y_col].values.astype(float)
 
-        xlim = ax.get_xlim()
-        ylim = ax.get_ylim()
-        x_range = xlim[1] - xlim[0]
-        y_range = ylim[1] - ylim[0]
-        if x_range == 0:
-            x_range = 1
-        if y_range == 0:
-            y_range = 1
-
-        out_x_idx = self._get_nearest_point(x, y, x_array, y_array, x_range, y_range)
+        # Screen-space nearest: equal weight per pixel (wide axes no longer over-weight Y).
+        out_x_idx = self._get_nearest_point(event.x, event.y, x_array, y_array, ax.transData)
         if out_x_idx is None:
             return
 

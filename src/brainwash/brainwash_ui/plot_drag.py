@@ -60,6 +60,40 @@ def artist_xy_first(line) -> tuple[float, float]:
     return float(xdata[0]), float(ydata[0])
 
 
+def nearest_point_index_display(
+    mouse_disp_x: float,
+    mouse_disp_y: float,
+    x_data,
+    y_data,
+    transform,
+) -> int | None:
+    """Index of the point nearest the mouse in *display* (screen/pixel) space.
+
+    Uses ``transform.transform`` (typically ``Axes.transData``) so X/Y are weighted
+    by on-screen distance, not raw data units or axis data-range fractions.
+    Returns None when no finite points exist.
+    """
+    x_arr = np.asarray(x_data, dtype=float).ravel()
+    y_arr = np.asarray(y_data, dtype=float).ravel()
+    if x_arr.size == 0 or x_arr.size != y_arr.size:
+        return None
+    finite = np.isfinite(x_arr) & np.isfinite(y_arr)
+    if not np.any(finite):
+        return None
+    pts = np.column_stack([x_arr, y_arr])
+    try:
+        disp = np.asarray(transform.transform(pts), dtype=float)
+    except Exception:
+        return None
+    if disp.ndim != 2 or disp.shape[0] != x_arr.size or disp.shape[1] < 2:
+        return None
+    d2 = (disp[:, 0] - float(mouse_disp_x)) ** 2 + (disp[:, 1] - float(mouse_disp_y)) ** 2
+    d2 = np.where(finite, d2, np.nan)
+    if np.all(np.isnan(d2)):
+        return None
+    return int(np.nanargmin(d2))
+
+
 def snap_to_nearest_x(x_range, x: float):
     """Return the nearest x in *x_range* to mouse *x* (may be numpy scalar)."""
     arr = np.asarray(x_range, dtype=float)
