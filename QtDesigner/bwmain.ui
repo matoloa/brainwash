@@ -273,9 +273,9 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-1057</y>
+          <y>-494</y>
           <width>284</width>
-          <height>1980</height>
+          <height>2107</height>
          </rect>
         </property>
         <property name="minimumSize">
@@ -639,7 +639,7 @@
            <widget class="QLineEdit" name="lineEdit_sweeps_range_to">
             <property name="geometry">
              <rect>
-              <x>150</x>
+              <x>160</x>
               <y>30</y>
               <width>41</width>
               <height>25</height>
@@ -649,7 +649,7 @@
            <widget class="QLabel" name="label_sweeps_dash">
             <property name="geometry">
              <rect>
-              <x>140</x>
+              <x>150</x>
               <y>30</y>
               <width>16</width>
               <height>20</height>
@@ -665,7 +665,7 @@
            <widget class="QLabel" name="label_sweeps_selection">
             <property name="geometry">
              <rect>
-              <x>10</x>
+              <x>20</x>
               <y>30</y>
               <width>71</width>
               <height>20</height>
@@ -681,7 +681,7 @@
            <widget class="QLineEdit" name="lineEdit_sweeps_range_from">
             <property name="geometry">
              <rect>
-              <x>90</x>
+              <x>100</x>
               <y>30</y>
               <width>41</width>
               <height>25</height>
@@ -1200,6 +1200,42 @@
           </widget>
          </item>
          <item>
+          <widget class="QFrame" name="frameToolType_sub_io_stim">
+           <property name="minimumSize">
+            <size>
+             <width>201</width>
+             <height>41</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Raised</enum>
+           </property>
+           <widget class="QLabel" name="label_io_input_stim">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>10</y>
+              <width>241</width>
+              <height>17</height>
+             </rect>
+            </property>
+            <property name="font">
+             <font>
+              <family>DejaVu Sans</family>
+              <weight>75</weight>
+              <bold>true</bold>
+             </font>
+            </property>
+            <property name="text">
+             <string>IO - Input stim</string>
+            </property>
+           </widget>
+          </widget>
+         </item>
+         <item>
           <widget class="QFrame" name="frameToolFilter">
            <property name="minimumSize">
             <size>
@@ -1394,7 +1430,7 @@
            <widget class="QLineEdit" name="lineEdit_norm_EPSP_end">
             <property name="geometry">
              <rect>
-              <x>80</x>
+              <x>90</x>
               <y>80</y>
               <width>41</width>
               <height>25</height>
@@ -1404,7 +1440,7 @@
            <widget class="QLabel" name="label_norm_on_sweep">
             <property name="geometry">
              <rect>
-              <x>10</x>
+              <x>20</x>
               <y>60</y>
               <width>151</width>
               <height>20</height>
@@ -1433,7 +1469,7 @@
            <widget class="QLabel" name="label_relative_to">
             <property name="geometry">
              <rect>
-              <x>70</x>
+              <x>80</x>
               <y>80</y>
               <width>21</width>
               <height>20</height>
@@ -1469,7 +1505,7 @@
            <widget class="QLineEdit" name="lineEdit_norm_EPSP_start">
             <property name="geometry">
              <rect>
-              <x>20</x>
+              <x>30</x>
               <y>80</y>
               <width>41</width>
               <height>25</height>
@@ -2643,15 +2679,15 @@
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="buttonGroup_test_n"/>
-  <buttongroup name="buttonGroup_filter"/>
-  <buttongroup name="buttonGroup_io_i"/>
-  <buttongroup name="buttonGroup_wilcoxon_tails"/>
-  <buttongroup name="buttonGroup_type"/>
   <buttongroup name="buttonGroup_test_t_tails"/>
   <buttongroup name="buttonGroup_wilcoxon_variant"/>
-  <buttongroup name="buttonGroup_test_t_variant"/>
   <buttongroup name="buttonGroup_io_o"/>
+  <buttongroup name="buttonGroup_io_i"/>
   <buttongroup name="buttonGroup_test"/>
+  <buttongroup name="buttonGroup_test_n"/>
+  <buttongroup name="buttonGroup_filter"/>
+  <buttongroup name="buttonGroup_type"/>
+  <buttongroup name="buttonGroup_wilcoxon_tails"/>
+  <buttongroup name="buttonGroup_test_t_variant"/>
  </buttongroups>
 </ui>
