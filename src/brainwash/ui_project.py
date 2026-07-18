@@ -1168,10 +1168,11 @@ class ProjectMixin:
             print(f"new_recording_name {new_recording_name} is not a valid filename")
 
     def rename_files_by_rec_name(self, old_name, new_name):
+        from brainwash_ui import recording_cache
+
         for folder_name, file_suffix in [
             ("data", ".parquet"),
             ("timepoints", ".parquet"),
-            ("stim_intensity", ".csv"),
             ("cache", "_mean.parquet"),
             ("cache", "_filter.parquet"),
             ("cache", "_bin.parquet"),
@@ -1184,6 +1185,17 @@ class ProjectMixin:
             elif folder_name == "data":
                 print(f"recording_rename_files: file not found: {old_file_path}")
                 raise FileNotFoundError
+        # Stim intensity: path helper strips a redundant .csv so we never get .csv.csv
+        if "stim_intensity" in self.dict_folders:
+            old_si = Path(recording_cache.stim_intensity_csv_path(str(self.dict_folders["stim_intensity"]), old_name))
+            new_si = Path(recording_cache.stim_intensity_csv_path(str(self.dict_folders["stim_intensity"]), new_name))
+            if old_si.exists() and old_si != new_si:
+                new_si.parent.mkdir(parents=True, exist_ok=True)
+                old_si.rename(new_si)
+            # Migrate accidental double-suffix files from earlier builds
+            legacy = Path(self.dict_folders["stim_intensity"]) / f"{old_name}.csv.csv"
+            if legacy.exists() and not new_si.exists():
+                legacy.rename(new_si)
 
     def set_rec_status(self, rec_name=None):  # TODO: should run on ID - not name!
         # Updates df_project['status'] to 'manual' if there is a single manual point, else 'default' if there is a default point, else 'auto'

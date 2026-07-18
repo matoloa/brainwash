@@ -30,8 +30,16 @@ def timepoints_parquet_path(timepoints_folder: str, recording_name: str) -> str:
 
 
 def stim_intensity_csv_path(stim_intensity_folder: str, recording_name: str) -> str:
-    """Per-recording user-owned stim strength CSV (µA)."""
-    return f"{stim_intensity_folder}/{recording_name}.csv"
+    """Per-recording user-owned stim strength CSV (µA).
+
+    Idempotent: if ``recording_name`` already ends with ``.csv``, do not double it.
+    """
+    name = str(recording_name).strip()
+    # Avoid "rec.csv.csv" when callers pass a name that already includes the suffix
+    # or when rename glue does base + ".csv" on a path that already ends in .csv.
+    while name.lower().endswith(".csv"):
+        name = name[: -len(".csv")]
+    return f"{stim_intensity_folder}/{name}.csv"
 
 
 def data_parquet_path(data_folder: str, recording_name: str) -> str:

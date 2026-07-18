@@ -15,6 +15,13 @@ def test_stim_intensity_csv_path():
     assert p == "/proj/stim_intensity/rec_A.csv"
 
 
+def test_stim_intensity_csv_path_no_double_csv():
+    p = recording_cache.stim_intensity_csv_path("/proj/stim_intensity", "rec_A.csv")
+    assert p == "/proj/stim_intensity/rec_A.csv"
+    p2 = recording_cache.stim_intensity_csv_path("/proj/stim_intensity", "rec_A.csv.csv")
+    assert p2 == "/proj/stim_intensity/rec_A.csv"
+
+
 def test_load_missing_returns_empty(tmp_path: Path):
     df = si.load_stim_intensity_csv(tmp_path / "missing.csv")
     assert list(df.columns) == list(si.CSV_COLUMNS)
