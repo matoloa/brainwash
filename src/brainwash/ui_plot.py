@@ -694,36 +694,39 @@ class UIplot:
         return plot_model.display_label_from_key(key)
 
     def update_group_level_visibility(self, active_level=None):
-        """Toggle visibility of group artists so only the current n_unit level is shown.
+        """Hide group artists that are not for the active n_unit level.
 
-        This allows keeping separate artist sets (mean + SEM) per level
-        and switching cheaply via visibility instead of unplot/replot.
-        Integrates with the level filter already present in update_show.
+        Active-level visibility is owned by update_show (selection / show checkboxes).
+        This helper must not force-show active-level artists or rebuild dict_group_show
+        from level alone — that clobbered selection rules after update_show.
         """
         if active_level is None:
             active_level = self.uistate.stat_test.buttonGroup_test_n
 
-        # Ensure only artists for the active level (or untagged) are visible.
-        # We set visibility here for level, and let update_show handle selection rules.
         dict_group = self.uistate.plot.dict_group_labels
 
-        for k, v in list(dict_group.items()):
-            if v.get("group_ID") is not None:
-                is_correct_level = (v.get("level") == active_level) or (v.get("level") is None)
-                visible_for_level = is_correct_level
-                for key in ["line", "fill"]:
-                    obj = v.get(key)
-                    if obj is not None:
-                        try:
-                            self._set_plot_artist_visible(obj, visible_for_level)
-                        except Exception:
-                            pass
+        for _k, v in list(dict_group.items()):
+            if v.get("group_ID") is None:
+                continue
+            is_correct_level = (v.get("level") == active_level) or (v.get("level") is None)
+            if is_correct_level:
+                continue
+            for key in ["line", "fill"]:
+                obj = v.get(key)
+                if obj is not None:
+                    try:
+                        self._set_plot_artist_visible(obj, False)
+                    except Exception:
+                        pass
 
-        # Rebuild show dict for the level (caller should invoke full update_show for selection rules if needed)
+        # Drop non-active levels from the show index; keep selection-filtered active entries.
         if hasattr(self.uistate.plot, "dict_group_show"):
-            new_show = {k: v for k, v in dict_group.items()
-                        if v.get("group_ID") is not None and ((v.get("level") == active_level) or (v.get("level") is None))}
-            self.uistate.plot.dict_group_show = new_show
+            show = self.uistate.plot.dict_group_show
+            self.uistate.plot.dict_group_show = {
+                k: v
+                for k, v in show.items()
+                if (v.get("level") == active_level) or (v.get("level") is None)
+            }
 
     def _ensure_reference_hlines(self, uistate) -> None:
         if "Events y zero marker" not in self.uistate.plot.dict_rec_labels:
@@ -1662,6 +1665,16 @@ class UIplot:
                 "fill": trendline,
             }
 
+    def _host_get_df_project(self):
+        """df_project for hierarchy (n_unit). Requires UIsub to set uiplot.uisub."""
+        host = getattr(self, "uisub", None)
+        if host is not None and hasattr(host, "get_df_project"):
+            try:
+                return host.get_df_project()
+            except Exception:
+                return None
+        return None
+
     def _add_group_pp(self, group_ID, dict_group, x_pos, level):
         group_name = dict_group["group_name"]
         color = dict_group["color"]
@@ -1669,12 +1682,12 @@ class UIplot:
             self.uistate.plot.dict_rec_labels,
             dict_group["rec_IDs"],
         )
-        df_p = None
-        try:
-            if hasattr(self, "uisub") and self.uisub and hasattr(self.uisub, "get_df_project"):
-                df_p = self.uisub.get_df_project()
-        except Exception:
-            df_p = None
+        df_p = self._host_get_df_project()
+        if level not in (None, "recording") and df_p is None:
+            print(
+                f"WARNING: PP group {group_ID} n_unit={level} without df_project; "
+                "falling back to per-recording units (wire uiplot.uisub)."
+            )
         aggregate = plot_series.aggregate_ppr_at_level(rec_ppr, level, df_p)
         for bar_spec in plot_series.build_pp_group_bar_plot_specs(
             aggregate=aggregate,
@@ -1688,14 +1701,14 @@ class UIplot:
             except Exception as e:
                 print(f"DEBUG: addGroup error in drawing loop: {e}")
 
-    def _add_group_io(self, group_ID, dict_group):
+    def _add_group_io(self, group_ID, dict_group, level=None):
         _, y_col_base = plot_series.io_axis_columns(
             self.uistate.experiment.io_input,
             self.uistate.experiment.io_output,
         )
         color = dict_group["color"]
         group_name = dict_group["group_name"]
-        io_level = self.uistate.stat_test.buttonGroup_test_n
+        io_level = level or self.uistate.stat_test.buttonGroup_test_n
         force0 = bool(self.uistate.project.checkBox.get("io_force0", False))
         for variant in ("raw", "norm"):
             xy = plot_series.collect_io_group_scatter_xy(
@@ -1728,12 +1741,12 @@ class UIplot:
         eff_level = level or self.uistate.stat_test.buttonGroup_test_n
         exp_type = self.uistate.experiment.experiment_type
         if exp_type == "PP":
-            self._add_group_pp(group_ID, dict_group, x_pos, eff_level or self.uistate.stat_test.buttonGroup_test_n)
+            self._add_group_pp(group_ID, dict_group, x_pos, eff_level)
             return
         if exp_type == "io":
-            self._add_group_io(group_ID, dict_group)
+            self._add_group_io(group_ID, dict_group, level=eff_level)
             return
-        self._add_group_means(group_ID, dict_group, df_groupmean, self.uistate.stat_test.buttonGroup_test_n)
+        self._add_group_means(group_ID, dict_group, df_groupmean, eff_level)
 
     def update(
         self,

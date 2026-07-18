@@ -112,6 +112,8 @@ class UIsub(
         self.config = ui_widgets.Config()
         self.uistate = ui_state_classes.UIstate()
         self.uiplot = ui_plot.UIplot(self.uistate)
+        # Host back-ref for UIplot paths that need DataFrameMixin (e.g. PP n_unit hierarchy).
+        self.uiplot.uisub = self
 
         # Custom UI initialization - non-QtDesigner-generated instructions
         self.pushButtonParse.setVisible(False)

@@ -55,6 +55,48 @@ def test_aggregate_ppr_at_level_recording():
     assert agg.rec_id_order["EPSP_amp"] == ["r1", "r2"]
 
 
+def test_aggregate_ppr_at_level_subject_collapses_recs():
+    """Two recs of the same subject → one unit mean; different subject stays separate."""
+    rec_ppr = {
+        "r1": {"EPSP_amp": 2.0},
+        "r2": {"EPSP_amp": 4.0},  # same subject as r1
+        "r3": {"EPSP_amp": 6.0},  # other subject
+    }
+    df_p = pd.DataFrame(
+        {
+            "ID": ["r1", "r2", "r3"],
+            "subject": ["S1", "S1", "S2"],
+            "slice": ["1", "2", "1"],
+        }
+    )
+    agg = plot_series.aggregate_ppr_at_level(rec_ppr, "subject", df_p)
+    vals = sorted(agg.ppr_data["EPSP_amp"])
+    assert vals == [3.0, 6.0]  # mean(2,4)=3 for S1; 6 for S2
+
+
+def test_aggregate_ppr_at_level_slice_keeps_slices_separate():
+    rec_ppr = {
+        "r1": {"EPSP_amp": 2.0},
+        "r2": {"EPSP_amp": 4.0},
+    }
+    df_p = pd.DataFrame(
+        {
+            "ID": ["r1", "r2"],
+            "subject": ["S1", "S1"],
+            "slice": ["1", "2"],
+        }
+    )
+    agg = plot_series.aggregate_ppr_at_level(rec_ppr, "slice", df_p)
+    assert sorted(agg.ppr_data["EPSP_amp"]) == [2.0, 4.0]
+
+
+def test_aggregate_ppr_at_level_without_df_falls_back_to_rec():
+    """Missing hierarchy must not invent subject units (silent rec-level fallback)."""
+    rec_ppr = {"r1": {"EPSP_amp": 2.0}, "r2": {"EPSP_amp": 4.0}}
+    agg = plot_series.aggregate_ppr_at_level(rec_ppr, "subject", None)
+    assert sorted(agg.ppr_data["EPSP_amp"]) == [2.0, 4.0]
+
+
 def test_pp_group_bar_store_items():
     spec = plot_series.PpGroupBarPlotSpec(
         aspect="EPSP_amp",
