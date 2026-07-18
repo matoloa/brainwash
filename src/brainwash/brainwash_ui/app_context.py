@@ -73,6 +73,12 @@ def compute_statusbar_result(
     test_type = stat_test.test_type
     if test_type == "None":
         return statusbar.StatusbarResult(None, None)
+    # ANCOVA is implemented for Input-Output only (not "missing" — wrong experiment type).
+    if test_type == "ANCOVA":
+        return statusbar.StatusbarResult(
+            "ANCOVA is for Input-Output experiments (select experiment type I-O)",
+            "warning",
+        )
     if test_type not in _IMPLEMENTED_TEST_TYPES:
         return statusbar.StatusbarResult(f"Statistical test '{test_type}' is not implemented", "warning")
     exp_type = None

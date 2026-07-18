@@ -74,6 +74,22 @@ def test_compute_statusbar_ttest_warning():
     assert "t-test requires 2 group(s)" in (result.text or "")
 
 
+def test_compute_statusbar_non_io_ancova_explains_io_only():
+    u = UIstate()
+    u.experiment.experiment_type = "time"
+    u.stat_test.test_type = "ANCOVA"
+    result = app_context.compute_statusbar_result(
+        experiment=app_context.experiment_snapshot_from(u),
+        stat_test=app_context.stat_test_snapshot_from(u),
+        dd_groups=make_dd_groups("G1", "G2"),
+        dd_testsets={},
+    )
+    assert result.state == "warning"
+    assert result.text is not None
+    assert "not implemented" not in result.text.lower()
+    assert "Input-Output" in result.text or "I-O" in result.text
+
+
 def test_compute_statusbar_none_clears():
     u = UIstate()
     u.stat_test.test_type = "None"
