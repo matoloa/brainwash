@@ -291,12 +291,16 @@ class StatTestMixin:
             self._set_statusbar_appearance(clear=True)
 
     def _on_statusbar_message_cleared(self, text):
-        """After a transient message clears, restore via set_statusbar (pure display refresh)."""
+        """After a transient message clears, restore permanent statusbar from current state."""
         if text:
             return
         if self._is_loading_active():
             return
-        self.set_statusbar(None, None)
+        # Recompute display only (no re-run of formal tests). Previously this called
+        # set_statusbar(None, None) which wiped the label permanently.
+        result = self._compute_statusbar_for_current_state()
+        self.uistate.stat_test.statusbar_state = result.state
+        self.set_statusbar(result.state, result.text)
 
     def apply_statistical_test_if_active(self):
         """Core dispatcher: IO ANCOVA (radio-only), non-IO formal tests, or clear."""
@@ -344,36 +348,47 @@ class StatTestMixin:
                 ref=0.0,
                 n_unit=self.uistate.stat_test.buttonGroup_test_n,
                 experiment_type=experiment_type,
+                uistate=self.uistate,
                 force_through_zero=bool(cb.get("io_force0", False)),
                 test_sw=bool(self.uistate.stat_test.test_sw),
                 test_levene=bool(self.uistate.stat_test.test_levene),
             )
-            results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
-            if comp.get("config"):
-                if not isinstance(results, list) or len(results) == 0:
-                    results = [comp["config"].copy()]
-                else:
-                    for r in results:
-                        if isinstance(r, dict):
-                            r.setdefault("config", comp["config"])
-            if results and isinstance(results, list) and len(results) > 0 and "group_ns" in results[0]:
-                if isinstance(results[0], dict) and "config" not in results[0]:
+            if comp.get("error") or comp.get("not_implemented"):
+                # Keep a stub so statusbar is never blank under IO+ANCOVA.
+                stub = dict(comp.get("config") or {})
+                stub.setdefault("type", "IO ANCOVA")
+                stub["error"] = comp.get("error") or comp.get("not_implemented")
+                results = [stub]
+            else:
+                results = list(comp.get("results", []))
+                if comp.get("config"):
+                    if not results:
+                        results = [{"config": dict(comp["config"])}]
+                    else:
+                        for r in results:
+                            if isinstance(r, dict):
+                                r.setdefault("config", comp["config"])
+                if results and isinstance(results[0], dict) and "group_ns" in results[0] and "config" not in results[0]:
                     results[0]["config"] = results[0].copy()
             self.uistate.stat_test.formal_test_results = results
             # PR-D: no sweep-style * markers on IO scatter (statusbar + console/export only).
             if hasattr(self.uiplot, "clear_test_markers"):
                 self.uiplot.clear_test_markers(draw=True)
-            self._print_io_ancova_table(results, comp.get("config") or {})
+            if not (comp.get("error") or comp.get("not_implemented")):
+                self._print_io_ancova_table(results, comp.get("config") or {})
             cb = self.uistate.project.checkBox
             self.usage(
                 f"stat_test applied: IO ANCOVA n_unit={self.uistate.stat_test.buttonGroup_test_n} "
                 f"force0={bool(cb.get('io_force0', False))} "
-                f"primary={(comp.get('config') or {}).get('primary_contrast')}"
+                f"primary={(comp.get('config') or {}).get('primary_contrast')} "
+                f"error={comp.get('error') or comp.get('not_implemented')}"
             )
-            return True
+            return not bool(comp.get("error") or comp.get("not_implemented"))
         except Exception as ex:
             print(f"IO ANCOVA compute error: {ex}")
-            self.clear_formal_test_results()
+            self.uistate.stat_test.formal_test_results = [
+                {"config": {"type": "IO ANCOVA", "error": str(ex)}}
+            ]
             return False
 
     def _print_io_ancova_table(self, results, config: dict | None = None) -> None:

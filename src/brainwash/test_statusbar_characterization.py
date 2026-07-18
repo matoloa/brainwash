@@ -16,7 +16,9 @@ def test_io_regression_statusbar_with_slope_p_and_r2():
                 "y_col": "EPSP_amp",
                 "group_ns": {"G1": 3, "G2": 4},
                 "slope_p": 0.042,
-                "r2_per_group": {"G1": 0.87},
+                "primary_contrast": "slope_interaction",
+                "slope_per_group": {"G1": 1.02, "G2": 0.41},
+                "r2_per_group": {"G1": 0.87, "G2": 0.74},
                 "n_unit": "subject",
             }
         }
@@ -28,8 +30,37 @@ def test_io_regression_statusbar_with_slope_p_and_r2():
     assert "IO ANCOVA" in result.text
     assert "Control=3" in result.text
     assert "Drug=4" in result.text
-    assert "ratio p=" in result.text
-    assert "r²(G1)=0.87" in result.text
+    assert "slopes differ" in result.text
+    assert "slope(Control)=1.02 r²=0.87" in result.text
+    assert "slope(Drug)=0.41 r²=0.74" in result.text
+    # r² immediately after its slope; no orphan r²(id)= form
+    assert "r²(G1)" not in result.text
+    assert result.text.index("slope(Control)") < result.text.index("r²=0.87")
+    assert result.text.index("r²=0.87") < result.text.index("slope(Drug)")
+
+
+def test_io_ancova_statusbar_group_adjusted_includes_slope_r2_pairs():
+    formal = [
+        {
+            "config": {
+                "type": "IO ANCOVA",
+                "x_col": "volley_amp",
+                "y_col": "EPSP_amp",
+                "group_ns": {"G1": 3, "G2": 4},
+                "primary_contrast": "group_adjusted",
+                "p_group_ancova": 0.01,
+                "p_interaction": 0.4,
+                "slope_per_group": {"G1": 1.0, "G2": 0.98},
+                "r2_per_group": {"G1": 0.91, "G2": 0.89},
+            }
+        }
+    ]
+    dd_groups = {"G1": {"group_name": "Ctl"}, "G2": {"group_name": "Tx"}}
+    result = format_io_regression_statusbar(formal, dd_groups=dd_groups, n_unit="subject")
+    assert "group p=" in (result.text or "")
+    assert "slopes OK" in (result.text or "")
+    assert "slope(Ctl)=1 r²=0.91" in (result.text or "")
+    assert "slope(Tx)=0.98 r²=0.89" in (result.text or "")
 
 
 def test_io_regression_statusbar_accepts_legacy_type():
@@ -52,12 +83,23 @@ def test_io_regression_statusbar_accepts_legacy_type():
 def test_io_regression_statusbar_missing_config():
     result = format_io_regression_statusbar([{"config": {"type": "t-test"}}], dd_groups={})
     assert result.text == "IO ANCOVA: select ≥2 groups to compute slope comparison"
+    assert result.state == "info"
 
 
 def test_io_regression_statusbar_empty():
+    # Never blank under IO+ANCOVA path — empty formal means "not enough data yet".
     result = format_io_regression_statusbar(None, dd_groups={})
-    assert result.text is None
-    assert result.state is None
+    assert result.text == "IO ANCOVA: select ≥2 groups to compute slope comparison"
+    assert result.state == "info"
+
+
+def test_io_regression_statusbar_error_stub():
+    result = format_io_regression_statusbar(
+        [{"config": {"type": "IO ANCOVA", "error": "need at least two shown groups"}}],
+        dd_groups={},
+    )
+    assert result.state == "warning"
+    assert "need at least two shown groups" in (result.text or "")
 
 
 def test_io_ancova_methods_text_group_adjusted():

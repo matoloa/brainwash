@@ -7,10 +7,11 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
     """Returns long DataFrame with ['rec_ID', 'subject', 'slice', 'x', 'y'] for all sweeps in group.
     Uses per_sweep=True, melts, joins real X from dfoutput via uistate.experiment.io_input. Falls back to sweep rank if X missing.
     """
-    if uistate is None:
-        io_input = "vamp"
-    else:
-        io_input = uistate.experiment.io_input
+    exp = getattr(uistate, "experiment", None) if uistate is not None else None
+    if exp is None and uistate is not None:
+        nested = getattr(uistate, "uistate", None)
+        exp = getattr(nested, "experiment", None) if nested is not None else None
+    io_input = getattr(exp, "io_input", "vamp") if exp is not None else "vamp"
 
     x_map = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}
     x_col = x_map.get(io_input, "volley_amp")

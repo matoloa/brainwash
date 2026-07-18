@@ -428,7 +428,11 @@ class UIsub(
         print(f"Heatmap is {self.uistate.plot.showHeatmap}")
         if not self.uistate.plot.showHeatmap:
             self.uiplot.heatunmap()
-            self.set_statusbar(None, None)  # pure display refresh (no test recompute)
+            # Restore permanent statusbar (no formal recompute)
+            if hasattr(self, "_compute_statusbar_for_current_state"):
+                r = self._compute_statusbar_for_current_state()
+                self.uistate.stat_test.statusbar_state = r.state
+                self.set_statusbar(r.state, r.text)
             return
         t0 = time.time()
         d_group_ndf = {}
@@ -488,7 +492,10 @@ class UIsub(
             except Exception:
                 pass
             try:
-                self.set_statusbar(None, None)  # pure display refresh after heatmap disable
+                if hasattr(self, "_compute_statusbar_for_current_state"):
+                    r = self._compute_statusbar_for_current_state()
+                    self.uistate.stat_test.statusbar_state = r.state
+                    self.set_statusbar(r.state, r.text)
             except Exception:
                 pass
 
@@ -589,8 +596,10 @@ class UIsub(
 
         # Re-apply statusbar state (after darkmode stylesheet reset). Warnings stay red; reports use theme default.
         try:
-            if not self._is_loading_active():
-                self.set_statusbar(None, None)  # pure display refresh (no test recompute)
+            if not self._is_loading_active() and hasattr(self, "_compute_statusbar_for_current_state"):
+                r = self._compute_statusbar_for_current_state()
+                self.uistate.stat_test.statusbar_state = r.state
+                self.set_statusbar(r.state, r.text)
         except Exception:
             pass
 

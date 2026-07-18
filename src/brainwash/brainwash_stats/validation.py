@@ -38,7 +38,10 @@ def validate_comparison_inputs(
     shown_groups = [g for g in groups if dd_groups.get(g, {}).get("show") in (True, "True", 1, "1", True)]
     shown_groups = [g for g in shown_groups if len(dd_groups.get(g, {}).get("rec_IDs", [])) > 0]
     if not shown_groups:
-        return {"error": "no shown groups", "results": []}
+        err = {"error": "no shown groups", "results": []}
+        if is_io or test_type == "ANCOVA":
+            err["config"] = {"type": "IO ANCOVA"}
+        return err
 
     if variant == "one-sample":
         pass
@@ -51,7 +54,11 @@ def validate_comparison_inputs(
     elif test_type == "ANCOVA":
         # Test sets ignored for IO ANCOVA v1 (all sweeps/bins).
         if len(shown_groups) < 2:
-            return {"error": "need at least two shown groups", "results": []}
+            return {
+                "error": "need at least two shown groups",
+                "results": [],
+                "config": {"type": "IO ANCOVA"},
+            }
     elif variant == "paired":
         if len(shown_groups) != 1:
             return {"error": "paired t-test requires exactly 1 group", "results": []}

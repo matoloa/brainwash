@@ -33,8 +33,9 @@ def format_io_regression_statusbar(
     n_unit: str = "subject",
 ) -> StatusbarResult:
     dd_groups = dd_groups or {}
+    _hint = StatusbarResult("IO ANCOVA: select ≥2 groups to compute slope comparison", "info")
     if not formal:
-        return StatusbarResult(None, None)
+        return _hint
 
     cfg = None
     if isinstance(formal, list) and formal:
@@ -47,7 +48,12 @@ def format_io_regression_statusbar(
     # Canonical "IO ANCOVA"; accept legacy "IO regression" from pre-PR-B results.
     cfg_type = cfg.get("type") if isinstance(cfg, dict) else None
     if not isinstance(cfg, dict) or cfg_type not in ("IO ANCOVA", "IO regression"):
-        return StatusbarResult("IO ANCOVA: select ≥2 groups to compute slope comparison", None)
+        return _hint
+
+    # Compute/validation failure stored as stub config
+    err = cfg.get("error")
+    if err:
+        return StatusbarResult(f"IO ANCOVA: {err}", "warning")
 
     prefix = "IO ANCOVA"
     global_notes = []
@@ -99,15 +105,22 @@ def format_io_regression_statusbar(
             else:
                 stat_label = "slope" if str(cfg.get("io_output", "")).endswith(("slope", "Slope")) else "ratio"
                 global_notes.append(f"{stat_label} p={ps}")
-        slopes = cfg.get("slope_per_group") or {}
-        for g, sl in list(slopes.items())[:2]:
-            if isinstance(sl, (int, float)) and np.isfinite(sl):
-                g_name = _group_display_name(dd_groups, g)
-                global_notes.append(f"slope({g_name})={sl:.3g}")
-    for g, r2v in (cfg.get("r2_per_group") or {}).items():
+
+    # Per-group simple-regression slope + matching r² (same OLS fit); always when finite.
+    slopes = cfg.get("slope_per_group") or {}
+    r2s = cfg.get("r2_per_group") or {}
+    group_order = list(slopes.keys()) or list(r2s.keys()) or list(group_ns.keys())
+    for g in group_order[:2]:
+        sl = slopes.get(g)
+        r2v = r2s.get(g)
+        if not (isinstance(sl, (int, float)) and np.isfinite(sl)):
+            continue
+        g_name = _group_display_name(dd_groups, g)
+        bit = f"slope({g_name})={sl:.3g}"
         if isinstance(r2v, (int, float)) and np.isfinite(r2v):
-            global_notes.append(f"r²({g})={r2v:.2f}")
-            break
+            bit += f" r²={r2v:.2f}"
+        global_notes.append(bit)
+
     assum = cfg.get("assumptions") or {}
     for note in (assum.get("notes") or [])[:2]:
         global_notes.append(f"warn: {note}")

@@ -180,6 +180,34 @@ def test_dispatcher_io_ancova_end_to_end():
     assert "primary_contrast" in out["config"]
 
 
+def test_dispatcher_recovers_uistate_from_uisub_host():
+    """Regression: bound get_group_testset_means lives on UIsub, not UIstate."""
+
+    class FakeUIsub:
+        def __init__(self):
+            self.uistate = MinimalUistate()
+
+        def get_group_testset_means(self, g, sweeps=None, aspect="EPSP_amp", per_sweep=False):
+            return _make_parallel_accessor()(g, sweeps=sweeps, aspect=aspect, per_sweep=per_sweep)
+
+    host = FakeUIsub()
+    out = compute_statistical_comparison(
+        groups=["G1", "G2"],
+        dd_groups=make_dd_groups("G1", "G2"),
+        dd_testsets={},
+        get_group_testset_means_fn=host.get_group_testset_means,
+        test_type="ANCOVA",
+        experiment_type="io",
+        # deliberately omit uistate — must resolve host.uistate
+        amp=True,
+        slope=False,
+        n_unit="recording",
+    )
+    assert "error" not in out or out.get("error") is None
+    assert out.get("config", {}).get("type") == "IO ANCOVA"
+    assert "UIsub" not in str(out.get("error", ""))
+
+
 def test_one_group_returns_validation_error():
     acc = _make_parallel_accessor()
     out = compute_statistical_comparison(
@@ -277,6 +305,7 @@ def test_legacy_io_regression_statusbar_still_readable():
                 "y_col": "EPSP_amp",
                 "group_ns": {"G1": 2},
                 "slope_p": 0.02,
+                "slope_per_group": {"G1": 1.1},
                 "r2_per_group": {"G1": 0.9},
             }
         }
@@ -284,3 +313,4 @@ def test_legacy_io_regression_statusbar_still_readable():
     result = statusbar.format_io_regression_statusbar(formal, dd_groups={"G1": {"group_name": "Ctl"}})
     assert result.state == "info"
     assert "IO ANCOVA" in (result.text or "")
+    assert "slope(Ctl)=1.1 r²=0.90" in (result.text or "")

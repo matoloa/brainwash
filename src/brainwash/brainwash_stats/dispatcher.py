@@ -71,7 +71,15 @@ def compute_statistical_comparison(
     # PR-B/C: IO ANCOVA only — ignore test sets; no fall-through to time ANOVA.
     if is_io and test_type == "ANCOVA":
         if uistate is None:
-            uistate = getattr(get_group_testset_means_fn, "__self__", None)
+            # Bound methods live on UIsub; experiment lives on UIsub.uistate.
+            host = getattr(get_group_testset_means_fn, "__self__", None)
+            if host is not None and hasattr(host, "experiment"):
+                uistate = host
+            elif host is not None:
+                uistate = getattr(host, "uistate", None)
+        elif not hasattr(uistate, "experiment"):
+            # Accidental UIsub (or similar host) passed as uistate.
+            uistate = getattr(uistate, "uistate", uistate)
         return compute_io_ancova(
             shown_groups=shown_groups,
             get_group_testset_means_fn=get_group_testset_means_fn,

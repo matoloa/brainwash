@@ -350,8 +350,6 @@ def compute_io_ancova(
     """
     results = []
     group_ns: dict = {}
-    r2_per_group: dict = {}
-    slope_per_group: dict = {}
     aspects = _aspect_measurement_columns(amp, slope, norm)
 
     # n per group once
@@ -376,6 +374,8 @@ def compute_io_ancova(
     last_fit: dict = {}
     for _short, col in aspects:
         frames = []
+        r2_per_group: dict = {}
+        slope_per_group: dict = {}
         for g in shown_groups:
             try:
                 xy_df = _get_io_xy_pairs(
@@ -436,8 +436,17 @@ def compute_io_ancova(
             "p_group": p_grp if np.isfinite(p_grp) else None,
             "group_ns": group_ns.copy(),
             "r2_per_group": r2_per_group.copy(),
+            "slope_per_group": slope_per_group.copy(),
             "primary_contrast": fit.get("primary_contrast"),
             "slopes_homogeneous": fit.get("slopes_homogeneous"),
+            "F_interaction": fit.get("F_interaction"),
+            "df_interaction": fit.get("df_interaction"),
+            "F_group_ancova": fit.get("F_group_ancova"),
+            "df_group": fit.get("df_group"),
+            "p_covariate": fit.get("p_covariate"),
+            "F_covariate": fit.get("F_covariate"),
+            "adjusted_means": fit.get("adjusted_means") or {},
+            "assumptions": fit.get("assumptions") or {},
             "aspect": col,
         }
         for g, r2v in r2_per_group.items():
@@ -448,15 +457,19 @@ def compute_io_ancova(
     y_col = "EPSP_amp"
     io_input = "vamp"
     io_output = "EPSPamp"
-    if uistate is not None:
-        io_input = uistate.experiment.io_input
-        io_output = uistate.experiment.io_output
+    exp = getattr(uistate, "experiment", None) if uistate is not None else None
+    if exp is None and uistate is not None:
+        nested = getattr(uistate, "uistate", None)
+        exp = getattr(nested, "experiment", None) if nested is not None else None
+    if exp is not None:
+        io_input = getattr(exp, "io_input", io_input)
+        io_output = getattr(exp, "io_output", io_output)
         x_map = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}
         y_map = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}
         x_col = x_map.get(io_input, "volley_amp")
         y_col = y_map.get(io_output, "EPSP_amp")
 
-    # Prefer aspect matching io_output for top-level config p-values
+    # Prefer aspect matching io_output for top-level config (p-values, slopes, r²)
     prefer_col = y_col if not norm else f"{y_col}_norm"
     primary_row = next((r for r in results if r.get("aspect") == prefer_col), results[0] if results else {})
 
@@ -475,20 +488,20 @@ def compute_io_ancova(
         "slope": slope,
         "norm": norm,
         "group_ns": group_ns,
-        "r2_per_group": r2_per_group,
-        "slope_per_group": slope_per_group,
+        "r2_per_group": primary_row.get("r2_per_group") or {},
+        "slope_per_group": primary_row.get("slope_per_group") or {},
         "p_interaction": primary_row.get("slope_p", last_fit.get("p_interaction")),
-        "F_interaction": last_fit.get("F_interaction"),
-        "df_interaction": last_fit.get("df_interaction"),
+        "F_interaction": primary_row.get("F_interaction", last_fit.get("F_interaction")),
+        "df_interaction": primary_row.get("df_interaction", last_fit.get("df_interaction")),
         "p_group_ancova": primary_row.get("p_group", last_fit.get("p_group_ancova")),
-        "F_group_ancova": last_fit.get("F_group_ancova"),
-        "df_group": last_fit.get("df_group"),
-        "p_covariate": last_fit.get("p_covariate"),
-        "F_covariate": last_fit.get("F_covariate"),
-        "slopes_homogeneous": last_fit.get("slopes_homogeneous"),
-        "primary_contrast": last_fit.get("primary_contrast"),
-        "adjusted_means": last_fit.get("adjusted_means") or {},
-        "assumptions": last_fit.get("assumptions") or {},
+        "F_group_ancova": primary_row.get("F_group_ancova", last_fit.get("F_group_ancova")),
+        "df_group": primary_row.get("df_group", last_fit.get("df_group")),
+        "p_covariate": primary_row.get("p_covariate", last_fit.get("p_covariate")),
+        "F_covariate": primary_row.get("F_covariate", last_fit.get("F_covariate")),
+        "slopes_homogeneous": primary_row.get("slopes_homogeneous", last_fit.get("slopes_homogeneous")),
+        "primary_contrast": primary_row.get("primary_contrast", last_fit.get("primary_contrast")),
+        "adjusted_means": primary_row.get("adjusted_means") or last_fit.get("adjusted_means") or {},
+        "assumptions": primary_row.get("assumptions") or last_fit.get("assumptions") or {},
         "slope_p": primary_row.get("slope_p", last_fit.get("p_interaction")),
     }
 
