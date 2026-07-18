@@ -293,24 +293,43 @@ class GroupMixin:
         return out
 
     def _rows_for_rec_ids(self, df_p, rec_ids: list, preferred_order: list[int] | None = None) -> list[int]:
-        """Map rec IDs → positional row indices in df_p; fall back to preferred_order."""
+        """Map rec IDs → row indices in the *displayed* project table (sorted model when present).
+
+        Must not use unsorted df_project positions for QTableView selection — after a column
+        sort, model row ≠ df_project row and selection/lineEdits desync.
+        """
+        if hasattr(self, "_model_rows_for_rec_ids"):
+            hits = self._model_rows_for_rec_ids(rec_ids)
+            if hits:
+                return hits
+        # Fallback: map against df_p (or model) by normalized ID
+        model_df = getattr(getattr(self, "tablemodel", None), "_data", None)
+        src = model_df if model_df is not None and not getattr(model_df, "empty", True) and "ID" in getattr(model_df, "columns", []) else df_p
+        if src is None or getattr(src, "empty", True) or "ID" not in src.columns:
+            n = len(df_p) if df_p is not None else 0
+            if preferred_order:
+                return [int(i) for i in preferred_order if 0 <= int(i) < n]
+            return []
         order = {self._norm_rec_id(rid): n for n, rid in enumerate(rec_ids)}
         to_select = sorted(
-            (i for i, rid in enumerate(df_p["ID"].tolist()) if self._norm_rec_id(rid) in order),
-            key=lambda i: order[self._norm_rec_id(df_p["ID"].iloc[i])],
+            (i for i, rid in enumerate(src["ID"].tolist()) if self._norm_rec_id(rid) in order),
+            key=lambda i: order[self._norm_rec_id(src["ID"].iloc[i])],
         )
         if to_select:
             return to_select
-        # Fallback: original view indices if still in range (unsorted table common case)
-        n = len(df_p)
+        n = len(src)
         if preferred_order:
             return [int(i) for i in preferred_order if 0 <= int(i) < n]
         return []
 
     def _select_project_table_rows(self, row_indices: list[int]) -> None:
-        """Select exact project-table rows; no last-row fallback. Blocks selectionChanged side effects."""
-        df_p = self.get_df_project()
-        n = len(df_p)
+        """Select exact *model* rows in the project table; no last-row fallback.
+
+        Blocks selectionChanged side effects. row_indices must be table-model rows
+        (from _rows_for_rec_ids / _model_rows_for_rec_ids), not unsorted df_project indices.
+        """
+        model_df = getattr(getattr(self, "tablemodel", None), "_data", None)
+        n = len(model_df) if model_df is not None else len(self.get_df_project())
         to_select = [int(i) for i in row_indices if 0 <= int(i) < n]
         self.uistate.plot.list_idx_select_recs = to_select
 

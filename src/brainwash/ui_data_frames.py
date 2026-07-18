@@ -127,7 +127,26 @@ class DataFrameMixin:
         self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
         df_p = self.get_df_project()
-        rows = df_p.iloc[selection] if selection is not None else df_p
+        if selection is None:
+            rows = df_p
+        else:
+            # selection is list_idx_select_recs (model rows). Map via IDs — never
+            # treat sorted-view indices as df_project.iloc positions.
+            model_df = getattr(getattr(self, "tablemodel", None), "_data", None)
+            if model_df is not None and not getattr(model_df, "empty", True) and "ID" in model_df.columns:
+                ids = []
+                n = len(model_df)
+                for i in selection:
+                    ii = int(i)
+                    if 0 <= ii < n:
+                        ids.append(model_df.iloc[ii]["ID"])
+                if ids:
+                    idset = {str(x) for x in ids}
+                    rows = df_p.loc[df_p["ID"].map(lambda v: str(v)).isin(idset)]
+                else:
+                    rows = df_p.iloc[0:0]
+            else:
+                rows = df_p.iloc[selection]
 
         if selection is None:
             self.uiplot.unPlot()

@@ -996,29 +996,31 @@ class ProjectMixin:
             self.lineEdit_hierarchy_slice.setText("")
             self.connectUIstate()
             return
-        # Read subject/slice from the *displayed* table model (sort-safe), fall back to df_p by ID.
-        model_df = getattr(getattr(self, "tablemodel", None), "_data", None)
+        # Prefer ID → df_project (source of truth after writes); avoids model/df index confusion.
         subs = []
         slices_list = []
-        if model_df is not None and not model_df.empty and "subject" in model_df.columns:
-            n = len(model_df)
-            for i in idxs:
-                if 0 <= int(i) < n:
-                    row = model_df.iloc[int(i)]
-                    if pd.notna(row.get("subject")):
-                        subs.append(str(row["subject"]))
-                    if pd.notna(row.get("slice")):
-                        slices_list.append(str(row["slice"]))
-        elif hasattr(self, "_project_rows_for_selected"):
+        if hasattr(self, "_project_rows_for_selected"):
             selected = self._project_rows_for_selected()
             if not selected.empty:
                 if "subject" in selected.columns:
                     subs = [str(v) for v in selected["subject"] if pd.notna(v)]
                 if "slice" in selected.columns:
                     slices_list = [str(v) for v in selected["slice"] if pd.notna(v)]
-        else:
-            subs = [str(df_p.at[i, "subject"]) for i in idxs if i in df_p.index and pd.notna(df_p.at[i, "subject"])]
-            slices_list = [str(df_p.at[i, "slice"]) for i in idxs if i in df_p.index and pd.notna(df_p.at[i, "slice"])]
+        if not subs and not slices_list:
+            # Fallback: model rows (list_idx must be table-model indices)
+            model_df = getattr(getattr(self, "tablemodel", None), "_data", None)
+            if model_df is not None and not model_df.empty and "subject" in model_df.columns:
+                n = len(model_df)
+                for i in idxs:
+                    if 0 <= int(i) < n:
+                        row = model_df.iloc[int(i)]
+                        if pd.notna(row.get("subject")):
+                            subs.append(str(row["subject"]))
+                        if pd.notna(row.get("slice")):
+                            slices_list.append(str(row["slice"]))
+            else:
+                subs = [str(df_p.at[i, "subject"]) for i in idxs if i in df_p.index and pd.notna(df_p.at[i, "subject"])]
+                slices_list = [str(df_p.at[i, "slice"]) for i in idxs if i in df_p.index and pd.notna(df_p.at[i, "slice"])]
         subj_val = subs[0] if len(set(subs)) == 1 else ""
         slice_val = slices_list[0] if len(set(slices_list)) == 1 else ""
         self.lineEdit_hierarchy_subject.setText(subj_val)
@@ -1042,13 +1044,15 @@ class ProjectMixin:
             rec_ids = self._selected_recording_ids()
         else:
             idxs = self.uistate.plot.list_idx_select_recs or []
-            df_tmp = self.get_df_project()
-            rec_ids = [df_tmp.iloc[int(i)]["ID"] for i in idxs if 0 <= int(i) < len(df_tmp)]
+            model_df = getattr(getattr(self, "tablemodel", None), "_data", None)
+            src = model_df if model_df is not None and not getattr(model_df, "empty", True) else self.get_df_project()
+            rec_ids = [src.iloc[int(i)]["ID"] for i in idxs if 0 <= int(i) < len(src)]
         if not rec_ids:
             return
         df_p = self.get_df_project().copy()
-        id_key = df_p["ID"].map(lambda v: str(v))
-        mask = id_key.isin({str(r) for r in rec_ids})
+        norm = getattr(self, "_norm_rec_id", lambda v: str(v))
+        id_key = df_p["ID"].map(norm)
+        mask = id_key.isin({norm(r) for r in rec_ids})
         if not mask.any():
             return
         if text:
@@ -1067,11 +1071,17 @@ class ProjectMixin:
         # 1) Persist hierarchy into df_project (and table model)
         self.set_df_project(df_p)
         self.tableUpdate(restore_selection=False)
-        if hasattr(self, "_select_project_table_rows") and hasattr(self, "_rows_for_rec_ids"):
+        # Reselect by ID on the *displayed* (possibly sorted) model — never df_project positions.
+        if hasattr(self, "_select_project_table_rows") and hasattr(self, "_model_rows_for_rec_ids"):
+            to_select = self._model_rows_for_rec_ids(selected_ids)
+            self._select_project_table_rows(to_select)
+        elif hasattr(self, "_select_project_table_rows") and hasattr(self, "_rows_for_rec_ids"):
             to_select = self._rows_for_rec_ids(self.get_df_project(), selected_ids)
             self._select_project_table_rows(to_select)
         else:
             self.tableUpdate(restore_selection=True)
+        if hasattr(self, "update_recs2plot"):
+            self.update_recs2plot()
         self.refreshHierarchyLineEdits()
 
         # 2) Invalidate anything that embeds old subject/slice aggregation

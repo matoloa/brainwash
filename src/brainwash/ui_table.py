@@ -290,13 +290,14 @@ class TableMixin:
         model_df = self._table_model_df()
         if model_df is None or getattr(model_df, "empty", True) or "ID" not in model_df.columns:
             return []
-        order = {str(rid): n for n, rid in enumerate(rec_ids)}
+        norm = getattr(self, "_norm_rec_id", lambda v: str(v))
+        order = {norm(rid): n for n, rid in enumerate(rec_ids)}
         hits = []
         for i, rid in enumerate(model_df["ID"].tolist()):
-            key = str(rid)
+            key = norm(rid)
             if key in order:
                 hits.append(i)
-        hits.sort(key=lambda i: order[str(model_df.iloc[i]["ID"])])
+        hits.sort(key=lambda i: order[norm(model_df.iloc[i]["ID"])])
         return hits
 
     def _restore_table_selection(
@@ -339,17 +340,34 @@ class TableMixin:
         else:
             self.uistate.plot.list_idx_select_recs = []
 
-    def get_prow(self, dfp_idx=None):
-        if dfp_idx is not None:
-            dfp = self.get_df_project()
-            row = dfp.loc[dfp_idx]
-            return row
-        if not self.uistate.plot.list_idx_select_recs:
-            return None
-        selected = self._project_rows_for_selected()
-        if selected.empty:
-            return None
-        return selected.iloc[0]
+    def get_prow(self, row_idx=None):
+        """Return the selected recording's df_project row.
+
+        row_idx is a *table selection / model* row (list_idx_select_recs), not
+        necessarily a positional index into unsorted df_project. Resolves via
+        model → ID → df_project so column-sorted tables stay correct.
+        """
+        if row_idx is None:
+            if not self.uistate.plot.list_idx_select_recs:
+                return None
+            selected = self._project_rows_for_selected()
+            if selected.empty:
+                return None
+            return selected.iloc[0]
+
+        i = int(row_idx)
+        model_df = self._table_model_df()
+        dfp = self.get_df_project()
+        if model_df is not None and not getattr(model_df, "empty", True) and "ID" in model_df.columns and 0 <= i < len(model_df):
+            rid = model_df.iloc[i]["ID"]
+            if not dfp.empty and "ID" in dfp.columns:
+                hits = dfp.loc[dfp["ID"].map(lambda v: str(v)) == str(rid)]
+                if not hits.empty:
+                    return hits.iloc[0]
+        # Unsorted / no-model fallback: positional row in df_project
+        if 0 <= i < len(dfp):
+            return dfp.iloc[i]
+        return None
 
     def get_trow(self, dfp_idx=None):
         if dfp_idx is not None:
