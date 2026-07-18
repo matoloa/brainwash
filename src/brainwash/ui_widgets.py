@@ -122,12 +122,11 @@ class Config:
         # frozen/AppImage builds is computed below (never inside squashfs).
         #
         # Search order (most-specific first):
-        #   1. Frozen build: the exe lives in build/exe.*/ and we copy
-            #      pyproject.toml to brainwash/pyproject.toml next to it, so look
-        #      relative to sys.executable first.
-        #   2. Development: relative paths from cwd (src/ or repo root).
-        #   3. Fallback: walk every entry in sys.path (AppImage, editable
-        #      installs, unusual working directories).
+        #   1. Frozen build: exe dir — pyproject.toml is copied next to the binary
+        #      and under lib/ (not brainwash/, which collides with the Linux
+        #      executable name "brainwash").
+        #   2. Development: relative paths from source / repo root.
+        #   3. Fallback: walk every entry in sys.path (AppImage, editable installs).
         def _find_file(filename: str) -> Path | None:
             # 1. Relative to the executable (frozen) or this source file (dev)
             anchors: list[Path] = []
@@ -138,7 +137,7 @@ class Config:
             anchors.append(Path(__file__).parent.parent.parent)  # repo root
 
             for anchor in anchors:
-                for rel in ["brainwash/" + filename, "lib/" + filename, filename]:
+                for rel in [filename, "lib/" + filename, "brainwash/" + filename]:
                     candidate = anchor / rel
                     if candidate.is_file():
                         return candidate
