@@ -67,7 +67,7 @@ class InteractivePlotMixin:
             self.uistate.plot.x_drag = None
             # Clear texts + selection state immediately (lightweight) for responsive feel and
             # so that any immediate readers (tagging etc.) see the cleared range.
-            # Defer the artist removes (xDeselect + clear_axe + testset spans) + stim buttons + draws.
+            # Defer the artist removes (xDeselect + clear_axe mean) + stim buttons + draws.
             if canvas == self.canvasMean:
                 self.lineEdit_mean_selection_start.setText("")
                 self.lineEdit_mean_selection_end.setText("")

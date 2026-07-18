@@ -229,7 +229,7 @@ class UIplot:
                 self.uistate.plot.x_select["output"] = set()
                 self.uistate.plot.x_select["output_start"] = None
                 self.uistate.plot.x_select["output_end"] = None
-                self.clear_testset_spans(draw=False)  # clear on full output reset per Phase 2
+                # Do not clear testset spans: they reflect shown test sets, not temp selection.
         else:  # axm
             axlines = list(ax.get_lines())
             axpatches = list(ax.patches)

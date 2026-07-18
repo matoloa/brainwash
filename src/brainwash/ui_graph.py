@@ -702,8 +702,9 @@ class GraphCoordinatorMixin:
             self.uistate.project.zoom["output_ax1_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
             self.uistate.project.zoom["output_ax2_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
         else:
-            xlim1 = self._xlim_from_artists(self.uistate.plot.ax1)
-            xlim2 = self._xlim_from_artists(self.uistate.plot.ax2)
+            # pad=0: match rec-selected x_axis_xlim (no fractional side margin)
+            xlim1 = self._xlim_from_artists(self.uistate.plot.ax1, pad=0)
+            xlim2 = self._xlim_from_artists(self.uistate.plot.ax2, pad=0)
 
             if xlim1 and xlim2:
                 out_xmin, out_xmax = min(xlim1[0], xlim2[0]), max(xlim1[1], xlim2[1])
@@ -779,64 +780,3 @@ class GraphCoordinatorMixin:
             self.uistate.plot.ax1.figure.canvas.draw_idle()
         else:
             raise ValueError("zoomReset: unknown axis")
-
-    def _fit_output_zoom_to_groups(self):
-        """Compute output xlim/ylim from currently visible artists (groups) and store in self.uistate.project.zoom.
-        Used when no single recording is selected.
-        """
-        ymin_clamp = 0 if self._is_io_mode() else (0 if self.uistate.project.checkBox["output_ymin0"] else None)
-
-        if self._is_io_mode():
-            xlim1 = self._xlim_from_artists(self.uistate.plot.ax1, pad=0)
-            xlim2 = self._xlim_from_artists(self.uistate.plot.ax2, pad=0)
-            if xlim1 and xlim2:
-                out_xmax = max(xlim1[1], xlim2[1])
-            elif xlim1:
-                out_xmax = xlim1[1]
-            elif xlim2:
-                out_xmax = xlim2[1]
-            else:
-                out_xmax = 1.0
-            out_xmax = out_xmax * 1.15 if out_xmax > 0 else 1.0
-            out_xmin = 0
-            self.uistate.project.zoom["output_xlim"] = (out_xmin, out_xmax)
-
-            y1 = self._ylim_from_artists(self.uistate.plot.ax1, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
-            y2 = self._ylim_from_artists(self.uistate.plot.ax2, pad=0, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax)
-            self.uistate.project.zoom["output_ax1_ylim"] = (0, y1[1] * 1.15 if y1 and y1[1] > 0 else 1.5)
-            self.uistate.project.zoom["output_ax2_ylim"] = (0, y2[1] * 1.15 if y2 and y2[1] > 0 else 1.5)
-        elif self.uistate.experiment.experiment_type == "PP":
-            self.uistate.project.zoom["output_xlim"] = self.uistate.x_axis_xlim(prow=None, dft=None)
-            out_xmin, out_xmax = self.uistate.project.zoom["output_xlim"]
-
-            y1 = self._ylim_from_artists(self.uistate.plot.ax1, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
-            y2 = self._ylim_from_artists(self.uistate.plot.ax2, pad=0.1, ymin=0, x_min=out_xmin, x_max=out_xmax)
-
-            def snap_pp_max(y_bounds):
-                if not y_bounds:
-                    return 3.0
-                return max(3.0, (int(y_bounds[1] / 1.0) + 1) * 1.0)
-
-            self.uistate.project.zoom["output_ax1_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
-            self.uistate.project.zoom["output_ax2_ylim"] = (0, max(snap_pp_max(y1), snap_pp_max(y2)))
-        else:
-            xlim1 = self._xlim_from_artists(self.uistate.plot.ax1)
-            xlim2 = self._xlim_from_artists(self.uistate.plot.ax2)
-
-            if xlim1 and xlim2:
-                out_xmin, out_xmax = min(xlim1[0], xlim2[0]), max(xlim1[1], xlim2[1])
-            elif xlim1:
-                out_xmin, out_xmax = xlim1
-            elif xlim2:
-                out_xmin, out_xmax = xlim2
-            else:
-                out_xmin, out_xmax = (0, 1)
-
-            self.uistate.project.zoom["output_xlim"] = (out_xmin, out_xmax)
-            out_ypad = 0.2  # match zoomAuto time/sweep/train headroom for SEM + markers
-            self.uistate.project.zoom["output_ax1_ylim"] = self._ylim_from_artists(
-                self.uistate.plot.ax1, pad=out_ypad, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
-            ) or (0, 1.5)
-            self.uistate.project.zoom["output_ax2_ylim"] = self._ylim_from_artists(
-                self.uistate.plot.ax2, pad=out_ypad, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
-            ) or (0, 1.5)
