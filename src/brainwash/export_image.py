@@ -45,6 +45,26 @@ JOURNAL_TEMPLATES: dict[str, JournalTemplate] = {
 }
 
 
+# Fractional y-span headroom above data for export * markers + brackets.
+# Live time/sweep zoom uses pad≈0.2; export uses slightly more for bracket offset.
+EXPORT_MARKER_TOP_PAD = 0.25
+
+
+def _expand_export_ylim_for_markers(ax: matplotlib.axes.Axes, top_pad: float = EXPORT_MARKER_TOP_PAD) -> None:
+    """Raise the top of ylim by a fraction of the current span (keep bottom).
+
+    Markers sit near y_frac≈0.94; without headroom they sit on the top of SEM/data.
+    Call after data are drawn and before _add_significance_markers.
+    """
+    ymin, ymax = ax.get_ylim()
+    if not (np.isfinite(ymin) and np.isfinite(ymax)):
+        return
+    span = float(ymax) - float(ymin)
+    if span <= 0:
+        return
+    ax.set_ylim(ymin, ymax + top_pad * span)
+
+
 JOURNAL_COLOR_PALETTES: dict[str, list[str]] = {
     "jneurosci": [
         "#1f77b4",
@@ -591,6 +611,8 @@ def render_publication_figure(
                 # Significance * markers: time/PP only. IO ANCOVA is statusbar + methods .md (PR-D).
                 formal_results = uistate.stat_test.formal_test_results
                 if formal_results and not is_io_mode:
+                    # Headroom above data so * / ** / brackets are not flush with SEM tops.
+                    _expand_export_ylim_for_markers(ax)
                     test_type = uistate.stat_test.test_type
                     if test_type == "Wilcoxon":
                         variant = uistate.stat_test.test_wilcox_variant
