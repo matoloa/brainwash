@@ -189,10 +189,13 @@ def test_output_axis_legend_map():
     dd_recs = {
         "rec1 EPSP amp": {"axis": "ax1", "line": "line1"},
         "rec1 marker": {"axis": "ax1", "line": "m1"},
+        "rec1 raw IO trendline": {"axis": "ax1", "line": "t1"},
     }
     dd_groups = {
         "G1 EPSP amp mean_subject": {"axis": "ax1", "line": "g1", "level": "subject"},
         "G2 EPSP amp mean_slice": {"axis": "ax1", "line": "g2", "level": "slice"},
+        "Ctl raw IO trendline_subject": {"axis": "ax1", "line": "gt", "level": "subject"},
+        "Ctl raw IO scatter_subject": {"axis": "ax1", "line": "gs", "level": "subject"},
     }
     legend = plot_model.output_axis_legend_map(
         dd_recs,
@@ -203,8 +206,11 @@ def test_output_axis_legend_map():
     )
     assert "rec1 EPSP amp" in legend
     assert "rec1 marker" not in legend
+    assert "rec1 raw IO trendline" not in legend
     assert "G1 EPSP amp mean" in legend
     assert "G2 EPSP amp mean" not in legend
+    assert "Ctl raw IO scatter" in legend
+    assert all("trendline" not in k for k in legend)
 
 
 def test_output_legend_locations():

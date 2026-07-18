@@ -5,6 +5,7 @@ from export_image import (
     build_figure_text_md,
     resolve_export_template_key,
     resolve_journal_export_key,
+    _figure_text_force0_warning,
     _figure_text_unit_warning,
 )
 from ui_state_classes import UIstate
@@ -88,6 +89,43 @@ def test_skeleton_slice_n_unit_leads_with_warning():
     assert md.index("Note on statistical units") < md.index("## Caption draft")
     assert "**slice**" in md
     assert "not subjects" in md
+
+
+def test_force0_warning_helper():
+    assert _figure_text_force0_warning(force0=False) is None
+    assert _figure_text_force0_warning(force0=True, exp_type="time") is None
+    w = _figure_text_force0_warning(force0=True, exp_type="io")
+    assert w is not None
+    assert "origin" in w.lower()
+    assert "io_force0" in w
+
+
+def test_skeleton_io_force0_under_unit_warning():
+    u = UIstate()
+    u.experiment.experiment_type = "io"
+    u.stat_test.test_type = "ANCOVA"
+    u.stat_test.buttonGroup_test_n = "recording"
+    u.project.checkBox["io_force0"] = True
+    u.stat_test.formal_test_results = [
+        {
+            "config": {
+                "type": "IO ANCOVA",
+                "x_col": "volley_amp",
+                "y_col": "EPSP_amp",
+                "group_ns": {"G1": 2, "G2": 2},
+                "primary_contrast": "slope_interaction",
+                "force_through_zero": True,
+                "p_interaction": 0.01,
+                "slope_per_group": {},
+                "r2_per_group": {},
+            }
+        }
+    ]
+    md = build_figure_text_md(u, _template(), group_names={"G1": "A", "G2": "B"}, panel_hint="io")
+    assert "Note on statistical units" in md
+    assert "Note on forced-through-origin" in md
+    assert md.index("Note on statistical units") < md.index("Note on forced-through-origin")
+    assert md.index("Note on forced-through-origin") < md.index("## Caption draft")
 
 
 def test_resolve_journal_export_none_key_defaults_jneurosci():

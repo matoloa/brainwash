@@ -319,6 +319,11 @@ def display_label_from_key(key: str) -> str:
     return key
 
 
+def _is_io_trendline_legend_key(key: str) -> bool:
+    """Trendlines share group color; omit from legend (scatter entry is enough)."""
+    return " IO trendline" in str(key)
+
+
 def output_axis_legend_map(
     dd_recs: dict,
     dd_group_show: dict,
@@ -329,17 +334,23 @@ def output_axis_legend_map(
 ) -> dict[str, object]:
     """Legend label → artist line for one output axis (graphRefresh)."""
     recs_on_axis = {
-        key: value for key, value in dd_recs.items() if value["axis"] == axid and not key.endswith(" marker")
+        key: value
+        for key, value in dd_recs.items()
+        if value["axis"] == axid and not key.endswith(" marker") and not _is_io_trendline_legend_key(key)
     }
     axis_legend = {key: value["line"] for key, value in recs_on_axis.items()}
     if include_groups:
         for key, value in dd_group_show.items():
             if value["axis"] != axid:
                 continue
+            if _is_io_trendline_legend_key(key):
+                continue
             level = value.get("level")
             if level is not None and level != current_level:
                 continue
             display_key = display_label_from_key(key)
+            if _is_io_trendline_legend_key(display_key):
+                continue
             axis_legend[display_key] = value["line"]
     return axis_legend
 

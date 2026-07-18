@@ -684,8 +684,14 @@ def render_publication_figure(
 
                 handles, labels = ax.get_legend_handles_labels()
                 if labels:
-                    by_label = dict(zip(labels, handles))
-                    ax.legend(by_label.values(), by_label.keys(), frameon=False)
+                    # Omit IO trendlines — same color as group scatter; clutter-free legend
+                    by_label = {
+                        lab: h
+                        for h, lab in zip(handles, labels)
+                        if lab and " IO trendline" not in str(lab) and not str(lab).startswith("_")
+                    }
+                    if by_label:
+                        ax.legend(by_label.values(), by_label.keys(), frameon=False)
 
                 show_inset = (is_io_mode and panel == "io") or (not is_io_mode and panel in ["amp", "slope"])
                 if show_inset and hasattr(uistate, "sample_inset") and uistate.plot.sample_inset is not None and uistate.plot.sample_inset.get_visible():
@@ -813,6 +819,22 @@ def _figure_text_unit_warning(n_unit: str) -> str | None:
         f"be anticonservative relative to a subject-level analysis. Consider subject-level aggregation "
         f"or mixed models for the final manuscript.\n"
         f"> <!-- Remove or rewrite this note if units are intentional and justified. -->"
+    )
+
+
+def _figure_text_force0_warning(*, force0: bool, exp_type: str | None = None) -> str | None:
+    """Callout when IO regressions / ANCOVA are constrained through the origin (io_force0)."""
+    if not force0:
+        return None
+    if exp_type is not None and exp_type != "io":
+        return None
+    return (
+        "> **Note on forced-through-origin fits:** Trendlines and IO ANCOVA models were constrained "
+        "to pass through the origin (`io_force0`). This is a strong modeling assumption: intercepts "
+        "are not free, slopes and *r*² can differ from unconstrained least-squares, and results "
+        "should be interpreted only if a zero intercept is scientifically justified "
+        "(e.g. no response at zero input).\n"
+        "> <!-- Remove or rewrite this note if force-through-zero is intentional and justified. -->"
     )
 
 
@@ -983,6 +1005,15 @@ def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | 
     warn = _figure_text_unit_warning(n_unit)
     if warn:
         lines.extend([warn, ""])
+
+    force0 = bool(cb.get("io_force0", False))
+    if not force0 and results:
+        cfg0 = results[0].get("config") if isinstance(results[0], dict) else None
+        if isinstance(cfg0, dict):
+            force0 = bool(cfg0.get("force_through_zero", False))
+    force0_warn = _figure_text_force0_warning(force0=force0, exp_type=exp_type)
+    if force0_warn:
+        lines.extend([force0_warn, ""])
 
     lines.append("## Caption draft")
     lines.append("")
