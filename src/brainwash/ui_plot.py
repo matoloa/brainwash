@@ -1005,6 +1005,13 @@ class UIplot:
         cmap = LinearSegmentedColormap.from_list("", colors)
         return {i: cmap(i / n_stims) for i in range(n_stims)}
 
+    def _output_line_style_kwargs(self) -> dict:
+        """Marker/linestyle for ax1/ax2 output series from uistate.plot.output_line_style."""
+        style = getattr(self.uistate.plot, "output_line_style", "line")
+        if style == "dots":
+            return {"marker": "o", "markersize": 3, "linestyle": "None"}
+        return {"marker": None, "markersize": None, "linestyle": "-"}
+
     def plot_line(
         self,
         label,
@@ -1026,9 +1033,12 @@ class UIplot:
         is_pp = self.uistate.experiment.experiment_type == "PP"
         if is_pp and axid in ("ax1", "ax2") and "PPR" not in label:
             return
-        zorder = 0 if width > 1 else 1
         if is_pp and axid in ("ax1", "ax2") and "PPR" in label:
-            zorder = 4  # Ensure rec blobs paint OVER the group overlays
+            zorder = 4  # rec PPR blobs over group overlays
+        elif axid in ("ax1", "ax2"):
+            zorder = 2  # rec output over group means (zorder 1)
+        else:
+            zorder = 0 if width > 1 else 1
         alpha = alpha if alpha is not None else self.uistate.project.settings["alpha_line"]
         kwargs = {"color": color, "label": label, "alpha": alpha, "linewidth": width, "zorder": zorder, "linestyle": linestyle}
         if marker is not None:
@@ -1272,15 +1282,20 @@ class UIplot:
             include_norm=series.y_norm is not None,
         )
         raw_spec = line_specs[0]
-        (meanline,) = axis.plot(
-            x_vals,
-            y_mean_vals,
-            color=color,
-            label=raw_spec.display_label,
-            alpha=self.uistate.project.settings["alpha_line"],
-            zorder=1,
-            linewidth=2.0,
-        )
+        style_kw = self._output_line_style_kwargs()
+        mean_plot_kw = {
+            "color": color,
+            "label": raw_spec.display_label,
+            "alpha": self.uistate.project.settings["alpha_line"],
+            "zorder": 1,
+            "linewidth": 2.0,
+            "linestyle": style_kw["linestyle"],
+        }
+        if style_kw["marker"] is not None:
+            mean_plot_kw["marker"] = style_kw["marker"]
+        if style_kw["markersize"] is not None:
+            mean_plot_kw["markersize"] = style_kw["markersize"]
+        (meanline,) = axis.plot(x_vals, y_mean_vals, **mean_plot_kw)
         meanfill = axis.fill_between(x_vals, y_mean_vals - y_sem_vals, y_mean_vals + y_sem_vals, alpha=0.25, color=color, zorder=0)
         meanline.set_visible(False)
         meanfill.set_visible(False)
@@ -1300,15 +1315,19 @@ class UIplot:
             norm_spec = line_specs[1]
             y_norm_vals = series.y_norm
             y_norm_sem_vals = series.y_norm_sem
-            (normline,) = axis.plot(
-                x_vals,
-                y_norm_vals,
-                color=color,
-                label=norm_spec.display_label,
-                alpha=self.uistate.project.settings["alpha_line"],
-                zorder=1,
-                linewidth=2.0,
-            )
+            norm_plot_kw = {
+                "color": color,
+                "label": norm_spec.display_label,
+                "alpha": self.uistate.project.settings["alpha_line"],
+                "zorder": 1,
+                "linewidth": 2.0,
+                "linestyle": style_kw["linestyle"],
+            }
+            if style_kw["marker"] is not None:
+                norm_plot_kw["marker"] = style_kw["marker"]
+            if style_kw["markersize"] is not None:
+                norm_plot_kw["markersize"] = style_kw["markersize"]
+            (normline,) = axis.plot(x_vals, y_norm_vals, **norm_plot_kw)
             normfill = axis.fill_between(x_vals, y_norm_vals - y_norm_sem_vals, y_norm_vals + y_norm_sem_vals, alpha=0.25, color=color, zorder=0)
             normline.set_visible(False)
             normfill.set_visible(False)
@@ -1402,6 +1421,7 @@ class UIplot:
         )
 
     def _render_stim_aggregate_plot_spec(self, spec, rec_ID):
+        style_kw = self._output_line_style_kwargs()
         self.plot_line(
             spec.line_label,
             spec.axid,
@@ -1412,6 +1432,9 @@ class UIplot:
             aspect=spec.aspect,
             variant=spec.variant,
             x_mode="stim",
+            marker=style_kw["marker"],
+            markersize=style_kw["markersize"],
+            linestyle=style_kw["linestyle"],
         )
         if spec.sem is not None and spec.shade_label is not None:
             self.plot_shade(
@@ -1465,6 +1488,7 @@ class UIplot:
                 x_mode=spec.x_mode,
             )
         else:
+            style_kw = self._output_line_style_kwargs() if spec.axid in ("ax1", "ax2") else {}
             self.plot_line(
                 spec.label,
                 spec.axid,
@@ -1477,6 +1501,9 @@ class UIplot:
                 variant=spec.variant,
                 x_mode=spec.x_mode,
                 width=spec.width,
+                marker=style_kw.get("marker"),
+                markersize=style_kw.get("markersize"),
+                linestyle=style_kw.get("linestyle", "-"),
             )
 
     def addRow(self, p_row, dft, dfmean, dfoutput):

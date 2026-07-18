@@ -247,6 +247,8 @@ class PlotSession:
         self.dict_heatmap = {}
         self.dict_test_markers = {}
         self.testset_spans = {}
+        # Output series on ax1/ax2: "line" (connected) or "dots" (markers only).
+        self.output_line_style = "dots"
         self.axm = None
         self.axe = None
         self.ax1 = None
