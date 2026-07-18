@@ -564,10 +564,18 @@ def format_non_io_stat_test_statusbar(
     else:
         variant = None
 
-    test_label = f"{eff} ({variant})" if variant else eff
+    # Strip engine "t-test (PPR)" type suffix if present; show quantity separately.
+    eff_display = eff.replace(" (PPR)", "") if isinstance(eff, str) else eff
+    test_label = f"{eff_display} ({variant})" if variant else str(eff_display)
+
+    primary = results[0] if results else {}
+    cfg0 = (primary0.get("config") or {}) if isinstance(primary0, dict) else {}
+    quantity = cfg0.get("quantity") or (primary.get("config") or {}).get("quantity") if isinstance(primary, dict) else None
+    is_ppr = isinstance(quantity, str) and "PPR" in quantity
+    if is_ppr and "PPR" not in test_label:
+        test_label = f"{test_label} · PPR"
 
     n_report = ""
-    primary = results[0] if results else {}
     try:
         if isinstance(primary, dict):
             unit_label = _unit_label(n_unit)
@@ -637,6 +645,8 @@ def format_non_io_stat_test_statusbar(
             set_prefix = f"{sname}: "
         for key in sorted(k for k in r.keys() if k.startswith("p_")):
             aspect = key[2:].replace("_norm", " (norm)")
+            if is_ppr and not str(aspect).upper().startswith("PPR"):
+                aspect = f"PPR {aspect}"
             use_q = test_fdr and r.get("q_" + key[2:]) is not None
             val_key = "q_" + key[2:] if use_q else key
             val = r.get(val_key, r.get(key))
