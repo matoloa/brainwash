@@ -287,6 +287,48 @@ def test_non_io_empty_formal():
     assert result.text is None
 
 
+def test_non_io_cluster_error_surfaces_on_statusbar():
+    formal = [
+        {
+            "error": "Paired Cluster perm. needs ≥2 sweeps in each of the two test sets.",
+            "set_name": "Cluster perm.",
+        }
+    ]
+    result = format_non_io_stat_test_statusbar(
+        formal,
+        effective_test_type="Cluster perm.",
+        dd_groups={"G1": {"group_name": "Ctl"}},
+    )
+    assert result.state == "warning"
+    assert result.text is not None
+    assert "Cluster perm." in result.text
+    assert "≥2 sweeps" in result.text or "Paired" in result.text
+    assert "[" not in result.text
+
+
+def test_non_io_cluster_paired_shows_mode_and_p():
+    formal = [
+        {
+            "cluster_mode": "paired",
+            "set_name": "Cluster (paired pre vs post)",
+            "group1": "G1",
+            "n1": 4,
+            "n_pairs": 4,
+            "p_amp": 0.04,
+            "sweeps": [1, 2, 3],
+        }
+    ]
+    result = format_non_io_stat_test_statusbar(
+        formal,
+        effective_test_type="Cluster perm.",
+        dd_groups={"G1": {"group_name": "Ctl"}},
+        n_unit="recording",
+    )
+    assert result.state == "info"
+    assert "Cluster perm. (paired)" in result.text
+    assert "amp: p=0.04" in result.text
+
+
 def test_non_io_anova_statusbar_shows_p():
     formal = [
         {

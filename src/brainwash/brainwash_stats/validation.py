@@ -58,6 +58,7 @@ def validate_comparison_inputs(
         if len(shown_groups) != 1:
             return {"error": "Friedman requires exactly 1 group", "results": []}
     elif test_type == "Cluster perm.":
+        # Layout checked with test sets below (needs both counts).
         pass
     elif test_type == "ANCOVA":
         # Test sets ignored for IO ANCOVA v1 (all sweeps/bins).
@@ -76,12 +77,44 @@ def validate_comparison_inputs(
 
     shown_sets = [(sid, info) for sid, info in (dd_testsets or {}).items() if info.get("show", False) and info.get("sweeps")]
     # IO ANCOVA does not require test sets (and ignores them for data selection in v1).
-    if not shown_sets and not is_io:
+    if not shown_sets and not is_io and test_type != "Cluster perm.":
         return {"error": "no shown test sets", "results": []}
     if paired_variant and len(shown_sets) != 2:
         return {"error": f"{_paired_label} requires exactly 2 shown test sets", "results": []}
     if test_type == "Friedman" and len(shown_sets) < 3:
         return {"error": "Friedman requires at least 3 shown test sets", "results": []}
+    if test_type == "Cluster perm.":
+        # Keep wording aligned with brainwash_ui.applicability.CLUSTER_PERM_LAYOUT_HELP
+        _cluster_help = (
+            "Valid layouts: (A) exactly 2 groups and ≥1 test set → between (one cluster test per set); "
+            "or (B) exactly 1 group and exactly 2 test sets → paired."
+        )
+        n_g = len(shown_groups)
+        n_ts = len(shown_sets)
+        if n_g == 0:
+            return {"error": f"No groups with data for Cluster perm. {_cluster_help}", "results": []}
+        if n_g > 2:
+            return {
+                "error": f"Cluster perm. does not support {n_g} groups (only exactly 2 for between). {_cluster_help}",
+                "results": [],
+            }
+        if n_g == 1 and n_ts != 2:
+            return {
+                "error": (
+                    f"Paired Cluster perm. needs exactly 2 test sets (have {n_ts}); "
+                    f"or use exactly 2 groups for between mode. {_cluster_help}"
+                ),
+                "results": [],
+            }
+        if n_g == 2 and n_ts < 1:
+            return {
+                "error": (
+                    f"Between-groups Cluster perm. needs ≥1 shown test set (have {n_ts}). {_cluster_help}"
+                ),
+                "results": [],
+            }
+        if not shown_sets and not is_io:
+            return {"error": f"no shown test sets. {_cluster_help}", "results": []}
 
     if get_group_testset_means_fn is None:
         return {"error": "no data accessor for testset means", "results": []}

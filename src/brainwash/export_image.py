@@ -954,7 +954,14 @@ def _figure_text_test_prose(test_type: str, variant: str, tails: str, fdr: bool)
     if test_type == "Friedman":
         return "Friedman test (repeated-measures omnibus)"
     if test_type == "Cluster perm.":
-        return "Cluster permutation test (between groups)"
+        # Prefer mode from formal results when available
+        mode = None
+        # callers pass only type/variant/tails/fdr — variant may be "between"/"paired" after fix
+        if variant in ("between", "paired", "cluster"):
+            mode = "paired" if variant == "paired" else "between" if variant == "between" else None
+        if mode == "paired":
+            return "Cluster permutation test (paired, within-group; recording-aligned differences)"
+        return "Cluster permutation test (between groups; recording-level matrices)"
     if test_type == "ANCOVA":
         return "ANCOVA"
     return test_type
@@ -1128,6 +1135,11 @@ def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | 
     if test_type == "Wilcoxon":
         variant = getattr(st, "test_wilcox_variant", "paired")
         tails = getattr(st, "test_wilcox_tails", "two-sided")
+    elif test_type == "Cluster perm.":
+        variant = "between"
+        if results and isinstance(results[0], dict):
+            variant = results[0].get("cluster_mode") or (results[0].get("config") or {}).get("variant") or "between"
+        tails = "two-sided"
     else:
         variant = getattr(st, "test_t_variant", "unpaired")
         tails = getattr(st, "test_t_tails", "two-sided")

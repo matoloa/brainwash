@@ -526,10 +526,61 @@ def test_not_implemented_test_type():
     assert out.get("results") == []
 
 
+def test_cluster_to_matrix_ignores_hierarchy_and_sorts_sweeps():
+    from brainwash_stats.formal_tests.cluster_perm import _sweep_columns, _to_matrix
+
+    df = pd.DataFrame(
+        {
+            "rec_ID": ["a", "b"],
+            "subject": ["s1", "s2"],
+            "slice": ["1", "1"],
+            "3": [3.0, 3.0],
+            "1": [1.0, 1.0],
+            "2": [2.0, 2.0],
+        }
+    )
+    cols = _sweep_columns(df)
+    assert cols == ["1", "2", "3"]
+    mat = _to_matrix(df)
+    assert mat.shape == (2, 3)
+    assert list(mat[0]) == pytest.approx([1.0, 2.0, 3.0])
+
+
+def test_cluster_align_paired_rec_order():
+    from brainwash_stats.formal_tests.cluster_perm import _align_paired_rec_matrices
+
+    df1 = pd.DataFrame(
+        {
+            "rec_ID": ["r1", "r2", "r3"],
+            "subject": ["s1", "s2", "s3"],
+            "1": [1.0, 2.0, 3.0],
+            "2": [1.1, 2.1, 3.1],
+        }
+    )
+    # Different absolute sweeps; reverse rec order; r3 only in set1, r4 only in set2
+    df2 = pd.DataFrame(
+        {
+            "rec_ID": ["r2", "r1", "r4"],
+            "subject": ["s2", "s1", "s4"],
+            "10": [20.0, 10.0, 40.0],
+            "11": [21.0, 11.0, 41.0],
+        }
+    )
+    aligned = _align_paired_rec_matrices(df1, df2)
+    assert aligned["n_pairs"] == 2
+    assert aligned["n_dropped"] >= 2
+    assert aligned["X1"].shape == (2, 2)
+    rows = {tuple(aligned["X1"][i]): tuple(aligned["X2"][i]) for i in range(2)}
+    assert rows[(1.0, 1.1)] == pytest.approx((10.0, 11.0))
+    assert rows[(2.0, 2.1)] == pytest.approx((20.0, 21.0))
+
+
 def test_cluster_perm_between_groups_smoke():
+    import math
+
     pytest.importorskip("mne")
-    g1_vals = [("r1", "s1", 1.0), ("r2", "s1", 1.2), ("r3", "s2", 1.1)]
-    g2_vals = [("r4", "s3", 2.5), ("r5", "s3", 2.7), ("r6", "s4", 2.6)]
+    g1_vals = [("r1", "s1", 1.0), ("r2", "s2", 1.2), ("r3", "s3", 1.1)]
+    g2_vals = [("r4", "s4", 2.5), ("r5", "s5", 2.7), ("r6", "s6", 2.6)]
     out = compute_statistical_comparison(
         groups=["G1", "G2"],
         dd_groups=make_dd_groups("G1", "G2"),
@@ -540,6 +591,75 @@ def test_cluster_perm_between_groups_smoke():
         slope=False,
         n_unit="subject",
     )
-    assert "error" not in out
+    assert "error" not in out, out
     assert out.get("config", {}).get("test_type") == "Cluster perm."
+    assert out.get("config", {}).get("variant") == "between"
     assert out.get("results")
+    res = out["results"][0]
+    assert res.get("cluster_mode") == "between"
+    p = res.get("p_amp")
+    assert isinstance(p, (int, float)) and (math.isfinite(p) or math.isnan(p))
+
+
+def test_cluster_rejects_three_groups():
+    g1 = [("r1", "s1", 1.0), ("r2", "s2", 1.1)]
+    g2 = [("r3", "s3", 2.0), ("r4", "s4", 2.1)]
+    g3 = [("r5", "s5", 3.0), ("r6", "s6", 3.1)]
+    out = compute_statistical_comparison(
+        groups=["G1", "G2", "G3"],
+        dd_groups=make_dd_groups("G1", "G2", "G3"),
+        dd_testsets=make_dd_testsets("TS1", sweeps=[1, 2, 3]),
+        get_group_testset_means_fn=make_scalar_accessor({"G1": g1, "G2": g2, "G3": g3}),
+        test_type="Cluster perm.",
+        amp=True,
+        slope=False,
+    )
+    assert "error" in out
+    assert "3 groups" in out["error"] or "does not support 3" in out["error"]
+    assert "Valid layouts" in out["error"]
+    assert not out.get("results")
+
+
+def test_cluster_paired_align_and_drops():
+    pytest.importorskip("mne")
+
+    def accessor_same(g, sweeps, aspect="EPSP_amp", per_sweep=False):
+        n = getattr(accessor_same, "_n", 0)
+        accessor_same._n = n + 1
+        if n % 2 == 0:
+            rows = [
+                {"rec_ID": "r1", "subject": "s1", "slice": "1", "1": 0.5, "2": 0.6, "3": 0.7},
+                {"rec_ID": "r2", "subject": "s2", "slice": "1", "1": 1.5, "2": 1.6, "3": 1.7},
+                {"rec_ID": "r4", "subject": "s4", "slice": "1", "1": 8.0, "2": 8.1, "3": 8.2},
+            ]
+        else:
+            rows = [
+                {"rec_ID": "r2", "subject": "s2", "slice": "1", "1": 2.5, "2": 2.6, "3": 2.7},
+                {"rec_ID": "r1", "subject": "s1", "slice": "1", "1": 1.0, "2": 1.1, "3": 1.2},
+                {"rec_ID": "r3", "subject": "s3", "slice": "1", "1": 9.0, "2": 9.1, "3": 9.2},
+            ]
+        return pd.DataFrame(rows)
+
+    dd = {
+        "A": {"show": True, "sweeps": [1, 2, 3], "set_name": "pre"},
+        "B": {"show": True, "sweeps": [1, 2, 3], "set_name": "post"},
+    }
+    out = compute_statistical_comparison(
+        groups=["G1"],
+        dd_groups=make_dd_groups("G1"),
+        dd_testsets=dd,
+        get_group_testset_means_fn=accessor_same,
+        test_type="Cluster perm.",
+        amp=True,
+        slope=False,
+        n_unit="recording",
+    )
+    assert "error" not in out, out
+    res = out["results"][0]
+    assert res.get("cluster_mode") == "paired"
+    assert res.get("n_pairs") == 2
+    assert res.get("n_dropped") >= 2
+    units = {d["unit"] for d in res.get("paired_dropped") or []}
+    assert "r3" in units or "r4" in units
+    assert isinstance(res.get("p_amp"), (int, float))
+

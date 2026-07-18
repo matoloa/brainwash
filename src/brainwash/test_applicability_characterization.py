@@ -141,16 +141,73 @@ def test_friedman_ok_one_group_three_sets():
     assert applicability.check_friedman_applicability(dd_g, make_dd_testsets("TS1", "TS2", "TS3")) is None
 
 
+def test_cluster_two_groups_needs_testset():
+    dd_g = _groups("G1", "G2")
+    msg = applicability.check_cluster_applicability(dd_g, {})
+    assert msg is not None
+    assert "Between-groups" in msg
+    assert "≥1 shown test set" in msg or ">=1" in msg
+    assert "Valid layouts" in msg
+    assert "exactly 2 groups" in msg and "exactly 2 test sets" in msg
+
+
 def test_cluster_two_groups_ok():
     dd_g = _groups("G1", "G2")
-    assert applicability.check_cluster_applicability(dd_g, {}) is None
+    assert applicability.check_cluster_applicability(dd_g, make_dd_testsets("TS1")) is None
+    # 2 groups + 2 sets still between (valid)
+    assert applicability.check_cluster_applicability(dd_g, make_dd_testsets("TS1", "TS2")) is None
+
+
+def test_cluster_three_groups_refused():
+    dd_g = _groups("G1", "G2", "G3")
+    msg = applicability.check_cluster_applicability(dd_g, make_dd_testsets("TS1"))
+    assert msg is not None
+    assert "3 groups" in msg
+    assert "Valid layouts" in msg
+
+
+def test_cluster_paired_needs_two_sets():
+    dd_g = _groups("G1")
+    msg = applicability.check_cluster_applicability(dd_g, make_dd_testsets("TS1"))
+    assert msg is not None
+    assert "Paired" in msg
+    assert "exactly 2 test sets" in msg
+    assert "2 groups" in msg  # points at between alternative
+    assert "Valid layouts" in msg
+
+
+def test_cluster_paired_ok():
+    dd_g = _groups("G1")
+    assert applicability.check_cluster_applicability(dd_g, make_dd_testsets("TS1", "TS2")) is None
+
+
+def test_cluster_paired_different_absolute_sweeps_ok():
+    """Baseline vs post: different absolute indices, same layout class — allowed."""
+    dd_g = _groups("G1")
+    dd_ts = {
+        "TS1": {"show": True, "sweeps": [1, 2, 3]},
+        "TS2": {"show": True, "sweeps": [10, 11, 12]},
+    }
+    assert applicability.check_cluster_applicability(dd_g, dd_ts) is None
+
+
+def test_cluster_paired_short_window_warns():
+    dd_g = _groups("G1")
+    dd_ts = {
+        "TS1": {"show": True, "sweeps": [1]},
+        "TS2": {"show": True, "sweeps": [10, 11, 12]},
+    }
+    msg = applicability.check_cluster_applicability(dd_g, dd_ts)
+    assert msg is not None
+    assert "≥2 sweeps" in msg
+    assert "Valid layouts" in msg
+    assert "[" not in msg
 
 
 def test_cluster_insufficient():
     dd_g = _groups("G1")
-    assert applicability.check_cluster_applicability(dd_g, make_dd_testsets("TS1")) == (
-        "Cluster permutation test requires ≥2 groups or 1 group + ≥2 test sets"
-    )
+    msg = applicability.check_cluster_applicability(dd_g, make_dd_testsets("TS1"))
+    assert msg is not None and "Paired" in msg and "Valid layouts" in msg
 
 
 def test_warning_for_test_type_not_implemented_type():

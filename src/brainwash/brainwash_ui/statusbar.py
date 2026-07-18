@@ -549,10 +549,18 @@ def format_non_io_stat_test_statusbar(
         return StatusbarResult(None, None)
 
     eff = effective_test_type
+    primary0 = results[0] if results and isinstance(results[0], dict) else {}
+    # Engine/UI error payloads (e.g. cluster layout failure) — always surface as warning
+    err_msg = primary0.get("error") or (primary0.get("config") or {}).get("error")
+    if err_msg:
+        return StatusbarResult(f"{eff}: {err_msg}", "warning")
+
     if eff == "Wilcoxon":
         variant = wilcox_variant
     elif eff == "t-test":
         variant = ttest_variant
+    elif eff == "Cluster perm.":
+        variant = primary0.get("cluster_mode") or (primary0.get("config") or {}).get("variant")
     else:
         variant = None
 

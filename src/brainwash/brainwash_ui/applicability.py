@@ -83,16 +83,51 @@ def check_friedman_applicability(dd_groups: dict | None, dd_testsets: dict | Non
     return None
 
 
+# Shared wording for statusbar / validation / engine (keep in sync).
+CLUSTER_PERM_LAYOUT_HELP = (
+    "Valid layouts: (A) exactly 2 groups and ≥1 test set → between (one cluster test per set); "
+    "or (B) exactly 1 group and exactly 2 test sets → paired."
+)
+
+
 def check_cluster_applicability(dd_groups: dict | None, dd_testsets: dict | None) -> str | None:
     if not dd_groups:
-        return "No groups defined for Cluster perm."
+        return f"No groups defined for Cluster perm. {CLUSTER_PERM_LAYOUT_HELP}"
     shown_groups = groups_with_recordings(dd_groups, visible_group_ids(dd_groups))
     shown_ts = visible_testset_ids(dd_testsets)
-    if len(shown_groups) >= 2:
+    n_g = len(shown_groups)
+    n_ts = len(shown_ts)
+    if n_g == 2:
+        if n_ts < 1:
+            return (
+                f"Between-groups Cluster perm. needs ≥1 shown test set (have {n_ts}). "
+                f"{CLUSTER_PERM_LAYOUT_HELP}"
+            )
         return None
-    if len(shown_groups) == 1 and len(shown_ts) >= 2:
+    if n_g == 1:
+        if n_ts != 2:
+            return (
+                f"Paired Cluster perm. needs exactly 2 test sets (have {n_ts}); "
+                f"or use exactly 2 groups for between mode. {CLUSTER_PERM_LAYOUT_HELP}"
+            )
+        # Each set needs a multi-sweep window; absolute sweep indices may differ (baseline vs post).
+        tids = shown_ts
+        t0 = (dd_testsets or {}).get(tids[0], {}) if tids else {}
+        t1 = (dd_testsets or {}).get(tids[1], {}) if len(tids) > 1 else {}
+        s0 = list(t0.get("sweeps") or [])
+        s1 = list(t1.get("sweeps") or [])
+        if len(s0) < 2 or len(s1) < 2:
+            return (
+                "Paired Cluster perm. needs ≥2 sweeps in each of the two test sets. "
+                f"{CLUSTER_PERM_LAYOUT_HELP}"
+            )
         return None
-    return "Cluster permutation test requires ≥2 groups or 1 group + ≥2 test sets"
+    if n_g > 2:
+        return (
+            f"Cluster perm. does not support {n_g} groups (only exactly 2 for between). "
+            f"{CLUSTER_PERM_LAYOUT_HELP}"
+        )
+    return f"No groups with data for Cluster perm. {CLUSTER_PERM_LAYOUT_HELP}"
 
 
 def warning_for_test_type(

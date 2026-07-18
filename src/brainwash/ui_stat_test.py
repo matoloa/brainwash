@@ -528,7 +528,45 @@ class StatTestMixin:
                 self.clear_formal_test_results()
                 return
 
-        if not shown_ts and test_type not in ("Cluster perm.",):
+        if test_type == "Cluster perm.":
+            # Wording aligned with brainwash_ui.applicability.CLUSTER_PERM_LAYOUT_HELP
+            _cluster_help = (
+                "Valid layouts: (A) exactly 2 groups and ≥1 test set → between (one cluster test per set); "
+                "or (B) exactly 1 group and exactly 2 test sets → paired."
+            )
+            n_g = len(shown_groups)
+            n_ts = len(shown_ts)
+            if n_g == 0:
+                if had_results:
+                    print(f"Statistical test: No groups with data for Cluster perm. {_cluster_help}")
+                self.clear_formal_test_results()
+                return
+            if n_g > 2:
+                if had_results:
+                    print(
+                        f"Statistical test: Cluster perm. does not support {n_g} groups "
+                        f"(only exactly 2 for between). {_cluster_help}"
+                    )
+                self.clear_formal_test_results()
+                return
+            if n_g == 1 and n_ts != 2:
+                if had_results:
+                    print(
+                        f"Statistical test: Paired Cluster perm. needs exactly 2 test sets (have {n_ts}); "
+                        f"or use exactly 2 groups for between mode. {_cluster_help}"
+                    )
+                self.clear_formal_test_results()
+                return
+            if n_g == 2 and n_ts < 1:
+                if had_results:
+                    print(
+                        f"Statistical test: Between-groups Cluster perm. needs ≥1 shown test set "
+                        f"(have {n_ts}). {_cluster_help}"
+                    )
+                self.clear_formal_test_results()
+                return
+
+        if not shown_ts:
             if had_results:
                 print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
             self.clear_formal_test_results()
@@ -576,8 +614,22 @@ class StatTestMixin:
                 test_sw=bool(self.uistate.stat_test.test_sw),
                 test_levene=bool(self.uistate.stat_test.test_levene),
             )
-            results = list(comp.get("results", [])) if not comp.get("error") and not comp.get("not_implemented") else []
-            if comp.get("config"):
+            if comp.get("error"):
+                # Keep error on formal results so statusbar is not blank (applicability may be OK).
+                err = str(comp.get("error"))
+                print(f"Statistical test error: {err}")
+                results = [
+                    {
+                        "error": err,
+                        "set_name": test_type,
+                        "config": dict(comp.get("config") or {"type": test_type, "error": err}),
+                    }
+                ]
+            elif comp.get("not_implemented"):
+                results = []
+            else:
+                results = list(comp.get("results", []))
+            if comp.get("config") and not comp.get("error"):
                 if not isinstance(results, list) or len(results) == 0:
                     results = [comp["config"].copy()]
                 else:
@@ -586,7 +638,7 @@ class StatTestMixin:
                             r.setdefault("config", comp["config"])
         except Exception as ex:
             print(f"apply_statistical_test compute error: {ex}")
-            results = []
+            results = [{"error": str(ex), "set_name": test_type, "config": {"type": test_type, "error": str(ex)}}]
 
         if not results and not (comp.get("config") and comp.get("config").get("implicit_testset")):
             self.clear_formal_test_results()
@@ -595,8 +647,14 @@ class StatTestMixin:
             results = [{"config": comp["config"]}]
 
         self.uistate.stat_test.formal_test_results = results
-        self.uiplot.show_test_markers(results)
-        self._print_statistical_test_table(results, variant=variant, tails=tails, fdr=fdr, norm=norm, test_type=test_type)
+        if any(isinstance(r, dict) and r.get("error") for r in results):
+            try:
+                self.uiplot.clear_test_markers()
+            except Exception:
+                pass
+        else:
+            self.uiplot.show_test_markers(results)
+            self._print_statistical_test_table(results, variant=variant, tails=tails, fdr=fdr, norm=norm, test_type=test_type)
         set_names = ", ".join(str(r.get("set_name") or r.get("set_id") or "?") for r in results)
         sw = bool(self.uistate.stat_test.test_sw)
         lev = bool(self.uistate.stat_test.test_levene)
@@ -627,6 +685,15 @@ class StatTestMixin:
             print(
                 "Method: Friedman repeated-measures omnibus on unit-key complete cases "
                 f"across ≥3 test sets (n_unit={n_unit}); incomplete units excluded; n = complete units. "
+                "Markers use q if FDR is on, else p. * p/q<0.05."
+            )
+        elif test_type == "Cluster perm.":
+            print(
+                "Method: MNE cluster permutation on recording × sorted-sweep matrices "
+                "(n at recording level; subject/slice aggregation deferred). "
+                "Between: exactly 2 groups per test-set window. "
+                "Paired: 1 group, 2 test-set windows (≥2 sweeps each; absolute indices may differ), "
+                "rec_ID-aligned differences by relative position. "
                 "Markers use q if FDR is on, else p. * p/q<0.05."
             )
         elif test_type == "t-test" and effective_variant == "paired":
