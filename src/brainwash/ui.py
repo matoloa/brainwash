@@ -843,12 +843,15 @@ class UIsub(
             self.uistate.stat_test.test_levene = state == 2
             self.update_test()
         # print(f"viewSettingsChanged: {key} = {state == 2}")
-        self.update_show()
-        if key in ["output_ymin0", "norm_EPSP"]:
-            self.zoomAuto()
-        elif self.uistate.experiment.experiment_type == "PP" and key in ["EPSP_amp", "volley_amp", "EPSP_slope", "volley_slope"]:
-            # Aspect set changes group box columns / rec PPR x slots — rebuild so
-            # volley never remains stacked on the EPSP amp position.
+        # Rebuild PP group artists before update_show: new artists start hidden, and
+        # visibility is applied only in update_show (otherwise the graph stays blank
+        # until the next selection change).
+        if self.uistate.experiment.experiment_type == "PP" and key in [
+            "EPSP_amp",
+            "volley_amp",
+            "EPSP_slope",
+            "volley_slope",
+        ]:
             if getattr(self, "dd_groups", None):
                 for gid in list(self.dd_groups.keys()):
                     try:
@@ -857,6 +860,15 @@ class UIsub(
                         pass
                 if hasattr(self, "graphGroups"):
                     self.graphGroups()
+        self.update_show()
+        if key in ["output_ymin0", "norm_EPSP"]:
+            self.zoomAuto()
+        elif self.uistate.experiment.experiment_type == "PP" and key in [
+            "EPSP_amp",
+            "volley_amp",
+            "EPSP_slope",
+            "volley_slope",
+        ]:
             self.zoomAuto()
         # norm/amp/slope (visible aspects) affect heatmap and statistical test inputs;
         # clear stale heatmap dots and formal test markers when they change.
