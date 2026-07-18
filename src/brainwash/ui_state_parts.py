@@ -223,6 +223,8 @@ class StatTestState:
         self.test_cluster = False
         self.formal_test_results = None
         self.statusbar_state = None
+        # Session-only: restore non-IO test when leaving experiment_type io (not pickled).
+        self.test_type_before_io = None
 
     def to_state_dict(self) -> dict:
         return {

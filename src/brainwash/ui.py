@@ -767,11 +767,21 @@ class UIsub(
         if hasattr(self, "frameToolType_sub_io"):
             self.frameToolType_sub_io.setVisible(exp_type == "io")
         if exp_type == "io":
-            # No test_type sentinel (experiment_type="io" is first-class per AGENTS.md and plan).
-            # Test frame visibility now controlled ONLY by menu or pushButton_hide_test (setViewToolVisible / viewTools).
-            # No auto-hide or gray menu.
+            # PR-A: IO formal analysis is ANCOVA-only — default radio and stash prior test.
+            if old_type != "io":
+                self.uistate.stat_test.test_type_before_io = self.uistate.stat_test.test_type
+            if hasattr(self, "_set_stat_test_type"):
+                self._set_stat_test_type("ANCOVA", save=False)
+            else:
+                self.uistate.stat_test.test_type = "ANCOVA"
             if hasattr(self, "frameToolTestOptions"):
-                getattr(self, "frameToolTestOptions").setVisible(True)  # n_unit relevant for regression granularity
+                getattr(self, "frameToolTestOptions").setVisible(True)  # n_unit for IO ANCOVA
+        elif old_type == "io":
+            # Restore pre-IO formal test if we stashed one.
+            prev = getattr(self.uistate.stat_test, "test_type_before_io", None)
+            if prev is not None and hasattr(self, "_set_stat_test_type"):
+                self._set_stat_test_type(prev, save=False)
+            self.uistate.stat_test.test_type_before_io = None
         self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
         # Clear stale results; update_test is the single entry point (re-eval + statusbar via _get...).
         self.uistate.stat_test.formal_test_results = None

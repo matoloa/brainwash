@@ -5,16 +5,18 @@ from test_statistics_fixtures import make_dd_groups, make_dd_testsets
 from ui_state_classes import UIstate
 
 
-def test_compute_statusbar_io_empty():
+def test_compute_statusbar_io_none_hints_select_ancova():
     u = UIstate()
     u.experiment.experiment_type = "io"
+    u.stat_test.test_type = "None"
     result = app_context.compute_statusbar_result(
         experiment=app_context.experiment_snapshot_from(u),
         stat_test=app_context.stat_test_snapshot_from(u),
         dd_groups={},
         dd_testsets={},
     )
-    assert result.text is None
+    assert result.state == "info"
+    assert result.text == "Select ANCOVA to run Input-Output analysis"
 
 
 def test_compute_statusbar_io_warns_on_non_ancova_test():
@@ -38,7 +40,7 @@ def test_compute_statusbar_io_ancova_allows_regression_path():
     u.stat_test.formal_test_results = [
         {
             "config": {
-                "type": "IO regression",
+                "type": "IO ANCOVA",
                 "x_col": "volley_amp",
                 "y_col": "EPSP_amp",
                 "group_ns": {"G1": 2},

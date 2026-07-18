@@ -9,8 +9,9 @@ from .xy_pairs import _get_io_xy_pairs
 def _compute_io_regression_internal(
     shown_groups, get_group_testset_means_fn, uistate=None, n_unit="subject", norm=False, amp=True, slope=True, dd_groups=None
 ):
-    """Core IO regression: linregress per group, OLS slope comparison between groups.
-    Returns dict with config["type"] == "IO regression" for statusbar.
+    """Core IO ANCOVA path (PR-B/C): linregress per group + OLS slope interaction.
+
+    Returns config["type"] == "IO ANCOVA". Full textbook ANCOVA table lands in PR-C.
     """
     results = []
     group_ns = {}
@@ -101,7 +102,7 @@ def _compute_io_regression_internal(
                     slope_p = np.nan
 
         res_row = {
-            "set_id": "__io_regression_implicit__",
+            "set_id": "__io_ancova__",
             "set_name": None,
             "group1": shown_groups,
             "n1": sum(group_ns.values()) if group_ns else 0,
@@ -126,13 +127,15 @@ def _compute_io_regression_internal(
         y_col = y_map.get(io_output, "EPSP_amp")
 
     config = {
-        "type": "IO regression",
+        "type": "IO ANCOVA",
         "io_input": uistate.experiment.io_input if uistate else "vamp",
         "io_output": uistate.experiment.io_output if uistate else "EPSPamp",
         "x_col": x_col,
         "y_col": y_col,
         "n_unit": n_unit,
+        # v1: all sweeps/bins; shown test sets are not used for IO ANCOVA data selection.
         "implicit_testset": True,
+        "test_sets_ignored": True,
         "amp": amp,
         "slope": slope,
         "norm": norm,

@@ -69,10 +69,11 @@ def test_stat_test_frame_visibility_follows_view_tools(qtbot):
 def test_stat_test_host_io_statusbar_text(qtbot):
     u = UIstate()
     u.experiment.experiment_type = "io"
+    u.stat_test.test_type = "ANCOVA"
     u.stat_test.formal_test_results = [
         {
             "config": {
-                "type": "IO regression",
+                "type": "IO ANCOVA",
                 "x_col": "volley_amp",
                 "y_col": "EPSP_amp",
                 "group_ns": {"G1": 2, "G2": 3},

@@ -44,8 +44,10 @@ def format_io_regression_statusbar(
     elif isinstance(formal, dict):
         cfg = formal.get("config") or formal
 
-    if not isinstance(cfg, dict) or cfg.get("type") != "IO regression":
-        return StatusbarResult("IO regression: select ≥2 groups to compute slope comparison", None)
+    # Canonical "IO ANCOVA"; accept legacy "IO regression" from pre-PR-B results.
+    cfg_type = cfg.get("type") if isinstance(cfg, dict) else None
+    if not isinstance(cfg, dict) or cfg_type not in ("IO ANCOVA", "IO regression"):
+        return StatusbarResult("IO ANCOVA: select ≥2 groups to compute slope comparison", None)
 
     prefix = "IO ANCOVA"
     global_notes = []

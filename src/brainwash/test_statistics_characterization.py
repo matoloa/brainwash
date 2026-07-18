@@ -115,7 +115,51 @@ def test_unpaired_ttest_returns_results_and_config():
     assert out.get("config", {}).get("type") == "t-test"
 
 
-def test_io_empty_testsets_returns_io_regression_not_anova():
+def test_io_ancova_empty_testsets():
+    g1 = [("rec_G1_1", "s1", 1.0), ("rec_G1_2", "s1", 1.5)]
+    g2 = [("rec_G2_1", "s2", 2.0), ("rec_G2_2", "s2", 2.5)]
+    accessor = bind_accessor(make_scalar_accessor({"G1": g1, "G2": g2}))
+    out = compute_statistical_comparison(
+        groups=["G1", "G2"],
+        dd_groups=make_dd_groups("G1", "G2"),
+        dd_testsets={},
+        get_group_testset_means_fn=accessor,
+        test_type="ANCOVA",
+        experiment_type="io",
+        uistate=MinimalUistate(),
+        amp=True,
+        slope=True,
+        n_unit="recording",
+    )
+    assert out.get("config", {}).get("type") == "IO ANCOVA"
+    assert out.get("config", {}).get("test_sets_ignored") is True
+    assert out.get("results")
+    assert out["results"][0].get("set_id") == "__io_ancova__"
+
+
+def test_io_ancova_ignores_shown_test_sets():
+    """PR-B policy: shown test sets must not fall through to time ANOVA."""
+    g1 = [("rec_G1_1", "s1", 1.0), ("rec_G1_2", "s1", 1.5)]
+    g2 = [("rec_G2_1", "s2", 2.0), ("rec_G2_2", "s2", 2.5)]
+    accessor = bind_accessor(make_scalar_accessor({"G1": g1, "G2": g2}))
+    out = compute_statistical_comparison(
+        groups=["G1", "G2"],
+        dd_groups=make_dd_groups("G1", "G2"),
+        dd_testsets=make_dd_testsets("TS1", sweeps=[1, 2]),
+        get_group_testset_means_fn=accessor,
+        test_type="ANCOVA",
+        experiment_type="io",
+        uistate=MinimalUistate(),
+        amp=True,
+        slope=True,
+        n_unit="recording",
+    )
+    assert "error" not in out
+    assert out.get("config", {}).get("type") == "IO ANCOVA"
+    assert out["results"][0].get("set_id") == "__io_ancova__"
+
+
+def test_io_rejects_non_ancova_test_type():
     g1 = [("rec_G1_1", "s1", 1.0), ("rec_G1_2", "s1", 1.5)]
     g2 = [("rec_G2_1", "s2", 2.0), ("rec_G2_2", "s2", 2.5)]
     accessor = bind_accessor(make_scalar_accessor({"G1": g1, "G2": g2}))
@@ -127,13 +171,24 @@ def test_io_empty_testsets_returns_io_regression_not_anova():
         test_type="ANOVA",
         experiment_type="io",
         uistate=MinimalUistate(),
-        amp=True,
-        slope=True,
-        n_unit="recording",
     )
-    assert out.get("config", {}).get("type") == "IO regression"
-    assert out.get("results")
-    assert out["results"][0].get("set_id") == "__io_regression_implicit__"
+    assert out.get("error") == "IO experiment requires ANCOVA"
+
+
+def test_io_ancova_radio_required_in_validation():
+    """Non-IO ANCOVA is not implemented; IO+ANCOVA is allowed (PR-A/B)."""
+    g1 = [("rec_G1_1", "s1", 1.0), ("rec_G1_2", "s1", 1.5)]
+    g2 = [("rec_G2_1", "s2", 2.0), ("rec_G2_2", "s2", 2.5)]
+    accessor = bind_accessor(make_scalar_accessor({"G1": g1, "G2": g2}))
+    out_non_io = compute_statistical_comparison(
+        groups=["G1", "G2"],
+        dd_groups=make_dd_groups("G1", "G2"),
+        dd_testsets={},
+        get_group_testset_means_fn=accessor,
+        test_type="ANCOVA",
+        experiment_type="time",
+    )
+    assert out_non_io.get("not_implemented") == "ANCOVA"
 
 
 def test_not_implemented_test_type():

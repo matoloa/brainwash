@@ -200,9 +200,34 @@ class StatTestMixin:
         return self.uistate.experiment.experiment_type == "io"
 
     def _effective_test_type(self) -> str:
-        if self._is_io_mode():
-            return "io_regression"
+        """Selected formal test type (no IO override — IO ANCOVA is radio-gated)."""
         return self.uistate.stat_test.test_type
+
+    def _set_stat_test_type(self, test_type: str, *, save: bool = False) -> None:
+        """Set test_type state and sync radios/sub-frames without running update_test."""
+        self.uistate.stat_test.test_type = test_type
+        radio_map = getattr(self, "_TEST_TO_RADIO", None) or {}
+        radio_name = radio_map.get(test_type)
+        if radio_name and hasattr(self, radio_name):
+            btn = getattr(self, radio_name)
+            try:
+                btn.blockSignals(True)
+                btn.setChecked(True)
+            finally:
+                btn.blockSignals(False)
+        if hasattr(self, "frameToolTest_sub_t"):
+            self.frameToolTest_sub_t.setVisible(test_type == "t-test")
+        if hasattr(self, "frameToolTest_sub_ANOVA"):
+            self.frameToolTest_sub_ANOVA.setVisible(test_type in ("ANOVA", "ANCOVA"))
+            if test_type in ("ANOVA", "ANCOVA") and hasattr(self, "update_anova_label"):
+                self.update_anova_label()
+        if hasattr(self, "frameToolTest_sub_wilcoxon"):
+            self.frameToolTest_sub_wilcoxon.setVisible(test_type == "Wilcoxon")
+        if save and hasattr(self, "dict_folders"):
+            try:
+                self.uistate.save_cfg(projectfolder=self.dict_folders.get("project"))
+            except Exception:
+                pass
 
     def _should_show_stat_test_frame(self) -> bool:
         """Central helper: return whether Statistical Test frame should be shown (respects viewTools/menu/hide button state; no auto-hide on IO)."""
@@ -274,11 +299,15 @@ class StatTestMixin:
         self.set_statusbar(None, None)
 
     def apply_statistical_test_if_active(self):
-        """Core dispatcher: io_regression or non-IO or clear."""
+        """Core dispatcher: IO ANCOVA (radio-only), non-IO formal tests, or clear."""
         try:
             eff = self._effective_test_type()
             if self._is_io_mode():
-                self._apply_io_regression()
+                # Publication plan PR-A: only ANCOVA runs IO analysis; never silent regression.
+                if eff == "ANCOVA":
+                    self._apply_io_regression()
+                else:
+                    self.clear_formal_test_results()
                 return
             if eff == "None":
                 self.clear_formal_test_results()
@@ -294,7 +323,7 @@ class StatTestMixin:
                 pass
 
     def _apply_io_regression(self) -> bool:
-        """Helper for IO path."""
+        """IO formal path (ANCOVA-selected only). Config type 'IO ANCOVA' (PR-B)."""
         shown_groups = self._get_shown_group_ids()
         shown_groups = [gid for gid in shown_groups if len(self.dd_groups.get(gid, {}).get("rec_IDs", [])) > 0]
         experiment_type = "io"
@@ -304,7 +333,7 @@ class StatTestMixin:
                 dd_groups=self.dd_groups,
                 dd_testsets=self.dd_testsets,
                 get_group_testset_means_fn=self.get_group_testset_means,
-                test_type="ANOVA",
+                test_type="ANCOVA",
                 variant="unpaired",
                 tails="two-sided",
                 fdr=False,
@@ -330,7 +359,7 @@ class StatTestMixin:
             self.uiplot.show_test_markers(results)
             return True
         except Exception as ex:
-            print(f"IO regression compute error: {ex}")
+            print(f"IO ANCOVA compute error: {ex}")
             self.clear_formal_test_results()
             return False
 

@@ -31,10 +31,9 @@ def compute_statistical_comparison(
     Old projects (no hierarchy) → statusbar warning + recording fallback.
     Cluster perm. forces recording-level n.
 
-    For experiment_type=="io" + no test sets: real X/Y regression via _compute_io_regression_internal
-    (linregress per unit + OLS slope test). Produces config with "type": "IO regression".
-    Early IO guard (is_io and use_implicit). ANCOVA is a normal test_type (non-IO ANOVA).
-    See AGENTS.md for statusbar and experiment_type rules.
+    IO formal analysis: experiment_type=="io" and test_type=="ANCOVA" only.
+    Uses all sweeps/bins (test sets ignored for v1). Config type "IO ANCOVA".
+    See work_plans/plan_io_ancova_publication.md.
     """
     validation_error = validate_comparison_inputs(
         groups=groups,
@@ -65,7 +64,8 @@ def compute_statistical_comparison(
     is_io = ctx["is_io"]
     fetch_group_testset_observations = ctx["fetch_group_testset_observations"]
 
-    if is_io and use_implicit:
+    # PR-B: IO ANCOVA radio gate only — do not require empty test sets; do not fall through to time ANOVA.
+    if is_io and test_type == "ANCOVA":
         if uistate is None:
             uistate = getattr(get_group_testset_means_fn, "__self__", None)
         return _compute_io_regression_internal(
@@ -78,9 +78,6 @@ def compute_statistical_comparison(
             slope=slope,
             dd_groups=dd_groups,
         )
-
-    # Legacy implicit ANOVA path removed (dead since IO regression became first-class).
-    # ANCOVA is now a normal test_type radio (handled as non-IO ANOVA).
 
     if n_unit not in ("subject", "slice", "recording"):
         n_unit = "subject"

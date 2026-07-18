@@ -15,7 +15,19 @@ def validate_comparison_inputs(
 
     When None, call ``comparison_context`` with the same kwargs for shown_groups, g1, g2, etc.
     """
-    if test_type not in ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."):
+    is_io = experiment_type == "io"
+    # IO formal analysis is ANCOVA-only (PR-A/B). Other test types must not run under experiment_type io.
+    if is_io and test_type != "ANCOVA":
+        return {
+            "error": "IO experiment requires ANCOVA",
+            "results": [],
+            "config": {"type": "IO ANCOVA"},
+        }
+    if test_type == "ANCOVA" and not is_io:
+        return {"not_implemented": "ANCOVA", "results": []}
+
+    allowed = ("t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm.", "ANCOVA")
+    if test_type not in allowed:
         return {"not_implemented": test_type, "results": []}
 
     if not isinstance(dd_groups, dict):
@@ -36,6 +48,10 @@ def validate_comparison_inputs(
         pass
     elif test_type == "Cluster perm.":
         pass
+    elif test_type == "ANCOVA":
+        # Test sets ignored for IO ANCOVA v1 (all sweeps/bins).
+        if len(shown_groups) < 2:
+            return {"error": "need at least two shown groups", "results": []}
     elif variant == "paired":
         if len(shown_groups) != 1:
             return {"error": "paired t-test requires exactly 1 group", "results": []}
@@ -44,7 +60,7 @@ def validate_comparison_inputs(
             return {"error": "need at least two shown groups", "results": []}
 
     shown_sets = [(sid, info) for sid, info in (dd_testsets or {}).items() if info.get("show", False) and info.get("sweeps")]
-    is_io = experiment_type == "io"
+    # IO ANCOVA does not require test sets (and ignores them for data selection in v1).
     if not shown_sets and not is_io:
         return {"error": "no shown test sets", "results": []}
 

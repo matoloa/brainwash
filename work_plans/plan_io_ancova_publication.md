@@ -1,6 +1,6 @@
 # Plan: Publication-grade IO ANCOVA (radio-triggered only)
 
-**Status:** APPROVED (2026-07-18) — implement PR-A → E in order  
+**Status:** APPROVED (2026-07-18) — **PR-A + PR-B done**; next PR-C (textbook engine)  
 **Branch target:** `0.16.3-nunit` or follow-on  
 **Goal:** Make Input–Output formal analysis **trigger only from the ANCOVA radio**, fix UI/engine inconsistencies, and deliver a **textbook-style ANCOVA** suitable for respectable scientific reporting (methods text, statusbar, export).
 

@@ -7,7 +7,7 @@ def test_io_regression_statusbar_with_slope_p_and_r2():
     formal = [
         {
             "config": {
-                "type": "IO regression",
+                "type": "IO ANCOVA",
                 "x_col": "volley_amp",
                 "y_col": "EPSP_amp",
                 "group_ns": {"G1": 3, "G2": 4},
@@ -28,9 +28,26 @@ def test_io_regression_statusbar_with_slope_p_and_r2():
     assert "r²(G1)=0.87" in result.text
 
 
+def test_io_regression_statusbar_accepts_legacy_type():
+    formal = [
+        {
+            "config": {
+                "type": "IO regression",
+                "x_col": "volley_amp",
+                "y_col": "EPSP_amp",
+                "group_ns": {},
+                "r2_per_group": {},
+            }
+        }
+    ]
+    result = format_io_regression_statusbar(formal, dd_groups={})
+    assert result.state == "info"
+    assert "IO ANCOVA" in (result.text or "")
+
+
 def test_io_regression_statusbar_missing_config():
     result = format_io_regression_statusbar([{"config": {"type": "t-test"}}], dd_groups={})
-    assert result.text == "IO regression: select ≥2 groups to compute slope comparison"
+    assert result.text == "IO ANCOVA: select ≥2 groups to compute slope comparison"
 
 
 def test_io_regression_statusbar_empty():

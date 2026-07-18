@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from . import applicability, statusbar
 
 _IMPLEMENTED_TEST_TYPES = frozenset({"t-test", "ANOVA", "Wilcoxon", "Friedman", "Cluster perm."})
-# IO regression is driven by experiment_type; only ANCOVA (or no test) is appropriate.
-_IO_ALLOWED_TEST_TYPES = frozenset({"ANCOVA", "None"})
 
 
 @dataclass(frozen=True)
@@ -53,19 +51,25 @@ def compute_statusbar_result(
     dd_groups: dict | None,
     dd_testsets: dict | None,
 ) -> statusbar.StatusbarResult:
-    if stat_test.test_type == "None" and experiment.experiment_type != "io":
-        return statusbar.StatusbarResult(None, None)
     if experiment.experiment_type == "io":
-        if stat_test.test_type not in _IO_ALLOWED_TEST_TYPES:
-            return statusbar.StatusbarResult(
-                "Use ANCOVA for Input-Output experiment analysis",
-                "warning",
+        # PR-A: formal IO analysis is ANCOVA-radio only.
+        if stat_test.test_type == "ANCOVA":
+            return statusbar.format_io_regression_statusbar(
+                stat_test.formal_test_results,
+                dd_groups=dd_groups or {},
+                n_unit=stat_test.buttonGroup_test_n,
             )
-        return statusbar.format_io_regression_statusbar(
-            stat_test.formal_test_results,
-            dd_groups=dd_groups or {},
-            n_unit=stat_test.buttonGroup_test_n,
+        if stat_test.test_type == "None":
+            return statusbar.StatusbarResult(
+                "Select ANCOVA to run Input-Output analysis",
+                "info",
+            )
+        return statusbar.StatusbarResult(
+            "Use ANCOVA for Input-Output experiment analysis",
+            "warning",
         )
+    if stat_test.test_type == "None":
+        return statusbar.StatusbarResult(None, None)
     test_type = stat_test.test_type
     if test_type == "None":
         return statusbar.StatusbarResult(None, None)
