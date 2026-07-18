@@ -927,9 +927,11 @@ class DataFrameMixin:
             if dff.empty:
                 continue
             # pivot-ish: one value per sweep for this rec
-            val_col = aspect if aspect in dff.columns else ("EPSP_amp" if "EPSP_amp" in dff.columns else None)
-            if val_col is None:
+            # Do NOT silently fall back to EPSP_amp when EPSP_amp_norm (etc.) is missing —
+            # that would test the wrong quantity while markers/labels still say "norm".
+            if aspect not in dff.columns:
                 continue
+            val_col = aspect
             rec_vals = {int(s): float(v) for s, v in zip(dff["sweep"], dff[val_col]) if pd.notna(v)}
             rows.append({"rec_ID": str(rec_ID), "vals": rec_vals})
         if not rows:

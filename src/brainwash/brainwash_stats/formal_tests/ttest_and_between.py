@@ -139,14 +139,27 @@ def run_main_test_set_loop(
                     eff_n1 = eff_n
                     eff_n2 = eff_n
                 else:
+                    # Unpaired Welch t-test (equal_var=False) on unit-level means
                     v1 = obs1[np.isfinite(obs1)]
                     v2 = obs2[np.isfinite(obs2)]
                     eff_n1 = int(v1.size)
                     eff_n2 = int(v2.size)
+                    # Diagnostics for console / figure text (means after n_unit aggregation)
+                    if eff_n1 >= 1:
+                        set_result[f"mean_{short}_g1"] = float(np.mean(v1))
+                        set_result[f"sd_{short}_g1"] = float(np.std(v1, ddof=1)) if eff_n1 >= 2 else 0.0
+                    if eff_n2 >= 1:
+                        set_result[f"mean_{short}_g2"] = float(np.mean(v2))
+                        set_result[f"sd_{short}_g2"] = float(np.std(v2, ddof=1)) if eff_n2 >= 2 else 0.0
                     if eff_n1 >= 1 and eff_n2 >= 1:
                         res = ttest_ind(v1, v2, alternative=alt, equal_var=False)
                         stat = float(res.statistic) if hasattr(res, "statistic") else np.nan
                         p = float(res.pvalue) if hasattr(res, "pvalue") else np.nan
+                        if hasattr(res, "df") and res.df is not None:
+                            try:
+                                set_result[f"df_{short}"] = float(res.df)
+                            except Exception:
+                                pass
             except Exception:
                 p = np.nan
                 stat = np.nan
@@ -155,6 +168,7 @@ def run_main_test_set_loop(
             s_key = f"stat_{short}" + ("_norm" if norm else "")
             set_result[p_key] = float(p) if np.isfinite(p) else np.nan
             set_result[s_key] = float(stat) if np.isfinite(stat) else np.nan
+            set_result[f"col_{short}"] = col  # measurement column actually tested
             if "eta2" in set_result:
                 set_result["eta2"] = set_result.get("eta2", np.nan)
 

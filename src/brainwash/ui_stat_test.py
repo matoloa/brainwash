@@ -572,7 +572,12 @@ class StatTestMixin:
         print("\n=== Statistical test (v0.16) ===")
         effective_variant = "unpaired" if (test_type or variant) == "Cluster perm." else variant
         print(f"variant={effective_variant}  tails={tails}  fdr={fdr}  norm={norm}")
-        print("Note: each n = mean of aspect over sweeps in the test set, per recording.")
+        print(
+            "Method: unpaired Welch t-test (equal_var=False) on unit-level means "
+            f"(n_unit={self.uistate.stat_test.buttonGroup_test_n}); "
+            "each unit value = mean of the aspect over test-set sweeps. "
+            "Markers use q if FDR is on, else p. * p/q<0.05."
+        )
         # Assumption lines (SW / Levene) when present on any result
         for r in results:
             if not isinstance(r, dict):
@@ -608,22 +613,39 @@ class StatTestMixin:
                         line += f"  q={qval:.4g}"
                     print(line)
         else:
-            r = results[0]
-            n1 = r.get("n1", 0)
-            n2 = r.get("n2", 0)
-            for key in sorted(k for k in r.keys() if k.startswith("p_")):
-                pval = r.get(key)
-                sval = r.get("stat_" + key[2:], np.nan)
-                qval = r.get("q_" + key[2:], None)
-                aspect = key[2:]
-                pstr = f"{pval:.4g}" if isinstance(pval, (int, float)) and np.isfinite(pval) else str(pval)
-                if isinstance(sval, (int, float)) and np.isfinite(sval):
-                    line = f"  {aspect}: p={pstr}  stat={sval:.4g}  n1={n1} n2={n2}"
-                else:
-                    line = f"  {aspect}: p={pstr}  n1={n1} n2={n2}"
-                if qval is not None and isinstance(qval, (int, float)) and np.isfinite(qval):
-                    line += f"  q={qval:.4g}"
-                print(line)
+            for r in results:
+                if not isinstance(r, dict):
+                    continue
+                n1 = r.get("n1", 0)
+                n2 = r.get("n2", 0)
+                set_name = r.get("set_name") or r.get("set_id") or "?"
+                g1, g2 = r.get("group1"), r.get("group2")
+                print(f"  {set_name}: groups {g1} vs {g2}  n1={n1} n2={n2}")
+                for key in sorted(k for k in r.keys() if k.startswith("p_")):
+                    pval = r.get(key)
+                    aspect = key[2:]  # e.g. amp, amp_norm, slope
+                    short = "amp" if "amp" in aspect else ("slope" if "slope" in aspect else aspect)
+                    sval = r.get("stat_" + aspect, r.get(f"stat_{short}", np.nan))
+                    qval = r.get("q_" + aspect, r.get("q_" + key[2:], None))
+                    pstr = f"{pval:.4g}" if isinstance(pval, (int, float)) and np.isfinite(pval) else str(pval)
+                    line = f"    {aspect}: p={pstr}"
+                    if isinstance(sval, (int, float)) and np.isfinite(sval):
+                        line += f"  t={sval:.4g}"
+                    dfv = r.get(f"df_{short}")
+                    if isinstance(dfv, (int, float)) and np.isfinite(dfv):
+                        line += f"  df={dfv:.3g}"
+                    m1, m2 = r.get(f"mean_{short}_g1"), r.get(f"mean_{short}_g2")
+                    s1, s2 = r.get(f"sd_{short}_g1"), r.get(f"sd_{short}_g2")
+                    if isinstance(m1, (int, float)) and isinstance(m2, (int, float)):
+                        line += f"  mean_g1={m1:.4g} mean_g2={m2:.4g}"
+                    if isinstance(s1, (int, float)) and isinstance(s2, (int, float)):
+                        line += f"  sd_g1={s1:.4g} sd_g2={s2:.4g}"
+                    col = r.get(f"col_{short}")
+                    if col:
+                        line += f"  col={col}"
+                    if qval is not None and isinstance(qval, (int, float)) and np.isfinite(qval):
+                        line += f"  q={qval:.4g}"
+                    print(line)
         print("=== end test ===\n")
 
     # -------------------------------------------------------------------------
