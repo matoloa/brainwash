@@ -63,6 +63,30 @@ def test_output_sweep_range_coerces_numpy_scalars():
     assert sel == {2, 3, 4, 5}
 
 
+def test_group_output_sweep_domain_from_show_store():
+    show = {
+        "g1 amp": {
+            "group_ID": 1,
+            "axis": "ax1",
+            "aspect": "EPSP_amp",
+            "line": _MockLine([0.0, 5.0, 10.0]),
+        },
+        "g2 slope": {
+            "group_ID": 2,
+            "axis": "ax2",
+            "aspect": "EPSP_slope",
+            "line": _MockLine([0.0, 3.0, 7.0]),
+        },
+    }
+    domain = plot_drag.group_output_sweep_domain(show, None)
+    assert domain == list(range(0, 11))
+
+
+def test_group_output_sweep_domain_empty():
+    assert plot_drag.group_output_sweep_domain({}, {}) == []
+    assert plot_drag.group_output_sweep_domain(None, None) == []
+
+
 def test_drag_release_line_candidates_prefers_sweep_aspects():
     rec_show = {
         "fill": {

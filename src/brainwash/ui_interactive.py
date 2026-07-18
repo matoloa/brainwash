@@ -17,6 +17,24 @@ class InteractivePlotMixin:
     #          Mouseover, click and drag events         #
     #####################################################
 
+    def _groups_only_output_select_ok(self, canvas) -> bool:
+        """True when output sweep select is allowed with no recording selected."""
+        if canvas is not self.canvasOutput:
+            return False
+        if self.uistate.plot.list_idx_select_recs:
+            return False
+        exp = self.uistate.experiment.experiment_type
+        if exp in ("io", "PP"):
+            return False
+        domain = self._groups_output_sweep_domain()
+        return bool(domain)
+
+    def _groups_output_sweep_domain(self) -> list[int]:
+        return plot_drag.group_output_sweep_domain(
+            getattr(self.uistate.plot, "dict_group_show", None),
+            getattr(self.uistate.plot, "dict_group_labels", None),
+        )
+
     def graphClicked(self, event, canvas):  # graph click event
         if event.button == 2:  # middle click, reset zoom on the clicked graph
             if canvas == self.canvasOutput and self.uistate.plot.ax1 is not None:
@@ -30,7 +48,9 @@ class InteractivePlotMixin:
                 elif canvas == self.canvasEvent and self.uistate.plot.axe is not None:
                     self.zoomReset(self.uistate.plot.axe)
             return
-        if not self.uistate.plot.list_idx_select_recs:  # no recording selected; do nothing for other interactions
+
+        groups_only_output = self._groups_only_output_select_ok(canvas)
+        if not self.uistate.plot.list_idx_select_recs and not groups_only_output:
             return
         x = event.xdata
         if x is None:  # clicked outside graph; do nothing
@@ -38,6 +58,9 @@ class InteractivePlotMixin:
         self.usage("graphClicked")
         if event.button == 3:  # right click, deselect
             if self.uistate.plot.dragging:
+                return
+            # Groups-only: only clear output sweep selection (mean canvas stays rec-gated)
+            if groups_only_output and canvas is not self.canvasOutput:
                 return
             self.mouse_drag = None
             self.mouse_release = None
@@ -60,6 +83,21 @@ class InteractivePlotMixin:
             return
 
         # left clicked on a graph
+        # Groups-only output: sweep range for lineEdits / test sets (no prow / no axe mean)
+        if groups_only_output:
+            if self.uistate.experiment.experiment_type == "io":
+                return
+            self.uistate.plot.dragging = True
+            sweep_numbers = self._groups_output_sweep_domain()
+            if not sweep_numbers:
+                self.uistate.plot.dragging = False
+                return
+            self.uistate.plot.x_on_click = plot_drag.snap_sweep_index(sweep_numbers, x)
+            self.uistate.plot.x_select["output_start"] = self.uistate.plot.x_on_click
+            self.lineEdit_sweeps_range_from.setText(str(self.uistate.plot.x_on_click))
+            self.connectDragRelease(x_range=sweep_numbers, rec_ID=None, graph="output")
+            return
+
         self.uistate.plot.dragging = True
         prow = self.get_prow()
         if prow is None:
@@ -406,16 +444,25 @@ class InteractivePlotMixin:
             print("connectDragRelease: Incorrect graph reference.")
             return
 
-        candidates = plot_drag.drag_release_line_candidates(
-            rec_ID,
-            graph,
-            dict_rec_show=self.uistate.plot.dict_rec_show,
-            dict_rec_labels=self.uistate.plot.dict_rec_labels,
-        )
-        if not candidates:
-            print("No lines found. Cannot set up drag and release.")
-            return
-        _max_x_line, x_data = max(candidates, key=lambda item: item[1][-1])
+        if rec_ID is None:
+            # Groups-only output: snap domain is x_range itself (no rec artists).
+            x_data = np.asarray(x_range, dtype=float)
+            if x_data.size == 0:
+                print("No group sweep domain. Cannot set up drag and release.")
+                self.uistate.plot.dragging = False
+                return
+        else:
+            candidates = plot_drag.drag_release_line_candidates(
+                rec_ID,
+                graph,
+                dict_rec_show=self.uistate.plot.dict_rec_show,
+                dict_rec_labels=self.uistate.plot.dict_rec_labels,
+            )
+            if not candidates:
+                print("No lines found. Cannot set up drag and release.")
+                self.uistate.plot.dragging = False
+                return
+            _max_x_line, x_data = max(candidates, key=lambda item: item[1][-1])
         self.mouse_drag = canvas.mpl_connect(
             "motion_notify_event",
             lambda event: self.xDrag(event, canvas=canvas, x_data=x_data, x_range=x_range),
@@ -464,14 +511,17 @@ class InteractivePlotMixin:
             try:
                 if is_output:
                     prow = self.get_prow()
+                    cands = None
                     if prow is not None:
                         n = int(prow.get("sweeps", 0))
                         if n > 0:
                             cands = list(range(0, n))
-                            arr = np.asarray(cands)
-                            rx = cands[int(np.argmin(np.abs(arr - event.xdata)))]
-                            if rx != self.uistate.plot.x_on_click:
-                                self.uistate.plot.x_drag = rx
+                    elif not self.uistate.plot.list_idx_select_recs:
+                        cands = self._groups_output_sweep_domain()
+                    if cands:
+                        rx = plot_drag.snap_sweep_index(cands, event.xdata)
+                        if rx != self.uistate.plot.x_on_click:
+                            self.uistate.plot.x_drag = rx
                 else:
                     # mean graph: x is time (float)
                     if self.uistate.plot.x_on_click is not None and abs(event.xdata - self.uistate.plot.x_on_click) > 1e-9:
@@ -540,7 +590,9 @@ class InteractivePlotMixin:
             if is_mean:
                 self.uiplot.xSelect(canvas=canvas)
             elif is_output:
-                self.uiplot.update_axe_mean()
+                # axe mean of selected sweeps is rec-only
+                if self.uistate.plot.list_idx_select_recs:
+                    self.uiplot.update_axe_mean()
                 self.uiplot.xSelect(canvas=canvas)
         except Exception as ex:
             print(f"_finalize_drag_release error: {ex}")

@@ -395,15 +395,15 @@ class GroupMixin:
     # Test Set tagging (Phase 1)
     # ------------------------------------------------------------------
     def add_to_data_set(self):
-        """Replaces previous compare stub. Captures current sweep selection and creates a new Test Set (set_ID + default name 'set N')."""
-        if not self.uistate.plot.list_idx_select_recs:
-            print("No recording selected for test set.")
-            return
+        """Create a test set from the current output sweep selection (x_select).
+
+        Does not require a recording selection: test sets are project-level sweep
+        lists (usable with groups-only output view).
+        """
         if not self.uistate.plot.x_select.get("output"):
             print("No sweeps selected. Drag on output graph or use sweep range controls first.")
             return
-        self.testset_new()
-        self.refresh_samples()  # 3.4.3: testset CRUD must trigger sample refresh
+        self.testset_new()  # persists, UI controls, refresh_samples, graphRefresh
 
     # ------------------------------------------------------------------
     # Sample designation (Phase 3.1)

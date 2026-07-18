@@ -113,3 +113,43 @@ def drag_release_line_candidates(
         if candidates:
             break
     return candidates
+
+
+def group_output_sweep_domain(
+    dict_group_show: dict | None,
+    dict_group_labels: dict | None = None,
+) -> list[int]:
+    """Inclusive sweep-index domain from visible group artists (groups-only output view).
+
+    Uses max finite x among group mean lines on ax1/ax2 (prefer dict_group_show).
+    Returns ``list(range(0, max_x + 1))`` or empty if no usable group series.
+    """
+    max_sweep = -1
+    for store in (dict_group_show, dict_group_labels):
+        if not store:
+            continue
+        for value in store.values():
+            if value.get("group_ID") is None:
+                continue
+            if value.get("axis") not in ("ax1", "ax2"):
+                continue
+            # Prefer mean lines; skip pure errorbar containers without get_xdata
+            line = value.get("line")
+            if line is None or not hasattr(line, "get_xdata"):
+                continue
+            xdata = artist_xdata(line)
+            if xdata.size == 0:
+                continue
+            finite = xdata[np.isfinite(xdata)]
+            if finite.size == 0:
+                continue
+            # Sweep indices are non-negative; ignore negative/weird x (e.g. PP bars)
+            finite = finite[finite >= 0]
+            if finite.size == 0:
+                continue
+            max_sweep = max(max_sweep, int(np.floor(float(np.nanmax(finite)))))
+        if max_sweep >= 0 and store is dict_group_show:
+            break
+    if max_sweep < 0:
+        return []
+    return list(range(0, max_sweep + 1))
