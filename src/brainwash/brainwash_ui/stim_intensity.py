@@ -179,6 +179,38 @@ def expand_bin_values_to_sweeps(
     return out
 
 
+DFOUTPUT_COL = "stim_intensity"  # joined column name on dfoutput (SI-free µA)
+
+
+def attach_stim_intensity_column(
+    dfoutput: pd.DataFrame,
+    series: Mapping[int, float] | pd.DataFrame | None,
+) -> pd.DataFrame:
+    """Return a copy of dfoutput with ``stim_intensity`` joined by sweep.
+
+    Stim-mode rows (sweep NaN) get NaN. Does not mutate the input frame.
+    """
+    if dfoutput is None:
+        return dfoutput
+    out = dfoutput.copy()
+    if out.empty or "sweep" not in out.columns:
+        out[DFOUTPUT_COL] = np.nan
+        return out
+    sweeps = pd.to_numeric(out["sweep"], errors="coerce")
+    # Align using unique finite sweeps then map back
+    finite_mask = sweeps.notna()
+    if not finite_mask.any():
+        out[DFOUTPUT_COL] = np.nan
+        return out
+    unique_sweeps = sorted({int(s) for s in sweeps[finite_mask].tolist()})
+    aligned = align_to_sweeps(series, unique_sweeps)
+    by_sweep = {sw: aligned[i] for i, sw in enumerate(unique_sweeps)}
+    out[DFOUTPUT_COL] = [
+        by_sweep.get(int(s), np.nan) if pd.notna(s) else np.nan for s in sweeps
+    ]
+    return out
+
+
 def bin_values_from_sweep_series(
     series: Mapping[int, float] | pd.DataFrame | None,
     *,

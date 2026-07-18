@@ -15,7 +15,7 @@ import analysis_v3 as analysis
 import numpy as np
 import pandas as pd
 import parse
-from brainwash_ui import recording_cache, recording_pipeline
+from brainwash_ui import recording_cache, recording_pipeline, stim_intensity
 
 class DataFrameMixin:
     """Mixin that provides the internal DataFrame computation layer for UIsub.
@@ -333,13 +333,25 @@ class DataFrameMixin:
     # Output DataFrame
     # ------------------------------------------------------------------
 
+    def _join_stim_intensity(self, row, dfoutput: pd.DataFrame) -> pd.DataFrame:
+        """Attach user-owned stim_intensity (µA) from CSV; never persists into measurement parquet."""
+        if dfoutput is None:
+            return dfoutput
+        rec = row["recording_name"]
+        folder = self.dict_folders.get("stim_intensity")
+        if folder is None:
+            return stim_intensity.attach_stim_intensity_column(dfoutput, None)
+        path = recording_cache.stim_intensity_csv_path(str(folder), rec)
+        series_df = stim_intensity.load_stim_intensity_csv(path)
+        return stim_intensity.attach_stim_intensity_column(dfoutput, series_df)
+
     def get_dfoutput(self, row, reset=False, dft=None):  # Requires df_t
         # returns an internal df output for the selected file. If it does not exist, read it from file first.
         rec = row["recording_name"]
         bin_active = pd.notna(row["bin_size"])
         cache_key = recording_cache.output_cache_key(bin_active=bin_active)
-        if rec in self.dict_outputs and not reset:  # 1: Return cached
-            return self.dict_outputs[rec]
+        if rec in self.dict_outputs and not reset:  # 1: Return cached (re-join µA each time)
+            return self._join_stim_intensity(row, self.dict_outputs[rec])
         str_output_path = recording_cache.output_parquet_path(
             self.dict_folders["cache"], rec, bin_active=bin_active
         )
@@ -367,11 +379,11 @@ class DataFrameMixin:
             )
             self.set_dft(rec, dft)
             print(f"get_dfoutput: done, dfoutput.shape={dfoutput.shape}")
-            # Persist the clean version to disk.
+            # Persist the clean version to disk (measurements only; µA joined below).
             self.df2file(df=dfoutput, filename=rec, key=cache_key)
-        # Cache and return
+        # Cache measurements without depending on CSV; join µA on every return.
         self.dict_outputs[rec] = dfoutput
-        return dfoutput
+        return self._join_stim_intensity(row, dfoutput)
 
     # ------------------------------------------------------------------
     # Raw data DataFrame

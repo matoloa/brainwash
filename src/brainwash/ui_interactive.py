@@ -1541,7 +1541,7 @@ class InteractivePlotMixin:
         df_sweeps = dfoutput[dfoutput["sweep"].notna()].reset_index(drop=True)
         io_input = self.uistate.experiment.io_input
         io_output = self.uistate.experiment.io_output
-        x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
+        x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim_intensity"}.get(io_input, "volley_amp")
         y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
 
         if x_col not in df_sweeps.columns or y_col not in df_sweeps.columns:

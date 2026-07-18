@@ -570,7 +570,7 @@ def compute_io_ancova(
     if exp is not None:
         io_input = getattr(exp, "io_input", io_input)
         io_output = getattr(exp, "io_output", io_output)
-        x_map = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}
+        x_map = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim_intensity"}
         y_map = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}
         x_col = x_map.get(io_input, "volley_amp")
         y_col = y_map.get(io_output, "EPSP_amp")

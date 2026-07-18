@@ -96,3 +96,31 @@ def test_save_creates_parent_dir(tmp_path: Path):
     path = tmp_path / "stim_intensity" / "rec.csv"
     si.save_stim_intensity_csv(path, si.frame_from_series({0: 1.0}))
     assert path.is_file()
+
+
+def test_attach_stim_intensity_column():
+    dfo = pd.DataFrame(
+        {
+            "stim": [1, 1, 1, 1],
+            "sweep": [0, 1, 2, np.nan],
+            "EPSP_amp": [1.0, 2.0, 3.0, 2.5],
+        }
+    )
+    series = {0: 20.0, 2: 60.0}
+    out = si.attach_stim_intensity_column(dfo, series)
+    assert si.DFOUTPUT_COL in out.columns
+    assert out.loc[0, si.DFOUTPUT_COL] == 20.0
+    assert np.isnan(out.loc[1, si.DFOUTPUT_COL])
+    assert out.loc[2, si.DFOUTPUT_COL] == 60.0
+    assert np.isnan(out.loc[3, si.DFOUTPUT_COL])
+    # Original not mutated
+    assert si.DFOUTPUT_COL not in dfo.columns
+
+
+def test_io_input_map_stim_to_stim_intensity():
+    from brainwash_ui import plot_series
+
+    assert plot_series.IO_INPUT_TO_XCOL["stim"] == "stim_intensity"
+    x_col, y_col = plot_series.io_axis_columns("stim", "EPSPamp")
+    assert x_col == "stim_intensity"
+    assert y_col == "EPSP_amp"

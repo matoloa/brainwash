@@ -226,6 +226,8 @@ class UIstate:
                 return "Volley Amplitude (mV)"
             if io_input == "vslope":
                 return "Volley Slope (mV/ms)"
+            if io_input == "stim":
+                return "Stimulus intensity (µA)"
             return "Stimulus"
         return {"sweep": "Sweep", "stim": "Stim"}.get(mode, "Sweep")
 
@@ -357,7 +359,7 @@ class UIstate:
             return dfoutput.loc[mask, "stim"]
         if mode == "io":
             mask = dfoutput["sweep"].notna()
-            col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(
+            col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim_intensity"}.get(
                 self.experiment.io_input, "volley_amp"
             )
             if col in dfoutput.columns:

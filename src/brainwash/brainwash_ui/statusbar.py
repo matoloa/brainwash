@@ -75,6 +75,7 @@ def format_io_regression_statusbar(
         "volley_amp": "volley amp",
         "volley_slope": "volley slope",
         "stim": "stim",
+        "stim_intensity": "stim intensity",
     }
     y_label = label_map.get(y_col, y_col.replace("_", " "))
     x_label = label_map.get(x_col, x_col.replace("_", " "))
@@ -274,6 +275,7 @@ def format_io_ancova_methods_text(
         "volley_amp": "volley amplitude",
         "volley_slope": "volley slope",
         "stim": "stimulus intensity",
+        "stim_intensity": "stimulus intensity",
     }
     y_lab = label_map.get(cfg.get("y_col", ""), cfg.get("y_col", "Y").replace("_", " "))
     x_lab = label_map.get(cfg.get("x_col", ""), cfg.get("x_col", "X").replace("_", " "))

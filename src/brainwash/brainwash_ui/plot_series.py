@@ -10,7 +10,7 @@ import pandas as pd
 
 from brainwash_ui import plot_drag, plot_model
 
-IO_INPUT_TO_XCOL = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}
+IO_INPUT_TO_XCOL = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim_intensity"}
 IO_OUTPUT_TO_YCOL = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}
 
 GROUP_MEAN_COLUMNS = (

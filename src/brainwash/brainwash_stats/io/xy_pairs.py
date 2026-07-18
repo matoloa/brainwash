@@ -13,8 +13,10 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
         exp = getattr(nested, "experiment", None) if nested is not None else None
     io_input = getattr(exp, "io_input", "vamp") if exp is not None else "vamp"
 
-    x_map = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}
+    x_map = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim_intensity"}
     x_col = x_map.get(io_input, "volley_amp")
+    # Do not invent µA from sweep rank when user-owned stim intensity is the X.
+    rank_fallback = x_col != "stim_intensity"
     y_col = aspect_col
 
     try:
@@ -87,22 +89,33 @@ def _get_io_xy_pairs(g, get_group_testset_means_fn, uistate=None, n_unit="record
                 x_df["sweep"] = x_df["sweep"].astype(int)
                 long = long.merge(x_df, on=["rec_ID", "sweep"], how="left")
             if "x" not in long.columns or long["x"].isna().all():
-                long["x"] = long.groupby("rec_ID")["sweep"].rank(method="dense") - 1
+                if rank_fallback:
+                    long["x"] = long.groupby("rec_ID")["sweep"].rank(method="dense") - 1
+                else:
+                    long["x"] = np.nan
             else:
-                # Per-rec fallback where X missing
+                # Per-rec fallback where X missing (not for stim intensity µA)
                 miss = long["x"].isna()
-                if miss.any():
+                if miss.any() and rank_fallback:
                     long.loc[miss, "x"] = long.loc[miss].groupby("rec_ID")["sweep"].rank(method="dense") - 1
         else:
-            long["x"] = long["sweep"].rank(method="dense") - 1
+            if rank_fallback:
+                long["x"] = long["sweep"].rank(method="dense") - 1
+            else:
+                long["x"] = np.nan
     except Exception:
-        long["x"] = long.groupby("rec_ID")["sweep"].rank(method="dense") - 1
+        if rank_fallback:
+            long["x"] = long.groupby("rec_ID")["sweep"].rank(method="dense") - 1
+        else:
+            long["x"] = np.nan
     if "x" not in long.columns:
-        long["x"] = long["sweep"].rank(method="dense") - 1
+        long["x"] = long["sweep"].rank(method="dense") - 1 if rank_fallback else np.nan
 
     long = long.dropna(subset=["y"])
     if "x" not in long.columns:
-        long["x"] = np.arange(len(long))
+        long["x"] = np.arange(len(long)) if rank_fallback else np.nan
+    if not rank_fallback:
+        long = long.dropna(subset=["x"])
 
     # n_unique from wide_df (before any loss) via _aggregate_to_unit_level -- ensures unique subjects for n_unit="subject"
     n_unique = 0
