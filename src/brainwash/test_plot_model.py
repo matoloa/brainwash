@@ -71,6 +71,22 @@ def test_build_test_marker_specs_paired_single_marker():
     assert specs[0].color == "white"
 
 
+def test_build_test_marker_specs_friedman_omnibus_uses_sweeps():
+    results = [{"sweeps": [1, 2, 10, 11, 20, 21], "p_amp": 0.03, "set_id": "__friedman_rm_omnibus__"}]
+    specs = plot_model.build_test_marker_specs(
+        results,
+        test_type="Friedman",
+        t_variant="paired",
+        wilcox_variant="paired",
+        amp_view=True,
+        slope_view=False,
+        dark=False,
+    )
+    assert len(specs) == 1
+    assert abs(specs[0].x - sum([1, 2, 10, 11, 20, 21]) / 6) < 1e-9
+    assert specs[0].label == "*"
+
+
 def test_build_test_marker_specs_wilcoxon_paired_single_marker():
     results = [{"sweeps": [1, 3], "sweeps2": [5, 7], "p_amp": 0.01}]
     specs = plot_model.build_test_marker_specs(

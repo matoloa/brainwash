@@ -510,8 +510,26 @@ class StatTestMixin:
                 self.clear_formal_test_results()
                 return
 
-        if not shown_ts and test_type not in ("Friedman", "Cluster perm."):
-            if had_results or test_type == "Friedman":
+        if test_type == "Friedman":
+            if len(shown_groups) != 1:
+                if had_results:
+                    print("Statistical test: Friedman requires exactly 1 shown group with data.")
+                self.clear_formal_test_results()
+                return
+            if len(shown_ts) < 3:
+                if had_results:
+                    print("Statistical test: Friedman requires ≥3 shown test sets.")
+                self.clear_formal_test_results()
+                return
+            n1 = len(self.dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
+            if n1 < 2:
+                if had_results:
+                    print("Statistical test: Friedman requires N ≥ 2 recordings.")
+                self.clear_formal_test_results()
+                return
+
+        if not shown_ts and test_type not in ("Cluster perm.",):
+            if had_results:
                 print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
             self.clear_formal_test_results()
             return
@@ -605,6 +623,12 @@ class StatTestMixin:
                 )
             method += " Markers use q if FDR is on, else p. * p/q<0.05."
             print(method)
+        elif test_type == "Friedman":
+            print(
+                "Method: Friedman repeated-measures omnibus on unit-key complete cases "
+                f"across ≥3 test sets (n_unit={n_unit}); incomplete units excluded; n = complete units. "
+                "Markers use q if FDR is on, else p. * p/q<0.05."
+            )
         elif test_type == "t-test" and effective_variant == "paired":
             print(
                 "Method: paired Student's t-test on unit-key complete pairs "

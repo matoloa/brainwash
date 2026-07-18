@@ -255,6 +255,109 @@ def test_io_ancova_ignores_shown_test_sets():
     assert out["results"][0].get("set_id") == "__io_ancova__"
 
 
+def test_friedman_happy_path_and_sweeps():
+    g1 = [("r1", "s1", 1.0), ("r2", "s2", 1.2), ("r3", "s3", 1.1)]
+    out = compute_statistical_comparison(
+        groups=["G1"],
+        dd_groups=make_dd_groups("G1"),
+        dd_testsets=make_dd_testsets("TS1", "TS2", "TS3"),
+        get_group_testset_means_fn=make_scalar_accessor({"G1": g1}),
+        test_type="Friedman",
+        amp=True,
+        slope=False,
+        n_unit="subject",
+    )
+    assert "error" not in out, out
+    assert out.get("results")
+    res = out["results"][0]
+    assert res.get("set_id") == "__friedman_rm_omnibus__"
+    assert res.get("sweeps")
+    assert res.get("n_pairs") == 3
+    assert "p_amp" in res
+
+
+def test_friedman_rejects_two_groups():
+    g1 = [("r1", "s1", 1.0), ("r2", "s2", 1.1)]
+    g2 = [("r3", "s3", 2.0), ("r4", "s4", 2.1)]
+    out = compute_statistical_comparison(
+        groups=["G1", "G2"],
+        dd_groups=make_dd_groups("G1", "G2"),
+        dd_testsets=make_dd_testsets("TS1", "TS2", "TS3"),
+        get_group_testset_means_fn=make_scalar_accessor({"G1": g1, "G2": g2}),
+        test_type="Friedman",
+        amp=True,
+        slope=False,
+        n_unit="subject",
+    )
+    assert out.get("error") == "Friedman requires exactly 1 group"
+    assert not out.get("results")
+
+
+def test_friedman_rejects_two_testsets():
+    g1 = [("r1", "s1", 1.0), ("r2", "s2", 1.1), ("r3", "s3", 1.2)]
+    out = compute_statistical_comparison(
+        groups=["G1"],
+        dd_groups=make_dd_groups("G1"),
+        dd_testsets=make_dd_testsets("TS1", "TS2"),
+        get_group_testset_means_fn=make_scalar_accessor({"G1": g1}),
+        test_type="Friedman",
+        amp=True,
+        slope=False,
+        n_unit="subject",
+    )
+    assert out.get("error") == "Friedman requires at least 3 shown test sets"
+    assert not out.get("results")
+
+
+def test_friedman_drops_incomplete_units():
+    def accessor(g, sweeps, aspect="EPSP_amp", per_sweep=False):
+        sw = list(sweeps or [])
+        if 10 in sw:
+            rows = [("r1", "s1", 2.0), ("r2", "s2", 2.1)]  # s3 missing
+        elif 20 in sw:
+            rows = [("r1", "s1", 3.0), ("r2", "s2", 3.1), ("r3", "s3", 3.2)]
+        else:
+            rows = [("r1", "s1", 1.0), ("r2", "s2", 1.1), ("r3", "s3", 1.2)]
+        return pd.DataFrame(
+            [{"rec_ID": rid, "subject": sub, "slice": "1", "value": val} for rid, sub, val in rows]
+        )
+
+    dd_ts = {
+        "A": {"show": True, "sweeps": [1, 2, 3], "set_name": "pre"},
+        "B": {"show": True, "sweeps": [10, 11, 12], "set_name": "mid"},
+        "C": {"show": True, "sweeps": [20, 21, 22], "set_name": "post"},
+    }
+    out = compute_statistical_comparison(
+        groups=["G1"],
+        dd_groups=make_dd_groups("G1"),
+        dd_testsets=dd_ts,
+        get_group_testset_means_fn=accessor,
+        test_type="Friedman",
+        amp=True,
+        slope=False,
+        n_unit="subject",
+    )
+    assert "error" not in out, out
+    res = out["results"][0]
+    assert res["n_pairs"] == 2
+    assert res["n_dropped"] >= 1
+    drop_units = {d["unit"] for d in res.get("paired_dropped") or []}
+    assert "s3" in drop_units
+
+
+def test_align_multi_condition_unit_values():
+    from brainwash_stats.data import _align_multi_condition_unit_values
+
+    a = pd.DataFrame({"subject": ["s1", "s2", "s3"], "value": [1.0, 2.0, 3.0]})
+    b = pd.DataFrame({"subject": ["s1", "s2"], "value": [1.5, 2.5]})
+    c = pd.DataFrame({"subject": ["s1", "s2", "s4"], "value": [2.0, 3.0, 9.0]})
+    aligned = _align_multi_condition_unit_values([a, b, c], n_unit="subject")
+    assert aligned["n_pairs"] == 2
+    assert aligned["n_dropped"] >= 2
+    assert len(aligned["values"]) == 3
+    assert list(aligned["values"][0]) == pytest.approx([1.0, 2.0])
+
+
 def test_wilcoxon_paired_returns_results_and_n_pairs():
     g1_vals = [("r1", "s1", 1.0), ("r2", "s2", 1.2), ("r3", "s3", 1.1)]
     out = compute_statistical_comparison(

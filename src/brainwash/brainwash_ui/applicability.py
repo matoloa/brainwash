@@ -68,9 +68,18 @@ def check_wilcoxon_applicability(variant: str, dd_groups: dict | None, dd_testse
     return None
 
 
-def check_friedman_applicability(dd_testsets: dict | None) -> str | None:
-    if len(visible_testset_ids(dd_testsets)) < 3:
+def check_friedman_applicability(dd_groups: dict | None, dd_testsets: dict | None) -> str | None:
+    if not dd_groups:
+        return "No groups defined for Friedman"
+    shown_groups = groups_with_recordings(dd_groups, visible_group_ids(dd_groups))
+    shown_ts = visible_testset_ids(dd_testsets)
+    if len(shown_groups) != 1:
+        return "Friedman requires exactly 1 group with data"
+    if len(shown_ts) < 3:
         return "Friedman requires ≥3 test sets for repeated-measures"
+    n1 = len(dd_groups.get(shown_groups[0], {}).get("rec_IDs", []))
+    if n1 < 2:
+        return "Friedman requires N ≥ 2 recordings per group"
     return None
 
 
@@ -101,7 +110,7 @@ def warning_for_test_type(
     if test_type == "Wilcoxon":
         return check_wilcoxon_applicability(wilcox_variant, dd_groups, dd_testsets)
     if test_type == "Friedman":
-        return check_friedman_applicability(dd_testsets)
+        return check_friedman_applicability(dd_groups, dd_testsets)
     if test_type == "Cluster perm.":
         return check_cluster_applicability(dd_groups, dd_testsets)
     return None

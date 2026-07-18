@@ -128,7 +128,12 @@ def compute_statistical_comparison(
             test_type=test_type,
         )
 
-    if test_type == "Friedman" and len(shown_groups) == 1 and len(shown_sets) >= 3:
+    if test_type == "Friedman":
+        # Never fall through to Welch/main loop under a Friedman label.
+        if len(shown_groups) != 1:
+            return {"error": "Friedman requires exactly 1 group", "results": []}
+        if len(shown_sets) < 3:
+            return {"error": "Friedman requires at least 3 shown test sets", "results": []}
         return run_friedman_omnibus(
             shown_groups=shown_groups,
             shown_sets=shown_sets,

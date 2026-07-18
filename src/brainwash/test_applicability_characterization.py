@@ -119,9 +119,26 @@ def test_anova_insufficient():
 
 
 def test_friedman_needs_three_testsets():
-    assert applicability.check_friedman_applicability(make_dd_testsets("TS1", "TS2")) == (
+    dd_g = _groups("G1")
+    dd_g["G1"]["rec_IDs"] = ["r1", "r2"]
+    assert applicability.check_friedman_applicability(dd_g, make_dd_testsets("TS1", "TS2")) == (
         "Friedman requires ≥3 test sets for repeated-measures"
     )
+
+
+def test_friedman_needs_exactly_one_group():
+    dd_g = _groups("G1", "G2")
+    dd_g["G1"]["rec_IDs"] = ["r1", "r2"]
+    dd_g["G2"]["rec_IDs"] = ["r3", "r4"]
+    assert applicability.check_friedman_applicability(dd_g, make_dd_testsets("TS1", "TS2", "TS3")) == (
+        "Friedman requires exactly 1 group with data"
+    )
+
+
+def test_friedman_ok_one_group_three_sets():
+    dd_g = _groups("G1")
+    dd_g["G1"]["rec_IDs"] = ["r1", "r2"]
+    assert applicability.check_friedman_applicability(dd_g, make_dd_testsets("TS1", "TS2", "TS3")) is None
 
 
 def test_cluster_two_groups_ok():

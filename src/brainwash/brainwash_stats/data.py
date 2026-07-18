@@ -191,6 +191,78 @@ def _align_paired_unit_values(
     }
 
 
+def _align_multi_condition_unit_values(
+    obs_dfs: list,
+    n_unit: str = "subject",
+    condition_labels: list[str] | None = None,
+) -> dict:
+    """Inner-join k≥2 unit-level frames (complete cases across all conditions).
+
+    Used by Friedman (and similar RM nonparametrics). Returns:
+      values: list[np.ndarray] — one aligned array per condition (length n_pairs)
+      n_pairs, n_dropped: ints
+      dropped: list[{unit, reason}]
+    """
+    k = len(obs_dfs)
+    labels = list(condition_labels) if condition_labels and len(condition_labels) == k else [f"condition {i + 1}" for i in range(k)]
+    empty_out = {
+        "values": [np.array([], dtype=float) for _ in range(k)],
+        "n_pairs": 0,
+        "n_dropped": 0,
+        "dropped": [],
+    }
+    if k < 2:
+        return empty_out
+
+    keys = _unit_key_columns(n_unit)
+    frames = []
+    for i, obs in enumerate(obs_dfs):
+        df = _prepare_unit_value_frame(obs, keys)
+        frames.append(df.rename(columns={"value": f"value_{i}"}))
+
+    if all(f.empty for f in frames):
+        return empty_out
+
+    merged = frames[0]
+    for f in frames[1:]:
+        merged = merged.merge(f, on=keys, how="outer")
+
+    value_cols = [f"value_{i}" for i in range(k)]
+    dropped: list[dict] = []
+    complete_mask = []
+    for idx, row in merged.iterrows():
+        lab = _format_unit_label(row, keys)
+        vals = [row.get(c) for c in value_cols]
+        ok = all(v is not None and pd.notna(v) and np.isfinite(float(v)) for v in vals)
+        if ok:
+            complete_mask.append(True)
+        else:
+            complete_mask.append(False)
+            missing = [labels[i] for i, v in enumerate(vals) if v is None or pd.isna(v) or not np.isfinite(float(v) if pd.notna(v) else np.nan)]
+            if not missing:
+                reason = "non-finite value in one or more conditions"
+            else:
+                reason = "missing or non-finite in: " + ", ".join(missing)
+            dropped.append({"unit": lab, "reason": reason})
+
+    complete = merged.loc[complete_mask].copy() if complete_mask else merged.iloc[0:0]
+    n_pairs = int(len(complete))
+    if n_pairs == 0:
+        return {
+            "values": [np.array([], dtype=float) for _ in range(k)],
+            "n_pairs": 0,
+            "n_dropped": len(dropped),
+            "dropped": dropped,
+        }
+    values = [complete[c].to_numpy(dtype=float) for c in value_cols]
+    return {
+        "values": values,
+        "n_pairs": n_pairs,
+        "n_dropped": len(dropped),
+        "dropped": dropped,
+    }
+
+
 def _make_group_testset_observation_accessor(get_group_testset_means_fn, use_implicit: bool):
     """Return callable that fetches group/testset observations (implicit all-sweeps when use_implicit)."""
 

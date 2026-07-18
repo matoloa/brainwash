@@ -54,8 +54,9 @@ def validate_comparison_inputs(
             return {"error": f"{_one_label} requires exactly 1 group", "results": []}
     elif test_type == "ANOVA" and len(shown_groups) == 1:
         pass
-    elif test_type == "Friedman" and len(shown_groups) == 1:
-        pass
+    elif test_type == "Friedman":
+        if len(shown_groups) != 1:
+            return {"error": "Friedman requires exactly 1 group", "results": []}
     elif test_type == "Cluster perm.":
         pass
     elif test_type == "ANCOVA":
@@ -79,6 +80,8 @@ def validate_comparison_inputs(
         return {"error": "no shown test sets", "results": []}
     if paired_variant and len(shown_sets) != 2:
         return {"error": f"{_paired_label} requires exactly 2 shown test sets", "results": []}
+    if test_type == "Friedman" and len(shown_sets) < 3:
+        return {"error": "Friedman requires at least 3 shown test sets", "results": []}
 
     if get_group_testset_means_fn is None:
         return {"error": "no data accessor for testset means", "results": []}
@@ -112,8 +115,8 @@ def comparison_context(
     elif test_type == "ANOVA":
         g1 = shown_groups[0]
         g2 = shown_groups[1] if len(shown_groups) > 1 else None
-    elif test_type == "Friedman" and len(shown_groups) == 1:
-        g1 = shown_groups[0]
+    elif test_type == "Friedman":
+        g1 = shown_groups[0] if shown_groups else None
         g2 = None
     elif test_type == "Cluster perm.":
         pass

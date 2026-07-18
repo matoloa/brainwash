@@ -860,12 +860,12 @@ def _figure_text_paired_drop_warning(results: list | None) -> str | None:
         except (TypeError, ValueError):
             n_pairs_i = None
         lines = [
-            "> **Note on incomplete pairs:** The paired analysis used **complete cases only**: "
-            "statistical units were included only when both test sets had a finite value after "
-            f"aggregation to the chosen unit. **{n_dropped}** unit(s) were excluded",
+            "> **Note on incomplete pairs:** The analysis used **complete cases only**: "
+            "statistical units were included only when every compared test set/condition had a finite "
+            f"value after aggregation to the chosen unit. **{n_dropped}** unit(s) were excluded",
         ]
         if n_pairs_i is not None:
-            lines[0] += f"; **{n_pairs_i}** complete pair(s) remained"
+            lines[0] += f"; **{n_pairs_i}** complete unit(s) remained"
         lines[0] += "."
         dropped = res.get("paired_dropped") or []
         if dropped:
