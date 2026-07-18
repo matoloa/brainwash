@@ -438,8 +438,27 @@ class ProjectMixin:
             if df[col].dtype != "object" and not pd.api.types.is_string_dtype(df[col]):
                 df[col] = df[col].astype("object")
 
+        # Canonical string keys so stats n_unit collapse treats 1 / "1" / 1.0 as one subject
+        try:
+            from brainwash_stats.data import _normalize_hierarchy_key
+        except Exception:
+            _normalize_hierarchy_key = lambda v: None if pd.isna(v) else str(v).strip()
+
+        for i, row in df.iterrows():
+            for hcol in ("subject", "slice"):
+                raw = row.get(hcol)
+                if pd.isna(raw) or str(raw).strip() == "":
+                    continue
+                canon = _normalize_hierarchy_key(raw)
+                if canon is not None:
+                    df.at[i, hcol] = canon
+
         # Lowest-unique-integer subjects (string)
-        existing_subs = set(df["subject"].dropna().astype(str).unique())
+        existing_subs = set()
+        for s in df["subject"].dropna().unique():
+            c = _normalize_hierarchy_key(s)
+            if c is not None:
+                existing_subs.add(c)
         next_id = 1
         for i, row in df.iterrows():
             subj = row.get("subject")
@@ -960,8 +979,29 @@ class ProjectMixin:
             self.lineEdit_hierarchy_slice.setText("")
             self.connectUIstate()
             return
-        subs = [str(df_p.at[i, "subject"]) for i in idxs if pd.notna(df_p.at[i, "subject"])]
-        slices_list = [str(df_p.at[i, "slice"]) for i in idxs if pd.notna(df_p.at[i, "slice"])]
+        # Read subject/slice from the *displayed* table model (sort-safe), fall back to df_p by ID.
+        model_df = getattr(getattr(self, "tablemodel", None), "_data", None)
+        subs = []
+        slices_list = []
+        if model_df is not None and not model_df.empty and "subject" in model_df.columns:
+            n = len(model_df)
+            for i in idxs:
+                if 0 <= int(i) < n:
+                    row = model_df.iloc[int(i)]
+                    if pd.notna(row.get("subject")):
+                        subs.append(str(row["subject"]))
+                    if pd.notna(row.get("slice")):
+                        slices_list.append(str(row["slice"]))
+        elif hasattr(self, "_project_rows_for_selected"):
+            selected = self._project_rows_for_selected()
+            if not selected.empty:
+                if "subject" in selected.columns:
+                    subs = [str(v) for v in selected["subject"] if pd.notna(v)]
+                if "slice" in selected.columns:
+                    slices_list = [str(v) for v in selected["slice"] if pd.notna(v)]
+        else:
+            subs = [str(df_p.at[i, "subject"]) for i in idxs if i in df_p.index and pd.notna(df_p.at[i, "subject"])]
+            slices_list = [str(df_p.at[i, "slice"]) for i in idxs if i in df_p.index and pd.notna(df_p.at[i, "slice"])]
         subj_val = subs[0] if len(set(subs)) == 1 else ""
         slice_val = slices_list[0] if len(set(slices_list)) == 1 else ""
         self.lineEdit_hierarchy_subject.setText(subj_val)
@@ -970,34 +1010,77 @@ class ProjectMixin:
 
     # v0.16_n Phase 1: line-edit edit → selected rows (immediate bulk assign)
     def applyHierarchyToSelection(self, col):
+        """Write subject/slice from hierarchy lineEdit to selected recordings.
+
+        Downstream: persist project, invalidate unit-level group/global caches and plots,
+        replot groups, recompute active formal tests + statusbar (n and p depend on hierarchy).
+        """
         self.usage(f"applyHierarchyToSelection({col})")
         le_name = f"lineEdit_hierarchy_{col}"
         if not hasattr(self, le_name):
             return
         text = getattr(self, le_name).text().strip()
-        idxs = self.uistate.plot.list_idx_select_recs
-        if not idxs:
+        # Map view selection → recording IDs (table may be sorted independently of df_project)
+        if hasattr(self, "_selected_recording_ids"):
+            rec_ids = self._selected_recording_ids()
+        else:
+            idxs = self.uistate.plot.list_idx_select_recs or []
+            df_tmp = self.get_df_project()
+            rec_ids = [df_tmp.iloc[int(i)]["ID"] for i in idxs if 0 <= int(i) < len(df_tmp)]
+        if not rec_ids:
             return
         df_p = self.get_df_project().copy()
+        id_key = df_p["ID"].map(lambda v: str(v))
+        mask = id_key.isin({str(r) for r in rec_ids})
+        if not mask.any():
+            return
         if text:
-            # Sanitize: ensure string (prevents LossySetitemError / int64 coercion when column inferred numeric)
-            df_p.loc[idxs, col] = str(text)
+            # Canonical string keys (1 / 1.0 / "1" → "1") so n_unit aggregation counts one unit
+            try:
+                from brainwash_stats.data import _normalize_hierarchy_key
+
+                canon = _normalize_hierarchy_key(text)
+                df_p.loc[mask, col] = canon if canon is not None else str(text).strip()
+            except Exception:
+                df_p.loc[mask, col] = str(text).strip()
         else:
-            df_p.loc[idxs, col] = pd.NA  # explicit NA; displays as blank
+            df_p.loc[mask, col] = pd.NA  # explicit NA; displays as blank
+        selected_ids = list(rec_ids)
+
+        # 1) Persist hierarchy into df_project (and table model)
         self.set_df_project(df_p)
-        self.tableUpdate(restore_selection=True)  # uses _restore_table_selection for consistent UX
-        self.refreshHierarchyLineEdits(df_p)  # refresh line-edits after table update (prevents feedback via disconnect guard)
-        self.update_test()  # hierarchy change (subject/slice) can affect n_unit n_report in IO statusbar; forces recompute of wide_df/get_group_testset_means (subject join) + statusbar
-        # Force full refresh of groups/dd_groups (invalidates any cached wide_df without subject column)
-        self.group_get_dd()  # rebuilds from updated df_project
+        self.tableUpdate(restore_selection=False)
+        if hasattr(self, "_select_project_table_rows") and hasattr(self, "_rows_for_rec_ids"):
+            to_select = self._rows_for_rec_ids(self.get_df_project(), selected_ids)
+            self._select_project_table_rows(to_select)
+        else:
+            self.tableUpdate(restore_selection=True)
+        self.refreshHierarchyLineEdits()
+
+        # 2) Invalidate anything that embeds old subject/slice aggregation
         if hasattr(self, "dict_global_units"):
-            self.dict_global_units.clear()  # globals depend on hierarchy
-        # Invalidate group means and plots for non-rec levels (hierarchy affects them)
-        self.group_cache_purge(levels=["slice", "subject"])
+            self.dict_global_units.clear()
+        # Slice/subject group means + their artists (recording-level means unchanged)
+        if hasattr(self, "group_cache_purge"):
+            self.group_cache_purge(levels=["slice", "subject"])
         if hasattr(self.uiplot, "unPlotGroup"):
-            self.uiplot.unPlotGroup()  # clear all to be safe, will re-add current on refresh
+            self.uiplot.unPlotGroup()
+
+        # 3) Rebuild group plots at current n_unit (if groups exist)
+        if hasattr(self, "graphGroups"):
+            self.graphGroups()
+        if hasattr(self, "update_show"):
+            self.update_show()
+
+        # 4) Formal tests join subject/slice from df_project on each compute — force fresh run
+        if hasattr(self, "clear_formal_test_results"):
+            self.clear_formal_test_results()
+        if hasattr(self, "update_test"):
+            self.update_test()
+
+        # 5) Canvas refresh (markers/statusbar already updated; avoid double test reeval)
         if hasattr(self, "graphRefresh"):
-            self.graphRefresh()
+            self.graphRefresh(reeval_formal_test=False)
 
     def renameRecording(self):
         # renames all instances of selected recording_name in df_project, and their associated files

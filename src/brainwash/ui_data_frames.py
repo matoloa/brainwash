@@ -979,8 +979,12 @@ class DataFrameMixin:
         # Uses df_project.ID == rec_ID (df_project uses ID as primary key).
         df_p = self.get_df_project()
         if not df_p.empty and "subject" in df_p.columns:
-            hierarchy = df_p[["ID", "subject", "slice"]].rename(columns={"ID": "rec_ID"})
-            hierarchy["rec_ID"] = hierarchy["rec_ID"].astype(str)
+            from brainwash_stats.data import _normalize_hierarchy_key
+
+            hierarchy = df_p[["ID", "subject", "slice"]].rename(columns={"ID": "rec_ID"}).copy()
+            hierarchy["rec_ID"] = hierarchy["rec_ID"].map(lambda v: str(v) if pd.notna(v) else "")
+            hierarchy["subject"] = hierarchy["subject"].map(_normalize_hierarchy_key)
+            hierarchy["slice"] = hierarchy["slice"].map(_normalize_hierarchy_key)
             out = out.merge(hierarchy, on="rec_ID", how="left")
             # Ensure subject/slice are present even if no match (old projects)
             for col in ("subject", "slice"):

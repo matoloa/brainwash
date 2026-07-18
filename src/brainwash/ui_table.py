@@ -59,16 +59,59 @@ class TableMixin:
         )
         self.setButtonParse()
 
+    def _table_model_df(self):
+        """DataFrame currently displayed in the project table (may be sorted ≠ df_project order)."""
+        return getattr(getattr(self, "tablemodel", None), "_data", None)
+
+    def _selected_recording_ids(self) -> list:
+        """Recording IDs for current table selection (view rows → model, not unsorted df_project)."""
+        idxs = self.uistate.plot.list_idx_select_recs or []
+        if not idxs:
+            return []
+        model_df = self._table_model_df()
+        if model_df is not None and not getattr(model_df, "empty", True) and "ID" in model_df.columns:
+            out = []
+            n = len(model_df)
+            for i in idxs:
+                if 0 <= int(i) < n:
+                    out.append(model_df.iloc[int(i)]["ID"])
+            return out
+        df_p = self.get_df_project()
+        n = len(df_p)
+        return [df_p.iloc[int(i)]["ID"] for i in idxs if 0 <= int(i) < n]
+
+    def _project_rows_for_selected(self):
+        """df_project rows for the current selection, in selection order (ID-stable under sort)."""
+        ids = self._selected_recording_ids()
+        if not ids:
+            return self.get_df_project().iloc[0:0]
+        df_p = self.get_df_project()
+        if df_p.empty or "ID" not in df_p.columns:
+            return df_p.iloc[0:0]
+        # Normalize ID types for join (str/int/numpy)
+        id_series = df_p["ID"].map(lambda v: str(v))
+        rows = []
+        for rid in ids:
+            key = str(rid)
+            m = df_p.loc[id_series == key]
+            if not m.empty:
+                rows.append(m.iloc[0])
+        if not rows:
+            return df_p.iloc[0:0]
+        return pd.DataFrame(rows)
+
     def update_recs2plot(self):
-        """Rebuild self.uistate.plot.df_recs2plot from current selection (positional rows).
-        Filters out unparsed rows (sweeps == "...").
+        """Rebuild self.uistate.plot.df_recs2plot from current selection.
+        Filters out unparsed rows (sweeps == "..."). Uses displayed-table IDs so sort is safe.
         """
         if not self.uistate.plot.list_idx_select_recs:
             self.uistate.plot.df_recs2plot = None
             return
         try:
-            df_p = self.get_df_project()
-            df_project_selected = df_p.iloc[self.uistate.plot.list_idx_select_recs]
+            df_project_selected = self._project_rows_for_selected()
+            if df_project_selected.empty:
+                self.uistate.plot.df_recs2plot = None
+                return
             self.uistate.plot.df_recs2plot = df_project_selected[df_project_selected["sweeps"] != "..."]
             if self.uistate.plot.df_recs2plot.empty:
                 self.uistate.plot.df_recs2plot = None
@@ -136,11 +179,13 @@ class TableMixin:
         self.connectUIstate(disconnect=True)
         self.update_experiment_type_radio_buttons()
         df_p = self.get_df_project()
-        if self.uistate.plot.list_idx_select_recs:
-            bin_values = {df_p.loc[i, "bin_size"] for i in self.uistate.plot.list_idx_select_recs}
+        selected_rows = self._project_rows_for_selected()
+        if not selected_rows.empty and "bin_size" in selected_rows.columns:
+            bin_values = set(selected_rows["bin_size"].tolist())
             nan_count = sum(1 for v in bin_values if pd.isna(v))
             non_nan = {v for v in bin_values if pd.notna(v)}
-            uniform = (nan_count == 0 and len(non_nan) == 1) or (nan_count == len(self.uistate.plot.list_idx_select_recs))
+            n_sel = len(selected_rows)
+            uniform = (nan_count == 0 and len(non_nan) == 1) or (nan_count == n_sel)
             if uniform:
                 single = non_nan.pop() if non_nan else float("nan")
                 self.lineEdit_bin_size.setText("0" if pd.isna(single) else str(int(single)))
@@ -214,9 +259,10 @@ class TableMixin:
             return row
         if not self.uistate.plot.list_idx_select_recs:
             return None
-        dfp = self.get_df_project()
-        row = dfp.loc[self.uistate.plot.list_idx_select_recs[0]]
-        return row
+        selected = self._project_rows_for_selected()
+        if selected.empty:
+            return None
+        return selected.iloc[0]
 
     def get_trow(self, dfp_idx=None):
         if dfp_idx is not None:

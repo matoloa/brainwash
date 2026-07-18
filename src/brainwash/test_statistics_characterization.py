@@ -3,8 +3,10 @@
 Start minimal (5 tests). Expand per work_plans/plan_statistics_refactor.md only when a phase needs it.
 """
 
+import pandas as pd
 import pytest
 
+from brainwash_stats.data import _aggregate_to_unit_level, _normalize_hierarchy_key
 from load_brainwash_statistics import load_brainwash_statistics_module
 
 brainwash_statistics = load_brainwash_statistics_module()
@@ -16,6 +18,29 @@ from test_statistics_fixtures import (
     make_scalar_accessor,
     MinimalUistate,
 )
+
+
+def test_normalize_hierarchy_key_unifies_numeric_forms():
+    assert _normalize_hierarchy_key(1) == "1"
+    assert _normalize_hierarchy_key(1.0) == "1"
+    assert _normalize_hierarchy_key("1") == "1"
+    assert _normalize_hierarchy_key("1.0") == "1"
+    assert _normalize_hierarchy_key(" 2 ") == "2"
+
+
+def test_aggregate_to_unit_level_collapses_mixed_subject_types():
+    """Two recs with subject 1 / '1' / '1.0' must count as one subject (n=1)."""
+    obs = pd.DataFrame(
+        {
+            "rec_ID": ["r1", "r2", "r3"],
+            "subject": [1, "1", "1.0"],
+            "slice": ["1", "1", 1],
+            "value": [1.0, 2.0, 3.0],
+        }
+    )
+    agg = _aggregate_to_unit_level(obs, "subject")
+    assert len(agg) == 1
+    assert float(agg.iloc[0]["value"]) == pytest.approx(2.0)
 
 
 def _ttest_fixture():

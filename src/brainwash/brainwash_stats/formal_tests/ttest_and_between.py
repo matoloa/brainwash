@@ -181,6 +181,13 @@ def run_main_test_set_loop(
             if eff_n2:
                 set_result["n2"] = max(int(set_result.get("n2", 0)), eff_n2)
 
+            # Per-group unit counts for statusbar (after n_unit aggregation)
+            gns = set_result.setdefault("group_ns", {})
+            if g1 is not None and not isinstance(g1, (list, tuple)) and eff_n1:
+                gns[g1] = max(int(gns.get(g1, 0)), eff_n1)
+            if g2 is not None and not isinstance(g2, (list, tuple)) and eff_n2:
+                gns[g2] = max(int(gns.get(g2, 0)), eff_n2)
+
         has_any_p = any(k.startswith("p_") for k in set_result.keys()) or any(
             k.startswith(("sw_", "levene_")) for k in set_result.keys()
         )
