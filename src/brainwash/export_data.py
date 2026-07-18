@@ -195,8 +195,8 @@ class ExportMixin:
 
         self.usage(f"triggerExportOutputImage: {template_key}")
 
-        if hasattr(self, "tableProj"):
-            self.tableProj.clearSelection()
+        # Do not clear project-table selection: that path re-zooms groups-only and can
+        # race export; export only reads group artists + formal results, not rec selection.
 
         selected_groups = list(set(str(info["group_ID"]) for info in self.uistate.plot.dict_group_show.values()))
 

@@ -716,6 +716,10 @@ class GraphCoordinatorMixin:
                 out_xmin, out_xmax = (0, 1)
 
             self.uistate.project.zoom["output_xlim"] = (out_xmin, out_xmax)
+            # Groups-only never calls x_axis_xlim(prow), so time conversion stayed at
+            # default hz=1 → "600 sweeps" labeled as "600 s". Sync from shown recs.
+            if self.uistate.x_axis == "time":
+                self._sync_time_axis_params_from_shown_groups(out_xmax)
             out_ypad = 0.2  # match zoomAuto time/sweep/train headroom for SEM + markers
             self.uistate.project.zoom["output_ax1_ylim"] = self._ylim_from_artists(
                 self.uistate.plot.ax1, pad=out_ypad, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
@@ -723,6 +727,79 @@ class GraphCoordinatorMixin:
             self.uistate.project.zoom["output_ax2_ylim"] = self._ylim_from_artists(
                 self.uistate.plot.ax2, pad=out_ypad, ymin=ymin_clamp, x_min=out_xmin, x_max=out_xmax
             ) or (0, 1.5)
+
+    def _infer_time_axis_meta_from_groups(self) -> tuple[float | None, float]:
+        """Return (sweep_hz, bin_size) from shown group recordings; (None, 1.0) if unknown."""
+        try:
+            df_p = self.get_df_project()
+        except Exception:
+            return None, 1.0
+        if df_p is None or getattr(df_p, "empty", True):
+            return None, 1.0
+        hz_list: list[float] = []
+        bin_list: list[float] = []
+        dd = getattr(self, "dd_groups", None) or {}
+        for _gid, ginfo in dd.items():
+            if not ginfo.get("show"):
+                continue
+            for rid in ginfo.get("rec_IDs") or []:
+                try:
+                    rows = df_p.loc[df_p["ID"] == rid]
+                    if rows.empty:
+                        rows = df_p.loc[df_p["ID"].astype(str) == str(rid)]
+                    if rows.empty:
+                        continue
+                    row = rows.iloc[0]
+                    hz = row.get("sweep_hz")
+                    if pd.notna(hz) and float(hz) > 0:
+                        hz_list.append(float(hz))
+                    bs = row.get("bin_size")
+                    if pd.notna(bs) and float(bs) > 0:
+                        bin_list.append(float(bs))
+                except Exception:
+                    continue
+        if not hz_list:
+            return None, 1.0
+        hz = float(np.median(np.asarray(hz_list, dtype=float)))
+        bin_size = float(np.median(np.asarray(bin_list, dtype=float))) if bin_list else 1.0
+        return hz, bin_size
+
+    def _sync_time_axis_params_from_shown_groups(self, xmax: float) -> None:
+        """Update Time (s|min|h) conversion when no recording is selected (groups-only view)."""
+        hz, bin_size = self._infer_time_axis_meta_from_groups()
+        if hz is None:
+            logger.debug("_sync_time_axis_params_from_shown_groups: no sweep_hz on shown group recs")
+            return
+        n_bins = max(float(xmax), 1.0)
+        try:
+            max_s = self.uistate.apply_time_axis_params(n_bins=n_bins, sweep_hz=hz, bin_size=bin_size)
+        except ValueError as ex:
+            logger.debug("_sync_time_axis_params_from_shown_groups: %s", ex)
+            return
+        logger.debug(
+            "_sync_time_axis_params_from_shown_groups: n_bins=%s hz=%s bin=%s → max_s=%s unit=%s",
+            n_bins,
+            hz,
+            bin_size,
+            max_s,
+            self.uistate.plot._time_unit_label,
+        )
+        self._reapply_output_time_axis_format()
+
+    def _reapply_output_time_axis_format(self) -> None:
+        """Refresh xlabel/locator/formatter after time params change (no full graphRefresh)."""
+        ax1 = getattr(self.uistate.plot, "ax1", None)
+        ax2 = getattr(self.uistate.plot, "ax2", None)
+        try:
+            if ax1 is not None:
+                ax1.set_xlabel(self.uistate.x_axis_xlabel())
+                ax1.xaxis.set_major_locator(self.uistate.x_axis_locator())
+                ax1.xaxis.set_major_formatter(self.uistate.x_axis_formatter())
+            if ax2 is not None:
+                ax2.xaxis.set_major_locator(self.uistate.x_axis_locator())
+                ax2.xaxis.set_major_formatter(self.uistate.x_axis_formatter())
+        except Exception as ex:
+            logger.debug("_reapply_output_time_axis_format: %s", ex)
 
     def zoomReset(self, axis=None):
         # self.usage("zoomReset")

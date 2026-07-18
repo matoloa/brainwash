@@ -199,6 +199,23 @@ class UIstate:
             return (60.0, "min")
         return (3600.0, "h")
 
+    def apply_time_axis_params(self, *, n_bins: float, sweep_hz: float, bin_size: float = 1.0) -> float:
+        """Set time-mode conversion (Hz, bin size, unit label) from bin count and sweep rate.
+
+        x-data stay in sweep/bin index; locators convert to Time (s|min|h).
+        Returns max duration in seconds (for tests / callers).
+        """
+        hz = float(sweep_hz)
+        if not np.isfinite(hz) or hz <= 0:
+            raise ValueError(f"apply_time_axis_params: sweep_hz must be positive finite, got {sweep_hz!r}")
+        bs = float(bin_size) if np.isfinite(bin_size) and float(bin_size) > 0 else 1.0
+        n = max(float(n_bins), 1.0)
+        self.plot._time_sweep_hz = hz
+        self.plot._time_bin_size = bs
+        max_seconds = (n * bs) / hz
+        self.plot._time_divisor, self.plot._time_unit_label = self.time_axis_unit(max_seconds)
+        return max_seconds
+
     def x_axis_xlabel(self) -> str:
         mode = self.x_axis
         if mode == "time":
@@ -259,10 +276,7 @@ class UIstate:
                 n = ceil(n / bin_size)
             else:
                 bin_size = 1.0
-            self.plot._time_sweep_hz = prow["sweep_hz"]
-            self.plot._time_bin_size = bin_size
-            max_seconds = (n * bin_size) / self.plot._time_sweep_hz
-            self.plot._time_divisor, self.plot._time_unit_label = self.time_axis_unit(max_seconds)
+            self.apply_time_axis_params(n_bins=n, sweep_hz=prow["sweep_hz"], bin_size=bin_size)
             return (0, n)
         if mode == "stim":
             if dft is not None and len(dft) > 0 and "stim" in dft.columns:

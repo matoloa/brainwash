@@ -65,6 +65,89 @@ def _expand_export_ylim_for_markers(ax: matplotlib.axes.Axes, top_pad: float = E
     ax.set_ylim(ymin, ymax + top_pad * span)
 
 
+def _export_x_mode(uistate) -> str | None:
+    """Best-effort x_axis mode from uistate (property or experiment_type)."""
+    x_mode = getattr(uistate, "x_axis", None)
+    if isinstance(x_mode, str) and x_mode:
+        return x_mode
+    exp = getattr(getattr(uistate, "experiment", None), "experiment_type", None)
+    if exp in ("time", "timestamp"):
+        return "time"
+    if exp == "sweep":
+        return "sweep"
+    if exp == "train":
+        return "stim"
+    if exp == "io":
+        return "io"
+    return None
+
+
+def _export_time_x_scale(uistate) -> float | None:
+    """Factor mapping sweep-index → display time unit (s|min|h), or None if not time mode.
+
+    Live axes keep data in sweep index and use TimeModeLocator + FuncFormatter.
+    Export is more reliable if data are converted into display units so plain
+    AutoLocator ticks match the xlabel (avoids raw '600' under Time (min)).
+    """
+    if _export_x_mode(uistate) != "time":
+        return None
+    p = getattr(uistate, "plot", None)
+    if p is None:
+        return None
+    try:
+        hz = float(getattr(p, "_time_sweep_hz", 1.0))
+        div = float(getattr(p, "_time_divisor", 1.0))
+        bin_s = float(getattr(p, "_time_bin_size", 1.0))
+    except (TypeError, ValueError):
+        return None
+    if not (np.isfinite(hz) and hz > 0 and np.isfinite(div) and div > 0 and np.isfinite(bin_s) and bin_s > 0):
+        return None
+    return bin_s / (hz * div)
+
+
+def _scale_export_x(x, x_scale: float | None):
+    """Apply sweep→display scale; pass through when x_scale is None."""
+    if x_scale is None:
+        return x
+    arr = np.asarray(x, dtype=float)
+    return arr * x_scale
+
+
+def _configure_export_xaxis(ax: matplotlib.axes.Axes, uistate, *, x_scale: float | None = None) -> None:
+    """Label + xlim for export. When x_scale is set, data/xlim are already in display units."""
+    if hasattr(uistate, "x_axis_xlabel"):
+        ax.set_xlabel(uistate.x_axis_xlabel())
+    else:
+        ax.set_xlabel("Time")
+
+    # Prefer live output xlim (sweep index) when set; convert if data were scaled.
+    try:
+        zoom = getattr(getattr(uistate, "project", None), "zoom", None) or {}
+        ox = zoom.get("output_xlim")
+        if ox is not None and len(ox) == 2 and ox[1] is not None and np.isfinite(ox[0]) and np.isfinite(ox[1]):
+            x0, x1 = float(ox[0]), float(ox[1])
+            if x_scale is not None:
+                x0, x1 = x0 * x_scale, x1 * x_scale
+            ax.set_xlim(x0, x1)
+    except Exception:
+        pass
+
+    # Data already in display units (or sweep/stim raw): use plain ticks.
+    from matplotlib.ticker import AutoLocator, FuncFormatter, ScalarFormatter
+
+    ax.xaxis.set_major_locator(AutoLocator())
+    if x_scale is not None:
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _p: f"{v:g}"))
+    elif _export_x_mode(uistate) == "time" and hasattr(uistate, "x_axis_formatter"):
+        # Fallback if caller did not scale data
+        ax.xaxis.set_major_locator(uistate.x_axis_locator())
+        ax.xaxis.set_major_formatter(uistate.x_axis_formatter())
+    elif _export_x_mode(uistate) == "stim" and hasattr(uistate, "x_axis_locator"):
+        ax.xaxis.set_major_locator(uistate.x_axis_locator())
+    else:
+        ax.xaxis.set_major_formatter(ScalarFormatter())
+
+
 JOURNAL_COLOR_PALETTES: dict[str, list[str]] = {
     "jneurosci": [
         "#1f77b4",
@@ -115,6 +198,7 @@ def _add_significance_markers(
     variant: str,
     fdr: bool,
     label_override: str | None = None,  # temporary for debugging p-value string in marker (Phase 0)
+    x_scale: float | None = None,  # sweep-index → display units (time export)
 ) -> None:
     """
     Draw significance markers (*, **, ***, ns) on an export Axes.
@@ -129,13 +213,14 @@ def _add_significance_markers(
 
     # Sweep-range bracket (journal convention): horizontal line + short vertical ticks
     # at min(sweeps) to max(sweeps). Sits ~1-2 pt below marker. Uses linewidth_axes.
+    _xs = float(x_scale) if x_scale is not None else 1.0
 
     for idx, res in enumerate(results):
         sweeps = res.get("sweeps", []) or []
         if not sweeps:
             continue
         try:
-            x = float(np.mean(sweeps))
+            x = float(np.mean(sweeps)) * _xs
         except Exception:
             continue
 
@@ -145,7 +230,7 @@ def _add_significance_markers(
                 continue
             try:
                 sweeps2 = results[1].get("sweeps", []) or []
-                x2 = float(np.mean(sweeps2))
+                x2 = float(np.mean(sweeps2)) * _xs
                 x = (x + x2) / 2.0
             except Exception:
                 pass
@@ -239,8 +324,8 @@ def _add_significance_markers(
                 # Many neuroscience journals (JNeurosci, JPhysiol, Nature) use this for test-set ranges
                 # or error-bar groups; marker text sits above. Lowered offset avoids overlap with "*"/"ns".
                 if sweeps and len(sweeps) >= 2:
-                    x_min = float(min(sweeps))
-                    x_max = float(max(sweeps))
+                    x_min = float(min(sweeps)) * _xs
+                    x_max = float(max(sweeps)) * _xs
                     # 1-col templates are tighter (smaller height_mm, denser y-scale); use larger relative offset.
                     offset_frac = 0.065 if template.width_mm < 90 else 0.04
                     bracket_y = y - (ymax - ymin) * offset_frac
@@ -346,6 +431,8 @@ def render_publication_figure(
             # We fetch data directly from the plotted group lines in uistate
             # to mirror exactly what was calculated, applying only new styling.
             has_data = False
+            # Time mode: convert sweep-index x → display units so ticks match xlabel.
+            x_scale = None if (is_pp_mode or is_io_mode) else _export_time_x_scale(uistate)
             axis_labels = plot_model.output_axis_ylabels(
                 experiment_type=uistate.experiment.experiment_type,
                 io_output=uistate.experiment.io_output if is_io_mode else "",
@@ -479,6 +566,9 @@ def render_publication_figure(
                         else:
                             yerr.append(0)
 
+                # Sweep index → display time (min/s/h) before plotting
+                xdata = _scale_export_x(xdata, x_scale)
+
                 if yerr is not None:
                     ax.errorbar(
                         xdata,
@@ -556,7 +646,7 @@ def render_publication_figure(
                         ax.set_xlim(min(x_ticks) - 0.6, max(x_ticks) + 0.6)
                         ax.tick_params(axis="x", bottom=False, labelbottom=True)
                 else:
-                    ax.set_xlabel(uistate.x_axis_xlabel() if hasattr(uistate, "x_axis_xlabel") else "Time")
+                    _configure_export_xaxis(ax, uistate, x_scale=x_scale)
 
                 handles, labels = ax.get_legend_handles_labels()
                 if labels:
@@ -649,6 +739,7 @@ def render_publication_figure(
                         variant=variant,
                         fdr=fdr_flag,
                         label_override=label_override,  # NEW: "AM" for amp image, "SM" for slope image
+                        x_scale=x_scale,
                     )
 
                 fig.tight_layout()
