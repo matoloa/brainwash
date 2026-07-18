@@ -902,10 +902,18 @@ class DataFrameMixin:
         v0.16_n_stats_IO: if sweeps is None or empty, uses ALL available sweeps from each recording's dfoutput
         (implicit test set for IO mode). Used for paired t-test alignment and implicit stats.
         aspect: 'EPSP_amp' | 'EPSP_amp_norm' | 'EPSP_slope' | ...
+
+        PP (experiment_type==\"PP\"): each cell is PPR = stim2/stim1 for that sweep/aspect
+        (matches group box plots). Other experiment types keep raw aspect values.
         """
+        from brainwash_ui import plot_series
+
         recs = self.dd_groups.get(group_ID, {}).get("rec_IDs", [])
         if not recs:
             return pd.DataFrame()
+        is_pp = getattr(getattr(self, "uistate", None), "experiment", None) is not None and (
+            self.uistate.experiment.experiment_type == "PP"
+        )
         df_p = self.get_df_project()
         rows = []
         for rec_ID in recs:
@@ -922,17 +930,24 @@ class DataFrameMixin:
             if sweeps is None or (isinstance(sweeps, (list, tuple)) and not sweeps):
                 # IO implicit: all sweeps for this recording
                 dff = dfo.copy()
+                sweep_filter = None
             else:
                 dff = dfo[dfo["sweep"].isin(sweeps)]
+                sweep_filter = list(sweeps)
             if dff.empty:
                 continue
-            # pivot-ish: one value per sweep for this rec
             # Do NOT silently fall back to EPSP_amp when EPSP_amp_norm (etc.) is missing —
             # that would test the wrong quantity while markers/labels still say "norm".
             if aspect not in dff.columns:
                 continue
-            val_col = aspect
-            rec_vals = {int(s): float(v) for s, v in zip(dff["sweep"], dff[val_col]) if pd.notna(v)}
+            if is_pp:
+                # Formal tests + cluster per-sweep: PPR per sweep (stim2/stim1)
+                rec_vals = plot_series.ppr_by_sweep_from_dfoutput(dff, aspect, sweeps=sweep_filter)
+            else:
+                # Time/train/IO: one raw value per sweep (last stim wins if multi-stim rows)
+                rec_vals = {int(s): float(v) for s, v in zip(dff["sweep"], dff[aspect]) if pd.notna(v)}
+            if not rec_vals:
+                continue
             rows.append({"rec_ID": str(rec_ID), "vals": rec_vals})
         if not rows:
             return pd.DataFrame()

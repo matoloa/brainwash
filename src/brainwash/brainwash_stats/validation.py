@@ -16,6 +16,7 @@ def validate_comparison_inputs(
     When None, call ``comparison_context`` with the same kwargs for shown_groups, g1, g2, etc.
     """
     is_io = experiment_type == "io"
+    is_pp = experiment_type == "PP"
     # IO formal analysis is ANCOVA-only (PR-A/B). Other test types must not run under experiment_type io.
     if is_io and test_type != "ANCOVA":
         return {
@@ -76,9 +77,18 @@ def validate_comparison_inputs(
             return {"error": "need at least two shown groups", "results": []}
 
     shown_sets = [(sid, info) for sid, info in (dd_testsets or {}).items() if info.get("show", False) and info.get("sweeps")]
-    # IO ANCOVA does not require test sets (and ignores them for data selection in v1).
+    # IO ANCOVA: no test sets. PP: unpaired / one-sample / multi-group ANOVA may use
+    # implicit all-sweeps window (typical PP: one binned "sweep" per recording).
+    # Paired / Friedman / cluster still need explicit multi-window test sets.
     if not shown_sets and not is_io and test_type != "Cluster perm.":
-        return {"error": "no shown test sets", "results": []}
+        pp_allows_implicit = is_pp and not paired_variant and test_type != "Friedman"
+        if pp_allows_implicit and test_type == "ANOVA" and len(shown_groups) < 2:
+            return {
+                "error": "ANOVA with 1 group needs ≥2 test sets (RM); PP without test sets needs ≥2 groups",
+                "results": [],
+            }
+        if not pp_allows_implicit:
+            return {"error": "no shown test sets", "results": []}
     if paired_variant and len(shown_sets) != 2:
         return {"error": f"{_paired_label} requires exactly 2 shown test sets", "results": []}
     if test_type == "Friedman" and len(shown_sets) < 3:
@@ -161,10 +171,20 @@ def comparison_context(
 
     shown_sets = [(sid, info) for sid, info in (dd_testsets or {}).items() if info.get("show", False) and info.get("sweeps")]
     is_io = experiment_type == "io"
+    is_pp = experiment_type == "PP"
     use_implicit = False
     if not shown_sets:
         if is_io:
             use_implicit = True
+        elif is_pp:
+            # Synthetic single window so unpaired/one-sample/ANOVA loops still run once.
+            use_implicit = True
+            shown_sets = [
+                (
+                    "__pp_all__",
+                    {"set_name": "all sweeps (PP)", "sweeps": [], "show": True},
+                )
+            ]
 
     fetch_group_testset_observations = _make_group_testset_observation_accessor(
         get_group_testset_means_fn, use_implicit

@@ -119,6 +119,26 @@ def test_rec_mean_ppr_from_dfoutput():
     assert means["EPSP_amp"] == pytest.approx(2.0)  # mean of 2/1 and 4/2
 
 
+def test_ppr_by_sweep_from_dfoutput():
+    df = pd.DataFrame(
+        {
+            "sweep": [0, 0, 1, 1, 2, 2],
+            "stim": [1, 2, 1, 2, 1, 2],
+            "EPSP_amp": [1.0, 2.0, 2.0, 3.0, 1.0, 1.5],
+        }
+    )
+    by = plot_series.ppr_by_sweep_from_dfoutput(df, "EPSP_amp")
+    assert by[0] == pytest.approx(2.0)
+    assert by[1] == pytest.approx(1.5)
+    assert by[2] == pytest.approx(1.5)
+    # Filter to one sweep
+    by1 = plot_series.ppr_by_sweep_from_dfoutput(df, "EPSP_amp", sweeps=[1])
+    assert list(by1.keys()) == [1]
+    assert by1[1] == pytest.approx(1.5)
+    # Mean of all sweeps matches rec_mean_ppr
+    assert float(np.mean(list(by.values()))) == pytest.approx(plot_series.rec_mean_ppr_from_dfoutput(df)["EPSP_amp"])
+
+
 def test_aggregate_ppr_at_level_slice_keeps_slices_separate():
     rec_ppr = {
         "r1": {"EPSP_amp": 2.0},

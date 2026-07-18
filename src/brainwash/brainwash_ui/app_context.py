@@ -75,12 +75,16 @@ def compute_statusbar_result(
         return statusbar.StatusbarResult(None, None)
     if test_type not in _IMPLEMENTED_TEST_TYPES:
         return statusbar.StatusbarResult(f"Statistical test '{test_type}' is not implemented", "warning")
+    exp_type = None
+    if experiment is not None:
+        exp_type = getattr(experiment, "experiment_type", None)
     warning = applicability.warning_for_test_type(
         test_type,
         dd_groups=dd_groups,
         dd_testsets=dd_testsets,
         ttest_variant=stat_test.test_t_variant,
         wilcox_variant=stat_test.test_wilcox_variant,
+        experiment_type=exp_type,
     )
     if warning is not None:
         return statusbar.StatusbarResult(warning, "warning")

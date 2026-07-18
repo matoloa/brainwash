@@ -104,9 +104,18 @@ def compute_statistical_comparison(
         sample_sid, sample_tset = shown_sets[0] if shown_sets else (None, None)
         if sample_sid or use_implicit:
             try:
-                sample_sweeps = sample_tset.get("sweeps", []) if sample_tset else None
+                # Implicit PP/IO windows: must pass sweeps=None (all sweeps). An empty
+                # list returns an empty frame without subject/slice and falsely reports
+                # hierarchy as unassigned.
+                if use_implicit:
+                    sample_sweeps = None
+                else:
+                    sample_sweeps = list(sample_tset.get("sweeps", [])) if sample_tset else None
                 sample_obs = get_group_testset_means_fn(shown_groups[0], sample_sweeps, aspect="EPSP_amp")
-                if not all(k in sample_obs.columns for k in ("subject", "slice")) or sample_obs["subject"].isna().all():
+                if sample_obs is None or sample_obs.empty:
+                    # No rows to check — do not treat as missing hierarchy.
+                    pass
+                elif not all(k in sample_obs.columns for k in ("subject", "slice")) or sample_obs["subject"].isna().all():
                     return {
                         "error": f"{n_unit} not assigned for included recording(s)",
                         "results": [],

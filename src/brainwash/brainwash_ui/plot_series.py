@@ -223,28 +223,52 @@ def pp_bar_layout(active_aspects: list[tuple[str, str]]) -> list[tuple[str, str,
 PPR_ASPECTS = ("EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope")
 
 
+def ppr_by_sweep_from_dfoutput(
+    dfoutput: pd.DataFrame | None,
+    aspect: str,
+    sweeps=None,
+) -> dict[int, float]:
+    """Per-sweep PPR (stim2/stim1) for one aspect. Pure; used by plot + formal stats.
+
+    If ``sweeps`` is a non-empty sequence, only those sweep indices are returned
+    (still requires both stims on that sweep). Empty/None → all pairable sweeps.
+    """
+    if dfoutput is None or getattr(dfoutput, "empty", True):
+        return {}
+    if "stim" not in dfoutput.columns or "sweep" not in dfoutput.columns:
+        return {}
+    if aspect not in dfoutput.columns:
+        return {}
+    out_sweeps = dfoutput[dfoutput["sweep"].notna()]
+    if sweeps is not None and isinstance(sweeps, (list, tuple)) and len(sweeps) > 0:
+        want = {int(s) for s in sweeps}
+        out_sweeps = out_sweeps[out_sweeps["sweep"].map(lambda s: int(s) if pd.notna(s) else s).isin(want)]
+    out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
+    out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
+    common = out1.index.intersection(out2.index).dropna()
+    if common.empty:
+        return {}
+    v1 = out1.loc[common, aspect].to_numpy(dtype=float)
+    v2 = out2.loc[common, aspect].to_numpy(dtype=float)
+    ppr = compute_ppr(v1, v2)
+    out: dict[int, float] = {}
+    for sw, val in zip(common, ppr):
+        if np.isfinite(val):
+            out[int(sw)] = float(val)
+    return out
+
+
 def rec_mean_ppr_from_dfoutput(dfoutput: pd.DataFrame | None) -> dict[str, float]:
     """Mean PPR (stim2/stim1) per aspect from a recording dfoutput. Pure; no artists."""
     if dfoutput is None or getattr(dfoutput, "empty", True):
         return {}
     if "stim" not in dfoutput.columns or "sweep" not in dfoutput.columns:
         return {}
-    out_sweeps = dfoutput[dfoutput["sweep"].notna()]
-    out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
-    out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
-    common = out1.index.intersection(out2.index).dropna()
-    if common.empty:
-        return {}
-    o1 = out1.loc[common]
-    o2 = out2.loc[common]
     means: dict[str, float] = {}
     for aspect in PPR_ASPECTS:
-        if aspect not in o1.columns or aspect not in o2.columns:
-            continue
-        ppr = compute_ppr(o1[aspect].to_numpy(dtype=float), o2[aspect].to_numpy(dtype=float))
-        valid = ppr[np.isfinite(ppr)]
-        if valid.size:
-            means[aspect] = float(np.mean(valid))
+        by_sw = ppr_by_sweep_from_dfoutput(dfoutput, aspect)
+        if by_sw:
+            means[aspect] = float(np.mean(list(by_sw.values())))
     return means
 
 

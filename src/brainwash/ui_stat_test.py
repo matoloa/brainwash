@@ -566,7 +566,14 @@ class StatTestMixin:
                 self.clear_formal_test_results()
                 return
 
-        if not shown_ts:
+        experiment_type_early = self.uistate.experiment.experiment_type
+        # PP: unpaired / one-sample / multi-group ANOVA do not require test sets
+        # (implicit all-sweeps / single binned sweep per recording).
+        pp_needs_no_sets = experiment_type_early == "PP" and (
+            (test_type in ("t-test", "Wilcoxon") and variant_for_check in ("unpaired", "one-sample"))
+            or (test_type == "ANOVA" and len(shown_groups) >= 2)
+        )
+        if not shown_ts and not pp_needs_no_sets:
             if had_results:
                 print(f"Statistical test: no shown test sets. Tag sweeps and show at least one test set. (shown_ts={len(shown_ts)})")
             self.clear_formal_test_results()
@@ -594,6 +601,13 @@ class StatTestMixin:
 
         n_unit = self.uistate.stat_test.buttonGroup_test_n
         experiment_type = self.uistate.experiment.experiment_type
+        # PP one-sample: facilitation vs 1 is the natural null when UI still holds 0.
+        if experiment_type == "PP" and variant == "one-sample":
+            try:
+                if float(ref_value) == 0.0:
+                    ref_value = 1.0
+            except (TypeError, ValueError):
+                ref_value = 1.0
 
         try:
             comp = stats.compute_statistical_comparison(
@@ -614,6 +628,14 @@ class StatTestMixin:
                 test_sw=bool(self.uistate.stat_test.test_sw),
                 test_levene=bool(self.uistate.stat_test.test_levene),
             )
+            if experiment_type == "PP" and isinstance(comp, dict):
+                cfg = dict(comp.get("config") or {})
+                cfg["quantity"] = "PPR (stim2/stim1)"
+                if cfg.get("type") and "PPR" not in str(cfg.get("type")):
+                    cfg["type"] = f"{cfg['type']} (PPR)"
+                elif not cfg.get("type"):
+                    cfg["type"] = f"{test_type} (PPR)"
+                comp["config"] = cfg
             if comp.get("error"):
                 # Keep error on formal results so statusbar is not blank (applicability may be OK).
                 err = str(comp.get("error"))
@@ -636,6 +658,8 @@ class StatTestMixin:
                     for r in results:
                         if isinstance(r, dict):
                             r.setdefault("config", comp["config"])
+                            if experiment_type == "PP" and isinstance(r.get("config"), dict):
+                                r["config"].setdefault("quantity", "PPR (stim2/stim1)")
         except Exception as ex:
             print(f"apply_statistical_test compute error: {ex}")
             results = [{"error": str(ex), "set_name": test_type, "config": {"type": test_type, "error": str(ex)}}]
@@ -654,43 +678,61 @@ class StatTestMixin:
                 pass
         else:
             self.uiplot.show_test_markers(results)
-            self._print_statistical_test_table(results, variant=variant, tails=tails, fdr=fdr, norm=norm, test_type=test_type)
+            self._print_statistical_test_table(
+                results,
+                variant=variant,
+                tails=tails,
+                fdr=fdr,
+                norm=norm,
+                test_type=test_type,
+                experiment_type=experiment_type,
+            )
         set_names = ", ".join(str(r.get("set_name") or r.get("set_id") or "?") for r in results)
         sw = bool(self.uistate.stat_test.test_sw)
         lev = bool(self.uistate.stat_test.test_levene)
         effective_variant = "unpaired" if test_type == "Cluster perm." else variant
         self.usage(f"stat_test applied: {test_type} {effective_variant} {tails} on {set_names} (fdr={fdr}, sw={sw}, levene={lev}, n_unit={n_unit})")
 
-    def _print_statistical_test_table(self, results, variant, tails, fdr, norm, test_type=None):
+    def _print_statistical_test_table(self, results, variant, tails, fdr, norm, test_type=None, experiment_type=None):
         if not results:
             return
         print("\n=== Statistical test (v0.16) ===")
         effective_variant = "unpaired" if (test_type or variant) == "Cluster perm." else variant
         n_unit = self.uistate.stat_test.buttonGroup_test_n
-        print(f"variant={effective_variant}  tails={tails}  fdr={fdr}  norm={norm}")
+        is_pp = (experiment_type or getattr(self.uistate.experiment, "experiment_type", None)) == "PP"
+        unit_qty = (
+            "mean PPR (stim2/stim1) over test-set sweeps"
+            if is_pp
+            else "mean of the aspect over test-set sweeps"
+        )
+        print(f"variant={effective_variant}  tails={tails}  fdr={fdr}  norm={norm}" + ("  quantity=PPR" if is_pp else ""))
         if test_type == "Wilcoxon":
             if effective_variant == "one-sample":
                 method = (
-                    "Method: one-sample Wilcoxon signed-rank on unit-level means vs reference "
-                    f"(n_unit={n_unit}); each unit value = mean of the aspect over test-set sweeps."
+                    "Method: one-sample Wilcoxon signed-rank on unit-level values vs reference "
+                    f"(n_unit={n_unit}); each unit value = {unit_qty}."
                 )
             else:
                 method = (
                     "Method: paired Wilcoxon signed-rank on unit-key complete pairs "
                     f"(n_unit={n_unit}); incomplete pairs excluded; n = n_pairs."
                 )
+                if is_pp:
+                    method += f" Unit values = {unit_qty}."
             method += " Markers use q if FDR is on, else p. * p/q<0.05."
             print(method)
         elif test_type == "Friedman":
             print(
                 "Method: Friedman repeated-measures omnibus on unit-key complete cases "
                 f"across ≥3 test sets (n_unit={n_unit}); incomplete units excluded; n = complete units. "
-                "Markers use q if FDR is on, else p. * p/q<0.05."
+                + (f"Unit values = {unit_qty}. " if is_pp else "")
+                + "Markers use q if FDR is on, else p. * p/q<0.05."
             )
         elif test_type == "Cluster perm.":
             print(
                 "Method: MNE cluster permutation on recording × sorted-sweep matrices "
-                "(n at recording level; subject/slice aggregation deferred). "
+                + ("of PPR (stim2/stim1) " if is_pp else "")
+                + "(n at recording level; subject/slice aggregation deferred). "
                 "Between: exactly 2 groups per test-set window. "
                 "Paired: 1 group, 2 test-set windows (≥2 sweeps each; absolute indices may differ), "
                 "rec_ID-aligned differences by relative position. "
@@ -700,19 +742,20 @@ class StatTestMixin:
             print(
                 "Method: paired Student's t-test on unit-key complete pairs "
                 f"(n_unit={n_unit}); incomplete pairs excluded; n = n_pairs. "
-                "Markers use q if FDR is on, else p. * p/q<0.05."
+                + (f"Unit values = {unit_qty}. " if is_pp else "")
+                + "Markers use q if FDR is on, else p. * p/q<0.05."
             )
         elif test_type == "t-test" and effective_variant == "one-sample":
             print(
-                "Method: one-sample Student's t-test on unit-level means vs reference "
-                f"(n_unit={n_unit}); each unit value = mean of the aspect over test-set sweeps. "
+                "Method: one-sample Student's t-test on unit-level values vs reference "
+                f"(n_unit={n_unit}); each unit value = {unit_qty}. "
                 "Markers use q if FDR is on, else p. * p/q<0.05."
             )
         else:
             print(
-                "Method: unpaired Welch t-test (equal_var=False) on unit-level means "
+                "Method: unpaired Welch t-test (equal_var=False) on unit-level values "
                 f"(n_unit={n_unit}); "
-                "each unit value = mean of the aspect over test-set sweeps. "
+                f"each unit value = {unit_qty}. "
                 "Markers use q if FDR is on, else p. * p/q<0.05."
             )
         # Assumption lines (SW / Levene) when present on any result
