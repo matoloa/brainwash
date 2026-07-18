@@ -622,17 +622,18 @@ class InteractivePlotMixin:
             self._update_marker_data()
 
         if n_recs > 1:
+            self.exorcise()
             self.graphRefresh(reeval_formal_test=False)
             return
-        if n_recs == 0 and len(self.uistate.plot.list_idx_select_stims or []) != 1:
+        if n_recs == 0:
+            # No rec → no sweep ghost (group means alone are not a ghost source)
+            self.exorcise()
             self.graphRefresh(reeval_formal_test=False)
             return
         prow = self.get_prow()
         if prow is None:
-            # group-only view (0 recs): still wire output hover so ghost can work on group means
-            logger.debug("mouseoverUpdate: prow is None (group view), wiring output hover and returning")
-            self.mouseoverOutput = self.canvasOutput.mpl_connect("motion_notify_event", self.outputMouseover)
-            self.mouseLeaveOutput = self.canvasOutput.mpl_connect("axes_leave_event", self.on_leave_output)
+            logger.debug("mouseoverUpdate: prow is None, skip output hover / ghost")
+            self.exorcise()
             self.graphRefresh(reeval_formal_test=False)
             return
         rec_ID = prow["ID"]
@@ -1205,59 +1206,39 @@ class InteractivePlotMixin:
                 self.exorcise()
             return
         n_recs = len(self.uistate.plot.list_idx_select_recs or [])
-        if n_recs > 1:
-            self.exorcise()
+        if n_recs != 1:
+            # Ghost is a per-recording voltage snippet; multi-rec / no-rec: never draw it.
+            # (Group-mean hover previously synthesized a ghost from the first rec in the group
+            # when EPSP_slope/ax2 was hovered — incorrect with no rec selected.)
+            if self.uistate.plot.ghost_sweep is not None:
+                self.exorcise()
             return
 
-        rec_id = None
-        if n_recs == 1:
-            prow = self.get_prow()
-            if prow is not None:
-                rec_id = prow["ID"]
+        prow = self.get_prow()
+        rec_id = prow["ID"] if prow is not None else None
+        if rec_id is None:
+            if self.uistate.plot.ghost_sweep is not None:
+                self.exorcise()
+            return
 
-        if n_recs == 1 and rec_id is not None:
-            # for single rec, prefer the hovered ax's per-sweep line (correct stim/offset), fallback to any ax
-            dict_out = {
-                key: value
-                for key, value in self.uistate.plot.dict_rec_show.items()
-                if value.get("rec_ID") == rec_id and value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
-            }
-            if not dict_out:
-                dict_out = {
-                    key: value
-                    for key, value in self.uistate.plot.dict_rec_show.items()
-                    if value.get("rec_ID") == rec_id and value.get("axis") in ("ax1", "ax2") and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
-                }
-        else:
-            dict_out = {
-                key: value
-                for key, value in self.uistate.plot.dict_rec_show.items()
-                if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
-            }
-        rec_ID_for_snippet = None
+        # Prefer the hovered ax's per-sweep line (correct stim/offset), fallback to any ax
+        dict_out = {
+            key: value
+            for key, value in self.uistate.plot.dict_rec_show.items()
+            if value.get("rec_ID") == rec_id and value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
+        }
         if not dict_out:
-            # Fallback for group-only view: use a shown group mean line for (x,y) sweep lookup;
-            # pick first rec in that group to source the actual voltage snippet (ghost).
-            g_out = {
+            dict_out = {
                 key: value
-                for key, value in self.uistate.plot.dict_group_show.items()
-                if value.get("axis") == str_ax and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
+                for key, value in self.uistate.plot.dict_rec_show.items()
+                if value.get("rec_ID") == rec_id and value.get("axis") in ("ax1", "ax2") and (value.get("aspect") in ["EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"]) and hasattr(value.get("line"), "get_xdata")
             }
-            if not g_out:
-                if self.uistate.plot.ghost_sweep is not None:
-                    self.exorcise()
-                return
-            dict_pop = list(g_out.values())[0]
-            gid = dict_pop.get("group_ID")
-            recs = []
-            if gid is not None and hasattr(self, "dd_groups") and self.dd_groups:
-                recs = self.dd_groups.get(gid, {}).get("rec_IDs", []) or []
-            if not recs:
-                return
-            rec_ID_for_snippet = recs[0]
-        else:
-            dict_pop = list(dict_out.values())[0]
-            rec_ID_for_snippet = dict_pop.get("rec_ID")
+        if not dict_out:
+            if self.uistate.plot.ghost_sweep is not None:
+                self.exorcise()
+            return
+        dict_pop = list(dict_out.values())[0]
+        rec_ID_for_snippet = dict_pop.get("rec_ID")
 
         x_data = plot_drag.artist_xdata(dict_pop["line"])
         y_data = plot_drag.artist_ydata(dict_pop["line"])
