@@ -195,8 +195,13 @@ class TableMixin:
                 top_left = self.tablemodel.index(idx, 0)
                 bottom_right = self.tablemodel.index(idx, self.tablemodel.columnCount(QtCore.QModelIndex()) - 1)
                 selection.select(top_left, bottom_right)
-            self.tableProj.selectionModel().select(selection, QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows)
-            self.tableProj.scrollTo(self.tablemodel.index(to_select[0], 0))
+            sm = self.tableProj.selectionModel()
+            sm.select(selection, QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows)
+            # Keep arrow-key navigation anchored to the selection (not row 0).
+            current = self.tablemodel.index(to_select[-1], 0)
+            if current.isValid():
+                sm.setCurrentIndex(current, QtCore.QItemSelectionModel.NoUpdate)
+            self.tableProj.scrollTo(current if current.isValid() else self.tablemodel.index(to_select[0], 0))
             self.tableProj.setFocus()
             self.uistate.plot.list_idx_select_recs = to_select
         else:

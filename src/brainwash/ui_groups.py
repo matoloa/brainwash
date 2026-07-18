@@ -10,6 +10,7 @@ import pickle
 import re
 from pathlib import Path
 
+import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
 from ui_widgets import CustomCheckBox
@@ -42,9 +43,9 @@ class GroupMixin:
         return {}
 
     def group_save_dd(
-        self, dd_groups=None
+        self, dd_groups=None, *, restore_selection: bool = True
     ):  # dd_groups is a dict of dicts: {group_ID (int): {group_name: str, color: str, show: bool, rec_IDs: [str]}}
-        self.group_update_dfp()
+        self.group_update_dfp(restore_selection=restore_selection)
         if dd_groups is None:
             dd_groups = self.dd_groups
         path_dd_groups = Path(self.dict_folders["project"] / "groups.pkl")
@@ -254,39 +255,131 @@ class GroupMixin:
             if hasattr(self, "apply_statistical_test_if_active"):
                 self.apply_statistical_test_if_active()
 
+    @staticmethod
+    def _norm_rec_id(val) -> str:
+        """Normalize recording IDs for robust equality (int/float/str/numpy)."""
+        if val is None:
+            return ""
+        try:
+            if pd.isna(val):
+                return ""
+        except (TypeError, ValueError):
+            pass
+        try:
+            if hasattr(val, "item"):
+                val = val.item()
+        except Exception:
+            pass
+        if isinstance(val, float):
+            if val.is_integer():
+                return str(int(val))
+            return str(val)
+        if isinstance(val, int):
+            return str(val)
+        s = str(val).strip()
+        if re.fullmatch(r"-?\d+\.0+", s):
+            return s.split(".", 1)[0]
+        return s
+
+    def _project_table_row_ids(self, row_indices: list[int]) -> list:
+        """IDs for view/model rows (model may be sorted independently of df_project)."""
+        model_df = getattr(getattr(self, "tablemodel", None), "_data", None)
+        src = model_df if model_df is not None and not getattr(model_df, "empty", True) else self.get_df_project()
+        out = []
+        n = len(src)
+        for i in row_indices:
+            if 0 <= i < n:
+                out.append(src.iloc[i]["ID"])
+        return out
+
+    def _rows_for_rec_ids(self, df_p, rec_ids: list, preferred_order: list[int] | None = None) -> list[int]:
+        """Map rec IDs → positional row indices in df_p; fall back to preferred_order."""
+        order = {self._norm_rec_id(rid): n for n, rid in enumerate(rec_ids)}
+        to_select = sorted(
+            (i for i, rid in enumerate(df_p["ID"].tolist()) if self._norm_rec_id(rid) in order),
+            key=lambda i: order[self._norm_rec_id(df_p["ID"].iloc[i])],
+        )
+        if to_select:
+            return to_select
+        # Fallback: original view indices if still in range (unsorted table common case)
+        n = len(df_p)
+        if preferred_order:
+            return [int(i) for i in preferred_order if 0 <= int(i) < n]
+        return []
+
+    def _select_project_table_rows(self, row_indices: list[int]) -> None:
+        """Select exact project-table rows; no last-row fallback. Blocks selectionChanged side effects."""
+        df_p = self.get_df_project()
+        n = len(df_p)
+        to_select = [int(i) for i in row_indices if 0 <= int(i) < n]
+        self.uistate.plot.list_idx_select_recs = to_select
+
+        was_updating = getattr(self, "updating_tableProj", False)
+        self.updating_tableProj = True
+        try:
+            self.tableProj.clearSelection()
+            if not to_select:
+                return
+            selection = QtCore.QItemSelection()
+            col_last = max(0, self.tablemodel.columnCount(QtCore.QModelIndex()) - 1)
+            for idx in to_select:
+                top_left = self.tablemodel.index(idx, 0)
+                bottom_right = self.tablemodel.index(idx, col_last)
+                if top_left.isValid() and bottom_right.isValid():
+                    selection.select(top_left, bottom_right)
+            sm = self.tableProj.selectionModel()
+            sm.select(
+                selection,
+                QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows,
+            )
+            # Keyboard nav uses currentIndex, not selection alone — without this,
+            # arrow keys jump from row 0 after a model reset / programmatic select.
+            current_row = to_select[-1]
+            current = self.tablemodel.index(current_row, 0)
+            if current.isValid():
+                sm.setCurrentIndex(current, QtCore.QItemSelectionModel.NoUpdate)
+            self.tableProj.scrollTo(current if current.isValid() else self.tablemodel.index(to_select[0], 0))
+            self.tableProj.setFocus()
+            self.uistate.plot.list_idx_select_recs = to_select
+        finally:
+            self.updating_tableProj = was_updating
+
     def group_selection(self, group_ID):
-        dfp = self.get_df_project()
-        if self.uistate.plot.df_recs2plot is None:
-            print("No parsed files selected.")
-            # TODO: set selection to clicked group
+        """Toggle group membership for the current project-table selection.
+
+        Conserves multi-selection across table model resets (setData / unsort).
+        """
+        # Prefer live Qt selection; fall back to uistate (e.g. keyboard shortcut via menu).
+        selected_indices: list[int] = []
+        if hasattr(self, "tableProj") and self.tableProj.selectionModel() is not None:
+            selected_indices = sorted({idx.row() for idx in self.tableProj.selectionModel().selectedRows()})
+        if not selected_indices:
+            selected_indices = [int(i) for i in (self.uistate.plot.list_idx_select_recs or [])]
+        if not selected_indices:
+            print("No recordings selected.")
             return
-        # Preserve the full multi-selection of recordings; we will restore it after
-        # the table model update(s) so that assigning a group does not clear the selection.
-        selected_indices = list(self.uistate.plot.list_idx_select_recs)
-        selected_rec_IDs = dfp.loc[selected_indices, "ID"].tolist()  # selected rec_IDs
+
+        selected_rec_IDs = self._project_table_row_ids(selected_indices)
+        if not selected_rec_IDs:
+            print("No recordings selected.")
+            return
+
         all_in_group = all(rec_ID in self.dd_groups[group_ID]["rec_IDs"] for rec_ID in selected_rec_IDs)
-        if all_in_group:  # If all selected_rec_IDs are in the group_ID, ungroup them
+        if all_in_group:
             for rec_ID in selected_rec_IDs:
                 self.group_rec_ungroup(rec_ID, group_ID)
-        else:  # Otherwise, add all selected_rec_IDs to the group_ID
+        else:
             for rec_ID in selected_rec_IDs:
                 self.group_rec_assign(rec_ID, group_ID)
-        self.group_save_dd()
-        self.set_df_project(dfp)
-        self.tableUpdate(restore_selection=False)  # we restore multi-selection manually below
-        # Restore the original multi-selection of recordings (indices are stable since
-        # group assignment does not add/remove rows).
-        self.uistate.plot.list_idx_select_recs = selected_indices
-        if selected_indices:
-            self.tableProj.clearSelection()
-            selection = QtCore.QItemSelection()
-            for idx in selected_indices:
-                top_left = self.tablemodel.index(idx, 0)
-                bottom_right = self.tablemodel.index(idx, self.tablemodel.columnCount(QtCore.QModelIndex()) - 1)
-                selection.select(top_left, bottom_right)
-            self.tableProj.selectionModel().select(selection, QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows)
-            self.tableProj.scrollTo(self.tablemodel.index(selected_indices[0], 0))
-            self.tableProj.setFocus()
+
+        # Persist groups + refresh table without intermediate last-row selection restore.
+        self.uistate.plot.list_idx_select_recs = list(selected_indices)
+        self.group_save_dd(restore_selection=False)
+
+        dfp = self.get_df_project()
+        to_select = self._rows_for_rec_ids(dfp, selected_rec_IDs, preferred_order=selected_indices)
+        self._select_project_table_rows(to_select)
+
         if hasattr(self, "clear_formal_test_results"):
             self.clear_formal_test_results()
         self.graphRefresh()
@@ -547,7 +640,7 @@ class GroupMixin:
     # df_project sync
     # ------------------------------------------------------------------
 
-    def group_update_dfp(self, rec_ID=None, reset=False):
+    def group_update_dfp(self, rec_ID=None, reset=False, *, restore_selection: bool = True):
         # update dfp['groups'] based on dd_groups
         def group_list(rec_ID):
             list_rec_in_groups = []
@@ -569,5 +662,7 @@ class GroupMixin:
                     rec_ID = row["ID"]
                     list_rec_in_groups = group_list(rec_ID)
                     df_p.at[i, "groups"] = ", ".join(sorted(list_rec_in_groups)) if list_rec_in_groups else " "
+        # set_df_project always tableUpdate(restore=False); optional restore for callers.
         self.set_df_project(df_p)
-        self.tableUpdate(restore_selection=True)  # use new helper instead of tableFormat (consistent selection restore)
+        if restore_selection:
+            self.tableUpdate(restore_selection=True)
