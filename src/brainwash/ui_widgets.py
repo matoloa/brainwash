@@ -139,6 +139,9 @@ class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None):
         super(TableModel, self).__init__()
         self._data = data
+        # Last user-chosen sort; reapplied in setData so tableUpdate keeps order.
+        self._sort_column = None
+        self._sort_order = QtCore.Qt.AscendingOrder
 
     def data(self, index, role=None):  # dataCell
         if role is None:
@@ -169,6 +172,17 @@ class TableModel(QtCore.QAbstractTableModel):
             if orientation == QtCore.Qt.Vertical:
                 return str(self._data.index[section])
 
+    def _apply_remembered_sort(self) -> None:
+        if self._sort_column is None:
+            return
+        if self._data is None or getattr(self._data, "empty", True):
+            return
+        if not (0 <= self._sort_column < self._data.shape[1]):
+            return
+        col = self._data.columns[self._sort_column]
+        ascending = self._sort_order == QtCore.Qt.AscendingOrder
+        self._data = self._data.sort_values(col, ascending=ascending)
+
     def setData(self, data: pd.DataFrame = None):
         self.beginResetModel()
         if data is None:
@@ -177,13 +191,19 @@ class TableModel(QtCore.QAbstractTableModel):
             self._data = data
         else:
             return False
+        try:
+            self._apply_remembered_sort()
+        except Exception as e:
+            print(f"Error reapplying table sort: {e}")
         self.endResetModel()
         return True
 
     def sort(self, column, order):
         try:
+            self._sort_column = column
+            self._sort_order = order
             self.layoutAboutToBeChanged.emit()
-            self._data = self._data.sort_values(self._data.columns[column], ascending=order == QtCore.Qt.AscendingOrder)
+            self._apply_remembered_sort()
             self.layoutChanged.emit()
         except Exception as e:
             print(f"Error sorting table: {e}")

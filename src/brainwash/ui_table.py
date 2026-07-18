@@ -210,29 +210,56 @@ class TableMixin:
 
     def tableUpdate(self, restore_selection: bool = True, target_idx: int | None = None):
         self.updating_tableProj = True
+        # Capture IDs before setData (model order may be sorted; indices are view rows).
+        selected_ids = self._selected_recording_ids() if restore_selection else []
         df_project = self.get_df_project()
         self.tablemodel.setData(df_project)
         self.formatTableLayout()
         self.tableProj.resizeColumnsToContents()
 
         if restore_selection:
-            self._restore_table_selection(df_project, target_idx)
+            self._restore_table_selection(df_project, target_idx, rec_ids=selected_ids)
 
         self.updating_tableProj = False
         self.setButtonParse()
 
-    def _restore_table_selection(self, df_p: pd.DataFrame, target_idx: int | None = None) -> None:
+    def _model_rows_for_rec_ids(self, rec_ids: list) -> list[int]:
+        """Map recording IDs → row indices in the (possibly sorted) table model."""
+        if not rec_ids:
+            return []
+        model_df = self._table_model_df()
+        if model_df is None or getattr(model_df, "empty", True) or "ID" not in model_df.columns:
+            return []
+        order = {str(rid): n for n, rid in enumerate(rec_ids)}
+        hits = []
+        for i, rid in enumerate(model_df["ID"].tolist()):
+            key = str(rid)
+            if key in order:
+                hits.append(i)
+        hits.sort(key=lambda i: order[str(model_df.iloc[i]["ID"])])
+        return hits
+
+    def _restore_table_selection(
+        self,
+        df_p: pd.DataFrame,
+        target_idx: int | None = None,
+        rec_ids: list | None = None,
+    ) -> None:
         self.tableProj.clearSelection()
-        to_select = []
-        if target_idx is not None:
-            if 0 <= target_idx < len(df_p):
-                to_select = [target_idx]
-        elif self.uistate.plot.list_idx_select_recs:
-            to_select = [i for i in self.uistate.plot.list_idx_select_recs if 0 <= i < len(df_p)]
-            if not to_select and len(df_p) > 0:
-                to_select = [len(df_p) - 1]
-        elif len(df_p) > 0:
-            to_select = [len(df_p) - 1]
+        to_select: list[int] = []
+        model_df = self._table_model_df()
+        n_model = 0 if model_df is None else len(model_df)
+
+        if target_idx is not None and 0 <= target_idx < len(df_p) and "ID" in df_p.columns:
+            to_select = self._model_rows_for_rec_ids([df_p.iloc[target_idx]["ID"]])
+        elif rec_ids:
+            to_select = self._model_rows_for_rec_ids(rec_ids)
+        elif self.uistate.plot.list_idx_select_recs and n_model > 0:
+            # Fallback: treat list_idx as model rows (pre-sort-persist path / empty ID map)
+            to_select = [i for i in self.uistate.plot.list_idx_select_recs if 0 <= int(i) < n_model]
+
+        if not to_select and n_model > 0:
+            to_select = [n_model - 1]
 
         if to_select:
             selection = QtCore.QItemSelection()
