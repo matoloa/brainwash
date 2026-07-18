@@ -1111,31 +1111,54 @@ def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | 
         if pair_bits:
             methods = methods.rstrip(".") + ". Per-group fits: " + "; ".join(pair_bits) + "."
         lines.append(methods)
-        # Verbose residual / normality notes (SW, Levene) for the author
+        # Verbose residual / normality notes (SW, Levene) — self-contained, no statusbar refs
+        ass_prose = ""
         if isinstance(cfg, dict):
             ass_prose = statusbar_fmt.format_io_ancova_assumption_prose(cfg.get("assumptions") or {})
+        sw_on = bool(getattr(st, "test_sw", False))
+        lev_on = bool(getattr(st, "test_levene", False))
+        if ass_prose or sw_on or lev_on:
+            lines.append("")
+            lines.append("### Assumption checks")
+            lines.append("")
             if ass_prose:
-                lines.append("")
-                lines.append("### Assumption checks (residuals)")
-                lines.append("")
                 lines.append(ass_prose)
+            else:
+                # Checkboxes on but no residual stats stored
+                if sw_on:
+                    lines.append(
+                        "Shapiro–Wilk was enabled for this session; no residual SW *p*-value is stored "
+                        "in the formal result (insufficient residual *n* or check did not run)."
+                    )
+                if lev_on:
+                    lines.append(
+                        "Levene’s test was enabled for this session; no residual Levene *p*-value is stored "
+                        "in the formal result (insufficient *n* or check did not run)."
+                    )
         lines.append("")
         lines.append("### Symbols")
         lines.append("")
         lines.append(
-            "IO ANCOVA is reported in the statusbar and this text; significance * markers are not drawn on IO scatter panels."
+            "IO ANCOVA is summarized in this text and the companion figure; "
+            "significance * markers are not drawn on IO scatter panels."
         )
         lines.append("")
         lines.append("### Checklist (from session)")
         lines.append("")
         lines.append("- Test: ANCOVA (IO)")
         lines.append(f"- n_unit: `{n_unit}`")
+        lines.append(f"- Assumption checks requested: SW=`{sw_on}`, Levene=`{lev_on}`")
         if isinstance(cfg, dict):
             lines.append(f"- Primary contrast: `{cfg.get('primary_contrast')}`")
             lines.append(f"- X / Y: `{cfg.get('x_col')}` / `{cfg.get('y_col')}`")
             lines.append(f"- force0: `{bool(cfg.get('force_through_zero'))}`")
             lines.append(f"- p_interaction: {_figure_text_pstr(cfg.get('p_interaction', cfg.get('slope_p')))}")
             lines.append(f"- p_group_ancova: {_figure_text_pstr(cfg.get('p_group_ancova'))}")
+            ass = cfg.get("assumptions") or {}
+            if ass.get("sw_p") is not None:
+                lines.append(f"- SW residual p: {_figure_text_pstr(ass.get('sw_p'))}")
+            if ass.get("levene_p") is not None:
+                lines.append(f"- Levene residual p: {_figure_text_pstr(ass.get('levene_p'))}")
         lines.append("")
         return "\n".join(lines).rstrip() + "\n"
 
@@ -1205,34 +1228,24 @@ def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | 
     if eta_bits:
         stat_sentences.append("Effect size: " + "; ".join(eta_bits) + ".")
 
-    # Pull residual assumption prose from first result if present (non-IO formal tests)
-    ass_dict = {}
-    for r in results:
-        if isinstance(r, dict) and r.get("assumptions"):
-            ass_dict = r.get("assumptions") or {}
-            break
-        if isinstance(r, dict) and (r.get("config") or {}).get("assumptions"):
-            ass_dict = (r.get("config") or {}).get("assumptions") or {}
-            break
-    if ass_dict:
-        from brainwash_ui import statusbar as statusbar_fmt
-
-        ass_prose = statusbar_fmt.format_io_ancova_assumption_prose(ass_dict)
-        if ass_prose:
-            stat_sentences.append(ass_prose)
-    else:
-        assum = []
-        if sw:
-            assum.append("Shapiro–Wilk (SW)")
-        if levene:
-            assum.append("Levene")
-        if assum:
-            stat_sentences.append(
-                "Assumption checks enabled: " + " and ".join(assum) + " (see console / session if flagged)."
-            )
-
     lines.append(" ".join(stat_sentences))
     lines.append("")
+
+    # Self-contained SW / Levene section (no statusbar/console referral)
+    from brainwash_ui import statusbar as statusbar_fmt
+
+    ass_report = statusbar_fmt.format_formal_assumption_report(
+        results, test_sw=sw, test_levene=levene, group_names=group_map
+    )
+    if ass_report or sw or levene:
+        lines.append("### Assumption checks")
+        lines.append("")
+        if ass_report:
+            lines.append(ass_report)
+        else:
+            lines.append("No Shapiro–Wilk or Levene checks were requested for this export.")
+        lines.append("")
+
     lines.append("### Symbols")
     lines.append("")
     if fdr:
@@ -1248,7 +1261,7 @@ def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | 
     lines.append(f"- Test: `{test_type}` (variant=`{variant}`, tails=`{tails}`, FDR=`{fdr}`)")
     lines.append(f"- n_unit: `{n_unit}`")
     lines.append(f"- Aspects: amp=`{amp_on}`, slope=`{slope_on}`, norm=`{norm}`")
-    lines.append(f"- Assumption flags: SW=`{sw}`, Levene=`{levene}`")
+    lines.append(f"- Assumption checks requested: SW=`{sw}`, Levene=`{levene}`")
     if group_map:
         gbits = []
         for g, v in group_map.items():
@@ -1266,6 +1279,10 @@ def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | 
             qk = "q_" + key[2:]
             if res.get(qk) is not None:
                 pbits.append(f"{qk}={_figure_text_pstr(res.get(qk))}")
+        for key in sorted(k for k in res.keys() if k.startswith("sw_p") or k.startswith("levene_p")):
+            pbits.append(f"{key}={_figure_text_pstr(res.get(key))}")
+        for key in sorted(k for k in res.keys() if k.startswith("sw_skip_") or k.startswith("levene_skip_")):
+            pbits.append(f"{key}={res.get(key)}")
         nbit = ""
         if res.get("n1") is not None:
             nbit = f", n1={res.get('n1')}, n2={res.get('n2')}"

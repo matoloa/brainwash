@@ -48,6 +48,8 @@ def test_skeleton_ttest_includes_p_and_checklist():
     u.stat_test.test_t_variant = "unpaired"
     u.stat_test.test_t_tails = "two-sided"
     u.stat_test.buttonGroup_test_n = "subject"
+    u.stat_test.test_sw = True
+    u.stat_test.test_levene = True
     u.stat_test.formal_test_results = [
         {
             "set_name": "post",
@@ -57,6 +59,14 @@ def test_skeleton_ttest_includes_p_and_checklist():
             "n1": 6,
             "n2": 7,
             "group_ns": {"G1": 6, "G2": 7},
+            "group1": "G1",
+            "group2": "G2",
+            "sw_p_amp_g1": 0.4,
+            "sw_p_amp_g2": 0.35,
+            "levene_p_amp": 0.2,
+            "sw_p_slope_g1": 0.01,
+            "sw_skip_slope_g2": "n=2<3",
+            "levene_skip_slope": "n<2 per group",
         }
     ]
     md = build_figure_text_md(
@@ -72,10 +82,42 @@ def test_skeleton_ttest_includes_p_and_checklist():
     assert "### Symbols" in md
     assert "### Checklist" in md
     assert "Set `post`" in md
+    assert "### Assumption checks" in md
+    assert "Shapiro–Wilk" in md
+    assert "Levene" in md
+    assert "per group" in md.lower() or "Control" in md
+    assert "group-1" not in md  # no longer only g1 wording
+    assert "statusbar" not in md.lower()
+    assert "console" not in md.lower()
     # no aggressive truncation
     assert len(md) > 200
     assert _figure_text_unit_warning("subject") is None
     assert "Note on statistical units" not in md
+
+
+def test_skeleton_ttest_sw_skip_reported_in_md():
+    u = UIstate()
+    u.stat_test.test_type = "t-test"
+    u.stat_test.test_sw = True
+    u.stat_test.test_levene = True
+    u.stat_test.formal_test_results = [
+        {
+            "set_name": "set 2",
+            "group1": "G1",
+            "group2": "G2",
+            "p_slope": 0.09,
+            "n1": 2,
+            "n2": 2,
+            "sw_skip_slope_g1": "n=2<3",
+            "sw_skip_slope_g2": "n=2<3",
+            "levene_p_slope": 0.4,
+        }
+    ]
+    md = build_figure_text_md(u, _template(), group_names={"G1": "A", "G2": "B"})
+    assert "### Assumption checks" in md
+    assert "not computed" in md.lower() or "n=2" in md
+    assert "A" in md or "B" in md or "group" in md.lower()
+    assert "statusbar" not in md.lower()
 
 
 def test_skeleton_slice_n_unit_leads_with_warning():
@@ -175,6 +217,7 @@ def test_skeleton_io_ancova_uses_methods_and_group_names():
     assert "Ctl" in md or "subject" in md
     assert "Per-group fits" in md or "slope" in md.lower()
     assert "### Checklist" in md
-    assert "### Assumption checks (residuals)" in md
+    assert "### Assumption checks" in md
     assert "Residuals are the vertical distances" in md
     assert "non-normal residual distribution" in md
+    assert "statusbar" not in md.lower()

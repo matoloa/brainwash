@@ -329,6 +329,12 @@ def format_io_ancova_methods_text(
     return " ".join(sentences)
 
 
+def _assumption_p_str(p) -> str:
+    if not isinstance(p, (int, float)) or not np.isfinite(p):
+        return "n.a."
+    return f"{p:.3g}" if p >= 0.001 else "<0.001"
+
+
 def format_io_ancova_assumption_prose(assumptions: dict | None) -> str:
     """Verbose methods-style text for SW/Levene residual checks (figure .md / methods)."""
     if not assumptions:
@@ -337,11 +343,6 @@ def format_io_ancova_assumption_prose(assumptions: dict | None) -> str:
     sw_p = assumptions.get("sw_p")
     lev_p = assumptions.get("levene_p")
     notes = list(assumptions.get("notes") or [])
-
-    def _p(p) -> str:
-        if not isinstance(p, (int, float)) or not np.isfinite(p):
-            return "n.a."
-        return f"{p:.3g}" if p >= 0.001 else "<0.001"
 
     # Always explain residuals briefly when any assumption info is present
     if sw_p is not None or lev_p is not None or notes:
@@ -353,23 +354,24 @@ def format_io_ancova_assumption_prose(assumptions: dict | None) -> str:
         if sw_p < 0.05:
             bits.append(
                 f"Shapiro–Wilk test on residuals suggested a non-normal residual distribution "
-                f"(*p* = {_p(sw_p)}); linear-model *p*-values should be interpreted with caution "
+                f"(*p* = {_assumption_p_str(sw_p)}); linear-model *p*-values should be interpreted with caution "
                 f"(consider robust methods, transforms, or nonparametric alternatives)."
             )
         else:
             bits.append(
-                f"Shapiro–Wilk test on residuals did not indicate clear non-normality (*p* = {_p(sw_p)})."
+                f"Shapiro–Wilk test on residuals did not indicate clear non-normality "
+                f"(*p* = {_assumption_p_str(sw_p)})."
             )
     if isinstance(lev_p, (int, float)) and np.isfinite(lev_p):
         if lev_p < 0.05:
             bits.append(
                 f"Levene’s test suggested heterogeneous residual variance across groups "
-                f"(*p* = {_p(lev_p)}); ANCOVA *p*-values may be sensitive to this."
+                f"(*p* = {_assumption_p_str(lev_p)}); ANCOVA *p*-values may be sensitive to this."
             )
         else:
             bits.append(
                 f"Levene’s test did not indicate clear residual variance heterogeneity across groups "
-                f"(*p* = {_p(lev_p)})."
+                f"(*p* = {_assumption_p_str(lev_p)})."
             )
     # Failure / skip notes not already covered by p-values
     for n in notes:
@@ -381,6 +383,150 @@ def format_io_ancova_assumption_prose(assumptions: dict | None) -> str:
         elif s not in " ".join(bits):
             bits.append(s if s.endswith(".") else s + ".")
     return " ".join(bits)
+
+
+def _group_label_for_sw(result: dict, which: str, dd_groups: dict | None = None) -> str:
+    """Human label for SW group slot g1/g2."""
+    dd_groups = dd_groups or {}
+    g = result.get("group1") if which == "g1" else result.get("group2")
+    if isinstance(g, (list, tuple)) and g:
+        g = g[0]
+    if g is None or isinstance(g, (list, tuple)):
+        return "group 1" if which == "g1" else "group 2"
+    entry = dd_groups.get(g, dd_groups.get(str(g)))
+    if isinstance(entry, dict) and entry.get("group_name"):
+        return str(entry["group_name"])
+    if isinstance(entry, str) and entry:
+        return entry
+    return f"group {g}"
+
+
+def format_formal_assumption_report(
+    results: list | None,
+    *,
+    test_sw: bool = False,
+    test_levene: bool = False,
+    group_names: dict | None = None,
+) -> str:
+    """Full SW/Levene report for figure .md from non-IO formal test results.
+
+    Self-contained: no references to statusbar or console. SW is reported **per group**
+    when g1/g2 keys exist. Includes skip reasons (e.g. n&lt;3) when not computable.
+    """
+    if not test_sw and not test_levene:
+        return ""
+    results = results or []
+    dd = {}
+    for gid, val in (group_names or {}).items():
+        if isinstance(val, dict):
+            dd[gid] = val
+            dd[str(gid)] = val
+        else:
+            dd[gid] = {"group_name": str(val)}
+            dd[str(gid)] = {"group_name": str(val)}
+
+    rows: list[str] = []
+    any_sw_p = False
+    any_lev_p = False
+    for r in results:
+        if not isinstance(r, dict):
+            continue
+        sname = r.get("set_name") or r.get("set_id") or "comparison"
+        for asp in ("amp", "slope"):
+            if test_sw:
+                # Prefer per-group keys; fall back to legacy single sw_p_{asp}
+                per_group_found = False
+                for which in ("g1", "g2"):
+                    pk = f"sw_p_{asp}_{which}"
+                    sk = f"sw_skip_{asp}_{which}"
+                    if pk not in r and sk not in r:
+                        continue
+                    per_group_found = True
+                    glabel = _group_label_for_sw(r, which, dd)
+                    p = r.get(pk)
+                    if isinstance(p, (int, float)) and np.isfinite(p):
+                        any_sw_p = True
+                        verdict = "non-normal" if p < 0.05 else "no clear non-normality"
+                        rows.append(
+                            f"- **{sname}** / {asp} / **{glabel}**: Shapiro–Wilk on unit values "
+                            f"*p* = {_assumption_p_str(p)} ({verdict})."
+                        )
+                    elif r.get(sk):
+                        reason = str(r.get(sk))
+                        rows.append(
+                            f"- **{sname}** / {asp} / **{glabel}**: Shapiro–Wilk **not computed** "
+                            f"(need ≥3 finite units; {reason})."
+                        )
+                if not per_group_found:
+                    pk = f"sw_p_{asp}"
+                    sk = f"sw_skip_{asp}"
+                    if pk in r or sk in r:
+                        p = r.get(pk)
+                        if isinstance(p, (int, float)) and np.isfinite(p):
+                            any_sw_p = True
+                            verdict = "non-normal" if p < 0.05 else "no clear non-normality"
+                            rows.append(
+                                f"- **{sname}** / {asp}: Shapiro–Wilk on unit values "
+                                f"*p* = {_assumption_p_str(p)} ({verdict})."
+                            )
+                        elif r.get(sk):
+                            reason = str(r.get(sk))
+                            rows.append(
+                                f"- **{sname}** / {asp}: Shapiro–Wilk **not computed** "
+                                f"(need ≥3 finite units; {reason})."
+                            )
+            if test_levene:
+                pk = f"levene_p_{asp}"
+                sk = f"levene_skip_{asp}"
+                if pk in r or sk in r:
+                    p = r.get(pk)
+                    if isinstance(p, (int, float)) and np.isfinite(p):
+                        any_lev_p = True
+                        verdict = "heterogeneous variances" if p < 0.05 else "no clear variance heterogeneity"
+                        rows.append(
+                            f"- **{sname}** / {asp}: Levene’s test across groups "
+                            f"*p* = {_assumption_p_str(p)} ({verdict})."
+                        )
+                    elif r.get(sk):
+                        rows.append(
+                            f"- **{sname}** / {asp}: Levene’s test **not computed** ({r.get(sk)})."
+                        )
+        ass = r.get("assumptions") or (r.get("config") or {}).get("assumptions") or {}
+        if isinstance(ass, dict) and (ass.get("sw_p") is not None or ass.get("levene_p") is not None):
+            prose = format_io_ancova_assumption_prose(ass)
+            if prose and prose not in "\n".join(rows):
+                rows.append(f"- **{sname}**: {prose}")
+
+    if not rows:
+        bits = []
+        if test_sw:
+            bits.append(
+                "Shapiro–Wilk was requested but no SW statistic is stored for this export "
+                "(insufficient *n* per group, or the test path did not record results)."
+            )
+        if test_levene:
+            bits.append(
+                "Levene’s test was requested but no Levene statistic is stored for this export "
+                "(insufficient *n* per group, or the test path did not record results)."
+            )
+        return " ".join(bits)
+
+    intro = []
+    if test_sw:
+        intro.append(
+            "Shapiro–Wilk tests whether each group’s unit-level values are consistent with a normal "
+            "distribution (α = 0.05; reported **per group** when two groups are compared)."
+        )
+    if test_levene:
+        intro.append(
+            "Levene’s test assesses equality of variance across groups (α = 0.05)."
+        )
+    if any_sw_p or any_lev_p:
+        intro.append(
+            "These checks are diagnostic; significant results caution interpretation of parametric *p*-values "
+            "but do not by themselves invalidate the comparison."
+        )
+    return " ".join(intro) + ("\n\n" + "\n".join(rows) if rows else "")
 
 
 def format_non_io_stat_test_statusbar(
