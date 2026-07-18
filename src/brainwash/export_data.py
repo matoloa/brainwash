@@ -237,8 +237,9 @@ class ExportMixin:
             print(f"Saved image: {out_path_png}")
             fig.savefig(out_path_png, dpi=template.dpi, bbox_inches="tight")
 
-            # Phase 0: minimal .md with "text" (final typewriter in export_data per plan)
-            figure_text_md = export_image.build_figure_text_md(self.uistate, template, group_names)
+            figure_text_md = export_image.build_figure_text_md(
+                self.uistate, template, group_names, panel_hint=panel_name
+            )
             out_path_md = out_path_png.with_suffix(".md")
             out_path_md.write_text(figure_text_md, encoding="utf-8")
             print(f"Saved figure text: {out_path_md}")

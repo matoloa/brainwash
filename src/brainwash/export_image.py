@@ -754,149 +754,435 @@ def render_publication_figure(
     return figures
 
 
-def build_figure_text_md(uistate, template, group_names=None) -> str:
-    """Pure helper (Phase 1+): returns journal-ready figure text/caption for .md companion file.
-    Called from triggerExportOutputImage (the typewriter per revised plan). Reuses parsing
-    patterns from _get_stat_test_warning (ui.py) and _add_significance_markers.
-    Per-panel .md strategy (Option A): one .md per PNG with matching base name.
+def _figure_text_pstr(p, q=None, *, prefer_q: bool = False) -> str:
+    val = q if prefer_q and isinstance(q, (int, float)) and np.isfinite(q) else p
+    if not isinstance(val, (int, float)) or not np.isfinite(val):
+        return "NA"
+    if val < 0.001:
+        return "<0.001"
+    return f"{val:.3g}"
+
+
+def _figure_text_unit_plural(n_unit: str) -> str:
+    return "subjects" if n_unit == "subject" else f"{n_unit}s"
+
+
+def _figure_text_unit_warning(n_unit: str) -> str | None:
+    """Lead callout when *n* is not subject-level (species-neutral wording)."""
+    if n_unit not in ("slice", "recording"):
+        return None
+    plural = _figure_text_unit_plural(n_unit)
+    return (
+        f"> **Note on statistical units:** Comparisons used the **{n_unit}** as the independent "
+        f"observation (*n* counts {plural}, **not subjects**). If multiple {plural} derive from the "
+        f"same subject (e.g. same animal, donor, or culture line), standard errors and *p*-values may "
+        f"be anticonservative relative to a subject-level analysis. Consider subject-level aggregation "
+        f"or mixed models for the final manuscript.\n"
+        f"> <!-- Remove or rewrite this note if units are intentional and justified. -->"
+    )
+
+
+def _figure_text_dd_groups(group_names: dict | None) -> dict:
+    """Map {gid: name} or {gid: {group_name: ...}} → statusbar-style dd_groups."""
+    out: dict = {}
+    for gid, val in (group_names or {}).items():
+        if isinstance(val, dict):
+            out[gid] = val
+            # also index by str
+            out[str(gid)] = val
+        else:
+            entry = {"group_name": str(val)}
+            out[gid] = entry
+            out[str(gid)] = entry
+    return out
+
+
+def _figure_text_panel_title(panel_hint: str | None, exp_type: str) -> str:
+    if not panel_hint:
+        return "[Panel title / what is plotted.]"
+    p = str(panel_hint).lower()
+    if p in ("amplitude", "amp", "epsp_amp"):
+        return "[EPSP amplitude over time.]" if exp_type not in ("io", "PP") else "[EPSP amplitude.]"
+    if p in ("slope", "epsp_slope"):
+        return "[EPSP slope over time.]" if exp_type not in ("io", "PP") else "[EPSP slope.]"
+    if "io" in p or "-" in p:  # e.g. vamp-EPSPamp
+        return "[Input–output relationship.]"
+    if "ppr" in p or exp_type == "PP":
+        return f"[Paired-pulse ratio ({panel_hint}).]"
+    return f"[{panel_hint}.]"
+
+
+def _figure_text_measure_phrase(panel_hint: str | None, amp_on: bool, slope_on: bool) -> str:
+    p = (panel_hint or "").lower()
+    if p in ("amplitude", "amp", "epsp_amp"):
+        return "EPSP amplitude"
+    if p in ("slope", "epsp_slope"):
+        return "EPSP slope"
+    if amp_on and slope_on:
+        return "EPSP amplitude / slope"
+    if slope_on:
+        return "EPSP slope"
+    return "EPSP amplitude"
+
+
+def _figure_text_test_prose(test_type: str, variant: str, tails: str, fdr: bool) -> str:
+    if test_type == "t-test":
+        if variant == "paired":
+            core = "paired two-sided Student's *t*-test"
+        elif variant == "one-sample":
+            core = "one-sample two-sided Student's *t*-test"
+        else:
+            core = "unpaired two-sided Student's *t*-test"
+        if tails != "two-sided":
+            core = core.replace("two-sided", tails)
+        if fdr:
+            core += " with Benjamini–Hochberg FDR correction"
+        return core[0].upper() + core[1:]
+    if test_type == "Wilcoxon":
+        if variant == "paired":
+            core = "paired two-sided Wilcoxon signed-rank test"
+        elif variant == "one-sample":
+            core = "one-sample two-sided Wilcoxon signed-rank test"
+        else:
+            core = "unpaired two-sided Wilcoxon rank-sum test"
+        if tails != "two-sided":
+            core = core.replace("two-sided", tails)
+        if fdr:
+            core += " with Benjamini–Hochberg FDR correction"
+        return core[0].upper() + core[1:]
+    if test_type == "ANOVA":
+        return "Repeated-measures ANOVA (omnibus)"
+    if test_type == "Friedman":
+        return "Friedman test (repeated-measures omnibus)"
+    if test_type == "Cluster perm.":
+        return "Cluster permutation test (between groups)"
+    if test_type == "ANCOVA":
+        return "ANCOVA"
+    return test_type
+
+
+def _figure_text_group_n_phrase(results: list, group_map: dict, n_unit: str) -> str:
+    """Best-effort 'Control (*n* = 6 subjects) and Drug (*n* = 7 subjects)'."""
+    plural = _figure_text_unit_plural(n_unit)
+    # Prefer group_ns on first result / config
+    primary = results[0] if results else {}
+    group_ns = primary.get("group_ns") or (primary.get("config") or {}).get("group_ns") or {}
+    if group_ns:
+        bits = []
+        for gid, n in group_ns.items():
+            name = group_map.get(gid) or group_map.get(str(gid))
+            if isinstance(name, dict):
+                name = name.get("group_name", f"Group {gid}")
+            if not name:
+                name = f"Group {gid}"
+            bits.append(f"**{name}** (*n* = {n} {plural})")
+        if len(bits) == 1:
+            return bits[0]
+        if len(bits) == 2:
+            return f"{bits[0]} and {bits[1]}"
+        return ", ".join(bits[:-1]) + f", and {bits[-1]}"
+    # Fallback n1/n2 + group1/group2
+    g1, g2 = primary.get("group1"), primary.get("group2")
+    n1, n2 = primary.get("n1"), primary.get("n2")
+    if g1 is not None and n1 is not None:
+        def _nm(g):
+            if isinstance(g, (list, tuple)):
+                return ", ".join(str(group_map.get(x) or group_map.get(str(x)) or x) for x in g)
+            return str(group_map.get(g) or group_map.get(str(g)) or g)
+
+        if g2 is not None and n2 is not None and g1 != g2:
+            return f"**{_nm(g1)}** (*n* = {n1} {plural}) and **{_nm(g2)}** (*n* = {n2} {plural})"
+        return f"**{_nm(g1)}** (*n* = {n1} {plural})"
+    if group_map:
+        names = []
+        for gid, val in group_map.items():
+            if isinstance(gid, str) and gid.isdigit() is False and not isinstance(val, dict):
+                # skip duplicate str keys if we also have int keys — still list unique names
+                pass
+            name = val.get("group_name") if isinstance(val, dict) else val
+            if name and str(name) not in names:
+                names.append(str(name))
+        # dedupe preserving order (str/int double keys)
+        seen = set()
+        uniq = []
+        for n in names:
+            if n not in seen:
+                seen.add(n)
+                uniq.append(n)
+        if uniq:
+            return " and ".join(f"**{n}**" for n in uniq[:4])
+    return f"[groups; *n* at the {n_unit} level]"
+
+
+def build_figure_text_md(uistate, template, group_names=None, panel_hint: str | None = None) -> str:
+    """Journal figure-text skeleton (.md companion next to each PNG).
+
+    Sectioned draft for paste into a caption: unit-of-analysis warning (if needed),
+    author placeholders, statistics prose from formal results / statusbar sources,
+    symbol legend, and a machine-readable checklist.
     """
-    if not uistate or uistate.stat_test.test_type == "None":
-        if getattr(uistate, "experiment", None) and uistate.experiment.experiment_type == "io":
-            return "(IO figure exported without ANCOVA selected.)"
-        return "(Exported without statistical comparison overlay.)"
+    lines: list[str] = [
+        "# Figure text skeleton",
+        "<!-- Auto-generated by Brainwash. Replace [brackets]; keep or edit statistics. -->",
+        "",
+    ]
 
-    test_type = uistate.stat_test.test_type
-    results = uistate.stat_test.formal_test_results or []
-    if not results:
-        return "(Exported without statistical comparison overlay.)"
+    exp_type = getattr(getattr(uistate, "experiment", None), "experiment_type", "time") if uistate else "time"
+    st = getattr(uistate, "stat_test", None) if uistate else None
+    test_type = getattr(st, "test_type", "None") if st else "None"
+    n_unit = getattr(st, "buttonGroup_test_n", "subject") if st else "subject"
+    results = list(getattr(st, "formal_test_results", None) or []) if st else []
 
-    # IO ANCOVA: methods paragraph from pure statusbar helper (PR-D)
-    exp_type = getattr(getattr(uistate, "experiment", None), "experiment_type", "time")
+    project = getattr(uistate, "project", None) if uistate else None
+    cb = getattr(project, "checkBox", {}) if project else {}
+    amp_on = bool(cb.get("EPSP_amp", True))
+    slope_on = bool(cb.get("EPSP_slope", True))
+    norm = bool(cb.get("norm_EPSP", False))
+
+    group_map = dict(group_names or {})
+    if not group_map and uistate is not None and hasattr(uistate, "plot"):
+        for _k, v in getattr(uistate.plot, "dict_group_labels", {}).items() or []:
+            if isinstance(v, dict) and "group_name" in v:
+                group_map[str(v.get("group_ID", ""))] = v["group_name"]
+    dd_groups = _figure_text_dd_groups(group_map)
+
+    warn = _figure_text_unit_warning(n_unit)
+    if warn:
+        lines.extend([warn, ""])
+
+    lines.append("## Caption draft")
+    lines.append("")
+    lines.append(f"**{_figure_text_panel_title(panel_hint, exp_type)}**  ")
+    lines.append(
+        "[One sentence of experimental context: preparation, groups, intervention, time window.]"
+    )
+    lines.append("")
+
+    measure = _figure_text_measure_phrase(panel_hint, amp_on, slope_on)
+    x_phrase = {
+        "time": "time",
+        "timestamp": "time",
+        "sweep": "sweep number",
+        "train": "stimulus number",
+        "io": "input (stimulus / volley)",
+        "PP": "group",
+    }.get(exp_type, "x")
+    norm_note = " Data are normalized to baseline." if norm else ""
+    group_n = _figure_text_group_n_phrase(results, group_map, n_unit)
+
+    lines.append(
+        f"Group means (± SEM) of **{measure}** versus **{x_phrase}** for {group_n}.{norm_note}"
+    )
+    lines.append("")
+
+    # --- Statistics section ---
+    lines.append("### Statistics")
+    lines.append("")
+
+    no_test = test_type in (None, "None") or not results
+    io_needs_ancova = exp_type == "io" and test_type != "ANCOVA"
+
+    if no_test or io_needs_ancova:
+        if exp_type == "io" and test_type != "ANCOVA":
+            lines.append(
+                "No formal statistical comparison was applied for this export "
+                "(select **ANCOVA** under Input–Output to compute slope/group tests)."
+            )
+        else:
+            lines.append("No formal statistical comparison was applied for this export.")
+        lines.append("")
+        lines.append("### Symbols")
+        lines.append("")
+        lines.append("(not applicable)")
+        lines.append("")
+        lines.append("### Checklist (from session)")
+        lines.append("")
+        lines.append(f"- Experiment type: `{exp_type}`")
+        lines.append(f"- Test: `{test_type}`")
+        lines.append(f"- n_unit: `{n_unit}`")
+        if group_map:
+            names = []
+            for g, v in group_map.items():
+                nm = v.get("group_name") if isinstance(v, dict) else v
+                if nm and str(nm) not in names:
+                    names.append(str(nm))
+            lines.append(f"- Groups: {', '.join(names)}")
+        lines.append("")
+        return "\n".join(lines).rstrip() + "\n"
+
+    fdr = bool(getattr(st, "test_fdr", False))
+    sw = bool(getattr(st, "test_sw", False))
+    levene = bool(getattr(st, "test_levene", False))
+    if test_type == "Wilcoxon":
+        variant = getattr(st, "test_wilcox_variant", "paired")
+        tails = getattr(st, "test_wilcox_tails", "two-sided")
+    else:
+        variant = getattr(st, "test_t_variant", "unpaired")
+        tails = getattr(st, "test_t_tails", "two-sided")
+
+    # IO ANCOVA path
     if exp_type == "io" and test_type == "ANCOVA":
         from brainwash_ui import statusbar as statusbar_fmt
 
-        dd = {}
-        # Prefer live group names from host if available via uistate only (pure export path)
-        return statusbar_fmt.format_io_ancova_methods_text(
-            results,
-            dd_groups=dd,
-            n_unit=getattr(uistate.stat_test, "buttonGroup_test_n", "subject"),
+        methods = statusbar_fmt.format_io_ancova_methods_text(
+            results, dd_groups=dd_groups, n_unit=n_unit
+        )
+        # Append slope / r² pairs from config (statusbar pairing)
+        cfg = {}
+        if results and isinstance(results[0], dict):
+            cfg = results[0].get("config") or results[0]
+        slopes = (cfg.get("slope_per_group") or {}) if isinstance(cfg, dict) else {}
+        r2s = (cfg.get("r2_per_group") or {}) if isinstance(cfg, dict) else {}
+        pair_bits = []
+        for g, sl in slopes.items():
+            if not (isinstance(sl, (int, float)) and np.isfinite(sl)):
+                continue
+            gname = dd_groups.get(g, dd_groups.get(str(g), {})).get("group_name", f"Group {g}")
+            r2v = r2s.get(g)
+            bit = f"{gname} slope = {sl:.3g}"
+            if isinstance(r2v, (int, float)) and np.isfinite(r2v):
+                bit += f", *r*² = {r2v:.2f}"
+            pair_bits.append(bit)
+        if pair_bits:
+            methods = methods.rstrip(".") + ". Per-group fits: " + "; ".join(pair_bits) + "."
+        lines.append(methods)
+        lines.append("")
+        lines.append("### Symbols")
+        lines.append("")
+        lines.append(
+            "IO ANCOVA is reported in the statusbar and this text; significance * markers are not drawn on IO scatter panels."
+        )
+        lines.append("")
+        lines.append("### Checklist (from session)")
+        lines.append("")
+        lines.append("- Test: ANCOVA (IO)")
+        lines.append(f"- n_unit: `{n_unit}`")
+        if isinstance(cfg, dict):
+            lines.append(f"- Primary contrast: `{cfg.get('primary_contrast')}`")
+            lines.append(f"- X / Y: `{cfg.get('x_col')}` / `{cfg.get('y_col')}`")
+            lines.append(f"- force0: `{bool(cfg.get('force_through_zero'))}`")
+            lines.append(f"- p_interaction: {_figure_text_pstr(cfg.get('p_interaction', cfg.get('slope_p')))}")
+            lines.append(f"- p_group_ancova: {_figure_text_pstr(cfg.get('p_group_ancova'))}")
+        lines.append("")
+        return "\n".join(lines).rstrip() + "\n"
+
+    # Formal non-IO tests
+    test_prose = _figure_text_test_prose(test_type, variant, tails, fdr)
+    stat_sentences = [
+        f"{test_prose} at the **{n_unit}** level.",
+    ]
+
+    prefer_q = fdr
+    set_clauses = []
+    for res in results:
+        if not isinstance(res, dict):
+            continue
+        set_name = res.get("set_name") or res.get("set_id") or "comparison"
+        if set_name in ("__io_ancova__",):
+            continue
+        sweeps = res.get("sweeps") or []
+        sweep_note = ""
+        if sweeps:
+            try:
+                sweep_note = f" (sweeps {int(min(sweeps))}–{int(max(sweeps))})"
+            except Exception:
+                sweep_note = ""
+
+        p_amp, p_slope = res.get("p_amp"), res.get("p_slope")
+        q_amp, q_slope = res.get("q_amp"), res.get("q_slope")
+        n1, n2 = res.get("n1"), res.get("n2")
+        n_bit = ""
+        if n1 is not None and n2 is not None and n1 != n2:
+            n_bit = f"; *n* = {n1} vs {n2}"
+        elif n1 is not None:
+            n_bit = f"; *n* = {n1}"
+
+        aspects = []
+        if amp_on and isinstance(p_amp, (int, float)) and np.isfinite(p_amp):
+            lab = "*q*" if prefer_q and isinstance(q_amp, (int, float)) else "*p*"
+            aspects.append(f"EPSP amplitude {lab} = {_figure_text_pstr(p_amp, q_amp, prefer_q=prefer_q)}")
+        if slope_on and isinstance(p_slope, (int, float)) and np.isfinite(p_slope):
+            lab = "*q*" if prefer_q and isinstance(q_slope, (int, float)) else "*p*"
+            aspects.append(f"EPSP slope {lab} = {_figure_text_pstr(p_slope, q_slope, prefer_q=prefer_q)}")
+        # Generic p_* keys (ANOVA multi-aspect etc.)
+        if not aspects:
+            for key in sorted(k for k in res.keys() if k.startswith("p_")):
+                aspect = key[2:].replace("_", " ")
+                qkey = "q_" + key[2:]
+                val = res.get(key)
+                qv = res.get(qkey)
+                if isinstance(val, (int, float)) and np.isfinite(val):
+                    lab = "*q*" if prefer_q and isinstance(qv, (int, float)) else "*p*"
+                    aspects.append(f"{aspect} {lab} = {_figure_text_pstr(val, qv, prefer_q=prefer_q)}")
+
+        if aspects:
+            set_clauses.append(f"**{set_name}**{sweep_note}: " + "; ".join(aspects) + n_bit + ".")
+        elif n_bit:
+            set_clauses.append(f"**{set_name}**{sweep_note}{n_bit}.")
+
+    if set_clauses:
+        stat_sentences.append(" ".join(set_clauses))
+    else:
+        stat_sentences.append("See session checklist for per-comparison *p*-values.")
+
+    eta_bits = []
+    for r in results:
+        if isinstance(r, dict) and isinstance(r.get("eta2"), (int, float)) and r["eta2"] > 0:
+            eta_bits.append(f"η² = {r['eta2']:.2f}")
+    if eta_bits:
+        stat_sentences.append("Effect size: " + "; ".join(eta_bits) + ".")
+
+    assum = []
+    if sw:
+        assum.append("Shapiro–Wilk (SW)")
+    if levene:
+        assum.append("Levene")
+    if assum:
+        stat_sentences.append(
+            "Assumption checks enabled: " + " and ".join(assum) + " (see console / session if flagged)."
         )
 
-    # Extract config (defensive, mirrors ui.py/_get_stat_test_warning)
-    fdr = bool(uistate.stat_test.test_fdr)
-    variant = uistate.stat_test.test_t_variant
-    if test_type == "Wilcoxon":
-        variant = uistate.stat_test.test_wilcox_variant
-    tails = uistate.stat_test.test_t_tails if test_type != "Wilcoxon" else uistate.stat_test.test_wilcox_tails
-    sw = bool(uistate.stat_test.test_sw)
-    levene = bool(uistate.stat_test.test_levene)
-    norm = bool(uistate.project.checkBox.get("norm_EPSP", False))
-    amp_enabled = bool(uistate.project.checkBox.get("EPSP_amp", True))
-    slope_enabled = bool(uistate.project.checkBox.get("EPSP_slope", True))
-
-    # Group names (fallback to set_name or generic)
-    group_map = group_names or {}
-    if not group_map and hasattr(uistate, "dict_group_labels"):
-        for k, v in uistate.plot.dict_group_labels.items():
-            if isinstance(v, dict) and "group_name" in v:
-                group_map[str(v.get("group_ID", ""))] = v["group_name"]
-
-    # Build core summary (reuses statusbar logic patterns; publication-polished)
-    parts = []
-    if test_type == "t-test":
-        if variant == "paired":
-            prefix = "Paired two-sided t-test"
-        elif variant == "one-sample":
-            prefix = "One-sample two-sided t-test"
-        else:
-            prefix = "Unpaired two-sided t-test"
-        if fdr:
-            prefix += " with FDR correction"
-        if tails != "two-sided":
-            prefix = prefix.replace("two-sided", tails)
-        parts.append(prefix)
-    elif test_type == "Wilcoxon":
-        if variant == "paired":
-            prefix = "Paired two-sided Wilcoxon signed-rank test"
-        elif variant == "one-sample":
-            prefix = "One-sample two-sided Wilcoxon signed-rank test"
-        else:
-            prefix = "Unpaired two-sided Wilcoxon rank-sum test"
-        if fdr:
-            prefix += " with FDR correction"
-        if tails != "two-sided":
-            prefix = prefix.replace("two-sided", tails)
-        parts.append(prefix)
-    elif test_type == "ANOVA":
-        parts.append("Repeated-measures ANOVA (omnibus)")
-    elif test_type == "Friedman":
-        parts.append("Friedman test (repeated-measures omnibus)")
-    elif test_type == "Cluster perm.":
-        parts.append("Cluster permutation test (between-subjects)")
-    else:
-        parts.append(test_type)
-
-    # Aspect-specific p-values + n (only enabled aspects; per result/set)
-    # Matches statusbar logic + plan examples
-    aspect_parts = []
-    for res in results:
-        set_name = res.get("set_name", res.get("set_id", "set"))
-        n1 = res.get("n1", 0)
-        n2 = res.get("n2", n1)
-        n_str = f"n={n1}" if n1 == n2 else f"n1={n1}, n2={n2}"
-
-        p_amp = res.get("p_amp")
-        p_slope = res.get("p_slope")
-        q_amp = res.get("q_amp")
-        q_slope = res.get("q_slope")
-
-        def pstr(p, q=None):
-            val = q if (isinstance(q, (int, float)) and np.isfinite(q)) else p
-            if not isinstance(val, (int, float)) or not np.isfinite(val):
-                return "NA"
-            if val < 0.001:
-                return "<0.001"
-            return f"{val:.3g}"
-
-        shown_aspects = []
-        if amp_enabled and isinstance(p_amp, (int, float)):
-            shown_aspects.append(f"amp p={pstr(p_amp, q_amp)}")
-        if slope_enabled and isinstance(p_slope, (int, float)):
-            shown_aspects.append(f"slope p={pstr(p_slope, q_slope)}")
-        if shown_aspects:
-            aspect_parts.append(f"{set_name}: {', '.join(shown_aspects)} ({n_str})")
-
-    if aspect_parts:
-        parts.append("; ".join(aspect_parts))
-
-    # Effect size / diagnostics (tiered by template.width_mm per Phase 3; reuse statusbar notes)
-    eta_parts = []
-    for r in results:
-        if isinstance(r.get("eta2"), (int, float)) and r["eta2"] > 0:
-            eta_parts.append(f"η²={r['eta2']:.2f}")
-    if eta_parts:
-        parts.extend(eta_parts)
-
-    notes = []
+    lines.append(" ".join(stat_sentences))
+    lines.append("")
+    lines.append("### Symbols")
+    lines.append("")
     if fdr:
-        notes.append("FDR")
-    if sw:
-        notes.append("SW")
-    if levene:
-        notes.append("Levene")
-    if notes:
-        parts.append("({})".format(", ".join(notes)))
-
-    # Significance legend (journal standard; matches _add_significance_markers)
-    parts.append("*p<0.05, **p<0.01, ***p<0.001")
-
-    text = ". ".join([p for p in parts if p]) + "."
-    # Journal tier (Phase 3): shorter for 1-col templates
-    if getattr(template, "width_mm", 100) < 90 and len(text) > 100:
-        text = text.replace("Repeated-measures ANOVA (omnibus)", "RM-ANOVA (omnibus)").replace("; ", ". ")[:95] + "."
-
-    return text
+        lines.append(
+            "\\* *q* < 0.05, \\*\\* *q* < 0.01, \\*\\*\\* *q* < 0.001 (FDR-adjusted); ns = not significant."
+        )
+    else:
+        lines.append("\\* *p* < 0.05, \\*\\* *p* < 0.01, \\*\\*\\* *p* < 0.001; ns = not significant.")
+    lines.append("")
+    lines.append("### Checklist (from session)")
+    lines.append("")
+    lines.append(f"- Experiment type: `{exp_type}`")
+    lines.append(f"- Test: `{test_type}` (variant=`{variant}`, tails=`{tails}`, FDR=`{fdr}`)")
+    lines.append(f"- n_unit: `{n_unit}`")
+    lines.append(f"- Aspects: amp=`{amp_on}`, slope=`{slope_on}`, norm=`{norm}`")
+    lines.append(f"- Assumption flags: SW=`{sw}`, Levene=`{levene}`")
+    if group_map:
+        gbits = []
+        for g, v in group_map.items():
+            nm = v.get("group_name") if isinstance(v, dict) else v
+            if nm and f"{g}={nm}" not in gbits:
+                gbits.append(f"{g}={nm}")
+        lines.append(f"- Groups: {', '.join(gbits)}")
+    for res in results:
+        if not isinstance(res, dict):
+            continue
+        sid = res.get("set_name") or res.get("set_id") or "?"
+        pbits = []
+        for key in sorted(k for k in res.keys() if k.startswith("p_")):
+            pbits.append(f"{key}={_figure_text_pstr(res.get(key))}")
+            qk = "q_" + key[2:]
+            if res.get(qk) is not None:
+                pbits.append(f"{qk}={_figure_text_pstr(res.get(qk))}")
+        nbit = ""
+        if res.get("n1") is not None:
+            nbit = f", n1={res.get('n1')}, n2={res.get('n2')}"
+        lines.append(f"- Set `{sid}`: " + (", ".join(pbits) if pbits else "no p-keys") + nbit)
+    lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 if __name__ == "__main__":
