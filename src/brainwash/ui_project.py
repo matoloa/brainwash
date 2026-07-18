@@ -962,6 +962,8 @@ class ProjectMixin:
             if self.uistate.stat_test.test_type == "Wilcoxon" and hasattr(self, "lineEdit_wilcoxon_one_sample_value"):
                 val = self.uistate.stat_test.label_test_wilcox_one_sample_value
                 self.lineEdit_wilcoxon_one_sample_value.setText(str(val))
+        if hasattr(self, "_update_one_sample_ref_visibility"):
+            self._update_one_sample_ref_visibility()
         # experiment_type drives IO regression; ANCOVA is normal test_type radio
 
         # Ensure tools column is treated as fixed pixels

@@ -46,9 +46,12 @@ def validate_comparison_inputs(
     # t-test / Wilcoxon variant radios must not constrain ANOVA / Friedman / Cluster.
     paired_variant = test_type in ("t-test", "Wilcoxon") and variant == "paired"
     one_sample_variant = test_type in ("t-test", "Wilcoxon") and variant == "one-sample"
+    _paired_label = "paired Wilcoxon" if test_type == "Wilcoxon" else "paired t-test"
+    _one_label = "one-sample Wilcoxon" if test_type == "Wilcoxon" else "one-sample t-test"
 
     if one_sample_variant:
-        pass
+        if len(shown_groups) != 1:
+            return {"error": f"{_one_label} requires exactly 1 group", "results": []}
     elif test_type == "ANOVA" and len(shown_groups) == 1:
         pass
     elif test_type == "Friedman" and len(shown_groups) == 1:
@@ -65,7 +68,7 @@ def validate_comparison_inputs(
             }
     elif paired_variant:
         if len(shown_groups) != 1:
-            return {"error": "paired t-test requires exactly 1 group", "results": []}
+            return {"error": f"{_paired_label} requires exactly 1 group", "results": []}
     else:
         if len(shown_groups) < 2:
             return {"error": "need at least two shown groups", "results": []}
@@ -75,7 +78,7 @@ def validate_comparison_inputs(
     if not shown_sets and not is_io:
         return {"error": "no shown test sets", "results": []}
     if paired_variant and len(shown_sets) != 2:
-        return {"error": "paired t-test requires exactly 2 shown test sets", "results": []}
+        return {"error": f"{_paired_label} requires exactly 2 shown test sets", "results": []}
 
     if get_group_testset_means_fn is None:
         return {"error": "no data accessor for testset means", "results": []}

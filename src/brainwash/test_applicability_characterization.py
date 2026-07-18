@@ -53,6 +53,58 @@ def test_ttest_no_groups():
     assert applicability.check_ttest_applicability("unpaired", None, {}) == "No groups defined for t-test"
 
 
+def test_ttest_one_sample_needs_exactly_one_group():
+    dd_g = _groups("G1", "G2")
+    dd_g["G1"]["rec_IDs"] = ["r1", "r2"]
+    dd_g["G2"]["rec_IDs"] = ["r3", "r4"]
+    assert applicability.check_ttest_applicability("one-sample", dd_g, make_dd_testsets("TS1")) == (
+        "One-sample t-test requires exactly 1 group with data"
+    )
+
+
+def test_wilcoxon_paired_messages_not_ttest():
+    dd_g = _groups("G1", "G2")
+    dd_g["G1"]["rec_IDs"] = ["r1", "r2"]
+    dd_g["G2"]["rec_IDs"] = ["r3", "r4"]
+    msg = applicability.check_wilcoxon_applicability("paired", dd_g, make_dd_testsets("TS1", "TS2"))
+    assert msg == "Paired Wilcoxon requires exactly 1 group with data"
+    assert "t-test" not in msg.lower()
+
+
+def test_wilcoxon_paired_ok_one_group_two_sets():
+    dd_g = _groups("G1")
+    dd_g["G1"]["rec_IDs"] = ["r1", "r2"]
+    assert applicability.check_wilcoxon_applicability("paired", dd_g, make_dd_testsets("TS1", "TS2")) is None
+
+
+def test_wilcoxon_one_sample_needs_exactly_one_group():
+    dd_g = _groups("G1", "G2")
+    dd_g["G1"]["rec_IDs"] = ["r1", "r2"]
+    dd_g["G2"]["rec_IDs"] = ["r3", "r4"]
+    msg = applicability.check_wilcoxon_applicability("one-sample", dd_g, make_dd_testsets("TS1"))
+    assert msg == "One-sample Wilcoxon requires exactly 1 group with data"
+    assert "t-test" not in msg.lower()
+
+
+def test_wilcoxon_one_sample_ok():
+    dd_g = _groups("G1")
+    dd_g["G1"]["rec_IDs"] = ["r1", "r2"]
+    assert applicability.check_wilcoxon_applicability("one-sample", dd_g, make_dd_testsets("TS1")) is None
+
+
+def test_warning_for_wilcoxon_uses_wilcox_variant():
+    dd_g = _groups("G1", "G2")
+    dd_g["G1"]["rec_IDs"] = ["r1", "r2"]
+    dd_g["G2"]["rec_IDs"] = ["r3", "r4"]
+    w = applicability.warning_for_test_type(
+        "Wilcoxon",
+        dd_groups=dd_g,
+        dd_testsets=make_dd_testsets("TS1", "TS2"),
+        wilcox_variant="paired",
+    )
+    assert w is not None and "Wilcoxon" in w and "t-test" not in w.lower()
+
+
 def test_anova_one_group_two_testsets_ok():
     dd_g = _groups("G1")
     dd_ts = make_dd_testsets("TS1", "TS2")

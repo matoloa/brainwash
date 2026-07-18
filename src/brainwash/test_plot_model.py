@@ -71,6 +71,22 @@ def test_build_test_marker_specs_paired_single_marker():
     assert specs[0].color == "white"
 
 
+def test_build_test_marker_specs_wilcoxon_paired_single_marker():
+    results = [{"sweeps": [1, 3], "sweeps2": [5, 7], "p_amp": 0.01}]
+    specs = plot_model.build_test_marker_specs(
+        results,
+        test_type="Wilcoxon",
+        t_variant="unpaired",
+        wilcox_variant="paired",
+        amp_view=True,
+        slope_view=False,
+        dark=False,
+    )
+    assert len(specs) == 1
+    assert specs[0].x == 4.0
+    assert specs[0].label == "*"
+
+
 def test_build_test_marker_specs_anova_ignores_t_paired_variant():
     """ANOVA must place per-set markers even if t-test radio is still 'paired'."""
     results = [

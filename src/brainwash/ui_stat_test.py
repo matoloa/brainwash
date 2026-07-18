@@ -223,6 +223,7 @@ class StatTestMixin:
                 self.update_anova_label()
         if hasattr(self, "frameToolTest_sub_wilcoxon"):
             self.frameToolTest_sub_wilcoxon.setVisible(test_type == "Wilcoxon")
+        self._update_one_sample_ref_visibility()
         if save and hasattr(self, "dict_folders"):
             try:
                 self.uistate.save_cfg(projectfolder=self.dict_folders.get("project"))
@@ -482,7 +483,7 @@ class StatTestMixin:
             self.clear_formal_test_results()
             return
 
-        # Paired constraints apply only to t-test / Wilcoxon — not ANOVA/Friedman/Cluster.
+        # Paired / one-sample constraints apply only to t-test / Wilcoxon — not ANOVA/Friedman/Cluster.
         if variant_for_check == "paired" and test_type in ("t-test", "Wilcoxon"):
             # Paired t-test / Wilcoxon: exactly 1 shown group + exactly 2 test sets.
             if len(shown_groups) != 1:
@@ -499,6 +500,13 @@ class StatTestMixin:
             if n1 < 2:
                 if had_results:
                     print("Statistical test: paired requires N ≥ 2 recordings.")
+                self.clear_formal_test_results()
+                return
+
+        if variant_for_check == "one-sample" and test_type in ("t-test", "Wilcoxon"):
+            if len(shown_groups) != 1:
+                if had_results:
+                    print("Statistical test: one-sample requires exactly 1 shown group with data.")
                 self.clear_formal_test_results()
                 return
 
@@ -582,13 +590,40 @@ class StatTestMixin:
             return
         print("\n=== Statistical test (v0.16) ===")
         effective_variant = "unpaired" if (test_type or variant) == "Cluster perm." else variant
+        n_unit = self.uistate.stat_test.buttonGroup_test_n
         print(f"variant={effective_variant}  tails={tails}  fdr={fdr}  norm={norm}")
-        print(
-            "Method: unpaired Welch t-test (equal_var=False) on unit-level means "
-            f"(n_unit={self.uistate.stat_test.buttonGroup_test_n}); "
-            "each unit value = mean of the aspect over test-set sweeps. "
-            "Markers use q if FDR is on, else p. * p/q<0.05."
-        )
+        if test_type == "Wilcoxon":
+            if effective_variant == "one-sample":
+                method = (
+                    "Method: one-sample Wilcoxon signed-rank on unit-level means vs reference "
+                    f"(n_unit={n_unit}); each unit value = mean of the aspect over test-set sweeps."
+                )
+            else:
+                method = (
+                    "Method: paired Wilcoxon signed-rank on unit-key complete pairs "
+                    f"(n_unit={n_unit}); incomplete pairs excluded; n = n_pairs."
+                )
+            method += " Markers use q if FDR is on, else p. * p/q<0.05."
+            print(method)
+        elif test_type == "t-test" and effective_variant == "paired":
+            print(
+                "Method: paired Student's t-test on unit-key complete pairs "
+                f"(n_unit={n_unit}); incomplete pairs excluded; n = n_pairs. "
+                "Markers use q if FDR is on, else p. * p/q<0.05."
+            )
+        elif test_type == "t-test" and effective_variant == "one-sample":
+            print(
+                "Method: one-sample Student's t-test on unit-level means vs reference "
+                f"(n_unit={n_unit}); each unit value = mean of the aspect over test-set sweeps. "
+                "Markers use q if FDR is on, else p. * p/q<0.05."
+            )
+        else:
+            print(
+                "Method: unpaired Welch t-test (equal_var=False) on unit-level means "
+                f"(n_unit={n_unit}); "
+                "each unit value = mean of the aspect over test-set sweeps. "
+                "Markers use q if FDR is on, else p. * p/q<0.05."
+            )
         # Assumption lines (SW / Levene) when present on any result
         for r in results:
             if not isinstance(r, dict):
@@ -686,14 +721,28 @@ class StatTestMixin:
             if test_type == "Wilcoxon" and hasattr(self, "lineEdit_wilcoxon_one_sample_value"):
                 val = self.uistate.stat_test.label_test_wilcox_one_sample_value
                 self.lineEdit_wilcoxon_one_sample_value.setText(str(val))
+        self._update_one_sample_ref_visibility()
         self.uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.uistate.stat_test.formal_test_results = None
         self.update_test()
+
+    def _update_one_sample_ref_visibility(self) -> None:
+        """Show one-sample reference value only when that variant is active."""
+        st = self.uistate.stat_test
+        show_t = st.test_type == "t-test" and st.test_t_variant == "one-sample"
+        show_w = st.test_type == "Wilcoxon" and st.test_wilcox_variant == "one-sample"
+        for name in ("label_test_t_one_sample_value", "lineEdit_test_t_one_sample_value"):
+            if hasattr(self, name):
+                getattr(self, name).setVisible(show_t)
+        for name in ("label_test_wilcoxon_one_sample_value", "lineEdit_wilcoxon_one_sample_value"):
+            if hasattr(self, name):
+                getattr(self, name).setVisible(show_w)
 
     def test_t_variant_changed(self, button):
         variant = self._RADIO_TO_TEST_T_VARIANT.get(button.objectName(), button.text()) if hasattr(self, "_RADIO_TO_TEST_T_VARIANT") else button.text()
         print(f"Selected t-test variant: {variant}")
         self.uistate.stat_test.test_t_variant = variant
+        self._update_one_sample_ref_visibility()
         self.uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.update_test()
 
@@ -708,6 +757,7 @@ class StatTestMixin:
         variant = self._RADIO_TO_TEST_WILCOX_VARIANT.get(button.objectName(), button.text()) if hasattr(self, "_RADIO_TO_TEST_WILCOX_VARIANT") else button.text()
         print(f"Selected Wilcoxon variant: {variant}")
         self.uistate.stat_test.test_wilcox_variant = variant
+        self._update_one_sample_ref_visibility()
         self.uistate.save_cfg(projectfolder=self.dict_folders.get("project", None))
         self.update_test()
 

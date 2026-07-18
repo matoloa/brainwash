@@ -939,12 +939,11 @@ def _figure_text_test_prose(test_type: str, variant: str, tails: str, fdr: bool)
             core += " with Benjamini–Hochberg FDR correction"
         return core[0].upper() + core[1:]
     if test_type == "Wilcoxon":
-        if variant == "paired":
-            core = "paired two-sided Wilcoxon signed-rank test"
-        elif variant == "one-sample":
+        # UI/engine ship signed-rank only (paired or one-sample); no rank-sum.
+        if variant == "one-sample":
             core = "one-sample two-sided Wilcoxon signed-rank test"
         else:
-            core = "unpaired two-sided Wilcoxon rank-sum test"
+            core = "paired two-sided Wilcoxon signed-rank test"
         if tails != "two-sided":
             core = core.replace("two-sided", tails)
         if fdr:

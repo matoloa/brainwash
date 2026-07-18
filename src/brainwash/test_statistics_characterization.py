@@ -255,6 +255,85 @@ def test_io_ancova_ignores_shown_test_sets():
     assert out["results"][0].get("set_id") == "__io_ancova__"
 
 
+def test_wilcoxon_paired_returns_results_and_n_pairs():
+    g1_vals = [("r1", "s1", 1.0), ("r2", "s2", 1.2), ("r3", "s3", 1.1)]
+    out = compute_statistical_comparison(
+        groups=["G1"],
+        dd_groups=make_dd_groups("G1"),
+        dd_testsets=make_dd_testsets("TS1", "TS2"),
+        get_group_testset_means_fn=make_scalar_accessor({"G1": g1_vals}),
+        test_type="Wilcoxon",
+        variant="paired",
+        amp=True,
+        slope=False,
+        n_unit="subject",
+    )
+    assert "error" not in out, out
+    assert len(out.get("results") or []) == 1
+    res = out["results"][0]
+    assert res.get("n_pairs") == 3
+    assert res.get("n_dropped", 0) == 0
+    assert "p_amp" in res
+    assert "sweeps2" in res
+    assert out.get("config", {}).get("variant") == "paired"
+
+
+def test_wilcoxon_one_sample_rejects_two_groups():
+    g1 = [("r1", "s1", 1.0), ("r2", "s2", 1.2)]
+    g2 = [("r3", "s3", 2.0), ("r4", "s4", 2.1)]
+    out = compute_statistical_comparison(
+        groups=["G1", "G2"],
+        dd_groups=make_dd_groups("G1", "G2"),
+        dd_testsets=make_dd_testsets("TS1"),
+        get_group_testset_means_fn=make_scalar_accessor({"G1": g1, "G2": g2}),
+        test_type="Wilcoxon",
+        variant="one-sample",
+        amp=True,
+        slope=False,
+        n_unit="subject",
+        ref=0.0,
+    )
+    assert "error" in out
+    assert "one-sample Wilcoxon" in out["error"]
+    assert "t-test" not in out["error"]
+
+
+def test_wilcoxon_one_sample_ok_one_group():
+    g1 = [("r1", "s1", 1.0), ("r2", "s2", 1.2), ("r3", "s3", 1.1)]
+    out = compute_statistical_comparison(
+        groups=["G1"],
+        dd_groups=make_dd_groups("G1"),
+        dd_testsets=make_dd_testsets("TS1"),
+        get_group_testset_means_fn=make_scalar_accessor({"G1": g1}),
+        test_type="Wilcoxon",
+        variant="one-sample",
+        amp=True,
+        slope=False,
+        n_unit="subject",
+        ref=0.0,
+    )
+    assert "error" not in out, out
+    assert out.get("results")
+    assert "p_amp" in out["results"][0]
+
+
+def test_wilcoxon_paired_multi_group_error_says_wilcoxon():
+    g1 = [("r1", "s1", 1.0), ("r2", "s2", 1.1)]
+    g2 = [("r3", "s3", 2.0), ("r4", "s4", 2.1)]
+    out = compute_statistical_comparison(
+        groups=["G1", "G2"],
+        dd_groups=make_dd_groups("G1", "G2"),
+        dd_testsets=make_dd_testsets("TS1", "TS2"),
+        get_group_testset_means_fn=make_scalar_accessor({"G1": g1, "G2": g2}),
+        test_type="Wilcoxon",
+        variant="paired",
+        amp=True,
+        slope=False,
+        n_unit="subject",
+    )
+    assert out.get("error") == "paired Wilcoxon requires exactly 1 group"
+
+
 def test_anova_multi_group_ignores_leftover_paired_variant():
     """t-test 'paired' radio must not blank multi-group one-way ANOVA."""
     g1 = [("r1", "s1", 1.0), ("r2", "s2", 1.1), ("r3", "s3", 1.05)]
