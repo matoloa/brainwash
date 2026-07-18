@@ -29,6 +29,11 @@ def timepoints_parquet_path(timepoints_folder: str, recording_name: str) -> str:
     return f"{timepoints_folder}/{recording_name}.parquet"
 
 
+def stim_intensity_csv_path(stim_intensity_folder: str, recording_name: str) -> str:
+    """Per-recording user-owned stim strength CSV (µA)."""
+    return f"{stim_intensity_folder}/{recording_name}.csv"
+
+
 def data_parquet_path(data_folder: str, recording_name: str) -> str:
     return f"{data_folder}/{recording_name}.parquet"
 

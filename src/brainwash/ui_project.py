@@ -493,6 +493,8 @@ class ProjectMixin:
             os.makedirs(self.dict_folders["cache"])
         if not os.path.exists(self.dict_folders["timepoints"]):
             os.makedirs(self.dict_folders["timepoints"])
+        if not os.path.exists(self.dict_folders["stim_intensity"]):
+            os.makedirs(self.dict_folders["stim_intensity"])
 
     def setupToolBar(self):
         # apply viewstates for tool frames in the toolbar
@@ -515,6 +517,7 @@ class ProjectMixin:
             "project": self.projects_folder / self.projectname,  # path to project folder
             "data": self.projects_folder / self.projectname / "data",  # path to project data subfolder
             "timepoints": self.projects_folder / self.projectname / "timepoints",  # path to project timepoints subfolder
+            "stim_intensity": self.projects_folder / self.projectname / "stim_intensity",  # user-owned stim µA CSVs
             "cache": self.projects_folder / f"cache {self.config.version}" / self.projectname,  # path to project cache subfolder
         }
         return dict_folders
@@ -1148,6 +1151,7 @@ class ProjectMixin:
         for folder_name, file_suffix in [
             ("data", ".parquet"),
             ("timepoints", ".parquet"),
+            ("stim_intensity", ".csv"),
             ("cache", "_mean.parquet"),
             ("cache", "_filter.parquet"),
             ("cache", "_bin.parquet"),
