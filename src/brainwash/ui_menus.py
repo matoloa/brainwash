@@ -162,6 +162,17 @@ class MenuMixin:
         self.actionClearTestSets.triggered.connect(self.triggerClearTestSets)
         self.menuData.addAction(self.actionClearTestSets)
 
+        # Global talkback toggle last (bw_cfg; default off)
+        self.menuData.addSeparator()
+        self.actionTalkback = QtWidgets.QAction("Log usage (Talkback)")
+        self.actionTalkback.setCheckable(True)
+        self.actionTalkback.setChecked(bool(getattr(self.config, "talkback", False)))
+        self.actionTalkback.setToolTip(
+            "When on, write interaction counts and optional aspect-edit snippets under projects/talkback/."
+        )
+        self.actionTalkback.triggered.connect(self.triggerTalkback)
+        self.menuData.addAction(self.actionTalkback)
+
         # Group menu — clear-all only; digit keys 1–9 create/assign (setup_group_digit_shortcuts)
         self.actionClearAllGroups = QtWidgets.QAction("Clear all groups")
         self.actionClearAllGroups.triggered.connect(self.triggerClearAllGroups)

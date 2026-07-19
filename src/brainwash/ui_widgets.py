@@ -109,7 +109,8 @@ class Config:
         self.transient = False  # Block persisting of files
 
         self.verbose = self.dev_mode  # Now tied to --debug
-        self.talkback = not self.dev_mode
+        # Global; toggled from Data menu; default off (persisted in bw_cfg.yaml).
+        self.talkback = False
         self.hide_experimental = not self.dev_mode
         self.track_widget_focus = False
         self.terminal_space = 372 if self.dev_mode else 100  # pixels reserved for viewing prints

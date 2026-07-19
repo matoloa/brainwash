@@ -143,7 +143,8 @@ class ProjectMixin:
         # Load test set data (integer set_ID based, defaults "set 1", "set 2", ...; persisted in test_sets.pkl)
         self.dd_testsets = self.testset_get_dd()
         self.dd_group_samples = {}  # phase 3.3: group_ID -> {test_ID: df}; populated lazily via get_ddgroup_sample()
-        if self.config.talkback:
+        # Talkback optional (#7): usage.yaml + slice dumps under projects_folder/talkback/
+        if getattr(self.config, "talkback", False) and hasattr(self, "setupTalkback"):
             self.setupTalkback()
         # Set up canvases and graphs
         self.groupControlsRefresh()  # add group controls to UI
@@ -156,6 +157,8 @@ class ProjectMixin:
         self.setupToolBar()
         self._sync_blinded_toolframe()
         self._sync_blind_menu_action()
+        if hasattr(self, "_sync_talkback_menu_action"):
+            self._sync_talkback_menu_action()
         if hasattr(self, "tableUpdate"):
             self.tableUpdate(restore_selection=False)
         # set focus to TableProj, so that arrows work immediately
@@ -178,8 +181,9 @@ class ProjectMixin:
         self.uistate.darkmode = True
         self.uistate.project.showTimetable = False
         self.uistate.plot.showHeatmap = False
-        # Global preference (bw_cfg.yaml only; not per-project cfg.pkl)
+        # Global preferences (bw_cfg.yaml only; not per-project cfg.pkl)
         self.always_blind_new_projects = False
+        self.config.talkback = False
 
         # Load config if present
         if self.config.bw_cfg_yaml is not None:
@@ -196,6 +200,7 @@ class ProjectMixin:
                     self.uistate.project.showTimetable = cfg.get("showTimetable", False)
                     self.uistate.plot.showHeatmap = cfg.get("showHeatmap", False)
                     self.always_blind_new_projects = bool(cfg.get("always_blind_new_projects", False))
+                    self.config.talkback = bool(cfg.get("talkback", False))
         else:
             self.bw_cfg_yaml = None  # Make sure it's defined for consistency
 
@@ -213,6 +218,7 @@ class ProjectMixin:
             "showTimetable": self.uistate.project.showTimetable,
             "showHeatmap": self.uistate.plot.showHeatmap,
             "always_blind_new_projects": bool(getattr(self, "always_blind_new_projects", False)),
+            "talkback": bool(getattr(self.config, "talkback", False)),
         }
         path = Path(self.bw_cfg_yaml)  # ensure Path
         path.parent.mkdir(parents=True, exist_ok=True)  # critical for XDG/portable
@@ -620,7 +626,7 @@ class ProjectMixin:
     # ------------------------------------------------------------------
 
     def _update_window_title(self):
-        """Window title: Brainwash {version} - {project}[ - BLINDED]."""
+        """Window title: Brainwash {version} - {project}[ - BLINDED][ - Talkback online]."""
         if not hasattr(self, "mainwindow") or self.mainwindow is None:
             return
         version = getattr(self.config, "version", "")
@@ -628,6 +634,8 @@ class ProjectMixin:
         title = f"Brainwash {version} - {name}"
         if getattr(self.uistate.project, "blind_recordings", False):
             title += " - BLINDED"
+        if getattr(self.config, "talkback", False):
+            title += " - Talkback online"
         self.mainwindow.setWindowTitle(title)
 
     def _ensure_blind_aliases(self, *, force_new: bool = False):
@@ -759,12 +767,34 @@ class ProjectMixin:
         action.setVisible(not bool(getattr(self.uistate.project, "blind_recordings", False)))
         action.setEnabled(True)
 
+    def _sync_talkback_menu_action(self):
+        action = getattr(self, "actionTalkback", None)
+        if action is None:
+            return
+        action.setChecked(bool(getattr(self.config, "talkback", False)))
+
+    def triggerTalkback(self, checked=False):
+        """Data menu: global talkback on/off → bw_cfg.yaml + window title."""
+        self.config.talkback = bool(checked)
+        if hasattr(self, "actionTalkback"):
+            self.actionTalkback.setChecked(self.config.talkback)
+        self.write_bw_cfg()
+        if self.config.talkback and hasattr(self, "setupTalkback"):
+            self.setupTalkback()
+        if hasattr(self, "_update_window_title"):
+            self._update_window_title()
+        # Log the toggle only when enabling (usage() no-ops when talkback is off)
+        if hasattr(self, "usage"):
+            self.usage(f"triggerTalkback → {self.config.talkback}")
+
     def triggerAlwaysBlindNewProjects(self, checked=False):
         """Data menu checkbox → global bw_cfg.yaml; applied only on New project."""
         self.always_blind_new_projects = bool(checked)
         if hasattr(self, "actionAlwaysBlindNewProjects"):
             self.actionAlwaysBlindNewProjects.setChecked(self.always_blind_new_projects)
         self.write_bw_cfg()
+        if hasattr(self, "usage"):
+            self.usage(f"triggerAlwaysBlindNewProjects → {self.always_blind_new_projects}")
 
     def triggerBlindRecordings(self):
         """Data → Blind recordings: new random aliases, deselect, sort by display name."""
@@ -780,6 +810,8 @@ class ProjectMixin:
             self._save_cfg_now()
         elif hasattr(self, "dict_folders"):
             self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
+        if hasattr(self, "usage"):
+            self.usage("triggerBlindRecordings")
 
     def triggerUnblindRecordings(self):
         """Blinded toolframe × only: restore real names; destroy placeholders."""
@@ -794,6 +826,8 @@ class ProjectMixin:
             self._save_cfg_now()
         elif hasattr(self, "dict_folders"):
             self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
+        if hasattr(self, "usage"):
+            self.usage("triggerUnblindRecordings")
 
     def _apply_blind_ui_state(self, *, skip_label_rewrite: bool = False, restore_selection: bool = True):
         """Title, strip, table DisplayRole, legend stems, menu label, graph refresh."""

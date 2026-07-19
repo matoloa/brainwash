@@ -538,7 +538,7 @@ class UIsub(
             "t_volley_slope_end",  # 't_volley_slope_method', 't_volley_slope_params'
         ]
         dict_event = {key: trow[key] for key in keys}
-        print(f"talkback dict_event: {dict_event}")
+        logger.debug("talkback dict_event: %s", dict_event)
         # store dict_event as .csv named after recording_name
         path_talkback = Path(f"{self.projects_folder}/talkback/talkback_meta_{prow['ID']}_stim.csv")
         with open(path_talkback, "w") as f:
@@ -970,26 +970,31 @@ class UIsub(
             self.testset_controls_add(set_ID)
         self.update_anova_label()  # sync label after test set UI refresh
 
-    def usage(self, ui_component):  # Talkback function
+    def usage(self, ui_component):  # Talkback: count + persist; no terminal / statusbar noise
         logger.debug("usage: %s", ui_component)
-        print(f"usage: {ui_component}")
-        if not self.config.talkback:
+        if not getattr(self.config, "talkback", False):
             return
-        if ui_component not in self.dict_usage.keys():
-            self.dict_usage[ui_component] = 0
-        self.dict_usage[ui_component] += 1
-        if self.config.talkback and ui_component in self.dict_usage:
-            # Do not clobber warning / attention chrome
-            if self.uistate.stat_test.statusbar_state not in ("warning", "attention"):
-                # Show as centered text using the current default (theme/darkmode) color
-                self._set_statusbar_appearance(text=f"Used {ui_component} {self.dict_usage[ui_component]} times", bold=False)
+        if not hasattr(self, "dict_usage") or not isinstance(getattr(self, "dict_usage", None), dict):
+            self.dict_usage = {}
+        key = str(ui_component)
+        # Skip non-counter metadata keys if someone passes them by mistake
+        if key in ("WARNING", "alias", "ID", "os", "ID_created") or key.startswith("last_used_"):
+            return
+        try:
+            self.dict_usage[key] = int(self.dict_usage.get(key) or 0) + 1
+        except (TypeError, ValueError):
+            self.dict_usage[key] = 1
         self.write_usage()
 
     def write_usage(self):
-        path_usage = Path(f"{self.projects_folder}/talkback/usage.yaml")
-        if not path_usage.parent.exists():
-            path_usage.parent.mkdir(parents=True, exist_ok=True)
-        # make sure 'WARNING' and 'alias' are printed first
+        folder = getattr(self, "projects_folder", None)
+        if folder is None:
+            return
+        if not hasattr(self, "dict_usage") or not isinstance(self.dict_usage, dict):
+            return
+        path_usage = Path(folder) / "talkback" / "usage.yaml"
+        path_usage.parent.mkdir(parents=True, exist_ok=True)
+        # make sure 'WARNING' and 'alias' are written first
         top_keys = ["WARNING", "alias"]
         dict_bottom = self.dict_usage.copy()
         top_data = {key: dict_bottom.pop(key, None) for key in top_keys}
@@ -1015,19 +1020,23 @@ class UIsub(
     # uisub init refactoring (bootstrap and loadProject live in ProjectMixin)
 
     def setupTalkback(self):
-        path_usage = Path(f"{self.projects_folder}/talkback/usage.yaml")
+        """Load or create talkback/usage.yaml under the projects folder."""
+        path_usage = Path(self.projects_folder) / "talkback" / "usage.yaml"
+        path_usage.parent.mkdir(parents=True, exist_ok=True)
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if path_usage.exists():
             with path_usage.open("r") as file:
-                self.dict_usage = yaml.safe_load(file)
+                loaded = yaml.safe_load(file) or {}
+            if not isinstance(loaded, dict):
+                loaded = {}
+            self.dict_usage = loaded
             self.dict_usage[f"last_used_{self.config.version}"] = now
         else:
-            os_name = sys.platform
             self.dict_usage = {
                 "WARNING": "Do NOT set your alias to anything that can be used to identify you!",
                 "alias": "",
                 "ID": str(uuid.uuid4()),
-                "os": os_name,
+                "os": sys.platform,
                 "ID_created": now,
                 f"last_used_{self.config.version}": now,
             }
@@ -1039,7 +1048,9 @@ class UIsub(
     def groupCheckboxChanged(self, state, group_ID):
         logger.debug("groupCheckboxChanged: %s = %s", group_ID, state)
         print(f"groupCheckboxChanged: {str(group_ID)} = {state}")
-        self.dd_groups[group_ID]["show"] = state == 2
+        shown = state == 2
+        self.dd_groups[group_ID]["show"] = shown
+        self.usage(f"groupCheckboxChanged group_{group_ID} → {'show' if shown else 'hide'}")
         self.group_save_dd()
         self.refresh_samples()
         self.update_stim_buttons()

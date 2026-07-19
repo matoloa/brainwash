@@ -114,6 +114,8 @@ class GroupMixin:
             "sample": None,
         }
         print(f"group_ensure: created group {group_ID}")
+        if hasattr(self, "usage"):
+            self.usage(f"group_ensure created group_{group_ID}")
         self.group_save_dd()
         self.ensure_groups_list_header()
         self.group_controls_add(group_ID)
@@ -139,6 +141,8 @@ class GroupMixin:
         """Digit-key path: ensure group exists, then toggle-assign selection."""
         if not self.group_ensure(group_ID):
             return
+        if hasattr(self, "usage"):
+            self.usage(f"group_digit_assign → group_{int(group_ID)}")
         self.group_selection(group_ID)
 
     def group_remove_last_empty(self):
@@ -245,6 +249,8 @@ class GroupMixin:
         self.ensure_testsets_list_header()
         self.testset_controls_add(set_ID)
         print(f"Created test set {set_ID} with {len(selected_sweeps)} sweeps: {selected_sweeps}")
+        if hasattr(self, "usage"):
+            self.usage(f"testset_new set_{set_ID} n_sweeps={len(selected_sweeps)}")
         self.refresh_samples()  # ensure sample data for new test set
         # Changing test sets requires fresh statistical markers (invalidate cached results so graph safeguard does not redraw stale)
         if hasattr(self, "clear_formal_test_results"):
@@ -261,10 +267,14 @@ class GroupMixin:
         if set_ID is None:
             self.dd_testsets = {}
             self.testset_controls_remove()
+            if hasattr(self, "usage"):
+                self.usage("testset_remove all")
         else:
             if set_ID in self.dd_testsets:
                 del self.dd_testsets[set_ID]
             self.testset_controls_remove(set_ID)
+            if hasattr(self, "usage"):
+                self.usage(f"testset_remove set_{set_ID}")
         self.testset_save_dd()
         self.refresh_samples()  # testset CRUD must keep samples in sync
         # Test set removal requires fresh markers for remaining sets
@@ -280,6 +290,8 @@ class GroupMixin:
             self.dd_testsets[set_ID]["set_name"] = new_set_name
             self.testset_save_dd()
             self.testsetControlsRefresh()
+            if hasattr(self, "usage"):
+                self.usage(f"testset_rename set_{set_ID}")
             self.graphRefresh()
             # graphRefresh (default) re-evaluates test via update_test() (refreshes table with updated name)
         else:
@@ -455,9 +467,13 @@ class GroupMixin:
         if all_in_group:
             for rec_ID in selected_rec_IDs:
                 self.group_rec_ungroup(rec_ID, group_ID)
+            action = "ungroup"
         else:
             for rec_ID in selected_rec_IDs:
                 self.group_rec_assign(rec_ID, group_ID)
+            action = "assign"
+        if hasattr(self, "usage"):
+            self.usage(f"group_selection {action} group_{group_ID} n={len(selected_rec_IDs)}")
 
         # Persist groups + refresh table without intermediate last-row selection restore.
         self.uistate.plot.list_idx_select_recs = list(selected_indices)
