@@ -91,7 +91,41 @@ class GroupMixin:
     # Create / remove
     # ------------------------------------------------------------------
 
+    def group_ensure(self, group_ID: int) -> bool:
+        """Create group *group_ID* (1–9) if missing. Returns True if group exists afterward."""
+        try:
+            group_ID = int(group_ID)
+        except (TypeError, ValueError):
+            return False
+        if group_ID < 1 or group_ID > 9:
+            print(f"group_ensure: invalid group_ID {group_ID} (allowed 1–9).")
+            return False
+        if group_ID in self.dd_groups:
+            return True
+        if len(self.dd_groups) > 8:
+            print("Maximum of 9 groups allowed for now.")
+            return False
+        colors = self.uistate.project.colors
+        color = colors[(group_ID - 1) % len(colors)] if colors else "#808080"
+        self.dd_groups[group_ID] = {
+            "group_name": f"group {group_ID}",
+            "color": color,
+            "show": True,
+            "rec_IDs": [],
+            "sample": None,
+        }
+        print(f"group_ensure: created group {group_ID}")
+        self.group_save_dd()
+        self.ensure_groups_list_header()
+        self.group_controls_add(group_ID)
+        if hasattr(self, "turn_heatmap_off"):
+            self.turn_heatmap_off()
+        if hasattr(self, "apply_statistical_test_if_active"):
+            self.apply_statistical_test_if_active()
+        return True
+
     def group_new(self):
+        """Create the next free group ID (legacy; digit keys use group_ensure)."""
         print(f"Adding new group to dd_groups: {self.dd_groups}")
         if len(self.dd_groups) > 8:  # TODO: hardcoded max nr of groups: move to bw cfg
             print("Maximum of 9 groups allowed for now.")
@@ -100,19 +134,13 @@ class GroupMixin:
         if self.dd_groups:
             while group_ID in self.dd_groups.keys():
                 group_ID += 1
-        self.dd_groups[group_ID] = {
-            "group_name": f"group {group_ID}",
-            "color": self.uistate.project.colors[group_ID - 1],
-            "show": "True",
-            "rec_IDs": [],
-            "sample": None,
-        }
-        self.group_save_dd()
-        self.group_controls_add(group_ID)
-        if hasattr(self, "turn_heatmap_off"):
-            self.turn_heatmap_off()
-        if hasattr(self, "apply_statistical_test_if_active"):
-            self.apply_statistical_test_if_active()
+        self.group_ensure(group_ID)
+
+    def group_digit_assign(self, group_ID: int):
+        """Digit-key path: ensure group exists, then toggle-assign selection."""
+        if not self.group_ensure(group_ID):
+            return
+        self.group_selection(group_ID)
 
     def group_remove_last_empty(self):
         if not self.dd_groups:
@@ -147,14 +175,47 @@ class GroupMixin:
             self.apply_statistical_test_if_active()
 
     def group_rename(self, group_ID, new_group_name):
+        if not new_group_name:
+            return
         if new_group_name in [group["group_name"] for group in self.dd_groups.values()]:
             print(f"Group name {new_group_name} already exists.")
         elif re.match(r"^[a-zA-Z0-9_ -]+$", str(new_group_name)) is not None:  # True if valid filename
             self.dd_groups[group_ID]["group_name"] = new_group_name
-            self.group_save_dd()
+            self.group_save_dd()  # syncs df_project["groups"] column via group_update_dfp
             self.groupControlsRefresh()
+            # Legend / artist keys bake in group_name at addGroup time; graphRefresh
+            # does not re-plot groups already in dict_group_labels — rebuild this group.
+            self._replot_group_after_rename(group_ID)
+            if hasattr(self, "clear_formal_test_results"):
+                self.clear_formal_test_results()
+            if hasattr(self, "apply_statistical_test_if_active"):
+                self.apply_statistical_test_if_active()
+            if hasattr(self, "update_show"):
+                self.update_show()
+            if hasattr(self, "graphRefresh"):
+                self.graphRefresh()
+            if hasattr(self, "mouseoverUpdate"):
+                self.mouseoverUpdate()
         else:
             print(f"Group name {new_group_name} is not a valid name.")
+
+    def _replot_group_after_rename(self, group_ID):
+        """Drop and re-add plot artists so output legend uses the new group name."""
+        if not hasattr(self, "uiplot") or group_ID not in self.dd_groups:
+            return
+        dict_group = self.dd_groups[group_ID]
+        self.uiplot.unPlotGroup(group_ID)  # all levels; keys contain old name
+        if not dict_group.get("rec_IDs"):
+            return
+        level = self.uistate.stat_test.buttonGroup_test_n
+        if not hasattr(self, "get_dfgroupmean"):
+            return
+        df_groupmean = self.get_dfgroupmean(group_ID, level=level)
+        if df_groupmean is None or getattr(df_groupmean, "empty", False):
+            return
+        x_pos = plot_series.pp_group_x_position(self.dd_groups, group_ID)
+        ydf = self.V2mV(df_groupmean) if hasattr(self, "V2mV") else df_groupmean
+        self.uiplot.addGroup(group_ID, dict_group, ydf, x_pos=x_pos, level=level)
 
     # ------------------------------------------------------------------
     # Test Set Create / remove / rename (modeled exactly on groups but using set_ID and default names 'set N')
@@ -369,6 +430,9 @@ class GroupMixin:
 
         Conserves multi-selection across table model resets (setData / unsort).
         """
+        if group_ID not in self.dd_groups:
+            if not self.group_ensure(group_ID):
+                return
         # Prefer live Qt selection; fall back to uistate (e.g. keyboard shortcut via menu).
         selected_indices: list[int] = []
         if hasattr(self, "tableProj") and self.tableProj.selectionModel() is not None:
@@ -384,7 +448,9 @@ class GroupMixin:
             print("No recordings selected.")
             return
 
-        all_in_group = all(rec_ID in self.dd_groups[group_ID]["rec_IDs"] for rec_ID in selected_rec_IDs)
+        # Membership lists may mix str/int IDs — compare as str
+        member_ids = {str(r) for r in self.dd_groups[group_ID]["rec_IDs"]}
+        all_in_group = all(str(rec_ID) in member_ids for rec_ID in selected_rec_IDs)
         if all_in_group:
             for rec_ID in selected_rec_IDs:
                 self.group_rec_ungroup(rec_ID, group_ID)
@@ -567,38 +633,67 @@ class GroupMixin:
     # Qt widget controls
     # ------------------------------------------------------------------
 
-    def group_controls_add(self, group_ID):  # Create menu for adding to group and checkbox for showing group
+    def ensure_groups_list_header(self):
+        """Bold 'Groups' header above the group checkbox list (once)."""
+        existing = getattr(self, "_groups_list_header", None)
+        if existing is not None:
+            return
+        if hasattr(self, "centralwidget"):
+            found = self.centralwidget.findChild(QtWidgets.QLabel, "label_groups_header")
+            if found is not None:
+                self._groups_list_header = found
+                return
+        lbl = QtWidgets.QLabel("Groups")
+        lbl.setObjectName("label_groups_header")
+        font = lbl.font()
+        font.setBold(True)
+        lbl.setFont(font)
+        self.verticalLayoutGroups.insertWidget(0, lbl)
+        self._groups_list_header = lbl
+
+    def setup_group_digit_shortcuts(self):
+        """Permanent digit 1–9 actions: ensure group N exists, then assign selection.
+
+        Shortcuts are WindowShortcut; SelectionMixin / event filter still block
+        digits while focus is in text-entry widgets (stim µA, etc.).
+        """
+        if getattr(self, "_group_digit_shortcuts_ready", False):
+            return
+        for n in range(1, 10):
+            action = QtWidgets.QAction(f"Assign selection to group {n}")
+            action.setObjectName(f"actionGroupDigit_{n}")
+            action.setShortcut(f"{n}")
+            action.setShortcutContext(QtCore.Qt.WindowShortcut)
+            action.triggered.connect(lambda checked=False, gid=n: self.group_digit_assign(gid))
+            self.menuGroups.addAction(action)
+            setattr(self, f"actionGroupDigit_{n}", action)
+        self._group_digit_shortcuts_ready = True
+
+    def group_controls_add(self, group_ID):  # Checkbox for showing group (digit shortcuts are global)
         group_name = self.dd_groups[group_ID]["group_name"]
-        # print(f"group_controls_add, group_ID: {group_ID}, type: {type(group_ID)} group_name: {group_name}")
         dict_group = self.dd_groups.get(group_ID)
         if not dict_group:
             print(f" - {group_ID} not found in self.dd_groups:")
             print(self.dd_groups)
             return
+        self.ensure_groups_list_header()
         color = dict_group["color"]
         str_ID = str(group_ID)
-        setattr(
-            self,
-            f"actionAddTo_{str_ID}",
-            QtWidgets.QAction(f"Add selection to {group_name}"),
-        )
-        self.new_group_menu_item = getattr(self, f"actionAddTo_{str_ID}")
-        self.new_group_menu_item.triggered.connect(lambda checked, add_group_ID=group_ID: self.group_selection(add_group_ID))
-        # Bare digits steal keystrokes from table/line editors (e.g. stim µA "20").
-        # Keep digit shortcuts but only when focus is not in a text-entry widget —
-        # see SelectionMixin.eventFilter / _text_entry_has_focus.
-        self.new_group_menu_item.setShortcut(f"{str_ID}")
-        self.new_group_menu_item.setShortcutContext(QtCore.Qt.WindowShortcut)
-        self.menuGroups.addAction(self.new_group_menu_item)
         self.new_checkbox = CustomCheckBox(group_ID)
         self.new_checkbox.rightClicked.connect(self.triggerGroupRename)  # str_ID is passed by CustomCheckBox
         self.new_checkbox.setObjectName(f"checkBox_group_{str_ID}")
         self.new_checkbox.setText(f"{str_ID}. {group_name}")
         self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the background color
         self.new_checkbox.setMaximumWidth(100)  # Set the maximum width
-        self.new_checkbox.setChecked(bool(dict_group["show"]))
+        show = dict_group.get("show", True)
+        if isinstance(show, str):
+            checked = show.strip().lower() in ("true", "1", "yes")
+        else:
+            checked = bool(show)
+        self.new_checkbox.setChecked(checked)
         self.new_checkbox.stateChanged.connect(lambda state, group_ID=group_ID: self.groupCheckboxChanged(state, group_ID))
         self.verticalLayoutGroups.addWidget(self.new_checkbox)
+        setattr(self, f"checkBox_group_{str_ID}", self.new_checkbox)
 
     def group_controls_remove(self, group_ID=None):
         if group_ID is None:  # if group_ID is not provided, remove all group controls
@@ -612,11 +707,12 @@ class GroupMixin:
             if widget:
                 print(f"Removing widget {widget_name}")
                 widget.deleteLater()
-            # else:
-            #     print(f"Widget {widget_name} not found.")
-            # get the action named actionAddTo_{group} and remove it
+            attr_name = f"checkBox_group_{str_ID}"
+            if hasattr(self, attr_name):
+                delattr(self, attr_name)
+            # Legacy per-group menu actions (pre–digit-global) if any remain
             action = getattr(self, f"actionAddTo_{str_ID}", None)
-            if action:
+            if action is not None:
                 self.menuGroups.removeAction(action)
                 delattr(self, f"actionAddTo_{str_ID}")
 

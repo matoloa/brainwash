@@ -23,7 +23,7 @@ Living priority map across milestones. **Execution** is on GitHub issues when a 
 | # | Title | Notes |
 |---|--------|--------|
 | [#10](https://github.com/matoloa/brainwash/issues/10) | Lean data + `_sweeptimes.parquet` | **Plan:** [`plan_data_sweeptimes_format.md`](plan_data_sweeptimes_format.md). Format floor. |
-| [#1](https://github.com/matoloa/brainwash/issues/1) | UI Groups overhaul | Digit create/assign, clear-all, header, name sync (incl. statusbar on rename) |
+| [#1](https://github.com/matoloa/brainwash/issues/1) | UI Groups overhaul | Digit create/assign, clear-all, header, name sync — **implemented on `1.0.0` (manual smoke pending)** |
 | [#2](https://github.com/matoloa/brainwash/issues/2) | Output line appearance UI | `output_line_style` |
 | [#3](https://github.com/matoloa/brainwash/issues/3) | Default aspect color palette | Volley green / EPSP blue |
 | [#4](https://github.com/matoloa/brainwash/issues/4) | UI Test Sets overhaul | After #1 |

@@ -913,8 +913,10 @@ class UIsub(
         self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
     def groupControlsRefresh(self):
+        self.ensure_groups_list_header()
+        self.setup_group_digit_shortcuts()
         self.group_controls_remove()
-        for group_ID in self.dd_groups.keys():
+        for group_ID in sorted(self.dd_groups.keys()):
             self.group_controls_add(group_ID)
 
     def testsetControlsRefresh(self):
@@ -1287,7 +1289,18 @@ class UIsub(
         self.usage("triggerRenameRecording")
         self.renameRecording()
 
+    def triggerClearAllGroups(self):
+        """Remove every group (menu: Clear all groups)."""
+        self.usage("triggerClearAllGroups")
+        self.group_controls_remove()
+        self.group_remove()  # all
+        self.tableUpdate(restore_selection=True)
+        self.mouseoverUpdate()
+        if hasattr(self, "graphRefresh"):
+            self.graphRefresh()
+
     def triggerClearGroups(self):
+        """Legacy: clear group membership for selection only (no longer in menu)."""
         self.usage("triggerClearGroups")
         if self.uistate.plot.list_idx_select_recs:
             self.clearGroupsByRow(self.uistate.plot.list_idx_select_recs)
@@ -1296,13 +1309,9 @@ class UIsub(
         else:
             print("No files selected.")
 
-    def triggerEditGroups(self):  # Open groups UI (not built)
-        self.usage("triggerEditGroups")
-        # Placeholder: For now, delete all buttons and groups
-        self.group_controls_remove()
-        self.group_remove()
-        self.tableUpdate(restore_selection=True)
-        self.mouseoverUpdate()
+    def triggerEditGroups(self):
+        """Alias for clear-all (older name)."""
+        self.triggerClearAllGroups()
 
     def triggerNewGroup(self):
         self.usage("triggerNewGroup")

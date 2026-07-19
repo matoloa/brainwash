@@ -157,29 +157,13 @@ class MenuMixin:
         self.actionClearTestSets.triggered.connect(self.triggerClearTestSets)
         self.menuData.addAction(self.actionClearTestSets)
 
-        # Group menu
-        self.actionNewGroup = QtWidgets.QAction("Add a group")
-        self.actionNewGroup.triggered.connect(self.triggerNewGroup)
-        self.actionNewGroup.setShortcut("+")
-        self.menuGroups.addAction(self.actionNewGroup)
-
-        self.actionRemoveEmptyGroup = QtWidgets.QAction("Remove last empty group")
-        self.actionRemoveEmptyGroup.triggered.connect(self.triggerRemoveLastEmptyGroup)
-        self.actionRemoveEmptyGroup.setShortcut("-")
-        self.menuGroups.addAction(self.actionRemoveEmptyGroup)
-
-        self.actionRemoveGroup = QtWidgets.QAction("Force remove last group")
-        self.actionRemoveGroup.triggered.connect(self.triggerRemoveLastGroup)
-        self.actionRemoveGroup.setShortcut("Ctrl+-")
-        self.menuGroups.addAction(self.actionRemoveGroup)
-
-        self.actionClearGroups = QtWidgets.QAction("Clear group(s) in selection")
-        self.actionClearGroups.triggered.connect(self.triggerClearGroups)
-        self.menuGroups.addAction(self.actionClearGroups)
-
-        self.actionResetGroups = QtWidgets.QAction("Remove all groups")
-        self.actionResetGroups.triggered.connect(self.triggerEditGroups)
-        self.menuGroups.addAction(self.actionResetGroups)
+        # Group menu — clear-all only; digit keys 1–9 create/assign (setup_group_digit_shortcuts)
+        self.actionClearAllGroups = QtWidgets.QAction("Clear all groups")
+        self.actionClearAllGroups.triggered.connect(self.triggerClearAllGroups)
+        self.menuGroups.addAction(self.actionClearAllGroups)
+        # Digit shortcuts (permanent; also re-asserted on groupControlsRefresh)
+        if hasattr(self, "setup_group_digit_shortcuts"):
+            self.setup_group_digit_shortcuts()
 
         # Export menu (triggers → ExportMixin in export_data.py)
         # — Copy section —
