@@ -177,10 +177,11 @@ Follow “one rename family per PR” spirit; each PR green on pytest.
 - `updateAmpMarker` / `updateLine` / `updateOutLine*` / `updateStimLines` / drag start / mean hover / mouseover zones use display_label or metadata  
 - Remaining: drag plans still emit display strings (OK via display_label bridge); full identity tokens optional cleanup  
 
-### PR-5 — Groups align (if not done in PR-3)
+### PR-5 — Groups align — **done**
 
-- Group keys already closer (`group_ID` + level); switch to same `storage_key_group` + display_label  
-- `export_image` PP string splits → metadata  
+- Group mean/norm, IO group, PP box/point use `storage_key_group` when `group_ID` set  
+- Display labels remain human names; legend already prefers `display_label`  
+- Export PP + `x_axis_xlim` / PPR extractors use role/metadata instead of name-split keys  
 
 ### PR-6 — Cleanup
 

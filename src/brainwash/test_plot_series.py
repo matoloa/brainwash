@@ -256,11 +256,17 @@ def test_build_io_group_plot_specs():
         variant="raw",
         level="recording",
         force_through_zero=True,
+        group_ID=1,
     )
     assert len(specs) == 2
     assert isinstance(specs[0], plot_series.IoGroupScatterPlotSpec)
     assert isinstance(specs[1], plot_series.IoGroupTrendlinePlotSpec)
-    assert specs[0].storage_key == "G1 raw IO scatter"
+    assert specs[0].storage_key.startswith("grp|1|")
+    assert specs[0].label == "G1 raw IO scatter"
+    legacy = plot_series.build_io_group_plot_specs(
+        "G1", x, y, y_col_base="EPSP_amp", variant="raw", level="recording", force_through_zero=True
+    )
+    assert legacy[0].storage_key == "G1 raw IO scatter"
 
 
 def test_build_pp_graph_refresh_xaxis_plan_group_bars():

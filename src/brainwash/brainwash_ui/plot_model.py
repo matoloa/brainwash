@@ -162,20 +162,49 @@ def build_group_line_specs(
     level: str,
     *,
     include_norm: bool,
+    group_ID=None,
+    axis: str = "ax1",
 ) -> list[GroupLineVariantSpec]:
+    """Build group mean/norm specs. Prefer opaque storage keys when group_ID is set."""
+    from brainwash_ui import plot_identity as pi
+
     mean_label, norm_label = group_line_display_labels(group_name, aspect)
+    if group_ID is not None:
+        raw_key = pi.storage_key_group(
+            group_ID=group_ID,
+            axis=axis,
+            role=pi.ROLE_GROUP_MEAN,
+            aspect=aspect,
+            variant="raw",
+            level=level,
+            x_mode="sweep",
+        )
+    else:
+        raw_key = level_storage_key(mean_label, level)
     specs = [
         GroupLineVariantSpec(
             display_label=mean_label,
-            storage_key=level_storage_key(mean_label, level),
+            storage_key=raw_key,
             variant="raw",
         )
     ]
     if include_norm:
+        if group_ID is not None:
+            norm_key = pi.storage_key_group(
+                group_ID=group_ID,
+                axis=axis,
+                role=pi.ROLE_GROUP_NORM,
+                aspect=aspect,
+                variant="norm",
+                level=level,
+                x_mode="sweep",
+            )
+        else:
+            norm_key = level_storage_key(norm_label, level)
         specs.append(
             GroupLineVariantSpec(
                 display_label=norm_label,
-                storage_key=level_storage_key(norm_label, level),
+                storage_key=norm_key,
                 variant="norm",
             )
         )

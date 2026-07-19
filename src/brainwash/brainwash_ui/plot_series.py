@@ -297,7 +297,10 @@ def extract_rec_ppr_means(dict_rec_labels: dict, rec_ids: list) -> dict:
         rec_id = linedict.get("rec_ID")
         if rec_id not in rec_id_set:
             continue
-        if "PPR" not in _key or linedict.get("variant") != "raw":
+        role = linedict.get("role")
+        disp = str(linedict.get("display_label") or _key)
+        is_ppr = role == "ppr" or "PPR" in disp
+        if not is_ppr or linedict.get("variant") != "raw":
             continue
         aspect = linedict.get("aspect")
         if not aspect:
@@ -544,9 +547,21 @@ def collect_io_group_scatter_xy(
     for key, linedict in dict_rec_labels.items():
         if linedict.get("x_mode") != "io" or linedict.get("rec_ID") not in rec_id_set:
             continue
-        if not key.endswith(suffix):
+        role = linedict.get("role")
+        disp = str(linedict.get("display_label") or key)
+        if role not in (None, "io_scatter") and not disp.endswith(suffix) and not str(key).endswith(suffix):
             continue
+        if role == "io_trend":
+            continue
+        if role is None and not (disp.endswith(suffix) or str(key).endswith(suffix)):
+            continue
+        if linedict.get("variant") not in (None, variant) and variant not in disp:
+            # Prefer matching variant when present
+            if linedict.get("variant") != variant:
+                continue
         scatter = linedict["line"]
+        if not hasattr(scatter, "get_offsets"):
+            continue
         offsets = scatter.get_offsets()
         if len(offsets) == 0:
             continue
@@ -588,13 +603,29 @@ def build_io_group_plot_specs(
     variant: str,
     level: str,
     force_through_zero: bool,
+    group_ID=None,
+    axis: str = "ax1",
 ) -> list[IoGroupScatterPlotSpec | IoGroupTrendlinePlotSpec]:
+    from brainwash_ui import plot_identity as pi
+
     specs: list[IoGroupScatterPlotSpec | IoGroupTrendlinePlotSpec] = []
     scatter_label = f"{group_name} {variant} IO scatter"
+    if group_ID is not None:
+        scatter_key = pi.storage_key_group(
+            group_ID=group_ID,
+            axis=axis,
+            role=pi.ROLE_IO_SCATTER,
+            aspect=y_col_base,
+            variant=variant,
+            level=level,
+            x_mode="io",
+        )
+    else:
+        scatter_key = plot_model.level_storage_key(scatter_label, level)
     specs.append(
         IoGroupScatterPlotSpec(
             label=scatter_label,
-            storage_key=plot_model.level_storage_key(scatter_label, level),
+            storage_key=scatter_key,
             variant=variant,
             aspect=y_col_base,
             level=level,
@@ -605,10 +636,22 @@ def build_io_group_plot_specs(
     reg = compute_io_regression(x_vals, y_vals, force_through_zero=force_through_zero)
     if reg is not None:
         trend_label = f"{group_name} {variant} IO trendline"
+        if group_ID is not None:
+            trend_key = pi.storage_key_group(
+                group_ID=group_ID,
+                axis=axis,
+                role=pi.ROLE_IO_TREND,
+                aspect=y_col_base,
+                variant=variant,
+                level=level,
+                x_mode="io",
+            )
+        else:
+            trend_key = plot_model.level_storage_key(trend_label, level)
         specs.append(
             IoGroupTrendlinePlotSpec(
                 label=trend_label,
-                storage_key=plot_model.level_storage_key(trend_label, level),
+                storage_key=trend_key,
                 variant=variant,
                 aspect=y_col_base,
                 level=level,

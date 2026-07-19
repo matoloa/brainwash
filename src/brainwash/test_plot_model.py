@@ -140,19 +140,27 @@ def test_build_test_marker_specs_paired_one_result_with_sweeps2():
 
 
 def test_build_group_line_specs_raw_only():
-    specs = plot_model.build_group_line_specs("Group A", "EPSP_amp", "slice", include_norm=False)
+    specs = plot_model.build_group_line_specs(
+        "Group A", "EPSP_amp", "slice", include_norm=False, group_ID=2, axis="ax1"
+    )
     assert len(specs) == 1
     assert specs[0].display_label == "Group A EPSP amp mean"
-    assert specs[0].storage_key == "Group A EPSP amp mean_slice"
+    assert specs[0].storage_key.startswith("grp|2|")
+    assert "Group A" not in specs[0].storage_key
     assert specs[0].variant == "raw"
+    # Legacy path without group_ID still uses display-based keys
+    legacy = plot_model.build_group_line_specs("Group A", "EPSP_amp", "slice", include_norm=False)
+    assert legacy[0].storage_key == "Group A EPSP amp mean_slice"
 
 
 def test_build_group_line_specs_with_norm():
-    specs = plot_model.build_group_line_specs("G1", "EPSP_slope", "recording", include_norm=True)
+    specs = plot_model.build_group_line_specs(
+        "G1", "EPSP_slope", "recording", include_norm=True, group_ID=1, axis="ax2"
+    )
     assert len(specs) == 2
     assert specs[0].variant == "raw"
     assert specs[1].display_label == "G1 EPSP slope norm"
-    assert specs[1].storage_key == "G1 EPSP slope norm"
+    assert specs[1].storage_key.startswith("grp|1|")
     assert specs[1].variant == "norm"
 
 

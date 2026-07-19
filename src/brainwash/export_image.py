@@ -581,8 +581,10 @@ def render_publication_figure(
                                 art.set_linewidth(lw)
                         continue
 
-                    # Unit scatter points
-                    if "point" in label and hasattr(line, "get_offsets"):
+                    # Unit scatter points (role or legacy display/key name)
+                    disp = str(info.get("display_label") or label)
+                    is_point = info.get("role") == "pp_point" or "point" in disp or "point" in str(label)
+                    if is_point and hasattr(line, "get_offsets"):
                         try:
                             off = line.get_offsets()
                             if len(off):
@@ -599,10 +601,23 @@ def render_publication_figure(
                             pass
                         continue
 
-                    # Legacy bar path
+                    # Legacy bar path — resolve companion bar by group_ID/aspect, not name-split key
                     shift = 0
-                    bar_label = f"{label.split(' PPR')[0]} PPR {info.get('aspect')} bar"
-                    bar_info = uistate.plot.dict_group_labels.get(bar_label)
+                    bar_info = None
+                    for _k, ent in (uistate.plot.dict_group_labels or {}).items():
+                        if not isinstance(ent, dict):
+                            continue
+                        if ent.get("group_ID") != info.get("group_ID"):
+                            continue
+                        if ent.get("aspect") != info.get("aspect"):
+                            continue
+                        if ent.get("is_pp_box") or ent.get("role") == "pp_box":
+                            bar_info = ent
+                            break
+                        bline = ent.get("line")
+                        if bline is not None and hasattr(bline, "patches") and len(bline.patches) > 0:
+                            bar_info = ent
+                            break
                     if bar_info and hasattr(bar_info.get("line"), "patches") and len(bar_info["line"].patches) > 0:
                         p = bar_info["line"].patches[0]
                         orig_base_x = p.get_x() + p.get_width() / 2

@@ -235,7 +235,14 @@ class UIstate:
         if self.experiment.experiment_type == "PP":
             box_xs: list[float] = []
             for key, val in self.plot.dict_group_show.items():
-                if "PPR" not in key or "point" in key:
+                role = val.get("role")
+                disp = str(val.get("display_label") or key)
+                # Boxes only (not unit points)
+                if role == "pp_point" or (role is None and "point" in disp):
+                    continue
+                if role not in ("pp_box", None) and "PPR" not in disp and not val.get("is_pp_box"):
+                    continue
+                if role is None and "PPR" not in disp and not val.get("is_pp_box"):
                     continue
                 if val.get("pp_box_x") is not None:
                     try:
@@ -256,7 +263,10 @@ class UIstate:
                     return xlim
             rec_x_positions = []
             for key, val in self.plot.dict_rec_show.items():
-                if "PPR" in key and "marker" not in key and val.get("line") and val["line"].get_visible():
+                role = val.get("role")
+                disp = str(val.get("display_label") or key)
+                is_ppr = role == "ppr" or ("PPR" in disp and "marker" not in disp)
+                if is_ppr and val.get("line") and val["line"].get_visible():
                     try:
                         rec_x_positions.extend(plot_drag.artist_xdata(val["line"]).tolist())
                     except Exception:

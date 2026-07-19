@@ -1393,6 +1393,8 @@ class UIplot:
             aspect,
             eff_level,
             include_norm=series.y_norm is not None,
+            group_ID=group_ID,
+            axis=axid,
         )
         raw_spec = line_specs[0]
         style_kw = self._output_line_style_kwargs()
@@ -1754,9 +1756,16 @@ class UIplot:
                 except Exception:
                     pass
             box_disp = f"{group_name} PPR {spec.aspect} box"
-            self.uistate.plot.dict_group_labels[
-                self._level_key(box_disp, level)
-            ] = {
+            box_key = plot_identity.storage_key_group(
+                group_ID=group_ID,
+                axis=spec.axid,
+                role=plot_identity.ROLE_PP_BOX,
+                aspect=spec.aspect,
+                variant="raw",
+                level=level,
+                x_mode="sweep",
+            )
+            self.uistate.plot.dict_group_labels[box_key] = {
                 **plot_model.pp_group_bar_label_entry(
                     group_ID=group_ID,
                     aspect=spec.aspect,
@@ -1781,9 +1790,17 @@ class UIplot:
         for scat_art, rid in scat_artists:
             self._hide_plot_artist(scat_art)
             pt_disp = f"{group_name} PPR {spec.aspect} {rid} point"
-            self.uistate.plot.dict_group_labels[
-                self._level_key(pt_disp, level)
-            ] = {
+            pt_key = plot_identity.storage_key_group(
+                group_ID=group_ID,
+                axis=spec.axid,
+                role=plot_identity.ROLE_PP_POINT,
+                aspect=spec.aspect,
+                variant="raw",
+                level=level,
+                x_mode="sweep",
+                unit_id=rid,
+            )
+            self.uistate.plot.dict_group_labels[pt_key] = {
                 **plot_model.pp_group_bar_label_entry(
                     group_ID=group_ID,
                     aspect=spec.aspect,
@@ -1929,6 +1946,8 @@ class UIplot:
                 variant=variant,
                 level=io_level,
                 force_through_zero=force0,
+                group_ID=group_ID,
+                axis="ax1",
             ):
                 self._render_io_group_plot_spec(spec, group_ID, color)
 
