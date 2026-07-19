@@ -405,18 +405,21 @@ class CustomCheckBox(QtWidgets.QCheckBox):
             super().mousePressEvent(event)
 
 
-class GroupRemoveButton(QtWidgets.QToolButton):
-    """Far-right × on a group row: double-click removes; hover drives red statusbar."""
+class EntityRemoveButton(QtWidgets.QToolButton):
+    """Far-right × on a group/test-set row: double-click removes; hover → attention statusbar."""
 
     removeRequested = QtCore.pyqtSignal(int)
-    hoverEntered = QtCore.pyqtSignal(int, str)  # group_ID, group_name
+    hoverEntered = QtCore.pyqtSignal(int, str)  # entity_ID, display_name
     hoverLeft = QtCore.pyqtSignal()
 
-    def __init__(self, group_ID: int, group_name: str, parent=None):
+    def __init__(self, entity_ID: int, entity_name: str, *, object_prefix: str = "entity_remove", parent=None):
         super().__init__(parent)
-        self.group_ID = int(group_ID)
-        self.group_name = str(group_name)
-        self.setObjectName(f"group_remove_{self.group_ID}")
+        self.entity_ID = int(entity_ID)
+        self.entity_name = str(entity_name)
+        # Back-compat aliases used by older group wiring
+        self.group_ID = self.entity_ID
+        self.group_name = self.entity_name
+        self.setObjectName(f"{object_prefix}_{self.entity_ID}")
         self.setText("×")
         self.setAutoRaise(True)
         self.setFocusPolicy(QtCore.Qt.NoFocus)
@@ -429,18 +432,22 @@ class GroupRemoveButton(QtWidgets.QToolButton):
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
-            self.removeRequested.emit(self.group_ID)
+            self.removeRequested.emit(self.entity_ID)
             event.accept()
             return
         super().mouseDoubleClickEvent(event)
 
     def enterEvent(self, event):
-        self.hoverEntered.emit(self.group_ID, self.group_name)
+        self.hoverEntered.emit(self.entity_ID, self.entity_name)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         self.hoverLeft.emit()
         super().leaveEvent(event)
+
+
+# Alias for call sites / tests that still use the Groups name
+GroupRemoveButton = EntityRemoveButton
 
 
 class ProgressBarManager:

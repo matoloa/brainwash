@@ -933,8 +933,10 @@ class UIsub(
             self.group_controls_add(group_ID)
 
     def testsetControlsRefresh(self):
+        if hasattr(self, "ensure_testsets_list_header"):
+            self.ensure_testsets_list_header()
         self.testset_controls_remove()
-        for set_ID in getattr(self, "dd_testsets", {}).keys():
+        for set_ID in sorted(getattr(self, "dd_testsets", {}).keys()):
             self.testset_controls_add(set_ID)
         self.update_anova_label()  # sync label after test set UI refresh
 
@@ -1340,8 +1342,15 @@ class UIsub(
         self.uistate.stat_test.statusbar_state = "attention"
         self.set_statusbar("attention", f"Double-click to remove group: {group_name}")
 
-    def _on_group_remove_hover_leave(self):
-        """Restore statusbar after leaving the group × control."""
+    def _on_testset_remove_hover_enter(self, set_ID, set_name):
+        """Attention statusbar while hovering the test-set × remove control."""
+        if not hasattr(self, "set_statusbar"):
+            return
+        self.uistate.stat_test.statusbar_state = "attention"
+        self.set_statusbar("attention", f"Double-click to remove test set: {set_name}")
+
+    def _on_entity_remove_hover_leave(self):
+        """Restore statusbar after leaving a group/test-set × control."""
         if getattr(self.uistate.stat_test, "statusbar_state", None) != "attention":
             return
         self.uistate.stat_test.statusbar_state = None
@@ -1355,6 +1364,9 @@ class UIsub(
             self.set_statusbar(result.state, result.text)
         elif hasattr(self, "_set_statusbar_appearance"):
             self._set_statusbar_appearance(clear=True)
+
+    # Back-compat alias
+    _on_group_remove_hover_leave = _on_entity_remove_hover_leave
 
     def triggerClearGroups(self):
         """Legacy: clear group membership for selection only (no longer in menu)."""
@@ -1438,17 +1450,39 @@ class UIsub(
         self.tableProjSelectionChanged()
 
     def triggerAddSelectionToTestSet(self):
+        """Create test set from output sweep selection (also pushButton_add_to_set)."""
         self.usage("triggerAddSelectionToTestSet")
         self.add_to_data_set()
 
     def triggerRemoveLastTestSet(self):
+        """Legacy: remove highest set_ID only (no longer in menu)."""
         self.usage("triggerRemoveLastTestSet")
         self.testset_remove_last()
 
+    def triggerRemoveTestSet(self, set_ID):
+        """Double-click × on a test-set row: remove that set (no dialog)."""
+        self.usage("triggerRemoveTestSet")
+        try:
+            set_ID = int(set_ID)
+        except (TypeError, ValueError):
+            return
+        if set_ID not in getattr(self, "dd_testsets", {}):
+            return
+        if getattr(self.uistate.stat_test, "statusbar_state", None) == "attention":
+            self.uistate.stat_test.statusbar_state = None
+        self.testset_remove(set_ID)
+        if hasattr(self, "update_anova_label"):
+            self.update_anova_label()
+        if hasattr(self, "update_test"):
+            self.update_test()
+
     def triggerClearTestSets(self):
+        """Remove every test set (menu: Clear all test sets)."""
         self.usage("triggerClearTestSets")
-        while self.dd_testsets:
-            self.testset_remove_last()
+        self.testset_controls_remove()
+        self.testset_remove()  # all
+        if hasattr(self, "update_anova_label"):
+            self.update_anova_label()
 
     def triggerSetGain(self):
         self.usage("triggerSetGain")

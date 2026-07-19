@@ -28,10 +28,10 @@ def test_qt_application_and_label(qtbot):
     assert label.text() == "brainwash"
 
 
-def test_group_remove_button_double_click_and_hover(qtbot):
-    from ui_widgets import GroupRemoveButton
+def test_entity_remove_button_double_click_and_hover(qtbot):
+    from ui_widgets import EntityRemoveButton, GroupRemoveButton
 
-    btn = GroupRemoveButton(2, "controls")
+    btn = EntityRemoveButton(2, "controls", object_prefix="group_remove")
     qtbot.addWidget(btn)
     removed = []
     hovered = []
@@ -53,6 +53,11 @@ def test_group_remove_button_double_click_and_hover(qtbot):
 
     btn.leaveEvent(None)
     assert left == [True]
+
+    # Alias still constructs
+    alias = GroupRemoveButton(1, "set 1", object_prefix="testset_remove")
+    qtbot.addWidget(alias)
+    assert alias.objectName() == "testset_remove_1"
 
 
 def test_radio_group_updates_checked_button(qtbot):

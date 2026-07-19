@@ -14,8 +14,7 @@ import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
 from brainwash_ui import plot_series
-from ui_widgets import CustomCheckBox, GroupRemoveButton
-
+from ui_widgets import CustomCheckBox, EntityRemoveButton
 
 class GroupMixin:
     """Mixin that provides all group-management behaviour for UIsub.
@@ -234,14 +233,16 @@ class GroupMixin:
         if not selected_sweeps:
             print("No sweeps selected for test set.")
             return
+        colors = self.uistate.project.colors or ["#808080"]
         self.dd_testsets[set_ID] = {
             "set_name": f"set {set_ID}",
-            "color": self.uistate.project.colors[set_ID - 1 % len(self.uistate.project.colors)],
+            "color": colors[(set_ID - 1) % len(colors)],
             "show": True,
             "sweeps": selected_sweeps,
             "description": f"Test set {set_ID} created from selection",
         }
         self.testset_save_dd()
+        self.ensure_testsets_list_header()
         self.testset_controls_add(set_ID)
         print(f"Created test set {set_ID} with {len(selected_sweeps)} sweeps: {selected_sweeps}")
         self.refresh_samples()  # ensure sample data for new test set
@@ -704,10 +705,10 @@ class GroupMixin:
         checkbox.setChecked(checked)
         checkbox.stateChanged.connect(lambda state, gid=group_ID: self.groupCheckboxChanged(state, gid))
 
-        remove_btn = GroupRemoveButton(group_ID, group_name)
+        remove_btn = EntityRemoveButton(group_ID, group_name, object_prefix="group_remove")
         remove_btn.removeRequested.connect(self.triggerRemoveGroup)
         remove_btn.hoverEntered.connect(self._on_group_remove_hover_enter)
-        remove_btn.hoverLeft.connect(self._on_group_remove_hover_leave)
+        remove_btn.hoverLeft.connect(self._on_entity_remove_hover_leave)
 
         row_layout.addWidget(checkbox, 1)
         row_layout.addWidget(remove_btn, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
@@ -748,49 +749,103 @@ class GroupMixin:
                 delattr(self, f"actionAddTo_{str_ID}")
 
     # ------------------------------------------------------------------
-    # Test Set controls (mirrors group_controls_* but targets verticalLayoutTestSet,
-    # uses set_ID, set_name, checkBox_testset_{ID}, and calls triggerTestSetRename)
+    # Test Set controls (mirrors group_controls_* but targets verticalLayoutTestSet)
     # ------------------------------------------------------------------
 
+    def ensure_testsets_list_header(self):
+        """Bold 'Test sets' header above the test set checkbox list (once)."""
+        existing = getattr(self, "_testsets_list_header", None)
+        if existing is not None:
+            return
+        if hasattr(self, "centralwidget"):
+            found = self.centralwidget.findChild(QtWidgets.QLabel, "label_testsets_header")
+            if found is not None:
+                self._testsets_list_header = found
+                return
+        lbl = QtWidgets.QLabel("Test sets")
+        lbl.setObjectName("label_testsets_header")
+        font = lbl.font()
+        font.setBold(True)
+        lbl.setFont(font)
+        lbl.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        self.verticalLayoutTestSet.insertWidget(0, lbl)
+        self._testsets_list_header = lbl
+
     def testsetControlsRefresh(self):
+        self.ensure_testsets_list_header()
         self.testset_controls_remove()
-        for set_ID in self.dd_testsets.keys():
+        for set_ID in sorted(self.dd_testsets.keys()):
             print(f"testsetControlsRefresh, adding set_ID: {set_ID}")
             self.testset_controls_add(set_ID)
 
-    def testset_controls_add(self, set_ID):  # Create checkbox for test set (modeled on group_controls_add)
+    def testset_controls_add(self, set_ID):
         dict_set = self.dd_testsets.get(set_ID)
         if not dict_set:
             print(f" - {set_ID} not found in self.dd_testsets:")
             print(self.dd_testsets)
             return
+        self.ensure_testsets_list_header()
         set_name = dict_set["set_name"]
         color = dict_set["color"]
         str_ID = str(set_ID)
-        self.new_testset_checkbox = CustomCheckBox(set_ID)
-        self.new_testset_checkbox.rightClicked.connect(self.triggerTestSetRename)  # set_ID is passed by CustomCheckBox
-        self.new_testset_checkbox.setObjectName(f"checkBox_testset_{str_ID}")
-        self.new_testset_checkbox.setText(f"{str_ID}. {set_name}")
-        self.new_testset_checkbox.setStyleSheet(f"background-color: {color};")  # Set the background color
-        self.new_testset_checkbox.setMaximumWidth(100)  # Set the maximum width
-        self.new_testset_checkbox.setChecked(bool(dict_set.get("show", True)))
-        self.new_testset_checkbox.stateChanged.connect(lambda state, set_ID=set_ID: self.testsetCheckboxChanged(state, set_ID))
-        self.verticalLayoutTestSet.addWidget(self.new_testset_checkbox)
-        setattr(self, f"checkBox_testset_{str_ID}", self.new_testset_checkbox)
+
+        row = QtWidgets.QWidget()
+        row.setObjectName(f"testset_row_{str_ID}")
+        row.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        row_layout = QtWidgets.QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(2)
+
+        checkbox = CustomCheckBox(set_ID)
+        checkbox.rightClicked.connect(self.triggerTestSetRename)
+        checkbox.setObjectName(f"checkBox_testset_{str_ID}")
+        checkbox.setText(f"{str_ID}. {set_name}")
+        checkbox.setStyleSheet(f"background-color: {color};")
+        checkbox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        checkbox.setMinimumWidth(0)
+        checkbox.setMaximumWidth(16777215)
+        show = dict_set.get("show", True)
+        if isinstance(show, str):
+            checked = show.strip().lower() in ("true", "1", "yes")
+        else:
+            checked = bool(show)
+        checkbox.setChecked(checked)
+        checkbox.stateChanged.connect(lambda state, sid=set_ID: self.testsetCheckboxChanged(state, sid))
+
+        remove_btn = EntityRemoveButton(set_ID, set_name, object_prefix="testset_remove")
+        remove_btn.removeRequested.connect(self.triggerRemoveTestSet)
+        remove_btn.hoverEntered.connect(self._on_testset_remove_hover_enter)
+        remove_btn.hoverLeft.connect(self._on_entity_remove_hover_leave)
+
+        row_layout.addWidget(checkbox, 1)
+        row_layout.addWidget(remove_btn, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        self.verticalLayoutTestSet.addWidget(row)
+        self.new_testset_checkbox = checkbox
+        setattr(self, f"checkBox_testset_{str_ID}", checkbox)
+        setattr(self, f"testset_row_{str_ID}", row)
 
     def testset_controls_remove(self, set_ID=None):
-        if set_ID is None:  # if set_ID is not provided, remove all test set controls
-            for i in range(1, 10):  # clear test set controls 1-9
+        if set_ID is None:
+            for i in range(1, 10):
                 self.testset_controls_remove(i)
+            return
+        str_ID = str(set_ID)
+        row_name = f"testset_row_{str_ID}"
+        row = None
+        if hasattr(self, "centralwidget"):
+            row = self.centralwidget.findChild(QtWidgets.QWidget, row_name)
+        if row is None:
+            row = getattr(self, row_name, None)
+        if row is not None:
+            print(f"Removing widget {row_name}")
+            row.deleteLater()
         else:
-            str_ID = str(set_ID)
-            # Correctly identify the widget by its full object name used during creation
             widget_name = f"checkBox_testset_{str_ID}"
-            widget = self.centralwidget.findChild(QtWidgets.QWidget, widget_name)
+            widget = self.centralwidget.findChild(QtWidgets.QWidget, widget_name) if hasattr(self, "centralwidget") else None
             if widget:
                 print(f"Removing widget {widget_name}")
                 widget.deleteLater()
-            attr_name = f"checkBox_testset_{str_ID}"
+        for attr_name in (f"checkBox_testset_{str_ID}", f"testset_row_{str_ID}"):
             if hasattr(self, attr_name):
                 delattr(self, attr_name)
 

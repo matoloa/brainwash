@@ -26,7 +26,7 @@ Living priority map across milestones. **Execution** is on GitHub issues when a 
 | [#1](https://github.com/matoloa/brainwash/issues/1) | UI Groups overhaul | **Done** — digit create/assign, clear-all, header, rename/legend |
 | [#2](https://github.com/matoloa/brainwash/issues/2) | Output line appearance UI | **Done** — Results display Dots/Line |
 | [#3](https://github.com/matoloa/brainwash/issues/3) | Default aspect color palette | **Done** — EPSP blue / volley green; stim indigo→violet; legacy magenta migrate |
-| [#4](https://github.com/matoloa/brainwash/issues/4) | UI Test Sets overhaul | After #1 |
+| [#4](https://github.com/matoloa/brainwash/issues/4) | UI Test Sets overhaul | **Done** — full-width rows, × remove, header, clear-all menu; create via Tag button |
 | [#5](https://github.com/matoloa/brainwash/issues/5) | Blind / unblind rec names | Display-only; main + parse UI |
 | [#6](https://github.com/matoloa/brainwash/issues/6) | Color-by Aspect \| Rec \| Stim \| Group | Timebox; may slip to 1.0.1 |
 | [#7](https://github.com/matoloa/brainwash/issues/7) | Reconnect Talkback | Spike first |
@@ -38,7 +38,7 @@ Living priority map across milestones. **Execution** is on GitHub issues when a 
 1. ~~**#10** format~~ **done**  
 2. ~~**#1** Groups~~ **done**  
 3. ~~**#2** line style~~ **done** · ~~**#3** palette~~ **done**  
-4. **#4**, **#5** as capacity allows  
+4. ~~**#4** test sets~~ **done** · **#5** as capacity allows  
 5. **#6** timeboxed; **#7** spike; **#8–#9** opportunistic  
 
 ### Capacity note
