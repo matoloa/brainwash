@@ -66,6 +66,7 @@ Living priority map across milestones. **Execution** is on GitHub issues when a 
 - Darkmode-sensitive popups  
 - Consistent toolFrame size / margins  
 - When `tableProj` is active, left/right arrow keys change stim number  
+- **Export project table (`dfp`)** to `.csv` / `.xls` (former dead “Copy project summary” menu — re-add only when implemented)  
 
 ### Interactive / cross-cut
 

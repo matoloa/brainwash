@@ -106,7 +106,7 @@ class GraphCoordinatorMixin:
             return
 
         # Any test is shown → we will pass dd_testset as second argument.
-        # Check if any group is shown (accounting for legacy string "True" artefact). TODO: Address legacy string issue
+        # Group show may still be legacy string "True" from older pickles.
         any_group_shown = any(g.get("show") in (True, "True", "true", 1, "1") for g in dd_groups.values())
 
         if any_group_shown:
@@ -171,7 +171,7 @@ class GraphCoordinatorMixin:
         ax2 = ax1.twinx()
         self.uistate.plot.ax2 = ax2  # Store the ax2 instance
         self.uistate.plot.ax1 = ax1
-        # connect scroll event if not already connected #TODO: when graphAxes is called only once, the check should be redundant
+        # connect scroll event if not already connected
         if not hasattr(self, "scroll_event_connected") or not self.scroll_event_connected:
             self.canvasMean.mpl_connect(
                 "scroll_event",

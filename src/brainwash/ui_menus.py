@@ -26,11 +26,6 @@ class MenuMixin:
         self.menuFile.addAction(self.actionExit)
 
         # Edit menu
-        # self.actionUndo = QtWidgets.QAction("Undo", self) # TODO: Implement undo
-        # self.actionUndo.triggered.connect(self.triggerUndo)
-        # self.actionUndo.setShortcut("Ctrl+Z")
-        # self.menuEdit.addAction(self.actionUndo)
-
         self.actionSetGain = QtWidgets.QAction("Set gain")
         self.actionSetGain.triggered.connect(self.triggerSetGain)
         self.actionSetGain.setShortcut("G")
@@ -183,10 +178,7 @@ class MenuMixin:
 
         # Export menu (triggers → ExportMixin in export_data.py)
         # — Copy section —
-        self.actionCopyProjectSummary = QtWidgets.QAction("Copy project summary")
-        self.actionCopyProjectSummary.triggered.connect(self.triggerCopyProjectSummary)
-        self.menuExport.addAction(self.actionCopyProjectSummary)
-
+        # Project table export (dfp → csv/xls): roadmap 1.0.1 — do not ship a dead menu item.
         self.actionCopyTimepoints = QtWidgets.QAction("Copy timepoints")
         self.actionCopyTimepoints.triggered.connect(self.triggerCopyTimepoints)
         self.actionCopyTimepoints.setShortcut("Ctrl+T")

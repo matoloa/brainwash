@@ -1994,22 +1994,22 @@ class InteractivePlotMixin:
         elif "slope_left" in locals():  # on output
             if on_left:
                 if slope_left:  # scroll left y zoom output slope y
-                    ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom  # TODO: self.uistate.project.checkBox...
+                    ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom
                     ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
                 else:  # scroll left y to zoom output amp y
-                    ymin = 0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom  # TODO: self.uistate.project.checkBox...
+                    ymin = 0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom
                     ax1.set_ylim(ymin, y + (ax1.get_ylim()[1] - y) / zoom)
             elif on_right and not slope_left:  # scroll right y to zoom output slope y
-                ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom  # TODO: self.uistate.project.checkBox...
+                ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom
                 ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
             else:  # default, scroll graph to zoom all
                 ax1.set_xlim(
                     x - (x - ax1.get_xlim()[0]) / zoom,
                     x + (ax1.get_xlim()[1] - x) / zoom,
                 )
-                ymin = 0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom  # TODO: self.uistate.project.checkBox...
+                ymin = 0 if ymin0 else y - (y - ax1.get_ylim()[0]) / zoom
                 ax1.set_ylim(ymin, y + (ax1.get_ylim()[1] - y) / zoom)
-                ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom  # TODO: self.uistate.project.checkBox...
+                ymin = 0 if ymin0 else y - (y - ax.get_ylim()[0]) / zoom
                 ax.set_ylim(ymin, y + (ax.get_ylim()[1] - y) / zoom)
         else:  # on mean or event graphs
             if on_left:  # scroll left x to zoom mean or event x
@@ -2017,13 +2017,6 @@ class InteractivePlotMixin:
             else:
                 ax.set_xlim(x - (x - ax.get_xlim()[0]) / zoom, x + (ax.get_xlim()[1] - x) / zoom)
                 ax.set_ylim(y - (y - ax.get_ylim()[0]) / zoom, y + (ax.get_ylim()[1] - y) / zoom)
-
-        # TODO: this block is dev visualization for debugging
-        if False:
-            if hasattr(ax, "hline"):  # If the line exists, update it
-                ax.hline.set_ydata(bottom)
-            else:  # Otherwise, create a new line
-                ax.hline = ax.axhline(y=bottom, color="r", linestyle="--")
 
         canvas.draw_idle()
 

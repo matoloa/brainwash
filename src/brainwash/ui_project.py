@@ -1377,8 +1377,6 @@ class ProjectMixin:
         # Initial evaluation of test condition warnings on the statusbar (after config/test radios restored)
         self.update_test()
 
-    # trigger functions TODO: break out the big ones to separate functions!
-
     def triggerHideHierarchy(self):
         self.usage("triggerHideHierarchy")
         self.setViewToolVisible("frameToolHierarchy", False)

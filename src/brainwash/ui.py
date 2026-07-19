@@ -1,6 +1,6 @@
 import json
 import math
-import os  # TODO: replace use by pathlib?
+import os
 import sys
 import tempfile
 import traceback

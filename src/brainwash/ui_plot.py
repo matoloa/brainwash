@@ -12,7 +12,6 @@ from collections import defaultdict
 from matplotlib import style
 from matplotlib.colors import LinearSegmentedColormap
 
-# from matplotlib.lines import Line2D  # for custom legend; TODO: still used?
 from matplotlib.ticker import FuncFormatter
 from matplotlib.transforms import blended_transform_factory
 

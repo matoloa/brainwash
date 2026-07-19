@@ -111,7 +111,6 @@ class Config:
         self.verbose = self.dev_mode  # Now tied to --debug
         # Global; toggled from Data menu; default off (persisted in bw_cfg.yaml).
         self.talkback = False
-        self.hide_experimental = not self.dev_mode
         self.track_widget_focus = False
         self.terminal_space = 372 if self.dev_mode else 100  # pixels reserved for viewing prints
         self.work_space = 646 if self.dev_mode else 0  # pixels reserved for working area
@@ -407,7 +406,7 @@ class FileTreeSelectorDialog(QtWidgets.QWidget):
         self.view = QtWidgets.QTreeView()
 
         self.view.setObjectName("treeView_fileTreeSelector")
-        self.view.setWindowTitle("Dir View")  # TODO:  Which title?
+        self.view.setWindowTitle("Dir View")
         self.view.setSortingEnabled(False)
 
         # Attach Model to View

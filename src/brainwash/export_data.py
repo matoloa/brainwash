@@ -58,10 +58,7 @@ class ExportMixin:
     # ------------------------------------------------------------------
     # Copy triggers
     # ------------------------------------------------------------------
-
-    def triggerCopyProjectSummary(self):
-        self.usage("triggerCopyProjectSummary")
-        pass  # TODO: implement
+    # Export project table (dfp) to .csv / .xls: see ROADMAP 1.0.1 — not wired until implemented.
 
     def triggerCopyTimepoints(self):
         self.usage("triggerCopyTimepoints")
