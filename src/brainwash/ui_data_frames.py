@@ -216,6 +216,9 @@ class DataFrameMixin:
 
     def set_dft(self, rec_name, df):  # persists df and saves it as a file
         # print(f"type: {type(df)}")
+        df, repaired = recording_pipeline.ensure_stim_ids(df)
+        if repaired:
+            print(f"set_dft: repaired invalid stim ids for {rec_name}")
         print(f"set_dft of {rec_name}: {df}")
         self.dict_ts[rec_name] = df
         self.df2file(df=df, filename=rec_name, key="timepoints")
@@ -284,8 +287,13 @@ class DataFrameMixin:
             print(f"get_dft: {rec} not parsed yet")
             return None
         if rec in self.dict_ts.keys() and not reset:
-            # print("returning cached dft")
-            return self.dict_ts[rec]
+            dft = self.dict_ts[rec]
+            dft, repaired = recording_pipeline.ensure_stim_ids(dft)
+            if repaired:
+                print(f"get_dft: repaired invalid stim ids in cache for {rec}")
+                self.dict_ts[rec] = dft
+                self.df2file(df=dft, filename=rec, key="timepoints")
+            return dft
         str_t_path = recording_cache.timepoints_parquet_path(self.dict_folders["timepoints"], rec)
         if Path(str_t_path).exists() and not reset:
             # print("reading dft from file")
@@ -293,6 +301,10 @@ class DataFrameMixin:
             if recording_pipeline.migrate_dft_column_names(dft):
                 self.df2file(df=dft, filename=rec, key="timepoints")  # re-persist with corrected names
             recording_pipeline.normalize_dft_dtypes(dft)
+            dft, repaired = recording_pipeline.ensure_stim_ids(dft)
+            if repaired:
+                print(f"get_dft: repaired invalid stim ids from file for {rec}")
+                self.df2file(df=dft, filename=rec, key="timepoints")
             self.dict_ts[rec] = dft
             return dft
         else:
@@ -324,6 +336,7 @@ class DataFrameMixin:
                 self.set_uniformTimepoints(p_row=row, dft=dft, dfoutput=dfoutput)
                 dft = self.dict_ts[rec]
             recording_pipeline.normalize_dft_dtypes(dft)
+            dft, _ = recording_pipeline.ensure_stim_ids(dft)
             self.dict_ts[rec] = dft
             self.df2file(df=dft, filename=rec, key="timepoints")  # persist dft as parquet
             self.set_rec_status(rec)  # update status in df_project
@@ -1198,16 +1211,16 @@ class DataFrameMixin:
                 t_stim = round(t_template_row["t_stim"].values[0], precision)
                 for var in variables:
                     t_template_row[var] = round(t_template_row[var].values[0] - t_stim, precision)
-                if "stim" not in df_t.columns:
-                    df_t["stim"] = None
                 for i, row_t in df_t.iterrows():
-                    df_t.at[i, "stim"] = i + 1  # stims numbered from 1
                     for var in variables:
                         df_t.at[i, var] = round(t_template_row[var].values[0] + row_t["t_stim"], precision)
                     for method in methods:
                         df_t.at[i, method] = f"=stim_{stim_max}"
                     for param in params:
                         df_t.at[i, param] = f"=stim_{stim_max}"
+                # stim ids always 1..n (set_dft → ensure_stim_ids)
+                df_t = df_t.sort_values("t_stim").reset_index(drop=True)
+                df_t["stim"] = range(1, len(df_t) + 1)
                 print(f"Uniform timepoints applied to {p_row['recording_name']}.")
                 self.set_dft(p_row["recording_name"], df_t)
                 dfoutput = self.get_dfoutput(p_row, reset=True)

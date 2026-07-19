@@ -72,8 +72,8 @@ class UIstate:
         t_volley_slope_width = 0.0003
         t_epsp_slope_width = 0.0007
         resolution = 0.0001
+        # Do not put stim id here — always assigned 1..n after insert/load (ensure_stim_ids).
         self.project.default_dict_t = {
-            "stim": 0,
             "t_stim": 0.0,
             "t_stim_method": "max prim",
             "t_stim_params": "NA",

@@ -273,7 +273,7 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-815</y>
+          <y>-771</y>
           <width>284</width>
           <height>2194</height>
          </rect>
@@ -1735,7 +1735,7 @@
            <widget class="QRadioButton" name="radioButton_display_color_stim_number">
             <property name="geometry">
              <rect>
-              <x>180</x>
+              <x>90</x>
               <y>70</y>
               <width>81</width>
               <height>16</height>
@@ -1751,7 +1751,7 @@
            <widget class="QRadioButton" name="radioButton_display_color_group">
             <property name="geometry">
              <rect>
-              <x>90</x>
+              <x>180</x>
               <y>70</y>
               <width>81</width>
               <height>16</height>
@@ -2894,17 +2894,17 @@
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="buttonGroup_test_t_variant"/>
+  <buttongroup name="buttonGroup_io_i"/>
+  <buttongroup name="buttonGroup_display_color"/>
+  <buttongroup name="buttonGroup_filter"/>
   <buttongroup name="buttonGroup_display_timecourse"/>
   <buttongroup name="buttonGroup_io_o"/>
-  <buttongroup name="buttonGroup_display_color"/>
-  <buttongroup name="buttonGroup_test_n"/>
-  <buttongroup name="buttonGroup_wilcoxon_variant"/>
+  <buttongroup name="buttonGroup_test_t_tails"/>
+  <buttongroup name="buttonGroup_test_t_variant"/>
   <buttongroup name="buttonGroup_type"/>
   <buttongroup name="buttonGroup_wilcoxon_tails"/>
-  <buttongroup name="buttonGroup_test_t_tails"/>
-  <buttongroup name="buttonGroup_io_i"/>
-  <buttongroup name="buttonGroup_filter"/>
+  <buttongroup name="buttonGroup_wilcoxon_variant"/>
   <buttongroup name="buttonGroup_test"/>
+  <buttongroup name="buttonGroup_test_n"/>
  </buttongroups>
 </ui>

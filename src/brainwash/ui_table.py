@@ -19,7 +19,7 @@ from PyQt5 import QtCore, QtWidgets, sip
 
 import ui_widgets  # for TableModel, TableProjSub etc. (injected widgets)
 
-from brainwash_ui import view_state
+from brainwash_ui import recording_pipeline, view_state
 from project_schema import df_projectTemplate
 
 # ---------------------------------------------------------------------------
@@ -178,6 +178,8 @@ class TableMixin:
             dft_for_format = self._multi_rec_common_stim_table(self.uistate.plot.df_recs2plot)
 
         if dft_for_format is not None and not getattr(dft_for_format, "empty", True):
+            # Defense: never show null/0 stim ids in the table
+            dft_for_format, _ = recording_pipeline.ensure_stim_ids(dft_for_format)
             self.tableStimModel.setData(dft_for_format)
             # Map previous stim numbers onto new row indices
             new_indices = []
