@@ -17,7 +17,7 @@ Provide **Color events by** modes that disambiguate overlays using:
 - **Stim** — same gradient family over stim indices (existing behavior)  
 - **Group** — strict group palette coloring (no gradients)
 
-**Not in scope for this plan:** color **output** sweeps (ax1/ax2) by Aspect | Rec | Stim | Group; dual-encoding aspect×hue; nested rec×stim dual gradients.
+**Not in scope:** output-series coloring (ax1/ax2); nested rec×stim dual gradients.
 
 ---
 
@@ -119,7 +119,7 @@ color[rec_id] = gradient[i]  # i = index in display_order
 
 **Out v1:**
 
-- Output ax1/ax2 series aspect colors  
+- Output ax1/ax2 series recoloring  
 - Group mean series (already group-colored)  
 - Mean full-trace on axm (stays black)
 
@@ -190,7 +190,6 @@ Manual smoke:
 
 ## Out of scope / later
 
-- Color **output** by Aspect | Rec | Stim | Group (original #6 wording) — new issue or 1.0.1 if still wanted  
 - Nested gradient (rec base + stim shade)  
 - Gray vs black for ambiguous group (v1 = **black** as specified)  
 - Export-specific color policy beyond “same artists as interactive”
@@ -199,8 +198,7 @@ Manual smoke:
 
 ## Roadmap / issue hygiene
 
-- Rewrite #6 title/body to match this plan (events, not output Aspect).  
-- ROADMAP note: #6 → color events by Rec|Stim|Group; plan link.
+- #6 + ROADMAP already point at this plan (events Rec|Stim|Group).
 
 ---
 
@@ -209,3 +207,4 @@ Manual smoke:
 | Date | Note |
 |------|------|
 | 2026-07-19 | Design locked from discussion; plan filed for implement |
+| 2026-07-19 | Drop aspect/output-mode residue from plan wording |
