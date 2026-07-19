@@ -1594,7 +1594,7 @@ class InteractivePlotMixin:
     # --- Phase 2: Specialized Drag Update Strategies ---
 
     def _update_dft_temp_from_drag(self, x_start, x_end, precision, *, propagate_linked_stims: bool) -> bool:
-        """Update dft_temp while dragging on the event plot; defer build_dfoutput to release."""
+        """Update dft_temp while dragging on the event plot."""
         action = self.uistate.plot.mouseover_action
         if action is None:
             return False
@@ -1631,14 +1631,227 @@ class InteractivePlotMixin:
                     dft_temp.at[i, key] = round(i_trow["t_stim"] - offset, precision)
         return True
 
+    def _set_mouseover_out_preview(self, axis, drag_x, drag_y, *, color, linestyle, marker_style, msize):
+        """Thick overlay of the selected recording's output while dragging (never group)."""
+        if axis is None:
+            return
+        if self.uistate.plot.mouseover_out is None:
+            self.uistate.plot.mouseover_out = axis.plot(
+                drag_x,
+                drag_y,
+                color=color,
+                linewidth=3,
+                linestyle=linestyle,
+                marker=marker_style,
+                markersize=msize,
+                zorder=5,
+            )
+        else:
+            line = self.uistate.plot.mouseover_out[0]
+            if getattr(line, "axes", None) != axis:
+                try:
+                    line.remove()
+                except Exception:
+                    pass
+                self.uistate.plot.mouseover_out = axis.plot(
+                    drag_x,
+                    drag_y,
+                    color=color,
+                    linewidth=3,
+                    linestyle=linestyle,
+                    marker=marker_style,
+                    markersize=msize,
+                    zorder=5,
+                )
+            else:
+                line.set_data(drag_x, drag_y)
+                line.set_marker(marker_style)
+                line.set_linestyle(linestyle)
+                line.set_color(color)
+                line.set_markersize(msize)
+        self.canvasOutput.draw_idle()
+
+    def _preview_rec_output_while_dragging(self, *, mode: str) -> None:
+        """Live morph of the *selected recording* output series (not group means).
+
+        Restored after the UI-refactor deferral of build_dfoutput to release only;
+        group artists still update on drag release only.
+        """
+        action = self.uistate.plot.mouseover_action
+        if action is None:
+            return
+        aspect = "_".join(action.split()[:2])  # EPSP_amp / EPSP_slope / volley_*
+        stim_idx = self.uistate.plot.list_idx_select_stims[0]
+        prow = self.get_prow()
+        if prow is None:
+            return
+        n_stims = prow["stims"]
+        dft_temp = self.uistate.plot.dft_temp
+        trow_temp = dft_temp.iloc[stim_idx]
+
+        if not self.uistate.project.checkBox["timepoints_per_stim"] and n_stims > 1:
+            dft_to_update = dft_temp.copy()
+        else:
+            dft_to_update = dft_temp.iloc[[stim_idx]].copy()
+
+        # Ensure measure_waveform / build_dfoutput has required fields
+        for col in (
+            "t_EPSP_amp_halfwidth",
+            "t_volley_amp_halfwidth",
+            "norm_output_from",
+            "norm_output_to",
+            "stim",
+            "amp_zero",
+            "t_stim",
+        ):
+            if col in trow_temp.index and col not in dft_to_update.columns:
+                dft_to_update[col] = trow_temp[col]
+
+        rec_filter = prow.get("filter")
+        if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
+            rec_filter = "voltage"
+
+        if pd.notna(prow.get("bin_size")):
+            dffilter = self.get_dfbin(prow)
+        else:
+            dffilter = self.get_dffilter(row=prow)
+
+        # Axis / series for this aspect
+        if aspect in ("EPSP_slope", "volley_slope"):
+            axis = self.uistate.plot.ax2
+        else:
+            axis = self.uistate.plot.ax1
+
+        color = self.uistate.project.settings.get(f"rgb_{aspect}", "black")
+        msize = 6
+
+        try:
+            if mode == "time" and self.uistate.x_axis == "stim" and len(getattr(self.uistate.plot, "df_rec_select_time", []) or []) > 1:
+                # Stim-mode aggregate: single point per stim from mean waveform
+                dfmean = self.get_dfmean(row=prow)
+                dict_t_stim = dft_to_update.iloc[0].to_dict()
+                t_stim = dict_t_stim.get("t_stim", 0.0)
+                t_win_start = t_stim - 0.002
+                t_win_end = dict_t_stim.get("t_EPSP_amp", t_stim + 0.01) + dict_t_stim.get(
+                    "t_EPSP_amp_width",
+                    2 * dict_t_stim.get("t_EPSP_amp_halfwidth", 0.001),
+                )
+                snippet = dfmean[(dfmean["time"] >= t_win_start) & (dfmean["time"] <= t_win_end)].copy().reset_index(drop=True)
+                measured = analysis.measure_waveform(snippet, dict_t_stim, filter=rec_filter)
+                stim_num = int(dict_t_stim["stim"])
+                drag_x = np.array([stim_num])
+                val = measured.get(aspect, np.nan)
+                # measure_waveform returns SI amp; output graph uses mV for amp columns
+                if aspect in ("EPSP_amp", "volley_amp") and val is not None and val == val:
+                    val = float(val) * 1000.0
+                drag_y = np.array([val])
+                marker_style, linestyle = "o", "None"
+            elif mode == "pp":
+                out = analysis.build_dfoutput(
+                    dffilter=dffilter,
+                    dfmean=self.get_dfmean(row=prow),
+                    dft=dft_to_update,
+                    quick=True,
+                    filter=rec_filter,
+                )
+                out = self.V2mV(out)
+                out_sweeps = out[out["sweep"].notna()]
+                out1 = out_sweeps[out_sweeps["stim"] == 1].set_index("sweep")
+                out2 = out_sweeps[out_sweeps["stim"] == 2].set_index("sweep")
+                common_sweeps = out1.index.intersection(out2.index).dropna()
+                if not common_sweeps.empty and aspect in out1.columns:
+                    o1 = out1.loc[common_sweeps]
+                    o2 = out2.loc[common_sweeps]
+                    v1 = o1[aspect].values.astype(float)
+                    v2 = o2[aspect].values.astype(float)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        ppr = plot_series.compute_ppr(v1, v2)
+                    x_val = plot_series.pp_overlay_x_map(self.uistate.project.checkBox).get(aspect, 1)
+                    drag_x = np.full(len(common_sweeps), x_val)
+                    drag_y = ppr
+                    marker_style, linestyle = "o", "None"
+                else:
+                    if aspect in ("EPSP_amp", "EPSP_slope"):
+                        outkey = f"{aspect}_norm" if self.uistate.project.checkBox["norm_EPSP"] else aspect
+                    else:
+                        outkey = aspect
+                    if outkey not in out.columns:
+                        return
+                    drag_x = out["sweep"].values
+                    drag_y = out[outkey].values
+                    marker_style = "o" if len(drag_x) == 1 else "None"
+                    linestyle = "-"
+            elif mode == "io":
+                out = analysis.build_dfoutput(
+                    dffilter=dffilter,
+                    dfmean=self.get_dfmean(row=prow),
+                    dft=dft_to_update,
+                    quick=True,
+                    filter=rec_filter,
+                )
+                out = self.V2mV(out)
+                io_input = self.uistate.experiment.io_input
+                io_output = self.uistate.experiment.io_output
+                x_col = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim"}.get(io_input, "volley_amp")
+                y_col = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}.get(io_output, "EPSP_amp")
+                out_sweeps = out[out["sweep"].notna()].dropna(subset=[x_col, y_col])
+                drag_x = out_sweeps[x_col].values
+                drag_y = out_sweeps[y_col].values
+                marker_style, linestyle = "o", "None"
+                color = self.uistate.project.settings.get(f"rgb_{y_col}", "black")
+                msize = 10
+                axis = self.uistate.plot.ax1
+            else:
+                # default time / train: per-sweep series for this recording
+                out = analysis.build_dfoutput(
+                    dffilter=dffilter,
+                    dfmean=self.get_dfmean(row=prow),
+                    dft=dft_to_update,
+                    quick=True,
+                    filter=rec_filter,
+                )
+                out = self.V2mV(out)
+                if aspect in ("EPSP_amp", "EPSP_slope"):
+                    outkey = f"{aspect}_norm" if self.uistate.project.checkBox["norm_EPSP"] else aspect
+                else:
+                    outkey = aspect
+                if outkey not in out.columns:
+                    return
+                # Sweep-mode rows only for the series morph
+                out_sw = out[out["sweep"].notna()] if "sweep" in out.columns else out
+                drag_x = out_sw["sweep"].values if "sweep" in out_sw.columns else np.arange(len(out_sw))
+                drag_y = out_sw[outkey].values
+                marker_style = "o" if len(drag_x) == 1 else "None"
+                linestyle = "-"
+        except Exception as exc:
+            logger.debug("live drag preview failed: %s", exc)
+            return
+
+        self._set_mouseover_out_preview(
+            axis,
+            drag_x,
+            drag_y,
+            color=color,
+            linestyle=linestyle,
+            marker_style=marker_style,
+            msize=msize,
+        )
+
     def _drag_update_time(self, x_start, x_end, precision):
-        self._update_dft_temp_from_drag(x_start, x_end, precision, propagate_linked_stims=True)
+        if not self._update_dft_temp_from_drag(x_start, x_end, precision, propagate_linked_stims=True):
+            return
+        self._preview_rec_output_while_dragging(mode="time")
 
     def _drag_update_pp(self, x_start, x_end, precision):
-        self._update_dft_temp_from_drag(x_start, x_end, precision, propagate_linked_stims=True)
+        if not self._update_dft_temp_from_drag(x_start, x_end, precision, propagate_linked_stims=True):
+            return
+        self._preview_rec_output_while_dragging(mode="pp")
 
     def _drag_update_io(self, x_start, x_end, precision):
-        self._update_dft_temp_from_drag(x_start, x_end, precision, propagate_linked_stims=False)
+        if not self._update_dft_temp_from_drag(x_start, x_end, precision, propagate_linked_stims=False):
+            return
+        self._preview_rec_output_while_dragging(mode="io")
 
     # --- Phase 2: Specialized Drag Release Strategies ---
 
