@@ -215,9 +215,13 @@ def build_stim_event_plot_specs(
 ) -> list[StimEventPlotSpec]:
     """Per-stim event/marker/output descriptors for addRow (no matplotlib artists)."""
     specs: list[StimEventPlotSpec] = []
-    for i_stim, t_row in dft.iterrows():
-        color = stim_colors[i_stim]
-        stim_num = stim_num_from_index(i_stim)
+    for pos, (i_stim, t_row) in enumerate(dft.iterrows()):
+        color = stim_colors.get(pos, stim_colors.get(i_stim, "black"))
+        # Prefer column stim id (identity); index+1 only as legacy fallback
+        try:
+            stim_num = int(t_row["stim"]) if "stim" in t_row.index and pd.notna(t_row["stim"]) else stim_num_from_index(i_stim)
+        except (TypeError, ValueError):
+            stim_num = stim_num_from_index(i_stim)
         stim_str = _stim_label_suffix(stim_num)
         t_stim = t_row["t_stim"]
         out = dfoutput[dfoutput["stim"] == stim_num]
@@ -578,10 +582,14 @@ def build_slope_drag_update_plan(
     out_label = drag_output_label(label_core, aspect, norm_epsp)
     col = slope_output_column(aspect, norm_epsp)
     output_updates: list[DragOutputUpdate] = []
+    # Prefer from_df when release already rebuilt dfoutput — out_line needs
+    # mouseover_out (live preview), which is None when Preview is off or cleared.
     if aspect == "volley slope":
-        if is_pp and has_dfoutput:
-            output_updates.append(DragOutputUpdate(label_core, "from_df", column=col))
+        if has_dfoutput:
+            output_updates.append(DragOutputUpdate(out_label if is_pp else label_core, "from_df", column=col))
         elif not is_pp:
+            output_updates.append(DragOutputUpdate(label_core, "out_line"))
+        if not is_pp:
             output_updates.append(
                 DragOutputUpdate(
                     f"{label_core} mean",
@@ -589,9 +597,9 @@ def build_slope_drag_update_plan(
                     mean_value=trow.get("volley_slope_mean"),
                 )
             )
-    elif is_pp and has_dfoutput:
+    elif has_dfoutput:
         output_updates.append(DragOutputUpdate(out_label, "from_df", column=col))
-    else:
+    elif not is_pp:
         output_updates.append(DragOutputUpdate(out_label, "out_line"))
     return SlopeDragUpdatePlan(
         marker_label=f"{label_core} marker",
@@ -725,9 +733,12 @@ def build_axe_mean_plot_specs(
     df_mean = mean_of_selected_sweeps(df_rec_data, selected_sweeps, col)
     alpha = settings["alpha_line"] / 2
     specs: list[AxeMeanLinePlotSpec] = []
-    for i_stim, t_row in df_rec_time.iterrows():
-        color = stim_colors[i_stim]
-        stim_num = stim_num_from_index(i_stim)
+    for pos, (i_stim, t_row) in enumerate(df_rec_time.iterrows()):
+        color = stim_colors.get(pos, stim_colors.get(i_stim, "black"))
+        try:
+            stim_num = int(t_row["stim"]) if "stim" in t_row.index and pd.notna(t_row["stim"]) else stim_num_from_index(i_stim)
+        except (TypeError, ValueError):
+            stim_num = stim_num_from_index(i_stim)
         stim_str = _stim_label_suffix(stim_num)
         t_stim = t_row["t_stim"]
         df_event = event_window_df(df_mean, t_stim, settings["event_start"], settings["event_end"], col)

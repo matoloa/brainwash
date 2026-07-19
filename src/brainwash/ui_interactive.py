@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from brainwash_ui import plot_drag, plot_series
+from brainwash_ui import plot_drag, plot_identity, plot_series
 from brainwash import analysis_v3 as analysis
 from brainwash import ui_plot
 from ui_state_parts import measure_rgb
@@ -701,17 +701,15 @@ class InteractivePlotMixin:
         self.uistate.setMargins(axe=self.uistate.plot.axe)
         from brainwash_ui import plot_identity as pi
 
+        # Amp also has amp_x/amp_y/amp_zero with aspect=EPSP_amp on axe; only the
+        # aspect_marker handle may set the amp move zone (slope has one handle).
         dict_labels = {
             key: value
             for key, value in self.uistate.plot.dict_rec_labels.items()
             if isinstance(value, dict)
             and str(value.get("rec_ID")) == str(rec_ID)
-            and value.get("axis") == "axe"
             and pi._stim_equal(value.get("stim"), stim_num)
-            and (
-                value.get("role") == pi.ROLE_ASPECT_MARKER
-                or str(value.get("display_label") or key).endswith(" marker")
-            )
+            and plot_drag.is_axe_aspect_drag_handle(value)
         }
 
         if not dict_labels:
@@ -1145,11 +1143,16 @@ class InteractivePlotMixin:
 
         def update_amp_marker(trow, aspect, prow, dfmean, dfoutput):
             rec_filter = prow.get("filter", "voltage")
-            if rec_filter != "voltage":
-                label_core = f"{rec_name} ({rec_filter})"
-            else:
-                label_core = rec_name
-            labelbase = f"{label_core} - stim {trow['stim']}"
+            if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
+                rec_filter = "voltage"
+            display_name = plot_identity.display_recording_name(
+                prow["ID"],
+                prow["recording_name"],
+                blind=bool(getattr(self.uistate.project, "blind_recordings", False)),
+                aliases=getattr(self.uistate.project, "blind_aliases", None),
+            )
+            stem = plot_series.recording_plot_label(display_name, rec_filter)
+            labelbase = f"{stem} - stim {trow['stim']}"
             labelamp = f"{labelbase} {aspect}"
             column_name = aspect.replace(" ", "_")
             t_aspect = f"t_{column_name}"
@@ -1182,7 +1185,17 @@ class InteractivePlotMixin:
                     amp_val = dfmean.loc[(dfmean["time"] >= t_amp_val - half) & (dfmean["time"] <= t_amp_val + half), rec_filter].mean()
                 amp = -(amp_val - amp_zero_plot)
 
-            self.uiplot.updateAmpMarker(labelamp, x, y, amp_x, amp_zero_plot, amp=amp)
+            self.uiplot.updateAmpMarker(
+                labelamp,
+                x,
+                y,
+                amp_x,
+                amp_zero_plot,
+                amp=amp,
+                rec_ID=prow["ID"],
+                stim=trow["stim"],
+                aspect_field=column_name,
+            )
 
         if aspect in ["EPSP amp", "volley amp"]:
             # print(f" - {aspect} updated")

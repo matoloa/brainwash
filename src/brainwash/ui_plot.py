@@ -786,13 +786,51 @@ class UIplot:
                 else:
                     line.set_visible(visible)
 
-    def _apply_drag_output_update(self, update: plot_stim.DragOutputUpdate, dfoutput, stim_num: int) -> None:
+    def _apply_drag_output_update(
+        self,
+        update: plot_stim.DragOutputUpdate,
+        dfoutput,
+        stim_num: int,
+        *,
+        rec_ID=None,
+        aspect_field=None,
+        norm_epsp: bool = False,
+    ) -> None:
         if update.method == "from_df":
-            self.updateOutLineFromDf(update.label, dfoutput, stim_num, update.column)
+            self.updateOutLineFromDf(
+                update.label,
+                dfoutput,
+                stim_num,
+                update.column,
+                rec_ID=rec_ID,
+                aspect_field=aspect_field,
+                norm_epsp=norm_epsp or (update.column or "").endswith("_norm"),
+            )
         elif update.method == "out_line":
-            self.updateOutLine(update.label)
+            # Live preview may be absent (Preview off / cleared); use df when possible.
+            col = update.column
+            if not col and aspect_field:
+                col = f"{aspect_field}_norm" if norm_epsp else aspect_field
+            if self.uistate.plot.mouseover_out is None and dfoutput is not None and col:
+                self.updateOutLineFromDf(
+                    update.label,
+                    dfoutput,
+                    stim_num,
+                    col,
+                    rec_ID=rec_ID,
+                    aspect_field=aspect_field,
+                    norm_epsp=norm_epsp or str(col).endswith("_norm"),
+                )
+            else:
+                self.updateOutLine(
+                    update.label,
+                    rec_ID=rec_ID,
+                    stim=stim_num,
+                    aspect_field=aspect_field,
+                    norm_epsp=norm_epsp,
+                )
         elif update.method == "out_mean":
-            self.updateOutMean(update.label, update.mean_value)
+            self.updateOutMean(update.label, update.mean_value, rec_ID=rec_ID, aspect_field=aspect_field)
 
     def _refresh_output_legends(self, uistate, *, is_pp: bool, current_level: str) -> None:
         dd_recs = uistate.plot.dict_rec_show
@@ -2011,9 +2049,20 @@ class UIplot:
         """
 
         data_x, data_y = plot_stim.validate_drag_update_inputs(prow, trow, aspect, data_x, data_y, amp)
-        label_core = plot_stim.drag_update_label_core(
+        # Prefer display stem used at plot time (blind aliases) so string fallback still works
+        rec_ID = prow["ID"]
+        rec_filter = prow.get("filter")
+        if pd.isna(rec_filter) or not rec_filter or rec_filter == "none":
+            rec_filter = "voltage"
+        display_name = plot_identity.display_recording_name(
+            rec_ID,
             prow["recording_name"],
-            prow.get("filter"),
+            blind=bool(getattr(self.uistate.project, "blind_recordings", False)),
+            aliases=getattr(self.uistate.project, "blind_aliases", None),
+        )
+        label_core = plot_stim.drag_update_label_core(
+            plot_series.recording_plot_label(display_name, rec_filter),
+            "voltage",  # recording_plot_label already applied filter suffix
             trow["stim"],
             aspect,
         )
@@ -2021,6 +2070,7 @@ class UIplot:
         stim_num = trow["stim"]
         has_dfoutput = dfoutput is not None
         norm = self.uistate.project.checkBox["norm_EPSP"]
+        aspect_field = aspect.replace(" ", "_")  # EPSP_amp / EPSP_slope / …
 
         if aspect in plot_stim.SLOPE_DRAG_ASPECTS:
             plan = plot_stim.build_slope_drag_update_plan(
@@ -2034,9 +2084,18 @@ class UIplot:
                 is_pp=is_pp,
                 has_dfoutput=has_dfoutput,
             )
-            self.updateLine(plan.marker_label, plan.marker_x, plan.marker_y)
+            self.updateLine(
+                plan.marker_label,
+                plan.marker_x,
+                plan.marker_y,
+                rec_ID=rec_ID,
+                stim=stim_num,
+                aspect_field=aspect_field,
+            )
             for out_update in plan.output_updates:
-                self._apply_drag_output_update(out_update, dfoutput, stim_num)
+                self._apply_drag_output_update(
+                    out_update, dfoutput, stim_num, rec_ID=rec_ID, aspect_field=aspect_field, norm_epsp=norm
+                )
         elif aspect in plot_stim.AMP_DRAG_ASPECTS:
             plan = plot_stim.build_amp_drag_update_plan(
                 trow,
@@ -2052,19 +2111,91 @@ class UIplot:
                 has_dfoutput=has_dfoutput,
             )
             geom = plan.geom
-            self.updateAmpMarker(plan.label_core, geom.t_amp, geom.y_position, geom.amp_x, geom.amp_zero, amp=plan.amp)
+            self.updateAmpMarker(
+                plan.label_core,
+                geom.t_amp,
+                geom.y_position,
+                geom.amp_x,
+                geom.amp_zero,
+                amp=plan.amp,
+                rec_ID=rec_ID,
+                stim=stim_num,
+                aspect_field=aspect_field,
+            )
             for out_update in plan.output_updates:
-                self._apply_drag_output_update(out_update, dfoutput, stim_num)
+                self._apply_drag_output_update(
+                    out_update, dfoutput, stim_num, rec_ID=rec_ID, aspect_field=aspect_field, norm_epsp=norm
+                )
 
     def _rec_entry_by_display(self, display_label: str):
         """Resolve dict_rec_labels entry by display_label (or legacy key)."""
         return plot_identity.find_entry_by_display_label(self.uistate.plot.dict_rec_labels, display_label)[1]
 
-    def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None, draw=False):
+    def _resolve_rec_entry(
+        self,
+        display_label: str | None = None,
+        *,
+        rec_ID=None,
+        stim=None,
+        aspect=None,
+        role=None,
+        axis=None,
+        variant=None,
+        x_mode=None,
+    ):
+        """Prefer identity filters (rec_ID/stim/role/aspect); fall back to display_label."""
+        store = self.uistate.plot.dict_rec_labels
+        if rec_ID is not None and role is not None:
+            hits = plot_identity.find_rec_entries(
+                store,
+                rec_ID=rec_ID,
+                stim=stim,
+                aspect=aspect,
+                role=role,
+                axis=axis,
+                variant=variant,
+                x_mode=x_mode,
+            )
+            if len(hits) == 1:
+                return hits[0][1]
+            if len(hits) > 1:
+                if display_label:
+                    for _k, ent in hits:
+                        if ent.get("display_label") == display_label:
+                            return ent
+                return hits[0][1]
+        if display_label:
+            ent = self._rec_entry_by_display(display_label)
+            if ent is not None:
+                return ent
+            return self.uistate.plot.dict_rec_labels.get(display_label)
+        return None
+
+    def updateAmpMarker(
+        self,
+        labelbase,
+        x,
+        y,
+        amp_x,
+        amp_zero,
+        amp=None,
+        draw=False,
+        *,
+        rec_ID=None,
+        stim=None,
+        aspect_field=None,
+    ):
         axe = self.uistate.plot.axe
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
-        marker_ent = self._rec_entry_by_display(f"{labelbase} marker")
+        marker_ent = self._resolve_rec_entry(
+            f"{labelbase} marker",
+            rec_ID=rec_ID,
+            stim=stim,
+            aspect=aspect_field,
+            role=plot_identity.ROLE_ASPECT_MARKER,
+            axis="axe",
+        )
         if marker_ent is None:
             print(f"updateAmpMarker: missing marker for {labelbase!r}")
             return
@@ -2073,8 +2204,22 @@ class UIplot:
         if amp_si is not None:
             is_zero_width = plot_stim.amp_x_is_zero_width(amp_x)
             amp_y = plot_stim.amp_width_y_coords(amp_si, amp_zero)
-            x_ent = self._rec_entry_by_display(f"{labelbase} x marker")
-            y_ent = self._rec_entry_by_display(f"{labelbase} y marker")
+            x_ent = self._resolve_rec_entry(
+                f"{labelbase} x marker",
+                rec_ID=rec_ID,
+                stim=stim,
+                aspect=aspect_field,
+                role=plot_identity.ROLE_AMP_X,
+                axis="axe",
+            )
+            y_ent = self._resolve_rec_entry(
+                f"{labelbase} y marker",
+                rec_ID=rec_ID,
+                stim=stim,
+                aspect=aspect_field,
+                role=plot_identity.ROLE_AMP_Y,
+                axis="axe",
+            )
             if x_ent is not None:
                 x_ent["line"].set_data(amp_x, [amp_y[1], amp_y[1]])
                 x_ent["is_zero_width"] = is_zero_width
@@ -2084,11 +2229,26 @@ class UIplot:
         if draw:
             axe.figure.canvas.draw_idle()
 
-    def updateLine(self, plot_to_update, x_data, y_data, draw=False):
+    def updateLine(
+        self,
+        plot_to_update,
+        x_data,
+        y_data,
+        draw=False,
+        *,
+        rec_ID=None,
+        stim=None,
+        aspect_field=None,
+    ):
         axe = self.uistate.plot.axe
-        dict_line = self._rec_entry_by_display(plot_to_update)
-        if dict_line is None:
-            dict_line = self.uistate.plot.dict_rec_labels.get(plot_to_update)
+        dict_line = self._resolve_rec_entry(
+            plot_to_update,
+            rec_ID=rec_ID,
+            stim=stim,
+            aspect=aspect_field,
+            role=plot_identity.ROLE_ASPECT_MARKER,
+            axis="axe",
+        )
         if dict_line is None:
             print(f"updateLine: missing {plot_to_update!r}")
             return
@@ -2096,13 +2256,23 @@ class UIplot:
         if draw:
             axe.figure.canvas.draw_idle()
 
-    def updateOutLine(self, label):
+    def updateOutLine(self, label, *, rec_ID=None, stim=None, aspect_field=None, norm_epsp: bool = False):
         print(f"updateOutLine: {label}")
         mouseover_out = self.uistate.plot.mouseover_out
         if mouseover_out is None:
             print(f"updateOutLine: mouseover_out is None, skipping update for '{label}'")
             return
-        linedict = self._rec_entry_by_display(label)
+        role = plot_identity.ROLE_SERIES_NORM if norm_epsp else plot_identity.ROLE_SERIES
+        linedict = self._resolve_rec_entry(
+            label,
+            rec_ID=rec_ID,
+            stim=stim,
+            aspect=aspect_field,
+            role=role,
+            axis=None,
+            variant="norm" if norm_epsp else "raw",
+            x_mode="sweep",
+        )
         if linedict is None:
             return
         linedict["line"].set_xdata(plot_drag.artist_xdata(mouseover_out[0]))
@@ -2202,7 +2372,18 @@ class UIplot:
                 if new_shade is not None:
                     new_shade["line"].set_visible(linedict["line"].get_visible())
 
-    def updateOutLineFromDf(self, label, dfoutput, stim_num, column, x_axis=None):
+    def updateOutLineFromDf(
+        self,
+        label,
+        dfoutput,
+        stim_num,
+        column,
+        x_axis=None,
+        *,
+        rec_ID=None,
+        aspect_field=None,
+        norm_epsp: bool = False,
+    ):
         """Populate an output line directly from a dfoutput DataFrame.
 
         Used on drag-release for amp aspects so that the persisted full-width
@@ -2210,7 +2391,7 @@ class UIplot:
         live-drag preview held in mouseover_out.
 
         Parameters
-        - label: key in dict_rec_labels to update
+        - label: display_label fallback (identity preferred when rec_ID given)
         - dfoutput: the fully-recalculated output DataFrame
         - stim_num: stim number (1-based) to filter dfoutput rows
         - column: column name to use for y-values (e.g. 'EPSP_amp' or 'EPSP_amp_norm')
@@ -2219,14 +2400,25 @@ class UIplot:
         xy = plot_series.out_line_xy_from_df(dfoutput, stim_num, column)
         if xy is None:
             print(f"updateOutLineFromDf: no data for stim={stim_num} col={column}, falling back to updateOutLine")
-            self.updateOutLine(label)
+            self.updateOutLine(
+                label, rec_ID=rec_ID, stim=stim_num, aspect_field=aspect_field, norm_epsp=norm_epsp
+            )
             return
 
-        linedict = self._rec_entry_by_display(label)
+        role = plot_identity.ROLE_SERIES_NORM if norm_epsp or str(column).endswith("_norm") else plot_identity.ROLE_SERIES
+        aspect = aspect_field or str(column).replace("_norm", "")
+        linedict = self._resolve_rec_entry(
+            label,
+            rec_ID=rec_ID,
+            stim=stim_num,
+            aspect=aspect,
+            role=role,
+            variant="norm" if role == plot_identity.ROLE_SERIES_NORM else "raw",
+            x_mode="sweep",
+        )
         if linedict is None:
             if self.uistate.experiment.experiment_type == "PP":
                 rec_label = label.split(" - stim ")[0]
-                aspect = column.replace("_norm", "")
                 for spec in plot_series.build_ppr_overlay_refresh_specs(
                     rec_label,
                     dfoutput,
@@ -2245,12 +2437,14 @@ class UIplot:
         x_mode = linedict.get("x_mode", "sweep")
         xy = plot_series.out_line_xy_from_df(dfoutput, stim_num, column, x_mode=x_mode)
         if xy is None:
-            self.updateOutLine(label)
+            self.updateOutLine(
+                label, rec_ID=rec_ID, stim=stim_num, aspect_field=aspect_field, norm_epsp=norm_epsp
+            )
             return
         linedict["line"].set_xdata(xy[0])
         linedict["line"].set_ydata(xy[1])
 
-    def updateOutMean(self, label, mean):
+    def updateOutMean(self, label, mean, *, rec_ID=None, aspect_field=None):
         """Update a mean *axhline* (e.g. volley amp/slope mean) to a new y level.
 
         Must not copy geometry from mouseover_out: that artist is the live rec
@@ -2258,7 +2452,12 @@ class UIplot:
         from the hline's old length crashes matplotlib draw (broadcast mismatch).
         """
         print(f"updateOutMean: {label}, {mean}")
-        linedict = self._rec_entry_by_display(label)
+        linedict = self._resolve_rec_entry(
+            label,
+            rec_ID=rec_ID,
+            aspect=aspect_field,
+            role=plot_identity.ROLE_SERIES_MEAN_HLINE,
+        )
         if linedict is None:
             return
         y = plot_stim.mean_hline_ydata(mean, x_len=2)

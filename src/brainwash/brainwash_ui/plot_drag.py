@@ -2,11 +2,44 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 
 SWEEP_OUTPUT_ASPECTS = frozenset({"EPSP_amp", "EPSP_slope", "volley_amp", "volley_slope"})
+# Roles that share aspect=EPSP_amp / volley_amp on axe but are *not* the drag handle.
+_AMP_NON_HANDLE_ROLES = frozenset({"amp_x", "amp_y", "amp_zero", "amp_width", "event_trace", "series"})
+
+
+def is_axe_aspect_drag_handle(entry: Mapping | None) -> bool:
+    """True for the single per-aspect handle used for mouseover/drag zones.
+
+    Amp also registers amp_x / amp_y / amp_zero with the same aspect on axe;
+    those must not supply the amp move zone (they used to overwrite it).
+    """
+    if not isinstance(entry, dict):
+        return False
+    if entry.get("axis") != "axe":
+        return False
+    aspect = entry.get("aspect")
+    if aspect not in SWEEP_OUTPUT_ASPECTS:
+        return False
+    role = entry.get("role")
+    if role in _AMP_NON_HANDLE_ROLES:
+        return False
+    if role == "aspect_marker":
+        return True
+    # Legacy entries without role: label ends with the aspect handle name only.
+    disp = str(entry.get("display_label") or "")
+    if aspect == "EPSP_amp":
+        return disp.endswith("EPSP amp marker")
+    if aspect == "volley_amp":
+        return disp.endswith("volley amp marker")
+    if aspect == "EPSP_slope":
+        return disp.endswith("EPSP slope marker")
+    if aspect == "volley_slope":
+        return disp.endswith("volley slope marker")
+    return False
 
 
 def amp_move_zone(x: float, y: float, *, x_margin: float, y_margin: float) -> dict[str, tuple[float, float]]:

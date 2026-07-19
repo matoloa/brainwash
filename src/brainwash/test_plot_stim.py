@@ -96,11 +96,26 @@ def test_drag_update_label_core_and_output_label():
     assert plot_stim.amp_output_column("EPSP amp", True) == "EPSP_amp_norm"
 
 
-def test_build_slope_drag_update_plan_pp_from_df():
+def test_build_slope_drag_update_plan_from_df_when_dfoutput():
+    """Non-PP EPSP slope release must not depend on mouseover_out (Preview off)."""
     trow = {"t_stim": 0.04, "stim": 1, "t_EPSP_slope_start": 0.045, "t_EPSP_slope_end": 0.055}
     data_x = np.linspace(0, 0.02, 5)
     data_y = data_x * 0.1
-    plan = plot_stim.build_slope_drag_update_plan(
+    for is_pp in (True, False):
+        plan = plot_stim.build_slope_drag_update_plan(
+            trow,
+            "EPSP slope",
+            0.04,
+            data_x,
+            data_y,
+            "rec1 - stim 1 EPSP slope",
+            norm_epsp=False,
+            is_pp=is_pp,
+            has_dfoutput=True,
+        )
+        assert plan.output_updates[0].method == "from_df"
+        assert plan.output_updates[0].column == "EPSP_slope"
+    plan_no_df = plot_stim.build_slope_drag_update_plan(
         trow,
         "EPSP slope",
         0.04,
@@ -108,11 +123,10 @@ def test_build_slope_drag_update_plan_pp_from_df():
         data_y,
         "rec1 - stim 1 EPSP slope",
         norm_epsp=False,
-        is_pp=True,
-        has_dfoutput=True,
+        is_pp=False,
+        has_dfoutput=False,
     )
-    assert plan.output_updates[0].method == "from_df"
-    assert plan.output_updates[0].column == "EPSP_slope"
+    assert plan_no_df.output_updates[0].method == "out_line"
 
 
 def test_build_amp_drag_update_plan_volley_mean():

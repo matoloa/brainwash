@@ -21,6 +21,37 @@ def test_amp_move_zone():
     assert zone == {"x": (0.9, 1.1), "y": (1.8, 2.2)}
 
 
+def test_is_axe_aspect_drag_handle_excludes_amp_chrome():
+    """amp_x / amp_y / amp_zero share aspect=EPSP_amp but must not set the move zone."""
+    handle = {
+        "axis": "axe",
+        "role": "aspect_marker",
+        "aspect": "EPSP_amp",
+        "display_label": "rec - stim 1 EPSP amp marker",
+    }
+    assert plot_drag.is_axe_aspect_drag_handle(handle)
+    for role in ("amp_x", "amp_y", "amp_zero"):
+        assert not plot_drag.is_axe_aspect_drag_handle(
+            {
+                "axis": "axe",
+                "role": role,
+                "aspect": "EPSP_amp",
+                "display_label": f"rec - stim 1 EPSP amp {role} marker",
+            }
+        )
+    assert plot_drag.is_axe_aspect_drag_handle(
+        {
+            "axis": "axe",
+            "role": "aspect_marker",
+            "aspect": "EPSP_slope",
+            "display_label": "rec - stim 1 EPSP slope marker",
+        }
+    )
+    assert not plot_drag.is_axe_aspect_drag_handle(
+        {"axis": "ax1", "role": "aspect_marker", "aspect": "EPSP_amp", "display_label": "x"}
+    )
+
+
 def test_slope_drag_state():
     start, end, move, resize = plot_drag.slope_drag_state(
         [0.0, 1.0, 2.0],
