@@ -1649,7 +1649,14 @@ class UIplot:
         rec_filter = p_row["filter"]  # the filter currently used for this recording
         n_stims = len(dft)
         skip_output = plot_series.skip_pp_recording_output(self.uistate.experiment.experiment_type, n_stims)
-        label = plot_series.recording_plot_label(rec_name, rec_filter)
+        # Presentation stem only; storage keys use rec_ID. Real name stays in df_project.
+        display_name = plot_identity.display_recording_name(
+            rec_ID,
+            rec_name,
+            blind=bool(getattr(self.uistate.project, "blind_recordings", False)),
+            aliases=getattr(self.uistate.project, "blind_aliases", None),
+        )
+        label = plot_series.recording_plot_label(display_name, rec_filter)
 
         if self.uistate.experiment.experiment_type == "io":
             _, y_col_base = plot_series.io_axis_columns(
@@ -2267,23 +2274,3 @@ class UIplot:
                 line.set_xdata([0.0, 1.0])
         line.set_ydata(y)
 
-    #####################################################################
-    #     #DEPRECATED FUNCTIONS - TO BE REMOVED IN FUTURE RELEASES      #
-    #####################################################################
-
-    def updateEPSPout(self, rec_name, out):
-        # OBSOLETE - dict_rec_labels path for norm refresh (no stim-specific data).
-        dict_rec_labels = self.uistate.plot.dict_rec_labels
-        draw_axes: set[str] = set()
-        for label, col in plot_series.deprecated_epsp_output_refresh_labels(rec_name):
-            if label not in dict_rec_labels or col not in out:
-                continue
-            entry = dict_rec_labels[label]
-            entry["line"].set_ydata(out[col])
-            axis = entry.get("axis")
-            if axis in ("ax1", "ax2"):
-                draw_axes.add(axis)
-        for axid in draw_axes:
-            axis = self.get_axis(axid)
-            if axis is not None:
-                axis.figure.canvas.draw_idle()

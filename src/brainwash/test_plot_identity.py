@@ -110,6 +110,53 @@ def test_legend_label_prefers_display_label():
     assert pi.legend_label_for_entry({}, fallback_key="fallback") == "fallback"
 
 
+def test_display_recording_name_blind_hook():
+    assert pi.display_recording_name("r1", "slice07", blind=False) == "slice07"
+    assert pi.display_recording_name("r1", "slice07", blind=True, aliases={"r1": "Rec 1"}) == "Rec 1"
+    assert pi.display_recording_name(2, "abf", blind=True) == "Rec 2"
+
+
+def test_build_blind_aliases_random_new_episode():
+    import random
+
+    ids = [10, 2, 3]
+    a = pi.build_blind_aliases(ids, rng=random.Random(0))
+    b = pi.build_blind_aliases(ids, rng=random.Random(1))
+    # Full covering of Rec 1..N
+    assert set(a.values()) == {"Rec 1", "Rec 2", "Rec 3"}
+    assert set(a.keys()) == {"2", "3", "10"}
+    # Not the old sorted-by-ID assignment (Rec 1 → smallest ID always)
+    sorted_by_id = {"2": "Rec 1", "3": "Rec 2", "10": "Rec 3"}
+    # At least one seed should differ from sorted-by-ID; both must be valid bijections
+    assert a != sorted_by_id or b != sorted_by_id
+    # Different seeds can produce different maps
+    assert a == pi.build_blind_aliases(ids, rng=random.Random(0))
+    # Incremental: keep existing labels; new ID gets next free Rec n
+    grown = pi.build_blind_aliases([10, 2, 3, 1], existing=a)
+    assert grown["2"] == a["2"]
+    assert grown["3"] == a["3"]
+    assert grown["10"] == a["10"]
+    assert grown["1"] == "Rec 4"
+    # Empty existing after unblind → new shuffle (not reuse)
+    fresh = pi.build_blind_aliases(ids, existing={}, rng=random.Random(2))
+    assert set(fresh.values()) == {"Rec 1", "Rec 2", "Rec 3"}
+
+
+def test_recording_name_sort_key_natural_rec():
+    assert pi.recording_name_sort_key("Rec 2") < pi.recording_name_sort_key("Rec 10")
+    assert pi.recording_name_sort_key("Rec 1") < pi.recording_name_sort_key("Rec 2")
+    assert pi.recording_name_sort_key("Rec 10") < pi.recording_name_sort_key("zzz")
+
+
+def test_replace_recording_stem_for_legend_labels():
+    assert pi.replace_recording_stem("slice07", "slice07", "Rec 1") == "Rec 1"
+    assert pi.replace_recording_stem("mean slice07", "slice07", "Rec 1") == "mean Rec 1"
+    assert pi.replace_recording_stem("slice07 - stim 1 EPSP amp", "slice07", "Rec 1") == "Rec 1 - stim 1 EPSP amp"
+    assert pi.replace_recording_stem("slice07 (savgol)", "slice07", "Rec 1") == "Rec 1 (savgol)"
+    # reverse unblind
+    assert pi.replace_recording_stem("Rec 1 - stim 1 EPSP amp", "Rec 1", "slice07") == "slice07 - stim 1 EPSP amp"
+
+
 def test_find_entry_by_display_label():
     store = {
         "rec|r1|ax1|series|s1|EPSP_amp|raw|sweep": {

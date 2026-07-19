@@ -215,6 +215,13 @@ class TableMixin:
         selected_ids = self._selected_recording_ids() if restore_selection else []
         df_project = self.get_df_project()
         self._sync_tablemodel_sort_from_project_pref(df_project)
+        if getattr(self.uistate.project, "blind_recordings", False) and hasattr(self, "_ensure_blind_aliases"):
+            self._ensure_blind_aliases()
+        if hasattr(self, "tablemodel") and self.tablemodel is not None:
+            self.tablemodel.set_blind_display(
+                blind=bool(getattr(self.uistate.project, "blind_recordings", False)),
+                aliases=getattr(self.uistate.project, "blind_aliases", None) or {},
+            )
         self.tablemodel.setData(df_project)
         self.formatTableLayout()
         self.tableProj.resizeColumnsToContents()

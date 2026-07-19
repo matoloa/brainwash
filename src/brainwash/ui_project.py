@@ -133,7 +133,9 @@ class ProjectMixin:
             bw_version=self.config.version,
             force_reset=self.config.force_cfg_reset,
         )
-        self.mainwindow.setWindowTitle(f"Brainwash {self.config.version} - {self.projectname}")
+        if self.uistate.project.blind_recordings:
+            self._ensure_blind_aliases()
+        self._update_window_title()
 
         # Load group data
         self.dd_groups = self.group_get_dd()
@@ -152,6 +154,10 @@ class ProjectMixin:
         self.darkmode()  # set darkmode if set in bw_cfg. Requires tables and canvases be loaded!
         self.setTableStimVisibility(self.uistate.project.showTimetable)
         self.setupToolBar()
+        self._sync_blinded_toolframe()
+        self._sync_blind_menu_action()
+        if hasattr(self, "tableUpdate"):
+            self.tableUpdate(restore_selection=False)
         # set focus to TableProj, so that arrows work immediately
         self.tableProj.setFocus()
         self.updating_tableProj = False  # v0.16_n: init guard used by tableUpdate() (called from set_df_project)
@@ -172,6 +178,8 @@ class ProjectMixin:
         self.uistate.darkmode = True
         self.uistate.project.showTimetable = False
         self.uistate.plot.showHeatmap = False
+        # Global preference (bw_cfg.yaml only; not per-project cfg.pkl)
+        self.always_blind_new_projects = False
 
         # Load config if present
         if self.config.bw_cfg_yaml is not None:
@@ -187,6 +195,7 @@ class ProjectMixin:
                     self.uistate.darkmode = cfg.get("darkmode", True)
                     self.uistate.project.showTimetable = cfg.get("showTimetable", False)
                     self.uistate.plot.showHeatmap = cfg.get("showHeatmap", False)
+                    self.always_blind_new_projects = bool(cfg.get("always_blind_new_projects", False))
         else:
             self.bw_cfg_yaml = None  # Make sure it's defined for consistency
 
@@ -203,6 +212,7 @@ class ProjectMixin:
             "darkmode": self.uistate.darkmode,
             "showTimetable": self.uistate.project.showTimetable,
             "showHeatmap": self.uistate.plot.showHeatmap,
+            "always_blind_new_projects": bool(getattr(self, "always_blind_new_projects", False)),
         }
         path = Path(self.bw_cfg_yaml)  # ensure Path
         path.parent.mkdir(parents=True, exist_ok=True)  # critical for XDG/portable
@@ -308,6 +318,9 @@ class ProjectMixin:
         self.loadProject()
         self.set_df_project()
         self.write_bw_cfg()
+        # Global pref only — does not affect Open of existing projects.
+        if getattr(self, "always_blind_new_projects", False) and hasattr(self, "triggerBlindRecordings"):
+            self.triggerBlindRecordings()
 
     def openProject(self, str_projectfolder):
         self.clearProject()
@@ -337,7 +350,7 @@ class ProjectMixin:
             if Path(dict_old["cache"]).exists():
                 dict_old["cache"].rename(self.dict_folders["cache"])
             self.write_bw_cfg()  # update boot-up-path in bw_cfg.yaml to new project folder
-            self.mainwindow.setWindowTitle(f"Brainwash {self.config.version} - {self.projectname}")
+            self._update_window_title()
         else:
             print(f"Project name {new_project_name} is not a valid path.")
 
@@ -562,6 +575,200 @@ class ProjectMixin:
             self.frameToolTest.setVisible(self._should_show_stat_test_frame())  # controlled ONLY by menu or hide button (viewTools); no auto-hide on IO
         if hasattr(self, "frameToolTestOptions"):
             self.frameToolTestOptions.setVisible(True)
+        # Blinded strip is not in viewTools (cannot hide via View menu)
+        self._sync_blinded_toolframe()
+
+    # ------------------------------------------------------------------
+    # Recording name blinding (#5) — display only
+    # ------------------------------------------------------------------
+
+    def _update_window_title(self):
+        """Window title: Brainwash {version} - {project}[ - BLINDED]."""
+        if not hasattr(self, "mainwindow") or self.mainwindow is None:
+            return
+        version = getattr(self.config, "version", "")
+        name = getattr(self, "projectname", "") or ""
+        title = f"Brainwash {version} - {name}"
+        if getattr(self.uistate.project, "blind_recordings", False):
+            title += " - BLINDED"
+        self.mainwindow.setWindowTitle(title)
+
+    def _ensure_blind_aliases(self, *, force_new: bool = False):
+        """Ensure rec_ID → Rec n map for the current blind episode.
+
+        force_new: discard any map and mint a fresh random bijection (Blind recordings).
+        Otherwise preserve the episode map and only fill in newly added IDs.
+        """
+        from brainwash_ui import plot_identity
+
+        df_p = self.get_df_project() if hasattr(self, "get_df_project") else getattr(self, "df_project", None)
+        if df_p is None or getattr(df_p, "empty", True) or "ID" not in getattr(df_p, "columns", []):
+            self.uistate.project.blind_aliases = {}
+            return
+        existing = None if force_new else (self.uistate.project.blind_aliases or None)
+        self.uistate.project.blind_aliases = plot_identity.build_blind_aliases(
+            df_p["ID"].tolist(),
+            existing=existing,
+        )
+
+    def _sync_rec_display_labels_for_blind(self):
+        """Rewrite dict_rec_labels display_label stems real↔blind without changing storage keys."""
+        from brainwash_ui import plot_identity
+
+        proj = self.uistate.project
+        blind = bool(proj.blind_recordings)
+        aliases = proj.blind_aliases or {}
+        df_p = self.get_df_project() if hasattr(self, "get_df_project") else getattr(self, "df_project", None)
+        id_to_real = {}
+        if df_p is not None and not getattr(df_p, "empty", True) and "ID" in df_p.columns:
+            for _, row in df_p.iterrows():
+                rid = row["ID"]
+                real = row.get("recording_name", "")
+                id_to_real[rid] = real
+                id_to_real[str(rid)] = real
+
+        store = getattr(self.uistate.plot, "dict_rec_labels", None) or {}
+        for _key, entry in store.items():
+            if not isinstance(entry, dict):
+                continue
+            rid = entry.get("rec_ID")
+            real = id_to_real.get(rid)
+            if real is None:
+                real = id_to_real.get(str(rid))
+            if real is None:
+                continue
+            display = plot_identity.display_recording_name(rid, real, blind=True, aliases=aliases)
+            old_label = entry.get("display_label") or ""
+            if blind:
+                new_label = plot_identity.replace_recording_stem(str(old_label), str(real), str(display))
+            else:
+                new_label = plot_identity.replace_recording_stem(str(old_label), str(display), str(real))
+            entry["display_label"] = new_label
+            line = entry.get("line")
+            if line is not None and hasattr(line, "set_label"):
+                try:
+                    cur = line.get_label()
+                    if cur and not str(cur).startswith("_"):
+                        if blind:
+                            line.set_label(plot_identity.replace_recording_stem(str(cur), str(real), str(display)))
+                        else:
+                            line.set_label(plot_identity.replace_recording_stem(str(cur), str(display), str(real)))
+                    else:
+                        line.set_label(new_label)
+                except Exception:
+                    pass
+
+    def _sync_blinded_toolframe(self):
+        """Show compact Blinded strip at top of tools when blinded; hide when not.
+
+        Not registered in viewTools — no View-menu hide. Double-click × unblinds.
+        """
+        if not hasattr(self, "verticalLayout_2"):
+            return
+        blind = bool(getattr(self.uistate.project, "blind_recordings", False))
+        frame = getattr(self, "frameToolBlinded", None)
+        if frame is None:
+            parent = getattr(self, "scrollAreaWidgetContentsTools", None)
+            frame = QtWidgets.QFrame(parent)
+            frame.setObjectName("frameToolBlinded")
+            size_policy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+            frame.setSizePolicy(size_policy)
+            frame.setMinimumSize(QtCore.QSize(201, 36))
+            frame.setFrameShape(QtWidgets.QFrame.StyledPanel)
+            frame.setFrameShadow(QtWidgets.QFrame.Raised)
+            row = QtWidgets.QHBoxLayout(frame)
+            row.setContentsMargins(8, 4, 4, 4)
+            row.setSpacing(4)
+            label = QtWidgets.QLabel("Blinded")
+            label.setObjectName("label_blinded")
+            font = label.font()
+            font.setBold(True)
+            label.setFont(font)
+            label.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+            remove_btn = ui_widgets.EntityRemoveButton(0, "BLINDED", object_prefix="blind_unblind")
+            remove_btn.removeRequested.connect(lambda _id: self.triggerUnblindRecordings())
+            remove_btn.hoverEntered.connect(self._on_blind_unblind_hover_enter)
+            remove_btn.hoverLeft.connect(self._on_entity_remove_hover_leave)
+            row.addWidget(label, 1)
+            row.addWidget(remove_btn, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+            self.verticalLayout_2.insertWidget(0, frame)
+            self.frameToolBlinded = frame
+            self._blind_unblind_btn = remove_btn
+        frame.setVisible(blind)
+
+    def _on_blind_unblind_hover_enter(self, _entity_ID, _entity_name):
+        if not hasattr(self, "set_statusbar"):
+            return
+        self.uistate.stat_test.statusbar_state = "attention"
+        self.set_statusbar("attention", "Double-click to unblind")
+
+    def _clear_recording_selection(self):
+        """Deselect project table and clear plot selection lists (after Blind)."""
+        if hasattr(self, "tableProj") and self.tableProj is not None:
+            try:
+                self.tableProj.clearSelection()
+            except Exception:
+                pass
+        if hasattr(self, "uistate"):
+            self.uistate.plot.list_idx_select_recs = []
+            self.uistate.plot.df_recs2plot = None
+
+    def _sync_blind_menu_action(self):
+        """Data menu: Blind recordings only; hidden while blinded (unblind via strip ×)."""
+        action = getattr(self, "actionBlindRecordings", None)
+        if action is None:
+            return
+        action.setText("Blind recordings")
+        action.setVisible(not bool(getattr(self.uistate.project, "blind_recordings", False)))
+        action.setEnabled(True)
+
+    def triggerAlwaysBlindNewProjects(self, checked=False):
+        """Data menu checkbox → global bw_cfg.yaml; applied only on New project."""
+        self.always_blind_new_projects = bool(checked)
+        if hasattr(self, "actionAlwaysBlindNewProjects"):
+            self.actionAlwaysBlindNewProjects.setChecked(self.always_blind_new_projects)
+        self.write_bw_cfg()
+
+    def triggerBlindRecordings(self):
+        """Data → Blind recordings: new random aliases, deselect, sort by display name."""
+        if getattr(self.uistate.project, "blind_recordings", False):
+            return
+        # Each Blind episode mints a fresh map (unblind destroyed the previous one).
+        self._ensure_blind_aliases(force_new=True)
+        self.uistate.project.blind_recordings = True
+        self.uistate.project.project_table_sort = {"column": "recording_name", "order": 0}
+        self._clear_recording_selection()
+        self._apply_blind_ui_state(restore_selection=False)
+        if hasattr(self, "_save_cfg_now"):
+            self._save_cfg_now()
+        elif hasattr(self, "dict_folders"):
+            self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
+
+    def triggerUnblindRecordings(self):
+        """Blinded toolframe × only: restore real names; destroy placeholders."""
+        if not getattr(self.uistate.project, "blind_recordings", False):
+            return
+        # Rewrite legends while aliases still present, then destroy the episode map.
+        self.uistate.project.blind_recordings = False
+        self._sync_rec_display_labels_for_blind()
+        self.uistate.project.blind_aliases = {}
+        self._apply_blind_ui_state(skip_label_rewrite=True, restore_selection=True)
+        if hasattr(self, "_save_cfg_now"):
+            self._save_cfg_now()
+        elif hasattr(self, "dict_folders"):
+            self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
+
+    def _apply_blind_ui_state(self, *, skip_label_rewrite: bool = False, restore_selection: bool = True):
+        """Title, strip, table DisplayRole, legend stems, menu label, graph refresh."""
+        if not skip_label_rewrite and getattr(self.uistate.project, "blind_recordings", False):
+            self._sync_rec_display_labels_for_blind()
+        self._update_window_title()
+        self._sync_blinded_toolframe()
+        self._sync_blind_menu_action()
+        if hasattr(self, "tableUpdate"):
+            self.tableUpdate(restore_selection=restore_selection)
+        if hasattr(self, "graphRefresh"):
+            self.graphRefresh(reeval_formal_test=False)
 
     def build_dict_folders(self):
         dict_folders = {

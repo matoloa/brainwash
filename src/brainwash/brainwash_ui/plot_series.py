@@ -434,18 +434,6 @@ def pp_group_box_store_items(spec: PpGroupBoxPlotSpec) -> tuple[PpGroupBarStoreI
     return tuple(items)
 
 
-DEPRECATED_EPSP_OUTPUT_SUFFIXES = (
-    ("EPSP amp", "EPSP_amp"),
-    ("EPSP amp norm", "EPSP_amp_norm"),
-    ("EPSP slope", "EPSP_slope"),
-    ("EPSP slope norm", "EPSP_slope_norm"),
-)
-
-
-def deprecated_epsp_output_refresh_labels(rec_name: str) -> tuple[tuple[str, str], ...]:
-    return tuple((f"{rec_name} {suffix}", col) for suffix, col in DEPRECATED_EPSP_OUTPUT_SUFFIXES)
-
-
 def build_pp_group_bar_plot_specs(
     *,
     aggregate: PprLevelAggregate,
@@ -702,9 +690,19 @@ def collect_pp_group_bar_patch_specs(
     """
     specs: list[tuple[float, float, str]] = []
     for key, val in dict_group_show.items():
-        if "PPR" not in key or val.get("is_overlay"):
+        role = val.get("role")
+        disp = str(val.get("display_label") or key)
+        if val.get("is_overlay"):
             continue
-        if "point" in key:
+        if role == "pp_point" or (role is None and "point" in disp):
+            continue
+        is_pp_box = (
+            val.get("is_pp_box")
+            or role == "pp_box"
+            or ("PPR" in disp and "point" not in disp)
+            or ("PPR" in str(key) and "point" not in str(key))
+        )
+        if not is_pp_box:
             continue
         level = val.get("level")
         if level is not None and level != current_level:
@@ -716,7 +714,7 @@ def collect_pp_group_bar_patch_specs(
             try:
                 x = float(val["pp_box_x"])
                 w = float(val.get("pp_box_width", 0.5))
-                tick_label = val.get("pp_tick_label") or group_display_name(key.split(" PPR")[0])
+                tick_label = val.get("pp_tick_label") or group_display_name(disp.split(" PPR")[0] if " PPR" in disp else disp)
                 specs.append((x - w / 2.0, w, tick_label))
                 continue
             except Exception:
@@ -726,7 +724,7 @@ def collect_pp_group_bar_patch_specs(
             continue
         try:
             patch = line.patches[0]
-            base_name = key.split(" PPR")[0]
+            base_name = disp.split(" PPR")[0] if " PPR" in disp else disp
             specs.append((patch.get_x(), patch.get_width(), group_display_name(base_name)))
         except Exception:
             pass

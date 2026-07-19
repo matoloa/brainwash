@@ -1,10 +1,14 @@
 """Plot artist identity: storage keys vs display labels.
 
-Storage keys are stable IDs (rec_ID / group_ID + role + geometry). Display labels
-are human-facing and may later follow blind aliases without rekeying the store.
+**Contract**
 
-Call sites still use name-based keys until migration PRs land; these helpers are
-the single source of truth for the target scheme.
+- ``dict_rec_labels`` / ``dict_group_labels`` keys are **identity** (``rec|…`` /
+  ``grp|…`` / ``sys|…``), not user-facing legend text.
+- ``entry["display_label"]`` is **presentation** (recording/group name today;
+  blind aliases later). Legends and drag string bridges use this field.
+- Never rewrite ``df_project["recording_name"]`` or parquet paths for display.
+
+``display_recording_name`` is the hook for issue #5 (blinding).
 """
 
 from __future__ import annotations
@@ -78,6 +82,102 @@ def _tok(value) -> str:
     if value is None or value == "":
         return "-"
     return str(value).replace("|", "_")
+
+
+def display_recording_name(
+    rec_ID,
+    real_name: str,
+    *,
+    blind: bool = False,
+    aliases: dict | None = None,
+) -> str:
+    """Human-facing recording name for table/legend (identity keys stay real).
+
+    When *blind* is True, prefer *aliases[rec_ID]* (e.g. ``Rec 1``); never mutate
+    the underlying project table or storage keys.
+    """
+    if not blind:
+        return real_name if real_name is not None else ""
+    if aliases:
+        for key in (rec_ID, str(rec_ID)):
+            if key in aliases:
+                return str(aliases[key])
+    # Stable fallback until alias map is built by the UI
+    return f"Rec {rec_ID}"
+
+
+def build_blind_aliases(
+    rec_ids: Iterable,
+    existing: dict | None = None,
+    *,
+    rng=None,
+) -> dict[str, str]:
+    """Map str(rec_ID) → ``Rec n``.
+
+    New episode (*existing* empty): random bijection of ``Rec 1..N`` (not ID order).
+    Within an episode (*existing* set): keep labels; new IDs get the next free ``Rec n``.
+    Unblind clears *existing*; the next Blind must pass empty *existing* for a fresh shuffle.
+    """
+    import random as _random
+
+    ids = list(rec_ids or [])
+    try:
+        ordered = sorted(ids, key=lambda x: int(x))
+    except (TypeError, ValueError):
+        ordered = sorted(ids, key=lambda x: str(x))
+    live = {str(rid) for rid in ordered}
+    prev = {str(k): str(v) for k, v in (existing or {}).items() if str(k) in live}
+    if not prev:
+        labels = [f"Rec {i}" for i in range(1, len(ordered) + 1)]
+        shuffler = rng if rng is not None else _random
+        shuffler.shuffle(labels)
+        return {str(rid): lab for rid, lab in zip(ordered, labels)}
+    used = set(prev.values())
+    n = 1
+    for rid in ordered:
+        key = str(rid)
+        if key in prev:
+            continue
+        while f"Rec {n}" in used:
+            n += 1
+        label = f"Rec {n}"
+        prev[key] = label
+        used.add(label)
+        n += 1
+    return prev
+
+
+def recording_name_sort_key(display_name: str):
+    """Sort key for table: natural order for ``Rec N``, else casefold string."""
+    import re
+
+    s = "" if display_name is None else str(display_name)
+    m = re.fullmatch(r"Rec\s+(\d+)", s.strip(), flags=re.IGNORECASE)
+    if m:
+        return (0, int(m.group(1)))
+    return (1, s.casefold())
+
+
+def replace_recording_stem(label: str, old_stem: str, new_stem: str) -> str:
+    """Swap recording name stem inside a plot display_label (legend presentation).
+
+    Handles exact match, leading stem (``name - stim…``), and ``mean {stem}…``.
+    """
+    if not label or not old_stem or old_stem == new_stem:
+        return label if label is not None else ""
+    s = str(label)
+    old = str(old_stem)
+    new = str(new_stem)
+    if s == old:
+        return new
+    mean_prefix = f"mean {old}"
+    if s.startswith(mean_prefix):
+        return f"mean {new}" + s[len(mean_prefix) :]
+    if s.startswith(old):
+        return new + s[len(old) :]
+    if old in s:
+        return s.replace(old, new)
+    return s
 
 
 def storage_key_rec(

@@ -382,19 +382,6 @@ class InteractivePlotMixin:
                     continue
                 p.mouseover_action = action
                 plotMouseover(action, axe)
-
-                # Debugging block
-                if False:
-                    prow = self.get_prow()
-                    rec_name = prow["recording_name"]
-                    rec_ID = prow["ID"]
-                    trow = self.get_trow()
-                    # new_dict = {key: value for key, value in self.uistate.plot.dict_rec_labels.items() if value.get('stim') == stim_num and value.get('rec_ID') == rec_ID and value.get('axis') == 'ax2'}
-                    # EPSP_slope = new_dict.get(f"{rec_name} - stim {stim_num} EPSP slope")
-                    EPSP_slope = self.uistate.plot.dict_rec_labels.get(f"{rec_name} - stim {trow['stim']} EPSP slope")
-                    line = EPSP_slope.get("line")
-                    line.set_linewidth(10)
-                    print(f"{EPSP_slope} - {action}")
                 break
 
             if self.uistate.plot.mouseover_action is None:

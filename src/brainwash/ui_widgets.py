@@ -203,6 +203,14 @@ class TableModel(QtCore.QAbstractTableModel):
         self._sort_order = QtCore.Qt.AscendingOrder
         # Optional: fn(column: int, order: Qt.SortOrder) after user/API sort.
         self._sort_changed_callback = None
+        # Display-only blinding (#5): never mutates underlying DataFrame.
+        self.blind_recordings = False
+        self.blind_aliases = {}
+
+    def set_blind_display(self, *, blind: bool, aliases: dict | None = None) -> None:
+        """Configure DisplayRole masking for recording_name / path."""
+        self.blind_recordings = bool(blind)
+        self.blind_aliases = dict(aliases or {})
 
     def data(self, index, role=None):  # dataCell
         if role is None:
@@ -210,6 +218,22 @@ class TableModel(QtCore.QAbstractTableModel):
             return value
         if role == QtCore.Qt.DisplayRole:
             value = self._data.iloc[index.row(), index.column()]
+            if self.blind_recordings and self._data is not None:
+                col = self._data.columns[index.column()]
+                if col == "path":
+                    return "—"
+                if col == "recording_name":
+                    from brainwash_ui import plot_identity
+
+                    rid = None
+                    if "ID" in self._data.columns:
+                        rid = self._data.iloc[index.row()]["ID"]
+                    return plot_identity.display_recording_name(
+                        rid,
+                        "" if value is None else str(value),
+                        blind=True,
+                        aliases=self.blind_aliases,
+                    )
             return str(value)
 
     def dataRow(self, index, role=None):
@@ -233,6 +257,29 @@ class TableModel(QtCore.QAbstractTableModel):
             if orientation == QtCore.Qt.Vertical:
                 return str(self._data.index[section])
 
+    def _display_sort_keys_for_column(self, col: str):
+        """Keys matching DisplayRole when blinded (recording_name / path)."""
+        from brainwash_ui import plot_identity
+
+        if col == "path":
+            # All cells show "—"; keep relative order stable.
+            return list(range(len(self._data)))
+        if col == "recording_name":
+            keys = []
+            has_id = "ID" in self._data.columns
+            for i in range(len(self._data)):
+                real = self._data.iloc[i][col]
+                rid = self._data.iloc[i]["ID"] if has_id else None
+                disp = plot_identity.display_recording_name(
+                    rid,
+                    "" if real is None else str(real),
+                    blind=True,
+                    aliases=self.blind_aliases,
+                )
+                keys.append(plot_identity.recording_name_sort_key(disp))
+            return keys
+        return None
+
     def _apply_remembered_sort(self) -> None:
         if self._sort_column is None:
             return
@@ -242,6 +289,12 @@ class TableModel(QtCore.QAbstractTableModel):
             return
         col = self._data.columns[self._sort_column]
         ascending = self._sort_order == QtCore.Qt.AscendingOrder
+        if self.blind_recordings:
+            disp_keys = self._display_sort_keys_for_column(str(col))
+            if disp_keys is not None:
+                order = sorted(range(len(disp_keys)), key=lambda i: disp_keys[i], reverse=not ascending)
+                self._data = self._data.iloc[order].reset_index(drop=True)
+                return
         self._data = self._data.sort_values(col, ascending=ascending)
 
     def setData(self, data: pd.DataFrame = None):

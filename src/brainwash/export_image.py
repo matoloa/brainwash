@@ -761,12 +761,17 @@ def render_publication_figure(
                     for label, info in uistate.plot.dict_group_labels.items():
                         if info.get("aspect") != panel:
                             continue
-                        if "overlay" in label or info.get("is_overlay"):
+                        if info.get("is_overlay"):
+                            continue
+                        disp = str(info.get("display_label") or label)
+                        if info.get("is_overlay") or info.get("role") == "pp_point":
                             continue
                         if info.get("is_pp_box") and info.get("pp_box_x") is not None:
                             bx = float(info["pp_box_x"])
                             bw = float(info.get("pp_box_width", 0.5))
-                            tick_lab = info.get("pp_tick_label") or label.split(" PPR")[0]
+                            tick_lab = info.get("pp_tick_label") or (
+                                disp.split(" PPR")[0] if " PPR" in disp else disp
+                            )
                             bar_specs.append((bx - bw / 2.0, bw, tick_lab))
                             continue
                         line_obj = info.get("line")
@@ -776,7 +781,8 @@ def render_publication_figure(
                             patches = line_obj.patches
                             if patches:
                                 p = patches[0]
-                                bar_specs.append((p.get_x(), p.get_width(), label.split(" PPR")[0]))
+                                gname = disp.split(" PPR")[0] if " PPR" in disp else disp
+                                bar_specs.append((p.get_x(), p.get_width(), gname))
                         except Exception:
                             pass
                     x_ticks, x_ticklabels = plot_series.pp_group_tick_label_map(bar_specs)

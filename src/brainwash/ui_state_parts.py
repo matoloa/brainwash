@@ -158,6 +158,9 @@ class ProjectPersistedState:
         self.detailedTimetable = False
         # Project table header sort: column name (stable) + 0=asc / 1=desc. None = unsorted.
         self.project_table_sort = {"column": None, "order": 0}
+        # Display-only blinding (#5): never mutates df_project / paths / storage keys.
+        self.blind_recordings = False
+        self.blind_aliases = {}  # str(rec_ID) -> "Rec n"
         self.pushButtons = {
             "pushButton_stim_add": "triggerStimAdd",
             "pushButton_stim_remove": "triggerStimRemove",
@@ -200,6 +203,8 @@ class ProjectPersistedState:
             "detailedTimetable": self.detailedTimetable,
             "project_table_sort": self._normalize_project_table_sort(self.project_table_sort),
             "output_line_style": self.output_line_style if self.output_line_style in ("dots", "line") else "dots",
+            "blind_recordings": bool(self.blind_recordings),
+            "blind_aliases": {str(k): str(v) for k, v in (self.blind_aliases or {}).items()},
         }
 
     def apply_state_dict(self, state: dict, *, zoom_defaults: dict) -> None:
@@ -246,6 +251,12 @@ class ProjectPersistedState:
         self.project_table_sort = self._normalize_project_table_sort(state.get("project_table_sort"))
         style = state.get("output_line_style", "dots")
         self.output_line_style = style if style in ("dots", "line") else "dots"
+        self.blind_recordings = bool(state.get("blind_recordings", False))
+        raw_aliases = state.get("blind_aliases") or {}
+        if isinstance(raw_aliases, dict):
+            self.blind_aliases = {str(k): str(v) for k, v in raw_aliases.items()}
+        else:
+            self.blind_aliases = {}
 
 
 class ExperimentConfig:

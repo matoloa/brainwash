@@ -145,6 +145,18 @@ class MenuMixin:
         self.actionReAnalyzeRecordings.setShortcut("A")
         self.menuData.addAction(self.actionReAnalyzeRecordings)
 
+        self.actionBlindRecordings = QtWidgets.QAction("Blind recordings")
+        self.actionBlindRecordings.triggered.connect(self.triggerBlindRecordings)
+        self.menuData.addAction(self.actionBlindRecordings)
+        if hasattr(self, "_sync_blind_menu_action"):
+            self._sync_blind_menu_action()
+
+        self.actionAlwaysBlindNewProjects = QtWidgets.QAction("Always blind new projects")
+        self.actionAlwaysBlindNewProjects.setCheckable(True)
+        self.actionAlwaysBlindNewProjects.setChecked(bool(getattr(self, "always_blind_new_projects", False)))
+        self.actionAlwaysBlindNewProjects.triggered.connect(self.triggerAlwaysBlindNewProjects)
+        self.menuData.addAction(self.actionAlwaysBlindNewProjects)
+
         # Test sets: create via Tag tool "Add to Test Set"; remove via per-row ×; menu clear-all only
         self.actionClearTestSets = QtWidgets.QAction("Clear all test sets")
         self.actionClearTestSets.triggered.connect(self.triggerClearTestSets)

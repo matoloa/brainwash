@@ -221,11 +221,6 @@ def test_build_pp_group_box_plot_specs():
     assert len(specs[0].scatter_points) == 3
 
 
-def test_deprecated_epsp_output_refresh_labels():
-    labels = plot_series.deprecated_epsp_output_refresh_labels("rec1")
-    assert labels[0] == ("rec1 EPSP amp", "EPSP_amp")
-
-
 def test_build_pp_group_bar_plot_specs():
     agg = plot_series.PprLevelAggregate(
         ppr_data={"EPSP_amp": [2.0, 4.0], "EPSP_slope": [], "volley_amp": [], "volley_slope": []},

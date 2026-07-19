@@ -60,6 +60,77 @@ def test_entity_remove_button_double_click_and_hover(qtbot):
     assert alias.objectName() == "testset_remove_1"
 
 
+def test_tablemodel_blind_display_masks_name_and_path(qtbot):
+    """DisplayRole blinds name/path; underlying DataFrame keeps real values."""
+    import pandas as pd
+    from PyQt5 import QtCore
+
+    from ui_widgets import TableModel
+
+    df = pd.DataFrame(
+        {
+            "ID": [1, 2],
+            "recording_name": ["slice_A", "slice_B"],
+            "path": ["/secret/a.abf", "/secret/b.abf"],
+        }
+    )
+    model = TableModel(df)
+    # Real values when not blind
+    assert model.data(model.index(0, 1), QtCore.Qt.DisplayRole) == "slice_A"
+    assert model.data(model.index(0, 2), QtCore.Qt.DisplayRole) == "/secret/a.abf"
+    # Underlying access (role=None) still real
+    assert model.data(model.index(0, 1), None) == "slice_A"
+
+    model.set_blind_display(blind=True, aliases={"1": "Rec 1", "2": "Rec 2"})
+    assert model.data(model.index(0, 1), QtCore.Qt.DisplayRole) == "Rec 1"
+    assert model.data(model.index(1, 1), QtCore.Qt.DisplayRole) == "Rec 2"
+    assert model.data(model.index(0, 2), QtCore.Qt.DisplayRole) == "—"
+    # DataFrame / non-Display access unchanged
+    assert model._data.iloc[0]["recording_name"] == "slice_A"
+    assert model._data.iloc[0]["path"] == "/secret/a.abf"
+    assert model.data(model.index(0, 1), None) == "slice_A"
+
+
+def test_tablemodel_sort_by_display_recording_name_when_blind(qtbot):
+    """Blind sort uses Rec n order, not real recording_name lexicographic order."""
+    import pandas as pd
+    from PyQt5 import QtCore
+
+    from ui_widgets import TableModel
+
+    # Real names would sort: high_z, mid_m, low_a
+    # Aliases intentionally reverse-ish: high_z→Rec 1, mid_m→Rec 3, low_a→Rec 2
+    df = pd.DataFrame(
+        {
+            "ID": [10, 20, 30],
+            "recording_name": ["high_z", "mid_m", "low_a"],
+            "path": ["/z", "/m", "/a"],
+        }
+    )
+    model = TableModel(df)
+    model.set_blind_display(
+        blind=True,
+        aliases={"10": "Rec 1", "20": "Rec 3", "30": "Rec 2"},
+    )
+    name_col = list(df.columns).index("recording_name")
+    model.sort(name_col, QtCore.Qt.AscendingOrder)
+    # Display order Rec 1, Rec 2, Rec 3 → IDs 10, 30, 20
+    assert list(model._data["ID"]) == [10, 30, 20]
+    assert list(model._data["recording_name"]) == ["high_z", "low_a", "mid_m"]
+    # Natural: Rec 10 after Rec 2
+    df2 = pd.DataFrame(
+        {
+            "ID": [1, 2, 3],
+            "recording_name": ["a", "b", "c"],
+            "path": ["p1", "p2", "p3"],
+        }
+    )
+    model2 = TableModel(df2)
+    model2.set_blind_display(blind=True, aliases={"1": "Rec 10", "2": "Rec 2", "3": "Rec 1"})
+    model2.sort(0 if df2.columns[0] == "recording_name" else list(df2.columns).index("recording_name"), QtCore.Qt.AscendingOrder)
+    assert list(model2._data["ID"]) == [3, 2, 1]
+
+
 def test_radio_group_updates_checked_button(qtbot):
     group = QtWidgets.QButtonGroup()
     box = QtWidgets.QWidget()

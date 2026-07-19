@@ -183,11 +183,11 @@ Follow “one rename family per PR” spirit; each PR green on pytest.
 - Display labels remain human names; legend already prefers `display_label`  
 - Export PP + `x_axis_xlim` / PPR extractors use role/metadata instead of name-split keys  
 
-### PR-6 — Cleanup
+### PR-6 — Cleanup — **done**
 
-- Remove `startswith(rec_name)`, deprecated `updateEPSPout` name lists if dead  
-- Docs: short note in `AGENTS.md` or `brainwash_ui` docstring: *keys are identity; display_label is presentation*  
-- Unlock #5 design: `display_recording_name(rec_ID)` feeds display_label only  
+- Removed dead `updateEPSPout` / `deprecated_epsp_output_refresh_labels`  
+- PP collect/export/xlim use role + `display_label` (not name-split keys)  
+- `AGENTS.md` plot-identity contract; `display_recording_name` hook for #5  
 
 ---
 

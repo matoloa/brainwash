@@ -27,6 +27,7 @@ This file provides instructions for AI agents (Grok, Claude, etc.) and human con
    - **State & Singletons**: `uistate` (from `ui_state_classes.py`) is the source of truth. `UIsub` sets `self.uistate` / `self.config` / `self.uiplot`; all mixins use `self.*` — no module-level singleton injection.
    - **compute_statistical_comparison**: Keep as thin dispatcher where possible. Avoid 1000+ LOC god function growth. Extract helpers for new modes (IO, PP, etc.).
    - **Statusbar**: One source of truth via `_get_statusbar_for_current_state()` or equivalent. IO ANCOVA must produce `{"config": {"type": "IO ANCOVA", ...}}` (accept legacy `"IO regression"`).
+   - **Plot artist identity**: `dict_rec_labels` / `dict_group_labels` keys are **opaque identity** (`rec|…` / `grp|…` via `brainwash_ui.plot_identity`), not legend text. Human names live in `entry["display_label"]`. Lookups: metadata (`find_rec_entries`) or `find_entry_by_display_label`. Do not re-introduce `recording_name` as storage keys. Plan: `work_plans/plan_plot_artist_identity.md`. Blinding (#5) must only change presentation (`display_recording_name` / DisplayRole), never keys or `df_project`.
 
 4. **Naming (human-readable, conservative renames encouraged)**
    - Prefer names understandable to a new contributor without deep context (verb phrases for functions, domain nouns for modules).

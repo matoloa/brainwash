@@ -28,6 +28,8 @@ def test_cfg_pickle_roundtrip():
     u.stat_test.test_fdr = True
     u.project.checkBox["EPSP_slope"] = False
     u.project.project_table_sort = {"column": "recording_name", "order": 1}
+    u.project.blind_recordings = True
+    u.project.blind_aliases = {"1": "Rec 1", "7": "Rec 2"}
     with tempfile.TemporaryDirectory() as tmp:
         folder = Path(tmp)
         u.save_cfg(folder, bw_version="9.9.9")
@@ -39,6 +41,8 @@ def test_cfg_pickle_roundtrip():
         assert u2.project.checkBox["EPSP_slope"] is False
         assert u2.project.version == "9.9.9"
         assert u2.project.project_table_sort == {"column": "recording_name", "order": 1}
+        assert u2.project.blind_recordings is True
+        assert u2.project.blind_aliases == {"1": "Rec 1", "7": "Rec 2"}
 
 
 def test_amp_slope_view_ignore_volley_under_relative():
@@ -80,6 +84,8 @@ def test_project_table_sort_normalize_and_legacy_cfg():
     p.reset()
     p.apply_state_dict({"version": "0.1"}, zoom_defaults=p.zoom.copy())
     assert p.project_table_sort == {"column": None, "order": 0}
+    assert p.blind_recordings is False
+    assert p.blind_aliases == {}
 
 
 def test_migrate_legacy_volley_magenta_to_green():
