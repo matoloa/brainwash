@@ -117,7 +117,22 @@ class InteractivePlotMixin:
             else:
                 label_core = rec_name
             label = f"{label_core} - stim {trow['stim']}"
-            dict_event = self.uistate.plot.dict_rec_labels[label]
+            from brainwash_ui import plot_identity as pi
+
+            dict_event = pi.find_entry_by_display_label(self.uistate.plot.dict_rec_labels, label)[1]
+            if dict_event is None:
+                # Metadata fallback: event trace on axe for this stim
+                hits = pi.find_rec_entries(
+                    self.uistate.plot.dict_rec_labels,
+                    rec_ID=prow["ID"],
+                    stim=trow["stim"],
+                    axis="axe",
+                    role=pi.ROLE_EVENT_TRACE,
+                )
+                dict_event = hits[0][1] if hits else None
+            if dict_event is None:
+                self.uistate.plot.dragging = False
+                return
             data_x = plot_drag.artist_xdata(dict_event["line"])
             data_y = plot_drag.artist_ydata(dict_event["line"])
             self.uistate.plot.x_on_click = data_x[np.abs(data_x - x).argmin()]  # time-value of the nearest index
@@ -236,8 +251,18 @@ class InteractivePlotMixin:
                 # find corresponding selection marker:
                 stim_str = f"- stim {stim}"
                 label = f"mean {label_core} {stim_str} marker"
-                stim_marker = self.uistate.plot.dict_rec_labels.get(label)
-                # print(f"{label}: {stim_marker}")
+                from brainwash_ui import plot_identity as pi
+
+                stim_marker = pi.find_entry_by_display_label(self.uistate.plot.dict_rec_labels, label)[1]
+                if stim_marker is None:
+                    hits = pi.find_rec_entries(
+                        self.uistate.plot.dict_rec_labels,
+                        rec_ID=prow["ID"],
+                        stim=stim,
+                        axis="axm",
+                        role=pi.ROLE_STIM_MARKER,
+                    )
+                    stim_marker = hits[0][1] if hits else None
                 # zorder mouseovered marker to top, alpha 1
                 if stim_marker is not None:
                     stim_marker_line = stim_marker.get("line")
@@ -248,7 +273,18 @@ class InteractivePlotMixin:
                 # reset all stim markers to default zorder and alpha
                 stim_str = f"- stim {stim}"
                 label = f"mean {label_core} {stim_str} marker"
-                stim_marker = self.uistate.plot.dict_rec_labels.get(label)
+                from brainwash_ui import plot_identity as pi
+
+                stim_marker = pi.find_entry_by_display_label(self.uistate.plot.dict_rec_labels, label)[1]
+                if stim_marker is None:
+                    hits = pi.find_rec_entries(
+                        self.uistate.plot.dict_rec_labels,
+                        rec_ID=prow["ID"],
+                        stim=stim,
+                        axis="axm",
+                        role=pi.ROLE_STIM_MARKER,
+                    )
+                    stim_marker = hits[0][1] if hits else None
                 if stim_marker is not None:
                     stim_marker_line = stim_marker.get("line")
                     stim_marker_line.set_zorder(0)
@@ -649,10 +685,19 @@ class InteractivePlotMixin:
             return
         stim_num = trow["stim"]
         self.uistate.setMargins(axe=self.uistate.plot.axe)
+        from brainwash_ui import plot_identity as pi
+
         dict_labels = {
             key: value
             for key, value in self.uistate.plot.dict_rec_labels.items()
-            if key.endswith(" marker") and value["rec_ID"] == rec_ID and value["axis"] == "axe" and value["stim"] == stim_num
+            if isinstance(value, dict)
+            and str(value.get("rec_ID")) == str(rec_ID)
+            and value.get("axis") == "axe"
+            and pi._stim_equal(value.get("stim"), stim_num)
+            and (
+                value.get("role") == pi.ROLE_ASPECT_MARKER
+                or str(value.get("display_label") or key).endswith(" marker")
+            )
         }
 
         if not dict_labels:
@@ -661,21 +706,23 @@ class InteractivePlotMixin:
             self.graphRefresh()
             return
 
-        for label, value in dict_labels.items():
+        for key, value in dict_labels.items():
             line = value["line"]
-            if label.endswith("EPSP amp marker"):
+            disp = str(value.get("display_label") or key)
+            aspect = value.get("aspect")
+            if aspect == "EPSP_amp" or disp.endswith("EPSP amp marker"):
                 x, y = plot_drag.artist_xy_first(line)
                 self.uistate.updatePointDragZone(aspect="EPSP amp move", x=x, y=y)
-            elif label.endswith("volley amp marker"):
+            elif aspect == "volley_amp" or disp.endswith("volley amp marker"):
                 x, y = plot_drag.artist_xy_first(line)
                 self.uistate.updatePointDragZone(aspect="volley amp move", x=x, y=y)
-            elif label.endswith("EPSP slope marker"):
+            elif aspect == "EPSP_slope" or disp.endswith("EPSP slope marker"):
                 self.uistate.updateDragZones(
                     aspect="EPSP slope",
                     x=plot_drag.artist_xdata(line),
                     y=plot_drag.artist_ydata(line),
                 )
-            elif label.endswith("volley slope marker"):
+            elif aspect == "volley_slope" or disp.endswith("volley slope marker"):
                 self.uistate.updateDragZones(
                     aspect="volley slope",
                     x=plot_drag.artist_xdata(line),
@@ -703,7 +750,17 @@ class InteractivePlotMixin:
         ]
 
         for aspect_prefix, marker_suffix, is_slope in aspects:
-            markers = {k: v for k, v in self.uistate.plot.dict_rec_show.items() if k.endswith(marker_suffix)}
+            markers = {
+                k: v
+                for k, v in self.uistate.plot.dict_rec_show.items()
+                if isinstance(v, dict)
+                and (
+                    v.get("aspect") == aspect_prefix
+                    and v.get("role") in ("aspect_marker", None)
+                    or str(v.get("display_label") or k).endswith(marker_suffix.strip())
+                    or str(k).endswith(marker_suffix)
+                )
+            }
             for marker in markers.values():
                 p_row = df_p.loc[df_p["ID"] == marker["rec_ID"]].squeeze()
                 dfmean = self.get_dfmean(row=p_row)

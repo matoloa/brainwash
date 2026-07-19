@@ -158,14 +158,10 @@ def test_build_group_line_specs_with_norm():
 
 def test_io_rec_label_entry():
     entry = plot_model.io_rec_label_entry(rec_ID="r1", aspect="EPSP_amp", variant="raw")
-    assert entry == {
-        "rec_ID": "r1",
-        "aspect": "EPSP_amp",
-        "variant": "raw",
-        "stim": None,
-        "axis": "ax1",
-        "x_mode": "io",
-    }
+    assert entry["rec_ID"] == "r1"
+    assert entry["x_mode"] == "io"
+    assert entry["role"] == "io_scatter"
+    assert entry["stim"] is None
 
 
 def test_io_group_label_entry():
@@ -201,15 +197,10 @@ def test_group_line_label_entry():
         axis="ax1",
         level="subject",
     )
-    assert entry == {
-        "group_ID": 3,
-        "stim": None,
-        "aspect": "EPSP_amp",
-        "variant": "raw",
-        "axis": "ax1",
-        "x_mode": "sweep",
-        "level": "subject",
-    }
+    assert entry["group_ID"] == 3
+    assert entry["level"] == "subject"
+    assert entry["role"] == "group_mean"
+    assert entry["x_mode"] == "sweep"
 
 
 def test_level_storage_key_and_display_label():

@@ -1,7 +1,7 @@
 import time  # counting time for functions
 import warnings
 
-from brainwash_ui import plot_drag, plot_model, plot_series, plot_stim, plot_testsets
+from brainwash_ui import plot_drag, plot_identity, plot_model, plot_series, plot_stim, plot_testsets
 
 import matplotlib.pyplot as plt  # for the scatterplot
 import numpy as np
@@ -739,7 +739,7 @@ class UIplot:
         if "Events y zero marker" not in self.uistate.plot.dict_rec_labels:
             hline0 = self.uistate.plot.axe.axhline(0, linestyle="dotted", alpha=0.3)
             self.uistate.plot.dict_rec_labels["Events y zero marker"] = {
-                **plot_model.reference_hline_label_entry(axis="axe"),
+                **plot_model.reference_hline_label_entry(axis="axe", display_label="Events y zero marker"),
                 "line": hline0,
             }
         uistate.plot.dict_rec_labels["Events y zero marker"]["line"].set_visible(True)
@@ -759,11 +759,11 @@ class UIplot:
                     color=uistate.project.settings["rgb_EPSP_slope"],
                 )
                 self.uistate.plot.dict_rec_labels["output amp 100% marker"] = {
-                    **plot_model.reference_hline_label_entry(axis="ax1"),
+                    **plot_model.reference_hline_label_entry(axis="ax1", display_label="output amp 100% marker"),
                     "line": hline100ax1,
                 }
                 self.uistate.plot.dict_rec_labels["output slope 100% marker"] = {
-                    **plot_model.reference_hline_label_entry(axis="ax2"),
+                    **plot_model.reference_hline_label_entry(axis="ax2", display_label="output slope 100% marker"),
                     "line": hline100ax2,
                 }
             uistate.plot.dict_rec_labels["output amp 100% marker"]["line"].set_visible(uistate.ampView())
@@ -1092,6 +1092,7 @@ class UIplot:
         marker=None,
         markersize=None,
         linestyle="-",
+        role=None,
     ):
         is_pp = self.uistate.experiment.experiment_type == "PP"
         if is_pp and axid in ("ax1", "ax2") and "PPR" not in label:
@@ -1110,7 +1111,12 @@ class UIplot:
             kwargs["markersize"] = markersize
         (line,) = self.get_axis(axid).plot(x, y, **kwargs)
         line.set_visible(False)
-        self.uistate.plot.dict_rec_labels[label] = {
+        if role is None:
+            role = plot_identity.infer_rec_role(label, kind="line", axid=axid, aspect=aspect, variant=variant)
+        storage_key = plot_identity.storage_key_rec(
+            rec_ID=rec_ID, axis=axid, role=role, stim=stim, aspect=aspect, variant=variant, x_mode=x_mode
+        )
+        self.uistate.plot.dict_rec_labels[storage_key] = {
             **plot_model.rec_label_entry(
                 rec_ID=rec_ID,
                 aspect=aspect,
@@ -1118,6 +1124,8 @@ class UIplot:
                 stim=stim,
                 axis=axid,
                 x_mode=x_mode,
+                role=role,
+                display_label=label,
             ),
             "line": line,
         }
@@ -1135,11 +1143,17 @@ class UIplot:
         stim=None,
         variant="raw",
         x_mode="stim",
+        role=None,
     ):
         alpha = self.uistate.project.settings.get("alpha_shade", 0.3)
         fill = self.get_axis(axid).fill_between(x, y_mean - sem, y_mean + sem, alpha=alpha, color=color, zorder=0)
         fill.set_visible(False)
-        self.uistate.plot.dict_rec_labels[label] = {
+        if role is None:
+            role = plot_identity.ROLE_SHADE
+        storage_key = plot_identity.storage_key_rec(
+            rec_ID=rec_ID, axis=axid, role=role, stim=stim, aspect=aspect, variant=variant, x_mode=x_mode
+        )
+        self.uistate.plot.dict_rec_labels[storage_key] = {
             **plot_model.rec_label_entry(
                 rec_ID=rec_ID,
                 aspect=aspect,
@@ -1147,6 +1161,8 @@ class UIplot:
                 stim=stim,
                 axis=axid,
                 x_mode=x_mode,
+                role=role,
+                display_label=label,
             ),
             "line": fill,
         }
@@ -1163,6 +1179,7 @@ class UIplot:
         stim=None,
         variant="raw",
         x_mode=None,
+        role=None,
     ):
         is_pp = self.uistate.experiment.experiment_type == "PP"
         if is_pp and axid in ("ax1", "ax2") and "PPR" not in label:
@@ -1179,7 +1196,12 @@ class UIplot:
             label=label,
         )
         marker.set_visible(False)
-        self.uistate.plot.dict_rec_labels[label] = {
+        if role is None:
+            role = plot_identity.infer_rec_role(label, kind="marker", axid=axid, aspect=aspect, variant=variant)
+        storage_key = plot_identity.storage_key_rec(
+            rec_ID=rec_ID, axis=axid, role=role, stim=stim, aspect=aspect, variant=variant, x_mode=x_mode
+        )
+        self.uistate.plot.dict_rec_labels[storage_key] = {
             **plot_model.rec_label_entry(
                 rec_ID=rec_ID,
                 aspect=aspect,
@@ -1187,6 +1209,8 @@ class UIplot:
                 stim=stim,
                 axis=axid,
                 x_mode=x_mode,
+                role=role,
+                display_label=label,
             ),
             "line": marker,
         }
@@ -1226,7 +1250,13 @@ class UIplot:
         )
         xline.set_visible(False)
         yline.set_visible(False)
-        self.uistate.plot.dict_rec_labels[f"{label} x marker"] = {
+        x_key = plot_identity.storage_key_rec(
+            rec_ID=rec_ID, axis=axid, role=plot_identity.ROLE_AMP_X, stim=stim, aspect=aspect, variant=variant, x_mode=x_mode
+        )
+        y_key = plot_identity.storage_key_rec(
+            rec_ID=rec_ID, axis=axid, role=plot_identity.ROLE_AMP_Y, stim=stim, aspect=aspect, variant=variant, x_mode=x_mode
+        )
+        self.uistate.plot.dict_rec_labels[x_key] = {
             **plot_model.amp_width_marker_entry(
                 rec_ID=rec_ID,
                 aspect=aspect,
@@ -1235,10 +1265,12 @@ class UIplot:
                 axis=axid,
                 x_mode=x_mode,
                 is_zero_width=is_zero_width,
+                role=plot_identity.ROLE_AMP_X,
+                display_label=f"{label} x marker",
             ),
             "line": xline,
         }
-        self.uistate.plot.dict_rec_labels[f"{label} y marker"] = {
+        self.uistate.plot.dict_rec_labels[y_key] = {
             **plot_model.amp_width_marker_entry(
                 rec_ID=rec_ID,
                 aspect=aspect,
@@ -1247,6 +1279,8 @@ class UIplot:
                 axis=axid,
                 x_mode=x_mode,
                 is_zero_width=False,
+                role=plot_identity.ROLE_AMP_Y,
+                display_label=f"{label} y marker",
             ),
             "line": yline,
         }
@@ -1263,6 +1297,7 @@ class UIplot:
         linewidth=8,
         variant="raw",
         x_mode=None,
+        role=None,
     ):
         vline = self.get_axis(axid).axvline(
             x=x,
@@ -1273,7 +1308,12 @@ class UIplot:
             zorder=0,
         )
         vline.set_visible(False)
-        self.uistate.plot.dict_rec_labels[label] = {
+        if role is None:
+            role = plot_identity.infer_rec_role(label, kind="vline", axid=axid, aspect=aspect, variant=variant)
+        storage_key = plot_identity.storage_key_rec(
+            rec_ID=rec_ID, axis=axid, role=role, stim=stim, aspect=aspect, variant=variant, x_mode=x_mode
+        )
+        self.uistate.plot.dict_rec_labels[storage_key] = {
             **plot_model.rec_label_entry(
                 rec_ID=rec_ID,
                 aspect=aspect,
@@ -1281,6 +1321,8 @@ class UIplot:
                 stim=stim,
                 axis=axid,
                 x_mode=x_mode,
+                role=role,
+                display_label=label,
             ),
             "line": vline,
         }
@@ -1297,6 +1339,7 @@ class UIplot:
         linewidth=1,
         variant="raw",
         x_mode=None,
+        role=None,
     ):
         is_pp = self.uistate.experiment.experiment_type == "PP"
         if is_pp and axid in ("ax1", "ax2") and "PPR" not in label:
@@ -1310,7 +1353,12 @@ class UIplot:
             zorder=0,
         )
         hline.set_visible(False)
-        self.uistate.plot.dict_rec_labels[label] = {
+        if role is None:
+            role = plot_identity.infer_rec_role(label, kind="hline", axid=axid, aspect=aspect, variant=variant)
+        storage_key = plot_identity.storage_key_rec(
+            rec_ID=rec_ID, axis=axid, role=role, stim=stim, aspect=aspect, variant=variant, x_mode=x_mode
+        )
+        self.uistate.plot.dict_rec_labels[storage_key] = {
             **plot_model.rec_label_entry(
                 rec_ID=rec_ID,
                 aspect=aspect,
@@ -1318,6 +1366,8 @@ class UIplot:
                 stim=stim,
                 axis=axid,
                 x_mode=x_mode,
+                role=role,
+                display_label=label,
             ),
             "line": hline,
         }
@@ -1369,6 +1419,7 @@ class UIplot:
                 variant=raw_spec.variant,
                 axis=axid,
                 level=eff_level,
+                display_label=raw_spec.display_label,
             ),
             "line": meanline,
             "fill": meanfill,
@@ -1401,6 +1452,7 @@ class UIplot:
                     variant=norm_spec.variant,
                     axis=axid,
                     level=eff_level,
+                    display_label=norm_spec.display_label,
                 ),
                 "line": normline,
                 "fill": normfill,
@@ -1436,12 +1488,22 @@ class UIplot:
                 zorder=2,
             )
             scatter.set_visible(False)
-            self.uistate.plot.dict_rec_labels[spec.label] = {
+            sk = plot_identity.storage_key_rec(
+                rec_ID=rec_ID,
+                axis=axid,
+                role=plot_identity.ROLE_IO_SCATTER,
+                aspect=spec.aspect,
+                variant=spec.variant,
+                x_mode="io",
+            )
+            self.uistate.plot.dict_rec_labels[sk] = {
                 **plot_model.io_rec_label_entry(
                     rec_ID=rec_ID,
                     aspect=spec.aspect,
                     variant=spec.variant,
                     axis=axid,
+                    role=plot_identity.ROLE_IO_SCATTER,
+                    display_label=spec.label,
                 ),
                 "line": scatter,
             }
@@ -1456,12 +1518,22 @@ class UIplot:
                 zorder=1,
             )
             trendline.set_visible(False)
-            self.uistate.plot.dict_rec_labels[spec.label] = {
+            sk = plot_identity.storage_key_rec(
+                rec_ID=rec_ID,
+                axis=axid,
+                role=plot_identity.ROLE_IO_TREND,
+                aspect=spec.aspect,
+                variant=spec.variant,
+                x_mode="io",
+            )
+            self.uistate.plot.dict_rec_labels[sk] = {
                 **plot_model.io_rec_label_entry(
                     rec_ID=rec_ID,
                     aspect=spec.aspect,
                     variant=spec.variant,
                     axis=axid,
+                    role=plot_identity.ROLE_IO_TREND,
+                    display_label=spec.label,
                 ),
                 "line": trendline,
             }
@@ -1681,8 +1753,9 @@ class UIplot:
                     self._hide_plot_artist(art)
                 except Exception:
                     pass
+            box_disp = f"{group_name} PPR {spec.aspect} box"
             self.uistate.plot.dict_group_labels[
-                self._level_key(f"{group_name} PPR {spec.aspect} box", level)
+                self._level_key(box_disp, level)
             ] = {
                 **plot_model.pp_group_bar_label_entry(
                     group_ID=group_ID,
@@ -1691,6 +1764,8 @@ class UIplot:
                     axis=spec.axid,
                     rec_ID=None,
                     is_overlay=False,
+                    role=plot_identity.ROLE_PP_BOX,
+                    display_label=box_disp,
                 ),
                 "line": box_artist,
                 "fill": box_artist,
@@ -1705,8 +1780,9 @@ class UIplot:
             }
         for scat_art, rid in scat_artists:
             self._hide_plot_artist(scat_art)
+            pt_disp = f"{group_name} PPR {spec.aspect} {rid} point"
             self.uistate.plot.dict_group_labels[
-                self._level_key(f"{group_name} PPR {spec.aspect} {rid} point", level)
+                self._level_key(pt_disp, level)
             ] = {
                 **plot_model.pp_group_bar_label_entry(
                     group_ID=group_ID,
@@ -1715,6 +1791,8 @@ class UIplot:
                     axis=spec.axid,
                     rec_ID=rid,
                     is_overlay=False,
+                    role=plot_identity.ROLE_PP_POINT,
+                    display_label=pt_disp,
                 ),
                 "line": scat_art,
                 "fill": scat_art,
@@ -1739,6 +1817,8 @@ class UIplot:
                     variant=spec.variant,
                     axis="ax1",
                     level=spec.level,
+                    role=plot_identity.ROLE_IO_SCATTER,
+                    display_label=spec.label,
                 ),
                 "line": scatter,
                 "fill": scatter,
@@ -1762,6 +1842,8 @@ class UIplot:
                     variant=spec.variant,
                     axis="ax1",
                     level=spec.level,
+                    role=plot_identity.ROLE_IO_TREND,
+                    display_label=spec.label,
                 ),
                 "line": trendline,
                 "fill": trendline,
@@ -1942,25 +2024,42 @@ class UIplot:
             for out_update in plan.output_updates:
                 self._apply_drag_output_update(out_update, dfoutput, stim_num)
 
+    def _rec_entry_by_display(self, display_label: str):
+        """Resolve dict_rec_labels entry by display_label (or legacy key)."""
+        return plot_identity.find_entry_by_display_label(self.uistate.plot.dict_rec_labels, display_label)[1]
+
     def updateAmpMarker(self, labelbase, x, y, amp_x, amp_zero, amp=None, draw=False):
         axe = self.uistate.plot.axe
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
-        self.uistate.plot.dict_rec_labels[f"{labelbase} marker"]["line"].set_data(x, y)
+        marker_ent = self._rec_entry_by_display(f"{labelbase} marker")
+        if marker_ent is None:
+            print(f"updateAmpMarker: missing marker for {labelbase!r}")
+            return
+        marker_ent["line"].set_data(x, y)
         amp_si = plot_stim.resolve_drag_amp_si(amp, float(y[0]), amp_zero)
         if amp_si is not None:
             is_zero_width = plot_stim.amp_x_is_zero_width(amp_x)
             amp_y = plot_stim.amp_width_y_coords(amp_si, amp_zero)
-            self.uistate.plot.dict_rec_labels[f"{labelbase} x marker"]["line"].set_data(amp_x, [amp_y[1], amp_y[1]])
-            self.uistate.plot.dict_rec_labels[f"{labelbase} y marker"]["line"].set_data([x[0], x[0]], amp_y)
-            self.uistate.plot.dict_rec_labels[f"{labelbase} x marker"]["is_zero_width"] = is_zero_width
-            self.uistate.plot.dict_rec_labels[f"{labelbase} y marker"]["is_zero_width"] = False
+            x_ent = self._rec_entry_by_display(f"{labelbase} x marker")
+            y_ent = self._rec_entry_by_display(f"{labelbase} y marker")
+            if x_ent is not None:
+                x_ent["line"].set_data(amp_x, [amp_y[1], amp_y[1]])
+                x_ent["is_zero_width"] = is_zero_width
+            if y_ent is not None:
+                y_ent["line"].set_data([x[0], x[0]], amp_y)
+                y_ent["is_zero_width"] = False
         if draw:
             axe.figure.canvas.draw_idle()
 
     def updateLine(self, plot_to_update, x_data, y_data, draw=False):
         axe = self.uistate.plot.axe
-        dict_line = self.uistate.plot.dict_rec_labels[plot_to_update]
+        dict_line = self._rec_entry_by_display(plot_to_update)
+        if dict_line is None:
+            dict_line = self.uistate.plot.dict_rec_labels.get(plot_to_update)
+        if dict_line is None:
+            print(f"updateLine: missing {plot_to_update!r}")
+            return
         dict_line["line"].set_data(x_data, y_data)
         if draw:
             axe.figure.canvas.draw_idle()
@@ -1971,9 +2070,9 @@ class UIplot:
         if mouseover_out is None:
             print(f"updateOutLine: mouseover_out is None, skipping update for '{label}'")
             return
-        if label not in self.uistate.plot.dict_rec_labels:
+        linedict = self._rec_entry_by_display(label)
+        if linedict is None:
             return
-        linedict = self.uistate.plot.dict_rec_labels[label]
         linedict["line"].set_xdata(plot_drag.artist_xdata(mouseover_out[0]))
         linedict["line"].set_ydata(plot_drag.artist_ydata(mouseover_out[0]))
 
@@ -2000,6 +2099,11 @@ class UIplot:
         """
         force0 = bool(self.uistate.project.checkBox.get("io_force0", False))
         dict_rec_labels = self.uistate.plot.dict_rec_labels
+        rec_ID = None
+        for ent in dict_rec_labels.values():
+            if isinstance(ent, dict) and ent.get("display_label", "").startswith(rec_name):
+                rec_ID = ent.get("rec_ID")
+                break
         for spec in plot_series.build_io_refresh_specs_for_rec(
             rec_name,
             dict_rec_labels,
@@ -2007,8 +2111,11 @@ class UIplot:
             self.uistate.experiment.io_input,
             self.uistate.experiment.io_output,
             force_through_zero=force0,
+            rec_ID=rec_ID,
         ):
-            linedict = dict_rec_labels[spec.label]
+            linedict = dict_rec_labels.get(spec.label) or self._rec_entry_by_display(spec.label)
+            if linedict is None:
+                continue
             if isinstance(spec, plot_series.IoScatterRefreshSpec):
                 linedict["line"].set_offsets(np.c_[spec.x, spec.y])
                 print(f"updateStimLines: refreshed IO scatter '{spec.label}'")
@@ -2022,21 +2129,33 @@ class UIplot:
             dfoutput,
             self.uistate.project.settings,
             existing_labels,
+            dict_rec_labels=dict_rec_labels,
+            rec_ID=rec_ID,
         ):
-            linedict = dict_rec_labels[spec.line_label]
+            linedict = dict_rec_labels.get(spec.line_label) or self._rec_entry_by_display(spec.line_label)
+            if linedict is None:
+                continue
             linedict["line"].set_xdata(spec.x)
             linedict["line"].set_ydata(spec.y)
             print(f"updateStimLines: refreshed '{spec.line_label}'")
 
             if spec.shade_label is not None and spec.sem is not None:
-                old_shade_dict = dict_rec_labels[spec.shade_label]
+                old_shade_dict = dict_rec_labels.get(spec.shade_label) or self._rec_entry_by_display(spec.shade_label)
+                if old_shade_dict is None:
+                    continue
                 try:
                     old_shade_dict["line"].remove()
                 except Exception:
                     pass
+                # Drop old storage key so plot_shade can re-register under identity key
+                for k, v in list(dict_rec_labels.items()):
+                    if v is old_shade_dict:
+                        del dict_rec_labels[k]
+                        break
                 color = self.uistate.project.settings.get(spec.color_setting_key, "black")
+                shade_disp = old_shade_dict.get("display_label") or f"{rec_name} shade"
                 self.plot_shade(
-                    spec.shade_label,
+                    shade_disp,
                     spec.axid,
                     spec.x,
                     spec.y,
@@ -2047,7 +2166,9 @@ class UIplot:
                     variant=spec.variant,
                     x_mode="stim",
                 )
-                dict_rec_labels[spec.shade_label]["line"].set_visible(linedict["line"].get_visible())
+                new_shade = self._rec_entry_by_display(shade_disp)
+                if new_shade is not None:
+                    new_shade["line"].set_visible(linedict["line"].get_visible())
 
     def updateOutLineFromDf(self, label, dfoutput, stim_num, column, x_axis=None):
         """Populate an output line directly from a dfoutput DataFrame.
@@ -2069,7 +2190,8 @@ class UIplot:
             self.updateOutLine(label)
             return
 
-        if label not in self.uistate.plot.dict_rec_labels:
+        linedict = self._rec_entry_by_display(label)
+        if linedict is None:
             if self.uistate.experiment.experiment_type == "PP":
                 rec_label = label.split(" - stim ")[0]
                 aspect = column.replace("_norm", "")
@@ -2081,12 +2203,13 @@ class UIplot:
                     self.uistate.project.settings,
                     frozenset(self.uistate.plot.dict_rec_labels.keys()),
                 ):
-                    line = self.uistate.plot.dict_rec_labels[spec.label]["line"]
-                    line.set_xdata(spec.x)
-                    line.set_ydata(spec.y)
+                    ent = self.uistate.plot.dict_rec_labels.get(spec.label) or self._rec_entry_by_display(spec.label)
+                    if ent is None:
+                        continue
+                    ent["line"].set_xdata(spec.x)
+                    ent["line"].set_ydata(spec.y)
             return
 
-        linedict = self.uistate.plot.dict_rec_labels[label]
         x_mode = linedict.get("x_mode", "sweep")
         xy = plot_series.out_line_xy_from_df(dfoutput, stim_num, column, x_mode=x_mode)
         if xy is None:
@@ -2103,13 +2226,14 @@ class UIplot:
         from the hline's old length crashes matplotlib draw (broadcast mismatch).
         """
         print(f"updateOutMean: {label}, {mean}")
-        if label not in self.uistate.plot.dict_rec_labels:
+        linedict = self._rec_entry_by_display(label)
+        if linedict is None:
             return
         y = plot_stim.mean_hline_ydata(mean, x_len=2)
         if y is None:
             print(f"updateOutMean: invalid mean for '{label}', skip")
             return
-        line = self.uistate.plot.dict_rec_labels[label]["line"]
+        line = linedict["line"]
         # Heal prior corruption (series x glued onto an hline) by restoring a
         # two-point horizontal span on the current axes limits.
         x = plot_drag.artist_xdata(line)

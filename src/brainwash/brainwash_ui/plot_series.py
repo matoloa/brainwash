@@ -1045,18 +1045,31 @@ def build_io_refresh_specs_for_rec(
     io_output: str,
     *,
     force_through_zero: bool,
+    rec_ID=None,
 ) -> list[IoRefreshSpec]:
-    """IO scatter/trendline refresh data for updateStimLines (no matplotlib artists)."""
+    """IO scatter/trendline refresh data for updateStimLines (no matplotlib artists).
+
+    Matches artists by rec_ID / display_label stem (not storage-key prefix).
+    ``label`` on returned specs is the *storage key* for dict lookup.
+    """
     specs: list[IoRefreshSpec] = []
     for key, linedict in dict_rec_labels.items():
-        if not key.startswith(rec_name):
+        if not isinstance(linedict, dict) or linedict.get("x_mode") != "io":
             continue
+        if rec_ID is not None and str(linedict.get("rec_ID")) != str(rec_ID):
+            continue
+        if rec_ID is None:
+            disp = str(linedict.get("display_label") or key)
+            if not (disp.startswith(rec_name) or key.startswith(rec_name)):
+                continue
         variant = linedict.get("variant", "raw")
-        if key.endswith(" IO scatter") and linedict.get("x_mode") == "io":
+        role = linedict.get("role")
+        disp = str(linedict.get("display_label") or key)
+        if role == "io_scatter" or disp.endswith(" IO scatter") or key.endswith(" IO scatter"):
             xy = io_scatter_xy(dfoutput, io_input, io_output, variant=variant)
             if xy is not None:
                 specs.append(IoScatterRefreshSpec(label=key, x=xy[0], y=xy[1]))
-        elif key.endswith(" IO trendline") and linedict.get("x_mode") == "io":
+        elif role == "io_trend" or disp.endswith(" IO trendline") or key.endswith(" IO trendline"):
             line_xy = io_trendline_xy(
                 dfoutput,
                 io_input,
@@ -1087,28 +1100,64 @@ def build_stim_aggregate_refresh_specs(
     dfoutput: pd.DataFrame,
     settings: dict,
     existing_labels: frozenset[str],
+    *,
+    dict_rec_labels: dict | None = None,
+    rec_ID=None,
 ) -> list[StimAggregateRefreshSpec]:
-    """Stim-mode aggregate line + SEM refresh data for updateStimLines."""
+    """Stim-mode aggregate line + SEM refresh data for updateStimLines.
+
+    Resolves artists by display_label (or legacy storage key). Returned
+    line_label/shade_label are *storage keys* when dict_rec_labels is provided.
+    """
     out_stim = dfoutput[dfoutput["sweep"].isna()]
     if out_stim.empty:
         return []
     df_sweeps = dfoutput[dfoutput["sweep"].notna()]
     df_sem = df_sweeps.groupby("stim").sem(numeric_only=True)
     stims = out_stim["stim"].values
+    store = dict_rec_labels or {}
     specs: list[StimAggregateRefreshSpec] = []
     for suffix, axid, col, _color, variant in stim_aggregate_line_configs(settings):
-        line_label = f"{rec_name} {suffix}"
-        if line_label not in existing_labels:
-            continue
+        display_line = f"{rec_name} {suffix}"
+        storage_line = None
+        if store:
+            from brainwash_ui import plot_identity as pi
+
+            storage_line, ent = pi.find_entry_by_display_label(store, display_line)
+            if ent is None and rec_ID is not None:
+                aspect = col.replace("_norm", "")
+                role = "series_norm" if variant == "norm" else "series"
+                hits = pi.find_rec_entries(
+                    store, rec_ID=rec_ID, aspect=aspect, role=role, x_mode="stim", variant=variant
+                )
+                if hits:
+                    storage_line = hits[0][0]
+            if storage_line is None and display_line not in existing_labels and display_line not in store:
+                continue
+            if storage_line is None:
+                storage_line = display_line
+        else:
+            if display_line not in existing_labels:
+                continue
+            storage_line = display_line
         if col not in out_stim.columns:
             continue
         aspect = col.replace("_norm", "")
         sem_vals = stim_aggregate_sem(df_sem, out_stim, col)
-        shade_label = f"{line_label} shade"
+        display_shade = f"{display_line} shade"
+        storage_shade = None
+        if store and sem_vals is not None:
+            from brainwash_ui import plot_identity as pi
+
+            storage_shade, _ = pi.find_entry_by_display_label(store, display_shade)
+            if storage_shade is None and display_shade in store:
+                storage_shade = display_shade
+        elif display_shade in existing_labels:
+            storage_shade = display_shade
         specs.append(
             StimAggregateRefreshSpec(
-                line_label=line_label,
-                shade_label=shade_label if sem_vals is not None and shade_label in existing_labels else None,
+                line_label=storage_line,
+                shade_label=storage_shade if sem_vals is not None and storage_shade else None,
                 x=stims,
                 y=out_stim[col].values,
                 sem=sem_vals,

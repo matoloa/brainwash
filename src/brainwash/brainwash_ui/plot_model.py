@@ -190,16 +190,26 @@ def rec_label_entry(
     stim=None,
     axis: str,
     x_mode=None,
+    role=None,
+    display_label=None,
 ) -> dict:
-    """Shared dict_rec_labels metadata (caller adds ``line`` artist)."""
-    return {
+    """Shared dict_rec_labels metadata (caller adds ``line`` artist).
+
+    ``role`` is the identity role from plot_identity (series, aspect_marker, …).
+    ``display_label`` is presentation text (may later diverge under blind).
+    """
+    entry = {
         "rec_ID": rec_ID,
         "aspect": aspect,
         "variant": variant,
         "stim": stim,
         "axis": axis,
         "x_mode": x_mode,
+        "role": role,
     }
+    if display_label is not None:
+        entry["display_label"] = display_label
+    return entry
 
 
 def amp_width_marker_entry(
@@ -211,8 +221,14 @@ def amp_width_marker_entry(
     axis: str,
     x_mode=None,
     is_zero_width: bool,
+    role=None,
+    display_label=None,
 ) -> dict:
     """Amp-width x/y marker metadata (extends rec_label_entry)."""
+    from brainwash_ui import plot_identity as pi
+
+    if role is None:
+        role = pi.ROLE_AMP_X  # caller should pass ROLE_AMP_X / ROLE_AMP_Y
     return {
         **rec_label_entry(
             rec_ID=rec_ID,
@@ -221,19 +237,29 @@ def amp_width_marker_entry(
             stim=stim,
             axis=axis,
             x_mode=x_mode,
+            role=role,
+            display_label=display_label,
         ),
         "is_zero_width": is_zero_width,
     }
 
 
-def reference_hline_label_entry(*, axis: str, variant=None) -> dict:
+def reference_hline_label_entry(*, axis: str, variant=None, display_label=None) -> dict:
     """Reference hline metadata for graphRefresh (events zero, output 100%)."""
-    return {
+    from brainwash_ui import plot_identity as pi
+
+    entry = {
         "rec_ID": None,
         "stim": None,
         "variant": variant,
         "axis": axis,
+        "role": pi.ROLE_REF_HLINE,
+        "aspect": None,
+        "x_mode": None,
     }
+    if display_label is not None:
+        entry["display_label"] = display_label
+    return entry
 
 
 def io_rec_label_entry(
@@ -242,7 +268,13 @@ def io_rec_label_entry(
     aspect: str,
     variant: str,
     axis: str = "ax1",
+    role=None,
+    display_label=None,
 ) -> dict:
+    from brainwash_ui import plot_identity as pi
+
+    if role is None:
+        role = pi.ROLE_IO_SCATTER
     return rec_label_entry(
         rec_ID=rec_ID,
         aspect=aspect,
@@ -250,6 +282,8 @@ def io_rec_label_entry(
         stim=None,
         axis=axis,
         x_mode="io",
+        role=role,
+        display_label=display_label,
     )
 
 
@@ -260,8 +294,14 @@ def io_group_label_entry(
     variant: str,
     axis: str,
     level: str,
+    role=None,
+    display_label=None,
 ) -> dict:
-    return {
+    from brainwash_ui import plot_identity as pi
+
+    if role is None:
+        role = pi.ROLE_IO_SCATTER
+    entry = {
         "group_ID": group_ID,
         "aspect": aspect,
         "variant": variant,
@@ -269,7 +309,11 @@ def io_group_label_entry(
         "axis": axis,
         "x_mode": "io",
         "level": level,
+        "role": role,
     }
+    if display_label is not None:
+        entry["display_label"] = display_label
+    return entry
 
 
 def pp_group_bar_label_entry(
@@ -280,7 +324,13 @@ def pp_group_bar_label_entry(
     axis: str,
     rec_ID=None,
     is_overlay: bool = False,
+    role=None,
+    display_label=None,
 ) -> dict:
+    from brainwash_ui import plot_identity as pi
+
+    if role is None:
+        role = pi.ROLE_PP_POINT if rec_ID is not None and not is_overlay else pi.ROLE_PP_BOX
     entry = {
         "group_ID": group_ID,
         "aspect": aspect,
@@ -291,9 +341,12 @@ def pp_group_bar_label_entry(
         "is_container": True,
         "is_overlay": is_overlay,
         "level": level,
+        "role": role,
     }
     if rec_ID is not None:
         entry["rec_ID"] = rec_ID
+    if display_label is not None:
+        entry["display_label"] = display_label
     return entry
 
 
@@ -304,8 +357,14 @@ def group_line_label_entry(
     variant: str,
     axis: str,
     level: str,
+    role=None,
+    display_label=None,
 ) -> dict:
-    return {
+    from brainwash_ui import plot_identity as pi
+
+    if role is None:
+        role = pi.ROLE_GROUP_NORM if variant == "norm" else pi.ROLE_GROUP_MEAN
+    entry = {
         "group_ID": group_ID,
         "stim": None,
         "aspect": aspect,
@@ -313,7 +372,11 @@ def group_line_label_entry(
         "axis": axis,
         "x_mode": "sweep",
         "level": level,
+        "role": role,
     }
+    if display_label is not None:
+        entry["display_label"] = display_label
+    return entry
 
 
 def level_storage_key(base_label: str, level: str | None) -> str:
@@ -342,26 +405,48 @@ def output_axis_legend_map(
     current_level: str,
     include_groups: bool,
 ) -> dict[str, object]:
-    """Legend label → artist line for one output axis (graphRefresh)."""
-    recs_on_axis = {
-        key: value
-        for key, value in dd_recs.items()
-        if value["axis"] == axid and not key.endswith(" marker") and not _is_io_trendline_legend_key(key)
-    }
-    axis_legend = {key: value["line"] for key, value in recs_on_axis.items()}
+    """Legend *display* label → artist line for one output axis (graphRefresh).
+
+    Prefers entry ``display_label`` over storage key so opaque rec|… keys never
+    appear in the legend.
+    """
+    from brainwash_ui import plot_identity as pi
+
+    axis_legend: dict[str, object] = {}
+    for key, value in (dd_recs or {}).items():
+        if not isinstance(value, dict) or value.get("axis") != axid:
+            continue
+        role = value.get("role")
+        disp = value.get("display_label") or key
+        if role in (
+            pi.ROLE_ASPECT_MARKER,
+            pi.ROLE_STIM_MARKER,
+            pi.ROLE_STIM_SELECTION,
+            pi.ROLE_AMP_X,
+            pi.ROLE_AMP_Y,
+            pi.ROLE_AMP_ZERO,
+            pi.ROLE_REF_HLINE,
+            pi.ROLE_IO_TREND,
+        ):
+            continue
+        if str(key).endswith(" marker") or str(disp).endswith(" marker"):
+            continue
+        if _is_io_trendline_legend_key(key) or _is_io_trendline_legend_key(str(disp)):
+            continue
+        axis_legend[str(disp)] = value.get("line")
     if include_groups:
-        for key, value in dd_group_show.items():
-            if value["axis"] != axid:
+        for key, value in (dd_group_show or {}).items():
+            if not isinstance(value, dict) or value.get("axis") != axid:
                 continue
-            if _is_io_trendline_legend_key(key):
+            if value.get("role") == pi.ROLE_IO_TREND or _is_io_trendline_legend_key(key):
                 continue
             level = value.get("level")
             if level is not None and level != current_level:
                 continue
-            display_key = display_label_from_key(key)
-            if _is_io_trendline_legend_key(display_key):
+            display_key = value.get("display_label") or display_label_from_key(key)
+            if _is_io_trendline_legend_key(str(display_key)):
                 continue
-            axis_legend[display_key] = value["line"]
+            axis_legend[str(display_key)] = value.get("line")
     return axis_legend
 
 
