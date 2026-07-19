@@ -151,3 +151,4 @@ See [`NTH.md`](NTH.md) for small style items (e.g. experiment type token `"PP"` 
 | Date | Change |
 |------|--------|
 | 2026-07-19 | Initial draft from 1.0.0 issue set + placeholder triage discussion |
+| 2026-07-19 | #5 blind/unblind marked **done** (`2bce475`); focus order → #6–#9 |
