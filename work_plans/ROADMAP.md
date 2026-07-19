@@ -28,10 +28,10 @@ Living priority map across milestones. **Execution** is on GitHub issues when a 
 | [#3](https://github.com/matoloa/brainwash/issues/3) | Default aspect color palette | **Done** — EPSP blue / volley green; stim indigo→violet; legacy magenta migrate |
 | [#4](https://github.com/matoloa/brainwash/issues/4) | UI Test Sets overhaul | **Done** — full-width rows, × remove, header, clear-all menu; create via Tag button |
 | [#5](https://github.com/matoloa/brainwash/issues/5) | Blind / unblind rec names | **Done** — display-only random `Rec n` episodes; strip × unblind; always-blind-new in `bw_cfg` |
-| [#6](https://github.com/matoloa/brainwash/issues/6) | Color events by Rec \| Stim \| Group | Plan: [`plan_color_events_by.md`](plan_color_events_by.md); axe/axm overlay (not output Aspect) |
-| [#7](https://github.com/matoloa/brainwash/issues/7) | Reconnect Talkback | Spike first |
+| [#6](https://github.com/matoloa/brainwash/issues/6) | Color events by Rec \| Stim \| Group | **Done** — [`plan_color_events_by.md`](plan_color_events_by.md); 1×1 defaults; axe/axm overlay |
+| [#7](https://github.com/matoloa/brainwash/issues/7) | Reconnect Talkback | **Done** — Data-menu toggle (default off); quiet `usage.yaml`; title suffix when on |
 | [#8](https://github.com/matoloa/brainwash/issues/8) | Audit mixin arrangement | **Done** — [`audit_mixin_arrangement.md`](audit_mixin_arrangement.md); no moves |
-| [#9](https://github.com/matoloa/brainwash/issues/9) | Clean sweep: Experimental + TODOs | Hygiene |
+| [#9](https://github.com/matoloa/brainwash/issues/9) | Clean sweep: Experimental + TODOs | **Done** — [`todo_triage_1.0.0.md`](todo_triage_1.0.0.md); dead flag/menu removed; remaining TODOs → 1.0.1+ |
 
 ### Suggested focus order
 
@@ -39,11 +39,11 @@ Living priority map across milestones. **Execution** is on GitHub issues when a 
 2. ~~**#1** Groups~~ **done**  
 3. ~~**#2** line style~~ **done** · ~~**#3** palette~~ **done**  
 4. ~~**#4** test sets~~ **done** · ~~**#5** blind~~ **done**  
-5. ~~**#6**~~ **done** · ~~**#7**~~ **done** · ~~**#8**~~ **audit done** · **#9** opportunistic  
+5. ~~**#6**–**#9**~~ **done** (color events, talkback, mixin audit, TODO/Experimental hygiene)  
 
 ### Capacity note
 
-#10 + #1–#5 is already a full release if #6 slips. Do not expand 1.0.0 with the 1.0.1+ lists below.
+**1.0.0 filed issues #1–#10 are complete.** Next work is ship/tag and/or **1.0.1** bullets below (file milestone when ready).
 
 ---
 
