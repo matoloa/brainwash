@@ -25,7 +25,7 @@ Living priority map across milestones. **Execution** is on GitHub issues when a 
 | [#10](https://github.com/matoloa/brainwash/issues/10) | Lean data + `_sweeptimes.parquet` | **Done** — [`plan_data_sweeptimes_format.md`](plan_data_sweeptimes_format.md) |
 | [#1](https://github.com/matoloa/brainwash/issues/1) | UI Groups overhaul | **Done** — digit create/assign, clear-all, header, rename/legend |
 | [#2](https://github.com/matoloa/brainwash/issues/2) | Output line appearance UI | **Done** — Results display Dots/Line |
-| [#3](https://github.com/matoloa/brainwash/issues/3) | Default aspect color palette | EPSP blue / volley green; stim ramp indigo→violet (defaults only) |
+| [#3](https://github.com/matoloa/brainwash/issues/3) | Default aspect color palette | **Done** — EPSP blue / volley green; stim indigo→violet; legacy magenta migrate |
 | [#4](https://github.com/matoloa/brainwash/issues/4) | UI Test Sets overhaul | After #1 |
 | [#5](https://github.com/matoloa/brainwash/issues/5) | Blind / unblind rec names | Display-only; main + parse UI |
 | [#6](https://github.com/matoloa/brainwash/issues/6) | Color-by Aspect \| Rec \| Stim \| Group | Timebox; may slip to 1.0.1 |
@@ -37,7 +37,7 @@ Living priority map across milestones. **Execution** is on GitHub issues when a 
 
 1. ~~**#10** format~~ **done**  
 2. ~~**#1** Groups~~ **done**  
-3. ~~**#2** line style~~ **done** · **#3** palette next  
+3. ~~**#2** line style~~ **done** · ~~**#3** palette~~ **done**  
 4. **#4**, **#5** as capacity allows  
 5. **#6** timeboxed; **#7** spike; **#8–#9** opportunistic  
 
