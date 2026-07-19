@@ -1020,10 +1020,53 @@ class UIplot:
 
     def _output_line_style_kwargs(self) -> dict:
         """Marker/linestyle for ax1/ax2 output series from uistate.plot.output_line_style."""
-        style = getattr(self.uistate.plot, "output_line_style", "line")
+        # Prefer project-persisted style; fall back to session / dots default.
+        style = getattr(getattr(self.uistate, "project", None), "output_line_style", None)
+        if style not in ("dots", "line"):
+            style = getattr(self.uistate.plot, "output_line_style", "dots")
         if style == "dots":
             return {"marker": "o", "markersize": 3, "linestyle": "None"}
         return {"marker": None, "markersize": None, "linestyle": "-"}
+
+    def apply_output_line_style(self, *, draw: bool = True) -> None:
+        """Restyle existing ax1/ax2 Line2D artists (graphRefresh does not recreate them).
+
+        Skips PathCollection/scatter and non-line artists. Group SEM fills are
+        under key \"fill\" and are left unchanged.
+        """
+        kw = self._output_line_style_kwargs()
+        marker = kw.get("marker")
+        markersize = kw.get("markersize")
+        linestyle = kw.get("linestyle")
+        if linestyle is None:
+            linestyle = "-"
+
+        for store_name in ("dict_rec_labels", "dict_group_labels"):
+            store = getattr(self.uistate.plot, store_name, None) or {}
+            for _key, entry in store.items():
+                if not isinstance(entry, dict):
+                    continue
+                if entry.get("axis") not in ("ax1", "ax2"):
+                    continue
+                line = entry.get("line")
+                if line is None or not hasattr(line, "set_linestyle"):
+                    continue
+                try:
+                    if marker:
+                        line.set_linestyle("None")
+                        line.set_marker(marker)
+                        if markersize is not None:
+                            line.set_markersize(markersize)
+                    else:
+                        line.set_marker("None")
+                        line.set_linestyle(linestyle if linestyle not in (None, "None") else "-")
+                except Exception:
+                    pass
+
+        if draw:
+            ax1 = getattr(self.uistate.plot, "ax1", None)
+            if ax1 is not None:
+                ax1.figure.canvas.draw_idle()
 
     def plot_line(
         self,

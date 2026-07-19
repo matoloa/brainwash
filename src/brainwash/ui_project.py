@@ -709,6 +709,14 @@ class ProjectMixin:
                     pass
             else:
                 self.buttonGroup_test_n.buttonClicked.connect(self.n_unit_changed)
+        if hasattr(self, "buttonGroup_display_timecourse"):
+            if disconnect:
+                try:
+                    self.buttonGroup_display_timecourse.buttonClicked.disconnect()
+                except TypeError:
+                    pass
+            else:
+                self.buttonGroup_display_timecourse.buttonClicked.connect(self.display_timecourse_style_changed)
         # hide buttons
         hide_buttons = {
             "pushButton_hide_stim": "frameToolStim",
@@ -718,6 +726,7 @@ class ProjectMixin:
             "pushButton_hide_type": "frameToolType",
             "pushButton_hide_filter": "frameToolFilter",
             "pushButton_hide_y_axis": "frameToolYscale",
+            "pushButton_hide_display": "frameToolDisplay",
             "pushButton_hide_aspect": "frameToolAspect",
             "pushButton_hide_slope_width": "frameToolAspectSlope",
             "pushButton_hide_amplitude_width": "frameToolAspectAmp",
@@ -964,6 +973,18 @@ class ProjectMixin:
             self.radioButton_filter_savgol.setChecked(True)
         else:
             self.radioButton_filter_none.setChecked(True)
+
+        # Output series style (Dots / Line); default dots
+        style = getattr(self.uistate.project, "output_line_style", "dots")
+        if style not in ("dots", "line"):
+            style = "dots"
+        self.uistate.project.output_line_style = style
+        self.uistate.plot.output_line_style = style
+        if hasattr(self, "radioButton_display_dots") and hasattr(self, "radioButton_display_line"):
+            if style == "line":
+                self.radioButton_display_line.setChecked(True)
+            else:
+                self.radioButton_display_dots.setChecked(True)
 
         self.lineEdit_savgol_window.setText(str(self.uistate.project.lineEdit.get("savgol_window", 9)))
         self.lineEdit_savgol_poly.setText(str(self.uistate.project.lineEdit.get("savgol_poly", 3)))

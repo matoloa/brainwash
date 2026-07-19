@@ -36,6 +36,7 @@ class ProjectPersistedState:
             "frameToolType": ["Experiment type", True],
             "frameToolFilter": ["Filter", True],
             "frameToolYscale": ["Y scaling", True],
+            "frameToolDisplay": ["Results display", True],
             "frameToolAspect": ["Aspect toggles", True],
             "frameToolAspectSlope": ["Slope width", False],
             "frameToolAspectAmp": ["Amplitude width", False],
@@ -43,6 +44,8 @@ class ProjectPersistedState:
             "frameToolHierarchy": ["Hierarchy", True],
             "frameToolType_sub_io_stim": ["IO stim µA", True],
         }
+        # Output ax1/ax2 series style: "dots" | "line" (default dots)
+        self.output_line_style = "dots"
         self.checkBox = {
             "EPSP_amp": True,
             "EPSP_slope": True,
@@ -142,6 +145,7 @@ class ProjectPersistedState:
             "detailedProjectTable": self.detailedProjectTable,
             "detailedTimetable": self.detailedTimetable,
             "project_table_sort": self._normalize_project_table_sort(self.project_table_sort),
+            "output_line_style": self.output_line_style if self.output_line_style in ("dots", "line") else "dots",
         }
 
     def apply_state_dict(self, state: dict, *, zoom_defaults: dict) -> None:
@@ -186,6 +190,8 @@ class ProjectPersistedState:
         self.detailedProjectTable = state.get("detailedProjectTable", False)
         self.detailedTimetable = state.get("detailedTimetable", False)
         self.project_table_sort = self._normalize_project_table_sort(state.get("project_table_sort"))
+        style = state.get("output_line_style", "dots")
+        self.output_line_style = style if style in ("dots", "line") else "dots"
 
 
 class ExperimentConfig:

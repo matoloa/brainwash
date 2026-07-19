@@ -636,6 +636,19 @@ class UIsub(
             self.recalculate(selection=selected_idx)
             self.update_show()
 
+    def display_timecourse_style_changed(self, button):
+        """Handler for buttonGroup_display_timecourse: Dots vs Line on output series."""
+        name = button.objectName() if button is not None else ""
+        style = "line" if name.endswith("_line") else "dots"
+        self.usage(f"display_timecourse_style_changed → {style}")
+        self.uistate.project.output_line_style = style
+        self.uistate.plot.output_line_style = style
+        # graphRefresh only refreshes axes/legends — restyle existing Line2D artists
+        if hasattr(self, "uiplot") and hasattr(self.uiplot, "apply_output_line_style"):
+            self.uiplot.apply_output_line_style(draw=True)
+        if hasattr(self, "dict_folders") and self.dict_folders.get("project"):
+            self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
+
     def editSavgolParams(self, lineEdit):
         try:
             val = int(lineEdit.text())
