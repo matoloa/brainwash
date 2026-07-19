@@ -1,6 +1,6 @@
 # Plan: Lean recording data + `_sweeptimes.parquet`
 
-**Status:** NEXT (pre-1.0.0 format work)  
+**Status:** IMPLEMENTED on branch `1.0.0` (issue #10)  
 **Branch context:** `1.0.0` / pre-1.0.0  
 **Goal:** Stop storing per-sample absolute timestamps; put sweep clock in a small accessory file; keep disposable caches waveform-only; unify on-disk file roles for rename/purge/duplicate.
 

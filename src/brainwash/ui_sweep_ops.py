@@ -144,23 +144,22 @@ class SweepOpsMixin:
         print(f"Sweeps excluded, remaining sweeps: {df_data_filtered['sweep'].unique()}")
         pruned_df = self.sweep_shift_gaps(df_data_filtered, sweeps_to_remove)  # renumber remaining sweeps to close gaps
         print(f"Gaps closed, remaining sweeps: {pruned_df['sweep'].unique()}")
-        self.df2file(df=pruned_df, filename=rec_name, key="data")  # overwrite data file with pruned data
+        old_st = self.get_sweeptimes_df(rec_name)
+        if old_st is not None:
+            new_st = parse.remap_sweeptimes_after_removal(old_st, sweeps_to_remove)
+        else:
+            new_st = None
+        self.write_recording_samples(rec_name, pruned_df, sweeptimes=new_st)
         n_remaining_sweeps = len(pruned_df["sweep"].unique())
         df_project = self.get_df_project()
         df_project.loc[df_project["ID"] == rec_ID, "sweeps"] = n_remaining_sweeps  # update sweeps count in df_project
+        if new_st is not None:
+            hz = parse.compute_sweep_hz(None, sweeptimes=new_st)
+            if hz is not None:
+                df_project.loc[df_project["ID"] == rec_ID, "sweep_hz"] = hz
         self.save_df_project()
         print(f"Recording '{rec_name}': {n_remaining_sweeps} sweep{'s' if n_remaining_sweeps != 1 else ''} remain.")
-        # clear cache files for the recording
-        old_timepoints = self.dict_folders["timepoints"] / (rec_name + ".parquet")
-        old_mean = self.dict_folders["cache"] / (rec_name + "_mean.parquet")
-        old_filter = self.dict_folders["cache"] / (rec_name + "_filter.parquet")
-        old_bin = self.dict_folders["cache"] / (rec_name + "_bin.parquet")
-        old_output = self.dict_folders["cache"] / (rec_name + "_output.parquet")
-        for old_file in [old_timepoints, old_mean, old_filter, old_bin, old_output]:
-            if old_file.exists():
-                old_file.unlink()
-                if self.config.verbose:
-                    print(f"Deleted cache file: {old_file}")
+        self._clear_rec_cache(rec_name)
         return
 
     def sweep_keep_selected(self):
@@ -266,9 +265,9 @@ class SweepOpsMixin:
             self.df_project.loc[self.df_project["ID"] == source_row["ID"], "sweeps"] = n_sweeps_A
             self.df_project.loc[self.df_project["ID"] == source_row["ID"], "sweep_duration"] = sweep_duration_A
 
-            # --- Write both halves directly (no intermediate full copy) ---
-            self.df2file(df=df_A, filename=rec_A, key="data")
-            self.df2file(df=df_B, filename=rec_B, key="data")
+            # --- Write both halves (lean samples + sweeptimes) ---
+            self.write_recording_samples(rec_A, df_A)
+            self.write_recording_samples(rec_B, df_B)
 
             # --- Clear stale cache for both halves ---
             for rec_name in (rec_A, rec_B):
@@ -329,7 +328,7 @@ class SweepOpsMixin:
         df_cropped["time"] = (df_cropped["time"] - offset).round(9)
 
         new_sweep_duration = parse.metadata(df_cropped)["sweep_duration"]
-        self.df2file(df=df_cropped, filename=rec_name, key="data")
+        self.write_recording_samples(rec_name, df_cropped)
         self.df_project.loc[self.df_project["ID"] == rec_ID, "sweep_duration"] = new_sweep_duration
         self.save_df_project()
         self._clear_rec_cache(rec_name)
@@ -441,7 +440,7 @@ class SweepOpsMixin:
             df_joined["time"] = (df_joined["time"] - offset).round(9)
 
             new_sweep_duration = parse.metadata(df_joined)["sweep_duration"]
-            self.df2file(df=df_joined, filename=rec_name, key="data")
+            self.write_recording_samples(rec_name, df_joined)
             self.df_project.loc[self.df_project["ID"] == rec_ID, "sweep_duration"] = new_sweep_duration
             self.save_df_project()
             self._clear_rec_cache(rec_name)
@@ -484,23 +483,14 @@ class SweepOpsMixin:
         raise RuntimeError(f"_next_free_time_split_pair: all 13 letter pairs are taken for '{base_name}'")
 
     def _clear_rec_cache(self, rec_name: str):
-        """Delete all cache / timepoint files for *rec_name*."""
-        for suffix in (
-            "_mean.parquet",
-            "_filter.parquet",
-            "_bin.parquet",
-            "_output.parquet",
-        ):
-            p = self.dict_folders["cache"] / (rec_name + suffix)
+        """Delete disposable cache / timepoint files for *rec_name* (not data/sweeptimes)."""
+        from brainwash_ui import recording_cache
+
+        for p in recording_cache.cache_and_timepoints_paths(self.dict_folders, rec_name):
             if p.exists():
                 p.unlink()
                 if self.config.verbose:
                     print(f"Deleted cache file: {p}")
-        tp = self.dict_folders["timepoints"] / (rec_name + ".parquet")
-        if tp.exists():
-            tp.unlink()
-            if self.config.verbose:
-                print(f"Deleted cache file: {tp}")
 
     def sweep_split_by_time(self):
         """Split each selected recording at a within-sweep time point (ms).
@@ -652,9 +642,9 @@ class SweepOpsMixin:
             self.df_project.loc[self.df_project["ID"] == source_row["ID"], "sweeps"] = n_sweeps_a
             self.df_project.loc[self.df_project["ID"] == source_row["ID"], "sweep_duration"] = sweep_duration_a
 
-            # --- Write both halves as source data files ---
-            self.df2file(df=df_a, filename=rec_a, key="data")
-            self.df2file(df=df_b, filename=rec_b, key="data")
+            # --- Write both halves as source data files (+ sweeptimes) ---
+            self.write_recording_samples(rec_a, df_a)
+            self.write_recording_samples(rec_b, df_b)
 
             # --- Clear stale cache for both halves ---
             self._clear_rec_cache(rec_a)

@@ -54,8 +54,8 @@ class ParseMixin:
         list_recording_names = set(df_p["recording_name"])
         for index, row in dfAdd.iterrows():
             check_recording_name = row["recording_name"]
-            if check_recording_name.endswith("_mean.parquet"):
-                print("recording_name must not end with _mean.parquet - appending _X")  # must not collide with internal naming
+            if check_recording_name.endswith("_mean.parquet") or str(check_recording_name).endswith("_sweeptimes"):
+                print(f"recording_name must not end with reserved suffix - appending _X: {check_recording_name}")
                 check_recording_name = check_recording_name + "_X"
                 dfAdd.at[index, "recording_name"] = check_recording_name
             if check_recording_name in list_recording_names:
@@ -81,17 +81,12 @@ class ParseMixin:
         print("addData:", self.get_df_project())
 
     def purgeRecordingData(self, rec_ID, rec_name):
+        from brainwash_ui import recording_cache
+
         def removeFromCache(cache_name):
             cache = getattr(self, cache_name)
             if rec_name in cache.keys():
                 cache.pop(rec_name, None)
-
-        def removeFromDisk(folder_name, file_suffix):
-            file_path = Path(self.dict_folders[folder_name] / (rec_name + file_suffix))
-            if file_path.exists():
-                file_path.unlink()
-            else:
-                print(f"purgeRecordingData: file not found: {file_path}")
 
         groups2purge = self.get_groupsOfRec(rec_ID)
         if groups2purge:  # if rec_ID is in groups, purge those group caches and update dd_groups
@@ -114,15 +109,11 @@ class ParseMixin:
             "dict_diffs",
         ]:
             removeFromCache(cache_name)
-        for folder_name, file_suffix in [
-            ("data", ".parquet"),
-            ("timepoints", ".parquet"),
-            ("cache", "_mean.parquet"),
-            ("cache", "_filter.parquet"),
-            ("cache", "_bin.parquet"),
-            ("cache", "_output.parquet"),
-        ]:
-            removeFromDisk(folder_name, file_suffix)
+        for path in recording_cache.iter_recording_disk_files(self.dict_folders, rec_name):
+            if path.exists():
+                path.unlink()
+            else:
+                print(f"purgeRecordingData: file not found: {path}")
 
     def parseData(self):
         if hasattr(self, "_current_parse_thread") and self._current_parse_thread is not None:
@@ -226,20 +217,15 @@ class ParseMixin:
         new_row["ID"] = str(int(df_p["ID"].max() or 0) + 1)  # simplistic new ID
         df_p = pd.concat([df_p, pd.DataFrame([new_row])], ignore_index=True)
         self.set_df_project(df_p)
-        # copy files
-        for folder, suffix in [
-            ("data", ".parquet"),
-            ("timepoints", ".parquet"),
-            ("cache", "_mean.parquet"),
-            ("cache", "_filter.parquet"),
-            ("cache", "_bin.parquet"),
-            ("cache", "_output.parquet"),
-        ]:
-            src = Path(self.dict_folders[folder]) / (source_p_row["recording_name"] + suffix)
-            dst = Path(self.dict_folders[folder]) / (new_name + suffix)
-            if src.exists():
-                import shutil
-                shutil.copy(src, dst)
+        # copy files (samples, sweeptimes, timepoints, caches)
+        from brainwash_ui import recording_cache
+        import shutil
+
+        for src in recording_cache.iter_recording_disk_files(self.dict_folders, source_p_row["recording_name"]):
+            if not src.exists():
+                continue
+            dst = src.parent / src.name.replace(source_p_row["recording_name"], new_name, 1)
+            shutil.copy(src, dst)
         self.tableUpdate(restore_selection=True)
         print(f"Duplicated {source_p_row['recording_name']} as {new_name}")
 
@@ -254,7 +240,7 @@ class ParseMixin:
             df_proj_new_row["sweep_duration"] = dict_meta.get("sweep_duration", None)
             df_proj_new_row["sampling_rate"] = dict_meta.get("sampling_rate", None)
             df_proj_new_row["resets"] = ""  # dict_meta.get('resets', None)
-            # sweep_hz: inter-sweep rate derived from t0 timestamps; NaN if unavailable
+            # sweep_hz: inter-sweep rate from sweeptimes accessory; NaN if unavailable
             sweep_hz = dict_meta.get("sweep_hz", None)
             df_proj_new_row["sweep_hz"] = sweep_hz if sweep_hz is not None else float("nan")
             # Build pipe-delimited status flags; append "default Hz" when sweep_hz is absent
@@ -266,14 +252,20 @@ class ParseMixin:
 
         if status_callback:
             status_callback("building dataframe...")
-        self.df2file(df=df_raw, filename=rec, key="data")  # persist raws
-        dfmean, i_stim = parse.build_dfmean(df_raw)
+        try:
+            path_src = df_proj_row["path"]
+        except Exception:
+            path_src = None
+        source_kind = parse.infer_source_kind(path_src, df_raw)
+        sweeptimes = parse.build_sweeptimes(df_raw, source_kind=source_kind)
+        samples, sweeptimes = self.write_recording_samples(rec, df_raw, source_kind=source_kind, sweeptimes=sweeptimes)
+        dfmean, i_stim = parse.build_dfmean(samples)
         if status_callback:
             status_callback("writing to disk...")
         self.df2file(df=dfmean, filename=rec, key="mean")  # persist mean
-        df = parse.zeroSweeps(df_raw, i_stim=i_stim)
-        self.df2file(df=df, filename=rec, key="filter")  # persist zeroed
-        dict_meta = parse.metadata(df)  # extract metadata
+        df_filter = parse.zeroSweeps(samples, i_stim=i_stim)
+        self.df2file(df=df_filter, filename=rec, key="filter")  # persist zeroed (lean)
+        dict_meta = parse.metadata(samples, sweeptimes=sweeptimes)
         df_proj_new_row = create_row(df_proj_row=df_proj_row, new_name=rec, dict_meta=dict_meta)
         return df_proj_new_row
 

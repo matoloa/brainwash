@@ -51,41 +51,165 @@ def build_dfmean(dfdata, rollingwidth=3):
     return dfmean, i_stim
 
 
+def lean_samples(dfdata: pd.DataFrame) -> pd.DataFrame:
+    """Waveform-only sample table for data/{rec}.parquet (no t0/datetime)."""
+    if dfdata is None or len(dfdata) == 0:
+        return pd.DataFrame(columns=["sweep", "time", "voltage_raw"])
+    out = dfdata.loc[:, ["sweep", "time", "voltage_raw"]].copy()
+    out["sweep"] = out["sweep"].astype(np.int32)
+    out["time"] = out["time"].astype(np.float64)
+    if out["voltage_raw"].dtype != np.float32:
+        out["voltage_raw"] = out["voltage_raw"].astype(np.float32)
+    return out.reset_index(drop=True)
+
+
+def infer_source_kind(path=None, df: pd.DataFrame | None = None) -> str:
+    """Best-effort source_kind for build_sweeptimes (abf|ibw|csv|atf|unknown)."""
+    if path is not None and str(path).strip():
+        suf = Path(str(path)).suffix.lstrip(".").lower()
+        if suf in ("abf", "ibw", "csv", "atf"):
+            return suf
+    if df is not None and len(df) > 0 and "t0" in df.columns:
+        t0 = df.groupby("sweep")["t0"].first() if "sweep" in df.columns else df["t0"]
+        t0v = pd.to_numeric(t0, errors="coerce")
+        if t0v.notna().any() and (t0v.fillna(0).abs() > 1e-12).any():
+            return "abf"  # run-relative t0 present
+        if "datetime" in df.columns and df["datetime"].notna().any():
+            return "ibw"  # absolute clock only
+    return "unknown"
+
+
+def build_sweeptimes(df_long: pd.DataFrame, *, source_kind: str = "unknown") -> pd.DataFrame:
+    """One row per sweep: run-relative t0 + absolute sweep_start (when clock exists).
+
+    Call after sweep ids are assigned. Works for ABF (meaningful t0), IBW (t0 was
+    always 0 — derive relative t0 from absolute starts), CSV/ATF (possibly null).
+    """
+    cols = ["sweep", "t0", "sweep_start", "recording_start", "source_kind"]
+    if df_long is None or len(df_long) == 0 or "sweep" not in df_long.columns:
+        return pd.DataFrame(columns=cols)
+
+    kind = (source_kind or "unknown").lower()
+    g = df_long.groupby("sweep", sort=True)
+
+    sweeps = g.size().index.to_numpy()
+    n = len(sweeps)
+    t0_out = np.full(n, np.nan, dtype=np.float64)
+    sweep_start = pd.Series(pd.NaT, index=np.arange(n), dtype="datetime64[ns]")
+
+    has_datetime = "datetime" in df_long.columns and df_long["datetime"].notna().any()
+    has_t0 = "t0" in df_long.columns and pd.to_numeric(df_long["t0"], errors="coerce").notna().any()
+
+    # Per-sweep absolute start: first datetime in sweep (at time≈0) when present
+    if has_datetime:
+        dt_first = g["datetime"].first()
+        sweep_start = pd.to_datetime(dt_first, errors="coerce").reset_index(drop=True)
+
+    # Per-sweep sample t0 (may be 0 for IBW or NaN for ATF)
+    t0_first = None
+    if has_t0:
+        t0_first = pd.to_numeric(g["t0"].first(), errors="coerce").reset_index(drop=True).to_numpy(dtype=np.float64)
+
+    use_relative_t0 = kind in ("abf", "csv") or (
+        t0_first is not None and np.isfinite(t0_first).any() and np.nanmax(np.abs(np.nan_to_num(t0_first))) > 1e-12
+    )
+
+    if use_relative_t0 and t0_first is not None and np.isfinite(t0_first).any():
+        t0_out = t0_first.astype(np.float64)
+        # If we have t0 but no absolute starts, leave sweep_start as NaT
+        if has_datetime and sweep_start.notna().any():
+            # Prefer recording_start = first sweep absolute - first t0 (ABF origin)
+            i0 = 0
+            if pd.notna(sweep_start.iloc[i0]) and np.isfinite(t0_out[i0]):
+                recording_start = sweep_start.iloc[i0] - pd.to_timedelta(float(t0_out[i0]), unit="s")
+            else:
+                recording_start = sweep_start.dropna().iloc[0] if sweep_start.notna().any() else pd.NaT
+            # Recompute sweep_start from origin + t0 when absolute was noisy
+            if pd.notna(recording_start):
+                for i in range(n):
+                    if np.isfinite(t0_out[i]):
+                        sweep_start.iloc[i] = recording_start + pd.to_timedelta(float(t0_out[i]), unit="s")
+        else:
+            recording_start = pd.NaT
+    elif has_datetime and sweep_start.notna().any():
+        # IBW-like: absolute starts only — derive run-relative t0
+        recording_start = sweep_start.dropna().iloc[0]
+        for i in range(n):
+            if pd.notna(sweep_start.iloc[i]):
+                t0_out[i] = (sweep_start.iloc[i] - recording_start).total_seconds()
+    else:
+        recording_start = pd.NaT
+
+    if pd.isna(recording_start) and sweep_start.notna().any():
+        recording_start = sweep_start.dropna().iloc[0]
+
+    out = pd.DataFrame(
+        {
+            "sweep": sweeps.astype(np.int32),
+            "t0": t0_out,
+            "sweep_start": pd.to_datetime(sweep_start, errors="coerce"),
+            "recording_start": recording_start,
+            "source_kind": kind,
+        }
+    )
+    return out.reset_index(drop=True)
+
+
+def remap_sweeptimes_after_removal(sweeptimes: pd.DataFrame, sweeps_removed) -> pd.DataFrame:
+    """Drop removed sweeps and renumber like SweepOpsMixin.sweep_shift_gaps."""
+    if sweeptimes is None or len(sweeptimes) == 0:
+        return sweeptimes
+    removed = np.array(sorted(sweeps_removed), dtype=np.int64)
+    st = sweeptimes[~sweeptimes["sweep"].isin(removed)].copy()
+    if st.empty:
+        return st.reset_index(drop=True)
+    s = st["sweep"].to_numpy(dtype=np.int64)
+    k = np.searchsorted(removed, s, side="right")
+    st["sweep"] = (s - k).astype(np.int32)
+    # Re-base recording_start / t0 if absolute starts exist
+    if "sweep_start" in st.columns and st["sweep_start"].notna().any():
+        rec_start = st["sweep_start"].dropna().iloc[0]
+        st["recording_start"] = rec_start
+        st["t0"] = (st["sweep_start"] - rec_start).dt.total_seconds()
+    return st.reset_index(drop=True)
+
+
+def subset_sweeptimes(sweeptimes: pd.DataFrame, sweeps_keep) -> pd.DataFrame:
+    """Keep rows for the given sweep ids (no renumber)."""
+    if sweeptimes is None or len(sweeptimes) == 0:
+        return sweeptimes
+    keep = set(sweeps_keep)
+    st = sweeptimes[sweeptimes["sweep"].isin(keep)].copy()
+    return st.reset_index(drop=True)
+
+
 def zeroSweeps(dfdata, i_stim=None, dfmean=None):
-    # returns dfdata with sweeps zeroed to the mean of the 20th to 10th column before i_stim
+    """Return lean filter frame: sweep, time, voltage (baseline-zeroed). No t0/datetime."""
     if i_stim is None:
         if dfmean is None:
             print("zeroSweeps: calling dfmean to get i_stim.")
             _, i_stim = build_dfmean(dfdata)
         else:
             i_stim = first_stim_index(dfmean)
-    print(f"i_stim: {i_stim}, df_data: {dfdata}")
-    df_zeroed = dfdata.copy()  # Copy dfdata to avoid modifying the original DataFrame
-    # Check for duplicates based on 'sweep' and 'time'
-    duplicates = df_zeroed.duplicated(subset=["sweep", "time"], keep=False)
+    print(f"zeroSweeps: i_stim={i_stim}, n_rows={len(dfdata) if dfdata is not None else 0}")
+
+    # Only waveform columns — never carry clock columns into filter cache
+    work = dfdata.loc[:, ["sweep", "time", "voltage_raw"]].copy()
+    duplicates = work.duplicated(subset=["sweep", "time"], keep=False)
     if duplicates.any():
-        print("Warning: Duplicates found before zeroing.")
-        print(df_zeroed[duplicates])
-        df_zeroed = df_zeroed.groupby(["sweep", "time"]).agg({"voltage_raw": "mean"}).reset_index()
-        print("Duplicates removed.")
-        print(df_zeroed)
+        print("Warning: Duplicates found before zeroing; averaging voltage_raw.")
+        work = work.groupby(["sweep", "time"], as_index=False).agg({"voltage_raw": "mean"})
 
-    dfpivot = df_zeroed.pivot(
-        index="sweep", columns="time", values="voltage_raw"
-    )  # Reshape df_zeroed to have one row per 'sweep' and one column per 'time'
-    ser_mean = dfpivot.iloc[:, i_stim - 20 : i_stim - 10].mean(
-        axis=1
-    )  # Calculate the mean of 'voltage_raw' values from the 20th to the 10th column before i_stim for each 'sweep'
-    dfpivot = dfpivot.subtract(ser_mean, axis="rows")  # Subtract the calculated means from dfpivot
-
-    # handle the reassignment to 'voltage' to ensure length matches
-    df_zeroed = df_zeroed.drop(columns=["voltage_raw"])
+    dfpivot = work.pivot(index="sweep", columns="time", values="voltage_raw")
+    ser_mean = dfpivot.iloc[:, i_stim - 20 : i_stim - 10].mean(axis=1)
+    dfpivot = dfpivot.subtract(ser_mean, axis="rows")
     df_stacked = dfpivot.stack().reset_index(name="voltage")
-    # Merge back with df_zeroed to ensure correct length and alignment
-    df_zeroed = df_zeroed.merge(df_stacked, on=["sweep", "time"], how="left")
-
-    print(f"zeroSweeps: {df_zeroed}")
-    return df_zeroed
+    df_stacked = df_stacked.rename(columns={"level_0": "sweep"}) if "level_0" in df_stacked.columns else df_stacked
+    # stack leaves columns sweep, time, voltage
+    out = df_stacked.loc[:, ["sweep", "time", "voltage"]].copy()
+    out["sweep"] = out["sweep"].astype(np.int32)
+    print(f"zeroSweeps: done shape={out.shape}")
+    return out
 
 
 def first_stim_index(dfmean, threshold_factor=0.75, min_time_difference=0.005):
@@ -401,39 +525,50 @@ def parse_abf(filepath):
     return df
 
 
-def compute_sweep_hz(df):
-    """Derive inter-sweep rate (Hz) from a raw data DataFrame.
+def _round_hz(raw_hz: float) -> float:
+    magnitude = math.floor(math.log10(abs(raw_hz)))
+    return round(raw_hz, -magnitude + 2)
 
-    Uses the ``datetime`` column (absolute wall-clock timestamps) which is
-    populated by all parsers (ABF, IBW, CSV).  The ``t0`` column is not used:
-    for ABF it encodes the same intervals already present in ``datetime``,
-    and for IBW it is a constant 0.0 placeholder.
 
-    The DataFrame must contain ``sweep`` and ``datetime`` columns.  Returns
-    the rounded Hz value, or *None* if it cannot be determined (e.g. fewer
-    than 2 sweeps or ``datetime`` column is absent).
+def compute_sweep_hz(df, sweeptimes: pd.DataFrame | None = None):
+    """Derive inter-sweep rate (Hz).
+
+    Prefer *sweeptimes* accessory (``sweep_start`` or run-relative ``t0``).
+    Fall back to per-sample ``datetime`` on *df* for legacy wide frames still
+    used in tests / mid-parse.
     """
-    if "datetime" not in df.columns:
+    if sweeptimes is not None and len(sweeptimes) > 0:
+        st = sweeptimes.sort_values("sweep")
+        if "sweep_start" in st.columns and st["sweep_start"].notna().sum() >= 2:
+            intervals = st["sweep_start"].diff().dropna().dt.total_seconds()
+            median_interval = intervals.median()
+            if pd.notna(median_interval) and median_interval > 0:
+                return _round_hz(1.0 / float(median_interval))
+        if "t0" in st.columns and st["t0"].notna().sum() >= 2:
+            intervals = st["t0"].sort_values().diff().dropna()
+            # t0 may not be sorted by sweep order if mis-ordered — use sweep order
+            intervals = st.sort_values("sweep")["t0"].diff().dropna()
+            median_interval = intervals.median()
+            if pd.notna(median_interval) and median_interval > 0:
+                return _round_hz(1.0 / float(median_interval))
+        return None
+
+    if df is None or "datetime" not in df.columns or "sweep" not in df.columns:
         return None
     sweep_dts = df.groupby("sweep")["datetime"].first().sort_values()
-    if len(sweep_dts) < 2:
-        return None
-    if sweep_dts.isna().all():
+    if len(sweep_dts) < 2 or sweep_dts.isna().all():
         return None
     intervals = sweep_dts.diff().dropna().dt.total_seconds()
     median_interval = intervals.median()
     if pd.isna(median_interval) or median_interval <= 0:
         return None
-    raw_hz = 1.0 / median_interval
-    # Round to 3 significant figures
-    magnitude = math.floor(math.log10(abs(raw_hz)))
-    return round(raw_hz, -magnitude + 2)
+    return _round_hz(1.0 / float(median_interval))
 
 
-def metadata(df):
+def metadata(df, sweeptimes: pd.DataFrame | None = None):
     """
-    Usage: called by parse.metadata(df) from ui.py
-    returns a dict with metadata from the df:
+    Usage: called by parse.metadata(df) from ui / create_recording.
+    returns a dict with metadata from the sample df (+ optional sweeptimes for sweep_hz):
     dict_meta: {    "nsweeps": number of sweeps in the recording
                     "sweep_duration": duration of a sweep in seconds
                     "sampling_rate": sampling rate in Hz
@@ -452,7 +587,7 @@ def metadata(df):
     # Sampling rate: 1 / interval between time samples (assume uniform)
     time_diffs = first_sweep["time"].diff().dropna()
     sampling_rate = int(round(1 / time_diffs.mode().iloc[0]))
-    sweep_hz = compute_sweep_hz(df)
+    sweep_hz = compute_sweep_hz(df, sweeptimes=sweeptimes)
     dict_meta = {
         "nsweeps": nsweeps,  # number of sweeps in the recording
         "sweep_duration": sweep_duration,  # time in seconds

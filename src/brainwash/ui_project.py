@@ -19,6 +19,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import yaml
@@ -228,11 +229,56 @@ class ProjectMixin:
         elif key == "data":
             filepath = f"{self.dict_folders['data']}/{filename}.{filetype}"
             self.dict_folders["data"].mkdir(exist_ok=True)
+        elif key == "sweeptimes":
+            from brainwash_ui import recording_cache
+
+            self.dict_folders["data"].mkdir(exist_ok=True)
+            filepath = recording_cache.sweeptimes_parquet_path(str(self.dict_folders["data"]), filename)
         else:
             filepath = f"{self.dict_folders['cache']}/{filename}_{key}.{filetype}"
 
         df.to_parquet(filepath, index=False)
         print(f"saved {filepath}")
+
+    def write_recording_samples(self, rec_name, df, *, source_kind=None, sweeptimes=None):
+        """Persist lean samples + sweeptimes for *rec_name*.
+
+        If *df* still has clock columns, builds sweeptimes from them (unless
+        *sweeptimes* is provided). If *df* is already lean, keeps/subsets
+        existing sweeptimes when possible, else writes a null-clock table.
+        """
+        from brainwash_ui import recording_cache
+
+        has_clock = df is not None and (("datetime" in df.columns) or ("t0" in df.columns))
+        samples = parse.lean_samples(df) if df is not None else parse.lean_samples(pd.DataFrame())
+        if sweeptimes is None:
+            if has_clock:
+                kind = source_kind or parse.infer_source_kind(df=df)
+                sweeptimes = parse.build_sweeptimes(df, source_kind=kind)
+            else:
+                path_st = Path(recording_cache.sweeptimes_parquet_path(str(self.dict_folders["data"]), rec_name))
+                if path_st.exists():
+                    old = pd.read_parquet(path_st)
+                    keep = samples["sweep"].unique() if len(samples) else []
+                    sweeptimes = parse.subset_sweeptimes(old, keep)
+                else:
+                    kind = source_kind or "unknown"
+                    sweeptimes = parse.build_sweeptimes(samples.assign(t0=np.nan), source_kind=kind)
+        self.df2file(df=samples, filename=rec_name, key="data")
+        self.df2file(df=sweeptimes, filename=rec_name, key="sweeptimes")
+        # Drop in-memory raw cache so next get_dfdata reloads lean samples
+        if hasattr(self, "dict_datas") and rec_name in self.dict_datas:
+            self.dict_datas.pop(rec_name, None)
+        return samples, sweeptimes
+
+    def get_sweeptimes_df(self, rec_name):
+        """Load data/{rec}_sweeptimes.parquet or None if missing."""
+        from brainwash_ui import recording_cache
+
+        path = Path(recording_cache.sweeptimes_parquet_path(str(self.dict_folders["data"]), rec_name))
+        if not path.exists():
+            return None
+        return pd.read_parquet(path)
 
     # ------------------------------------------------------------------
     # Project lifecycle
@@ -394,19 +440,24 @@ class ProjectMixin:
         if data_dir is None or not data_dir.exists():
             return
         updated = 0
+        from brainwash_ui import recording_cache
+
         for idx in df_p.index[missing]:
             rec = df_p.at[idx, "recording_name"]
-            path_data = data_dir / f"{rec}.parquet"
-            if not path_data.exists():
-                continue
+            path_st = Path(recording_cache.sweeptimes_parquet_path(str(data_dir), rec))
+            path_data = Path(recording_cache.data_parquet_path(str(data_dir), rec))
             try:
-                # Read only the columns needed — fast even for large files.
-                schema = pq.read_schema(str(path_data))
-                available = set(schema.names)
-                if "sweep" not in available or "datetime" not in available:
-                    continue
-                df_raw = pd.read_parquet(str(path_data), columns=["sweep", "datetime"])
-                sweep_hz = parse.compute_sweep_hz(df_raw)
+                sweep_hz = None
+                if path_st.exists():
+                    st = pd.read_parquet(path_st)
+                    sweep_hz = parse.compute_sweep_hz(None, sweeptimes=st)
+                elif path_data.exists():
+                    # Legacy fat data parquet with per-sample datetime
+                    schema = pq.read_schema(str(path_data))
+                    available = set(schema.names)
+                    if "sweep" in available and "datetime" in available:
+                        df_raw = pd.read_parquet(str(path_data), columns=["sweep", "datetime"])
+                        sweep_hz = parse.compute_sweep_hz(df_raw)
                 if sweep_hz is not None:
                     df_p.at[idx, "sweep_hz"] = sweep_hz
                     # Clear the "default Hz" status flag.
@@ -1170,21 +1221,19 @@ class ProjectMixin:
     def rename_files_by_rec_name(self, old_name, new_name):
         from brainwash_ui import recording_cache
 
-        for folder_name, file_suffix in [
-            ("data", ".parquet"),
-            ("timepoints", ".parquet"),
-            ("cache", "_mean.parquet"),
-            ("cache", "_filter.parquet"),
-            ("cache", "_bin.parquet"),
-            ("cache", "_output.parquet"),
-        ]:
-            old_file_path = Path(self.dict_folders[folder_name] / (old_name + file_suffix))
-            new_file_path = Path(self.dict_folders[folder_name] / (new_name + file_suffix))
-            if old_file_path.exists():
-                old_file_path.rename(new_file_path)
-            elif folder_name == "data":
-                print(f"recording_rename_files: file not found: {old_file_path}")
-                raise FileNotFoundError
+        data_sample = Path(recording_cache.data_parquet_path(str(self.dict_folders["data"]), old_name))
+        if not data_sample.exists():
+            print(f"recording_rename_files: file not found: {data_sample}")
+            raise FileNotFoundError
+
+        for old_path in recording_cache.iter_recording_disk_files(self.dict_folders, old_name):
+            if not old_path.exists():
+                continue
+            # Replace trailing /{old_name}… with /{new_name}… on the same parent
+            new_path = old_path.parent / old_path.name.replace(old_name, new_name, 1)
+            if old_path != new_path:
+                old_path.rename(new_path)
+
         # Stim intensity: path helper strips a redundant .csv so we never get .csv.csv
         if "stim_intensity" in self.dict_folders:
             old_si = Path(recording_cache.stim_intensity_csv_path(str(self.dict_folders["stim_intensity"]), old_name))

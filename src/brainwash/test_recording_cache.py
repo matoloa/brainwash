@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from brainwash_ui import recording_cache
 
 
@@ -22,6 +24,10 @@ def test_timepoints_and_data_paths():
     assert recording_cache.data_parquet_path("/data", "rec1") == "/data/rec1.parquet"
 
 
+def test_sweeptimes_parquet_path():
+    assert recording_cache.sweeptimes_parquet_path("/data", "rec1") == "/data/rec1_sweeptimes.parquet"
+
+
 def test_group_mean_parquet_path():
     assert recording_cache.group_mean_parquet_path("/cache", "G1") == "/cache/group_G1_mean.parquet"
     assert (
@@ -32,3 +38,33 @@ def test_group_mean_parquet_path():
 
 def test_timepoints_cache_key_constant():
     assert recording_cache.TIMEPOINTS_CACHE_KEY == "timepoints"
+
+
+def test_recording_disk_paths_include_sweeptimes():
+    folders = {
+        "data": Path("/proj/data"),
+        "timepoints": Path("/proj/timepoints"),
+        "cache": Path("/proj/cache"),
+    }
+    paths = recording_cache.recording_disk_paths(folders, "recA")
+    names = [p.name for p in paths]
+    assert "recA.parquet" in names
+    assert "recA_sweeptimes.parquet" in names
+    assert "recA_mean.parquet" in names
+    assert "recA_filter.parquet" in names
+    assert all(isinstance(p, Path) for p in paths)
+
+
+def test_cache_and_timepoints_paths_exclude_data():
+    folders = {
+        "data": Path("/proj/data"),
+        "timepoints": Path("/proj/timepoints"),
+        "cache": Path("/proj/cache"),
+    }
+    paths = recording_cache.cache_and_timepoints_paths(folders, "recA")
+    assert all(p.parent != Path("/proj/data") for p in paths)
+    names = [p.name for p in paths]
+    assert "recA_sweeptimes.parquet" not in names
+    assert "recA_mean.parquet" in names
+    assert "recA_filter.parquet" in names
+    assert any(p.parent == Path("/proj/timepoints") for p in paths)

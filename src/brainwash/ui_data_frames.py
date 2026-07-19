@@ -432,6 +432,11 @@ class DataFrameMixin:
             path_filter = Path(recording_cache.filter_parquet_path(self.dict_folders["cache"], recording_name))
             if Path(path_filter).exists():  # 2: Read from file
                 dffilter = pd.read_parquet(path_filter)
+                # Drop legacy clock columns from fat filter caches
+                drop_clock = [c for c in ("t0", "datetime") if c in dffilter.columns]
+                if drop_clock:
+                    dffilter = dffilter.drop(columns=drop_clock)
+                    persist = True
             else:  # 3: Create file
                 dfdata = self.get_dfdata(row=row)
                 if dfdata is None or str(row.get("sweeps", "...")) == "...":
