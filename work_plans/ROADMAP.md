@@ -28,7 +28,7 @@ Living priority map across milestones. **Execution** is on GitHub issues when a 
 | [#3](https://github.com/matoloa/brainwash/issues/3) | Default aspect color palette | **Done** — EPSP blue / volley green; stim indigo→violet; legacy magenta migrate |
 | [#4](https://github.com/matoloa/brainwash/issues/4) | UI Test Sets overhaul | **Done** — full-width rows, × remove, header, clear-all menu; create via Tag button |
 | [#5](https://github.com/matoloa/brainwash/issues/5) | Blind / unblind rec names | **Done** — display-only random `Rec n` episodes; strip × unblind; always-blind-new in `bw_cfg` |
-| [#6](https://github.com/matoloa/brainwash/issues/6) | Color-by Aspect \| Rec \| Stim \| Group | Timebox; may slip to 1.0.1 |
+| [#6](https://github.com/matoloa/brainwash/issues/6) | Color events by Rec \| Stim \| Group | Plan: [`plan_color_events_by.md`](plan_color_events_by.md); axe/axm overlay (not output Aspect) |
 | [#7](https://github.com/matoloa/brainwash/issues/7) | Reconnect Talkback | Spike first |
 | [#8](https://github.com/matoloa/brainwash/issues/8) | Audit mixin arrangement | Hygiene; small moves only |
 | [#9](https://github.com/matoloa/brainwash/issues/9) | Clean sweep: Experimental + TODOs | Hygiene |
@@ -152,3 +152,4 @@ See [`NTH.md`](NTH.md) for small style items (e.g. experiment type token `"PP"` 
 |------|--------|
 | 2026-07-19 | Initial draft from 1.0.0 issue set + placeholder triage discussion |
 | 2026-07-19 | #5 blind/unblind marked **done** (`2bce475`); focus order → #6–#9 |
+| 2026-07-19 | #6 retargeted to color **events** (Rec/Stim preference + Group mode); [`plan_color_events_by.md`](plan_color_events_by.md) |
