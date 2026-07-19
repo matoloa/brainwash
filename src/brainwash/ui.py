@@ -1383,6 +1383,8 @@ class UIsub(
         """Attention statusbar while hovering the group × remove control."""
         if not hasattr(self, "set_statusbar"):
             return
+        if hasattr(self, "_cancel_attention_toast"):
+            self._cancel_attention_toast()
         self.uistate.stat_test.statusbar_state = "attention"
         self.set_statusbar("attention", f"Double-click to remove group: {group_name}")
 
@@ -1390,6 +1392,8 @@ class UIsub(
         """Attention statusbar while hovering the test-set × remove control."""
         if not hasattr(self, "set_statusbar"):
             return
+        if hasattr(self, "_cancel_attention_toast"):
+            self._cancel_attention_toast()
         self.uistate.stat_test.statusbar_state = "attention"
         self.set_statusbar("attention", f"Double-click to remove test set: {set_name}")
 
@@ -1397,17 +1401,14 @@ class UIsub(
         """Restore statusbar after leaving a group/test-set × control."""
         if getattr(self.uistate.stat_test, "statusbar_state", None) != "attention":
             return
-        self.uistate.stat_test.statusbar_state = None
-        if getattr(self, "_stim_intensity_dirty_active", lambda: False)():
-            if hasattr(self, "_show_stim_intensity_pending_statusbar"):
-                self._show_stim_intensity_pending_statusbar()
-            return
-        if hasattr(self, "_compute_statusbar_for_current_state") and hasattr(self, "set_statusbar"):
-            result = self._compute_statusbar_for_current_state()
-            self.uistate.stat_test.statusbar_state = result.state
-            self.set_statusbar(result.state, result.text)
-        elif hasattr(self, "_set_statusbar_appearance"):
-            self._set_statusbar_appearance(clear=True)
+        if hasattr(self, "_cancel_attention_toast"):
+            self._cancel_attention_toast()
+        if hasattr(self, "_restore_transient_statusbar"):
+            self._restore_transient_statusbar()
+        else:
+            self.uistate.stat_test.statusbar_state = None
+            if hasattr(self, "_set_statusbar_appearance"):
+                self._set_statusbar_appearance(clear=True)
 
     # Back-compat alias
     _on_group_remove_hover_leave = _on_entity_remove_hover_leave

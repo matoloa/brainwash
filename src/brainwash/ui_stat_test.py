@@ -318,6 +318,45 @@ class StatTestMixin:
         else:
             self._set_statusbar_appearance(clear=True)
 
+    def _cancel_attention_toast(self) -> None:
+        """Invalidate any pending timed attention toast (hover or a newer toast wins)."""
+        self._attention_toast_gen = getattr(self, "_attention_toast_gen", 0) + 1
+
+    def _restore_transient_statusbar(self) -> None:
+        """Restore formal (or stim-pending) chrome after transient attention; no formal re-run."""
+        if getattr(self, "_stim_intensity_dirty_active", lambda: False)():
+            if hasattr(self, "_show_stim_intensity_pending_statusbar"):
+                self._show_stim_intensity_pending_statusbar()
+                return
+        if hasattr(self, "_compute_statusbar_for_current_state"):
+            result = self._compute_statusbar_for_current_state()
+            self.uistate.stat_test.statusbar_state = result.state
+            self.set_statusbar(result.state, result.text)
+        else:
+            self.uistate.stat_test.statusbar_state = None
+            if hasattr(self, "_set_statusbar_appearance"):
+                self._set_statusbar_appearance(clear=True)
+
+    def show_attention_toast(self, text: str, duration_ms: int = 5000) -> None:
+        """Pumpkin attention chrome for action feedback; restores after duration_ms.
+
+        Distinct from formal ``warning`` (red) so ephemeral messages are not mistaken
+        for pre-existing test errors. Generation token cancels stale singleShots.
+        """
+        gen = getattr(self, "_attention_toast_gen", 0) + 1
+        self._attention_toast_gen = gen
+        self.uistate.stat_test.statusbar_state = "attention"
+        self.set_statusbar("attention", text)
+
+        def _done():
+            if getattr(self, "_attention_toast_gen", 0) != gen:
+                return
+            if getattr(self.uistate.stat_test, "statusbar_state", None) != "attention":
+                return
+            self._restore_transient_statusbar()
+
+        QtCore.QTimer.singleShot(duration_ms, _done)
+
     def _on_statusbar_message_cleared(self, text):
         """After a transient message clears, restore permanent statusbar from current state."""
         if text:

@@ -781,7 +781,6 @@ class TableProjSub(QtWidgets.QTableView):
     def dropEvent(self, event):
         if event.mimeData().hasUrls():
             file_urls = [url.toLocalFile() for url in event.mimeData().urls()]
-            print("Files dropped:", file_urls)
             # Handle the dropped files here
             dfAdd = df_projectTemplate()
             dfAdd["path"] = file_urls  # needs to be first, as it sets the number of rows
@@ -791,21 +790,40 @@ class TableProjSub(QtWidgets.QTableView):
             # For now, use name + lowest level folder
             names = []
             duplicates = []  # remove these from dfAdd
-            df_p_paths = self.parent.get_df_project()["path"].values if hasattr(self.parent, "get_df_project") else self.parent.df_project["path"].values
+            df_p = self.parent.get_df_project() if hasattr(self.parent, "get_df_project") else self.parent.df_project
+            df_p_paths = set(str(p) for p in df_p["path"].tolist()) if "path" in df_p.columns else set()
             for i in file_urls:
                 # check if file is already in df_project
-                if i in df_p_paths:
-                    print(f"File {i} already in df_project")
+                if str(i) in df_p_paths:
                     duplicates.append(i)
                 else:
                     names.append(os.path.basename(os.path.dirname(i)) + "_" + os.path.basename(i))
+
+            def _report_already_imported(paths: list) -> None:
+                if not paths:
+                    return
+                if len(paths) == 1:
+                    text = f"File already imported: {os.path.basename(paths[0])}"
+                else:
+                    text = f"{len(paths)} files already imported"
+                # Pumpkin attention toast (5s), not red warning — avoid looking like a formal-test error.
+                if hasattr(self.parent, "show_attention_toast"):
+                    self.parent.show_attention_toast(text, duration_ms=5000)
+                elif hasattr(self.parent, "set_statusbar"):
+                    if hasattr(self.parent, "uistate"):
+                        self.parent.uistate.stat_test.statusbar_state = "attention"
+                    self.parent.set_statusbar("attention", text)
+
             if not names:
-                print("No new files to add.")
+                _report_already_imported(duplicates)
+                event.acceptProposedAction()
                 return
             dfAdd = dfAdd.drop(dfAdd[dfAdd["path"].isin(duplicates)].index)
             dfAdd["recording_name"] = names
             # v0.16_n: _migrate_hierarchy called inside parent.addData() -> set_df_project()
             self.parent.addData(dfAdd)
+            if duplicates:
+                _report_already_imported(duplicates)
             event.acceptProposedAction()
         else:
             event.ignore()

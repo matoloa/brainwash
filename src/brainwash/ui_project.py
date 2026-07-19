@@ -744,6 +744,8 @@ class ProjectMixin:
     def _on_blind_unblind_hover_enter(self, _entity_ID, _entity_name):
         if not hasattr(self, "set_statusbar"):
             return
+        if hasattr(self, "_cancel_attention_toast"):
+            self._cancel_attention_toast()
         self.uistate.stat_test.statusbar_state = "attention"
         self.set_statusbar("attention", "Double-click to unblind")
 
