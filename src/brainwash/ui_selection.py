@@ -365,6 +365,32 @@ class SelectionMixin:
 
         mode = color_events.effective_color_events_mode(radio, n_rec, n_stim)
 
+        def _set_event_artist_color(line, color) -> None:
+            if line is None or color is None:
+                return
+            try:
+                if hasattr(line, "set_color"):
+                    line.set_color(color)
+                if hasattr(line, "set_markerfacecolor"):
+                    line.set_markerfacecolor(color)
+                if hasattr(line, "set_markeredgecolor"):
+                    line.set_markeredgecolor(color)
+            except Exception:
+                pass
+
+        if mode == "default":
+            # Restore build-time colours (measure_rgb / per-stim gradient at addRow)
+            for _k, entry in store.items():
+                if not color_events.artist_should_receive_event_color(entry):
+                    continue
+                _set_event_artist_color(entry.get("line"), entry.get("base_color"))
+            if draw:
+                for canvas_name in ("canvasMean", "canvasEvent", "canvasOutput"):
+                    canvas = getattr(self, canvas_name, None)
+                    if canvas is not None and hasattr(canvas, "draw_idle"):
+                        canvas.draw_idle()
+            return
+
         # Full table display order (not only selected) → stable rec hues
         display_order = []
         model_df = None
@@ -408,18 +434,7 @@ class SelectionMixin:
                 gradient=gradient,
                 dd_groups=dd_groups,
             )
-            line = entry.get("line")
-            if line is None:
-                continue
-            try:
-                if hasattr(line, "set_color"):
-                    line.set_color(color)
-                if hasattr(line, "set_markerfacecolor"):
-                    line.set_markerfacecolor(color)
-                if hasattr(line, "set_markeredgecolor"):
-                    line.set_markeredgecolor(color)
-            except Exception:
-                pass
+            _set_event_artist_color(entry.get("line"), color)
 
         if draw:
             for canvas_name in ("canvasMean", "canvasEvent", "canvasOutput"):

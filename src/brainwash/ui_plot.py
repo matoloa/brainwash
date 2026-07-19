@@ -1128,6 +1128,7 @@ class UIplot:
                 display_label=label,
             ),
             "line": line,
+            "base_color": color,
         }
 
     def plot_shade(
@@ -1213,6 +1214,7 @@ class UIplot:
                 display_label=label,
             ),
             "line": marker,
+            "base_color": color,
         }
 
     def plot_amp_width(
@@ -1269,6 +1271,7 @@ class UIplot:
                 display_label=f"{label} x marker",
             ),
             "line": xline,
+            "base_color": color,
         }
         self.uistate.plot.dict_rec_labels[y_key] = {
             **plot_model.amp_width_marker_entry(
@@ -1283,6 +1286,7 @@ class UIplot:
                 display_label=f"{label} y marker",
             ),
             "line": yline,
+            "base_color": color,
         }
 
     def plot_vline(
@@ -1325,6 +1329,7 @@ class UIplot:
                 display_label=label,
             ),
             "line": vline,
+            "base_color": color,
         }
 
     def plot_hline(
@@ -1370,6 +1375,7 @@ class UIplot:
                 display_label=label,
             ),
             "line": hline,
+            "base_color": color,
         }
 
     def plot_group_lines(self, axid, group_ID, dict_group, df_groupmean, aspect=None, level=None):

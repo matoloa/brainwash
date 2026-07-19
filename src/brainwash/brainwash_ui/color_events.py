@@ -33,12 +33,20 @@ def normalize_color_events_by(raw) -> str:
 
 
 def effective_color_events_mode(radio: str, n_rec_selected: int, n_stim_selected: int) -> str:
-    """Resolve encoding from radio preference + selection multiplicity."""
+    """Resolve encoding from radio preference + selection multiplicity.
+
+    Returns ``"default"`` when at most one rec and one stim are selected: keep
+    build-time marker/event colors and interactive axe mouseover chrome.
+    Multi-rec or multi-stim enables rec/stim/group color coding instead.
+    """
     radio = normalize_color_events_by(radio)
-    if radio == "group":
-        return "group"
     n_rec = max(int(n_rec_selected or 0), 0)
     n_stim = max(int(n_stim_selected or 0), 0)
+    # 0/1 rec × 0/1 stim → no overlay disambiguation needed
+    if n_rec <= 1 and n_stim <= 1:
+        return "default"
+    if radio == "group":
+        return "group"
     if n_rec == 1 and n_stim > 1:
         return "stim"
     if n_rec > 1 and n_stim == 1:
@@ -46,6 +54,11 @@ def effective_color_events_mode(radio: str, n_rec_selected: int, n_stim_selected
     if n_rec > 1 and n_stim > 1:
         return radio
     return radio
+
+
+def event_mouseover_enabled(n_rec_selected: int, n_stim_selected: int) -> bool:
+    """Axe event-marker mouseover/drag only for exactly one rec and one stim."""
+    return int(n_rec_selected or 0) == 1 and int(n_stim_selected or 0) == 1
 
 
 def selected_rec_ids_in_display_order(

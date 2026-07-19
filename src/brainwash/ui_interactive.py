@@ -657,6 +657,8 @@ class InteractivePlotMixin:
         self.usage("mouseoverUpdate")
         self.mouseoverDisconnect()
         n_recs = len(self.uistate.plot.list_idx_select_recs or [])
+        n_stims = len(self.uistate.plot.list_idx_select_stims or [])
+        from brainwash_ui import color_events
 
         if n_recs == 1:
             self.mouseoverOutput = self.canvasOutput.mpl_connect("motion_notify_event", self.outputMouseover)
@@ -671,6 +673,14 @@ class InteractivePlotMixin:
         if n_recs == 0:
             # No rec → no sweep ghost (group means alone are not a ghost source)
             self.exorcise()
+            self.graphRefresh(reeval_formal_test=False)
+            return
+        # Multi-stim (or none): color-code overlays; no axe event-marker mouseover/drag.
+        # Mean (axm) stim pick still works for single-rec multi-stim.
+        if not color_events.event_mouseover_enabled(n_recs, n_stims):
+            self.mouseoverMean = self.canvasMean.mpl_connect("motion_notify_event", self.meanMouseover)
+            self.mouseoverOutput = self.canvasOutput.mpl_connect("motion_notify_event", self.outputMouseover)
+            self.mouseLeaveOutput = self.canvasOutput.mpl_connect("axes_leave_event", self.on_leave_output)
             self.graphRefresh(reeval_formal_test=False)
             return
         prow = self.get_prow()

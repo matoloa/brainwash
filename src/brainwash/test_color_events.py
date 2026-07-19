@@ -11,8 +11,15 @@ def test_normalize_and_effective_mode_matrix():
     assert ce.effective_color_events_mode("stim", 3, 1) == "rec"
     assert ce.effective_color_events_mode("rec", 3, 4) == "rec"
     assert ce.effective_color_events_mode("stim", 3, 4) == "stim"
-    assert ce.effective_color_events_mode("rec", 1, 1) == "rec"
-    assert ce.effective_color_events_mode("stim", 1, 1) == "stim"
+    # 1×1 (or thinner) keeps build-time defaults — even if radio is group/rec/stim
+    assert ce.effective_color_events_mode("rec", 1, 1) == "default"
+    assert ce.effective_color_events_mode("stim", 1, 1) == "default"
+    assert ce.effective_color_events_mode("group", 1, 1) == "default"
+    assert ce.effective_color_events_mode("rec", 0, 0) == "default"
+    assert ce.event_mouseover_enabled(1, 1) is True
+    assert ce.event_mouseover_enabled(1, 2) is False
+    assert ce.event_mouseover_enabled(2, 1) is False
+    assert ce.event_mouseover_enabled(1, 0) is False
 
 
 def test_display_order_and_rec_index_map():
