@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import analysis_v3 as analysis
@@ -22,6 +23,44 @@ class DataFrameMixin:
 
     Host: ``protocols.DataFrameHost``
     """
+
+    def _stim_id_heal_session_set(self) -> set:
+        s = getattr(self, "_stim_id_heal_persisted_session", None)
+        if s is None:
+            s = set()
+            self._stim_id_heal_persisted_session = s
+        return s
+
+    def _apply_stim_id_heal(self, rec_name: str, dft, *, source: str) -> object:
+        """Heal invalid stim ids in memory; persist to disk at most once per rec/session.
+
+        Always updates ``dict_ts``. Disk write + ``stim_id_heal_log`` only when
+        ``should_persist_stim_id_heal`` says so (option-2 policy).
+        """
+        dft, repaired = recording_pipeline.ensure_stim_ids(dft)
+        if not repaired:
+            return dft
+        self.dict_ts[rec_name] = dft
+        session = self._stim_id_heal_session_set()
+        if not recording_pipeline.should_persist_stim_id_heal(rec_name, repaired=True, session_persisted=session):
+            print(f"get_dft: stim id heal in-memory only for {rec_name} ({source}; already persisted this session)")
+            return dft
+        self.df2file(df=dft, filename=rec_name, key="timepoints")
+        session.add(str(rec_name))
+        log = getattr(self.uistate.project, "stim_id_heal_log", None)
+        if not isinstance(log, dict):
+            log = {}
+            self.uistate.project.stim_id_heal_log = log
+        log[str(rec_name)] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        print(f"get_dft: repaired and persisted stim ids for {rec_name} ({source}; logged once)")
+        try:
+            project_folder = (getattr(self, "dict_folders", None) or {}).get("project")
+            if project_folder is not None and hasattr(self, "uistate"):
+                ver = getattr(getattr(self, "config", None), "version", None)
+                self.uistate.save_cfg(project_folder, ver)
+        except Exception as exc:
+            print(f"get_dft: could not save stim_id_heal_log for {rec_name}: {exc}")
+        return dft
 
     # ------------------------------------------------------------------
     # Stub / trivial helpers
@@ -215,10 +254,17 @@ class DataFrameMixin:
     # ------------------------------------------------------------------
 
     def set_dft(self, rec_name, df):  # persists df and saves it as a file
-        # print(f"type: {type(df)}")
+        # Explicit write path: always ensure valid stim ids and persist.
         df, repaired = recording_pipeline.ensure_stim_ids(df)
         if repaired:
             print(f"set_dft: repaired invalid stim ids for {rec_name}")
+            session = self._stim_id_heal_session_set()
+            session.add(str(rec_name))
+            log = getattr(self.uistate.project, "stim_id_heal_log", None)
+            if not isinstance(log, dict):
+                log = {}
+                self.uistate.project.stim_id_heal_log = log
+            log[str(rec_name)] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         print(f"set_dft of {rec_name}: {df}")
         self.dict_ts[rec_name] = df
         self.df2file(df=df, filename=rec_name, key="timepoints")
@@ -347,11 +393,7 @@ class DataFrameMixin:
             return None
         if rec in self.dict_ts.keys() and not reset:
             dft = self.dict_ts[rec]
-            dft, repaired = recording_pipeline.ensure_stim_ids(dft)
-            if repaired:
-                print(f"get_dft: repaired invalid stim ids in cache for {rec}")
-                self.dict_ts[rec] = dft
-                self.df2file(df=dft, filename=rec, key="timepoints")
+            dft = self._apply_stim_id_heal(rec, dft, source="cache")
             self._ensure_project_stims_count(n_stims=len(dft), row=row, rec_name=rec)
             return dft
         str_t_path = recording_cache.timepoints_parquet_path(self.dict_folders["timepoints"], rec)
@@ -361,10 +403,7 @@ class DataFrameMixin:
             if recording_pipeline.migrate_dft_column_names(dft):
                 self.df2file(df=dft, filename=rec, key="timepoints")  # re-persist with corrected names
             recording_pipeline.normalize_dft_dtypes(dft)
-            dft, repaired = recording_pipeline.ensure_stim_ids(dft)
-            if repaired:
-                print(f"get_dft: repaired invalid stim ids from file for {rec}")
-                self.df2file(df=dft, filename=rec, key="timepoints")
+            dft = self._apply_stim_id_heal(rec, dft, source="file")
             self.dict_ts[rec] = dft
             self._ensure_project_stims_count(n_stims=len(dft), row=row, rec_name=rec)
             return dft

@@ -202,6 +202,13 @@ def test_output_axis_legend_map_from_entries_uses_display():
             "display_label": "Rec 1 marker",
             "line": line_b,
         },
+        "rec|r1|ax1|io_trend|s-|EPSP_amp|raw|io": {
+            "rec_ID": "r1",
+            "axis": "ax1",
+            "role": pi.ROLE_IO_TREND,
+            "display_label": "Rec 1 raw IO trendline",
+            "line": object(),
+        },
     }
     leg = pi.output_axis_legend_map_from_entries(
         dd_recs,

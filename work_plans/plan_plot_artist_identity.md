@@ -1,5 +1,8 @@
 # Plan: Plot artist identity (storage key ≠ display label)
 
+**STATUS: done** (shipped on `1.0.0`; identity PRs 1–6 + #5 blind; dual-path lookup cleanup 2026-07-19).  
+Do **not** re-implement. Remaining string parsers live only in `plot_identity.entry_io_role` / `_legacy_io_role_from_text`. Guard: `test_identity_lookup_patterns.py`.
+
 **Branch:** `1.0.0`  
 **Unblocks:** [#5](https://github.com/matoloa/brainwash/issues/5) blind/unblind (display-only) without ad-hoc legend hacks  
 **Related smell:** stringly-typed keys in `dict_rec_labels` / `dict_group_labels` — human `recording_name` prefixes double as primary keys and legend text  
@@ -242,22 +245,6 @@ uv run pytest src/brainwash/test_plot_stim.py src/brainwash/test_plot_series.py 
 
 ---
 
-## Recommended decision
+## Recommended decision — **done**
 
-1. **Approve** this plan as prerequisite to #5  
-2. Start **PR-1** (helpers + tests only) on `1.0.0`  
-3. File or retitle a tracking issue: e.g. “Plot artist identity: storage key ≠ display” (optional; can live as plan in `work_plans/` if preferred)  
-4. #5 stays open until identity PRs land  
-
----
-
-## Open choices (defaults proposed)
-
-| Choice | Default |
-|--------|---------|
-| Key format | Opaque `rec|…` strings (Option A) |
-| Lookup | Metadata filter helpers first; index if needed |
-| Group keys | Same scheme in PR-5 (or with PR-3 if cheap) |
-| Blind in same milestone | After PR-6 only |
-
-If you prefer a **faster** path that still improves architecture: PR-1 + PR-4 only (metadata lookup, keep name keys) — unlocks safer drag/rename partially but **does not** fully unlock clean blinding of legends without display_label separation. Full Option A remains the right end state.
+Shipped: opaque keys, `display_label`, #5 blind, group keys, dual-path cleanup (`entry_io_role` / `entry_matches_rec_name`). Archive this plan to `History/` when tagging 1.0.0.

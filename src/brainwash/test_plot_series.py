@@ -507,10 +507,29 @@ def test_build_io_refresh_specs_for_rec():
             "EPSP_amp_norm": [50.0, 100.0, 150.0],
         }
     )
+    # Role + rec_ID preferred; legacy display_label only when role missing
     dict_rec_labels = {
-        "rec1 raw IO scatter": {"x_mode": "io", "variant": "raw"},
-        "rec1 raw IO trendline": {"x_mode": "io", "variant": "raw"},
-        "rec2 raw IO scatter": {"x_mode": "io", "variant": "raw"},
+        "rec|1|ax1|io_scatter|s-|EPSP_amp|raw|io": {
+            "x_mode": "io",
+            "variant": "raw",
+            "role": "io_scatter",
+            "rec_ID": 1,
+            "display_label": "rec1 raw IO scatter",
+        },
+        "rec|1|ax1|io_trend|s-|EPSP_amp|raw|io": {
+            "x_mode": "io",
+            "variant": "raw",
+            "role": "io_trend",
+            "rec_ID": 1,
+            "display_label": "rec1 raw IO trendline",
+        },
+        "rec|2|ax1|io_scatter|s-|EPSP_amp|raw|io": {
+            "x_mode": "io",
+            "variant": "raw",
+            "role": "io_scatter",
+            "rec_ID": 2,
+            "display_label": "rec2 raw IO scatter",
+        },
     }
     specs = plot_series.build_io_refresh_specs_for_rec(
         "rec1",
@@ -519,11 +538,23 @@ def test_build_io_refresh_specs_for_rec():
         "vamp",
         "EPSPamp",
         force_through_zero=True,
+        rec_ID=1,
     )
     assert len(specs) == 2
-    assert specs[0].label == "rec1 raw IO scatter"
+    assert specs[0].label.startswith("rec|1|")
     assert isinstance(specs[0], plot_series.IoScatterRefreshSpec)
     assert isinstance(specs[1], plot_series.IoTrendlineRefreshSpec)
+    # Legacy name keys still resolve via display/role infer
+    legacy = {
+        "rec1 raw IO scatter": {"x_mode": "io", "variant": "raw", "display_label": "rec1 raw IO scatter"},
+        "rec1 raw IO trendline": {"x_mode": "io", "variant": "raw", "display_label": "rec1 raw IO trendline"},
+        "rec2 raw IO scatter": {"x_mode": "io", "variant": "raw", "display_label": "rec2 raw IO scatter"},
+    }
+    legacy_specs = plot_series.build_io_refresh_specs_for_rec(
+        "rec1", legacy, df, "vamp", "EPSPamp", force_through_zero=True
+    )
+    assert len(legacy_specs) == 2
+    assert legacy_specs[0].label == "rec1 raw IO scatter"
 
 
 def test_out_line_xy_from_df():

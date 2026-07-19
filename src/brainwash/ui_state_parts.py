@@ -165,6 +165,8 @@ class ProjectPersistedState:
         # Display-only blinding (#5): never mutates df_project / paths / storage keys.
         self.blind_recordings = False
         self.blind_aliases = {}  # str(rec_ID) -> "Rec n"
+        # rec_name -> ISO UTC when invalid stim ids were healed and written once.
+        self.stim_id_heal_log = {}
         self.pushButtons = {
             "pushButton_stim_add": "triggerStimAdd",
             "pushButton_stim_remove": "triggerStimRemove",
@@ -210,6 +212,7 @@ class ProjectPersistedState:
             "color_events_by": self.color_events_by if self.color_events_by in ("rec", "stim", "group") else "rec",
             "blind_recordings": bool(self.blind_recordings),
             "blind_aliases": {str(k): str(v) for k, v in (self.blind_aliases or {}).items()},
+            "stim_id_heal_log": {str(k): str(v) for k, v in (self.stim_id_heal_log or {}).items()},
         }
 
     def apply_state_dict(self, state: dict, *, zoom_defaults: dict) -> None:
@@ -269,6 +272,11 @@ class ProjectPersistedState:
             self.blind_aliases = {str(k): str(v) for k, v in raw_aliases.items()}
         else:
             self.blind_aliases = {}
+        raw_heals = state.get("stim_id_heal_log") or {}
+        if isinstance(raw_heals, dict):
+            self.stim_id_heal_log = {str(k): str(v) for k, v in raw_heals.items()}
+        else:
+            self.stim_id_heal_log = {}
 
 
 class ExperimentConfig:

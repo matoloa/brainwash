@@ -411,6 +411,80 @@ def legend_label_for_entry(entry: dict, *, fallback_key: str = "") -> str:
     return fallback_key
 
 
+def _legacy_io_role_from_text(text) -> str | None:
+    """Infer IO scatter/trend role from legacy label text only (role field unset)."""
+    s = str(text or "")
+    if not s or s.startswith("rec|") or s.startswith("grp|") or s.startswith("sys|"):
+        return None
+    if s.endswith(" IO scatter") or " IO scatter" in s:
+        return ROLE_IO_SCATTER
+    if s.endswith(" IO trendline") or " IO trendline" in s:
+        return ROLE_IO_TREND
+    return None
+
+
+def entry_io_role(entry: dict | None, key: str = "") -> str | None:
+    """Return ROLE_IO_SCATTER / ROLE_IO_TREND, or None.
+
+    Prefer ``entry['role']``. Legacy string suffixes are consulted only when
+    ``role`` is missing (pre-identity sessions). Opaque ``rec|`` / ``grp|`` keys
+    are never parsed as display text.
+    """
+    if not isinstance(entry, dict):
+        return _legacy_io_role_from_text(key)
+    role = entry.get("role")
+    if role in (ROLE_IO_SCATTER, ROLE_IO_TREND):
+        return role
+    if role is not None:
+        return None
+    for text in (entry.get("display_label"), key):
+        inferred = _legacy_io_role_from_text(text)
+        if inferred is not None:
+            return inferred
+    line = entry.get("line")
+    if line is not None and hasattr(line, "get_label"):
+        try:
+            return _legacy_io_role_from_text(line.get_label())
+        except Exception:
+            pass
+    return None
+
+
+def is_io_trendline_entry(entry: dict | None, key: str = "") -> bool:
+    """True when this artist is an IO trendline (omit from legends / gate visibility)."""
+    return entry_io_role(entry, key) == ROLE_IO_TREND
+
+
+def entry_matches_rec_name(entry: dict, rec_name: str, *, key: str = "") -> bool:
+    """Match a rec by display_label stem (or legacy name key) — never opaque storage keys.
+
+    Prefer ``rec_ID`` equality at call sites when available.
+    """
+    if not rec_name:
+        return False
+    name = str(rec_name)
+    disp = str(entry.get("display_label") or "") if isinstance(entry, dict) else ""
+    if disp:
+        return disp == name or disp.startswith(name + " ") or disp.startswith(name + " (")
+    key_s = str(key or "")
+    if key_s.startswith("rec|") or key_s.startswith("grp|") or key_s.startswith("sys|"):
+        return False
+    return key_s == name or key_s.startswith(name + " ") or key_s.startswith(name + " (")
+
+
+def resolve_rec_id_from_store(store: dict | None, rec_name: str) -> Any:
+    """Best-effort rec_ID from dict_rec_labels via display_label stem."""
+    for key, entry in (store or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        rid = entry.get("rec_ID")
+        if rid is None:
+            continue
+        if entry_matches_rec_name(entry, rec_name, key=str(key)):
+            return rid
+    return None
+
+
 def output_axis_legend_map_from_entries(
     dd_recs: dict,
     dd_group_show: dict,
@@ -435,7 +509,7 @@ def output_axis_legend_map_from_entries(
         if str(key).endswith(" marker") and role is None:
             # Legacy name-based keys until migration completes
             continue
-        if role == ROLE_IO_TREND or " IO trendline" in str(key) or " IO trendline" in str(value.get("display_label", "")):
+        if is_io_trendline_entry(value, str(key)):
             continue
         label = legend_label_for_entry(value, fallback_key=str(key))
         if label and not label.endswith(" marker"):
@@ -446,7 +520,7 @@ def output_axis_legend_map_from_entries(
                 continue
             if value.get("axis") != axid:
                 continue
-            if value.get("role") == ROLE_IO_TREND or " IO trendline" in str(key):
+            if is_io_trendline_entry(value, str(key)):
                 continue
             level = value.get("level")
             if level is not None and level != current_level:

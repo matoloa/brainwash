@@ -2300,11 +2300,9 @@ class UIplot:
         """
         force0 = bool(self.uistate.project.checkBox.get("io_force0", False))
         dict_rec_labels = self.uistate.plot.dict_rec_labels
-        rec_ID = None
-        for ent in dict_rec_labels.values():
-            if isinstance(ent, dict) and ent.get("display_label", "").startswith(rec_name):
-                rec_ID = ent.get("rec_ID")
-                break
+        from brainwash_ui import plot_identity as pi
+
+        rec_ID = pi.resolve_rec_id_from_store(dict_rec_labels, rec_name)
         for spec in plot_series.build_io_refresh_specs_for_rec(
             rec_name,
             dict_rec_labels,

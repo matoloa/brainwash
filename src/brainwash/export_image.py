@@ -799,12 +799,17 @@ def render_publication_figure(
 
                 handles, labels = ax.get_legend_handles_labels()
                 if labels:
-                    # Omit IO trendlines — same color as group scatter; clutter-free legend
-                    by_label = {
-                        lab: h
-                        for h, lab in zip(handles, labels)
-                        if lab and " IO trendline" not in str(lab) and not str(lab).startswith("_")
-                    }
+                    # Omit IO trendlines — same color as group scatter; clutter-free legend.
+                    # Legend text is display_label; legacy sessions may still end with the suffix.
+                    from brainwash_ui import plot_identity as pi
+
+                    by_label = {}
+                    for h, lab in zip(handles, labels):
+                        if not lab or str(lab).startswith("_"):
+                            continue
+                        if pi.entry_io_role({"role": None, "display_label": lab}, str(lab)) == pi.ROLE_IO_TREND:
+                            continue
+                        by_label[lab] = h
                     if by_label:
                         ax.legend(by_label.values(), by_label.keys(), frameon=False)
 

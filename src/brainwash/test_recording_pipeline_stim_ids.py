@@ -53,3 +53,11 @@ def test_project_stims_needs_update():
     assert rp.project_stims_needs_update(2.0, 2) is False
     assert rp.project_stims_needs_update(1, 2) is True
     assert rp.project_stims_needs_update("x", 2) is True
+
+
+def test_should_persist_stim_id_heal_once_per_session():
+    assert rp.should_persist_stim_id_heal("r1", repaired=False, session_persisted=set()) is False
+    assert rp.should_persist_stim_id_heal("r1", repaired=True, session_persisted=set()) is True
+    assert rp.should_persist_stim_id_heal("r1", repaired=True, session_persisted={"r1"}) is False
+    assert rp.should_persist_stim_id_heal("r2", repaired=True, session_persisted={"r1"}) is True
+    assert rp.should_persist_stim_id_heal("", repaired=True, session_persisted=set()) is False

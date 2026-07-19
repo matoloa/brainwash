@@ -77,7 +77,9 @@ class SelectionMixin:
         if x_mode is not None and x_mode != self.uistate.x_axis:
             if not (x_mode == "sweep" and self.uistate.x_axis == "time"):
                 return False
-        if is_io and v.get("line") and v["line"].get_label().endswith(" IO trendline"):
+        from brainwash_ui import plot_identity as pi
+
+        if is_io and pi.is_io_trendline_entry(v):
             if not self.uistate.project.checkBox.get("io_trendline", False):
                 return False
         aspect = v.get("aspect")
@@ -130,7 +132,9 @@ class SelectionMixin:
         if x_mode is not None and x_mode != self.uistate.x_axis:
             if not (x_mode == "sweep" and self.uistate.x_axis == "time"):
                 return False
-        if is_io and v.get("line") and v["line"].get_label().endswith(" IO trendline"):
+        from brainwash_ui import plot_identity as pi
+
+        if is_io and pi.is_io_trendline_entry(v):
             if not self.uistate.project.checkBox.get("io_trendline", False):
                 return False
         aspect = v.get("aspect")

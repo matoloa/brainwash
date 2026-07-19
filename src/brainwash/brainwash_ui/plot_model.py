@@ -421,11 +421,6 @@ def display_label_from_key(key: str) -> str:
     return key
 
 
-def _is_io_trendline_legend_key(key: str) -> bool:
-    """Trendlines share group color; omit from legend (scatter entry is enough)."""
-    return " IO trendline" in str(key)
-
-
 def output_axis_legend_map(
     dd_recs: dict,
     dd_group_show: dict,
@@ -460,21 +455,19 @@ def output_axis_legend_map(
             continue
         if str(key).endswith(" marker") or str(disp).endswith(" marker"):
             continue
-        if _is_io_trendline_legend_key(key) or _is_io_trendline_legend_key(str(disp)):
+        if pi.is_io_trendline_entry(value, str(key)):
             continue
         axis_legend[str(disp)] = value.get("line")
     if include_groups:
         for key, value in (dd_group_show or {}).items():
             if not isinstance(value, dict) or value.get("axis") != axid:
                 continue
-            if value.get("role") == pi.ROLE_IO_TREND or _is_io_trendline_legend_key(key):
+            if pi.is_io_trendline_entry(value, str(key)):
                 continue
             level = value.get("level")
             if level is not None and level != current_level:
                 continue
             display_key = value.get("display_label") or display_label_from_key(key)
-            if _is_io_trendline_legend_key(str(display_key)):
-                continue
             axis_legend[str(display_key)] = value.get("line")
     return axis_legend
 

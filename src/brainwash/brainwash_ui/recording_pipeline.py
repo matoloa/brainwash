@@ -57,6 +57,19 @@ def stim_ids_are_valid(dft: pd.DataFrame) -> bool:
     return True
 
 
+def should_persist_stim_id_heal(rec_name: str, *, repaired: bool, session_persisted: set | frozenset | None) -> bool:
+    """True when a stim-id repair should be written to disk (once per rec per session).
+
+    Policy: always heal in memory; persist at most once per recording name while the
+    project is open. Durable log (``stim_id_heal_log`` in cfg) records the event.
+    """
+    if not repaired or not rec_name:
+        return False
+    if session_persisted is not None and str(rec_name) in session_persisted:
+        return False
+    return True
+
+
 def ensure_stim_ids(dft: pd.DataFrame | None) -> tuple[pd.DataFrame | None, bool]:
     """Guarantee stim column is unique integers >= 1.
 
@@ -64,7 +77,8 @@ def ensure_stim_ids(dft: pd.DataFrame | None) -> tuple[pd.DataFrame | None, bool
     sort by t_stim (when present) and renumber 1..n. Valid dfts are left unchanged
     (aside from casting stim to int).
 
-    Returns (dft, repaired).
+    Returns (dft, repaired). Callers that load from disk must not re-write on every
+    ``get_dft`` — use ``should_persist_stim_id_heal`` + session/project log.
     """
     if dft is None:
         return None, False

@@ -154,3 +154,4 @@ See [`NTH.md`](NTH.md) for small style items (e.g. experiment type token `"PP"` 
 | 2026-07-19 | Initial draft from 1.0.0 issue set + placeholder triage discussion |
 | 2026-07-19 | #5 blind/unblind marked **done** (`2bce475`); focus order → #6–#9 |
 | 2026-07-19 | #6 retargeted to color **events** (Rec/Stim preference + Group mode); [`plan_color_events_by.md`](plan_color_events_by.md) |
+| 2026-07-19 | Post-#1–#10 hardening: identity dual-path cleanup, stim-id heal-once + `stim_id_heal_log`, [`manual_smokes_1.0.0.md`](manual_smokes_1.0.0.md) |

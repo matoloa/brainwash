@@ -1090,27 +1090,33 @@ def build_io_refresh_specs_for_rec(
 ) -> list[IoRefreshSpec]:
     """IO scatter/trendline refresh data for updateStimLines (no matplotlib artists).
 
-    Matches artists by rec_ID / display_label stem (not storage-key prefix).
+    Matches artists by ``rec_ID`` when known, else display_label stem (never opaque
+    storage-key prefixes). Role via ``plot_identity.entry_io_role`` (metadata first).
     ``label`` on returned specs is the *storage key* for dict lookup.
     """
+    from brainwash_ui import plot_identity as pi
+
     specs: list[IoRefreshSpec] = []
+    rid = rec_ID
+    if rid is None and rec_name:
+        rid = pi.resolve_rec_id_from_store(dict_rec_labels, rec_name)
     for key, linedict in dict_rec_labels.items():
         if not isinstance(linedict, dict) or linedict.get("x_mode") != "io":
             continue
-        if rec_ID is not None and str(linedict.get("rec_ID")) != str(rec_ID):
-            continue
-        if rec_ID is None:
-            disp = str(linedict.get("display_label") or key)
-            if not (disp.startswith(rec_name) or key.startswith(rec_name)):
+        if rid is not None:
+            if linedict.get("rec_ID") is not None and str(linedict.get("rec_ID")) != str(rid):
                 continue
+            if linedict.get("rec_ID") is None and not pi.entry_matches_rec_name(linedict, rec_name, key=str(key)):
+                continue
+        elif not pi.entry_matches_rec_name(linedict, rec_name, key=str(key)):
+            continue
         variant = linedict.get("variant", "raw")
-        role = linedict.get("role")
-        disp = str(linedict.get("display_label") or key)
-        if role == "io_scatter" or disp.endswith(" IO scatter") or key.endswith(" IO scatter"):
+        io_role = pi.entry_io_role(linedict, str(key))
+        if io_role == pi.ROLE_IO_SCATTER:
             xy = io_scatter_xy(dfoutput, io_input, io_output, variant=variant)
             if xy is not None:
                 specs.append(IoScatterRefreshSpec(label=key, x=xy[0], y=xy[1]))
-        elif role == "io_trend" or disp.endswith(" IO trendline") or key.endswith(" IO trendline"):
+        elif io_role == pi.ROLE_IO_TREND:
             line_xy = io_trendline_xy(
                 dfoutput,
                 io_input,
