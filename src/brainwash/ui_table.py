@@ -26,6 +26,23 @@ from project_schema import df_projectTemplate
 logger = logging.getLogger(__name__)
 
 
+# Default column order for empty stim table headers (no placeholder data row).
+_STIM_TABLE_COLUMNS = [
+    "stim",
+    "t_stim",
+    "t_EPSP_slope_start",
+    "t_EPSP_slope_end",
+    "t_EPSP_slope_method",
+    "t_EPSP_amp",
+    "t_EPSP_amp_method",
+    "t_volley_slope_start",
+    "t_volley_slope_end",
+    "t_volley_slope_method",
+    "t_volley_amp",
+    "t_volley_amp_method",
+]
+
+
 class TableMixin:
     """Mixin that provides project table (tableProj) and stim table management.
 
@@ -132,6 +149,7 @@ class TableMixin:
         if self.uistate.plot.df_recs2plot is None:
             print("No parsed recordings selected.")
             self.uistate.plot.list_idx_select_stims = []
+            self._set_table_stim_empty()
             self.update_show()
             self.zoomAuto()
             self.graphRefresh(reeval_formal_test=False)
@@ -151,7 +169,7 @@ class TableMixin:
             self.uistate.plot.float_sweep_duration_max = longest_sweep_prow["sweep_duration"]
             dft_for_format = self.get_dft(row=longest_sweep_prow)
 
-        if dft_for_format is not None:
+        if dft_for_format is not None and not getattr(dft_for_format, "empty", True):
             num_stims = len(dft_for_format)
             valid_stim_indices = [i for i in self.uistate.plot.list_idx_select_stims if i < num_stims]
             if not valid_stim_indices and num_stims > 0:
@@ -169,7 +187,8 @@ class TableMixin:
             self.formatTableStimLayout(dft=dft_for_format)
         else:
             self.uistate.plot.list_idx_select_stims = []
-            logger.debug("tableProjSelectionChanged: dft_for_format is None (no stims detected), clearing stim selection")
+            self._set_table_stim_empty()
+            logger.debug("tableProjSelectionChanged: dft empty/None, showing headers only")
 
         # Single rec: keep full dft for axm stim mouseover/click (all detected stims).
         # Data for event drag needs single stim — set when exactly one stim selected.
@@ -444,8 +463,26 @@ class TableMixin:
         except Exception as e:
             print(f"Error setting up tableProj: {e}")
 
+    def empty_stim_dataframe(self) -> pd.DataFrame:
+        """Zero-row dft with headers only (no placeholder data when nothing selected)."""
+        cols = list(_STIM_TABLE_COLUMNS)
+        dt = getattr(self.uistate.project, "default_dict_t", None) or {}
+        for k in dt.keys():
+            if k not in cols:
+                cols.append(k)
+        return pd.DataFrame(columns=cols)
+
+    def _set_table_stim_empty(self) -> None:
+        """Show stim table headers only; clear row selection."""
+        empty = self.empty_stim_dataframe()
+        if hasattr(self, "tableStimModel") and self.tableStimModel is not None:
+            self.tableStimModel.setData(empty)
+        if hasattr(self, "tableStim") and self.tableStim.selectionModel() is not None:
+            self.tableStim.clearSelection()
+        self.formatTableStimLayout(empty)
+
     def setupTableStim(self):
-        dft_init = pd.DataFrame([self.uistate.project.default_dict_t])
+        dft_init = self.empty_stim_dataframe()
         self.tableStimModel = ui_widgets.TableModel(dft_init)
         self.tableStim.setModel(self.tableStimModel)
         self.tableStim.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
@@ -498,24 +535,11 @@ class TableMixin:
             header.moveSection(header.visualIndex(col_index), i)
 
     def formatTableStimLayout(self, dft):
-        if dft is None:
-            dft = pd.DataFrame([self.uistate.project.default_dict_t])
+        if dft is None or getattr(dft, "empty", True) and (dft is None or len(getattr(dft, "columns", [])) == 0):
+            dft = self.empty_stim_dataframe()
 
         header = self.tableStim.horizontalHeader()
-        column_order = [
-            "stim",
-            "t_stim",
-            "t_EPSP_slope_start",
-            "t_EPSP_slope_end",
-            "t_EPSP_slope_method",
-            "t_EPSP_amp",
-            "t_EPSP_amp_method",
-            "t_volley_slope_start",
-            "t_volley_slope_end",
-            "t_volley_slope_method",
-            "t_volley_amp",
-            "t_volley_amp_method",
-        ]
+        column_order = list(_STIM_TABLE_COLUMNS)
         if self.uistate.project.detailedTimetable:
             for col_name in dft.columns:
                 if col_name not in column_order:
@@ -532,7 +556,8 @@ class TableMixin:
                 self.tableStim.setColumnHidden(col, True)
         for i, col_index in enumerate(col_indices):
             header.moveSection(header.visualIndex(col_index), i)
-        self.tableStim.resizeColumnsToContents()
+        if num_columns > 0:
+            self.tableStim.resizeColumnsToContents()
 
     def _store_splitter_proportions_from_sizes(self, splitter_name: str, sizes: list) -> None:
         """Write splitter sizes into uistate.project.splitter (float proportions / fixed px)."""

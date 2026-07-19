@@ -1,7 +1,7 @@
 """Unit tests for h_splitterMaster dft proportion helpers (no full Qt UI)."""
 
 from ui_state_classes import UIstate
-from ui_table import TableMixin
+from ui_table import TableMixin, _STIM_TABLE_COLUMNS
 
 
 class _Host(TableMixin):
@@ -34,3 +34,15 @@ def test_ensure_noop_when_dft_share_present():
     h.uistate.project.splitter["h_splitterMaster"] = [0.1, 0.15, 0.75, 300]
     h._ensure_h_splitter_dft_share()
     assert h.uistate.project.splitter["h_splitterMaster"][1] == 0.15
+
+
+def test_empty_stim_dataframe_headers_only():
+    h = _Host()
+    h.uistate.project.default_dict_t = {"stim": 0, "t_stim": 0, "custom_col": 1}
+    empty = h.empty_stim_dataframe()
+    assert len(empty) == 0
+    assert "stim" in empty.columns
+    assert "t_stim" in empty.columns
+    assert "custom_col" in empty.columns
+    for c in _STIM_TABLE_COLUMNS:
+        assert c in empty.columns

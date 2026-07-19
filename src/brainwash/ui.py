@@ -1274,10 +1274,13 @@ class UIsub(
                 if prow is not None:
                     dft = self.get_dft(prow)
 
-            if dft is None:
-                dft = pd.DataFrame([self.uistate.project.default_dict_t])
-
-            self.formatTableStimLayout(dft)
+            if dft is None or getattr(dft, "empty", True):
+                if hasattr(self, "_set_table_stim_empty"):
+                    self._set_table_stim_empty()
+                else:
+                    self.formatTableStimLayout(None)
+            else:
+                self.formatTableStimLayout(dft)
 
             if hasattr(self, "actionToggleTimetable"):
                 self.actionToggleTimetable.setChecked(self.uistate.project.detailedTimetable)
