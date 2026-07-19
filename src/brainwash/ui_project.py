@@ -1298,7 +1298,8 @@ class ProjectMixin:
             if type(self.uistate.project.splitter["h_splitterMaster"][3]) == float:
                 self.uistate.project.splitter["h_splitterMaster"][3] = 300
 
-        # apply splitter proportions from project config
+        # apply splitter proportions from project config, then show/hide dft and
+        # re-apply sizes (hidden panes do not keep setSizes until visible)
         self.setSplitterSizes(*self.uistate.project.splitter.keys())
         self.setTableStimVisibility(self.uistate.project.showTimetable, initialize=True)
         self.connectUIstate()

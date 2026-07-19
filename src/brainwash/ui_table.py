@@ -534,39 +534,85 @@ class TableMixin:
             header.moveSection(header.visualIndex(col_index), i)
         self.tableStim.resizeColumnsToContents()
 
-    def setTableStimVisibility(self, state, initialize=False):
-        """Toggle visibility of the stim table (right pane of master splitter)."""
-        widget = self.h_splitterMaster.widget(1)  # Get the second widget in the splitter
-
-        if initialize:
-            widget.setVisible(state)
-            return
-
-        if state == widget.isVisible():
-            return
-
-        sizes = self.h_splitterMaster.sizes()
-        if state:
-            prop = self.uistate.project.settings.get("dft_width_proportion", 0.2)
-            total = sizes[1] + sizes[2]
-            sizes[1] = min(total, max(100, int(total * prop)))
-            sizes[2] = total - sizes[1]
-            widget.setVisible(True)
-            self.h_splitterMaster.setSizes(sizes)
-        else:
-            sizes[2] += sizes[1]
-            sizes[1] = 0
-            widget.setVisible(False)
-            self.h_splitterMaster.setSizes(sizes)
-
+    def _store_splitter_proportions_from_sizes(self, splitter_name: str, sizes: list) -> None:
+        """Write splitter sizes into uistate.project.splitter (float proportions / fixed px)."""
         total_size = sum(sizes)
-        if total_size > 0:
-            old_proportions = self.uistate.project.splitter.get("h_splitterMaster", [])
-            unbounded_px = sum(size for i, size in enumerate(sizes) if i >= len(old_proportions) or type(old_proportions[i]) == float)
-            proportions = []
-            for i, size in enumerate(sizes):
-                if i < len(old_proportions) and type(old_proportions[i]) != float:
-                    proportions.append(int(size))
-                else:
-                    proportions.append(float(size / unbounded_px if unbounded_px > 0 else 0.0))
-            self.uistate.project.splitter["h_splitterMaster"] = proportions
+        if total_size <= 0:
+            return
+        old_proportions = self.uistate.project.splitter.get(splitter_name, [])
+        unbounded_px = sum(
+            size for i, size in enumerate(sizes) if i >= len(old_proportions) or type(old_proportions[i]) == float
+        )
+        proportions = []
+        for i, size in enumerate(sizes):
+            if i < len(old_proportions) and type(old_proportions[i]) != float:
+                proportions.append(int(size))
+            else:
+                proportions.append(float(size / unbounded_px if unbounded_px > 0 else 0.0))
+        self.uistate.project.splitter[splitter_name] = proportions
+
+    def _ensure_h_splitter_dft_share(self) -> None:
+        """If stim pane proportion was collapsed to 0, restore from dft_width_proportion."""
+        props = list(self.uistate.project.splitter.get("h_splitterMaster", [0.105, 0.04, 0.855, 300]))
+        if len(props) < 3:
+            return
+        p1 = props[1]
+        if isinstance(p1, float) and p1 > 1e-6:
+            return
+        prop = float(self.uistate.project.settings.get("dft_width_proportion", 0.2) or 0.2)
+        prop = min(0.45, max(0.08, prop))
+        # Float panes 0..2: assign prop to dft, leave proj share, rest graphs
+        f0 = props[0] if isinstance(props[0], float) else 0.105
+        f2 = max(0.05, 1.0 - f0 - prop)
+        s = f0 + prop + f2
+        if s <= 0:
+            return
+        props[0] = f0 / s
+        props[1] = prop / s
+        props[2] = f2 / s
+        self.uistate.project.splitter["h_splitterMaster"] = props
+
+    def setTableStimVisibility(self, state, initialize=False):
+        """Toggle visibility of the stim table (pane 1 of h_splitterMaster).
+
+        Always restores horizontal proportions after show so launch does not let
+        the dft table bloat. When hiding, remember dft share before collapsing to 0.
+        """
+        widget = self.h_splitterMaster.widget(1)  # stim / dft pane
+
+        if not initialize and state == widget.isVisible():
+            return
+
+        sizes = list(self.h_splitterMaster.sizes())
+
+        if not state:
+            if widget.isVisible() and len(sizes) >= 3 and sizes[1] > 0:
+                den = sizes[1] + sizes[2]
+                if den > 0:
+                    self.uistate.project.settings["dft_width_proportion"] = float(sizes[1] / den)
+                # Persist layout *before* collapse so cfg keeps a non-zero dft share
+                self._store_splitter_proportions_from_sizes("h_splitterMaster", sizes)
+                sizes[2] += sizes[1]
+                sizes[1] = 0
+                widget.setVisible(False)
+                self.h_splitterMaster.setSizes(sizes)
+            else:
+                widget.setVisible(False)
+            return
+
+        # Show dft: make visible first, then apply saved proportions (Qt ignores sizes of hidden panes)
+        widget.setVisible(True)
+        self._ensure_h_splitter_dft_share()
+        if hasattr(self, "setSplitterSizes"):
+            self.setSplitterSizes("h_splitterMaster")
+        else:
+            prop = float(self.uistate.project.settings.get("dft_width_proportion", 0.2) or 0.2)
+            prop = min(0.45, max(0.08, prop))
+            total = (sizes[1] + sizes[2]) if len(sizes) >= 3 else sum(sizes)
+            if total <= 0:
+                total = 1000
+            sizes = list(sizes) if len(sizes) >= 3 else [0, 0, total, 0]
+            sizes[1] = min(total, max(100, int(total * prop)))
+            sizes[2] = max(0, total - sizes[1])
+            self.h_splitterMaster.setSizes(sizes)
+            self._store_splitter_proportions_from_sizes("h_splitterMaster", self.h_splitterMaster.sizes())

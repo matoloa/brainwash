@@ -208,8 +208,12 @@ class UIsub(
     def closeEvent(self, event):
         # Ensure all threads are stopped on window close
         self._cleanup_threads()
-        # Persist UI state (incl. current splitter sizes) on close.
-        # We deliberately do not save on every splitterMoved (see onSplitterMoved).
+        # Snapshot splitters then persist (incl. dft share when stim pane hidden)
+        if hasattr(self, "capture_splitter_proportions"):
+            try:
+                self.capture_splitter_proportions()
+            except Exception:
+                pass
         self._save_cfg_now()
 
         super().closeEvent(event)

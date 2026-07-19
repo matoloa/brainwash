@@ -313,25 +313,72 @@ class GraphCoordinatorMixin:
         self.canvasEvent = setup_graph(self.graphEvent)
         self.canvasOutput = setup_graph(self.graphOutput)
 
+    def capture_splitter_proportions(self) -> None:
+        """Snapshot all splitters into uistate (for close/save).
+
+        If the stim (dft) pane is hidden, do not persist a 0-width share — rebuild
+        a virtual size from dft_width_proportion so the next show/launch restores it.
+        """
+        for splitter_name in list(self.uistate.project.splitter.keys()):
+            splitter = getattr(self, splitter_name, None)
+            if splitter is None or not hasattr(splitter, "sizes"):
+                continue
+            sizes = list(splitter.sizes())
+            if splitter_name == "h_splitterMaster" and len(sizes) >= 3:
+                stim_w = splitter.widget(1)
+                if stim_w is not None and not stim_w.isVisible() and sizes[1] == 0:
+                    prop = float(self.uistate.project.settings.get("dft_width_proportion", 0.2) or 0.2)
+                    prop = min(0.45, max(0.08, prop))
+                    den = sizes[1] + sizes[2]
+                    if den <= 0:
+                        den = max(sizes[2], 1)
+                    sizes[1] = max(1, int(den * prop))
+                    sizes[2] = max(0, den - sizes[1])
+            if hasattr(self, "_store_splitter_proportions_from_sizes"):
+                self._store_splitter_proportions_from_sizes(splitter_name, sizes)
+            else:
+                # Fallback same math as before
+                total_size = sum(sizes)
+                if total_size == 0:
+                    continue
+                old_proportions = self.uistate.project.splitter.get(splitter_name, [])
+                unbounded_px = sum(
+                    size for i, size in enumerate(sizes) if i >= len(old_proportions) or type(old_proportions[i]) == float
+                )
+                proportions = []
+                for i, size in enumerate(sizes):
+                    if i < len(old_proportions) and type(old_proportions[i]) != float:
+                        proportions.append(int(size))
+                    else:
+                        proportions.append(float(size / unbounded_px if unbounded_px > 0 else 0.0))
+                self.uistate.project.splitter[splitter_name] = proportions
+
     def onSplitterMoved(self, splitter_name, pos, index):
         splitter = getattr(self, splitter_name)
         total_size = sum(splitter.sizes())
         if total_size == 0:
             return
 
-        old_proportions = self.uistate.project.splitter.get(splitter_name, [])
-        sizes = splitter.sizes()
-        unbounded_px = sum(size for i, size in enumerate(sizes) if i >= len(old_proportions) or type(old_proportions[i]) == float)
+        sizes = list(splitter.sizes())
+        # While dft is visible, also remember its share of (dft+graphs) for hide/show
+        if splitter_name == "h_splitterMaster" and len(sizes) >= 3 and splitter.widget(1).isVisible() and sizes[1] > 0:
+            den = sizes[1] + sizes[2]
+            if den > 0:
+                self.uistate.project.settings["dft_width_proportion"] = float(sizes[1] / den)
 
-        proportions = []
-        for i, size in enumerate(sizes):
-            if i < len(old_proportions) and type(old_proportions[i]) != float:
-                proportions.append(int(size))  # Keep as fixed pixel value
-            else:
-                proportions.append(float(size / unbounded_px if unbounded_px > 0 else 0.0))
+        if hasattr(self, "_store_splitter_proportions_from_sizes"):
+            self._store_splitter_proportions_from_sizes(splitter_name, sizes)
+        else:
+            old_proportions = self.uistate.project.splitter.get(splitter_name, [])
+            unbounded_px = sum(size for i, size in enumerate(sizes) if i >= len(old_proportions) or type(old_proportions[i]) == float)
+            proportions = []
+            for i, size in enumerate(sizes):
+                if i < len(old_proportions) and type(old_proportions[i]) != float:
+                    proportions.append(int(size))
+                else:
+                    proportions.append(float(size / unbounded_px if unbounded_px > 0 else 0.0))
+            self.uistate.project.splitter[splitter_name] = proportions
 
-        # print(f"{splitter_name}, total_size: {total_size}, Proportions: {proportions}")
-        self.uistate.project.splitter[splitter_name] = proportions
         if splitter_name == "h_splitterMaster" and self.h_splitterMaster.widget(1).isVisible():
             # Recompute graph zooms when the output splitter moves, because the
             # artists' screen positions changed and the hit-test zones for
