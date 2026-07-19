@@ -1010,13 +1010,20 @@ class UIplot:
         return axis_dict.get(axisname, None)
 
     def get_dict_gradient(self, n_stims):
+        """Per-stim colors on axm: dark indigo-blue → purple (no orange = 'error' signal).
+
+        Start is a darker blue than EPSP amp (0.2, 0.25, 0.85), then hue shifts toward purple.
+        """
+        if n_stims <= 0:
+            return {}
         colors = [
-            (1, 0.3, 0),
-            "green",
-            (0, 0.3, 1),
-        ]  # RGB for a redder orange and a tealer blue
-        cmap = LinearSegmentedColormap.from_list("", colors)
-        return {i: cmap(i / n_stims) for i in range(n_stims)}
+            (0.12, 0.18, 0.55),  # indigo: darker blue than EPSP amp marker
+            (0.35, 0.22, 0.72),  # blue → purple
+            (0.58, 0.28, 0.82),  # purple / violet
+        ]
+        cmap = LinearSegmentedColormap.from_list("stim_indigo_violet", colors)
+        denom = max(n_stims - 1, 1)
+        return {i: cmap(i / denom) for i in range(n_stims)}
 
     def _output_line_style_kwargs(self) -> dict:
         """Marker/linestyle for ax1/ax2 output series from uistate.plot.output_line_style."""
@@ -2089,18 +2096,33 @@ class UIplot:
         linedict["line"].set_ydata(xy[1])
 
     def updateOutMean(self, label, mean):
+        """Update a mean *axhline* (e.g. volley amp/slope mean) to a new y level.
+
+        Must not copy geometry from mouseover_out: that artist is the live rec
+        series preview (N sweeps) and pairing set_xdata(N) with set_ydata(2)
+        from the hline's old length crashes matplotlib draw (broadcast mismatch).
+        """
         print(f"updateOutMean: {label}, {mean}")
-        mouseover_out = self.uistate.plot.mouseover_out
-        if mouseover_out is None:
-            print(f"updateOutMean: mouseover_out is None, skipping update for '{label}'")
-            return
         if label not in self.uistate.plot.dict_rec_labels:
             return
-        linedict = self.uistate.plot.dict_rec_labels[label]
-        x_len = len(plot_drag.artist_xdata(linedict["line"]))
-        linedict["line"].set_xdata(plot_drag.artist_xdata(mouseover_out[0]))
-        linedict["line"].set_ydata([mean] * x_len)
-        # linedict['line'].set_ydata(mean)
+        y = plot_stim.mean_hline_ydata(mean, x_len=2)
+        if y is None:
+            print(f"updateOutMean: invalid mean for '{label}', skip")
+            return
+        line = self.uistate.plot.dict_rec_labels[label]["line"]
+        # Heal prior corruption (series x glued onto an hline) by restoring a
+        # two-point horizontal span on the current axes limits.
+        x = plot_drag.artist_xdata(line)
+        if x.size != 2:
+            ax = getattr(line, "axes", None)
+            if ax is not None:
+                x0, x1 = ax.get_xlim()
+                line.set_xdata([x0, x1])
+            elif x.size > 0:
+                line.set_xdata([float(x[0]), float(x[-1])])
+            else:
+                line.set_xdata([0.0, 1.0])
+        line.set_ydata(y)
 
     #####################################################################
     #     #DEPRECATED FUNCTIONS - TO BE REMOVED IN FUTURE RELEASES      #

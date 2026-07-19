@@ -8,6 +8,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from brainwash_ui import plot_drag, plot_series
 from brainwash import analysis_v3 as analysis
 from brainwash import ui_plot
+from ui_state_parts import measure_rgb
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +275,7 @@ class InteractivePlotMixin:
                         p.EPSP_slope_start_xy[1],
                         p.EPSP_slope_end_xy[1],
                     )
-                    color = self.uistate.project.settings["rgb_EPSP_slope"]
+                    color = measure_rgb(self.uistate.project.settings, "EPSP_slope")
                 elif "volley" in action:
                     x_range = (
                         p.volley_slope_start_xy[0],
@@ -284,7 +285,7 @@ class InteractivePlotMixin:
                         p.volley_slope_start_xy[1],
                         p.volley_slope_end_xy[1],
                     )
-                    color = self.uistate.project.settings["rgb_volley_slope"]
+                    color = measure_rgb(self.uistate.project.settings, "volley_slope")
 
                 if self.uistate.plot.mouseover_blob is None:
                     self.uistate.plot.mouseover_blob = axe.scatter(x_range[1], y_range[1], color=color, s=100, alpha=alpha)
@@ -311,10 +312,10 @@ class InteractivePlotMixin:
             elif "amp" in action:
                 if "EPSP" in action:
                     x, y = p.EPSP_amp_xy
-                    color = self.uistate.project.settings["rgb_EPSP_amp"]
+                    color = measure_rgb(self.uistate.project.settings, "EPSP_amp")
                 elif "volley" in action:
                     x, y = p.volley_amp_xy
-                    color = self.uistate.project.settings["rgb_volley_amp"]
+                    color = measure_rgb(self.uistate.project.settings, "volley_amp")
 
                 if self.uistate.plot.mouseover_blob is None:
                     self.uistate.plot.mouseover_blob = axe.scatter(x, y, color=color, s=100, alpha=alpha)

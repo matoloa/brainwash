@@ -8,6 +8,61 @@ def _merge_dict(default_dict: dict, loaded_dict: dict | None) -> dict:
     return {k: loaded.get(k, default_dict[k]) for k in default_dict}
 
 
+def _rgb_near(a, b, *, tol: float = 0.05) -> bool:
+    if not (isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)) and len(a) >= 3 and len(b) >= 3):
+        return False
+    try:
+        return all(abs(float(a[i]) - float(b[i])) <= tol for i in range(3))
+    except (TypeError, ValueError):
+        return False
+
+
+# Pre-1.0.0 measure colors still present in many cfg.pkl settings blobs.
+_LEGACY_MEASURE_RGB = {
+    "rgb_volley_amp": (1.0, 0.2, 1.0),  # magenta
+    "rgb_volley_slope": (1.0, 0.5, 1.0),  # light magenta
+}
+_DEFAULT_MEASURE_RGB = {
+    "rgb_EPSP_amp": (0.2, 0.25, 0.85),
+    "rgb_EPSP_slope": (0.45, 0.55, 0.95),
+    "rgb_volley_amp": (0.1, 0.45, 0.15),
+    "rgb_volley_slope": (0.35, 0.7, 0.35),
+}
+
+
+def migrate_legacy_measure_colors(settings: dict) -> dict:
+    """Replace stock magenta volley RGBs with green family; leave custom colors alone."""
+    out = dict(settings)
+    for key, legacy in _LEGACY_MEASURE_RGB.items():
+        if key in out and _rgb_near(out[key], legacy):
+            out[key] = _DEFAULT_MEASURE_RGB[key]
+    return out
+
+
+def measure_rgb(settings: dict, aspect: str, default="black"):
+    """Resolve rgb_* for an aspect, including *_mean / *_norm variants.
+
+    Stock pre-1.0.0 magenta volley colors are remapped to the green family even if
+    settings were not run through migrate_legacy_measure_colors (e.g. partial dicts).
+    """
+    if not aspect:
+        return default
+    base = str(aspect).replace("_mean", "").replace("_norm", "")
+    key = f"rgb_{base}"
+    if key in settings:
+        color = settings[key]
+        legacy = _LEGACY_MEASURE_RGB.get(key)
+        if legacy is not None and _rgb_near(color, legacy):
+            return _DEFAULT_MEASURE_RGB[key]
+        return color
+    # Fallback chain for partial settings
+    if base.startswith("volley"):
+        return settings.get("rgb_volley_amp", _DEFAULT_MEASURE_RGB.get("rgb_volley_amp", default))
+    if base.startswith("EPSP"):
+        return settings.get("rgb_EPSP_amp", _DEFAULT_MEASURE_RGB.get("rgb_EPSP_amp", default))
+    return default
+
+
 class ProjectPersistedState:
     """Persisted project UI preferences (cfg.pkl)."""
 
@@ -81,10 +136,9 @@ class ProjectPersistedState:
             "precision": 4,
             "dft_width_proportion": 0.2,
             "filter": "voltage",
-            "rgb_EPSP_amp": (0.2, 0.2, 1),
-            "rgb_EPSP_slope": (0.5, 0.5, 1),
-            "rgb_volley_amp": (1, 0.2, 1),
-            "rgb_volley_slope": (1, 0.5, 1),
+            # Measure colors: EPSP blue family, volley green family (dark=amp, light=slope).
+            # Same values for light/dark UI (black/white traces remain visible either way).
+            **_DEFAULT_MEASURE_RGB,
             "alpha_mark": 0.4,
             "alpha_line": 1,
             "journal_export": "jneurosci",
@@ -163,7 +217,7 @@ class ProjectPersistedState:
         self.viewTools = _merge_dict(self.viewTools, state.get("viewTools"))
         self.checkBox = _merge_dict(self.checkBox, state.get("checkBox"))
         self.lineEdit = _merge_dict(self.lineEdit, state.get("lineEdit"))
-        self.settings = _merge_dict(self.settings, state.get("settings"))
+        self.settings = migrate_legacy_measure_colors(_merge_dict(self.settings, state.get("settings")))
         loaded_zoom = state.get("zoom") or {}
 
         def _ok(v):

@@ -112,6 +112,17 @@ def test_build_amp_drag_update_plan_volley_mean():
     assert methods == ["out_line", "out_mean"]
 
 
+def test_mean_hline_ydata_matches_x_len_not_series():
+    """Mean hlines must keep axhline length; never follow N-point series preview."""
+    y = plot_stim.mean_hline_ydata(1.5, x_len=2)
+    assert y is not None
+    assert list(y) == [1.5, 1.5]
+    y600 = plot_stim.mean_hline_ydata(0.25, x_len=600)
+    assert y600 is not None and len(y600) == 600 and np.all(y600 == 0.25)
+    assert plot_stim.mean_hline_ydata(None) is None
+    assert plot_stim.mean_hline_ydata(float("nan")) is None
+
+
 def test_amp_drag_geometry_and_resolve_drag_amp_si():
     trow = {
         "t_EPSP_amp": 0.05,
@@ -188,6 +199,69 @@ def test_build_stim_event_plot_specs_minimal():
     assert "rec1 - stim 1 EPSP amp" in labels
     assert any(isinstance(s, plot_stim.StimAmpWidthPlotSpec) for s in specs)
     assert any(isinstance(s, plot_stim.StimLinePlotSpec) and s.axid == "axe" for s in specs)
+
+
+def test_volley_marker_and_mean_use_green_not_legacy_magenta():
+    """Legacy magenta settings must not paint volley markers / mean hlines."""
+    from ui_state_parts import _DEFAULT_MEASURE_RGB
+
+    dfmean = _dfmean_with_stim()
+    dft = pd.DataFrame(
+        [
+            {
+                "stim": 1,
+                "t_stim": 0.04,
+                "t_EPSP_amp": np.nan,
+                "t_EPSP_amp_halfwidth": 0.0,
+                "t_EPSP_slope_start": np.nan,
+                "t_EPSP_slope_end": np.nan,
+                "t_volley_amp": 0.005,
+                "t_volley_amp_halfwidth": 0.0005,
+                "t_volley_slope_start": 0.002,
+                "t_volley_slope_end": 0.004,
+                "volley_amp_mean": 0.001,
+                "volley_slope_mean": 0.5,
+            }
+        ]
+    )
+    dfoutput = pd.DataFrame(
+        {
+            "sweep": [0, 1, None],
+            "stim": [1, 1, 1],
+            "EPSP_amp": [np.nan, np.nan, np.nan],
+            "EPSP_amp_norm": [np.nan, np.nan, np.nan],
+            "EPSP_slope": [np.nan, np.nan, np.nan],
+            "EPSP_slope_norm": [np.nan, np.nan, np.nan],
+            "volley_amp": [1.0, 1.1, 1.05],
+            "volley_slope": [0.01, 0.02, 0.015],
+        }
+    )
+    settings = {
+        "event_start": -0.01,
+        "event_end": 0.02,
+        "rgb_EPSP_amp": (0.2, 0.25, 0.85),
+        "rgb_EPSP_slope": (0.45, 0.55, 0.95),
+        # Stock pre-1.0.0 magenta — must remap to green family
+        "rgb_volley_amp": (1.0, 0.2, 1.0),
+        "rgb_volley_slope": (1.0, 0.5, 1.0),
+    }
+    specs = plot_stim.build_stim_event_plot_specs(
+        "rec1",
+        dft,
+        dfmean,
+        dfoutput,
+        "prim",
+        settings,
+        {0: "cyan"},
+    )
+    by_label = {s.label: s for s in specs}
+    amp_green = _DEFAULT_MEASURE_RGB["rgb_volley_amp"]
+    slope_green = _DEFAULT_MEASURE_RGB["rgb_volley_slope"]
+    assert by_label["rec1 - stim 1 volley amp marker"].color == amp_green
+    assert by_label["rec1 - stim 1 volley amp mean"].color == amp_green
+    assert by_label["rec1 - stim 1 volley amp"].color == amp_green
+    assert by_label["rec1 - stim 1 volley slope marker"].color == slope_green
+    assert by_label["rec1 - stim 1 volley slope mean"].color == slope_green
 
 
 def test_mean_of_selected_sweeps():

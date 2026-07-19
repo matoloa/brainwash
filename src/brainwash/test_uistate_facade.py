@@ -80,3 +80,44 @@ def test_project_table_sort_normalize_and_legacy_cfg():
     p.reset()
     p.apply_state_dict({"version": "0.1"}, zoom_defaults=p.zoom.copy())
     assert p.project_table_sort == {"column": None, "order": 0}
+
+
+def test_migrate_legacy_volley_magenta_to_green():
+    from ui_state_parts import (
+        ProjectPersistedState,
+        _DEFAULT_MEASURE_RGB,
+        measure_rgb,
+        migrate_legacy_measure_colors,
+    )
+
+    legacy = {
+        "rgb_volley_amp": (1, 0.2, 1),
+        "rgb_volley_slope": [1.0, 0.5, 1.0],
+        "rgb_EPSP_amp": (0.2, 0.25, 0.85),
+    }
+    migrated = migrate_legacy_measure_colors(legacy)
+    assert migrated["rgb_volley_amp"] == _DEFAULT_MEASURE_RGB["rgb_volley_amp"]
+    assert migrated["rgb_volley_slope"] == _DEFAULT_MEASURE_RGB["rgb_volley_slope"]
+    # Custom / already-new colors left alone
+    custom = migrate_legacy_measure_colors({"rgb_volley_amp": (0.9, 0.1, 0.1)})
+    assert custom["rgb_volley_amp"] == (0.9, 0.1, 0.1)
+
+    # measure_rgb remaps legacy magenta and strips _mean / _norm
+    assert measure_rgb(legacy, "volley_amp") == _DEFAULT_MEASURE_RGB["rgb_volley_amp"]
+    assert measure_rgb(legacy, "volley_amp_mean") == _DEFAULT_MEASURE_RGB["rgb_volley_amp"]
+    assert measure_rgb(legacy, "volley_slope_mean") == _DEFAULT_MEASURE_RGB["rgb_volley_slope"]
+
+    p = ProjectPersistedState()
+    p.reset()
+    p.apply_state_dict(
+        {
+            "version": "0.16.3",
+            "settings": {
+                "rgb_volley_amp": (1.0, 0.2, 1.0),
+                "rgb_volley_slope": (1.0, 0.5, 1.0),
+            },
+        },
+        zoom_defaults=p.zoom.copy(),
+    )
+    assert p.settings["rgb_volley_amp"] == _DEFAULT_MEASURE_RGB["rgb_volley_amp"]
+    assert p.settings["rgb_volley_slope"] == _DEFAULT_MEASURE_RGB["rgb_volley_slope"]

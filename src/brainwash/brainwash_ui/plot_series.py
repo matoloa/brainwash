@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from brainwash_ui import plot_drag, plot_model
+from ui_state_parts import measure_rgb
 
 IO_INPUT_TO_XCOL = {"vamp": "volley_amp", "vslope": "volley_slope", "stim": "stim_intensity"}
 IO_OUTPUT_TO_YCOL = {"EPSPamp": "EPSP_amp", "EPSPslope": "EPSP_slope"}
@@ -461,7 +462,7 @@ def build_pp_group_bar_plot_specs(
         mean_val, sem_val = mean_sem(vals)
         bar_x = x_pos + offset
         scatter_points: tuple[PpGroupScatterPointSpec, ...] = ()
-        scatter_color = settings.get(f"rgb_{aspect}", "white")
+        scatter_color = measure_rgb(settings, aspect, "white")
         unit_ids = aggregate.rec_id_order.get(aspect, [])
         if unit_ids and len(unit_ids) == len(vals):
             jitter = pp_group_scatter_jitter(len(vals), rng=rng)
@@ -525,7 +526,7 @@ def build_pp_group_box_plot_specs(
                 n=n,
                 tick_label=f"{group_name} {aspect_tick} (n={n})",
                 scatter_points=scatter_points,
-                scatter_color=settings.get(f"rgb_{aspect}", "white"),
+                scatter_color=measure_rgb(settings, aspect, "white"),
             )
         )
     return specs
@@ -790,10 +791,10 @@ def compute_ppr_percent(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
 
 def pp_recording_aspect_configs(settings: dict) -> list[tuple[str, str, str]]:
     return [
-        ("EPSP_amp", "ax1", settings.get("rgb_EPSP_amp", "blue")),
-        ("EPSP_slope", "ax2", settings.get("rgb_EPSP_slope", "red")),
-        ("volley_amp", "ax1", settings.get("rgb_volley_amp", "green")),
-        ("volley_slope", "ax2", settings.get("rgb_volley_slope", "orange")),
+        ("EPSP_amp", "ax1", measure_rgb(settings, "EPSP_amp", "blue")),
+        ("EPSP_slope", "ax2", measure_rgb(settings, "EPSP_slope", (0.45, 0.55, 0.95))),
+        ("volley_amp", "ax1", measure_rgb(settings, "volley_amp", "green")),
+        ("volley_slope", "ax2", measure_rgb(settings, "volley_slope", (0.35, 0.7, 0.35))),
     ]
 
 
@@ -994,12 +995,12 @@ def build_stim_aggregate_plot_specs(
 
 def stim_aggregate_line_configs(settings: dict) -> list[tuple[str, str, str, str, str]]:
     return [
-        ("EPSP amp", "ax1", "EPSP_amp", settings["rgb_EPSP_amp"], "raw"),
-        ("EPSP amp norm", "ax1", "EPSP_amp_norm", settings["rgb_EPSP_amp"], "norm"),
-        ("EPSP slope", "ax2", "EPSP_slope", settings["rgb_EPSP_slope"], "raw"),
-        ("EPSP slope norm", "ax2", "EPSP_slope_norm", settings["rgb_EPSP_slope"], "norm"),
-        ("volley amp", "ax1", "volley_amp", settings["rgb_volley_amp"], "raw"),
-        ("volley slope", "ax2", "volley_slope", settings["rgb_volley_slope"], "raw"),
+        ("EPSP amp", "ax1", "EPSP_amp", measure_rgb(settings, "EPSP_amp"), "raw"),
+        ("EPSP amp norm", "ax1", "EPSP_amp_norm", measure_rgb(settings, "EPSP_amp"), "norm"),
+        ("EPSP slope", "ax2", "EPSP_slope", measure_rgb(settings, "EPSP_slope"), "raw"),
+        ("EPSP slope norm", "ax2", "EPSP_slope_norm", measure_rgb(settings, "EPSP_slope"), "norm"),
+        ("volley amp", "ax1", "volley_amp", measure_rgb(settings, "volley_amp"), "raw"),
+        ("volley slope", "ax2", "volley_slope", measure_rgb(settings, "volley_slope"), "raw"),
     ]
 
 

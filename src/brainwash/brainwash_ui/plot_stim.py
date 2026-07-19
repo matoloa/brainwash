@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from ui_state_parts import measure_rgb
+
 STIM_TIME_VARIABLES = (
     "t_EPSP_amp",
     "t_EPSP_slope_start",
@@ -246,13 +248,14 @@ def build_stim_event_plot_specs(
         if not np.isnan(t_row["t_EPSP_amp"]):
             x_position = t_row["t_EPSP_amp"]
             y_position = y_at_event_time(df_event, x_position, rec_filter)
+            epsp_amp_color = measure_rgb(settings, "EPSP_amp")
             specs.append(
                 StimMarkerPlotSpec(
                     f"{label} {stim_str} EPSP amp marker",
                     "axe",
                     x_position,
                     y_position,
-                    settings["rgb_EPSP_amp"],
+                    epsp_amp_color,
                     aspect="EPSP_amp",
                     stim=stim_num,
                 )
@@ -270,7 +273,7 @@ def build_stim_event_plot_specs(
                     x_position,
                     amp_x,
                     amp_y,
-                    settings["rgb_EPSP_amp"],
+                    epsp_amp_color,
                     "EPSP_amp",
                     stim_num,
                 )
@@ -282,7 +285,7 @@ def build_stim_event_plot_specs(
                         "ax1",
                         out["sweep"].values,
                         out["EPSP_amp"].values,
-                        settings["rgb_EPSP_amp"],
+                        epsp_amp_color,
                         stim=stim_num,
                         aspect="EPSP_amp",
                         variant="raw",
@@ -293,7 +296,7 @@ def build_stim_event_plot_specs(
                         "ax1",
                         out["sweep"].values,
                         out["EPSP_amp_norm"].values,
-                        settings["rgb_EPSP_amp"],
+                        epsp_amp_color,
                         stim=stim_num,
                         aspect="EPSP_amp",
                         variant="norm",
@@ -304,7 +307,7 @@ def build_stim_event_plot_specs(
                         "axe",
                         list(AMP_ZERO_PRE_WINDOW),
                         [amp_zero_plot, amp_zero_plot],
-                        settings["rgb_EPSP_amp"],
+                        epsp_amp_color,
                         stim=stim_num,
                         aspect="EPSP_amp",
                     ),
@@ -315,6 +318,7 @@ def build_stim_event_plot_specs(
             df_event, t_row["t_EPSP_slope_start"], t_row["t_EPSP_slope_end"], rec_filter
         )
         if epsp_slope is not None:
+            epsp_slope_color = measure_rgb(settings, "EPSP_slope")
             specs.extend(
                 [
                     StimLinePlotSpec(
@@ -322,7 +326,7 @@ def build_stim_event_plot_specs(
                         "axe",
                         [epsp_slope.x_start, epsp_slope.x_end],
                         [epsp_slope.y_start, epsp_slope.y_end],
-                        settings["rgb_EPSP_slope"],
+                        epsp_slope_color,
                         stim=stim_num,
                         aspect="EPSP_slope",
                         width=5,
@@ -332,7 +336,7 @@ def build_stim_event_plot_specs(
                         "ax2",
                         out["sweep"].values,
                         out["EPSP_slope"].values,
-                        settings["rgb_EPSP_slope"],
+                        epsp_slope_color,
                         stim=stim_num,
                         aspect="EPSP_slope",
                         variant="raw",
@@ -343,7 +347,7 @@ def build_stim_event_plot_specs(
                         "ax2",
                         out["sweep"].values,
                         out["EPSP_slope_norm"].values,
-                        settings["rgb_EPSP_slope"],
+                        epsp_slope_color,
                         stim=stim_num,
                         aspect="EPSP_slope",
                         variant="norm",
@@ -355,7 +359,7 @@ def build_stim_event_plot_specs(
         if not np.isnan(t_row["t_volley_amp"]):
             x_position = t_row["t_volley_amp"]
             y_position = y_at_event_time(df_event, x_position, rec_filter)
-            volley_color = settings["rgb_volley_amp"]
+            volley_color = measure_rgb(settings, "volley_amp")
             specs.append(
                 StimMarkerPlotSpec(
                     f"{label} {stim_str} volley amp marker",
@@ -422,7 +426,7 @@ def build_stim_event_plot_specs(
                         "axe",
                         [volley_slope.x_start, volley_slope.x_end],
                         [volley_slope.y_start, volley_slope.y_end],
-                        settings["rgb_volley_slope"],
+                        measure_rgb(settings, "volley_slope"),
                         stim=stim_num,
                         aspect="volley_slope",
                         width=5,
@@ -431,7 +435,7 @@ def build_stim_event_plot_specs(
                         f"{label} {stim_str} volley slope mean",
                         "ax2",
                         volley_slope_mean,
-                        settings["rgb_volley_slope"],
+                        measure_rgb(settings, "volley_slope"),
                         "volley_slope_mean",
                         stim_num,
                     ),
@@ -440,7 +444,7 @@ def build_stim_event_plot_specs(
                         "ax2",
                         out["sweep"].values,
                         out["volley_slope"].values,
-                        settings["rgb_volley_slope"],
+                        measure_rgb(settings, "volley_slope"),
                         stim=stim_num,
                         aspect="volley_slope",
                         x_mode="sweep",
@@ -490,6 +494,23 @@ def drag_output_label(label_core: str, aspect: str, norm_epsp: bool) -> str:
     if norm_epsp and aspect in ("EPSP slope", "EPSP amp"):
         return f"{label_core} norm"
     return label_core
+
+
+def mean_hline_ydata(mean, *, x_len: int = 2) -> np.ndarray | None:
+    """Y array for an axhline mean marker: same length as existing x, constant mean.
+
+    Returns None if mean is missing/non-finite. Does not touch series preview geometry.
+    """
+    if mean is None:
+        return None
+    try:
+        mean_f = float(mean)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(mean_f):
+        return None
+    n = max(int(x_len), 2)
+    return np.full(n, mean_f, dtype=float)
 
 
 def slope_output_column(aspect: str, norm_epsp: bool) -> str:

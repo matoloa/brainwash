@@ -25,7 +25,7 @@ Living priority map across milestones. **Execution** is on GitHub issues when a 
 | [#10](https://github.com/matoloa/brainwash/issues/10) | Lean data + `_sweeptimes.parquet` | **Done** — [`plan_data_sweeptimes_format.md`](plan_data_sweeptimes_format.md) |
 | [#1](https://github.com/matoloa/brainwash/issues/1) | UI Groups overhaul | **Done** — digit create/assign, clear-all, header, rename/legend |
 | [#2](https://github.com/matoloa/brainwash/issues/2) | Output line appearance UI | **Done** — Results display Dots/Line |
-| [#3](https://github.com/matoloa/brainwash/issues/3) | Default aspect color palette | Volley green / EPSP blue |
+| [#3](https://github.com/matoloa/brainwash/issues/3) | Default aspect color palette | EPSP blue / volley green; stim ramp indigo→violet (defaults only) |
 | [#4](https://github.com/matoloa/brainwash/issues/4) | UI Test Sets overhaul | After #1 |
 | [#5](https://github.com/matoloa/brainwash/issues/5) | Blind / unblind rec names | Display-only; main + parse UI |
 | [#6](https://github.com/matoloa/brainwash/issues/6) | Color-by Aspect \| Rec \| Stim \| Group | Timebox; may slip to 1.0.1 |
@@ -75,6 +75,7 @@ Living priority map across milestones. **Execution** is on GitHub issues when a 
 ### Process
 
 - Project/format **forward** BC pattern after 1.0.0 (version-aware load / pure migrators for *new* fields). Data parquet dual-stack for old shapes is **out** (handled by #10 + re-parse policy).
+- **Customizable / user-persisted color schemes** (aspect RGBs, stim ramp, group palette) — defaults ship in 1.0.0 (#3); full UI + per-project/global schemes later.
 
 ### Folded into 1.0.0 (do not re-file)
 
