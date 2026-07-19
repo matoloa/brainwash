@@ -282,16 +282,37 @@ class StatTestMixin:
         if getattr(self, "_stim_intensity_dirty_active", lambda: False)():
             self._show_stim_intensity_pending_statusbar()
             return
+        # Transient UI chrome (group × hover): do not clobber while pointer is on delete.
+        if getattr(self.uistate.stat_test, "statusbar_state", None) == "attention":
+            return
         result = self._compute_statusbar_for_current_state()
         self.uistate.stat_test.statusbar_state = result.state
         self.set_statusbar(result.state, result.text)
 
     def set_statusbar(self, state: str | None = None, text: str | None = None):
-        """Low-level applicator: only does what it is given (appearance + label text)."""
+        """Low-level applicator: only does what it is given (appearance + label text).
+
+        Color ladder (chrome):
+        - stim_intensity_pending: orange #e67e22
+        - attention: deep orange–red #d35400 (e.g. group × hover)
+        - warning: error red #c0392b
+        """
         if state == "stim_intensity_pending":
-            self._set_statusbar_appearance("#e67e22", text_color="white", bold=True, text=text or "Press Apply to update results")
+            self._set_statusbar_appearance(
+                statusbar.STATUSBAR_BG_STIM_PENDING,
+                text_color="white",
+                bold=True,
+                text=text or "Press Apply to update results",
+            )
+        elif state == "attention":
+            self._set_statusbar_appearance(
+                statusbar.STATUSBAR_BG_ATTENTION,
+                text_color="white",
+                bold=True,
+                text=text or "",
+            )
         elif state == "warning":
-            self._set_statusbar_appearance("#c0392b", text_color="white", bold=True, text=text)
+            self._set_statusbar_appearance(statusbar.STATUSBAR_BG_WARNING, text_color="white", bold=True, text=text)
         elif state == "info" or text:
             self._set_statusbar_appearance(bg_color=None, bold=True, text=text or "")
         else:
@@ -305,6 +326,8 @@ class StatTestMixin:
             return
         if getattr(self, "_stim_intensity_dirty_active", lambda: False)():
             self._show_stim_intensity_pending_statusbar()
+            return
+        if getattr(self.uistate.stat_test, "statusbar_state", None) == "attention":
             return
         # Recompute display only (no re-run of formal tests). Previously this called
         # set_statusbar(None, None) which wiped the label permanently.

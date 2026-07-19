@@ -424,7 +424,7 @@ class GroupRemoveButton(QtWidgets.QToolButton):
         self.setFixedSize(22, 22)
         self.setStyleSheet(
             "QToolButton { font-weight: bold; font-size: 14px; padding: 0; border: none; }"
-            "QToolButton:hover { color: #c0392b; }"
+            "QToolButton:hover { color: #d35400; }"  # matches statusbar attention chrome
         )
 
     def mouseDoubleClickEvent(self, event):

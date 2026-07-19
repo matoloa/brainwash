@@ -375,3 +375,19 @@ def test_non_io_paired_statusbar_n_dropped_warning():
     assert "2 n dropped" in result.text
     assert "t-test (paired)" in result.text
 
+
+
+def test_statusbar_attention_chrome_color_distinct():
+    """attention mid-band is distinct from stim pending and warning."""
+    from brainwash_ui import statusbar
+
+    assert statusbar.STATUSBAR_BG_ATTENTION == "#d35400"
+    assert statusbar.STATUSBAR_BG_STIM_PENDING == "#e67e22"
+    assert statusbar.STATUSBAR_BG_WARNING == "#c0392b"
+    assert len(
+        {
+            statusbar.STATUSBAR_BG_STIM_PENDING,
+            statusbar.STATUSBAR_BG_ATTENTION,
+            statusbar.STATUSBAR_BG_WARNING,
+        }
+    ) == 3

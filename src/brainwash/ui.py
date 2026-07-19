@@ -947,8 +947,8 @@ class UIsub(
             self.dict_usage[ui_component] = 0
         self.dict_usage[ui_component] += 1
         if self.config.talkback and ui_component in self.dict_usage:
-            # Do not clobber active red statusbars (test warning / group-remove hover)
-            if self.uistate.stat_test.statusbar_state not in ("warning", "group_remove_hover"):
+            # Do not clobber warning / attention chrome
+            if self.uistate.stat_test.statusbar_state not in ("warning", "attention"):
                 # Show as centered text using the current default (theme/darkmode) color
                 self._set_statusbar_appearance(text=f"Used {ui_component} {self.dict_usage[ui_component]} times", bold=False)
         self.write_usage()
@@ -1321,7 +1321,7 @@ class UIsub(
             return
         if group_ID not in getattr(self, "dd_groups", {}):
             return
-        if getattr(self.uistate.stat_test, "statusbar_state", None) == "group_remove_hover":
+        if getattr(self.uistate.stat_test, "statusbar_state", None) == "attention":
             self.uistate.stat_test.statusbar_state = None
         self.group_remove(group_ID)
         if hasattr(self, "tableUpdate"):
@@ -1334,20 +1334,15 @@ class UIsub(
             self.update_test()
 
     def _on_group_remove_hover_enter(self, group_ID, group_name):
-        """Red statusbar while hovering the group × remove control."""
-        if not hasattr(self, "_set_statusbar_appearance"):
+        """Attention statusbar while hovering the group × remove control."""
+        if not hasattr(self, "set_statusbar"):
             return
-        self.uistate.stat_test.statusbar_state = "group_remove_hover"
-        self._set_statusbar_appearance(
-            bg_color="#c0392b",
-            text_color="white",
-            bold=True,
-            text=f"Double-click to remove group {group_name}",
-        )
+        self.uistate.stat_test.statusbar_state = "attention"
+        self.set_statusbar("attention", f"Double-click to remove group: {group_name}")
 
     def _on_group_remove_hover_leave(self):
         """Restore statusbar after leaving the group × control."""
-        if getattr(self.uistate.stat_test, "statusbar_state", None) != "group_remove_hover":
+        if getattr(self.uistate.stat_test, "statusbar_state", None) != "attention":
             return
         self.uistate.stat_test.statusbar_state = None
         if getattr(self, "_stim_intensity_dirty_active", lambda: False)():

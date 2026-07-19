@@ -7,6 +7,12 @@ from typing import Literal
 
 import numpy as np
 
+# Chrome background colors (Qt host applies via set_statusbar).
+# Ladder: default → orange pending → attention → warning red.
+STATUSBAR_BG_STIM_PENDING = "#e67e22"  # amber
+STATUSBAR_BG_ATTENTION = "#d35400"  # deep orange–red (group × hover, etc.)
+STATUSBAR_BG_WARNING = "#c0392b"  # error
+
 StatusbarState = Literal["info", "warning"] | None
 
 
