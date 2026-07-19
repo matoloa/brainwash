@@ -432,10 +432,47 @@ class ProjectMixin:
         self.df_project = self._migrate_hierarchy(self.df_project)
 
         self._backfill_sweep_hz()
+        self._backfill_stims()
         self.uistate.load_cfg(self.dict_folders["project"], self.config.version)
         self.syncJournalExportMenu()
         self.tableUpdate(restore_selection=False)  # initial load; selection set by later tableProjSelectionChanged
         self.write_bw_cfg()
+
+    def _backfill_stims(self):
+        """Fill df_project.stims from timepoints parquet when the count is NA.
+
+        stims is only written when dft is first created. Loading an existing
+        timepoints file never updated the project column, so older/partial
+        projects can show NA for parsed recordings that already have dft on disk.
+        """
+        df_p = self.df_project
+        if df_p is None or df_p.empty or "stims" not in df_p.columns:
+            return
+        missing = df_p["stims"].isna()
+        if not missing.any():
+            return
+        tp_dir = self.dict_folders.get("timepoints")
+        if tp_dir is None:
+            return
+        from brainwash_ui import recording_cache
+
+        updated = 0
+        for idx in df_p.index[missing]:
+            rec = df_p.at[idx, "recording_name"]
+            path = Path(recording_cache.timepoints_parquet_path(str(tp_dir), rec))
+            if not path.exists():
+                continue
+            try:
+                dft = pd.read_parquet(path)
+                n = len(dft)
+                if n > 0:
+                    df_p.at[idx, "stims"] = n
+                    updated += 1
+            except Exception as exc:
+                print(f"_backfill_stims: skipping {rec}: {exc}")
+        if updated:
+            print(f"_backfill_stims: set stims for {updated} recording(s)")
+            self.save_df_project()
 
     def _backfill_sweep_hz(self):
         """Recompute sweep_hz for recordings where it is NaN.

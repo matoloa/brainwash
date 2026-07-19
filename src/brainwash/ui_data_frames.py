@@ -222,6 +222,65 @@ class DataFrameMixin:
         print(f"set_dft of {rec_name}: {df}")
         self.dict_ts[rec_name] = df
         self.df2file(df=df, filename=rec_name, key="timepoints")
+        if df is not None:
+            self._ensure_project_stims_count(n_stims=len(df), rec_name=rec_name)
+
+    def _ensure_project_stims_count(self, n_stims, *, row=None, rec_name=None) -> bool:
+        """Keep df_project['stims'] equal to the actual timepoints row count.
+
+        Only writes when missing/wrong. Persists via save_df_project (not set_df_project)
+        so worker threads calling get_dft do not force nested Qt tableUpdate storms.
+        """
+        try:
+            n = int(n_stims)
+        except (TypeError, ValueError):
+            return False
+        if n < 0:
+            return False
+        df_p = self.get_df_project()
+        if df_p is None or getattr(df_p, "empty", True) or "stims" not in df_p.columns:
+            return False
+        if row is not None and "ID" in df_p.columns:
+            try:
+                rid = row["ID"]
+            except (KeyError, TypeError):
+                rid = None
+            mask = df_p["ID"] == rid if rid is not None else pd.Series(False, index=df_p.index)
+            if not mask.any() and "recording_name" in df_p.columns:
+                try:
+                    mask = df_p["recording_name"] == row["recording_name"]
+                except (KeyError, TypeError):
+                    pass
+        elif rec_name is not None and "recording_name" in df_p.columns:
+            mask = df_p["recording_name"] == rec_name
+        else:
+            return False
+        if not mask.any():
+            return False
+        cur = df_p.loc[mask, "stims"].iloc[0]
+        if not recording_pipeline.project_stims_needs_update(cur, n):
+            return False
+        df_p.loc[mask, "stims"] = n
+        name = rec_name
+        if name is None and row is not None:
+            try:
+                name = row["recording_name"]
+            except (KeyError, TypeError):
+                name = "?"
+        print(f"_ensure_project_stims_count: {name} stims -> {n}")
+        if hasattr(self, "save_df_project"):
+            self.save_df_project()
+        # Refresh project table only on the GUI thread.
+        try:
+            from PyQt5 import QtCore, QtWidgets
+
+            app = QtWidgets.QApplication.instance()
+            if app is not None and QtCore.QThread.currentThread() is app.thread():
+                if hasattr(self, "tableUpdate"):
+                    self.tableUpdate(restore_selection=True)
+        except Exception:
+            pass
+        return True
 
     # ------------------------------------------------------------------
     # Mean DataFrame
@@ -293,6 +352,7 @@ class DataFrameMixin:
                 print(f"get_dft: repaired invalid stim ids in cache for {rec}")
                 self.dict_ts[rec] = dft
                 self.df2file(df=dft, filename=rec, key="timepoints")
+            self._ensure_project_stims_count(n_stims=len(dft), row=row, rec_name=rec)
             return dft
         str_t_path = recording_cache.timepoints_parquet_path(self.dict_folders["timepoints"], rec)
         if Path(str_t_path).exists() and not reset:
@@ -306,6 +366,7 @@ class DataFrameMixin:
                 print(f"get_dft: repaired invalid stim ids from file for {rec}")
                 self.df2file(df=dft, filename=rec, key="timepoints")
             self.dict_ts[rec] = dft
+            self._ensure_project_stims_count(n_stims=len(dft), row=row, rec_name=rec)
             return dft
         else:
             print("creating dft")
@@ -321,11 +382,8 @@ class DataFrameMixin:
             if dft is None:
                 print("get_dft: No stims found.")
                 return None
-            df_p = self.get_df_project()  # update (number of) 'stims' columns
             stims = len(dft)
-            df_p.loc[row["ID"] == df_p["ID"], "stims"] = stims
-            self.set_df_project(df_p)
-            self.tableUpdate(restore_selection=True)  # ensure selection preserved after stim count update
+            self._ensure_project_stims_count(n_stims=stims, row=row, rec_name=rec)
             # If the UI checkbox for 'timepoints_per_stim' is checked OR there's only 1 stim,
             # we assume timepoints don't need adjustment, so we cache df_t as-is.
             if self.uistate.project.checkBox["timepoints_per_stim"] or stims == 1:
@@ -339,6 +397,7 @@ class DataFrameMixin:
             dft, _ = recording_pipeline.ensure_stim_ids(dft)
             self.dict_ts[rec] = dft
             self.df2file(df=dft, filename=rec, key="timepoints")  # persist dft as parquet
+            self._ensure_project_stims_count(n_stims=len(dft), row=row, rec_name=rec)
             self.set_rec_status(rec)  # update status in df_project
             return dft
 

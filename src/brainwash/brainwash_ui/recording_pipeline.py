@@ -82,6 +82,18 @@ def ensure_stim_ids(dft: pd.DataFrame | None) -> tuple[pd.DataFrame | None, bool
     return out, True
 
 
+def project_stims_needs_update(current_stims, n_dft: int) -> bool:
+    """True if df_project.stims should be set to n_dft (NA, wrong, or non-int)."""
+    if n_dft < 0:
+        return False
+    try:
+        if current_stims is not None and pd.notna(current_stims) and int(current_stims) == int(n_dft):
+            return False
+    except (TypeError, ValueError):
+        return True
+    return True
+
+
 def build_dft(
     dfmean: pd.DataFrame,
     *,

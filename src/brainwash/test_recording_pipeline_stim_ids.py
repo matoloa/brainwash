@@ -43,3 +43,13 @@ def test_empty_and_none():
     out, repaired = rp.ensure_stim_ids(empty)
     assert repaired is False
     assert len(out) == 0
+
+
+def test_project_stims_needs_update():
+    assert rp.project_stims_needs_update(pd.NA, 2) is True
+    assert rp.project_stims_needs_update(np.nan, 2) is True
+    assert rp.project_stims_needs_update(None, 2) is True
+    assert rp.project_stims_needs_update(2, 2) is False
+    assert rp.project_stims_needs_update(2.0, 2) is False
+    assert rp.project_stims_needs_update(1, 2) is True
+    assert rp.project_stims_needs_update("x", 2) is True
