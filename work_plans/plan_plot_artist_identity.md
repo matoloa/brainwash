@@ -191,12 +191,12 @@ Follow “one rename family per PR” spirit; each PR green on pytest.
 
 ---
 
-## #5 after this (sketch only)
+## #5 after this — **done** (`2bce475`, issue closed)
 
-1. `uistate.project.blind_names` + alias map `rec_ID → "Rec n"`  
-2. Table `DisplayRole` for `recording_name` / `path`  
-3. On toggle: recompute display_labels for visible entries **or** legend map calls `display_recording_name` live + `tableUpdate` + `graphRefresh` legends only  
-4. **No** `dict_rec_labels` key changes  
+1. `uistate.project.blind_recordings` + `blind_aliases` (`rec_ID → "Rec n"`, random per episode)  
+2. Table `DisplayRole` for `recording_name` / `path`; display-aware sort  
+3. Blind via Data menu; unblind via toolframe × only (destroys map); optional `always_blind_new_projects` in `bw_cfg`  
+4. **No** `dict_rec_labels` key changes — presentation only via `display_recording_name` / `display_label`  
 
 ---
 
