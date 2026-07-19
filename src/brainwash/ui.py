@@ -325,8 +325,14 @@ class UIsub(
             self.tableStim.clearSelection()
 
         if self.uistate.plot.mean_mouseover_stim_select is not None:  # clicked graph
-            row = self.uistate.plot.mean_mouseover_stim_select - 1
-            model_index = self.tableStimModel.index(row, 0)
+            from brainwash_ui import view_state
+
+            stim_num = self.uistate.plot.mean_mouseover_stim_select
+            model_df = getattr(self.tableStimModel, "_data", None)
+            row = view_state.row_index_for_stim_number(model_df, stim_num)
+            if row is None:
+                row = int(stim_num) - 1 if stim_num is not None else 0
+            model_index = self.tableStimModel.index(max(0, row), 0)
 
             modifiers = QtWidgets.QApplication.keyboardModifiers()
             if modifiers & QtCore.Qt.ControlModifier:
@@ -346,7 +352,7 @@ class UIsub(
 
         selected_indexes = self.tableStim.selectionModel().selectedRows()
 
-        # build the list self.uistate.plot.list_idx_select_stims with indices
+        # Row indices into current stim table; update_show maps via stim column
         self.uistate.plot.list_idx_select_stims = [index.row() for index in selected_indexes]
 
         # update single-recording reference dataframe if applicable

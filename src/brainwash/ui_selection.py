@@ -244,7 +244,11 @@ class SelectionMixin:
             return
 
         selected_ids = set(self.uistate.plot.df_recs2plot["ID"])
-        selected_stims = {stim + 1 for stim in self.uistate.plot.list_idx_select_stims}  # stim_select is 0-based (indices) - convert to stims
+        # Resolve stim numbers from table model (multi-rec intersection uses real stim ids)
+        if hasattr(self, "_selected_stim_numbers"):
+            selected_stims = self._selected_stim_numbers()
+        else:
+            selected_stims = {int(i) + 1 for i in (self.uistate.plot.list_idx_select_stims or [])}
         # print(f"update_show, selected_ids: {selected_ids}, selected_stims: {selected_stims}")
 
         is_pp = self.uistate.experiment.experiment_type == "PP"
@@ -338,7 +342,10 @@ class SelectionMixin:
         else:
             selected_ids = list(df_sel["ID"].tolist())
 
-        selected_stims = {int(stim) + 1 for stim in (self.uistate.plot.list_idx_select_stims or [])}
+        if hasattr(self, "_selected_stim_numbers"):
+            selected_stims = self._selected_stim_numbers()
+        else:
+            selected_stims = {int(stim) + 1 for stim in (self.uistate.plot.list_idx_select_stims or [])}
         n_rec = len(selected_ids)
         n_stim = len(selected_stims) if selected_stims else 0
         if n_stim == 0 and selected_ids:

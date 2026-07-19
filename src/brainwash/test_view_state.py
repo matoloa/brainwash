@@ -4,6 +4,23 @@ from brainwash_ui import view_state
 from test_statistics_fixtures import make_dd_groups, make_dd_testsets
 
 
+def test_multi_rec_stim_intersection_helpers():
+    import pandas as pd
+
+    a = view_state.stim_numbers_from_dft(pd.DataFrame({"stim": [1, 2, 3]}))
+    b = view_state.stim_numbers_from_dft(pd.DataFrame({"stim": [2, 3, 4]}))
+    c = view_state.stim_numbers_from_dft(pd.DataFrame({"stim": [2, 3]}))
+    assert view_state.intersect_stim_numbers([a, b, c]) == [2, 3]
+    assert view_state.intersect_stim_numbers([a, set()]) == []
+    df = view_state.multi_rec_stim_display_frame([2, 3])
+    assert list(df.columns) == ["stim"]
+    assert list(df["stim"]) == [2, 3]
+    # row → stim number
+    assert view_state.stim_numbers_from_table_rows(df, [0, 1]) == {2, 3}
+    assert view_state.row_index_for_stim_number(df, 3) == 1
+    assert view_state.row_index_for_stim_number(df, 9) is None
+
+
 def test_axm_stim_entry_passes_stim_gate_option_a():
     # Detection blobs: ignore selected_stims
     assert view_state.axm_stim_entry_passes_stim_gate(

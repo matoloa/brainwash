@@ -17,6 +17,86 @@ VOLLEY_ASPECTS_NO_NORM = frozenset(
 )
 
 
+def stim_numbers_from_dft(dft) -> set[int]:
+    """Integer stim numbers present in a timepoints/dft frame."""
+    if dft is None or getattr(dft, "empty", True) or "stim" not in getattr(dft, "columns", []):
+        return set()
+    out: set[int] = set()
+    for v in dft["stim"].tolist():
+        try:
+            if v is None or (isinstance(v, float) and v != v):  # NaN
+                continue
+            out.add(int(v))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def intersect_stim_numbers(sets: list[set[int]]) -> list[int]:
+    """Sorted stim numbers common to all sets; empty if any set missing/empty."""
+    if not sets:
+        return []
+    common: set[int] | None = None
+    for s in sets:
+        if not s:
+            return []
+        common = set(s) if common is None else common & s
+    return sorted(common or [])
+
+
+def multi_rec_stim_display_frame(common_stims: list[int]):
+    """One-column stim table for multi-rec intersection view."""
+    import pandas as pd
+
+    return pd.DataFrame({"stim": list(common_stims or [])})
+
+
+def stim_numbers_from_table_rows(model_df, row_indices) -> set[int]:
+    """Map stim-table row indices → stim numbers (prefer 'stim' column)."""
+    if not row_indices:
+        return set()
+    if model_df is None or getattr(model_df, "empty", True):
+        return {int(i) + 1 for i in row_indices}
+    out: set[int] = set()
+    n = len(model_df)
+    has_stim = "stim" in getattr(model_df, "columns", [])
+    for i in row_indices:
+        try:
+            ii = int(i)
+        except (TypeError, ValueError):
+            continue
+        if not (0 <= ii < n):
+            continue
+        if has_stim:
+            try:
+                out.add(int(model_df.iloc[ii]["stim"]))
+                continue
+            except (TypeError, ValueError):
+                pass
+        out.add(ii + 1)
+    return out
+
+
+def row_index_for_stim_number(model_df, stim_num) -> int | None:
+    """Find table row whose stim column equals stim_num."""
+    if model_df is None or getattr(model_df, "empty", True) or "stim" not in model_df.columns:
+        try:
+            return int(stim_num) - 1
+        except (TypeError, ValueError):
+            return None
+    try:
+        target = int(stim_num)
+    except (TypeError, ValueError):
+        return None
+    for i, v in enumerate(model_df["stim"].tolist()):
+        try:
+            if int(v) == target:
+                return i
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def axm_stim_entry_passes_stim_gate(
     *,
     axis: str | None,

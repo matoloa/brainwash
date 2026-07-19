@@ -19,6 +19,7 @@ from PyQt5 import QtCore, QtWidgets, sip
 
 import ui_widgets  # for TableModel, TableProjSub etc. (injected widgets)
 
+from brainwash_ui import view_state
 from project_schema import df_projectTemplate
 
 # ---------------------------------------------------------------------------
@@ -156,27 +157,41 @@ class TableMixin:
             return
 
         prow = self.get_prow()
+        n_sel = len(self.uistate.plot.list_idx_select_recs)
+        multi_rec = n_sel > 1
+        stim_column_only = multi_rec
 
-        if len(self.uistate.plot.list_idx_select_recs) == 1:
+        # Preserve previously selected *stim numbers* across table rebuild
+        prev_stim_nums = self._selected_stim_numbers()
+
+        if not multi_rec:
             dft_for_format = self.get_dft(row=prow)
         else:
             self.uistate.plot.df_rec_select_data = None
             self.uistate.plot.df_rec_select_time = None
-            # Multi-rec: no axm stim click/hover chrome (selection markers hidden in update_show)
             if hasattr(self, "clear_axm_stim_hover_chrome"):
                 self.clear_axm_stim_hover_chrome(draw=False)
-            longest_sweep_prow = self.uistate.plot.df_recs2plot.loc[self.uistate.plot.df_recs2plot["sweep_duration"].idxmax()]
+            longest_sweep_prow = self.uistate.plot.df_recs2plot.loc[
+                self.uistate.plot.df_recs2plot["sweep_duration"].idxmax()
+            ]
             self.uistate.plot.float_sweep_duration_max = longest_sweep_prow["sweep_duration"]
-            dft_for_format = self.get_dft(row=longest_sweep_prow)
+            dft_for_format = self._multi_rec_common_stim_table(self.uistate.plot.df_recs2plot)
 
         if dft_for_format is not None and not getattr(dft_for_format, "empty", True):
-            num_stims = len(dft_for_format)
-            valid_stim_indices = [i for i in self.uistate.plot.list_idx_select_stims if i < num_stims]
-            if not valid_stim_indices and num_stims > 0:
-                valid_stim_indices = [0]
-            self.uistate.plot.list_idx_select_stims = valid_stim_indices
-
             self.tableStimModel.setData(dft_for_format)
+            # Map previous stim numbers onto new row indices
+            new_indices = []
+            if "stim" in dft_for_format.columns and prev_stim_nums:
+                for i, s in enumerate(dft_for_format["stim"].tolist()):
+                    try:
+                        if int(s) in prev_stim_nums:
+                            new_indices.append(i)
+                    except (TypeError, ValueError):
+                        continue
+            if not new_indices:
+                new_indices = [0]
+            self.uistate.plot.list_idx_select_stims = new_indices
+
             model = self.tableStim.model()
             selection = QtCore.QItemSelection()
             for row_idx in self.uistate.plot.list_idx_select_stims:
@@ -184,15 +199,14 @@ class TableMixin:
                 index_end = model.index(row_idx, model.columnCount(QtCore.QModelIndex()) - 1)
                 selection.select(index_start, index_end)
             self.tableStim.selectionModel().select(selection, QtCore.QItemSelectionModel.ClearAndSelect)
-            self.formatTableStimLayout(dft=dft_for_format)
+            self.formatTableStimLayout(dft=dft_for_format, stim_column_only=stim_column_only)
         else:
             self.uistate.plot.list_idx_select_stims = []
-            self._set_table_stim_empty()
+            self._set_table_stim_empty(stim_column_only=stim_column_only)
             logger.debug("tableProjSelectionChanged: dft empty/None, showing headers only")
 
         # Single rec: keep full dft for axm stim mouseover/click (all detected stims).
-        # Data for event drag needs single stim — set when exactly one stim selected.
-        if len(self.uistate.plot.list_idx_select_recs) == 1:
+        if n_sel == 1:
             self.uistate.plot.df_rec_select_time = self.get_dft(row=prow)
             self.uistate.plot.float_sweep_duration_max = prow["sweep_duration"]
             if len(self.uistate.plot.list_idx_select_stims) == 1:
@@ -463,8 +477,10 @@ class TableMixin:
         except Exception as e:
             print(f"Error setting up tableProj: {e}")
 
-    def empty_stim_dataframe(self) -> pd.DataFrame:
+    def empty_stim_dataframe(self, *, stim_column_only: bool = False) -> pd.DataFrame:
         """Zero-row dft with headers only (no placeholder data when nothing selected)."""
+        if stim_column_only:
+            return pd.DataFrame(columns=["stim"])
         cols = list(_STIM_TABLE_COLUMNS)
         dt = getattr(self.uistate.project, "default_dict_t", None) or {}
         for k in dt.keys():
@@ -472,14 +488,34 @@ class TableMixin:
                 cols.append(k)
         return pd.DataFrame(columns=cols)
 
-    def _set_table_stim_empty(self) -> None:
+    def _set_table_stim_empty(self, *, stim_column_only: bool = False) -> None:
         """Show stim table headers only; clear row selection."""
-        empty = self.empty_stim_dataframe()
+        empty = self.empty_stim_dataframe(stim_column_only=stim_column_only)
         if hasattr(self, "tableStimModel") and self.tableStimModel is not None:
             self.tableStimModel.setData(empty)
         if hasattr(self, "tableStim") and self.tableStim.selectionModel() is not None:
             self.tableStim.clearSelection()
-        self.formatTableStimLayout(empty)
+        self.formatTableStimLayout(empty, stim_column_only=stim_column_only)
+
+    def _multi_rec_common_stim_table(self, df_selected: pd.DataFrame) -> pd.DataFrame:
+        """Intersection of stim numbers across selected recs; stim column only."""
+        sets = []
+        for _, prow in df_selected.iterrows():
+            dft = self.get_dft(row=prow)
+            s = view_state.stim_numbers_from_dft(dft)
+            if not s:
+                return view_state.multi_rec_stim_display_frame([])
+            sets.append(s)
+        common = view_state.intersect_stim_numbers(sets)
+        return view_state.multi_rec_stim_display_frame(common)
+
+    def _selected_stim_numbers(self) -> set:
+        """Stim numbers for current tableStim row selection (not bare index+1)."""
+        idxs = getattr(self.uistate.plot, "list_idx_select_stims", None) or []
+        model_df = None
+        if hasattr(self, "tableStimModel") and self.tableStimModel is not None:
+            model_df = getattr(self.tableStimModel, "_data", None)
+        return view_state.stim_numbers_from_table_rows(model_df, idxs)
 
     def setupTableStim(self):
         dft_init = self.empty_stim_dataframe()
@@ -534,11 +570,22 @@ class TableMixin:
         for i, col_index in enumerate(col_indices):
             header.moveSection(header.visualIndex(col_index), i)
 
-    def formatTableStimLayout(self, dft):
-        if dft is None or getattr(dft, "empty", True) and (dft is None or len(getattr(dft, "columns", [])) == 0):
-            dft = self.empty_stim_dataframe()
+    def formatTableStimLayout(self, dft, *, stim_column_only: bool = False):
+        if dft is None or (getattr(dft, "empty", True) and len(getattr(dft, "columns", [])) == 0):
+            dft = self.empty_stim_dataframe(stim_column_only=stim_column_only)
 
         header = self.tableStim.horizontalHeader()
+        num_columns = dft.shape[1]
+        if stim_column_only or list(dft.columns) == ["stim"]:
+            for col in range(num_columns):
+                name = str(dft.columns[col])
+                self.tableStim.setColumnHidden(col, name != "stim")
+                if name == "stim":
+                    header.setSectionResizeMode(col, QtWidgets.QHeaderView.Interactive)
+            if num_columns > 0:
+                self.tableStim.resizeColumnsToContents()
+            return
+
         column_order = list(_STIM_TABLE_COLUMNS)
         if self.uistate.project.detailedTimetable:
             for col_name in dft.columns:
@@ -546,7 +593,6 @@ class TableMixin:
                     column_order.append(col_name)
 
         col_indices = [dft.columns.get_loc(col) for col in column_order if col in dft.columns]
-        num_columns = dft.shape[1]
 
         for col in range(num_columns):
             if col in col_indices:
