@@ -888,6 +888,10 @@ class UIsub(
         self.usage(f"viewSettingsChanged {key}, {state == 2}")
         if key in self.uistate.project.checkBox:
             self.uistate.project.checkBox[key] = state == 2
+            if key == "aspect_preview":
+                # Persist only — does not change which artists are drawn.
+                self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
+                return
             if key == "splitOddEven":
                 self.checkBox_splitOddEven_changed(state)
             elif key == "timepoints_per_stim":

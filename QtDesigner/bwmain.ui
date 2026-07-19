@@ -273,7 +273,7 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-771</y>
+          <y>-1009</y>
           <width>284</width>
           <height>2194</height>
          </rect>
@@ -1900,6 +1900,22 @@
              <bool>true</bool>
             </property>
            </widget>
+           <widget class="QCheckBox" name="checkBox_aspect_preview">
+            <property name="geometry">
+             <rect>
+              <x>140</x>
+              <y>10</y>
+              <width>101</width>
+              <height>23</height>
+             </rect>
+            </property>
+            <property name="text">
+             <string>Preview</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
           </widget>
          </item>
          <item>
@@ -2894,17 +2910,17 @@
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="buttonGroup_io_i"/>
-  <buttongroup name="buttonGroup_display_color"/>
+  <buttongroup name="buttonGroup_test_t_variant"/>
+  <buttongroup name="buttonGroup_wilcoxon_tails"/>
+  <buttongroup name="buttonGroup_io_o"/>
+  <buttongroup name="buttonGroup_wilcoxon_variant"/>
   <buttongroup name="buttonGroup_filter"/>
   <buttongroup name="buttonGroup_display_timecourse"/>
-  <buttongroup name="buttonGroup_io_o"/>
-  <buttongroup name="buttonGroup_test_t_tails"/>
-  <buttongroup name="buttonGroup_test_t_variant"/>
   <buttongroup name="buttonGroup_type"/>
-  <buttongroup name="buttonGroup_wilcoxon_tails"/>
-  <buttongroup name="buttonGroup_wilcoxon_variant"/>
   <buttongroup name="buttonGroup_test"/>
   <buttongroup name="buttonGroup_test_n"/>
+  <buttongroup name="buttonGroup_io_i"/>
+  <buttongroup name="buttonGroup_display_color"/>
+  <buttongroup name="buttonGroup_test_t_tails"/>
  </buttongroups>
 </ui>

@@ -119,6 +119,8 @@ class ProjectPersistedState:
             "io_force0": False,
             "is_group_sample": False,
             "hierarchy_dd_is_subject": False,
+            # Live morph of output series while dragging event aspects (axe markers still move).
+            "aspect_preview": True,
         }
         self.lineEdit = {
             "split_at_time": 0.0,

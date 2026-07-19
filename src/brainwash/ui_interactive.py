@@ -1748,7 +1748,12 @@ class InteractivePlotMixin:
 
         Restored after the UI-refactor deferral of build_dfoutput to release only;
         group artists still update on drag release only.
+
+        Gated by project.checkBox['aspect_preview'] (default True). When off,
+        drag still updates dft_temp and the axe chrome; output recomputes on release.
         """
+        if not self.uistate.project.checkBox.get("aspect_preview", True):
+            return
         action = self.uistate.plot.mouseover_action
         if action is None:
             return
