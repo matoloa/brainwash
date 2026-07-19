@@ -405,6 +405,44 @@ class CustomCheckBox(QtWidgets.QCheckBox):
             super().mousePressEvent(event)
 
 
+class GroupRemoveButton(QtWidgets.QToolButton):
+    """Far-right × on a group row: double-click removes; hover drives red statusbar."""
+
+    removeRequested = QtCore.pyqtSignal(int)
+    hoverEntered = QtCore.pyqtSignal(int, str)  # group_ID, group_name
+    hoverLeft = QtCore.pyqtSignal()
+
+    def __init__(self, group_ID: int, group_name: str, parent=None):
+        super().__init__(parent)
+        self.group_ID = int(group_ID)
+        self.group_name = str(group_name)
+        self.setObjectName(f"group_remove_{self.group_ID}")
+        self.setText("×")
+        self.setAutoRaise(True)
+        self.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.setCursor(QtCore.Qt.PointingHandCursor)
+        self.setFixedSize(22, 22)
+        self.setStyleSheet(
+            "QToolButton { font-weight: bold; font-size: 14px; padding: 0; border: none; }"
+            "QToolButton:hover { color: #c0392b; }"
+        )
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton:
+            self.removeRequested.emit(self.group_ID)
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
+    def enterEvent(self, event):
+        self.hoverEntered.emit(self.group_ID, self.group_name)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.hoverLeft.emit()
+        super().leaveEvent(event)
+
+
 class ProgressBarManager:
     def __init__(self, progressBar, total):
         self.progressBar = progressBar

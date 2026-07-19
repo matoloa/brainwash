@@ -947,8 +947,8 @@ class UIsub(
             self.dict_usage[ui_component] = 0
         self.dict_usage[ui_component] += 1
         if self.config.talkback and ui_component in self.dict_usage:
-            # Do not clobber an active test warning (red statusbar)
-            if self.uistate.stat_test.statusbar_state != "warning":
+            # Do not clobber active red statusbars (test warning / group-remove hover)
+            if self.uistate.stat_test.statusbar_state not in ("warning", "group_remove_hover"):
                 # Show as centered text using the current default (theme/darkmode) color
                 self._set_statusbar_appearance(text=f"Used {ui_component} {self.dict_usage[ui_component]} times", bold=False)
         self.write_usage()
@@ -1311,6 +1311,55 @@ class UIsub(
         self.mouseoverUpdate()
         if hasattr(self, "graphRefresh"):
             self.graphRefresh()
+
+    def triggerRemoveGroup(self, group_ID):
+        """Double-click × on a group row: remove that group (no dialog)."""
+        self.usage("triggerRemoveGroup")
+        try:
+            group_ID = int(group_ID)
+        except (TypeError, ValueError):
+            return
+        if group_ID not in getattr(self, "dd_groups", {}):
+            return
+        if getattr(self.uistate.stat_test, "statusbar_state", None) == "group_remove_hover":
+            self.uistate.stat_test.statusbar_state = None
+        self.group_remove(group_ID)
+        if hasattr(self, "tableUpdate"):
+            self.tableUpdate(restore_selection=True)
+        if hasattr(self, "mouseoverUpdate"):
+            self.mouseoverUpdate()
+        if hasattr(self, "graphRefresh"):
+            self.graphRefresh()
+        if hasattr(self, "update_test"):
+            self.update_test()
+
+    def _on_group_remove_hover_enter(self, group_ID, group_name):
+        """Red statusbar while hovering the group × remove control."""
+        if not hasattr(self, "_set_statusbar_appearance"):
+            return
+        self.uistate.stat_test.statusbar_state = "group_remove_hover"
+        self._set_statusbar_appearance(
+            bg_color="#c0392b",
+            text_color="white",
+            bold=True,
+            text=f"Double-click to remove group {group_name}",
+        )
+
+    def _on_group_remove_hover_leave(self):
+        """Restore statusbar after leaving the group × control."""
+        if getattr(self.uistate.stat_test, "statusbar_state", None) != "group_remove_hover":
+            return
+        self.uistate.stat_test.statusbar_state = None
+        if getattr(self, "_stim_intensity_dirty_active", lambda: False)():
+            if hasattr(self, "_show_stim_intensity_pending_statusbar"):
+                self._show_stim_intensity_pending_statusbar()
+            return
+        if hasattr(self, "_compute_statusbar_for_current_state") and hasattr(self, "set_statusbar"):
+            result = self._compute_statusbar_for_current_state()
+            self.uistate.stat_test.statusbar_state = result.state
+            self.set_statusbar(result.state, result.text)
+        elif hasattr(self, "_set_statusbar_appearance"):
+            self._set_statusbar_appearance(clear=True)
 
     def triggerClearGroups(self):
         """Legacy: clear group membership for selection only (no longer in menu)."""

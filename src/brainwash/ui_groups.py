@@ -14,7 +14,7 @@ import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
 from brainwash_ui import plot_series
-from ui_widgets import CustomCheckBox
+from ui_widgets import CustomCheckBox, GroupRemoveButton
 
 
 class GroupMixin:
@@ -648,6 +648,7 @@ class GroupMixin:
         font = lbl.font()
         font.setBold(True)
         lbl.setFont(font)
+        lbl.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
         self.verticalLayoutGroups.insertWidget(0, lbl)
         self._groups_list_header = lbl
 
@@ -679,21 +680,41 @@ class GroupMixin:
         self.ensure_groups_list_header()
         color = dict_group["color"]
         str_ID = str(group_ID)
-        self.new_checkbox = CustomCheckBox(group_ID)
-        self.new_checkbox.rightClicked.connect(self.triggerGroupRename)  # str_ID is passed by CustomCheckBox
-        self.new_checkbox.setObjectName(f"checkBox_group_{str_ID}")
-        self.new_checkbox.setText(f"{str_ID}. {group_name}")
-        self.new_checkbox.setStyleSheet(f"background-color: {color};")  # Set the background color
-        self.new_checkbox.setMaximumWidth(100)  # Set the maximum width
+
+        row = QtWidgets.QWidget()
+        row.setObjectName(f"group_row_{str_ID}")
+        row.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        row_layout = QtWidgets.QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(2)
+
+        checkbox = CustomCheckBox(group_ID)
+        checkbox.rightClicked.connect(self.triggerGroupRename)
+        checkbox.setObjectName(f"checkBox_group_{str_ID}")
+        checkbox.setText(f"{str_ID}. {group_name}")
+        checkbox.setStyleSheet(f"background-color: {color};")
+        checkbox.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        checkbox.setMinimumWidth(0)
+        checkbox.setMaximumWidth(16777215)
         show = dict_group.get("show", True)
         if isinstance(show, str):
             checked = show.strip().lower() in ("true", "1", "yes")
         else:
             checked = bool(show)
-        self.new_checkbox.setChecked(checked)
-        self.new_checkbox.stateChanged.connect(lambda state, group_ID=group_ID: self.groupCheckboxChanged(state, group_ID))
-        self.verticalLayoutGroups.addWidget(self.new_checkbox)
-        setattr(self, f"checkBox_group_{str_ID}", self.new_checkbox)
+        checkbox.setChecked(checked)
+        checkbox.stateChanged.connect(lambda state, gid=group_ID: self.groupCheckboxChanged(state, gid))
+
+        remove_btn = GroupRemoveButton(group_ID, group_name)
+        remove_btn.removeRequested.connect(self.triggerRemoveGroup)
+        remove_btn.hoverEntered.connect(self._on_group_remove_hover_enter)
+        remove_btn.hoverLeft.connect(self._on_group_remove_hover_leave)
+
+        row_layout.addWidget(checkbox, 1)
+        row_layout.addWidget(remove_btn, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        self.verticalLayoutGroups.addWidget(row)
+        self.new_checkbox = checkbox
+        setattr(self, f"checkBox_group_{str_ID}", checkbox)
+        setattr(self, f"group_row_{str_ID}", row)
 
     def group_controls_remove(self, group_ID=None):
         if group_ID is None:  # if group_ID is not provided, remove all group controls
@@ -701,15 +722,25 @@ class GroupMixin:
                 self.group_controls_remove(i)
         else:
             str_ID = str(group_ID)
-            # Correctly identify the widget by its full object name used during creation
-            widget_name = f"checkBox_group_{str_ID}"
-            widget = self.centralwidget.findChild(QtWidgets.QWidget, widget_name)
-            if widget:
-                print(f"Removing widget {widget_name}")
-                widget.deleteLater()
-            attr_name = f"checkBox_group_{str_ID}"
-            if hasattr(self, attr_name):
-                delattr(self, attr_name)
+            row_name = f"group_row_{str_ID}"
+            row = None
+            if hasattr(self, "centralwidget"):
+                row = self.centralwidget.findChild(QtWidgets.QWidget, row_name)
+            if row is None:
+                row = getattr(self, row_name, None)
+            if row is not None:
+                print(f"Removing widget {row_name}")
+                row.deleteLater()
+            else:
+                # Pre–row-widget bare checkbox
+                widget_name = f"checkBox_group_{str_ID}"
+                widget = self.centralwidget.findChild(QtWidgets.QWidget, widget_name) if hasattr(self, "centralwidget") else None
+                if widget:
+                    print(f"Removing widget {widget_name}")
+                    widget.deleteLater()
+            for attr_name in (f"checkBox_group_{str_ID}", f"group_row_{str_ID}"):
+                if hasattr(self, attr_name):
+                    delattr(self, attr_name)
             # Legacy per-group menu actions (pre–digit-global) if any remain
             action = getattr(self, f"actionAddTo_{str_ID}", None)
             if action is not None:

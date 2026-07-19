@@ -1,6 +1,6 @@
 """pytest-qt smoke tests (offscreen; no full UIsub)."""
 
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
 from brainwash_ui import app_context, statusbar, view_state
 from ui_state_classes import UIstate
@@ -26,6 +26,33 @@ def test_qt_application_and_label(qtbot):
     label = QtWidgets.QLabel("brainwash")
     qtbot.addWidget(label)
     assert label.text() == "brainwash"
+
+
+def test_group_remove_button_double_click_and_hover(qtbot):
+    from ui_widgets import GroupRemoveButton
+
+    btn = GroupRemoveButton(2, "controls")
+    qtbot.addWidget(btn)
+    removed = []
+    hovered = []
+    left = []
+    btn.removeRequested.connect(lambda gid: removed.append(gid))
+    btn.hoverEntered.connect(lambda gid, name: hovered.append((gid, name)))
+    btn.hoverLeft.connect(lambda: left.append(True))
+
+    qtbot.mouseMove(btn)
+    btn.enterEvent(None)
+    assert hovered == [(2, "controls")]
+
+    # Single click does not remove
+    qtbot.mouseClick(btn, QtCore.Qt.LeftButton)
+    assert removed == []
+
+    qtbot.mouseDClick(btn, QtCore.Qt.LeftButton)
+    assert removed == [2]
+
+    btn.leaveEvent(None)
+    assert left == [True]
 
 
 def test_radio_group_updates_checked_button(qtbot):
