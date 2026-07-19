@@ -199,6 +199,33 @@ class InteractivePlotMixin:
             self.connectDragRelease(x_range=sweep_numbers, rec_ID=prow["ID"], graph="output")
 
     # pyqtSlot decorators
+    def clear_axm_stim_hover_chrome(self, *, draw: bool = True) -> None:
+        """Reset axm stim-marker hover (alpha/zorder) and clear pending stim click target.
+
+        Multi-rec selection disables click-to-select stims; leftover lit markers confuse.
+        """
+        from brainwash_ui import plot_identity as pi
+
+        self.uistate.plot.mean_mouseover_stim_select = None
+        for _k, entry in (self.uistate.plot.dict_rec_labels or {}).items():
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("axis") != "axm" or entry.get("role") != pi.ROLE_STIM_MARKER:
+                continue
+            line = entry.get("line")
+            if line is None:
+                continue
+            try:
+                line.set_zorder(0)
+                line.set_alpha(0.4)
+            except Exception:
+                pass
+        if draw and getattr(self.uistate.plot, "axm", None) is not None:
+            try:
+                self.uistate.plot.axm.figure.canvas.draw_idle()
+            except Exception:
+                pass
+
     @QtCore.pyqtSlot()
     def meanMouseover(self, event):  # determine which event is being mouseovered
         x = event.xdata
@@ -206,6 +233,11 @@ class InteractivePlotMixin:
         if x is None or y is None:
             return
         self.uistate.plot.mean_mouseover_stim_select = None  # Always clear on movement initially
+        # Multi-rec: no stim click/hover affordance on axm (selection via fields only)
+        n_sel = len(self.uistate.plot.list_idx_select_recs or [])
+        if n_sel != 1:
+            self.clear_axm_stim_hover_chrome(draw=True)
+            return
         dft = self.uistate.plot.df_rec_select_time
         if dft is None or dft.empty:
             # print("No single recording selected with timepoints to mouseover.")
@@ -214,19 +246,13 @@ class InteractivePlotMixin:
         if n_stims < 1:
             # print("Not enough stims to mouseover.")
             return
-        # One recording selected, with 2 or more stims, define mouseover zones
+        # One recording selected: define mouseover zones for every detected stim
         prow = self.get_prow()
         if prow is None:
             return
-        rec_name = f"{prow['recording_name']}"
-        rec_filter = prow["filter"]  # the filter currently used for this recording
-        if rec_filter != "voltage":
-            label_core = f"{rec_name} ({rec_filter})"
-        else:
-            label_core = rec_name
 
         axm = self.uistate.plot.axm
-        self.uistate.plot.mean_mouseover_stim_select = None  # name of stim that will be selected if clicked
+        self.uistate.plot.mean_mouseover_stim_select = None  # stim that will be selected if clicked
         self.uistate.plot.mean_stim_x_ranges = {}  # dict: stim_num: (x_start, x_end)
         # Margins are set pixel-based by _recalc_axm_detection_zones; recompute
         # here only as a fallback when they have not been initialised yet.
@@ -243,52 +269,43 @@ class InteractivePlotMixin:
             t_stim = row.t_stim
             x_range = t_stim - self.uistate.plot.mean_x_margin, t_stim + self.uistate.plot.mean_x_margin
             self.uistate.plot.mean_stim_x_ranges[stim] = x_range
+        from brainwash_ui import plot_identity as pi
+
+        def _axm_stim_marker_line(stim_num):
+            hits = pi.find_rec_entries(
+                self.uistate.plot.dict_rec_labels,
+                rec_ID=prow["ID"],
+                stim=stim_num,
+                axis="axm",
+                role=pi.ROLE_STIM_MARKER,
+            )
+            if hits:
+                return hits[0][1].get("line")
+            # Fallback: display_label (respects blind aliases on entry)
+            for _k, ent in (self.uistate.plot.dict_rec_labels or {}).items():
+                if not isinstance(ent, dict):
+                    continue
+                if ent.get("rec_ID") != prow["ID"] and str(ent.get("rec_ID")) != str(prow["ID"]):
+                    continue
+                if ent.get("axis") != "axm" or ent.get("role") != pi.ROLE_STIM_MARKER:
+                    continue
+                if pi._stim_equal(ent.get("stim"), stim_num):
+                    return ent.get("line")
+            return None
+
         # check if mouse is within any of the stim zones
         for stim, x_range in self.uistate.plot.mean_stim_x_ranges.items():
+            line = _axm_stim_marker_line(stim)
             if x_range[0] <= x <= x_range[1] and y_range[0] <= y <= y_range[1]:
                 self.uistate.plot.mean_mouseover_stim_select = stim
-                # print(f"meanMouseover of {self.uistate.plot.mean_mouseover_stim_select}: x={x}, y={y}")
-                # find corresponding selection marker:
-                stim_str = f"- stim {stim}"
-                label = f"mean {label_core} {stim_str} marker"
-                from brainwash_ui import plot_identity as pi
-
-                stim_marker = pi.find_entry_by_display_label(self.uistate.plot.dict_rec_labels, label)[1]
-                if stim_marker is None:
-                    hits = pi.find_rec_entries(
-                        self.uistate.plot.dict_rec_labels,
-                        rec_ID=prow["ID"],
-                        stim=stim,
-                        axis="axm",
-                        role=pi.ROLE_STIM_MARKER,
-                    )
-                    stim_marker = hits[0][1] if hits else None
-                # zorder mouseovered marker to top, alpha 1
-                if stim_marker is not None:
-                    stim_marker_line = stim_marker.get("line")
-                    stim_marker_line.set_zorder(10)
-                    stim_marker_line.set_alpha(1.0)
+                if line is not None:
+                    line.set_zorder(10)
+                    line.set_alpha(1.0)
                 break
             else:
-                # reset all stim markers to default zorder and alpha
-                stim_str = f"- stim {stim}"
-                label = f"mean {label_core} {stim_str} marker"
-                from brainwash_ui import plot_identity as pi
-
-                stim_marker = pi.find_entry_by_display_label(self.uistate.plot.dict_rec_labels, label)[1]
-                if stim_marker is None:
-                    hits = pi.find_rec_entries(
-                        self.uistate.plot.dict_rec_labels,
-                        rec_ID=prow["ID"],
-                        stim=stim,
-                        axis="axm",
-                        role=pi.ROLE_STIM_MARKER,
-                    )
-                    stim_marker = hits[0][1] if hits else None
-                if stim_marker is not None:
-                    stim_marker_line = stim_marker.get("line")
-                    stim_marker_line.set_zorder(0)
-                    stim_marker_line.set_alpha(0.4)
+                if line is not None:
+                    line.set_zorder(0)
+                    line.set_alpha(0.4)
 
         axm.figure.canvas.draw_idle()
 

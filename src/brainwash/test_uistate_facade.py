@@ -45,6 +45,23 @@ def test_cfg_pickle_roundtrip():
         assert u2.project.blind_aliases == {"1": "Rec 1", "7": "Rec 2"}
 
 
+def test_color_events_by_persist_default():
+    u = UIstate()
+    assert u.project.color_events_by == "rec"
+    u.project.color_events_by = "group"
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = Path(tmp)
+        u.save_cfg(folder, bw_version="1.0.0")
+        u2 = UIstate()
+        u2.load_cfg(folder, "1.0.0")
+        assert u2.project.color_events_by == "group"
+    # Legacy cfg without key
+    p = __import__("ui_state_parts", fromlist=["ProjectPersistedState"]).ProjectPersistedState()
+    p.reset()
+    p.apply_state_dict({"version": "0.1"}, zoom_defaults=p.zoom.copy())
+    assert p.color_events_by == "rec"
+
+
 def test_amp_slope_view_ignore_volley_under_relative():
     u = UIstate()
     u.project.checkBox["EPSP_amp"] = False

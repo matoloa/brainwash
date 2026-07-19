@@ -101,6 +101,8 @@ class ProjectPersistedState:
         }
         # Output ax1/ax2 series style: "dots" | "line" (default dots)
         self.output_line_style = "dots"
+        # Color events by: "rec" | "stim" | "group" (Results display radios; #6)
+        self.color_events_by = "rec"
         self.checkBox = {
             "EPSP_amp": True,
             "EPSP_slope": True,
@@ -203,6 +205,7 @@ class ProjectPersistedState:
             "detailedTimetable": self.detailedTimetable,
             "project_table_sort": self._normalize_project_table_sort(self.project_table_sort),
             "output_line_style": self.output_line_style if self.output_line_style in ("dots", "line") else "dots",
+            "color_events_by": self.color_events_by if self.color_events_by in ("rec", "stim", "group") else "rec",
             "blind_recordings": bool(self.blind_recordings),
             "blind_aliases": {str(k): str(v) for k, v in (self.blind_aliases or {}).items()},
         }
@@ -251,6 +254,13 @@ class ProjectPersistedState:
         self.project_table_sort = self._normalize_project_table_sort(state.get("project_table_sort"))
         style = state.get("output_line_style", "dots")
         self.output_line_style = style if style in ("dots", "line") else "dots"
+        ceb = str(state.get("color_events_by", "rec") or "rec").strip().lower()
+        if ceb in ("stim", "stim_number", "stim_nr"):
+            self.color_events_by = "stim"
+        elif ceb == "group":
+            self.color_events_by = "group"
+        else:
+            self.color_events_by = "rec"
         self.blind_recordings = bool(state.get("blind_recordings", False))
         raw_aliases = state.get("blind_aliases") or {}
         if isinstance(raw_aliases, dict):

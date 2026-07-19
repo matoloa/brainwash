@@ -286,15 +286,35 @@ class UIstate:
         if mode == "time":
             from math import ceil
 
-            if pd.isna(prow["sweep_hz"]):
-                raise ValueError("x_axis_xlim called in time mode but sweep_hz is NaN")
-            n = prow["sweeps"]
+            n = prow.get("sweeps", 1)
+            try:
+                n = int(n) if pd.notna(n) else 1
+            except (TypeError, ValueError):
+                n = 1
+            n = max(n, 1)
             bin_size = prow.get("bin_size")
             if pd.notna(bin_size):
-                n = ceil(n / bin_size)
+                try:
+                    bs = float(bin_size)
+                except (TypeError, ValueError):
+                    bs = 1.0
+                if bs > 0 and np.isfinite(bs):
+                    n = ceil(n / bs)
+                    bin_size = bs
+                else:
+                    bin_size = 1.0
             else:
                 bin_size = 1.0
-            self.apply_time_axis_params(n_bins=n, sweep_hz=prow["sweep_hz"], bin_size=bin_size)
+            hz = prow.get("sweep_hz")
+            try:
+                hz_f = float(hz) if pd.notna(hz) else float("nan")
+            except (TypeError, ValueError):
+                hz_f = float("nan")
+            if not np.isfinite(hz_f) or hz_f <= 0:
+                # Multi-rec / incomplete rows can lack sweep_hz — do not crash zoomAuto.
+                # X limits stay in sweep-index units until a valid Hz is available.
+                return (0, n)
+            self.apply_time_axis_params(n_bins=n, sweep_hz=hz_f, bin_size=bin_size)
             return (0, n)
         if mode == "stim":
             if dft is not None and len(dft) > 0 and "stim" in dft.columns:

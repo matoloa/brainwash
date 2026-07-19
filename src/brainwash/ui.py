@@ -649,6 +649,22 @@ class UIsub(
         if hasattr(self, "dict_folders") and self.dict_folders.get("project"):
             self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
 
+    def display_color_events_changed(self, button):
+        """Handler for buttonGroup_display_color: Rec | Stim | Group event coloring (#6)."""
+        name = button.objectName() if button is not None else ""
+        if name.endswith("_group"):
+            mode = "group"
+        elif name.endswith("_stim_number") or "stim" in name:
+            mode = "stim"
+        else:
+            mode = "rec"
+        self.usage(f"display_color_events_changed → {mode}")
+        self.uistate.project.color_events_by = mode
+        if hasattr(self, "apply_event_colors"):
+            self.apply_event_colors(draw=True)
+        if hasattr(self, "dict_folders") and self.dict_folders.get("project"):
+            self.uistate.save_cfg(projectfolder=self.dict_folders["project"])
+
     def editSavgolParams(self, lineEdit):
         try:
             val = int(lineEdit.text())

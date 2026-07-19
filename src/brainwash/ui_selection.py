@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 
-from brainwash_ui import recording_cache, stim_intensity, view_state
+from brainwash_ui import color_events, recording_cache, stim_intensity, view_state
 from ui_widgets import StimTableShortcutFilter, StimUaItemDelegate
 
 logger = logging.getLogger(__name__)
@@ -44,13 +44,24 @@ class SelectionMixin:
         """Predicate: should this rec-label entry be visible given current UI state."""
         if v.get("is_zero_width"):
             return False
-        if v["rec_ID"] not in selected_ids:
+        # ID type may be int/str/numpy across df vs artist metadata
+        rid = v.get("rec_ID")
+        if rid not in selected_ids and str(rid) not in {str(x) for x in selected_ids}:
             return False
-        if v["stim"] is not None and v["stim"] not in selected_stims:
+
+        axis = v.get("axis")
+        role = v.get("role")
+        stim = v.get("stim")
+        if not view_state.axm_stim_entry_passes_stim_gate(
+            axis=axis,
+            role=role,
+            stim=stim,
+            n_selected_recs=len(selected_ids),
+            selected_stims=selected_stims,
+        ):
             return False
 
         # Phase 0 PP mode display guard
-        axis = v.get("axis")
         is_pp = self.uistate.experiment.experiment_type == "PP"
         if is_pp and axis in ("ax1", "ax2"):
             if valid_pp_ids is not None and v["rec_ID"] not in valid_pp_ids:
@@ -310,6 +321,104 @@ class SelectionMixin:
             # enforce n_unit level visibility for groups (separate artists per level)
             if hasattr(self.uiplot, "update_group_level_visibility"):
                 self.uiplot.update_group_level_visibility()
+
+        # Event/stim marker colors (Rec | Stim | Group) — after visibility settled
+        self.apply_event_colors(draw=False)
+
+    def apply_event_colors(self, *, draw: bool = True) -> None:
+        """Recolor axe/axm stim-related artists per color_events policy (#6)."""
+        store = getattr(self.uistate.plot, "dict_rec_labels", None) or {}
+        if not store:
+            return
+
+        radio = color_events.normalize_color_events_by(getattr(self.uistate.project, "color_events_by", "rec"))
+        df_sel = getattr(self.uistate.plot, "df_recs2plot", None)
+        if df_sel is None or getattr(df_sel, "empty", True) or "ID" not in getattr(df_sel, "columns", []):
+            selected_ids = []
+        else:
+            selected_ids = list(df_sel["ID"].tolist())
+
+        selected_stims = {int(stim) + 1 for stim in (self.uistate.plot.list_idx_select_stims or [])}
+        n_rec = len(selected_ids)
+        n_stim = len(selected_stims) if selected_stims else 0
+        if n_stim == 0 and selected_ids:
+            # Fall back to unique stim tags among event artists for selected recs
+            stims = set()
+            for v in store.values():
+                if not isinstance(v, dict):
+                    continue
+                if v.get("rec_ID") not in selected_ids and str(v.get("rec_ID")) not in {str(x) for x in selected_ids}:
+                    continue
+                if v.get("stim") is not None:
+                    try:
+                        stims.add(int(v["stim"]))
+                    except (TypeError, ValueError):
+                        stims.add(v["stim"])
+            n_stim = len(stims)
+
+        mode = color_events.effective_color_events_mode(radio, n_rec, n_stim)
+
+        # Full table display order (not only selected) → stable rec hues
+        display_order = []
+        model_df = None
+        if hasattr(self, "_table_model_df"):
+            model_df = self._table_model_df()
+        if model_df is not None and not getattr(model_df, "empty", True) and "ID" in model_df.columns:
+            display_order = list(model_df["ID"].tolist())
+        else:
+            display_order = list(selected_ids)
+        rec_index_map = color_events.rec_gradient_index_map(display_order)
+
+        # Full *detected* stim domain on selected recs (not only field-selected stims)
+        # so blob color matches event color for the same stim number.
+        domain_rec_ids = selected_ids if selected_ids else display_order
+        full_stim_domain = color_events.collect_stim_domain_for_recs(store, domain_rec_ids)
+        stim_index_map = color_events.stim_gradient_index_map(full_stim_domain)
+
+        if mode == "rec":
+            n_grad = max(len(display_order), 1)
+        elif mode == "stim":
+            n_grad = max(len(full_stim_domain), 1)
+        else:
+            n_grad = 1
+        if hasattr(self, "uiplot") and hasattr(self.uiplot, "get_dict_gradient"):
+            gradient = self.uiplot.get_dict_gradient(n_grad)
+        else:
+            gradient = {i: "black" for i in range(n_grad)}
+
+        dd_groups = getattr(self, "dd_groups", None) or {}
+
+        for _k, entry in store.items():
+            if not color_events.artist_should_receive_event_color(entry):
+                continue
+            rid = entry.get("rec_ID")
+            color = color_events.resolve_event_artist_color(
+                mode=mode,
+                rec_ID=rid,
+                stim=entry.get("stim"),
+                stim_index_map=stim_index_map,
+                rec_index_map=rec_index_map,
+                gradient=gradient,
+                dd_groups=dd_groups,
+            )
+            line = entry.get("line")
+            if line is None:
+                continue
+            try:
+                if hasattr(line, "set_color"):
+                    line.set_color(color)
+                if hasattr(line, "set_markerfacecolor"):
+                    line.set_markerfacecolor(color)
+                if hasattr(line, "set_markeredgecolor"):
+                    line.set_markeredgecolor(color)
+            except Exception:
+                pass
+
+        if draw:
+            for canvas_name in ("canvasMean", "canvasEvent", "canvasOutput"):
+                canvas = getattr(self, canvas_name, None)
+                if canvas is not None and hasattr(canvas, "draw_idle"):
+                    canvas.draw_idle()
 
     def update_sample_checkbox(self):
         """Updates checkBox_is_group_sample enabled/checked state. Called from tableProjSelectionChanged"""

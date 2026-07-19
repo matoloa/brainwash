@@ -224,7 +224,10 @@ def build_stim_event_plot_specs(
         amp_zero_plot, _y_at_stim = amp_zero_and_y_at_stim(dfmean, t_stim, rec_filter)
         shift_stim_times(t_row, t_stim)
 
-        specs.append(StimMarkerPlotSpec(f"mean {label} {stim_str} marker", "axm", t_stim, 0.0, color))
+        # stim= required on axm marker: storage_key_rec includes stim; None collapses all stims to one key
+        specs.append(
+            StimMarkerPlotSpec(f"mean {label} {stim_str} marker", "axm", t_stim, 0.0, color, stim=stim_num)
+        )
         specs.append(
             StimVlinePlotSpec(f"mean {label} {stim_str} selection marker", "axm", t_stim, color, stim=stim_num)
         )

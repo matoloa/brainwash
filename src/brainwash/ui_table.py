@@ -144,6 +144,9 @@ class TableMixin:
         else:
             self.uistate.plot.df_rec_select_data = None
             self.uistate.plot.df_rec_select_time = None
+            # Multi-rec: no axm stim click/hover chrome (selection markers hidden in update_show)
+            if hasattr(self, "clear_axm_stim_hover_chrome"):
+                self.clear_axm_stim_hover_chrome(draw=False)
             longest_sweep_prow = self.uistate.plot.df_recs2plot.loc[self.uistate.plot.df_recs2plot["sweep_duration"].idxmax()]
             self.uistate.plot.float_sweep_duration_max = longest_sweep_prow["sweep_duration"]
             dft_for_format = self.get_dft(row=longest_sweep_prow)
@@ -168,10 +171,15 @@ class TableMixin:
             self.uistate.plot.list_idx_select_stims = []
             logger.debug("tableProjSelectionChanged: dft_for_format is None (no stims detected), clearing stim selection")
 
-        if len(self.uistate.plot.list_idx_select_recs) == 1 and len(self.uistate.plot.list_idx_select_stims) == 1:
+        # Single rec: keep full dft for axm stim mouseover/click (all detected stims).
+        # Data for event drag needs single stim — set when exactly one stim selected.
+        if len(self.uistate.plot.list_idx_select_recs) == 1:
             self.uistate.plot.df_rec_select_time = self.get_dft(row=prow)
-            self.uistate.plot.df_rec_select_data = self.get_dffilter(prow)
             self.uistate.plot.float_sweep_duration_max = prow["sweep_duration"]
+            if len(self.uistate.plot.list_idx_select_stims) == 1:
+                self.uistate.plot.df_rec_select_data = self.get_dffilter(prow)
+            else:
+                self.uistate.plot.df_rec_select_data = None
         else:
             self.uistate.plot.df_rec_select_data = None
             self.uistate.plot.df_rec_select_time = None
@@ -285,6 +293,9 @@ class TableMixin:
         if pref.get("column") == col_name and int(pref.get("order", 0) or 0) == order_int:
             return
         self.uistate.project.project_table_sort = {"column": col_name, "order": order_int}
+        # Rec event colors follow table display order among selected (#6)
+        if hasattr(self, "apply_event_colors"):
+            self.apply_event_colors(draw=True)
         timer = getattr(self, "_save_cfg_timer", None)
         if timer is not None:
             timer.start(400)

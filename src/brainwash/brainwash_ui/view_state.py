@@ -17,6 +17,34 @@ VOLLEY_ASPECTS_NO_NORM = frozenset(
 )
 
 
+def axm_stim_entry_passes_stim_gate(
+    *,
+    axis: str | None,
+    role: str | None,
+    stim,
+    n_selected_recs: int,
+    selected_stims: set,
+) -> bool:
+    """Option A: axm detection markers vs selection vlines vs other stim-gated artists.
+
+    - ``stim_marker`` (detection blob): always pass stim gate when rec is selected
+      (caller already required rec membership).
+    - ``stim_selection`` (thick vline): only single-rec and stim in *selected_stims*.
+    - else: require stim in *selected_stims* when stim is not None.
+    """
+    if axis == "axm" and role == "stim_marker":
+        return True
+    if axis == "axm" and role == "stim_selection":
+        if n_selected_recs != 1:
+            return False
+        if stim is not None and stim not in selected_stims:
+            return False
+        return True
+    if stim is not None and stim not in selected_stims:
+        return False
+    return True
+
+
 def suppress_volley_under_norm(
     aspect: str | None,
     *,

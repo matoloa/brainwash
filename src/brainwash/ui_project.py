@@ -924,6 +924,14 @@ class ProjectMixin:
                     pass
             else:
                 self.buttonGroup_display_timecourse.buttonClicked.connect(self.display_timecourse_style_changed)
+        if hasattr(self, "buttonGroup_display_color"):
+            if disconnect:
+                try:
+                    self.buttonGroup_display_color.buttonClicked.disconnect()
+                except TypeError:
+                    pass
+            else:
+                self.buttonGroup_display_color.buttonClicked.connect(self.display_color_events_changed)
         # hide buttons
         hide_buttons = {
             "pushButton_hide_stim": "frameToolStim",
@@ -1192,6 +1200,19 @@ class ProjectMixin:
                 self.radioButton_display_line.setChecked(True)
             else:
                 self.radioButton_display_dots.setChecked(True)
+
+        # Color events by (Rec | Stim | Group); default rec
+        ceb = getattr(self.uistate.project, "color_events_by", "rec")
+        if ceb not in ("rec", "stim", "group"):
+            ceb = "rec"
+        self.uistate.project.color_events_by = ceb
+        if hasattr(self, "radioButton_display_color_rec"):
+            if ceb == "stim" and hasattr(self, "radioButton_display_color_stim_number"):
+                self.radioButton_display_color_stim_number.setChecked(True)
+            elif ceb == "group" and hasattr(self, "radioButton_display_color_group"):
+                self.radioButton_display_color_group.setChecked(True)
+            else:
+                self.radioButton_display_color_rec.setChecked(True)
 
         self.lineEdit_savgol_window.setText(str(self.uistate.project.lineEdit.get("savgol_window", 9)))
         self.lineEdit_savgol_poly.setText(str(self.uistate.project.lineEdit.get("savgol_poly", 3)))

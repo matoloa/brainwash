@@ -47,6 +47,36 @@ def test_stim_num_from_index():
     assert plot_stim.stim_num_from_index(0) == 1
 
 
+def test_axm_stim_markers_carry_stim_for_storage_key():
+    """Each axm detection blob must include stim= so keys do not collapse to last stim."""
+    dft = pd.DataFrame(
+        {
+            "stim": [1, 2],
+            "t_stim": [0.1, 0.5],
+            "t_EPSP_amp": [np.nan, np.nan],
+            "t_EPSP_slope_start": [np.nan, np.nan],
+            "t_EPSP_slope_end": [np.nan, np.nan],
+            "t_volley_amp": [np.nan, np.nan],
+            "t_volley_slope_start": [np.nan, np.nan],
+            "t_volley_slope_end": [np.nan, np.nan],
+        }
+    )
+    dfmean = pd.DataFrame({"time": np.linspace(0, 1, 20), "voltage": np.zeros(20)})
+    dfoutput = pd.DataFrame({"stim": [1, 2], "sweep": [np.nan, np.nan]})
+    specs = plot_stim.build_stim_event_plot_specs(
+        "recA",
+        dft,
+        dfmean,
+        dfoutput,
+        "voltage",
+        {"event_start": -0.005, "event_end": 0.05},
+        {0: "r", 1: "b"},
+    )
+    axm_markers = [s for s in specs if isinstance(s, plot_stim.StimMarkerPlotSpec) and s.axid == "axm"]
+    assert len(axm_markers) == 2
+    assert {s.stim for s in axm_markers} == {1, 2}
+
+
 def test_validate_drag_update_inputs():
     prow = pd.Series({"recording_name": "r1", "filter": "voltage"})
     trow = {"t_stim": 0.04, "stim": 1}

@@ -38,6 +38,17 @@ def test_time_axis_unit_thresholds():
     assert UIstate.time_axis_unit(7200) == (3600.0, "h")
 
 
+def test_x_axis_xlim_time_mode_nan_sweep_hz_no_raise(monkeypatch):
+    """Multi-rec / incomplete rows: zoomAuto must not crash on NaN sweep_hz."""
+    u = UIstate()
+    monkeypatch.setattr(type(u), "x_axis", property(lambda self: "time"))
+    prow = pd.Series({"sweeps": 100, "sweep_hz": np.nan, "bin_size": np.nan})
+    assert u.x_axis_xlim(prow) == (0, 100)
+    prow2 = pd.Series({"sweeps": 100, "sweep_hz": 0.2, "bin_size": np.nan})
+    assert u.x_axis_xlim(prow2) == (0, 100)
+    assert abs(u.plot._time_sweep_hz - 0.2) < 1e-9
+
+
 def test_infer_meta_from_groups_helper_via_fake_host():
     """Lightweight stand-in for GraphCoordinatorMixin._infer_time_axis_meta_from_groups."""
 

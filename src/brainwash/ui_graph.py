@@ -515,6 +515,25 @@ class GraphCoordinatorMixin:
         # set and apply Auto-zoom parameters for all axes
         self.usage("zoomAuto")
         prow = self.get_prow()
+        # Prefer a selected row with finite sweep_hz when multi-select / incomplete meta
+        if prow is not None and self.uistate.x_axis == "time":
+            hz0 = prow.get("sweep_hz")
+            try:
+                hz_ok = pd.notna(hz0) and np.isfinite(float(hz0)) and float(hz0) > 0
+            except (TypeError, ValueError):
+                hz_ok = False
+            if not hz_ok and hasattr(self, "_project_rows_for_selected"):
+                sel = self._project_rows_for_selected()
+                if sel is not None and not getattr(sel, "empty", True) and "sweep_hz" in sel.columns:
+                    for _, row in sel.iterrows():
+                        try:
+                            h = row.get("sweep_hz")
+                            if pd.notna(h) and np.isfinite(float(h)) and float(h) > 0:
+                                if str(row.get("sweeps", "...")) != "...":
+                                    prow = row
+                                    break
+                        except (TypeError, ValueError):
+                            continue
 
         ymin_clamp = 0 if self._is_io_mode() else (0 if self.uistate.project.checkBox["output_ymin0"] else None)
 

@@ -2,7 +2,7 @@
 
 **Issue:** [#6](https://github.com/matoloa/brainwash/issues/6)  
 **Branch:** `1.0.0`  
-**Status:** NEXT — design locked; implement after this plan is on origin  
+**Status:** Implemented (pending manual smoke / issue close)
 **Related:** Results display toolframe (Designer: Rec / Group / Stim nr); stim gradient `UIplot.get_dict_gradient`; groups `dd_groups` colors / `show`
 
 ---
@@ -86,21 +86,22 @@ function effective_color_events_mode(radio, n_rec_selected, n_stim_selected):
 
 ### Stim
 
-- Monotonic stim order: first→last stim index / stim number as today.
-- `get_dict_gradient(n_stims)` (indigo→violet). Unchanged family.
+- Domain = **all detected stims** on selected recs (union from artists/dft), **not** only field-selected stims.
+- Index = rank in sorted full domain → same hue for blob and event of stim *k*.
+- `get_dict_gradient(len(domain))` (indigo→violet).
 
 ### Rec
 
-- Gradient over **selected** recordings only.
-- Order = **current project table display order** (`tablemodel._data` row order after header sort), filtered to selected `ID`s.
-- Resorting the table **reapplies** the gradient (same top→bottom mapping among selected).
-- Tie-break within equal sort keys: stable model order; optional secondary `ID` only if needed for determinism.
-- **Do not** use click-selection order or raw `df_project` order as primary key.
-- Storage / identity always **`rec_ID`** (never display name; blinding does not affect ID).
+- Domain = **full table display order** (all rows), not only selected.
+- Selected recs take the hue for their rank in that list (stable when selection shrinks).
+- Resorting the table reassigns ranks (intentional).
+- Storage / identity always **`rec_ID`**.
 
 ```text
-display_order = [row.ID for row in tablemodel._data if row.ID in selected_ids]
-color[rec_id] = gradient[i]  # i = index in display_order
+display_order = [row.ID for row in tablemodel._data]  # full list
+color[rec_id] = gradient[rank_in_display_order]
+stim_domain = union of detected stims on selected recs
+color[stim_k] = gradient[rank_in_stim_domain]
 ```
 
 ### Group
@@ -208,3 +209,4 @@ Manual smoke:
 |------|------|
 | 2026-07-19 | Design locked from discussion; plan filed for implement |
 | 2026-07-19 | Drop aspect/output-mode residue from plan wording |
+| 2026-07-19 | Implementation: `color_events.py`, radios, `apply_event_colors` |

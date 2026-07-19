@@ -4,6 +4,31 @@ from brainwash_ui import view_state
 from test_statistics_fixtures import make_dd_groups, make_dd_testsets
 
 
+def test_axm_stim_entry_passes_stim_gate_option_a():
+    # Detection blobs: ignore selected_stims
+    assert view_state.axm_stim_entry_passes_stim_gate(
+        axis="axm", role="stim_marker", stim=3, n_selected_recs=5, selected_stims={1}
+    )
+    # Selection vline: multi-rec → off
+    assert not view_state.axm_stim_entry_passes_stim_gate(
+        axis="axm", role="stim_selection", stim=1, n_selected_recs=2, selected_stims={1}
+    )
+    # Selection vline: single-rec + selected stim
+    assert view_state.axm_stim_entry_passes_stim_gate(
+        axis="axm", role="stim_selection", stim=1, n_selected_recs=1, selected_stims={1}
+    )
+    assert not view_state.axm_stim_entry_passes_stim_gate(
+        axis="axm", role="stim_selection", stim=2, n_selected_recs=1, selected_stims={1}
+    )
+    # Axe event still gated by selected_stims
+    assert not view_state.axm_stim_entry_passes_stim_gate(
+        axis="axe", role="event_trace", stim=2, n_selected_recs=2, selected_stims={1}
+    )
+    assert view_state.axm_stim_entry_passes_stim_gate(
+        axis="axe", role="event_trace", stim=1, n_selected_recs=2, selected_stims={1}
+    )
+
+
 def test_visible_group_ids_empty():
     assert view_state.visible_group_ids({}) == []
     assert view_state.visible_group_ids(None) == []
